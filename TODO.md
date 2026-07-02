@@ -19,7 +19,6 @@ before starting; this is the only global find-replace required.
 +M0-Scaffold  — repo skeleton, builds, CI. No agent logic yet.
 ================================================================================
 
-(A) Add .gitignore for Go (bin/, *.test, coverage.out, .paw/, adapters/harbor/bin/paw-linux-amd64, dist/) @setup file:.gitignore
 (A) Create main.go that only imports cmd and calls cmd.Execute(); no logic in main @cli file:main.go ref:docs/DESIGN.md#8
 (A) Add cobra dependency: `go get github.com/spf13/cobra@latest`; create cmd/root.go with rootCmd, persistent flags --config,--trace-file,--verbose @cli file:cmd/root.go
 (A) Implement cmd/version.go: `paw version` prints version, git commit (via -ldflags), Go version @cli file:cmd/version.go

@@ -1,0 +1,6 @@
+bin/
+*.test
+coverage.out
+.paw/
+adapters/harbor/bin/paw-linux-amd64
+dist/
