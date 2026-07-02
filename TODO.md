@@ -54,7 +54,6 @@ before starting; this is the only global find-replace required.
 +M7-Gather  — deterministic context collection. NO model. Depends M1.
 ================================================================================
 
-(A) Add testdata/repo/ fixture: a tiny Go (or generic) repo with a known bug and a known symbol to search for @gather file:testdata/repo/ ref:docs/TESTING.md#2
 (A) Write internal/gather/gather_test.go: finds known symbol; respects depth/byte bounds; injecting a non-nil model client is unnecessary — assert gather has no llm.Client field at all (compile-time guarantee it cannot call a model) @gather file:internal/gather/gather_test.go ref:docs/TESTING.md#2
 
 ================================================================================
