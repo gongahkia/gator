@@ -34,7 +34,6 @@ before starting; this is the only global find-replace required.
 +M3-LLM  — provider-agnostic client (openai + ollama first; anthropic optional/later).
 ================================================================================
 
-(A) Create internal/llm/factory.go: NewBrainClient(cfg) and NewDroneClient(cfg) selecting transport from config/env (PAW_BRAIN_*, PAW_DRONE_*) @llm file:internal/llm/factory.go ref:docs/MODEL_APIS.md#2,#4
 (A) Create internal/llm/faketest/server.go: httptest.Server speaking both /chat/completions and /api/chat; register canned responses by request-substring; record last outbound request for assertions; support returning invalid/hallucinated payloads on demand @llm file:internal/llm/faketest/server.go ref:docs/TESTING.md#1
 (A) Write internal/llm/openai_test.go and ollama_test.go against faketest server: assert request shape (response_format present when schema set), response parsing, usage extraction, retry-on-500, no-retry-on-400 @llm file:internal/llm/openai_test.go ref:docs/TESTING.md
 
