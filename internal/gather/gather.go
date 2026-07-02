@@ -26,6 +26,11 @@ func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Enve
 	if err != nil {
 		return nil, err
 	}
+	symbols, err := collectSymbols(ctx, in.Cwd, g.Config.MaxFileBytes)
+	if err != nil {
+		return nil, err
+	}
+	units = append(units, symbols...)
 	hits, err := collectSearchHits(ctx, in.Cwd, in.Instruction, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err
