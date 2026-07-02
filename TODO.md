@@ -24,7 +24,6 @@ before starting; this is the only global find-replace required.
 +M1-Envelope  — the wire contract and schemas. Everything else depends on this.
 ================================================================================
 
-(A) Add sub-structs DigestSpan, DigestItem, ContextDigest per docs/SCHEMAS.md §2 @envelope file:internal/envelope/digest.go ref:docs/SCHEMAS.md#2
 (A) Add sub-structs NextAction, Plan per docs/SCHEMAS.md §3 @envelope file:internal/envelope/plan.go ref:docs/SCHEMAS.md#3
 (A) Add sub-structs Patch, VerifyResult, Budget per docs/SCHEMAS.md §4-6 @envelope file:internal/envelope/results.go ref:docs/SCHEMAS.md#4
 (A) Add envelope (de)serialization helpers: Marshal(w io.Writer), Unmarshal(r io.Reader), and a NewEnvelope(taskID, instruction, cwd) constructor that sets SchemaVersion and zero Budget @envelope file:internal/envelope/io.go
