@@ -25,7 +25,7 @@ func fallbackDigest(instruction string, raw *envelope.RawContext, maxTokens int)
 	digest := envelope.ContextDigest{Summary: "deterministic fallback selected highest-overlap raw units"}
 	remaining := maxTokens
 	for _, item := range ranked {
-		if remaining <= 0 {
+		if remaining <= 0 || len(digest.Items) == 40 {
 			break
 		}
 		quote := fitQuote(item.unit.Text, remaining)
@@ -105,6 +105,9 @@ func tokenCounts(text string) map[string]int {
 }
 
 func fitQuote(text string, maxTokens int) string {
+	if len([]rune(text)) > 2000 {
+		text = string([]rune(text)[:2000])
+	}
 	if llm.Estimate(text) <= maxTokens {
 		return text
 	}

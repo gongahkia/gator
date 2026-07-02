@@ -12,6 +12,8 @@ import (
 type Compress struct {
 	Client          llm.Client
 	DisableCompress bool
+	UsedFallback    bool
+	DroppedItems    int
 }
 
 func New(client llm.Client) *Compress {
@@ -24,13 +26,16 @@ func (c *Compress) Name() string {
 
 func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
+	c.UsedFallback = false
+	c.DroppedItems = 0
 	out.Stage = c.Name()
 	if in.Raw == nil || len(in.Raw.Units) == 0 {
-		out.Digest = &envelope.ContextDigest{}
+		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
 		return &out, nil
 	}
 	if c.DisableCompress || c.Client == nil {
-		out.Digest = &envelope.ContextDigest{}
+		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+		c.UsedFallback = true
 		return &out, nil
 	}
 	rawSchema := schema.Raw("context_digest")
@@ -44,8 +49,25 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	}
 	var digest envelope.ContextDigest
 	if err := json.Unmarshal([]byte(resp.Content), &digest); err != nil {
-		return nil, err
+		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+		c.UsedFallback = true
+		return &out, nil
 	}
-	out.Digest = &digest
+	validated, stats, err := validateDigest(in.Raw, digest)
+	c.DroppedItems = stats.Dropped
+	if err != nil || tooManyDropped(stats) {
+		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+		c.UsedFallback = true
+		return &out, nil
+	}
+	out.Digest = &validated
 	return &out, nil
+}
+
+func tooManyDropped(stats validationStats) bool {
+	return stats.Total > 0 && float64(stats.Dropped)/float64(stats.Total) > 0.5
+}
+
+func ptr(d envelope.ContextDigest) *envelope.ContextDigest {
+	return &d
 }
