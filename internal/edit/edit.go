@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
 	patcher "github.com/gongahkia/paw/internal/patch"
@@ -43,12 +44,12 @@ func (e *Edit) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	if e.Client == nil {
 		return nil, fmt.Errorf("edit client is nil")
 	}
-	diff, err := e.askAndApply(ctx, in, editPrompt(in))
+	diff, err := e.askAndApply(ctx, &out, editPrompt(&out))
 	if err == nil {
 		out.Patch = &envelope.Patch{UnifiedDiff: diff, Files: diffFiles(diff)}
 		return &out, nil
 	}
-	retryDiff, retryErr := e.askAndApply(ctx, in, retryPrompt(in, err))
+	retryDiff, retryErr := e.askAndApply(ctx, &out, retryPrompt(&out, err))
 	if retryErr != nil {
 		return nil, &ApplyFailure{Err: retryErr}
 	}
@@ -67,6 +68,7 @@ func (e *Edit) askAndApply(ctx context.Context, env *envelope.Envelope, prompt s
 	if err != nil {
 		return "", err
 	}
+	budget.AddBrain(&env.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens)
 	diff, err := patcher.Extract(resp.Content)
 	if err != nil {
 		return "", err

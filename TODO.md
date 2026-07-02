@@ -74,7 +74,6 @@ before starting; this is the only global find-replace required.
 +M11-Edit  — BRAIN edit → unified diff → deterministic apply. Depends M9,M10.
 ================================================================================
 
-(A) Update budget on edit calls @edit file:internal/edit/edit.go
 (A) Write internal/edit/edit_test.go with faketest brain returning a known-good diff for testdata/repo/ bug → asserts file changed on disk; and a bad diff → asserts single retry then structured failure @edit file:internal/edit/edit_test.go ref:docs/TESTING.md#2
 
 ================================================================================
