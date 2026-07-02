@@ -84,7 +84,6 @@ before starting; this is the only global find-replace required.
 +M13-CLI  — subcommands wiring stages; pipeable text contract. Depends M6-M12.
 ================================================================================
 
-(A) Create cmd/plan.go: `paw plan` reads Envelope stdin, runs plan stage, writes stdout @cli file:cmd/plan.go
 (A) Create cmd/edit.go: `paw edit` reads Envelope stdin, runs edit stage (applies patch to Cwd), writes stdout @cli file:cmd/edit.go
 (A) Create cmd/verify.go: `paw verify` reads Envelope stdin, runs verify stage, writes stdout @cli file:cmd/verify.go
 (A) Add `paw run --explain`: print the composed pipeline as `gather | compress | plan | edit | verify` and exit (the shareable one-liner demo) @cli file:cmd/run.go ref:docs/DESIGN.md#3
