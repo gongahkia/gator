@@ -69,7 +69,6 @@ before starting; this is the only global find-replace required.
 +M10-Patch  — deterministic unified-diff apply. NO model. Depends M1.
 ================================================================================
 
-(A) Add go get github.com/bluekeyes/go-gitdiff/gitdiff @patch file:go.mod ref:docs/PATCH_FORMAT.md#2
 (A) Create internal/patch/apply.go: parse unified diff (gitdiff.Parse), validate each target path is inside Cwd (reject abs and .. escapes), apply per file (gitdiff.Apply), atomic write via temp+rename, in-memory backup + rollback-all on any failure; return structured apply error naming file+first failing hunk @patch file:internal/patch/apply.go ref:docs/PATCH_FORMAT.md#2
 (A) Create internal/patch/extract.go: strip surrounding prose/code-fences from a model response, extracting from first "--- " to last hunk line, before parsing @patch file:internal/patch/extract.go ref:docs/PATCH_FORMAT.md#1
 (A) Add testdata/patches/ fixtures: create-new, delete-file, single-hunk, multi-hunk, multi-file, context-mismatch (must fail), path-escape (must fail) @patch file:testdata/patches/ ref:docs/PATCH_FORMAT.md#4
