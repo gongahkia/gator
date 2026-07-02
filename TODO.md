@@ -84,7 +84,6 @@ before starting; this is the only global find-replace required.
 +M13-CLI  — subcommands wiring stages; pipeable text contract. Depends M6-M12.
 ================================================================================
 
-(A) Create cmd/run.go: `paw run` — flags --instruction/--instruction-file, --max-turns, --raw-context, --disable-compress, --drone-model, --trace-file, --noninteractive (also via PAW_NONINTERACTIVE); builds config+clients, constructs Pipeline, calls RunLoop against Cwd; exit 0 on done/verify-pass @cli file:cmd/run.go ref:docs/DESIGN.md#5, docs/BENCHMARKS.md#2
 (A) Create cmd/stage_common.go: helper to read an Envelope from stdin and write to stdout for the standalone stage subcommands @cli file:cmd/stage_common.go ref:docs/DESIGN.md#3
 (A) Create cmd/gather.go: `paw gather --instruction ...` seeds an Envelope and runs the gather stage, emitting the Envelope on stdout @cli file:cmd/gather.go
 (A) Create cmd/compress.go: `paw compress` reads Envelope stdin, runs compress stage, writes stdout (honors --disable-compress/--drone-model) @cli file:cmd/compress.go

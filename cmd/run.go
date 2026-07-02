@@ -1,0 +1,147 @@
+package cmd
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/gongahkia/paw/internal/compress"
+	"github.com/gongahkia/paw/internal/config"
+	"github.com/gongahkia/paw/internal/edit"
+	"github.com/gongahkia/paw/internal/envelope"
+	"github.com/gongahkia/paw/internal/gather"
+	"github.com/gongahkia/paw/internal/llm"
+	"github.com/gongahkia/paw/internal/plan"
+	"github.com/gongahkia/paw/internal/stage"
+	"github.com/gongahkia/paw/internal/verify"
+	"github.com/spf13/cobra"
+)
+
+var (
+	runInstruction     string
+	runInstructionFile string
+	runMaxTurns        int
+	runRawContext      bool
+	runDisableCompress bool
+	runDroneModel      string
+	runNoninteractive  bool
+)
+
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Run the full agent pipeline",
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		if runNoninteractive || os.Getenv("PAW_NONINTERACTIVE") != "" {
+			cmd.SilenceUsage = true
+		}
+		instruction, err := readInstruction()
+		if err != nil {
+			return err
+		}
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return err
+		}
+		if runMaxTurns > 0 {
+			cfg.MaxTurns = runMaxTurns
+		}
+		if runDroneModel != "" {
+			cfg.Drone.Model = runDroneModel
+		}
+		brain, err := llm.NewBrainClient(llmConfig(cfg))
+		if err != nil {
+			return err
+		}
+		drone, err := llm.NewDroneClient(llmConfig(cfg))
+		if err != nil {
+			return err
+		}
+		compressStage := compress.New(drone)
+		compressStage.DisableCompress = runDisableCompress || runRawContext
+		pipeline, err := stage.NewPipeline(
+			gather.New(cfg.Gather),
+			compressStage,
+			plan.New(brain),
+			edit.New(brain),
+			verify.New(""),
+		)
+		if err != nil {
+			return err
+		}
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		env := envelope.NewEnvelope(taskID(instruction, cwd), instruction, cwd)
+		env.Budget.MaxTurns = cfg.MaxTurns
+		env.Budget.MaxBrainTokens = cfg.MaxBrainTokens
+		out, err := pipeline.RunLoop(cmd.Context(), env)
+		if err != nil {
+			return err
+		}
+		if err := out.Marshal(cmd.OutOrStdout()); err != nil {
+			return err
+		}
+		if runSucceeded(out) {
+			return nil
+		}
+		return fmt.Errorf("run stopped without done or verify pass")
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(runCmd)
+	runCmd.Flags().StringVar(&runInstruction, "instruction", "", "task instruction")
+	runCmd.Flags().StringVar(&runInstructionFile, "instruction-file", "", "task instruction file")
+	runCmd.Flags().IntVar(&runMaxTurns, "max-turns", 0, "maximum agent turns")
+	runCmd.Flags().BoolVar(&runRawContext, "raw-context", false, "bypass model compression")
+	runCmd.Flags().BoolVar(&runDisableCompress, "disable-compress", false, "use deterministic compression fallback")
+	runCmd.Flags().StringVar(&runDroneModel, "drone-model", "", "drone model override")
+	runCmd.Flags().BoolVar(&runNoninteractive, "noninteractive", false, "disable interactive prompts")
+}
+
+func readInstruction() (string, error) {
+	if runInstruction != "" && runInstructionFile != "" {
+		return "", fmt.Errorf("use --instruction or --instruction-file, not both")
+	}
+	if runInstruction != "" {
+		return runInstruction, nil
+	}
+	if runInstructionFile == "" {
+		return "", fmt.Errorf("missing --instruction or --instruction-file")
+	}
+	data, err := os.ReadFile(runInstructionFile)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func llmConfig(cfg config.Config) llm.FactoryConfig {
+	return llm.FactoryConfig{
+		Brain: llm.EndpointConfig{
+			Transport: cfg.Brain.Transport,
+			BaseURL:   cfg.Brain.BaseURL,
+			APIKey:    cfg.Brain.APIKey,
+			Model:     cfg.Brain.Model,
+		},
+		Drone: llm.EndpointConfig{
+			Transport: cfg.Drone.Transport,
+			BaseURL:   cfg.Drone.BaseURL,
+			APIKey:    cfg.Drone.APIKey,
+			Model:     cfg.Drone.Model,
+		},
+		CallTimeout: cfg.CallTimeout,
+	}
+}
+
+func taskID(instruction, cwd string) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s\x00%d", instruction, cwd, time.Now().UnixNano())))
+	return "task-" + hex.EncodeToString(sum[:])[:12]
+}
+
+func runSucceeded(env *envelope.Envelope) bool {
+	return env.Done || env.Verify != nil && env.Verify.Passed
+}
