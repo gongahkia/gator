@@ -54,7 +54,6 @@ before starting; this is the only global find-replace required.
 +M7-Gather  — deterministic context collection. NO model. Depends M1.
 ================================================================================
 
-(A) Write internal/gather/gather_test.go: finds known symbol; respects depth/byte bounds; injecting a non-nil model client is unnecessary — assert gather has no llm.Client field at all (compile-time guarantee it cannot call a model) @gather file:internal/gather/gather_test.go ref:docs/TESTING.md#2
 
 ================================================================================
 +M8-Compress  — DRONE model + deterministic validation. THE CORE. Depends M2,M3,M7.
