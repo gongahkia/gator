@@ -26,12 +26,17 @@ var (
 	runDisableCompress bool
 	runDroneModel      string
 	runNoninteractive  bool
+	runExplain         bool
 )
 
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the full agent pipeline",
 	RunE: func(cmd *cobra.Command, _ []string) error {
+		if runExplain {
+			cmd.Println("gather | compress | plan | edit | verify")
+			return nil
+		}
 		if runNoninteractive || os.Getenv("PAW_NONINTERACTIVE") != "" {
 			cmd.SilenceUsage = true
 		}
@@ -99,6 +104,7 @@ func init() {
 	runCmd.Flags().BoolVar(&runDisableCompress, "disable-compress", false, "use deterministic compression fallback")
 	runCmd.Flags().StringVar(&runDroneModel, "drone-model", "", "drone model override")
 	runCmd.Flags().BoolVar(&runNoninteractive, "noninteractive", false, "disable interactive prompts")
+	runCmd.Flags().BoolVar(&runExplain, "explain", false, "print composed pipeline")
 }
 
 func readInstruction() (string, error) {
