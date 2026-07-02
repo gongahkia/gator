@@ -24,7 +24,6 @@ before starting; this is the only global find-replace required.
 +M1-Envelope  — the wire contract and schemas. Everything else depends on this.
 ================================================================================
 
-(A) Write internal/envelope/envelope_test.go: round-trip marshal/unmarshal of a fully-populated Envelope; assert equality; assert version-mismatch behavior @envelope file:internal/envelope/envelope_test.go ref:docs/TESTING.md#2
 
 ================================================================================
 +M2-Schema  — embedded JSON Schemas + validators (drone output + struct sync).
