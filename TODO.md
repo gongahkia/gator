@@ -59,7 +59,6 @@ before starting; this is the only global find-replace required.
 +M8-Compress  — DRONE model + deterministic validation. THE CORE. Depends M2,M3,M7.
 ================================================================================
 
-(A) Create internal/compress/compress.go implementing Stage: chunk RawContext, build drone prompt, call drone client with schema.Raw("context_digest") as JSONSchema, receive candidate ContextDigest @compress file:internal/compress/compress.go ref:docs/DESIGN.md#4.2
 (A) Create internal/compress/prompt.go: system+user prompt instructing the drone to ONLY score relevance, extract minimal verbatim spans, and NEVER invent paths/symbols/lines; paste the JSON schema text into the prompt to ground output @compress file:internal/compress/prompt.go ref:docs/MODEL_APIS.md#4
 (A) Create internal/compress/validate.go: the deterministic checks in docs/SCHEMAS.md §2 — schema-valid, unit_id exists in RawContext, path matches unit, quote is verbatim substring (strings.Contains), line numbers within unit range; drop failing items, log to trace @compress file:internal/compress/validate.go ref:docs/SCHEMAS.md#2
 (A) Create internal/compress/fallback.go: deterministic BM25-style ranking of RawUnits vs Instruction (implement simple TF/IDF over whitespace+identifier tokens; no external dep, or use a small pure-Go bm25 lib pinned in go.mod), emit top-N-by-token-budget as a ContextDigest; used when >50% items dropped or unparseable @compress file:internal/compress/fallback.go ref:docs/SCHEMAS.md#2
