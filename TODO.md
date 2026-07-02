@@ -79,7 +79,6 @@ before starting; this is the only global find-replace required.
 +M12-Verify  — deterministic build/test/lint runner + failure compaction. NO model.
 ================================================================================
 
-(A) Create internal/verify/verify.go implementing Stage: run the task verification command (from config/env PAW_VERIFY_CMD, or a sensible default like the repo's test runner), capture exit code + combined output @verify file:internal/verify/verify.go ref:docs/DESIGN.md#4.5
 (A) Create internal/verify/digest.go: deterministic FailureDigest — keep last N lines + lines matching FAIL/Error/assert/panic/Traceback/expected/got, dedup, cap 4KB; set RawTailBytes @verify file:internal/verify/digest.go ref:docs/SCHEMAS.md#5
 (A) Write internal/verify/verify_test.go: passing cmd → Passed true; failing cmd → Passed false + digest keeps markers + respects byte cap @verify file:internal/verify/verify_test.go ref:docs/TESTING.md#2
 
