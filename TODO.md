@@ -59,7 +59,6 @@ before starting; this is the only global find-replace required.
 +M8-Compress  — DRONE model + deterministic validation. THE CORE. Depends M2,M3,M7.
 ================================================================================
 
-(A) Create internal/compress/fallback.go: deterministic BM25-style ranking of RawUnits vs Instruction (implement simple TF/IDF over whitespace+identifier tokens; no external dep, or use a small pure-Go bm25 lib pinned in go.mod), emit top-N-by-token-budget as a ContextDigest; used when >50% items dropped or unparseable @compress file:internal/compress/fallback.go ref:docs/SCHEMAS.md#2
 (A) Wire threshold logic in compress.go: if parse fails OR dropped/total > 0.5 → use fallback; record used_fallback in trace; always emit a valid ContextDigest @compress file:internal/compress/compress.go
 (A) Add --disable-compress behavior hook: when set, compress.go skips the drone entirely and returns fallback(); this is the ablation control @compress file:internal/compress/compress.go ref:docs/BENCHMARKS.md#4
 (A) Write internal/compress/compress_test.go with faketest drone: valid→passes; hallucinated path→dropped; non-verbatim quote→dropped; bad line range→dropped; >50% dropped→fallback; unparseable→fallback; assert the digest handed onward never contains bytes absent from RawContext @compress file:internal/compress/compress_test.go ref:docs/TESTING.md#2
