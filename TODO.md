@@ -64,7 +64,6 @@ before starting; this is the only global find-replace required.
 +M9-Plan  — BRAIN planning. Depends M2,M3,M8.
 ================================================================================
 
-(A) Write internal/plan/plan_test.go with faketest brain: done=true short-circuits; done=false w/o next_action → error; assert outbound brain request contains digest summary and NOT raw unit text (core-thesis regression guard) @plan file:internal/plan/plan_test.go ref:docs/TESTING.md#1
 
 ================================================================================
 +M10-Patch  — deterministic unified-diff apply. NO model. Depends M1.
