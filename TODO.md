@@ -59,7 +59,6 @@ before starting; this is the only global find-replace required.
 +M8-Compress  — DRONE model + deterministic validation. THE CORE. Depends M2,M3,M7.
 ================================================================================
 
-(A) Write internal/compress/compress_test.go with faketest drone: valid→passes; hallucinated path→dropped; non-verbatim quote→dropped; bad line range→dropped; >50% dropped→fallback; unparseable→fallback; assert the digest handed onward never contains bytes absent from RawContext @compress file:internal/compress/compress_test.go ref:docs/TESTING.md#2
 (A) Write internal/compress/fallback_test.go: deterministic ranking stable across runs; respects token budget @compress file:internal/compress/fallback_test.go
 
 ================================================================================
