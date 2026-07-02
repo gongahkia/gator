@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["done", "reasoning"],
+  "properties": {
+    "done": { "type": "boolean" },
+    "reasoning": { "type": "string", "maxLength": 2000 },
+    "next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "description"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["edit_file", "run_command", "inspect"] },
+        "description": { "type": "string", "maxLength": 2000 },
+        "target_path": { "type": "string" },
+        "command": { "type": "string" }
+      }
+    }
+  }
+}
