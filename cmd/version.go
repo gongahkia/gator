@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -15,10 +14,10 @@ var (
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "version: %s\n", version)
-		fmt.Fprintf(cmd.OutOrStdout(), "git_commit: %s\n", gitCommit)
-		fmt.Fprintf(cmd.OutOrStdout(), "go: %s\n", runtime.Version())
+	Run: func(cmd *cobra.Command, _ []string) {
+		cmd.Printf("version: %s\n", version)
+		cmd.Printf("git_commit: %s\n", gitCommit)
+		cmd.Printf("go: %s\n", runtime.Version())
 	},
 }
 
