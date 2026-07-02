@@ -74,7 +74,6 @@ before starting; this is the only global find-replace required.
 +M11-Edit  — BRAIN edit → unified diff → deterministic apply. Depends M9,M10.
 ================================================================================
 
-(A) Create internal/edit/edit.go implementing Stage: build prompt from current step + digest; call brain (plain text or json with a unified_diff field); extract diff (internal/patch/extract); apply via internal/patch/apply; on apply error, re-prompt brain ONCE with failing file slice + error, then bounce to plan @edit file:internal/edit/edit.go ref:docs/DESIGN.md#4.4, docs/PATCH_FORMAT.md#3
 (A) Create internal/edit/prompt.go: instruct the model to emit ONLY a unified diff obeying docs/PATCH_FORMAT.md §1 rules (relative a//b/ paths, no fences, no prose) @edit file:internal/edit/prompt.go ref:docs/PATCH_FORMAT.md#1
 (A) Update budget on edit calls @edit file:internal/edit/edit.go
 (A) Write internal/edit/edit_test.go with faketest brain returning a known-good diff for testdata/repo/ bug → asserts file changed on disk; and a bad diff → asserts single retry then structured failure @edit file:internal/edit/edit_test.go ref:docs/TESTING.md#2
