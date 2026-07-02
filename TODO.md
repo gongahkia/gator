@@ -44,7 +44,6 @@ before starting; this is the only global find-replace required.
 +M5-Budget  — token/turn accounting threaded through the loop.
 ================================================================================
 
-(A) Write internal/budget/budget_test.go: caps trigger correctly; accumulation correct @budget file:internal/budget/budget_test.go
 
 ================================================================================
 +M6-Stage  — Stage interface + Pipeline runner (in-process + streaming). Depends M1.
