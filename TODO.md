@@ -19,7 +19,6 @@ before starting; this is the only global find-replace required.
 +M0-Scaffold  — repo skeleton, builds, CI. No agent logic yet.
 ================================================================================
 
-(A) Add cobra dependency: `go get github.com/spf13/cobra@latest`; create cmd/root.go with rootCmd, persistent flags --config,--trace-file,--verbose @cli file:cmd/root.go
 (A) Implement cmd/version.go: `paw version` prints version, git commit (via -ldflags), Go version @cli file:cmd/version.go
 (A) Create Makefile targets: build (host), build-linux (GOOS=linux GOARCH=amd64 static, CGO_ENABLED=0, output bin/paw-linux-amd64), test (go test ./... -race), lint (golangci-lint run), fmt (gofmt -w .), clean @setup file:Makefile
 (A) Add .golangci.yml enabling: govet, staticcheck, errcheck, ineffassign, gofmt, misspell, revive @setup file:.golangci.yml ref:docs/TESTING.md#5
