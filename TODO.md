@@ -69,7 +69,6 @@ before starting; this is the only global find-replace required.
 +M10-Patch  — deterministic unified-diff apply. NO model. Depends M1.
 ================================================================================
 
-(A) Write internal/patch/apply_test.go covering all fixtures incl. rollback-on-partial-failure and path-escape rejection @patch file:internal/patch/apply_test.go ref:docs/PATCH_FORMAT.md#4, docs/TESTING.md#2
 
 ================================================================================
 +M11-Edit  — BRAIN edit → unified diff → deterministic apply. Depends M9,M10.
