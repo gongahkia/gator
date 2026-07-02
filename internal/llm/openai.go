@@ -40,18 +40,18 @@ func (c *openAIClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.post(ctx, body)
+	resp, err := c.post(ctx, body, messageText(req.Messages))
 	if se, ok := err.(*statusError); ok && req.JSONSchema != nil && se.StatusCode >= http.StatusBadRequest && se.StatusCode < http.StatusInternalServerError {
 		fallback, buildErr := openAIRequest(req, c.model, true)
 		if buildErr != nil {
 			return nil, buildErr
 		}
-		return c.post(ctx, fallback)
+		return c.post(ctx, fallback, messageText(req.Messages))
 	}
 	return resp, err
 }
 
-func (c *openAIClient) post(ctx context.Context, body []byte) (*ChatResponse, error) {
+func (c *openAIClient) post(ctx context.Context, body []byte, inputText string) (*ChatResponse, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -79,13 +79,12 @@ func (c *openAIClient) post(ctx context.Context, body []byte) (*ChatResponse, er
 	if len(out.Choices) == 0 {
 		return nil, fmt.Errorf("openai response has no choices")
 	}
-	return &ChatResponse{
-		Content: out.Choices[0].Message.Content,
-		Usage: Usage{
-			InputTokens:  out.Usage.PromptTokens,
-			OutputTokens: out.Usage.CompletionTokens,
-		},
-	}, nil
+	content := out.Choices[0].Message.Content
+	usage := Usage{
+		InputTokens:  out.Usage.PromptTokens,
+		OutputTokens: out.Usage.CompletionTokens,
+	}
+	return &ChatResponse{Content: content, Usage: usageWithEstimate(usage, inputText, content)}, nil
 }
 
 func openAIRequest(req ChatRequest, defaultModel string, jsonObjectFallback bool) ([]byte, error) {

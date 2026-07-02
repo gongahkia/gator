@@ -53,13 +53,11 @@ func (c *ollamaClient) Chat(ctx context.Context, req ChatRequest) (*ChatResponse
 	if out.Message.Content == "" {
 		return nil, fmt.Errorf("ollama response has empty message content")
 	}
-	return &ChatResponse{
-		Content: out.Message.Content,
-		Usage: Usage{
-			InputTokens:  out.PromptEvalCount,
-			OutputTokens: out.EvalCount,
-		},
-	}, nil
+	usage := Usage{
+		InputTokens:  out.PromptEvalCount,
+		OutputTokens: out.EvalCount,
+	}
+	return &ChatResponse{Content: out.Message.Content, Usage: usageWithEstimate(usage, messageText(req.Messages), out.Message.Content)}, nil
 }
 
 func ollamaRequest(req ChatRequest, defaultModel string) ([]byte, error) {
