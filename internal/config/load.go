@@ -12,7 +12,20 @@ import (
 )
 
 func Defaults() Config {
-	return Config{}
+	return Config{
+		Brain: EndpointConfig{
+			Transport: "openai",
+			BaseURL:   "https://api.z.ai/api/paas/v4",
+			Model:     "glm-4.6",
+		},
+		Drone: EndpointConfig{
+			Transport: "ollama",
+			BaseURL:   "http://localhost:11434",
+			Model:     "qwen3:8b",
+		},
+		MaxTurns:       40,
+		MaxBrainTokens: 200000,
+	}
 }
 
 func Load(path string) (Config, error) {
