@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/gongahkia/paw/internal/compress"
 	"github.com/gongahkia/paw/internal/config"
@@ -138,7 +137,7 @@ func llmConfig(cfg config.Config) llm.FactoryConfig {
 }
 
 func taskID(instruction, cwd string) string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s\x00%d", instruction, cwd, time.Now().UnixNano())))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s", instruction, cwd)))
 	return "task-" + hex.EncodeToString(sum[:])[:12]
 }
 
