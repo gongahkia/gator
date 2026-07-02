@@ -49,7 +49,6 @@ before starting; this is the only global find-replace required.
 +M6-Stage  — Stage interface + Pipeline runner (in-process + streaming). Depends M1.
 ================================================================================
 
-(A) Create internal/stage/stage.go: Stage interface (Name(), Run(ctx, *Envelope)(*Envelope,error)) exactly per docs/DESIGN.md §3 @stage file:internal/stage/stage.go ref:docs/DESIGN.md#3
 (A) Create internal/stage/pipeline.go: Pipeline holds ordered stages; RunOnce passes an Envelope through a named stage; RunLoop implements the control loop in docs/DESIGN.md §5 (gather→compress→plan→[edit→verify]→gather) with budget/turn stop conditions and Done handling @stage file:internal/stage/pipeline.go ref:docs/DESIGN.md#5
 (A) Create internal/stage/trace.go: NDJSON tracer writing one line per stage invocation {stage,turn,input_bytes,output_bytes,tokens,dropped_items,used_fallback,duration_ms}; no model involved @stage file:internal/stage/trace.go ref:docs/SCHEMAS.md#7
 (A) Write internal/stage/pipeline_test.go: fake stages (no LLM) verifying loop ordering, turn increment, stop-on-Done, stop-on-budget @stage file:internal/stage/pipeline_test.go
