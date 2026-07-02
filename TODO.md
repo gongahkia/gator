@@ -29,7 +29,6 @@ before starting; this is the only global find-replace required.
 +M2-Schema  — embedded JSON Schemas + validators (drone output + struct sync).
 ================================================================================
 
-(A) Create internal/schema/schema.go: //go:embed the *.schema.json files; expose Compiled(name) (*jsonschema.Schema, error) and Raw(name) json.RawMessage (Raw is passed to the LLM format field) @schema file:internal/schema/schema.go ref:docs/MODEL_APIS.md#4
 (A) Add ValidateContextDigest(raw []byte) error and ValidatePlan(raw []byte) error wrappers @schema file:internal/schema/validate.go
 (A) Write internal/schema/schema_test.go: marshal a fully-populated ContextDigest and Plan struct, validate against embedded schema, assert pass; mutate to break a constraint (relevance 200), assert fail — this keeps structs and schemas in sync @schema file:internal/schema/schema_test.go ref:docs/SCHEMAS.md, docs/TESTING.md#2
 
