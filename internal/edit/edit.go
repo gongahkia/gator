@@ -3,8 +3,6 @@ package edit
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/paw/internal/envelope"
@@ -61,7 +59,7 @@ func (e *Edit) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 func (e *Edit) askAndApply(ctx context.Context, env *envelope.Envelope, prompt string) (string, error) {
 	resp, err := e.Client.Chat(ctx, llm.ChatRequest{
 		Messages: []llm.ChatMessage{
-			{Role: "system", Content: "Return only a unified diff. No prose, no fences."},
+			{Role: "system", Content: editSystemPrompt()},
 			{Role: "user", Content: prompt},
 		},
 		Temperature: 0,
@@ -77,47 +75,6 @@ func (e *Edit) askAndApply(ctx context.Context, env *envelope.Envelope, prompt s
 		return "", err
 	}
 	return diff, nil
-}
-
-func editPrompt(env *envelope.Envelope) string {
-	return strings.Join([]string{
-		"Instruction:",
-		env.Instruction,
-		"",
-		"Current step:",
-		env.Plan.NextAction.Description,
-		"",
-		"Target path:",
-		env.Plan.NextAction.TargetPath,
-		"",
-		"Context digest:",
-		fmt.Sprintf("%#v", env.Digest),
-	}, "\n")
-}
-
-func retryPrompt(env *envelope.Envelope, applyErr error) string {
-	target := env.Plan.NextAction.TargetPath
-	return strings.Join([]string{
-		editPrompt(env),
-		"",
-		"Previous patch failed:",
-		applyErr.Error(),
-		"",
-		"Current target file:",
-		readTarget(env.Cwd, target),
-	}, "\n")
-}
-
-func readTarget(cwd, rel string) string {
-	path := filepath.Join(cwd, rel)
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	if len(b) > 8192 {
-		b = b[:8192]
-	}
-	return string(b)
 }
 
 func diffFiles(diff string) []string {
