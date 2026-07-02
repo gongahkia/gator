@@ -34,7 +34,6 @@ before starting; this is the only global find-replace required.
 +M3-LLM  — provider-agnostic client (openai + ollama first; anthropic optional/later).
 ================================================================================
 
-(A) Write internal/llm/openai_test.go and ollama_test.go against faketest server: assert request shape (response_format present when schema set), response parsing, usage extraction, retry-on-500, no-retry-on-400 @llm file:internal/llm/openai_test.go ref:docs/TESTING.md
 
 ================================================================================
 +M4-Config  — config file + env var loading (no secrets in code).

@@ -112,8 +112,9 @@ func (s *Server) record(req Request) {
 func (s *Server) match(body string) Response {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, resp := range s.responses {
+	for i, resp := range s.responses {
 		if resp.Match == "" || strings.Contains(body, resp.Match) {
+			s.responses = append(s.responses[:i], s.responses[i+1:]...)
 			return resp
 		}
 	}
