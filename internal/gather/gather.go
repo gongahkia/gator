@@ -22,11 +22,16 @@ func (g *Gather) Name() string {
 
 func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
-	units, err := collectSearchHits(ctx, in.Cwd, in.Instruction, g.Config.MaxFileBytes)
+	units, err := collectDirListing(in.Cwd, g.Config.MaxDepth, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err
 	}
-	slices, err := collectFileSlices(in.Cwd, units, g.Config.MaxFileBytes)
+	hits, err := collectSearchHits(ctx, in.Cwd, in.Instruction, g.Config.MaxFileBytes)
+	if err != nil {
+		return nil, err
+	}
+	units = append(units, hits...)
+	slices, err := collectFileSlices(in.Cwd, hits, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err
 	}
