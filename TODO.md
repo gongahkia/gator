@@ -69,7 +69,6 @@ before starting; this is the only global find-replace required.
 +M10-Patch  — deterministic unified-diff apply. NO model. Depends M1.
 ================================================================================
 
-(A) Add testdata/patches/ fixtures: create-new, delete-file, single-hunk, multi-hunk, multi-file, context-mismatch (must fail), path-escape (must fail) @patch file:testdata/patches/ ref:docs/PATCH_FORMAT.md#4
 (A) Write internal/patch/apply_test.go covering all fixtures incl. rollback-on-partial-failure and path-escape rejection @patch file:internal/patch/apply_test.go ref:docs/PATCH_FORMAT.md#4, docs/TESTING.md#2
 
 ================================================================================

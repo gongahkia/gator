@@ -1,0 +1,13 @@
+--- a/file.txt
++++ b/file.txt
+@@ -1,4 +1,4 @@
+ one
+-two
++TWO
+ three
+ four
+@@ -6,3 +6,3 @@
+ six
+-seven
++SEVEN
+ eight
