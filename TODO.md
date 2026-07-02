@@ -34,7 +34,6 @@ before starting; this is the only global find-replace required.
 +M3-LLM  — provider-agnostic client (openai + ollama first; anthropic optional/later).
 ================================================================================
 
-(A) Create internal/llm/llm.go: ChatMessage, ChatRequest (with JSONSchema json.RawMessage), Usage, ChatResponse, Client interface — exactly per docs/MODEL_APIS.md §1 @llm file:internal/llm/llm.go ref:docs/MODEL_APIS.md#1
 (A) Implement internal/llm/openai.go: openaiClient with base_url + key + model; POST {base_url}/chat/completions; Bearer auth; temperature/max_tokens/stream:false; when JSONSchema != nil add response_format json_schema strict:true, with fallback to json_object + schema-in-prompt on 4xx; parse choices[0].message.content and usage.prompt_tokens/completion_tokens @llm file:internal/llm/openai.go ref:docs/MODEL_APIS.md#2
 (A) Implement internal/llm/ollama.go: ollamaClient POST {base_url}/api/chat; body includes messages, stream:false, format:<full schema object>, options.temperature; parse message.content; usage from prompt_eval_count/eval_count @llm file:internal/llm/ollama.go ref:docs/MODEL_APIS.md#4
 (A) Add retry/backoff wrapper internal/llm/retry.go: max 2 retries, backoff 250ms/1s, only on 429/5xx/network, never on 4xx; per-call context deadline @llm file:internal/llm/retry.go ref:docs/MODEL_APIS.md#6
