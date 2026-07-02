@@ -19,7 +19,6 @@ before starting; this is the only global find-replace required.
 +M0-Scaffold  — repo skeleton, builds, CI. No agent logic yet.
 ================================================================================
 
-(A) Verify: `make build` produces bin/paw; `./bin/paw version` prints; `make test` passes with zero tests @setup
 
 ================================================================================
 +M1-Envelope  — the wire contract and schemas. Everything else depends on this.
