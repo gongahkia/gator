@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
 	"github.com/gongahkia/paw/internal/schema"
@@ -41,6 +42,7 @@ func (p *Plan) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	if err != nil {
 		return nil, err
 	}
+	budget.AddBrain(&out.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens)
 	var next envelope.Plan
 	if err := json.Unmarshal([]byte(resp.Content), &next); err != nil {
 		return nil, err
