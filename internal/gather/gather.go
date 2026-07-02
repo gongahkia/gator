@@ -22,10 +22,12 @@ func (g *Gather) Name() string {
 
 func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
-	units, err := collectDirListing(in.Cwd, g.Config.MaxDepth, g.Config.MaxFileBytes)
+	units := verifyFailureUnits(in)
+	listing, err := collectDirListing(in.Cwd, g.Config.MaxDepth, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err
 	}
+	units = append(units, listing...)
 	symbols, err := collectSymbols(ctx, in.Cwd, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err
@@ -59,4 +61,14 @@ func totalBytes(units []envelope.RawUnit) int {
 		total += len(unit.Text)
 	}
 	return total
+}
+
+func verifyFailureUnits(in *envelope.Envelope) []envelope.RawUnit {
+	if in.Verify == nil || in.Verify.FailureDigest == "" {
+		return nil
+	}
+	return []envelope.RawUnit{{
+		Kind: "verify_failure",
+		Text: in.Verify.FailureDigest,
+	}}
 }
