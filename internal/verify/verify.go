@@ -42,7 +42,7 @@ func (v *Verify) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Enve
 		Passed:        err == nil,
 		ExitCode:      exitCode,
 		Command:       cmdText,
-		FailureDigest: string(output),
+		FailureDigest: failureDigest(output, v.MaxDigestBytes),
 		RawTailBytes:  len(output),
 	}
 	return &out, nil
