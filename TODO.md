@@ -79,7 +79,6 @@ before starting; this is the only global find-replace required.
 +M12-Verify  — deterministic build/test/lint runner + failure compaction. NO model.
 ================================================================================
 
-(A) Write internal/verify/verify_test.go: passing cmd → Passed true; failing cmd → Passed false + digest keeps markers + respects byte cap @verify file:internal/verify/verify_test.go ref:docs/TESTING.md#2
 
 ================================================================================
 +M13-CLI  — subcommands wiring stages; pipeable text contract. Depends M6-M12.
