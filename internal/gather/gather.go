@@ -26,6 +26,11 @@ func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Enve
 	if err != nil {
 		return nil, err
 	}
+	slices, err := collectFileSlices(in.Cwd, units, g.Config.MaxFileBytes)
+	if err != nil {
+		return nil, err
+	}
+	units = append(units, slices...)
 	assignIDs(units)
 	out.Stage = g.Name()
 	out.Raw = &envelope.RawContext{Units: units, TotalBytes: totalBytes(units)}

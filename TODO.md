@@ -54,7 +54,6 @@ before starting; this is the only global find-replace required.
 +M7-Gather  — deterministic context collection. NO model. Depends M1.
 ================================================================================
 
-(A) Implement file-slice reader internal/gather/slice.go: read bounded byte windows around hits (config Gather.MaxFileBytes), produce file_slice RawUnits with correct StartLine/EndLine @gather file:internal/gather/slice.go
 (A) Implement dir listing internal/gather/tree.go: bounded-depth walk (Gather.MaxDepth), skip .git/node_modules/.paw; produce a dir_listing RawUnit @gather file:internal/gather/tree.go
 (A) Implement optional ctags internal/gather/ctags.go: if universal-ctags present, produce a symbol-map RawUnit; degrade silently if absent @gather file:internal/gather/ctags.go
 (A) Fold prior VerifyResult.FailureDigest into a verify_failure RawUnit when present on the incoming envelope @gather file:internal/gather/gather.go ref:docs/SCHEMAS.md#5
