@@ -12,7 +12,7 @@ type Envelope struct {
 	Digest        *ContextDigest `json:"digest,omitempty"`
 	Plan          *Plan          `json:"plan,omitempty"`
 	Patch         *Patch         `json:"patch,omitempty"`
-	Verify        *VerifyResult `json:"verify,omitempty"`
+	Verify        *VerifyResult  `json:"verify,omitempty"`
 	Budget        Budget         `json:"budget"`
 	Raw           *RawContext    `json:"raw,omitempty"`
 	Done          bool           `json:"done"`
