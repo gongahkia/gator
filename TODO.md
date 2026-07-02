@@ -24,7 +24,6 @@ before starting; this is the only global find-replace required.
 +M1-Envelope  — the wire contract and schemas. Everything else depends on this.
 ================================================================================
 
-(A) Create internal/envelope/envelope.go: define Envelope struct exactly per docs/SCHEMAS.md (SchemaVersion const "paw.env/1", TaskID, Instruction, Cwd, Stage, Turn, Digest, Plan, Patch, Verify, Budget, Raw, Done) @envelope file:internal/envelope/envelope.go ref:docs/SCHEMAS.md#1
 (A) In internal/envelope, add sub-structs RawUnit, RawContext per docs/SCHEMAS.md §1 @envelope file:internal/envelope/raw.go ref:docs/SCHEMAS.md#1
 (A) Add sub-structs DigestSpan, DigestItem, ContextDigest per docs/SCHEMAS.md §2 @envelope file:internal/envelope/digest.go ref:docs/SCHEMAS.md#2
 (A) Add sub-structs NextAction, Plan per docs/SCHEMAS.md §3 @envelope file:internal/envelope/plan.go ref:docs/SCHEMAS.md#3
