@@ -1,0 +1,24 @@
+{
+  "schema_version": "paw.env/1",
+  "task_id": "<task>",
+  "instruction": "target",
+  "cwd": "<cwd>",
+  "stage": "verify",
+  "turn": 0,
+  "verify": {
+    "passed": true,
+    "exit_code": 0,
+    "command": "printf 'ok\\n'",
+    "failure_digest": "ok",
+    "raw_tail_bytes": 3
+  },
+  "budget": {
+    "max_turns": 0,
+    "turn": 0,
+    "brain_input_tokens": 0,
+    "brain_output_tokens": 0,
+    "drone_tokens": 0,
+    "max_brain_tokens": 0
+  },
+  "done": false
+}

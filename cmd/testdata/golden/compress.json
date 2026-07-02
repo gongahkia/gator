@@ -1,0 +1,47 @@
+{
+  "schema_version": "paw.env/1",
+  "task_id": "<task>",
+  "instruction": "target",
+  "cwd": "<cwd>",
+  "stage": "compress",
+  "turn": 0,
+  "digest": {
+    "summary": "deterministic fallback selected highest-overlap raw units",
+    "items": [
+      {
+        "unit_id": "u001",
+        "path": "app.txt",
+        "relevance": 100,
+        "spans": [
+          {
+            "start_line": 1,
+            "end_line": 1,
+            "quote": "target line\n"
+          }
+        ]
+      }
+    ]
+  },
+  "raw": {
+    "units": [
+      {
+        "id": "u001",
+        "kind": "file_slice",
+        "path": "app.txt",
+        "start_line": 1,
+        "end_line": 1,
+        "text": "target line\n"
+      }
+    ],
+    "total_bytes": 12
+  },
+  "budget": {
+    "max_turns": 0,
+    "turn": 0,
+    "brain_input_tokens": 0,
+    "brain_output_tokens": 0,
+    "drone_tokens": 0,
+    "max_brain_tokens": 0
+  },
+  "done": false
+}

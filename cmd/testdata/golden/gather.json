@@ -1,0 +1,46 @@
+{
+  "schema_version": "paw.env/1",
+  "task_id": "<task>",
+  "instruction": "target",
+  "cwd": "<cwd>",
+  "stage": "gather",
+  "turn": 0,
+  "raw": {
+    "units": [
+      {
+        "id": "u001",
+        "kind": "dir_listing",
+        "path": "",
+        "start_line": 0,
+        "end_line": 0,
+        "text": "f notes.txt\n"
+      },
+      {
+        "id": "u002",
+        "kind": "search_hits",
+        "path": "notes.txt",
+        "start_line": 2,
+        "end_line": 2,
+        "text": "2: beta target\n"
+      },
+      {
+        "id": "u003",
+        "kind": "file_slice",
+        "path": "notes.txt",
+        "start_line": 1,
+        "end_line": 3,
+        "text": "alpha\nbeta target\nomega\n"
+      }
+    ],
+    "total_bytes": 51
+  },
+  "budget": {
+    "max_turns": 0,
+    "turn": 0,
+    "brain_input_tokens": 0,
+    "brain_output_tokens": 0,
+    "drone_tokens": 0,
+    "max_brain_tokens": 0
+  },
+  "done": false
+}
