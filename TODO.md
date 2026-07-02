@@ -49,7 +49,6 @@ before starting; this is the only global find-replace required.
 +M6-Stage  — Stage interface + Pipeline runner (in-process + streaming). Depends M1.
 ================================================================================
 
-(A) Create internal/stage/trace.go: NDJSON tracer writing one line per stage invocation {stage,turn,input_bytes,output_bytes,tokens,dropped_items,used_fallback,duration_ms}; no model involved @stage file:internal/stage/trace.go ref:docs/SCHEMAS.md#7
 (A) Write internal/stage/pipeline_test.go: fake stages (no LLM) verifying loop ordering, turn increment, stop-on-Done, stop-on-budget @stage file:internal/stage/pipeline_test.go
 
 ================================================================================
