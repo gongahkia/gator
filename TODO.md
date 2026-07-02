@@ -19,7 +19,6 @@ before starting; this is the only global find-replace required.
 +M0-Scaffold  — repo skeleton, builds, CI. No agent logic yet.
 ================================================================================
 
-(A) Implement cmd/version.go: `paw version` prints version, git commit (via -ldflags), Go version @cli file:cmd/version.go
 (A) Create Makefile targets: build (host), build-linux (GOOS=linux GOARCH=amd64 static, CGO_ENABLED=0, output bin/paw-linux-amd64), test (go test ./... -race), lint (golangci-lint run), fmt (gofmt -w .), clean @setup file:Makefile
 (A) Add .golangci.yml enabling: govet, staticcheck, errcheck, ineffassign, gofmt, misspell, revive @setup file:.golangci.yml ref:docs/TESTING.md#5
 (A) Add GitHub Actions workflow .github/workflows/ci.yml: matrix Go 1.23; steps gofmt -l check, go vet, golangci-lint, go test -race -cover; do NOT run Docker/Harbor here @setup file:.github/workflows/ci.yml ref:docs/TESTING.md#5
