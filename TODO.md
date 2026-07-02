@@ -44,7 +44,6 @@ before starting; this is the only global find-replace required.
 +M5-Budget  — token/turn accounting threaded through the loop.
 ================================================================================
 
-(A) Create internal/budget/budget.go: methods on envelope.Budget — AddBrain(in,out int), AddDrone(n int), IncTurn(), ExceededTokens() bool, ExceededTurns() bool @budget file:internal/budget/budget.go ref:docs/SCHEMAS.md#6
 (A) Write internal/budget/budget_test.go: caps trigger correctly; accumulation correct @budget file:internal/budget/budget_test.go
 
 ================================================================================
