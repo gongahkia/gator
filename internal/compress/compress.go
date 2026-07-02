@@ -3,7 +3,6 @@ package compress
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
@@ -36,10 +35,7 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	}
 	rawSchema := schema.Raw("context_digest")
 	resp, err := c.Client.Chat(ctx, llm.ChatRequest{
-		Messages: []llm.ChatMessage{
-			{Role: "system", Content: "Select only real, relevant spans from the provided raw context."},
-			{Role: "user", Content: rawPrompt(in)},
-		},
+		Messages:    droneMessages(in, rawSchema),
 		Temperature: 0,
 		JSONSchema:  rawSchema,
 	})
@@ -52,9 +48,4 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	}
 	out.Digest = &digest
 	return &out, nil
-}
-
-func rawPrompt(env *envelope.Envelope) string {
-	b, _ := json.Marshal(env.Raw)
-	return fmt.Sprintf("instruction:\n%s\n\nraw_context:\n%s", env.Instruction, b)
 }
