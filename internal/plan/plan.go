@@ -34,10 +34,7 @@ func (p *Plan) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	}
 	rawSchema := schema.Raw("plan")
 	resp, err := p.Client.Chat(ctx, llm.ChatRequest{
-		Messages: []llm.ChatMessage{
-			{Role: "system", Content: "Return one concrete next step as JSON matching the provided schema."},
-			{Role: "user", Content: planPrompt(in)},
-		},
+		Messages:    planMessages(in),
 		Temperature: 0,
 		JSONSchema:  rawSchema,
 	})
@@ -81,10 +78,4 @@ func validatePlan(plan envelope.Plan) error {
 		}
 	}
 	return nil
-}
-
-func planPrompt(env *envelope.Envelope) string {
-	digest, _ := json.Marshal(env.Digest)
-	verify, _ := json.Marshal(env.Verify)
-	return fmt.Sprintf("Instruction:\n%s\n\nContextDigest JSON:\n%s\n\nPrior VerifyResult JSON:\n%s", env.Instruction, digest, verify)
 }
