@@ -59,7 +59,6 @@ before starting; this is the only global find-replace required.
 +M8-Compress  — DRONE model + deterministic validation. THE CORE. Depends M2,M3,M7.
 ================================================================================
 
-(A) Write internal/compress/fallback_test.go: deterministic ranking stable across runs; respects token budget @compress file:internal/compress/fallback_test.go
 
 ================================================================================
 +M9-Plan  — BRAIN planning. Depends M2,M3,M8.
