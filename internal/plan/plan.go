@@ -1,0 +1,90 @@
+package plan
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/gongahkia/paw/internal/envelope"
+	"github.com/gongahkia/paw/internal/llm"
+	"github.com/gongahkia/paw/internal/schema"
+)
+
+type Plan struct {
+	Client llm.Client
+}
+
+func New(client llm.Client) *Plan {
+	return &Plan{Client: client}
+}
+
+func (p *Plan) Name() string {
+	return "plan"
+}
+
+func (p *Plan) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
+	out := *in
+	out.Stage = p.Name()
+	if in.Done {
+		out.Plan = &envelope.Plan{Done: true, Reasoning: "already done"}
+		return &out, nil
+	}
+	if p.Client == nil {
+		return nil, fmt.Errorf("plan client is nil")
+	}
+	rawSchema := schema.Raw("plan")
+	resp, err := p.Client.Chat(ctx, llm.ChatRequest{
+		Messages: []llm.ChatMessage{
+			{Role: "system", Content: "Return one concrete next step as JSON matching the provided schema."},
+			{Role: "user", Content: planPrompt(in)},
+		},
+		Temperature: 0,
+		JSONSchema:  rawSchema,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var next envelope.Plan
+	if err := json.Unmarshal([]byte(resp.Content), &next); err != nil {
+		return nil, err
+	}
+	if err := validatePlan(next); err != nil {
+		return nil, err
+	}
+	out.Plan = &next
+	out.Done = next.Done
+	return &out, nil
+}
+
+func validatePlan(plan envelope.Plan) error {
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	if err := schema.ValidatePlan(raw); err != nil {
+		return err
+	}
+	if plan.Done {
+		return nil
+	}
+	if plan.NextAction == nil {
+		return fmt.Errorf("plan next_action is required when done is false")
+	}
+	switch plan.NextAction.Kind {
+	case "run_command":
+		if plan.NextAction.Command == "" {
+			return fmt.Errorf("run_command requires command")
+		}
+	case "edit_file":
+		if plan.NextAction.TargetPath == "" {
+			return fmt.Errorf("edit_file requires target_path")
+		}
+	}
+	return nil
+}
+
+func planPrompt(env *envelope.Envelope) string {
+	digest, _ := json.Marshal(env.Digest)
+	verify, _ := json.Marshal(env.Verify)
+	return fmt.Sprintf("Instruction:\n%s\n\nContextDigest JSON:\n%s\n\nPrior VerifyResult JSON:\n%s", env.Instruction, digest, verify)
+}
