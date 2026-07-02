@@ -24,7 +24,6 @@ before starting; this is the only global find-replace required.
 +M1-Envelope  — the wire contract and schemas. Everything else depends on this.
 ================================================================================
 
-(A) Add envelope (de)serialization helpers: Marshal(w io.Writer), Unmarshal(r io.Reader), and a NewEnvelope(taskID, instruction, cwd) constructor that sets SchemaVersion and zero Budget @envelope file:internal/envelope/io.go
 (A) Add SchemaVersion check on Unmarshal: reject/parse-warn if incoming SchemaVersion != current @envelope file:internal/envelope/io.go
 (A) Write internal/envelope/envelope_test.go: round-trip marshal/unmarshal of a fully-populated Envelope; assert equality; assert version-mismatch behavior @envelope file:internal/envelope/envelope_test.go ref:docs/TESTING.md#2
 
