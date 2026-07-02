@@ -19,7 +19,6 @@ before starting; this is the only global find-replace required.
 +M0-Scaffold  — repo skeleton, builds, CI. No agent logic yet.
 ================================================================================
 
-(A) Add GitHub Actions workflow .github/workflows/ci.yml: matrix Go 1.23; steps gofmt -l check, go vet, golangci-lint, go test -race -cover; do NOT run Docker/Harbor here @setup file:.github/workflows/ci.yml ref:docs/TESTING.md#5
 (A) Verify: `make build` produces bin/paw; `./bin/paw version` prints; `make test` passes with zero tests @setup
 
 ================================================================================
