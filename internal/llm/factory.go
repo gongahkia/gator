@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -24,6 +25,9 @@ func NewBrainClient(cfg FactoryConfig) (Client, error) {
 	endpoint := endpointFromEnv(cfg.Brain, "PAW_BRAIN_")
 	if endpoint.Transport == "" {
 		endpoint.Transport = "openai"
+	}
+	if strings.EqualFold(endpoint.Transport, "openai") && endpoint.APIKey == "" {
+		return missingKeyClient{envKey: "PAW_BRAIN_API_KEY"}, nil
 	}
 	return newClient(endpoint, callTimeout(cfg.CallTimeout))
 }
@@ -76,4 +80,12 @@ func callTimeout(current time.Duration) time.Duration {
 		}
 	}
 	return current
+}
+
+type missingKeyClient struct {
+	envKey string
+}
+
+func (c missingKeyClient) Chat(context.Context, ChatRequest) (*ChatResponse, error) {
+	return nil, fmt.Errorf("missing required %s", c.envKey)
 }

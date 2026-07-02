@@ -39,7 +39,6 @@ before starting; this is the only global find-replace required.
 +M4-Config  — config file + env var loading (no secrets in code).
 ================================================================================
 
-(A) Write internal/config/load_test.go: env overrides file overrides defaults; missing brain key surfaces a clear error only when a brain call is actually attempted (not at load) @config file:internal/config/load_test.go
 
 ================================================================================
 +M5-Budget  — token/turn accounting threaded through the loop.
