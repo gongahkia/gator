@@ -39,7 +39,6 @@ before starting; this is the only global find-replace required.
 +M4-Config  — config file + env var loading (no secrets in code).
 ================================================================================
 
-(A) Create internal/config/config.go: Config struct (Brain{Transport,BaseURL,APIKey,Model}, Drone{Transport,BaseURL,APIKey,Model}, MaxTurns, MaxBrainTokens, CallTimeout, Gather{MaxDepth,MaxFileBytes}) @config file:internal/config/config.go ref:docs/MODEL_APIS.md
 (A) Load precedence in internal/config/load.go: defaults < config file (~/.config/paw/config.toml or --config) < env vars (PAW_*) ; use github.com/BurntSushi/toml @config file:internal/config/load.go
 (A) Define documented defaults: Brain transport openai / base https://api.z.ai/api/paas/v4 / model glm-4.6 ; Drone transport ollama / base http://localhost:11434 / model qwen3:8b ; MaxTurns 40 ; MaxBrainTokens 200000 @config file:internal/config/load.go ref:docs/MODEL_APIS.md#7
 (A) Write internal/config/load_test.go: env overrides file overrides defaults; missing brain key surfaces a clear error only when a brain call is actually attempted (not at load) @config file:internal/config/load_test.go
