@@ -34,7 +34,6 @@ before starting; this is the only global find-replace required.
 +M3-LLM  — provider-agnostic client (openai + ollama first; anthropic optional/later).
 ================================================================================
 
-(A) Implement internal/llm/ollama.go: ollamaClient POST {base_url}/api/chat; body includes messages, stream:false, format:<full schema object>, options.temperature; parse message.content; usage from prompt_eval_count/eval_count @llm file:internal/llm/ollama.go ref:docs/MODEL_APIS.md#4
 (A) Add retry/backoff wrapper internal/llm/retry.go: max 2 retries, backoff 250ms/1s, only on 429/5xx/network, never on 4xx; per-call context deadline @llm file:internal/llm/retry.go ref:docs/MODEL_APIS.md#6
 (A) Add token estimation internal/llm/tokens.go using github.com/tiktoken-go/tokenizer cl100k_base; Estimate(text) int; used only when provider usage is absent; set token_source metadata @llm file:internal/llm/tokens.go ref:docs/MODEL_APIS.md#5
 (A) Create internal/llm/factory.go: NewBrainClient(cfg) and NewDroneClient(cfg) selecting transport from config/env (PAW_BRAIN_*, PAW_DRONE_*) @llm file:internal/llm/factory.go ref:docs/MODEL_APIS.md#2,#4
