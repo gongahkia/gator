@@ -92,7 +92,6 @@ before starting; this is the only global find-replace required.
 +M15-Docs  — README and top-level docs. Code-adjacent only, no marketing.
 ================================================================================
 
-(A) Create README.md: what paw is using the HONEST positioning from docs/DESIGN.md §2 (productize a proven technique; NOT "we invented small-model compression"); install (`go install`/release binary + Ollama prereq for drone), quickstart (`paw run --instruction "..."`), the pipeline one-liner (`paw run --explain`), config/env table; include a short "Prior art & how paw differs" section linking docs/RELATED_WORK.md (name SWE-Pruner/Focus/TokenPilot/LLMLingua/The Token Company); link docs/*.md; NO promotional copy, NO invented-novelty claims, NO benchmark boasting beyond linking docs/RESULTS.md @docs file:README.md ref:docs/DESIGN.md#2, docs/RELATED_WORK.md
 (A) In README.md, do NOT copy prior-art token-reduction numbers as paw's own; paw's reduction is whatever docs/RESULTS.md measures @docs file:README.md ref:docs/RELATED_WORK.md#3
 (A) Add CONTRIBUTING.md: how to add a Stage (implement interface + subcommand + golden test), how to add an llm transport, test/lint commands @docs file:CONTRIBUTING.md ref:docs/TESTING.md
 (A) Add LICENSE (Apache-2.0, matching the ecosystem norm for benchmarks/harnesses) @docs file:LICENSE
