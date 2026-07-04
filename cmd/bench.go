@@ -23,6 +23,7 @@ var (
 	benchModel           string
 	benchJobsDir         string
 	benchJobName         string
+	benchResultsPath     string
 	benchAgentImportPath string
 	benchHarborBin       string
 	benchNConcurrent     int
@@ -68,7 +69,11 @@ var benchCmd = &cobra.Command{
 				return err
 			}
 		}
-		printBenchTable(cmd.OutOrStdout(), []benchRow{summary.row(spec.Name)})
+		row := summary.row(spec.Name)
+		printBenchTable(cmd.OutOrStdout(), []benchRow{row})
+		if benchResultsPath != "" {
+			return updateResultsFile(benchResultsPath, row)
+		}
 		return nil
 	},
 }
@@ -80,6 +85,7 @@ func init() {
 	benchCmd.Flags().StringVar(&benchModel, "model", "openai/glm-4.6", "Harbor model")
 	benchCmd.Flags().StringVar(&benchJobsDir, "jobs-dir", ".paw/bench-jobs", "Harbor jobs directory")
 	benchCmd.Flags().StringVar(&benchJobName, "job-name", "", "Harbor job name")
+	benchCmd.Flags().StringVar(&benchResultsPath, "results-file", "docs/RESULTS.md", "results markdown file to update")
 	benchCmd.Flags().StringVar(&benchAgentImportPath, "agent-import-path", "paw_harbor:PawAgent", "Harbor agent import path")
 	benchCmd.Flags().StringVar(&benchHarborBin, "harbor-bin", "harbor", "Harbor executable")
 	benchCmd.Flags().IntVar(&benchNConcurrent, "n-concurrent", 4, "Harbor concurrency")
@@ -358,8 +364,57 @@ func printBenchTable(w io.Writer, rows []benchRow) {
 	fmt.Fprintln(w, "| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |")
 	fmt.Fprintln(w, "| --- | ---: | ---: | ---: | ---: | ---: |")
 	for _, row := range rows {
-		fmt.Fprintf(w, "| %s | %d | %s | %s | %s | %s |\n", row.Config, row.Tasks, row.PassRate, row.BrainTokens, row.DroneTokens, row.WallSeconds)
+		fmt.Fprintln(w, row.markdown())
 	}
+}
+
+const (
+	resultsStartMarker = "<!-- paw-results:start -->"
+	resultsEndMarker   = "<!-- paw-results:end -->"
+)
+
+func updateResultsFile(path string, row benchRow) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	start, end := markerBounds(lines)
+	if start == -1 || end == -1 || start >= end {
+		return fmt.Errorf("results table markers not found in %s", path)
+	}
+	next := row.markdown()
+	replaced := false
+	for i := start + 1; i < end; i++ {
+		if strings.HasPrefix(lines[i], "| "+row.Config+" |") {
+			lines[i] = next
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		lines = append(lines[:end], append([]string{next}, lines[end:]...)...)
+	}
+	out := strings.Join(lines, "\n")
+	return os.WriteFile(path, []byte(out), 0o644)
+}
+
+func markerBounds(lines []string) (int, int) {
+	start, end := -1, -1
+	for i, line := range lines {
+		switch strings.TrimSpace(line) {
+		case resultsStartMarker:
+			start = i
+		case resultsEndMarker:
+			end = i
+			return start, end
+		}
+	}
+	return start, end
+}
+
+func (r benchRow) markdown() string {
+	return fmt.Sprintf("| %s | %d | %s | %s | %s | %s |", r.Config, r.Tasks, r.PassRate, r.BrainTokens, r.DroneTokens, r.WallSeconds)
 }
 
 func ratio(numerator, denominator int) string {

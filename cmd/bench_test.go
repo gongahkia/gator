@@ -75,6 +75,39 @@ func TestLoadBenchSummaryParsesResultsAndTrace(t *testing.T) {
 	}
 }
 
+func TestUpdateResultsFileReplacesConfigRow(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "RESULTS.md")
+	if err := os.WriteFile(path, []byte(strings.Join([]string{
+		"# Results",
+		resultsStartMarker,
+		"| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |",
+		"| --- | ---: | ---: | ---: | ---: | ---: |",
+		"| raw | 0 | n/a | n/a | n/a | n/a |",
+		resultsEndMarker,
+		"",
+	}, "\n")), 0o644); err != nil {
+		t.Fatalf("write results: %v", err)
+	}
+	err := updateResultsFile(path, benchRow{
+		Config:      "raw",
+		Tasks:       5,
+		PassRate:    "0.80",
+		BrainTokens: "1200",
+		DroneTokens: "300",
+		WallSeconds: "42.5",
+	})
+	if err != nil {
+		t.Fatalf("update results: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read results: %v", err)
+	}
+	if !strings.Contains(string(got), "| raw | 5 | 0.80 | 1200 | 300 | 42.5 |") {
+		t.Fatalf("row not updated:\n%s", got)
+	}
+}
+
 func writeBenchFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
