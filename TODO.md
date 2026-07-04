@@ -92,8 +92,6 @@ before starting; this is the only global find-replace required.
 +M15-Docs  — README and top-level docs. Code-adjacent only, no marketing.
 ================================================================================
 
-(A) Add docs/ARCHITECTURE.md as a short pointer file linking RELATED_WORK/DESIGN/SCHEMAS/MODEL_APIS/PATCH_FORMAT/BENCHMARKS/TESTING so newcomers have one entry point @docs file:docs/ARCHITECTURE.md
-
 ================================================================================
 +M16-Anthropic  — OPTIONAL: anthropic-compatible transport. Do only after M14 green.
 ================================================================================
