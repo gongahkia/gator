@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "paw-harbor"
+version = "0.1.0"
+description = "Harbor adapter for paw"
+requires-python = ">=3.12"
+dependencies = [
+  "harbor>=0.17.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/paw_harbor"]

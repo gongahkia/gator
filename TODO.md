@@ -88,7 +88,6 @@ before starting; this is the only global find-replace required.
 +M14-Harbor  — Terminal-Bench 2.0 integration via Harbor Python adapter. Depends M13.
 ================================================================================
 
-(A) Create adapters/harbor/pyproject.toml: package paw-harbor, module paw_harbor, dep on harbor; python 3.12 @bench file:adapters/harbor/pyproject.toml ref:docs/BENCHMARKS.md#3
 (A) Create adapters/harbor/src/paw_harbor/__init__.py exporting PawAgent @bench file:adapters/harbor/src/paw_harbor/__init__.py
 (A) Create adapters/harbor/src/paw_harbor/agent.py: PawAgent(BaseInstalledAgent) with name/version/install/run exactly per docs/BENCHMARKS.md §2 — install() apt-installs ripgrep/git/ctags/ca-certificates and uploads bin/paw-linux-amd64 to /usr/local/bin/paw; run() writes instruction to file and execs `paw run` in /workspace with PAW_NONINTERACTIVE; MUST NOT create top-level tests/ dir @bench file:adapters/harbor/src/paw_harbor/agent.py ref:docs/BENCHMARKS.md#2
 (A) Ensure `make build-linux` output path (bin/paw-linux-amd64) matches adapter upload path; add adapters/harbor/README.md with exact env vars + `harbor run --agent-import-path paw_harbor:PawAgent` commands @bench file:adapters/harbor/README.md ref:docs/BENCHMARKS.md#1
