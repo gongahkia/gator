@@ -92,7 +92,6 @@ before starting; this is the only global find-replace required.
 +M15-Docs  — README and top-level docs. Code-adjacent only, no marketing.
 ================================================================================
 
-(A) Add LICENSE (Apache-2.0, matching the ecosystem norm for benchmarks/harnesses) @docs file:LICENSE
 (A) Add docs/ARCHITECTURE.md as a short pointer file linking RELATED_WORK/DESIGN/SCHEMAS/MODEL_APIS/PATCH_FORMAT/BENCHMARKS/TESTING so newcomers have one entry point @docs file:docs/ARCHITECTURE.md
 
 ================================================================================
