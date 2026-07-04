@@ -84,8 +84,6 @@ before starting; this is the only global find-replace required.
 +M13-CLI  — subcommands wiring stages; pipeable text contract. Depends M6-M12.
 ================================================================================
 
-(A) Write internal/stage full integration test (real stages, fake LLM) per docs/TESTING.md §3: loop terminates, patch applied, verify passes, brain-input tokens < rawBytes/4 @stage file:internal/stage/integration_test.go ref:docs/TESTING.md#3
-
 ================================================================================
 +M14-Harbor  — Terminal-Bench 2.0 integration via Harbor Python adapter. Depends M13.
 ================================================================================
