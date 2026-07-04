@@ -88,8 +88,6 @@ before starting; this is the only global find-replace required.
 +M14-Harbor  — Terminal-Bench 2.0 integration via Harbor Python adapter. Depends M13.
 ================================================================================
 
-(A) Manual milestone check (document in adapters/harbor/README.md, not automated): (1) oracle passes locally, (2) PawAgent completes >=1 task with reward.txt==1, (3) bench-smoke raw vs full shows brain-token reduction at held pass-rate @bench ref:docs/BENCHMARKS.md#6
-
 ================================================================================
 +M15-Docs  — README and top-level docs. Code-adjacent only, no marketing.
 ================================================================================

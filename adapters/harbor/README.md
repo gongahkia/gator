@@ -47,3 +47,31 @@ harbor run \
 ```
 
 `PawAgent` uploads `bin/paw-linux-amd64` to `/usr/local/bin/paw`, writes the task instruction to `/tmp/paw_instruction.txt`, runs in `/workspace`, and keeps scratch output under `/workspace/.paw`.
+
+## Manual milestone check
+
+Run these manually before recording M14 as benchmark-ready:
+
+```sh
+make bench-oracle
+```
+
+Evidence: Harbor completes the oracle run locally.
+
+```sh
+make build-linux
+harbor run \
+  --dataset terminal-bench@2.0 \
+  --agent-import-path paw_harbor:PawAgent \
+  --model openai/glm-4.6 \
+  --n-concurrent 1 \
+  --n-tasks 1
+```
+
+Evidence: at least one PawAgent trial finishes with `verifier/reward.txt` equal to `1`.
+
+```sh
+make bench-smoke
+```
+
+Evidence: `docs/RESULTS.md` has `raw` and `full` rows from the same 5-task subset, with lower `brain_in_tok/task (median)` for `full` and no pass-rate drop.
