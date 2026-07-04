@@ -31,7 +31,7 @@ bench-smoke: build-linux
 	go run . bench --config full --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 5 --job-name paw-smoke-full
 
 bench-oracle:
-	harbor run --dataset $(BENCH_DATASET) --agent oracle
+	harbor run --dataset $(BENCH_DATASET) --agent oracle --jobs-dir $(BENCH_JOBS_DIR) --job-name paw-oracle --n-tasks 1
 
 bench-full: build-linux
 	go run . bench --config raw --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 89 --job-name paw-full-raw
