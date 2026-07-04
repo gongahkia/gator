@@ -2,8 +2,12 @@ BINARY := paw
 VERSION ?= dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS := -X github.com/gongahkia/paw/cmd.version=$(VERSION) -X github.com/gongahkia/paw/cmd.gitCommit=$(COMMIT)
+BENCH_DATASET ?= terminal-bench@2.0
+BENCH_MODEL ?= openai/glm-4.6
+BENCH_JOBS_DIR ?= .paw/bench-jobs
+BENCH_N_CONCURRENT ?= 4
 
-.PHONY: build build-linux test lint fmt clean
+.PHONY: build build-linux test lint fmt bench-smoke bench-oracle bench-full clean
 
 build:
 	mkdir -p bin
@@ -21,6 +25,18 @@ lint:
 
 fmt:
 	gofmt -w .
+
+bench-smoke: build-linux
+	go run . bench --config raw --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 5 --job-name paw-smoke-raw
+	go run . bench --config full --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 5 --job-name paw-smoke-full
+
+bench-oracle:
+	harbor run --dataset $(BENCH_DATASET) --agent oracle
+
+bench-full: build-linux
+	go run . bench --config raw --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 89 --job-name paw-full-raw
+	go run . bench --config no-compress --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 89 --job-name paw-full-no-compress
+	go run . bench --config full --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 89 --job-name paw-full-full
 
 clean:
 	rm -rf bin coverage.out dist
