@@ -92,7 +92,6 @@ before starting; this is the only global find-replace required.
 +M15-Docs  — README and top-level docs. Code-adjacent only, no marketing.
 ================================================================================
 
-(A) In README.md, do NOT copy prior-art token-reduction numbers as paw's own; paw's reduction is whatever docs/RESULTS.md measures @docs file:README.md ref:docs/RELATED_WORK.md#3
 (A) Add CONTRIBUTING.md: how to add a Stage (implement interface + subcommand + golden test), how to add an llm transport, test/lint commands @docs file:CONTRIBUTING.md ref:docs/TESTING.md
 (A) Add LICENSE (Apache-2.0, matching the ecosystem norm for benchmarks/harnesses) @docs file:LICENSE
 (A) Add docs/ARCHITECTURE.md as a short pointer file linking RELATED_WORK/DESIGN/SCHEMAS/MODEL_APIS/PATCH_FORMAT/BENCHMARKS/TESTING so newcomers have one entry point @docs file:docs/ARCHITECTURE.md
