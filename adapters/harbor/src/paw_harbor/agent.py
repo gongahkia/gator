@@ -53,6 +53,7 @@ class PawAgent(BaseInstalledAgent):
                 "cd /workspace && "
                 "PAW_NONINTERACTIVE=1 paw run "
                 "--instruction-file /tmp/paw_instruction.txt "
+                f"{self._run_flags()}"
                 "--max-turns 40 "
                 "--trace-file /workspace/.paw/trace.ndjson"
             ),
@@ -81,5 +82,23 @@ class PawAgent(BaseInstalledAgent):
             for key, value in os.environ.items()
             if key.startswith("PAW_") and key != "PAW_HARBOR_BINARY"
         }
+        env.update(
+            {
+                key: value
+                for key, value in self.extra_env.items()
+                if key.startswith("PAW_") and key != "PAW_HARBOR_BINARY"
+            }
+        )
         env["PAW_NONINTERACTIVE"] = "1"
         return env
+
+    def _run_flags(self) -> str:
+        match self._paw_env().get("PAW_BENCH_CONFIG", "full"):
+            case "full":
+                return ""
+            case "no-compress":
+                return "--disable-compress "
+            case "raw":
+                return "--raw-context "
+            case value:
+                raise ValueError(f"unsupported PAW_BENCH_CONFIG: {value}")

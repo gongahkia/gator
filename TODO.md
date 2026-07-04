@@ -88,7 +88,6 @@ before starting; this is the only global find-replace required.
 +M14-Harbor  — Terminal-Bench 2.0 integration via Harbor Python adapter. Depends M13.
 ================================================================================
 
-(A) Create cmd/bench.go: `paw bench` shells out to `harbor run` with configured flags; supports --config full|no-compress|raw mapping to run.go flags; parses Harbor jobs-dir results + paw NDJSON traces; prints the comparison table in docs/BENCHMARKS.md §4 @bench file:cmd/bench.go ref:docs/BENCHMARKS.md#4
 (A) Add Makefile targets: bench-smoke (5-task subset, configs raw+full), bench-oracle (harbor run --agent oracle sanity), bench-full (89-task, all three configs) @bench file:Makefile ref:docs/BENCHMARKS.md#6
 (A) Create docs/RESULTS.md template with the empty comparison table + reproduction command block + a dedicated "vs SWE-Pruner (prior art)" section per docs/BENCHMARKS.md §4a (measured paw full-vs-raw reduction beside SWE-Pruner's reported 23-54%, clearly labeling borrowed vs reproduced numbers); bench.go appends/updates rows here @bench file:docs/RESULTS.md ref:docs/BENCHMARKS.md#4,#4a
 (A) Manual milestone check (document in adapters/harbor/README.md, not automated): (1) oracle passes locally, (2) PawAgent completes >=1 task with reward.txt==1, (3) bench-smoke raw vs full shows brain-token reduction at held pass-rate @bench ref:docs/BENCHMARKS.md#6
