@@ -26,7 +26,7 @@ func NewBrainClient(cfg FactoryConfig) (Client, error) {
 	if endpoint.Transport == "" {
 		endpoint.Transport = "openai"
 	}
-	if strings.EqualFold(endpoint.Transport, "openai") && endpoint.APIKey == "" {
+	if requiresBrainKey(endpoint.Transport) && endpoint.APIKey == "" {
 		return missingKeyClient{envKey: "PAW_BRAIN_API_KEY"}, nil
 	}
 	return newClient(endpoint, callTimeout(cfg.CallTimeout))
@@ -45,6 +45,8 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 	switch strings.ToLower(endpoint.Transport) {
 	case "openai":
 		client = NewOpenAIClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model)
+	case "anthropic":
+		client = NewAnthropicClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model)
 	case "ollama":
 		client = NewOllamaClient(endpoint.BaseURL, endpoint.Model)
 	default:
@@ -54,6 +56,15 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 		client = NewRetryClient(client, timeout)
 	}
 	return client, nil
+}
+
+func requiresBrainKey(transport string) bool {
+	switch strings.ToLower(transport) {
+	case "openai", "anthropic":
+		return true
+	default:
+		return false
+	}
 }
 
 func endpointFromEnv(cfg EndpointConfig, prefix string) EndpointConfig {

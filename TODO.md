@@ -96,7 +96,6 @@ before starting; this is the only global find-replace required.
 +M16-Anthropic  — OPTIONAL: anthropic-compatible transport. Do only after M14 green.
 ================================================================================
 
-(B) Extend factory.go + config to allow transport=anthropic for brain (e.g. DeepSeek anthropic base https://api.deepseek.com/anthropic) @llm file:internal/llm/factory.go ref:docs/MODEL_APIS.md#3
 (B) Write internal/llm/anthropic_test.go against faketest server (add /v1/messages route to the fake) @llm file:internal/llm/anthropic_test.go ref:docs/TESTING.md#1
 
 ================================================================================

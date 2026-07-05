@@ -92,6 +92,27 @@ model = "glm-test"
 	}
 }
 
+func TestLoadAllowsAnthropicBrainTransport(t *testing.T) {
+	clearPawEnv(t)
+	path := writeConfig(t, `
+[brain]
+transport = "anthropic"
+base_url = "https://api.deepseek.com/anthropic"
+api_key = "deepseek-key"
+model = "deepseek-v4-pro"
+`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Transport != "anthropic" || cfg.Brain.BaseURL != "https://api.deepseek.com/anthropic" {
+		t.Fatalf("brain = %#v", cfg.Brain)
+	}
+	if cfg.Brain.APIKey != "deepseek-key" || cfg.Brain.Model != "deepseek-v4-pro" {
+		t.Fatalf("brain = %#v", cfg.Brain)
+	}
+}
+
 func clearPawEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{

@@ -66,6 +66,16 @@ Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config
 | `PAW_GATHER_MAX_DEPTH` | `gather.max_depth` | stage default |
 | `PAW_GATHER_MAX_FILE_BYTES` | `gather.max_file_bytes` | stage default |
 
+Anthropic-compatible brain transport example:
+
+```toml
+[brain]
+transport = "anthropic"
+base_url = "https://api.deepseek.com/anthropic"
+api_key = "..."
+model = "deepseek-v4-pro"
+```
+
 ## Prior Art
 
 Closest related systems include SWE-Pruner, Focus, TokenPilot, LLMLingua, and The Token Company. `paw` differs by packaging the pattern as a single Go binary with pipeable stages, stock-model drone support, offline-capable defaults, and deterministic validation of quoted spans. paw's measured benchmark results belong in [docs/RESULTS.md](docs/RESULTS.md), not in copied prior-art numbers.
