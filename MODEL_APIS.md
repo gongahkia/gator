@@ -50,6 +50,7 @@ the Ollama native `/api/chat` (it supports the richer `format` schema mode).
 - **Z.AI base_url:** `https://api.z.ai/api/paas/v4`  → full URL `.../v4/chat/completions`.
 - **DeepSeek base_url:** `https://api.deepseek.com` → `.../chat/completions`.
 - **Auth header:** `Authorization: Bearer {api_key}`.
+  Local loopback endpoints (`localhost`, `127.0.0.1`, `[::1]`) may omit `api_key`.
 - **Request body (minimum):**
   ```json
   {
@@ -77,6 +78,21 @@ PAW_BRAIN_BASE_URL   e.g. https://api.z.ai/api/paas/v4
 PAW_BRAIN_API_KEY    provider key
 PAW_BRAIN_MODEL      e.g. glm-4.6
 ```
+
+### Local OpenAI-compatible profiles
+
+These use the same `openai` transport and the same `/chat/completions` client path. Run
+`paw doctor models` after starting the server; model IDs are server-specific.
+
+- **LM Studio:** `base_url = "http://localhost:1234/v1"`. LM Studio documents `/v1/models` and
+  `/v1/chat/completions`; use the model identifier shown by LM Studio.
+  Source: https://lmstudio.ai/docs/developer/openai-compat
+- **vLLM:** `base_url = "http://localhost:8000/v1"` when served on port 8000. vLLM documents an
+  OpenAI-compatible server for Chat/Completions APIs; use the served model ID.
+  Source: https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/
+- **llama.cpp server:** `base_url = "http://localhost:8080/v1"` by default. The server docs list
+  default port 8080, OpenAI-compatible chat completions, and schema-constrained JSON support.
+  Source: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 
 ---
 

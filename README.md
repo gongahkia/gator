@@ -63,6 +63,7 @@ Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config
 | `PAW_MAX_TURNS` | `max_turns` | `40` |
 | `PAW_MAX_BRAIN_TOKENS` | `max_brain_tokens` | `200000` |
 | `PAW_CALL_TIMEOUT` | `call_timeout` | empty |
+| `PAW_OLLAMA_AUTO_PULL` | `ollama_auto_pull` | `false` |
 | `PAW_GATHER_MAX_DEPTH` | `gather.max_depth` | stage default |
 | `PAW_GATHER_MAX_FILE_BYTES` | `gather.max_file_bytes` | stage default |
 
@@ -83,6 +84,36 @@ export PAW_BRAIN_TRANSPORT=openai
 export PAW_BRAIN_BASE_URL=https://api.z.ai/api/paas/v4
 export PAW_BRAIN_API_KEY=...
 export PAW_BRAIN_MODEL=glm-4.6
+```
+
+Local OpenAI-compatible brain profiles do not require an API key when the base URL is loopback.
+Use `paw doctor models` after starting the local server.
+
+LM Studio:
+
+```toml
+[brain]
+transport = "openai"
+base_url = "http://localhost:1234/v1"
+model = "use-the-loaded-lm-studio-model-id"
+```
+
+vLLM:
+
+```toml
+[brain]
+transport = "openai"
+base_url = "http://localhost:8000/v1"
+model = "NousResearch/Meta-Llama-3-8B-Instruct"
+```
+
+llama.cpp server:
+
+```toml
+[brain]
+transport = "openai"
+base_url = "http://localhost:8080/v1"
+model = "gpt-3.5-turbo"
 ```
 
 Codex CLI brain transport uses the user's existing Codex CLI auth:
