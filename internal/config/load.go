@@ -14,9 +14,9 @@ import (
 func Defaults() Config {
 	return Config{
 		Brain: EndpointConfig{
-			Transport: "openai",
-			BaseURL:   "https://api.z.ai/api/paas/v4",
-			Model:     "glm-4.6",
+			Transport: "ollama",
+			BaseURL:   "http://localhost:11434",
+			Model:     "gpt-oss:20b",
 		},
 		Drone: EndpointConfig{
 			Transport: "ollama",

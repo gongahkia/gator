@@ -58,6 +58,16 @@ max_file_bytes = 99
 	}
 }
 
+func TestDefaultsAreLocalFirst(t *testing.T) {
+	cfg := Defaults()
+	if cfg.Brain.Transport != "ollama" || cfg.Brain.BaseURL != "http://localhost:11434" || cfg.Brain.Model != "gpt-oss:20b" {
+		t.Fatalf("brain defaults = %#v", cfg.Brain)
+	}
+	if cfg.Drone.Transport != "ollama" || cfg.Drone.BaseURL != "http://localhost:11434" || cfg.Drone.Model != "qwen3:8b" {
+		t.Fatalf("drone defaults = %#v", cfg.Drone)
+	}
+}
+
 func TestLoadAllowsMissingBrainKeyUntilChat(t *testing.T) {
 	clearPawEnv(t)
 	path := writeConfig(t, `

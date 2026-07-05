@@ -24,7 +24,13 @@ type FactoryConfig struct {
 func NewBrainClient(cfg FactoryConfig) (Client, error) {
 	endpoint := endpointFromEnv(cfg.Brain, "PAW_BRAIN_")
 	if endpoint.Transport == "" {
-		endpoint.Transport = "openai"
+		endpoint.Transport = "ollama"
+	}
+	if endpoint.BaseURL == "" && strings.EqualFold(endpoint.Transport, "ollama") {
+		endpoint.BaseURL = "http://localhost:11434"
+	}
+	if endpoint.Model == "" && strings.EqualFold(endpoint.Transport, "ollama") {
+		endpoint.Model = "gpt-oss:20b"
 	}
 	if requiresBrainKey(endpoint.Transport) && endpoint.APIKey == "" {
 		return missingKeyClient{envKey: "PAW_BRAIN_API_KEY"}, nil
@@ -36,6 +42,12 @@ func NewDroneClient(cfg FactoryConfig) (Client, error) {
 	endpoint := endpointFromEnv(cfg.Drone, "PAW_DRONE_")
 	if endpoint.Transport == "" {
 		endpoint.Transport = "ollama"
+	}
+	if endpoint.BaseURL == "" && strings.EqualFold(endpoint.Transport, "ollama") {
+		endpoint.BaseURL = "http://localhost:11434"
+	}
+	if endpoint.Model == "" && strings.EqualFold(endpoint.Transport, "ollama") {
+		endpoint.Model = "qwen3:8b"
 	}
 	return newClient(endpoint, callTimeout(cfg.CallTimeout))
 }

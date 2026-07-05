@@ -44,7 +44,7 @@ the Ollama native `/api/chat` (it supports the richer `format` schema mode).
 
 ---
 
-## 2. OpenAI-compatible transport (brain default: GLM via Z.AI; also DeepSeek, vLLM, OpenRouter)
+## 2. OpenAI-compatible transport (benchmark/API override: GLM via Z.AI; also DeepSeek, vLLM, OpenRouter)
 
 - **Endpoint:** `{base_url}/chat/completions` (POST).
 - **Z.AI base_url:** `https://api.z.ai/api/paas/v4`  → full URL `.../v4/chat/completions`.
@@ -68,7 +68,7 @@ the Ollama native `/api/chat` (it supports the richer `format` schema mode).
   schema pasted into the prompt (record which mode was used in the trace).
 - **Response:** `choices[0].message.content` (string). `usage.prompt_tokens` /
   `usage.completion_tokens` populate `Usage`.
-- **Default headline model id:** `glm-4.6` (config-overridable). Also validated: `deepseek-v4-pro`
+- **Benchmark headline model id:** `glm-4.6` (config-overridable). Also validated: `deepseek-v4-pro`
   on DeepSeek base_url.
 
 ### Env vars (OpenAI transport)
@@ -97,9 +97,10 @@ This transport is OPTIONAL for v1 — implement openai + ollama first; anthropic
 
 ---
 
-## 4. Ollama transport (drone default, local)
+## 4. Ollama transport (default, local)
 
-- **Endpoint:** `http://localhost:11434/api/chat` (POST). Base configurable via `PAW_DRONE_BASE_URL`.
+- **Endpoint:** `http://localhost:11434/api/chat` (POST). Base configurable via `PAW_BRAIN_BASE_URL`
+  and `PAW_DRONE_BASE_URL`.
 - **Body:**
   ```json
   {
@@ -124,6 +125,13 @@ This transport is OPTIONAL for v1 — implement openai + ollama first; anthropic
 PAW_DRONE_TRANSPORT  "ollama" (default) | "openai"
 PAW_DRONE_BASE_URL   default http://localhost:11434
 PAW_DRONE_MODEL      e.g. qwen3:8b  (any 3–8B instruct/coder model; must support format/json)
+```
+
+### Env vars (local brain)
+```
+PAW_BRAIN_TRANSPORT  "ollama" (default) | "openai" | "anthropic"
+PAW_BRAIN_BASE_URL   default http://localhost:11434
+PAW_BRAIN_MODEL      default gpt-oss:20b
 ```
 
 If `PAW_DRONE_TRANSPORT=openai`, the drone uses a cheap OpenAI-compatible API model instead of

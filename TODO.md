@@ -100,7 +100,6 @@ before starting; this is the only global find-replace required.
 +M16.5-ModelAccess  — local-first defaults + subscription CLI brains. Do before M17.
 ================================================================================
 
-(B) Switch defaults/docs/tests to fully local: brain transport=ollama model=gpt-oss:20b; drone remains ollama qwen3:8b; benchmark docs keep API overrides explicit @config file:internal/config/load.go ref:MODEL_APIS.md#4
 (B) Add internal/llm external CLI runner scaffold: command runner abstraction, prompt/schema wrapping, temp schema support, usage estimation, fake-runner tests @llm file:internal/llm/cli.go ref:MODEL_APIS.md#1
 (B) Add codex-cli brain transport using `codex exec` prompt-only/read-only mode, ChatGPT/API auth reuse, JSON Schema via --output-schema @llm file:internal/llm/codex_cli.go ref:MODEL_APIS.md#1
 (B) Add gemini-cli brain transport using `gemini --prompt` prompt-only plan mode with output parsing and schema prompt fallback @llm file:internal/llm/gemini_cli.go ref:MODEL_APIS.md#1

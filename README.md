@@ -20,17 +20,17 @@ make build
 
 For a release binary, put the `paw` executable on `PATH`.
 
-Default drone mode uses Ollama:
+Default mode uses local Ollama for both models:
 
 ```sh
 ollama serve
+ollama pull gpt-oss:20b
 ollama pull qwen3:8b
 ```
 
 ## Quickstart
 
 ```sh
-export PAW_BRAIN_API_KEY=...
 paw run --instruction "fix the failing test"
 ```
 
@@ -52,10 +52,10 @@ Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config
 
 | env var | config field | default |
 | --- | --- | --- |
-| `PAW_BRAIN_TRANSPORT` | `brain.transport` | `openai` |
-| `PAW_BRAIN_BASE_URL` | `brain.base_url` | `https://api.z.ai/api/paas/v4` |
+| `PAW_BRAIN_TRANSPORT` | `brain.transport` | `ollama` |
+| `PAW_BRAIN_BASE_URL` | `brain.base_url` | `http://localhost:11434` |
 | `PAW_BRAIN_API_KEY` | `brain.api_key` | empty |
-| `PAW_BRAIN_MODEL` | `brain.model` | `glm-4.6` |
+| `PAW_BRAIN_MODEL` | `brain.model` | `gpt-oss:20b` |
 | `PAW_DRONE_TRANSPORT` | `drone.transport` | `ollama` |
 | `PAW_DRONE_BASE_URL` | `drone.base_url` | `http://localhost:11434` |
 | `PAW_DRONE_API_KEY` | `drone.api_key` | empty |
@@ -74,6 +74,15 @@ transport = "anthropic"
 base_url = "https://api.deepseek.com/anthropic"
 api_key = "..."
 model = "deepseek-v4-pro"
+```
+
+OpenAI-compatible API override for benchmark runs:
+
+```sh
+export PAW_BRAIN_TRANSPORT=openai
+export PAW_BRAIN_BASE_URL=https://api.z.ai/api/paas/v4
+export PAW_BRAIN_API_KEY=...
+export PAW_BRAIN_MODEL=glm-4.6
 ```
 
 ## Prior Art
