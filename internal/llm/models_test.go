@@ -2,7 +2,6 @@ package llm
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -17,7 +16,7 @@ func TestListEndpointModelsOpenAILocal(t *testing.T) {
 			t.Fatalf("path = %q", r.URL.Path)
 		}
 		auth = r.Header.Get("Authorization")
-		fmt.Fprint(w, `{"data":[{"id":"local-a"},{"id":"local-b"}]}`)
+		mustWriteResponse(t, w, `{"data":[{"id":"local-a"},{"id":"local-b"}]}`)
 	}))
 	defer srv.Close()
 

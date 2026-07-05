@@ -39,7 +39,9 @@ var doctorModelsCmd = &cobra.Command{
 			{Name: "brain", Report: checker.Check(cmd.Context(), llmConfig(cfg).Brain)},
 			{Name: "drone", Report: checker.Check(cmd.Context(), llmConfig(cfg).Drone)},
 		}
-		writeHealthReports(cmd.OutOrStdout(), reports)
+		if err := writeHealthReports(cmd.OutOrStdout(), reports); err != nil {
+			return err
+		}
 		if hasHealthFailures(reports) {
 			return fmt.Errorf("model doctor found failures")
 		}
@@ -57,28 +59,45 @@ func init() {
 	doctorCmd.AddCommand(doctorModelsCmd)
 }
 
-func writeHealthReports(w io.Writer, reports []namedHealthReport) {
+func writeHealthReports(w io.Writer, reports []namedHealthReport) error {
 	for _, named := range reports {
 		report := named.Report
-		fmt.Fprintf(w, "%s: %s", named.Name, report.Transport)
+		if _, err := fmt.Fprintf(w, "%s: %s", named.Name, report.Transport); err != nil {
+			return err
+		}
 		if report.Model != "" {
-			fmt.Fprintf(w, " model=%s", report.Model)
+			if _, err := fmt.Fprintf(w, " model=%s", report.Model); err != nil {
+				return err
+			}
 		}
 		if report.BaseURL != "" {
-			fmt.Fprintf(w, " base_url=%s", report.BaseURL)
+			if _, err := fmt.Fprintf(w, " base_url=%s", report.BaseURL); err != nil {
+				return err
+			}
 		}
-		fmt.Fprintln(w)
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
 		for _, check := range report.Checks {
-			fmt.Fprintf(w, "  %s %s", check.Status, check.Name)
+			if _, err := fmt.Fprintf(w, "  %s %s", check.Status, check.Name); err != nil {
+				return err
+			}
 			if check.Detail != "" {
-				fmt.Fprintf(w, ": %s", check.Detail)
+				if _, err := fmt.Fprintf(w, ": %s", check.Detail); err != nil {
+					return err
+				}
 			}
 			if check.Action != "" {
-				fmt.Fprintf(w, " | action: %s", check.Action)
+				if _, err := fmt.Fprintf(w, " | action: %s", check.Action); err != nil {
+					return err
+				}
 			}
-			fmt.Fprintln(w)
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func hasHealthFailures(reports []namedHealthReport) bool {

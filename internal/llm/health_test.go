@@ -16,7 +16,7 @@ func TestHealthOllamaTagsCheck(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotMethod = r.Method
-		fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"}]}`)
+		mustWriteResponse(t, w, `{"models":[{"name":"qwen3:8b"}]}`)
 	}))
 	defer srv.Close()
 
@@ -38,7 +38,7 @@ func TestHealthOllamaMissingModelSuggestsPull(t *testing.T) {
 	pulls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		pulls++
-		fmt.Fprint(w, `{"models":[{"name":"other:latest"}]}`)
+		mustWriteResponse(t, w, `{"models":[{"name":"other:latest"}]}`)
 	}))
 	defer srv.Close()
 
@@ -61,10 +61,10 @@ func TestHealthOllamaAutoPullsWhenExplicitlyEnabled(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/tags":
-			fmt.Fprint(w, `{"models":[{"name":"other:latest"}]}`)
+			mustWriteResponse(t, w, `{"models":[{"name":"other:latest"}]}`)
 		case "/api/pull":
 			pullBody = readRequestBody(t, r)
-			fmt.Fprint(w, `{"status":"success"}`)
+			mustWriteResponse(t, w, `{"status":"success"}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -90,10 +90,10 @@ func TestHealthOllamaSchemaSmoke(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/tags":
-			fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"}]}`)
+			mustWriteResponse(t, w, `{"models":[{"name":"qwen3:8b"}]}`)
 		case "/api/chat":
 			chatBody = readRequestBody(t, r)
-			fmt.Fprint(w, `{"message":{"content":"{\"ok\":true}"}}`)
+			mustWriteResponse(t, w, `{"message":{"content":"{\"ok\":true}"}}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -115,9 +115,9 @@ func TestHealthOllamaSchemaSmokeFailsOnMismatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/tags":
-			fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"}]}`)
+			mustWriteResponse(t, w, `{"models":[{"name":"qwen3:8b"}]}`)
 		case "/api/chat":
-			fmt.Fprint(w, `{"message":{"content":"{\"ok\":\"no\"}"}}`)
+			mustWriteResponse(t, w, `{"message":{"content":"{\"ok\":\"no\"}"}}`)
 		default:
 			http.NotFound(w, r)
 		}
@@ -139,7 +139,7 @@ func TestListOllamaModelsUsesTags(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
-		fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"},{"model":"gpt-oss:20b"}]}`)
+		mustWriteResponse(t, w, `{"models":[{"name":"qwen3:8b"},{"model":"gpt-oss:20b"}]}`)
 	}))
 	defer srv.Close()
 
@@ -162,7 +162,7 @@ func TestHealthOpenAICompatibleModelsCheck(t *testing.T) {
 			t.Fatalf("path = %q", r.URL.Path)
 		}
 		auth = r.Header.Get("Authorization")
-		fmt.Fprint(w, `{"data":[{"id":"glm-test"}]}`)
+		mustWriteResponse(t, w, `{"data":[{"id":"glm-test"}]}`)
 	}))
 	defer srv.Close()
 
@@ -185,7 +185,7 @@ func TestHealthOpenAILocalNoKey(t *testing.T) {
 	var auth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth = r.Header.Get("Authorization")
-		fmt.Fprint(w, `{"data":[{"id":"local-model"}]}`)
+		mustWriteResponse(t, w, `{"data":[{"id":"local-model"}]}`)
 	}))
 	defer srv.Close()
 
@@ -352,6 +352,13 @@ func readRequestBody(t *testing.T, r *http.Request) string {
 		t.Fatalf("read body: %v", err)
 	}
 	return string(body)
+}
+
+func mustWriteResponse(t *testing.T, w http.ResponseWriter, body string) {
+	t.Helper()
+	if _, err := fmt.Fprint(w, body); err != nil {
+		t.Fatalf("write response: %v", err)
+	}
 }
 
 type sequenceCLIRunner struct {

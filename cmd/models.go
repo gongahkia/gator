@@ -44,10 +44,14 @@ var modelsListCmd = &cobra.Command{
 			models, err := modelsLister.ListEndpointModels(cmd.Context(), endpoint.Endpoint, opts)
 			if err != nil {
 				failed = true
-				fmt.Fprintf(cmd.OutOrStdout(), "%s: error: %v\n", endpoint.Name, err)
+				if _, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "%s: error: %v\n", endpoint.Name, err); writeErr != nil {
+					return writeErr
+				}
 				continue
 			}
-			writeModelList(cmd.OutOrStdout(), endpoint.Name, endpoint.Endpoint.Transport, models)
+			if err := writeModelList(cmd.OutOrStdout(), endpoint.Name, endpoint.Endpoint.Transport, models); err != nil {
+				return err
+			}
 		}
 		if failed {
 			return fmt.Errorf("model listing failed")
@@ -87,13 +91,18 @@ func selectedModelEndpoints(cfg config.Config, args []string) ([]namedEndpoint, 
 	}
 }
 
-func writeModelList(w io.Writer, name, transport string, models []llm.ModelInfo) {
-	fmt.Fprintf(w, "%s: %s\n", name, transport)
+func writeModelList(w io.Writer, name, transport string, models []llm.ModelInfo) error {
+	if _, err := fmt.Fprintf(w, "%s: %s\n", name, transport); err != nil {
+		return err
+	}
 	if len(models) == 0 {
-		fmt.Fprintln(w, "  no models returned")
-		return
+		_, err := fmt.Fprintln(w, "  no models returned")
+		return err
 	}
 	for _, model := range models {
-		fmt.Fprintf(w, "  %s\n", model.ID)
+		if _, err := fmt.Fprintf(w, "  %s\n", model.ID); err != nil {
+			return err
+		}
 	}
+	return nil
 }
