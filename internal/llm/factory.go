@@ -76,6 +76,8 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 		client = NewAiderCLIClient(endpoint.Model)
 	case "goose-cli":
 		client = NewGooseCLIClient(endpoint.Provider, endpoint.Model)
+	case "qwen-cli":
+		client = NewQwenCLIClient(endpoint.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm transport %q", endpoint.Transport)
 	}
