@@ -104,7 +104,6 @@ before starting; this is the only global find-replace required.
 +M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
 ================================================================================
 
-(A) Add provider health-check abstractions for HTTP and CLI transports: report installed/running/auth/model/schema capability without making repo edits @llm file:internal/llm ref:MODEL_APIS.md
 (A) Add `paw doctor models` command: checks configured brain+drone transports, Ollama `/api/tags`, OpenAI-compatible `/v1/models`, CLI binary presence, and prints actionable failures @cli @llm file:cmd file:internal/llm
 (A) Add Ollama model detection: list installed models via `/api/tags`, verify configured brain/drone models exist, and return pull command when missing @llm file:internal/llm
 (A) Add optional Ollama auto-pull behind explicit env/config opt-in only; default must only suggest, not download @llm @config file:internal/llm file:internal/config
