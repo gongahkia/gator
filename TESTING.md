@@ -57,7 +57,33 @@ that compression actually happened).
 
 ---
 
-## 5. Lint / CI gates (see TODO.md CI task)
+## 5. Logged-in CLI smoke tests
+
+`internal/llm/cli_e2e_test.go` is skipped by default. These tests call real installed CLIs and
+therefore require the user to be logged in before running. Enable one transport at a time:
+
+```sh
+PAW_E2E_CODEX_CLI=1 go test ./internal/llm -run TestCLITransportE2ESmoke/codex
+PAW_E2E_GEMINI_CLI=1 go test ./internal/llm -run TestCLITransportE2ESmoke/gemini
+PAW_E2E_CLAUDE_CLI=1 go test ./internal/llm -run TestCLITransportE2ESmoke/claude
+PAW_E2E_OPENCODE_CLI=1 go test ./internal/llm -run TestCLITransportE2ESmoke/opencode
+```
+
+Optional model overrides:
+
+```sh
+PAW_E2E_CODEX_MODEL=gpt-5
+PAW_E2E_GEMINI_MODEL=gemini-3-pro
+PAW_E2E_CLAUDE_MODEL=sonnet
+PAW_E2E_OPENCODE_MODEL=opencode/big-pickle
+```
+
+The smoke prompt is intentionally non-mutating: `Return exactly {"ok":true} as JSON. Do not
+inspect files. Do not edit files.` The expected response is exactly `{"ok":true}`.
+
+---
+
+## 6. Lint / CI gates (see TODO.md CI task)
 - `go vet ./...`
 - `golangci-lint run` (config `.golangci.yml`)
 - `go test ./... -race`

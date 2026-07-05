@@ -104,7 +104,6 @@ before starting; this is the only global find-replace required.
 +M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
 ================================================================================
 
-(A) Document E2E smoke env vars and expected non-mutating prompts for logged-in CLI validation @docs file:TESTING.md file:MODEL_APIS.md
 
 ================================================================================
 +M16.7-AgentCLIExpansion  — add more subscription/local coding CLI brain transports.

@@ -173,6 +173,11 @@ CLI transports implement `Client` by invoking an installed coding CLI. They are 
 brain use, not drone compression. They reuse the CLI's own login/session and do not read or copy
 credential files.
 
+Logged-in smoke tests are env-gated and skipped by default:
+`PAW_E2E_CODEX_CLI=1`, `PAW_E2E_GEMINI_CLI=1`, `PAW_E2E_CLAUDE_CLI=1`,
+`PAW_E2E_OPENCODE_CLI=1`. Optional model override env vars use the same names with `_MODEL`.
+The smoke prompt asks only for `{"ok":true}` and explicitly says not to inspect or edit files.
+
 ### Codex CLI
 
 - **Transport:** `codex-cli`.
