@@ -94,6 +94,23 @@ These use the same `openai` transport and the same `/chat/completions` client pa
   default port 8080, OpenAI-compatible chat completions, and schema-constrained JSON support.
   Source: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 
+### macOS local sizing guidance
+
+These are conservative starting points for Apple Silicon unified memory, not guarantees.
+Ollama documents that context length and parallelism change required RAM, and its `gpt-oss`
+library page says `gpt-oss:20b` can run with as little as 16GB memory. Always verify with
+`paw doctor models` on the target machine.
+
+- **8-12GB memory:** keep the drone local, use a subscription/API brain or a 3-4B local brain.
+- **16GB memory:** try `qwen3:8b` as drone and `gpt-oss:20b` as brain; reduce context if the OS
+  reports memory pressure.
+- **24-36GB memory:** use the default local pair: `qwen3:8b` drone and `gpt-oss:20b` brain.
+- **48GB+ memory:** defaults should have headroom; test 30B/32B-class brains only after the
+  doctor and a real task smoke pass.
+
+Sources: https://ollama.com/library/gpt-oss, https://docs.ollama.com/faq,
+https://docs.ollama.com/context-length
+
 ---
 
 ## 3. Anthropic-compatible transport (optional; DeepSeek also exposes this)

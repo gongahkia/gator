@@ -116,6 +116,18 @@ base_url = "http://localhost:8080/v1"
 model = "gpt-3.5-turbo"
 ```
 
+Local model sizing on macOS:
+
+| Apple Silicon memory | Suggested setup |
+| --- | --- |
+| 8-12 GB | Use local drone only; use a subscription/API brain or a 3-4B local brain. |
+| 16 GB | Try `qwen3:8b` drone and `gpt-oss:20b` brain; reduce context if memory pressure is high. |
+| 24-36 GB | Defaults are the recommended starting point: `qwen3:8b` drone + `gpt-oss:20b` brain. |
+| 48 GB+ | Defaults should have more headroom; test larger 30B/32B-class brains only after `paw doctor models` passes. |
+
+These are starting points, not fit guarantees. Context length, quantization, parallel requests, and
+other apps change memory use; verify on the target Mac with `paw doctor models`.
+
 Codex CLI brain transport uses the user's existing Codex CLI auth:
 
 ```sh
