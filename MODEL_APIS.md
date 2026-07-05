@@ -158,6 +158,14 @@ credential files.
   or common JSON wrapper fields such as `response`/`text`/`content`.
 - **Safety boundary:** plan approval mode; `paw` remains responsible for patch application.
 
+### Claude CLI
+
+- **Transport:** `claude-cli`.
+- **Command:** `claude -p --permission-mode plan --output-format json [--model model] [--json-schema schema]`.
+- **Auth:** existing Claude Code auth. Do not pass `--bare`; that mode skips OAuth/keychain auth.
+- **Structured output:** uses `--json-schema` when `ChatRequest.JSONSchema` is set.
+- **Safety boundary:** plan permission mode; `paw` remains responsible for patch application.
+
 If `PAW_DRONE_TRANSPORT=openai`, the drone uses a cheap OpenAI-compatible API model instead of
 local Ollama (for users with no local GPU). Same `response_format` schema path as §2.
 

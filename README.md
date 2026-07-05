@@ -101,6 +101,14 @@ export PAW_BRAIN_TRANSPORT=gemini-cli
 export PAW_BRAIN_MODEL=gemini-3-pro
 ```
 
+Claude CLI brain transport uses the user's existing Claude Code auth:
+
+```sh
+claude auth login
+export PAW_BRAIN_TRANSPORT=claude-cli
+export PAW_BRAIN_MODEL=sonnet
+```
+
 ## Prior Art
 
 Closest related systems include SWE-Pruner, Focus, TokenPilot, LLMLingua, and The Token Company. `paw` differs by packaging the pattern as a single Go binary with pipeable stages, stock-model drone support, offline-capable defaults, and deterministic validation of quoted spans. paw's measured benchmark results belong in [docs/RESULTS.md](docs/RESULTS.md), not in copied prior-art numbers.
