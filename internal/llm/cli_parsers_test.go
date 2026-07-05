@@ -13,6 +13,7 @@ func TestCLIParserOutputVariants(t *testing.T) {
 		"claude":   parseClaudeOutput,
 		"goose":    parseGooseOutput,
 		"opencode": parseOpenCodeOutput,
+		"qwen":     parseQwenOutput,
 	}
 	cases := []struct {
 		name   string
