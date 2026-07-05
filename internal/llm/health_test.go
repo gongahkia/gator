@@ -205,7 +205,10 @@ func TestHealthOpenAILocalNoKey(t *testing.T) {
 }
 
 func TestHealthCLIVersionProbe(t *testing.T) {
-	runner := &fakeCLIRunner{stdout: "codex-cli 1.2.3\n"}
+	runner := &sequenceCLIRunner{results: []cliResult{
+		{Stdout: "codex-cli 1.2.3\n"},
+		{Stdout: "--sandbox --model --output-schema --cd --ephemeral"},
+	}}
 	report := EndpointHealthChecker{
 		CLIRunner: runner,
 		LookPath: func(command string) (string, error) {
@@ -218,14 +221,38 @@ func TestHealthCLIVersionProbe(t *testing.T) {
 		Transport: "codex-cli",
 		Model:     "gpt-test",
 	})
-	if runner.inv.Command != "codex" || !reflect.DeepEqual(runner.inv.Args, []string{"--version"}) {
-		t.Fatalf("invocation = %#v", runner.inv)
+	if len(runner.invocations) != 2 {
+		t.Fatalf("invocations = %#v", runner.invocations)
+	}
+	if runner.invocations[0].Command != "codex" || !reflect.DeepEqual(runner.invocations[0].Args, []string{"--version"}) {
+		t.Fatalf("version invocation = %#v", runner.invocations[0])
+	}
+	if !reflect.DeepEqual(runner.invocations[1].Args, []string{"exec", "--help"}) {
+		t.Fatalf("help invocation = %#v", runner.invocations[1])
 	}
 	requireCheck(t, report, "installed", HealthOK)
 	requireCheck(t, report, "running", HealthOK)
+	requireCheck(t, report, "capabilities", HealthOK)
 	requireCheck(t, report, "auth", HealthUnknown)
 	requireCheck(t, report, "model", HealthUnknown)
 	requireCheck(t, report, "schema", HealthOK)
+}
+
+func TestHealthCLIMissingCapabilityFlag(t *testing.T) {
+	runner := &sequenceCLIRunner{results: []cliResult{
+		{Stdout: "2.1.119\n"},
+		{Stdout: "--print --permission-mode --output-format --model"},
+	}}
+	report := EndpointHealthChecker{
+		CLIRunner: runner,
+		LookPath: func(command string) (string, error) {
+			return "/usr/local/bin/" + command, nil
+		},
+	}.Check(context.Background(), EndpointConfig{Transport: "claude-cli"})
+	check := requireCheck(t, report, "capabilities", HealthFail)
+	if !strings.Contains(check.Detail, "--json-schema") || !strings.Contains(check.Action, "upgrade claude") {
+		t.Fatalf("check = %#v", check)
+	}
 }
 
 func TestHealthCLIMissingBinary(t *testing.T) {
@@ -264,4 +291,25 @@ func readRequestBody(t *testing.T, r *http.Request) string {
 		t.Fatalf("read body: %v", err)
 	}
 	return string(body)
+}
+
+type sequenceCLIRunner struct {
+	invocations []cliInvocation
+	results     []cliResult
+	errs        []error
+}
+
+func (r *sequenceCLIRunner) Run(_ context.Context, inv cliInvocation) (cliResult, error) {
+	r.invocations = append(r.invocations, inv)
+	var result cliResult
+	if len(r.results) > 0 {
+		result = r.results[0]
+		r.results = r.results[1:]
+	}
+	var err error
+	if len(r.errs) > 0 {
+		err = r.errs[0]
+		r.errs = r.errs[1:]
+	}
+	return result, err
 }

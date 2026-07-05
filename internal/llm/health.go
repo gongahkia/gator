@@ -160,6 +160,7 @@ func (c EndpointHealthChecker) checkCLI(ctx context.Context, endpoint EndpointCo
 	} else {
 		report.add(HealthCheck{Name: "running", Status: HealthOK, Detail: strings.TrimSpace(version)})
 	}
+	report.add(c.cliCapabilityHealth(ctx, endpoint.Transport, bin))
 	report.add(HealthCheck{Name: "auth", Status: HealthUnknown, Detail: "not checked without a model call"})
 	if endpoint.Model == "" {
 		report.add(HealthCheck{Name: "model", Status: HealthUnknown, Detail: "no model configured"})
@@ -405,6 +406,64 @@ func cliSchemaCheck(transport string) HealthCheck {
 		return HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "schema is prompt-enforced, not CLI-enforced"}
 	default:
 		return HealthCheck{Name: "schema", Status: HealthUnknown}
+	}
+}
+
+func (c EndpointHealthChecker) cliCapabilityHealth(ctx context.Context, transport, bin string) HealthCheck {
+	spec, ok := cliCapabilitySpec(transport)
+	if !ok {
+		return HealthCheck{Name: "capabilities", Status: HealthUnknown, Detail: "no capability spec"}
+	}
+	help, err := c.runCLI(ctx, bin, spec.helpArgs)
+	if err != nil {
+		return HealthCheck{Name: "capabilities", Status: HealthFail, Detail: err.Error(), Action: "upgrade or reinstall " + bin}
+	}
+	var missing []string
+	for _, flag := range spec.requiredFlags {
+		if !strings.Contains(help, flag) {
+			missing = append(missing, flag)
+		}
+	}
+	if len(missing) > 0 {
+		return HealthCheck{
+			Name:   "capabilities",
+			Status: HealthFail,
+			Detail: "missing flags: " + strings.Join(missing, ", "),
+			Action: "upgrade " + bin + " or choose another brain transport",
+		}
+	}
+	return HealthCheck{Name: "capabilities", Status: HealthOK, Detail: "required flags present"}
+}
+
+type cliCapability struct {
+	helpArgs      []string
+	requiredFlags []string
+}
+
+func cliCapabilitySpec(transport string) (cliCapability, bool) {
+	switch transport {
+	case "codex-cli":
+		return cliCapability{
+			helpArgs:      []string{"exec", "--help"},
+			requiredFlags: []string{"--sandbox", "--model", "--output-schema", "--cd", "--ephemeral"},
+		}, true
+	case "gemini-cli":
+		return cliCapability{
+			helpArgs:      []string{"--help"},
+			requiredFlags: []string{"--prompt", "--approval-mode", "--output-format", "--skip-trust", "--model"},
+		}, true
+	case "claude-cli":
+		return cliCapability{
+			helpArgs:      []string{"--help"},
+			requiredFlags: []string{"--print", "--permission-mode", "--output-format", "--model", "--json-schema"},
+		}, true
+	case "opencode-cli":
+		return cliCapability{
+			helpArgs:      []string{"run", "--help"},
+			requiredFlags: []string{"--format", "--model", "--dir"},
+		}, true
+	default:
+		return cliCapability{}, false
 	}
 }
 
