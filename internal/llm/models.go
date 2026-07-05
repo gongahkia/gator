@@ -29,6 +29,12 @@ func (c EndpointHealthChecker) ListEndpointModels(ctx context.Context, endpoint 
 		return c.listOpenCodeModels(ctx, opts.Provider)
 	case "aider-cli":
 		return c.listAiderModels(ctx, opts.Query)
+	case "cursor-cli":
+		return c.listCursorModels(ctx)
+	case "goose-cli":
+		return nil, fmt.Errorf("model listing unsupported for transport %q; run goose configure or set PAW_BRAIN_PROVIDER and PAW_BRAIN_MODEL", endpoint.Transport)
+	case "qwen-cli":
+		return nil, fmt.Errorf("model listing unsupported for transport %q; Qwen Code exposes model switching interactively via /model, so set PAW_BRAIN_MODEL explicitly", endpoint.Transport)
 	case "":
 		return nil, fmt.Errorf("missing transport")
 	default:
@@ -81,6 +87,14 @@ func (c EndpointHealthChecker) listAiderModels(ctx context.Context, query string
 		return nil, fmt.Errorf("aider model listing requires --query because aider --list-models requires a partial model name")
 	}
 	out, err := c.runCLI(ctx, "aider", []string{"--list-models", query})
+	if err != nil {
+		return nil, err
+	}
+	return parseModelLines(out), nil
+}
+
+func (c EndpointHealthChecker) listCursorModels(ctx context.Context) ([]ModelInfo, error) {
+	out, err := c.runCLI(ctx, "cursor-agent", []string{"models"})
 	if err != nil {
 		return nil, err
 	}

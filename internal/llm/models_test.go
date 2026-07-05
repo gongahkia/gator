@@ -77,6 +77,40 @@ func TestListEndpointModelsAider(t *testing.T) {
 	}
 }
 
+func TestListEndpointModelsCursor(t *testing.T) {
+	runner := &fakeCLIRunner{stdout: "gpt-5\nclaude-sonnet-4.6\n"}
+	models, err := EndpointHealthChecker{CLIRunner: runner}.ListEndpointModels(context.Background(), EndpointConfig{
+		Transport: "cursor-cli",
+	}, ModelListOptions{})
+	if err != nil {
+		t.Fatalf("list models: %v", err)
+	}
+	if runner.inv.Command != "cursor-agent" || !reflect.DeepEqual(runner.inv.Args, []string{"models"}) {
+		t.Fatalf("invocation = %#v", runner.inv)
+	}
+	if !reflect.DeepEqual(models, []ModelInfo{{ID: "gpt-5"}, {ID: "claude-sonnet-4.6"}}) {
+		t.Fatalf("models = %#v", models)
+	}
+}
+
+func TestListEndpointModelsGooseUnsupportedDiagnostic(t *testing.T) {
+	_, err := EndpointHealthChecker{}.ListEndpointModels(context.Background(), EndpointConfig{
+		Transport: "goose-cli",
+	}, ModelListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "PAW_BRAIN_PROVIDER") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestListEndpointModelsQwenUnsupportedDiagnostic(t *testing.T) {
+	_, err := EndpointHealthChecker{}.ListEndpointModels(context.Background(), EndpointConfig{
+		Transport: "qwen-cli",
+	}, ModelListOptions{})
+	if err == nil || !strings.Contains(err.Error(), "PAW_BRAIN_MODEL") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestListEndpointModelsUnsupportedTransport(t *testing.T) {
 	_, err := EndpointHealthChecker{}.ListEndpointModels(context.Background(), EndpointConfig{
 		Transport: "gemini-cli",

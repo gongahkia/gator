@@ -109,7 +109,6 @@ before starting; this is the only global find-replace required.
 +M16.7-AgentCLIExpansion  — add more subscription/local coding CLI brain transports.
 ================================================================================
 
-(B) Add model listing coverage for Aider/Goose/Qwen/Cursor where supported; unsupported listing must return explicit diagnostic, not silent empty output @cli @llm file:cmd file:internal/llm
 (B) Update README/MODEL_APIS with comparison table: local/no-key, subscription CLI, API-key required, model listing support, schema enforcement strength @docs file:README.md file:MODEL_APIS.md
 
 ================================================================================

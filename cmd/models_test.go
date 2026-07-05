@@ -37,8 +37,8 @@ func TestModelsListUnsupportedConfiguredCLIError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte(`
 [brain]
-transport = "gemini-cli"
-model = "gemini-test"
+transport = "qwen-cli"
+model = "qwen-test"
 `), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -47,7 +47,7 @@ model = "gemini-test"
 	if err == nil || !strings.Contains(err.Error(), "model listing failed") {
 		t.Fatalf("err = %v stderr=%s", err, stderr)
 	}
-	if !strings.Contains(out, `model listing unsupported for transport "gemini-cli"`) {
+	if !strings.Contains(out, `model listing unsupported for transport "qwen-cli"`) || !strings.Contains(out, "PAW_BRAIN_MODEL") {
 		t.Fatalf("out = %s", out)
 	}
 }
