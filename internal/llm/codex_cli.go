@@ -12,6 +12,7 @@ func newCodexCLIClientWithRunner(model string, runner cliRunner) Client {
 		model:         model,
 		runner:        runner,
 		useSchemaFile: true,
+		parse:         parseCodexOutput,
 		build: func(in cliBuildInput) cliInvocation {
 			args := []string{"exec", "--ephemeral", "--sandbox", "read-only"}
 			if cwd, err := os.Getwd(); err == nil {
@@ -30,4 +31,8 @@ func newCodexCLIClientWithRunner(model string, runner cliRunner) Client {
 			}
 		},
 	}
+}
+
+func parseCodexOutput(result cliResult) (string, error) {
+	return parseJSONStdout(result, "codex")
 }
