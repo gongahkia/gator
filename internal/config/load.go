@@ -74,10 +74,12 @@ func applyEnv(cfg *Config) error {
 	setString("PAW_BRAIN_TRANSPORT", &cfg.Brain.Transport)
 	setString("PAW_BRAIN_BASE_URL", &cfg.Brain.BaseURL)
 	setString("PAW_BRAIN_API_KEY", &cfg.Brain.APIKey)
+	setString("PAW_BRAIN_PROVIDER", &cfg.Brain.Provider)
 	setString("PAW_BRAIN_MODEL", &cfg.Brain.Model)
 	setString("PAW_DRONE_TRANSPORT", &cfg.Drone.Transport)
 	setString("PAW_DRONE_BASE_URL", &cfg.Drone.BaseURL)
 	setString("PAW_DRONE_API_KEY", &cfg.Drone.APIKey)
+	setString("PAW_DRONE_PROVIDER", &cfg.Drone.Provider)
 	setString("PAW_DRONE_MODEL", &cfg.Drone.Model)
 	if err := setInt("PAW_MAX_TURNS", &cfg.MaxTurns); err != nil {
 		return err

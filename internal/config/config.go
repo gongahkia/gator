@@ -6,6 +6,7 @@ type EndpointConfig struct {
 	Transport string `toml:"transport"`
 	BaseURL   string `toml:"base_url"`
 	APIKey    string `toml:"api_key"`
+	Provider  string `toml:"provider"`
 	Model     string `toml:"model"`
 }
 

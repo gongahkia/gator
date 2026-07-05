@@ -14,6 +14,7 @@ type EndpointConfig struct {
 	Transport string
 	BaseURL   string
 	APIKey    string
+	Provider  string
 	Model     string
 }
 
@@ -73,6 +74,8 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 		client = NewOpenCodeCLIClient(endpoint.Model)
 	case "aider-cli":
 		client = NewAiderCLIClient(endpoint.Model)
+	case "goose-cli":
+		client = NewGooseCLIClient(endpoint.Provider, endpoint.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm transport %q", endpoint.Transport)
 	}
@@ -115,6 +118,9 @@ func endpointFromEnv(cfg EndpointConfig, prefix string) EndpointConfig {
 	}
 	if v := os.Getenv(prefix + "API_KEY"); v != "" {
 		cfg.APIKey = v
+	}
+	if v := os.Getenv(prefix + "PROVIDER"); v != "" {
+		cfg.Provider = v
 	}
 	if v := os.Getenv(prefix + "MODEL"); v != "" {
 		cfg.Model = v

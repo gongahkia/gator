@@ -109,7 +109,6 @@ before starting; this is the only global find-replace required.
 +M16.7-AgentCLIExpansion  — add more subscription/local coding CLI brain transports.
 ================================================================================
 
-(B) Add Goose CLI brain transport `goose-cli`: `goose run --no-session --quiet --output-format json`, provider/model passthrough, schema-in-prompt, no default built-in mutation tools @llm file:internal/llm
 (B) Add Goose CLI parser tests and command construction tests for provider/model/json/stream-json variants @test @llm file:internal/llm
 (B) Add Qwen Code CLI brain transport `qwen-cli`: headless `--prompt`, `--plan`, `--output-format json`, model passthrough, schema-in-prompt @llm file:internal/llm
 (B) Add Qwen CLI parser tests and command construction tests for JSON, stream JSON, wrapped response, and text fallback @test @llm file:internal/llm
