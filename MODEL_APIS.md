@@ -215,6 +215,17 @@ The smoke prompt asks only for `{"ok":true}` and explicitly says not to inspect 
 - **Safety boundary:** no `--dangerously-skip-permissions`; `paw` remains responsible for patch
   application.
 
+### Cursor CLI (experimental)
+
+- **Transport:** `cursor-cli`.
+- **Command:** `cursor-agent --print --output-format json --mode ask [--model model] {prompt}`.
+- **Auth:** existing Cursor CLI auth/subscription.
+- **Structured output:** schema is pasted into the prompt. Cursor's documented CLI parameters
+  include JSON output but no schema flag, so this transport is weaker than Codex/Claude.
+- **Safety boundary:** ask mode and no force/yolo flags; `paw` remains responsible for patch
+  application. Keep this experimental until logged-in smoke tests prove stable headless behavior.
+  Source: https://cursor.com/docs/cli/reference/parameters.md
+
 If `PAW_DRONE_TRANSPORT=openai`, the drone uses a cheap OpenAI-compatible API model instead of
 local Ollama (for users with no local GPU). Same `response_format` schema path as §2.
 

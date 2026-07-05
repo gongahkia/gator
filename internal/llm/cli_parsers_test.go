@@ -9,6 +9,7 @@ func TestCLIParserOutputVariants(t *testing.T) {
 	parsers := map[string]func(cliResult) (string, error){
 		"aider":    parseAiderOutput,
 		"codex":    parseCodexOutput,
+		"cursor":   parseCursorOutput,
 		"gemini":   parseGeminiOutput,
 		"claude":   parseClaudeOutput,
 		"goose":    parseGooseOutput,
