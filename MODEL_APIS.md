@@ -182,6 +182,23 @@ All CLI brain transports accept `PAW_BRAIN_MODEL`. Goose also accepts `PAW_BRAIN
 because its CLI has separate `--provider` and `--model` flags. OpenCode encodes provider in the
 model string as `provider/model`.
 
+### Model access matrix
+
+| transport | local/no-key | subscription CLI | API key required | model listing | schema enforcement |
+| --- | --- | --- | --- | --- | --- |
+| `ollama` | yes | no | no | `/api/tags` | native `format` JSON Schema |
+| `openai` loopback | yes | no | no | `/models` | `response_format.json_schema` |
+| `openai` remote | no | no | yes | `/models` | `response_format.json_schema`, fallback to JSON object |
+| `anthropic` | no | no | yes | `/v1/models` | tool `input_schema`, fallback prompt |
+| `codex-cli` | no | yes | CLI-managed | unsupported | native `--output-schema` |
+| `gemini-cli` | no | yes | CLI-managed | unsupported | prompt-only |
+| `claude-cli` | no | yes | CLI-managed | unsupported | native `--json-schema` |
+| `opencode-cli` | provider-dependent | provider-dependent | provider-dependent | `opencode models` | prompt-only |
+| `aider-cli` | provider-dependent | provider-dependent | provider-dependent | `aider --list-models <query>` | prompt-only |
+| `goose-cli` | provider-dependent | provider-dependent | provider-dependent | unsupported; use `goose configure` | prompt-only |
+| `qwen-cli` | provider-dependent | yes | CLI-managed | unsupported; interactive `/model` only | prompt-only |
+| `cursor-cli` | no | yes | CLI-managed | `cursor-agent models` | prompt-only, experimental |
+
 ### Codex CLI
 
 - **Transport:** `codex-cli`.

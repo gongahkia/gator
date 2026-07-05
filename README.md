@@ -191,6 +191,23 @@ export PAW_BRAIN_TRANSPORT=cursor-cli
 export PAW_BRAIN_MODEL=cursor-default-model
 ```
 
+Model access comparison:
+
+| transport | local/no-key | subscription CLI | API key required | model listing | schema strength |
+| --- | --- | --- | --- | --- | --- |
+| `ollama` | yes | no | no | yes | native JSON Schema |
+| `openai` loopback | yes | no | no | yes | OpenAI-compatible `json_schema` |
+| `openai` remote | no | no | yes | yes | OpenAI-compatible `json_schema` |
+| `anthropic` | no | no | yes | yes | tool/schema coercion |
+| `codex-cli` | no | yes | CLI-managed | no | native `--output-schema` |
+| `gemini-cli` | no | yes | CLI-managed | no | prompt-only |
+| `claude-cli` | no | yes | CLI-managed | no | native `--json-schema` |
+| `opencode-cli` | provider-dependent | provider-dependent | provider-dependent | yes | prompt-only |
+| `aider-cli` | provider-dependent | provider-dependent | provider-dependent | query-only | prompt-only |
+| `goose-cli` | provider-dependent | provider-dependent | provider-dependent | no | prompt-only |
+| `qwen-cli` | provider-dependent | yes | CLI-managed | no | prompt-only |
+| `cursor-cli` | no | yes | CLI-managed | yes | prompt-only, experimental |
+
 ## Prior Art
 
 Closest related systems include SWE-Pruner, Focus, TokenPilot, LLMLingua, and The Token Company. `paw` differs by packaging the pattern as a single Go binary with pipeable stages, stock-model drone support, offline-capable defaults, and deterministic validation of quoted spans. paw's measured benchmark results belong in [docs/RESULTS.md](docs/RESULTS.md), not in copied prior-art numbers.
