@@ -109,6 +109,14 @@ export PAW_BRAIN_TRANSPORT=claude-cli
 export PAW_BRAIN_MODEL=sonnet
 ```
 
+OpenCode CLI brain transport uses OpenCode providers, including optional Zen/free models:
+
+```sh
+opencode auth login
+export PAW_BRAIN_TRANSPORT=opencode-cli
+export PAW_BRAIN_MODEL=opencode/big-pickle
+```
+
 ## Prior Art
 
 Closest related systems include SWE-Pruner, Focus, TokenPilot, LLMLingua, and The Token Company. `paw` differs by packaging the pattern as a single Go binary with pipeable stages, stock-model drone support, offline-capable defaults, and deterministic validation of quoted spans. paw's measured benchmark results belong in [docs/RESULTS.md](docs/RESULTS.md), not in copied prior-art numbers.

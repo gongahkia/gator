@@ -166,6 +166,17 @@ credential files.
 - **Structured output:** uses `--json-schema` when `ChatRequest.JSONSchema` is set.
 - **Safety boundary:** plan permission mode; `paw` remains responsible for patch application.
 
+### OpenCode CLI
+
+- **Transport:** `opencode-cli`.
+- **Command:** `opencode run --format json --dir {cwd} [--model provider/model] {prompt}`.
+- **Auth:** OpenCode provider auth. `opencode/big-pickle` and other Zen/free models are optional
+  user choices, not benchmark defaults.
+- **Structured output:** schema is pasted into the prompt; parser accepts JSON events, JSON arrays,
+  and raw text.
+- **Safety boundary:** no `--dangerously-skip-permissions`; `paw` remains responsible for patch
+  application.
+
 If `PAW_DRONE_TRANSPORT=openai`, the drone uses a cheap OpenAI-compatible API model instead of
 local Ollama (for users with no local GPU). Same `response_format` schema path as §2.
 

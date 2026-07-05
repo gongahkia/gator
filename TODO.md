@@ -100,8 +100,6 @@ before starting; this is the only global find-replace required.
 +M16.5-ModelAccess  — local-first defaults + subscription CLI brains. Do before M17.
 ================================================================================
 
-(B) Add opencode-cli brain transport using `opencode run`, prompt-only mode, JSON event parsing, and docs for optional Zen/free models @llm file:internal/llm/opencode_cli.go ref:MODEL_APIS.md#1
-
 ================================================================================
 +M17-SWEbench  — OPTIONAL secondary benchmark. Do only after M14 full run recorded.
 ================================================================================

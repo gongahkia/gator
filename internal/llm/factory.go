@@ -67,6 +67,8 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 		client = NewGeminiCLIClient(endpoint.Model)
 	case "claude-cli":
 		client = NewClaudeCLIClient(endpoint.Model)
+	case "opencode-cli":
+		client = NewOpenCodeCLIClient(endpoint.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm transport %q", endpoint.Transport)
 	}
