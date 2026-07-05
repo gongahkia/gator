@@ -149,6 +149,15 @@ credential files.
 - **Safety boundary:** runs read-only and prompts Codex to answer from the supplied digest instead
   of editing files. `paw` still applies patches deterministically.
 
+### Gemini CLI
+
+- **Transport:** `gemini-cli`.
+- **Command:** `gemini --prompt "Answer only from stdin..." --approval-mode plan --output-format json --skip-trust [-m model]`.
+- **Auth:** whatever the Gemini CLI has configured, including Google login or env-based API auth.
+- **Structured output:** schema is pasted into the prompt; output parser accepts raw JSON objects
+  or common JSON wrapper fields such as `response`/`text`/`content`.
+- **Safety boundary:** plan approval mode; `paw` remains responsible for patch application.
+
 If `PAW_DRONE_TRANSPORT=openai`, the drone uses a cheap OpenAI-compatible API model instead of
 local Ollama (for users with no local GPU). Same `response_format` schema path as §2.
 

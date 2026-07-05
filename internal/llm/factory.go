@@ -63,6 +63,8 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 		client = NewOllamaClient(endpoint.BaseURL, endpoint.Model)
 	case "codex-cli":
 		client = NewCodexCLIClient(endpoint.Model)
+	case "gemini-cli":
+		client = NewGeminiCLIClient(endpoint.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm transport %q", endpoint.Transport)
 	}
