@@ -100,6 +100,8 @@ func (c EndpointHealthChecker) checkOpenAICompatible(ctx context.Context, endpoi
 	if endpoint.APIKey != "" {
 		headers["Authorization"] = "Bearer " + endpoint.APIKey
 		report.add(HealthCheck{Name: "auth", Status: HealthOK, Detail: "API key configured"})
+	} else if isLocalBaseURL(endpoint.BaseURL) {
+		report.add(HealthCheck{Name: "auth", Status: HealthOK, Detail: "local OpenAI-compatible endpoint without API key"})
 	} else {
 		report.add(HealthCheck{Name: "auth", Status: HealthFail, Detail: "missing API key", Action: "set PAW_BRAIN_API_KEY or PAW_DRONE_API_KEY"})
 	}

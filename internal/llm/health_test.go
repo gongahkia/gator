@@ -181,6 +181,29 @@ func TestHealthOpenAICompatibleModelsCheck(t *testing.T) {
 	requireCheck(t, report, "schema", HealthUnknown)
 }
 
+func TestHealthOpenAILocalNoKey(t *testing.T) {
+	var auth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("Authorization")
+		fmt.Fprint(w, `{"data":[{"id":"local-model"}]}`)
+	}))
+	defer srv.Close()
+
+	report := EndpointHealthChecker{}.Check(context.Background(), EndpointConfig{
+		Transport: "openai",
+		BaseURL:   srv.URL,
+		Model:     "local-model",
+	})
+	check := requireCheck(t, report, "auth", HealthOK)
+	if !strings.Contains(check.Detail, "local") {
+		t.Fatalf("detail = %q", check.Detail)
+	}
+	if auth != "" {
+		t.Fatalf("authorization = %q", auth)
+	}
+	requireCheck(t, report, "model", HealthOK)
+}
+
 func TestHealthCLIVersionProbe(t *testing.T) {
 	runner := &fakeCLIRunner{stdout: "codex-cli 1.2.3\n"}
 	report := EndpointHealthChecker{

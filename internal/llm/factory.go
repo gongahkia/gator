@@ -3,6 +3,8 @@ package llm
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -32,7 +34,7 @@ func NewBrainClient(cfg FactoryConfig) (Client, error) {
 	if endpoint.Model == "" && strings.EqualFold(endpoint.Transport, "ollama") {
 		endpoint.Model = "gpt-oss:20b"
 	}
-	if requiresBrainKey(endpoint.Transport) && endpoint.APIKey == "" {
+	if requiresEndpointKey(endpoint) && endpoint.APIKey == "" {
 		return missingKeyClient{envKey: "PAW_BRAIN_API_KEY"}, nil
 	}
 	return newClient(endpoint, callTimeout(cfg.CallTimeout))
@@ -78,13 +80,28 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 	return client, nil
 }
 
-func requiresBrainKey(transport string) bool {
-	switch strings.ToLower(transport) {
-	case "openai", "anthropic":
+func requiresEndpointKey(endpoint EndpointConfig) bool {
+	switch strings.ToLower(endpoint.Transport) {
+	case "openai":
+		return !isLocalBaseURL(endpoint.BaseURL)
+	case "anthropic":
 		return true
 	default:
 		return false
 	}
+}
+
+func isLocalBaseURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func endpointFromEnv(cfg EndpointConfig, prefix string) EndpointConfig {

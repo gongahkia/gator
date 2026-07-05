@@ -104,7 +104,6 @@ before starting; this is the only global find-replace required.
 +M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
 ================================================================================
 
-(A) Add local OpenAI-compatible no-key support: allow `openai` transport with empty API key when base URL is localhost/127.0.0.1/[::1] @llm file:internal/llm
 (A) Add named local provider profiles in docs/config examples for LM Studio, vLLM, and llama.cpp using OpenAI-compatible transport @docs ref:MODEL_APIS.md file:README.md file:MODEL_APIS.md
 (A) Add hardware-aware local model recommendation docs for macOS: RAM/VRAM tiers, brain/drone defaults, and warning that actual fit must be verified locally @docs file:README.md file:MODEL_APIS.md
 (A) Add model listing command `paw models list`: supports Ollama, OpenAI-compatible `/v1/models`, OpenCode `models`, Aider `--list-models`, and configured CLI fallback errors @cli @llm file:cmd file:internal/llm
