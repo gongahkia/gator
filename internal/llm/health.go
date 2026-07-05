@@ -64,7 +64,7 @@ func (c EndpointHealthChecker) Check(ctx context.Context, endpoint EndpointConfi
 		return c.checkOpenAICompatible(ctx, endpoint, report)
 	case "anthropic":
 		return c.checkAnthropic(ctx, endpoint, report)
-	case "codex-cli", "gemini-cli", "claude-cli", "opencode-cli":
+	case "codex-cli", "gemini-cli", "claude-cli", "opencode-cli", "aider-cli", "goose-cli", "qwen-cli", "cursor-cli":
 		return c.checkCLI(ctx, endpoint, report)
 	case "":
 		report.add(HealthCheck{Name: "transport", Status: HealthFail, Detail: "missing transport"})
@@ -462,6 +462,44 @@ func cliCapabilitySpec(transport string) (cliCapability, bool) {
 			helpArgs:      []string{"run", "--help"},
 			requiredFlags: []string{"--format", "--model", "--dir"},
 		}, true
+	case "aider-cli":
+		return cliCapability{
+			helpArgs: []string{"--help"},
+			requiredFlags: []string{
+				"--message",
+				"--dry-run",
+				"--no-git",
+				"--no-auto-commits",
+				"--no-auto-lint",
+				"--no-auto-test",
+				"--no-suggest-shell-commands",
+				"--model",
+			},
+		}, true
+	case "goose-cli":
+		return cliCapability{
+			helpArgs: []string{"run", "--help"},
+			requiredFlags: []string{
+				"--no-session",
+				"--quiet",
+				"--output-format",
+				"--no-profile",
+				"--max-turns",
+				"--provider",
+				"--model",
+				"--text",
+			},
+		}, true
+	case "qwen-cli":
+		return cliCapability{
+			helpArgs:      []string{"--help"},
+			requiredFlags: []string{"--prompt", "--approval-mode", "--output-format", "--model"},
+		}, true
+	case "cursor-cli":
+		return cliCapability{
+			helpArgs:      []string{"--help"},
+			requiredFlags: []string{"--print", "--output-format", "--mode", "--model"},
+		}, true
 	default:
 		return cliCapability{}, false
 	}
@@ -477,6 +515,14 @@ func cliBinary(transport string) string {
 		return "claude"
 	case "opencode-cli":
 		return "opencode"
+	case "aider-cli":
+		return "aider"
+	case "goose-cli":
+		return "goose"
+	case "qwen-cli":
+		return "qwen"
+	case "cursor-cli":
+		return "cursor-agent"
 	default:
 		return transport
 	}

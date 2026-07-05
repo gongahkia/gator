@@ -255,6 +255,67 @@ func TestHealthCLIMissingCapabilityFlag(t *testing.T) {
 	}
 }
 
+func TestHealthNewCLICapabilitySpecs(t *testing.T) {
+	tests := []struct {
+		transport string
+		binary    string
+		helpArgs  []string
+		help      string
+	}{
+		{
+			transport: "aider-cli",
+			binary:    "aider",
+			helpArgs:  []string{"--help"},
+			help:      "--message --dry-run --no-git --no-auto-commits --no-auto-lint --no-auto-test --no-suggest-shell-commands --model",
+		},
+		{
+			transport: "goose-cli",
+			binary:    "goose",
+			helpArgs:  []string{"run", "--help"},
+			help:      "--no-session --quiet --output-format --no-profile --max-turns --provider --model --text",
+		},
+		{
+			transport: "qwen-cli",
+			binary:    "qwen",
+			helpArgs:  []string{"--help"},
+			help:      "--prompt --approval-mode --output-format --model",
+		},
+		{
+			transport: "cursor-cli",
+			binary:    "cursor-agent",
+			helpArgs:  []string{"--help"},
+			help:      "--print --output-format --mode --model",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.transport, func(t *testing.T) {
+			runner := &sequenceCLIRunner{results: []cliResult{
+				{Stdout: tc.binary + " 1.0\n"},
+				{Stdout: tc.help},
+			}}
+			report := EndpointHealthChecker{
+				CLIRunner: runner,
+				LookPath: func(command string) (string, error) {
+					if command != tc.binary {
+						t.Fatalf("command = %q; want %q", command, tc.binary)
+					}
+					return "/usr/local/bin/" + command, nil
+				},
+			}.Check(context.Background(), EndpointConfig{Transport: tc.transport, Model: "test-model"})
+			if len(runner.invocations) != 2 {
+				t.Fatalf("invocations = %#v", runner.invocations)
+			}
+			if !reflect.DeepEqual(runner.invocations[1].Args, tc.helpArgs) {
+				t.Fatalf("help args = %#v; want %#v", runner.invocations[1].Args, tc.helpArgs)
+			}
+			requireCheck(t, report, "installed", HealthOK)
+			requireCheck(t, report, "running", HealthOK)
+			requireCheck(t, report, "capabilities", HealthOK)
+			requireCheck(t, report, "model", HealthUnknown)
+		})
+	}
+}
+
 func TestHealthCLIMissingBinary(t *testing.T) {
 	report := EndpointHealthChecker{
 		LookPath: func(string) (string, error) {
