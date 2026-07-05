@@ -32,6 +32,7 @@ var doctorModelsCmd = &cobra.Command{
 		checker := doctorHealthChecker
 		if concrete, ok := checker.(llm.EndpointHealthChecker); ok {
 			concrete.AutoPullOllama = cfg.OllamaAutoPull
+			concrete.SchemaSmokeOllama = true
 			checker = concrete
 		}
 		reports := []namedHealthReport{

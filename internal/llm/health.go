@@ -39,10 +39,11 @@ type ModelInfo struct {
 }
 
 type EndpointHealthChecker struct {
-	HTTPClient     *http.Client
-	CLIRunner      cliRunner
-	LookPath       func(string) (string, error)
-	AutoPullOllama bool
+	HTTPClient        *http.Client
+	CLIRunner         cliRunner
+	LookPath          func(string) (string, error)
+	AutoPullOllama    bool
+	SchemaSmokeOllama bool
 }
 
 func CheckEndpointHealth(ctx context.Context, endpoint EndpointConfig) HealthReport {
@@ -77,14 +78,16 @@ func (c EndpointHealthChecker) checkOllama(ctx context.Context, endpoint Endpoin
 	baseURL := defaultEndpointBaseURL(endpoint, "http://localhost:11434")
 	report.BaseURL = baseURL
 	models, err := c.ListOllamaModels(ctx, baseURL)
+	modelCheck := HealthCheck{Name: "model", Status: HealthUnknown, Detail: "not checked because Ollama metadata failed"}
 	if err != nil {
 		report.add(HealthCheck{Name: "running", Status: HealthFail, Detail: err.Error(), Action: "start Ollama with `ollama serve`"})
 	} else {
 		report.add(HealthCheck{Name: "running", Status: HealthOK, Detail: "Ollama metadata endpoint responded"})
-		report.add(c.ollamaModelHealth(ctx, baseURL, endpoint.Model, models))
+		modelCheck = c.ollamaModelHealth(ctx, baseURL, endpoint.Model, models)
+		report.add(modelCheck)
 	}
 	report.add(HealthCheck{Name: "auth", Status: HealthOK, Detail: "no API key required for local Ollama"})
-	report.add(HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "schema support requires a smoke chat check"})
+	report.add(c.ollamaSchemaHealth(ctx, baseURL, endpoint.Model, modelCheck))
 	return report
 }
 
@@ -217,6 +220,63 @@ func (c EndpointHealthChecker) PullOllamaModel(ctx context.Context, baseURL, mod
 	return nil
 }
 
+func SmokeCheckOllamaSchema(ctx context.Context, baseURL, model string) error {
+	return EndpointHealthChecker{}.SmokeCheckOllamaSchema(ctx, baseURL, model)
+}
+
+func (c EndpointHealthChecker) SmokeCheckOllamaSchema(ctx context.Context, baseURL, model string) error {
+	baseURL = strings.TrimRight(baseURL, "/")
+	if baseURL == "" {
+		baseURL = "http://localhost:11434"
+	}
+	body, err := ollamaRequest(ChatRequest{
+		Model: model,
+		Messages: []ChatMessage{{
+			Role:    "user",
+			Content: `Return exactly {"ok":true} as JSON.`,
+		}},
+		Temperature: 0,
+		JSONSchema:  json.RawMessage(`{"type":"object","additionalProperties":false,"required":["ok"],"properties":{"ok":{"type":"boolean"}}}`),
+	}, model)
+	if err != nil {
+		return err
+	}
+	client := c.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/chat", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return &statusError{StatusCode: resp.StatusCode, Body: string(respBody)}
+	}
+	var out ollamaResponse
+	if err := json.Unmarshal(respBody, &out); err != nil {
+		return err
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(out.Message.Content), &payload); err != nil {
+		return fmt.Errorf("schema smoke returned invalid JSON: %w", err)
+	}
+	ok, hasOK := payload["ok"].(bool)
+	if !hasOK || !ok || len(payload) != 1 {
+		return fmt.Errorf("schema smoke response mismatch: %s", out.Message.Content)
+	}
+	return nil
+}
+
 func (c EndpointHealthChecker) getModelIDs(ctx context.Context, method, url string, headers map[string]string, field string) (map[string]bool, error) {
 	models, err := c.getModelInfos(ctx, method, url, headers, field)
 	if err != nil {
@@ -307,6 +367,22 @@ func (c EndpointHealthChecker) ollamaModelHealth(ctx context.Context, baseURL, m
 		return check
 	}
 	return HealthCheck{Name: "model", Status: HealthOK, Detail: "pulled " + model}
+}
+
+func (c EndpointHealthChecker) ollamaSchemaHealth(ctx context.Context, baseURL, model string, modelCheck HealthCheck) HealthCheck {
+	if !c.SchemaSmokeOllama {
+		return HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "schema support requires a smoke chat check"}
+	}
+	if model == "" {
+		return HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "not checked because no model is configured"}
+	}
+	if modelCheck.Status != HealthOK {
+		return HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "not checked because model is unavailable"}
+	}
+	if err := c.SmokeCheckOllamaSchema(ctx, baseURL, model); err != nil {
+		return HealthCheck{Name: "schema", Status: HealthFail, Detail: err.Error()}
+	}
+	return HealthCheck{Name: "schema", Status: HealthOK, Detail: "Ollama JSON Schema smoke check passed"}
 }
 
 func modelSet(models []ModelInfo) map[string]bool {

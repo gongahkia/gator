@@ -85,6 +85,56 @@ func TestHealthOllamaAutoPullsWhenExplicitlyEnabled(t *testing.T) {
 	}
 }
 
+func TestHealthOllamaSchemaSmoke(t *testing.T) {
+	var chatBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/tags":
+			fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"}]}`)
+		case "/api/chat":
+			chatBody = readRequestBody(t, r)
+			fmt.Fprint(w, `{"message":{"content":"{\"ok\":true}"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	report := EndpointHealthChecker{SchemaSmokeOllama: true}.Check(context.Background(), EndpointConfig{
+		Transport: "ollama",
+		BaseURL:   srv.URL,
+		Model:     "qwen3:8b",
+	})
+	requireCheck(t, report, "schema", HealthOK)
+	if !strings.Contains(chatBody, `"format"`) || !strings.Contains(chatBody, `"additionalProperties":false`) {
+		t.Fatalf("chat body = %q", chatBody)
+	}
+}
+
+func TestHealthOllamaSchemaSmokeFailsOnMismatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/tags":
+			fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"}]}`)
+		case "/api/chat":
+			fmt.Fprint(w, `{"message":{"content":"{\"ok\":\"no\"}"}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	report := EndpointHealthChecker{SchemaSmokeOllama: true}.Check(context.Background(), EndpointConfig{
+		Transport: "ollama",
+		BaseURL:   srv.URL,
+		Model:     "qwen3:8b",
+	})
+	check := requireCheck(t, report, "schema", HealthFail)
+	if !strings.Contains(check.Detail, "schema smoke response mismatch") {
+		t.Fatalf("detail = %q", check.Detail)
+	}
+}
+
 func TestListOllamaModelsUsesTags(t *testing.T) {
 	var gotPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
