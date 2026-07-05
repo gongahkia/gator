@@ -109,7 +109,6 @@ before starting; this is the only global find-replace required.
 +M16.7-AgentCLIExpansion  — add more subscription/local coding CLI brain transports.
 ================================================================================
 
-(B) Add Aider CLI brain transport `aider-cli`: one-shot read-only/chat invocation, model passthrough, schema-in-prompt, no auto-commit, no repo mutation @llm file:internal/llm
 (B) Add Aider CLI parser tests and command construction tests for model, prompt, schema, and non-mutating flags @test @llm file:internal/llm
 (B) Add Goose CLI brain transport `goose-cli`: `goose run --no-session --quiet --output-format json`, provider/model passthrough, schema-in-prompt, no default built-in mutation tools @llm file:internal/llm
 (B) Add Goose CLI parser tests and command construction tests for provider/model/json/stream-json variants @test @llm file:internal/llm
