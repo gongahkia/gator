@@ -62,6 +62,30 @@ func (s *Server) RespondOllama(match, content string) {
 	}))
 }
 
+func (s *Server) RespondAnthropicText(match, content string) {
+	s.Respond(match, http.StatusOK, mustJSON(map[string]any{
+		"content": []map[string]any{
+			{"type": "text", "text": content},
+		},
+		"usage": map[string]any{
+			"input_tokens":  17,
+			"output_tokens": 9,
+		},
+	}))
+}
+
+func (s *Server) RespondAnthropicTool(match string, content any) {
+	s.Respond(match, http.StatusOK, mustJSON(map[string]any{
+		"content": []map[string]any{
+			{"type": "tool_use", "id": "toolu_test", "name": "response", "input": content},
+		},
+		"usage": map[string]any{
+			"input_tokens":  17,
+			"output_tokens": 9,
+		},
+	}))
+}
+
 func (s *Server) RespondInvalidJSON(match string) {
 	s.Respond(match, http.StatusOK, "{")
 }
@@ -88,7 +112,7 @@ func HallucinatedDigest() string {
 }
 
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/chat/completions" && r.URL.Path != "/api/chat" {
+	if r.URL.Path != "/chat/completions" && r.URL.Path != "/api/chat" && r.URL.Path != "/v1/messages" {
 		http.NotFound(w, r)
 		return
 	}

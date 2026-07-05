@@ -96,8 +96,6 @@ before starting; this is the only global find-replace required.
 +M16-Anthropic  — OPTIONAL: anthropic-compatible transport. Do only after M14 green.
 ================================================================================
 
-(B) Write internal/llm/anthropic_test.go against faketest server (add /v1/messages route to the fake) @llm file:internal/llm/anthropic_test.go ref:docs/TESTING.md#1
-
 ================================================================================
 +M17-SWEbench  — OPTIONAL secondary benchmark. Do only after M14 full run recorded.
 ================================================================================
