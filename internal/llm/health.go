@@ -33,6 +33,10 @@ type HealthReport struct {
 	Checks    []HealthCheck `json:"checks"`
 }
 
+type ModelInfo struct {
+	ID string `json:"id"`
+}
+
 type EndpointHealthChecker struct {
 	HTTPClient *http.Client
 	CLIRunner  cliRunner
@@ -70,12 +74,12 @@ func (c EndpointHealthChecker) Check(ctx context.Context, endpoint EndpointConfi
 func (c EndpointHealthChecker) checkOllama(ctx context.Context, endpoint EndpointConfig, report HealthReport) HealthReport {
 	baseURL := defaultEndpointBaseURL(endpoint, "http://localhost:11434")
 	report.BaseURL = baseURL
-	models, err := c.getModelIDs(ctx, http.MethodGet, baseURL+"/api/tags", nil, "models")
+	models, err := c.ListOllamaModels(ctx, baseURL)
 	if err != nil {
 		report.add(HealthCheck{Name: "running", Status: HealthFail, Detail: err.Error(), Action: "start Ollama with `ollama serve`"})
 	} else {
 		report.add(HealthCheck{Name: "running", Status: HealthOK, Detail: "Ollama metadata endpoint responded"})
-		report.add(modelHealthCheck(endpoint.Model, models, "ollama pull "+endpoint.Model))
+		report.add(modelHealthCheck(endpoint.Model, modelSet(models), "ollama pull "+endpoint.Model))
 	}
 	report.add(HealthCheck{Name: "auth", Status: HealthOK, Detail: "no API key required for local Ollama"})
 	report.add(HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "schema support requires a smoke chat check"})
@@ -159,7 +163,27 @@ func (c EndpointHealthChecker) checkCLI(ctx context.Context, endpoint EndpointCo
 	return report
 }
 
+func ListOllamaModels(ctx context.Context, baseURL string) ([]ModelInfo, error) {
+	return EndpointHealthChecker{}.ListOllamaModels(ctx, baseURL)
+}
+
+func (c EndpointHealthChecker) ListOllamaModels(ctx context.Context, baseURL string) ([]ModelInfo, error) {
+	baseURL = strings.TrimRight(baseURL, "/")
+	if baseURL == "" {
+		baseURL = "http://localhost:11434"
+	}
+	return c.getModelInfos(ctx, http.MethodGet, baseURL+"/api/tags", nil, "models")
+}
+
 func (c EndpointHealthChecker) getModelIDs(ctx context.Context, method, url string, headers map[string]string, field string) (map[string]bool, error) {
+	models, err := c.getModelInfos(ctx, method, url, headers, field)
+	if err != nil {
+		return nil, err
+	}
+	return modelSet(models), nil
+}
+
+func (c EndpointHealthChecker) getModelInfos(ctx context.Context, method, url string, headers map[string]string, field string) ([]ModelInfo, error) {
 	client := c.HTTPClient
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
@@ -191,16 +215,16 @@ func (c EndpointHealthChecker) getModelIDs(ctx context.Context, method, url stri
 	if err := json.Unmarshal(doc[field], &items); err != nil {
 		return nil, fmt.Errorf("models response missing %q array: %w", field, err)
 	}
-	models := map[string]bool{}
+	var models []ModelInfo
 	for _, item := range items {
 		if id, ok := item["id"].(string); ok && id != "" {
-			models[id] = true
+			models = append(models, ModelInfo{ID: id})
 		}
 		if name, ok := item["name"].(string); ok && name != "" {
-			models[name] = true
+			models = append(models, ModelInfo{ID: name})
 		}
 		if model, ok := item["model"].(string); ok && model != "" {
-			models[model] = true
+			models = append(models, ModelInfo{ID: model})
 		}
 	}
 	return models, nil
@@ -229,6 +253,16 @@ func modelHealthCheck(model string, models map[string]bool, action string) Healt
 		return HealthCheck{Name: "model", Status: HealthOK, Detail: model}
 	}
 	return HealthCheck{Name: "model", Status: HealthFail, Detail: "configured model not found: " + model, Action: action}
+}
+
+func modelSet(models []ModelInfo) map[string]bool {
+	out := map[string]bool{}
+	for _, model := range models {
+		if model.ID != "" {
+			out[model.ID] = true
+		}
+	}
+	return out
 }
 
 func cliSchemaCheck(transport string) HealthCheck {

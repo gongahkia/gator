@@ -50,6 +50,26 @@ func TestHealthOllamaMissingModelSuggestsPull(t *testing.T) {
 	}
 }
 
+func TestListOllamaModelsUsesTags(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		fmt.Fprint(w, `{"models":[{"name":"qwen3:8b"},{"model":"gpt-oss:20b"}]}`)
+	}))
+	defer srv.Close()
+
+	models, err := EndpointHealthChecker{}.ListOllamaModels(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("list models: %v", err)
+	}
+	if gotPath != "/api/tags" {
+		t.Fatalf("path = %q", gotPath)
+	}
+	if !reflect.DeepEqual(models, []ModelInfo{{ID: "qwen3:8b"}, {ID: "gpt-oss:20b"}}) {
+		t.Fatalf("models = %#v", models)
+	}
+}
+
 func TestHealthOpenAICompatibleModelsCheck(t *testing.T) {
 	var auth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
