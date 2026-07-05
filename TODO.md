@@ -101,6 +101,41 @@ before starting; this is the only global find-replace required.
 ================================================================================
 
 ================================================================================
++M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
+================================================================================
+
+(A) Add provider health-check abstractions for HTTP and CLI transports: report installed/running/auth/model/schema capability without making repo edits @llm file:internal/llm ref:MODEL_APIS.md
+(A) Add `paw doctor models` command: checks configured brain+drone transports, Ollama `/api/tags`, OpenAI-compatible `/v1/models`, CLI binary presence, and prints actionable failures @cli @llm file:cmd file:internal/llm
+(A) Add Ollama model detection: list installed models via `/api/tags`, verify configured brain/drone models exist, and return pull command when missing @llm file:internal/llm
+(A) Add optional Ollama auto-pull behind explicit env/config opt-in only; default must only suggest, not download @llm @config file:internal/llm file:internal/config
+(A) Add schema smoke check for Ollama: run a tiny JSON-schema chat against configured model and fail doctor if invalid JSON/schema mismatch @llm file:internal/llm
+(A) Add local OpenAI-compatible no-key support: allow `openai` transport with empty API key when base URL is localhost/127.0.0.1/[::1] @llm file:internal/llm
+(A) Add named local provider profiles in docs/config examples for LM Studio, vLLM, and llama.cpp using OpenAI-compatible transport @docs ref:MODEL_APIS.md file:README.md file:MODEL_APIS.md
+(A) Add hardware-aware local model recommendation docs for macOS: RAM/VRAM tiers, brain/drone defaults, and warning that actual fit must be verified locally @docs file:README.md file:MODEL_APIS.md
+(A) Add model listing command `paw models list`: supports Ollama, OpenAI-compatible `/v1/models`, OpenCode `models`, Aider `--list-models`, and configured CLI fallback errors @cli @llm file:cmd file:internal/llm
+(A) Add parser fixture tests for Codex, Gemini, Claude, and OpenCode CLI outputs: raw text, JSON object, NDJSON/stream, wrapped result field, tool/event noise, empty/error output @llm file:internal/llm
+(A) Add version/capability checks for Codex/Gemini/Claude/OpenCode CLI transports using `--version`/`--help`, including missing flag diagnostics @llm file:internal/llm
+(A) Add env-gated E2E smoke tests for actual logged-in CLIs; skip by default unless explicit env vars are set @test @llm file:internal/llm ref:TESTING.md
+(A) Document E2E smoke env vars and expected non-mutating prompts for logged-in CLI validation @docs file:TESTING.md file:MODEL_APIS.md
+
+================================================================================
++M16.7-AgentCLIExpansion  — add more subscription/local coding CLI brain transports.
+================================================================================
+
+(B) Add Aider CLI brain transport `aider-cli`: one-shot read-only/chat invocation, model passthrough, schema-in-prompt, no auto-commit, no repo mutation @llm file:internal/llm
+(B) Add Aider CLI parser tests and command construction tests for model, prompt, schema, and non-mutating flags @test @llm file:internal/llm
+(B) Add Goose CLI brain transport `goose-cli`: `goose run --no-session --quiet --output-format json`, provider/model passthrough, schema-in-prompt, no default built-in mutation tools @llm file:internal/llm
+(B) Add Goose CLI parser tests and command construction tests for provider/model/json/stream-json variants @test @llm file:internal/llm
+(B) Add Qwen Code CLI brain transport `qwen-cli`: headless `--prompt`, `--plan`, `--output-format json`, model passthrough, schema-in-prompt @llm file:internal/llm
+(B) Add Qwen CLI parser tests and command construction tests for JSON, stream JSON, wrapped response, and text fallback @test @llm file:internal/llm
+(C) Add Cursor CLI brain transport `cursor-cli` as experimental: headless read-only/ask mode, model passthrough, JSON output, schema-in-prompt, no forced edits @llm file:internal/llm
+(C) Add Cursor CLI parser tests and command construction tests; document schema limitation and experimental status @test @docs file:internal/llm file:MODEL_APIS.md
+(B) Extend factory/config docs so every CLI brain transport can select provider-specific models via `PAW_BRAIN_MODEL` and, where applicable, provider via `PAW_BRAIN_PROVIDER` @config @docs file:internal/config file:internal/llm file:README.md
+(B) Add `paw doctor models` coverage for Aider/Goose/Qwen/Cursor binary/version/model capability checks @cli @llm file:cmd file:internal/llm
+(B) Add model listing coverage for Aider/Goose/Qwen/Cursor where supported; unsupported listing must return explicit diagnostic, not silent empty output @cli @llm file:cmd file:internal/llm
+(B) Update README/MODEL_APIS with comparison table: local/no-key, subscription CLI, API-key required, model listing support, schema enforcement strength @docs file:README.md file:MODEL_APIS.md
+
+================================================================================
 +M17-SWEbench  — OPTIONAL secondary benchmark. Do only after M14 full run recorded.
 ================================================================================
 
