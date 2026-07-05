@@ -135,6 +135,8 @@ func resetCLIState(t *testing.T) {
 	gatherInstruction = ""
 	compressDisableCompress = false
 	compressDroneModel = ""
+	modelsListQuery = ""
+	modelsListProvider = ""
 	rootCmd.SetArgs(nil)
 	rootCmd.SetIn(strings.NewReader(""))
 	rootCmd.SetOut(io.Discard)

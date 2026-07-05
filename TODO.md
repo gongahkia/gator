@@ -104,7 +104,6 @@ before starting; this is the only global find-replace required.
 +M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
 ================================================================================
 
-(A) Add model listing command `paw models list`: supports Ollama, OpenAI-compatible `/v1/models`, OpenCode `models`, Aider `--list-models`, and configured CLI fallback errors @cli @llm file:cmd file:internal/llm
 (A) Add parser fixture tests for Codex, Gemini, Claude, and OpenCode CLI outputs: raw text, JSON object, NDJSON/stream, wrapped result field, tool/event noise, empty/error output @llm file:internal/llm
 (A) Add version/capability checks for Codex/Gemini/Claude/OpenCode CLI transports using `--version`/`--help`, including missing flag diagnostics @llm file:internal/llm
 (A) Add env-gated E2E smoke tests for actual logged-in CLIs; skip by default unless explicit env vars are set @test @llm file:internal/llm ref:TESTING.md
