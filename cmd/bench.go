@@ -70,7 +70,9 @@ var benchCmd = &cobra.Command{
 			}
 		}
 		row := summary.row(spec.Name)
-		printBenchTable(cmd.OutOrStdout(), []benchRow{row})
+		if err := printBenchTable(cmd.OutOrStdout(), []benchRow{row}); err != nil {
+			return err
+		}
 		if benchResultsPath != "" {
 			return updateResultsFile(benchResultsPath, row)
 		}
@@ -360,12 +362,19 @@ func isTracePath(path string) bool {
 	return strings.Contains(clean, "/.paw/") || strings.Contains(filepath.Base(clean), "trace")
 }
 
-func printBenchTable(w io.Writer, rows []benchRow) {
-	fmt.Fprintln(w, "| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |")
-	fmt.Fprintln(w, "| --- | ---: | ---: | ---: | ---: | ---: |")
-	for _, row := range rows {
-		fmt.Fprintln(w, row.markdown())
+func printBenchTable(w io.Writer, rows []benchRow) error {
+	if _, err := fmt.Fprintln(w, "| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |"); err != nil {
+		return err
 	}
+	if _, err := fmt.Fprintln(w, "| --- | ---: | ---: | ---: | ---: | ---: |"); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := fmt.Fprintln(w, row.markdown()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 const (
@@ -470,7 +479,7 @@ func shellQuote(s string) string {
 		return "''"
 	}
 	if strings.IndexFunc(s, func(r rune) bool {
-		return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._/:=-", r))
+		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && !strings.ContainsRune("._/:=-", r)
 	}) == -1 {
 		return s
 	}

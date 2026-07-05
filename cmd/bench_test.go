@@ -69,7 +69,9 @@ func TestLoadBenchSummaryParsesResultsAndTrace(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	printBenchTable(&out, []benchRow{summary.row("full")})
+	if err := printBenchTable(&out, []benchRow{summary.row("full")}); err != nil {
+		t.Fatalf("print table: %v", err)
+	}
 	if !strings.Contains(out.String(), "| full | 1 | 1.00 | 24 | 5 | 12.0 |") {
 		t.Fatalf("unexpected table:\n%s", out.String())
 	}
