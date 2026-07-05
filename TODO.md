@@ -104,7 +104,6 @@ before starting; this is the only global find-replace required.
 +M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
 ================================================================================
 
-(A) Add env-gated E2E smoke tests for actual logged-in CLIs; skip by default unless explicit env vars are set @test @llm file:internal/llm ref:TESTING.md
 (A) Document E2E smoke env vars and expected non-mutating prompts for logged-in CLI validation @docs file:TESTING.md file:MODEL_APIS.md
 
 ================================================================================
