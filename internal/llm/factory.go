@@ -61,6 +61,8 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 		client = NewAnthropicClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model)
 	case "ollama":
 		client = NewOllamaClient(endpoint.BaseURL, endpoint.Model)
+	case "codex-cli":
+		client = NewCodexCLIClient(endpoint.Model)
 	default:
 		return nil, fmt.Errorf("unsupported llm transport %q", endpoint.Transport)
 	}

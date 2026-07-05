@@ -100,7 +100,6 @@ before starting; this is the only global find-replace required.
 +M16.5-ModelAccess  — local-first defaults + subscription CLI brains. Do before M17.
 ================================================================================
 
-(B) Add codex-cli brain transport using `codex exec` prompt-only/read-only mode, ChatGPT/API auth reuse, JSON Schema via --output-schema @llm file:internal/llm/codex_cli.go ref:MODEL_APIS.md#1
 (B) Add gemini-cli brain transport using `gemini --prompt` prompt-only plan mode with output parsing and schema prompt fallback @llm file:internal/llm/gemini_cli.go ref:MODEL_APIS.md#1
 (B) Add claude-cli brain transport using `claude -p` prompt-only plan mode, preserving subscription auth (no --bare), JSON Schema where available @llm file:internal/llm/claude_cli.go ref:MODEL_APIS.md#1
 (B) Add opencode-cli brain transport using `opencode run`, prompt-only mode, JSON event parsing, and docs for optional Zen/free models @llm file:internal/llm/opencode_cli.go ref:MODEL_APIS.md#1

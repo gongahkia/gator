@@ -85,6 +85,14 @@ export PAW_BRAIN_API_KEY=...
 export PAW_BRAIN_MODEL=glm-4.6
 ```
 
+Codex CLI brain transport uses the user's existing Codex CLI auth:
+
+```sh
+codex login
+export PAW_BRAIN_TRANSPORT=codex-cli
+export PAW_BRAIN_MODEL=gpt-5
+```
+
 ## Prior Art
 
 Closest related systems include SWE-Pruner, Focus, TokenPilot, LLMLingua, and The Token Company. `paw` differs by packaging the pattern as a single Go binary with pipeable stages, stock-model drone support, offline-capable defaults, and deterministic validation of quoted spans. paw's measured benchmark results belong in [docs/RESULTS.md](docs/RESULTS.md), not in copied prior-art numbers.

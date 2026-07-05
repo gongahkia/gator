@@ -134,12 +134,27 @@ PAW_BRAIN_BASE_URL   default http://localhost:11434
 PAW_BRAIN_MODEL      default gpt-oss:20b
 ```
 
+## 5. CLI brain transports (subscription reuse, prompt-only)
+
+CLI transports implement `Client` by invoking an installed coding CLI. They are intended for
+brain use, not drone compression. They reuse the CLI's own login/session and do not read or copy
+credential files.
+
+### Codex CLI
+
+- **Transport:** `codex-cli`.
+- **Command:** `codex exec --ephemeral --sandbox read-only --cd {cwd} [-m model] [--output-schema schema.json] -`.
+- **Auth:** whatever `codex login` has configured: ChatGPT subscription auth or API key auth.
+- **Structured output:** uses `--output-schema` with a temp JSON Schema file.
+- **Safety boundary:** runs read-only and prompts Codex to answer from the supplied digest instead
+  of editing files. `paw` still applies patches deterministically.
+
 If `PAW_DRONE_TRANSPORT=openai`, the drone uses a cheap OpenAI-compatible API model instead of
 local Ollama (for users with no local GPU). Same `response_format` schema path as §2.
 
 ---
 
-## 5. Token counting
+## 6. Token counting
 
 Prefer provider-reported `usage`. When absent (some compatible endpoints omit it), estimate with
 a local BPE tokenizer: use `github.com/tiktoken-go/tokenizer` (`cl100k_base` encoding) as a
@@ -148,7 +163,7 @@ reported numbers are never silently fabricated.
 
 ---
 
-## 6. Retries, timeouts, determinism
+## 7. Retries, timeouts, determinism
 
 - All requests use `context.Context` with a per-call deadline (config `PAW_CALL_TIMEOUT`, default
   120s for brain, 60s for drone).
@@ -160,7 +175,7 @@ reported numbers are never silently fabricated.
 
 ---
 
-## 7. Why GLM (Z.AI) is the headline (not DeepSeek)
+## 8. Why GLM (Z.AI) remains the benchmark headline (not DeepSeek)
 
 Decision recorded for future maintainers:
 - GLM is the top open-weight family on Terminal-Bench (our primary benchmark), and strongest on
