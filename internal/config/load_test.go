@@ -66,6 +66,29 @@ func TestDefaultsAreLocalFirst(t *testing.T) {
 	if cfg.Drone.Transport != "ollama" || cfg.Drone.BaseURL != "http://localhost:11434" || cfg.Drone.Model != "qwen3:8b" {
 		t.Fatalf("drone defaults = %#v", cfg.Drone)
 	}
+	if cfg.OllamaAutoPull {
+		t.Fatal("ollama auto-pull defaulted true")
+	}
+}
+
+func TestLoadOllamaAutoPullOptIn(t *testing.T) {
+	clearPawEnv(t)
+	path := writeConfig(t, `ollama_auto_pull = true`)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if !cfg.OllamaAutoPull {
+		t.Fatalf("file opt-in not loaded: %#v", cfg)
+	}
+	t.Setenv("PAW_OLLAMA_AUTO_PULL", "false")
+	cfg, err = Load(path)
+	if err != nil {
+		t.Fatalf("load env: %v", err)
+	}
+	if cfg.OllamaAutoPull {
+		t.Fatalf("env opt-out not loaded: %#v", cfg)
+	}
 }
 
 func TestLoadAllowsMissingBrainKeyUntilChat(t *testing.T) {
@@ -137,6 +160,7 @@ func clearPawEnv(t *testing.T) {
 		"PAW_MAX_TURNS",
 		"PAW_MAX_BRAIN_TOKENS",
 		"PAW_CALL_TIMEOUT",
+		"PAW_OLLAMA_AUTO_PULL",
 		"PAW_GATHER_MAX_DEPTH",
 		"PAW_GATHER_MAX_FILE_BYTES",
 	} {

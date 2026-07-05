@@ -88,6 +88,9 @@ func applyEnv(cfg *Config) error {
 	if err := setDuration("PAW_CALL_TIMEOUT", &cfg.CallTimeout); err != nil {
 		return err
 	}
+	if err := setBool("PAW_OLLAMA_AUTO_PULL", &cfg.OllamaAutoPull); err != nil {
+		return err
+	}
 	if err := setInt("PAW_GATHER_MAX_DEPTH", &cfg.Gather.MaxDepth); err != nil {
 		return err
 	}
@@ -123,5 +126,18 @@ func setDuration(key string, dst *time.Duration) error {
 		return fmt.Errorf("%s: %w", key, err)
 	}
 	*dst = d
+	return nil
+}
+
+func setBool(key string, dst *bool) error {
+	v := os.Getenv(key)
+	if v == "" {
+		return nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fmt.Errorf("%s: %w", key, err)
+	}
+	*dst = b
 	return nil
 }

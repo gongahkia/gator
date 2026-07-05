@@ -20,5 +20,6 @@ type Config struct {
 	MaxTurns       int            `toml:"max_turns"`
 	MaxBrainTokens int            `toml:"max_brain_tokens"`
 	CallTimeout    time.Duration  `toml:"call_timeout"`
+	OllamaAutoPull bool           `toml:"ollama_auto_pull"`
 	Gather         GatherConfig   `toml:"gather"`
 }

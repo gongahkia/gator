@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -34,7 +35,9 @@ func TestHealthOllamaTagsCheck(t *testing.T) {
 }
 
 func TestHealthOllamaMissingModelSuggestsPull(t *testing.T) {
+	pulls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		pulls++
 		fmt.Fprint(w, `{"models":[{"name":"other:latest"}]}`)
 	}))
 	defer srv.Close()
@@ -47,6 +50,38 @@ func TestHealthOllamaMissingModelSuggestsPull(t *testing.T) {
 	check := requireCheck(t, report, "model", HealthFail)
 	if check.Action != "ollama pull qwen3:8b" {
 		t.Fatalf("action = %q", check.Action)
+	}
+	if pulls != 1 {
+		t.Fatalf("requests = %d", pulls)
+	}
+}
+
+func TestHealthOllamaAutoPullsWhenExplicitlyEnabled(t *testing.T) {
+	var pullBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/tags":
+			fmt.Fprint(w, `{"models":[{"name":"other:latest"}]}`)
+		case "/api/pull":
+			pullBody = readRequestBody(t, r)
+			fmt.Fprint(w, `{"status":"success"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	report := EndpointHealthChecker{AutoPullOllama: true}.Check(context.Background(), EndpointConfig{
+		Transport: "ollama",
+		BaseURL:   srv.URL,
+		Model:     "qwen3:8b",
+	})
+	check := requireCheck(t, report, "model", HealthOK)
+	if check.Detail != "pulled qwen3:8b" {
+		t.Fatalf("detail = %q", check.Detail)
+	}
+	if !strings.Contains(pullBody, `"model":"qwen3:8b"`) || !strings.Contains(pullBody, `"stream":false`) {
+		t.Fatalf("pull body = %q", pullBody)
 	}
 }
 
@@ -146,4 +181,14 @@ func requireCheck(t *testing.T, report HealthReport, name string, status HealthS
 	}
 	t.Fatalf("missing %s in %#v", name, report)
 	return HealthCheck{}
+}
+
+func readRequestBody(t *testing.T, r *http.Request) string {
+	t.Helper()
+	defer func() { _ = r.Body.Close() }()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	return string(body)
 }

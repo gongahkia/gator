@@ -29,9 +29,14 @@ var doctorModelsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		checker := doctorHealthChecker
+		if concrete, ok := checker.(llm.EndpointHealthChecker); ok {
+			concrete.AutoPullOllama = cfg.OllamaAutoPull
+			checker = concrete
+		}
 		reports := []namedHealthReport{
-			{Name: "brain", Report: doctorHealthChecker.Check(cmd.Context(), llmConfig(cfg).Brain)},
-			{Name: "drone", Report: doctorHealthChecker.Check(cmd.Context(), llmConfig(cfg).Drone)},
+			{Name: "brain", Report: checker.Check(cmd.Context(), llmConfig(cfg).Brain)},
+			{Name: "drone", Report: checker.Check(cmd.Context(), llmConfig(cfg).Drone)},
 		}
 		writeHealthReports(cmd.OutOrStdout(), reports)
 		if hasHealthFailures(reports) {

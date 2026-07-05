@@ -104,7 +104,6 @@ before starting; this is the only global find-replace required.
 +M16.6-ModelAccessHardening  — harden local/API/CLI model access before benchmarks.
 ================================================================================
 
-(A) Add optional Ollama auto-pull behind explicit env/config opt-in only; default must only suggest, not download @llm @config file:internal/llm file:internal/config
 (A) Add schema smoke check for Ollama: run a tiny JSON-schema chat against configured model and fail doctor if invalid JSON/schema mismatch @llm file:internal/llm
 (A) Add local OpenAI-compatible no-key support: allow `openai` transport with empty API key when base URL is localhost/127.0.0.1/[::1] @llm file:internal/llm
 (A) Add named local provider profiles in docs/config examples for LM Studio, vLLM, and llama.cpp using OpenAI-compatible transport @docs ref:MODEL_APIS.md file:README.md file:MODEL_APIS.md

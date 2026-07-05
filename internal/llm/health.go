@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -38,9 +39,10 @@ type ModelInfo struct {
 }
 
 type EndpointHealthChecker struct {
-	HTTPClient *http.Client
-	CLIRunner  cliRunner
-	LookPath   func(string) (string, error)
+	HTTPClient     *http.Client
+	CLIRunner      cliRunner
+	LookPath       func(string) (string, error)
+	AutoPullOllama bool
 }
 
 func CheckEndpointHealth(ctx context.Context, endpoint EndpointConfig) HealthReport {
@@ -79,7 +81,7 @@ func (c EndpointHealthChecker) checkOllama(ctx context.Context, endpoint Endpoin
 		report.add(HealthCheck{Name: "running", Status: HealthFail, Detail: err.Error(), Action: "start Ollama with `ollama serve`"})
 	} else {
 		report.add(HealthCheck{Name: "running", Status: HealthOK, Detail: "Ollama metadata endpoint responded"})
-		report.add(modelHealthCheck(endpoint.Model, modelSet(models), "ollama pull "+endpoint.Model))
+		report.add(c.ollamaModelHealth(ctx, baseURL, endpoint.Model, models))
 	}
 	report.add(HealthCheck{Name: "auth", Status: HealthOK, Detail: "no API key required for local Ollama"})
 	report.add(HealthCheck{Name: "schema", Status: HealthUnknown, Detail: "schema support requires a smoke chat check"})
@@ -175,6 +177,46 @@ func (c EndpointHealthChecker) ListOllamaModels(ctx context.Context, baseURL str
 	return c.getModelInfos(ctx, http.MethodGet, baseURL+"/api/tags", nil, "models")
 }
 
+func PullOllamaModel(ctx context.Context, baseURL, model string) error {
+	return EndpointHealthChecker{}.PullOllamaModel(ctx, baseURL, model)
+}
+
+func (c EndpointHealthChecker) PullOllamaModel(ctx context.Context, baseURL, model string) error {
+	baseURL = strings.TrimRight(baseURL, "/")
+	if baseURL == "" {
+		baseURL = "http://localhost:11434"
+	}
+	body, err := json.Marshal(map[string]any{
+		"model":  model,
+		"stream": false,
+	})
+	if err != nil {
+		return err
+	}
+	client := c.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/pull", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return &statusError{StatusCode: resp.StatusCode, Body: string(respBody)}
+	}
+	return nil
+}
+
 func (c EndpointHealthChecker) getModelIDs(ctx context.Context, method, url string, headers map[string]string, field string) (map[string]bool, error) {
 	models, err := c.getModelInfos(ctx, method, url, headers, field)
 	if err != nil {
@@ -253,6 +295,18 @@ func modelHealthCheck(model string, models map[string]bool, action string) Healt
 		return HealthCheck{Name: "model", Status: HealthOK, Detail: model}
 	}
 	return HealthCheck{Name: "model", Status: HealthFail, Detail: "configured model not found: " + model, Action: action}
+}
+
+func (c EndpointHealthChecker) ollamaModelHealth(ctx context.Context, baseURL, model string, models []ModelInfo) HealthCheck {
+	check := modelHealthCheck(model, modelSet(models), "ollama pull "+model)
+	if check.Status != HealthFail || !c.AutoPullOllama || model == "" {
+		return check
+	}
+	if err := c.PullOllamaModel(ctx, baseURL, model); err != nil {
+		check.Detail = "auto-pull failed for " + model + ": " + err.Error()
+		return check
+	}
+	return HealthCheck{Name: "model", Status: HealthOK, Detail: "pulled " + model}
 }
 
 func modelSet(models []ModelInfo) map[string]bool {
