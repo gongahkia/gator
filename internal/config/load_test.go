@@ -21,11 +21,13 @@ call_timeout = "3s"
 transport = "openai"
 base_url = "https://file.example/v1"
 api_key = "file-key"
+provider = "file-provider"
 model = "file-brain"
 
 [drone]
 transport = "ollama"
 base_url = "http://file-drone"
+provider = "file-drone-provider"
 model = "file-drone"
 
 [gather]
@@ -33,6 +35,7 @@ max_depth = 2
 max_file_bytes = 99
 `)
 	t.Setenv("PAW_BRAIN_MODEL", "env-brain")
+	t.Setenv("PAW_BRAIN_PROVIDER", "env-provider")
 	t.Setenv("PAW_MAX_TURNS", "9")
 	t.Setenv("PAW_CALL_TIMEOUT", "5s")
 	t.Setenv("PAW_GATHER_MAX_FILE_BYTES", "256")
@@ -47,7 +50,10 @@ max_file_bytes = 99
 	if cfg.Brain.Model != "env-brain" {
 		t.Fatalf("brain env override failed: %#v", cfg.Brain)
 	}
-	if cfg.Drone.BaseURL != "http://file-drone" || cfg.Drone.Model != "file-drone" {
+	if cfg.Brain.Provider != "env-provider" {
+		t.Fatalf("brain provider env override failed: %#v", cfg.Brain)
+	}
+	if cfg.Drone.BaseURL != "http://file-drone" || cfg.Drone.Provider != "file-drone-provider" || cfg.Drone.Model != "file-drone" {
 		t.Fatalf("drone file overrides failed: %#v", cfg.Drone)
 	}
 	if cfg.MaxTurns != 9 || cfg.MaxBrainTokens != 123 || cfg.CallTimeout != 5*time.Second {

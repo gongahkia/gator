@@ -55,10 +55,12 @@ Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config
 | `PAW_BRAIN_TRANSPORT` | `brain.transport` | `ollama` |
 | `PAW_BRAIN_BASE_URL` | `brain.base_url` | `http://localhost:11434` |
 | `PAW_BRAIN_API_KEY` | `brain.api_key` | empty |
+| `PAW_BRAIN_PROVIDER` | `brain.provider` | empty |
 | `PAW_BRAIN_MODEL` | `brain.model` | `gpt-oss:20b` |
 | `PAW_DRONE_TRANSPORT` | `drone.transport` | `ollama` |
 | `PAW_DRONE_BASE_URL` | `drone.base_url` | `http://localhost:11434` |
 | `PAW_DRONE_API_KEY` | `drone.api_key` | empty |
+| `PAW_DRONE_PROVIDER` | `drone.provider` | empty |
 | `PAW_DRONE_MODEL` | `drone.model` | `qwen3:8b` |
 | `PAW_MAX_TURNS` | `max_turns` | `40` |
 | `PAW_MAX_BRAIN_TOKENS` | `max_brain_tokens` | `200000` |
@@ -158,6 +160,35 @@ OpenCode CLI brain transport uses OpenCode providers, including optional Zen/fre
 opencode auth login
 export PAW_BRAIN_TRANSPORT=opencode-cli
 export PAW_BRAIN_MODEL=opencode/big-pickle
+```
+
+Aider CLI brain transport uses Aider's configured provider credentials:
+
+```sh
+export PAW_BRAIN_TRANSPORT=aider-cli
+export PAW_BRAIN_MODEL=openai/gpt-5
+```
+
+Goose CLI brain transport can pass both provider and model:
+
+```sh
+export PAW_BRAIN_TRANSPORT=goose-cli
+export PAW_BRAIN_PROVIDER=ollama
+export PAW_BRAIN_MODEL=qwen3:8b
+```
+
+Qwen Code CLI brain transport:
+
+```sh
+export PAW_BRAIN_TRANSPORT=qwen-cli
+export PAW_BRAIN_MODEL=qwen3-coder-plus
+```
+
+Cursor CLI brain transport is experimental:
+
+```sh
+export PAW_BRAIN_TRANSPORT=cursor-cli
+export PAW_BRAIN_MODEL=cursor-default-model
 ```
 
 ## Prior Art

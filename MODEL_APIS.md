@@ -178,6 +178,10 @@ Logged-in smoke tests are env-gated and skipped by default:
 `PAW_E2E_OPENCODE_CLI=1`. Optional model override env vars use the same names with `_MODEL`.
 The smoke prompt asks only for `{"ok":true}` and explicitly says not to inspect or edit files.
 
+All CLI brain transports accept `PAW_BRAIN_MODEL`. Goose also accepts `PAW_BRAIN_PROVIDER`
+because its CLI has separate `--provider` and `--model` flags. OpenCode encodes provider in the
+model string as `provider/model`.
+
 ### Codex CLI
 
 - **Transport:** `codex-cli`.
@@ -214,6 +218,28 @@ The smoke prompt asks only for `{"ok":true}` and explicitly says not to inspect 
   and raw text.
 - **Safety boundary:** no `--dangerously-skip-permissions`; `paw` remains responsible for patch
   application.
+
+### Aider CLI
+
+- **Transport:** `aider-cli`.
+- **Command:** `aider --message {prompt} --dry-run --no-git --no-auto-commits [--model model]`.
+- **Structured output:** schema is pasted into the prompt.
+- **Safety boundary:** dry-run, no git, no auto-commits, no auto-lint/test/shell suggestions.
+
+### Goose CLI
+
+- **Transport:** `goose-cli`.
+- **Command:** `goose run --no-session --quiet --output-format json --no-profile --max-turns 1 --text {prompt} [--provider provider] [--model model]`.
+- **Structured output:** schema is pasted into the prompt.
+- **Safety boundary:** no session and no profile extensions by default.
+
+### Qwen Code CLI
+
+- **Transport:** `qwen-cli`.
+- **Command:** `qwen --prompt {prompt} --approval-mode plan --output-format json [--model model]`.
+- **Structured output:** schema is pasted into the prompt.
+- **Safety boundary:** approval mode `plan` analyzes only and does not modify files or execute
+  commands per Qwen Code docs.
 
 ### Cursor CLI (experimental)
 

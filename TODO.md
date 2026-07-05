@@ -109,7 +109,6 @@ before starting; this is the only global find-replace required.
 +M16.7-AgentCLIExpansion  — add more subscription/local coding CLI brain transports.
 ================================================================================
 
-(B) Extend factory/config docs so every CLI brain transport can select provider-specific models via `PAW_BRAIN_MODEL` and, where applicable, provider via `PAW_BRAIN_PROVIDER` @config @docs file:internal/config file:internal/llm file:README.md
 (B) Add `paw doctor models` coverage for Aider/Goose/Qwen/Cursor binary/version/model capability checks @cli @llm file:cmd file:internal/llm
 (B) Add model listing coverage for Aider/Goose/Qwen/Cursor where supported; unsupported listing must return explicit diagnostic, not silent empty output @cli @llm file:cmd file:internal/llm
 (B) Update README/MODEL_APIS with comparison table: local/no-key, subscription CLI, API-key required, model listing support, schema enforcement strength @docs file:README.md file:MODEL_APIS.md
