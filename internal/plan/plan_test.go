@@ -71,12 +71,13 @@ func TestPlanRawContextModeSendsRawContext(t *testing.T) {
 }
 
 func TestPlanAddsBrainCacheUsage(t *testing.T) {
-	stage := New(fakePlanClient{usage: llm.Usage{
+	fake := &fakePlanClient{usage: llm.Usage{
 		InputTokens:              1,
 		OutputTokens:             2,
 		CacheCreationInputTokens: 3,
 		CacheReadInputTokens:     4,
-	}})
+	}}
+	stage := New(fake)
 	got, err := stage.Run(context.Background(), planEnvelope())
 	if err != nil {
 		t.Fatalf("plan: %v", err)
@@ -84,13 +85,18 @@ func TestPlanAddsBrainCacheUsage(t *testing.T) {
 	if got.Budget.BrainInputTokens != 1 || got.Budget.BrainOutputTokens != 2 || got.Budget.BrainCacheCreationTokens != 3 || got.Budget.BrainCacheReadTokens != 4 {
 		t.Fatalf("budget = %#v", got.Budget)
 	}
+	if fake.request.MaxTokens != maxPlanOutputTokens {
+		t.Fatalf("max tokens = %d", fake.request.MaxTokens)
+	}
 }
 
 type fakePlanClient struct {
-	usage llm.Usage
+	usage   llm.Usage
+	request llm.ChatRequest
 }
 
-func (f fakePlanClient) Chat(context.Context, llm.ChatRequest) (*llm.ChatResponse, error) {
+func (f *fakePlanClient) Chat(_ context.Context, req llm.ChatRequest) (*llm.ChatResponse, error) {
+	f.request = req
 	return &llm.ChatResponse{
 		Content: `{"done":true,"reasoning":"done"}`,
 		Usage:   f.usage,

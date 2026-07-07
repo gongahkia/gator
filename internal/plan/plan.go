@@ -11,6 +11,8 @@ import (
 	"github.com/gongahkia/paw/internal/schema"
 )
 
+const maxPlanOutputTokens = 2048
+
 type Plan struct {
 	Client        llm.Client
 	UseRawContext bool
@@ -38,6 +40,7 @@ func (p *Plan) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	resp, err := p.Client.Chat(ctx, llm.ChatRequest{
 		Messages:    planMessages(in, p.UseRawContext),
 		Temperature: 0,
+		MaxTokens:   maxPlanOutputTokens,
 		JSONSchema:  rawSchema,
 	})
 	if err != nil {
