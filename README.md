@@ -6,6 +6,15 @@ This project does not claim to invent small-model context compression. See [RELA
 
 ## Install
 
+From GitHub Releases:
+
+```sh
+curl -L https://github.com/gongahkia/paw-cli/releases/latest/download/checksums.txt
+```
+
+Download the archive for your OS/architecture from the latest release, verify it against
+`checksums.txt`, extract `paw`, and put it on `PATH`.
+
 From source:
 
 ```sh
