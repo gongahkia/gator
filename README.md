@@ -56,6 +56,13 @@ ollama pull qwen3:8b
 paw run --instruction "fix the failing test"
 ```
 
+First-time setup:
+
+```sh
+paw init
+paw init --non-interactive --brain-transport ollama --drone-transport ollama
+```
+
 Pipeline shape:
 
 ```sh

@@ -11,6 +11,7 @@ Available Commands:
   edit        Apply the planned edit
   gather      Gather raw task context
   help        Help about any command
+  init        Create a paw config
   models      Inspect configured models
   plan        Plan the next agent step
   resume      Resume a run from its trace

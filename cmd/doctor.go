@@ -31,23 +31,7 @@ var doctorModelsCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		checker := doctorHealthChecker
-		if concrete, ok := checker.(llm.EndpointHealthChecker); ok {
-			concrete.AutoPullOllama = cfg.OllamaAutoPull
-			concrete.SchemaSmokeOllama = true
-			checker = concrete
-		}
-		reports := []namedHealthReport{
-			{Name: "brain", Report: checker.Check(cmd.Context(), llmConfig(cfg).Brain)},
-			{Name: "drone", Report: checker.Check(cmd.Context(), llmConfig(cfg).Drone)},
-		}
-		if err := writeHealthReports(cmd.OutOrStdout(), reports); err != nil {
-			return err
-		}
-		if hasHealthFailures(reports) {
-			return fmt.Errorf("model doctor found failures")
-		}
-		return nil
+		return runDoctorModels(cmd.Context(), cmd.OutOrStdout(), cfg)
 	},
 }
 
@@ -59,6 +43,26 @@ type namedHealthReport struct {
 func init() {
 	rootCmd.AddCommand(doctorCmd)
 	doctorCmd.AddCommand(doctorModelsCmd)
+}
+
+func runDoctorModels(ctx context.Context, w io.Writer, cfg config.Config) error {
+	checker := doctorHealthChecker
+	if concrete, ok := checker.(llm.EndpointHealthChecker); ok {
+		concrete.AutoPullOllama = cfg.OllamaAutoPull
+		concrete.SchemaSmokeOllama = true
+		checker = concrete
+	}
+	reports := []namedHealthReport{
+		{Name: "brain", Report: checker.Check(ctx, llmConfig(cfg).Brain)},
+		{Name: "drone", Report: checker.Check(ctx, llmConfig(cfg).Drone)},
+	}
+	if err := writeHealthReports(w, reports); err != nil {
+		return err
+	}
+	if hasHealthFailures(reports) {
+		return fmt.Errorf("model doctor found failures")
+	}
+	return nil
 }
 
 func writeHealthReports(w io.Writer, reports []namedHealthReport) error {

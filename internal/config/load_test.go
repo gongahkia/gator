@@ -310,6 +310,30 @@ model = "deepseek-v4-pro"
 	}
 }
 
+func TestSaveRoundTrip(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	cfg := Defaults()
+	cfg.Brain.Transport = "openai"
+	cfg.Brain.BaseURL = "https://api.example/v1"
+	cfg.Brain.APIKey = "brain-key"
+	cfg.Brain.Model = "brain-model"
+	cfg.Drone.Model = "drone-model"
+	cfg.MaxTurns = 17
+	cfg.CallTimeout = 4 * time.Second
+	path := filepath.Join(t.TempDir(), "nested", "config.toml")
+	if err := cfg.Save(path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.Brain.Model != "brain-model" || got.Drone.Model != "drone-model" || got.MaxTurns != 17 || got.CallTimeout != 4*time.Second {
+		t.Fatalf("round trip = %#v", got)
+	}
+}
+
 func clearPawEnv(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{

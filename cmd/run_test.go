@@ -279,6 +279,16 @@ func resetCLIState(t *testing.T) {
 	runNoninteractive = false
 	runExplain = false
 	runQuiet = false
+	initNonInteractive = false
+	initLocation = ""
+	initBrainTransport = ""
+	initBrainModel = ""
+	initBrainBaseURL = ""
+	initBrainAPIKey = ""
+	initDroneTransport = ""
+	initDroneModel = ""
+	initDroneBaseURL = ""
+	initDroneAPIKey = ""
 	resumeMaxTurns = 0
 	resumeRawContext = false
 	resumeDisableCompress = false
