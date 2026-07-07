@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type ollamaClient struct {
@@ -16,11 +17,11 @@ type ollamaClient struct {
 	httpClient *http.Client
 }
 
-func NewOllamaClient(baseURL, model string) Client {
+func NewOllamaClient(baseURL, model string, timeout ...time.Duration) Client {
 	return &ollamaClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		model:      model,
-		httpClient: http.DefaultClient,
+		httpClient: newHTTPClient(timeoutOrDefault(timeout, defaultDroneCallTimeout)),
 	}
 }
 

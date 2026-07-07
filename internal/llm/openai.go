@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type openAIClient struct {
@@ -26,12 +27,12 @@ func (e *statusError) Error() string {
 	return fmt.Sprintf("llm http status %d: %s", e.StatusCode, e.Body)
 }
 
-func NewOpenAIClient(baseURL, apiKey, model string) Client {
+func NewOpenAIClient(baseURL, apiKey, model string, timeout ...time.Duration) Client {
 	return &openAIClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		apiKey:     apiKey,
 		model:      model,
-		httpClient: http.DefaultClient,
+		httpClient: newHTTPClient(timeoutOrDefault(timeout, defaultBrainCallTimeout)),
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const anthropicVersion = "2023-06-01"
@@ -19,12 +20,12 @@ type anthropicClient struct {
 	httpClient *http.Client
 }
 
-func NewAnthropicClient(baseURL, apiKey, model string) Client {
+func NewAnthropicClient(baseURL, apiKey, model string, timeout ...time.Duration) Client {
 	return &anthropicClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		apiKey:     apiKey,
 		model:      model,
-		httpClient: http.DefaultClient,
+		httpClient: newHTTPClient(timeoutOrDefault(timeout, defaultBrainCallTimeout)),
 	}
 }
 

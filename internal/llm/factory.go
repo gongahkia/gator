@@ -66,11 +66,11 @@ func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
 	var client Client
 	switch strings.ToLower(endpoint.Transport) {
 	case "openai":
-		client = NewOpenAIClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model)
+		client = NewOpenAIClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model, timeout)
 	case "anthropic":
-		client = NewAnthropicClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model)
+		client = NewAnthropicClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model, timeout)
 	case "ollama":
-		client = NewOllamaClient(endpoint.BaseURL, endpoint.Model)
+		client = NewOllamaClient(endpoint.BaseURL, endpoint.Model, timeout)
 	case "codex-cli":
 		client = NewCodexCLIClient(endpoint.Model)
 	case "gemini-cli":
