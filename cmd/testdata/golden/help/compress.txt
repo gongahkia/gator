@@ -1,0 +1,14 @@
+Compress raw context
+
+Usage:
+  paw compress [flags]
+
+Flags:
+      --disable-compress     use deterministic compression fallback
+      --drone-model string   drone model override
+  -h, --help                 help for compress
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

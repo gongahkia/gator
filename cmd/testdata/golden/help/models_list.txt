@@ -1,0 +1,14 @@
+List models for configured transports
+
+Usage:
+  paw models list [brain|drone] [flags]
+
+Flags:
+  -h, --help              help for list
+      --provider string   provider filter for transports that support it
+      --query string      partial model name for transports that require search
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

@@ -1,0 +1,17 @@
+Inspect configured models
+
+Usage:
+  paw models [command]
+
+Available Commands:
+  list        List models for configured transports
+
+Flags:
+  -h, --help   help for models
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output
+
+Use "paw models [command] --help" for more information about a command.

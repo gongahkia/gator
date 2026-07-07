@@ -1,0 +1,23 @@
+Run paw Harbor benchmark sweeps
+
+Usage:
+  paw bench [flags]
+
+Flags:
+      --agent-import-path string   Harbor agent import path (default "paw_harbor:PawAgent")
+      --config string              benchmark config: full, no-compress, raw (default "full")
+      --dataset string             Harbor dataset (default "terminal-bench@2.0")
+      --dry-run                    print Harbor command without running it
+      --harbor-bin string          Harbor executable (default "harbor")
+  -h, --help                       help for bench
+      --job-name string            Harbor job name
+      --jobs-dir string            Harbor jobs directory (default ".paw/bench-jobs")
+      --model string               Harbor model (default "openai/glm-4.6")
+      --n-attempts int             optional Harbor attempts per task
+      --n-concurrent int           Harbor concurrency (default 4)
+      --n-tasks int                optional Harbor task subset size
+      --results-file string        results markdown file to update (default "docs/RESULTS.md")
+
+Global Flags:
+      --trace-file string   trace file
+      --verbose             verbose output

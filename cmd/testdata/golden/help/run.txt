@@ -1,0 +1,20 @@
+Run the full agent pipeline
+
+Usage:
+  paw run [flags]
+
+Flags:
+      --disable-compress          use deterministic compression fallback
+      --drone-model string        drone model override
+      --explain                   print composed pipeline
+  -h, --help                      help for run
+      --instruction string        task instruction
+      --instruction-file string   task instruction file
+      --max-turns int             maximum agent turns
+      --noninteractive            disable interactive prompts
+      --raw-context               bypass model compression
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

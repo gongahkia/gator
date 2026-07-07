@@ -1,0 +1,12 @@
+Apply the planned edit
+
+Usage:
+  paw edit [flags]
+
+Flags:
+  -h, --help   help for edit
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

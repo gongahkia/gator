@@ -1,0 +1,12 @@
+Plan the next agent step
+
+Usage:
+  paw plan [flags]
+
+Flags:
+  -h, --help   help for plan
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

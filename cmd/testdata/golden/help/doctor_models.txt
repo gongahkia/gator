@@ -1,0 +1,12 @@
+Check configured model transports
+
+Usage:
+  paw doctor models [flags]
+
+Flags:
+  -h, --help   help for models
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

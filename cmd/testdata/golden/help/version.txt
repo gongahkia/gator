@@ -1,0 +1,12 @@
+Print version information
+
+Usage:
+  paw version [flags]
+
+Flags:
+  -h, --help   help for version
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

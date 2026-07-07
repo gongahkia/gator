@@ -1,0 +1,17 @@
+Check local paw setup
+
+Usage:
+  paw doctor [command]
+
+Available Commands:
+  models      Check configured model transports
+
+Flags:
+  -h, --help   help for doctor
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output
+
+Use "paw doctor [command] --help" for more information about a command.

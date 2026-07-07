@@ -1,0 +1,12 @@
+Run verification command
+
+Usage:
+  paw verify [flags]
+
+Flags:
+  -h, --help   help for verify
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

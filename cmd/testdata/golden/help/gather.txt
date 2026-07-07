@@ -1,0 +1,13 @@
+Gather raw task context
+
+Usage:
+  paw gather [flags]
+
+Flags:
+  -h, --help                 help for gather
+      --instruction string   task instruction
+
+Global Flags:
+      --config string       config file
+      --trace-file string   trace file
+      --verbose             verbose output

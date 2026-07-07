@@ -1,0 +1,26 @@
+Pipelined Agent Workbench
+
+Usage:
+  paw [command]
+
+Available Commands:
+  bench       Run paw Harbor benchmark sweeps
+  completion  Generate the autocompletion script for the specified shell
+  compress    Compress raw context
+  doctor      Check local paw setup
+  edit        Apply the planned edit
+  gather      Gather raw task context
+  help        Help about any command
+  models      Inspect configured models
+  plan        Plan the next agent step
+  run         Run the full agent pipeline
+  verify      Run verification command
+  version     Print version information
+
+Flags:
+      --config string       config file
+  -h, --help                help for paw
+      --trace-file string   trace file
+      --verbose             verbose output
+
+Use "paw [command] --help" for more information about a command.
