@@ -128,7 +128,7 @@ Configs `bench` can sweep (the ablation that makes claims attributable):
 - `raw` — `--raw-context` (brain reads full `RawContext`, no compression at all) → the upper
   bound on brain tokens, the control the token-savings % is computed against.
 
-Results land in `docs/RESULTS.md` (created/updated by a task in TODO.md; starts as a template).
+Results land in `docs/RESULTS.md`.
 
 ### 4a. Direct comparison vs SWE-Pruner (prior art)
 Because SWE-Pruner is the closest prior art and publishes on SWE-bench Verified with GLM-4.6,
@@ -151,9 +151,22 @@ is no-training + offline + verified + installable, not necessarily a higher rati
 ## 5. Pinned versions (re-verify before submission)
 - Harbor: latest published (`uv tool install harbor`); dataset `terminal-bench@2.0`.
 - Sandbox: local Docker for dev; Daytona/Modal `--env` for scaled runs (optional, needs keys).
-- SWE-bench Verified: added via Harbor's `adapters/` mechanism in a later TODO milestone; use
-  Harbor's existing SWE-bench adapter path if present, else the standard SWE-bench harness with a
-  `paw`-invoking agent script. Do NOT start this until TB2.0 `full` config runs end-to-end.
+- SWE-bench Verified: run through Harbor with `make bench-swebench` after verifying the current
+  Harbor registry dataset id. Do NOT start this until TB2.0 `full` config runs end-to-end.
+
+### 5a. SWE-bench Verified
+
+`paw bench` is dataset-agnostic once Harbor exposes the dataset as normal tasks. The exact Harbor
+dataset id is not pinned in this repo because Harbor registry names can change; verify it with the
+Harbor registry before running.
+
+```sh
+make build-linux
+BENCH_SWEBENCH_DATASET=<harbor-swe-bench-verified-dataset@version> make bench-swebench
+```
+
+The target runs `raw` and `full` configs through the same `PawAgent` adapter and writes rows into
+`docs/RESULTS.md`. Record the exact dataset id, Harbor version, and model env used with any result.
 
 ---
 

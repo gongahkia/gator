@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +20,14 @@ func editSystemPrompt() string {
 	}, "\n")
 }
 
-func editPrompt(env *envelope.Envelope) string {
+func editPrompt(env *envelope.Envelope, useRawContext bool) string {
+	contextLabel := "Context digest:"
+	contextValue := fmt.Sprintf("%#v", env.Digest)
+	if useRawContext {
+		raw, _ := json.Marshal(env.Raw)
+		contextLabel = "Raw context JSON:"
+		contextValue = string(raw)
+	}
 	return strings.Join([]string{
 		"Instruction:",
 		env.Instruction,
@@ -30,15 +38,15 @@ func editPrompt(env *envelope.Envelope) string {
 		"Target path:",
 		env.Plan.NextAction.TargetPath,
 		"",
-		"Context digest:",
-		fmt.Sprintf("%#v", env.Digest),
+		contextLabel,
+		contextValue,
 	}, "\n")
 }
 
-func retryPrompt(env *envelope.Envelope, applyErr error) string {
+func retryPrompt(env *envelope.Envelope, applyErr error, useRawContext bool) string {
 	target := env.Plan.NextAction.TargetPath
 	return strings.Join([]string{
-		editPrompt(env),
+		editPrompt(env, useRawContext),
 		"",
 		"Previous patch failed:",
 		applyErr.Error(),

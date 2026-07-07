@@ -12,7 +12,8 @@ import (
 )
 
 type Edit struct {
-	Client llm.Client
+	Client        llm.Client
+	UseRawContext bool
 }
 
 type ApplyFailure struct {
@@ -44,12 +45,12 @@ func (e *Edit) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	if e.Client == nil {
 		return nil, fmt.Errorf("edit client is nil")
 	}
-	diff, err := e.askAndApply(ctx, &out, editPrompt(&out))
+	diff, err := e.askAndApply(ctx, &out, editPrompt(&out, e.UseRawContext))
 	if err == nil {
 		out.Patch = &envelope.Patch{UnifiedDiff: diff, Files: diffFiles(diff)}
 		return &out, nil
 	}
-	retryDiff, retryErr := e.askAndApply(ctx, &out, retryPrompt(&out, err))
+	retryDiff, retryErr := e.askAndApply(ctx, &out, retryPrompt(&out, err, e.UseRawContext))
 	if retryErr != nil {
 		return nil, &ApplyFailure{Err: retryErr}
 	}

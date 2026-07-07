@@ -33,3 +33,12 @@ This section separates measured paw results from prior-art numbers. Do not read 
 | paw full vs raw | Terminal-Bench 2.0 | GLM-4.6 | stock drone model + deterministic span validation | TBD, measured from the raw/full rows above |
 
 paw should only claim its own measured `full` vs `raw` reduction after both rows are populated by the same benchmark run setup.
+
+## SWE-bench Verified
+
+Status: no SWE-bench run recorded yet.
+
+| config | dataset | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| raw | TBD | 0 | n/a | n/a | n/a | n/a |
+| full | TBD | 0 | n/a | n/a | n/a | n/a |

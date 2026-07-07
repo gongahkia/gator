@@ -12,7 +12,8 @@ import (
 )
 
 type Plan struct {
-	Client llm.Client
+	Client        llm.Client
+	UseRawContext bool
 }
 
 func New(client llm.Client) *Plan {
@@ -35,7 +36,7 @@ func (p *Plan) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	}
 	rawSchema := schema.Raw("plan")
 	resp, err := p.Client.Chat(ctx, llm.ChatRequest{
-		Messages:    planMessages(in),
+		Messages:    planMessages(in, p.UseRawContext),
 		Temperature: 0,
 		JSONSchema:  rawSchema,
 	})

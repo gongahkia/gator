@@ -29,9 +29,28 @@ func TestEditAppliesGoodDiff(t *testing.T) {
 	if got.Budget.BrainInputTokens != 11 || got.Budget.BrainOutputTokens != 7 {
 		t.Fatalf("budget = %#v", got.Budget)
 	}
+	if strings.Contains(srv.LastRequest().Body, "SECRET_RAW") {
+		t.Fatalf("request leaked raw context: %s", srv.LastRequest().Body)
+	}
 	content := readFile(t, filepath.Join(dir, "calc.go"))
 	if !strings.Contains(content, "return a + b") {
 		t.Fatalf("file not edited:\n%s", content)
+	}
+}
+
+func TestEditRawContextModeSendsRawContext(t *testing.T) {
+	dir := fixtureRepo(t)
+	srv := faketest.NewServer()
+	defer srv.Close()
+	srv.RespondOpenAI("", goodDiff())
+
+	stage := New(llm.NewOpenAIClient(srv.URL, "key", "brain"))
+	stage.UseRawContext = true
+	if _, err := stage.Run(context.Background(), editEnvelope(dir)); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	if !strings.Contains(srv.LastRequest().Body, "SECRET_RAW") {
+		t.Fatalf("request missing raw context: %s", srv.LastRequest().Body)
 	}
 }
 
@@ -66,6 +85,9 @@ func editEnvelope(cwd string) *envelope.Envelope {
 		},
 	}
 	env.Digest = &envelope.ContextDigest{Summary: "calc.go Add subtracts instead of adding"}
+	env.Raw = &envelope.RawContext{
+		Units: []envelope.RawUnit{{ID: "u001", Kind: "file_slice", Path: "calc.go", Text: "SECRET_RAW"}},
+	}
 	return env
 }
 

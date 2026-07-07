@@ -54,6 +54,22 @@ func TestPlanSendsDigestNotRawContext(t *testing.T) {
 	}
 }
 
+func TestPlanRawContextModeSendsRawContext(t *testing.T) {
+	srv := faketest.NewServer()
+	defer srv.Close()
+	srv.RespondOpenAI("", `{"done":false,"reasoning":"edit","next_action":{"kind":"edit_file","description":"fix","target_path":"calc.go"}}`)
+
+	stage := New(llm.NewOpenAIClient(srv.URL, "key", "brain"))
+	stage.UseRawContext = true
+	if _, err := stage.Run(context.Background(), planEnvelope()); err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	body := srv.LastRequest().Body
+	if !strings.Contains(body, "SECRET_RAW") {
+		t.Fatalf("request missing raw context: %s", body)
+	}
+}
+
 func planEnvelope() *envelope.Envelope {
 	env := envelope.NewEnvelope("task", "fix Add", "/repo")
 	env.Digest = &envelope.ContextDigest{

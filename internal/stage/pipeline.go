@@ -2,7 +2,9 @@ package stage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
@@ -11,6 +13,7 @@ import (
 type Pipeline struct {
 	stages []Stage
 	byName map[string]Stage
+	tracer *Tracer
 }
 
 func NewPipeline(stages ...Stage) (*Pipeline, error) {
@@ -28,11 +31,18 @@ func NewPipeline(stages ...Stage) (*Pipeline, error) {
 	return p, nil
 }
 
+func (p *Pipeline) SetTracer(tracer *Tracer) {
+	p.tracer = tracer
+}
+
 func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envelope) (*envelope.Envelope, error) {
 	st, ok := p.byName[name]
 	if !ok {
 		return nil, fmt.Errorf("stage %q not found", name)
 	}
+	start := time.Now()
+	inputBytes := envelopeBytes(env)
+	before := env.Budget
 	out, err := st.Run(ctx, env)
 	if err != nil {
 		return nil, err
@@ -42,6 +52,9 @@ func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envel
 	}
 	if out.Stage == "" {
 		out.Stage = name
+	}
+	if err := p.writeTrace(st, out, before, inputBytes, time.Since(start)); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -97,4 +110,46 @@ func verified(env *envelope.Envelope) bool {
 
 func stop(env *envelope.Envelope) bool {
 	return budget.ExceededTokens(env.Budget) || budget.ExceededTurns(env.Budget)
+}
+
+type traceMetadata interface {
+	TraceMetadata() (droppedItems int, usedFallback bool)
+}
+
+func (p *Pipeline) writeTrace(st Stage, out *envelope.Envelope, before envelope.Budget, inputBytes int, duration time.Duration) error {
+	if p.tracer == nil {
+		return nil
+	}
+	dropped, fallback := 0, false
+	if meta, ok := st.(traceMetadata); ok {
+		dropped, fallback = meta.TraceMetadata()
+	}
+	after := out.Budget
+	return p.tracer.Write(TraceEvent{
+		Stage:        out.Stage,
+		Turn:         out.Turn,
+		InputBytes:   inputBytes,
+		OutputBytes:  envelopeBytes(out),
+		Tokens:       tokenDelta(before, after),
+		DroppedItems: dropped,
+		UsedFallback: fallback,
+		DurationMS:   duration.Milliseconds(),
+	})
+}
+
+func tokenDelta(before, after envelope.Budget) int {
+	return after.BrainInputTokens - before.BrainInputTokens +
+		after.BrainOutputTokens - before.BrainOutputTokens +
+		after.DroneTokens - before.DroneTokens
+}
+
+func envelopeBytes(env *envelope.Envelope) int {
+	if env == nil {
+		return 0
+	}
+	data, err := json.Marshal(env)
+	if err != nil {
+		return 0
+	}
+	return len(data)
 }

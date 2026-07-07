@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
 	"github.com/gongahkia/paw/internal/schema"
@@ -12,6 +13,7 @@ import (
 type Compress struct {
 	Client          llm.Client
 	DisableCompress bool
+	RawContext      bool
 	UsedFallback    bool
 	DroppedItems    int
 }
@@ -24,11 +26,19 @@ func (c *Compress) Name() string {
 	return "compress"
 }
 
+func (c *Compress) TraceMetadata() (int, bool) {
+	return c.DroppedItems, c.UsedFallback
+}
+
 func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
 	c.UsedFallback = false
 	c.DroppedItems = 0
 	out.Stage = c.Name()
+	if c.RawContext {
+		out.Digest = nil
+		return &out, nil
+	}
 	if in.Raw == nil || len(in.Raw.Units) == 0 {
 		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
 		return &out, nil
@@ -47,6 +57,7 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	if err != nil {
 		return nil, err
 	}
+	budget.AddDrone(&out.Budget, resp.Usage.InputTokens+resp.Usage.OutputTokens)
 	var digest envelope.ContextDigest
 	if err := json.Unmarshal([]byte(resp.Content), &digest); err != nil {
 		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))

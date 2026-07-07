@@ -19,6 +19,9 @@ func TestCompressValidDigestPasses(t *testing.T) {
 	if len(got.Digest.Items) != 1 || got.Digest.Items[0].UnitID != "u001" {
 		t.Fatalf("digest = %#v", got.Digest)
 	}
+	if got.Budget.DroneTokens != 18 {
+		t.Fatalf("drone tokens = %d", got.Budget.DroneTokens)
+	}
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 

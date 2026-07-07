@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+const (
+	defaultBrainCallTimeout = 120 * time.Second
+	defaultDroneCallTimeout = 60 * time.Second
+)
+
 type EndpointConfig struct {
 	Transport string
 	BaseURL   string
@@ -38,7 +43,7 @@ func NewBrainClient(cfg FactoryConfig) (Client, error) {
 	if requiresEndpointKey(endpoint) && endpoint.APIKey == "" {
 		return missingKeyClient{envKey: "PAW_BRAIN_API_KEY"}, nil
 	}
-	return newClient(endpoint, callTimeout(cfg.CallTimeout))
+	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultBrainCallTimeout))
 }
 
 func NewDroneClient(cfg FactoryConfig) (Client, error) {
@@ -52,7 +57,7 @@ func NewDroneClient(cfg FactoryConfig) (Client, error) {
 	if endpoint.Model == "" && strings.EqualFold(endpoint.Transport, "ollama") {
 		endpoint.Model = "qwen3:8b"
 	}
-	return newClient(endpoint, callTimeout(cfg.CallTimeout))
+	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultDroneCallTimeout))
 }
 
 func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
@@ -132,14 +137,17 @@ func endpointFromEnv(cfg EndpointConfig, prefix string) EndpointConfig {
 	return cfg
 }
 
-func callTimeout(current time.Duration) time.Duration {
+func callTimeout(current time.Duration, fallback time.Duration) time.Duration {
 	if v := os.Getenv("PAW_CALL_TIMEOUT"); v != "" {
 		timeout, err := time.ParseDuration(v)
 		if err == nil {
 			return timeout
 		}
 	}
-	return current
+	if current > 0 {
+		return current
+	}
+	return fallback
 }
 
 type missingKeyClient struct {

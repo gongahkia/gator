@@ -2,7 +2,7 @@
 
 > **Working name:** `paw` (Pipelined Agent Workbench). Placeholder — rename via a single
 > find-and-replace across the repo (`paw` → `<newname>`) plus the module path in `go.mod`.
-> This document is the authoritative architecture reference. `TODO.md` implements it task by task.
+> This document is the authoritative architecture reference.
 
 ---
 

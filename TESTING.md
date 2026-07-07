@@ -83,7 +83,7 @@ inspect files. Do not edit files.` The expected response is exactly `{"ok":true}
 
 ---
 
-## 6. Lint / CI gates (see TODO.md CI task)
+## 6. Lint / CI gates
 - `go vet ./...`
 - `golangci-lint run` (config `.golangci.yml`)
 - `go test ./... -race`

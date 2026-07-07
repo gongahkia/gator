@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -97,6 +98,29 @@ func TestRunLoopStopsOnBudget(t *testing.T) {
 	assertOrder(t, order, []string{"gather", "compress", "plan", "edit", "verify"})
 	if got.Turn != 1 || got.Done {
 		t.Fatalf("unexpected final env: %#v", got)
+	}
+}
+
+func TestRunOnceWritesTrace(t *testing.T) {
+	var trace bytes.Buffer
+	var order []string
+	p := testPipeline(t, &order, map[string]func(*envelope.Envelope){
+		"plan": func(env *envelope.Envelope) {
+			env.Budget.BrainInputTokens += 2
+			env.Budget.BrainOutputTokens += 3
+		},
+	})
+	p.SetTracer(NewTracer(&trace))
+	env := envelope.NewEnvelope("task", "fix", "/repo")
+	if _, err := p.RunOnce(context.Background(), "plan", env); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	var event TraceEvent
+	if err := json.Unmarshal(bytes.TrimSpace(trace.Bytes()), &event); err != nil {
+		t.Fatalf("decode trace: %v\n%s", err, trace.String())
+	}
+	if event.Stage != "plan" || event.Tokens != 5 || event.InputBytes == 0 || event.OutputBytes == 0 {
+		t.Fatalf("event = %#v", event)
 	}
 }
 
