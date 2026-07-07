@@ -160,6 +160,37 @@ func TestUpdateResultsFileReplacesSameRunID(t *testing.T) {
 	}
 }
 
+func TestWriteBenchResultConfigCapturesReproEnv(t *testing.T) {
+	t.Setenv("PAW_CALL_TIMEOUT", "120s")
+	t.Setenv("PAW_BENCH_HARDWARE", "macOS arm64")
+	path := filepath.Join(t.TempDir(), "RESULTS.md")
+	if err := writeBenchResultConfig(path, benchRow{
+		RunID:      "paw-full-raw",
+		Config:     "raw",
+		ConfigPath: "results-configs/paw-full-raw.toml",
+		Date:       "2026-07-07",
+	}, benchOptions{
+		Dataset:     "terminal-bench@2.0",
+		Model:       "ollama/qwen2.5-coder:1.5b",
+		JobsDir:     ".paw/bench-jobs",
+		JobName:     "paw-full-raw",
+		NConcurrent: 1,
+		NTasks:      89,
+	}); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(filepath.Dir(path), "results-configs", "paw-full-raw.toml"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	text := string(got)
+	for _, want := range []string{`PAW_CALL_TIMEOUT = "120s"`, `PAW_BENCH_HARDWARE = "macOS arm64"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q:\n%s", want, text)
+		}
+	}
+}
+
 func TestBenchHelpers(t *testing.T) {
 	if got := ratio(0, 0); got != "n/a" {
 		t.Fatalf("zero ratio = %s", got)

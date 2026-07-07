@@ -197,6 +197,8 @@ func writeBenchResultConfig(resultsPath string, row benchRow, opts benchOptions)
 		envConfigLine("PAW_DRONE_TRANSPORT"),
 		envConfigLine("PAW_DRONE_BASE_URL"),
 		envConfigLine("PAW_DRONE_MODEL"),
+		envConfigLine("PAW_CALL_TIMEOUT"),
+		envConfigLine("PAW_BENCH_HARDWARE"),
 		"PAW_BRAIN_API_KEY = \"<redacted>\"",
 		"PAW_DRONE_API_KEY = \"<redacted>\"",
 		"",
