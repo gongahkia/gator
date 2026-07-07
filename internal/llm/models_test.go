@@ -35,6 +35,34 @@ func TestListEndpointModelsOpenAILocal(t *testing.T) {
 	}
 }
 
+func TestListEndpointModelsAnthropic(t *testing.T) {
+	var apiKey, version string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		apiKey = r.Header.Get("x-api-key")
+		version = r.Header.Get("anthropic-version")
+		mustWriteResponse(t, w, `{"data":[{"id":"claude-test"}]}`)
+	}))
+	defer srv.Close()
+
+	models, err := EndpointHealthChecker{}.ListEndpointModels(context.Background(), EndpointConfig{
+		Transport: "anthropic",
+		BaseURL:   srv.URL,
+		APIKey:    "key",
+	}, ModelListOptions{})
+	if err != nil {
+		t.Fatalf("list models: %v", err)
+	}
+	if apiKey != "key" || version != "2023-06-01" {
+		t.Fatalf("headers = key:%q version:%q", apiKey, version)
+	}
+	if !reflect.DeepEqual(models, []ModelInfo{{ID: "claude-test"}}) {
+		t.Fatalf("models = %#v", models)
+	}
+}
+
 func TestListEndpointModelsOpenCode(t *testing.T) {
 	runner := &fakeCLIRunner{stdout: "anthropic/claude-sonnet\nopenai/gpt-5\n"}
 	models, err := EndpointHealthChecker{CLIRunner: runner}.ListEndpointModels(context.Background(), EndpointConfig{
