@@ -30,3 +30,13 @@ go vet ./...
 ```
 
 `make test` runs `go test ./... -race`. Benchmark checks are separate: see [BENCHMARKS.md](BENCHMARKS.md), [docs/RESULTS.md](docs/RESULTS.md), and `make bench-smoke`.
+
+## Install pre-commit hooks
+
+```sh
+brew install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+The hooks run `gofmt -w`, `go vet ./...`, and `golangci-lint run`. The `golangci-lint` hook installs `v2.12.2`, matching CI.

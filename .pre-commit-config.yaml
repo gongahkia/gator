@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: gofmt
+        entry: gofmt -w
+        language: system
+        types: [go]
+
+      - id: go-vet
+        name: go vet
+        entry: go vet ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run
+        language: golang
+        additional_dependencies:
+          - github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+        pass_filenames: false
+        types: [go]
