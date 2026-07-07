@@ -4,17 +4,16 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
+
+	pawlog "github.com/gongahkia/paw/internal/log"
 )
 
 type TLSConfig struct {
 	CAFile             string
 	InsecureSkipVerify bool
 }
-
-var tlsWarningWriter io.Writer = os.Stderr
 
 func newTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{InsecureSkipVerify: cfg.InsecureSkipVerify}
@@ -44,8 +43,6 @@ type warningRoundTripper struct {
 }
 
 func (rt warningRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if tlsWarningWriter != nil {
-		_, _ = fmt.Fprintln(tlsWarningWriter, "WARN: TLS verification disabled")
-	}
+	pawlog.From(req.Context()).Warn("TLS verification disabled")
 	return rt.inner.RoundTrip(req)
 }

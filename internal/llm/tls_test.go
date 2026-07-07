@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	pawlog "github.com/gongahkia/paw/internal/log"
 )
 
 func TestTLSConfigForHTTPSLLMTransports(t *testing.T) {
@@ -88,15 +90,16 @@ func TestTLSConfigForHTTPSLLMTransports(t *testing.T) {
 
 		t.Run(tt.name+"/skip verify succeeds and warns", func(t *testing.T) {
 			var warnings bytes.Buffer
-			oldWriter := tlsWarningWriter
-			tlsWarningWriter = &warnings
-			t.Cleanup(func() { tlsWarningWriter = oldWriter })
+			logger, err := pawlog.New(pawlog.Config{Writer: &warnings})
+			if err != nil {
+				t.Fatalf("logger: %v", err)
+			}
 
-			resp := tlsChat(t, tt.brain, TLSConfig{InsecureSkipVerify: true})
+			resp := tlsChatContext(t, pawlog.With(context.Background(), logger), tt.brain, TLSConfig{InsecureSkipVerify: true})
 			if resp.Content != tt.content {
 				t.Fatalf("content = %q", resp.Content)
 			}
-			if !strings.Contains(warnings.String(), "WARN: TLS verification disabled") {
+			if !strings.Contains(warnings.String(), `msg="TLS verification disabled"`) {
 				t.Fatalf("missing warning: %q", warnings.String())
 			}
 		})
@@ -104,6 +107,11 @@ func TestTLSConfigForHTTPSLLMTransports(t *testing.T) {
 }
 
 func tlsChat(t *testing.T, brain EndpointConfig, tlsConfig TLSConfig) *ChatResponse {
+	t.Helper()
+	return tlsChatContext(t, context.Background(), brain, tlsConfig)
+}
+
+func tlsChatContext(t *testing.T, ctx context.Context, brain EndpointConfig, tlsConfig TLSConfig) *ChatResponse {
 	t.Helper()
 	client, err := NewBrainClient(FactoryConfig{
 		Brain:       brain,
@@ -113,7 +121,7 @@ func tlsChat(t *testing.T, brain EndpointConfig, tlsConfig TLSConfig) *ChatRespo
 	if err != nil {
 		t.Fatalf("brain client: %v", err)
 	}
-	resp, err := client.Chat(context.Background(), ChatRequest{
+	resp, err := client.Chat(ctx, ChatRequest{
 		Messages: []ChatMessage{{Role: "user", Content: "tls"}},
 	})
 	if err != nil {

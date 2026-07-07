@@ -24,6 +24,8 @@ Flags:
       --results-file string        results markdown file to update (default "docs/RESULTS.md")
 
 Global Flags:
+      --log-format string   log format: text, json (default "text")
+      --log-level string    log level: debug, info, warn, error (default "info")
       --no-color            disable colored stderr output
       --trace-file string   trace file
       --verbose             verbose output

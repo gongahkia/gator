@@ -13,6 +13,7 @@ import (
 
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm/faketest"
+	pawlog "github.com/gongahkia/paw/internal/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -206,6 +207,45 @@ func TestRunProgressAndQuiet(t *testing.T) {
 	}
 }
 
+func TestRunJSONLogFormat(t *testing.T) {
+	isolateEnv(t)
+
+	run := func(level string) (string, []map[string]any) {
+		server := faketest.NewServer()
+		t.Cleanup(server.Close)
+		configureBrain(t, server.URL)
+		server.RespondOpenAI("Prior VerifyResult JSON", `{"done":true,"reasoning":"done"}`)
+
+		dir := t.TempDir()
+		chdir(t, dir)
+		writeTestFile(t, dir, "notes.txt", "target\n")
+
+		args := append(configArgs(t), "--log-format", "json", "--log-level", level, "--verbose", "run", "--raw-context", "--instruction", "target")
+		stdout, stderr, err := executeRootErr(t, args, "")
+		if err != nil {
+			t.Fatalf("run json logs: %v stderr=%s", err, stderr)
+		}
+		_ = canonicalEnvelopeJSON(t, []byte(stdout), true)
+		return stderr, decodeLogLines(t, stderr)
+	}
+
+	infoStderr, infoRecords := run("info")
+	if strings.Contains(infoStderr, "[gather]") {
+		t.Fatalf("json stderr contains text progress:\n%s", infoStderr)
+	}
+	if !hasLog(infoRecords, "stage complete") {
+		t.Fatalf("missing progress log:\n%s", infoStderr)
+	}
+	if hasLog(infoRecords, "stage trace") {
+		t.Fatalf("debug trace visible at info level:\n%s", infoStderr)
+	}
+
+	debugStderr, debugRecords := run("debug")
+	if !hasLog(debugRecords, "stage trace") {
+		t.Fatalf("missing debug trace:\n%s", debugStderr)
+	}
+}
+
 func executeRoot(t *testing.T, args []string, input string) string {
 	t.Helper()
 	resetCLIState(t)
@@ -228,6 +268,8 @@ func resetCLIState(t *testing.T) {
 	traceFile = ""
 	verbose = false
 	noColor = false
+	logFormat = "text"
+	logLevel = "info"
 	runInstruction = ""
 	runInstructionFile = ""
 	runMaxTurns = 0
@@ -247,6 +289,7 @@ func resetCLIState(t *testing.T) {
 	rootCmd.SetOut(io.Discard)
 	rootCmd.SetErr(io.Discard)
 	resetCommandFlags(t, rootCmd)
+	_, _ = pawlog.Install(pawlog.Config{Writer: io.Discard})
 }
 
 func resetCommandFlags(t *testing.T, cmd *cobra.Command) {
@@ -420,4 +463,30 @@ func readTestFile(t *testing.T, dir, rel string) string {
 		t.Fatalf("read file: %v", err)
 	}
 	return string(b)
+}
+
+func decodeLogLines(t *testing.T, stderr string) []map[string]any {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(stderr), "\n")
+	records := make([]map[string]any, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var record map[string]any
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("decode log line: %v\n%s", err, line)
+		}
+		records = append(records, record)
+	}
+	return records
+}
+
+func hasLog(records []map[string]any, msg string) bool {
+	for _, record := range records {
+		if record["msg"] == msg {
+			return true
+		}
+	}
+	return false
 }

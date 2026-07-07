@@ -3,16 +3,19 @@ package ui
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/gongahkia/paw/internal/envelope"
 )
 
 type Progress struct {
-	w     io.Writer
-	quiet bool
-	tty   bool
-	color Colorizer
+	w          io.Writer
+	quiet      bool
+	tty        bool
+	color      Colorizer
+	logger     *slog.Logger
+	structured bool
 }
 
 type ProgressOption func(*Progress)
@@ -29,6 +32,18 @@ func WithColorizer(color Colorizer) ProgressOption {
 	}
 }
 
+func WithLogger(logger *slog.Logger) ProgressOption {
+	return func(p *Progress) {
+		p.logger = logger
+	}
+}
+
+func WithStructured(structured bool) ProgressOption {
+	return func(p *Progress) {
+		p.structured = structured
+	}
+}
+
 func NewProgress(w io.Writer, opts ...ProgressOption) *Progress {
 	p := &Progress{w: w, tty: isTerminal(w), color: NewColorizer(w)}
 	for _, opt := range opts {
@@ -39,6 +54,10 @@ func NewProgress(w io.Writer, opts ...ProgressOption) *Progress {
 
 func (p *Progress) StageDone(stage string, env *envelope.Envelope, duration time.Duration) {
 	if p == nil || p.quiet || p.w == nil {
+		return
+	}
+	if p.structured && p.logger != nil {
+		p.logger.Info("stage complete", "stage", stage, "summary", stageSummary(stage, env), "duration_ms", duration.Milliseconds())
 		return
 	}
 	_, _ = fmt.Fprintf(p.w, "%s %s (%s)\n", p.color.Green("["+stage+"]"), p.summary(stage, env), p.color.Dim(formatDuration(duration)))

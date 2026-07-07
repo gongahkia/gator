@@ -77,6 +77,23 @@ gather | compress | plan | edit | verify
 | `2` | usage error, including bad flags and missing or mutually exclusive required options |
 | `64` | agent pipeline completed without a passing verification result |
 
+## Logging
+
+Diagnostics go to stderr. Default logs use text format at `info` level:
+
+```sh
+paw run --instruction "fix the failing test"
+```
+
+Use JSON logs for aggregators:
+
+```sh
+paw run --log-format=json --log-level=debug --instruction "fix the failing test"
+```
+
+`--log-format` accepts `text` or `json`. `--log-level` accepts `debug`, `info`, `warn`, or `error`.
+Command stdout stays reserved for envelope/output JSON.
+
 ## Configuration
 
 Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config.toml`.

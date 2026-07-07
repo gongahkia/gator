@@ -20,6 +20,8 @@ Available Commands:
 Flags:
       --config string       config file
   -h, --help                help for paw
+      --log-format string   log format: text, json (default "text")
+      --log-level string    log level: debug, info, warn, error (default "info")
       --no-color            disable colored stderr output
       --trace-file string   trace file
       --verbose             verbose output

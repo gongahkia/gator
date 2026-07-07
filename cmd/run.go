@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/gather"
 	"github.com/gongahkia/paw/internal/llm"
+	pawlog "github.com/gongahkia/paw/internal/log"
 	"github.com/gongahkia/paw/internal/plan"
 	"github.com/gongahkia/paw/internal/stage"
 	"github.com/gongahkia/paw/internal/ui"
@@ -103,13 +103,14 @@ var runCmd = &cobra.Command{
 		env := envelope.NewEnvelope(id, instruction, cwd)
 		env.Budget.MaxTurns = cfg.MaxTurns
 		env.Budget.MaxBrainTokens = cfg.MaxBrainTokens
-		traceHandle, tracer, err := setupRunTracer(id, verbose && !runQuiet, cmd.ErrOrStderr())
+		traceOpts := runTraceOptions(cmd)
+		traceHandle, tracer, err := setupRunTracer(id, traceOpts...)
 		if err != nil {
 			return err
 		}
 		defer func() { _ = traceHandle.Close() }()
 		pipeline.SetTracer(tracer)
-		pipeline.SetProgress(ui.NewProgress(cmd.ErrOrStderr(), ui.WithQuiet(runQuiet), ui.WithColorizer(ui.NewColorizer(cmd.ErrOrStderr(), ui.WithNoColor(noColor)))))
+		pipeline.SetProgress(ui.NewProgress(cmd.ErrOrStderr(), ui.WithQuiet(runQuiet), ui.WithColorizer(ui.NewColorizer(cmd.ErrOrStderr(), ui.WithNoColor(noColor))), ui.WithLogger(pawlog.From(cmd.Context())), ui.WithStructured(pawlog.IsJSON(logFormat))))
 		out, err := pipeline.RunLoop(cmd.Context(), env)
 		if err != nil {
 			return err
@@ -186,7 +187,17 @@ func taskID(instruction, cwd string) string {
 	return "task-" + hex.EncodeToString(sum[:])[:12]
 }
 
-func setupRunTracer(taskID string, mirror bool, mirrorWriter io.Writer) (*os.File, *stage.Tracer, error) {
+func runTraceOptions(cmd *cobra.Command) []stage.TracerOption {
+	if !verbose || runQuiet {
+		return nil
+	}
+	if pawlog.IsJSON(logFormat) {
+		return []stage.TracerOption{stage.WithLogger(pawlog.From(cmd.Context()))}
+	}
+	return []stage.TracerOption{stage.WithMirror(cmd.ErrOrStderr())}
+}
+
+func setupRunTracer(taskID string, opts ...stage.TracerOption) (*os.File, *stage.Tracer, error) {
 	path := traceFile
 	if path == "" {
 		path = filepath.Join(".paw", "trace-"+taskID+".ndjson")
@@ -198,10 +209,7 @@ func setupRunTracer(taskID string, mirror bool, mirrorWriter io.Writer) (*os.Fil
 	if err != nil {
 		return nil, nil, err
 	}
-	if mirror {
-		return file, stage.NewTracer(file, stage.WithMirror(mirrorWriter)), nil
-	}
-	return file, stage.NewTracer(file), nil
+	return file, stage.NewTracer(file, opts...), nil
 }
 
 func runSucceeded(env *envelope.Envelope) bool {
