@@ -19,9 +19,11 @@ type ChatRequest struct {
 }
 
 type Usage struct {
-	InputTokens  int
-	OutputTokens int
-	TokenSource  string
+	InputTokens              int
+	OutputTokens             int
+	CacheCreationInputTokens int
+	CacheReadInputTokens     int
+	TokenSource              string
 }
 
 type ChatResponse struct {

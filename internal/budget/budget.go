@@ -7,6 +7,11 @@ func AddBrain(b *envelope.Budget, in, out int) {
 	b.BrainOutputTokens += out
 }
 
+func AddBrainCache(b *envelope.Budget, creation, read int) {
+	b.BrainCacheCreationTokens += creation
+	b.BrainCacheReadTokens += read
+}
+
 func AddDrone(b *envelope.Budget, n int) {
 	b.DroneTokens += n
 }

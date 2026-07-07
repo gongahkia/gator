@@ -70,6 +70,33 @@ func TestPlanRawContextModeSendsRawContext(t *testing.T) {
 	}
 }
 
+func TestPlanAddsBrainCacheUsage(t *testing.T) {
+	stage := New(fakePlanClient{usage: llm.Usage{
+		InputTokens:              1,
+		OutputTokens:             2,
+		CacheCreationInputTokens: 3,
+		CacheReadInputTokens:     4,
+	}})
+	got, err := stage.Run(context.Background(), planEnvelope())
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if got.Budget.BrainInputTokens != 1 || got.Budget.BrainOutputTokens != 2 || got.Budget.BrainCacheCreationTokens != 3 || got.Budget.BrainCacheReadTokens != 4 {
+		t.Fatalf("budget = %#v", got.Budget)
+	}
+}
+
+type fakePlanClient struct {
+	usage llm.Usage
+}
+
+func (f fakePlanClient) Chat(context.Context, llm.ChatRequest) (*llm.ChatResponse, error) {
+	return &llm.ChatResponse{
+		Content: `{"done":true,"reasoning":"done"}`,
+		Usage:   f.usage,
+	}, nil
+}
+
 func planEnvelope() *envelope.Envelope {
 	env := envelope.NewEnvelope("task", "fix Add", "/repo")
 	env.Digest = &envelope.ContextDigest{

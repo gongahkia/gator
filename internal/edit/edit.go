@@ -70,6 +70,7 @@ func (e *Edit) askAndApply(ctx context.Context, env *envelope.Envelope, prompt s
 		return "", err
 	}
 	budget.AddBrain(&env.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens)
+	budget.AddBrainCache(&env.Budget, resp.Usage.CacheCreationInputTokens, resp.Usage.CacheReadInputTokens)
 	diff, err := patcher.Extract(resp.Content)
 	if err != nil {
 		return "", err

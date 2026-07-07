@@ -190,6 +190,8 @@ func (p *Pipeline) writeProgress(stage string, out *envelope.Envelope, duration 
 func tokenDelta(before, after envelope.Budget) int {
 	return after.BrainInputTokens - before.BrainInputTokens +
 		after.BrainOutputTokens - before.BrainOutputTokens +
+		after.BrainCacheCreationTokens - before.BrainCacheCreationTokens +
+		after.BrainCacheReadTokens - before.BrainCacheReadTokens +
 		after.DroneTokens - before.DroneTokens
 }
 

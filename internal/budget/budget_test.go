@@ -10,11 +10,12 @@ func TestBudgetAccumulation(t *testing.T) {
 	b := envelope.Budget{}
 	AddBrain(&b, 10, 3)
 	AddBrain(&b, 5, 2)
+	AddBrainCache(&b, 11, 13)
 	AddDrone(&b, 7)
 	IncTurn(&b)
 	IncTurn(&b)
 
-	if b.BrainInputTokens != 15 || b.BrainOutputTokens != 5 || b.DroneTokens != 7 || b.Turn != 2 {
+	if b.BrainInputTokens != 15 || b.BrainOutputTokens != 5 || b.BrainCacheCreationTokens != 11 || b.BrainCacheReadTokens != 13 || b.DroneTokens != 7 || b.Turn != 2 {
 		t.Fatalf("budget = %#v", b)
 	}
 }

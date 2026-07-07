@@ -196,12 +196,14 @@ matching common failure markers (`FAIL`, `Error`, `assert`, `panic`, `Traceback`
 
 ```go
 type Budget struct {
-    MaxTurns          int `json:"max_turns"`
-    Turn              int `json:"turn"`
-    BrainInputTokens  int `json:"brain_input_tokens"`   // headline metric
-    BrainOutputTokens int `json:"brain_output_tokens"`
-    DroneTokens       int `json:"drone_tokens"`
-    MaxBrainTokens    int `json:"max_brain_tokens"`      // hard cap; loop stops if exceeded
+    MaxTurns                 int `json:"max_turns"`
+    Turn                     int `json:"turn"`
+    BrainInputTokens         int `json:"brain_input_tokens"`   // headline metric
+    BrainOutputTokens        int `json:"brain_output_tokens"`
+    BrainCacheCreationTokens int `json:"brain_cache_creation_tokens,omitempty"`
+    BrainCacheReadTokens     int `json:"brain_cache_read_tokens,omitempty"`
+    DroneTokens              int `json:"drone_tokens"`
+    MaxBrainTokens           int `json:"max_brain_tokens"`      // hard cap; loop stops if exceeded
 }
 ```
 

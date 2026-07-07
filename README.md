@@ -155,6 +155,10 @@ api_key = "..."
 model = "deepseek-v4-pro"
 ```
 
+Anthropic requests mark the stable system/tool prefix with ephemeral prompt caching. Cache creation
+and read tokens are surfaced in the envelope budget as `brain_cache_creation_tokens` and
+`brain_cache_read_tokens`.
+
 OpenAI-compatible API override for benchmark runs:
 
 ```sh

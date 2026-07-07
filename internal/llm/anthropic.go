@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	pawlog "github.com/gongahkia/paw/internal/log"
 )
 
 const anthropicVersion = "2023-06-01"
@@ -80,8 +82,13 @@ func (c *anthropicClient) post(ctx context.Context, body []byte, inputText strin
 		return nil, err
 	}
 	usage := Usage{
-		InputTokens:  out.Usage.InputTokens,
-		OutputTokens: out.Usage.OutputTokens,
+		InputTokens:              out.Usage.InputTokens,
+		OutputTokens:             out.Usage.OutputTokens,
+		CacheCreationInputTokens: out.Usage.CacheCreationInputTokens,
+		CacheReadInputTokens:     out.Usage.CacheReadInputTokens,
+	}
+	if usage.CacheReadInputTokens > 0 {
+		pawlog.From(ctx).Info("anthropic prompt cache hit", "cache_read_input_tokens", usage.CacheReadInputTokens)
 	}
 	return &ChatResponse{Content: content, Usage: usageWithEstimate(usage, inputText, content)}, nil
 }
@@ -91,15 +98,16 @@ func anthropicRequest(req ChatRequest, defaultModel string, promptFallback bool)
 	if model == "" {
 		model = defaultModel
 	}
+	system, messages := anthropicMessages(req.Messages)
 	body := anthropicRequestBody{
 		Model:       model,
 		MaxTokens:   req.MaxTokens,
 		Temperature: req.Temperature,
+		Messages:    messages,
 	}
-	body.System, body.Messages = anthropicMessages(req.Messages)
 	if req.JSONSchema != nil {
 		if promptFallback {
-			body.System = appendSystem(body.System, "Return only JSON matching this schema:\n"+string(req.JSONSchema))
+			system = appendSystem(system, "Return only JSON matching this schema:\n"+string(req.JSONSchema))
 		} else {
 			var schema any
 			if err := json.Unmarshal(req.JSONSchema, &schema); err != nil {
@@ -113,6 +121,7 @@ func anthropicRequest(req ChatRequest, defaultModel string, promptFallback bool)
 			body.ToolChoice = map[string]string{"type": "tool", "name": "response"}
 		}
 	}
+	body.System = anthropicSystem(system)
 	raw, err := json.Marshal(body)
 	return raw, req.JSONSchema != nil && !promptFallback, err
 }
@@ -128,6 +137,17 @@ func anthropicMessages(messages []ChatMessage) (string, []anthropicMessage) {
 		out = append(out, anthropicMessage(msg))
 	}
 	return strings.Join(system, "\n\n"), out
+}
+
+func anthropicSystem(system string) []anthropicTextBlock {
+	if system == "" {
+		return nil
+	}
+	return []anthropicTextBlock{{
+		Type:         "text",
+		Text:         system,
+		CacheControl: &anthropicCacheControl{Type: "ephemeral"},
+	}}
 }
 
 func anthropicContent(resp anthropicResponse, toolMode bool) (string, error) {
@@ -166,13 +186,23 @@ func appendSystem(current, extra string) string {
 }
 
 type anthropicRequestBody struct {
-	Model       string             `json:"model"`
-	MaxTokens   int                `json:"max_tokens,omitempty"`
-	System      string             `json:"system,omitempty"`
-	Messages    []anthropicMessage `json:"messages"`
-	Temperature float64            `json:"temperature"`
-	Tools       []anthropicTool    `json:"tools,omitempty"`
-	ToolChoice  map[string]string  `json:"tool_choice,omitempty"`
+	Model       string               `json:"model"`
+	MaxTokens   int                  `json:"max_tokens,omitempty"`
+	System      []anthropicTextBlock `json:"system,omitempty"`
+	Messages    []anthropicMessage   `json:"messages"`
+	Temperature float64              `json:"temperature"`
+	Tools       []anthropicTool      `json:"tools,omitempty"`
+	ToolChoice  map[string]string    `json:"tool_choice,omitempty"`
+}
+
+type anthropicTextBlock struct {
+	Type         string                 `json:"type"`
+	Text         string                 `json:"text"`
+	CacheControl *anthropicCacheControl `json:"cache_control,omitempty"`
+}
+
+type anthropicCacheControl struct {
+	Type string `json:"type"`
 }
 
 type anthropicMessage struct {
@@ -194,7 +224,9 @@ type anthropicResponse struct {
 		Input json.RawMessage `json:"input,omitempty"`
 	} `json:"content"`
 	Usage struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
+		InputTokens              int `json:"input_tokens"`
+		OutputTokens             int `json:"output_tokens"`
+		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
 	} `json:"usage"`
 }

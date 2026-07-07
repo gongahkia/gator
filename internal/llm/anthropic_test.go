@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gongahkia/paw/internal/llm/faketest"
+	pawlog "github.com/gongahkia/paw/internal/log"
 )
 
 func TestAnthropicChatRequestShapeAndToolResponse(t *testing.T) {
@@ -50,8 +52,14 @@ func TestAnthropicChatRequestShapeAndToolResponse(t *testing.T) {
 	if body["model"] != "claude-test" || body["max_tokens"] != float64(123) || body["temperature"] != 0.25 {
 		t.Fatalf("body = %#v", body)
 	}
-	if body["system"] != "system prompt" {
+	system := body["system"].([]any)
+	systemBlock := system[0].(map[string]any)
+	if systemBlock["text"] != "system prompt" {
 		t.Fatalf("system = %#v", body["system"])
+	}
+	cacheControl := systemBlock["cache_control"].(map[string]any)
+	if cacheControl["type"] != "ephemeral" {
+		t.Fatalf("cache_control = %#v", cacheControl)
 	}
 	messages := body["messages"].([]any)
 	if len(messages) != 1 || messages[0].(map[string]any)["role"] != "user" {
@@ -69,6 +77,42 @@ func TestAnthropicChatRequestShapeAndToolResponse(t *testing.T) {
 	choice := body["tool_choice"].(map[string]any)
 	if choice["type"] != "tool" || choice["name"] != "response" {
 		t.Fatalf("tool_choice = %#v", choice)
+	}
+}
+
+func TestAnthropicPromptCachingUsage(t *testing.T) {
+	srv := faketest.NewServer()
+	defer srv.Close()
+	srv.Respond("cache", http.StatusOK, `{
+		"content":[{"type":"text","text":"ok"}],
+		"usage":{
+			"input_tokens":17,
+			"output_tokens":9,
+			"cache_creation_input_tokens":456,
+			"cache_read_input_tokens":1234
+		}
+	}`)
+	var logs bytes.Buffer
+	logger, err := pawlog.New(pawlog.Config{Writer: &logs})
+	if err != nil {
+		t.Fatalf("logger: %v", err)
+	}
+
+	client := NewAnthropicClient(srv.URL, "", "claude-test")
+	resp, err := client.Chat(pawlog.With(context.Background(), logger), ChatRequest{
+		Messages: []ChatMessage{
+			{Role: "system", Content: "cacheable system"},
+			{Role: "user", Content: "cache"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("chat: %v", err)
+	}
+	if resp.Usage.CacheCreationInputTokens != 456 || resp.Usage.CacheReadInputTokens != 1234 {
+		t.Fatalf("usage = %#v", resp.Usage)
+	}
+	if !strings.Contains(logs.String(), "anthropic prompt cache hit") || !strings.Contains(logs.String(), "cache_read_input_tokens=1234") {
+		t.Fatalf("logs = %q", logs.String())
 	}
 }
 
@@ -120,7 +164,8 @@ func TestAnthropicJSONSchemaFallbackOn4xx(t *testing.T) {
 	if _, ok := retryBody["tools"]; ok {
 		t.Fatalf("fallback request has tools: %#v", retryBody)
 	}
-	if !strings.Contains(retryBody["system"].(string), "Return only JSON matching this schema") {
+	retrySystem := retryBody["system"].([]any)[0].(map[string]any)
+	if !strings.Contains(retrySystem["text"].(string), "Return only JSON matching this schema") {
 		t.Fatalf("fallback system = %#v", retryBody["system"])
 	}
 }
