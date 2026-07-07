@@ -41,5 +41,21 @@ archives:
 checksum:
   name_template: checksums.txt
 
+sboms:
+  - id: paw
+    artifacts: archive
+    ids:
+      - paw
+    documents:
+      - "{{ .ArtifactName }}.sbom.json"
+    cmd: syft
+    args:
+      - "$artifact"
+      - "--output"
+      - "spdx-json=$document"
+      - "--enrich"
+      - "all"
+    disable: false
+
 snapshot:
   version_template: "{{ incpatch .Version }}-next"

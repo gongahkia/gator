@@ -26,6 +26,7 @@ curl -L https://github.com/gongahkia/paw-cli/releases/latest/download/checksums.
 
 Download the archive for your OS/architecture from the latest release, verify it against
 `checksums.txt`, extract `paw`, and put it on `PATH`.
+Each release also publishes SPDX JSON SBOMs as `<artifact>.sbom.json` assets beside the archives.
 
 From source:
 
