@@ -66,6 +66,8 @@ Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config
 | `PAW_MAX_BRAIN_TOKENS` | `max_brain_tokens` | `200000` |
 | `PAW_CALL_TIMEOUT` | `call_timeout` | brain 120s, drone 60s |
 | `PAW_OLLAMA_AUTO_PULL` | `ollama_auto_pull` | `false` |
+| `PAW_TLS_CA_FILE` | `tls.ca_file` | empty |
+| `PAW_INSECURE_SKIP_TLS_VERIFY` | `tls.insecure_skip_verify` | `false` |
 | `PAW_GATHER_MAX_DEPTH` | `gather.max_depth` | stage default |
 | `PAW_GATHER_MAX_FILE_BYTES` | `gather.max_file_bytes` | stage default |
 
@@ -90,6 +92,10 @@ export PAW_BRAIN_MODEL=glm-4.6
 
 Local OpenAI-compatible brain profiles do not require an API key when the base URL is loopback.
 Use `paw doctor models` after starting the local server.
+
+TLS overrides apply to `openai` and `anthropic` transports. `tls.ca_file` appends a PEM CA bundle
+to system roots for private endpoints. `tls.insecure_skip_verify` disables certificate verification
+and prints `WARN: TLS verification disabled` on every request.
 
 LM Studio:
 

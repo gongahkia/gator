@@ -52,7 +52,7 @@ func TestAiderCLITransportRequestShape(t *testing.T) {
 }
 
 func TestFactorySupportsAiderCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "aider-cli", Model: "aider-model"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "aider-cli", Model: "aider-model"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

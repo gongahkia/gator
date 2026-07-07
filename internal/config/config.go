@@ -15,9 +15,15 @@ type GatherConfig struct {
 	MaxFileBytes int `toml:"max_file_bytes"`
 }
 
+type TLSConfig struct {
+	CAFile             string `toml:"ca_file"`
+	InsecureSkipVerify bool   `toml:"insecure_skip_verify"`
+}
+
 type Config struct {
 	Brain          EndpointConfig `toml:"brain"`
 	Drone          EndpointConfig `toml:"drone"`
+	TLS            TLSConfig      `toml:"tls"`
 	MaxTurns       int            `toml:"max_turns"`
 	MaxBrainTokens int            `toml:"max_brain_tokens"`
 	CallTimeout    time.Duration  `toml:"call_timeout"`

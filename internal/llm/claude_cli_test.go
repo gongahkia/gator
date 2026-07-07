@@ -48,7 +48,7 @@ func TestParseClaudeOutputReturnsRawJSONObject(t *testing.T) {
 }
 
 func TestFactorySupportsClaudeCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "claude-cli", Model: "sonnet"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "claude-cli", Model: "sonnet"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

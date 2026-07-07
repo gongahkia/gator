@@ -48,7 +48,7 @@ func TestQwenCLITransportRequestShape(t *testing.T) {
 }
 
 func TestFactorySupportsQwenCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "qwen-cli", Model: "qwen3-coder-plus"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "qwen-cli", Model: "qwen3-coder-plus"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

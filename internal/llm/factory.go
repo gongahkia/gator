@@ -25,6 +25,7 @@ type EndpointConfig struct {
 type FactoryConfig struct {
 	Brain       EndpointConfig
 	Drone       EndpointConfig
+	TLS         TLSConfig
 	CallTimeout time.Duration
 }
 
@@ -42,7 +43,7 @@ func NewBrainClient(cfg FactoryConfig) (Client, error) {
 	if requiresEndpointKey(endpoint) && endpoint.APIKey == "" {
 		return nil, fmt.Errorf("missing required PAW_BRAIN_API_KEY for transport %q", endpoint.Transport)
 	}
-	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultBrainCallTimeout))
+	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultBrainCallTimeout), cfg.TLS)
 }
 
 func NewDroneClient(cfg FactoryConfig) (Client, error) {
@@ -59,18 +60,30 @@ func NewDroneClient(cfg FactoryConfig) (Client, error) {
 	if requiresEndpointKey(endpoint) && endpoint.APIKey == "" {
 		return nil, fmt.Errorf("missing required PAW_DRONE_API_KEY for transport %q", endpoint.Transport)
 	}
-	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultDroneCallTimeout))
+	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultDroneCallTimeout), cfg.TLS)
 }
 
-func newClient(endpoint EndpointConfig, timeout time.Duration) (Client, error) {
+func newClient(endpoint EndpointConfig, timeout time.Duration, tlsConfig TLSConfig) (Client, error) {
 	var client Client
 	switch strings.ToLower(endpoint.Transport) {
 	case "openai":
-		client = NewOpenAIClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model, timeout)
+		httpClient, err := newHTTPClient(HTTPClientConfig{Timeout: timeout, TLS: tlsConfig})
+		if err != nil {
+			return nil, err
+		}
+		client = newOpenAIClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model, httpClient)
 	case "anthropic":
-		client = NewAnthropicClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model, timeout)
+		httpClient, err := newHTTPClient(HTTPClientConfig{Timeout: timeout, TLS: tlsConfig})
+		if err != nil {
+			return nil, err
+		}
+		client = newAnthropicClient(endpoint.BaseURL, endpoint.APIKey, endpoint.Model, httpClient)
 	case "ollama":
-		client = NewOllamaClient(endpoint.BaseURL, endpoint.Model, timeout)
+		httpClient, err := newHTTPClient(HTTPClientConfig{Timeout: timeout})
+		if err != nil {
+			return nil, err
+		}
+		client = newOllamaClient(endpoint.BaseURL, endpoint.Model, httpClient)
 	case "codex-cli":
 		client = NewCodexCLIClient(endpoint.Model)
 	case "gemini-cli":

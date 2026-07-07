@@ -45,7 +45,7 @@ func TestParseGeminiOutputReturnsRawJSONObject(t *testing.T) {
 }
 
 func TestFactorySupportsGeminiCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "gemini-cli", Model: "gemini-test"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "gemini-cli", Model: "gemini-test"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

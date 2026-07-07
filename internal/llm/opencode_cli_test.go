@@ -49,7 +49,7 @@ func TestParseOpenCodeOutputUsesLastJSONEventText(t *testing.T) {
 }
 
 func TestFactorySupportsOpenCodeCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "opencode-cli", Model: "opencode/big-pickle"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "opencode-cli", Model: "opencode/big-pickle"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

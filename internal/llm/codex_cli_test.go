@@ -35,7 +35,7 @@ func TestCodexCLITransportRequestShape(t *testing.T) {
 }
 
 func TestFactorySupportsCodexCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "codex-cli", Model: "gpt-test"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "codex-cli", Model: "gpt-test"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

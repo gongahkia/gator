@@ -28,11 +28,15 @@ func (e *statusError) Error() string {
 }
 
 func NewOpenAIClient(baseURL, apiKey, model string, timeout ...time.Duration) Client {
+	return newOpenAIClient(baseURL, apiKey, model, defaultHTTPClient(timeoutOrDefault(timeout, defaultBrainCallTimeout)))
+}
+
+func newOpenAIClient(baseURL, apiKey, model string, httpClient *http.Client) Client {
 	return &openAIClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		apiKey:     apiKey,
 		model:      model,
-		httpClient: newHTTPClient(timeoutOrDefault(timeout, defaultBrainCallTimeout)),
+		httpClient: httpClient,
 	}
 }
 

@@ -81,6 +81,10 @@ func applyEnv(cfg *Config) error {
 	setString("PAW_DRONE_API_KEY", &cfg.Drone.APIKey)
 	setString("PAW_DRONE_PROVIDER", &cfg.Drone.Provider)
 	setString("PAW_DRONE_MODEL", &cfg.Drone.Model)
+	setString("PAW_TLS_CA_FILE", &cfg.TLS.CAFile)
+	if err := setBool("PAW_INSECURE_SKIP_TLS_VERIFY", &cfg.TLS.InsecureSkipVerify); err != nil {
+		return err
+	}
 	if err := setInt("PAW_MAX_TURNS", &cfg.MaxTurns); err != nil {
 		return err
 	}

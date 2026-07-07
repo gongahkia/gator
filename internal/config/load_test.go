@@ -32,12 +32,18 @@ model = "file-drone"
 [gather]
 max_depth = 2
 max_file_bytes = 99
+
+[tls]
+ca_file = "/file/ca.pem"
+insecure_skip_verify = false
 `)
 	t.Setenv("PAW_BRAIN_MODEL", "env-brain")
 	t.Setenv("PAW_BRAIN_PROVIDER", "env-provider")
 	t.Setenv("PAW_MAX_TURNS", "9")
 	t.Setenv("PAW_CALL_TIMEOUT", "5s")
 	t.Setenv("PAW_GATHER_MAX_FILE_BYTES", "256")
+	t.Setenv("PAW_TLS_CA_FILE", "/env/ca.pem")
+	t.Setenv("PAW_INSECURE_SKIP_TLS_VERIFY", "true")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -61,6 +67,9 @@ max_file_bytes = 99
 	if cfg.Gather.MaxDepth != 2 || cfg.Gather.MaxFileBytes != 256 {
 		t.Fatalf("gather precedence failed: %#v", cfg.Gather)
 	}
+	if cfg.TLS.CAFile != "/env/ca.pem" || !cfg.TLS.InsecureSkipVerify {
+		t.Fatalf("tls precedence failed: %#v", cfg.TLS)
+	}
 }
 
 func TestDefaultsAreLocalFirst(t *testing.T) {
@@ -73,6 +82,9 @@ func TestDefaultsAreLocalFirst(t *testing.T) {
 	}
 	if cfg.OllamaAutoPull {
 		t.Fatal("ollama auto-pull defaulted true")
+	}
+	if cfg.TLS.CAFile != "" || cfg.TLS.InsecureSkipVerify {
+		t.Fatalf("tls defaults = %#v", cfg.TLS)
 	}
 }
 
@@ -162,6 +174,8 @@ func clearPawEnv(t *testing.T) {
 		"PAW_MAX_BRAIN_TOKENS",
 		"PAW_CALL_TIMEOUT",
 		"PAW_OLLAMA_AUTO_PULL",
+		"PAW_TLS_CA_FILE",
+		"PAW_INSECURE_SKIP_TLS_VERIFY",
 		"PAW_GATHER_MAX_DEPTH",
 		"PAW_GATHER_MAX_FILE_BYTES",
 	} {

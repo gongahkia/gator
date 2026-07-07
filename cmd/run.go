@@ -157,6 +157,10 @@ func llmConfig(cfg config.Config) llm.FactoryConfig {
 			Provider:  cfg.Drone.Provider,
 			Model:     cfg.Drone.Model,
 		},
+		TLS: llm.TLSConfig{
+			CAFile:             cfg.TLS.CAFile,
+			InsecureSkipVerify: cfg.TLS.InsecureSkipVerify,
+		},
 		CallTimeout: cfg.CallTimeout,
 	}
 }

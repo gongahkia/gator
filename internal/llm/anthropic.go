@@ -21,11 +21,15 @@ type anthropicClient struct {
 }
 
 func NewAnthropicClient(baseURL, apiKey, model string, timeout ...time.Duration) Client {
+	return newAnthropicClient(baseURL, apiKey, model, defaultHTTPClient(timeoutOrDefault(timeout, defaultBrainCallTimeout)))
+}
+
+func newAnthropicClient(baseURL, apiKey, model string, httpClient *http.Client) Client {
 	return &anthropicClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		apiKey:     apiKey,
 		model:      model,
-		httpClient: newHTTPClient(timeoutOrDefault(timeout, defaultBrainCallTimeout)),
+		httpClient: httpClient,
 	}
 }
 

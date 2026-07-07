@@ -18,10 +18,14 @@ type ollamaClient struct {
 }
 
 func NewOllamaClient(baseURL, model string, timeout ...time.Duration) Client {
+	return newOllamaClient(baseURL, model, defaultHTTPClient(timeoutOrDefault(timeout, defaultDroneCallTimeout)))
+}
+
+func newOllamaClient(baseURL, model string, httpClient *http.Client) Client {
 	return &ollamaClient{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		model:      model,
-		httpClient: newHTTPClient(timeoutOrDefault(timeout, defaultDroneCallTimeout)),
+		httpClient: httpClient,
 	}
 }
 

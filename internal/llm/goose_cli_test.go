@@ -54,7 +54,7 @@ func TestGooseCLITransportRequestShape(t *testing.T) {
 }
 
 func TestFactorySupportsGooseCLITransport(t *testing.T) {
-	client, err := newClient(EndpointConfig{Transport: "goose-cli", Provider: "ollama", Model: "qwen3:8b"}, 0)
+	client, err := newClient(EndpointConfig{Transport: "goose-cli", Provider: "ollama", Model: "qwen3:8b"}, 0, TLSConfig{})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}
