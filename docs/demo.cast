@@ -1,0 +1,7 @@
+{"version": 2, "width": 96, "height": 24, "timestamp": 1783400032, "idle_time_limit": 1.0, "env": {"SHELL": "/bin/zsh", "TERM": "xterm-ghostty"}}
+[0.135505, "o", "$ go test ./...\r\n"]
+[0.704404, "o", "--- FAIL: TestAdd (0.00s)\r\n    calc_test.go:7: Add(2, 3) = -1\r\nFAIL\r\nFAIL\tdemo\t0.407s\r\nFAIL\r\n"]
+[0.710959, "o", "\r\n"]
+[0.710972, "o", "$ paw run --raw-context --instruction \"fix the failing test\"\r\n"]
+[1.307062, "o", "verify: passed\r\n\r\n$ sed -n \"1,6p\" calc.go\r\n"]
+[1.309348, "o", "package demo\r\n\r\nfunc Add(a int, b int) int {\r\n\treturn a + b\r\n}\r\n"]

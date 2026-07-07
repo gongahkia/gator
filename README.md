@@ -4,6 +4,8 @@
 
 This project does not claim to invent small-model context compression. See [RELATED_WORK.md](RELATED_WORK.md) and [DESIGN.md](DESIGN.md) for the positioning.
 
+[![paw run demo](docs/demo.gif)](docs/DEMO.md)
+
 ## Install
 
 With Homebrew:
