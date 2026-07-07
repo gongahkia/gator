@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"os"
 	"strings"
 	"testing"
@@ -97,7 +96,7 @@ func TestLoadOllamaAutoPullOptIn(t *testing.T) {
 	}
 }
 
-func TestLoadAllowsMissingBrainKeyUntilChat(t *testing.T) {
+func TestLoadFailsFastOnMissingBrainKey(t *testing.T) {
 	clearPawEnv(t)
 	path := writeConfig(t, `
 [brain]
@@ -120,14 +119,8 @@ model = "glm-test"
 			Model:     cfg.Brain.Model,
 		},
 	})
-	if err != nil {
-		t.Fatalf("brain client: %v", err)
-	}
-	_, err = client.Chat(context.Background(), llm.ChatRequest{
-		Messages: []llm.ChatMessage{{Role: "user", Content: "x"}},
-	})
 	if err == nil || !strings.Contains(err.Error(), "PAW_BRAIN_API_KEY") {
-		t.Fatalf("expected missing key chat error, got %v", err)
+		t.Fatalf("expected missing key factory error, got client=%T err=%v", client, err)
 	}
 }
 

@@ -103,6 +103,29 @@ func TestStageCommandsGolden(t *testing.T) {
 	})
 }
 
+func TestRunFailsFastOnMissingBrainKey(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+	configFile := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(configFile, []byte(`
+[brain]
+transport = "openai"
+base_url = "https://api.openai.com/v1"
+model = "gpt-test"
+`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	_, stderr, err := executeRootErr(t, []string{"--config", configFile, "run", "--raw-context", "--instruction", "target"}, "")
+	if err == nil || !strings.Contains(err.Error(), "PAW_BRAIN_API_KEY") {
+		t.Fatalf("expected PAW_BRAIN_API_KEY error, got err=%v stderr=%s", err, stderr)
+	}
+	if _, statErr := os.Stat(filepath.Join(dir, ".paw")); !os.IsNotExist(statErr) {
+		t.Fatalf("unexpected .paw dir after fail-fast: %v", statErr)
+	}
+}
+
 func executeRoot(t *testing.T, args []string, input string) string {
 	t.Helper()
 	resetCLIState(t)

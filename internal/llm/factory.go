@@ -1,7 +1,6 @@
 package llm
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -41,7 +40,7 @@ func NewBrainClient(cfg FactoryConfig) (Client, error) {
 		endpoint.Model = "gpt-oss:20b"
 	}
 	if requiresEndpointKey(endpoint) && endpoint.APIKey == "" {
-		return missingKeyClient{envKey: "PAW_BRAIN_API_KEY"}, nil
+		return nil, fmt.Errorf("missing required PAW_BRAIN_API_KEY for transport %q", endpoint.Transport)
 	}
 	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultBrainCallTimeout))
 }
@@ -56,6 +55,9 @@ func NewDroneClient(cfg FactoryConfig) (Client, error) {
 	}
 	if endpoint.Model == "" && strings.EqualFold(endpoint.Transport, "ollama") {
 		endpoint.Model = "qwen3:8b"
+	}
+	if requiresEndpointKey(endpoint) && endpoint.APIKey == "" {
+		return nil, fmt.Errorf("missing required PAW_DRONE_API_KEY for transport %q", endpoint.Transport)
 	}
 	return newClient(endpoint, callTimeout(cfg.CallTimeout, defaultDroneCallTimeout))
 }
@@ -148,12 +150,4 @@ func callTimeout(current time.Duration, fallback time.Duration) time.Duration {
 		return current
 	}
 	return fallback
-}
-
-type missingKeyClient struct {
-	envKey string
-}
-
-func (c missingKeyClient) Chat(context.Context, ChatRequest) (*ChatResponse, error) {
-	return nil, fmt.Errorf("missing required %s", c.envKey)
 }
