@@ -36,6 +36,19 @@ If `paw` is not on the host process `PATH`, use the absolute binary path:
 }
 ```
 
+For deterministic local smoke checks without a model call, add `--disable-compress`:
+
+```json
+{
+  "mcpServers": {
+    "paw": {
+      "command": "paw",
+      "args": ["mcp", "serve", "--disable-compress"]
+    }
+  }
+}
+```
+
 The server reads the same config files and `PAW_*` environment variables as the CLI. For local
 defaults, start Ollama and pull the drone model before using `compress` or `digest`:
 
@@ -91,6 +104,23 @@ Use native `paw run` when paw should own the full agent pipeline, including plan
 generation, patch application, and verification.
 
 ## Smoke Test
+
+With MCP Inspector:
+
+```sh
+npx -y @modelcontextprotocol/inspector paw mcp serve --disable-compress
+```
+
+In the Inspector UI, list tools and call `digest` with:
+
+```json
+{
+  "cwd": "/absolute/path/to/repo",
+  "instruction": "inspect the project"
+}
+```
+
+Plain stdio smoke:
 
 ```sh
 printf '%s\n' \

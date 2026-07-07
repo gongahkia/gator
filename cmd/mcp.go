@@ -11,6 +11,8 @@ var mcpCmd = &cobra.Command{
 	Short: "Run MCP integrations",
 }
 
+var mcpServeDisableCompress bool
+
 var mcpServeCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Run a stdio MCP server for context tools",
@@ -19,7 +21,7 @@ var mcpServeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		server := mcppkg.NewServer(mcppkg.StageRunner{Config: cfg})
+		server := mcppkg.NewServer(mcppkg.StageRunner{Config: cfg, DisableCompress: mcpServeDisableCompress})
 		return server.Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout())
 	},
 }
@@ -27,4 +29,5 @@ var mcpServeCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(mcpCmd)
 	mcpCmd.AddCommand(mcpServeCmd)
+	mcpServeCmd.Flags().BoolVar(&mcpServeDisableCompress, "disable-compress", false, "use deterministic compression fallback")
 }

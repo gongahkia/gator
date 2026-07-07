@@ -4,7 +4,8 @@ Usage:
   paw mcp serve [flags]
 
 Flags:
-  -h, --help   help for serve
+      --disable-compress   use deterministic compression fallback
+  -h, --help               help for serve
 
 Global Flags:
       --config string       config file
