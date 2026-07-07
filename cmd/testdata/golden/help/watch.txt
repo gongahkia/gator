@@ -1,0 +1,27 @@
+Watch files for AI markers
+
+Usage:
+  paw watch [flags]
+
+Examples:
+  paw watch
+  paw watch --markers "ai:,TODO(ai):"
+  paw watch --raw-context
+
+Flags:
+      --debounce duration    save debounce duration (default 200ms)
+      --disable-compress     use deterministic compression fallback
+      --drone-model string   drone model override
+  -h, --help                 help for watch
+      --markers string       comma-separated marker prefixes (default "ai:")
+      --max-turns int        maximum agent turns
+      --quiet                suppress progress output
+      --raw-context          bypass model compression
+
+Global Flags:
+      --config string       config file
+      --log-format string   log format: text, json (default "text")
+      --log-level string    log level: debug, info, warn, error (default "info")
+      --no-color            disable colored stderr output
+      --trace-file string   trace file
+      --verbose             verbose output

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm/faketest"
@@ -295,6 +296,13 @@ func resetCLIState(t *testing.T) {
 	resumeDroneModel = ""
 	resumeQuiet = false
 	statsRate = ""
+	watchMarkers = "ai:"
+	watchDebounce = 200 * time.Millisecond
+	watchMaxTurns = 0
+	watchRawContext = false
+	watchDisableCompress = false
+	watchDroneModel = ""
+	watchQuiet = false
 	gatherInstruction = ""
 	compressDisableCompress = false
 	compressDroneModel = ""

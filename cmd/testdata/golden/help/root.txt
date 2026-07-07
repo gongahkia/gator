@@ -19,6 +19,7 @@ Available Commands:
   stats       Summarize a run trace
   verify      Run verification command
   version     Print version information
+  watch       Watch files for AI markers
 
 Flags:
       --config string       config file

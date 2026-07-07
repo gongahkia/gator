@@ -27,6 +27,7 @@ func TestHelpGolden(t *testing.T) {
 		{name: "run", args: []string{"run"}},
 		{name: "stats", args: []string{"stats"}},
 		{name: "verify", args: []string{"verify"}},
+		{name: "watch", args: []string{"watch"}},
 		{name: "version", args: []string{"version"}},
 	}
 	for _, tt := range tests {

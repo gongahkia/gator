@@ -91,6 +91,16 @@ paw stats --trace-file .paw/trace-task-abc123.ndjson --rate brain:in=3.0,brain:o
 
 Rate keys are `brain:in`, `brain:out`, `brain:cache_creation`, `brain:cache_read`, and `drone`.
 
+Watch for inline AI markers and run paw when files are saved:
+
+```sh
+paw watch
+paw watch --markers "ai:,TODO(ai):"
+```
+
+Supported single-line marker comments include `# ai:`, `// ai:`, `/* ai: */`, and `<!-- ai: -->`.
+Successful runs remove the marker.
+
 ## Exit Codes
 
 | code | meaning |
