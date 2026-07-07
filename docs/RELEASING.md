@@ -55,6 +55,18 @@ Paste those values into `MACOS_CERTIFICATE` and `MACOS_NOTARY_KEY`.
 5. GoReleaser signs and notarizes darwin binaries before packaging release archives.
 6. The workflow publishes GitHub release assets and updates the Homebrew formula.
 
+## macOS Packaging Scope
+
+The current pipeline uses GoReleaser's cross-platform macOS notarization path, which signs and
+notarizes standalone Mach-O binaries before they are placed in release archives. This matches the
+Homebrew formula and tarball install flow.
+
+Do not add a stapling step to the current `tar.gz` archive path. If the project needs a stapled
+distributable, add a separate `.pkg` or `.dmg` release path and validate it with `xcrun stapler`.
+GoReleaser's built-in `.pkg` and `.dmg` builders are GoReleaser Pro features; without Pro, use a
+separate macOS packaging job with `pkgbuild`/`productbuild` or `hdiutil`, followed by `notarytool`
+and `stapler`.
+
 ## Verification
 
 After the first signed release, verify on a clean macOS 15+ machine:
@@ -71,11 +83,11 @@ spctl -a -t exec -vv ./paw
 Repeat for `darwin_amd64` on Intel macOS or under a matching validation host.
 
 Current release archives are `tar.gz` files containing a signed/notarized Mach-O binary. There is no
-`.app`, `.pkg`, or `.dmg` artifact to staple in this layout. If the project switches to a `.pkg` or
-`.dmg`, add a native macOS release path with `xcrun notarytool submit --wait` and `xcrun stapler
-staple` against that distributable.
+`.app`, `.pkg`, or `.dmg` artifact to staple in this layout.
 
 ## References
 
 - Apple notarization: <https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution>
 - GoReleaser notarization: <https://goreleaser.com/customization/sign/notarize/>
+- GoReleaser DMG packaging: <https://goreleaser.com/customization/package/dmg/>
+- GoReleaser PKG packaging: <https://goreleaser.com/customization/package/pkg/>
