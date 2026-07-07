@@ -70,27 +70,42 @@ func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envel
 func (p *Pipeline) RunLoop(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
 	var err error
 	env, err = p.RunOnce(ctx, "gather", env)
-	if err != nil || stop(env) {
+	if err != nil {
+		return env, err
+	}
+	if stop(env) {
 		return env, err
 	}
 	for {
 		env, err = p.RunOnce(ctx, "compress", env)
-		if err != nil || stop(env) {
+		if err != nil {
+			return env, err
+		}
+		if stop(env) {
 			return env, err
 		}
 		env, err = p.RunOnce(ctx, "plan", env)
-		if err != nil || done(env) || stop(env) {
+		if err != nil {
+			return env, err
+		}
+		if done(env) || stop(env) {
 			if done(env) {
 				env.Done = true
 			}
 			return env, err
 		}
 		env, err = p.RunOnce(ctx, "edit", env)
-		if err != nil || stop(env) {
+		if err != nil {
+			return env, err
+		}
+		if stop(env) {
 			return env, err
 		}
 		env, err = p.RunOnce(ctx, "verify", env)
-		if err != nil || verified(env) {
+		if err != nil {
+			return env, err
+		}
+		if verified(env) {
 			if verified(env) {
 				env.Done = true
 			}
@@ -102,7 +117,10 @@ func (p *Pipeline) RunLoop(ctx context.Context, env *envelope.Envelope) (*envelo
 			return env, nil
 		}
 		env, err = p.RunOnce(ctx, "gather", env)
-		if err != nil || stop(env) {
+		if err != nil {
+			return env, err
+		}
+		if stop(env) {
 			return env, err
 		}
 	}

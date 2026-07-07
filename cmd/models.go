@@ -28,7 +28,12 @@ var modelsCmd = &cobra.Command{
 var modelsListCmd = &cobra.Command{
 	Use:   "list [brain|drone]",
 	Short: "List models for configured transports",
-	Args:  cobra.MaximumNArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if err := cobra.MaximumNArgs(1)(cmd, args); err != nil {
+			return usageError(err)
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.Load(configPath)
 		if err != nil {
@@ -87,7 +92,7 @@ func selectedModelEndpoints(cfg config.Config, args []string) ([]namedEndpoint, 
 	case "drone":
 		return all[1:], nil
 	default:
-		return nil, fmt.Errorf("unknown model endpoint %q", args[0])
+		return nil, usageErrorf("unknown model endpoint %q", args[0])
 	}
 }
 

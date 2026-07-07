@@ -111,7 +111,10 @@ var runCmd = &cobra.Command{
 		if runSucceeded(out) {
 			return nil
 		}
-		return fmt.Errorf("run stopped without done or verify pass")
+		if out.Verify != nil && !out.Verify.Passed {
+			return verifyFailedErrorf("verification failed")
+		}
+		return verifyFailedErrorf("run stopped without done or verify pass")
 	},
 }
 
@@ -130,13 +133,13 @@ func init() {
 
 func readInstruction() (string, error) {
 	if runInstruction != "" && runInstructionFile != "" {
-		return "", fmt.Errorf("use --instruction or --instruction-file, not both")
+		return "", usageErrorf("use --instruction or --instruction-file, not both")
 	}
 	if runInstruction != "" {
 		return runInstruction, nil
 	}
 	if runInstructionFile == "" {
-		return "", fmt.Errorf("missing --instruction or --instruction-file")
+		return "", usageErrorf("missing --instruction or --instruction-file")
 	}
 	data, err := os.ReadFile(runInstructionFile)
 	if err != nil {

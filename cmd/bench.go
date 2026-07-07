@@ -105,7 +105,7 @@ func benchConfigSpec(name string) (benchConfig, error) {
 	case "full", "no-compress", "raw":
 		return benchConfig{Name: name}, nil
 	default:
-		return benchConfig{}, fmt.Errorf("unsupported bench config %q", name)
+		return benchConfig{}, usageErrorf("unsupported bench config %q", name)
 	}
 }
 

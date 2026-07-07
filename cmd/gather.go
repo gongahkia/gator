@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/gongahkia/paw/internal/config"
@@ -17,7 +16,7 @@ var gatherCmd = &cobra.Command{
 	Short: "Gather raw task context",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if gatherInstruction == "" {
-			return fmt.Errorf("missing --instruction")
+			return usageErrorf("missing --instruction")
 		}
 		cfg, err := config.Load(configPath)
 		if err != nil {

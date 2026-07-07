@@ -25,11 +25,14 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		color := ui.NewColorizer(os.Stderr, ui.WithNoColor(noColor))
 		fmt.Fprintln(os.Stderr, color.Red(err.Error()))
-		os.Exit(1)
+		os.Exit(int(codeForError(err)))
 	}
 }
 
 func init() {
+	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return usageError(err)
+	})
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file")
 	rootCmd.PersistentFlags().StringVar(&traceFile, "trace-file", "", "trace file")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "verbose output")

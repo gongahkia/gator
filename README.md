@@ -68,6 +68,15 @@ Output:
 gather | compress | plan | edit | verify
 ```
 
+## Exit Codes
+
+| code | meaning |
+| ---: | --- |
+| `0` | success |
+| `1` | system error, including filesystem, network, or model failures |
+| `2` | usage error, including bad flags and missing or mutually exclusive required options |
+| `64` | agent pipeline completed without a passing verification result |
+
 ## Configuration
 
 Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config.toml`.
