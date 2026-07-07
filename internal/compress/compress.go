@@ -10,7 +10,7 @@ import (
 	"github.com/gongahkia/paw/internal/schema"
 )
 
-const maxCompressOutputTokens = 2048
+const maxCompressOutputTokens = 1024
 
 type Compress struct {
 	Client          llm.Client

@@ -11,7 +11,7 @@ import (
 	patcher "github.com/gongahkia/paw/internal/patch"
 )
 
-const maxEditOutputTokens = 4096
+const maxEditOutputTokens = 1024
 
 type Edit struct {
 	Client        llm.Client

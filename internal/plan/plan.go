@@ -11,7 +11,7 @@ import (
 	"github.com/gongahkia/paw/internal/schema"
 )
 
-const maxPlanOutputTokens = 2048
+const maxPlanOutputTokens = 1024
 
 type Plan struct {
 	Client        llm.Client
