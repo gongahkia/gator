@@ -101,6 +101,30 @@ func TestRunLoopStopsOnBudget(t *testing.T) {
 	}
 }
 
+func TestRunFromResumesAfterCompletedStage(t *testing.T) {
+	var order []string
+	p := testPipeline(t, &order, map[string]func(*envelope.Envelope){
+		"plan": func(env *envelope.Envelope) {
+			env.Plan = &envelope.Plan{Done: true}
+		},
+	})
+	env := envelope.NewEnvelope("task", "fix", "/repo")
+	env.Stage = "compress"
+	env.Turn = 3
+	env.Budget.Turn = 3
+	env.Budget.DroneTokens = 7
+	got, err := p.RunFrom(context.Background(), env)
+	if err != nil {
+		t.Fatalf("run from: %v", err)
+	}
+	if strings.Join(order, ",") != "plan" {
+		t.Fatalf("order = %v", order)
+	}
+	if !got.Done || got.Turn != 3 || got.Budget.DroneTokens != 7 {
+		t.Fatalf("env = %#v", got)
+	}
+}
+
 func TestRunOnceWritesTrace(t *testing.T) {
 	var trace bytes.Buffer
 	var order []string
@@ -121,6 +145,51 @@ func TestRunOnceWritesTrace(t *testing.T) {
 	}
 	if event.Stage != "plan" || event.Tokens != 5 || event.InputBytes == 0 || event.OutputBytes == 0 {
 		t.Fatalf("event = %#v", event)
+	}
+	if event.Envelope == nil || event.Envelope.Stage != "plan" {
+		t.Fatalf("missing envelope snapshot: %#v", event.Envelope)
+	}
+}
+
+func TestReadTraceRestoresLastEnvelope(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trace.ndjson")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create trace: %v", err)
+	}
+	enc := json.NewEncoder(file)
+	first := envelope.NewEnvelope("task", "fix", "/repo")
+	first.Stage = "gather"
+	last := envelope.NewEnvelope("task", "fix", "/repo")
+	last.Stage = "plan"
+	last.Turn = 2
+	last.Budget.Turn = 2
+	if err := enc.Encode(TraceEvent{Stage: "gather", Envelope: first}); err != nil {
+		t.Fatalf("encode first: %v", err)
+	}
+	if err := enc.Encode(TraceEvent{Stage: "plan", Envelope: last}); err != nil {
+		t.Fatalf("encode last: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close trace: %v", err)
+	}
+
+	got, err := ReadTrace(path)
+	if err != nil {
+		t.Fatalf("read trace: %v", err)
+	}
+	if got.Stage != "plan" || got.Turn != 2 || got.Budget.Turn != 2 {
+		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestReadTraceMalformed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trace.ndjson")
+	if err := os.WriteFile(path, []byte(`{"stage":"gather"`), 0o644); err != nil {
+		t.Fatalf("write trace: %v", err)
+	}
+	if _, err := ReadTrace(path); err == nil || !strings.Contains(err.Error(), "read trace") {
+		t.Fatalf("err = %v", err)
 	}
 }
 

@@ -215,5 +215,6 @@ are honest.
 
 Every run writes an NDJSON trace to `--trace-file` (default `./.paw/trace-<taskid>.ndjson`): one
 line per stage invocation with `{stage, turn, input_bytes, output_bytes, tokens, dropped_items,
-used_fallback, duration_ms}`. `paw bench` aggregates these into the results tables. No model is
+used_fallback, duration_ms, envelope}`. `envelope` is the post-stage snapshot used by
+`paw resume`. `paw bench` aggregates the metric fields into the results tables. No model is
 involved in tracing.

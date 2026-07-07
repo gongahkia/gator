@@ -22,6 +22,7 @@ func TestHelpGolden(t *testing.T) {
 		{name: "models", args: []string{"models"}},
 		{name: "models_list", args: []string{"models", "list"}},
 		{name: "plan", args: []string{"plan"}},
+		{name: "resume", args: []string{"resume"}},
 		{name: "run", args: []string{"run"}},
 		{name: "verify", args: []string{"verify"}},
 		{name: "version", args: []string{"version"}},

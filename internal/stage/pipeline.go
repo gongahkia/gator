@@ -56,9 +56,7 @@ func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envel
 	if out == nil {
 		return nil, fmt.Errorf("stage %q returned nil envelope", name)
 	}
-	if out.Stage == "" {
-		out.Stage = name
-	}
+	out.Stage = name
 	duration := time.Since(start)
 	if err := p.writeTrace(st, out, before, inputBytes, duration); err != nil {
 		return nil, err
@@ -68,60 +66,78 @@ func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envel
 }
 
 func (p *Pipeline) RunLoop(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
-	var err error
-	env, err = p.RunOnce(ctx, "gather", env)
+	env, err := p.RunOnce(ctx, "gather", env)
 	if err != nil {
 		return env, err
 	}
-	if stop(env) {
-		return env, err
+	return p.RunFrom(ctx, env)
+}
+
+func (p *Pipeline) RunFrom(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
+	if env == nil {
+		return nil, fmt.Errorf("cannot resume nil envelope")
+	}
+	if env.Stage == "" {
+		return p.RunLoop(ctx, env)
 	}
 	for {
-		env, err = p.RunOnce(ctx, "compress", env)
-		if err != nil {
-			return env, err
-		}
-		if stop(env) {
-			return env, err
-		}
-		env, err = p.RunOnce(ctx, "plan", env)
-		if err != nil {
-			return env, err
-		}
-		if done(env) || stop(env) {
-			if done(env) {
-				env.Done = true
+		switch env.Stage {
+		case "gather":
+			if stop(env) {
+				return env, nil
 			}
-			return env, err
-		}
-		env, err = p.RunOnce(ctx, "edit", env)
-		if err != nil {
-			return env, err
-		}
-		if stop(env) {
-			return env, err
-		}
-		env, err = p.RunOnce(ctx, "verify", env)
-		if err != nil {
-			return env, err
-		}
-		if verified(env) {
+			var err error
+			env, err = p.RunOnce(ctx, "compress", env)
+			if err != nil {
+				return env, err
+			}
+		case "compress":
+			if stop(env) {
+				return env, nil
+			}
+			var err error
+			env, err = p.RunOnce(ctx, "plan", env)
+			if err != nil {
+				return env, err
+			}
+		case "plan":
+			if done(env) || stop(env) {
+				if done(env) {
+					env.Done = true
+				}
+				return env, nil
+			}
+			var err error
+			env, err = p.RunOnce(ctx, "edit", env)
+			if err != nil {
+				return env, err
+			}
+		case "edit":
+			if stop(env) {
+				return env, nil
+			}
+			var err error
+			env, err = p.RunOnce(ctx, "verify", env)
+			if err != nil {
+				return env, err
+			}
+		case "verify":
 			if verified(env) {
 				env.Done = true
+				return env, nil
 			}
-			return env, err
-		}
-		budget.IncTurn(&env.Budget)
-		env.Turn = env.Budget.Turn
-		if stop(env) {
-			return env, nil
-		}
-		env, err = p.RunOnce(ctx, "gather", env)
-		if err != nil {
-			return env, err
-		}
-		if stop(env) {
-			return env, err
+			budget.IncTurn(&env.Budget)
+			env.Turn = env.Budget.Turn
+			if stop(env) {
+				return env, nil
+			}
+			var err error
+			env, err = p.RunOnce(ctx, "gather", env)
+			if err != nil {
+				return env, err
+			}
+		default:
+			return nil, fmt.Errorf("cannot resume from stage %q", env.Stage)
 		}
 	}
 }
@@ -160,6 +176,7 @@ func (p *Pipeline) writeTrace(st Stage, out *envelope.Envelope, before envelope.
 		DroppedItems: dropped,
 		UsedFallback: fallback,
 		DurationMS:   duration.Milliseconds(),
+		Envelope:     out,
 	})
 }
 

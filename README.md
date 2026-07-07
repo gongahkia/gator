@@ -68,6 +68,13 @@ Output:
 gather | compress | plan | edit | verify
 ```
 
+Resume an interrupted task from its trace:
+
+```sh
+paw resume task-abc123
+paw resume task-abc123 --trace-file .paw/trace-task-abc123.ndjson
+```
+
 ## Exit Codes
 
 | code | meaning |

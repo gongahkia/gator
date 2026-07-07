@@ -279,6 +279,11 @@ func resetCLIState(t *testing.T) {
 	runNoninteractive = false
 	runExplain = false
 	runQuiet = false
+	resumeMaxTurns = 0
+	resumeRawContext = false
+	resumeDisableCompress = false
+	resumeDroneModel = ""
+	resumeQuiet = false
 	gatherInstruction = ""
 	compressDisableCompress = false
 	compressDroneModel = ""

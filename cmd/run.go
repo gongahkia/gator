@@ -67,31 +67,7 @@ var runCmd = &cobra.Command{
 		if runDroneModel != "" {
 			cfg.Drone.Model = runDroneModel
 		}
-		brain, err := llm.NewBrainClient(llmConfig(cfg))
-		if err != nil {
-			return err
-		}
-		var drone llm.Client
-		if !runDisableCompress && !runRawContext {
-			drone, err = llm.NewDroneClient(llmConfig(cfg))
-			if err != nil {
-				return err
-			}
-		}
-		compressStage := compress.New(drone)
-		compressStage.DisableCompress = runDisableCompress
-		compressStage.RawContext = runRawContext
-		planStage := plan.New(brain)
-		planStage.UseRawContext = runRawContext
-		editStage := edit.New(brain)
-		editStage.UseRawContext = runRawContext
-		pipeline, err := stage.NewPipeline(
-			gather.New(cfg.Gather),
-			compressStage,
-			planStage,
-			editStage,
-			verify.New(""),
-		)
+		pipeline, err := newAgentPipeline(cfg, runRawContext, runDisableCompress)
 		if err != nil {
 			return err
 		}
@@ -103,7 +79,7 @@ var runCmd = &cobra.Command{
 		env := envelope.NewEnvelope(id, instruction, cwd)
 		env.Budget.MaxTurns = cfg.MaxTurns
 		env.Budget.MaxBrainTokens = cfg.MaxBrainTokens
-		traceOpts := runTraceOptions(cmd)
+		traceOpts := runTraceOptions(cmd, runQuiet)
 		traceHandle, tracer, err := setupRunTracer(id, traceOpts...)
 		if err != nil {
 			return err
@@ -115,16 +91,7 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if err := out.Marshal(cmd.OutOrStdout()); err != nil {
-			return err
-		}
-		if runSucceeded(out) {
-			return nil
-		}
-		if out.Verify != nil && !out.Verify.Passed {
-			return verifyFailedErrorf("verification failed")
-		}
-		return verifyFailedErrorf("run stopped without done or verify pass")
+		return writeRunResult(cmd, out)
 	},
 }
 
@@ -182,13 +149,41 @@ func llmConfig(cfg config.Config) llm.FactoryConfig {
 	}
 }
 
+func newAgentPipeline(cfg config.Config, rawContext bool, disableCompress bool) (*stage.Pipeline, error) {
+	brain, err := llm.NewBrainClient(llmConfig(cfg))
+	if err != nil {
+		return nil, err
+	}
+	var drone llm.Client
+	if !disableCompress && !rawContext {
+		drone, err = llm.NewDroneClient(llmConfig(cfg))
+		if err != nil {
+			return nil, err
+		}
+	}
+	compressStage := compress.New(drone)
+	compressStage.DisableCompress = disableCompress
+	compressStage.RawContext = rawContext
+	planStage := plan.New(brain)
+	planStage.UseRawContext = rawContext
+	editStage := edit.New(brain)
+	editStage.UseRawContext = rawContext
+	return stage.NewPipeline(
+		gather.New(cfg.Gather),
+		compressStage,
+		planStage,
+		editStage,
+		verify.New(""),
+	)
+}
+
 func taskID(instruction, cwd string) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%s", instruction, cwd)))
 	return "task-" + hex.EncodeToString(sum[:])[:12]
 }
 
-func runTraceOptions(cmd *cobra.Command) []stage.TracerOption {
-	if !verbose || runQuiet {
+func runTraceOptions(cmd *cobra.Command, quiet bool) []stage.TracerOption {
+	if !verbose || quiet {
 		return nil
 	}
 	if pawlog.IsJSON(logFormat) {
@@ -197,11 +192,21 @@ func runTraceOptions(cmd *cobra.Command) []stage.TracerOption {
 	return []stage.TracerOption{stage.WithMirror(cmd.ErrOrStderr())}
 }
 
-func setupRunTracer(taskID string, opts ...stage.TracerOption) (*os.File, *stage.Tracer, error) {
-	path := traceFile
-	if path == "" {
-		path = filepath.Join(".paw", "trace-"+taskID+".ndjson")
+func writeRunResult(cmd *cobra.Command, out *envelope.Envelope) error {
+	if err := out.Marshal(cmd.OutOrStdout()); err != nil {
+		return err
 	}
+	if runSucceeded(out) {
+		return nil
+	}
+	if out.Verify != nil && !out.Verify.Passed {
+		return verifyFailedErrorf("verification failed")
+	}
+	return verifyFailedErrorf("run stopped without done or verify pass")
+}
+
+func setupRunTracer(taskID string, opts ...stage.TracerOption) (*os.File, *stage.Tracer, error) {
+	path := runTracePath(taskID)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, nil, err
 	}
@@ -210,6 +215,21 @@ func setupRunTracer(taskID string, opts ...stage.TracerOption) (*os.File, *stage
 		return nil, nil, err
 	}
 	return file, stage.NewTracer(file, opts...), nil
+}
+
+func setupAppendTracer(path string, opts ...stage.TracerOption) (*os.File, *stage.Tracer, error) {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return nil, nil, err
+	}
+	return file, stage.NewTracer(file, opts...), nil
+}
+
+func runTracePath(taskID string) string {
+	if traceFile != "" {
+		return traceFile
+	}
+	return filepath.Join(".paw", "trace-"+taskID+".ndjson")
 }
 
 func runSucceeded(env *envelope.Envelope) bool {

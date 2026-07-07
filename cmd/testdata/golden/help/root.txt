@@ -13,6 +13,7 @@ Available Commands:
   help        Help about any command
   models      Inspect configured models
   plan        Plan the next agent step
+  resume      Resume a run from its trace
   run         Run the full agent pipeline
   verify      Run verification command
   version     Print version information

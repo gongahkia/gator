@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
+
+	"github.com/gongahkia/paw/internal/envelope"
 )
 
 type TraceEvent struct {
-	Stage        string `json:"stage"`
-	Turn         int    `json:"turn"`
-	InputBytes   int    `json:"input_bytes"`
-	OutputBytes  int    `json:"output_bytes"`
-	Tokens       int    `json:"tokens"`
-	DroppedItems int    `json:"dropped_items"`
-	UsedFallback bool   `json:"used_fallback"`
-	DurationMS   int64  `json:"duration_ms"`
+	Stage        string             `json:"stage"`
+	Turn         int                `json:"turn"`
+	InputBytes   int                `json:"input_bytes"`
+	OutputBytes  int                `json:"output_bytes"`
+	Tokens       int                `json:"tokens"`
+	DroppedItems int                `json:"dropped_items"`
+	UsedFallback bool               `json:"used_fallback"`
+	DurationMS   int64              `json:"duration_ms"`
+	Envelope     *envelope.Envelope `json:"envelope,omitempty"`
 }
 
 type Tracer struct {
@@ -81,4 +85,36 @@ func (t *Tracer) Write(event TraceEvent) error {
 		)
 	}
 	return nil
+}
+
+func ReadTrace(path string) (*envelope.Envelope, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	dec := json.NewDecoder(file)
+	var last *envelope.Envelope
+	events := 0
+	for {
+		var event TraceEvent
+		if err := dec.Decode(&event); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("read trace %s event %d: %w", path, events+1, err)
+		}
+		events++
+		if event.Envelope != nil {
+			last = event.Envelope
+		}
+	}
+	if events == 0 {
+		return nil, fmt.Errorf("trace %s is empty", path)
+	}
+	if last == nil {
+		return nil, fmt.Errorf("trace %s contains no envelope snapshots", path)
+	}
+	return last, nil
 }
