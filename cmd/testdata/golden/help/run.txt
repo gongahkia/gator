@@ -12,6 +12,7 @@ Flags:
       --instruction-file string   task instruction file
       --max-turns int             maximum agent turns
       --noninteractive            disable interactive prompts
+      --quiet                     suppress progress output
       --raw-context               bypass model compression
 
 Global Flags:

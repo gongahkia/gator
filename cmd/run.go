@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/paw/internal/llm"
 	"github.com/gongahkia/paw/internal/plan"
 	"github.com/gongahkia/paw/internal/stage"
+	"github.com/gongahkia/paw/internal/ui"
 	"github.com/gongahkia/paw/internal/verify"
 	"github.com/spf13/cobra"
 )
@@ -29,6 +30,7 @@ var (
 	runDroneModel      string
 	runNoninteractive  bool
 	runExplain         bool
+	runQuiet           bool
 )
 
 var runCmd = &cobra.Command{
@@ -92,12 +94,13 @@ var runCmd = &cobra.Command{
 		env := envelope.NewEnvelope(id, instruction, cwd)
 		env.Budget.MaxTurns = cfg.MaxTurns
 		env.Budget.MaxBrainTokens = cfg.MaxBrainTokens
-		traceHandle, tracer, err := setupRunTracer(id, verbose, cmd.ErrOrStderr())
+		traceHandle, tracer, err := setupRunTracer(id, verbose && !runQuiet, cmd.ErrOrStderr())
 		if err != nil {
 			return err
 		}
 		defer func() { _ = traceHandle.Close() }()
 		pipeline.SetTracer(tracer)
+		pipeline.SetProgress(ui.NewProgress(cmd.ErrOrStderr(), ui.WithQuiet(runQuiet)))
 		out, err := pipeline.RunLoop(cmd.Context(), env)
 		if err != nil {
 			return err
@@ -122,6 +125,7 @@ func init() {
 	runCmd.Flags().StringVar(&runDroneModel, "drone-model", "", "drone model override")
 	runCmd.Flags().BoolVar(&runNoninteractive, "noninteractive", false, "disable interactive prompts")
 	runCmd.Flags().BoolVar(&runExplain, "explain", false, "print composed pipeline")
+	runCmd.Flags().BoolVar(&runQuiet, "quiet", false, "suppress progress output")
 }
 
 func readInstruction() (string, error) {

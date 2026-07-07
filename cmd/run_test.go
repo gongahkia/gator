@@ -151,14 +151,58 @@ func TestRunVerboseMirrorsTraceToStderr(t *testing.T) {
 		return stderr
 	}
 
-	if got := run(false); got != "" {
-		t.Fatalf("quiet stderr = %q", got)
+	if got := run(false); strings.Contains(got, "stage=gather") || !strings.Contains(got, "[gather]") {
+		t.Fatalf("default stderr = %q", got)
 	}
 	got := run(true)
-	for _, want := range []string{"stage=gather", "stage=plan", "dropped_items=0"} {
+	for _, want := range []string{"[gather]", "stage=gather", "stage=plan", "dropped_items=0"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("verbose stderr missing %q:\n%s", want, got)
 		}
+	}
+}
+
+func TestRunProgressAndQuiet(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+	writeTestFile(t, dir, "notes.txt", "target\n")
+
+	run := func(extra ...string) (string, string) {
+		server := faketest.NewServer()
+		t.Cleanup(server.Close)
+		configureBrain(t, server.URL)
+		server.RespondOpenAI("Prior VerifyResult JSON", `{"done":true,"reasoning":"done"}`)
+
+		args := append(configArgs(t), "run", "--raw-context", "--instruction", "target")
+		args = append(args, extra...)
+		stdout, stderr, err := executeRootErr(t, args, "")
+		if err != nil {
+			t.Fatalf("run %v: %v stderr=%s", extra, err, stderr)
+		}
+		return stdout, stderr
+	}
+
+	stdout, stderr := run()
+	for _, want := range []string{"[gather] collected", "[compress] raw context", "[plan] done"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("progress stderr missing %q:\n%s", want, stderr)
+		}
+	}
+	if strings.Contains(stderr, "\x1b[") {
+		t.Fatalf("non-tty stderr contains ANSI escapes:\n%q", stderr)
+	}
+
+	quietStdout, quietStderr := run("--quiet")
+	if quietStderr != "" {
+		t.Fatalf("quiet stderr = %q", quietStderr)
+	}
+	if got, want := canonicalEnvelopeJSON(t, []byte(stdout), true), canonicalEnvelopeJSON(t, []byte(quietStdout), true); got != want {
+		t.Fatalf("stdout changed with quiet\ngot:\n%s\nwant:\n%s", got, want)
+	}
+	_, quietVerboseStderr := run("--verbose", "--quiet")
+	if quietVerboseStderr != "" {
+		t.Fatalf("quiet verbose stderr = %q", quietVerboseStderr)
 	}
 }
 
@@ -191,6 +235,7 @@ func resetCLIState(t *testing.T) {
 	runDroneModel = ""
 	runNoninteractive = false
 	runExplain = false
+	runQuiet = false
 	gatherInstruction = ""
 	compressDisableCompress = false
 	compressDroneModel = ""

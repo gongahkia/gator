@@ -8,12 +8,14 @@ import (
 
 	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
+	"github.com/gongahkia/paw/internal/ui"
 )
 
 type Pipeline struct {
-	stages []Stage
-	byName map[string]Stage
-	tracer *Tracer
+	stages   []Stage
+	byName   map[string]Stage
+	tracer   *Tracer
+	progress *ui.Progress
 }
 
 func NewPipeline(stages ...Stage) (*Pipeline, error) {
@@ -35,6 +37,10 @@ func (p *Pipeline) SetTracer(tracer *Tracer) {
 	p.tracer = tracer
 }
 
+func (p *Pipeline) SetProgress(progress *ui.Progress) {
+	p.progress = progress
+}
+
 func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envelope) (*envelope.Envelope, error) {
 	st, ok := p.byName[name]
 	if !ok {
@@ -53,9 +59,11 @@ func (p *Pipeline) RunOnce(ctx context.Context, name string, env *envelope.Envel
 	if out.Stage == "" {
 		out.Stage = name
 	}
-	if err := p.writeTrace(st, out, before, inputBytes, time.Since(start)); err != nil {
+	duration := time.Since(start)
+	if err := p.writeTrace(st, out, before, inputBytes, duration); err != nil {
 		return nil, err
 	}
+	p.writeProgress(name, out, duration)
 	return out, nil
 }
 
@@ -135,6 +143,13 @@ func (p *Pipeline) writeTrace(st Stage, out *envelope.Envelope, before envelope.
 		UsedFallback: fallback,
 		DurationMS:   duration.Milliseconds(),
 	})
+}
+
+func (p *Pipeline) writeProgress(stage string, out *envelope.Envelope, duration time.Duration) {
+	if p.progress == nil {
+		return
+	}
+	p.progress.StageDone(stage, out, duration)
 }
 
 func tokenDelta(before, after envelope.Budget) int {
