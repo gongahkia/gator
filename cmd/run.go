@@ -100,7 +100,7 @@ var runCmd = &cobra.Command{
 		}
 		defer func() { _ = traceHandle.Close() }()
 		pipeline.SetTracer(tracer)
-		pipeline.SetProgress(ui.NewProgress(cmd.ErrOrStderr(), ui.WithQuiet(runQuiet)))
+		pipeline.SetProgress(ui.NewProgress(cmd.ErrOrStderr(), ui.WithQuiet(runQuiet), ui.WithColorizer(ui.NewColorizer(cmd.ErrOrStderr(), ui.WithNoColor(noColor)))))
 		out, err := pipeline.RunLoop(cmd.Context(), env)
 		if err != nil {
 			return err

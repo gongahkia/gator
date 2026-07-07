@@ -17,5 +17,6 @@ Flags:
 
 Global Flags:
       --config string       config file
+      --no-color            disable colored stderr output
       --trace-file string   trace file
       --verbose             verbose output

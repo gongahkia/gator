@@ -19,5 +19,6 @@ Flags:
       --results-file string        results markdown file to update (default "docs/RESULTS.md")
 
 Global Flags:
+      --no-color            disable colored stderr output
       --trace-file string   trace file
       --verbose             verbose output

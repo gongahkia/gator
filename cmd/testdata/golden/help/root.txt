@@ -20,6 +20,7 @@ Available Commands:
 Flags:
       --config string       config file
   -h, --help                help for paw
+      --no-color            disable colored stderr output
       --trace-file string   trace file
       --verbose             verbose output
 

@@ -227,6 +227,7 @@ func resetCLIState(t *testing.T) {
 	configPath = ""
 	traceFile = ""
 	verbose = false
+	noColor = false
 	runInstruction = ""
 	runInstructionFile = ""
 	runMaxTurns = 0

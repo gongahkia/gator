@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/gongahkia/paw/internal/envelope"
@@ -13,6 +12,7 @@ type Progress struct {
 	w     io.Writer
 	quiet bool
 	tty   bool
+	color Colorizer
 }
 
 type ProgressOption func(*Progress)
@@ -23,8 +23,14 @@ func WithQuiet(quiet bool) ProgressOption {
 	}
 }
 
+func WithColorizer(color Colorizer) ProgressOption {
+	return func(p *Progress) {
+		p.color = color
+	}
+}
+
 func NewProgress(w io.Writer, opts ...ProgressOption) *Progress {
-	p := &Progress{w: w, tty: isTerminal(w)}
+	p := &Progress{w: w, tty: isTerminal(w), color: NewColorizer(w)}
 	for _, opt := range opts {
 		opt(p)
 	}
@@ -35,11 +41,22 @@ func (p *Progress) StageDone(stage string, env *envelope.Envelope, duration time
 	if p == nil || p.quiet || p.w == nil {
 		return
 	}
-	_, _ = fmt.Fprintf(p.w, "[%s] %s (%s)\n", stage, stageSummary(stage, env), formatDuration(duration))
+	_, _ = fmt.Fprintf(p.w, "%s %s (%s)\n", p.color.Green("["+stage+"]"), p.summary(stage, env), p.color.Dim(formatDuration(duration)))
 }
 
 func (p *Progress) IsTTY() bool {
 	return p != nil && p.tty
+}
+
+func (p *Progress) summary(stage string, env *envelope.Envelope) string {
+	summary := stageSummary(stage, env)
+	if stage != "verify" || env == nil || env.Verify == nil {
+		return summary
+	}
+	if env.Verify.Passed {
+		return p.color.Green(summary)
+	}
+	return p.color.Yellow(summary)
 }
 
 func stageSummary(stage string, env *envelope.Envelope) string {
@@ -79,13 +96,4 @@ func stageSummary(stage string, env *envelope.Envelope) string {
 
 func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%.1fs", d.Seconds())
-}
-
-func isTerminal(w io.Writer) bool {
-	f, ok := w.(*os.File)
-	if !ok {
-		return false
-	}
-	info, err := f.Stat()
-	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
