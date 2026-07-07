@@ -12,6 +12,12 @@ With Homebrew:
 brew install gongahkia/paw/paw
 ```
 
+Quick install:
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/gongahkia/paw-cli/main/install.sh | sh
+```
+
 From GitHub Releases:
 
 ```sh
