@@ -20,6 +20,8 @@ func TestHelpGolden(t *testing.T) {
 		{name: "edit", args: []string{"edit"}},
 		{name: "gather", args: []string{"gather"}},
 		{name: "init", args: []string{"init"}},
+		{name: "mcp", args: []string{"mcp"}},
+		{name: "mcp_serve", args: []string{"mcp", "serve"}},
 		{name: "models", args: []string{"models"}},
 		{name: "models_list", args: []string{"models", "list"}},
 		{name: "plan", args: []string{"plan"}},

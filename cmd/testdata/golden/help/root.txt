@@ -12,6 +12,7 @@ Available Commands:
   gather      Gather raw task context
   help        Help about any command
   init        Create a paw config
+  mcp         Run MCP integrations
   models      Inspect configured models
   plan        Plan the next agent step
   resume      Resume a run from its trace
