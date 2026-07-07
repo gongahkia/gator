@@ -324,4 +324,5 @@ Closest related systems include SWE-Pruner, Focus, TokenPilot, LLMLingua, and Th
 - [PATCH_FORMAT.md](PATCH_FORMAT.md)
 - [BENCHMARKS.md](BENCHMARKS.md)
 - [TESTING.md](TESTING.md)
+- [SECURITY.md](SECURITY.md)
 - [docs/RESULTS.md](docs/RESULTS.md)
