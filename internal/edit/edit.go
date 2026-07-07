@@ -11,6 +11,8 @@ import (
 	patcher "github.com/gongahkia/paw/internal/patch"
 )
 
+const maxEditOutputTokens = 4096
+
 type Edit struct {
 	Client        llm.Client
 	UseRawContext bool
@@ -65,6 +67,7 @@ func (e *Edit) askAndApply(ctx context.Context, env *envelope.Envelope, prompt s
 			{Role: "user", Content: prompt},
 		},
 		Temperature: 0,
+		MaxTokens:   maxEditOutputTokens,
 	})
 	if err != nil {
 		return "", err

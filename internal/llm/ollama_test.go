@@ -18,6 +18,7 @@ func TestOllamaChatRequestShapeAndResponse(t *testing.T) {
 	resp, err := client.Chat(context.Background(), ChatRequest{
 		Messages:    []ChatMessage{{Role: "user", Content: "shape"}},
 		Temperature: 0.25,
+		MaxTokens:   123,
 		JSONSchema:  json.RawMessage(`{"type":"object","properties":{"ok":{"type":"boolean"}}}`),
 	})
 	if err != nil {
@@ -46,6 +47,9 @@ func TestOllamaChatRequestShapeAndResponse(t *testing.T) {
 	options := body["options"].(map[string]any)
 	if options["temperature"] != 0.25 {
 		t.Fatalf("options = %#v", options)
+	}
+	if options["num_predict"] != float64(123) {
+		t.Fatalf("num_predict = %#v", options["num_predict"])
 	}
 }
 

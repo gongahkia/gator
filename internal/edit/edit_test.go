@@ -38,6 +38,17 @@ func TestEditAppliesGoodDiff(t *testing.T) {
 	}
 }
 
+func TestEditCapsOutputTokens(t *testing.T) {
+	dir := fixtureRepo(t)
+	client := &captureEditClient{content: goodDiff()}
+	if _, err := New(client).Run(context.Background(), editEnvelope(dir)); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	if client.request.MaxTokens != maxEditOutputTokens {
+		t.Fatalf("max tokens = %d", client.request.MaxTokens)
+	}
+}
+
 func TestEditRawContextModeSendsRawContext(t *testing.T) {
 	dir := fixtureRepo(t)
 	srv := faketest.NewServer()
@@ -136,4 +147,17 @@ func badDiff() string {
 		" func KnownSymbol() string {",
 		"",
 	}, "\n")
+}
+
+type captureEditClient struct {
+	request llm.ChatRequest
+	content string
+}
+
+func (c *captureEditClient) Chat(_ context.Context, req llm.ChatRequest) (*llm.ChatResponse, error) {
+	c.request = req
+	return &llm.ChatResponse{
+		Content: c.content,
+		Usage:   llm.Usage{InputTokens: 11, OutputTokens: 7},
+	}, nil
 }

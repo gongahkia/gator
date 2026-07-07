@@ -78,6 +78,9 @@ func ollamaRequest(req ChatRequest, defaultModel string) ([]byte, error) {
 			"temperature": req.Temperature,
 		},
 	}
+	if req.MaxTokens > 0 {
+		body.Options["num_predict"] = req.MaxTokens
+	}
 	if req.JSONSchema != nil {
 		var format any
 		if err := json.Unmarshal(req.JSONSchema, &format); err != nil {

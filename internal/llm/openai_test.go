@@ -17,7 +17,8 @@ func TestOpenAIChatRequestShapeAndResponse(t *testing.T) {
 
 	client := NewOpenAIClient(srv.URL, "test-key", "glm-test")
 	resp, err := client.Chat(context.Background(), ChatRequest{
-		Messages: []ChatMessage{{Role: "user", Content: "shape"}},
+		Messages:  []ChatMessage{{Role: "user", Content: "shape"}},
+		MaxTokens: 321,
 		JSONSchema: json.RawMessage(`{
 			"type":"object",
 			"additionalProperties":false,
@@ -45,6 +46,9 @@ func TestOpenAIChatRequestShapeAndResponse(t *testing.T) {
 	decodeBody(t, req.Body, &body)
 	if body["model"] != "glm-test" || body["stream"] != false {
 		t.Fatalf("body = %#v", body)
+	}
+	if body["max_tokens"] != float64(321) {
+		t.Fatalf("max_tokens = %#v", body["max_tokens"])
 	}
 	format := body["response_format"].(map[string]any)
 	if format["type"] != "json_schema" {

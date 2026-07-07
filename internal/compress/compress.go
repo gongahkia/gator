@@ -10,6 +10,8 @@ import (
 	"github.com/gongahkia/paw/internal/schema"
 )
 
+const maxCompressOutputTokens = 2048
+
 type Compress struct {
 	Client          llm.Client
 	DisableCompress bool
@@ -52,6 +54,7 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	resp, err := c.Client.Chat(ctx, llm.ChatRequest{
 		Messages:    droneMessages(in, rawSchema),
 		Temperature: 0,
+		MaxTokens:   maxCompressOutputTokens,
 		JSONSchema:  rawSchema,
 	})
 	if err != nil {

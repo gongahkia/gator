@@ -25,6 +25,17 @@ func TestCompressValidDigestPasses(t *testing.T) {
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 
+func TestCompressCapsOutputTokens(t *testing.T) {
+	client := &captureCompressClient{content: digestJSON(t, validDigest())}
+	stage := New(client)
+	if _, err := stage.Run(context.Background(), rawEnvelope()); err != nil {
+		t.Fatalf("compress: %v", err)
+	}
+	if client.request.MaxTokens != maxCompressOutputTokens {
+		t.Fatalf("max tokens = %d", client.request.MaxTokens)
+	}
+}
+
 func TestCompressDropsHallucinatedPath(t *testing.T) {
 	stage, got := runCompress(t, digestWithInvalidItem(envelope.DigestItem{
 		UnitID:    "u001",
@@ -180,4 +191,17 @@ func assertDigestQuotesFromRaw(t *testing.T, raw *envelope.RawContext, digest *e
 			}
 		}
 	}
+}
+
+type captureCompressClient struct {
+	request llm.ChatRequest
+	content string
+}
+
+func (c *captureCompressClient) Chat(_ context.Context, req llm.ChatRequest) (*llm.ChatResponse, error) {
+	c.request = req
+	return &llm.ChatResponse{
+		Content: c.content,
+		Usage:   llm.Usage{InputTokens: 11, OutputTokens: 7},
+	}, nil
 }
