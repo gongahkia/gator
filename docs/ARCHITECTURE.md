@@ -6,6 +6,7 @@ Start here, then follow the focused docs:
 - [Design and stage model](../DESIGN.md)
 - [Schemas and envelope contract](../SCHEMAS.md)
 - [Model API contracts](../MODEL_APIS.md)
+- [MCP context sidecar](MCP.md)
 - [Patch format](../PATCH_FORMAT.md)
 - [Benchmarks](../BENCHMARKS.md)
 - [Testing strategy](../TESTING.md)

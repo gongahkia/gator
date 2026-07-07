@@ -106,6 +106,14 @@ paw watch --markers "ai:,TODO(ai):"
 Supported single-line marker comments include `# ai:`, `// ai:`, `/* ai: */`, and `<!-- ai: -->`.
 Successful runs remove the marker.
 
+Run paw as a context-only MCP sidecar:
+
+```sh
+paw mcp serve
+```
+
+Setup notes and the safety contract are in [docs/MCP.md](docs/MCP.md).
+
 ## Exit Codes
 
 | code | meaning |
