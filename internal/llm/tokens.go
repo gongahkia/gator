@@ -2,6 +2,7 @@ package llm
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/tiktoken-go/tokenizer"
 )
@@ -11,10 +12,21 @@ const (
 	TokenSourceEstimate = "estimate"
 )
 
-var estimateCodec = mustEstimateCodec()
+var (
+	estimateCodec     tokenizer.Codec
+	estimateCodecErr  error
+	estimateCodecOnce sync.Once
+	estimateCodecLoad = func() (tokenizer.Codec, error) {
+		return tokenizer.Get(tokenizer.Cl100kBase)
+	}
+)
 
 func Estimate(text string) int {
-	tokens, _, err := estimateCodec.Encode(text)
+	codec, err := loadEstimateCodec()
+	if err != nil || codec == nil {
+		return fallbackEstimate(text)
+	}
+	tokens, _, err := codec.Encode(text)
 	if err != nil {
 		return fallbackEstimate(text)
 	}
@@ -44,12 +56,11 @@ func messageText(messages []ChatMessage) string {
 	return b.String()
 }
 
-func mustEstimateCodec() tokenizer.Codec {
-	codec, err := tokenizer.Get(tokenizer.Cl100kBase)
-	if err != nil {
-		panic(err)
-	}
-	return codec
+func loadEstimateCodec() (tokenizer.Codec, error) {
+	estimateCodecOnce.Do(func() {
+		estimateCodec, estimateCodecErr = estimateCodecLoad()
+	})
+	return estimateCodec, estimateCodecErr
 }
 
 func fallbackEstimate(text string) int {
