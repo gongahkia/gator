@@ -82,6 +82,15 @@ paw resume task-abc123
 paw resume task-abc123 --trace-file .paw/trace-task-abc123.ndjson
 ```
 
+Summarize run tokens, turns, wall time, verification, and optional per-1M token costs:
+
+```sh
+paw stats task-abc123
+paw stats --trace-file .paw/trace-task-abc123.ndjson --rate brain:in=3.0,brain:out=15.0,drone=0.25
+```
+
+Rate keys are `brain:in`, `brain:out`, `brain:cache_creation`, `brain:cache_read`, and `drone`.
+
 ## Exit Codes
 
 | code | meaning |

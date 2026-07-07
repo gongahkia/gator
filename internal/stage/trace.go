@@ -88,6 +88,23 @@ func (t *Tracer) Write(event TraceEvent) error {
 }
 
 func ReadTrace(path string) (*envelope.Envelope, error) {
+	events, err := ReadTraceEvents(path)
+	if err != nil {
+		return nil, err
+	}
+	var last *envelope.Envelope
+	for i := range events {
+		if events[i].Envelope != nil {
+			last = events[i].Envelope
+		}
+	}
+	if last == nil {
+		return nil, fmt.Errorf("trace %s contains no envelope snapshots", path)
+	}
+	return last, nil
+}
+
+func ReadTraceEvents(path string) ([]TraceEvent, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -95,26 +112,19 @@ func ReadTrace(path string) (*envelope.Envelope, error) {
 	defer func() { _ = file.Close() }()
 
 	dec := json.NewDecoder(file)
-	var last *envelope.Envelope
-	events := 0
+	var events []TraceEvent
 	for {
 		var event TraceEvent
 		if err := dec.Decode(&event); err != nil {
 			if err == io.EOF {
 				break
 			}
-			return nil, fmt.Errorf("read trace %s event %d: %w", path, events+1, err)
+			return nil, fmt.Errorf("read trace %s event %d: %w", path, len(events)+1, err)
 		}
-		events++
-		if event.Envelope != nil {
-			last = event.Envelope
-		}
+		events = append(events, event)
 	}
-	if events == 0 {
+	if len(events) == 0 {
 		return nil, fmt.Errorf("trace %s is empty", path)
 	}
-	if last == nil {
-		return nil, fmt.Errorf("trace %s contains no envelope snapshots", path)
-	}
-	return last, nil
+	return events, nil
 }

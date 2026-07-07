@@ -25,6 +25,7 @@ func TestHelpGolden(t *testing.T) {
 		{name: "plan", args: []string{"plan"}},
 		{name: "resume", args: []string{"resume"}},
 		{name: "run", args: []string{"run"}},
+		{name: "stats", args: []string{"stats"}},
 		{name: "verify", args: []string{"verify"}},
 		{name: "version", args: []string{"version"}},
 	}

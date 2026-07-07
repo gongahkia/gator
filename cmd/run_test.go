@@ -294,6 +294,7 @@ func resetCLIState(t *testing.T) {
 	resumeDisableCompress = false
 	resumeDroneModel = ""
 	resumeQuiet = false
+	statsRate = ""
 	gatherInstruction = ""
 	compressDisableCompress = false
 	compressDroneModel = ""
