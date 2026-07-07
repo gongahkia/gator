@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -91,7 +92,7 @@ var runCmd = &cobra.Command{
 		env := envelope.NewEnvelope(id, instruction, cwd)
 		env.Budget.MaxTurns = cfg.MaxTurns
 		env.Budget.MaxBrainTokens = cfg.MaxBrainTokens
-		traceHandle, tracer, err := setupRunTracer(id)
+		traceHandle, tracer, err := setupRunTracer(id, verbose, cmd.ErrOrStderr())
 		if err != nil {
 			return err
 		}
@@ -165,7 +166,7 @@ func taskID(instruction, cwd string) string {
 	return "task-" + hex.EncodeToString(sum[:])[:12]
 }
 
-func setupRunTracer(taskID string) (*os.File, *stage.Tracer, error) {
+func setupRunTracer(taskID string, mirror bool, mirrorWriter io.Writer) (*os.File, *stage.Tracer, error) {
 	path := traceFile
 	if path == "" {
 		path = filepath.Join(".paw", "trace-"+taskID+".ndjson")
@@ -176,6 +177,9 @@ func setupRunTracer(taskID string) (*os.File, *stage.Tracer, error) {
 	file, err := os.Create(path)
 	if err != nil {
 		return nil, nil, err
+	}
+	if mirror {
+		return file, stage.NewTracer(file, stage.WithMirror(mirrorWriter)), nil
 	}
 	return file, stage.NewTracer(file), nil
 }

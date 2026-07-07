@@ -126,6 +126,42 @@ model = "gpt-test"
 	}
 }
 
+func TestRunVerboseMirrorsTraceToStderr(t *testing.T) {
+	isolateEnv(t)
+
+	run := func(verboseFlag bool) string {
+		server := faketest.NewServer()
+		t.Cleanup(server.Close)
+		configureBrain(t, server.URL)
+		server.RespondOpenAI("Prior VerifyResult JSON", `{"done":true,"reasoning":"done"}`)
+
+		dir := t.TempDir()
+		chdir(t, dir)
+		writeTestFile(t, dir, "notes.txt", "target\n")
+
+		args := configArgs(t)
+		if verboseFlag {
+			args = append(args, "--verbose")
+		}
+		args = append(args, "run", "--raw-context", "--instruction", "target")
+		_, stderr, err := executeRootErr(t, args, "")
+		if err != nil {
+			t.Fatalf("run verbose=%v: %v stderr=%s", verboseFlag, err, stderr)
+		}
+		return stderr
+	}
+
+	if got := run(false); got != "" {
+		t.Fatalf("quiet stderr = %q", got)
+	}
+	got := run(true)
+	for _, want := range []string{"stage=gather", "stage=plan", "dropped_items=0"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("verbose stderr missing %q:\n%s", want, got)
+		}
+	}
+}
+
 func executeRoot(t *testing.T, args []string, input string) string {
 	t.Helper()
 	resetCLIState(t)
