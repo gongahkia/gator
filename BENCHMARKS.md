@@ -174,6 +174,21 @@ make bench-swebench
 The target runs `raw` and `full` configs through the same `PawAgent` adapter and writes rows into
 `docs/RESULTS.md`. Record the exact dataset id, Harbor version, and model env used with any result.
 
+### 5b. Local Terminal-Bench harness validation
+
+Verified on 2026-07-07:
+- Harbor `0.17.1`; Docker client `29.6.1`, server `29.5.3`; Ollama `0.31.1`.
+- `make build-linux` produced `bin/paw-linux-amd64`.
+- Oracle job `.paw/bench-jobs/paw-oracle` completed on `terminal-bench@2.0` with reward `1.0`
+  and `0` exceptions.
+- PawAgent job `.paw/bench-jobs/paw-tb-harness-smoke-openai-qwen` completed 1 task with `0`
+  exceptions, reward `0.0`, trial `gpt2-codegolf__RHEScQF`.
+- PawAgent env shape: `PAW_BENCH_CONFIG=no-compress`, brain transport `openai` to local Ollama
+  OpenAI-compatible endpoint `http://host.docker.internal:11434/v1`, model `qwen3:0.6b`, dummy
+  local API key, trace artifact `/workspace/.paw/trace.ndjson`.
+- Local trace artifact downloaded to
+  `.paw/bench-jobs/paw-tb-harness-smoke-openai-qwen/gpt2-codegolf__RHEScQF/artifacts/workspace/.paw/trace.ndjson`.
+
 ---
 
 ## 6. Success criteria for the benchmark milestone
