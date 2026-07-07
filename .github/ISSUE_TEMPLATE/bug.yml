@@ -1,0 +1,109 @@
+name: Bug report
+description: Report a reproducible paw bug.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include enough detail for someone else to reproduce the issue from a clean checkout.
+        Do not paste secrets, API keys, or full trace files with sensitive content.
+  - type: input
+    id: paw-version
+    attributes:
+      label: paw version
+      description: Paste the output of `paw version`.
+      placeholder: "paw version"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - ollama
+        - openai
+        - anthropic
+        - codex-cli
+        - gemini-cli
+        - claude-cli
+        - opencode-cli
+        - aider-cli
+        - goose-cli
+        - qwen-cli
+        - cursor-cli
+        - other
+    validations:
+      required: true
+  - type: input
+    id: brain-model
+    attributes:
+      label: Brain model
+      placeholder: "gpt-oss:20b"
+    validations:
+      required: false
+  - type: input
+    id: drone-model
+    attributes:
+      label: Drone model
+      placeholder: "qwen3:8b"
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include commands, relevant files, and working directory assumptions.
+      placeholder: |
+        1. Run `paw ...`
+        2. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: trace-excerpt
+    attributes:
+      label: Trace excerpt
+      description: Paste the smallest relevant excerpt from `.paw/trace-*.ndjson`; redact secrets.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: config
+    attributes:
+      label: Config excerpt
+      description: Optional sanitized config or env vars relevant to the bug.
+      render: toml
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed secrets and private data from logs, traces, and config.
+          required: true
