@@ -30,11 +30,19 @@ func Defaults() Config {
 
 func Load(path string) (Config, error) {
 	cfg := Defaults()
-	explicit := path != ""
-	if path == "" {
-		path = DefaultPath()
+	if err := loadFile(DefaultPath(), false, &cfg); err != nil {
+		return Config{}, err
 	}
-	if err := loadFile(path, explicit, &cfg); err != nil {
+	repoPath, err := discoverRepoConfig("")
+	if err != nil {
+		return Config{}, err
+	}
+	if repoPath != "" {
+		if err := loadFile(repoPath, true, &cfg); err != nil {
+			return Config{}, err
+		}
+	}
+	if err := loadFile(path, path != "", &cfg); err != nil {
 		return Config{}, err
 	}
 	if err := applyEnv(&cfg); err != nil {
@@ -53,6 +61,70 @@ func DefaultPath() string {
 		dir = filepath.Join(home, ".config")
 	}
 	return filepath.Join(dir, "paw", "config.toml")
+}
+
+func discoverRepoConfig(cwd string) (string, error) {
+	if cwd == "" {
+		var err error
+		cwd, err = os.Getwd()
+		if err != nil {
+			return "", err
+		}
+	}
+	dir, err := canonicalPath(cwd)
+	if err != nil {
+		return "", err
+	}
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	if home != "" {
+		if absHome, err := canonicalPath(home); err == nil {
+			home = absHome
+		}
+	}
+	for {
+		candidate := filepath.Join(dir, ".paw", "config.toml")
+		info, err := os.Stat(candidate)
+		if err == nil {
+			if info.IsDir() {
+				return "", fmt.Errorf("%s is a directory", candidate)
+			}
+			return candidate, nil
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		if isGitRoot(dir) || samePath(dir, home) {
+			return "", nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil
+		}
+		dir = parent
+	}
+}
+
+func isGitRoot(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, ".git"))
+	return err == nil
+}
+
+func samePath(a, b string) bool {
+	return b != "" && filepath.Clean(a) == filepath.Clean(b)
+}
+
+func canonicalPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
+	}
+	return filepath.Clean(abs), nil
 }
 
 func loadFile(path string, explicit bool, cfg *Config) error {

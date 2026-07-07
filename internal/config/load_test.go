@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -108,6 +109,158 @@ func TestLoadOllamaAutoPullOptIn(t *testing.T) {
 	}
 }
 
+func TestLoadRepoConfig(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	repo := t.TempDir()
+	mkdir(t, filepath.Join(repo, ".git"))
+	writeConfigAt(t, filepath.Join(repo, ".paw", "config.toml"), `
+[brain]
+model = "repo-brain"
+`)
+	work := filepath.Join(repo, "cmd", "paw")
+	mkdir(t, work)
+	chdir(t, work)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Model != "repo-brain" {
+		t.Fatalf("brain model = %q", cfg.Brain.Model)
+	}
+}
+
+func TestLoadRepoOverridesUserAndEnvOverridesRepo(t *testing.T) {
+	clearPawEnv(t)
+	userConfig := setTestHome(t)
+	writeConfigAt(t, userConfig, `
+[brain]
+model = "user-brain"
+`)
+	repo := t.TempDir()
+	mkdir(t, filepath.Join(repo, ".git"))
+	writeConfigAt(t, filepath.Join(repo, ".paw", "config.toml"), `
+[brain]
+model = "repo-brain"
+`)
+	chdir(t, repo)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Model != "repo-brain" {
+		t.Fatalf("repo override failed: %#v", cfg.Brain)
+	}
+
+	t.Setenv("PAW_BRAIN_MODEL", "env-brain")
+	cfg, err = Load("")
+	if err != nil {
+		t.Fatalf("load env: %v", err)
+	}
+	if cfg.Brain.Model != "env-brain" {
+		t.Fatalf("env override failed: %#v", cfg.Brain)
+	}
+}
+
+func TestLoadExplicitConfigOverridesRepo(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	repo := t.TempDir()
+	mkdir(t, filepath.Join(repo, ".git"))
+	writeConfigAt(t, filepath.Join(repo, ".paw", "config.toml"), `
+[brain]
+model = "repo-brain"
+`)
+	explicit := writeConfig(t, `
+[brain]
+model = "explicit-brain"
+`)
+	chdir(t, repo)
+
+	cfg, err := Load(explicit)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Model != "explicit-brain" {
+		t.Fatalf("explicit override failed: %#v", cfg.Brain)
+	}
+}
+
+func TestRepoConfigNearestWins(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	repo := t.TempDir()
+	mkdir(t, filepath.Join(repo, ".git"))
+	writeConfigAt(t, filepath.Join(repo, ".paw", "config.toml"), `
+[brain]
+model = "root-brain"
+`)
+	nested := filepath.Join(repo, "services", "api")
+	mkdir(t, nested)
+	writeConfigAt(t, filepath.Join(repo, "services", ".paw", "config.toml"), `
+[brain]
+model = "nearest-brain"
+`)
+	chdir(t, nested)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Model != "nearest-brain" {
+		t.Fatalf("nearest config not used: %#v", cfg.Brain)
+	}
+}
+
+func TestRepoConfigStopsAtGitRoot(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	parent := t.TempDir()
+	writeConfigAt(t, filepath.Join(parent, ".paw", "config.toml"), `
+[brain]
+model = "parent-brain"
+`)
+	repo := filepath.Join(parent, "repo")
+	work := filepath.Join(repo, "sub")
+	mkdir(t, filepath.Join(repo, ".git"))
+	mkdir(t, work)
+	chdir(t, work)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Model == "parent-brain" {
+		t.Fatalf("walk crossed git root: %#v", cfg.Brain)
+	}
+}
+
+func TestRepoConfigStopsAtHome(t *testing.T) {
+	clearPawEnv(t)
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	mkdir(t, home)
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	writeConfigAt(t, filepath.Join(tmp, ".paw", "config.toml"), `
+[brain]
+model = "above-home-brain"
+`)
+	work := filepath.Join(home, "work", "repo")
+	mkdir(t, work)
+	chdir(t, work)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Brain.Model == "above-home-brain" {
+		t.Fatalf("walk crossed home: %#v", cfg.Brain)
+	}
+}
+
 func TestLoadFailsFastOnMissingBrainKey(t *testing.T) {
 	clearPawEnv(t)
 	path := writeConfig(t, `
@@ -186,8 +339,47 @@ func clearPawEnv(t *testing.T) {
 func writeConfig(t *testing.T, body string) string {
 	t.Helper()
 	path := t.TempDir() + "/config.toml"
+	writeConfigAt(t, path, body)
+	return path
+}
+
+func writeConfigAt(t *testing.T, path string, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
-	return path
+}
+
+func setTestHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	return DefaultPath()
+}
+
+func mkdir(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", path, err)
+	}
+}
+
+func chdir(t *testing.T, path string) {
+	t.Helper()
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(path); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(old); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
 }

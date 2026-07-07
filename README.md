@@ -104,6 +104,18 @@ Command stdout stays reserved for envelope/output JSON.
 ## Configuration
 
 Default config path: `$XDG_CONFIG_HOME/paw/config.toml` or `~/.config/paw/config.toml`.
+Repo config path: nearest `.paw/config.toml` found by walking from cwd upward, stopping at the git
+root, the home directory, or the filesystem root.
+
+Config precedence, later wins:
+
+| order | source |
+| ---: | --- |
+| 1 | built-in defaults |
+| 2 | user config |
+| 3 | nearest repo `.paw/config.toml` |
+| 4 | explicit `--config` path |
+| 5 | `PAW_*` environment variables |
 
 | env var | config field | default |
 | --- | --- | --- |
