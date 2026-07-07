@@ -12,20 +12,21 @@ import (
 func TestPrintBenchTableWritesStableMarkdown(t *testing.T) {
 	var out bytes.Buffer
 	err := printBenchTable(&out, []benchRow{{
-		Config:      "raw",
-		Tasks:       2,
-		PassRate:    "0.50",
-		BrainTokens: "10",
-		DroneTokens: "4",
-		WallSeconds: "1.5",
+		Config:            "raw",
+		Tasks:             2,
+		PassRate:          "0.50",
+		BrainInputTokens:  "10",
+		BrainOutputTokens: "3",
+		DroneTokens:       "4",
+		WallSeconds:       "1.5",
 	}})
 	if err != nil {
 		t.Fatalf("print table: %v", err)
 	}
 	want := strings.Join([]string{
-		"| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |",
-		"| --- | ---: | ---: | ---: | ---: | ---: |",
-		"| raw | 2 | 0.50 | 10 | 4 | 1.5 |",
+		"| config | tasks | pass@1 | brain_in_tok/task (median) | brain_out_tok/task (median) | drone_tok/task | wall_s/task |",
+		"| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+		"| raw | 2 | 0.50 | 10 | 3 | 4 | 1.5 |",
 		"",
 	}, "\n")
 	if out.String() != want {
@@ -38,21 +39,31 @@ func TestUpdateResultsFileReplacesConfigRow(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Join([]string{
 		"# Results",
 		resultsStartMarker,
-		"| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |",
-		"| --- | ---: | ---: | ---: | ---: | ---: |",
-		"| raw | 0 | n/a | n/a | n/a | n/a |",
+		"| run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+		"| tb2-raw-tbd | TBD | [raw](results-configs/example.toml) | terminal-bench@2.0 | TBD | n/a | TBD | TBD | 0 | n/a | n/a | n/a | n/a | n/a | TBD |",
 		resultsEndMarker,
 		"",
 	}, "\n")), 0o644); err != nil {
 		t.Fatalf("write results: %v", err)
 	}
 	err := updateResultsFile(path, benchRow{
-		Config:      "raw",
-		Tasks:       5,
-		PassRate:    "0.80",
-		BrainTokens: "1200",
-		DroneTokens: "300",
-		WallSeconds: "42.5",
+		RunID:             "tb2-smoke-raw",
+		Commit:            "abc123",
+		Config:            "raw",
+		ConfigPath:        "results-configs/tb2-smoke-raw.toml",
+		Dataset:           "terminal-bench@2.0",
+		BrainModel:        "openai/brain",
+		DroneModel:        "n/a",
+		Hardware:          "darwin/arm64",
+		Date:              "2026-07-07",
+		Tasks:             5,
+		PassRate:          "0.80",
+		BrainInputTokens:  "1200",
+		BrainOutputTokens: "200",
+		DroneTokens:       "0",
+		WallSeconds:       "42.5",
+		TraceBundle:       ".paw/bench-jobs/tb2-smoke-raw",
 	})
 	if err != nil {
 		t.Fatalf("update results: %v", err)
@@ -61,7 +72,7 @@ func TestUpdateResultsFileReplacesConfigRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read results: %v", err)
 	}
-	if !strings.Contains(string(got), "| raw | 5 | 0.80 | 1200 | 300 | 42.5 |") {
+	if !strings.Contains(string(got), "| tb2-smoke-raw | abc123 | [raw](results-configs/tb2-smoke-raw.toml) | terminal-bench@2.0 | openai/brain | n/a | darwin/arm64 | 2026-07-07 | 5 | 42.5 | 1200 | 200 | 0 | 0.80 | .paw/bench-jobs/tb2-smoke-raw |") {
 		t.Fatalf("row not updated:\n%s", got)
 	}
 }
@@ -71,20 +82,20 @@ func TestUpdateResultsFileInsertsRowAndRejectsMissingMarkers(t *testing.T) {
 	path := filepath.Join(dir, "RESULTS.md")
 	if err := os.WriteFile(path, []byte(strings.Join([]string{
 		resultsStartMarker,
-		"| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |",
+		"| run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |",
 		resultsEndMarker,
 		"",
 	}, "\n")), 0o644); err != nil {
 		t.Fatalf("write results: %v", err)
 	}
-	if err := updateResultsFile(path, benchRow{Config: "full", Tasks: 1, PassRate: "1.00", BrainTokens: "10", DroneTokens: "2", WallSeconds: "3.0"}); err != nil {
+	if err := updateResultsFile(path, benchRow{RunID: "tb2-full", Config: "full", Tasks: 1, PassRate: "1.00", BrainInputTokens: "10", BrainOutputTokens: "4", DroneTokens: "2", WallSeconds: "3.0"}); err != nil {
 		t.Fatalf("insert row: %v", err)
 	}
 	got, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read results: %v", err)
 	}
-	if !strings.Contains(string(got), "| full | 1 | 1.00 | 10 | 2 | 3.0 |") {
+	if !strings.Contains(string(got), "| tb2-full |  | full |  |  |  |  |  | 1 | 3.0 | 10 | 4 | 2 | 1.00 |  |") {
 		t.Fatalf("row not inserted:\n%s", got)
 	}
 	missing := filepath.Join(dir, "missing.md")
@@ -117,5 +128,8 @@ func TestBenchHelpers(t *testing.T) {
 	}
 	if got := shellCommand("paw bin", []string{"arg", "two words"}); got != "'paw bin' arg 'two words'" {
 		t.Fatalf("shell command = %s", got)
+	}
+	if got := resultRowMatches("| tb2-raw-tbd | TBD | [raw](x) |", "raw"); !got {
+		t.Fatalf("expected row match")
 	}
 }

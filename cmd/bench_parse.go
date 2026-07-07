@@ -11,11 +11,12 @@ import (
 )
 
 type benchSummary struct {
-	Tasks       int
-	Passed      int
-	BrainTokens []float64
-	DroneTokens []float64
-	WallSeconds []float64
+	Tasks             int
+	Passed            int
+	BrainInputTokens  []float64
+	BrainOutputTokens []float64
+	DroneTokens       []float64
+	WallSeconds       []float64
 }
 
 func loadBenchSummary(root string) (benchSummary, error) {
@@ -37,9 +38,12 @@ func loadBenchSummary(root string) (benchSummary, error) {
 				}
 			}
 		case strings.HasSuffix(entry.Name(), ".ndjson") && isTracePath(path):
-			brain, drone, ok := readTrace(path)
+			brainIn, brainOut, drone, ok := readTrace(path)
 			if ok {
-				summary.BrainTokens = append(summary.BrainTokens, float64(brain))
+				summary.BrainInputTokens = append(summary.BrainInputTokens, float64(brainIn))
+				if brainOut > 0 {
+					summary.BrainOutputTokens = append(summary.BrainOutputTokens, float64(brainOut))
+				}
 				summary.DroneTokens = append(summary.DroneTokens, float64(drone))
 			}
 		}
@@ -48,7 +52,7 @@ func loadBenchSummary(root string) (benchSummary, error) {
 	if err != nil {
 		return benchSummary{}, err
 	}
-	if summary.Tasks == 0 && len(summary.BrainTokens) == 0 && len(summary.DroneTokens) == 0 {
+	if summary.Tasks == 0 && len(summary.BrainInputTokens) == 0 && len(summary.DroneTokens) == 0 {
 		return benchSummary{}, fmt.Errorf("no Harbor results found under %s", root)
 	}
 	return summary, nil

@@ -23,6 +23,9 @@ func TestBuildHarborArgsMapsConfig(t *testing.T) {
 	got := strings.Join(args, "\x00")
 	for _, want := range []string{
 		"--agent-import-path\x00paw_harbor:PawAgent",
+		"--artifact\x00/workspace/.paw/trace.ndjson",
+		"--allow-agent-host\x00host.docker.internal",
+		"--yes",
 		"--agent-env\x00PAW_BENCH_CONFIG=raw",
 		"--n-tasks\x005",
 		"--n-attempts\x002",
@@ -46,6 +49,8 @@ func TestBenchCommandDryRunPrintsQuotedHarborCommand(t *testing.T) {
 	}, "")
 	for _, want := range []string{
 		"harbor run",
+		"--artifact /workspace/.paw/trace.ndjson",
+		"--allow-agent-host host.docker.internal",
 		"--agent-env PAW_BENCH_CONFIG=raw",
 		"'terminal bench@2.0'",
 		"'job with '\"'\"'quote'\"'\"''",
@@ -92,7 +97,7 @@ func TestBenchCommandRunsHarborAndPrintsSummary(t *testing.T) {
 		"--job-name", job,
 		"--results-file=",
 	}, "")
-	if !strings.Contains(out, "| no-compress | 1 | 1.00 | n/a | n/a | 4.0 |") {
+	if !strings.Contains(out, "| no-compress | 1 | 1.00 | n/a | n/a | n/a | 4.0 |") {
 		t.Fatalf("unexpected bench output:\n%s", out)
 	}
 }

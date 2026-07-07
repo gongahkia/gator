@@ -62,11 +62,14 @@ func runBenchCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	}
-	row := summary.row(spec.Name)
+	row := summary.row(spec.Name, opts)
 	if err := printBenchTable(cmd.OutOrStdout(), []benchRow{row}); err != nil {
 		return err
 	}
 	if benchResultsPath != "" {
+		if err := writeBenchResultConfig(benchResultsPath, row, opts); err != nil {
+			return err
+		}
 		return updateResultsFile(benchResultsPath, row)
 	}
 	return nil
@@ -90,6 +93,9 @@ func buildHarborArgs(opts benchOptions) []string {
 		"--n-concurrent", strconv.Itoa(opts.NConcurrent),
 		"--jobs-dir", opts.JobsDir,
 		"--job-name", opts.JobName,
+		"--artifact", "/workspace/.paw/trace.ndjson",
+		"--allow-agent-host", "host.docker.internal",
+		"--yes",
 		"--agent-env", "PAW_BENCH_CONFIG=" + opts.Config,
 	}
 	if opts.NTasks > 0 {

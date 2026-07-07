@@ -31,8 +31,11 @@ func TestLoadBenchSummaryParsesResultsAndTrace(t *testing.T) {
 	if summary.Tasks != 1 || summary.Passed != 1 {
 		t.Fatalf("tasks/pass = %d/%d", summary.Tasks, summary.Passed)
 	}
-	if got := formatMedian(summary.BrainTokens, 0); got != "24" {
+	if got := formatMedian(summary.BrainInputTokens, 0); got != "24" {
 		t.Fatalf("brain median = %s", got)
+	}
+	if got := formatMedian(summary.BrainOutputTokens, 0); got != "n/a" {
+		t.Fatalf("brain output median = %s", got)
 	}
 	if got := formatMedian(summary.DroneTokens, 0); got != "5" {
 		t.Fatalf("drone median = %s", got)
@@ -89,7 +92,7 @@ func TestLoadBenchSummaryHandlesAggregateRewardsAndFallbacks(t *testing.T) {
 	if got := formatMedian(summary.WallSeconds, 1); got != "10.0" {
 		t.Fatalf("wall median = %s", got)
 	}
-	if got := formatMedian(summary.BrainTokens, 0); got != "15" {
+	if got := formatMedian(summary.BrainInputTokens, 0); got != "15" {
 		t.Fatalf("brain median = %s", got)
 	}
 	if got := formatMedian(summary.DroneTokens, 0); got != "2" {
@@ -118,8 +121,21 @@ func TestReadTraceCountsKnownStages(t *testing.T) {
 	if !isTracePath(path) {
 		t.Fatalf("expected trace path")
 	}
-	brain, drone, ok := readTrace(path)
-	if !ok || brain != 12 || drone != 3 {
-		t.Fatalf("trace = brain:%d drone:%d ok:%v", brain, drone, ok)
+	brainIn, brainOut, drone, ok := readTrace(path)
+	if !ok || brainIn != 12 || brainOut != 0 || drone != 3 {
+		t.Fatalf("trace = brainIn:%d brainOut:%d drone:%d ok:%v", brainIn, brainOut, drone, ok)
+	}
+}
+
+func TestReadTracePrefersBudgetTotals(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), ".paw")
+	writeBenchFile(t, dir, "trace.ndjson", strings.Join([]string{
+		`{"stage":"compress","tokens":3,"envelope":{"budget":{"brain_input_tokens":10,"brain_output_tokens":2,"drone_tokens":3}}}`,
+		`{"stage":"plan","tokens":5,"envelope":{"budget":{"brain_input_tokens":20,"brain_output_tokens":4,"drone_tokens":3}}}`,
+		"",
+	}, "\n"))
+	brainIn, brainOut, drone, ok := readTrace(filepath.Join(dir, "trace.ndjson"))
+	if !ok || brainIn != 20 || brainOut != 4 || drone != 3 {
+		t.Fatalf("trace = brainIn:%d brainOut:%d drone:%d ok:%v", brainIn, brainOut, drone, ok)
 	}
 }
