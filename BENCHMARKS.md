@@ -119,7 +119,7 @@ Install for local runs: `uv tool install harbor` then `uv pip install -e adapter
 `cmd/bench.go` shells out to `harbor run` with the flags above, then parses the Harbor `jobs-dir`
 output (`results/**/result.json`, `reward.txt`) plus `paw`'s own NDJSON traces to emit a table:
 
-| config | tasks | pass@1 | brain_in_tok/task (median) | drone_tok/task | wall_s/task |
+| run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |
 
 Configs `bench` can sweep (the ablation that makes claims attributable):
 - `full` — compress ON (drone), brain = GLM.
@@ -128,7 +128,10 @@ Configs `bench` can sweep (the ablation that makes claims attributable):
 - `raw` — `--raw-context` (brain reads full `RawContext`, no compression at all) → the upper
   bound on brain tokens, the control the token-savings % is computed against.
 
-Results land in `docs/RESULTS.md`.
+Results land in `docs/RESULTS.md`. Every recorded row must include reproducibility metadata:
+full commit SHA, checked-in config path under `docs/results-configs/<run-id>.toml`, dataset id and
+revision, exact brain/drone model ids, hardware, ISO date, total wall time, total brain/drone token
+counts, pass rate with 95% CI when sample size is sufficient, and trace bundle path or URL.
 
 ### 4a. Direct comparison vs SWE-Pruner (prior art)
 Because SWE-Pruner is the closest prior art and publishes on SWE-bench Verified with GLM-4.6,

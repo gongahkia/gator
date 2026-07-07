@@ -1,0 +1,26 @@
+# Copy to docs/results-configs/<run-id>.toml for a recorded benchmark row.
+# Do not commit API keys.
+
+run_id = "tb2-full-YYYYMMDD"
+dataset = "terminal-bench@2.0.x"
+hardware = "Mac Studio M4 Max 128GB"
+commit = "0000000000000000000000000000000000000000"
+date = "2026-07-07"
+
+max_turns = 40
+max_brain_tokens = 200000
+
+[brain]
+transport = "openai"
+base_url = "https://api.z.ai/api/paas/v4"
+model = "glm-5.2"
+# api_key comes from PAW_BRAIN_API_KEY.
+
+[drone]
+transport = "ollama"
+base_url = "http://localhost:11434"
+model = "qwen3:8b"
+
+[gather]
+max_depth = 4
+max_file_bytes = 131072
