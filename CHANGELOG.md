@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Documented macOS release signing and notarization setup.
+- Pinned the verified Harbor SWE-bench Verified dataset id for benchmark runs.
 
 ### Changed
 

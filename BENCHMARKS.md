@@ -154,18 +154,21 @@ is no-training + offline + verified + installable, not necessarily a higher rati
 ## 5. Pinned versions (re-verify before submission)
 - Harbor: latest published (`uv tool install harbor`); dataset `terminal-bench@2.0`.
 - Sandbox: local Docker for dev; Daytona/Modal `--env` for scaled runs (optional, needs keys).
-- SWE-bench Verified: run through Harbor with `make bench-swebench` after verifying the current
-  Harbor registry dataset id. Do NOT start this until TB2.0 `full` config runs end-to-end.
+- SWE-bench Verified: Harbor dataset `swe-bench/swe-bench-verified@latest`, verified on
+  2026-07-07 with Harbor `0.17.1` via `harbor run --print-config --dataset
+  swe-bench/swe-bench-verified@latest`, resolving to name `swe-bench/swe-bench-verified` and ref
+  `latest`. Harbor Hub listed this dataset with 500 tasks on the same date. Do NOT start this until
+  TB2.0 `full` config runs end-to-end.
 
 ### 5a. SWE-bench Verified
 
-`paw bench` is dataset-agnostic once Harbor exposes the dataset as normal tasks. The exact Harbor
-dataset id is not pinned in this repo because Harbor registry names can change; verify it with the
-Harbor registry before running.
+`paw bench` is dataset-agnostic once Harbor exposes the dataset as normal tasks. This repo pins the
+current Harbor registry id to `swe-bench/swe-bench-verified@latest`; re-run the print-config check
+before publishing any SWE-bench result.
 
 ```sh
 make build-linux
-BENCH_SWEBENCH_DATASET=<harbor-swe-bench-verified-dataset@version> make bench-swebench
+make bench-swebench
 ```
 
 The target runs `raw` and `full` configs through the same `PawAgent` adapter and writes rows into
