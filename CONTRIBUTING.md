@@ -31,6 +31,11 @@ go vet ./...
 
 `make test` runs `go test ./... -race`. Benchmark checks are separate: see [BENCHMARKS.md](BENCHMARKS.md), [docs/RESULTS.md](docs/RESULTS.md), and `make bench-smoke`.
 
+## Changelog
+
+PRs that change user-visible behavior, CLI flags, configuration, release workflows, or documented
+behavior should update `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+
 ## Install pre-commit hooks
 
 ```sh
