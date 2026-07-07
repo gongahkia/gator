@@ -8,6 +8,8 @@ import (
 var verifyCmd = &cobra.Command{
 	Use:   "verify",
 	Short: "Run verification command",
+	Example: `  paw gather --instruction "fix the failing test" | paw compress | paw plan | paw edit | paw verify
+  paw edit < .paw/plan.json | paw verify > .paw/verified.json`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		env, err := readEnvelope(cmd)
 		if err != nil {

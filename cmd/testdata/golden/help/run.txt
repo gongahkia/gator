@@ -3,6 +3,17 @@ Run the full agent pipeline
 Usage:
   paw run [flags]
 
+Examples:
+  paw run --instruction "fix the failing test"
+  paw run --instruction-file task.md
+  env PAW_BRAIN_TRANSPORT=openai \
+    PAW_BRAIN_BASE_URL=https://api.z.ai/api/paas/v4 \
+    PAW_BRAIN_API_KEY=$ZAI_API_KEY \
+    PAW_BRAIN_MODEL=glm-4.6 \
+    paw run --instruction "add retry backoff"
+  paw run --explain
+  paw run --instruction "inspect flaky tests" --raw-context
+
 Flags:
       --disable-compress          use deterministic compression fallback
       --drone-model string        drone model override

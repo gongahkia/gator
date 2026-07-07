@@ -17,13 +17,15 @@ type endpointHealth interface {
 var doctorHealthChecker endpointHealth = llm.EndpointHealthChecker{}
 
 var doctorCmd = &cobra.Command{
-	Use:   "doctor",
-	Short: "Check local paw setup",
+	Use:     "doctor",
+	Short:   "Check local paw setup",
+	Example: "  paw doctor models",
 }
 
 var doctorModelsCmd = &cobra.Command{
-	Use:   "models",
-	Short: "Check configured model transports",
+	Use:     "models",
+	Short:   "Check configured model transports",
+	Example: "  paw doctor models",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		cfg, err := config.Load(configPath)
 		if err != nil {

@@ -3,6 +3,9 @@ Check local paw setup
 Usage:
   paw doctor [command]
 
+Examples:
+  paw doctor models
+
 Available Commands:
   models      Check configured model transports
 

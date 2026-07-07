@@ -35,6 +35,9 @@ var (
 var benchCmd = &cobra.Command{
 	Use:   "bench",
 	Short: "Run paw Harbor benchmark sweeps",
+	Example: `  paw bench --config raw --n-tasks 1 --dry-run
+  paw bench --config full --n-concurrent 4 --n-tasks 89 --job-name paw-full-full
+  paw bench --config full --dataset "$BENCH_SWEBENCH_DATASET" --job-name paw-swebench-full`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		spec, err := benchConfigSpec(benchConfigName)
 		if err != nil {

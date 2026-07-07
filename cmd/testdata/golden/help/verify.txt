@@ -3,6 +3,10 @@ Run verification command
 Usage:
   paw verify [flags]
 
+Examples:
+  paw gather --instruction "fix the failing test" | paw compress | paw plan | paw edit | paw verify
+  paw edit < .paw/plan.json | paw verify > .paw/verified.json
+
 Flags:
   -h, --help   help for verify
 

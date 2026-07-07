@@ -3,6 +3,11 @@ Run paw Harbor benchmark sweeps
 Usage:
   paw bench [flags]
 
+Examples:
+  paw bench --config raw --n-tasks 1 --dry-run
+  paw bench --config full --n-concurrent 4 --n-tasks 89 --job-name paw-full-full
+  paw bench --config full --dataset "$BENCH_SWEBENCH_DATASET" --job-name paw-swebench-full
+
 Flags:
       --agent-import-path string   Harbor agent import path (default "paw_harbor:PawAgent")
       --config string              benchmark config: full, no-compress, raw (default "full")

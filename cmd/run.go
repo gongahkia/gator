@@ -36,6 +36,15 @@ var (
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the full agent pipeline",
+	Example: `  paw run --instruction "fix the failing test"
+  paw run --instruction-file task.md
+  env PAW_BRAIN_TRANSPORT=openai \
+    PAW_BRAIN_BASE_URL=https://api.z.ai/api/paas/v4 \
+    PAW_BRAIN_API_KEY=$ZAI_API_KEY \
+    PAW_BRAIN_MODEL=glm-4.6 \
+    paw run --instruction "add retry backoff"
+  paw run --explain
+  paw run --instruction "inspect flaky tests" --raw-context`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if runExplain {
 			cmd.Println("gather | compress | plan | edit | verify")

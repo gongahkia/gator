@@ -14,6 +14,8 @@ var gatherInstruction string
 var gatherCmd = &cobra.Command{
 	Use:   "gather",
 	Short: "Gather raw task context",
+	Example: `  paw gather --instruction "fix the failing test" > .paw/gather.json
+  paw gather --instruction "fix the failing test" | paw compress --disable-compress`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if gatherInstruction == "" {
 			return usageErrorf("missing --instruction")

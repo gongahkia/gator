@@ -3,6 +3,10 @@ Gather raw task context
 Usage:
   paw gather [flags]
 
+Examples:
+  paw gather --instruction "fix the failing test" > .paw/gather.json
+  paw gather --instruction "fix the failing test" | paw compress --disable-compress
+
 Flags:
   -h, --help                 help for gather
       --instruction string   task instruction

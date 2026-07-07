@@ -3,6 +3,9 @@ Check configured model transports
 Usage:
   paw doctor models [flags]
 
+Examples:
+  paw doctor models
+
 Flags:
   -h, --help   help for models
 

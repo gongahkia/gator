@@ -10,6 +10,8 @@ import (
 var planCmd = &cobra.Command{
 	Use:   "plan",
 	Short: "Plan the next agent step",
+	Example: `  paw gather --instruction "fix the failing test" | paw compress | paw plan > .paw/plan.json
+  paw gather --instruction "fix the failing test" | paw compress | paw plan | paw edit`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		env, err := readEnvelope(cmd)
 		if err != nil {

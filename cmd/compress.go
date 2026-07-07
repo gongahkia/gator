@@ -15,6 +15,8 @@ var (
 var compressCmd = &cobra.Command{
 	Use:   "compress",
 	Short: "Compress raw context",
+	Example: `  paw gather --instruction "fix the failing test" | paw compress > .paw/compressed.json
+  paw gather --instruction "fix the failing test" | paw compress --disable-compress | paw plan`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		env, err := readEnvelope(cmd)
 		if err != nil {
