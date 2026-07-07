@@ -11,6 +11,13 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    env:
+      MACOS_SIGN_P12: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+      MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+      MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+      MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,6 +35,15 @@ jobs:
 
       - name: Check Syft
         run: syft version
+
+      - name: Check macOS signing secrets
+        run: |
+          test -n "$MACOS_SIGN_P12"
+          test -n "$MACOS_SIGN_PASSWORD"
+          test -n "$MACOS_KEYCHAIN_PWD"
+          test -n "$MACOS_NOTARY_KEY"
+          test -n "$MACOS_NOTARY_KEY_ID"
+          test -n "$MACOS_NOTARY_ISSUER_ID"
 
       - uses: goreleaser/goreleaser-action@v7
         with:

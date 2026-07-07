@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- None yet.
+- Documented macOS release signing and notarization setup.
 
 ### Changed
 
