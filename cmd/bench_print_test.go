@@ -107,6 +107,59 @@ func TestUpdateResultsFileInsertsRowAndRejectsMissingMarkers(t *testing.T) {
 	}
 }
 
+func TestUpdateResultsFileDoesNotReplaceNonPlaceholderConfigRow(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "RESULTS.md")
+	if err := os.WriteFile(path, []byte(strings.Join([]string{
+		resultsStartMarker,
+		"| run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+		"| paw-smoke-raw | smoke | [raw](results-configs/paw-smoke-raw.toml) | terminal-bench@2.0 | openai/brain | n/a | host | 2026-07-07 | 5 | 1.0 | 10 | 2 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-raw |",
+		resultsEndMarker,
+		"",
+	}, "\n")), 0o644); err != nil {
+		t.Fatalf("write results: %v", err)
+	}
+	if err := updateResultsFile(path, benchRow{RunID: "paw-full-raw", Config: "raw", Commit: "full", Tasks: 89}); err != nil {
+		t.Fatalf("update results: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read results: %v", err)
+	}
+	text := string(got)
+	if !strings.Contains(text, "| paw-smoke-raw | smoke | [raw](results-configs/paw-smoke-raw.toml) |") {
+		t.Fatalf("smoke row replaced:\n%s", text)
+	}
+	if !strings.Contains(text, "| paw-full-raw | full | raw |") {
+		t.Fatalf("full row not inserted:\n%s", text)
+	}
+}
+
+func TestUpdateResultsFileReplacesSameRunID(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "RESULTS.md")
+	if err := os.WriteFile(path, []byte(strings.Join([]string{
+		resultsStartMarker,
+		"| run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
+		"| paw-full-raw | old | [raw](results-configs/paw-full-raw.toml) | terminal-bench@2.0 | openai/brain | n/a | host | 2026-07-07 | 1 | 1.0 | 10 | 2 | 0 | 0.00 | .paw/bench-jobs/paw-full-raw |",
+		resultsEndMarker,
+		"",
+	}, "\n")), 0o644); err != nil {
+		t.Fatalf("write results: %v", err)
+	}
+	if err := updateResultsFile(path, benchRow{RunID: "paw-full-raw", Config: "raw", Commit: "new", Tasks: 89}); err != nil {
+		t.Fatalf("update results: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read results: %v", err)
+	}
+	text := string(got)
+	if strings.Contains(text, "| paw-full-raw | old |") || !strings.Contains(text, "| paw-full-raw | new |") {
+		t.Fatalf("same run id not replaced:\n%s", text)
+	}
+}
+
 func TestBenchHelpers(t *testing.T) {
 	if got := ratio(0, 0); got != "n/a" {
 		t.Fatalf("zero ratio = %s", got)
@@ -131,5 +184,8 @@ func TestBenchHelpers(t *testing.T) {
 	}
 	if got := resultRowMatches("| tb2-raw-tbd | TBD | [raw](x) |", "raw"); !got {
 		t.Fatalf("expected row match")
+	}
+	if got := resultRowRunID("| run-id | commit | raw |"); got != "run-id" {
+		t.Fatalf("run id = %s", got)
 	}
 }

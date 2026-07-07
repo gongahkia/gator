@@ -85,15 +85,23 @@ func updateResultsFile(path string, row benchRow) error {
 		return fmt.Errorf("results table markers not found in %s", path)
 	}
 	next := row.resultsMarkdown()
-	replaced := false
+	replaceIndex := -1
+	placeholderIndex := -1
 	for i := start + 1; i < end; i++ {
-		if resultRowMatches(lines[i], row.Config) {
-			lines[i] = next
-			replaced = true
+		if resultRowRunID(lines[i]) == row.RunID {
+			replaceIndex = i
 			break
 		}
+		if placeholderIndex == -1 && resultPlaceholderRowMatches(lines[i], row.Config) {
+			placeholderIndex = i
+		}
 	}
-	if !replaced {
+	if replaceIndex == -1 {
+		replaceIndex = placeholderIndex
+	}
+	if replaceIndex >= 0 {
+		lines[replaceIndex] = next
+	} else {
 		lines = append(lines[:end], append([]string{next}, lines[end:]...)...)
 	}
 	out := strings.Join(lines, "\n")
@@ -144,6 +152,18 @@ func (r benchRow) resultsMarkdown() string {
 
 func resultRowMatches(line, config string) bool {
 	return strings.HasPrefix(line, "| "+config+" |") || strings.Contains(line, "| ["+config+"](")
+}
+
+func resultPlaceholderRowMatches(line, config string) bool {
+	return resultRowMatches(line, config) && strings.Contains(line, "| TBD |")
+}
+
+func resultRowRunID(line string) string {
+	fields := strings.Split(line, "|")
+	if len(fields) < 3 {
+		return ""
+	}
+	return strings.TrimSpace(fields[1])
 }
 
 func writeBenchResultConfig(resultsPath string, row benchRow, opts benchOptions) error {
