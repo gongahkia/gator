@@ -54,7 +54,7 @@ the Ollama native `/api/chat` (it supports the richer `format` schema mode).
 - **Request body (minimum):**
   ```json
   {
-    "model": "glm-4.6",
+    "model": "glm-5.2",
     "messages": [{"role":"system","content":"..."},{"role":"user","content":"..."}],
     "temperature": 0.0,
     "max_tokens": 4096,
@@ -69,14 +69,15 @@ the Ollama native `/api/chat` (it supports the richer `format` schema mode).
   schema pasted into the prompt (record which mode was used in the trace).
 - **Response:** `choices[0].message.content` (string). `usage.prompt_tokens` /
   `usage.completion_tokens` populate `Usage`.
-- **Benchmark headline model id:** `glm-4.6` (config-overridable). Also validated: `deepseek-v4-pro`
-  on DeepSeek base_url.
+- **2026 API brain recommendation:** `glm-5.2` on Z.AI's OpenAI-compatible API for long-horizon
+  coding work. The current benchmark CLI default remains `glm-4.6` until benchmark baselines are
+  rerun. Also validated: `deepseek-v4-pro` on DeepSeek base_url.
 
 ### Env vars (OpenAI transport)
 ```
 PAW_BRAIN_BASE_URL   e.g. https://api.z.ai/api/paas/v4
 PAW_BRAIN_API_KEY    provider key
-PAW_BRAIN_MODEL      e.g. glm-4.6
+PAW_BRAIN_MODEL      e.g. glm-5.2
 ```
 
 ### Local OpenAI-compatible profiles
@@ -94,6 +95,24 @@ These use the same `openai` transport and the same `/chat/completions` client pa
   default port 8080, OpenAI-compatible chat completions, and schema-constrained JSON support.
   Source: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 
+### 2026 model notes
+
+- **GLM-5.2** is Z.AI's current API recommendation for coding brains. Z.AI documents model id
+  `glm-5.2`, up to 1M context, and migration from earlier GLM-4.x/5.x models. GLM-5 remains
+  relevant for self-hosted/open-weight comparisons; its model card reports 77.8 on SWE-bench
+  Verified.
+- **Qwen3-Coder-Next** is an 80B-A3B coding model with 256K context in the Qwen3-Coder family.
+  It is a strong drone candidate when served by Ollama cloud, a LAN OpenAI-compatible endpoint, or
+  a verified local quantized runtime. Ollama lists the local image around 52GB, so do not assume it
+  fits every 16GB laptop.
+- **Qwen3-Coder-30B-A3B-Instruct** is a smaller coding MoE option with 30.5B total / 3.3B active
+  parameters and OpenAI-compatible serving examples through vLLM/SGLang.
+
+Sources: https://docs.z.ai/guides/overview/quick-start,
+https://docs.z.ai/guides/overview/migrate-to-glm-new, https://github.com/zai-org/GLM-5,
+https://github.com/QwenLM/Qwen3-Coder, https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct,
+https://ollama.com/library/qwen3-coder-next
+
 ### macOS local sizing guidance
 
 These are conservative starting points for Apple Silicon unified memory, not guarantees.
@@ -102,14 +121,15 @@ library page says `gpt-oss:20b` can run with as little as 16GB memory. Always ve
 `paw doctor models` on the target machine.
 
 - **8-12GB memory:** keep the drone local, use a subscription/API brain or a 3-4B local brain.
-- **16GB memory:** try `qwen3:8b` as drone and `gpt-oss:20b` as brain; reduce context if the OS
-  reports memory pressure.
-- **24-36GB memory:** use the default local pair: `qwen3:8b` drone and `gpt-oss:20b` brain.
-- **48GB+ memory:** defaults should have headroom; test 30B/32B-class brains only after the
-  doctor and a real task smoke pass.
+- **16GB memory:** keep `qwen3:8b` as the conservative local drone. Prefer Qwen3-Coder-Next as a
+  coding drone only through cloud/LAN/local runtimes that have already passed a real smoke.
+- **24-36GB memory:** use the default pair for reliability; test Qwen3-Coder-30B-A3B or
+  Qwen3-Coder-Next through an OpenAI-compatible local server with reduced context.
+- **48GB+ memory:** test Qwen3-Coder-Next as drone or local brain, and use GLM-5-family API or
+  self-hosted brains for long-horizon tasks after the doctor and a real task smoke pass.
 
 Sources: https://ollama.com/library/gpt-oss, https://docs.ollama.com/faq,
-https://docs.ollama.com/context-length
+https://docs.ollama.com/context-length, https://ollama.com/library/qwen3-coder-next
 
 ---
 
@@ -298,8 +318,9 @@ reported numbers are never silently fabricated.
 ## 8. Why GLM (Z.AI) remains the benchmark headline (not DeepSeek)
 
 Decision recorded for future maintainers:
-- GLM is the top open-weight family on Terminal-Bench (our primary benchmark), and strongest on
-  the agentic/front-end work daily-driver users care about.
+- GLM-5.2 is Z.AI's current strongest coding model, while GLM-5 remains a published open-weight
+  reference with 77.8 on SWE-bench Verified.
+- GLM is the open-weight family to track on Terminal-Bench-style, long-horizon agentic work.
 - Cheap "coding plan" subscription lowers the barrier for people trying `paw`.
 - "The harness that lifts GLM above much pricier proprietary models" is a sharper narrative than
   DeepSeek (already cheap+good, needs less help).

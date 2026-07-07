@@ -52,6 +52,9 @@ ollama pull gpt-oss:20b
 ollama pull qwen3:8b
 ```
 
+These are conservative runtime defaults. For current model pairings, see
+[Recommended pairings (2026)](#recommended-pairings-2026).
+
 ## Quickstart
 
 ```sh
@@ -166,6 +169,26 @@ Config precedence, later wins:
 | `PAW_GATHER_MAX_DEPTH` | `gather.max_depth` | stage default |
 | `PAW_GATHER_MAX_FILE_BYTES` | `gather.max_file_bytes` | stage default |
 
+### Recommended pairings (2026)
+
+These are documentation recommendations only; runtime defaults stay unchanged until benchmark
+baselines are rerun.
+
+| profile | brain | drone | when to use |
+| --- | --- | --- | --- |
+| conservative local | `gpt-oss:20b` via Ollama | `qwen3:8b` via Ollama | Easiest fully local setup and the current default path. |
+| coding-focused local/LAN | `Qwen/Qwen3-Coder-30B-A3B-Instruct`, `qwen3-coder-next`, or `gpt-oss:20b` through Ollama, llama.cpp, LM Studio, or vLLM | `qwen3-coder-next` when a local, LAN, cloud, or quantized runtime can serve it; otherwise `qwen3:8b` | Better coding-specialized compression/planning while keeping source local or near-local. |
+| strongest API brain | `glm-5.2` on Z.AI's OpenAI-compatible API, or self-hosted GLM-5-family weights | local `qwen3-coder-next` or `qwen3:8b` | Long-horizon coding tasks where API use is acceptable. |
+
+Qwen3-Coder-Next is the preferred drone candidate when it is available through Ollama cloud, a LAN
+OpenAI-compatible server, or a local quantized runtime. Ollama currently lists the local
+`qwen3-coder-next` image at 52GB, so verify memory on the target machine before treating it as an
+on-device 16GB recommendation.
+
+Sources: https://github.com/QwenLM/Qwen3-Coder, https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct,
+https://ollama.com/library/qwen3-coder-next, https://docs.z.ai/guides/overview/quick-start,
+https://github.com/zai-org/GLM-5
+
 Anthropic-compatible brain transport example:
 
 ```toml
@@ -228,9 +251,9 @@ Local model sizing on macOS:
 | Apple Silicon memory | Suggested setup |
 | --- | --- |
 | 8-12 GB | Use local drone only; use a subscription/API brain or a 3-4B local brain. |
-| 16 GB | Try `qwen3:8b` drone and `gpt-oss:20b` brain; reduce context if memory pressure is high. |
-| 24-36 GB | Defaults are the recommended starting point: `qwen3:8b` drone + `gpt-oss:20b` brain. |
-| 48 GB+ | Defaults should have more headroom; test larger 30B/32B-class brains only after `paw doctor models` passes. |
+| 16 GB | Keep `qwen3:8b` as the conservative local drone. Prefer `qwen3-coder-next` as a coding drone only when served through Ollama cloud, a LAN endpoint, or a verified quantized runtime. |
+| 24-36 GB | Use defaults for reliability; test `Qwen/Qwen3-Coder-30B-A3B-Instruct` or `qwen3-coder-next` through an OpenAI-compatible local server with reduced context before relying on it. |
+| 48 GB+ | Try `qwen3-coder-next` as drone or local brain, and use GLM-5-family API/self-hosted brains for long-horizon tasks after `paw doctor models` passes. |
 
 These are starting points, not fit guarantees. Context length, quantization, parallel requests, and
 other apps change memory use; verify on the target Mac with `paw doctor models`.
