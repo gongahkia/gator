@@ -1,19 +1,27 @@
 # paw benchmark results
 
-Status: no benchmark run recorded yet.
+Status: Terminal-Bench 2.0 smoke run recorded for issue #2.
 
 ## Terminal-Bench 2.0
 
-Rows below are placeholders until issues #2 and #3 record smoke/full runs. Every populated row
-must include the reproducibility metadata described in [Reproduction](#reproduction).
+Rows below include the issue #2 smoke run. Remaining TBD rows are placeholders for larger follow-up runs.
+Every populated row must include the reproducibility metadata described in [Reproduction](#reproduction).
 
 <!-- paw-results:start -->
 | run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |
 | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| tb2-raw-tbd | TBD | [raw](results-configs/example.toml) | terminal-bench@2.0.x | TBD | n/a | TBD | TBD | 0 | n/a | n/a | n/a | n/a | n/a | TBD |
+| paw-smoke-raw | d91f8d0fe23a3f80527ad670bcd1208b266a0f87 | [raw](results-configs/paw-smoke-raw.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 5 | 68.0 | 756 | 242 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-raw |
 | tb2-no-compress-tbd | TBD | [no-compress](results-configs/example.toml) | terminal-bench@2.0.x | TBD | n/a | TBD | TBD | 0 | n/a | n/a | n/a | n/a | n/a | TBD |
-| tb2-full-tbd | TBD | [full](results-configs/example.toml) | terminal-bench@2.0.x | TBD | TBD | TBD | TBD | 0 | n/a | n/a | n/a | n/a | n/a | TBD |
+| paw-smoke-full | d91f8d0fe23a3f80527ad670bcd1208b266a0f87 | [full](results-configs/paw-smoke-full.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | openai/qwen2.5-coder:1.5b | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 5 | 93.3 | 562 | 132 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-full |
 <!-- paw-results:end -->
+
+Smoke notes, 2026-07-07: Harbor 0.17.1, Ollama 0.31.1, `terminal-bench@2.0`,
+`n_tasks=5`, `n_concurrent=1`, `PAW_CALL_TIMEOUT=120s`, brain/drone model
+`qwen2.5-coder:1.5b`, macOS arm64 Docker Desktop local Ollama. Raw and full used the same subset:
+`break-filter-js-from-html`, `gpt2-codegolf`, `llm-inference-batching-scheduler`,
+`reshard-c4-data`, `write-compressor`. Raw completed with 2 agent exceptions; full
+completed with 3 agent exceptions. Token and wall-time columns are medians per task
+from trace artifacts.
 
 ## Reproduction
 
