@@ -80,3 +80,32 @@ jobs:
             git commit -m "Update paw to ${{ github.ref_name }}"
             git push origin main
           fi
+
+  macos-validate:
+    needs: goreleaser
+    runs-on: macos-latest
+    steps:
+      - name: Download darwin release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/validate
+          gh release download "$GITHUB_REF_NAME" --pattern "*arwin*.tar.gz" --dir dist/validate
+
+      - name: Validate macOS signatures and Gatekeeper assessment
+        run: |
+          set -euo pipefail
+          found=0
+          for archive in dist/validate/*arwin*.tar.gz; do
+            [ -e "$archive" ] || continue
+            workdir="$(mktemp -d)"
+            tar -xzf "$archive" -C "$workdir"
+            binary="$workdir/paw"
+            test -x "$binary"
+            codesign -v --strict --verbose=2 "$binary"
+            codesign -dv --verbose=4 "$binary"
+            spctl -a -t exec -vv "$binary"
+            found=1
+          done
+          test "$found" -eq 1

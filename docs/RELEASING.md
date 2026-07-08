@@ -54,6 +54,9 @@ Paste those values into `MACOS_CERTIFICATE` and `MACOS_NOTARY_KEY`.
 4. The `release` workflow fails fast if signing/notarization secrets are missing.
 5. GoReleaser signs and notarizes darwin binaries before packaging release archives.
 6. The workflow publishes GitHub release assets and updates the Homebrew formula.
+7. The `macos-validate` job downloads the published darwin archives on macOS and runs
+   `codesign -v --strict --verbose=2`, `codesign -dv --verbose=4`, and
+   `spctl -a -t exec -vv` on each extracted `paw` binary.
 
 ## macOS Packaging Scope
 
@@ -69,7 +72,8 @@ and `stapler`.
 
 ## Verification
 
-After the first signed release, verify on a clean macOS 15+ machine:
+The release workflow verifies every darwin release archive after publication. After the first signed
+release, also verify on a clean macOS 15+ machine:
 
 ```sh
 curl -L -o paw.tar.gz https://github.com/gongahkia/paw-cli/releases/download/vX.Y.Z/paw_X.Y.Z_darwin_arm64.tar.gz
