@@ -9,6 +9,7 @@ import (
 )
 
 func TestBuildHarborArgsMapsConfig(t *testing.T) {
+	t.Setenv("PAW_BENCH_TRACE_MODE", "")
 	args := buildHarborArgs(benchOptions{
 		Config:          "raw",
 		Dataset:         "terminal-bench@2.0",
@@ -27,12 +28,22 @@ func TestBuildHarborArgsMapsConfig(t *testing.T) {
 		"--allow-agent-host\x00host.docker.internal",
 		"--yes",
 		"--agent-env\x00PAW_BENCH_CONFIG=raw",
+		"--agent-env\x00PAW_TRACE_MODE=compact",
 		"--n-tasks\x005",
 		"--n-attempts\x002",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("args missing %q: %v", want, args)
 		}
+	}
+}
+
+func TestBuildHarborArgsAllowsTraceModeOverride(t *testing.T) {
+	t.Setenv("PAW_BENCH_TRACE_MODE", "full")
+	args := buildHarborArgs(benchOptions{Config: "full"})
+	got := strings.Join(args, "\x00")
+	if !strings.Contains(got, "--agent-env\x00PAW_TRACE_MODE=full") {
+		t.Fatalf("args missing trace override: %v", args)
 	}
 }
 
@@ -52,6 +63,7 @@ func TestBenchCommandDryRunPrintsQuotedHarborCommand(t *testing.T) {
 		"--artifact /workspace/.paw/trace.ndjson",
 		"--allow-agent-host host.docker.internal",
 		"--agent-env PAW_BENCH_CONFIG=raw",
+		"--agent-env PAW_TRACE_MODE=compact",
 		"'terminal bench@2.0'",
 		"'job with '\"'\"'quote'\"'\"''",
 	} {

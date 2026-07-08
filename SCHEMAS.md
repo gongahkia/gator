@@ -225,11 +225,13 @@ estimate (see `docs/MODEL_APIS.md` §5). Source fields are role-level provenance
 ## 7. Trace log (observability, for ablation & debugging)
 
 Every run writes an NDJSON trace to `--trace-file` (default `./.paw/trace-<taskid>.ndjson`): one
-line per stage invocation with `{stage, turn, input_bytes, output_bytes, tokens, token_source,
-dropped_items, validation_drops, used_fallback, duration_ms, envelope}`. `token_source` is
+line per stage invocation with `{trace_mode, stage, turn, input_bytes, output_bytes, tokens,
+token_source, dropped_items, validation_drops, used_fallback, duration_ms, envelope}`.
+`token_source` is
 `provider`, `estimate`, `mixed`, or `none` for that stage's token delta. `validation_drops` is a
 compact reason counter for `compress`, keyed by `unknown_unit`, `path_mismatch`, `quote_missing`,
 `line_out_of_range`, `schema_error`, and `too_many_dropped`; it never stores raw quotes.
-`envelope` is the post-stage snapshot used by `paw resume`. `paw bench` aggregates the metric
-fields into the results tables and writes token source metadata into generated result configs. No
-model is involved in tracing.
+`trace_mode` is `full` or `compact`. Full traces keep post-stage envelope snapshots and are required
+for `paw resume`. Compact traces keep budgets, digest, patch file lists, verify summaries, and audit
+metadata, but omit `raw.units[].text` and patch diffs. `paw bench` aggregates the metric fields into
+the results tables and writes compact traces by default. No model is involved in tracing.

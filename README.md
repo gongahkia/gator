@@ -87,6 +87,9 @@ paw resume task-abc123
 paw resume task-abc123 --trace-file .paw/trace-task-abc123.ndjson
 ```
 
+Resume requires a full trace. Set `PAW_TRACE_MODE=compact` only for shareable debug/benchmark
+artifacts where raw repository text should be redacted.
+
 Summarize run tokens, turns, wall time, verification, and optional per-1M token costs:
 
 ```sh
@@ -178,6 +181,8 @@ Config precedence, later wins:
 | `PAW_GATHER_MAX_FILE_BYTES` | `gather.max_file_bytes` | stage default |
 | `PAW_VERIFY_CMD` | `verify.command` | repo-aware |
 | `PAW_VERIFY_TIMEOUT` | `verify.timeout` | `2m` |
+| `PAW_TRACE_MODE` | trace serialization mode | `full` |
+| `PAW_BENCH_TRACE_MODE` | benchmark trace mode override | `compact` |
 
 Verify command precedence is `PAW_VERIFY_CMD`, `[verify].command`, then repo-aware detection:
 `make test`, `npm test`, `go test ./...`, `cargo test`, `python -m pytest`, and finally `true`.

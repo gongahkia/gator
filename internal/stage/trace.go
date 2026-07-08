@@ -12,6 +12,7 @@ import (
 )
 
 type TraceEvent struct {
+	TraceMode       string             `json:"trace_mode,omitempty"`
 	Stage           string             `json:"stage"`
 	Turn            int                `json:"turn"`
 	InputBytes      int                `json:"input_bytes"`
@@ -30,6 +31,7 @@ type Tracer struct {
 	enc    *json.Encoder
 	mirror io.Writer
 	logger *slog.Logger
+	mode   string
 }
 
 type TracerOption func(*Tracer)
@@ -46,8 +48,14 @@ func WithLogger(logger *slog.Logger) TracerOption {
 	}
 }
 
+func WithMode(mode string) TracerOption {
+	return func(t *Tracer) {
+		t.mode = normalizeTraceMode(mode)
+	}
+}
+
 func NewTracer(w io.Writer, opts ...TracerOption) *Tracer {
-	tracer := &Tracer{enc: json.NewEncoder(w)}
+	tracer := &Tracer{enc: json.NewEncoder(w), mode: TraceModeFull}
 	for _, opt := range opts {
 		opt(tracer)
 	}
@@ -60,6 +68,10 @@ func (t *Tracer) Write(event TraceEvent) error {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	event.TraceMode = t.mode
+	if t.mode == TraceModeCompact {
+		event.Envelope = compactEnvelope(event.Envelope)
+	}
 	if err := t.enc.Encode(event); err != nil {
 		return err
 	}
@@ -99,6 +111,9 @@ func ReadTrace(path string) (*envelope.Envelope, error) {
 	}
 	var last *envelope.Envelope
 	for i := range events {
+		if events[i].TraceMode == TraceModeCompact {
+			return nil, fmt.Errorf("trace %s is compact; resume requires a full trace", path)
+		}
 		if events[i].Envelope != nil {
 			last = events[i].Envelope
 		}
@@ -107,6 +122,42 @@ func ReadTrace(path string) (*envelope.Envelope, error) {
 		return nil, fmt.Errorf("trace %s contains no envelope snapshots", path)
 	}
 	return last, nil
+}
+
+const (
+	TraceModeFull    = "full"
+	TraceModeCompact = "compact"
+)
+
+func normalizeTraceMode(mode string) string {
+	switch mode {
+	case TraceModeCompact:
+		return TraceModeCompact
+	default:
+		return TraceModeFull
+	}
+}
+
+func compactEnvelope(env *envelope.Envelope) *envelope.Envelope {
+	if env == nil {
+		return nil
+	}
+	out := *env
+	if env.Raw != nil {
+		raw := *env.Raw
+		raw.Units = make([]envelope.RawUnit, len(env.Raw.Units))
+		for i, unit := range env.Raw.Units {
+			unit.Text = ""
+			raw.Units[i] = unit
+		}
+		out.Raw = &raw
+	}
+	if env.Patch != nil {
+		patch := *env.Patch
+		patch.UnifiedDiff = ""
+		out.Patch = &patch
+	}
+	return &out
 }
 
 func ReadTraceEvents(path string) ([]TraceEvent, error) {

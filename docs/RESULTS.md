@@ -46,6 +46,7 @@ Required columns:
 - Token source (`provider`, `estimate`, or `mixed`) is recorded in the generated result config.
 - `pass_rate`: include a 95% CI when the sample size is large enough.
 - `trace_bundle`: path or URL to a `.tar.gz` containing the run traces.
+  Publish compact trace bundles only; full traces can contain raw private source text.
 
 ```sh
 make build-linux

@@ -135,6 +135,9 @@ full commit SHA, checked-in config path under `docs/results-configs/<run-id>.tom
 revision, exact brain/drone model ids, hardware, ISO date, total wall time, total brain/drone token
 counts, brain/drone token source (`provider`, `estimate`, or `mixed`) in the generated result
 config, pass rate with 95% CI when sample size is sufficient, and trace bundle path or URL.
+Benchmark trace bundles use `PAW_TRACE_MODE=compact` by default, which omits raw repository text
+and patch diffs. Use `PAW_BENCH_TRACE_MODE=full` only for private local debugging; do not publish
+full raw traces from private repositories.
 
 `paw bench` refuses to write `docs/RESULTS.md` rows when a requested `--n-tasks`/`--n-attempts`
 run is incomplete or Harbor marks the root job unfinished. Partial or interrupted runs belong in

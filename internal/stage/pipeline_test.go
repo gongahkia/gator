@@ -137,6 +137,7 @@ func TestRunOnceWritesTrace(t *testing.T) {
 	})
 	p.SetTracer(NewTracer(&trace))
 	env := envelope.NewEnvelope("task", "fix", "/repo")
+	env.Raw = &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Kind: "file_slice", Path: "x.go", Text: "SECRET_RAW"}}, TotalBytes: len("SECRET_RAW")}
 	if _, err := p.RunOnce(context.Background(), "plan", env); err != nil {
 		t.Fatalf("run once: %v", err)
 	}
@@ -149,6 +150,38 @@ func TestRunOnceWritesTrace(t *testing.T) {
 	}
 	if event.Envelope == nil || event.Envelope.Stage != "plan" {
 		t.Fatalf("missing envelope snapshot: %#v", event.Envelope)
+	}
+	if event.TraceMode != TraceModeFull || event.Envelope.Raw.Units[0].Text != "SECRET_RAW" {
+		t.Fatalf("full trace redacted unexpectedly: %#v", event)
+	}
+}
+
+func TestRunOnceWritesCompactTrace(t *testing.T) {
+	var trace bytes.Buffer
+	var order []string
+	p := testPipeline(t, &order, map[string]func(*envelope.Envelope){})
+	p.SetTracer(NewTracer(&trace, WithMode(TraceModeCompact)))
+	env := envelope.NewEnvelope("task", "fix", "/repo")
+	env.Raw = &envelope.RawContext{
+		Units:      []envelope.RawUnit{{ID: "u001", Kind: "file_slice", Path: "x.go", StartLine: 1, EndLine: 2, Text: "SECRET_RAW"}},
+		TotalBytes: len("SECRET_RAW"),
+	}
+	env.Patch = &envelope.Patch{UnifiedDiff: "--- a/x.go\n+++ b/x.go\n", Files: []string{"x.go"}}
+	if _, err := p.RunOnce(context.Background(), "gather", env); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	var event TraceEvent
+	if err := json.Unmarshal(bytes.TrimSpace(trace.Bytes()), &event); err != nil {
+		t.Fatalf("decode trace: %v\n%s", err, trace.String())
+	}
+	if event.TraceMode != TraceModeCompact || event.Envelope == nil || event.Envelope.Raw == nil {
+		t.Fatalf("compact event = %#v", event)
+	}
+	if event.Envelope.Raw.Units[0].Text != "" || event.Envelope.Raw.TotalBytes != len("SECRET_RAW") {
+		t.Fatalf("raw not compacted: %#v", event.Envelope.Raw)
+	}
+	if event.Envelope.Patch == nil || event.Envelope.Patch.UnifiedDiff != "" || len(event.Envelope.Patch.Files) != 1 {
+		t.Fatalf("patch not compacted: %#v", event.Envelope.Patch)
 	}
 }
 
@@ -272,6 +305,24 @@ func TestReadTraceRestoresLastEnvelope(t *testing.T) {
 	}
 	if got.Stage != "plan" || got.Turn != 2 || got.Budget.Turn != 2 {
 		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestReadTraceRejectsCompactTrace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trace.ndjson")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create trace: %v", err)
+	}
+	env := envelope.NewEnvelope("task", "fix", "/repo")
+	if err := json.NewEncoder(file).Encode(TraceEvent{TraceMode: TraceModeCompact, Stage: "gather", Envelope: env}); err != nil {
+		t.Fatalf("encode trace: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close trace: %v", err)
+	}
+	if _, err := ReadTrace(path); err == nil || !strings.Contains(err.Error(), "compact") {
+		t.Fatalf("err = %v", err)
 	}
 }
 

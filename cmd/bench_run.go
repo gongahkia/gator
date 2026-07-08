@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -125,6 +126,7 @@ func buildHarborArgs(opts benchOptions) []string {
 		"--allow-agent-host", "host.docker.internal",
 		"--yes",
 		"--agent-env", "PAW_BENCH_CONFIG=" + opts.Config,
+		"--agent-env", "PAW_TRACE_MODE=" + benchTraceMode(),
 	}
 	if opts.NTasks > 0 {
 		args = append(args, "--n-tasks", strconv.Itoa(opts.NTasks))
@@ -133,6 +135,13 @@ func buildHarborArgs(opts benchOptions) []string {
 		args = append(args, "--n-attempts", strconv.Itoa(opts.NAttempts))
 	}
 	return args
+}
+
+func benchTraceMode() string {
+	if mode := os.Getenv("PAW_BENCH_TRACE_MODE"); mode != "" {
+		return mode
+	}
+	return "compact"
 }
 
 func runHarbor(ctx context.Context, bin string, args []string, log io.Writer) error {

@@ -61,6 +61,8 @@ that compression actually happened).
 `Envelope` matches a golden file (`testdata/golden/`). This locks the pipeable text contract so
 `paw gather | paw compress | ...` stays stable across refactors.
 `paw stats` golden coverage also checks token source and compression validation audit summaries.
+Trace tests cover full snapshots, compact redaction, stats on compact traces, and clear resume
+failure on compact traces.
 
 ---
 

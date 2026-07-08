@@ -359,6 +359,8 @@ func isolateEnv(t *testing.T) {
 		"PAW_GATHER_MAX_FILE_BYTES",
 		"PAW_VERIFY_CMD",
 		"PAW_VERIFY_TIMEOUT",
+		"PAW_TRACE_MODE",
+		"PAW_BENCH_TRACE_MODE",
 	} {
 		t.Setenv(key, "")
 	}

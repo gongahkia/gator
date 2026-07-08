@@ -185,13 +185,17 @@ func taskID(instruction, cwd string) string {
 }
 
 func runTraceOptions(cmd *cobra.Command, quiet bool) []stage.TracerOption {
+	var opts []stage.TracerOption
+	if mode := os.Getenv("PAW_TRACE_MODE"); mode != "" {
+		opts = append(opts, stage.WithMode(mode))
+	}
 	if !verbose || quiet {
-		return nil
+		return opts
 	}
 	if pawlog.IsJSON(logFormat) {
-		return []stage.TracerOption{stage.WithLogger(pawlog.From(cmd.Context()))}
+		return append(opts, stage.WithLogger(pawlog.From(cmd.Context())))
 	}
-	return []stage.TracerOption{stage.WithMirror(cmd.ErrOrStderr())}
+	return append(opts, stage.WithMirror(cmd.ErrOrStderr()))
 }
 
 func writeRunResult(cmd *cobra.Command, out *envelope.Envelope) error {

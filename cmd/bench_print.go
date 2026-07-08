@@ -196,6 +196,7 @@ func writeBenchResultConfig(resultsPath string, row benchRow, opts benchOptions)
 		"n_attempts = " + strconv.Itoa(opts.NAttempts),
 		"date = " + tomlString(row.Date),
 		"trace_bundle = " + tomlString(row.TraceBundle),
+		"trace_mode = " + tomlString(benchTraceMode()),
 		"",
 		"[env]",
 		"PAW_BENCH_CONFIG = " + tomlString(row.Config),

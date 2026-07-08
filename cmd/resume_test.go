@@ -83,6 +83,21 @@ func TestResumeMalformedTraceFails(t *testing.T) {
 	}
 }
 
+func TestResumeCompactTraceFailsClearly(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+	tracePath := filepath.Join(dir, ".paw", "trace-task-compact.ndjson")
+	env := envelope.NewEnvelope("task-compact", "target", dir)
+	env.Stage = "gather"
+	writeTrace(t, tracePath, stage.TraceEvent{TraceMode: stage.TraceModeCompact, Stage: "gather", Envelope: env})
+
+	_, stderr, err := executeRootErr(t, append(configArgs(t), "resume", "task-compact", "--quiet"), "")
+	if err == nil || !strings.Contains(err.Error(), "compact") || !strings.Contains(err.Error(), "full trace") {
+		t.Fatalf("err = %v stderr=%s", err, stderr)
+	}
+}
+
 func writeTrace(t *testing.T, path string, events ...stage.TraceEvent) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
