@@ -15,7 +15,7 @@ embedded schema to enforce this.
 ```go
 type RawUnit struct {
     ID       string `json:"id"`        // stable within an envelope, e.g. "u001"
-    Kind     string `json:"kind"`      // file_slice | search_hits | dir_listing | verify_failure | git_status | git_diff_stat | git_diff_unstaged | git_diff_staged
+    Kind     string `json:"kind"`      // file_slice | syntax_context | search_hits | dir_listing | verify_failure | git_status | git_diff_stat | git_diff_unstaged | git_diff_staged
     Path     string `json:"path"`      // real path relative to Cwd; "" for non-file kinds
     StartLine int   `json:"start_line"`// 1-based; 0 if N/A
     EndLine   int   `json:"end_line"`  // inclusive; 0 if N/A

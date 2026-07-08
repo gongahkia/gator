@@ -25,6 +25,9 @@ func TestGatherFindsKnownSymbol(t *testing.T) {
 	if !hasKind(env.Raw, "file_slice") {
 		t.Fatalf("raw context missing file_slice: %#v", env.Raw)
 	}
+	if !hasKind(env.Raw, "syntax_context") {
+		t.Fatalf("raw context missing syntax_context: %#v", env.Raw)
+	}
 }
 
 func TestGatherRespectsDepthAndByteBounds(t *testing.T) {

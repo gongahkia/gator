@@ -43,6 +43,11 @@ func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Enve
 		return nil, err
 	}
 	units = append(units, hits...)
+	syntaxContexts, err := collectSyntaxContexts(in.Cwd, hits, g.Config.MaxFileBytes)
+	if err != nil {
+		return nil, err
+	}
+	units = append(units, syntaxContexts...)
 	slices, err := collectFileSlices(in.Cwd, hits, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err

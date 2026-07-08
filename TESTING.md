@@ -24,6 +24,8 @@ hallucinated output on demand to exercise the validation/fallback paths.
   respects depth bounds, and NEVER calls a model (inject a nil client; a call panics).
   Also cover git-aware units for clean repos, staged changes, unstaged changes, non-git dirs, and
   max-byte truncation.
+  Go syntax-aware context tests cover functions, methods, type declarations, parse errors, dedupe,
+  and max-byte caps.
 - `compress`:
   - Valid drone output → digest passes validation, brain would see only digest.
   - Drone returns a hallucinated `path` not in `RawContext` → item dropped.
