@@ -1,7 +1,9 @@
 # paw — Benchmarks (`docs/BENCHMARKS.md`)
 
-How `paw` is evaluated. Primary: **Terminal-Bench 2.0** via **Harbor**. Secondary:
-**SWE-bench Verified** (added after TB is green). All facts verified against Harbor/Terminal-Bench
+How `paw` is evaluated. Local, model-free stage benchmarks come first. Publishable external
+benchmarks use **Terminal-Bench 2.0** via **Harbor** after a credible smoke pass with a
+benchmark-capable model. **SWE-bench Verified** is secondary and stays deferred until the
+Terminal-Bench raw/full comparison is credible. All facts verified against Harbor/Terminal-Bench
 docs as of 2026-07; re-verify versions before a leaderboard submission.
 
 ---
@@ -114,7 +116,7 @@ Install for local runs: `uv tool install harbor` then `uv pip install -e adapter
 
 ---
 
-## 4. `paw bench` (local convenience wrapper)
+## 4. `paw bench` (external harness wrapper)
 
 `cmd/bench.go` shells out to `harbor run` with the flags above, then parses the Harbor `jobs-dir`
 output (`results/**/result.json`, `reward.txt`) plus `paw`'s own NDJSON traces to emit a table:
@@ -136,6 +138,10 @@ counts, pass rate with 95% CI when sample size is sufficient, and trace bundle p
 `paw bench` refuses to write `docs/RESULTS.md` rows when a requested `--n-tasks`/`--n-attempts`
 run is incomplete or Harbor marks the root job unfinished. Partial or interrupted runs belong in
 issue comments or diagnostic notes, not in the measured results table.
+
+Local stage benchmarks are separate from Harbor results. They should test context-gateway depth,
+compression validation, trace/stat accounting, and bounded tool execution without Docker or model
+keys. They can gate development; Harbor rows are for publishable external evidence only.
 
 ### 4a. Direct comparison vs SWE-Pruner (prior art)
 Because SWE-Pruner is the closest prior art and publishes on SWE-bench Verified with GLM-4.6,
@@ -161,14 +167,16 @@ is no-training + offline + verified + installable, not necessarily a higher rati
 - SWE-bench Verified: Harbor dataset `swe-bench/swe-bench-verified@latest`, verified on
   2026-07-07 with Harbor `0.17.1` via `harbor run --print-config --dataset
   swe-bench/swe-bench-verified@latest`, resolving to name `swe-bench/swe-bench-verified` and ref
-  `latest`. Harbor Hub listed this dataset with 500 tasks on the same date. Do NOT start this until
-  TB2.0 `full` config runs end-to-end.
+  `latest`. Harbor Hub listed this dataset with 500 tasks on the same date. Do not publish
+  SWE-bench rows until Terminal-Bench raw/full smoke runs show a nonzero credible pass signal with
+  the intended benchmark model family.
 
 ### 5a. SWE-bench Verified
 
 `paw bench` is dataset-agnostic once Harbor exposes the dataset as normal tasks. This repo pins the
 current Harbor registry id to `swe-bench/swe-bench-verified@latest`; re-run the print-config check
-before publishing any SWE-bench result.
+before publishing any SWE-bench result. Use this only after Terminal-Bench raw/full smoke runs are
+credible with a benchmark-capable model; it is not a near-term local development gate.
 
 ```sh
 make build-linux
@@ -195,9 +203,12 @@ Verified on 2026-07-07:
 
 ---
 
-## 6. Success criteria for the benchmark milestone
+## 6. Success criteria for publishable Harbor results
 1. `harbor run --agent oracle` passes locally (proves Docker + Harbor work).
-2. `PawAgent` installs the binary and completes ≥1 task end-to-end with `reward.txt == 1`.
-3. `paw bench --config raw` and `--config full` both complete a 5-task smoke subset and produce
-   the comparison table, showing brain-token reduction with pass-rate held.
-4. Full 89-task TB2.0 run recorded in `docs/RESULTS.md` with all three configs.
+2. Local, model-free stage benchmarks pass for gather/compress/plan/edit/verify contracts.
+3. `PawAgent` installs the binary and completes at least one task end-to-end with
+   `reward.txt == 1` using the intended benchmark model family.
+4. `paw bench --config raw` and `--config full` both complete the same 5-task smoke subset and
+   produce a comparison table with a nonzero credible pass signal.
+5. Only then schedule full Terminal-Bench or SWE-bench runs and record completed rows in
+   `docs/RESULTS.md`.

@@ -4,16 +4,14 @@ Status: Terminal-Bench 2.0 smoke run recorded for issue #2.
 
 ## Terminal-Bench 2.0
 
-Rows below include the issue #2 smoke run. Remaining TBD rows are placeholders for larger follow-up runs.
+Rows below include the issue #2 smoke run. Partial or interrupted jobs are not benchmark results.
 Every populated row must include the reproducibility metadata described in [Reproduction](#reproduction).
 
 <!-- paw-results:start -->
 | run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |
 | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | paw-smoke-raw | d91f8d0fe23a3f80527ad670bcd1208b266a0f87 | [raw](results-configs/paw-smoke-raw.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 5 | 68.0 | 756 | 242 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-raw |
-| paw-full-no-compress | 0df6ebe5459f8651fd168a344819bf1656326787 | [no-compress](results-configs/paw-full-no-compress.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-08 | 86 | 68.3 | 572 | 215 | 0 | 0.00 | .paw/bench-jobs/paw-full-no-compress |
 | paw-smoke-full | d91f8d0fe23a3f80527ad670bcd1208b266a0f87 | [full](results-configs/paw-smoke-full.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | openai/qwen2.5-coder:1.5b | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 5 | 93.3 | 562 | 132 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-full |
-| paw-full-raw | 0df6ebe5459f8651fd168a344819bf1656326787 | [raw](results-configs/paw-full-raw.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 88 | 69.4 | 557 | 220 | 0 | 0.00 | .paw/bench-jobs/paw-full-raw |
 <!-- paw-results:end -->
 
 Smoke notes, 2026-07-07: Harbor 0.17.1, Ollama 0.31.1, `terminal-bench@2.0`,
@@ -23,6 +21,13 @@ Smoke notes, 2026-07-07: Harbor 0.17.1, Ollama 0.31.1, `terminal-bench@2.0`,
 `reshard-c4-data`, `write-compressor`. Raw completed with 2 agent exceptions; full
 completed with 3 agent exceptions. Token and wall-time columns are medians per task
 from trace artifacts.
+
+Invalid diagnostic attempts, not benchmark results:
+
+| run_id | reason |
+| --- | --- |
+| paw-full-no-compress | Incomplete Terminal-Bench job: 86 task results from an attempted full run. |
+| paw-full-raw | Incomplete Terminal-Bench job: 88 task results from an attempted full run. |
 
 ## Reproduction
 
@@ -45,7 +50,8 @@ Required columns:
 make build-linux
 make bench-oracle
 make bench-smoke
-make bench-full
+# only after a credible raw/full smoke pass with the intended benchmark model:
+# make bench-full
 ```
 
 For any recorded row, commit the exact config under `docs/results-configs/`, preserve trace files
@@ -59,7 +65,7 @@ This section separates measured paw results from prior-art numbers. Do not read 
 | system | benchmark | model | compressor | token reduction |
 | --- | --- | --- | --- | --- |
 | SWE-Pruner | SWE-bench Verified | GLM-4.6 / Claude Sonnet 4.5 | trained 0.6B neural skimmer | 23-54%, reported by SWE-Pruner authors |
-| paw full vs raw | Terminal-Bench 2.0 | GLM-4.6 | stock drone model + deterministic span validation | TBD, measured from the raw/full rows above |
+| paw full vs raw | Terminal-Bench 2.0 | GLM-4.6 | stock drone model + deterministic span validation | TBD, measured only from completed matched raw/full rows |
 
 paw should only claim its own measured `full` vs `raw` reduction after both rows are populated by the same benchmark run setup.
 

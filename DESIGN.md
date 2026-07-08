@@ -80,7 +80,9 @@ with a verified (not merely trusted) compression step.*
 - No multi-daemon / microservice architecture (adoption killer). Stages are in-process by
   default; the "process" identity is the *subcommand* surface, not separate long-lived daemons.
 - The drone model NEVER edits code, applies patches, or makes an unchecked decision.
-- No MCP servers, no plugin system, no sub-agents-spawning-sub-agents in v1.
+- No plugin system, no sub-agents-spawning-sub-agents in v1.
+- MCP support is limited to a context sidecar (`paw mcp serve`) for `gather`/`compress`/`digest`;
+  it is not a second agent runner and does not expose planning, editing, or verification tools.
 
 ---
 
@@ -242,6 +244,9 @@ compression layer is designed to cut.
 - All model access goes through one internal `llm` package with two transports: `openai` and
   `anthropic` (both are just HTTP + JSON). See `docs/MODEL_APIS.md` for exact request/response
   shapes, env vars, and pinned behavior.
+- Model routing is an integration surface, not a core product layer: users can point brain/drone
+  roles at different compatible endpoints, but v1 does not optimize, arbitrate, or broker model
+  selection.
 
 ---
 
@@ -251,12 +256,20 @@ compression layer is designed to cut.
   Integration is a Python adapter subclassing `BaseInstalledAgent` that (a) `install()`s the
   `paw` binary into the sandbox container and (b) `run()`s it against the instruction, letting
   Harbor read `reward.txt`. Full contract in `docs/BENCHMARKS.md`.
-- Secondary: **SWE-bench Verified** (added after TB is green).
+- Secondary: **SWE-bench Verified**, only after a benchmark-capable model produces a credible
+  Terminal-Bench smoke pass rate under matching raw/full configs.
 - `paw bench` is a thin local wrapper that shells out to Harbor with the right flags and collects
   results + token accounting into `docs/RESULTS.md`-style tables.
 - **Ablation:** `paw run --disable-compress` (drone off → brain reads raw) and
   `paw run --drone-model X` let us produce the per-stage delta table that makes the token claim
   attributable.
+
+Near-term roadmap:
+- Context gateway depth: git-aware and syntax-aware gather units that preserve provenance.
+- Validation auditability: per-span drop reasons and token-source reporting in traces/stats.
+- Tool execution correctness: repo-aware, bounded verify command resolution.
+- Local stage benchmarks: model-free tests for gather/compress/plan/edit/verify behavior before
+  expensive Harbor runs.
 
 ---
 
