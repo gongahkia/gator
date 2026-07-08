@@ -25,6 +25,9 @@ func Defaults() Config {
 		},
 		MaxTurns:       40,
 		MaxBrainTokens: 200000,
+		Verify: VerifyConfig{
+			Timeout: 2 * time.Minute,
+		},
 	}
 }
 
@@ -172,7 +175,11 @@ func applyEnv(cfg *Config) error {
 	if err := setInt("PAW_GATHER_MAX_DEPTH", &cfg.Gather.MaxDepth); err != nil {
 		return err
 	}
-	return setInt("PAW_GATHER_MAX_FILE_BYTES", &cfg.Gather.MaxFileBytes)
+	if err := setInt("PAW_GATHER_MAX_FILE_BYTES", &cfg.Gather.MaxFileBytes); err != nil {
+		return err
+	}
+	setString("PAW_VERIFY_CMD", &cfg.Verify.Command)
+	return setDuration("PAW_VERIFY_TIMEOUT", &cfg.Verify.Timeout)
 }
 
 func setString(key string, dst *string) {

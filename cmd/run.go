@@ -168,12 +168,14 @@ func newAgentPipeline(cfg config.Config, rawContext bool, disableCompress bool) 
 	planStage.UseRawContext = rawContext
 	editStage := edit.New(brain)
 	editStage.UseRawContext = rawContext
+	verifyStage := verify.New(cfg.Verify.Command)
+	verifyStage.Timeout = cfg.Verify.Timeout
 	return stage.NewPipeline(
 		gather.New(cfg.Gather),
 		compressStage,
 		planStage,
 		editStage,
-		verify.New(""),
+		verifyStage,
 	)
 }
 

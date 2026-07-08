@@ -10,7 +10,8 @@
     "exit_code": 0,
     "command": "printf 'ok\\n'",
     "failure_digest": "ok",
-    "raw_tail_bytes": 3
+    "raw_tail_bytes": 3,
+    "stdout_bytes": 3
   },
   "budget": {
     "max_turns": 0,

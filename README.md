@@ -176,6 +176,11 @@ Config precedence, later wins:
 | `PAW_INSECURE_SKIP_TLS_VERIFY` | `tls.insecure_skip_verify` | `false` |
 | `PAW_GATHER_MAX_DEPTH` | `gather.max_depth` | stage default |
 | `PAW_GATHER_MAX_FILE_BYTES` | `gather.max_file_bytes` | stage default |
+| `PAW_VERIFY_CMD` | `verify.command` | repo-aware |
+| `PAW_VERIFY_TIMEOUT` | `verify.timeout` | `2m` |
+
+Verify command precedence is `PAW_VERIFY_CMD`, `[verify].command`, then repo-aware detection:
+`make test`, `npm test`, `go test ./...`, `cargo test`, `python -m pytest`, and finally `true`.
 
 ### Recommended pairings (2026)
 

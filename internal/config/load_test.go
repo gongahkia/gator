@@ -34,6 +34,10 @@ model = "file-drone"
 max_depth = 2
 max_file_bytes = 99
 
+[verify]
+command = "go test ./pkg"
+timeout = "10s"
+
 [tls]
 ca_file = "/file/ca.pem"
 insecure_skip_verify = false
@@ -43,6 +47,7 @@ insecure_skip_verify = false
 	t.Setenv("PAW_MAX_TURNS", "9")
 	t.Setenv("PAW_CALL_TIMEOUT", "5s")
 	t.Setenv("PAW_GATHER_MAX_FILE_BYTES", "256")
+	t.Setenv("PAW_VERIFY_TIMEOUT", "15s")
 	t.Setenv("PAW_TLS_CA_FILE", "/env/ca.pem")
 	t.Setenv("PAW_INSECURE_SKIP_TLS_VERIFY", "true")
 
@@ -68,6 +73,9 @@ insecure_skip_verify = false
 	if cfg.Gather.MaxDepth != 2 || cfg.Gather.MaxFileBytes != 256 {
 		t.Fatalf("gather precedence failed: %#v", cfg.Gather)
 	}
+	if cfg.Verify.Command != "go test ./pkg" || cfg.Verify.Timeout != 15*time.Second {
+		t.Fatalf("verify precedence failed: %#v", cfg.Verify)
+	}
 	if cfg.TLS.CAFile != "/env/ca.pem" || !cfg.TLS.InsecureSkipVerify {
 		t.Fatalf("tls precedence failed: %#v", cfg.TLS)
 	}
@@ -86,6 +94,9 @@ func TestDefaultsAreLocalFirst(t *testing.T) {
 	}
 	if cfg.TLS.CAFile != "" || cfg.TLS.InsecureSkipVerify {
 		t.Fatalf("tls defaults = %#v", cfg.TLS)
+	}
+	if cfg.Verify.Timeout != 2*time.Minute {
+		t.Fatalf("verify defaults = %#v", cfg.Verify)
 	}
 }
 
@@ -355,6 +366,8 @@ func clearPawEnv(t *testing.T) {
 		"PAW_INSECURE_SKIP_TLS_VERIFY",
 		"PAW_GATHER_MAX_DEPTH",
 		"PAW_GATHER_MAX_FILE_BYTES",
+		"PAW_VERIFY_CMD",
+		"PAW_VERIFY_TIMEOUT",
 	} {
 		t.Setenv(key, "")
 	}

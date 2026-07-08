@@ -20,10 +20,16 @@ type TLSConfig struct {
 	InsecureSkipVerify bool   `toml:"insecure_skip_verify"`
 }
 
+type VerifyConfig struct {
+	Command string        `toml:"command"`
+	Timeout time.Duration `toml:"timeout"`
+}
+
 type Config struct {
 	Brain          EndpointConfig `toml:"brain"`
 	Drone          EndpointConfig `toml:"drone"`
 	TLS            TLSConfig      `toml:"tls"`
+	Verify         VerifyConfig   `toml:"verify"`
 	MaxTurns       int            `toml:"max_turns"`
 	MaxBrainTokens int            `toml:"max_brain_tokens"`
 	CallTimeout    time.Duration  `toml:"call_timeout"`

@@ -12,6 +12,9 @@ type VerifyResult struct {
 	Command       string `json:"command"`
 	FailureDigest string `json:"failure_digest"`
 	RawTailBytes  int    `json:"raw_tail_bytes"`
+	StdoutBytes   int    `json:"stdout_bytes,omitempty"`
+	StderrBytes   int    `json:"stderr_bytes,omitempty"`
+	TimedOut      bool   `json:"timed_out,omitempty"`
 }
 
 type Budget struct {

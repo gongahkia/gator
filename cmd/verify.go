@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/gongahkia/paw/internal/config"
 	verifystage "github.com/gongahkia/paw/internal/verify"
 	"github.com/spf13/cobra"
 )
@@ -15,7 +16,13 @@ var verifyCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		out, err := verifystage.New("").Run(cmd.Context(), env)
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return err
+		}
+		stage := verifystage.New(cfg.Verify.Command)
+		stage.Timeout = cfg.Verify.Timeout
+		out, err := stage.Run(cmd.Context(), env)
 		if err != nil {
 			return err
 		}

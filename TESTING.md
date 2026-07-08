@@ -37,8 +37,9 @@ hallucinated output on demand to exercise the validation/fallback paths.
 - `plan`: `done=false` with no `next_action` → validation error. Enum enforcement on `kind`.
 - `edit` + `patch`: see `docs/PATCH_FORMAT.md` §4 fixture list (create/delete/multi-hunk/
   multi-file/context-mismatch/path-escape).
-- `verify`: run a fixture with a passing and a failing test command; assert `FailureDigest`
-  truncation keeps failure markers and respects the byte budget.
+- `verify`: run fixtures with passing, failing, and timed-out commands; assert command resolution
+  for common repo types, stdout/stderr byte counts, timeout metadata, and `FailureDigest`
+  truncation.
 - `envelope`: round-trip marshal/unmarshal; schema-version mismatch handling.
 - `schema`: marshal a fully-populated struct and validate against the embedded JSON Schema
   (keeps structs and schemas in sync).

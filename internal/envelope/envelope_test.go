@@ -45,6 +45,9 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		Command:       "go test ./...",
 		FailureDigest: "FAIL",
 		RawTailBytes:  128,
+		StdoutBytes:   64,
+		StderrBytes:   64,
+		TimedOut:      true,
 	}
 	env.Budget = Budget{
 		MaxTurns:          40,

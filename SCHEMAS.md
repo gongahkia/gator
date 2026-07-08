@@ -181,6 +181,9 @@ type VerifyResult struct {
     Command       string `json:"command"`         // what was run
     FailureDigest string `json:"failure_digest"`  // deterministically truncated/structured output
     RawTailBytes  int    `json:"raw_tail_bytes"`  // how much raw output existed before truncation
+    StdoutBytes   int    `json:"stdout_bytes,omitempty"`
+    StderrBytes   int    `json:"stderr_bytes,omitempty"`
+    TimedOut      bool   `json:"timed_out,omitempty"`
 }
 ```
 
@@ -188,6 +191,11 @@ type VerifyResult struct {
 matching common failure markers (`FAIL`, `Error`, `assert`, `panic`, `Traceback`, `expected`,
 `got`), deduplicated, capped at a byte budget (default 4 KB). This is fed back into `gather` as a
 `verify_failure` `RawUnit`.
+
+Verify command precedence: `PAW_VERIFY_CMD`, `[verify].command` or explicit stage command, then
+repo-aware detection (`make test`, `npm test`, `go test ./...`, `cargo test`,
+`python -m pytest`), then `true`. Runtime is bounded by `[verify].timeout` /
+`PAW_VERIFY_TIMEOUT` (default 2 minutes).
 
 ---
 
