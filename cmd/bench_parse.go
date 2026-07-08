@@ -17,6 +17,8 @@ type benchSummary struct {
 	BrainOutputTokens []float64
 	DroneTokens       []float64
 	WallSeconds       []float64
+	JobFinishedKnown  bool
+	JobFinished       bool
 }
 
 func loadBenchSummary(root string) (benchSummary, error) {
@@ -67,6 +69,7 @@ func readResultJSON(path string, summary *benchSummary, seen map[string]bool) er
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil
 	}
+	recordJobCompletion(doc, summary)
 	if trials, ok := doc["trial_results"].([]any); ok {
 		for _, trial := range trials {
 			if obj, ok := trial.(map[string]any); ok {
@@ -79,6 +82,17 @@ func readResultJSON(path string, summary *benchSummary, seen map[string]bool) er
 		addTrialResult(doc, summary, seen)
 	}
 	return nil
+}
+
+func recordJobCompletion(doc map[string]any, summary *benchSummary) {
+	if _, isTrial := doc["trial_name"]; isTrial {
+		return
+	}
+	if _, hasFinished := doc["finished_at"]; !hasFinished {
+		return
+	}
+	summary.JobFinishedKnown = true
+	summary.JobFinished = stringField(doc, "finished_at") != ""
 }
 
 func addTrialResult(trial map[string]any, summary *benchSummary, seen map[string]bool) {

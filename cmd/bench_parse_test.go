@@ -107,6 +107,24 @@ func TestLoadBenchSummaryRejectsEmptyTree(t *testing.T) {
 	}
 }
 
+func TestLoadBenchSummaryRecordsUnfinishedRootJob(t *testing.T) {
+	root := t.TempDir()
+	writeBenchFile(t, root, "result.json", `{"finished_at":null}`)
+	writeBenchFile(t, filepath.Join(root, "trial-a"), "result.json", `{
+  "id": "trial-a",
+  "trial_name": "task-a__1",
+  "verifier_result": {"rewards": {"reward": 1}}
+}`)
+
+	summary, err := loadBenchSummary(root)
+	if err != nil {
+		t.Fatalf("load summary: %v", err)
+	}
+	if !summary.JobFinishedKnown || summary.JobFinished {
+		t.Fatalf("job completion = known:%t finished:%t", summary.JobFinishedKnown, summary.JobFinished)
+	}
+}
+
 func TestReadTraceCountsKnownStages(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), ".paw")
 	writeBenchFile(t, dir, "trace.ndjson", strings.Join([]string{

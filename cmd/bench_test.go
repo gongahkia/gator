@@ -102,6 +102,77 @@ func TestBenchCommandRunsHarborAndPrintsSummary(t *testing.T) {
 	}
 }
 
+func TestBenchCommandRejectsPartialResultsBeforeWriting(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses POSIX shell script")
+	}
+	isolateEnv(t)
+	root := t.TempDir()
+	job := "paw-test-job"
+	trial := filepath.Join(root, job, "trial-a")
+	writeBenchFile(t, trial, "result.json", `{
+  "id": "trial-a",
+  "trial_name": "task-a__1",
+  "verifier_result": {"rewards": {"reward": 1}}
+}`)
+	harbor := filepath.Join(t.TempDir(), "harbor")
+	if err := os.WriteFile(harbor, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("write harbor: %v", err)
+	}
+	results := filepath.Join(t.TempDir(), "RESULTS.md")
+	original := strings.Join([]string{
+		resultsStartMarker,
+		"| run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |",
+		resultsEndMarker,
+		"",
+	}, "\n")
+	if err := os.WriteFile(results, []byte(original), 0o644); err != nil {
+		t.Fatalf("write results: %v", err)
+	}
+
+	stdout, stderr, err := executeRootErr(t, []string{
+		"bench",
+		"--config", "raw",
+		"--harbor-bin", harbor,
+		"--jobs-dir", root,
+		"--job-name", job,
+		"--n-tasks", "2",
+		"--results-file", results,
+	}, "")
+	if err == nil || !strings.Contains(err.Error(), "incomplete Harbor results") {
+		t.Fatalf("err = %v stdout=%s stderr=%s", err, stdout, stderr)
+	}
+	got, err := os.ReadFile(results)
+	if err != nil {
+		t.Fatalf("read results: %v", err)
+	}
+	if string(got) != original {
+		t.Fatalf("results file changed:\n%s", got)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(results), "results-configs", job+".toml")); !os.IsNotExist(err) {
+		t.Fatalf("partial run wrote config, err=%v", err)
+	}
+}
+
+func TestValidateBenchSummaryExpectedTrials(t *testing.T) {
+	complete := benchSummary{Tasks: 6}
+	opts := benchOptions{JobName: "job", NTasks: 3, NAttempts: 2}
+	if err := validateBenchSummary(complete, opts); err != nil {
+		t.Fatalf("complete summary rejected: %v", err)
+	}
+	partial := benchSummary{Tasks: 5}
+	if err := validateBenchSummary(partial, opts); err == nil || !strings.Contains(err.Error(), "expected 6") {
+		t.Fatalf("partial summary err = %v", err)
+	}
+	if err := validateBenchSummary(partial, benchOptions{JobName: "unknown", NTasks: 0}); err != nil {
+		t.Fatalf("zero-task expected should not enforce count: %v", err)
+	}
+	unfinished := benchSummary{Tasks: 6, JobFinishedKnown: true, JobFinished: false}
+	if err := validateBenchSummary(unfinished, opts); err == nil || !strings.Contains(err.Error(), "did not finish") {
+		t.Fatalf("unfinished job err = %v", err)
+	}
+}
+
 func writeBenchFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {

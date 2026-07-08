@@ -62,6 +62,9 @@ func runBenchCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	}
+	if err := validateBenchSummary(summary, opts); err != nil {
+		return err
+	}
 	row := summary.row(spec.Name, opts)
 	if err := printBenchTable(cmd.OutOrStdout(), []benchRow{row}); err != nil {
 		return err
@@ -73,6 +76,31 @@ func runBenchCommand(cmd *cobra.Command, _ []string) error {
 		return updateResultsFile(benchResultsPath, row)
 	}
 	return nil
+}
+
+func validateBenchSummary(summary benchSummary, opts benchOptions) error {
+	if summary.JobFinishedKnown && !summary.JobFinished {
+		return usageErrorf("Harbor job %q did not finish; refusing to record partial results", opts.JobName)
+	}
+	expected := opts.expectedTrials()
+	if expected == 0 {
+		return nil
+	}
+	if summary.Tasks < expected {
+		return usageErrorf("incomplete Harbor results for %q: got %d task results, expected %d", opts.JobName, summary.Tasks, expected)
+	}
+	return nil
+}
+
+func (opts benchOptions) expectedTrials() int {
+	if opts.NTasks <= 0 {
+		return 0
+	}
+	attempts := opts.NAttempts
+	if attempts <= 0 {
+		attempts = 1
+	}
+	return opts.NTasks * attempts
 }
 
 func benchConfigSpec(name string) (benchConfig, error) {

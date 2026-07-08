@@ -133,6 +133,10 @@ full commit SHA, checked-in config path under `docs/results-configs/<run-id>.tom
 revision, exact brain/drone model ids, hardware, ISO date, total wall time, total brain/drone token
 counts, pass rate with 95% CI when sample size is sufficient, and trace bundle path or URL.
 
+`paw bench` refuses to write `docs/RESULTS.md` rows when a requested `--n-tasks`/`--n-attempts`
+run is incomplete or Harbor marks the root job unfinished. Partial or interrupted runs belong in
+issue comments or diagnostic notes, not in the measured results table.
+
 ### 4a. Direct comparison vs SWE-Pruner (prior art)
 Because SWE-Pruner is the closest prior art and publishes on SWE-bench Verified with GLM-4.6,
 `docs/RESULTS.md` includes a dedicated comparison section. The honest comparison holds the
