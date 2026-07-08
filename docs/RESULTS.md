@@ -43,6 +43,7 @@ Required columns:
 - `date`: ISO 8601 date or timestamp.
 - `wall_time`: total wall time for the run.
 - `tokens_brain_in` / `tokens_brain_out` / `tokens_drone`: total tokens across completed tasks.
+- Token source (`provider`, `estimate`, or `mixed`) is recorded in the generated result config.
 - `pass_rate`: include a 95% CI when the sample size is large enough.
 - `trace_bundle`: path or URL to a `.tar.gz` containing the run traces.
 

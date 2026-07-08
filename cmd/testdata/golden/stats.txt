@@ -2,5 +2,6 @@ Task:      task-stats
 Turns:     2
 Brain:     1,000 in / 200 out (cached: 1,000, 50.0%) -> $0.0072
 Drone:     400 total -> $0.0001
+Token src: brain=provider drone=estimate
 Wall time: 3.2s
 Verify:    passed

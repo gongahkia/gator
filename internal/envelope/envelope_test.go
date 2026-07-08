@@ -51,7 +51,9 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		Turn:              3,
 		BrainInputTokens:  100,
 		BrainOutputTokens: 20,
+		BrainTokenSource:  "provider",
 		DroneTokens:       30,
+		DroneTokenSource:  "estimate",
 		MaxBrainTokens:    200000,
 	}
 	env.Raw = &RawContext{

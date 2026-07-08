@@ -18,9 +18,9 @@ func TestLoadBenchSummaryParsesResultsAndTrace(t *testing.T) {
   "verifier_result": {"rewards": {"reward": 1}}
 }`)
 	writeBenchFile(t, filepath.Join(trial, ".paw"), "trace.ndjson", strings.Join([]string{
-		`{"stage":"compress","tokens":5}`,
-		`{"stage":"plan","tokens":11}`,
-		`{"stage":"edit","tokens":13}`,
+		`{"stage":"compress","tokens":5,"token_source":"estimate"}`,
+		`{"stage":"plan","tokens":11,"token_source":"provider"}`,
+		`{"stage":"edit","tokens":13,"token_source":"provider"}`,
 		"",
 	}, "\n"))
 
@@ -42,6 +42,9 @@ func TestLoadBenchSummaryParsesResultsAndTrace(t *testing.T) {
 	}
 	if got := formatMedian(summary.WallSeconds, 1); got != "12.0" {
 		t.Fatalf("wall median = %s", got)
+	}
+	if summary.BrainTokenSource != "provider" || summary.DroneTokenSource != "estimate" {
+		t.Fatalf("token sources = brain:%q drone:%q", summary.BrainTokenSource, summary.DroneTokenSource)
 	}
 }
 
@@ -139,21 +142,21 @@ func TestReadTraceCountsKnownStages(t *testing.T) {
 	if !isTracePath(path) {
 		t.Fatalf("expected trace path")
 	}
-	brainIn, brainOut, drone, ok := readTrace(path)
-	if !ok || brainIn != 12 || brainOut != 0 || drone != 3 {
-		t.Fatalf("trace = brainIn:%d brainOut:%d drone:%d ok:%v", brainIn, brainOut, drone, ok)
+	brainIn, brainOut, drone, brainSource, droneSource, ok := readTrace(path)
+	if !ok || brainIn != 12 || brainOut != 0 || drone != 3 || brainSource != "none" || droneSource != "none" {
+		t.Fatalf("trace = brainIn:%d brainOut:%d drone:%d brainSource:%s droneSource:%s ok:%v", brainIn, brainOut, drone, brainSource, droneSource, ok)
 	}
 }
 
 func TestReadTracePrefersBudgetTotals(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), ".paw")
 	writeBenchFile(t, dir, "trace.ndjson", strings.Join([]string{
-		`{"stage":"compress","tokens":3,"envelope":{"budget":{"brain_input_tokens":10,"brain_output_tokens":2,"drone_tokens":3}}}`,
-		`{"stage":"plan","tokens":5,"envelope":{"budget":{"brain_input_tokens":20,"brain_output_tokens":4,"drone_tokens":3}}}`,
+		`{"stage":"compress","tokens":3,"envelope":{"budget":{"brain_input_tokens":10,"brain_output_tokens":2,"brain_token_source":"provider","drone_tokens":3,"drone_token_source":"estimate"}}}`,
+		`{"stage":"plan","tokens":5,"envelope":{"budget":{"brain_input_tokens":20,"brain_output_tokens":4,"brain_token_source":"provider","drone_tokens":3,"drone_token_source":"estimate"}}}`,
 		"",
 	}, "\n"))
-	brainIn, brainOut, drone, ok := readTrace(filepath.Join(dir, "trace.ndjson"))
-	if !ok || brainIn != 20 || brainOut != 4 || drone != 3 {
-		t.Fatalf("trace = brainIn:%d brainOut:%d drone:%d ok:%v", brainIn, brainOut, drone, ok)
+	brainIn, brainOut, drone, brainSource, droneSource, ok := readTrace(filepath.Join(dir, "trace.ndjson"))
+	if !ok || brainIn != 20 || brainOut != 4 || drone != 3 || brainSource != "provider" || droneSource != "estimate" {
+		t.Fatalf("trace = brainIn:%d brainOut:%d drone:%d brainSource:%s droneSource:%s ok:%v", brainIn, brainOut, drone, brainSource, droneSource, ok)
 	}
 }

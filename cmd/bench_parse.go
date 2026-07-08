@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/paw/internal/budget"
 )
 
 type benchSummary struct {
@@ -17,6 +19,8 @@ type benchSummary struct {
 	BrainOutputTokens []float64
 	DroneTokens       []float64
 	WallSeconds       []float64
+	BrainTokenSource  string
+	DroneTokenSource  string
 	JobFinishedKnown  bool
 	JobFinished       bool
 }
@@ -40,13 +44,15 @@ func loadBenchSummary(root string) (benchSummary, error) {
 				}
 			}
 		case strings.HasSuffix(entry.Name(), ".ndjson") && isTracePath(path):
-			brainIn, brainOut, drone, ok := readTrace(path)
+			brainIn, brainOut, drone, brainSource, droneSource, ok := readTrace(path)
 			if ok {
 				summary.BrainInputTokens = append(summary.BrainInputTokens, float64(brainIn))
 				if brainOut > 0 {
 					summary.BrainOutputTokens = append(summary.BrainOutputTokens, float64(brainOut))
 				}
 				summary.DroneTokens = append(summary.DroneTokens, float64(drone))
+				summary.BrainTokenSource = mergeBenchTokenSource(summary.BrainTokenSource, brainIn+brainOut, brainSource)
+				summary.DroneTokenSource = mergeBenchTokenSource(summary.DroneTokenSource, drone, droneSource)
 			}
 		}
 		return nil
@@ -58,6 +64,13 @@ func loadBenchSummary(root string) (benchSummary, error) {
 		return benchSummary{}, fmt.Errorf("no Harbor results found under %s", root)
 	}
 	return summary, nil
+}
+
+func mergeBenchTokenSource(existing string, tokens int, source string) string {
+	if tokens <= 0 {
+		return existing
+	}
+	return budget.MergeTokenSource(existing, source)
 }
 
 func readResultJSON(path string, summary *benchSummary, seen map[string]bool) error {

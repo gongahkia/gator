@@ -133,7 +133,8 @@ Configs `bench` can sweep (the ablation that makes claims attributable):
 Results land in `docs/RESULTS.md`. Every recorded row must include reproducibility metadata:
 full commit SHA, checked-in config path under `docs/results-configs/<run-id>.toml`, dataset id and
 revision, exact brain/drone model ids, hardware, ISO date, total wall time, total brain/drone token
-counts, pass rate with 95% CI when sample size is sufficient, and trace bundle path or URL.
+counts, brain/drone token source (`provider`, `estimate`, or `mixed`) in the generated result
+config, pass rate with 95% CI when sample size is sufficient, and trace bundle path or URL.
 
 `paw bench` refuses to write `docs/RESULTS.md` rows when a requested `--n-tasks`/`--n-attempts`
 run is incomplete or Harbor marks the root job unfinished. Partial or interrupted runs belong in

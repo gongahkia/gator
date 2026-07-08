@@ -17,6 +17,7 @@ type TraceEvent struct {
 	InputBytes   int                `json:"input_bytes"`
 	OutputBytes  int                `json:"output_bytes"`
 	Tokens       int                `json:"tokens"`
+	TokenSource  string             `json:"token_source,omitempty"`
 	DroppedItems int                `json:"dropped_items"`
 	UsedFallback bool               `json:"used_fallback"`
 	DurationMS   int64              `json:"duration_ms"`
@@ -68,17 +69,19 @@ func (t *Tracer) Write(event TraceEvent) error {
 			"input_bytes", event.InputBytes,
 			"output_bytes", event.OutputBytes,
 			"tokens", event.Tokens,
+			"token_source", event.TokenSource,
 			"dropped_items", event.DroppedItems,
 			"used_fallback", event.UsedFallback,
 			"duration_ms", event.DurationMS,
 		)
 	} else if t.mirror != nil {
-		_, _ = fmt.Fprintf(t.mirror, "stage=%s turn=%d input_bytes=%d output_bytes=%d tokens=%d dropped_items=%d used_fallback=%t duration_ms=%d\n",
+		_, _ = fmt.Fprintf(t.mirror, "stage=%s turn=%d input_bytes=%d output_bytes=%d tokens=%d token_source=%s dropped_items=%d used_fallback=%t duration_ms=%d\n",
 			event.Stage,
 			event.Turn,
 			event.InputBytes,
 			event.OutputBytes,
 			event.Tokens,
+			event.TokenSource,
 			event.DroppedItems,
 			event.UsedFallback,
 			event.DurationMS,

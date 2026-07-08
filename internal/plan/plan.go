@@ -46,8 +46,8 @@ func (p *Plan) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelo
 	if err != nil {
 		return nil, err
 	}
-	budget.AddBrain(&out.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens)
-	budget.AddBrainCache(&out.Budget, resp.Usage.CacheCreationInputTokens, resp.Usage.CacheReadInputTokens)
+	budget.AddBrain(&out.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens, resp.Usage.TokenSource)
+	budget.AddBrainCache(&out.Budget, resp.Usage.CacheCreationInputTokens, resp.Usage.CacheReadInputTokens, resp.Usage.TokenSource)
 	var next envelope.Plan
 	if err := json.Unmarshal([]byte(resp.Content), &next); err != nil {
 		return nil, err

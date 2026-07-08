@@ -56,6 +56,9 @@ func TestPlanSendsDigestNotRawContext(t *testing.T) {
 	if got.Budget.BrainInputTokens != 11 || got.Budget.BrainOutputTokens != 7 {
 		t.Fatalf("budget = %#v", got.Budget)
 	}
+	if got.Budget.BrainTokenSource != llm.TokenSourceProvider {
+		t.Fatalf("brain token source = %q", got.Budget.BrainTokenSource)
+	}
 	body := srv.LastRequest().Body
 	if !strings.Contains(body, "digest summary") {
 		t.Fatalf("request missing digest summary: %s", body)
@@ -87,6 +90,7 @@ func TestPlanAddsBrainCacheUsage(t *testing.T) {
 		OutputTokens:             2,
 		CacheCreationInputTokens: 3,
 		CacheReadInputTokens:     4,
+		TokenSource:              llm.TokenSourceEstimate,
 	}}
 	stage := New(fake)
 	got, err := stage.Run(context.Background(), planEnvelope())
@@ -95,6 +99,9 @@ func TestPlanAddsBrainCacheUsage(t *testing.T) {
 	}
 	if got.Budget.BrainInputTokens != 1 || got.Budget.BrainOutputTokens != 2 || got.Budget.BrainCacheCreationTokens != 3 || got.Budget.BrainCacheReadTokens != 4 {
 		t.Fatalf("budget = %#v", got.Budget)
+	}
+	if got.Budget.BrainTokenSource != llm.TokenSourceEstimate {
+		t.Fatalf("brain token source = %q", got.Budget.BrainTokenSource)
 	}
 	if fake.request.MaxTokens != maxPlanOutputTokens {
 		t.Fatalf("max tokens = %d", fake.request.MaxTokens)

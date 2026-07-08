@@ -173,6 +173,7 @@ func (p *Pipeline) writeTrace(st Stage, out *envelope.Envelope, before envelope.
 		InputBytes:   inputBytes,
 		OutputBytes:  envelopeBytes(out),
 		Tokens:       tokenDelta(before, after),
+		TokenSource:  tokenSourceDelta(before, after),
 		DroppedItems: dropped,
 		UsedFallback: fallback,
 		DurationMS:   duration.Milliseconds(),
@@ -193,6 +194,22 @@ func tokenDelta(before, after envelope.Budget) int {
 		after.BrainCacheCreationTokens - before.BrainCacheCreationTokens +
 		after.BrainCacheReadTokens - before.BrainCacheReadTokens +
 		after.DroneTokens - before.DroneTokens
+}
+
+func tokenSourceDelta(before, after envelope.Budget) string {
+	source := budget.TokenSourceNone
+	brainDelta := after.BrainInputTokens - before.BrainInputTokens +
+		after.BrainOutputTokens - before.BrainOutputTokens +
+		after.BrainCacheCreationTokens - before.BrainCacheCreationTokens +
+		after.BrainCacheReadTokens - before.BrainCacheReadTokens
+	if brainDelta > 0 {
+		source = budget.MergeTokenSource(source, after.BrainTokenSource)
+	}
+	droneDelta := after.DroneTokens - before.DroneTokens
+	if droneDelta > 0 {
+		source = budget.MergeTokenSource(source, after.DroneTokenSource)
+	}
+	return source
 }
 
 func envelopeBytes(env *envelope.Envelope) int {

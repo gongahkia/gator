@@ -5,6 +5,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/pricing"
 	"github.com/gongahkia/paw/internal/stage"
@@ -58,7 +59,9 @@ type traceStats struct {
 	BrainOutput        int
 	BrainCacheCreation int
 	BrainCacheRead     int
+	BrainTokenSource   string
 	Drone              int
+	DroneTokenSource   string
 	WallMS             int64
 	Verify             string
 }
@@ -95,9 +98,14 @@ func summarizeTrace(path, fallbackTaskID string, events []stage.TraceEvent) (tra
 		BrainOutput:        last.Budget.BrainOutputTokens,
 		BrainCacheCreation: last.Budget.BrainCacheCreationTokens,
 		BrainCacheRead:     last.Budget.BrainCacheReadTokens,
-		Drone:              last.Budget.DroneTokens,
-		WallMS:             wallMS,
-		Verify:             verifyStatus(last),
+		BrainTokenSource: budget.SourceForTokens(
+			last.Budget.BrainInputTokens+last.Budget.BrainOutputTokens+last.Budget.BrainCacheCreationTokens+last.Budget.BrainCacheReadTokens,
+			last.Budget.BrainTokenSource,
+		),
+		Drone:            last.Budget.DroneTokens,
+		DroneTokenSource: budget.SourceForTokens(last.Budget.DroneTokens, last.Budget.DroneTokenSource),
+		WallMS:           wallMS,
+		Verify:           verifyStatus(last),
 	}, nil
 }
 
@@ -123,6 +131,7 @@ func writeStats(w io.Writer, s traceStats, rates pricing.Rates) {
 	}
 	_, _ = fmt.Fprintf(w, " -> %s\n", formatCost(brainCost, hasBrainCost))
 	_, _ = fmt.Fprintf(w, "Drone:     %s total -> %s\n", formatCount(s.Drone), formatCost(droneCost, hasDroneCost))
+	_, _ = fmt.Fprintf(w, "Token src: brain=%s drone=%s\n", s.BrainTokenSource, s.DroneTokenSource)
 	_, _ = fmt.Fprintf(w, "Wall time: %.1fs\n", float64(s.WallMS)/1000)
 	_, _ = fmt.Fprintf(w, "Verify:    %s\n", s.Verify)
 }

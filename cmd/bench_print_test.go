@@ -165,10 +165,12 @@ func TestWriteBenchResultConfigCapturesReproEnv(t *testing.T) {
 	t.Setenv("PAW_BENCH_HARDWARE", "macOS arm64")
 	path := filepath.Join(t.TempDir(), "RESULTS.md")
 	if err := writeBenchResultConfig(path, benchRow{
-		RunID:      "paw-full-raw",
-		Config:     "raw",
-		ConfigPath: "results-configs/paw-full-raw.toml",
-		Date:       "2026-07-07",
+		RunID:            "paw-full-raw",
+		Config:           "raw",
+		ConfigPath:       "results-configs/paw-full-raw.toml",
+		Date:             "2026-07-07",
+		BrainTokenSource: "provider",
+		DroneTokenSource: "none",
 	}, benchOptions{
 		Dataset:     "terminal-bench@2.0",
 		Model:       "ollama/qwen2.5-coder:1.5b",
@@ -184,7 +186,7 @@ func TestWriteBenchResultConfigCapturesReproEnv(t *testing.T) {
 		t.Fatalf("read config: %v", err)
 	}
 	text := string(got)
-	for _, want := range []string{`PAW_CALL_TIMEOUT = "120s"`, `PAW_BENCH_HARDWARE = "macOS arm64"`} {
+	for _, want := range []string{`brain_token_source = "provider"`, `drone_token_source = "none"`, `PAW_CALL_TIMEOUT = "120s"`, `PAW_BENCH_HARDWARE = "macOS arm64"`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q:\n%s", want, text)
 		}

@@ -72,8 +72,8 @@ func (e *Edit) askAndApply(ctx context.Context, env *envelope.Envelope, prompt s
 	if err != nil {
 		return "", err
 	}
-	budget.AddBrain(&env.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens)
-	budget.AddBrainCache(&env.Budget, resp.Usage.CacheCreationInputTokens, resp.Usage.CacheReadInputTokens)
+	budget.AddBrain(&env.Budget, resp.Usage.InputTokens, resp.Usage.OutputTokens, resp.Usage.TokenSource)
+	budget.AddBrainCache(&env.Budget, resp.Usage.CacheCreationInputTokens, resp.Usage.CacheReadInputTokens, resp.Usage.TokenSource)
 	diff, err := patcher.Extract(resp.Content)
 	if err != nil {
 		return "", err

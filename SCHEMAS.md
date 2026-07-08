@@ -201,21 +201,24 @@ type Budget struct {
     BrainOutputTokens        int `json:"brain_output_tokens"`
     BrainCacheCreationTokens int `json:"brain_cache_creation_tokens,omitempty"`
     BrainCacheReadTokens     int `json:"brain_cache_read_tokens,omitempty"`
+    BrainTokenSource         string `json:"brain_token_source,omitempty"` // provider|estimate|mixed
     DroneTokens              int `json:"drone_tokens"`
+    DroneTokenSource         string `json:"drone_token_source,omitempty"` // provider|estimate|mixed
     MaxBrainTokens           int `json:"max_brain_tokens"`      // hard cap; loop stops if exceeded
 }
 ```
 
 Token counts come from provider `usage` fields when present; otherwise from a local tokenizer
-estimate (see `docs/MODEL_APIS.md` §5). The estimate method is recorded in the trace so numbers
-are honest.
+estimate (see `docs/MODEL_APIS.md` §5). Source fields are role-level provenance: `provider`,
+`estimate`, `mixed`, or omitted when no tokens were added.
 
 ---
 
 ## 7. Trace log (observability, for ablation & debugging)
 
 Every run writes an NDJSON trace to `--trace-file` (default `./.paw/trace-<taskid>.ndjson`): one
-line per stage invocation with `{stage, turn, input_bytes, output_bytes, tokens, dropped_items,
-used_fallback, duration_ms, envelope}`. `envelope` is the post-stage snapshot used by
-`paw resume`. `paw bench` aggregates the metric fields into the results tables. No model is
-involved in tracing.
+line per stage invocation with `{stage, turn, input_bytes, output_bytes, tokens, token_source,
+dropped_items, used_fallback, duration_ms, envelope}`. `token_source` is `provider`, `estimate`,
+`mixed`, or `none` for that stage's token delta. `envelope` is the post-stage snapshot used by
+`paw resume`. `paw bench` aggregates the metric fields into the results tables and writes token
+source metadata into generated result configs. No model is involved in tracing.

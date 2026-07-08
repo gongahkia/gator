@@ -10,12 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/compress"
 	"github.com/gongahkia/paw/internal/config"
 	"github.com/gongahkia/paw/internal/edit"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/gather"
 	"github.com/gongahkia/paw/internal/llm"
+	"github.com/gongahkia/paw/internal/llm/faketest"
 	"github.com/gongahkia/paw/internal/plan"
 	"github.com/gongahkia/paw/internal/verify"
 )
@@ -130,8 +132,7 @@ func TestRunOnceWritesTrace(t *testing.T) {
 	var order []string
 	p := testPipeline(t, &order, map[string]func(*envelope.Envelope){
 		"plan": func(env *envelope.Envelope) {
-			env.Budget.BrainInputTokens += 2
-			env.Budget.BrainOutputTokens += 3
+			budget.AddBrain(&env.Budget, 2, 3, llm.TokenSourceProvider)
 		},
 	})
 	p.SetTracer(NewTracer(&trace))
@@ -143,11 +144,68 @@ func TestRunOnceWritesTrace(t *testing.T) {
 	if err := json.Unmarshal(bytes.TrimSpace(trace.Bytes()), &event); err != nil {
 		t.Fatalf("decode trace: %v\n%s", err, trace.String())
 	}
-	if event.Stage != "plan" || event.Tokens != 5 || event.InputBytes == 0 || event.OutputBytes == 0 {
+	if event.Stage != "plan" || event.Tokens != 5 || event.TokenSource != "provider" || event.InputBytes == 0 || event.OutputBytes == 0 {
 		t.Fatalf("event = %#v", event)
 	}
 	if event.Envelope == nil || event.Envelope.Stage != "plan" {
 		t.Fatalf("missing envelope snapshot: %#v", event.Envelope)
+	}
+}
+
+func TestRunOnceWritesEstimateTokenSource(t *testing.T) {
+	var trace bytes.Buffer
+	var order []string
+	p := testPipeline(t, &order, map[string]func(*envelope.Envelope){
+		"compress": func(env *envelope.Envelope) {
+			budget.AddDrone(&env.Budget, 4, llm.TokenSourceEstimate)
+		},
+	})
+	p.SetTracer(NewTracer(&trace))
+	env := envelope.NewEnvelope("task", "fix", "/repo")
+	if _, err := p.RunOnce(context.Background(), "compress", env); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	var event TraceEvent
+	if err := json.Unmarshal(bytes.TrimSpace(trace.Bytes()), &event); err != nil {
+		t.Fatalf("decode trace: %v\n%s", err, trace.String())
+	}
+	if event.TokenSource != "estimate" {
+		t.Fatalf("token source = %#v", event)
+	}
+}
+
+func TestRunOnceProviderLLMTraceTokenSource(t *testing.T) {
+	srv := faketest.NewServer()
+	defer srv.Close()
+	srv.RespondOllama("", `{"summary":"target","items":[{"unit_id":"u001","path":"a.go","relevance":100,"spans":[{"start_line":1,"end_line":1,"quote":"target"}]}]}`)
+	p, err := NewPipeline(compress.New(llm.NewOllamaClient(srv.URL, "drone")))
+	if err != nil {
+		t.Fatalf("new pipeline: %v", err)
+	}
+	var trace bytes.Buffer
+	p.SetTracer(NewTracer(&trace))
+	env := envelope.NewEnvelope("task", "target", "/repo")
+	env.Raw = &envelope.RawContext{
+		Units: []envelope.RawUnit{{
+			ID:        "u001",
+			Kind:      "file_slice",
+			Path:      "a.go",
+			StartLine: 1,
+			EndLine:   1,
+			Text:      "target\n",
+		}},
+		TotalBytes: len("target\n"),
+	}
+	got, err := p.RunOnce(context.Background(), "compress", env)
+	if err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	var event TraceEvent
+	if err := json.Unmarshal(bytes.TrimSpace(trace.Bytes()), &event); err != nil {
+		t.Fatalf("decode trace: %v\n%s", err, trace.String())
+	}
+	if event.TokenSource != "provider" || got.Budget.DroneTokenSource != llm.TokenSourceProvider {
+		t.Fatalf("token source event=%q budget=%q", event.TokenSource, got.Budget.DroneTokenSource)
 	}
 }
 
@@ -310,7 +368,7 @@ func (f *realStageFakeLLM) Chat(_ context.Context, req llm.ChatRequest) (*llm.Ch
 	switch {
 	case strings.Contains(body, "context compression drone"):
 		f.calls = append(f.calls, "compress")
-		return &llm.ChatResponse{Content: f.digest(body), Usage: llm.Usage{InputTokens: 13, OutputTokens: 5}}, nil
+		return &llm.ChatResponse{Content: f.digest(body), Usage: llm.Usage{InputTokens: 13, OutputTokens: 5, TokenSource: llm.TokenSourceProvider}}, nil
 	case strings.Contains(body, "brain planning stage"):
 		f.calls = append(f.calls, "plan")
 		if strings.Contains(body, "RawContext JSON") {
@@ -318,7 +376,7 @@ func (f *realStageFakeLLM) Chat(_ context.Context, req llm.ChatRequest) (*llm.Ch
 		}
 		return &llm.ChatResponse{
 			Content: `{"done":false,"reasoning":"fix failing Add implementation","next_action":{"kind":"edit_file","description":"change Add to return the sum","target_path":"calc.go"}}`,
-			Usage:   llm.Usage{InputTokens: 9, OutputTokens: 4},
+			Usage:   llm.Usage{InputTokens: 9, OutputTokens: 4, TokenSource: llm.TokenSourceProvider},
 		}, nil
 	case strings.Contains(body, "Emit only a unified diff."):
 		f.calls = append(f.calls, "edit")
@@ -335,7 +393,7 @@ func (f *realStageFakeLLM) Chat(_ context.Context, req llm.ChatRequest) (*llm.Ch
 				" }",
 				"",
 			}, "\n"),
-			Usage: llm.Usage{InputTokens: 9, OutputTokens: 4},
+			Usage: llm.Usage{InputTokens: 9, OutputTokens: 4, TokenSource: llm.TokenSourceProvider},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected llm prompt: %.120s", body)

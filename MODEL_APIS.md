@@ -24,13 +24,16 @@ type ChatRequest struct {
 }
 
 type Usage struct {
-    InputTokens  int
-    OutputTokens int
+    InputTokens              int
+    OutputTokens             int
+    CacheCreationInputTokens int
+    CacheReadInputTokens     int
+    TokenSource              string // provider | estimate
 }
 
 type ChatResponse struct {
     Content string
-    Usage   Usage // zero values if provider omitted usage; caller falls back to estimate
+    Usage   Usage // provider usage when present, otherwise local estimate
 }
 
 type Client interface {
@@ -68,7 +71,8 @@ the Ollama native `/api/chat` (it supports the richer `format` schema mode).
   If a given provider/model rejects `json_schema`, fall back to `{"type":"json_object"}` plus the
   schema pasted into the prompt (record which mode was used in the trace).
 - **Response:** `choices[0].message.content` (string). `usage.prompt_tokens` /
-  `usage.completion_tokens` populate `Usage`.
+  `usage.completion_tokens` populate `Usage` with `TokenSource="provider"`. If omitted, paw
+  estimates tokens locally and records `TokenSource="estimate"`.
 - **2026 API brain recommendation:** `glm-5.2` on Z.AI's OpenAI-compatible API for long-horizon
   coding work. The current benchmark CLI default remains `glm-4.6` until benchmark baselines are
   rerun. Also validated: `deepseek-v4-pro` on DeepSeek base_url.
@@ -140,7 +144,7 @@ https://docs.ollama.com/context-length, https://ollama.com/library/qwen3-coder-n
 - **Headers:** `x-api-key: {key}`, `anthropic-version: 2023-06-01`, `Content-Type: application/json`.
 - **Body:** `{ "model": "...", "max_tokens": N, "system": "...", "messages": [{"role":"user","content":"..."}] }`.
 - **Response:** `content[]` array; concatenate text blocks. `usage.input_tokens` /
-  `usage.output_tokens`.
+  `usage.output_tokens` populate provider-sourced usage.
 - **Structured output:** Anthropic-style has no `response_format`; coerce via a single tool with
   an `input_schema` equal to the JSON Schema and instruct the model to call it, then read
   `tool_use.input`. If the compatible endpoint lacks tool support, fall back to prompt-embedded
@@ -169,7 +173,7 @@ This transport is OPTIONAL for v1 — implement openai + ollama first; anthropic
   Still validate deterministically afterward — schema-shaped ≠ semantically valid (paths/quotes
   can still be wrong, which is exactly what `internal/compress/validate.go` catches).
 - **Response:** `message.content` (a JSON string matching the schema). Ollama returns token counts
-  in `prompt_eval_count` (input) and `eval_count` (output) → populate `Usage`.
+  in `prompt_eval_count` (input) and `eval_count` (output), so usage is provider-sourced.
 - **Best practice:** also paste the JSON Schema as text into the prompt to ground the model
   (per Ollama docs). Use `temperature: 0` for determinism.
 

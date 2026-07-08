@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/paw/internal/budget"
 )
 
 type benchRow struct {
@@ -27,7 +29,9 @@ type benchRow struct {
 	PassRate          string
 	BrainInputTokens  string
 	BrainOutputTokens string
+	BrainTokenSource  string
 	DroneTokens       string
+	DroneTokenSource  string
 	WallSeconds       string
 	TraceBundle       string
 }
@@ -48,7 +52,9 @@ func (s benchSummary) row(config string, opts benchOptions) benchRow {
 		PassRate:          ratio(s.Passed, s.Tasks),
 		BrainInputTokens:  formatMedian(s.BrainInputTokens, 0),
 		BrainOutputTokens: formatMedian(s.BrainOutputTokens, 0),
+		BrainTokenSource:  normalizedBenchTokenSource(s.BrainTokenSource),
 		DroneTokens:       formatMedian(s.DroneTokens, 0),
+		DroneTokenSource:  normalizedBenchTokenSource(s.DroneTokenSource),
 		WallSeconds:       formatMedian(s.WallSeconds, 1),
 		TraceBundle:       filepath.ToSlash(filepath.Join(opts.JobsDir, runID)),
 	}
@@ -181,6 +187,8 @@ func writeBenchResultConfig(resultsPath string, row benchRow, opts benchOptions)
 		"config = " + tomlString(row.Config),
 		"dataset = " + tomlString(opts.Dataset),
 		"model = " + tomlString(opts.Model),
+		"brain_token_source = " + tomlString(row.BrainTokenSource),
+		"drone_token_source = " + tomlString(row.DroneTokenSource),
 		"jobs_dir = " + tomlString(opts.JobsDir),
 		"job_name = " + tomlString(opts.JobName),
 		"n_concurrent = " + strconv.Itoa(opts.NConcurrent),
@@ -271,4 +279,8 @@ func formatMedian(values []float64, decimals int) string {
 		value = (sorted[mid-1] + sorted[mid]) / 2
 	}
 	return fmt.Sprintf("%."+strconv.Itoa(decimals)+"f", value)
+}
+
+func normalizedBenchTokenSource(source string) string {
+	return budget.NormalizeTokenSource(source)
 }

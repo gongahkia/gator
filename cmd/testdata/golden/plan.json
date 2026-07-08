@@ -36,6 +36,7 @@
     "turn": 0,
     "brain_input_tokens": 11,
     "brain_output_tokens": 7,
+    "brain_token_source": "provider",
     "drone_tokens": 0,
     "max_brain_tokens": 0
   },

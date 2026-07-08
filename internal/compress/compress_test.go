@@ -22,6 +22,9 @@ func TestCompressValidDigestPasses(t *testing.T) {
 	if got.Budget.DroneTokens != 18 {
 		t.Fatalf("drone tokens = %d", got.Budget.DroneTokens)
 	}
+	if got.Budget.DroneTokenSource != llm.TokenSourceProvider {
+		t.Fatalf("drone token source = %q", got.Budget.DroneTokenSource)
+	}
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 

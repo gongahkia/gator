@@ -60,7 +60,7 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	if err != nil {
 		return nil, err
 	}
-	budget.AddDrone(&out.Budget, resp.Usage.InputTokens+resp.Usage.OutputTokens)
+	budget.AddDrone(&out.Budget, resp.Usage.InputTokens+resp.Usage.OutputTokens, resp.Usage.TokenSource)
 	var digest envelope.ContextDigest
 	if err := json.Unmarshal([]byte(resp.Content), &digest); err != nil {
 		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))

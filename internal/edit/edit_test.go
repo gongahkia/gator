@@ -29,6 +29,9 @@ func TestEditAppliesGoodDiff(t *testing.T) {
 	if got.Budget.BrainInputTokens != 11 || got.Budget.BrainOutputTokens != 7 {
 		t.Fatalf("budget = %#v", got.Budget)
 	}
+	if got.Budget.BrainTokenSource != llm.TokenSourceProvider {
+		t.Fatalf("brain token source = %q", got.Budget.BrainTokenSource)
+	}
 	if strings.Contains(srv.LastRequest().Body, "SECRET_RAW") {
 		t.Fatalf("request leaked raw context: %s", srv.LastRequest().Body)
 	}
@@ -158,6 +161,6 @@ func (c *captureEditClient) Chat(_ context.Context, req llm.ChatRequest) (*llm.C
 	c.request = req
 	return &llm.ChatResponse{
 		Content: c.content,
-		Usage:   llm.Usage{InputTokens: 11, OutputTokens: 7},
+		Usage:   llm.Usage{InputTokens: 11, OutputTokens: 7, TokenSource: llm.TokenSourceEstimate},
 	}, nil
 }
