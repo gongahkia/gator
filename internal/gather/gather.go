@@ -23,6 +23,11 @@ func (g *Gather) Name() string {
 func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
 	units := verifyFailureUnits(in)
+	gitUnits, err := collectGitUnits(ctx, in.Cwd, g.Config.MaxFileBytes)
+	if err != nil {
+		return nil, err
+	}
+	units = append(units, gitUnits...)
 	listing, err := collectDirListing(in.Cwd, g.Config.MaxDepth, g.Config.MaxFileBytes)
 	if err != nil {
 		return nil, err

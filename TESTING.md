@@ -22,6 +22,8 @@ hallucinated output on demand to exercise the validation/fallback paths.
 
 - `gather`: run against `testdata/repo/` (a small fixture repo). Assert it finds known symbols,
   respects depth bounds, and NEVER calls a model (inject a nil client; a call panics).
+  Also cover git-aware units for clean repos, staged changes, unstaged changes, non-git dirs, and
+  max-byte truncation.
 - `compress`:
   - Valid drone output → digest passes validation, brain would see only digest.
   - Drone returns a hallucinated `path` not in `RawContext` → item dropped.
