@@ -4,7 +4,6 @@ type NextAction struct {
 	Kind        string `json:"kind"`
 	Description string `json:"description"`
 	TargetPath  string `json:"target_path,omitempty"`
-	Command     string `json:"command,omitempty"`
 }
 
 type Plan struct {

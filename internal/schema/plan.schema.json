@@ -10,10 +10,9 @@
       "additionalProperties": false,
       "required": ["kind", "description"],
       "properties": {
-        "kind": { "type": "string", "enum": ["edit_file", "run_command", "inspect"] },
+        "kind": { "type": "string", "enum": ["edit_file"] },
         "description": { "type": "string", "maxLength": 2000 },
-        "target_path": { "type": "string" },
-        "command": { "type": "string" }
+        "target_path": { "type": "string" }
       }
     }
   }

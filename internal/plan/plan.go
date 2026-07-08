@@ -74,15 +74,11 @@ func validatePlan(plan envelope.Plan) error {
 	if plan.NextAction == nil {
 		return fmt.Errorf("plan next_action is required when done is false")
 	}
-	switch plan.NextAction.Kind {
-	case "run_command":
-		if plan.NextAction.Command == "" {
-			return fmt.Errorf("run_command requires command")
-		}
-	case "edit_file":
-		if plan.NextAction.TargetPath == "" {
-			return fmt.Errorf("edit_file requires target_path")
-		}
+	if plan.NextAction.Kind != "edit_file" {
+		return fmt.Errorf("unsupported plan action %q", plan.NextAction.Kind)
+	}
+	if plan.NextAction.TargetPath == "" {
+		return fmt.Errorf("edit_file requires target_path")
 	}
 	return nil
 }

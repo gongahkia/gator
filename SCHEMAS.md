@@ -126,10 +126,9 @@ bad drone and gives a clean control condition for the ablation ("compress off = 
       "additionalProperties": false,
       "required": ["kind", "description"],
       "properties": {
-        "kind":        { "type": "string", "enum": ["edit_file", "run_command", "inspect"] },
+        "kind":        { "type": "string", "enum": ["edit_file"] },
         "description": { "type": "string", "maxLength": 2000 },
-        "target_path": { "type": "string" },
-        "command":     { "type": "string" }
+        "target_path": { "type": "string" }
       }
     }
   }
@@ -138,10 +137,9 @@ bad drone and gives a clean control condition for the ablation ("compress off = 
 
 ```go
 type NextAction struct {
-    Kind        string `json:"kind"` // edit_file | run_command | inspect
+    Kind        string `json:"kind"` // edit_file
     Description string `json:"description"`
     TargetPath  string `json:"target_path,omitempty"`
-    Command     string `json:"command,omitempty"`
 }
 type Plan struct {
     Done       bool        `json:"done"`
@@ -150,8 +148,9 @@ type Plan struct {
 }
 ```
 
-Validation: if `Done` is false, `NextAction` MUST be present. `run_command` requires `command`;
-`edit_file` requires `target_path`.
+Validation: if `Done` is false, `NextAction` MUST be present. In v1, the only supported action is
+`edit_file`, and it requires `target_path`. Additional action kinds are intentionally rejected
+until the pipeline has deterministic handlers for them.
 
 ---
 

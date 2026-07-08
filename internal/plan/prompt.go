@@ -22,9 +22,10 @@ func planSystemPrompt(useRawContext bool) string {
 	}
 	return strings.Join([]string{
 		"You are the brain planning stage.",
-		"Choose exactly one concrete next action, or mark done.",
+		"Choose exactly one edit_file action, or mark done.",
 		"Do not make a long-horizon plan.",
 		contextRule,
+		"The only allowed next_action kind is edit_file.",
 		"Return only JSON matching the provided plan schema.",
 	}, "\n")
 }

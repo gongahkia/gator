@@ -33,6 +33,17 @@ func TestPlanRequiresNextActionWhenNotDone(t *testing.T) {
 	}
 }
 
+func TestPlanRejectsUnsupportedActionKind(t *testing.T) {
+	srv := faketest.NewServer()
+	defer srv.Close()
+	srv.RespondOpenAI("", `{"done":false,"reasoning":"run","next_action":{"kind":"run_command","description":"run tests","command":"go test ./..."}}`)
+
+	_, err := New(llm.NewOpenAIClient(srv.URL, "key", "brain")).Run(context.Background(), planEnvelope())
+	if err == nil || !strings.Contains(err.Error(), "edit_file") {
+		t.Fatalf("expected unsupported action error, got %v", err)
+	}
+}
+
 func TestPlanSendsDigestNotRawContext(t *testing.T) {
 	srv := faketest.NewServer()
 	defer srv.Close()

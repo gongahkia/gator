@@ -24,7 +24,6 @@ func TestValidateEnvelopeStructsAgainstSchemas(t *testing.T) {
 			Kind:        "edit_file",
 			Description: "replace the bad return",
 			TargetPath:  "main.go",
-			Command:     "go test ./...",
 		},
 	}
 	rawPlan, err := json.Marshal(plan)
