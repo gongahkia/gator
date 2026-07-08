@@ -146,6 +146,15 @@ issue comments or diagnostic notes, not in the measured results table.
 Local stage benchmarks are separate from Harbor results. They should test context-gateway depth,
 compression validation, trace/stat accounting, and bounded tool execution without Docker or model
 keys. They can gate development; Harbor rows are for publishable external evidence only.
+Run them with:
+
+```sh
+make bench-local
+```
+
+The target runs deterministic Go benchmarks for gather, fallback compression, digest validation,
+and compact trace stats, then writes output to `.paw/local-bench/latest.txt` (git-ignored). CI does
+not run this target by default.
 
 ### 4a. Direct comparison vs SWE-Pruner (prior art)
 Because SWE-Pruner is the closest prior art and publishes on SWE-bench Verified with GLM-4.6,

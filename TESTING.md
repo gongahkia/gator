@@ -99,3 +99,9 @@ inspect files. Do not edit files.` The expected response is exactly `{"ok":true}
 - `gofmt -l .` must be empty
 The Harbor/Docker benchmark is NOT run in unit CI (needs Docker + keys); it has a separate manual
 make target and a documented smoke procedure.
+
+## 7. Local Benchmarks
+
+`make bench-local` runs model-free Go benchmarks for gather, fallback compression, digest
+validation, and compact trace stats. It requires no Docker, Harbor, Ollama, or API keys and writes
+the latest output under `.paw/local-bench/`.

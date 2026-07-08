@@ -7,8 +7,9 @@ BENCH_SWEBENCH_DATASET ?= swe-bench/swe-bench-verified@latest
 BENCH_MODEL ?= openai/glm-4.6
 BENCH_JOBS_DIR ?= .paw/bench-jobs
 BENCH_N_CONCURRENT ?= 4
+BENCH_LOCAL_OUT ?= .paw/local-bench/latest.txt
 
-.PHONY: build build-linux test lint fmt release-snapshot bench-smoke bench-oracle bench-full bench-swebench clean
+.PHONY: build build-linux test lint fmt release-snapshot bench-local bench-smoke bench-oracle bench-full bench-swebench clean
 
 build:
 	mkdir -p bin
@@ -30,6 +31,11 @@ fmt:
 release-snapshot:
 	goreleaser check
 	goreleaser release --snapshot --clean --skip=publish
+
+bench-local:
+	mkdir -p .paw/local-bench
+	go test ./internal/gather ./internal/compress ./cmd -run '^$$' -bench 'Benchmark' -benchmem > $(BENCH_LOCAL_OUT)
+	cat $(BENCH_LOCAL_OUT)
 
 bench-smoke: build-linux
 	go run . bench --config raw --dataset $(BENCH_DATASET) --model $(BENCH_MODEL) --jobs-dir $(BENCH_JOBS_DIR) --n-concurrent $(BENCH_N_CONCURRENT) --n-tasks 5 --job-name paw-smoke-raw
