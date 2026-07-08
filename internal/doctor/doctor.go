@@ -1,8 +1,10 @@
 package doctor
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +37,7 @@ const (
 	StatusWarn    Status = "warn"
 	StatusFail    Status = "fail"
 	StatusFixed   Status = "fixed"
+	StatusPlanned Status = "plan"
 	StatusSkipped Status = "skip"
 )
 
@@ -55,6 +59,7 @@ type Summary struct {
 	Warning int `json:"warning"`
 	Error   int `json:"error"`
 	Fixed   int `json:"fixed"`
+	Planned int `json:"planned"`
 	Skipped int `json:"skipped"`
 }
 
@@ -76,6 +81,7 @@ type Options struct {
 	Version        string
 	Deep           bool
 	Fix            bool
+	DryRun         bool
 	Yes            bool
 	NonInteractive bool
 	SeverityMin    Severity
@@ -83,6 +89,17 @@ type Options struct {
 	Skip           []string
 	HealthChecker  EndpointHealth
 	Stdin          io.Reader
+	PromptWriter   io.Writer
+	Now            func() time.Time
+}
+
+type Operation struct {
+	Timestamp string `json:"timestamp"`
+	Action    string `json:"action"`
+	Status    string `json:"status"`
+	Path      string `json:"path,omitempty"`
+	Detail    string `json:"detail,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 func Run(ctx context.Context, opts Options) Report {
@@ -116,6 +133,9 @@ func Run(ctx context.Context, opts Options) Report {
 	}
 	if r.shouldRunSection("models") {
 		r.checkModels(ctx, cfg)
+	}
+	if r.shouldRunSection("trace") {
+		r.checkTrace()
 	}
 	if r.shouldRunSection("onboarding") {
 		r.checkOnboarding(cfg)
@@ -165,6 +185,12 @@ func normalizeOptions(opts Options) Options {
 	if opts.Stdin == nil {
 		opts.Stdin = os.Stdin
 	}
+	if opts.PromptWriter == nil {
+		opts.PromptWriter = io.Discard
+	}
+	if opts.Now == nil {
+		opts.Now = time.Now
+	}
 	return opts
 }
 
@@ -204,10 +230,21 @@ func (r *runner) checkPawDir() {
 		return
 	}
 	if r.opts.Fix {
+		if r.opts.DryRun {
+			r.add(Finding{ID: "system.paw_dir", Section: "system", Severity: SeverityInfo, Status: StatusPlanned, Message: "would create .paw directory", Path: path})
+			return
+		}
+		allowed, detail := r.confirmRepair("create .paw directory", path)
+		if !allowed {
+			r.add(Finding{ID: "system.paw_dir", Section: "system", Severity: SeverityWarning, Status: StatusSkipped, Message: "skipped .paw directory repair", Detail: detail, Path: path, Fix: "rerun with `paw doctor --fix --yes`"})
+			return
+		}
 		if err := os.MkdirAll(path, 0o755); err != nil {
+			r.logOperation("create .paw directory", "fail", path, "", err)
 			r.add(Finding{ID: "system.paw_dir", Section: "system", Severity: SeverityError, Status: StatusFail, Message: "failed to create .paw directory", Detail: err.Error(), Path: path})
 			return
 		}
+		r.logOperation("create .paw directory", "ok", path, "", nil)
 		r.add(Finding{ID: "system.paw_dir", Section: "system", Severity: SeverityInfo, Status: StatusFixed, Message: "created .paw directory", Path: path})
 		return
 	}
@@ -259,9 +296,24 @@ func (r *runner) checkConfig(loadErr error, cfg config.Config) {
 		if r.opts.Fix {
 			path := repairConfigPath(r.opts, r.configSources, r.gitRoot)
 			if path != "" {
-				if err := backupAndSaveConfig(path, cfg); err != nil {
+				if r.opts.DryRun {
+					f.Status = StatusPlanned
+					f.Severity = SeverityInfo
+					f.Message = "would repair config by writing defaults"
+					f.Path = path
+					f.Fix = ""
+				} else if allowed, detail := r.confirmRepair("repair config", path); !allowed {
+					f.Status = StatusSkipped
+					f.Severity = SeverityWarning
+					f.Message = "skipped config repair"
+					f.Detail = detail
+					f.Path = path
+					f.Fix = "rerun with `paw doctor --fix --yes`"
+				} else if err := backupAndSaveConfig(path, cfg); err != nil {
+					r.logOperation("repair config", "fail", path, "", err)
 					f.Detail = f.Detail + "; repair failed: " + err.Error()
 				} else {
+					r.logOperation("repair config", "ok", path, "backup written if config existed", nil)
 					f.Status = StatusFixed
 					f.Severity = SeverityInfo
 					f.Message = "repaired config by writing defaults"
@@ -289,10 +341,21 @@ func (r *runner) checkMissingConfig(cfg config.Config) {
 	}
 	path := repairConfigPath(r.opts, r.configSources, r.gitRoot)
 	if r.opts.Fix {
-		if err := cfg.Save(path); err != nil {
+		if r.opts.DryRun {
+			r.add(Finding{ID: "config.bootstrap", Section: "config", Severity: SeverityInfo, Status: StatusPlanned, Message: "would create config", Path: path})
+			return
+		}
+		allowed, detail := r.confirmRepair("create config", path)
+		if !allowed {
+			r.add(Finding{ID: "config.bootstrap", Section: "config", Severity: SeverityWarning, Status: StatusSkipped, Message: "skipped config creation", Detail: detail, Path: path, Fix: "rerun with `paw doctor --fix --yes`"})
+			return
+		}
+		if err := saveConfigWithMode(path, cfg, 0o600); err != nil {
+			r.logOperation("create config", "fail", path, "", err)
 			r.add(Finding{ID: "config.bootstrap", Section: "config", Severity: SeverityError, Status: StatusFail, Message: "failed to create config", Detail: err.Error(), Path: path})
 			return
 		}
+		r.logOperation("create config", "ok", path, "mode=0600", nil)
 		r.add(Finding{ID: "config.bootstrap", Section: "config", Severity: SeverityInfo, Status: StatusFixed, Message: "created config", Path: path})
 		return
 	}
@@ -333,12 +396,14 @@ func (r *runner) checkVerify(ctx context.Context, cfg config.Config) {
 		r.add(Finding{ID: "verify.dry_run", Section: "verify", Severity: SeverityInfo, Status: StatusSkipped, Message: "verify dry-run skipped", Fix: "run `paw doctor --deep`"})
 		return
 	}
+	start := time.Now()
 	out, err := runShell(ctx, r.opts.CWD, cfg.Verify.Timeout, cmdText)
+	elapsed := time.Since(start)
 	if err != nil {
-		r.add(Finding{ID: "verify.dry_run", Section: "verify", Severity: SeverityError, Status: StatusFail, Message: "verify command failed", Detail: tail(out, 600), Command: cmdText})
+		r.add(Finding{ID: "verify.dry_run", Section: "verify", Severity: SeverityError, Status: StatusFail, Message: "verify command failed", Detail: tail(out, 600), Command: cmdText, Metadata: elapsedMetadata(elapsed, cfg.Verify.Timeout)})
 		return
 	}
-	r.add(Finding{ID: "verify.dry_run", Section: "verify", Severity: SeverityInfo, Status: StatusOK, Message: "verify command passed", Command: cmdText})
+	r.add(Finding{ID: "verify.dry_run", Section: "verify", Severity: SeverityInfo, Status: StatusOK, Message: "verify command passed", Command: cmdText, Metadata: elapsedMetadata(elapsed, cfg.Verify.Timeout)})
 }
 
 func (r *runner) checkModels(ctx context.Context, cfg config.Config) {
@@ -355,6 +420,7 @@ func (r *runner) checkModels(ctx context.Context, cfg config.Config) {
 		{name: "brain", cfg: cfg.Brain},
 		{name: "drone", cfg: cfg.Drone},
 	} {
+		start := time.Now()
 		report := checker.Check(ctx, llm.EndpointConfig{
 			Transport: endpoint.cfg.Transport,
 			BaseURL:   endpoint.cfg.BaseURL,
@@ -362,11 +428,35 @@ func (r *runner) checkModels(ctx context.Context, cfg config.Config) {
 			Provider:  endpoint.cfg.Provider,
 			Model:     endpoint.cfg.Model,
 		})
-		r.add(Finding{ID: "models." + endpoint.name, Section: "models", Severity: SeverityInfo, Status: StatusOK, Message: endpoint.name + " endpoint", Detail: endpointDetail(report)})
+		r.add(Finding{ID: "models." + endpoint.name, Section: "models", Severity: SeverityInfo, Status: StatusOK, Message: endpoint.name + " endpoint", Detail: endpointDetail(report), Metadata: elapsedMetadata(time.Since(start), 0)})
 		for _, check := range report.Checks {
 			r.add(healthFinding(endpoint.name, check))
 		}
+		if strings.EqualFold(endpoint.cfg.Transport, "ollama") {
+			r.add(ollamaFitFinding(r.opts.CWD, endpoint.name, endpoint.cfg.Model))
+		}
+		if r.opts.Deep && (strings.EqualFold(endpoint.cfg.Transport, "openai") || strings.EqualFold(endpoint.cfg.Transport, "anthropic")) {
+			r.add(apiSmokeFinding(endpoint.name, endpoint.cfg.Transport, report))
+		}
 	}
+}
+
+func (r *runner) checkTrace() {
+	mode := strings.TrimSpace(os.Getenv("PAW_TRACE_MODE"))
+	if mode == "" || mode == "full" {
+		r.add(Finding{ID: "trace.mode", Section: "trace", Severity: SeverityWarning, Status: StatusWarn, Message: "full traces can include raw repository text", Detail: defaultString(mode, "full(default)"), Fix: "set PAW_TRACE_MODE=compact for shareable traces"})
+	} else {
+		r.add(Finding{ID: "trace.mode", Section: "trace", Severity: SeverityInfo, Status: StatusOK, Message: "trace mode configured", Detail: mode})
+	}
+	if r.gitRoot == "" {
+		r.add(Finding{ID: "trace.gitignore", Section: "trace", Severity: SeverityWarning, Status: StatusSkipped, Message: ".paw ignore check skipped outside git repo"})
+		return
+	}
+	if _, err := runCommand(context.Background(), r.gitRoot, 2*time.Second, "git", "check-ignore", "-q", ".paw"); err == nil {
+		r.add(Finding{ID: "trace.gitignore", Section: "trace", Severity: SeverityInfo, Status: StatusOK, Message: ".paw traces are ignored by git"})
+		return
+	}
+	r.add(Finding{ID: "trace.gitignore", Section: "trace", Severity: SeverityWarning, Status: StatusWarn, Message: ".paw traces may be tracked", Fix: "add `.paw/` to .gitignore"})
 }
 
 func (r *runner) checkOnboarding(cfg config.Config) {
@@ -426,6 +516,131 @@ func healthFinding(name string, check llm.HealthCheck) Finding {
 	return Finding{ID: id, Section: "models", Severity: severity, Status: status, Message: name + " " + check.Name, Detail: check.Detail, Fix: check.Action}
 }
 
+func apiSmokeFinding(name, transport string, report llm.HealthReport) Finding {
+	for _, check := range report.Checks {
+		if (check.Name == "auth" || check.Name == "running") && check.Status == llm.HealthFail {
+			return Finding{ID: "models." + name + ".api_smoke", Section: "models", Severity: SeverityError, Status: StatusFail, Message: name + " API smoke failed", Detail: check.Detail, Fix: check.Action}
+		}
+	}
+	return Finding{ID: "models." + name + ".api_smoke", Section: "models", Severity: SeverityInfo, Status: StatusOK, Message: name + " API smoke passed", Detail: transport + " metadata endpoint responded"}
+}
+
+func ollamaFitFinding(cwd, name, model string) Finding {
+	estimate := estimatedModelBytes(model)
+	if estimate == 0 {
+		return Finding{ID: "models." + name + ".fit", Section: "models", Severity: SeverityWarning, Status: StatusSkipped, Message: name + " local fit estimate unavailable", Detail: model}
+	}
+	mem := physicalMemoryBytes()
+	disk := diskFreeBytes(cwd)
+	meta := map[string]string{
+		"model":           model,
+		"estimated_bytes": strconv.FormatUint(estimate, 10),
+	}
+	if mem > 0 {
+		meta["memory_bytes"] = strconv.FormatUint(mem, 10)
+	}
+	if disk > 0 {
+		meta["disk_free_bytes"] = strconv.FormatUint(disk, 10)
+	}
+	detail := "estimated_model=" + humanBytes(estimate)
+	if mem > 0 {
+		detail += " memory=" + humanBytes(mem)
+	}
+	if disk > 0 {
+		detail += " disk_free=" + humanBytes(disk)
+	}
+	if mem > 0 && mem < estimate+estimate/4 {
+		return Finding{ID: "models." + name + ".fit", Section: "models", Severity: SeverityWarning, Status: StatusWarn, Message: name + " model may not fit local memory", Detail: detail, Metadata: meta, Fix: "choose a smaller model or API brain"}
+	}
+	if disk > 0 && disk < estimate {
+		return Finding{ID: "models." + name + ".fit", Section: "models", Severity: SeverityWarning, Status: StatusWarn, Message: name + " model may not fit free disk", Detail: detail, Metadata: meta, Fix: "free disk or choose a smaller model"}
+	}
+	return Finding{ID: "models." + name + ".fit", Section: "models", Severity: SeverityInfo, Status: StatusOK, Message: name + " local fit estimate passed", Detail: detail, Metadata: meta}
+}
+
+func estimatedModelBytes(model string) uint64 {
+	lower := strings.ToLower(model)
+	switch {
+	case strings.Contains(lower, "qwen3-coder-next"):
+		return 52 << 30
+	case strings.Contains(lower, "70b"):
+		return 45 << 30
+	case strings.Contains(lower, "30b"):
+		return 24 << 30
+	case strings.Contains(lower, "20b"):
+		return 14 << 30
+	case strings.Contains(lower, "14b"):
+		return 10 << 30
+	case strings.Contains(lower, "8b"):
+		return 6 << 30
+	case strings.Contains(lower, "7b"):
+		return 5 << 30
+	default:
+		return 0
+	}
+}
+
+func physicalMemoryBytes() uint64 {
+	switch runtime.GOOS {
+	case "darwin":
+		out, err := exec.Command("sysctl", "-n", "hw.memsize").Output()
+		if err != nil {
+			return 0
+		}
+		n, _ := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
+		return n
+	case "linux":
+		data, err := os.ReadFile("/proc/meminfo")
+		if err != nil {
+			return 0
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 && fields[0] == "MemTotal:" {
+				n, _ := strconv.ParseUint(fields[1], 10, 64)
+				return n * 1024
+			}
+		}
+	}
+	return 0
+}
+
+func diskFreeBytes(cwd string) uint64 {
+	out, err := exec.Command("df", "-k", cwd).Output()
+	if err != nil {
+		return 0
+	}
+	lines := nonemptyLines(string(out))
+	if len(lines) < 2 {
+		return 0
+	}
+	fields := strings.Fields(lines[len(lines)-1])
+	if len(fields) < 4 {
+		return 0
+	}
+	n, _ := strconv.ParseUint(fields[3], 10, 64)
+	return n * 1024
+}
+
+func humanBytes(n uint64) string {
+	const gib = 1 << 30
+	if n >= gib {
+		return fmt.Sprintf("%.1fGiB", float64(n)/gib)
+	}
+	const mib = 1 << 20
+	if n >= mib {
+		return fmt.Sprintf("%.1fMiB", float64(n)/mib)
+	}
+	return fmt.Sprintf("%dB", n)
+}
+
+func defaultString(value, fallback string) string {
+	if value != "" {
+		return value
+	}
+	return fallback
+}
+
 func endpointDetail(report llm.HealthReport) string {
 	var parts []string
 	if report.Transport != "" {
@@ -440,12 +655,22 @@ func endpointDetail(report llm.HealthReport) string {
 	return strings.Join(parts, " ")
 }
 
+func elapsedMetadata(elapsed time.Duration, timeout time.Duration) map[string]string {
+	meta := map[string]string{"elapsed_ms": strconv.FormatInt(elapsed.Milliseconds(), 10)}
+	if timeout > 0 {
+		meta["timeout"] = timeout.String()
+	}
+	return meta
+}
+
 func summarize(findings []Finding) Summary {
 	var s Summary
 	for _, f := range findings {
 		switch f.Status {
 		case StatusFixed:
 			s.Fixed++
+		case StatusPlanned:
+			s.Planned++
 		case StatusSkipped:
 			s.Skipped++
 		case StatusFail:
@@ -481,6 +706,23 @@ func ParseSeverity(raw string) (Severity, error) {
 	default:
 		return "", fmt.Errorf("unsupported severity %q", raw)
 	}
+}
+
+func Explanation(id string) (string, bool) {
+	explanations := map[string]string{
+		"system.paw_dir":       ".paw stores traces, doctor logs, and repo-local config. Repair creates the directory only.",
+		"config.bootstrap":     "Paw can run on defaults, but a config file makes setup explicit. Repair writes a repo config inside .paw when running in a git repo.",
+		"config.load":          "Invalid config prevents Paw from knowing model, transport, and verify settings. Repair backs up the current file and writes defaults.",
+		"repo.paw_ignored":     ".paw traces may include raw repository context. Add .paw/ to .gitignore before sharing a repo.",
+		"trace.mode":           "Full traces are best for resume/debugging but can include source text. Use PAW_TRACE_MODE=compact for shareable artifacts.",
+		"verify.dry_run":       "Deep doctor can run the resolved verify command before an agent task, catching missing test tools early.",
+		"models.brain.running": "The configured brain transport is unavailable. For local Ollama, start it with ollama serve before running Paw.",
+		"models.drone.running": "The configured drone transport is unavailable. For local Ollama, start it with ollama serve before running Paw.",
+		"models.brain.fit":     "Local model fit is an estimate from model naming, machine memory, and free disk. Treat warnings as capacity checks, not exact limits.",
+		"models.drone.fit":     "Local model fit is an estimate from model naming, machine memory, and free disk. Treat warnings as capacity checks, not exact limits.",
+	}
+	text, ok := explanations[id]
+	return text, ok
 }
 
 func selectorSet(values []string) map[string]bool {
@@ -565,16 +807,25 @@ func repairConfigPath(opts Options, sources []configSource, gitRoot string) stri
 }
 
 func backupAndSaveConfig(path string, cfg config.Config) error {
-	if _, err := os.Stat(path); err == nil {
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
 		backup := path + ".bak"
-		if err := copyFile(path, backup); err != nil {
+		if err := copyFile(path, backup, mode); err != nil {
 			return err
 		}
 	}
-	return cfg.Save(path)
+	return saveConfigWithMode(path, cfg, mode)
 }
 
-func copyFile(src, dst string) error {
+func saveConfigWithMode(path string, cfg config.Config, mode os.FileMode) error {
+	if err := cfg.Save(path); err != nil {
+		return err
+	}
+	return os.Chmod(path, mode)
+}
+
+func copyFile(src, dst string, mode os.FileMode) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -582,7 +833,88 @@ func copyFile(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0o600)
+	return os.WriteFile(dst, data, mode)
+}
+
+func (r *runner) confirmRepair(action, path string) (bool, string) {
+	if r.opts.Yes || r.opts.NonInteractive {
+		return true, ""
+	}
+	if _, err := fmt.Fprintf(r.opts.PromptWriter, "apply repair %s %s? [y/N] ", action, path); err != nil {
+		return false, err.Error()
+	}
+	line, err := bufio.NewReader(r.opts.Stdin).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err.Error()
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return true, ""
+	default:
+		return false, "declined"
+	}
+}
+
+func (r *runner) logOperation(action, status, path, detail string, opErr error) {
+	if r.opts.DryRun || os.Getenv("PAW_DOCTOR_NO_OPLOG") != "" {
+		return
+	}
+	op := Operation{
+		Timestamp: r.opts.Now().UTC().Format(time.RFC3339Nano),
+		Action:    action,
+		Status:    status,
+		Path:      path,
+		Detail:    detail,
+	}
+	if opErr != nil {
+		op.Error = opErr.Error()
+	}
+	_ = AppendOperation(r.opts.CWD, op)
+}
+
+func OperationLogPath(cwd string) string {
+	return filepath.Join(cleanAbs(cwd), ".paw", "doctor", "operations.ndjson")
+}
+
+func AppendOperation(cwd string, op Operation) error {
+	path := OperationLogPath(cwd)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	return json.NewEncoder(file).Encode(op)
+}
+
+func ReadOperations(cwd string, limit int) ([]Operation, error) {
+	path := OperationLogPath(cwd)
+	file, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	var ops []Operation
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var op Operation
+		if err := json.Unmarshal(scanner.Bytes(), &op); err != nil {
+			return nil, err
+		}
+		ops = append(ops, op)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if limit > 0 && len(ops) > limit {
+		ops = ops[len(ops)-limit:]
+	}
+	return ops, nil
 }
 
 func findGitRoot(cwd string) string {

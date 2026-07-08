@@ -16,6 +16,8 @@ func TestHelpGolden(t *testing.T) {
 		{name: "bench", args: []string{"bench"}},
 		{name: "compress", args: []string{"compress"}},
 		{name: "doctor", args: []string{"doctor"}},
+		{name: "doctor_explain", args: []string{"doctor", "explain"}},
+		{name: "doctor_history", args: []string{"doctor", "history"}},
 		{name: "doctor_models", args: []string{"doctor", "models"}},
 		{name: "edit", args: []string{"edit"}},
 		{name: "gather", args: []string{"gather"}},

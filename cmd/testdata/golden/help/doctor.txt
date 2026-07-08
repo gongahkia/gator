@@ -6,15 +6,21 @@ Usage:
 
 Examples:
   paw doctor
+  paw doctor --fix --dry-run
   paw doctor --fix --yes
   paw doctor --lint --json
+  paw doctor history
+  paw doctor explain config.bootstrap
   paw doctor models
 
 Available Commands:
+  explain     Explain a doctor finding
+  history     Show doctor repair operation history
   models      Check configured model transports
 
 Flags:
       --deep                  run slower probes, including verify dry-run and schema smoke checks
+      --dry-run               preview repairs without changing files
       --fix                   apply supported repairs
   -h, --help                  help for doctor
       --json                  write machine-readable JSON report

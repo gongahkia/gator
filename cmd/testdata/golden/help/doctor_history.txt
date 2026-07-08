@@ -1,0 +1,21 @@
+Show doctor repair operation history
+
+Usage:
+  paw doctor history [flags]
+
+Examples:
+  paw doctor history
+  paw doctor history --json
+
+Flags:
+  -h, --help        help for history
+      --json        write machine-readable JSON history
+      --limit int   maximum operations to show (default 20)
+
+Global Flags:
+      --config string       config file
+      --log-format string   log format: text, json (default "text")
+      --log-level string    log level: debug, info, warn, error (default "info")
+      --no-color            disable colored stderr output
+      --trace-file string   trace file
+      --verbose             verbose output

@@ -130,6 +130,112 @@ func TestDoctorFixCreatesRepoConfigAndPawDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".paw", "config.toml")); err != nil {
 		t.Fatalf("missing repo config: %v", err)
 	}
+	info, err := os.Stat(filepath.Join(dir, ".paw", "config.toml"))
+	if err != nil {
+		t.Fatalf("stat config: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("config mode = %o", got)
+	}
+	ops, err := doctorpkg.ReadOperations(dir, 10)
+	if err != nil {
+		t.Fatalf("read ops: %v", err)
+	}
+	if len(ops) != 1 || ops[0].Action != "create config" || ops[0].Status != "ok" {
+		t.Fatalf("ops = %#v", ops)
+	}
+}
+
+func TestDoctorDryRunDoesNotCreateConfigOrLog(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+	chdir(t, dir)
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	out := executeRoot(t, []string{"doctor", "--fix", "--dry-run", "--only", "config.bootstrap"}, "")
+	if !strings.Contains(out, "would create config") || !strings.Contains(out, "plan=1") {
+		t.Fatalf("missing dry-run plan:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".paw", "config.toml")); !os.IsNotExist(err) {
+		t.Fatalf("dry-run created config: %v", err)
+	}
+	ops, err := doctorpkg.ReadOperations(dir, 10)
+	if err != nil {
+		t.Fatalf("read ops: %v", err)
+	}
+	if len(ops) != 0 {
+		t.Fatalf("dry-run wrote ops = %#v", ops)
+	}
+}
+
+func TestDoctorFixPreservesConfigModeAndWritesBackup(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+	path := filepath.Join(dir, "bad.toml")
+	if err := os.WriteFile(path, []byte("%%%"), 0o640); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	out := executeRoot(t, []string{"--config", path, "doctor", "--fix", "--yes", "--only", "config.load"}, "")
+	if !strings.Contains(out, "repaired config") {
+		t.Fatalf("missing repair output:\n%s", out)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat config: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o640 {
+		t.Fatalf("config mode = %o", got)
+	}
+	if got := readTestFile(t, dir, "bad.toml.bak"); got != "%%%" {
+		t.Fatalf("backup = %q", got)
+	}
+}
+
+func TestDoctorFixPromptDeclineSkipsRepair(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+	chdir(t, dir)
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	out, stderr, err := executeRootErr(t, []string{"doctor", "--fix", "--only", "config.bootstrap"}, "n\n")
+	if err != nil {
+		t.Fatalf("doctor prompt: %v stderr=%s", err, stderr)
+	}
+	if !strings.Contains(stderr, "apply repair create config") || !strings.Contains(out, "skipped config creation") {
+		t.Fatalf("prompt output mismatch stdout=%s stderr=%s", out, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".paw", "config.toml")); !os.IsNotExist(err) {
+		t.Fatalf("declined repair created config: %v", err)
+	}
+}
+
+func TestDoctorHistoryAndExplain(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+	if err := os.MkdirAll(filepath.Join(dir, ".paw", "doctor"), 0o755); err != nil {
+		t.Fatalf("mkdir log: %v", err)
+	}
+	if err := doctorpkg.AppendOperation(dir, doctorpkg.Operation{Timestamp: "2026-07-08T00:00:00Z", Action: "create config", Status: "ok", Path: "config.toml"}); err != nil {
+		t.Fatalf("append op: %v", err)
+	}
+
+	history := executeRoot(t, []string{"doctor", "history"}, "")
+	if !strings.Contains(history, "create config") {
+		t.Fatalf("history = %s", history)
+	}
+	explain := executeRoot(t, []string{"doctor", "explain", "config.bootstrap"}, "")
+	if !strings.Contains(explain, "Paw can run on defaults") {
+		t.Fatalf("explain = %s", explain)
+	}
 }
 
 type fakeEndpointHealth struct {

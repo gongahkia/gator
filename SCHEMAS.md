@@ -199,7 +199,59 @@ repo-aware detection (`make test`, `npm test`, `go test ./...`, `cargo test`,
 
 ---
 
-## 6. `Budget` (accounting, threaded through every envelope)
+## 6. `DoctorReport` (output of `paw doctor --json`, deterministic)
+
+`paw doctor --json` emits a stable diagnostic report for onboarding and CI:
+
+```go
+type DoctorReport struct {
+    SchemaVersion int             `json:"schema_version"` // currently 1
+    Version       string          `json:"version,omitempty"`
+    CWD           string          `json:"cwd"`
+    Summary       DoctorSummary   `json:"summary"`
+    Findings      []DoctorFinding `json:"findings"`
+}
+type DoctorSummary struct {
+    OK      int `json:"ok"`
+    Warning int `json:"warning"`
+    Error   int `json:"error"`
+    Fixed   int `json:"fixed"`
+    Planned int `json:"planned"`
+    Skipped int `json:"skipped"`
+}
+type DoctorFinding struct {
+    ID       string            `json:"id"`
+    Section  string            `json:"section"`
+    Severity string            `json:"severity"` // info | warning | error
+    Status   string            `json:"status"`   // ok | warn | fail | fixed | plan | skip
+    Message  string            `json:"message"`
+    Detail   string            `json:"detail,omitempty"`
+    Fix      string            `json:"fix,omitempty"`
+    Command  string            `json:"command,omitempty"`
+    Path     string            `json:"path,omitempty"`
+    Metadata map[string]string `json:"metadata,omitempty"`
+}
+```
+
+`paw doctor history --json` reads `.paw/doctor/operations.ndjson`, where each line is:
+
+```go
+type DoctorOperation struct {
+    Timestamp string `json:"timestamp"`
+    Action    string `json:"action"`
+    Status    string `json:"status"`
+    Path      string `json:"path,omitempty"`
+    Detail    string `json:"detail,omitempty"`
+    Error     string `json:"error,omitempty"`
+}
+```
+
+`paw doctor --fix --dry-run` reports `status:"plan"` findings and must not write files or
+operation logs. `paw doctor --fix` writes operation logs unless `PAW_DOCTOR_NO_OPLOG=1`.
+
+---
+
+## 7. `Budget` (accounting, threaded through every envelope)
 
 ```go
 type Budget struct {

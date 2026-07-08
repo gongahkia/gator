@@ -294,11 +294,14 @@ func resetCLIState(t *testing.T) {
 	doctorLint = false
 	doctorDeep = false
 	doctorFix = false
+	doctorDryRun = false
 	doctorYes = false
 	doctorNonInteractive = false
 	doctorSeverityMin = "info"
 	doctorOnly = nil
 	doctorSkip = nil
+	doctorHistoryJSON = false
+	doctorHistoryLimit = 20
 	resumeMaxTurns = 0
 	resumeRawContext = false
 	resumeDisableCompress = false
