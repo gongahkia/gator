@@ -274,7 +274,7 @@ estimate (see `docs/MODEL_APIS.md` §5). Source fields are role-level provenance
 
 ---
 
-## 7. Trace log (observability, for ablation & debugging)
+## 8. Trace log (observability, for ablation & debugging)
 
 Every run writes an NDJSON trace to `--trace-file` (default `./.paw/trace-<taskid>.ndjson`): one
 line per stage invocation with `{trace_mode, stage, turn, input_bytes, output_bytes, tokens,
