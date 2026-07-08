@@ -1,2 +1,3 @@
 {"stage":"gather","turn":1,"duration_ms":1000,"envelope":{"task_id":"task-stats","stage":"gather","turn":1,"budget":{"turn":1}}}
+{"stage":"compress","turn":1,"duration_ms":100,"used_fallback":true,"validation_drops":{"quote_missing":2,"path_mismatch":1}}
 {"stage":"plan","turn":2,"duration_ms":2200,"tokens":1600,"token_source":"mixed","envelope":{"task_id":"task-stats","stage":"verify","turn":2,"verify":{"passed":true,"exit_code":0,"command":"go test ./...","failure_digest":"","raw_tail_bytes":0},"budget":{"turn":2,"brain_input_tokens":1000,"brain_output_tokens":200,"brain_cache_creation_tokens":300,"brain_cache_read_tokens":700,"brain_token_source":"provider","drone_tokens":400,"drone_token_source":"estimate"}}}

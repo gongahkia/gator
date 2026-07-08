@@ -52,7 +52,24 @@ func TestCompressDropsHallucinatedPath(t *testing.T) {
 	if len(got.Digest.Items) != 1 {
 		t.Fatalf("digest = %#v", got.Digest)
 	}
+	assertDropCount(t, stage, dropPathMismatch, 1)
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
+}
+
+func TestCompressDropsUnknownUnit(t *testing.T) {
+	stage, got := runCompress(t, digestWithInvalidItem(envelope.DigestItem{
+		UnitID:    "missing",
+		Path:      "calc.go",
+		Relevance: 100,
+		Spans:     []envelope.DigestSpan{{StartLine: 2, EndLine: 2, Quote: "func KnownSymbol() string"}},
+	}))
+	if stage.UsedFallback || stage.DroppedItems != 1 {
+		t.Fatalf("fallback=%v dropped=%d", stage.UsedFallback, stage.DroppedItems)
+	}
+	if len(got.Digest.Items) != 1 {
+		t.Fatalf("digest = %#v", got.Digest)
+	}
+	assertDropCount(t, stage, dropUnknownUnit, 1)
 }
 
 func TestCompressDropsNonVerbatimQuote(t *testing.T) {
@@ -65,6 +82,7 @@ func TestCompressDropsNonVerbatimQuote(t *testing.T) {
 	if stage.UsedFallback || stage.DroppedItems != 1 {
 		t.Fatalf("fallback=%v dropped=%d", stage.UsedFallback, stage.DroppedItems)
 	}
+	assertDropCount(t, stage, dropQuoteMissing, 1)
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 
@@ -78,6 +96,7 @@ func TestCompressDropsBadLineRange(t *testing.T) {
 	if stage.UsedFallback || stage.DroppedItems != 1 {
 		t.Fatalf("fallback=%v dropped=%d", stage.UsedFallback, stage.DroppedItems)
 	}
+	assertDropCount(t, stage, dropLineOutOfRange, 1)
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 
@@ -93,6 +112,9 @@ func TestCompressFallsBackWhenTooManyDropped(t *testing.T) {
 	if !stage.UsedFallback {
 		t.Fatal("expected fallback")
 	}
+	assertDropCount(t, stage, dropPathMismatch, 1)
+	assertDropCount(t, stage, dropUnknownUnit, 1)
+	assertDropCount(t, stage, dropTooManyDropped, 1)
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 
@@ -108,6 +130,7 @@ func TestCompressFallsBackOnUnparseable(t *testing.T) {
 	if !stage.UsedFallback {
 		t.Fatal("expected fallback")
 	}
+	assertDropCount(t, stage, dropSchemaError, 1)
 	assertDigestQuotesFromRaw(t, got.Raw, got.Digest)
 }
 
@@ -193,6 +216,13 @@ func assertDigestQuotesFromRaw(t *testing.T, raw *envelope.RawContext, digest *e
 				t.Fatalf("quote %q absent from raw unit %q", span.Quote, item.UnitID)
 			}
 		}
+	}
+}
+
+func assertDropCount(t *testing.T, stage *Compress, reason string, want int) {
+	t.Helper()
+	if got := stage.ValidationDrops[reason]; got != want {
+		t.Fatalf("drop %s = %d, want %d; all=%v", reason, got, want, stage.ValidationDrops)
 	}
 }
 

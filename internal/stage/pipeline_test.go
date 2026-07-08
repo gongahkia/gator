@@ -209,6 +209,40 @@ func TestRunOnceProviderLLMTraceTokenSource(t *testing.T) {
 	}
 }
 
+func TestRunOnceWritesValidationDropCounts(t *testing.T) {
+	srv := faketest.NewServer()
+	defer srv.Close()
+	srv.RespondOllama("", `{"summary":"target","items":[{"unit_id":"u001","path":"a.go","relevance":100,"spans":[{"start_line":1,"end_line":1,"quote":"target"}]},{"unit_id":"u001","path":"ghost.go","relevance":100,"spans":[{"start_line":1,"end_line":1,"quote":"target"}]}]}`)
+	p, err := NewPipeline(compress.New(llm.NewOllamaClient(srv.URL, "drone")))
+	if err != nil {
+		t.Fatalf("new pipeline: %v", err)
+	}
+	var trace bytes.Buffer
+	p.SetTracer(NewTracer(&trace))
+	env := envelope.NewEnvelope("task", "target", "/repo")
+	env.Raw = &envelope.RawContext{
+		Units: []envelope.RawUnit{{
+			ID:        "u001",
+			Kind:      "file_slice",
+			Path:      "a.go",
+			StartLine: 1,
+			EndLine:   1,
+			Text:      "target\n",
+		}},
+		TotalBytes: len("target\n"),
+	}
+	if _, err := p.RunOnce(context.Background(), "compress", env); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	var event TraceEvent
+	if err := json.Unmarshal(bytes.TrimSpace(trace.Bytes()), &event); err != nil {
+		t.Fatalf("decode trace: %v\n%s", err, trace.String())
+	}
+	if event.DroppedItems != 1 || event.ValidationDrops["path_mismatch"] != 1 || event.UsedFallback {
+		t.Fatalf("event = %#v", event)
+	}
+}
+
 func TestReadTraceRestoresLastEnvelope(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "trace.ndjson")
 	file, err := os.Create(path)

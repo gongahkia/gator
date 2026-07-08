@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/gongahkia/paw/internal/budget"
 	"github.com/gongahkia/paw/internal/envelope"
@@ -62,6 +64,8 @@ type traceStats struct {
 	BrainTokenSource   string
 	Drone              int
 	DroneTokenSource   string
+	CompressFallbacks  int
+	ValidationDrops    map[string]int
 	WallMS             int64
 	Verify             string
 }
@@ -74,8 +78,18 @@ func init() {
 func summarizeTrace(path, fallbackTaskID string, events []stage.TraceEvent) (traceStats, error) {
 	var last *envelope.Envelope
 	var wallMS int64
+	drops := map[string]int{}
+	compressFallbacks := 0
 	for i := range events {
 		wallMS += events[i].DurationMS
+		if events[i].Stage == "compress" && events[i].UsedFallback {
+			compressFallbacks++
+		}
+		for reason, count := range events[i].ValidationDrops {
+			if count > 0 {
+				drops[reason] += count
+			}
+		}
 		if events[i].Envelope != nil {
 			last = events[i].Envelope
 		}
@@ -102,10 +116,12 @@ func summarizeTrace(path, fallbackTaskID string, events []stage.TraceEvent) (tra
 			last.Budget.BrainInputTokens+last.Budget.BrainOutputTokens+last.Budget.BrainCacheCreationTokens+last.Budget.BrainCacheReadTokens,
 			last.Budget.BrainTokenSource,
 		),
-		Drone:            last.Budget.DroneTokens,
-		DroneTokenSource: budget.SourceForTokens(last.Budget.DroneTokens, last.Budget.DroneTokenSource),
-		WallMS:           wallMS,
-		Verify:           verifyStatus(last),
+		Drone:             last.Budget.DroneTokens,
+		DroneTokenSource:  budget.SourceForTokens(last.Budget.DroneTokens, last.Budget.DroneTokenSource),
+		CompressFallbacks: compressFallbacks,
+		ValidationDrops:   drops,
+		WallMS:            wallMS,
+		Verify:            verifyStatus(last),
 	}, nil
 }
 
@@ -132,8 +148,30 @@ func writeStats(w io.Writer, s traceStats, rates pricing.Rates) {
 	_, _ = fmt.Fprintf(w, " -> %s\n", formatCost(brainCost, hasBrainCost))
 	_, _ = fmt.Fprintf(w, "Drone:     %s total -> %s\n", formatCount(s.Drone), formatCost(droneCost, hasDroneCost))
 	_, _ = fmt.Fprintf(w, "Token src: brain=%s drone=%s\n", s.BrainTokenSource, s.DroneTokenSource)
+	_, _ = fmt.Fprintf(w, "Compress:  fallbacks=%d drops=%s\n", s.CompressFallbacks, formatValidationDrops(s.ValidationDrops))
 	_, _ = fmt.Fprintf(w, "Wall time: %.1fs\n", float64(s.WallMS)/1000)
 	_, _ = fmt.Fprintf(w, "Verify:    %s\n", s.Verify)
+}
+
+func formatValidationDrops(drops map[string]int) string {
+	if len(drops) == 0 {
+		return "none"
+	}
+	keys := make([]string, 0, len(drops))
+	for reason, count := range drops {
+		if count > 0 {
+			keys = append(keys, reason)
+		}
+	}
+	if len(keys) == 0 {
+		return "none"
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, reason := range keys {
+		parts = append(parts, reason+":"+strconv.Itoa(drops[reason]))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func formatCount(n int) string {

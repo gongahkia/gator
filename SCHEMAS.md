@@ -218,7 +218,10 @@ estimate (see `docs/MODEL_APIS.md` §5). Source fields are role-level provenance
 
 Every run writes an NDJSON trace to `--trace-file` (default `./.paw/trace-<taskid>.ndjson`): one
 line per stage invocation with `{stage, turn, input_bytes, output_bytes, tokens, token_source,
-dropped_items, used_fallback, duration_ms, envelope}`. `token_source` is `provider`, `estimate`,
-`mixed`, or `none` for that stage's token delta. `envelope` is the post-stage snapshot used by
-`paw resume`. `paw bench` aggregates the metric fields into the results tables and writes token
-source metadata into generated result configs. No model is involved in tracing.
+dropped_items, validation_drops, used_fallback, duration_ms, envelope}`. `token_source` is
+`provider`, `estimate`, `mixed`, or `none` for that stage's token delta. `validation_drops` is a
+compact reason counter for `compress`, keyed by `unknown_unit`, `path_mismatch`, `quote_missing`,
+`line_out_of_range`, `schema_error`, and `too_many_dropped`; it never stores raw quotes.
+`envelope` is the post-stage snapshot used by `paw resume`. `paw bench` aggregates the metric
+fields into the results tables and writes token source metadata into generated result configs. No
+model is involved in tracing.

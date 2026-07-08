@@ -158,6 +158,10 @@ type traceMetadata interface {
 	TraceMetadata() (droppedItems int, usedFallback bool)
 }
 
+type validationDropMetadata interface {
+	ValidationDropCounts() map[string]int
+}
+
 func (p *Pipeline) writeTrace(st Stage, out *envelope.Envelope, before envelope.Budget, inputBytes int, duration time.Duration) error {
 	if p.tracer == nil {
 		return nil
@@ -166,18 +170,23 @@ func (p *Pipeline) writeTrace(st Stage, out *envelope.Envelope, before envelope.
 	if meta, ok := st.(traceMetadata); ok {
 		dropped, fallback = meta.TraceMetadata()
 	}
+	var validationDrops map[string]int
+	if meta, ok := st.(validationDropMetadata); ok {
+		validationDrops = meta.ValidationDropCounts()
+	}
 	after := out.Budget
 	return p.tracer.Write(TraceEvent{
-		Stage:        out.Stage,
-		Turn:         out.Turn,
-		InputBytes:   inputBytes,
-		OutputBytes:  envelopeBytes(out),
-		Tokens:       tokenDelta(before, after),
-		TokenSource:  tokenSourceDelta(before, after),
-		DroppedItems: dropped,
-		UsedFallback: fallback,
-		DurationMS:   duration.Milliseconds(),
-		Envelope:     out,
+		Stage:           out.Stage,
+		Turn:            out.Turn,
+		InputBytes:      inputBytes,
+		OutputBytes:     envelopeBytes(out),
+		Tokens:          tokenDelta(before, after),
+		TokenSource:     tokenSourceDelta(before, after),
+		DroppedItems:    dropped,
+		ValidationDrops: validationDrops,
+		UsedFallback:    fallback,
+		DurationMS:      duration.Milliseconds(),
+		Envelope:        out,
 	})
 }
 

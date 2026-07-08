@@ -12,16 +12,17 @@ import (
 )
 
 type TraceEvent struct {
-	Stage        string             `json:"stage"`
-	Turn         int                `json:"turn"`
-	InputBytes   int                `json:"input_bytes"`
-	OutputBytes  int                `json:"output_bytes"`
-	Tokens       int                `json:"tokens"`
-	TokenSource  string             `json:"token_source,omitempty"`
-	DroppedItems int                `json:"dropped_items"`
-	UsedFallback bool               `json:"used_fallback"`
-	DurationMS   int64              `json:"duration_ms"`
-	Envelope     *envelope.Envelope `json:"envelope,omitempty"`
+	Stage           string             `json:"stage"`
+	Turn            int                `json:"turn"`
+	InputBytes      int                `json:"input_bytes"`
+	OutputBytes     int                `json:"output_bytes"`
+	Tokens          int                `json:"tokens"`
+	TokenSource     string             `json:"token_source,omitempty"`
+	DroppedItems    int                `json:"dropped_items"`
+	ValidationDrops map[string]int     `json:"validation_drops,omitempty"`
+	UsedFallback    bool               `json:"used_fallback"`
+	DurationMS      int64              `json:"duration_ms"`
+	Envelope        *envelope.Envelope `json:"envelope,omitempty"`
 }
 
 type Tracer struct {
@@ -71,6 +72,7 @@ func (t *Tracer) Write(event TraceEvent) error {
 			"tokens", event.Tokens,
 			"token_source", event.TokenSource,
 			"dropped_items", event.DroppedItems,
+			"validation_drops", event.ValidationDrops,
 			"used_fallback", event.UsedFallback,
 			"duration_ms", event.DurationMS,
 		)

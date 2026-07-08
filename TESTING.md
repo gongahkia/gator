@@ -28,6 +28,7 @@ hallucinated output on demand to exercise the validation/fallback paths.
   - Drone returns a `quote` not verbatim in the unit → item dropped.
   - Drone returns a line number outside the unit range → item dropped.
   - >50% dropped OR unparseable → heuristic fallback used; assert fallback is deterministic.
+  - Assert `validation_drops` reason counters are written for each drop/fallback category.
   - Assert `token_source` recorded correctly (provider vs estimate).
 - `plan`: `done=false` with no `next_action` → validation error. Enum enforcement on `kind`.
 - `edit` + `patch`: see `docs/PATCH_FORMAT.md` §4 fixture list (create/delete/multi-hunk/
@@ -54,6 +55,7 @@ that compression actually happened).
 `cmd/*_test.go`: invoke each subcommand with a fixture `Envelope` on stdin, assert the stdout
 `Envelope` matches a golden file (`testdata/golden/`). This locks the pipeable text contract so
 `paw gather | paw compress | ...` stays stable across refactors.
+`paw stats` golden coverage also checks token source and compression validation audit summaries.
 
 ---
 
