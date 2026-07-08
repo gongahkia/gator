@@ -3,9 +3,13 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	doctorpkg "github.com/gongahkia/paw/internal/doctor"
 	"github.com/gongahkia/paw/internal/llm"
 )
 
@@ -72,6 +76,59 @@ func TestDoctorModelsFailsOnFailedCheck(t *testing.T) {
 	}
 	if !strings.Contains(out, "action: ollama pull missing:latest") {
 		t.Fatalf("missing action:\n%s", out)
+	}
+}
+
+func TestDoctorJSONOutput(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+
+	out := executeRoot(t, append(configArgs(t), "doctor", "--json", "--only", "system.runtime"), "")
+	var report doctorpkg.Report
+	if err := json.Unmarshal([]byte(out), &report); err != nil {
+		t.Fatalf("json report: %v\n%s", err, out)
+	}
+	if report.SchemaVersion != 1 || len(report.Findings) != 1 || report.Findings[0].ID != "system.runtime" {
+		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestDoctorLintFailsOnWarning(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	chdir(t, dir)
+
+	out, stderr, err := executeRootErr(t, append(configArgs(t), "doctor", "--lint", "--only", "system.paw_dir"), "")
+	if err == nil || !strings.Contains(err.Error(), "doctor lint found issues") {
+		t.Fatalf("err = %v stderr=%s out=%s", err, stderr, out)
+	}
+	if !strings.Contains(out, ".paw directory is missing") {
+		t.Fatalf("missing warning:\n%s", out)
+	}
+}
+
+func TestDoctorFixCreatesRepoConfigAndPawDir(t *testing.T) {
+	isolateEnv(t)
+	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+	chdir(t, dir)
+	if err := os.Mkdir(filepath.Join(dir, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+	withDoctorHealth(t, &fakeEndpointHealth{
+		reports: []llm.HealthReport{
+			{Transport: "ollama", Checks: []llm.HealthCheck{{Name: "running", Status: llm.HealthOK}}},
+			{Transport: "ollama", Checks: []llm.HealthCheck{{Name: "running", Status: llm.HealthOK}}},
+		},
+	})
+
+	out := executeRoot(t, []string{"doctor", "--fix", "--yes", "--only", "config.bootstrap"}, "")
+	if !strings.Contains(out, "created config") {
+		t.Fatalf("missing repair output:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".paw", "config.toml")); err != nil {
+		t.Fatalf("missing repo config: %v", err)
 	}
 }
 

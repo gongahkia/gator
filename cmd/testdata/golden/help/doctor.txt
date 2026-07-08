@@ -1,16 +1,29 @@
 Check local paw setup
 
 Usage:
+  paw doctor [flags]
   paw doctor [command]
 
 Examples:
+  paw doctor
+  paw doctor --fix --yes
+  paw doctor --lint --json
   paw doctor models
 
 Available Commands:
   models      Check configured model transports
 
 Flags:
-  -h, --help   help for doctor
+      --deep                  run slower probes, including verify dry-run and schema smoke checks
+      --fix                   apply supported repairs
+  -h, --help                  help for doctor
+      --json                  write machine-readable JSON report
+      --lint                  read-only CI preflight; fail on warnings or errors
+      --non-interactive       disable prompts and risky repair actions
+      --only stringArray      only run matching check id or section; repeatable
+      --severity-min string   minimum severity to report: info, warning, error (default "info")
+      --skip stringArray      skip matching check id or section; repeatable
+      --yes                   apply repairs without prompting
 
 Global Flags:
       --config string       config file

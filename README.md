@@ -66,6 +66,9 @@ First-time setup:
 ```sh
 paw init
 paw init --non-interactive --brain-transport ollama --drone-transport ollama
+paw doctor
+paw doctor --fix --yes
+paw doctor --lint --json
 ```
 
 Pipeline shape:

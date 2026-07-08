@@ -290,6 +290,15 @@ func resetCLIState(t *testing.T) {
 	initDroneModel = ""
 	initDroneBaseURL = ""
 	initDroneAPIKey = ""
+	doctorJSON = false
+	doctorLint = false
+	doctorDeep = false
+	doctorFix = false
+	doctorYes = false
+	doctorNonInteractive = false
+	doctorSeverityMin = "info"
+	doctorOnly = nil
+	doctorSkip = nil
 	resumeMaxTurns = 0
 	resumeRawContext = false
 	resumeDisableCompress = false
