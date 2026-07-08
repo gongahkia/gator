@@ -117,7 +117,7 @@ func ReadOperations(cwd string, limit int) ([]Operation, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
+			return []Operation{}, nil
 		}
 		return nil, err
 	}
