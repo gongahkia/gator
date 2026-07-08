@@ -23,6 +23,7 @@ func toolDefinitions() []Tool {
 					"instruction": stringSchema("Task instruction for raw context input."),
 					"envelope":    map[string]any{"type": "object", "description": "paw Envelope with raw context."},
 					"raw":         map[string]any{"type": "object", "description": "paw RawContext object."},
+					"include_raw": boolSchema("Return the full Envelope including raw context."),
 				},
 				"oneOf": []map[string]any{
 					{"required": []string{"envelope"}},
@@ -37,6 +38,7 @@ func toolDefinitions() []Tool {
 			InputSchema: objectSchema(map[string]any{
 				"cwd":         stringSchema("Working directory to inspect."),
 				"instruction": stringSchema("Task instruction used for gather and compression."),
+				"include_raw": boolSchema("Return the full Envelope including raw context."),
 			}, []string{"cwd", "instruction"}),
 		},
 	}
@@ -53,4 +55,8 @@ func objectSchema(properties map[string]any, required []string) map[string]any {
 
 func stringSchema(description string) map[string]any {
 	return map[string]any{"type": "string", "description": description}
+}
+
+func boolSchema(description string) map[string]any {
+	return map[string]any{"type": "boolean", "description": description}
 }

@@ -36,6 +36,29 @@ type contextArgs struct {
 	Instruction string               `json:"instruction,omitempty"`
 	Envelope    *envelope.Envelope   `json:"envelope,omitempty"`
 	Raw         *envelope.RawContext `json:"raw,omitempty"`
+	IncludeRaw  bool                 `json:"include_raw,omitempty"`
+}
+
+type compactEnvelope struct {
+	SchemaVersion string                  `json:"schema_version"`
+	TaskID        string                  `json:"task_id"`
+	Instruction   string                  `json:"instruction,omitempty"`
+	Cwd           string                  `json:"cwd,omitempty"`
+	Stage         string                  `json:"stage"`
+	Turn          int                     `json:"turn"`
+	Digest        *envelope.ContextDigest `json:"digest,omitempty"`
+	Budget        envelope.Budget         `json:"budget"`
+	RawTotalBytes int                     `json:"raw_total_bytes,omitempty"`
+	Provenance    []rawUnitProvenance     `json:"provenance,omitempty"`
+}
+
+type rawUnitProvenance struct {
+	ID        string `json:"id"`
+	Kind      string `json:"kind"`
+	Path      string `json:"path,omitempty"`
+	StartLine int    `json:"start_line,omitempty"`
+	EndLine   int    `json:"end_line,omitempty"`
+	Bytes     int    `json:"bytes"`
 }
 
 func (s *Server) callTool(ctx context.Context, raw json.RawMessage) (toolResult, *rpcError) {
@@ -71,12 +94,12 @@ func (s *Server) callGather(ctx context.Context, raw json.RawMessage) (toolResul
 }
 
 func (s *Server) callCompress(ctx context.Context, raw json.RawMessage) (toolResult, *rpcError) {
-	env, rpcErr := envelopeArg(raw)
+	env, includeRaw, rpcErr := envelopeArg(raw)
 	if rpcErr != nil {
 		return toolResult{}, rpcErr
 	}
 	out, err := s.runner.Compress(ctx, env)
-	return envelopeToolResult(out, err), nil
+	return compactEnvelopeToolResult(out, err, includeRaw), nil
 }
 
 func (s *Server) callDigest(ctx context.Context, raw json.RawMessage) (toolResult, *rpcError) {
@@ -88,30 +111,30 @@ func (s *Server) callDigest(ctx context.Context, raw json.RawMessage) (toolResul
 		return toolResult{}, invalidParams(err.Error())
 	}
 	env, err := s.runner.Digest(ctx, args.Cwd, args.Instruction)
-	return envelopeToolResult(env, err), nil
+	return compactEnvelopeToolResult(env, err, args.IncludeRaw), nil
 }
 
-func envelopeArg(raw json.RawMessage) (*envelope.Envelope, *rpcError) {
+func envelopeArg(raw json.RawMessage) (*envelope.Envelope, bool, *rpcError) {
 	var args contextArgs
 	if err := decodeStrict(raw, &args); err != nil {
-		return nil, invalidParams("invalid compress arguments: %v", err)
+		return nil, false, invalidParams("invalid compress arguments: %v", err)
 	}
 	if args.Envelope != nil {
 		if args.Envelope.SchemaVersion != envelope.SchemaVersion {
-			return nil, invalidParams("unsupported envelope schema version: %q", args.Envelope.SchemaVersion)
+			return nil, false, invalidParams("unsupported envelope schema version: %q", args.Envelope.SchemaVersion)
 		}
-		return args.Envelope, nil
+		return args.Envelope, args.IncludeRaw, nil
 	}
 	if args.Raw == nil {
-		return nil, invalidParams("compress requires envelope or raw")
+		return nil, false, invalidParams("compress requires envelope or raw")
 	}
 	if err := validateCwdInstruction(args.Cwd, args.Instruction); err != nil {
-		return nil, invalidParams(err.Error())
+		return nil, false, invalidParams(err.Error())
 	}
 	env := envelope.NewEnvelope(taskID(args.Instruction, args.Cwd), args.Instruction, args.Cwd)
 	env.Stage = "gather"
 	env.Raw = args.Raw
-	return env, nil
+	return env, args.IncludeRaw, nil
 }
 
 func envelopeToolResult(env *envelope.Envelope, err error) toolResult {
@@ -126,6 +149,54 @@ func envelopeToolResult(env *envelope.Envelope, err error) toolResult {
 		Content:           []toolContent{{Type: "text", Text: string(data)}},
 		StructuredContent: env,
 	}
+}
+
+func compactEnvelopeToolResult(env *envelope.Envelope, err error, includeRaw bool) toolResult {
+	if includeRaw {
+		return envelopeToolResult(env, err)
+	}
+	if err != nil {
+		return toolResult{Content: []toolContent{{Type: "text", Text: err.Error()}}, IsError: true}
+	}
+	compact := compactEnvelopeFrom(env)
+	data, err := json.Marshal(compact)
+	if err != nil {
+		return toolResult{Content: []toolContent{{Type: "text", Text: err.Error()}}, IsError: true}
+	}
+	return toolResult{
+		Content:           []toolContent{{Type: "text", Text: string(data)}},
+		StructuredContent: compact,
+	}
+}
+
+func compactEnvelopeFrom(env *envelope.Envelope) compactEnvelope {
+	if env == nil {
+		return compactEnvelope{}
+	}
+	compact := compactEnvelope{
+		SchemaVersion: env.SchemaVersion,
+		TaskID:        env.TaskID,
+		Instruction:   env.Instruction,
+		Cwd:           env.Cwd,
+		Stage:         env.Stage,
+		Turn:          env.Turn,
+		Digest:        env.Digest,
+		Budget:        env.Budget,
+	}
+	if env.Raw != nil {
+		compact.RawTotalBytes = env.Raw.TotalBytes
+		for _, unit := range env.Raw.Units {
+			compact.Provenance = append(compact.Provenance, rawUnitProvenance{
+				ID:        unit.ID,
+				Kind:      unit.Kind,
+				Path:      unit.Path,
+				StartLine: unit.StartLine,
+				EndLine:   unit.EndLine,
+				Bytes:     len(unit.Text),
+			})
+		}
+	}
+	return compact
 }
 
 func decodeStrict(raw json.RawMessage, dst any) error {

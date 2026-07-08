@@ -67,19 +67,24 @@ ollama pull qwen3:8b
 
 `compress`
 
-- Input: either `envelope`, or `cwd`, `instruction`, and `raw`.
-- Output: a `paw.env/1` Envelope with `stage="compress"` and `digest`.
+- Input: either `envelope`, or `cwd`, `instruction`, and `raw`. Optional `include_raw`.
+- Output: compact `paw.env/1` metadata with `stage="compress"`, `digest`, `budget`, and raw-unit
+  provenance by default.
 - Use when the host already has raw context and wants paw's validated digest contract.
+- Set `include_raw=true` only for local debugging when the host needs the full raw Envelope.
 
 `digest`
 
-- Input: `cwd` and `instruction`.
-- Output: a `paw.env/1` Envelope after `gather` then `compress`.
+- Input: `cwd` and `instruction`. Optional `include_raw`.
+- Output: compact `paw.env/1` metadata after `gather` then `compress`, with `digest`, `budget`,
+  and raw-unit provenance by default.
 - Use as the default sidecar call when the host needs compact context for a task.
+- Set `include_raw=true` only for local debugging when the host needs the full raw Envelope.
 
-Tool results include text JSON plus structured content containing the same Envelope. Invalid tool
-arguments return JSON-RPC `InvalidParams` errors. Stage/runtime failures return MCP tool results with
-`isError=true`.
+Tool results include text JSON plus matching structured content. `gather` returns the full raw
+Envelope. `compress` and `digest` return compact structured content by default so MCP hosts do not
+pay for raw repository text twice. Invalid tool arguments return JSON-RPC `InvalidParams` errors.
+Stage/runtime failures return MCP tool results with `isError=true`.
 
 ## Safety Contract
 
@@ -117,6 +122,16 @@ In the Inspector UI, list tools and call `digest` with:
 {
   "cwd": "/absolute/path/to/repo",
   "instruction": "inspect the project"
+}
+```
+
+For full raw debug output:
+
+```json
+{
+  "cwd": "/absolute/path/to/repo",
+  "instruction": "inspect the project",
+  "include_raw": true
 }
 ```
 

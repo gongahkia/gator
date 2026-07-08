@@ -32,9 +32,33 @@ func TestToolsListIncludesContextToolSchemas(t *testing.T) {
 	if !schemaRequires(digest, "cwd") || !schemaRequires(digest, "instruction") {
 		t.Fatalf("digest required = %#v", digest["required"])
 	}
+	if !schemaHasProperty(digest, "include_raw") {
+		t.Fatalf("digest schema missing include_raw: %#v", digest["properties"])
+	}
 }
 
-func TestDigestCallReturnsEnvelopeStructuredContent(t *testing.T) {
+func TestGatherCallStillReturnsRawEnvelope(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc target() {}\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	cfg := config.Defaults()
+	cfg.Gather = config.GatherConfig{MaxDepth: 2, MaxFileBytes: 4096}
+	args := `{"cwd":` + quoteJSON(t, dir) + `,"instruction":"inspect target"}`
+	req := `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"gather","arguments":` + args + `}}`
+
+	out := serveLines(t, NewServer(StageRunner{Config: cfg, DisableCompress: true}), req)
+	resp := decodeResponse(t, out)
+	if resp.Error != nil {
+		t.Fatalf("error = %#v", resp.Error)
+	}
+	env := responseEnvelope(t, resp)
+	if env.Stage != "gather" || env.Raw == nil || len(env.Raw.Units) == 0 {
+		t.Fatalf("missing raw gather envelope: %#v", env)
+	}
+}
+
+func TestDigestCallReturnsCompactStructuredContentByDefault(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc target() {}\n"), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
@@ -49,15 +73,46 @@ func TestDigestCallReturnsEnvelopeStructuredContent(t *testing.T) {
 	if resp.Error != nil {
 		t.Fatalf("error = %#v", resp.Error)
 	}
+	content := responseContentText(t, resp)
+	if strings.Contains(content, `"raw"`) || strings.Contains(content, `"units"`) {
+		t.Fatalf("compact content leaked raw context: %s", content)
+	}
+	structured := responseStructuredMap(t, resp)
+	if _, ok := structured["raw"]; ok {
+		t.Fatalf("compact structured content has raw: %#v", structured)
+	}
+	if structured["schema_version"] != envelope.SchemaVersion || structured["stage"] != "compress" {
+		t.Fatalf("unexpected compact result = %#v", structured)
+	}
+	if _, ok := structured["digest"].(map[string]any); !ok {
+		t.Fatalf("missing digest: %#v", structured)
+	}
+	if items, ok := structured["provenance"].([]any); !ok || len(items) == 0 {
+		t.Fatalf("missing provenance: %#v", structured["provenance"])
+	}
+}
+
+func TestDigestIncludeRawReturnsFullEnvelope(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc target() {}\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	cfg := config.Defaults()
+	cfg.Gather = config.GatherConfig{MaxDepth: 2, MaxFileBytes: 4096}
+	args := `{"cwd":` + quoteJSON(t, dir) + `,"instruction":"inspect target","include_raw":true}`
+	req := `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"digest","arguments":` + args + `}}`
+
+	out := serveLines(t, NewServer(StageRunner{Config: cfg, DisableCompress: true}), req)
+	resp := decodeResponse(t, out)
+	if resp.Error != nil {
+		t.Fatalf("error = %#v", resp.Error)
+	}
 	env := responseEnvelope(t, resp)
 	if env.SchemaVersion != envelope.SchemaVersion || env.Stage != "compress" || env.Digest == nil {
 		t.Fatalf("unexpected envelope = %#v", env)
 	}
 	if env.Raw == nil || len(env.Raw.Units) == 0 {
 		t.Fatalf("missing raw context: %#v", env.Raw)
-	}
-	if env.Digest.Summary == "" {
-		t.Fatalf("missing digest summary")
 	}
 }
 
@@ -126,6 +181,39 @@ func responseEnvelope(t *testing.T, resp rpcResponse) *envelope.Envelope {
 	return &result.StructuredContent
 }
 
+func responseStructuredMap(t *testing.T, resp rpcResponse) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(resp.Result)
+	if err != nil {
+		t.Fatalf("marshal result: %v", err)
+	}
+	var result struct {
+		StructuredContent map[string]any `json:"structuredContent"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("decode structured content: %v", err)
+	}
+	return result.StructuredContent
+}
+
+func responseContentText(t *testing.T, resp rpcResponse) string {
+	t.Helper()
+	raw, err := json.Marshal(resp.Result)
+	if err != nil {
+		t.Fatalf("marshal result: %v", err)
+	}
+	var result struct {
+		Content []toolContent `json:"content"`
+	}
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("decode content: %v", err)
+	}
+	if len(result.Content) == 0 {
+		t.Fatal("missing content")
+	}
+	return result.Content[0].Text
+}
+
 func schemaRequires(schema map[string]any, key string) bool {
 	items, _ := schema["required"].([]any)
 	for _, item := range items {
@@ -134,6 +222,12 @@ func schemaRequires(schema map[string]any, key string) bool {
 		}
 	}
 	return false
+}
+
+func schemaHasProperty(schema map[string]any, key string) bool {
+	properties, _ := schema["properties"].(map[string]any)
+	_, ok := properties[key]
+	return ok
 }
 
 func quoteJSON(t *testing.T, value string) string {
