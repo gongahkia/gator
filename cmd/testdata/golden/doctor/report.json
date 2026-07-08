@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "version": "dev",
+  "cwd": "/work",
+  "summary": {
+    "ok": 1,
+    "warning": 1,
+    "error": 1,
+    "fixed": 1,
+    "planned": 1,
+    "skipped": 1
+  },
+  "findings": [
+    {
+      "id": "system.runtime",
+      "section": "system",
+      "severity": "info",
+      "status": "ok",
+      "message": "runtime detected",
+      "detail": "darwin/arm64",
+      "metadata": {
+        "go": "go1.26.5"
+      }
+    },
+    {
+      "id": "config.bootstrap",
+      "section": "config",
+      "severity": "info",
+      "status": "plan",
+      "message": "would create config",
+      "path": "/work/.paw/config.toml"
+    }
+  ]
+}

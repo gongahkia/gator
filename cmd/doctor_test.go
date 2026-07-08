@@ -94,6 +94,24 @@ func TestDoctorJSONOutput(t *testing.T) {
 	}
 }
 
+func TestDoctorJSONGolden(t *testing.T) {
+	report := doctorpkg.Report{
+		SchemaVersion: 1,
+		Version:       "dev",
+		CWD:           "/work",
+		Summary:       doctorpkg.Summary{OK: 1, Warning: 1, Error: 1, Fixed: 1, Planned: 1, Skipped: 1},
+		Findings: []doctorpkg.Finding{
+			{ID: "system.runtime", Section: "system", Severity: doctorpkg.SeverityInfo, Status: doctorpkg.StatusOK, Message: "runtime detected", Detail: "darwin/arm64", Metadata: map[string]string{"go": "go1.26.5"}},
+			{ID: "config.bootstrap", Section: "config", Severity: doctorpkg.SeverityInfo, Status: doctorpkg.StatusPlanned, Message: "would create config", Path: "/work/.paw/config.toml"},
+		},
+	}
+	data, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal report: %v", err)
+	}
+	assertGoldenText(t, filepath.Join("doctor", "report.json"), string(data)+"\n")
+}
+
 func TestDoctorLintFailsOnWarning(t *testing.T) {
 	isolateEnv(t)
 	dir := t.TempDir()
