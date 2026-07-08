@@ -11,8 +11,9 @@ Every populated row must include the reproducibility metadata described in [Repr
 | run_id | commit | config | dataset | brain_model | drone_model | hardware | date | tasks | wall_time | tokens_brain_in | tokens_brain_out | tokens_drone | pass_rate | trace_bundle |
 | --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | paw-smoke-raw | d91f8d0fe23a3f80527ad670bcd1208b266a0f87 | [raw](results-configs/paw-smoke-raw.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 5 | 68.0 | 756 | 242 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-raw |
-| tb2-no-compress-tbd | TBD | [no-compress](results-configs/example.toml) | terminal-bench@2.0.x | TBD | n/a | TBD | TBD | 0 | n/a | n/a | n/a | n/a | n/a | TBD |
+| paw-full-no-compress | 0df6ebe5459f8651fd168a344819bf1656326787 | [no-compress](results-configs/paw-full-no-compress.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-08 | 86 | 68.3 | 572 | 215 | 0 | 0.00 | .paw/bench-jobs/paw-full-no-compress |
 | paw-smoke-full | d91f8d0fe23a3f80527ad670bcd1208b266a0f87 | [full](results-configs/paw-smoke-full.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | openai/qwen2.5-coder:1.5b | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 5 | 93.3 | 562 | 132 | 0 | 0.00 | .paw/bench-jobs/paw-smoke-full |
+| paw-full-raw | 0df6ebe5459f8651fd168a344819bf1656326787 | [raw](results-configs/paw-full-raw.toml) | terminal-bench@2.0 | openai/qwen2.5-coder:1.5b | n/a | macOS arm64 Docker Desktop local Ollama | 2026-07-07 | 88 | 69.4 | 557 | 220 | 0 | 0.00 | .paw/bench-jobs/paw-full-raw |
 <!-- paw-results:end -->
 
 Smoke notes, 2026-07-07: Harbor 0.17.1, Ollama 0.31.1, `terminal-bench@2.0`,
