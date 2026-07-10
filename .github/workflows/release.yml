@@ -52,34 +52,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-
-      - name: Clone Homebrew tap
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          test -n "$HOMEBREW_TAP_TOKEN"
-          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/gongahkia/homebrew-paw.git" ../homebrew-paw
-
-      - name: Generate Homebrew formula
-        env:
-          TAG: ${{ github.ref_name }}
-          TAP_DIR: ../homebrew-paw
-          DIST_DIR: dist
-        run: bash .github/scripts/update-homebrew-formula.sh
-
-      - name: Push Homebrew formula
-        working-directory: ../homebrew-paw
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/paw.rb
-          if git diff --cached --quiet; then
-            echo "Homebrew formula unchanged"
-          else
-            git commit -m "Update paw to ${{ github.ref_name }}"
-            git push origin main
-          fi
 
   macos-validate:
     needs: goreleaser

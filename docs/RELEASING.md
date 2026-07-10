@@ -9,7 +9,6 @@ Configure these repository secrets before pushing a release tag:
 
 | secret | value |
 | --- | --- |
-| `HOMEBREW_TAP_TOKEN` | token that can push to `gongahkia/homebrew-paw` |
 | `MACOS_CERTIFICATE` | base64 encoded Developer ID Application `.p12` |
 | `MACOS_CERTIFICATE_PWD` | password for the `.p12` export |
 | `MACOS_KEYCHAIN_PWD` | reserved for a native macOS keychain signing fallback |
@@ -53,7 +52,7 @@ Paste those values into `MACOS_CERTIFICATE` and `MACOS_NOTARY_KEY`.
 
 4. The `release` workflow fails fast if signing/notarization secrets are missing.
 5. GoReleaser signs and notarizes darwin binaries before packaging release archives.
-6. The workflow publishes GitHub release assets and updates the Homebrew formula.
+6. The workflow publishes GitHub release assets.
 7. The `macos-validate` job downloads the published darwin archives on macOS and runs
    `codesign -v --strict --verbose=2`, `codesign -dv --verbose=4`, and
    `spctl -a -t exec -vv` on each extracted `paw` binary.
@@ -62,7 +61,7 @@ Paste those values into `MACOS_CERTIFICATE` and `MACOS_NOTARY_KEY`.
 
 The current pipeline uses GoReleaser's cross-platform macOS notarization path, which signs and
 notarizes standalone Mach-O binaries before they are placed in release archives. This matches the
-Homebrew formula and tarball install flow.
+tarball install flow.
 
 Do not add a stapling step to the current `tar.gz` archive path. If the project needs a stapled
 distributable, add a separate `.pkg` or `.dmg` release path and validate it with `xcrun stapler`.

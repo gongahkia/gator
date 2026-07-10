@@ -8,12 +8,6 @@ This project does not claim to invent small-model context compression. See [RELA
 
 ## Install
 
-With Homebrew:
-
-```sh
-brew install gongahkia/paw/paw
-```
-
 Quick install:
 
 ```sh

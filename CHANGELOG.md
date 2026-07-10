@@ -48,8 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   overrides, local OpenAI-compatible profiles, TLS options, and macOS local-model guidance.
 - Runtime observability through progress output, color controls, verbose trace mirroring,
   structured logging, typed exit codes, trace resume, trace stats, and AI-marker watch mode.
-- Release and maintenance scaffolding including GoReleaser, Homebrew tap publishing, curl
-  installer, SBOM generation, cross-platform CI, govulncheck, Dependabot, and pre-commit hooks.
+- Release and maintenance scaffolding including GoReleaser, curl installer, SBOM generation,
+  cross-platform CI, govulncheck, Dependabot, and pre-commit hooks.
 
 ### Changed
 
