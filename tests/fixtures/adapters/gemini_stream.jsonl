@@ -1,0 +1,6 @@
+{"type":"init","timestamp":"2026-07-16T00:00:00.000Z","session_id":"gemini-fixture","model":"gemini-test"}
+{"type":"message","timestamp":"2026-07-16T00:00:00.001Z","role":"user","content":"List project files."}
+{"type":"tool_use","timestamp":"2026-07-16T00:00:00.002Z","tool_name":"list_directory","tool_id":"tool-fixture","parameters":{"path":"."}}
+{"type":"tool_result","timestamp":"2026-07-16T00:00:00.003Z","tool_id":"tool-fixture","status":"success","output":"README.md"}
+{"type":"message","timestamp":"2026-07-16T00:00:00.004Z","role":"assistant","content":"README.md","delta":true}
+{"type":"result","timestamp":"2026-07-16T00:00:00.005Z","status":"success","stats":{"total_tokens":5,"input_tokens":2,"output_tokens":1,"cached":0,"input":2,"duration_ms":5,"tool_calls":1,"models":{"gemini-test":{"total_tokens":5,"input_tokens":2,"output_tokens":1,"cached":0,"input":2}}}}

@@ -36,6 +36,17 @@ assert(
 	"Claude fixture must preserve structured session and completion data"
 )
 
+local gemini = {}
+assert(fixtures.replay_jsonl(root .. "/gemini_stream.jsonl", function(record)
+	table.insert(gemini, record)
+end) == 6, "Gemini stream fixture must replay every record")
+assert(
+	gemini[1].session_id == "gemini-fixture"
+		and gemini[3].tool_name == "list_directory"
+		and gemini[6].status == "success",
+	"Gemini fixture must preserve session, tool, and completion data"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk
