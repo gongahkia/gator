@@ -6,6 +6,7 @@ local M = {
 	markdown = require("gator.ui.markdown"),
 	selection = require("gator.ui.selection"),
 	sidebar = require("gator.ui.sidebar"),
+	timeline = require("gator.ui.timeline"),
 }
 local panels = {}
 
