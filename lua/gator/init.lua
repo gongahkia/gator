@@ -4,6 +4,7 @@ local ui = require("gator.ui")
 
 local M = {
 	_state = nil,
+	error = require("gator.error"),
 	modules = {
 		core = "gator.core",
 		ui = "gator.ui",
