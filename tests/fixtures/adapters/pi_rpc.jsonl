@@ -1,0 +1,5 @@
+{"id":"gator-fixture","type":"response","command":"get_state","success":true,"data":{"sessionId":"pi-fixture","sessionFile":"/tmp/pi-fixture.jsonl","isStreaming":false}}
+{"id":"gator-fixture","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"fix-tests","description":"Fix failing tests","source":"prompt","location":"project","path":"/workspace/.pi/agent/prompts/fix-tests.md"}]}}
+{"id":"gator-fixture","type":"response","command":"prompt","success":true}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"gator-fixture"}]}}
+{"type":"agent_end","messages":[{"role":"assistant","content":[{"type":"text","text":"gator-fixture"}]}]}

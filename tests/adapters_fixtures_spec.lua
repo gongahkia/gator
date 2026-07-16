@@ -70,6 +70,19 @@ assert(
 	"OpenCode fixture must preserve ACP capabilities, sessions, and command updates"
 )
 
+local pi = {}
+assert(fixtures.replay_jsonl(root .. "/pi_rpc.jsonl", function(record)
+	table.insert(pi, record)
+end) == 5, "Pi RPC fixture must replay every record")
+assert(
+	pi[1].command == "get_state"
+		and pi[1].data.sessionId == "pi-fixture"
+		and pi[2].data.commands[1].source == "prompt"
+		and pi[4].message.content[1].text == "gator-fixture"
+		and pi[5].type == "agent_end",
+	"Pi fixture must preserve RPC state, commands, and streamed responses"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk
