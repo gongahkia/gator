@@ -9,6 +9,7 @@ local M = {
 	claude = require("gator.adapters.claude"),
 	claude_sessions = require("gator.adapters.claude_sessions"),
 	claude_policy = require("gator.adapters.claude_policy"),
+	claude_context = require("gator.adapters.claude_context"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
