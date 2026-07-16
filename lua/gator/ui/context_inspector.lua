@@ -1,0 +1,123 @@
+local pack = require("gator.context.pack")
+local M = {}
+local inspectors = {}
+
+local function fail(message)
+	error("Gator context inspector: " .. message, 3)
+end
+
+local function current()
+	local tabpage = vim.api.nvim_get_current_tabpage()
+	local inspector = inspectors[tabpage]
+	if inspector and vim.api.nvim_win_is_valid(inspector.window) then
+		return inspector, tabpage
+	end
+	inspectors[tabpage] = nil
+	return nil, tabpage
+end
+
+local function estimate(entry)
+	if entry.token_estimate.status == "estimated" then
+		return tostring(entry.token_estimate.tokens) .. " tokens"
+	end
+	return "unavailable: " .. entry.token_estimate.reason
+end
+
+local function transfer(entry)
+	if entry.transfer.eligible then
+		return "eligible"
+	end
+	return "ineligible: " .. entry.transfer.reason
+end
+
+local function render(inspector)
+	local lines = { "Gator context · " .. inspector.pack.task_id }
+	for _, entry in ipairs(inspector.pack.entries) do
+		local included = inspector.included[entry.id] and "included" or "excluded"
+		table.insert(lines, "[" .. included .. "] " .. entry.id .. " · " .. entry.kind)
+		table.insert(lines, "  ref: " .. entry.ref)
+		table.insert(lines, "  provenance: " .. entry.provenance.source .. " · " .. entry.provenance.ref)
+		table.insert(lines, "  trust: " .. entry.trust .. " · tokens: " .. estimate(entry))
+		table.insert(lines, "  transfer: " .. transfer(entry))
+	end
+	if #inspector.pack.entries == 0 then
+		table.insert(lines, "No context entries")
+	end
+	vim.api.nvim_buf_set_lines(inspector.buffer, 0, -1, false, lines)
+end
+
+function M.open(opts)
+	if type(opts) ~= "table" or not pack.is(opts.pack) or type(opts.on_confirm) ~= "function" then
+		fail("open requires a context pack and on_confirm callback")
+	end
+	local included = {}
+	for _, entry in ipairs(opts.pack.entries) do
+		included[entry.id] = entry.transfer.eligible
+	end
+	local inspector, tabpage = current()
+	if inspector then
+		inspector.pack = opts.pack
+		inspector.included = included
+		inspector.on_confirm = opts.on_confirm
+		render(inspector)
+		vim.api.nvim_set_current_win(inspector.window)
+		return inspector.window
+	end
+	vim.cmd("botright 14new")
+	local window = vim.api.nvim_get_current_win()
+	local buffer = vim.api.nvim_create_buf(false, true)
+	vim.bo[buffer].filetype = "gator-context"
+	vim.bo[buffer].bufhidden = "wipe"
+	vim.api.nvim_win_set_buf(window, buffer)
+	inspector =
+		{ window = window, buffer = buffer, pack = opts.pack, included = included, on_confirm = opts.on_confirm }
+	inspectors[tabpage] = inspector
+	render(inspector)
+	return window
+end
+
+function M.toggle(entry_id)
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	for _, entry in ipairs(inspector.pack.entries) do
+		if entry.id == entry_id then
+			if not entry.transfer.eligible then
+				fail("entry is not transfer-eligible: " .. entry_id)
+			end
+			inspector.included[entry_id] = not inspector.included[entry_id]
+			render(inspector)
+			return inspector.included[entry_id]
+		end
+	end
+	fail("entry is not present in the context pack: " .. tostring(entry_id))
+end
+
+function M.confirm()
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	local entries = {}
+	for _, entry in ipairs(inspector.pack.entries) do
+		if inspector.included[entry.id] then
+			table.insert(entries, entry)
+		end
+	end
+	local selected = pack.new({ id = inspector.pack.id, task_id = inspector.pack.task_id, entries = entries })
+	inspector.on_confirm(selected)
+	return selected
+end
+
+function M.close()
+	local inspector, tabpage = current()
+	if not inspector then
+		return false
+	end
+	vim.api.nvim_win_close(inspector.window, true)
+	inspectors[tabpage] = nil
+	return true
+end
+
+return M

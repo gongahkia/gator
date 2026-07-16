@@ -1,5 +1,10 @@
-local M =
-	{ name = "ui", api_version = 1, dashboard = require("gator.ui.dashboard"), sidebar = require("gator.ui.sidebar") }
+local M = {
+	name = "ui",
+	api_version = 1,
+	context_inspector = require("gator.ui.context_inspector"),
+	dashboard = require("gator.ui.dashboard"),
+	sidebar = require("gator.ui.sidebar"),
+}
 local panels = {}
 
 local function fail(message)
