@@ -84,4 +84,41 @@ function M.probe(opts)
 	}
 end
 
+function M.launch(opts)
+	if type(opts) ~= "table" or type(opts.manager) ~= "table" or type(opts.manager.launch) ~= "function" then
+		fail("launch requires a process manager")
+	end
+	for key in pairs(opts) do
+		if key ~= "manager" and key ~= "id" and key ~= "cwd" and key ~= "args" and key ~= "executable" then
+			fail("launch contains unsupported field: " .. tostring(key))
+		end
+	end
+	if type(opts.id) ~= "string" or not opts.id:match("^[a-z][a-z0-9_-]*$") then
+		fail("id must be a lowercase identifier")
+	end
+	if type(opts.cwd) ~= "string" or opts.cwd == "" then
+		fail("cwd must be a non-empty string")
+	end
+	local cwd = vim.uv.fs_realpath(opts.cwd)
+	if not cwd or vim.fn.isdirectory(cwd) ~= 1 then
+		fail("cwd must resolve to a directory")
+	end
+	local executable = opts.executable or "copilot"
+	if type(executable) ~= "string" or executable == "" then
+		fail("executable must be a non-empty string")
+	end
+	local args = opts.args or {}
+	if type(args) ~= "table" or not vim.islist(args) then
+		fail("args must be an array")
+	end
+	local argv = { executable }
+	for index, argument in ipairs(args) do
+		if type(argument) ~= "string" or argument == "" then
+			fail("argument " .. index .. " must be a non-empty string")
+		end
+		table.insert(argv, argument)
+	end
+	return opts.manager:launch({ id = opts.id, command = argv, cwd = cwd })
+end
+
 return M
