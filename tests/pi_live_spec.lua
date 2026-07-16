@@ -13,3 +13,8 @@ assert(
 		and value.capabilities.tool_filters,
 	"protected Pi verification requires the credential-free RPC profile"
 )
+local auth = pi.auth()
+assert(
+	not auth.authenticated and type(auth.reason) == "string",
+	"protected Pi verification must expose unavailable credential status explicitly"
+)

@@ -131,4 +131,38 @@ function M.probe(opts)
 	}
 end
 
+function M.auth()
+	return {
+		provider = "pi",
+		authenticated = false,
+		reason = "Pi RPC does not expose a non-interactive credential-status contract",
+	}
+end
+
+function M.launch(opts)
+	if type(opts) ~= "table" or type(opts.manager) ~= "table" or type(opts.manager.launch) ~= "function" then
+		fail("launch requires a process manager")
+	end
+	for key in pairs(opts) do
+		if key ~= "manager" and key ~= "id" and key ~= "cwd" and key ~= "executable" then
+			fail("launch contains unsupported field: " .. tostring(key))
+		end
+	end
+	if type(opts.id) ~= "string" or not opts.id:match("^[a-z][a-z0-9_-]*$") then
+		fail("id must be a lowercase identifier")
+	end
+	if type(opts.cwd) ~= "string" or opts.cwd == "" then
+		fail("cwd must be a non-empty string")
+	end
+	local cwd = vim.uv.fs_realpath(opts.cwd)
+	if not cwd or vim.fn.isdirectory(cwd) ~= 1 then
+		fail("cwd must resolve to a directory")
+	end
+	local executable = opts.executable or "pi"
+	if type(executable) ~= "string" or executable == "" then
+		fail("executable must be a non-empty string")
+	end
+	return opts.manager:launch({ id = opts.id, command = { executable, "--mode", "rpc" }, cwd = cwd })
+end
+
 return M

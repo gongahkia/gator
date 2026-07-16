@@ -53,3 +53,32 @@ assert(
 		and unsupported.capability_error,
 	"unverified Pi versions and unavailable RPC profiles must remain explicit"
 )
+local auth = pi.auth()
+assert(
+	not auth.authenticated and auth.reason == "Pi RPC does not expose a non-interactive credential-status contract",
+	"Pi authentication capability absence must remain explicit"
+)
+local launched
+local manager = {
+	launch = function(_, opts)
+		launched = opts
+		return { state = "running" }
+	end,
+}
+assert(
+	pi.launch({ manager = manager, id = "pi-run", cwd = vim.g.gator_test.root }).state == "running",
+	"Pi launch must use shared lifecycle management"
+)
+assert(
+	launched.command[1] == "pi"
+		and launched.command[2] == "--mode"
+		and launched.command[3] == "rpc"
+		and launched.cwd == vim.uv.fs_realpath(vim.g.gator_test.root),
+	"Pi launch must preserve native login and map cwd safely"
+)
+assert(not pcall(pi.launch, {
+	manager = manager,
+	id = "pi-run",
+	cwd = vim.g.gator_test.root,
+	token = "secret",
+}), "Pi launch must reject credential fields")
