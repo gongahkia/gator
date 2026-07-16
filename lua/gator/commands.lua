@@ -22,6 +22,15 @@ function M.register()
 		range = true,
 		desc = "Capture visual selection for task:<id> or session:<provider>:<id>",
 	})
+	vim.api.nvim_create_user_command("GatorPalette", function(opts)
+		require("gator.ui").palette.execute(opts.args)
+	end, {
+		nargs = 1,
+		complete = function(arglead)
+			return require("gator.ui").palette.complete(arglead)
+		end,
+		desc = "Run a registered Gator action, adapter, task, or provider command",
+	})
 end
 
 return M
