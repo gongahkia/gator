@@ -1,0 +1,3 @@
+{"jsonrpc":"2.0","method":"session/update","params":{"text":"hello"}}
+{"jsonrpc":"2.0","id":1,"result":{"session":"native-1"}}
+{"jsonrpc":"2.0","id":2,"error":{"code":-32601,"message":"unsupported"}}
