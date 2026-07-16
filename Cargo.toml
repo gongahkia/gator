@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/gator-index"]
+resolver = "2"

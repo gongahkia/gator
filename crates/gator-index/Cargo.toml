@@ -1,0 +1,10 @@
+[package]
+name = "gator-index"
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[[bin]]
+name = "gator-index"
+path = "src/main.rs"
