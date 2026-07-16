@@ -11,6 +11,7 @@ local M = {
 	claude_policy = require("gator.adapters.claude_policy"),
 	claude_context = require("gator.adapters.claude_context"),
 	gemini = require("gator.adapters.gemini"),
+	gemini_sessions = require("gator.adapters.gemini_sessions"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
