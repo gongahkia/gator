@@ -1,4 +1,4 @@
-local M = { name = "ui", api_version = 1 }
+local M = { name = "ui", api_version = 1, sidebar = require("gator.ui.sidebar") }
 local panels = {}
 
 local function fail(message)
