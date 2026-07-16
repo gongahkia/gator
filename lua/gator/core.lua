@@ -1,6 +1,7 @@
 local M = {
 	name = "core",
 	api_version = 1,
+	database = require("gator.core.database"),
 	lifecycle = require("gator.core.lifecycle"),
 	run = require("gator.core.run"),
 	session = require("gator.core.session"),
