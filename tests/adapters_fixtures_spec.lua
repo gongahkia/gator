@@ -27,6 +27,15 @@ assert(
 	"Codex fixture must preserve authenticated app-server traffic"
 )
 
+local claude = {}
+assert(fixtures.replay_jsonl(root .. "/claude_stream.jsonl", function(record)
+	table.insert(claude, record)
+end) == 3, "Claude stream fixture must replay every record")
+assert(
+	claude[1].session_id == "claude-fixture" and claude[3].subtype == "success",
+	"Claude fixture must preserve structured session and completion data"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk
