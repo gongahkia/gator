@@ -90,6 +90,36 @@ fn index(params: &Value) -> Result<Value, &'static str> {
     Ok(json!({"files": files}))
 }
 
+fn chunks(params: &Value) -> Result<Value, &'static str> {
+    let text = params
+        .get("text")
+        .and_then(Value::as_str)
+        .ok_or("chunk requires params.text")?;
+    let language = params
+        .get("language")
+        .and_then(Value::as_str)
+        .unwrap_or("text");
+    let lines: Vec<&str> = text.lines().collect();
+    let spans = params
+        .get("tree_sitter_spans")
+        .and_then(Value::as_array)
+        .filter(|spans| !spans.is_empty());
+    let chunks: Vec<Value> = if let Some(spans) = spans {
+        spans.iter().map(|span| {
+            let start = span.get("start_line").and_then(Value::as_u64).ok_or("Tree-sitter span requires start_line")? as usize;
+            let end = span.get("end_line").and_then(Value::as_u64).ok_or("Tree-sitter span requires end_line")? as usize;
+            if start == 0 || end < start || end > lines.len() { return Err("Tree-sitter span is outside document"); }
+            Ok(json!({"id": format!("{}:{}:{}", language, start, end), "source": "tree-sitter", "start_line": start, "end_line": end, "text": lines[start - 1..end].join("\n")}))
+        }).collect::<Result<_, _>>()?
+    } else {
+        lines.chunks(32).enumerate().map(|(index, chunk)| {
+            let start = index * 32 + 1; let end = start + chunk.len() - 1;
+            json!({"id": format!("{}:{}:{}", language, start, end), "source": "text", "start_line": start, "end_line": end, "text": chunk.join("\n")})
+        }).collect()
+    };
+    Ok(json!({"chunks": chunks}))
+}
+
 fn handle(request: Request) -> Value {
     if request.version != PROTOCOL_VERSION {
         return error(Some(&request.id), "unsupported protocol version");
@@ -97,6 +127,7 @@ fn handle(request: Request) -> Value {
     let result = match request.method.as_str() {
         "health" => Ok(json!({"status": "healthy", "protocol_version": PROTOCOL_VERSION})),
         "index" => index(&request.params),
+        "chunk" => chunks(&request.params),
         "cancel" => request
             .params
             .get("request_id")
@@ -189,5 +220,13 @@ mod tests {
         let result = index(&json!({"root": root, "approved_tracked": ["tracked.txt"], "approved_untracked": ["selected.txt", "ignored.txt"]})).unwrap();
         assert_eq!(result["files"], json!(["selected.txt", "tracked.txt"]));
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn chunks_prefer_tree_sitter_spans() {
+        let parsed = chunks(&json!({"language":"lua","text":"one\ntwo\nthree","tree_sitter_spans":[{"start_line":2,"end_line":3}]})).unwrap();
+        assert_eq!(parsed["chunks"][0]["source"], "tree-sitter");
+        let fallback = chunks(&json!({"text":"one\ntwo"})).unwrap();
+        assert_eq!(fallback["chunks"][0]["source"], "text");
     }
 }
