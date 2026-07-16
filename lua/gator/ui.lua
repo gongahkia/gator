@@ -8,6 +8,7 @@ local M = {
 	selection = require("gator.ui.selection"),
 	sidebar = require("gator.ui.sidebar"),
 	timeline = require("gator.ui.timeline"),
+	workspace_dashboard = require("gator.ui.workspace_dashboard"),
 }
 local panels = {}
 
