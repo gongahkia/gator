@@ -13,6 +13,9 @@ local context_pack = pack.new({
 			trust = "repository",
 			token_estimate = { status = "estimated", tokens = 42 },
 			transfer = { eligible = true },
+			revision = "sha256:fixture",
+			retrieval_source = "repository-index",
+			policy_decision = "allowed by project policy",
 		},
 		{
 			id = "entry-two",
@@ -34,6 +37,14 @@ local window = context_inspector.open({
 })
 
 assert(vim.api.nvim_win_is_valid(window), "context inspector opening must create a window")
+local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false)
+assert(
+	vim.tbl_contains(lines, "  source path: HEAD")
+		and vim.tbl_contains(lines, "  revision: sha256:fixture")
+		and vim.tbl_contains(lines, "  retrieval source: repository-index")
+		and vim.tbl_contains(lines, "  policy: allowed by project policy"),
+	"context inspector must render provenance, trust, and policy metadata"
+)
 assert(not context_inspector.toggle("entry-one"), "eligible context entries must be excludable")
 assert(context_inspector.toggle("entry-one"), "eligible context entries must be includable")
 context_inspector.add({

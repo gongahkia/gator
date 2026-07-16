@@ -30,14 +30,27 @@ local function transfer(entry)
 	return "ineligible: " .. entry.transfer.reason
 end
 
+local function policy(entry)
+	if entry.policy_decision then
+		return entry.policy_decision
+	end
+	if entry.transfer.eligible then
+		return "allowed by transfer eligibility"
+	end
+	return "blocked: " .. entry.transfer.reason
+end
+
 local function render(inspector)
 	local lines = { "Gator context · " .. inspector.pack.task_id }
 	for _, entry in ipairs(inspector.pack.entries) do
 		local included = inspector.included[entry.id] and "included" or "excluded"
 		table.insert(lines, "[" .. included .. "] " .. entry.id .. " · " .. entry.kind)
 		table.insert(lines, "  ref: " .. entry.ref)
-		table.insert(lines, "  provenance: " .. entry.provenance.source .. " · " .. entry.provenance.ref)
+		table.insert(lines, "  source path: " .. entry.provenance.ref)
+		table.insert(lines, "  revision: " .. (entry.revision or "unavailable"))
+		table.insert(lines, "  retrieval source: " .. (entry.retrieval_source or entry.provenance.source))
 		table.insert(lines, "  trust: " .. entry.trust .. " · tokens: " .. estimate(entry))
+		table.insert(lines, "  policy: " .. policy(entry))
 		table.insert(lines, "  transfer: " .. transfer(entry))
 		if entry.pinned then
 			table.insert(lines, "  pinned")

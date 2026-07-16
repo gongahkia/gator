@@ -91,6 +91,9 @@ function M.entry(attrs)
 		transfer = true,
 		annotation = true,
 		pinned = true,
+		revision = true,
+		retrieval_source = true,
+		policy_decision = true,
 	}, "entry")
 	local trust = require_string(attrs.trust, "entry.trust")
 	if not M.trust[trust] then
@@ -103,6 +106,11 @@ function M.entry(attrs)
 	if attrs.pinned ~= nil and type(attrs.pinned) ~= "boolean" then
 		fail("entry.pinned must be a boolean")
 	end
+	for _, key in ipairs({ "revision", "retrieval_source", "policy_decision" }) do
+		if attrs[key] ~= nil and (type(attrs[key]) ~= "string" or attrs[key] == "") then
+			fail("entry." .. key .. " must be a non-empty string")
+		end
+	end
 	return {
 		id = require_identifier(attrs.id, "entry.id"),
 		kind = require_string(attrs.kind, "entry.kind"),
@@ -113,6 +121,9 @@ function M.entry(attrs)
 		transfer = transfer(attrs.transfer),
 		annotation = annotation,
 		pinned = attrs.pinned or false,
+		revision = attrs.revision,
+		retrieval_source = attrs.retrieval_source,
+		policy_decision = attrs.policy_decision,
 	}
 end
 
