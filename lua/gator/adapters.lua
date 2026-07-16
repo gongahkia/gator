@@ -2,6 +2,7 @@ local M = {
 	name = "adapters",
 	api_version = 1,
 	capabilities = require("gator.adapters.capabilities"),
+	codex = require("gator.adapters.codex"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
