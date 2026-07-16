@@ -2,6 +2,7 @@ local M = {
 	name = "workspace",
 	api_version = 1,
 	branch = require("gator.workspace.branch"),
+	cleanup = require("gator.workspace.cleanup"),
 	links = require("gator.workspace.links"),
 	monitor = require("gator.workspace.monitor"),
 	policy = require("gator.workspace.policy"),
