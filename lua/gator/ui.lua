@@ -1,4 +1,4 @@
-local M = {}
+local M = { name = "ui", api_version = 1 }
 
 function M.open(state)
   local buf = vim.api.nvim_create_buf(false, true)
