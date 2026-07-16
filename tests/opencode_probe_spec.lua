@@ -22,6 +22,7 @@ assert(
 		and value.capabilities.session_list
 		and value.capabilities.session_close
 		and value.capabilities.session_fork
+		and value.capabilities.session_resume
 		and value.capabilities.mcp_http
 		and value.capabilities.mcp_sse,
 	"OpenCode probe must expose the initialized ACP capability profile"

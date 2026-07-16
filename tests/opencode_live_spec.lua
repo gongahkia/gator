@@ -11,7 +11,8 @@ assert(
 		and value.capabilities.load_session
 		and value.capabilities.session_list
 		and value.capabilities.session_close
-		and value.capabilities.session_fork,
+		and value.capabilities.session_fork
+		and value.capabilities.session_resume,
 	"protected OpenCode verification requires the initialized ACP session profile"
 )
 local auth = opencode.auth()

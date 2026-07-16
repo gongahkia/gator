@@ -117,6 +117,7 @@ function M.probe(opts)
 			session_list = valid and session_capability(agent, "list"),
 			session_close = valid and session_capability(agent, "close"),
 			session_fork = valid and session_capability(agent, "fork"),
+			session_resume = valid and session_capability(agent, "resume"),
 			mcp_http = valid and capability(mcp, "http"),
 			mcp_sse = valid and capability(mcp, "sse"),
 			embedded_context = valid and capability(prompt, "embeddedContext"),
