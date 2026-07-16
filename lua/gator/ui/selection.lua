@@ -52,9 +52,27 @@ local function sequence(state)
 	return state.context.selection_sequence
 end
 
+local function surrounding(buffer, first_line, last_line, line_count)
+	local before_first = math.max(1, first_line - 3)
+	local after_last = math.min(line_count, last_line + 3)
+	return {
+		before = {
+			first_line = before_first,
+			last_line = first_line - 1,
+			lines = vim.api.nvim_buf_get_lines(buffer, before_first - 1, first_line - 1, false),
+		},
+		after = {
+			first_line = last_line + 1,
+			last_line = after_last,
+			lines = vim.api.nvim_buf_get_lines(buffer, last_line, after_last, false),
+		},
+	}
+end
+
 function M.capture(state, target_value, source_value)
 	local destination = target(target_value)
 	local buffer, first_line, last_line = source(source_value)
+	local line_count = vim.api.nvim_buf_line_count(buffer)
 	local id = "selection-" .. sequence(state)
 	local name = vim.api.nvim_buf_get_name(buffer)
 	if name == "" then
@@ -77,6 +95,7 @@ function M.capture(state, target_value, source_value)
 		language = vim.bo[buffer].filetype,
 		revision = vim.api.nvim_buf_get_changedtick(buffer),
 		range = { first_line = first_line, last_line = last_line },
+		surrounding = surrounding(buffer, first_line, last_line, line_count),
 	}
 	state.context.selections = state.context.selections or {}
 	if type(state.context.selections) ~= "table" or not vim.islist(state.context.selections) then

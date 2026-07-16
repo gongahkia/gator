@@ -1,10 +1,22 @@
 local gator = require("gator")
 local selection = require("gator.ui").selection
 
+if not gator._state then
+	gator.setup()
+end
+if vim.fn.exists(":GatorCaptureSelection") ~= 2 then
+	require("gator.commands").register()
+end
 assert(gator._state, "selection actions require the initialized Gator state")
-vim.api.nvim_buf_set_lines(0, 0, -1, false, { "first selected line", "second selected line", "other line" })
+vim.api.nvim_buf_set_lines(
+	0,
+	0,
+	-1,
+	false,
+	{ "context before", "first selected line", "second selected line", "context after" }
+)
 vim.bo.filetype = "gator-test"
-vim.cmd("1,2GatorCaptureSelection task:task-selection")
+vim.cmd("2,3GatorCaptureSelection task:task-selection")
 
 local task_capture = gator._state.context.selections[1]
 assert(
@@ -18,8 +30,13 @@ assert(
 	"selection actions must retain selected lines"
 )
 assert(task_capture.language == "gator-test", "selection actions must retain buffer language")
+assert(
+	task_capture.surrounding.before.lines[1] == "context before"
+		and task_capture.surrounding.after.lines[1] == "context after",
+	"selection actions must retain surrounding context metadata"
+)
 
-vim.cmd("3GatorCaptureSelection session:codex:native-one")
+vim.cmd("4GatorCaptureSelection session:codex:native-one")
 local session_capture = gator._state.context.selections[2]
 assert(
 	session_capture.target.kind == "session"
