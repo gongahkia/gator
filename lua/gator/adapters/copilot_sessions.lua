@@ -18,13 +18,6 @@ local function id(value, name)
 	return value
 end
 
-local function cwd(value)
-	if type(value) ~= "string" or value == "" then
-		fail("cwd must be a non-empty string")
-	end
-	return value
-end
-
 local function request(callback, method, params)
 	local ok, result = pcall(callback, method, params)
 	if not ok or type(result) ~= "table" then
@@ -44,22 +37,18 @@ function M.create(opts)
 	if type(opts) ~= "table" then
 		fail("create requires request and cwd")
 	end
-	return session(request(client(opts.request), "session/new", { cwd = cwd(opts.cwd), mcpServers = {} }))
+	if type(opts.cwd) ~= "string" or opts.cwd == "" then
+		fail("cwd must be a non-empty string")
+	end
+	return session(request(client(opts.request), "session/new", { cwd = opts.cwd, mcpServers = {} }))
 end
 
 function M.list()
 	return { available = false, reason = "Copilot ACP does not advertise a documented session-list contract" }
 end
 
-function M.resume(opts)
-	if type(opts) ~= "table" then
-		fail("resume requires request, id, and cwd")
-	end
-	return session(request(client(opts.request), "session/load", {
-		sessionId = id(opts.id, "id"),
-		cwd = cwd(opts.cwd),
-		mcpServers = {},
-	}))
+function M.resume()
+	return { available = false, reason = "Copilot ACP 0.0.x does not advertise session loading" }
 end
 
 function M.close()
