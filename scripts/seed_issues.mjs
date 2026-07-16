@@ -262,6 +262,10 @@ async function parallel(items, limit, action) {
   }));
 }
 
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function main() {
   const existing = await run(["issue", "list", "--repo", repo, "--state", "all", "--limit", "1000", "--json", "title"]);
   const titles = new Set(JSON.parse(existing).map((issue) => issue.title));
@@ -269,6 +273,7 @@ async function main() {
   const milestoneNumbers = await ensureMilestones();
   const missing = tasks.filter((task) => !titles.has(task.title));
   const limit = Number(process.env.GATOR_ISSUE_LIMIT || missing.length);
+  const delayMs = Number(process.env.GATOR_ISSUE_DELAY_MS || 0);
   const batch = missing.slice(0, limit);
   await parallel(batch, 1, async (task) => {
     const infrastructure = ["foundation", "indexer", "extensions", "telemetry", "performance"].includes(task.area);
@@ -278,6 +283,7 @@ async function main() {
       labels: ["status:backlog", infrastructure ? "type:infrastructure" : "type:feature", "priority:high", `area:${task.area}`],
       milestone: milestoneNumbers.get(milestoneFor[task.area]),
     });
+    if (delayMs > 0) await delay(delayMs);
   });
   console.log(`Gator backlog: ${tasks.length - missing.length} existing, ${batch.length} created, ${tasks.length} total.`);
 }
