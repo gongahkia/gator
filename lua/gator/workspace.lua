@@ -9,6 +9,7 @@ local M = {
 	policy = require("gator.workspace.policy"),
 	repository = require("gator.workspace.repository"),
 	scheduler = require("gator.workspace.scheduler"),
+	snapshot = require("gator.workspace.snapshot"),
 	switch = require("gator.workspace.switch"),
 	worktree = require("gator.workspace.worktree"),
 }
