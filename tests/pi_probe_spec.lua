@@ -22,7 +22,10 @@ assert(
 		and value.capabilities.rpc
 		and value.capabilities.stdio
 		and value.capabilities.state
-		and value.capabilities.sessions
+		and value.capabilities.session_create
+		and value.capabilities.session_resume
+		and not value.capabilities.session_list
+		and not value.capabilities.session_close
 		and value.capabilities.tool_filters,
 	"Pi probe must expose the initialized RPC capability profile"
 )

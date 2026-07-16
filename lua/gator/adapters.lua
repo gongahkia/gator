@@ -23,6 +23,7 @@ local M = {
 	opencode_policy = require("gator.adapters.opencode_policy"),
 	opencode_context = require("gator.adapters.opencode_context"),
 	pi = require("gator.adapters.pi"),
+	pi_sessions = require("gator.adapters.pi_sessions"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),

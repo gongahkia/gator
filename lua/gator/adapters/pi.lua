@@ -122,9 +122,10 @@ function M.probe(opts)
 			rpc = valid,
 			stdio = valid,
 			state = valid,
-			sessions = output:find("--continue", 1, true) ~= nil
-				and output:find("--resume", 1, true) ~= nil
-				and output:find("--session", 1, true) ~= nil,
+			session_create = valid,
+			session_resume = valid,
+			session_list = false,
+			session_close = false,
 			tool_filters = output:find("--tools", 1, true) ~= nil and output:find("--exclude-tools", 1, true) ~= nil,
 		},
 		capability_error = valid and nil or "Pi RPC get_state is unavailable",

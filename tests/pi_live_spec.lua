@@ -9,7 +9,10 @@ assert(
 	value.capabilities.rpc
 		and value.capabilities.stdio
 		and value.capabilities.state
-		and value.capabilities.sessions
+		and value.capabilities.session_create
+		and value.capabilities.session_resume
+		and not value.capabilities.session_list
+		and not value.capabilities.session_close
 		and value.capabilities.tool_filters,
 	"protected Pi verification requires the credential-free RPC profile"
 )
