@@ -1,10 +1,18 @@
-.PHONY: test indexer-test fmt format-check check issues
+.PHONY: test fixture-test indexer-test sidecar fmt format-check lint check issues
+
+NVIM_TEST = nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
 test:
-	nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
+	$(NVIM_TEST)
+
+fixture-test:
+	GATOR_TEST_GLOB='adapters_fixtures_spec.lua' $(NVIM_TEST)
 
 indexer-test:
 	cargo test --manifest-path crates/gator-index/Cargo.toml
+
+sidecar:
+	cargo run --manifest-path crates/gator-index/Cargo.toml --quiet
 
 fmt:
 	stylua lua plugin tests
@@ -14,7 +22,10 @@ format-check:
 	stylua --check lua plugin tests
 	cargo fmt --manifest-path crates/gator-index/Cargo.toml --check
 
-check: test indexer-test format-check
+lint:
+	nvim --headless --noplugin -i NONE -u NONE -c "lua dofile('tests/lint.lua')"
+
+check: test indexer-test format-check lint
 
 issues:
 	node scripts/seed_issues.mjs
