@@ -1,6 +1,9 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
+use std::path::Path;
+use std::process::Command;
 
 const PROTOCOL_VERSION: u32 = 1;
 
@@ -17,13 +20,83 @@ fn error(id: Option<&str>, message: &str) -> Value {
     json!({"version": PROTOCOL_VERSION, "id": id, "ok": false, "error": message})
 }
 
+fn approved(params: &Value, name: &str) -> Result<HashSet<String>, &'static str> {
+    params
+        .get(name)
+        .and_then(Value::as_array)
+        .ok_or("index requires explicit approved file lists")?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .filter(|path| !path.is_empty())
+                .map(str::to_owned)
+                .ok_or("approved file paths must be non-empty strings")
+        })
+        .collect()
+}
+
+fn git_files(root: &Path, args: &[&str]) -> Result<Vec<String>, &'static str> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|_| "Git is unavailable")?;
+    if !output.status.success() {
+        return Err("Git file scan failed");
+    }
+    String::from_utf8(output.stdout)
+        .map_err(|_| "Git file scan returned invalid UTF-8")?
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .map(str::to_owned)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|path| {
+            if Path::new(&path).is_relative() && !path.split('/').any(|part| part == "..") {
+                Ok(path)
+            } else {
+                Err("Git returned unsafe path")
+            }
+        })
+        .collect()
+}
+
+fn index(params: &Value) -> Result<Value, &'static str> {
+    let root = params
+        .get("root")
+        .and_then(Value::as_str)
+        .filter(|root| !root.is_empty())
+        .ok_or("index requires params.root")?;
+    let root = Path::new(root)
+        .canonicalize()
+        .map_err(|_| "index root is unavailable")?;
+    if !root.is_dir() {
+        return Err("index root is unavailable");
+    }
+    let tracked = approved(params, "approved_tracked")?;
+    let untracked = approved(params, "approved_untracked")?;
+    let mut files: Vec<String> = git_files(&root, &["ls-files", "-z"])?
+        .into_iter()
+        .filter(|path| tracked.contains(path))
+        .collect();
+    files.extend(
+        git_files(&root, &["ls-files", "-o", "--exclude-standard", "-z"])?
+            .into_iter()
+            .filter(|path| untracked.contains(path)),
+    );
+    files.sort();
+    files.dedup();
+    Ok(json!({"files": files}))
+}
+
 fn handle(request: Request) -> Value {
     if request.version != PROTOCOL_VERSION {
         return error(Some(&request.id), "unsupported protocol version");
     }
     let result = match request.method.as_str() {
         "health" => Ok(json!({"status": "healthy", "protocol_version": PROTOCOL_VERSION})),
-        "index" => Ok(json!({"accepted": true, "request": request.params})),
+        "index" => index(&request.params),
         "cancel" => request
             .params
             .get("request_id")
@@ -61,6 +134,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn health_is_versioned() {
@@ -83,5 +157,37 @@ mod tests {
             params: json!({}),
         });
         assert_eq!(response["ok"], false);
+    }
+
+    #[test]
+    fn approved_lists_require_strings() {
+        assert!(approved(&json!({"approved_tracked": ["a"]}), "approved_tracked").is_ok());
+        assert!(approved(&json!({"approved_tracked": [1]}), "approved_tracked").is_err());
+    }
+
+    #[test]
+    fn index_filters_git_files_by_policy() {
+        let root = std::env::temp_dir().join(format!("gator-index-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        assert!(Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&root)
+            .status()
+            .unwrap()
+            .success());
+        fs::write(root.join("tracked.txt"), "tracked").unwrap();
+        fs::write(root.join("selected.txt"), "selected").unwrap();
+        fs::write(root.join("ignored.txt"), "ignored").unwrap();
+        fs::write(root.join(".gitignore"), "ignored.txt\n").unwrap();
+        assert!(Command::new("git")
+            .args(["add", "tracked.txt"])
+            .current_dir(&root)
+            .status()
+            .unwrap()
+            .success());
+        let result = index(&json!({"root": root, "approved_tracked": ["tracked.txt"], "approved_untracked": ["selected.txt", "ignored.txt"]})).unwrap();
+        assert_eq!(result["files"], json!(["selected.txt", "tracked.txt"]));
+        fs::remove_dir_all(root).unwrap();
     }
 }
