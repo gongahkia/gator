@@ -4,6 +4,7 @@ local M = {
 	context_inspector = require("gator.ui.context_inspector"),
 	dashboard = require("gator.ui.dashboard"),
 	diff_review = require("gator.ui.diff_review"),
+	accessibility = require("gator.ui.accessibility"),
 	markdown = require("gator.ui.markdown"),
 	palette = require("gator.ui.palette"),
 	picker = require("gator.ui.picker"),
