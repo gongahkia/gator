@@ -167,6 +167,49 @@ fn embed(params: &Value) -> Result<Value, &'static str> {
     Ok(json!({"provider":"local-command","vector":vector}))
 }
 
+fn cloud_embed(params: &Value) -> Result<Value, &'static str> {
+    if params.get("privacy_consent") != Some(&Value::Bool(true)) {
+        return Err("cloud embedding requires explicit privacy consent");
+    }
+    let endpoint = params
+        .get("endpoint")
+        .and_then(Value::as_str)
+        .filter(|value| value.starts_with("https://"))
+        .ok_or("cloud embedding requires an HTTPS endpoint")?;
+    let credential_env = params
+        .get("credential_env")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or("cloud embedding requires credential_env")?;
+    let input = params
+        .get("input")
+        .and_then(Value::as_str)
+        .ok_or("cloud embedding requires params.input")?;
+    let credential =
+        std::env::var(credential_env).map_err(|_| "cloud embedding credential is unavailable")?;
+    let response: Value = reqwest::blocking::Client::new()
+        .post(endpoint)
+        .bearer_auth(credential)
+        .json(&json!({"input": input}))
+        .send()
+        .map_err(|_| "cloud embedding request failed")?
+        .error_for_status()
+        .map_err(|_| "cloud embedding request failed")?
+        .json()
+        .map_err(|_| "cloud embedding response is invalid")?;
+    let vector = response
+        .get("vector")
+        .and_then(Value::as_array)
+        .filter(|values| {
+            !values.is_empty()
+                && values
+                    .iter()
+                    .all(|value| value.as_f64().is_some_and(f64::is_finite))
+        })
+        .ok_or("cloud embedding response is invalid")?;
+    Ok(json!({"provider":"cloud","vector":vector}))
+}
+
 fn handle(request: Request) -> Value {
     if request.version != PROTOCOL_VERSION {
         return error(Some(&request.id), "unsupported protocol version");
@@ -176,6 +219,7 @@ fn handle(request: Request) -> Value {
         "index" => index(&request.params),
         "chunk" => chunks(&request.params),
         "embed" => embed(&request.params),
+        "cloud_embed" => cloud_embed(&request.params),
         "cancel" => request
             .params
             .get("request_id")
@@ -281,5 +325,13 @@ mod tests {
     #[test]
     fn embedding_requires_absolute_executable() {
         assert!(embed(&json!({"input":"text","command":["provider"]})).is_err());
+    }
+
+    #[test]
+    fn cloud_embedding_requires_consent_before_credentials() {
+        assert!(cloud_embed(
+            &json!({"endpoint":"https://example.test","credential_env":"MISSING","input":"text"})
+        )
+        .is_err());
     }
 }
