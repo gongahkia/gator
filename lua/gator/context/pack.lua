@@ -89,10 +89,19 @@ function M.entry(attrs)
 		trust = true,
 		token_estimate = true,
 		transfer = true,
+		annotation = true,
+		pinned = true,
 	}, "entry")
 	local trust = require_string(attrs.trust, "entry.trust")
 	if not M.trust[trust] then
 		fail("entry.trust is unknown: " .. trust)
+	end
+	local annotation = attrs.annotation
+	if annotation ~= nil then
+		annotation = require_string(annotation, "entry.annotation")
+	end
+	if attrs.pinned ~= nil and type(attrs.pinned) ~= "boolean" then
+		fail("entry.pinned must be a boolean")
 	end
 	return {
 		id = require_identifier(attrs.id, "entry.id"),
@@ -102,6 +111,8 @@ function M.entry(attrs)
 		trust = trust,
 		token_estimate = estimate(attrs.token_estimate),
 		transfer = transfer(attrs.transfer),
+		annotation = annotation,
+		pinned = attrs.pinned or false,
 	}
 end
 

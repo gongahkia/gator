@@ -36,9 +36,29 @@ local window = context_inspector.open({
 assert(vim.api.nvim_win_is_valid(window), "context inspector opening must create a window")
 assert(not context_inspector.toggle("entry-one"), "eligible context entries must be excludable")
 assert(context_inspector.toggle("entry-one"), "eligible context entries must be includable")
+context_inspector.add({
+	id = "entry-three",
+	kind = "diff",
+	ref = "diff://one",
+	provenance = { source = "repository", ref = "HEAD" },
+	trust = "repository",
+	token_estimate = { status = "estimated", tokens = 7 },
+	transfer = { eligible = true },
+})
+context_inspector.annotate("entry-three", "review first")
+context_inspector.pin("entry-three", true)
+context_inspector.move("entry-three", 1)
+context_inspector.remove("entry-two")
 local ok = pcall(context_inspector.toggle, "entry-two")
-assert(not ok, "transfer-ineligible entries must remain excluded")
+assert(not ok, "removed entries must remain unavailable")
 local selected = context_inspector.confirm()
-assert(#selected.entries == 1 and selected.entries[1].id == "entry-one", "confirmation must preserve included order")
+assert(
+	#selected.entries == 2
+		and selected.entries[1].id == "entry-three"
+		and selected.entries[1].annotation == "review first"
+		and selected.entries[1].pinned
+		and selected.entries[2].id == "entry-one",
+	"confirmation must preserve pinned annotated ordering"
+)
 assert(confirmed == selected, "confirmation must route the selected context pack")
 assert(context_inspector.close(), "context inspector close must report success")

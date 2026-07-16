@@ -39,11 +39,26 @@ local function render(inspector)
 		table.insert(lines, "  provenance: " .. entry.provenance.source .. " · " .. entry.provenance.ref)
 		table.insert(lines, "  trust: " .. entry.trust .. " · tokens: " .. estimate(entry))
 		table.insert(lines, "  transfer: " .. transfer(entry))
+		if entry.pinned then
+			table.insert(lines, "  pinned")
+		end
+		if entry.annotation then
+			table.insert(lines, "  note: " .. entry.annotation)
+		end
 	end
 	if #inspector.pack.entries == 0 then
 		table.insert(lines, "No context entries")
 	end
 	vim.api.nvim_buf_set_lines(inspector.buffer, 0, -1, false, lines)
+end
+
+local function find(inspector, entry_id)
+	for index, entry in ipairs(inspector.pack.entries) do
+		if entry.id == entry_id then
+			return index, entry
+		end
+	end
+	fail("entry is not present in the context pack: " .. tostring(entry_id))
 end
 
 function M.open(opts)
@@ -56,7 +71,7 @@ function M.open(opts)
 	end
 	local inspector, tabpage = current()
 	if inspector then
-		inspector.pack = opts.pack
+		inspector.pack = pack.from_record(pack.to_record(opts.pack))
 		inspector.included = included
 		inspector.on_confirm = opts.on_confirm
 		render(inspector)
@@ -69,8 +84,13 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-context"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	inspector =
-		{ window = window, buffer = buffer, pack = opts.pack, included = included, on_confirm = opts.on_confirm }
+	inspector = {
+		window = window,
+		buffer = buffer,
+		pack = pack.from_record(pack.to_record(opts.pack)),
+		included = included,
+		on_confirm = opts.on_confirm,
+	}
 	inspectors[tabpage] = inspector
 	render(inspector)
 	return window
@@ -81,17 +101,80 @@ function M.toggle(entry_id)
 	if not inspector then
 		fail("no context inspector is open in this tab")
 	end
-	for _, entry in ipairs(inspector.pack.entries) do
-		if entry.id == entry_id then
-			if not entry.transfer.eligible then
-				fail("entry is not transfer-eligible: " .. entry_id)
-			end
-			inspector.included[entry_id] = not inspector.included[entry_id]
-			render(inspector)
-			return inspector.included[entry_id]
+	local _, entry = find(inspector, entry_id)
+	if not entry.transfer.eligible then
+		fail("entry is not transfer-eligible: " .. entry_id)
+	end
+	inspector.included[entry_id] = not inspector.included[entry_id]
+	render(inspector)
+	return inspector.included[entry_id]
+end
+
+function M.add(entry)
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	entry = pack.entry(entry)
+	for _, existing in ipairs(inspector.pack.entries) do
+		if existing.id == entry.id then
+			fail("entry is already present: " .. entry.id)
 		end
 	end
-	fail("entry is not present in the context pack: " .. tostring(entry_id))
+	table.insert(inspector.pack.entries, entry)
+	inspector.included[entry.id] = entry.transfer.eligible
+	render(inspector)
+end
+
+function M.remove(entry_id)
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	local index, entry = find(inspector, entry_id)
+	table.remove(inspector.pack.entries, index)
+	inspector.included[entry.id] = nil
+	render(inspector)
+end
+
+function M.move(entry_id, index)
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #inspector.pack.entries then
+		fail("destination index must be within the context pack")
+	end
+	local current_index = find(inspector, entry_id)
+	local entry = table.remove(inspector.pack.entries, current_index)
+	table.insert(inspector.pack.entries, index, entry)
+	render(inspector)
+end
+
+function M.annotate(entry_id, value)
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	if value ~= nil and (type(value) ~= "string" or value == "") then
+		fail("annotation must be a non-empty string or nil")
+	end
+	local _, entry = find(inspector, entry_id)
+	entry.annotation = value
+	render(inspector)
+end
+
+function M.pin(entry_id, value)
+	local inspector = current()
+	if not inspector then
+		fail("no context inspector is open in this tab")
+	end
+	if type(value) ~= "boolean" then
+		fail("pinned value must be a boolean")
+	end
+	local _, entry = find(inspector, entry_id)
+	entry.pinned = value
+	render(inspector)
 end
 
 function M.confirm()
@@ -100,9 +183,11 @@ function M.confirm()
 		fail("no context inspector is open in this tab")
 	end
 	local entries = {}
-	for _, entry in ipairs(inspector.pack.entries) do
-		if inspector.included[entry.id] then
-			table.insert(entries, entry)
+	for _, pinned in ipairs({ true, false }) do
+		for _, entry in ipairs(inspector.pack.entries) do
+			if inspector.included[entry.id] and entry.pinned == pinned then
+				table.insert(entries, entry)
+			end
 		end
 	end
 	local selected = pack.new({ id = inspector.pack.id, task_id = inspector.pack.task_id, entries = entries })
