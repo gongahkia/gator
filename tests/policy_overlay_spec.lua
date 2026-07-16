@@ -16,6 +16,14 @@ assert(global.rules.write_runs.maximum == 1, "policy overlays must preserve stru
 assert(file.target == "lua/gator/**", "scoped overlays must preserve their target")
 assert(file.provenance.source == "project-policy", "policy overlays must preserve provenance")
 
+local validation = overlay.new({
+	scope = "project",
+	target = "project",
+	rules = { test_commands = { unit = { argv = { "make", "test" } } } },
+	provenance = { source = "project-policy", ref = ".gator/policy.json" },
+})
+assert(validation.rules.test_commands.unit.argv[2] == "test", "policy overlays must preserve approved argv arrays")
+
 local record = overlay.to_record(file)
 record.rules.write_allowed = true
 assert(not file.rules.write_allowed, "policy records must not mutate overlays")

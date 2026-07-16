@@ -37,6 +37,12 @@ local function safe_value(value, path)
 		fail(path .. " must be JSON-compatible")
 	end
 	local result = {}
+	if vim.islist(value) then
+		for index, child in ipairs(value) do
+			result[index] = safe_value(child, path .. "[" .. index .. "]")
+		end
+		return result
+	end
 	for key, child in pairs(value) do
 		if type(key) ~= "string" then
 			fail(path .. " keys must be strings")
