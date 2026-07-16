@@ -25,6 +25,7 @@ local M = {
 	pi = require("gator.adapters.pi"),
 	pi_sessions = require("gator.adapters.pi_sessions"),
 	pi_policy = require("gator.adapters.pi_policy"),
+	pi_context = require("gator.adapters.pi_context"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
