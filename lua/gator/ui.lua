@@ -6,6 +6,7 @@ local M = {
 	diff_review = require("gator.ui.diff_review"),
 	markdown = require("gator.ui.markdown"),
 	palette = require("gator.ui.palette"),
+	picker = require("gator.ui.picker"),
 	selection = require("gator.ui.selection"),
 	sidebar = require("gator.ui.sidebar"),
 	timeline = require("gator.ui.timeline"),
