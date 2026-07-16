@@ -1,6 +1,7 @@
 local run = require("gator.core.run")
 local M = {}
 local reviews = {}
+local decisions = { pending = true, accepted = true, rejected = true }
 
 local function fail(message)
 	error("Gator diff review: " .. message, 3)
@@ -11,6 +12,31 @@ local function require_string(value, name)
 		fail(name .. " must be a non-empty string")
 	end
 	return value
+end
+
+local function hunks(change)
+	if type(vim.diff) ~= "function" then
+		fail("native diff capability is unavailable")
+	end
+	local output = vim.diff(change.before, change.after, { result_type = "unified", ctxlen = 0 })
+	local result = {}
+	for header in output:gmatch("[^\n]+") do
+		local before_start, before_count, after_start, after_count =
+			header:match("^@@ %-(%d+),?(%d*) %+(%d+),?(%d*) @@")
+		if before_start then
+			before_count = before_count == "" and 1 or tonumber(before_count)
+			after_count = after_count == "" and 1 or tonumber(after_count)
+			table.insert(result, {
+				id = "hunk-" .. vim.fn.sha256(change.path .. "\0" .. header):sub(1, 16),
+				before_start = tonumber(before_start),
+				before_count = before_count,
+				after_start = tonumber(after_start),
+				after_count = after_count,
+				decision = "pending",
+			})
+		end
+	end
+	return result
 end
 
 local function changes(value)
@@ -35,8 +61,14 @@ local function changes(value)
 			before = change.before,
 			after = change.after,
 		}
+		result[index].hunks = hunks(result[index])
 	end
 	return result
+end
+
+local function selected_hunk(review)
+	local change = review.changes[review.selected]
+	return change and change.hunks[review.hunk] or nil
 end
 
 local function current()
@@ -68,6 +100,26 @@ local function render(review)
 		for index, change in ipairs(review.changes) do
 			local marker = index == review.selected and ">" or " "
 			table.insert(lines, marker .. " " .. change.path)
+			for hunk_index, hunk in ipairs(change.hunks) do
+				local hunk_marker = index == review.selected and hunk_index == review.hunk and ">" or " "
+				local annotation = hunk.annotation and " · " .. hunk.annotation or ""
+				table.insert(
+					lines,
+					"  "
+						.. hunk_marker
+						.. " @@ -"
+						.. hunk.before_start
+						.. ","
+						.. hunk.before_count
+						.. " +"
+						.. hunk.after_start
+						.. ","
+						.. hunk.after_count
+						.. " · "
+						.. hunk.decision
+						.. annotation
+				)
+			end
 		end
 	end
 	vim.api.nvim_buf_set_lines(review.buffer, 0, -1, false, lines)
@@ -95,6 +147,7 @@ function M.open(opts)
 		review.run = opts.run
 		review.changes = value
 		review.selected = math.min(review.selected, math.max(#value, 1))
+		review.hunk = 1
 		render(review)
 		vim.api.nvim_set_current_win(review.window)
 		return review.window
@@ -105,8 +158,16 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-review"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	review =
-		{ window = window, buffer = buffer, run = opts.run, changes = value, selected = 1, diffs = {}, sequence = 0 }
+	review = {
+		window = window,
+		buffer = buffer,
+		run = opts.run,
+		changes = value,
+		selected = 1,
+		hunk = 1,
+		diffs = {},
+		sequence = 0,
+	}
 	reviews[tabpage] = review
 	render(review)
 	return window
@@ -121,8 +182,85 @@ function M.select(index)
 		fail("selection must identify a changed file")
 	end
 	review.selected = index
+	review.hunk = 1
 	render(review)
 	return vim.deepcopy(review.changes[index])
+end
+
+function M.hunk()
+	local review = current()
+	if not review then
+		fail("no diff review is open in this tab")
+	end
+	local hunk = selected_hunk(review)
+	if not hunk then
+		fail("no hunk is selected")
+	end
+	return vim.deepcopy(hunk)
+end
+
+function M.next_hunk()
+	local review = current()
+	if not review then
+		fail("no diff review is open in this tab")
+	end
+	for change_index = review.selected, #review.changes do
+		local start = change_index == review.selected and review.hunk + 1 or 1
+		if review.changes[change_index].hunks[start] then
+			review.selected, review.hunk = change_index, start
+			render(review)
+			return M.hunk()
+		end
+	end
+	fail("no next hunk is available")
+end
+
+function M.previous_hunk()
+	local review = current()
+	if not review then
+		fail("no diff review is open in this tab")
+	end
+	for change_index = review.selected, 1, -1 do
+		local start = change_index == review.selected and review.hunk - 1 or #review.changes[change_index].hunks
+		if review.changes[change_index].hunks[start] then
+			review.selected, review.hunk = change_index, start
+			render(review)
+			return M.hunk()
+		end
+	end
+	fail("no previous hunk is available")
+end
+
+function M.stage(decision)
+	if type(decision) ~= "string" or not decisions[decision] then
+		fail("decision must be pending, accepted, or rejected")
+	end
+	local review = current()
+	if not review then
+		fail("no diff review is open in this tab")
+	end
+	local hunk = selected_hunk(review)
+	if not hunk then
+		fail("no hunk is selected")
+	end
+	hunk.decision = decision
+	render(review)
+	return vim.deepcopy(hunk)
+end
+
+function M.annotate(annotation)
+	annotation = require_string(annotation, "annotation")
+	local review = current()
+	if not review then
+		fail("no diff review is open in this tab")
+	end
+	local hunk = selected_hunk(review)
+	if not hunk then
+		fail("no hunk is selected")
+	end
+	hunk.annotation = annotation
+	render(review)
+	return vim.deepcopy(hunk)
 end
 
 function M.open_selected()
@@ -142,7 +280,16 @@ function M.open_selected()
 	vim.api.nvim_win_set_buf(after, scratch(review, "after", change.after))
 	vim.wo[before].diff = true
 	vim.wo[after].diff = true
-	local result = { before = before, after = after, path = change.path }
+	local hunk = selected_hunk(review)
+	if hunk then
+		local before_line =
+			math.min(math.max(hunk.before_start, 1), vim.api.nvim_buf_line_count(vim.api.nvim_win_get_buf(before)))
+		local after_line =
+			math.min(math.max(hunk.after_start, 1), vim.api.nvim_buf_line_count(vim.api.nvim_win_get_buf(after)))
+		vim.api.nvim_win_set_cursor(before, { before_line, 0 })
+		vim.api.nvim_win_set_cursor(after, { after_line, 0 })
+	end
+	local result = { before = before, after = after, path = change.path, hunk = hunk and hunk.id or nil }
 	table.insert(review.diffs, result)
 	return vim.deepcopy(result)
 end
