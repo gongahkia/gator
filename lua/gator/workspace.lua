@@ -1,3 +1,8 @@
-local M = { name = "workspace", api_version = 1, repository = require("gator.workspace.repository") }
+local M = {
+	name = "workspace",
+	api_version = 1,
+	policy = require("gator.workspace.policy"),
+	repository = require("gator.workspace.repository"),
+}
 
 return M
