@@ -10,6 +10,7 @@ local M = {
 	claude_sessions = require("gator.adapters.claude_sessions"),
 	claude_policy = require("gator.adapters.claude_policy"),
 	claude_context = require("gator.adapters.claude_context"),
+	cline = require("gator.adapters.cline"),
 	cursor = require("gator.adapters.cursor"),
 	gemini = require("gator.adapters.gemini"),
 	gemini_sessions = require("gator.adapters.gemini_sessions"),
