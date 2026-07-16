@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::io::{self, BufRead, Write};
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const PROTOCOL_VERSION: u32 = 1;
 
@@ -120,6 +120,53 @@ fn chunks(params: &Value) -> Result<Value, &'static str> {
     Ok(json!({"chunks": chunks}))
 }
 
+fn embed(params: &Value) -> Result<Value, &'static str> {
+    let input = params
+        .get("input")
+        .and_then(Value::as_str)
+        .ok_or("embed requires params.input")?;
+    let command = params
+        .get("command")
+        .and_then(Value::as_array)
+        .ok_or("embed requires a local command array")?;
+    let argv: Vec<&str> = command
+        .iter()
+        .map(|part| {
+            part.as_str()
+                .filter(|part| !part.is_empty())
+                .ok_or("embedding command arguments must be strings")
+        })
+        .collect::<Result<_, _>>()?;
+    let executable = Path::new(*argv.first().ok_or("embed requires a local command array")?);
+    if !executable.is_absolute() || !executable.is_file() {
+        return Err("embedding executable must be an existing absolute local file");
+    }
+    let mut child = Command::new(executable)
+        .args(&argv[1..])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|_| "local embedding provider failed to start")?;
+    child
+        .stdin
+        .as_mut()
+        .ok_or("local embedding provider has no stdin")?
+        .write_all(input.as_bytes())
+        .map_err(|_| "local embedding provider input failed")?;
+    let output = child
+        .wait_with_output()
+        .map_err(|_| "local embedding provider failed")?;
+    if !output.status.success() {
+        return Err("local embedding provider failed");
+    }
+    let vector: Vec<f64> = serde_json::from_slice(&output.stdout)
+        .map_err(|_| "local embedding provider returned invalid JSON")?;
+    if vector.is_empty() || vector.iter().any(|value| !value.is_finite()) {
+        return Err("local embedding provider returned invalid vector");
+    }
+    Ok(json!({"provider":"local-command","vector":vector}))
+}
+
 fn handle(request: Request) -> Value {
     if request.version != PROTOCOL_VERSION {
         return error(Some(&request.id), "unsupported protocol version");
@@ -128,6 +175,7 @@ fn handle(request: Request) -> Value {
         "health" => Ok(json!({"status": "healthy", "protocol_version": PROTOCOL_VERSION})),
         "index" => index(&request.params),
         "chunk" => chunks(&request.params),
+        "embed" => embed(&request.params),
         "cancel" => request
             .params
             .get("request_id")
@@ -228,5 +276,10 @@ mod tests {
         assert_eq!(parsed["chunks"][0]["source"], "tree-sitter");
         let fallback = chunks(&json!({"text":"one\ntwo"})).unwrap();
         assert_eq!(fallback["chunks"][0]["source"], "text");
+    }
+
+    #[test]
+    fn embedding_requires_absolute_executable() {
+        assert!(embed(&json!({"input":"text","command":["provider"]})).is_err());
     }
 }
