@@ -17,6 +17,7 @@ local M = {
 		workspace = "gator.workspace",
 		review = "gator.review",
 		policy = "gator.policy",
+		telemetry = "gator.telemetry",
 	},
 }
 
