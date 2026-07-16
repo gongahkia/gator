@@ -1,6 +1,7 @@
 local M = {
 	name = "context",
 	api_version = 1,
+	automatic = require("gator.context.automatic"),
 	diagnostic = require("gator.context.diagnostic"),
 	diff = require("gator.context.diff"),
 	estimate = require("gator.context.estimate"),
