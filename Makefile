@@ -1,4 +1,4 @@
-.PHONY: test fixture-test live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar fmt format-check lint check issues
+.PHONY: test fixture-test live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
 
 NVIM_TEST = nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
@@ -40,6 +40,9 @@ live-pi-e2e:
 
 indexer-test:
 	cargo test --manifest-path crates/gator-index/Cargo.toml
+
+benchmark:
+	GATOR_TEST_GLOB='performance_suite_spec.lua' $(NVIM_TEST)
 
 sidecar:
 	cargo run --manifest-path crates/gator-index/Cargo.toml --quiet
