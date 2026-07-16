@@ -5,6 +5,7 @@ local M = {
 	evidence = require("gator.review.evidence"),
 	feedback = require("gator.review.feedback"),
 	inventory = require("gator.review.inventory"),
+	merge = require("gator.review.merge"),
 	validation = require("gator.review.validation"),
 }
 
