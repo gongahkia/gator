@@ -12,3 +12,4 @@ local output = help.stdout or ""
 assert(help.code == 0, "protected Copilot verification requires the CLI")
 assert(output:find("--acp", 1, true), "protected Copilot verification requires ACP support")
 assert(output:find("--resume", 1, true), "protected Copilot verification requires native session resume")
+assert(output:find("--available-tools", 1, true), "protected Copilot verification requires native tool filters")
