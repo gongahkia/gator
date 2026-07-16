@@ -5,6 +5,7 @@ local M = {
 	gh = require("gator.github.gh"),
 	issue = require("gator.github.issue"),
 	pull_request = require("gator.github.pull_request"),
+	sync = require("gator.github.sync"),
 }
 
 return M
