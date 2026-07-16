@@ -1,0 +1,151 @@
+local errors = require("gator.error")
+local M = {}
+local Retention = {}
+
+Retention.__index = Retention
+M.categories = { "transcripts", "indices", "worktree_records", "telemetry" }
+
+local function fail(detail)
+	errors.raise(errors.new("retention.invalid", "Local retention request is invalid", {
+		detail = detail,
+		remedy = "Use managed local-state paths, review the cleanup plan, then explicitly confirm deletion.",
+	}))
+end
+
+local function now_seconds()
+	return math.floor(vim.uv.gettimeofday().sec)
+end
+
+local function is_category(name)
+	return vim.tbl_contains(M.categories, name)
+end
+
+local function path_within(path, root)
+	path = vim.fs.normalize(path)
+	root = vim.fs.normalize(root)
+	return path == root or path:sub(1, #root + 1) == root .. "/"
+end
+
+local function collect(root, result)
+	local handle, err = vim.uv.fs_scandir(root)
+	if not handle then
+		if err and err:match("ENOENT") then
+			return
+		end
+		fail("cannot scan managed path: " .. root .. ": " .. tostring(err))
+	end
+	while true do
+		local name, kind = vim.uv.fs_scandir_next(handle)
+		if not name then
+			break
+		end
+		local path = root .. "/" .. name
+		if kind == "directory" then
+			collect(path, result)
+		elseif kind == "file" then
+			local stat = vim.uv.fs_lstat(path)
+			if stat and stat.type == "file" then
+				table.insert(result, { path = path, mtime = stat.mtime.sec })
+			end
+		end
+	end
+end
+
+function M.new(opts)
+	opts = opts or {}
+	if
+		type(opts) ~= "table"
+		or type(opts.root) ~= "string"
+		or opts.root == ""
+		or type(opts.paths) ~= "table"
+		or type(opts.max_age) ~= "table"
+	then
+		fail("root, paths, and max_age must be provided")
+	end
+	local root = vim.fs.normalize(opts.root)
+	local paths = {}
+	local max_age = {}
+	for _, category in ipairs(M.categories) do
+		local path = opts.paths[category]
+		local age = opts.max_age[category]
+		if type(path) ~= "string" or path == "" then
+			fail(category .. " path must be a non-empty string")
+		end
+		if type(age) ~= "number" or age < 0 or age % 1 ~= 0 then
+			fail(category .. " max_age must be a non-negative integer")
+		end
+		path = vim.fs.normalize(path)
+		if not path_within(path, root) then
+			fail(category .. " path must stay within retention root")
+		end
+		paths[category] = path
+		max_age[category] = age
+	end
+	return setmetatable({ root = root, paths = paths, max_age = max_age }, Retention)
+end
+
+function M.default(max_age)
+	max_age = max_age or {}
+	local root = vim.fn.stdpath("state") .. "/gator"
+	local paths = {}
+	for _, category in ipairs(M.categories) do
+		paths[category] = root .. "/" .. category
+	end
+	return M.new({ root = root, paths = paths, max_age = max_age })
+end
+
+function Retention:plan(now)
+	now = now or now_seconds()
+	if type(now) ~= "number" or now < 0 or now % 1 ~= 0 then
+		fail("now must be a non-negative integer")
+	end
+	local result = {}
+	for _, category in ipairs(M.categories) do
+		local files = {}
+		collect(self.paths[category], files)
+		for _, file in ipairs(files) do
+			if now - file.mtime >= self.max_age[category] then
+				table.insert(result, { category = category, path = file.path, mtime = file.mtime })
+			end
+		end
+	end
+	table.sort(result, function(left, right)
+		return left.path < right.path
+	end)
+	return result
+end
+
+function Retention:prune(plan, confirm)
+	if confirm ~= true then
+		fail("cleanup requires explicit confirmation")
+	end
+	if type(plan) ~= "table" or not vim.islist(plan) then
+		fail("plan must be an array returned by retention:plan")
+	end
+	local removed = {}
+	for _, candidate in ipairs(plan) do
+		if
+			type(candidate) ~= "table"
+			or not is_category(candidate.category)
+			or type(candidate.path) ~= "string"
+			or type(candidate.mtime) ~= "number"
+		then
+			fail("plan contains an invalid candidate")
+		end
+		local root = self.paths[candidate.category]
+		if not path_within(candidate.path, root) then
+			fail("plan candidate escapes its managed path")
+		end
+		local stat = vim.uv.fs_lstat(candidate.path)
+		if stat and stat.type == "file" and stat.mtime.sec == candidate.mtime then
+			local ok, err = vim.uv.fs_unlink(candidate.path)
+			if not ok then
+				fail("cannot remove stale file: " .. candidate.path .. ": " .. tostring(err))
+			end
+			table.insert(removed, candidate.path)
+		end
+	end
+	return removed
+end
+
+return M
