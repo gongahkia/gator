@@ -10,7 +10,10 @@ local dir = helpers.tempdir("fixture")
 local path = dir .. "/nested/sample.txt"
 helpers.write(path, "temporary fixture")
 assert(helpers.read(path) == "temporary fixture", "fixture helpers must round-trip content")
-assert(helpers.read(helpers.fixture_path("sample.txt")) == "gator fixture\n", "fixture helper must read repository fixtures")
+assert(
+	helpers.read(helpers.fixture_path("sample.txt")) == "gator fixture\n",
+	"fixture helper must read repository fixtures"
+)
 
 local ok = pcall(helpers.fixture_path, "../outside")
 assert(not ok, "fixture helper must reject path traversal")
