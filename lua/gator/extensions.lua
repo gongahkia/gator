@@ -3,6 +3,7 @@ local M = {
 	api_version = 1,
 	adapter_sdk = require("gator.extensions.adapter_sdk"),
 	manager = require("gator.extensions.manager"),
+	retrieval_sdk = require("gator.extensions.retrieval_sdk"),
 }
 
 return M
