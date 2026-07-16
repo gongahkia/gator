@@ -90,6 +90,7 @@ function M.entry(attrs)
 		token_estimate = true,
 		transfer = true,
 		annotation = true,
+		content = true,
 		pinned = true,
 		revision = true,
 		retrieval_source = true,
@@ -106,6 +107,9 @@ function M.entry(attrs)
 	if attrs.pinned ~= nil and type(attrs.pinned) ~= "boolean" then
 		fail("entry.pinned must be a boolean")
 	end
+	if attrs.content ~= nil and (type(attrs.content) ~= "string" or attrs.content == "") then
+		fail("entry.content must be a non-empty string")
+	end
 	for _, key in ipairs({ "revision", "retrieval_source", "policy_decision" }) do
 		if attrs[key] ~= nil and (type(attrs[key]) ~= "string" or attrs[key] == "") then
 			fail("entry." .. key .. " must be a non-empty string")
@@ -120,6 +124,7 @@ function M.entry(attrs)
 		token_estimate = estimate(attrs.token_estimate),
 		transfer = transfer(attrs.transfer),
 		annotation = annotation,
+		content = attrs.content,
 		pinned = attrs.pinned or false,
 		revision = attrs.revision,
 		retrieval_source = attrs.retrieval_source,
