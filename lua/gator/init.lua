@@ -1,4 +1,5 @@
 local config = require("gator.config")
+local compat = require("gator.compat")
 local state = require("gator.state")
 local ui = require("gator.ui")
 
@@ -25,8 +26,14 @@ function M.module(name)
 end
 
 function M.setup(opts)
+	local report = compat.require_supported()
 	M._state = state.new(config.resolve(opts))
+	M._state.compatibility = report
 	return M
+end
+
+function M.compatibility()
+	return compat.inspect()
 end
 
 function M.open()
@@ -37,18 +44,20 @@ function M.open()
 end
 
 function M.health()
+	local report = M.compatibility()
 	local lines = {
 		"Gator health",
-		"Neovim: " .. vim.version().major .. "." .. vim.version().minor,
 		"Git: " .. (vim.fn.executable("git") == 1 and "available" or "missing"),
 		"Rust indexer: not configured",
 	}
+	vim.list_extend(lines, compat.summary(report))
 	vim.notify(table.concat(lines, "\n"))
 end
 
 function M._test()
 	assert(M._state, "gator setup must initialize state")
 	assert(M._state.config.context.mode == "manual", "manual context must be the default")
+	assert(M._state.compatibility.supported, "gator setup must enforce compatible Neovim")
 	for name in pairs(M.modules) do
 		local module = M.module(name)
 		assert(type(module) == "table", name .. " module must return a table")
