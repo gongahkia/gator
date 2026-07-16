@@ -4,6 +4,7 @@ local M = {
 	file = require("gator.policy.file"),
 	overlay = require("gator.policy.overlay"),
 	project = require("gator.policy.project"),
+	redact = require("gator.policy.redact"),
 	repository = require("gator.policy.repository"),
 	run = require("gator.policy.run"),
 }

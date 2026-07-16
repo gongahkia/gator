@@ -1,4 +1,5 @@
 local M = {}
+local redact = require("gator.policy.redact")
 
 M.defaults = {
 	ui = { layout = "adaptive", keymaps = {}, screen_reader = true },
@@ -6,7 +7,7 @@ M.defaults = {
 	sessions = { transfer = "manual" },
 	workspaces = { mode = "project", max_write_runs = 1 },
 	persistence = { sharing = "local" },
-	telemetry = { enabled = false },
+	telemetry = { enabled = false, redaction_patterns = {} },
 }
 
 local function fail(message)
@@ -30,6 +31,12 @@ local function safe(value, path)
 	end
 	if kind ~= "table" then
 		fail(path .. " must be JSON-compatible")
+	end
+	if vim.islist(value) then
+		for index, child in ipairs(value) do
+			safe(child, path .. "[" .. index .. "]")
+		end
+		return
 	end
 	for key, child in pairs(value) do
 		if type(key) ~= "string" then
@@ -64,7 +71,7 @@ local function settings(value)
 	fields(value.sessions, { transfer = true }, "settings.sessions")
 	fields(value.workspaces, { mode = true, max_write_runs = true }, "settings.workspaces")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
-	fields(value.telemetry, { enabled = true }, "settings.telemetry")
+	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
 	if not vim.tbl_contains({ "adaptive", "modal" }, value.ui.layout) then
 		fail("ui.layout must be adaptive or modal")
 	end
@@ -104,6 +111,7 @@ local function settings(value)
 	if type(value.telemetry.enabled) ~= "boolean" then
 		fail("telemetry.enabled must be boolean")
 	end
+	redact.validate_patterns(value.telemetry.redaction_patterns)
 	return value
 end
 

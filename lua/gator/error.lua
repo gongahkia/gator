@@ -1,5 +1,6 @@
 local M = {}
 local Error = {}
+local redact = require("gator.policy.redact")
 
 Error.__index = Error
 
@@ -55,7 +56,7 @@ function M.format(value)
 		table.insert(lines, "Details: " .. value.detail)
 	end
 	table.insert(lines, "Recovery: " .. value.remedy)
-	return table.concat(lines, "\n")
+	return redact.text(table.concat(lines, "\n"))
 end
 
 function M.notify(value)
