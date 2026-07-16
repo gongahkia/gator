@@ -1,0 +1,4 @@
+{"method":"initialize","id":1,"params":{"clientInfo":{"name":"gator","title":"Gator","version":"1"}}}
+{"method":"initialized","params":{}}
+{"method":"account/read","id":2,"params":{"refreshToken":false}}
+{"id":2,"result":{"account":{"type":"chatgpt"},"requiresOpenaiAuth":true}}

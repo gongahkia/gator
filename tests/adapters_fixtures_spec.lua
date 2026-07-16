@@ -18,6 +18,15 @@ assert(jsonrpc[1].method == "session/update", "JSON-RPC replay must preserve not
 assert(jsonrpc[2].result.session == "native-1", "JSON-RPC replay must preserve results")
 assert(jsonrpc[3].error.code == -32601, "JSON-RPC replay must preserve errors")
 
+local codex = {}
+assert(fixtures.replay_jsonl(root .. "/codex_appserver.jsonl", function(record)
+	table.insert(codex, record)
+end) == 4, "Codex app-server fixture must replay every record")
+assert(
+	codex[3].method == "account/read" and codex[4].result.account.type == "chatgpt",
+	"Codex fixture must preserve authenticated app-server traffic"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk
