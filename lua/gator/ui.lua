@@ -3,6 +3,7 @@ local M = {
 	api_version = 1,
 	context_inspector = require("gator.ui.context_inspector"),
 	dashboard = require("gator.ui.dashboard"),
+	selection = require("gator.ui.selection"),
 	sidebar = require("gator.ui.sidebar"),
 }
 local panels = {}

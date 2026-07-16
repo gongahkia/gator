@@ -4,6 +4,7 @@ local commands = vim.api.nvim_get_commands({ builtin = false })
 
 assert(not commands.Gator, "lazy module loading must not register commands")
 assert(not commands.GatorHealth, "lazy module loading must not register commands")
+assert(not commands.GatorCaptureSelection, "lazy module loading must not register context commands")
 
 local gator = require("gator").setup()
 assert(gator._state, "lazy module loading must support setup")
@@ -19,4 +20,5 @@ vim.cmd("packadd gator")
 commands = vim.api.nvim_get_commands({ builtin = false })
 assert(commands.Gator, "native package loading must register :Gator")
 assert(commands.GatorHealth, "native package loading must register :GatorHealth")
+assert(commands.GatorCaptureSelection, "native package loading must register selection capture")
 assert(require("gator")._state == gator._state, "plugin loading must preserve configured state")
