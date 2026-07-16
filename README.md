@@ -8,6 +8,10 @@ The first public-release target supports Codex, Claude Code, Gemini CLI, Copilot
 
 Run `make test` for Lua tests and `make indexer-test` for the optional Rust indexer.
 
+## Loading
+
+Gator supports Neovim's native packages and runtimepath-based lazy loaders. Native packages source `plugin/gator.lua` and register `:Gator` and `:GatorHealth`; lazy loaders may call `require("gator").setup()` directly without registering commands or launching agents.
+
 ## Status
 
 Foundation only. The GitHub issue tracker is the implementation backlog.
