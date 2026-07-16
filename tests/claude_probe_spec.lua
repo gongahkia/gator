@@ -23,3 +23,26 @@ local unknown = claude.probe({
 	end,
 })
 assert(not unknown.available, "unrecognized Claude versions must fail explicitly")
+local launched
+local manager = {
+	launch = function(_, opts)
+		launched = opts
+		return { state = "running" }
+	end,
+}
+assert(
+	claude.launch({ manager = manager, id = "claude-run", cwd = vim.g.gator_test.root, args = { "--help" } }).state
+		== "running",
+	"Claude launch must use shared lifecycle management"
+)
+assert(
+	launched.command[1] == "claude" and launched.cwd == vim.uv.fs_realpath(vim.g.gator_test.root),
+	"Claude launch must safely map cwd"
+)
+local ok = pcall(claude.launch, {
+	manager = manager,
+	id = "claude-run",
+	cwd = vim.g.gator_test.root,
+	token = "secret",
+})
+assert(not ok, "Claude launch must reject credential fields")
