@@ -4,6 +4,7 @@ local M = {
 	capabilities = require("gator.adapters.capabilities"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
+	model_usage = require("gator.adapters.model_usage"),
 	process = require("gator.adapters.process"),
 	rpc = require("gator.adapters.rpc"),
 	resume = require("gator.adapters.resume"),
