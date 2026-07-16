@@ -27,3 +27,42 @@ assert(
 	output:find("build (primary)", 1, true) and output:find("plan (primary)", 1, true),
 	"protected OpenCode verification requires native build and plan modes"
 )
+
+if vim.env.GATOR_LIVE_OPENCODE_AUTH ~= "1" then
+	return
+end
+
+assert(auth.authenticated, "authenticated OpenCode verification requires configured native credentials")
+local workspace = vim.fn.tempname()
+assert(vim.fn.mkdir(workspace, "p") == 1, "authenticated OpenCode verification requires a temporary workspace")
+local result = vim.system({
+	"opencode",
+	"run",
+	"--agent",
+	"plan",
+	"--format",
+	"json",
+	"Reply exactly: gator-live-e2e",
+}, { cwd = workspace, text = true }):wait()
+local session_id
+local text
+for line in vim.gsplit(result.stdout or "", "\n", { plain = true, trimempty = true }) do
+	local ok, event = pcall(vim.json.decode, line)
+	if ok and type(event) == "table" then
+		if type(event.sessionID) == "string" and event.sessionID ~= "" then
+			session_id = event.sessionID
+		end
+		if event.type == "text" and type(event.part) == "table" and type(event.part.text) == "string" then
+			text = event.part.text
+		end
+	end
+end
+local deleted
+if session_id then
+	deleted = vim.system({ "opencode", "session", "delete", session_id }, { cwd = workspace, text = true }):wait()
+end
+vim.fn.delete(workspace, "d")
+assert(result.code == 0, "authenticated OpenCode verification requires a successful headless run")
+assert(session_id, "authenticated OpenCode verification requires a native session id")
+assert(vim.trim(text or "") == "gator-live-e2e", "OpenCode E2E must preserve its exact response")
+assert(deleted and deleted.code == 0, "OpenCode E2E must delete its native test session")

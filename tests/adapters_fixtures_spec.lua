@@ -58,6 +58,18 @@ assert(
 	"Copilot fixture must preserve ACP capability, session, and command updates"
 )
 
+local opencode = {}
+assert(fixtures.replay_jsonrpc(root .. "/opencode_acp.jsonl", function(message)
+	table.insert(opencode, message)
+end) == 5, "OpenCode ACP fixture must replay every record")
+assert(
+	opencode[2].result.agentCapabilities.loadSession
+		and opencode[2].result.agentCapabilities.sessionCapabilities.resume ~= nil
+		and opencode[4].result.sessionId == "opencode-fixture"
+		and opencode[5].params.update.availableCommands[1].name == "help",
+	"OpenCode fixture must preserve ACP capabilities, sessions, and command updates"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk
