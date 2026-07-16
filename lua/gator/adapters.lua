@@ -6,6 +6,7 @@ local M = {
 	fixtures = require("gator.adapters.fixtures"),
 	process = require("gator.adapters.process"),
 	rpc = require("gator.adapters.rpc"),
+	resume = require("gator.adapters.resume"),
 	stream = require("gator.adapters.stream"),
 	terminal = require("gator.adapters.terminal"),
 }
