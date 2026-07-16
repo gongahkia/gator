@@ -14,6 +14,7 @@ local M = {
 	gemini_sessions = require("gator.adapters.gemini_sessions"),
 	gemini_policy = require("gator.adapters.gemini_policy"),
 	gemini_context = require("gator.adapters.gemini_context"),
+	copilot = require("gator.adapters.copilot"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
