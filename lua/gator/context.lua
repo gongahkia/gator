@@ -11,6 +11,7 @@ local M = {
 	lexical = require("gator.context.lexical"),
 	instructions = require("gator.context.instructions"),
 	pack = require("gator.context.pack"),
+	transfer = require("gator.context.transfer"),
 }
 
 return M
