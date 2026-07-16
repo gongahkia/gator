@@ -1,6 +1,7 @@
 local M = {
 	name = "adapters",
 	api_version = 1,
+	amp = require("gator.adapters.amp"),
 	capabilities = require("gator.adapters.capabilities"),
 	aider = require("gator.adapters.aider"),
 	codex = require("gator.adapters.codex"),
