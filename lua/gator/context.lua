@@ -12,6 +12,7 @@ local M = {
 	instructions = require("gator.context.instructions"),
 	pack = require("gator.context.pack"),
 	transfer = require("gator.context.transfer"),
+	trust = require("gator.context.trust"),
 }
 
 return M

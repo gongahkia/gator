@@ -82,8 +82,8 @@ local function settings(value)
 	if not vim.tbl_contains({ "manual", "inspect", "automatic" }, value.context.mode) then
 		fail("context.mode must be manual, inspect, or automatic")
 	end
-	if value.context.trust ~= "provenance" then
-		fail("context.trust must be provenance")
+	if not vim.tbl_contains({ "provenance", "repository", "manual" }, value.context.trust) then
+		fail("context.trust must be provenance, repository, or manual")
 	end
 	if value.sessions.transfer ~= "manual" then
 		fail("sessions.transfer must be manual")

@@ -32,7 +32,9 @@ function M.attach(opts)
 				or (entry.transfer.eligible and decision.reason or entry.transfer.reason),
 		}
 		if allowed then
-			table.insert(entries, entry)
+			local selected = vim.deepcopy(entry)
+			selected.policy_decision = decision.reason
+			table.insert(entries, selected)
 		end
 	end
 	local selected = pack.new({ id = opts.pack.id, task_id = opts.pack.task_id, entries = entries })
