@@ -44,14 +44,7 @@ function M.open()
 end
 
 function M.health()
-	local report = M.compatibility()
-	local lines = {
-		"Gator health",
-		"Git: " .. (vim.fn.executable("git") == 1 and "available" or "missing"),
-		"Rust indexer: not configured",
-	}
-	vim.list_extend(lines, compat.summary(report))
-	vim.notify(table.concat(lines, "\n"))
+	vim.cmd("checkhealth gator")
 end
 
 function M._test()
