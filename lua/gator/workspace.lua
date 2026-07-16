@@ -7,6 +7,7 @@ local M = {
 	links = require("gator.workspace.links"),
 	monitor = require("gator.workspace.monitor"),
 	policy = require("gator.workspace.policy"),
+	recovery = require("gator.workspace.recovery"),
 	repository = require("gator.workspace.repository"),
 	scheduler = require("gator.workspace.scheduler"),
 	snapshot = require("gator.workspace.snapshot"),
