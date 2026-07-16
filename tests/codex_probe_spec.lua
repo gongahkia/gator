@@ -26,3 +26,21 @@ local missing = codex.probe({
 	end,
 })
 assert(not missing.available, "missing Codex executables must fail explicitly")
+local launched
+local manager = {
+	launch = function(_, opts)
+		launched = opts
+		return { id = opts.id, state = "running" }
+	end,
+}
+assert(
+	codex.launch({ manager = manager, id = "codex-run", cwd = vim.g.gator_test.root, args = { "--help" } }).state
+		== "running",
+	"Codex launch must delegate to the process lifecycle manager"
+)
+assert(
+	launched.command[1] == "codex" and launched.cwd == vim.uv.fs_realpath(vim.g.gator_test.root),
+	"Codex launch must preserve CLI login and map cwd safely"
+)
+local ok = pcall(codex.launch, { manager = manager, id = "codex-run", cwd = vim.g.gator_test.root, token = "secret" })
+assert(not ok, "Codex launch must reject credential fields")
