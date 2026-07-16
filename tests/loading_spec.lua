@@ -1,4 +1,5 @@
-local root = vim.fn.getcwd()
+local root = vim.g.gator_test.root
+local helpers = dofile(root .. "/tests/helpers.lua")
 local commands = vim.api.nvim_get_commands({ builtin = false })
 
 assert(not commands.Gator, "lazy module loading must not register commands")
@@ -7,7 +8,7 @@ assert(not commands.GatorHealth, "lazy module loading must not register commands
 local gator = require("gator").setup()
 assert(gator._state, "lazy module loading must support setup")
 
-local packpath = vim.fn.tempname()
+local packpath = helpers.tempdir("packpath")
 local package_dir = packpath .. "/pack/gator/start/gator"
 assert(vim.fn.mkdir(vim.fn.fnamemodify(package_dir, ":h"), "p") == 1, "must create native package directory")
 assert(vim.uv.fs_symlink(root, package_dir, { dir = true }), "must link native package fixture")

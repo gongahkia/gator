@@ -1,7 +1,7 @@
 .PHONY: test indexer-test fmt check issues
 
 test:
-	nvim --headless --noplugin -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
+	nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
 indexer-test:
 	cargo test --manifest-path crates/gator-index/Cargo.toml
