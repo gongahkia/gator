@@ -20,6 +20,7 @@ local M = {
 	copilot_context = require("gator.adapters.copilot_context"),
 	opencode = require("gator.adapters.opencode"),
 	opencode_sessions = require("gator.adapters.opencode_sessions"),
+	opencode_policy = require("gator.adapters.opencode_policy"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),

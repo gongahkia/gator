@@ -20,3 +20,10 @@ assert(
 	type(auth.authenticated) == "boolean" and (auth.authenticated or type(auth.reason) == "string"),
 	"protected OpenCode verification must expose native credential status explicitly"
 )
+local agents = vim.system({ "opencode", "agent", "list" }, { text = true }):wait()
+local output = agents.stdout or ""
+assert(agents.code == 0, "protected OpenCode verification requires native agent modes")
+assert(
+	output:find("build (primary)", 1, true) and output:find("plan (primary)", 1, true),
+	"protected OpenCode verification requires native build and plan modes"
+)
