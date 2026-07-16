@@ -7,6 +7,7 @@ local M = {
 	estimate = require("gator.context.estimate"),
 	file = require("gator.context.file"),
 	inspect = require("gator.context.inspect"),
+	handoff = require("gator.context.handoff"),
 	lexical = require("gator.context.lexical"),
 	pack = require("gator.context.pack"),
 }
