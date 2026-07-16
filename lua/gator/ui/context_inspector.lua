@@ -80,7 +80,7 @@ function M.open(opts)
 	end
 	local included = {}
 	for _, entry in ipairs(opts.pack.entries) do
-		included[entry.id] = entry.transfer.eligible
+		included[entry.id] = false
 	end
 	local inspector, tabpage = current()
 	if inspector then
@@ -135,7 +135,7 @@ function M.add(entry)
 		end
 	end
 	table.insert(inspector.pack.entries, entry)
-	inspector.included[entry.id] = entry.transfer.eligible
+	inspector.included[entry.id] = false
 	render(inspector)
 end
 

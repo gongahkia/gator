@@ -45,8 +45,7 @@ assert(
 		and vim.tbl_contains(lines, "  policy: allowed by project policy"),
 	"context inspector must render provenance, trust, and policy metadata"
 )
-assert(not context_inspector.toggle("entry-one"), "eligible context entries must be excludable")
-assert(context_inspector.toggle("entry-one"), "eligible context entries must be includable")
+assert(context_inspector.toggle("entry-one"), "eligible context entries must require explicit inclusion")
 context_inspector.add({
 	id = "entry-three",
 	kind = "diff",
@@ -59,6 +58,7 @@ context_inspector.add({
 context_inspector.annotate("entry-three", "review first")
 context_inspector.pin("entry-three", true)
 context_inspector.move("entry-three", 1)
+assert(context_inspector.toggle("entry-three"), "added entries must require explicit inclusion")
 context_inspector.remove("entry-two")
 local ok = pcall(context_inspector.toggle, "entry-two")
 assert(not ok, "removed entries must remain unavailable")
