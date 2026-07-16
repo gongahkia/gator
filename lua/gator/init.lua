@@ -11,6 +11,7 @@ local M = {
 		ui = "gator.ui",
 		adapters = "gator.adapters",
 		context = "gator.context",
+		extensions = "gator.extensions",
 		github = "gator.github",
 		indexer = "gator.indexer",
 		workspace = "gator.workspace",

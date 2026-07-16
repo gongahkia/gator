@@ -34,6 +34,15 @@ function M.register(name, check)
 	M.checks[name] = check
 end
 
+function M.unregister(name)
+	validate_name(name)
+	if not M.checks[name] then
+		return false
+	end
+	M.checks[name] = nil
+	return true
+end
+
 function M.run(reporter)
 	validate_reporter(reporter)
 	local names = vim.tbl_keys(M.checks)
