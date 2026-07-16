@@ -47,6 +47,17 @@ assert(
 	"Gemini fixture must preserve session, tool, and completion data"
 )
 
+local copilot = {}
+assert(fixtures.replay_jsonrpc(root .. "/copilot_acp.jsonl", function(message)
+	table.insert(copilot, message)
+end) == 5, "Copilot ACP fixture must replay every record")
+assert(
+	copilot[2].result.agentCapabilities.loadSession == false
+		and copilot[4].result.sessionId == "copilot-fixture"
+		and copilot[5].params.update.availableCommands[1].name == "context",
+	"Copilot fixture must preserve ACP capability, session, and command updates"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk

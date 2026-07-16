@@ -1,4 +1,4 @@
-.PHONY: test fixture-test live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-copilot-test indexer-test sidecar fmt format-check lint check issues
+.PHONY: test fixture-test live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-copilot-test live-copilot-e2e indexer-test sidecar fmt format-check lint check issues
 
 NVIM_TEST = nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
@@ -22,6 +22,9 @@ live-gemini-e2e:
 
 live-copilot-test:
 	GATOR_LIVE_COPILOT=1 GATOR_TEST_GLOB='copilot_live_spec.lua' $(NVIM_TEST)
+
+live-copilot-e2e:
+	GATOR_LIVE_COPILOT=1 GATOR_LIVE_COPILOT_AUTH=1 GATOR_TEST_GLOB='copilot_live_spec.lua' $(NVIM_TEST)
 
 indexer-test:
 	cargo test --manifest-path crates/gator-index/Cargo.toml
