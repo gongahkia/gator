@@ -5,6 +5,7 @@ local M = {
 	diff = require("gator.context.diff"),
 	estimate = require("gator.context.estimate"),
 	file = require("gator.context.file"),
+	inspect = require("gator.context.inspect"),
 	pack = require("gator.context.pack"),
 }
 
