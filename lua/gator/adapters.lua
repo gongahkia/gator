@@ -6,6 +6,7 @@ local M = {
 	codex_sessions = require("gator.adapters.codex_sessions"),
 	codex_policy = require("gator.adapters.codex_policy"),
 	codex_context = require("gator.adapters.codex_context"),
+	claude = require("gator.adapters.claude"),
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
