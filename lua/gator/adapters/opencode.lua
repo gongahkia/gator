@@ -3,7 +3,7 @@ local M = {}
 M.range = { minimum = { 1, 17, 15 }, maximum = { 1, 17, 15 } }
 
 local function fail(message)
-	error("Gator OpenCode probe: " .. message, 3)
+	error("Gator OpenCode adapter: " .. message, 3)
 end
 
 local function version(value, name)
@@ -124,6 +124,74 @@ function M.probe(opts)
 		},
 		capability_error = valid and nil or "OpenCode ACP initialization is unavailable",
 	}
+end
+
+function M.auth(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" or (opts.run ~= nil and type(opts.run) ~= "function") then
+		fail("authentication options must provide an optional run function")
+	end
+	for key in pairs(opts) do
+		if key ~= "run" and key ~= "executable" then
+			fail("authentication options contain unsupported field: " .. tostring(key))
+		end
+	end
+	local executable = opts.executable or "opencode"
+	if type(executable) ~= "string" or executable == "" then
+		fail("executable must be a non-empty string")
+	end
+	local invoke = opts.run
+		or function(argv)
+			local result = vim.system(argv, { text = true }):wait()
+			return { code = result.code, stdout = result.stdout or "" }
+		end
+	local ok, result = pcall(invoke, { executable, "providers", "list" })
+	if not ok or type(result) ~= "table" or result.code ~= 0 or type(result.stdout) ~= "string" then
+		return { provider = "opencode", authenticated = false, reason = "OpenCode credential status is unavailable" }
+	end
+	local output = result.stdout:gsub("\27%[[%d;?]*[ -/]*[@-~]", "")
+	local count = output:match("(%d+)%s+credentials?")
+	if not count then
+		return { provider = "opencode", authenticated = false, reason = "OpenCode credential status is unrecognized" }
+	end
+	if tonumber(count) == 0 then
+		return {
+			provider = "opencode",
+			authenticated = false,
+			reason = "OpenCode has no configured provider credentials",
+		}
+	end
+	return { provider = "opencode", authenticated = true }
+end
+
+function M.launch(opts)
+	if type(opts) ~= "table" or type(opts.manager) ~= "table" or type(opts.manager.launch) ~= "function" then
+		fail("launch requires a process manager")
+	end
+	for key in pairs(opts) do
+		if key ~= "manager" and key ~= "id" and key ~= "cwd" and key ~= "executable" then
+			fail("launch contains unsupported field: " .. tostring(key))
+		end
+	end
+	if type(opts.id) ~= "string" or not opts.id:match("^[a-z][a-z0-9_-]*$") then
+		fail("id must be a lowercase identifier")
+	end
+	if type(opts.cwd) ~= "string" or opts.cwd == "" then
+		fail("cwd must be a non-empty string")
+	end
+	local cwd = vim.uv.fs_realpath(opts.cwd)
+	if not cwd or vim.fn.isdirectory(cwd) ~= 1 then
+		fail("cwd must resolve to a directory")
+	end
+	local executable = opts.executable or "opencode"
+	if type(executable) ~= "string" or executable == "" then
+		fail("executable must be a non-empty string")
+	end
+	return opts.manager:launch({
+		id = opts.id,
+		command = { executable, "acp", "--cwd", cwd },
+		cwd = cwd,
+	})
 end
 
 return M

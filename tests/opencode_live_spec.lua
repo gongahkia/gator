@@ -14,3 +14,8 @@ assert(
 		and value.capabilities.session_fork,
 	"protected OpenCode verification requires the initialized ACP session profile"
 )
+local auth = opencode.auth()
+assert(
+	type(auth.authenticated) == "boolean" and (auth.authenticated or type(auth.reason) == "string"),
+	"protected OpenCode verification must expose native credential status explicitly"
+)

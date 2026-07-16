@@ -53,3 +53,44 @@ assert(
 		and unsupported.capability_error,
 	"unverified OpenCode versions and unavailable ACP profiles must remain explicit"
 )
+local authenticated = opencode.auth({
+	run = function(argv)
+		assert(argv[2] == "providers" and argv[3] == "list", "OpenCode authentication must query native credentials")
+		return { code = 0, stdout = "\27[90m2 credentials\27[0m" }
+	end,
+})
+assert(authenticated.authenticated, "OpenCode authentication must preserve CLI-owned login state")
+local unauthenticated = opencode.auth({
+	run = function()
+		return { code = 0, stdout = "0 credentials" }
+	end,
+})
+assert(
+	not unauthenticated.authenticated and unauthenticated.reason == "OpenCode has no configured provider credentials",
+	"OpenCode must report missing provider credentials explicitly"
+)
+local launched
+local manager = {
+	launch = function(_, opts)
+		launched = opts
+		return { state = "running" }
+	end,
+}
+assert(
+	opencode.launch({ manager = manager, id = "opencode-run", cwd = vim.g.gator_test.root }).state == "running",
+	"OpenCode launch must use shared lifecycle management"
+)
+assert(
+	launched.command[1] == "opencode"
+		and launched.command[2] == "acp"
+		and launched.command[3] == "--cwd"
+		and launched.command[4] == vim.uv.fs_realpath(vim.g.gator_test.root)
+		and launched.cwd == vim.uv.fs_realpath(vim.g.gator_test.root),
+	"OpenCode launch must preserve native login and map cwd safely"
+)
+assert(not pcall(opencode.launch, {
+	manager = manager,
+	id = "opencode-run",
+	cwd = vim.g.gator_test.root,
+	token = "secret",
+}), "OpenCode launch must reject credential fields")
