@@ -210,6 +210,45 @@ fn cloud_embed(params: &Value) -> Result<Value, &'static str> {
     Ok(json!({"provider":"cloud","vector":vector}))
 }
 
+fn ranking_signal(value: &Value, name: &str) -> Result<f64, &'static str> {
+    let value = value
+        .get(name)
+        .and_then(Value::as_f64)
+        .ok_or("rank candidates require numeric signals")?;
+    if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+        return Err("rank signals must be within zero and one");
+    }
+    Ok(value)
+}
+
+fn rank(params: &Value) -> Result<Value, &'static str> {
+    let candidates = params
+        .get("candidates")
+        .and_then(Value::as_array)
+        .ok_or("rank requires candidates")?;
+    let mut ranked: Vec<Value> = candidates.iter().map(|candidate| {
+        let id = candidate.get("id").and_then(Value::as_str).filter(|id| !id.is_empty()).ok_or("rank candidates require id")?;
+        let lexical = ranking_signal(candidate, "lexical")?;
+        let semantic = ranking_signal(candidate, "semantic")?;
+        let recency = ranking_signal(candidate, "recency")?;
+        let score = lexical * 0.5 + semantic * 0.4 + recency * 0.1;
+        Ok::<Value, &'static str>(json!({"id":id,"score":score,"signals":{"lexical":lexical,"semantic":semantic,"recency":recency}}))
+    }).collect::<Result<_, _>>()?;
+    ranked.sort_by(|left, right| {
+        right["score"]
+            .as_f64()
+            .unwrap()
+            .total_cmp(&left["score"].as_f64().unwrap())
+            .then_with(|| {
+                left["id"]
+                    .as_str()
+                    .unwrap()
+                    .cmp(right["id"].as_str().unwrap())
+            })
+    });
+    Ok(json!({"results":ranked}))
+}
+
 fn handle(request: Request) -> Value {
     if request.version != PROTOCOL_VERSION {
         return error(Some(&request.id), "unsupported protocol version");
@@ -220,6 +259,7 @@ fn handle(request: Request) -> Value {
         "chunk" => chunks(&request.params),
         "embed" => embed(&request.params),
         "cloud_embed" => cloud_embed(&request.params),
+        "rank" => rank(&request.params),
         "cancel" => request
             .params
             .get("request_id")
@@ -333,5 +373,12 @@ mod tests {
             &json!({"endpoint":"https://example.test","credential_env":"MISSING","input":"text"})
         )
         .is_err());
+    }
+
+    #[test]
+    fn ranking_is_explainable_and_stable() {
+        let result = rank(&json!({"candidates":[{"id":"b","lexical":1.0,"semantic":0.0,"recency":0.0},{"id":"a","lexical":1.0,"semantic":0.0,"recency":0.0}]})).unwrap();
+        assert_eq!(result["results"][0]["id"], "a");
+        assert_eq!(result["results"][0]["signals"]["lexical"], 1.0);
     }
 }
