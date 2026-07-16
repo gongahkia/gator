@@ -3,6 +3,7 @@ local M = {
 	api_version = 1,
 	overlay = require("gator.policy.overlay"),
 	project = require("gator.policy.project"),
+	repository = require("gator.policy.repository"),
 }
 
 return M
