@@ -43,6 +43,8 @@ require("gator").setup({
 
 Gator is a native-first meta-harness. Providers retain authentication, model selection, tool loops, compaction, and sandboxing. Gator may narrow a provider action or require confirmation; it never broadens provider permissions. Project instructions are discovered as provenance-tracked context and require explicit trust before transfer.
 
+Provider runs are validated against their task, context pack, narrowed run policy, and advertised capability before launch. The asynchronous supervisor bounds runtime and in-memory output, reports typed exit/timeout/cancellation states, escalates cancelled processes, and terminates managed runs during editor shutdown; it never persists provider output or credentials.
+
 ## Provider support
 
 See [the provider capability matrix](docs/PROVIDERS.md). A listed adapter means Gator has a capability-aware integration; individual operations remain unavailable unless the installed CLI proves support.

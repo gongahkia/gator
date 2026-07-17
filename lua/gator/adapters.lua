@@ -62,6 +62,7 @@ local M = {
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
 	process = require("gator.adapters.process"),
+	supervisor = require("gator.adapters.process"),
 	rpc = require("gator.adapters.rpc"),
 	resume = require("gator.adapters.resume"),
 	stream = require("gator.adapters.stream"),
