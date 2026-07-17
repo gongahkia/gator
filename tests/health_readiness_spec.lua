@@ -15,6 +15,9 @@ local records = health.readiness({
 	probe = function(provider)
 		return { provider = provider, available = true, supported = true, version = "1.0.0" }
 	end,
+	auth = function(provider)
+		return { provider = provider, authenticated = true }
+	end,
 	consent = consent,
 })
 local seen = {}
@@ -33,4 +36,29 @@ assert(
 	seen.policy.level == "ok" and seen.telemetry.level == "ok" and seen.telemetry.message:find("disabled", 1, true),
 	"health readiness must report valid policy and default-denied telemetry consent"
 )
-assert(not pcall(health.readiness, { executable = true }), "invalid readiness probes must fail explicitly")
+local unverified = health.readiness({
+	executable = function(name)
+		return name == "codex"
+	end,
+	probe = function()
+		return { available = true, supported = true, version = "1.0.0" }
+	end,
+	auth = function()
+		return { authenticated = false, reason = "fixture login is absent" }
+	end,
+	consent = consent,
+})
+local codex
+for _, record in ipairs(unverified) do
+	if record.component == "adapter.codex" then
+		codex = record
+	end
+end
+assert(
+	codex.level == "warn" and codex.message:find("authentication not verified", 1, true),
+	"health must not report provider readiness from executable and capability presence alone"
+)
+assert(
+	not pcall(health.readiness, { executable = true }) and not pcall(health.readiness, { auth = true }),
+	"invalid readiness probes must fail explicitly"
+)

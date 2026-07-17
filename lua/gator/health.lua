@@ -3,24 +3,24 @@ local config = require("gator.config")
 local consent = require("gator.telemetry.consent")
 local M = { checks = {} }
 local providers = {
-	"aider",
-	"amp",
-	"cline",
-	"cursor",
-	"codex",
-	"claude",
-	"droid",
-	"gemini",
-	"goose",
-	"kimi",
-	"copilot",
-	"opencode",
-	"pi",
-	"vibe",
+	{ name = "aider", executable = "aider" },
+	{ name = "amp", executable = "amp" },
+	{ name = "cline", executable = "cline", cwd = true },
+	{ name = "cursor", executable = "cursor-agent" },
+	{ name = "codex", executable = "codex" },
+	{ name = "claude", executable = "claude" },
+	{ name = "droid", executable = "droid" },
+	{ name = "gemini", executable = "gemini" },
+	{ name = "goose", executable = "goose" },
+	{ name = "kimi", executable = "kimi" },
+	{ name = "copilot", executable = "copilot" },
+	{ name = "opencode", executable = "opencode", cwd = true },
+	{ name = "pi", executable = "pi", cwd = true },
+	{ name = "vibe", executable = "vibe" },
 }
 local provider_modules = {}
 for _, provider in ipairs(providers) do
-	provider_modules[provider] = "gator.adapters." .. provider
+	provider_modules[provider.name] = "gator.adapters." .. provider.name
 end
 
 local function fail(message)
@@ -111,6 +111,7 @@ function M.readiness(opts)
 			and key ~= "settings"
 			and key ~= "consent"
 			and key ~= "probe"
+			and key ~= "auth"
 		then
 			fail("readiness contains unsupported field: " .. tostring(key))
 		end
@@ -124,6 +125,9 @@ function M.readiness(opts)
 	if opts.probe ~= nil and type(opts.probe) ~= "function" then
 		fail("readiness probe must be a function")
 	end
+	if opts.auth ~= nil and type(opts.auth) ~= "function" then
+		fail("readiness auth must be a function")
+	end
 	if opts.cwd ~= nil and (type(opts.cwd) ~= "string" or opts.cwd == "") then
 		fail("readiness cwd must be a non-empty string")
 	end
@@ -134,45 +138,99 @@ function M.readiness(opts)
 		return vim.fn.executable(name) == 1
 	end
 	local run = opts.run
-		or function(argv, cwd)
-			local value = vim.system(argv, { cwd = cwd, text = true, timeout = 3000 }):wait()
+		or function(argv, directory, input)
+			local value = vim.system(argv, { cwd = directory, stdin = input, text = true, timeout = 3000 }):wait()
 			return { code = value.code, stdout = value.stdout or "" }
 		end
 	local cwd = opts.cwd or vim.fn.getcwd()
+	local function probe_run(argv, input)
+		return run(argv, cwd, input)
+	end
 	local records = {}
 	local function add(component, level, message, repair)
 		table.insert(records, { component = component, level = level, message = message, repair = repair })
 	end
+	local function version(value)
+		if type(value) == "string" then
+			return value
+		end
+		if type(value) == "table" and #value == 3 then
+			return table.concat(value, ".")
+		end
+		return nil
+	end
+	local function probe(provider, adapter)
+		if opts.probe then
+			return opts.probe(provider.name, provider.executable, probe_run)
+		end
+		local args = { executable = provider.executable, run = probe_run }
+		if provider.cwd then
+			args.cwd = cwd
+		end
+		return adapter.probe(args)
+	end
+	local function auth(provider, adapter)
+		if opts.auth then
+			return opts.auth(provider.name, provider.executable, probe_run)
+		end
+		if type(adapter.auth) ~= "function" then
+			return {
+				provider = provider.name,
+				authenticated = false,
+				reason = "This provider does not expose a non-interactive authentication-status probe",
+			}
+		end
+		if provider.name == "codex" or provider.name == "claude" or provider.name == "opencode" then
+			return adapter.auth({ executable = provider.executable, run = probe_run })
+		end
+		return adapter.auth()
+	end
 	for _, provider in ipairs(providers) do
-		if not executable(provider) then
+		if not executable(provider.executable) then
 			add(
-				"adapter." .. provider,
+				"adapter." .. provider.name,
 				"warn",
-				"Adapter " .. provider .. " executable is unavailable",
-				"Install " .. provider .. " to enable this adapter."
+				"Adapter " .. provider.name .. " executable " .. provider.executable .. " is unavailable",
+				"Install " .. provider.executable .. " to enable this adapter."
 			)
 		else
-			local ok, result = pcall(opts.probe or function(name)
-				return require(provider_modules[name]).probe({ executable = name, run = run })
-			end, provider)
+			local loaded, adapter = pcall(require, provider_modules[provider.name])
+			local ok, result = false, nil
+			if loaded then
+				ok, result = pcall(probe, provider, adapter)
+			end
 			if not ok or type(result) ~= "table" or result.available ~= true then
 				add(
-					"adapter." .. provider,
+					"adapter." .. provider.name,
 					"warn",
-					"Adapter " .. provider .. " version or capability probe failed",
+					"Adapter " .. provider.name .. " version or capability probe failed",
 					(ok and result and result.reason)
 						or "Run the provider CLI manually, update it, then rerun :GatorHealth."
 				)
-			elseif result.supported == false then
-				add(
-					"adapter." .. provider,
-					"warn",
-					"Adapter " .. provider .. " is installed but outside Gator's supported capability range",
-					"Update the provider CLI or use only the explicitly available capabilities."
-				)
 			else
-				local version = type(result.version) == "string" and " " .. result.version or ""
-				add("adapter." .. provider, "ok", "Adapter " .. provider .. " capability probe passed" .. version)
+				local authenticated, auth_result = pcall(auth, provider, adapter)
+				local auth_ok = authenticated
+					and type(auth_result) == "table"
+					and type(auth_result.authenticated) == "boolean"
+				local auth_reason = auth_ok and auth_result.reason or "authentication-status probe failed"
+				local detected = version(result.version)
+				local capability = result.supported == false and "outside Gator's supported capability range"
+					or "capability probe passed"
+				local authentication = auth_ok and auth_result.authenticated and "authentication probe passed"
+					or "authentication not verified: "
+						.. (type(auth_reason) == "string" and auth_reason or "authentication status is unavailable")
+				add(
+					"adapter." .. provider.name,
+					result.supported ~= false and auth_ok and auth_result.authenticated and "ok" or "warn",
+					"Adapter "
+						.. provider.name
+						.. " "
+						.. capability
+						.. (detected and " " .. detected or "")
+						.. "; "
+						.. authentication,
+					"Use only advertised capabilities, verify provider-native login, then rerun :GatorHealth."
+				)
 			end
 		end
 	end

@@ -79,6 +79,32 @@ function M.probe(opts)
 	}
 end
 
+function M.auth(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" or (opts.run ~= nil and type(opts.run) ~= "function") then
+		fail("authentication options must provide an optional run function")
+	end
+	for key in pairs(opts) do
+		if key ~= "run" and key ~= "executable" then
+			fail("authentication options contain unsupported field: " .. tostring(key))
+		end
+	end
+	local executable = opts.executable or "codex"
+	if type(executable) ~= "string" or executable == "" then
+		fail("authentication executable must be a non-empty string")
+	end
+	local invoke = opts.run
+		or function(argv)
+			local result = vim.system(argv, { text = true, timeout = 3000 }):wait()
+			return { code = result.code, stdout = result.stdout or "" }
+		end
+	local ok, result = pcall(invoke, { executable, "login", "status" })
+	if not ok or type(result) ~= "table" or result.code ~= 0 then
+		return { provider = "codex", authenticated = false, reason = "Codex login status is unavailable" }
+	end
+	return { provider = "codex", authenticated = true }
+end
+
 function M.launch(opts)
 	if type(opts) ~= "table" or type(opts.manager) ~= "table" or type(opts.manager.launch) ~= "function" then
 		fail("launch requires a process manager")

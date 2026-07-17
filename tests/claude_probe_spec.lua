@@ -23,6 +23,19 @@ local unknown = claude.probe({
 	end,
 })
 assert(not unknown.available, "unrecognized Claude versions must fail explicitly")
+local authenticated = claude.auth({
+	run = function(argv)
+		assert(argv[2] == "auth" and argv[3] == "status", "Claude auth must query native login status")
+		return { code = 0, stdout = '{"loggedIn":true}' }
+	end,
+})
+assert(authenticated.authenticated, "Claude auth must preserve CLI-owned login state")
+local unauthenticated = claude.auth({
+	run = function()
+		return { code = 0, stdout = '{"loggedIn":false}' }
+	end,
+})
+assert(not unauthenticated.authenticated, "Claude auth failures must remain explicit")
 local launched
 local manager = {
 	launch = function(_, opts)

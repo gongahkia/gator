@@ -26,6 +26,19 @@ local missing = codex.probe({
 	end,
 })
 assert(not missing.available, "missing Codex executables must fail explicitly")
+local authenticated = codex.auth({
+	run = function(argv)
+		assert(argv[2] == "login" and argv[3] == "status", "Codex auth must query native login status")
+		return { code = 0, stdout = "Logged in" }
+	end,
+})
+assert(authenticated.authenticated, "Codex auth must preserve CLI-owned login state")
+local unauthenticated = codex.auth({
+	run = function()
+		return { code = 1, stdout = "" }
+	end,
+})
+assert(not unauthenticated.authenticated, "Codex auth failures must remain explicit")
 local launched
 local manager = {
 	launch = function(_, opts)

@@ -1,22 +1,24 @@
 # Provider support matrix
 
-Gator is a native-first meta-harness: the provider owns authentication, model choice, sessions, tool loop, compaction, and sandboxing. Gator owns editor UX, context provenance, lifecycle evidence, and permission narrowing.
+Gator is a native-first meta-harness: providers own authentication, model selection, sessions, tool loops, compaction, and sandboxing. Gator owns editor UX, context provenance, lifecycle evidence, and permission narrowing. The health check runs each listed version/capability probe with a three-second bound; it only reports ready when that probe and a non-interactive auth probe both pass.
 
-| Provider | CLI | Verification | Notes |
-| --- | --- | --- | --- |
-| Aider | `aider` | protected authenticated E2E | native session integration where advertised |
-| Amp | `amp` | protected authenticated E2E | native thread integration where advertised |
-| Cline | `cline` | protected authenticated E2E | ACP/stream capability depends on CLI version |
-| Cursor Agent | `cursor` | protected authenticated E2E | native session capability depends on CLI version |
-| Codex | `codex` | protected live check | provider-owned app-server/session behavior |
-| Claude Code | `claude` | protected live check | provider-owned authentication and sessions |
-| Droid | `droid` | protected authenticated E2E | list/delete are unavailable when not advertised |
-| Gemini CLI | `gemini` | protected authenticated E2E | CLI capability varies by installed version |
-| Goose | `goose` | protected authenticated E2E | native session capability depends on CLI version |
-| Kimi Code CLI | `kimi` | protected probe only | no authenticated E2E workflow yet |
-| Mistral Vibe | `vibe` | protected probe only | no authenticated E2E workflow yet |
-| Copilot CLI | `copilot` | protected authenticated E2E | native CLI login remains provider-owned |
-| OpenCode | `opencode` | protected authenticated E2E | ACP capability depends on CLI version |
-| Pi | `pi` | protected authenticated E2E | RPC capability depends on CLI version |
+“Fixture-tested” names the exact CLI version exercised by checked-in adapter tests. A range is enforced only where stated. Capability lists are probes, not promises: an operation is unavailable unless the installed CLI advertises it.
 
-`:GatorHealth` reports local executable, Git workspace, policy, and telemetry state. It does not claim provider readiness until a bounded provider probe succeeds.
+| Provider | Executable | Fixture-tested version | Auth probe | Advertised capabilities | Explicit limitations | Verification tier |
+| --- | --- | --- | --- | --- | --- | --- |
+| Aider | `aider` | 0.77.1 | unavailable: no provider-independent status contract | CLI, message, stream, ask/architect, history | no ACP or structured-output claim; auth cannot be checked | fixture + protected authenticated E2E |
+| Amp | `amp` | 1.2.3 | unavailable: no non-interactive status contract | execute, JSON stream/input, threads, MCP, plugins | no ACP claim; auth cannot be checked | fixture + protected authenticated E2E |
+| Cline | `cline` | 1.3.0 | unavailable: no provider-independent status contract | ACP/stdio, JSON, create/resume, plan, MCP, embedded context | ACP profile varies by CLI; auth cannot be checked | fixture + protected authenticated E2E |
+| Cursor Agent | `cursor-agent` | 1.2.3 | unavailable: `status` has no machine-readable schema | print, stream JSON, history/resume, force | no machine-readable auth readiness | fixture + protected authenticated E2E |
+| Codex | `codex` | 0.144.4; enforced 0.144.x | `codex login status` | CLI, app-server RPC | only detected app-server surface is advertised | fixture + protected authenticated check |
+| Claude Code | `claude` | 2.1.119; enforced 2.1.x | `claude auth status` JSON | stream JSON, resume | no capabilities beyond CLI help are advertised | fixture + protected authenticated check |
+| Droid | `droid` | 1.2.3 | unavailable: no non-interactive status command | exec JSON/JSON-RPC, resume/fork, spec/autonomy/tool controls | list/delete are unavailable unless the CLI advertises them; auth cannot be checked | fixture + protected authenticated E2E |
+| Gemini CLI | `gemini` | 0.46.0; enforced 0.46.x | unavailable: no non-interactive status contract | ACP, stream JSON, list/resume sessions | auth cannot be checked | fixture + protected authenticated E2E |
+| Goose | `goose` | 1.36.0 | unavailable: no non-interactive status command | ACP/stdio, load/list/close sessions, MCP HTTP, context/images/extensions | fork/resume unavailable unless advertised; auth cannot be checked | fixture + protected authenticated E2E |
+| Kimi Code CLI | `kimi` | 1.45.0 | unavailable: no non-interactive status command | ACP/stdio, load/list sessions, MCP HTTP/SSE, context/images, plan | close/fork/resume unavailable unless advertised; no authenticated E2E | fixture + bounded probe only |
+| Mistral Vibe | `vibe` and `vibe-acp` | 2.1.0 | unavailable: no non-interactive status command | ACP/stdio, load/list/close/fork, context/images, JSON, plan | resume unavailable unless advertised; no authenticated E2E | fixture + bounded probe only |
+| Copilot CLI | `copilot` | 0.0.411; enforced 0.0.411–0.0.999 | unavailable: no machine-readable status contract | ACP/stdio, resume | native login remains provider-owned; auth cannot be checked | fixture + protected authenticated E2E |
+| OpenCode | `opencode` | 1.17.15; exact enforced | `opencode providers list` | ACP/stdio, load/list/close/fork/resume, MCP HTTP/SSE, context/images | other versions and missing ACP are unsupported | fixture + protected authenticated E2E |
+| Pi | `pi` | 0.80.7; exact enforced | unavailable: RPC has no credential-status contract | RPC/stdio, state, create/resume, tool filters | list/close sessions and auth status are unavailable; protected run is offline | fixture + protected offline E2E |
+
+`:GatorHealth` does not read credentials. “Authentication probe passed” means the provider’s own status command reported login; it does not expose or validate credential material. Kimi and Vibe are intentionally probe-only until protected authenticated E2E coverage exists.
