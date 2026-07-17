@@ -48,25 +48,13 @@ local function render(panel)
 		"Actions:",
 		(panel.selected == 1 and "> " or "  ") .. "Run health check",
 		(panel.selected == 2 and "> " or "  ") .. "Close workspace",
-		"<CR> confirm · j/k navigate · q close",
+		"<CR> confirm · j/k navigate · q close · ? help",
 	}
-	if state.config.ui.screen_reader then
-		accessibility.text(panel.buffer, lines)
-	else
-		vim.bo[panel.buffer].modifiable = true
-		vim.api.nvim_buf_set_lines(panel.buffer, 0, -1, false, lines)
-		vim.bo[panel.buffer].modifiable = false
-		vim.bo[panel.buffer].filetype = "gator"
-	end
+	accessibility.render(panel.buffer, lines, "gator")
 end
 
 local function bind(panel)
-	local keys = vim.tbl_extend(
-		"force",
-		{ next = "j", previous = "k", confirm = "<CR>", cancel = "q" },
-		panel.state.config.ui.keymaps
-	)
-	accessibility.bind(panel.buffer, keys, {
+	accessibility.panel(panel.buffer, { next = "j", previous = "k", confirm = "<CR>", cancel = "q", help = "?" }, {
 		next = function()
 			panel.selected = panel.selected % 2 + 1
 			render(panel)
@@ -85,6 +73,9 @@ local function bind(panel)
 		cancel = function()
 			M.close()
 		end,
+		help = function()
+			vim.notify("Gator workspace: j/k navigate, <CR> confirm, q close", vim.log.levels.INFO)
+		end,
 	})
 end
 
@@ -92,6 +83,7 @@ function M.open(state)
 	if type(state) ~= "table" or type(state.config) ~= "table" or type(state.config.context) ~= "table" then
 		fail("open requires initialized Gator state")
 	end
+	accessibility.configure(state.config.ui)
 	local panel, tabpage = current_panel()
 	if panel then
 		panel.state = state

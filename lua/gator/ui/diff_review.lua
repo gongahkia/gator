@@ -1,4 +1,5 @@
 local run = require("gator.core.run")
+local accessibility = require("gator.ui.accessibility")
 local M = {}
 local reviews = {}
 local decisions = { pending = true, accepted = true, rejected = true }
@@ -122,7 +123,64 @@ local function render(review)
 			end
 		end
 	end
-	vim.api.nvim_buf_set_lines(review.buffer, 0, -1, false, lines)
+	table.insert(lines, "j/k hunk · <CR> open diff · a accept · r reject · q close · ? help")
+	accessibility.render(review.buffer, lines, "gator-review")
+end
+
+local function move_hunk(review, offset)
+	local positions = {}
+	for change_index, change in ipairs(review.changes) do
+		for hunk_index in ipairs(change.hunks) do
+			table.insert(positions, { change = change_index, hunk = hunk_index })
+		end
+	end
+	if #positions == 0 then
+		return
+	end
+	local selected = 1
+	for index, position in ipairs(positions) do
+		if position.change == review.selected and position.hunk == review.hunk then
+			selected = index
+			break
+		end
+	end
+	local target = positions[(selected - 1 + offset) % #positions + 1]
+	review.selected, review.hunk = target.change, target.hunk
+	render(review)
+end
+
+local function bind(review)
+	accessibility.panel(
+		review.buffer,
+		{ next = "j", previous = "k", confirm = "<CR>", accept = "a", reject = "r", cancel = "q", help = "?" },
+		{
+			next = function()
+				move_hunk(review, 1)
+			end,
+			previous = function()
+				move_hunk(review, -1)
+			end,
+			confirm = function()
+				if review.changes[review.selected] then
+					M.open_selected()
+				end
+			end,
+			accept = function()
+				if selected_hunk(review) then
+					M.stage("accepted")
+				end
+			end,
+			reject = function()
+				if selected_hunk(review) then
+					M.stage("rejected")
+				end
+			end,
+			cancel = M.close,
+			help = function()
+				vim.notify("Gator review: j/k hunk, <CR> open diff, a accept, r reject, q close", vim.log.levels.INFO)
+			end,
+		}
+	)
 end
 
 local function scratch(review, side, content)
@@ -170,6 +228,7 @@ function M.open(opts)
 	}
 	reviews[tabpage] = review
 	render(review)
+	bind(review)
 	return window
 end
 
@@ -291,6 +350,7 @@ function M.open_selected()
 	end
 	local result = { before = before, after = after, path = change.path, hunk = hunk and hunk.id or nil }
 	table.insert(review.diffs, result)
+	vim.api.nvim_set_current_win(review.window)
 	return vim.deepcopy(result)
 end
 

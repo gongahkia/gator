@@ -24,6 +24,21 @@ Native package loading registers `:Gator`, `:GatorHealth`, `:GatorCaptureSelecti
 
 Run `:GatorHealth` before first use. It verifies Neovim, Git, local policy, optional indexing, and provider availability without reading provider credentials.
 
+## Keyboard and screen reader UX
+
+Every Gator panel is keyboard-first and buffer-local: `j`/`k` moves the current selection, `<CR>` confirms or opens it, `q` closes or cancels, and `?` shows panel help. Context uses `<Space>` to include or exclude an entry; review uses `a`/`r` to accept or reject a hunk; timelines use `<Space>` to collapse or expand a call. Focus stays in the control panel after opening a review diff, and closing the primary workspace restores the prior user window.
+
+Override action names through `ui.keymaps`; only panels that implement an action receive its override. Set `ui.screen_reader = true` (the default) for plain, read-only `gator-text` buffers that include selection, status, policy, and decision text.
+
+```lua
+require("gator").setup({
+  ui = {
+    keymaps = { next = "]", previous = "[", confirm = "<C-m>", cancel = "<Esc>" },
+    screen_reader = true,
+  },
+})
+```
+
 ## Safety model
 
 Gator is a native-first meta-harness. Providers retain authentication, model selection, tool loops, compaction, and sandboxing. Gator may narrow a provider action or require confirmation; it never broadens provider permissions. Project instructions are discovered as provenance-tracked context and require explicit trust before transfer.

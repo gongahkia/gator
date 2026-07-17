@@ -26,6 +26,15 @@ assert(
 	value.required and vim.api.nvim_win_is_valid(value.window) and #value.changes == 2,
 	"broader modes must open acknowledgement UI"
 )
+local buffer = vim.api.nvim_win_get_buf(value.window)
+assert(
+	vim.bo[buffer].filetype == "gator-text"
+		and not vim.bo[buffer].modifiable
+		and vim.api.nvim_buf_call(buffer, function()
+			return vim.fn.maparg("?", "n", false, true).buffer == 1
+		end),
+	"escalation must provide read-only text output and buffer-local keyboard help"
+)
 local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(value.window), 0, -1, false)
 assert(
 	vim.tbl_contains(lines, "Acknowledgement is required before Gator requests this broader provider mode.")

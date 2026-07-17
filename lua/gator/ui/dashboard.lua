@@ -1,5 +1,6 @@
 local M = {}
 local dashboards = {}
+local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
 	error("Gator dashboard: " .. message, 3)
@@ -102,7 +103,32 @@ local function render(dashboard)
 			)
 		end
 	end
-	vim.api.nvim_buf_set_lines(dashboard.buffer, 0, -1, false, lines)
+	table.insert(lines, "j/k navigate · <CR> open · q close · ? help")
+	accessibility.render(dashboard.buffer, lines, "gator-dashboard")
+end
+
+local function bind(dashboard)
+	accessibility.panel(dashboard.buffer, { next = "j", previous = "k", confirm = "<CR>", cancel = "q", help = "?" }, {
+		next = function()
+			if #dashboard.tasks > 0 then
+				M.select(dashboard.selected % #dashboard.tasks + 1)
+			end
+		end,
+		previous = function()
+			if #dashboard.tasks > 0 then
+				M.select((dashboard.selected - 2) % #dashboard.tasks + 1)
+			end
+		end,
+		confirm = function()
+			if #dashboard.tasks > 0 then
+				M.open_selected()
+			end
+		end,
+		cancel = M.close,
+		help = function()
+			vim.notify("Gator tasks: j/k navigate, <CR> open, q close", vim.log.levels.INFO)
+		end,
+	})
 end
 
 function M.open(opts)
@@ -128,6 +154,7 @@ function M.open(opts)
 	dashboard = { window = window, buffer = buffer, tasks = tasks, selected = 1, on_open = opts.on_open }
 	dashboards[tabpage] = dashboard
 	render(dashboard)
+	bind(dashboard)
 	return window
 end
 

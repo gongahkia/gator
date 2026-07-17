@@ -67,8 +67,8 @@ local function render(escalation)
 	for _, change in ipairs(escalation.changes) do
 		table.insert(lines, "  " .. change.key .. ": " .. tostring(change.before) .. " → " .. tostring(change.after))
 	end
-	table.insert(lines, "<CR> acknowledge · q cancel")
-	accessibility.text(escalation.buffer, lines)
+	table.insert(lines, "<CR> acknowledge · q cancel · ? help")
+	accessibility.render(escalation.buffer, lines, "gator-escalation")
 end
 
 function M.request(opts)
@@ -120,9 +120,12 @@ function M.request(opts)
 	local _, tabpage = current()
 	escalations[tabpage] = escalation
 	render(escalation)
-	accessibility.bind(buffer, { confirm = "<CR>", cancel = "q" }, {
+	accessibility.panel(buffer, { confirm = "<CR>", cancel = "q", help = "?" }, {
 		confirm = M.acknowledge,
 		cancel = M.cancel,
+		help = function()
+			vim.notify("Gator escalation: <CR> acknowledge, q cancel", vim.log.levels.INFO)
+		end,
 	})
 	return { required = true, changes = vim.deepcopy(value), window = window }
 end

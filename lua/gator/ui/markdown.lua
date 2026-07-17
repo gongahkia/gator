@@ -1,6 +1,7 @@
 local M = {}
 local renderers = {}
 local namespace = vim.api.nvim_create_namespace("gator-markdown")
+local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
 	error("Gator markdown: " .. message, 3)
@@ -61,7 +62,7 @@ end
 
 local function render(renderer)
 	local lines = vim.split(renderer.text, "\n", { plain = true, trimempty = false })
-	vim.api.nvim_buf_set_lines(renderer.buffer, 0, -1, false, lines)
+	accessibility.render(renderer.buffer, lines, "gator-markdown")
 	renderer.blocks = blocks(renderer.text)
 	vim.api.nvim_buf_clear_namespace(renderer.buffer, namespace, 0, -1)
 	for _, block in ipairs(renderer.blocks) do
@@ -70,6 +71,15 @@ local function render(renderer)
 			virt_text_pos = "eol",
 		})
 	end
+end
+
+local function bind(renderer)
+	accessibility.panel(renderer.buffer, { cancel = "q", help = "?" }, {
+		cancel = M.close,
+		help = function()
+			vim.notify("Gator markdown: use native movement keys; q closes the panel", vim.log.levels.INFO)
+		end,
+	})
 end
 
 function M.open()
@@ -87,6 +97,7 @@ function M.open()
 	renderer = { window = window, buffer = buffer, text = "", blocks = {} }
 	renderers[tabpage] = renderer
 	render(renderer)
+	bind(renderer)
 	return window
 end
 

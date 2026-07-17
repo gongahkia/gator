@@ -19,6 +19,7 @@ assert(vim.api.nvim_win_is_valid(window), "diff review opening must create a win
 assert(diff_review.select(1).path == "lua/gator/init.lua", "diff review selection must preserve changed file paths")
 local split = diff_review.open_selected()
 assert(vim.wo[split.before].diff and vim.wo[split.after].diff, "diff review must open native diff windows")
+assert(vim.api.nvim_get_current_win() == window, "opening a diff must preserve keyboard focus in the review controls")
 assert(
 	vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(split.before), 0, -1, false)[1] == "local old = true",
 	"diff review must render pre-run content"

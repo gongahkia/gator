@@ -1,6 +1,7 @@
 local M = {}
 local dashboards = {}
 local kinds = { project = true, worktree = true }
+local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
 	error("Gator workspace dashboard: " .. message, 3)
@@ -115,17 +116,46 @@ local function render(dashboard)
 			table.insert(lines, "  activity: " .. value.provider .. " · " .. value.session_id .. " · " .. value.state)
 		end
 	end
-	vim.api.nvim_buf_set_lines(dashboard.buffer, 0, -1, false, lines)
+	table.insert(lines, "j/k navigate · <CR> select · q close · ? help")
+	accessibility.render(dashboard.buffer, lines, "gator-workspaces")
+end
+
+local function bind(dashboard)
+	accessibility.panel(dashboard.buffer, { next = "j", previous = "k", confirm = "<CR>", cancel = "q", help = "?" }, {
+		next = function()
+			if #dashboard.workspaces > 0 then
+				M.select(dashboard.selected % #dashboard.workspaces + 1)
+			end
+		end,
+		previous = function()
+			if #dashboard.workspaces > 0 then
+				M.select((dashboard.selected - 2) % #dashboard.workspaces + 1)
+			end
+		end,
+		confirm = function()
+			if #dashboard.workspaces > 0 then
+				M.confirm()
+			end
+		end,
+		cancel = M.close,
+		help = function()
+			vim.notify("Gator workspaces: j/k navigate, <CR> select, q close", vim.log.levels.INFO)
+		end,
+	})
 end
 
 function M.open(opts)
 	if type(opts) ~= "table" then
 		fail("open requires options")
 	end
+	if opts.on_select ~= nil and type(opts.on_select) ~= "function" then
+		fail("on_select must be a function")
+	end
 	local value = workspaces(opts.workspaces or {})
 	local dashboard, tabpage = current()
 	if dashboard then
 		dashboard.workspaces = value
+		dashboard.on_select = opts.on_select
 		dashboard.selected = math.min(dashboard.selected, math.max(#value, 1))
 		render(dashboard)
 		vim.api.nvim_set_current_win(dashboard.window)
@@ -137,9 +167,10 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-workspaces"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	dashboard = { window = window, buffer = buffer, workspaces = value, selected = 1 }
+	dashboard = { window = window, buffer = buffer, workspaces = value, selected = 1, on_select = opts.on_select }
 	dashboards[tabpage] = dashboard
 	render(dashboard)
+	bind(dashboard)
 	return window
 end
 
@@ -154,6 +185,18 @@ function M.select(index)
 	dashboard.selected = index
 	render(dashboard)
 	return vim.deepcopy(dashboard.workspaces[index])
+end
+
+function M.confirm()
+	local dashboard = current()
+	if not dashboard or not dashboard.workspaces[dashboard.selected] then
+		fail("no workspace is selected")
+	end
+	local workspace = vim.deepcopy(dashboard.workspaces[dashboard.selected])
+	if dashboard.on_select then
+		dashboard.on_select(workspace)
+	end
+	return workspace
 end
 
 function M.close()

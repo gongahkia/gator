@@ -1,6 +1,7 @@
 local M = {}
 local timelines = {}
 local motion = require("gator.ui.motion")
+local accessibility = require("gator.ui.accessibility")
 local approvals = { not_required = true, pending = true, granted = true, denied = true }
 local statuses = { pending = true, running = true, succeeded = true, failed = true }
 local max_output_lines = 200
@@ -135,7 +136,9 @@ end
 local function status_line(timeline, call)
 	local state = timeline.collapsed[call.id] and "collapsed" or "expanded"
 	local status = call.status == "running" and "running " .. timeline.frame or call.status
-	return "[" .. state .. "] " .. call.id .. " · " .. call.name .. " · " .. status
+	local selected = timeline.calls[timeline.selected] and timeline.calls[timeline.selected].id == call.id and "> "
+		or "  "
+	return selected .. "[" .. state .. "] " .. call.id .. " · " .. call.name .. " · " .. status
 end
 
 local function render(timeline)
@@ -161,10 +164,14 @@ local function render(timeline)
 			end
 		end
 	end
-	vim.api.nvim_buf_set_lines(timeline.buffer, 0, -1, false, lines)
+	if #lines < 205 then
+		table.insert(lines, "j/k navigate · <Space> collapse/expand · q close · ? help")
+	end
+	accessibility.render(timeline.buffer, lines, "gator-timeline")
 end
 
 local function render_status(timeline)
+	vim.bo[timeline.buffer].modifiable = true
 	for _, call in ipairs(timeline.calls) do
 		if call.status == "running" then
 			local line = timeline.status_lines and timeline.status_lines[call.id]
@@ -173,6 +180,7 @@ local function render_status(timeline)
 			end
 		end
 	end
+	vim.bo[timeline.buffer].modifiable = false
 end
 
 local function update_motion(timeline)
@@ -212,6 +220,34 @@ local function replace(timeline, calls)
 	end
 	timeline.calls = calls
 	timeline.collapsed = collapsed
+	timeline.selected = math.min(timeline.selected or 1, math.max(#calls, 1))
+end
+
+local function bind(timeline)
+	accessibility.panel(timeline.buffer, { next = "j", previous = "k", toggle = "<Space>", cancel = "q", help = "?" }, {
+		next = function()
+			if #timeline.calls > 0 then
+				timeline.selected = timeline.selected % #timeline.calls + 1
+				render(timeline)
+			end
+		end,
+		previous = function()
+			if #timeline.calls > 0 then
+				timeline.selected = (timeline.selected - 2) % #timeline.calls + 1
+				render(timeline)
+			end
+		end,
+		toggle = function()
+			local call = timeline.calls[timeline.selected]
+			if call then
+				M.toggle(call.id)
+			end
+		end,
+		cancel = M.close,
+		help = function()
+			vim.notify("Gator timeline: j/k navigate, <Space> collapse or expand, q close", vim.log.levels.INFO)
+		end,
+	})
 end
 
 local function schedule_render(timeline)
@@ -264,10 +300,12 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-timeline"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	timeline = { window = window, buffer = buffer, calls = value, collapsed = {}, frame = "", tabpage = tabpage }
+	timeline =
+		{ window = window, buffer = buffer, calls = value, collapsed = {}, frame = "", tabpage = tabpage, selected = 1 }
 	timelines[tabpage] = timeline
 	replace(timeline, value)
 	render(timeline)
+	bind(timeline)
 	update_motion(timeline)
 	return window
 end

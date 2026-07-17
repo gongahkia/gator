@@ -1,5 +1,6 @@
 local M = {}
 local pickers = {}
+local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
 	error("Gator picker: " .. message, 3)
@@ -57,7 +58,32 @@ local function render(picker)
 	for index, item in ipairs(picker.visible) do
 		table.insert(lines, (index == picker.selected and ">" or " ") .. " " .. item.label)
 	end
-	vim.api.nvim_buf_set_lines(picker.buffer, 0, -1, false, lines)
+	table.insert(lines, "j/k navigate · <CR> confirm · q cancel · ? help")
+	accessibility.render(picker.buffer, lines, "gator-picker")
+end
+
+local function bind(picker)
+	accessibility.panel(picker.buffer, { next = "j", previous = "k", confirm = "<CR>", cancel = "q", help = "?" }, {
+		next = function()
+			if #picker.visible > 0 then
+				M.select(picker.selected % #picker.visible + 1)
+			end
+		end,
+		previous = function()
+			if #picker.visible > 0 then
+				M.select((picker.selected - 2) % #picker.visible + 1)
+			end
+		end,
+		confirm = function()
+			if #picker.visible > 0 then
+				M.confirm()
+			end
+		end,
+		cancel = M.cancel,
+		help = function()
+			vim.notify("Gator picker: j/k navigate, <CR> confirm, q cancel", vim.log.levels.INFO)
+		end,
+	})
 end
 
 function M.open(opts)
@@ -99,6 +125,7 @@ function M.open(opts)
 	}
 	pickers[tabpage] = picker
 	render(picker)
+	bind(picker)
 	return window
 end
 

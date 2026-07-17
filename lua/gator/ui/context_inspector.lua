@@ -1,4 +1,5 @@
 local pack = require("gator.context.pack")
+local accessibility = require("gator.ui.accessibility")
 local M = {}
 local inspectors = {}
 
@@ -42,9 +43,18 @@ end
 
 local function render(inspector)
 	local lines = { "Gator context · " .. inspector.pack.task_id }
-	for _, entry in ipairs(inspector.pack.entries) do
+	for index, entry in ipairs(inspector.pack.entries) do
 		local included = inspector.included[entry.id] and "included" or "excluded"
-		table.insert(lines, "[" .. included .. "] " .. entry.id .. " · " .. entry.kind)
+		table.insert(
+			lines,
+			(index == inspector.selected and "> " or "  ")
+				.. "["
+				.. included
+				.. "] "
+				.. entry.id
+				.. " · "
+				.. entry.kind
+		)
 		table.insert(lines, "  ref: " .. entry.ref)
 		table.insert(lines, "  source path: " .. entry.provenance.ref)
 		table.insert(lines, "  revision: " .. (entry.revision or "unavailable"))
@@ -62,7 +72,40 @@ local function render(inspector)
 	if #inspector.pack.entries == 0 then
 		table.insert(lines, "No context entries")
 	end
-	vim.api.nvim_buf_set_lines(inspector.buffer, 0, -1, false, lines)
+	table.insert(lines, "j/k navigate · <Space> include · <CR> confirm · q close · ? help")
+	accessibility.render(inspector.buffer, lines, "gator-context")
+end
+
+local function bind(inspector)
+	accessibility.panel(
+		inspector.buffer,
+		{ next = "j", previous = "k", toggle = "<Space>", confirm = "<CR>", cancel = "q", help = "?" },
+		{
+			next = function()
+				if #inspector.pack.entries > 0 then
+					inspector.selected = inspector.selected % #inspector.pack.entries + 1
+					render(inspector)
+				end
+			end,
+			previous = function()
+				if #inspector.pack.entries > 0 then
+					inspector.selected = (inspector.selected - 2) % #inspector.pack.entries + 1
+					render(inspector)
+				end
+			end,
+			toggle = function()
+				local entry = inspector.pack.entries[inspector.selected]
+				if entry and entry.transfer.eligible then
+					M.toggle(entry.id)
+				end
+			end,
+			confirm = M.confirm,
+			cancel = M.close,
+			help = function()
+				vim.notify("Gator context: j/k navigate, <Space> include, <CR> confirm, q close", vim.log.levels.INFO)
+			end,
+		}
+	)
 end
 
 local function find(inspector, entry_id)
@@ -87,6 +130,7 @@ function M.open(opts)
 		inspector.pack = pack.from_record(pack.to_record(opts.pack))
 		inspector.included = included
 		inspector.on_confirm = opts.on_confirm
+		inspector.selected = 1
 		render(inspector)
 		vim.api.nvim_set_current_win(inspector.window)
 		return inspector.window
@@ -103,9 +147,11 @@ function M.open(opts)
 		pack = pack.from_record(pack.to_record(opts.pack)),
 		included = included,
 		on_confirm = opts.on_confirm,
+		selected = 1,
 	}
 	inspectors[tabpage] = inspector
 	render(inspector)
+	bind(inspector)
 	return window
 end
 
@@ -147,6 +193,7 @@ function M.remove(entry_id)
 	local index, entry = find(inspector, entry_id)
 	table.remove(inspector.pack.entries, index)
 	inspector.included[entry.id] = nil
+	inspector.selected = math.min(inspector.selected, math.max(#inspector.pack.entries, 1))
 	render(inspector)
 end
 

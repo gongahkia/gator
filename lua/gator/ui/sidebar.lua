@@ -1,6 +1,7 @@
 local M = {}
 local sidebars = {}
 local motion = require("gator.ui.motion")
+local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
 	error("Gator sidebar: " .. message, 3)
@@ -58,7 +59,37 @@ local function render(sidebar)
 			table.insert(lines, marker .. " " .. session.task_id .. " · " .. session.provider .. " · " .. status)
 		end
 	end
-	vim.api.nvim_buf_set_lines(sidebar.buffer, 0, -1, false, lines)
+	table.insert(lines, "j/k navigate · <CR> prompt selected session · q close · ? help")
+	accessibility.render(sidebar.buffer, lines, "gator-sidebar")
+end
+
+local function bind(sidebar)
+	accessibility.panel(sidebar.buffer, { next = "j", previous = "k", prompt = "<CR>", cancel = "q", help = "?" }, {
+		next = function()
+			if #sidebar.sessions > 0 then
+				M.select(sidebar.selected % #sidebar.sessions + 1)
+			end
+		end,
+		previous = function()
+			if #sidebar.sessions > 0 then
+				M.select((sidebar.selected - 2) % #sidebar.sessions + 1)
+			end
+		end,
+		prompt = function()
+			local session = sidebar.sessions[sidebar.selected]
+			if session then
+				vim.ui.input({ prompt = "Gator prompt: " }, function(text)
+					if type(text) == "string" and text ~= "" then
+						sidebar.on_input(vim.deepcopy(session), text)
+					end
+				end)
+			end
+		end,
+		cancel = M.close,
+		help = function()
+			vim.notify("Gator conversations: j/k navigate, <CR> prompt, q close", vim.log.levels.INFO)
+		end,
+	})
 end
 
 local function update_motion(sidebar)
@@ -107,6 +138,7 @@ function M.open(opts)
 		{ window = window, buffer = buffer, sessions = sessions, selected = 1, on_input = opts.on_input, frame = "" }
 	sidebars[tabpage] = sidebar
 	render(sidebar)
+	bind(sidebar)
 	update_motion(sidebar)
 	return window
 end

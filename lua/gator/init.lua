@@ -35,6 +35,7 @@ function M.setup(opts)
 	local report = compat.require_supported()
 	M._state = state.new(config.resolve(opts))
 	require("gator.ui.motion").configure(M._state.config.ui.motion)
+	require("gator.ui.accessibility").configure(M._state.config.ui)
 	require("gator.policy.redact").configure({ patterns = M._state.config.telemetry.redaction_patterns })
 	require("gator.telemetry.consent").configure({ enabled = M._state.config.telemetry.enabled })
 	M._state.compatibility = report

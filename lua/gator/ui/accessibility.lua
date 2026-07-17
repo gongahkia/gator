@@ -1,5 +1,16 @@
 local M = {}
-local actions = { next = true, previous = true, confirm = true, cancel = true }
+local actions = {
+	next = true,
+	previous = true,
+	confirm = true,
+	cancel = true,
+	toggle = true,
+	accept = true,
+	reject = true,
+	prompt = true,
+	help = true,
+}
+local settings = { keymaps = {}, screen_reader = true }
 
 local function fail(message)
 	error("Gator accessibility: " .. message, 3)
@@ -23,6 +34,31 @@ function M.bind(buffer, keymaps, handlers)
 	end
 end
 
+function M.configure(opts)
+	if type(opts) ~= "table" or type(opts.keymaps) ~= "table" or type(opts.screen_reader) ~= "boolean" then
+		fail("settings require keymaps and screen_reader")
+	end
+	settings = { keymaps = vim.deepcopy(opts.keymaps), screen_reader = opts.screen_reader }
+	return vim.deepcopy(settings)
+end
+
+function M.keymaps(defaults, handlers)
+	if type(defaults) ~= "table" or type(handlers) ~= "table" then
+		fail("keymaps require defaults and handlers")
+	end
+	local result = vim.deepcopy(defaults)
+	for action, lhs in pairs(settings.keymaps) do
+		if handlers[action] then
+			result[action] = lhs
+		end
+	end
+	return result
+end
+
+function M.panel(buffer, defaults, handlers)
+	M.bind(buffer, M.keymaps(defaults, handlers), handlers)
+end
+
 function M.text(buffer, lines)
 	if
 		type(buffer) ~= "number"
@@ -41,6 +77,20 @@ function M.text(buffer, lines)
 	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
 	vim.bo[buffer].modifiable = false
 	vim.bo[buffer].filetype = "gator-text"
+end
+
+function M.render(buffer, lines, filetype)
+	if type(filetype) ~= "string" or filetype == "" then
+		fail("render requires a non-empty filetype")
+	end
+	if settings.screen_reader then
+		M.text(buffer, lines)
+		return
+	end
+	vim.bo[buffer].modifiable = true
+	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
+	vim.bo[buffer].modifiable = false
+	vim.bo[buffer].filetype = filetype
 end
 
 return M
