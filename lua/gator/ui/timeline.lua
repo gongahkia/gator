@@ -3,6 +3,8 @@ local timelines = {}
 local motion = require("gator.ui.motion")
 local approvals = { not_required = true, pending = true, granted = true, denied = true }
 local statuses = { pending = true, running = true, succeeded = true, failed = true }
+local max_output_lines = 200
+local max_output_bytes = 65536
 
 local function fail(message)
 	error("Gator timeline: " .. message, 3)
@@ -13,6 +15,35 @@ local function require_string(value, name)
 		fail(name .. " must be a non-empty string")
 	end
 	return value
+end
+
+local function bounded_output(value, name)
+	value = require_string(value, name)
+	local lines, offset, retained = {}, 1, 0
+	while offset <= #value and #lines < max_output_lines and retained < max_output_bytes do
+		local ending = value:find("\n", offset, true)
+		local line = value:sub(offset, ending and ending - 1 or #value)
+		local remaining = max_output_bytes - retained
+		if #line > remaining then
+			line = line:sub(1, remaining)
+			ending = nil
+		end
+		table.insert(lines, line)
+		retained = retained + #line + 1
+		if not ending then
+			break
+		end
+		offset = ending + 1
+	end
+	local result = table.concat(lines, "\n")
+	if offset <= #value then
+		local marker = "[output truncated in Gator; inspect the provider-native session for full history]"
+		if #result + #marker + 1 > max_output_bytes then
+			result = result:sub(1, math.max(0, max_output_bytes - #marker - 1))
+		end
+		result = result == "" and marker or result .. "\n" .. marker
+	end
+	return result
 end
 
 local function calls(value)
@@ -66,8 +97,8 @@ local function calls(value)
 			name = require_string(call.name, "call " .. index .. " name"),
 			arguments = require_string(call.arguments, "call " .. index .. " arguments"),
 			approval = approval,
-			output = call.output ~= nil and require_string(call.output, "call " .. index .. " output") or nil,
-			failure = call.failure ~= nil and require_string(call.failure, "call " .. index .. " failure") or nil,
+			output = call.output ~= nil and bounded_output(call.output, "call " .. index .. " output") or nil,
+			failure = call.failure ~= nil and bounded_output(call.failure, "call " .. index .. " failure") or nil,
 			status = status,
 		}
 	end
@@ -87,12 +118,18 @@ end
 local function detail(lines, label, value)
 	local values = vim.split(value, "\n", { plain = true, trimempty = false })
 	for index, line in ipairs(values) do
-		if index > 200 then
+		if index > max_output_lines then
 			table.insert(lines, "  output truncated in Gator; inspect the provider-native session for full history")
 			break
 		end
 		table.insert(lines, index == 1 and "  " .. label .. ": " .. line or "  " .. line)
 	end
+end
+
+local function focused(timeline)
+	return vim.api.nvim_win_is_valid(timeline.window)
+		and vim.api.nvim_get_current_tabpage() == timeline.tabpage
+		and vim.api.nvim_get_current_win() == timeline.window
 end
 
 local function status_line(timeline, call)
@@ -139,11 +176,20 @@ local function render_status(timeline)
 end
 
 local function update_motion(timeline)
+	if not focused(timeline) then
+		if timeline.status_motion then
+			timeline.status_motion.stop()
+		end
+		if timeline.action_motion then
+			timeline.action_motion.stop()
+		end
+		return
+	end
 	for _, call in ipairs(timeline.calls) do
 		if call.status == "running" then
 			timeline.status_motion = timeline.status_motion or motion.spinner()
 			timeline.status_motion.start(function(frame)
-				if not vim.api.nvim_win_is_valid(timeline.window) then
+				if not focused(timeline) then
 					timeline.status_motion.stop()
 					return
 				end
@@ -157,6 +203,29 @@ local function update_motion(timeline)
 		timeline.status_motion.stop()
 	end
 	timeline.frame = ""
+end
+
+local function replace(timeline, calls)
+	local collapsed = {}
+	for _, call in ipairs(calls) do
+		collapsed[call.id] = timeline.collapsed[call.id] or false
+	end
+	timeline.calls = calls
+	timeline.collapsed = collapsed
+end
+
+local function schedule_render(timeline)
+	if timeline.refresh_pending then
+		return
+	end
+	timeline.refresh_pending = true
+	vim.schedule(function()
+		timeline.refresh_pending = false
+		if vim.api.nvim_win_is_valid(timeline.window) then
+			render(timeline)
+			update_motion(timeline)
+		end
+	end)
 end
 
 local function pulse(timeline)
@@ -183,15 +252,10 @@ function M.open(opts)
 	local value = calls(opts.calls or {})
 	local timeline, tabpage = current()
 	if timeline then
-		local collapsed = {}
-		for _, call in ipairs(value) do
-			collapsed[call.id] = timeline.collapsed[call.id] or false
-		end
-		timeline.calls = value
-		timeline.collapsed = collapsed
+		replace(timeline, value)
 		render(timeline)
-		update_motion(timeline)
 		vim.api.nvim_set_current_win(timeline.window)
+		update_motion(timeline)
 		return timeline.window
 	end
 	vim.cmd("botright 14new")
@@ -200,8 +264,9 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-timeline"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	timeline = { window = window, buffer = buffer, calls = value, collapsed = {}, frame = "" }
+	timeline = { window = window, buffer = buffer, calls = value, collapsed = {}, frame = "", tabpage = tabpage }
 	timelines[tabpage] = timeline
+	replace(timeline, value)
 	render(timeline)
 	update_motion(timeline)
 	return window
@@ -212,7 +277,8 @@ function M.update(value)
 	if not timeline then
 		fail("no tool-call timeline is open in this tab")
 	end
-	M.open({ calls = value })
+	replace(timeline, calls(value))
+	schedule_render(timeline)
 end
 
 function M.toggle(id)
@@ -245,5 +311,40 @@ function M.close()
 	timelines[tabpage] = nil
 	return true
 end
+
+function M.inspect()
+	local timeline = current()
+	if not timeline then
+		return nil
+	end
+	local output_bytes = 0
+	for _, call in ipairs(timeline.calls) do
+		output_bytes = output_bytes + #(call.output or "") + #(call.failure or "")
+	end
+	return {
+		motion_active = timeline.status_motion and timeline.status_motion.active or false,
+		refresh_pending = timeline.refresh_pending == true,
+		output_bytes = output_bytes,
+		max_output_bytes = max_output_bytes,
+	}
+end
+
+function M.refresh()
+	for tabpage, timeline in pairs(timelines) do
+		if not vim.api.nvim_win_is_valid(timeline.window) then
+			timelines[tabpage] = nil
+		else
+			update_motion(timeline)
+		end
+	end
+end
+
+local group = vim.api.nvim_create_augroup("GatorTimelineActivity", { clear = true })
+vim.api.nvim_create_autocmd({ "WinEnter", "WinLeave", "TabEnter", "TabLeave" }, {
+	group = group,
+	callback = function()
+		vim.schedule(M.refresh)
+	end,
+})
 
 return M
