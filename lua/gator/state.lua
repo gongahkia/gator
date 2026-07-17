@@ -6,6 +6,8 @@ function M.new(config)
 		tasks = {},
 		context = {},
 		adapters = {},
+		workspace = { status = "ready" },
+		review = {},
 	}
 end
 

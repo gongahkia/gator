@@ -10,7 +10,12 @@ assert(vim.api.nvim_win_is_valid(panel), "opening Gator must create a panel wind
 assert(vim.api.nvim_get_current_win() == panel, "opening Gator must focus its panel")
 assert(vim.api.nvim_win_get_buf(user_window) == user_buffer, "opening Gator must preserve the user buffer")
 local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(panel), 0, -1, false)
-assert(lines[1] == "Gator workspace" and lines[7] == "Actions:", "opening Gator must render the primary workspace")
+assert(
+	lines[1] == "Gator workspace"
+		and vim.tbl_contains(lines, "Tasks: empty · create or import a task to begin")
+		and vim.tbl_contains(lines, "Actions:"),
+	"opening Gator must render the primary task/session/context/review workspace"
+)
 assert(vim.fn.maparg("q", "n", false, true).buffer == 1, "workspace close must be keyboard-accessible")
 assert(ui.open(gator._state) == panel, "opening Gator twice must reuse its panel")
 assert(ui.resize(6) == 6, "Gator panels must resize explicitly")
