@@ -39,3 +39,7 @@ Run `make check` for Lua, Rust, formatting, and lint checks. `make benchmark` ru
 ## Release and support
 
 Gator is MIT licensed. See [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [SUPPORT.md](SUPPORT.md).
+
+### Extension and marketplace trust
+
+Gator extensions, provider CLIs, and marketplace packages execute with your user privileges. Install only extensions from maintainers you can verify; review their source, release provenance, requested permissions, and dependency changes before enabling them. Marketplace publication is not a security review or a trust guarantee. Do not install a package that asks you to disable provider sandboxing, expand permissions, or share credentials.
