@@ -1,4 +1,4 @@
-.PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
+.PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-vibe-test live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
 
 NVIM_TEST = nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
@@ -52,6 +52,9 @@ live-goose-e2e:
 
 live-kimi-test:
 	GATOR_LIVE_KIMI=1 GATOR_TEST_GLOB='kimi_live_spec.lua' $(NVIM_TEST)
+
+live-vibe-test:
+	GATOR_LIVE_VIBE=1 GATOR_TEST_GLOB='vibe_live_spec.lua' $(NVIM_TEST)
 
 live-copilot-test:
 	GATOR_LIVE_COPILOT=1 GATOR_TEST_GLOB='copilot_live_spec.lua' $(NVIM_TEST)

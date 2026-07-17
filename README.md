@@ -2,7 +2,7 @@
 
 Gator is a private Neovim workspace for running, steering, reviewing, and coordinating existing coding-agent CLIs without owning their credentials.
 
-The first public-release target supports Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Gemini CLI, Goose, Kimi Code CLI, Copilot CLI, OpenCode, and Pi through capability-aware adapters. Gator keeps agent-native sessions intact while providing context packs, worktree workflows, review, and opt-in shared Git artifacts.
+The first public-release target supports Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Gemini CLI, Goose, Kimi Code CLI, Mistral Vibe, Copilot CLI, OpenCode, and Pi through capability-aware adapters. Gator keeps agent-native sessions intact while providing context packs, worktree workflows, review, and opt-in shared Git artifacts.
 
 ## Development
 

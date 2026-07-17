@@ -15,6 +15,7 @@ local providers = {
 	"copilot",
 	"opencode",
 	"pi",
+	"vibe",
 }
 
 local function fail(message)
