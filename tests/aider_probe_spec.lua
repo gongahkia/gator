@@ -20,3 +20,28 @@ assert(not aider.probe({
 		return { code = 127, stdout = "" }
 	end,
 }).available, "missing Aider executables must fail explicitly")
+local launched
+local manager = {
+	launch = function(_, opts)
+		launched = opts
+		return { state = "running" }
+	end,
+}
+assert(
+	aider.launch({ manager = manager, id = "aider-run", cwd = vim.g.gator_test.root }).state == "running",
+	"Aider launch must use shared lifecycle management"
+)
+assert(
+	launched.command[1] == "aider" and launched.cwd == vim.uv.fs_realpath(vim.g.gator_test.root),
+	"Aider launch must preserve provider-native credentials and map cwd safely"
+)
+assert(
+	not aider.auth().authenticated and aider.auth().reason:find("provider-independent", 1, true),
+	"Aider must expose unavailable authentication status explicitly"
+)
+assert(not pcall(aider.launch, {
+	manager = manager,
+	id = "aider-run",
+	cwd = vim.g.gator_test.root,
+	token = "secret",
+}), "Aider launch must reject credential fields")

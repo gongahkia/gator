@@ -2,7 +2,7 @@ local compat = require("gator.compat")
 local config = require("gator.config")
 local consent = require("gator.telemetry.consent")
 local M = { checks = {} }
-local providers = { "amp", "codex", "claude", "gemini", "copilot", "opencode", "pi" }
+local providers = { "aider", "amp", "codex", "claude", "gemini", "copilot", "opencode", "pi" }
 
 local function fail(message)
 	error("invalid Gator health check: " .. message, 3)
