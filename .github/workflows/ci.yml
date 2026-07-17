@@ -18,7 +18,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         neovim: [v0.11.0, stable]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: MunifTanjim/setup-neovim-action@5595675b7a0187e70489af966a26c43179d8ea5d # v1
         with:
           tag: ${{ matrix.neovim }}
