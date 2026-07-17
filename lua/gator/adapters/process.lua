@@ -29,7 +29,7 @@ local function command(value)
 end
 
 local function default_spawn(argv, opts, callback)
-	return vim.system(argv, { cwd = opts.cwd, text = true }, callback)
+	return vim.system(argv, { cwd = opts.cwd, text = true, timeout = opts.timeout_ms }, callback)
 end
 
 function M.new(opts)
@@ -45,7 +45,7 @@ function Manager:launch(opts)
 		fail("launch requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "id" and key ~= "command" and key ~= "cwd" then
+		if key ~= "id" and key ~= "command" and key ~= "cwd" and key ~= "timeout_ms" then
 			fail("launch contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -56,10 +56,16 @@ function Manager:launch(opts)
 	if opts.cwd ~= nil and (type(opts.cwd) ~= "string" or opts.cwd == "") then
 		fail("cwd must be a non-empty string")
 	end
+	if
+		opts.timeout_ms ~= nil
+		and (type(opts.timeout_ms) ~= "number" or opts.timeout_ms < 1 or opts.timeout_ms % 1 ~= 0)
+	then
+		fail("timeout_ms must be a positive integer")
+	end
 	local argv = command(opts.command)
-	local process = { id = id, command = argv, cwd = opts.cwd, state = "starting" }
+	local process = { id = id, command = argv, cwd = opts.cwd, timeout_ms = opts.timeout_ms, state = "starting" }
 	self.processes[id] = process
-	local ok, handle = pcall(self.spawn, argv, { cwd = opts.cwd }, function(result)
+	local ok, handle = pcall(self.spawn, argv, { cwd = opts.cwd, timeout_ms = opts.timeout_ms }, function(result)
 		process.result = { code = result.code, signal = result.signal }
 		if process.state == "cancelling" then
 			process.state = "cancelled"
@@ -89,6 +95,7 @@ function Manager:status(id)
 		id = process.id,
 		pid = process.pid,
 		executable = process.command[1],
+		timeout_ms = process.timeout_ms,
 		state = process.state,
 		result = process.result,
 	})
@@ -120,9 +127,9 @@ function Manager:restart(id)
 	if process.state == "running" or process.state == "starting" or process.state == "cancelling" then
 		fail("restart requires a terminal process state")
 	end
-	local argv, cwd = process.command, process.cwd
+	local argv, cwd, timeout_ms = process.command, process.cwd, process.timeout_ms
 	self.processes[id] = nil
-	return self:launch({ id = id, command = argv, cwd = cwd })
+	return self:launch({ id = id, command = argv, cwd = cwd, timeout_ms = timeout_ms })
 end
 
 function Manager:cleanup(id)

@@ -18,6 +18,10 @@ local providers = {
 	"pi",
 	"vibe",
 }
+local provider_modules = {}
+for _, provider in ipairs(providers) do
+	provider_modules[provider] = "gator.adapters." .. provider
+end
 
 local function fail(message)
 	error("invalid Gator health check: " .. message, 3)
@@ -100,7 +104,14 @@ function M.readiness(opts)
 		fail("readiness requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "executable" and key ~= "cwd" and key ~= "run" and key ~= "settings" and key ~= "consent" then
+		if
+			key ~= "executable"
+			and key ~= "cwd"
+			and key ~= "run"
+			and key ~= "settings"
+			and key ~= "consent"
+			and key ~= "probe"
+		then
 			fail("readiness contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -109,6 +120,9 @@ function M.readiness(opts)
 	end
 	if opts.run ~= nil and type(opts.run) ~= "function" then
 		fail("readiness run must be a function")
+	end
+	if opts.probe ~= nil and type(opts.probe) ~= "function" then
+		fail("readiness probe must be a function")
 	end
 	if opts.cwd ~= nil and (type(opts.cwd) ~= "string" or opts.cwd == "") then
 		fail("readiness cwd must be a non-empty string")
@@ -121,7 +135,7 @@ function M.readiness(opts)
 	end
 	local run = opts.run
 		or function(argv, cwd)
-			local value = vim.system(argv, { cwd = cwd, text = true }):wait()
+			local value = vim.system(argv, { cwd = cwd, text = true, timeout = 3000 }):wait()
 			return { code = value.code, stdout = value.stdout or "" }
 		end
 	local cwd = opts.cwd or vim.fn.getcwd()
@@ -130,15 +144,36 @@ function M.readiness(opts)
 		table.insert(records, { component = component, level = level, message = message, repair = repair })
 	end
 	for _, provider in ipairs(providers) do
-		if executable(provider) then
-			add("adapter." .. provider, "ok", "Adapter " .. provider .. " executable is available")
-		else
+		if not executable(provider) then
 			add(
 				"adapter." .. provider,
 				"warn",
 				"Adapter " .. provider .. " executable is unavailable",
 				"Install " .. provider .. " to enable this adapter."
 			)
+		else
+			local ok, result = pcall(opts.probe or function(name)
+				return require(provider_modules[name]).probe({ executable = name, run = run })
+			end, provider)
+			if not ok or type(result) ~= "table" or result.available ~= true then
+				add(
+					"adapter." .. provider,
+					"warn",
+					"Adapter " .. provider .. " version or capability probe failed",
+					(ok and result and result.reason)
+						or "Run the provider CLI manually, update it, then rerun :GatorHealth."
+				)
+			elseif result.supported == false then
+				add(
+					"adapter." .. provider,
+					"warn",
+					"Adapter " .. provider .. " is installed but outside Gator's supported capability range",
+					"Update the provider CLI or use only the explicitly available capabilities."
+				)
+			else
+				local version = type(result.version) == "string" and " " .. result.version or ""
+				add("adapter." .. provider, "ok", "Adapter " .. provider .. " capability probe passed" .. version)
+			end
 		end
 	end
 	local git = executable("git")

@@ -85,20 +85,31 @@ local function current()
 end
 
 local function detail(lines, label, value)
-	for index, line in ipairs(vim.split(value, "\n", { plain = true, trimempty = false })) do
+	local values = vim.split(value, "\n", { plain = true, trimempty = false })
+	for index, line in ipairs(values) do
+		if index > 200 then
+			table.insert(lines, "  output truncated in Gator; inspect the provider-native session for full history")
+			break
+		end
 		table.insert(lines, index == 1 and "  " .. label .. ": " .. line or "  " .. line)
 	end
 end
 
+local function status_line(timeline, call)
+	local state = timeline.collapsed[call.id] and "collapsed" or "expanded"
+	local status = call.status == "running" and "running " .. timeline.frame or call.status
+	return "[" .. state .. "] " .. call.id .. " · " .. call.name .. " · " .. status
+end
+
 local function render(timeline)
 	local lines = { "Gator tool calls" .. (timeline.action_marker or "") }
+	timeline.status_lines = {}
 	if #timeline.calls == 0 then
 		table.insert(lines, "No provider tool calls")
 	end
 	for _, call in ipairs(timeline.calls) do
-		local state = timeline.collapsed[call.id] and "collapsed" or "expanded"
-		local status = call.status == "running" and "running " .. timeline.frame or call.status
-		table.insert(lines, "[" .. state .. "] " .. call.id .. " · " .. call.name .. " · " .. status)
+		table.insert(lines, status_line(timeline, call))
+		timeline.status_lines[call.id] = #lines
 		table.insert(
 			lines,
 			"  provider: " .. call.provider .. " · session: " .. call.session_id .. " · approval: " .. call.approval
@@ -116,6 +127,17 @@ local function render(timeline)
 	vim.api.nvim_buf_set_lines(timeline.buffer, 0, -1, false, lines)
 end
 
+local function render_status(timeline)
+	for _, call in ipairs(timeline.calls) do
+		if call.status == "running" then
+			local line = timeline.status_lines and timeline.status_lines[call.id]
+			if line then
+				vim.api.nvim_buf_set_lines(timeline.buffer, line - 1, line, false, { status_line(timeline, call) })
+			end
+		end
+	end
+end
+
 local function update_motion(timeline)
 	for _, call in ipairs(timeline.calls) do
 		if call.status == "running" then
@@ -126,7 +148,7 @@ local function update_motion(timeline)
 					return
 				end
 				timeline.frame = frame
-				render(timeline)
+				render_status(timeline)
 			end)
 			return
 		end

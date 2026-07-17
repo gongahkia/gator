@@ -1,21 +1,41 @@
 # Gator
 
-Gator is a private Neovim workspace for running, steering, reviewing, and coordinating existing coding-agent CLIs without owning their credentials.
+Gator is a Neovim workspace for steering, reviewing, and coordinating existing coding-agent CLIs without owning their credentials. It preserves provider-native sessions and policies while adding local context provenance, task/run evidence, and editor-native workflows.
 
-The first public-release target supports Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Droid, Gemini CLI, Goose, Kimi Code CLI, Mistral Vibe, Copilot CLI, OpenCode, and Pi through capability-aware adapters. Gator keeps agent-native sessions intact while providing context packs, worktree workflows, review, and opt-in shared Git artifacts.
+## Requirements
+
+- Neovim 0.11+
+- Git
+- An installed, provider-authenticated coding-agent CLI for the adapter you use
+- Optional: Rust stable and `sqlite3` for `gator-index`
+
+## Install and setup
+
+Install with any runtimepath-compatible plugin manager, then configure Gator:
+
+```lua
+require("gator").setup({
+  context = { mode = "manual", trust = "provenance" },
+  telemetry = { enabled = false },
+})
+```
+
+Native package loading registers `:Gator`, `:GatorHealth`, `:GatorCaptureSelection`, and `:GatorPalette`. Lazy loading may call `require("gator").setup()` directly.
+
+Run `:GatorHealth` before first use. It verifies Neovim, Git, local policy, optional indexing, and provider availability without reading provider credentials.
+
+## Safety model
+
+Gator is a native-first meta-harness. Providers retain authentication, model selection, tool loops, compaction, and sandboxing. Gator may narrow a provider action or require confirmation; it never broadens provider permissions. Project instructions are discovered as provenance-tracked context and require explicit trust before transfer.
+
+## Provider support
+
+See [the provider capability matrix](docs/PROVIDERS.md). A listed adapter means Gator has a capability-aware integration; individual operations remain unavailable unless the installed CLI proves support.
 
 ## Development
 
-Run `make test` for Lua tests and `make indexer-test` for the optional Rust indexer.
+Run `make check` for Lua, Rust, formatting, and lint checks. `make benchmark` runs fixture-backed performance cases. Protected authenticated verification is manual-only, default-branch-only, and runs on the `gator-live-agents` self-hosted runner; credentials are never exported by the workflow.
 
-## Loading
+## Release and support
 
-Gator supports Neovim's native packages and runtimepath-based lazy loaders. Native packages source `plugin/gator.lua` and register `:Gator` and `:GatorHealth`; lazy loaders may call `require("gator").setup()` directly without registering commands or launching agents.
-
-## Protected live verification
-
-`live-agent-e2e.yml` is manual-only, default-branch-only, and requires the `protected-live-agents` environment plus a `gator-live-agents` self-hosted runner. The runner supplies each provider's native login; the workflow exports no credential secrets.
-
-## Status
-
-Foundation only. The GitHub issue tracker is the implementation backlog.
+Gator is MIT licensed. See [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [SUPPORT.md](SUPPORT.md).

@@ -12,6 +12,9 @@ local records = health.readiness({
 	run = function()
 		return { code = 0, stdout = "true\n" }
 	end,
+	probe = function(provider)
+		return { provider = provider, available = true, supported = true, version = "1.0.0" }
+	end,
 	consent = consent,
 })
 local seen = {}
@@ -20,7 +23,7 @@ for _, record in ipairs(records) do
 end
 assert(
 	seen["adapter.codex"].level == "ok" and seen["adapter.claude"].level == "warn",
-	"health readiness must report every adapter without launching agents"
+	"health readiness must report every adapter with bounded capability probes"
 )
 assert(
 	seen.git.level == "ok" and seen.indexer.level == "ok" and seen.workspace.level == "ok",

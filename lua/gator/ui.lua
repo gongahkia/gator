@@ -16,6 +16,7 @@ local M = {
 	motion = require("gator.ui.motion"),
 }
 local panels = {}
+local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
 	error("Gator UI: " .. message, 3)
@@ -35,46 +36,54 @@ local function height()
 	return math.max(8, math.min(20, math.floor(vim.o.lines * 0.33)))
 end
 
-local function render(buffer, state, marker)
-	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, {
-		"Gator" .. (marker or ""),
-		"Foundation workspace is active.",
-		"Adapter, context, task, and review panels are issue-tracked.",
-		"Configured context mode: " .. state.config.context.mode,
-	})
+local function render(panel)
+	local state = panel.state
+	local lines = {
+		"Gator workspace",
+		"Tasks: no task selected",
+		"Sessions: provider-native sessions are linked to tasks",
+		"Context: " .. state.config.context.mode .. " / " .. state.config.context.trust,
+		"Review: select a task to inspect local evidence",
+		"",
+		"Actions:",
+		(panel.selected == 1 and "> " or "  ") .. "Run health check",
+		(panel.selected == 2 and "> " or "  ") .. "Close workspace",
+		"<CR> confirm · j/k navigate · q close",
+	}
+	if state.config.ui.screen_reader then
+		accessibility.text(panel.buffer, lines)
+	else
+		vim.bo[panel.buffer].modifiable = true
+		vim.api.nvim_buf_set_lines(panel.buffer, 0, -1, false, lines)
+		vim.bo[panel.buffer].modifiable = false
+		vim.bo[panel.buffer].filetype = "gator"
+	end
 end
 
-local function pulse(panel, state)
-	if panel.focus_motion then
-		panel.focus_motion.stop()
-	end
-	panel.focus_motion = M.motion.transition({
-		from = 1,
-		to = 0,
-		steps = 1,
-		settings = state.config.ui.motion,
-		render = function(value)
-			if vim.api.nvim_win_is_valid(panel.window) then
-				render(panel.buffer, state, value > 0 and " •" or "")
+local function bind(panel)
+	local keys = vim.tbl_extend(
+		"force",
+		{ next = "j", previous = "k", confirm = "<CR>", cancel = "q" },
+		panel.state.config.ui.keymaps
+	)
+	accessibility.bind(panel.buffer, keys, {
+		next = function()
+			panel.selected = panel.selected % 2 + 1
+			render(panel)
+		end,
+		previous = function()
+			panel.selected = panel.selected == 1 and 2 or panel.selected - 1
+			render(panel)
+		end,
+		confirm = function()
+			if panel.selected == 1 then
+				vim.cmd("checkhealth gator")
+			else
+				M.close()
 			end
 		end,
-	})
-end
-
-local function expand(panel, state, target)
-	if panel.layout_motion then
-		panel.layout_motion.stop()
-	end
-	local steps = math.min(4, math.max(1, target - 1))
-	panel.layout_motion = M.motion.transition({
-		from = 1,
-		to = target,
-		steps = steps,
-		settings = state.config.ui.motion,
-		render = function(value)
-			if vim.api.nvim_win_is_valid(panel.window) then
-				vim.api.nvim_win_set_height(panel.window, math.max(1, math.floor(value + 0.5)))
-			end
+		cancel = function()
+			M.close()
 		end,
 	})
 end
@@ -86,7 +95,7 @@ function M.open(state)
 	local panel, tabpage = current_panel()
 	if panel then
 		panel.state = state
-		pulse(panel, state)
+		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
@@ -98,10 +107,11 @@ function M.open(state)
 	vim.bo[buffer].filetype = "gator"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	panel = { window = window, buffer = buffer, previous = previous, state = state }
+	vim.api.nvim_win_set_height(window, target)
+	panel = { window = window, buffer = buffer, previous = previous, state = state, selected = 1 }
 	panels[tabpage] = panel
-	pulse(panel, state)
-	expand(panel, state, target)
+	render(panel)
+	bind(panel)
 	return window
 end
 
@@ -110,7 +120,6 @@ function M.focus()
 	if not panel then
 		fail("no Gator panel is open in this tab")
 	end
-	pulse(panel, panel.state)
 	vim.api.nvim_set_current_win(panel.window)
 	return panel.window
 end
@@ -133,12 +142,6 @@ function M.close()
 		return false
 	end
 	local previous = panel.previous
-	if panel.focus_motion then
-		panel.focus_motion.stop()
-	end
-	if panel.layout_motion then
-		panel.layout_motion.stop()
-	end
 	vim.api.nvim_win_close(panel.window, true)
 	panels[tabpage] = nil
 	if previous and vim.api.nvim_win_is_valid(previous) then

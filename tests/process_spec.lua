@@ -11,8 +11,9 @@ local manager = process.new({
 		}
 	end,
 })
-local launched = manager:launch({ id = "agent-one", command = { "agent", "run" } })
+local launched = manager:launch({ id = "agent-one", command = { "agent", "run" }, timeout_ms = 5000 })
 assert(launched.state == "running" and launched.executable == "agent", "launch must expose only safe process metadata")
+assert(launched.timeout_ms == 5000, "managed processes must retain bounded runtime timeouts")
 callbacks[1]({ code = 1, signal = 0 })
 assert(manager:status("agent-one").state == "failed", "monitoring must record non-zero exits")
 assert(manager:restart("agent-one").state == "running", "terminal processes must restart")
@@ -22,3 +23,7 @@ assert(manager:status("agent-one").state == "cancelled", "cancelled processes mu
 assert(manager:cleanup("agent-one") and not manager:status("agent-one"), "terminal processes must clean up")
 local ok = pcall(manager.restart, manager, "missing")
 assert(not ok, "unknown processes must fail explicitly")
+assert(
+	not pcall(manager.launch, manager, { id = "bad-timeout", command = { "agent" }, timeout_ms = 0 }),
+	"invalid timeouts must fail explicitly"
+)
