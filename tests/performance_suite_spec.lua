@@ -24,6 +24,7 @@ local report = suite.run({
 })
 assert(
 	#report.metrics == 6
+		and report.schema_version == 2
 		and report.metrics[1].name == "startup"
 		and report.metrics[6].name == "indexer"
 		and vim.fn.filereadable(path) == 1,
