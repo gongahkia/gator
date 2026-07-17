@@ -2,7 +2,12 @@ local M = {}
 local redact = require("gator.policy.redact")
 
 M.defaults = {
-	ui = { layout = "adaptive", keymaps = {}, screen_reader = true },
+	ui = {
+		layout = "adaptive",
+		keymaps = {},
+		screen_reader = true,
+		motion = { enabled = true, interval_ms = 120, reduced = false },
+	},
 	context = { mode = "manual", trust = "provenance" },
 	sessions = { transfer = "manual" },
 	workspaces = { mode = "project", max_write_runs = 1 },
@@ -66,7 +71,7 @@ local function settings(value)
 		{ ui = true, context = true, sessions = true, workspaces = true, persistence = true, telemetry = true },
 		"settings"
 	)
-	fields(value.ui, { layout = true, keymaps = true, screen_reader = true }, "settings.ui")
+	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, motion = true }, "settings.ui")
 	fields(value.context, { mode = true, trust = true }, "settings.context")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
 	fields(value.workspaces, { mode = true, max_write_runs = true }, "settings.workspaces")
@@ -86,6 +91,11 @@ local function settings(value)
 	if type(value.ui.screen_reader) ~= "boolean" then
 		fail("ui.screen_reader must be boolean")
 	end
+	if type(value.ui.motion) ~= "table" then
+		fail("ui.motion must be an object")
+	end
+	local motion = require("gator.ui.motion").resolve(value.ui.motion)
+	value.ui.motion = motion
 	if not vim.tbl_contains({ "manual", "inspect", "automatic" }, value.context.mode) then
 		fail("context.mode must be manual, inspect, or automatic")
 	end

@@ -1,5 +1,6 @@
 local M = {}
 local sidebars = {}
+local motion = require("gator.ui.motion")
 
 local function fail(message)
 	error("Gator sidebar: " .. message, 3)
@@ -53,11 +54,32 @@ local function render(sidebar)
 	else
 		for index, session in ipairs(sidebar.sessions) do
 			local marker = index == sidebar.selected and ">" or " "
-			local status = session.streaming and "streaming" or "idle"
+			local status = session.streaming and "streaming " .. sidebar.frame or "idle"
 			table.insert(lines, marker .. " " .. session.task_id .. " · " .. session.provider .. " · " .. status)
 		end
 	end
 	vim.api.nvim_buf_set_lines(sidebar.buffer, 0, -1, false, lines)
+end
+
+local function update_motion(sidebar)
+	for _, session in ipairs(sidebar.sessions) do
+		if session.streaming then
+			sidebar.stream_motion = sidebar.stream_motion or motion.spinner()
+			sidebar.stream_motion.start(function(frame)
+				if not vim.api.nvim_win_is_valid(sidebar.window) then
+					sidebar.stream_motion.stop()
+					return
+				end
+				sidebar.frame = frame
+				render(sidebar)
+			end)
+			return
+		end
+	end
+	if sidebar.stream_motion then
+		sidebar.stream_motion.stop()
+	end
+	sidebar.frame = ""
 end
 
 function M.open(opts)
@@ -71,6 +93,7 @@ function M.open(opts)
 		sidebar.on_input = opts.on_input
 		sidebar.selected = math.min(sidebar.selected, math.max(#sessions, 1))
 		render(sidebar)
+		update_motion(sidebar)
 		vim.api.nvim_set_current_win(sidebar.window)
 		return sidebar.window
 	end
@@ -80,9 +103,11 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-sidebar"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	sidebar = { window = window, buffer = buffer, sessions = sessions, selected = 1, on_input = opts.on_input }
+	sidebar =
+		{ window = window, buffer = buffer, sessions = sessions, selected = 1, on_input = opts.on_input, frame = "" }
 	sidebars[tabpage] = sidebar
 	render(sidebar)
+	update_motion(sidebar)
 	return window
 end
 
@@ -118,6 +143,9 @@ function M.close()
 	local sidebar, tabpage = current()
 	if not sidebar then
 		return false
+	end
+	if sidebar.stream_motion then
+		sidebar.stream_motion.stop()
 	end
 	vim.api.nvim_win_close(sidebar.window, true)
 	sidebars[tabpage] = nil

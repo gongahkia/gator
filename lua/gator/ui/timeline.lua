@@ -1,5 +1,6 @@
 local M = {}
 local timelines = {}
+local motion = require("gator.ui.motion")
 local approvals = { not_required = true, pending = true, granted = true, denied = true }
 local statuses = { pending = true, running = true, succeeded = true, failed = true }
 
@@ -90,13 +91,14 @@ local function detail(lines, label, value)
 end
 
 local function render(timeline)
-	local lines = { "Gator tool calls" }
+	local lines = { "Gator tool calls" .. (timeline.action_marker or "") }
 	if #timeline.calls == 0 then
 		table.insert(lines, "No provider tool calls")
 	end
 	for _, call in ipairs(timeline.calls) do
 		local state = timeline.collapsed[call.id] and "collapsed" or "expanded"
-		table.insert(lines, "[" .. state .. "] " .. call.id .. " · " .. call.name .. " · " .. call.status)
+		local status = call.status == "running" and "running " .. timeline.frame or call.status
+		table.insert(lines, "[" .. state .. "] " .. call.id .. " · " .. call.name .. " · " .. status)
 		table.insert(
 			lines,
 			"  provider: " .. call.provider .. " · session: " .. call.session_id .. " · approval: " .. call.approval
@@ -114,6 +116,44 @@ local function render(timeline)
 	vim.api.nvim_buf_set_lines(timeline.buffer, 0, -1, false, lines)
 end
 
+local function update_motion(timeline)
+	for _, call in ipairs(timeline.calls) do
+		if call.status == "running" then
+			timeline.status_motion = timeline.status_motion or motion.spinner()
+			timeline.status_motion.start(function(frame)
+				if not vim.api.nvim_win_is_valid(timeline.window) then
+					timeline.status_motion.stop()
+					return
+				end
+				timeline.frame = frame
+				render(timeline)
+			end)
+			return
+		end
+	end
+	if timeline.status_motion then
+		timeline.status_motion.stop()
+	end
+	timeline.frame = ""
+end
+
+local function pulse(timeline)
+	if timeline.action_motion then
+		timeline.action_motion.stop()
+	end
+	timeline.action_motion = motion.transition({
+		from = 1,
+		to = 0,
+		steps = 1,
+		render = function(value)
+			if vim.api.nvim_win_is_valid(timeline.window) then
+				timeline.action_marker = value > 0 and " •" or ""
+				render(timeline)
+			end
+		end,
+	})
+end
+
 function M.open(opts)
 	if type(opts) ~= "table" then
 		fail("open requires options")
@@ -128,6 +168,7 @@ function M.open(opts)
 		timeline.calls = value
 		timeline.collapsed = collapsed
 		render(timeline)
+		update_motion(timeline)
 		vim.api.nvim_set_current_win(timeline.window)
 		return timeline.window
 	end
@@ -137,9 +178,10 @@ function M.open(opts)
 	vim.bo[buffer].filetype = "gator-timeline"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	timeline = { window = window, buffer = buffer, calls = value, collapsed = {} }
+	timeline = { window = window, buffer = buffer, calls = value, collapsed = {}, frame = "" }
 	timelines[tabpage] = timeline
 	render(timeline)
+	update_motion(timeline)
 	return window
 end
 
@@ -159,7 +201,7 @@ function M.toggle(id)
 	for _, call in ipairs(timeline.calls) do
 		if call.id == id then
 			timeline.collapsed[id] = not timeline.collapsed[id]
-			render(timeline)
+			pulse(timeline)
 			return timeline.collapsed[id]
 		end
 	end
@@ -170,6 +212,12 @@ function M.close()
 	local timeline, tabpage = current()
 	if not timeline then
 		return false
+	end
+	if timeline.status_motion then
+		timeline.status_motion.stop()
+	end
+	if timeline.action_motion then
+		timeline.action_motion.stop()
 	end
 	vim.api.nvim_win_close(timeline.window, true)
 	timelines[tabpage] = nil

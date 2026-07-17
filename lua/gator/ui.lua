@@ -13,6 +13,7 @@ local M = {
 	sidebar = require("gator.ui.sidebar"),
 	timeline = require("gator.ui.timeline"),
 	workspace_dashboard = require("gator.ui.workspace_dashboard"),
+	motion = require("gator.ui.motion"),
 }
 local panels = {}
 
@@ -34,12 +35,47 @@ local function height()
 	return math.max(8, math.min(20, math.floor(vim.o.lines * 0.33)))
 end
 
-local function render(buffer, state)
+local function render(buffer, state, marker)
 	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, {
-		"Gator",
+		"Gator" .. (marker or ""),
 		"Foundation workspace is active.",
 		"Adapter, context, task, and review panels are issue-tracked.",
 		"Configured context mode: " .. state.config.context.mode,
+	})
+end
+
+local function pulse(panel, state)
+	if panel.focus_motion then
+		panel.focus_motion.stop()
+	end
+	panel.focus_motion = M.motion.transition({
+		from = 1,
+		to = 0,
+		steps = 1,
+		settings = state.config.ui.motion,
+		render = function(value)
+			if vim.api.nvim_win_is_valid(panel.window) then
+				render(panel.buffer, state, value > 0 and " •" or "")
+			end
+		end,
+	})
+end
+
+local function expand(panel, state, target)
+	if panel.layout_motion then
+		panel.layout_motion.stop()
+	end
+	local steps = math.min(4, math.max(1, target - 1))
+	panel.layout_motion = M.motion.transition({
+		from = 1,
+		to = target,
+		steps = steps,
+		settings = state.config.ui.motion,
+		render = function(value)
+			if vim.api.nvim_win_is_valid(panel.window) then
+				vim.api.nvim_win_set_height(panel.window, math.max(1, math.floor(value + 0.5)))
+			end
+		end,
 	})
 end
 
@@ -49,19 +85,23 @@ function M.open(state)
 	end
 	local panel, tabpage = current_panel()
 	if panel then
-		render(panel.buffer, state)
+		panel.state = state
+		pulse(panel, state)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
 	local previous = vim.api.nvim_get_current_win()
-	vim.cmd("botright " .. height() .. "new")
+	local target = height()
+	vim.cmd("botright 1new")
 	local window = vim.api.nvim_get_current_win()
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	render(buffer, state)
-	panels[tabpage] = { window = window, buffer = buffer, previous = previous }
+	panel = { window = window, buffer = buffer, previous = previous, state = state }
+	panels[tabpage] = panel
+	pulse(panel, state)
+	expand(panel, state, target)
 	return window
 end
 
@@ -70,6 +110,7 @@ function M.focus()
 	if not panel then
 		fail("no Gator panel is open in this tab")
 	end
+	pulse(panel, panel.state)
 	vim.api.nvim_set_current_win(panel.window)
 	return panel.window
 end
@@ -92,6 +133,12 @@ function M.close()
 		return false
 	end
 	local previous = panel.previous
+	if panel.focus_motion then
+		panel.focus_motion.stop()
+	end
+	if panel.layout_motion then
+		panel.layout_motion.stop()
+	end
 	vim.api.nvim_win_close(panel.window, true)
 	panels[tabpage] = nil
 	if previous and vim.api.nvim_win_is_valid(previous) then
