@@ -100,6 +100,26 @@ assert(
 	"Cursor fixture must preserve documented stream session, tool, and completion records"
 )
 
+local droid = {}
+assert(fixtures.replay_jsonl(root .. "/droid_result.json", function(record)
+	table.insert(droid, record)
+end) == 1, "Droid result fixture must replay one structured result")
+assert(
+	droid[1].type == "result" and droid[1].session_id == "droid-fixture" and droid[1].is_error == false,
+	"Droid fixture must preserve documented JSON result fields"
+)
+
+local droid_rpc = {}
+assert(fixtures.replay_jsonrpc(root .. "/droid_rpc.jsonl", function(message)
+	table.insert(droid_rpc, message)
+end) == 3, "Droid JSON-RPC fixture must replay every record")
+assert(
+	droid_rpc[1].method == "droid.session_notification"
+		and droid_rpc[2].result.sessionId == "droid-fixture"
+		and droid_rpc[3].method == "droid.request_permission",
+	"Droid fixture must preserve native JSON-RPC session traffic"
+)
+
 local opencode = {}
 assert(fixtures.replay_jsonrpc(root .. "/opencode_acp.jsonl", function(message)
 	table.insert(opencode, message)

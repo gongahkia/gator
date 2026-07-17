@@ -1,1 +1,1 @@
-{"stdout":["droid 1.2.3\n","exec --output-format json stream-jsonrpc --session-id --use-spec\n"],"stderr":[],"code":0}
+{"stdout":["droid 1.2.3\n","--output-format json stream-jsonrpc --session-id --fork --use-spec --auto --enabled-tools --disabled-tools --cwd\n"],"stderr":[],"code":0}

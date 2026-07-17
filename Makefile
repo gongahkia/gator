@@ -1,4 +1,4 @@
-.PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-vibe-test live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
+.PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-claude-test live-droid-test live-droid-e2e live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-vibe-test live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
 
 NVIM_TEST = nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
@@ -37,6 +37,12 @@ live-codex-test:
 
 live-claude-test:
 	GATOR_LIVE_CLAUDE=1 GATOR_TEST_GLOB='claude_live_spec.lua' $(NVIM_TEST)
+
+live-droid-test:
+	GATOR_LIVE_DROID=1 GATOR_TEST_GLOB='droid_live_spec.lua' $(NVIM_TEST)
+
+live-droid-e2e:
+	GATOR_LIVE_DROID=1 GATOR_LIVE_DROID_AUTH=1 GATOR_TEST_GLOB='droid_live_spec.lua' $(NVIM_TEST)
 
 live-gemini-test:
 	GATOR_LIVE_GEMINI=1 GATOR_TEST_GLOB='gemini_live_spec.lua' $(NVIM_TEST)

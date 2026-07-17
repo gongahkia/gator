@@ -14,8 +14,9 @@ on:
           - cursor
           - codex
           - claude
+          - droid
           - gemini
-	          - goose
+          - goose
           - copilot
           - opencode
           - pi
@@ -52,8 +53,9 @@ jobs:
             cursor) make live-cursor-e2e ;;
             codex) make live-codex-test ;;
             claude) make live-claude-test ;;
+            droid) make live-droid-e2e ;;
             gemini) make live-gemini-e2e ;;
-	            goose) make live-goose-e2e ;;
+            goose) make live-goose-e2e ;;
             copilot) make live-copilot-e2e ;;
             opencode) make live-opencode-e2e ;;
             pi) make live-pi-e2e ;;
