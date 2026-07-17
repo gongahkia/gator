@@ -30,6 +30,7 @@ for _, target in ipairs({
 	"make live-codex-test",
 	"make live-claude-test",
 	"make live-gemini-e2e",
+	"make live-goose-e2e",
 	"make live-copilot-e2e",
 	"make live-opencode-e2e",
 	"make live-pi-e2e",

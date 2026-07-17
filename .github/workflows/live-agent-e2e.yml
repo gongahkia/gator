@@ -15,6 +15,7 @@ on:
           - codex
           - claude
           - gemini
+	          - goose
           - copilot
           - opencode
           - pi
@@ -52,6 +53,7 @@ jobs:
             codex) make live-codex-test ;;
             claude) make live-claude-test ;;
             gemini) make live-gemini-e2e ;;
+	            goose) make live-goose-e2e ;;
             copilot) make live-copilot-e2e ;;
             opencode) make live-opencode-e2e ;;
             pi) make live-pi-e2e ;;
