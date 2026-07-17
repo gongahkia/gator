@@ -7,13 +7,29 @@ fixtures.replay_process(vim.g.gator_test.root .. "/tests/fixtures/adapters/kimi_
 	end,
 })
 local value = kimi.probe({
-	run = function(argv)
-		return { code = 0, stdout = argv[2] == "--version" and chunks[1] or chunks[2] }
+	run = function(argv, input)
+		if argv[2] == "--version" then
+			return { code = 0, stdout = chunks[1] }
+		end
+		assert(argv[2] == "acp" and input:find('"initialize"', 1, true), "Kimi must initialize ACP")
+		return {
+			code = 0,
+			stdout = [[{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"mcpCapabilities":{"http":true,"sse":true},"promptCapabilities":{"embeddedContext":true,"image":true},"sessionCapabilities":{"list":{}}}}}]],
+		}
 	end,
 })
 assert(
-	value.available and value.capabilities.acp and value.capabilities.session_resume and value.capabilities.print,
-	"Kimi probe must expose documented ACP, session, and print capabilities"
+	value.available
+		and value.supported
+		and value.capabilities.acp
+		and value.capabilities.stdio
+		and value.capabilities.load_session
+		and value.capabilities.session_list
+		and value.capabilities.mcp_http
+		and value.capabilities.mcp_sse
+		and value.capabilities.embedded_context
+		and value.capabilities.plan,
+	"Kimi probe must expose initialized ACP capabilities"
 )
 assert(not kimi.probe({
 	run = function()
