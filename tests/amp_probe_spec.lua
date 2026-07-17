@@ -12,7 +12,11 @@ local value = amp.probe({
 	end,
 })
 assert(
-	value.available and value.capabilities.execute and value.capabilities.stream_json and value.capabilities.mcp,
+	value.available
+		and value.capabilities.execute
+		and value.capabilities.stream_json
+		and value.capabilities.stream_input
+		and value.capabilities.mcp,
 	"Amp probe must expose documented execute, stream JSON, and MCP capabilities"
 )
 assert(not amp.probe({
@@ -20,3 +24,28 @@ assert(not amp.probe({
 		return { code = 127, stdout = "" }
 	end,
 }).available, "missing Amp executables must fail explicitly")
+local launched
+local manager = {
+	launch = function(_, opts)
+		launched = opts
+		return { state = "running" }
+	end,
+}
+assert(
+	amp.launch({ manager = manager, id = "amp-run", cwd = vim.g.gator_test.root }).state == "running",
+	"Amp launch must use shared lifecycle management"
+)
+assert(
+	launched.command[1] == "amp" and launched.cwd == vim.uv.fs_realpath(vim.g.gator_test.root),
+	"Amp launch must preserve provider-native credentials and map cwd safely"
+)
+assert(
+	not amp.auth().authenticated and amp.auth().reason:find("non-interactive", 1, true),
+	"Amp must expose unavailable authentication status explicitly"
+)
+assert(not pcall(amp.launch, {
+	manager = manager,
+	id = "amp-run",
+	cwd = vim.g.gator_test.root,
+	token = "secret",
+}), "Amp launch must reject credential fields")

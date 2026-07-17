@@ -18,6 +18,17 @@ assert(jsonrpc[1].method == "session/update", "JSON-RPC replay must preserve not
 assert(jsonrpc[2].result.session == "native-1", "JSON-RPC replay must preserve results")
 assert(jsonrpc[3].error.code == -32601, "JSON-RPC replay must preserve errors")
 
+local amp = {}
+assert(fixtures.replay_jsonl(root .. "/amp_stream.jsonl", function(record)
+	table.insert(amp, record)
+end) == 3, "Amp stream fixture must replay every record")
+assert(
+	amp[1].session_id == "T-amp-fixture"
+		and amp[2].message.content[1].text == "gator-fixture"
+		and amp[3].subtype == "success",
+	"Amp fixture must preserve documented stream JSON thread and completion records"
+)
+
 local codex = {}
 assert(fixtures.replay_jsonl(root .. "/codex_appserver.jsonl", function(record)
 	table.insert(codex, record)

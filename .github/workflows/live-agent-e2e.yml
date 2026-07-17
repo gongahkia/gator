@@ -8,6 +8,7 @@ on:
         required: true
         type: choice
         options:
+          - amp
           - codex
           - claude
           - gemini
@@ -41,6 +42,7 @@ jobs:
         run: |
           set -eu
           case "$PROVIDER" in
+            amp) make live-amp-e2e ;;
             codex) make live-codex-test ;;
             claude) make live-claude-test ;;
             gemini) make live-gemini-e2e ;;

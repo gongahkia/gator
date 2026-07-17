@@ -23,6 +23,7 @@ assert(
 	"live-agent workflow must use least-privilege permissions without exporting secrets"
 )
 for _, target in ipairs({
+	"make live-amp-e2e",
 	"make live-codex-test",
 	"make live-claude-test",
 	"make live-gemini-e2e",

@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","cwd":"/fixture","session_id":"T-amp-fixture","tools":["Read"],"mcp_servers":[]}
+{"type":"assistant","message":{"type":"message","role":"assistant","content":[{"type":"text","text":"gator-fixture"}],"stop_reason":"end_turn"},"parent_tool_use_id":null,"session_id":"T-amp-fixture"}
+{"type":"result","subtype":"success","duration_ms":5,"is_error":false,"num_turns":1,"result":"gator-fixture","session_id":"T-amp-fixture"}
