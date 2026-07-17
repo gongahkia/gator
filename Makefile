@@ -1,4 +1,4 @@
-.PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
+.PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-codex-test live-claude-test live-gemini-test live-gemini-e2e live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
 
 NVIM_TEST = nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
 
@@ -19,6 +19,12 @@ live-amp-test:
 
 live-amp-e2e:
 	GATOR_LIVE_AMP=1 GATOR_LIVE_AMP_AUTH=1 GATOR_TEST_GLOB='amp_live_spec.lua' $(NVIM_TEST)
+
+live-cline-test:
+	GATOR_LIVE_CLINE=1 GATOR_TEST_GLOB='cline_live_spec.lua' $(NVIM_TEST)
+
+live-cline-e2e:
+	GATOR_LIVE_CLINE=1 GATOR_LIVE_CLINE_AUTH=1 GATOR_TEST_GLOB='cline_live_spec.lua' $(NVIM_TEST)
 
 live-codex-test:
 	GATOR_LIVE_CODEX=1 GATOR_TEST_GLOB='codex_live_spec.lua' $(NVIM_TEST)

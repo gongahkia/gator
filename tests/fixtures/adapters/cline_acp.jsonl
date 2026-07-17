@@ -1,0 +1,5 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"mcpCapabilities":{"http":true,"sse":false},"promptCapabilities":{"embeddedContext":true,"image":true,"audio":false}},"agentInfo":{"name":"cline","version":"2.5.0"}}}
+{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"/workspace","mcpServers":[]}}
+{"jsonrpc":"2.0","id":2,"result":{"sessionId":"cline-fixture","modes":{"availableModes":[{"id":"plan","name":"Plan"},{"id":"act","name":"Act"}],"currentModeId":"act"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"cline-fixture","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"gator-fixture"}}}}

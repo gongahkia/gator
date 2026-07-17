@@ -10,6 +10,7 @@ on:
         options:
           - aider
           - amp
+          - cline
           - codex
           - claude
           - gemini
@@ -45,6 +46,7 @@ jobs:
           case "$PROVIDER" in
             aider) make live-aider-e2e ;;
             amp) make live-amp-e2e ;;
+            cline) make live-cline-e2e ;;
             codex) make live-codex-test ;;
             claude) make live-claude-test ;;
             gemini) make live-gemini-e2e ;;

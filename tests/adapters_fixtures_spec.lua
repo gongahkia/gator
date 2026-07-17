@@ -69,6 +69,26 @@ assert(
 	"Copilot fixture must preserve ACP capability, session, and command updates"
 )
 
+local cline = {}
+assert(fixtures.replay_jsonrpc(root .. "/cline_acp.jsonl", function(message)
+	table.insert(cline, message)
+end) == 5, "Cline ACP fixture must replay every record")
+assert(
+	cline[2].result.agentCapabilities.loadSession
+		and cline[4].result.sessionId == "cline-fixture"
+		and cline[5].params.update.content.text == "gator-fixture",
+	"Cline fixture must preserve ACP capability, session, and streamed update records"
+)
+
+local cline_stream = {}
+assert(fixtures.replay_jsonl(root .. "/cline_stream.jsonl", function(record)
+	table.insert(cline_stream, record)
+end) == 2, "Cline stream fixture must replay every record")
+assert(
+	cline_stream[1].type == "say" and cline_stream[2].partial == false,
+	"Cline fixture must preserve documented JSON message records"
+)
+
 local opencode = {}
 assert(fixtures.replay_jsonrpc(root .. "/opencode_acp.jsonl", function(message)
 	table.insert(opencode, message)
