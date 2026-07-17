@@ -30,7 +30,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            crates/gator-index/target
+            target
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes sqlite3
@@ -41,3 +41,9 @@ jobs:
           args: false
       - run: make check
       - run: make benchmark
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-artifacts-${{ matrix.os }}-nvim-${{ matrix.neovim }}
+          path: .gator-test
+          if-no-files-found: ignore

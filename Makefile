@@ -1,6 +1,8 @@
 .PHONY: test fixture-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-claude-test live-droid-test live-droid-e2e live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-vibe-test live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e indexer-test sidecar benchmark fmt format-check lint check issues
 
-NVIM_TEST = NVIM_LOG_FILE=/dev/null nvim --headless --noplugin -i NONE -u tests/minimal_init.lua -c "lua dofile('tests/run.lua')"
+NVIM_TEST = tests/gator-test.sh
+NVIM_LINT = tests/gator-test.sh lint
+INDEXER_TEST = tests/gator-test.sh indexer
 
 test:
 	$(NVIM_TEST)
@@ -81,7 +83,7 @@ live-pi-e2e:
 	GATOR_LIVE_PI=1 GATOR_LIVE_PI_AUTH=1 GATOR_TEST_GLOB='pi_live_spec.lua' $(NVIM_TEST)
 
 indexer-test:
-	cargo test --manifest-path crates/gator-index/Cargo.toml
+	$(INDEXER_TEST)
 
 benchmark:
 	GATOR_TEST_GLOB='performance*_spec.lua' $(NVIM_TEST)
@@ -98,7 +100,7 @@ format-check:
 	cargo fmt --manifest-path crates/gator-index/Cargo.toml --check
 
 lint:
-	NVIM_LOG_FILE=/dev/null nvim --headless --noplugin -i NONE -u NONE -c "lua dofile('tests/lint.lua')"
+	$(NVIM_LINT)
 
 check: test indexer-test format-check lint
 

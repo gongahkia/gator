@@ -1,6 +1,11 @@
 local source = debug.getinfo(1, "S").source:sub(2)
 local root = vim.fn.fnamemodify(source, ":h:h")
 local tempdir = vim.fn.tempname()
+local expected = vim.env.GATOR_TEST_ROOT
+
+if expected and expected ~= "" then
+	assert(tempdir:sub(1, #expected + 1) == expected .. "/", "test TMPDIR must be isolated from the host")
+end
 
 assert(vim.fn.mkdir(tempdir, "p") == 1, "must create isolated test state")
 vim.env.XDG_CACHE_HOME = tempdir .. "/cache"

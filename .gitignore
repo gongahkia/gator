@@ -5,4 +5,5 @@ target/
 *.sqlite3-shm
 *.sqlite3-wal
 .gator/
+.gator-test/
 test-results/
