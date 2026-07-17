@@ -1,0 +1,51 @@
+name: Protected live-agent E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Authenticated provider to verify
+        required: true
+        type: choice
+        options:
+          - codex
+          - claude
+          - gemini
+          - copilot
+          - opencode
+          - pi
+
+permissions:
+  contents: read
+
+concurrency:
+  group: protected-live-agent-e2e
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: [self-hosted, gator-live-agents]
+    environment: protected-live-agents
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify trusted runner prerequisites
+        run: |
+          set -eu
+          command -v make
+          command -v nvim
+      - name: Verify provider-native authentication
+        env:
+          PROVIDER: ${{ inputs.provider }}
+        run: |
+          set -eu
+          case "$PROVIDER" in
+            codex) make live-codex-test ;;
+            claude) make live-claude-test ;;
+            gemini) make live-gemini-e2e ;;
+            copilot) make live-copilot-e2e ;;
+            opencode) make live-opencode-e2e ;;
+            pi) make live-pi-e2e ;;
+            *) exit 64 ;;
+          esac

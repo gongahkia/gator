@@ -12,6 +12,10 @@ Run `make test` for Lua tests and `make indexer-test` for the optional Rust inde
 
 Gator supports Neovim's native packages and runtimepath-based lazy loaders. Native packages source `plugin/gator.lua` and register `:Gator` and `:GatorHealth`; lazy loaders may call `require("gator").setup()` directly without registering commands or launching agents.
 
+## Protected live verification
+
+`live-agent-e2e.yml` is manual-only, default-branch-only, and requires the `protected-live-agents` environment plus a `gator-live-agents` self-hosted runner. The runner supplies each provider's native login; the workflow exports no credential secrets.
+
 ## Status
 
 Foundation only. The GitHub issue tracker is the implementation backlog.
