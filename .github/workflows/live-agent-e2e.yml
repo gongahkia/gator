@@ -11,6 +11,7 @@ on:
           - aider
           - amp
           - cline
+          - cursor
           - codex
           - claude
           - gemini
@@ -47,6 +48,7 @@ jobs:
             aider) make live-aider-e2e ;;
             amp) make live-amp-e2e ;;
             cline) make live-cline-e2e ;;
+            cursor) make live-cursor-e2e ;;
             codex) make live-codex-test ;;
             claude) make live-claude-test ;;
             gemini) make live-gemini-e2e ;;

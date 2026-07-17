@@ -26,6 +26,7 @@ for _, target in ipairs({
 	"make live-aider-e2e",
 	"make live-amp-e2e",
 	"make live-cline-e2e",
+	"make live-cursor-e2e",
 	"make live-codex-test",
 	"make live-claude-test",
 	"make live-gemini-e2e",

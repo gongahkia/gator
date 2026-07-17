@@ -89,6 +89,17 @@ assert(
 	"Cline fixture must preserve documented JSON message records"
 )
 
+local cursor = {}
+assert(fixtures.replay_jsonl(root .. "/cursor_stream.jsonl", function(record)
+	table.insert(cursor, record)
+end) == 6, "Cursor stream fixture must replay every record")
+assert(
+	cursor[1].session_id == "cursor-fixture"
+		and cursor[5].tool_call.readToolCall.result.success.totalLines == 1
+		and cursor[6].subtype == "success",
+	"Cursor fixture must preserve documented stream session, tool, and completion records"
+)
+
 local opencode = {}
 assert(fixtures.replay_jsonrpc(root .. "/opencode_acp.jsonl", function(message)
 	table.insert(opencode, message)

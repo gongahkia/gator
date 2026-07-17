@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/workspace","session_id":"cursor-fixture","model":"gpt-5","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Reply exactly: gator-fixture"}]},"session_id":"cursor-fixture"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"gator-fixture"}]},"session_id":"cursor-fixture"}
+{"type":"tool_call","subtype":"started","call_id":"call-fixture","tool_call":{"readToolCall":{"args":{"path":"README.md"}}},"session_id":"cursor-fixture"}
+{"type":"tool_call","subtype":"completed","call_id":"call-fixture","tool_call":{"readToolCall":{"args":{"path":"README.md"},"result":{"success":{"content":"fixture","isEmpty":false,"exceededLimit":false,"totalLines":1,"totalChars":7}}}},"session_id":"cursor-fixture"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":1,"duration_api_ms":1,"result":"gator-fixture","session_id":"cursor-fixture"}
