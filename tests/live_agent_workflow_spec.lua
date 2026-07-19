@@ -22,6 +22,10 @@ assert(
 	workflow:find("contents: read", 1, true) and not workflow:find("secrets.", 1, true),
 	"live-agent workflow must use least-privilege permissions without exporting secrets"
 )
+assert(
+	workflow:find("actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5", 1, true),
+	"live-agent workflow must pin checkout to an immutable commit SHA"
+)
 for _, target in ipairs({
 	"make live-aider-e2e",
 	"make live-amp-e2e",

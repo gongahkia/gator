@@ -138,3 +138,9 @@ Gator follows semantic versioning; supported behavior changes are recorded in [C
 ## Supported vs. planned
 
 Only behavior implemented in this repository, `:GatorHealth`, and [docs/PROVIDERS.md](docs/PROVIDERS.md) is supported. Provider capabilities not advertised by the installed CLI, authenticated checks marked unavailable, and unlisted provider integrations are not promised behavior.
+
+Gator is MIT licensed. See [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and [SUPPORT.md](SUPPORT.md).
+
+### Extension and marketplace trust
+
+Gator extensions, provider CLIs, and marketplace packages execute with your user privileges. Install only extensions from maintainers you can verify; review their source, release provenance, requested permissions, and dependency changes before enabling them. Marketplace publication is not a security review or a trust guarantee. Do not install a package that asks you to disable provider sandboxing, expand permissions, or share credentials.
