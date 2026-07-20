@@ -18,5 +18,6 @@ assert(consent.status().enabled, "coordinator must configure telemetry consent f
 assert(redact.text("private-value") == "[REDACTED]", "coordinator must configure configured redaction")
 assert(not pcall(coordinator.new, { unsupported = true }), "coordinator must reject unsupported settings")
 assert(not pcall(value.state, {}), "coordinator methods must reject invalid receivers")
+assert(value:module("core").name == "core", "coordinator must resolve public modules through its container")
 
 coordinator.new()

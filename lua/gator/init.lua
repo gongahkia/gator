@@ -5,30 +5,17 @@ local M = {
 	_state = nil,
 	_coordinator = nil,
 	error = require("gator.error"),
-	modules = {
-		core = "gator.core",
-		coordinator = "gator.coordinator",
-		ui = "gator.ui",
-		adapters = "gator.adapters",
-		context = "gator.context",
-		extensions = "gator.extensions",
-		github = "gator.github",
-		indexer = "gator.indexer",
-		workspace = "gator.workspace",
-		review = "gator.review",
-		policy = "gator.policy",
-		performance = "gator.performance",
-		startup = "gator.startup",
-		telemetry = "gator.telemetry",
-	},
+	modules = coordinator.modules,
 }
 
 function M.module(name)
-	local path = M.modules[name]
-	if not path then
-		error("unknown Gator module: " .. tostring(name))
+	if name == "coordinator" then
+		return coordinator
 	end
-	return require(path)
+	if M._coordinator then
+		return M._coordinator:module(name)
+	end
+	return coordinator.module(name)
 end
 
 function M.setup(opts)

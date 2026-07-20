@@ -1,11 +1,4 @@
-local compat = require("gator.compat")
-local config = require("gator.config")
-local state = require("gator.state")
-local ui = require("gator.ui")
-local motion = require("gator.ui.motion")
-local accessibility = require("gator.ui.accessibility")
-local redact = require("gator.policy.redact")
-local consent = require("gator.telemetry.consent")
+local dependencies = require("gator.coordinator.dependencies")
 
 local M = { name = "coordinator", api_version = 1 }
 local Coordinator = {}
@@ -15,24 +8,32 @@ local function fail(message)
 	error("Gator coordinator: " .. message, 3)
 end
 
-local function configure(settings)
-	motion.configure(settings.ui.motion)
-	accessibility.configure(settings.ui)
-	redact.configure({ patterns = settings.telemetry.redaction_patterns })
-	consent.configure({ enabled = settings.telemetry.enabled })
+local function configure(container, settings)
+	container:require("motion").configure(settings.ui.motion)
+	container:require("accessibility").configure(settings.ui)
+	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
+	container:require("consent").configure({ enabled = settings.telemetry.enabled })
 end
 
 function M.new(opts)
-	local report = compat.require_supported()
-	local settings = config.resolve(opts)
-	configure(settings)
-	local value = setmetatable({ _state = state.new(settings) }, Coordinator)
+	local container = dependencies.new()
+	local report = container:require("compat").require_supported()
+	local settings = container:require("config").resolve(opts)
+	configure(container, settings)
+	local value =
+		setmetatable({ _dependencies = container, _state = container:require("state").new(settings) }, Coordinator)
 	value._state.compatibility = report
 	return value
 end
 
 function M.is(value)
 	return getmetatable(value) == Coordinator
+end
+
+M.modules = dependencies.modules()
+
+function M.module(name)
+	return dependencies.new():module(name)
 end
 
 function Coordinator:state()
@@ -43,12 +44,26 @@ function Coordinator:state()
 end
 
 function Coordinator:open()
-	return ui.open(self:state())
+	return self:dependency("ui").open(self:state())
 end
 
 function Coordinator:health()
 	self:state()
 	vim.cmd("checkhealth gator")
+end
+
+function Coordinator:dependency(name)
+	if not M.is(self) or not dependencies.is(self._dependencies) then
+		fail("dependency requires an initialized coordinator")
+	end
+	return self._dependencies:require(name)
+end
+
+function Coordinator:module(name)
+	if not M.is(self) or not dependencies.is(self._dependencies) then
+		fail("module requires an initialized coordinator")
+	end
+	return self._dependencies:module(name)
 end
 
 return M
