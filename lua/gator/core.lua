@@ -3,6 +3,7 @@ local M = {
 	api_version = 1,
 	database = require("gator.core.database"),
 	lifecycle = require("gator.core.lifecycle"),
+	provider_event = require("gator.core.provider_event"),
 	retention = require("gator.core.retention"),
 	run = require("gator.core.run"),
 	supervisor = require("gator.core.supervisor"),
