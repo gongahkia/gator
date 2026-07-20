@@ -24,6 +24,7 @@ local M = {
 	cline_policy = require("gator.adapters.cline_policy"),
 	cline_sessions = require("gator.adapters.cline_sessions"),
 	cline_stream = require("gator.adapters.cline_stream"),
+	decoder = require("gator.adapters.decoder"),
 	cursor = require("gator.adapters.cursor"),
 	cursor_context = require("gator.adapters.cursor_context"),
 	cursor_policy = require("gator.adapters.cursor_policy"),
