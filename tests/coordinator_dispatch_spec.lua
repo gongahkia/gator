@@ -13,7 +13,10 @@ palette.register({
 })
 
 assert(
-	vim.deep_equal(coordinator.actions(), { "open", "health", "close", "capture_selection", "palette" }),
+	vim.deep_equal(
+		coordinator.actions(),
+		{ "open", "health", "close", "cancel_operation", "capture_selection", "palette" }
+	),
 	"coordinator must expose supported action names"
 )
 assert(

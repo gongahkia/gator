@@ -19,6 +19,9 @@ function M.module(name)
 end
 
 function M.setup(opts)
+	if M._coordinator then
+		M._coordinator:cancel_all("Gator configuration changed")
+	end
 	M._coordinator = coordinator.new(opts)
 	M._state = M._coordinator:state()
 	return M

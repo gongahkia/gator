@@ -1,16 +1,20 @@
 local dependencies = require("gator.coordinator.dependencies")
+local cancellation = require("gator.coordinator.cancellation")
 
 local M = { name = "coordinator", api_version = 1 }
 local Coordinator = {}
+local Operation = {}
 Coordinator.__index = Coordinator
+Operation.__index = Operation
 local actions = {
 	open = { fields = {} },
 	health = { fields = {} },
 	close = { fields = {} },
+	cancel_operation = { fields = { id = true, reason = true } },
 	capture_selection = { fields = { target = true, buffer = true, first_line = true, last_line = true } },
 	palette = { fields = { id = true } },
 }
-local action_names = { "open", "health", "close", "capture_selection", "palette" }
+local action_names = { "open", "health", "close", "cancel_operation", "capture_selection", "palette" }
 
 local function fail(message)
 	error("Gator coordinator: " .. message, 3)
@@ -52,6 +56,7 @@ function M.new(opts)
 	configure(container, settings)
 	local value = setmetatable({
 		_dependencies = container,
+		_operations = {},
 		_state = container:require("state").new(settings, report),
 	}, Coordinator)
 	return value
@@ -59,6 +64,10 @@ end
 
 function M.is(value)
 	return getmetatable(value) == Coordinator
+end
+
+function M.is_operation(value)
+	return getmetatable(value) == Operation
 end
 
 M.modules = dependencies.modules()
@@ -108,6 +117,9 @@ function Coordinator:dispatch(action, opts)
 	if action == "close" then
 		return self:dependency("ui").close()
 	end
+	if action == "cancel_operation" then
+		return self:cancel_operation(opts.id, opts.reason)
+	end
 	if action == "capture_selection" then
 		return self:dependency("ui").selection.capture(self:state(), require_string(opts.target, "target"), {
 			buffer = opts.buffer,
@@ -116,6 +128,86 @@ function Coordinator:dispatch(action, opts)
 		})
 	end
 	return self:dependency("ui").palette.execute(require_string(opts.id, "palette id"))
+end
+
+function Coordinator:start_operation(opts)
+	if not M.is(self) then
+		fail("start_operation requires an initialized coordinator")
+	end
+	if type(opts) ~= "table" then
+		fail("start_operation requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "id" and key ~= "cancel" then
+			fail("start_operation contains unsupported field: " .. tostring(key))
+		end
+	end
+	local id = require_string(opts.id, "operation id")
+	if not id:match("^[a-z][a-z0-9_-]*$") then
+		fail("operation id must be a lowercase identifier")
+	end
+	if opts.cancel ~= nil and type(opts.cancel) ~= "function" then
+		fail("operation cancel must be a function")
+	end
+	if self._operations[id] then
+		fail("operation is already active: " .. id)
+	end
+	local value = setmetatable({ coordinator = self, id = id, token = cancellation.new(), active = true }, Operation)
+	self._operations[id] = value
+	if opts.cancel then
+		value.token:on_cancel(opts.cancel)
+	end
+	return value
+end
+
+function Coordinator:cancel_operation(id, reason)
+	if not M.is(self) then
+		fail("cancel_operation requires an initialized coordinator")
+	end
+	id = require_string(id, "operation id")
+	local operation = self._operations[id]
+	if not operation then
+		fail("operation is unavailable: " .. id)
+	end
+	return operation.token:cancel(reason)
+end
+
+function Coordinator:cancel_all(reason)
+	if not M.is(self) then
+		fail("cancel_all requires an initialized coordinator")
+	end
+	local ids = {}
+	for id in pairs(self._operations) do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+	local cancelled = 0
+	for _, id in ipairs(ids) do
+		if self:cancel_operation(id, reason) then
+			cancelled = cancelled + 1
+		end
+	end
+	return cancelled
+end
+
+function Operation:status()
+	if not M.is_operation(self) then
+		fail("operation status requires an active operation")
+	end
+	local token = self.token:status()
+	return { id = self.id, active = self.active, cancelled = token.cancelled, reason = token.reason }
+end
+
+function Operation:complete()
+	if not M.is_operation(self) then
+		fail("operation completion requires an active operation")
+	end
+	if not self.active then
+		return false
+	end
+	self.coordinator._operations[self.id] = nil
+	self.active = false
+	return true
 end
 
 function Coordinator:dependency(name)
