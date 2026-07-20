@@ -1,13 +1,13 @@
-local config = require("gator.config")
 local compat = require("gator.compat")
-local state = require("gator.state")
-local ui = require("gator.ui")
+local coordinator = require("gator.coordinator")
 
 local M = {
 	_state = nil,
+	_coordinator = nil,
 	error = require("gator.error"),
 	modules = {
 		core = "gator.core",
+		coordinator = "gator.coordinator",
 		ui = "gator.ui",
 		adapters = "gator.adapters",
 		context = "gator.context",
@@ -32,13 +32,8 @@ function M.module(name)
 end
 
 function M.setup(opts)
-	local report = compat.require_supported()
-	M._state = state.new(config.resolve(opts))
-	require("gator.ui.motion").configure(M._state.config.ui.motion)
-	require("gator.ui.accessibility").configure(M._state.config.ui)
-	require("gator.policy.redact").configure({ patterns = M._state.config.telemetry.redaction_patterns })
-	require("gator.telemetry.consent").configure({ enabled = M._state.config.telemetry.enabled })
-	M._state.compatibility = report
+	M._coordinator = coordinator.new(opts)
+	M._state = M._coordinator:state()
 	return M
 end
 
@@ -50,17 +45,21 @@ function M.open()
 	if not M._state then
 		M.setup()
 	end
-	ui.open(M._state)
+	return M._coordinator:open()
 end
 
 function M.health()
-	vim.cmd("checkhealth gator")
+	if not M._state then
+		M.setup()
+	end
+	return M._coordinator:health()
 end
 
 function M._test()
 	assert(M._state, "gator setup must initialize state")
 	assert(M._state.config.context.mode == "manual", "manual context must be the default")
 	assert(M._state.compatibility.supported, "gator setup must enforce compatible Neovim")
+	assert(coordinator.is(M._coordinator), "gator setup must use the production coordinator")
 	for name in pairs(M.modules) do
 		local module = M.module(name)
 		assert(type(module) == "table", name .. " module must return a table")
