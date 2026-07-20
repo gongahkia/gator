@@ -1,4 +1,5 @@
-local M = {}
+local redact = require("gator.policy.redact")
+local M = { api_version = 2, schema_version = 2 }
 local Contract = {}
 
 Contract.__index = Contract
@@ -56,7 +57,20 @@ local function domain(value, name)
 	if value.modes ~= nil or type(value.reason) ~= "string" or value.reason == "" then
 		fail(name .. " unavailability requires a reason and no modes")
 	end
-	return { available = false, reason = value.reason }
+	return { available = false, reason = redact.text(value.reason) }
+end
+
+local function schema_version(value)
+	if value == nil then
+		return 1
+	end
+	if type(value) ~= "number" or value % 1 ~= 0 or value < 1 then
+		fail("schema_version must be a positive integer")
+	end
+	if value > M.schema_version then
+		fail("schema_version " .. value .. " is newer than supported version " .. M.schema_version)
+	end
+	return value
 end
 
 function M.new(attrs)
@@ -64,11 +78,12 @@ function M.new(attrs)
 		fail("attributes must be a table")
 	end
 	for key in pairs(attrs) do
-		if key ~= "provider" and not M.domains[key] then
+		if key ~= "provider" and key ~= "schema_version" and not M.domains[key] then
 			fail("attributes contain unsupported field: " .. tostring(key))
 		end
 	end
-	local result = { provider = identifier(attrs.provider, "provider") }
+	schema_version(attrs.schema_version)
+	local result = { schema_version = M.schema_version, provider = identifier(attrs.provider, "provider") }
 	for name in pairs(M.domains) do
 		result[name] = domain(attrs[name], name)
 	end
@@ -83,11 +98,19 @@ function M.to_record(value)
 	if not M.is(value) then
 		fail("value must be created by gator.adapters.capabilities.new")
 	end
-	return M.new(value)
+	local record = { schema_version = M.schema_version, provider = value.provider }
+	for name in pairs(M.domains) do
+		record[name] = vim.deepcopy(value[name])
+	end
+	return record
 end
 
 function M.from_record(value)
 	return M.new(value)
+end
+
+function M.upgrade(value)
+	return M.to_record(M.from_record(value))
 end
 
 function M.supports(value, name, mode)
