@@ -50,9 +50,10 @@ function M.new(opts)
 	local report = container:require("compat").require_supported()
 	local settings = container:require("config").resolve(opts)
 	configure(container, settings)
-	local value =
-		setmetatable({ _dependencies = container, _state = container:require("state").new(settings) }, Coordinator)
-	value._state.compatibility = report
+	local value = setmetatable({
+		_dependencies = container,
+		_state = container:require("state").new(settings, report),
+	}, Coordinator)
 	return value
 end
 

@@ -1,4 +1,5 @@
 local pack = require("gator.context.pack")
+local state_store = require("gator.state")
 local M = {}
 
 local function fail(message)
@@ -69,9 +70,7 @@ local function surrounding(buffer, first_line, last_line, line_count)
 	}
 end
 
-function M.capture(state, target_value, source_value)
-	local destination = target(target_value)
-	local buffer, first_line, last_line = source(source_value)
+local function capture(state, destination, buffer, first_line, last_line)
 	local line_count = vim.api.nvim_buf_line_count(buffer)
 	local id = "selection-" .. sequence(state)
 	local name = vim.api.nvim_buf_get_name(buffer)
@@ -102,7 +101,18 @@ function M.capture(state, target_value, source_value)
 		fail("selection store must be an array")
 	end
 	table.insert(state.context.selections, record)
-	return vim.deepcopy(record)
+	return record
+end
+
+function M.capture(state, target_value, source_value)
+	local destination = target(target_value)
+	local buffer, first_line, last_line = source(source_value)
+	if state_store.is(state) then
+		return state:mutate(function(next)
+			return vim.deepcopy(capture(next, destination, buffer, first_line, last_line))
+		end)
+	end
+	return vim.deepcopy(capture(state, destination, buffer, first_line, last_line))
 end
 
 return M

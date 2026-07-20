@@ -56,6 +56,8 @@ assert(
 		and content():find("Provider codex: unavailable · CLI not authenticated", 1, true),
 	"primary workspace must present task, session, context, review, and provider status"
 )
+state:update({ workspace = { status = "loading", detail = "state store update" } })
+assert(content():find("State: loading · state store update", 1, true), "workspace must react to state store changes")
 assert(
 	ui.set_status(state, "loading", "refreshing providers").status == "loading",
 	"workspace must expose loading state"

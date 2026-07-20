@@ -1,6 +1,7 @@
 local core_task = require("gator.core.task")
 local core_run = require("gator.core.run")
 local context_pack = require("gator.context.pack")
+local state_store = require("gator.state")
 local M = {
 	name = "ui",
 	api_version = 1,
@@ -41,7 +42,6 @@ local function height()
 end
 
 local function workspace_state(state)
-	state.workspace = state.workspace or { status = "ready" }
 	if type(state.workspace) ~= "table" or not statuses[state.workspace.status] then
 		fail("workspace state must expose ready, loading, failed, or recovering status")
 	end
@@ -265,23 +265,42 @@ function M.set_status(state, status, detail)
 	then
 		fail("status requires initialized state, a known status, and optional detail")
 	end
-	state.workspace = { status = status, detail = detail }
-	local panel = current_panel()
-	if panel and panel.state == state then
-		render(panel)
+	if not state_store.is(state) then
+		fail("status requires a reactive Gator state store")
 	end
-	return vim.deepcopy(state.workspace)
+	return state:update({ workspace = { status = status, detail = detail } }).workspace
+end
+
+local function subscribe(panel)
+	if not state_store.is(panel.state) then
+		return
+	end
+	panel.subscription = panel.state:subscribe(function()
+		local current = current_panel()
+		if current and current == panel and current.state == panel.state then
+			render(panel)
+		end
+	end)
+end
+
+local function unsubscribe(panel)
+	if panel.subscription then
+		panel.subscription:cancel()
+		panel.subscription = nil
+	end
 end
 
 function M.open(state)
-	if type(state) ~= "table" or type(state.config) ~= "table" or type(state.config.context) ~= "table" then
+	if not state_store.is(state) or type(state.config) ~= "table" or type(state.config.context) ~= "table" then
 		fail("open requires initialized Gator state")
 	end
 	accessibility.configure(state.config.ui)
 	workspace_state(state)
 	local panel, tabpage = current_panel()
 	if panel then
+		unsubscribe(panel)
 		panel.state = state
+		subscribe(panel)
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
@@ -296,6 +315,7 @@ function M.open(state)
 	vim.api.nvim_win_set_height(window, height())
 	panel = { window = window, buffer = buffer, previous = previous, state = state, selected = 1 }
 	panels[tabpage] = panel
+	subscribe(panel)
 	render(panel)
 	bind(panel)
 	return window
@@ -328,6 +348,7 @@ function M.close()
 		return false
 	end
 	local previous = panel.previous
+	unsubscribe(panel)
 	vim.api.nvim_win_close(panel.window, true)
 	panels[tabpage] = nil
 	if previous and vim.api.nvim_win_is_valid(previous) then
