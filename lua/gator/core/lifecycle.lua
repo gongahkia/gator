@@ -11,6 +11,7 @@ local transitions = {
 	merged = {},
 	discarded = {},
 }
+local states = { "draft", "planned", "running", "awaiting_review", "failed", "merged", "discarded" }
 
 local function fail(detail)
 	errors.raise(errors.new("task.transition_invalid", "Task lifecycle transition is invalid", {
@@ -32,6 +33,21 @@ function M.can_transition(from, to)
 	return transitions[from][to] == true
 end
 
+function M.states()
+	return vim.deepcopy(states)
+end
+
+function M.next_states(from)
+	validate_state(from, "from")
+	local result = {}
+	for _, state in ipairs(states) do
+		if transitions[from][state] then
+			table.insert(result, state)
+		end
+	end
+	return result
+end
+
 function M.transition(entity, to, updated_at)
 	if not task.is(entity) then
 		fail("entity must be created by gator.core.task.new")
@@ -50,6 +66,10 @@ function M.transition(entity, to, updated_at)
 	record.lifecycle = to
 	record.updated_at = updated_at
 	return task.from_record(record)
+end
+
+function M.cancel(entity, updated_at)
+	return M.transition(entity, "discarded", updated_at)
 end
 
 return M
