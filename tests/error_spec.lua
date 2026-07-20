@@ -32,3 +32,18 @@ assert(not ok, "untyped notifications must fail explicitly")
 local raised
 ok, raised = pcall(errors.raise, value)
 assert(not ok and raised:find("Recovery:", 1, true), "raised errors must preserve recovery guidance")
+
+local runtime = errors.runtime("cancelled", { detail = "token: private-value" })
+assert(
+	runtime.code == "runtime.cancelled"
+		and errors.classify(runtime).scope == "runtime"
+		and errors.format(runtime):find("private%-value") == nil,
+	"runtime errors must be classified and redacted"
+)
+local recovery = errors.recovery("probe_failed")
+assert(
+	recovery.code == "recovery.probe_failed" and errors.classify(recovery).kind == "probe_failed",
+	"recovery errors must use the fixed taxonomy"
+)
+ok = pcall(errors.runtime, "missing")
+assert(not ok, "unknown runtime taxonomy entries must fail explicitly")

@@ -1,4 +1,5 @@
 local runs = require("gator.core.run")
+local errors = require("gator.error")
 local M = {}
 local terminal = { completed = true, failed = true, cancelled = true }
 
@@ -19,15 +20,22 @@ end
 local function probe(callback, run)
 	local ok, value = pcall(callback, reference(run))
 	if not ok or type(value) ~= "table" then
-		fail("run liveness probe failed")
+		errors.raise(errors.recovery("probe_failed", { detail = "run " .. run.id .. " liveness probe failed" }))
 	end
 	for key in pairs(value) do
 		if key ~= "live" and key ~= "resumable" then
-			fail("run liveness probe returned unsupported field: " .. tostring(key))
+			errors.raise(
+				errors.recovery(
+					"probe_failed",
+					{ detail = "run liveness probe returned unsupported field: " .. tostring(key) }
+				)
+			)
 		end
 	end
 	if type(value.live) ~= "boolean" or type(value.resumable) ~= "boolean" then
-		fail("run liveness probe must return live and resumable booleans")
+		errors.raise(
+			errors.recovery("probe_failed", { detail = "run liveness probe must return live and resumable booleans" })
+		)
 	end
 	return value
 end

@@ -40,3 +40,14 @@ assert(
 	"missing sessions must not be replaced"
 )
 assert(value[4].status == "terminal", "terminal runs must not be restarted")
+
+local ok, failure = pcall(recovery.recover, {
+	runs = { agent("run-probe-failure", "running", "native-probe") },
+	probe = function()
+		error("token: private-value")
+	end,
+})
+assert(
+	not ok and failure:find("[recovery.probe_failed]", 1, true) and failure:find("private%-value") == nil,
+	"recovery probe failures must use redacted typed errors"
+)

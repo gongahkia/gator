@@ -1,5 +1,6 @@
 local capabilities = require("gator.adapters.capabilities")
 local context = require("gator.context.pack")
+local errors = require("gator.error")
 local event = require("gator.core.run").event
 local overlay = require("gator.policy.overlay")
 local task = require("gator.core.task")
@@ -157,8 +158,13 @@ function Supervisor:start(opts)
 		request.executable = opts.executable
 	end
 	local launched, status = pcall(opts.adapter.launch, request)
-	if not launched or type(status) ~= "table" or status.id ~= value.id or type(status.state) ~= "string" then
-		fail("adapter did not return a managed provider-native run")
+	if not launched then
+		errors.raise(errors.runtime("launch_failed", { detail = tostring(status) }))
+	end
+	if type(status) ~= "table" or status.id ~= value.id or type(status.state) ~= "string" then
+		errors.raise(
+			errors.runtime("protocol_failed", { detail = "adapter did not return a managed provider-native run" })
+		)
 	end
 	if not exited then
 		emit(status)
