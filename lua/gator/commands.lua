@@ -2,17 +2,14 @@ local M = {}
 
 function M.register()
 	vim.api.nvim_create_user_command("Gator", function()
-		require("gator").open()
+		require("gator").dispatch("open")
 	end, { desc = "Open Gator" })
 	vim.api.nvim_create_user_command("GatorHealth", function()
-		require("gator").health()
+		require("gator").dispatch("health")
 	end, { desc = "Check Gator health" })
 	vim.api.nvim_create_user_command("GatorCaptureSelection", function(opts)
-		local gator = require("gator")
-		if not gator._state then
-			error("Gator must be set up before capturing context", 0)
-		end
-		require("gator.ui").selection.capture(gator._state, opts.args, {
+		require("gator").dispatch("capture_selection", {
+			target = opts.args,
 			buffer = vim.api.nvim_get_current_buf(),
 			first_line = opts.line1,
 			last_line = opts.line2,
@@ -23,7 +20,7 @@ function M.register()
 		desc = "Capture visual selection for task:<id> or session:<provider>:<id>",
 	})
 	vim.api.nvim_create_user_command("GatorPalette", function(opts)
-		require("gator.ui").palette.execute(opts.args)
+		require("gator").dispatch("palette", { id = opts.args })
 	end, {
 		nargs = 1,
 		complete = function(arglead)

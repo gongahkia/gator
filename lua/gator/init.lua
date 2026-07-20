@@ -29,17 +29,24 @@ function M.compatibility()
 end
 
 function M.open()
-	if not M._state then
-		M.setup()
-	end
-	return M._coordinator:open()
+	return M.dispatch("open")
 end
 
 function M.health()
-	if not M._state then
+	return M.dispatch("health")
+end
+
+function M.dispatch(action, opts)
+	if not coordinator.is_action(action) then
+		error("unknown Gator action: " .. tostring(action))
+	end
+	if not M._coordinator then
+		if action == "capture_selection" then
+			error("Gator must be set up before capturing context", 0)
+		end
 		M.setup()
 	end
-	return M._coordinator:health()
+	return M._coordinator:dispatch(action, opts)
 end
 
 function M._test()
