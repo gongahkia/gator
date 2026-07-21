@@ -10,6 +10,8 @@ Supported Neovim baseline: **0.11+**. The public CI matrix checks Neovim 0.11 an
 
 Provider CLIs are optional and provider-owned. Install and authenticate each CLI separately, then use `:GatorHealth` to see its local readiness. The exact supported provider surfaces, fixture versions, and explicit limitations are in [docs/PROVIDERS.md](docs/PROVIDERS.md). Windows is not in the current CI matrix.
 
+Automation can read the versioned local compatibility manifest through `require("gator").compatibility_manifest()` or its JSON form, `compatibility_manifest_json()`. It reports only Neovim version and local capability status; it does not probe, store, or expose provider credentials.
+
 ## Install
 
 With `lazy.nvim`:

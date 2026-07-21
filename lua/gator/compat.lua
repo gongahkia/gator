@@ -1,5 +1,5 @@
 local errors = require("gator.error")
-local M = { minimum = { major = 0, minor = 11, patch = 0 } }
+local M = { manifest_version = 1, minimum = { major = 0, minor = 11, patch = 0 } }
 
 local function fail(message)
 	error("invalid Gator compatibility report: " .. message, 3)
@@ -65,6 +65,25 @@ function M.inspect(opts)
 		capabilities = available,
 		degraded = degraded,
 	}
+end
+
+function M.manifest(opts)
+	local report = M.inspect(opts)
+	return {
+		schema_version = M.manifest_version,
+		product = "gator",
+		neovim = {
+			current = vim.deepcopy(report.version),
+			minimum = vim.deepcopy(M.minimum),
+			supported = report.supported,
+		},
+		capabilities = vim.deepcopy(report.capabilities),
+		degraded = vim.deepcopy(report.degraded),
+	}
+end
+
+function M.manifest_json(opts)
+	return vim.json.encode(M.manifest(opts))
 end
 
 function M.require_supported(report)

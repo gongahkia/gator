@@ -32,6 +32,14 @@ function M.compatibility()
 	return compat.inspect()
 end
 
+function M.compatibility_manifest(opts)
+	return compat.manifest(opts)
+end
+
+function M.compatibility_manifest_json(opts)
+	return compat.manifest_json(opts)
+end
+
 function M.open()
 	return M.dispatch("open")
 end
