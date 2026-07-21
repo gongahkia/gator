@@ -22,6 +22,7 @@ local M = {
 	retention = require("gator.core.retention"),
 	runtime = require("gator.core.runtime"),
 	runtime_diagnostics = require("gator.core.runtime_diagnostics"),
+	runtime_events = require("gator.core.runtime_events"),
 	run = require("gator.core.run"),
 	run_limits = require("gator.core.run_limits"),
 	run_reconciliation = require("gator.core.run_reconciliation"),
