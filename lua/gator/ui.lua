@@ -21,6 +21,7 @@ local M = {
 	task_file_picker = require("gator.ui.task_file_picker"),
 	sidebar = require("gator.ui.sidebar"),
 	timeline = require("gator.ui.timeline"),
+	usage_details = require("gator.ui.usage_details"),
 	workspace_dashboard = require("gator.ui.workspace_dashboard"),
 	motion = require("gator.ui.motion"),
 }
