@@ -1,7 +1,7 @@
 local compat = require("gator.compat")
 local config = require("gator.config")
 local consent = require("gator.telemetry.consent")
-local M = { checks = {} }
+local M = { checks = {}, graph = require("gator.health.graph") }
 local providers = {
 	{ name = "aider", executable = "aider" },
 	{ name = "amp", executable = "amp" },
