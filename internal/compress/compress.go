@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/gongahkia/paw/internal/budget"
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
 	"github.com/gongahkia/paw/internal/schema"
@@ -39,6 +40,12 @@ func (c *Compress) ValidationDropCounts() map[string]int {
 
 func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
+	redacted, manifest := egress.RedactForEgress(in.Raw)
+	if in.Egress != nil && len(in.Egress.Findings) > 0 {
+		manifest.Findings = append([]egress.Finding(nil), in.Egress.Findings...)
+	}
+	out.Raw = redacted.Raw
+	out.Egress = &manifest
 	c.UsedFallback = false
 	c.DroppedItems = 0
 	c.ValidationDrops = nil
@@ -47,18 +54,18 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 		out.Digest = nil
 		return &out, nil
 	}
-	if in.Raw == nil || len(in.Raw.Units) == 0 {
-		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+	if out.Raw == nil || len(out.Raw.Units) == 0 {
+		out.Digest = ptr(fallbackDigest(out.Instruction, out.Raw, defaultFallbackTokens))
 		return &out, nil
 	}
 	if c.DisableCompress || c.Client == nil {
-		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+		out.Digest = ptr(fallbackDigest(out.Instruction, out.Raw, defaultFallbackTokens))
 		c.UsedFallback = true
 		return &out, nil
 	}
 	rawSchema := schema.Raw("context_digest")
 	resp, err := c.Client.Chat(ctx, llm.ChatRequest{
-		Messages:    droneMessages(in, rawSchema),
+		Messages:    droneMessages(&out, rawSchema),
 		Temperature: 0,
 		MaxTokens:   maxCompressOutputTokens,
 		JSONSchema:  rawSchema,
@@ -70,18 +77,18 @@ func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.En
 	var digest envelope.ContextDigest
 	if err := json.Unmarshal([]byte(resp.Content), &digest); err != nil {
 		c.recordDrop(dropSchemaError)
-		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+		out.Digest = ptr(fallbackDigest(out.Instruction, out.Raw, defaultFallbackTokens))
 		c.UsedFallback = true
 		return &out, nil
 	}
-	validated, stats, err := validateDigest(in.Raw, digest)
+	validated, stats, err := validateDigest(out.Raw, digest)
 	c.DroppedItems = stats.Dropped
 	c.ValidationDrops = copyDropCounts(stats.Reasons)
 	if err != nil || tooManyDropped(stats) {
 		if err == nil {
 			c.recordReason(dropTooManyDropped)
 		}
-		out.Digest = ptr(fallbackDigest(in.Instruction, in.Raw, defaultFallbackTokens))
+		out.Digest = ptr(fallbackDigest(out.Instruction, out.Raw, defaultFallbackTokens))
 		c.UsedFallback = true
 		return &out, nil
 	}

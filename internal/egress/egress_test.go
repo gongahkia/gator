@@ -59,6 +59,21 @@ func TestRedactRemovesDetectedValues(t *testing.T) {
 	}
 }
 
+func TestRedactForEgressKeepsFindingWithoutSecretPayload(t *testing.T) {
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	raw := &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Text: "token=" + secret}}}
+	result, manifest := RedactForEgress(raw)
+	if strings.Contains(result.Raw.Units[0].Text, secret) {
+		t.Fatalf("redacted raw = %q", result.Raw.Units[0].Text)
+	}
+	if len(manifest.Findings) != 1 || manifest.Findings[0].Kind != "openai_key" {
+		t.Fatalf("manifest findings = %#v", manifest.Findings)
+	}
+	if strings.Contains(manifest.Units[0].SHA256, secret) {
+		t.Fatalf("manifest leaked secret: %#v", manifest)
+	}
+}
+
 func TestEnforceUsesConfiguredLimits(t *testing.T) {
 	manifest := Manifest{Units: []UnitManifest{{ID: "u001"}, {ID: "u002"}}, TotalBytes: 10}
 	if err := Enforce(config.EgressPolicy{MaxFiles: 1, MaxBytes: 20}, manifest); err == nil {

@@ -111,7 +111,15 @@ func Prepare(cfg config.EgressPolicy, raw *envelope.RawContext) (RedactionResult
 	if err := Enforce(cfg, manifest); err != nil {
 		return RedactionResult{}, manifest, err
 	}
-	return Redact(raw), manifest, nil
+	result, redactedManifest := RedactForEgress(raw)
+	return result, redactedManifest, nil
+}
+
+func RedactForEgress(raw *envelope.RawContext) (RedactionResult, Manifest) {
+	result := Redact(raw)
+	manifest := Build(result.Raw)
+	manifest.Findings = result.Findings
+	return result, manifest
 }
 
 func Approve(manifest Manifest, transport, baseURL string, now time.Time, autoApproved bool) (Manifest, error) {

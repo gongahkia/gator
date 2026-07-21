@@ -60,5 +60,7 @@ manifest digest.
 Gathered context is scanned for GitHub tokens, OpenAI keys, AWS access keys, private keys, and JWTs.
 The manifest records finding kinds and counts only.
 
+Detected secret values are redacted before compression or raw-context model requests.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

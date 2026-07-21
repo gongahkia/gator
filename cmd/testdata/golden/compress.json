@@ -35,6 +35,18 @@
     ],
     "total_bytes": 12
   },
+  "egress": {
+    "units": [
+      {
+        "id": "u001",
+        "kind": "file_slice",
+        "path": "app.txt",
+        "bytes": 12,
+        "sha256": "8ffc26f19acacad38ecbfc06d1f03282de7e8cd834f2200117c635f85f7d4db8"
+      }
+    ],
+    "total_bytes": 12
+  },
   "budget": {
     "max_turns": 0,
     "turn": 0,

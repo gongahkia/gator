@@ -39,6 +39,28 @@ func TestCompressCapsOutputTokens(t *testing.T) {
 	}
 }
 
+func TestCompressRedactsSecretsBeforeModelEgress(t *testing.T) {
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	client := &captureCompressClient{content: digestJSON(t, validDigest())}
+	stage := New(client)
+	env := rawEnvelope()
+	env.Raw.Units = append(env.Raw.Units, envelope.RawUnit{ID: "u003", Kind: "file_slice", Path: "config.env", Text: "token=" + secret})
+	got, err := stage.Run(context.Background(), env)
+	if err != nil {
+		t.Fatalf("compress: %v", err)
+	}
+	messages, err := json.Marshal(client.request.Messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(messages), secret) || strings.Contains(got.Raw.Units[2].Text, secret) {
+		t.Fatalf("model egress leaked secret: messages=%s raw=%q", messages, got.Raw.Units[2].Text)
+	}
+	if got.Egress == nil || len(got.Egress.Findings) != 1 || got.Egress.Findings[0].Kind != "openai_key" {
+		t.Fatalf("egress manifest = %#v", got.Egress)
+	}
+}
+
 func TestCompressDropsHallucinatedPath(t *testing.T) {
 	stage, got := runCompress(t, digestWithInvalidItem(envelope.DigestItem{
 		UnitID:    "u001",
