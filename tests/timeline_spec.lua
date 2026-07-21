@@ -5,9 +5,9 @@ local calls = {
 		provider = "codex",
 		session_id = "native-one",
 		name = "read_file",
-		arguments = '{"path":"README.md"}',
+		arguments = "path=README.md token=fixture-secret",
 		approval = "granted",
-		output = "# Gator",
+		output = "# Gator\ntoken=fixture-secret",
 		status = "succeeded",
 	},
 	{
@@ -17,7 +17,7 @@ local calls = {
 		name = "apply_patch",
 		arguments = '{"path":"lua/gator/init.lua"}',
 		approval = "denied",
-		failure = "user declined",
+		failure = "user declined\ntoken=fixture-secret",
 		status = "failed",
 	},
 }
@@ -25,8 +25,9 @@ local calls = {
 local window = timeline.open({ calls = calls })
 assert(vim.api.nvim_win_is_valid(window), "timeline opening must create a window")
 local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
-assert(content:find('arguments: {"path"', 1, true), "timeline must render provider arguments")
+assert(content:find("arguments: path=README.md", 1, true), "timeline must render provider arguments")
 assert(content:find("failure: user declined", 1, true), "timeline must render failures")
+assert(not content:find("fixture-secret", 1, true), "timeline must redact rendered tool details")
 assert(timeline.toggle("call-one"), "timeline calls must be collapsible")
 content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
 assert(not content:find("README.md", 1, true), "collapsed calls must hide arguments and output")

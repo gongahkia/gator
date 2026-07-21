@@ -2,6 +2,7 @@ local M = {}
 local timelines = {}
 local motion = require("gator.ui.motion")
 local accessibility = require("gator.ui.accessibility")
+local redact = require("gator.policy.redact")
 local approvals = { not_required = true, pending = true, granted = true, denied = true }
 local statuses = { pending = true, running = true, succeeded = true, failed = true }
 local max_output_lines = 200
@@ -20,6 +21,7 @@ end
 
 local function bounded_output(value, name)
 	value = require_string(value, name)
+	value = redact.text(value)
 	local lines, offset, retained = {}, 1, 0
 	while offset <= #value and #lines < max_output_lines and retained < max_output_bytes do
 		local ending = value:find("\n", offset, true)
@@ -96,7 +98,7 @@ local function calls(value)
 			provider = require_string(call.provider, "call " .. index .. " provider"),
 			session_id = require_string(call.session_id, "call " .. index .. " session_id"),
 			name = require_string(call.name, "call " .. index .. " name"),
-			arguments = require_string(call.arguments, "call " .. index .. " arguments"),
+			arguments = redact.text(require_string(call.arguments, "call " .. index .. " arguments")),
 			approval = approval,
 			output = call.output ~= nil and bounded_output(call.output, "call " .. index .. " output") or nil,
 			failure = call.failure ~= nil and bounded_output(call.failure, "call " .. index .. " failure") or nil,
