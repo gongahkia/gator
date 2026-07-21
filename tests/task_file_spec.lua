@@ -115,3 +115,45 @@ assert(not pcall(format.write, "/fixture/task-write-failure.md", parsed, {
 		end,
 	}),
 }), "task-file projections must expose filesystem write failures")
+
+local watched, callback, stopped = {}, nil, false
+files["/fixture/task-external.md"] = definition
+local watcher = format.watch("/fixture/task-external.md", {
+	filesystem = filesystem.new({
+		readable = function(path)
+			return files[path] ~= nil
+		end,
+		read = function(path)
+			return files[path]
+		end,
+	}),
+	backend = {
+		put_task = function(_, value)
+			watched[#watched + 1] = value
+			return value
+		end,
+	},
+	watch = function(_, value)
+		callback = value
+		return function()
+			stopped = true
+		end
+	end,
+})
+files["/fixture/task-external.md"] = definition:gsub("- lifecycle: planned", "- lifecycle: running", 1)
+assert(
+	watcher:status().active
+		and watched[1].lifecycle == "planned"
+		and callback(nil, "task-external.md").lifecycle == "running"
+		and watched[2].lifecycle == "running",
+	"task-file watchers must import external validated changes through the storage backend"
+)
+files["/fixture/task-external.md"] = "invalid Markdown"
+assert(
+	callback(nil, "task-external.md") == false and watcher:status().last_error ~= nil,
+	"task-file watchers must retain explicit errors for malformed external files"
+)
+assert(
+	watcher:stop() and stopped and callback(nil, "task-external.md") == false,
+	"task-file watchers must be cancellable"
+)
