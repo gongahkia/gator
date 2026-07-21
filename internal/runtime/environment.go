@@ -26,10 +26,14 @@ func isWSL(goos string, readFile func(string) ([]byte, error)) bool {
 }
 
 func ValidateWSL() error {
-	if runtime.GOOS != "linux" {
+	return validateWSL(runtime.GOOS, os.ReadFile)
+}
+
+func validateWSL(goos string, readFile func(string) ([]byte, error)) error {
+	if goos != "linux" {
 		return errors.New("WSL requires a Linux runtime")
 	}
-	if !IsWSL() {
+	if !isWSL(goos, readFile) {
 		return fmt.Errorf("WSL environment not detected")
 	}
 	return nil

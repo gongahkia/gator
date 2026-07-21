@@ -49,3 +49,38 @@ func TestDetectWSL(t *testing.T) {
 		t.Fatal("non-Linux runtime reported WSL")
 	}
 }
+
+func TestValidateWSLFixtures(t *testing.T) {
+	tests := []struct {
+		name     string
+		goos     string
+		readFile func(string) ([]byte, error)
+		want     string
+	}{
+		{
+			name: "supported wsl", goos: "linux",
+			readFile: func(string) ([]byte, error) { return []byte("6.6.0-microsoft-standard-WSL2"), nil },
+		},
+		{
+			name: "non linux", goos: "darwin",
+			readFile: func(string) ([]byte, error) { return nil, errors.New("not read") },
+			want:     "WSL requires a Linux runtime",
+		},
+		{
+			name: "linux without wsl marker", goos: "linux",
+			readFile: func(string) ([]byte, error) { return []byte("6.6.0-generic"), nil },
+			want:     "WSL environment not detected",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateWSL(test.goos, test.readFile)
+			if test.want == "" && err != nil {
+				t.Fatal(err)
+			}
+			if test.want != "" && (err == nil || err.Error() != test.want) {
+				t.Fatalf("validate error = %v", err)
+			}
+		})
+	}
+}
