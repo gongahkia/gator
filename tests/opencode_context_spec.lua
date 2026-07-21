@@ -74,6 +74,26 @@ adapters.opencode_context.command({
 	end,
 })
 assert(command == "review", "advertised OpenCode commands must execute")
+local ineligible = pack.new({
+	id = "pack-opencode-blocked",
+	task_id = "task-opencode",
+	entries = {
+		{
+			id = "blocked-file",
+			kind = "file",
+			ref = "SECRET.md",
+			provenance = { source = "repository", ref = "HEAD" },
+			trust = "repository",
+			token_estimate = { status = "estimated", tokens = 1 },
+			transfer = { eligible = false, reason = "policy" },
+		},
+	},
+})
+assert(not pcall(adapters.opencode_context.submit, {
+	pack = ineligible,
+	capabilities = contract,
+	send = function() end,
+}), "OpenCode context submission must reject policy-ineligible transfers")
 assert(not pcall(adapters.opencode_context.command, {
 	capabilities = contract,
 	name = "hidden",
