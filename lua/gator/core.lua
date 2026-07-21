@@ -31,6 +31,7 @@ local M = {
 	storage = require("gator.core.storage"),
 	task = require("gator.core.task"),
 	task_file = require("gator.core.task_file"),
+	task_run_accounting = require("gator.core.task_run_accounting"),
 	thread = require("gator.core.thread"),
 	tool_event = require("gator.core.tool_event"),
 	usage_event = require("gator.core.usage_event"),
