@@ -39,6 +39,35 @@ assert(
 	"OpenCode signal support must expose unavailable compaction explicitly"
 )
 
+local unsafe = stream.new()
+unsafe:feed({
+	jsonrpc = "2.0",
+	method = "session/update",
+	params = {
+		sessionId = "opencode-fixture",
+		update = {
+			sessionUpdate = "tool_call",
+			toolCallId = "unsafe-tool",
+			title = "write",
+			kind = "edit",
+			status = "pending",
+			rawInput = { filePath = "/outside/repository" },
+		},
+	},
+}, { run_id = "run-opencode", session_id = "opencode-fixture" })
+local unsafe_events = unsafe:feed({
+	jsonrpc = "2.0",
+	method = "session/update",
+	params = {
+		sessionId = "opencode-fixture",
+		update = { sessionUpdate = "tool_call_update", toolCallId = "unsafe-tool", status = "completed" },
+	},
+}, { run_id = "run-opencode", session_id = "opencode-fixture" })
+assert(
+	#unsafe_events == 1 and unsafe_events[1].type == "tool.result",
+	"OpenCode file-change signals must omit unsafe paths"
+)
+
 local mismatch = stream.new()
 assert(not pcall(mismatch.feed, mismatch, {
 	jsonrpc = "2.0",
