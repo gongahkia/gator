@@ -18,6 +18,7 @@ local M = {
 	provider_picker = require("gator.ui.provider_picker"),
 	selection = require("gator.ui.selection"),
 	session_picker = require("gator.ui.session_picker"),
+	session_actions = require("gator.ui.session_actions"),
 	task_file_picker = require("gator.ui.task_file_picker"),
 	sidebar = require("gator.ui.sidebar"),
 	timeline = require("gator.ui.timeline"),
