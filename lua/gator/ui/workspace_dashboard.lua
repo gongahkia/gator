@@ -1,6 +1,7 @@
 local M = {}
 local dashboards = {}
 local kinds = { project = true, worktree = true }
+local collision_kinds = { generated = true, overlap = true }
 local accessibility = require("gator.ui.accessibility")
 
 local function fail(message)
@@ -41,6 +42,50 @@ local function activity(value, index)
 	}
 end
 
+local function collisions(value, index)
+	if value == nil then
+		return {}
+	end
+	if type(value) ~= "table" or not vim.islist(value) then
+		fail("workspace " .. index .. " collisions must be an array")
+	end
+	local result = {}
+	for collision_index, collision in ipairs(value) do
+		if type(collision) ~= "table" then
+			fail("workspace " .. index .. " collision " .. collision_index .. " must be a table")
+		end
+		for key in pairs(collision) do
+			if key ~= "kind" and key ~= "path" and key ~= "worktree_ids" then
+				fail(
+					"workspace "
+						.. index
+						.. " collision "
+						.. collision_index
+						.. " contains unsupported field: "
+						.. tostring(key)
+				)
+			end
+		end
+		local kind =
+			require_string(collision.kind, "workspace " .. index .. " collision " .. collision_index .. " kind")
+		if not collision_kinds[kind] then
+			fail("workspace " .. index .. " collision " .. collision_index .. " kind is unknown: " .. kind)
+		end
+		result[collision_index] = {
+			kind = kind,
+			path = require_string(collision.path, "workspace " .. index .. " collision " .. collision_index .. " path"),
+			worktree_ids = strings(
+				collision.worktree_ids,
+				"workspace " .. index .. " collision " .. collision_index .. " worktree_ids"
+			),
+		}
+		if #result[collision_index].worktree_ids == 0 then
+			fail("workspace " .. index .. " collision " .. collision_index .. " must identify writer worktrees")
+		end
+	end
+	return result
+end
+
 local function workspaces(value)
 	if type(value) ~= "table" or not vim.islist(value) then
 		fail("workspaces must be an array")
@@ -58,6 +103,7 @@ local function workspaces(value)
 				and key ~= "tasks"
 				and key ~= "dirty_files"
 				and key ~= "activity"
+				and key ~= "collisions"
 			then
 				fail("workspace " .. index .. " contains unsupported field: " .. tostring(key))
 			end
@@ -84,6 +130,7 @@ local function workspaces(value)
 				"workspace " .. index .. " dirty_files"
 			),
 			activity = records,
+			collisions = collisions(workspace.collisions, index),
 		}
 	end
 	return result
@@ -114,6 +161,21 @@ local function render(dashboard)
 		)
 		for _, value in ipairs(workspace.activity) do
 			table.insert(lines, "  activity: " .. value.provider .. " · " .. value.session_id .. " · " .. value.state)
+		end
+		if #workspace.collisions == 0 then
+			table.insert(lines, "  writer collisions: none")
+		else
+			for _, collision in ipairs(workspace.collisions) do
+				table.insert(
+					lines,
+					"  writer collision: "
+						.. collision.kind
+						.. " · "
+						.. collision.path
+						.. " · "
+						.. table.concat(collision.worktree_ids, ", ")
+				)
+			end
 		end
 	end
 	table.insert(lines, "j/k navigate · <CR> select · q close · ? help")

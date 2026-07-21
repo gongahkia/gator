@@ -8,6 +8,9 @@ local window = dashboard.open({
 			tasks = { "task-one" },
 			dirty_files = { "lua/gator/init.lua" },
 			activity = { { provider = "codex", session_id = "native-one", state = "running" } },
+			collisions = {
+				{ kind = "overlap", path = "lua/gator/init.lua", worktree_ids = { "worktree-one", "worktree-two" } },
+			},
 		},
 	},
 })
@@ -17,8 +20,24 @@ local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf
 assert(content:find("task%-one"), "workspace dashboard must render linked tasks")
 assert(content:find("lua/gator/init.lua", 1, true), "workspace dashboard must render dirty files")
 assert(content:find("native%-one"), "workspace dashboard must render agent activity")
+assert(
+	content:find("writer collision: overlap · lua/gator/init.lua · worktree-one, worktree-two", 1, true),
+	"workspace dashboard must render active writer collisions"
+)
 assert(dashboard.select(1).kind == "worktree", "workspace dashboard selection must preserve workspace kind")
 assert(dashboard.close(), "workspace dashboard close must report success")
 
 local ok = pcall(dashboard.open, { workspaces = { { id = "invalid", kind = "remote", root = "/tmp", activity = {} } } })
 assert(not ok, "unsupported workspace kinds must fail explicitly")
+ok = pcall(dashboard.open, {
+	workspaces = {
+		{
+			id = "invalid",
+			kind = "worktree",
+			root = "/tmp",
+			activity = {},
+			collisions = { { kind = "unknown", path = "x", worktree_ids = { "one" } } },
+		},
+	},
+})
+assert(not ok, "unknown writer collision kinds must fail explicitly")
