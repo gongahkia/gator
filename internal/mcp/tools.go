@@ -40,16 +40,17 @@ type contextArgs struct {
 }
 
 type compactEnvelope struct {
-	SchemaVersion string                  `json:"schema_version"`
-	TaskID        string                  `json:"task_id"`
-	Instruction   string                  `json:"instruction,omitempty"`
-	Cwd           string                  `json:"cwd,omitempty"`
-	Stage         string                  `json:"stage"`
-	Turn          int                     `json:"turn"`
-	Digest        *envelope.ContextDigest `json:"digest,omitempty"`
-	Budget        envelope.Budget         `json:"budget"`
-	RawTotalBytes int                     `json:"raw_total_bytes,omitempty"`
-	Provenance    []rawUnitProvenance     `json:"provenance,omitempty"`
+	SchemaVersion string                   `json:"schema_version"`
+	TaskID        string                   `json:"task_id"`
+	Instruction   string                   `json:"instruction,omitempty"`
+	Cwd           string                   `json:"cwd,omitempty"`
+	Stage         string                   `json:"stage"`
+	Turn          int                      `json:"turn"`
+	Digest        *envelope.ContextDigest  `json:"digest,omitempty"`
+	Budget        envelope.Budget          `json:"budget"`
+	Egress        *envelope.EgressManifest `json:"egress,omitempty"`
+	RawTotalBytes int                      `json:"raw_total_bytes,omitempty"`
+	Provenance    []rawUnitProvenance      `json:"provenance,omitempty"`
 }
 
 type rawUnitProvenance struct {
@@ -182,6 +183,7 @@ func compactEnvelopeFrom(env *envelope.Envelope) compactEnvelope {
 		Turn:          env.Turn,
 		Digest:        env.Digest,
 		Budget:        env.Budget,
+		Egress:        env.Egress,
 	}
 	if env.Raw != nil {
 		compact.RawTotalBytes = env.Raw.TotalBytes

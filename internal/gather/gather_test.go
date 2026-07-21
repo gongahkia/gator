@@ -28,6 +28,14 @@ func TestGatherFindsKnownSymbol(t *testing.T) {
 	if !hasKind(env.Raw, "syntax_context") {
 		t.Fatalf("raw context missing syntax_context: %#v", env.Raw)
 	}
+	if env.Egress == nil || len(env.Egress.Units) != len(env.Raw.Units) || env.Egress.TotalBytes != env.Raw.TotalBytes {
+		t.Fatalf("egress manifest = %#v", env.Egress)
+	}
+	for _, unit := range env.Egress.Units {
+		if unit.ID == "" || unit.Bytes < 0 || unit.SHA256 == "" {
+			t.Fatalf("egress unit = %#v", unit)
+		}
+	}
 }
 
 func TestGatherRespectsDepthAndByteBounds(t *testing.T) {

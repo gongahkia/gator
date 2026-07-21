@@ -34,6 +34,31 @@
     ],
     "total_bytes": 51
   },
+  "egress": {
+    "units": [
+      {
+        "id": "u001",
+        "kind": "dir_listing",
+        "bytes": 12,
+        "sha256": "c1055d96ff1a38ce6f2ae340796327259deaa6d7487a1301535b835dac646c94"
+      },
+      {
+        "id": "u002",
+        "kind": "search_hits",
+        "path": "notes.txt",
+        "bytes": 15,
+        "sha256": "f1e6e6cdc8e0adfa080927d139dff06f176d04bcb30303a99441377c580500bc"
+      },
+      {
+        "id": "u003",
+        "kind": "file_slice",
+        "path": "notes.txt",
+        "bytes": 24,
+        "sha256": "e69259836ec923cc551c50cac085fcd6f616a5bd0ee6c06be3584824efcedc7a"
+      }
+    ],
+    "total_bytes": 51
+  },
   "budget": {
     "max_turns": 0,
     "turn": 0,

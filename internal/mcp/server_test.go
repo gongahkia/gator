@@ -74,7 +74,7 @@ func TestDigestCallReturnsCompactStructuredContentByDefault(t *testing.T) {
 		t.Fatalf("error = %#v", resp.Error)
 	}
 	content := responseContentText(t, resp)
-	if strings.Contains(content, `"raw"`) || strings.Contains(content, `"units"`) {
+	if strings.Contains(content, `"raw"`) || strings.Contains(content, `"text"`) {
 		t.Fatalf("compact content leaked raw context: %s", content)
 	}
 	structured := responseStructuredMap(t, resp)
@@ -89,6 +89,9 @@ func TestDigestCallReturnsCompactStructuredContentByDefault(t *testing.T) {
 	}
 	if items, ok := structured["provenance"].([]any); !ok || len(items) == 0 {
 		t.Fatalf("missing provenance: %#v", structured["provenance"])
+	}
+	if manifest, ok := structured["egress"].(map[string]any); !ok || manifest["total_bytes"] == nil {
+		t.Fatalf("missing egress manifest: %#v", structured["egress"])
 	}
 }
 
@@ -131,6 +134,19 @@ func TestStageRunnerBlocksSecretBearingDigest(t *testing.T) {
 	env.Raw = &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Text: "token=sk-abcdefghijklmnopqrstuvwxyz123456"}}}
 	if _, err := runner.Compress(context.Background(), env); err == nil || !strings.Contains(err.Error(), "egress blocked") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestStageRunnerRecordsEgressManifest(t *testing.T) {
+	runner := StageRunner{Config: config.Defaults(), DisableCompress: true}
+	env := envelope.NewEnvelope("task", "inspect", t.TempDir())
+	env.Raw = &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Kind: "file_slice", Path: "main.go", Text: "package main\n"}}}
+	out, err := runner.Compress(context.Background(), env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Egress == nil || len(out.Egress.Units) != 1 || out.Egress.Units[0].SHA256 == "" {
+		t.Fatalf("egress manifest = %#v", out.Egress)
 	}
 }
 

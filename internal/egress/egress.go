@@ -10,24 +10,9 @@ import (
 	"github.com/gongahkia/paw/internal/envelope"
 )
 
-type Finding struct {
-	Kind  string `json:"kind"`
-	Count int    `json:"count"`
-}
-
-type UnitManifest struct {
-	ID     string `json:"id"`
-	Kind   string `json:"kind"`
-	Path   string `json:"path,omitempty"`
-	Bytes  int    `json:"bytes"`
-	SHA256 string `json:"sha256"`
-}
-
-type Manifest struct {
-	Units      []UnitManifest `json:"units"`
-	TotalBytes int            `json:"total_bytes"`
-	Findings   []Finding      `json:"findings,omitempty"`
-}
+type Finding = envelope.EgressFinding
+type UnitManifest = envelope.EgressUnit
+type Manifest = envelope.EgressManifest
 
 type RedactionResult struct {
 	Raw      *envelope.RawContext

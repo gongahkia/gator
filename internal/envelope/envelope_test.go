@@ -65,6 +65,11 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		},
 		TotalBytes: 13,
 	}
+	env.Egress = &EgressManifest{
+		Units:      []EgressUnit{{ID: "u001", Kind: "file_slice", Path: "main.go", Bytes: 13, SHA256: "digest"}},
+		TotalBytes: 13,
+		Findings:   []EgressFinding{{Kind: "openai_key", Count: 1}},
+	}
 	env.Done = true
 
 	var buf bytes.Buffer

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/gongahkia/paw/internal/config"
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 )
 
@@ -56,6 +57,8 @@ func (g *Gather) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Enve
 	assignIDs(units)
 	out.Stage = g.Name()
 	out.Raw = &envelope.RawContext{Units: units, TotalBytes: totalBytes(units)}
+	manifest := egress.Build(out.Raw)
+	out.Egress = &manifest
 	return &out, nil
 }
 

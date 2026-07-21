@@ -35,12 +35,13 @@ func (r StageRunner) Gather(ctx context.Context, cwd, instruction string) (*enve
 }
 
 func (r StageRunner) Compress(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
-	prepared, _, err := egress.Prepare(r.Config.Policy.Egress, env.Raw)
+	prepared, manifest, err := egress.Prepare(r.Config.Policy.Egress, env.Raw)
 	if err != nil {
 		return nil, err
 	}
 	in := *env
 	in.Raw = prepared.Raw
+	in.Egress = &manifest
 	var drone llm.Client
 	if !r.DisableCompress {
 		if err := policy.CheckEndpoint(r.Config.Policy, r.Config.Drone.Transport, r.Config.Drone.BaseURL); err != nil {
