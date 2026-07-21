@@ -19,13 +19,15 @@ import (
 const (
 	SchemaVersion       = "paw.session/2"
 	LegacySchemaVersion = "paw.session/1"
+	maxIDAttempts       = 8
 )
 
 var (
-	ErrInvalidSessionID  = errors.New("invalid session id")
-	ErrInvalidManifest   = errors.New("invalid session manifest")
-	ErrMigrationRequired = errors.New("session state migration required")
-	ErrUnsupportedSchema = errors.New("unsupported session schema")
+	ErrInvalidSessionID   = errors.New("invalid session id")
+	ErrInvalidManifest    = errors.New("invalid session manifest")
+	ErrMigrationRequired  = errors.New("session state migration required")
+	ErrUnsupportedSchema  = errors.New("unsupported session schema")
+	ErrSessionIDCollision = errors.New("session id collision")
 )
 
 type Status string
@@ -125,7 +127,7 @@ func Create(cwd string, manifest Manifest) (*Store, error) {
 	}
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		if errors.Is(err, os.ErrExist) {
-			return nil, fmt.Errorf("session %q already exists", manifest.ID)
+			return nil, fmt.Errorf("%w: %q", ErrSessionIDCollision, manifest.ID)
 		}
 		return nil, fmt.Errorf("create session directory: %w", err)
 	}
@@ -135,6 +137,27 @@ func Create(cwd string, manifest Manifest) (*Store, error) {
 		return nil, err
 	}
 	return store, nil
+}
+
+func CreateNew(cwd string, now time.Time, entropy io.Reader) (*Store, Manifest, error) {
+	for attempt := 0; attempt < maxIDAttempts; attempt++ {
+		id, err := NewID(now, entropy)
+		if err != nil {
+			return nil, Manifest{}, err
+		}
+		manifest, err := NewManifest(id, cwd, now)
+		if err != nil {
+			return nil, Manifest{}, err
+		}
+		store, err := Create(cwd, manifest)
+		if err == nil {
+			return store, manifest, nil
+		}
+		if !errors.Is(err, ErrSessionIDCollision) {
+			return nil, Manifest{}, err
+		}
+	}
+	return nil, Manifest{}, fmt.Errorf("%w after %d attempts", ErrSessionIDCollision, maxIDAttempts)
 }
 
 func Open(cwd, id string) (*Store, error) {
@@ -333,7 +356,7 @@ func validateSchemaVersion(version string) error {
 }
 
 func validateID(id string) error {
-	if !strings.HasPrefix(id, "session-") || len(id) > 160 {
+	if !strings.HasPrefix(id, "session-") || len(id) > 160 || strings.Contains(id, "..") {
 		return fmt.Errorf("%w: %q", ErrInvalidSessionID, id)
 	}
 	for _, r := range id {
@@ -345,7 +368,7 @@ func validateID(id string) error {
 }
 
 func validIDRune(r rune) bool {
-	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_'
+	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.'
 }
 
 func writeAtomic(path string, data []byte) error {

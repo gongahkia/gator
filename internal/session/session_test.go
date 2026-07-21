@@ -20,6 +20,51 @@ func TestNewIDUsesEntropyAndTime(t *testing.T) {
 	}
 }
 
+func TestCreateNewRetriesIDCollision(t *testing.T) {
+	cwd := t.TempDir()
+	now := time.Date(2026, 7, 21, 12, 30, 45, 0, time.UTC)
+	first := bytes.Repeat([]byte{0xab}, 10)
+	second := bytes.Repeat([]byte{0xcd}, 10)
+	id, err := NewID(now, bytes.NewReader(first))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := NewManifest(id, cwd, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Create(cwd, manifest); err != nil {
+		t.Fatal(err)
+	}
+	store, created, err := CreateNew(cwd, now, bytes.NewReader(append(first, second...)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store == nil || created.ID == id {
+		t.Fatalf("created = %#v", created)
+	}
+}
+
+func TestCreateNewFailsAfterRepeatedIDCollisions(t *testing.T) {
+	cwd := t.TempDir()
+	now := time.Date(2026, 7, 21, 12, 30, 45, 0, time.UTC)
+	entropy := bytes.Repeat([]byte{0xab}, 10)
+	id, err := NewID(now, bytes.NewReader(entropy))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := NewManifest(id, cwd, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Create(cwd, manifest); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := CreateNew(cwd, now, bytes.NewReader(bytes.Repeat(entropy, maxIDAttempts))); !errors.Is(err, ErrSessionIDCollision) {
+		t.Fatalf("create new error = %v", err)
+	}
+}
+
 func TestStorePersistsManifestAndEvents(t *testing.T) {
 	cwd := t.TempDir()
 	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
@@ -104,6 +149,10 @@ func TestLoadManifestRejectsLegacyFixtureWithoutRewrite(t *testing.T) {
 func TestCreateRejectsTraversalID(t *testing.T) {
 	cwd := t.TempDir()
 	manifest, err := NewManifest("session-../escape", cwd, time.Now())
+	if err == nil || !errors.Is(err, ErrInvalidSessionID) || manifest.ID != "" {
+		t.Fatalf("manifest = %#v err = %v", manifest, err)
+	}
+	manifest, err = NewManifest("session-..", cwd, time.Now())
 	if err == nil || !errors.Is(err, ErrInvalidSessionID) || manifest.ID != "" {
 		t.Fatalf("manifest = %#v err = %v", manifest, err)
 	}
