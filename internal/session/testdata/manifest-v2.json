@@ -5,7 +5,8 @@
   "status": "active",
   "workspace": {
     "root": "/workspace",
-    "is_git": false
+    "is_git": false,
+    "writable_hint": true
   },
   "created_at": "2026-07-21T00:00:00Z",
   "updated_at": "2026-07-21T00:00:00Z"

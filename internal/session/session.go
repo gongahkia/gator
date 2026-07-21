@@ -42,9 +42,10 @@ const (
 )
 
 type Workspace struct {
-	Root    string `json:"root"`
-	GitRoot string `json:"git_root,omitempty"`
-	IsGit   bool   `json:"is_git"`
+	Root         string `json:"root"`
+	GitRoot      string `json:"git_root,omitempty"`
+	IsGit        bool   `json:"is_git"`
+	WritableHint bool   `json:"writable_hint"`
 }
 
 type Manifest struct {
@@ -95,9 +96,10 @@ func NewManifest(id, cwd string, now time.Time) (Manifest, error) {
 		Cwd:           state.Root,
 		Status:        StatusActive,
 		Workspace: Workspace{
-			Root:    state.Root,
-			GitRoot: state.GitRoot,
-			IsGit:   state.IsGit,
+			Root:         state.Root,
+			GitRoot:      state.GitRoot,
+			IsGit:        state.IsGit,
+			WritableHint: state.WritableHint,
 		},
 		CreatedAt: now.UTC(),
 		UpdatedAt: now.UTC(),
@@ -346,6 +348,12 @@ func validateManifest(manifest Manifest) error {
 	}
 	if manifest.Cwd == "" || manifest.Workspace.Root == "" {
 		return fmt.Errorf("%w: cwd and workspace root are required", ErrInvalidManifest)
+	}
+	if manifest.Workspace.IsGit && manifest.Workspace.GitRoot == "" {
+		return fmt.Errorf("%w: git workspace requires git root", ErrInvalidManifest)
+	}
+	if !manifest.Workspace.IsGit && manifest.Workspace.GitRoot != "" {
+		return fmt.Errorf("%w: non-git workspace cannot have git root", ErrInvalidManifest)
 	}
 	switch manifest.Status {
 	case StatusActive, StatusStopped, StatusCompleted, StatusFailed:

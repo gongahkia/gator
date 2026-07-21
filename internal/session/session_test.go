@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gongahkia/paw/internal/testrepo"
 )
 
 func TestNewIDUsesEntropyAndTime(t *testing.T) {
@@ -104,6 +106,45 @@ func TestStorePersistsManifestAndEvents(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("manifest mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestNewManifestRecordsNonGitWorkspaceCapabilities(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-nongit-capabilities", cwd, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Workspace.IsGit || manifest.Workspace.GitRoot != "" || !manifest.Workspace.WritableHint {
+		t.Fatalf("workspace = %#v", manifest.Workspace)
+	}
+}
+
+func TestNewManifestRecordsGitWorkspaceCapabilities(t *testing.T) {
+	repo := testrepo.NewGit(t)
+	manifest, err := NewManifest("session-git-capabilities", repo.Root, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !manifest.Workspace.IsGit || manifest.Workspace.GitRoot != manifest.Workspace.Root || !manifest.Workspace.WritableHint {
+		t.Fatalf("workspace = %#v", manifest.Workspace)
+	}
+}
+
+func TestManifestRejectsInconsistentWorkspaceCapabilities(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-capability-validation", cwd, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Workspace.GitRoot = manifest.Workspace.Root
+	if err := validateManifest(manifest); !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("non-git validation error = %v", err)
+	}
+	manifest.Workspace.IsGit = true
+	manifest.Workspace.GitRoot = ""
+	if err := validateManifest(manifest); !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("git validation error = %v", err)
 	}
 }
 
