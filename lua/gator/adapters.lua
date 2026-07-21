@@ -54,6 +54,7 @@ local M = {
 	opencode_policy = require("gator.adapters.opencode_policy"),
 	opencode_context = require("gator.adapters.opencode_context"),
 	pi = require("gator.adapters.pi"),
+	pi_transport = require("gator.adapters.pi_transport"),
 	pi_sessions = require("gator.adapters.pi_sessions"),
 	pi_policy = require("gator.adapters.pi_policy"),
 	pi_context = require("gator.adapters.pi_context"),
