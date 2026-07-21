@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"runtime"
 	"testing"
 )
@@ -17,6 +18,20 @@ func TestNativeRunnerCapturesExitOutput(t *testing.T) {
 	}
 	if result.ExitCode != 7 || string(result.Stdout) != "out" || string(result.Stderr) != "err" {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestNativeRunnerRejectsMissingPath(t *testing.T) {
+	_, err := (NativeRunner{}).Run(context.Background(), Command{})
+	if err == nil || err.Error() != "command path is required" {
+		t.Fatalf("run error = %v", err)
+	}
+}
+
+func TestNativeRunnerPreservesNotFoundError(t *testing.T) {
+	_, err := (NativeRunner{}).Run(context.Background(), Command{Path: "paw-command-that-does-not-exist"})
+	if !errors.Is(err, exec.ErrNotFound) {
+		t.Fatalf("run error = %v", err)
 	}
 }
 

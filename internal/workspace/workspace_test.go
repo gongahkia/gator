@@ -1,11 +1,20 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	pawruntime "github.com/gongahkia/paw/internal/runtime"
 )
+
+type runnerFunc func(context.Context, pawruntime.Command) (pawruntime.Result, error)
+
+func (f runnerFunc) Run(ctx context.Context, command pawruntime.Command) (pawruntime.Result, error) {
+	return f(ctx, command)
+}
 
 func TestResolvePathAllowsNestedFutureFile(t *testing.T) {
 	root := t.TempDir()
@@ -51,5 +60,32 @@ func TestInspectFindsGitWorkspace(t *testing.T) {
 	}
 	if manifest.IsGit {
 		t.Fatal("empty .git directory must not be treated as a git worktree")
+	}
+}
+
+func TestInspectUsesProcessRunnerForGitDetection(t *testing.T) {
+	root := t.TempDir()
+	var got pawruntime.Command
+	manifest, err := inspect(root, runnerFunc(func(_ context.Context, command pawruntime.Command) (pawruntime.Result, error) {
+		got = command
+		return pawruntime.Result{Stdout: []byte(root + "\n")}, nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !manifest.IsGit || manifest.GitRoot == "" {
+		t.Fatalf("manifest = %#v", manifest)
+	}
+	if got.Path != "git" || got.Dir == "" || len(got.Args) != 2 || got.Args[0] != "rev-parse" {
+		t.Fatalf("command = %#v", got)
+	}
+}
+
+func TestInspectReturnsUnexpectedRunnerError(t *testing.T) {
+	_, err := inspect(t.TempDir(), runnerFunc(func(context.Context, pawruntime.Command) (pawruntime.Result, error) {
+		return pawruntime.Result{}, errors.New("runner failed")
+	}))
+	if err == nil || err.Error() != "inspect git workspace: runner failed" {
+		t.Fatalf("inspect error = %v", err)
 	}
 }

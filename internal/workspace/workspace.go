@@ -1,12 +1,15 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	pawruntime "github.com/gongahkia/paw/internal/runtime"
 )
 
 var ErrPathEscapesRoot = errors.New("path escapes workspace root")
@@ -67,6 +70,10 @@ func ResolvePath(root, rel string) (string, error) {
 }
 
 func Inspect(path string) (Manifest, error) {
+	return inspect(path, pawruntime.NativeRunner{})
+}
+
+func inspect(path string, runner pawruntime.Runner) (Manifest, error) {
 	root, err := CanonicalRoot(path)
 	if err != nil {
 		return Manifest{}, err
@@ -76,10 +83,9 @@ func Inspect(path string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	manifest := Manifest{Root: root, WritableHint: info.Mode().Perm()&0o222 != 0}
-	cmd := exec.Command("git", "-C", root, "rev-parse", "--show-toplevel")
-	out, err := cmd.Output()
+	result, err := runner.Run(context.Background(), pawruntime.Command{Path: "git", Args: []string{"rev-parse", "--show-toplevel"}, Dir: root})
 	if err == nil {
-		gitRoot, rootErr := CanonicalRoot(strings.TrimSpace(string(out)))
+		gitRoot, rootErr := CanonicalRoot(strings.TrimSpace(string(result.Stdout)))
 		if rootErr != nil {
 			return Manifest{}, rootErr
 		}
