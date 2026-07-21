@@ -16,6 +16,14 @@ assert(
 		and vim.tbl_contains(lines, "Actions:"),
 	"opening Gator must render the primary task/session/context/review workspace"
 )
+assert(
+	(ui.layout(79) == "narrow" and ui.layout(100) == "wide") and not pcall(ui.layout, 0),
+	"workspace layouts must resolve narrow and wide widths explicitly"
+)
+assert(
+	vim.tbl_contains(lines, "Layout: " .. ui.layout(vim.api.nvim_win_get_width(panel))),
+	"workspace must render its active layout"
+)
 assert(vim.fn.maparg("q", "n", false, true).buffer == 1, "workspace close must be keyboard-accessible")
 assert(ui.open(gator._state) == panel, "opening Gator twice must reuse its panel")
 assert(ui.resize(6) == 6, "Gator panels must resize explicitly")

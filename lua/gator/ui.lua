@@ -30,6 +30,7 @@ local M = {
 local panels = {}
 local accessibility = require("gator.ui.accessibility")
 local statuses = { ready = true, loading = true, degraded = true, failed = true, recovering = true }
+local narrow_width = 100
 
 local function fail(message)
 	error("Gator UI: " .. message, 3)
@@ -155,8 +156,10 @@ local function render(panel)
 	local state = panel.state
 	local workspace = workspace_state(state)
 	local task_values, session_values, entries = tasks(state), sessions(state), context_entries(state)
+	local layout = M.layout(vim.api.nvim_win_get_width(panel.window))
 	local lines =
 		{ "Gator workspace", "State: " .. workspace.status .. (workspace.detail and " · " .. workspace.detail or "") }
+	table.insert(lines, "Layout: " .. layout)
 	if workspace.status == "degraded" then
 		table.insert(lines, "Degraded: some provider features are unavailable · run health / recover providers")
 	end
@@ -165,7 +168,10 @@ local function render(panel)
 	else
 		table.insert(lines, "Tasks: " .. #task_values .. " · open task dashboard")
 		for _, value in ipairs(task_values) do
-			table.insert(lines, "  " .. value.id .. " · " .. value.lifecycle .. " · " .. value.objective)
+			table.insert(
+				lines,
+				"  " .. value.id .. " · " .. value.lifecycle .. (layout == "wide" and " · " .. value.objective or "")
+			)
 		end
 	end
 	table.insert(
@@ -421,6 +427,13 @@ function M.resize(lines)
 	return vim.api.nvim_win_get_height(panel.window)
 end
 
+function M.layout(width)
+	if type(width) ~= "number" or width < 1 or width % 1 ~= 0 then
+		fail("layout width must be a positive integer")
+	end
+	return width < narrow_width and "narrow" or "wide"
+end
+
 function M.close()
 	local panel, tabpage = current_panel()
 	if not panel then
@@ -443,5 +456,19 @@ function M.restore(state)
 	end
 	return M.open(state)
 end
+
+local group = vim.api.nvim_create_augroup("GatorWorkspaceLayout", { clear = true })
+vim.api.nvim_create_autocmd("WinResized", {
+	group = group,
+	callback = function()
+		vim.schedule(function()
+			for _, panel in pairs(panels) do
+				if vim.api.nvim_win_is_valid(panel.window) then
+					render(panel)
+				end
+			end
+		end)
+	end,
+})
 
 return M
