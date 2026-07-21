@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -180,6 +181,20 @@ max_commands = 2
 	}
 	if cfg.Policy.Risk.MaxCommands != 2 {
 		t.Fatalf("nearest policy max commands = %d", cfg.Policy.Risk.MaxCommands)
+	}
+}
+
+func TestLoadRejectsPolicyWithPathDiagnostic(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	path := writeConfig(t, `
+[policy.risk]
+max_commands = 0
+`)
+	_, err := Load(path)
+	var diagnostic *PolicyValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Path != "policy.risk.max_commands" || diagnostic.Reason != "must be greater than zero" {
+		t.Fatalf("policy diagnostic = %#v err=%v", diagnostic, err)
 	}
 }
 

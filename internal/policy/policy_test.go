@@ -32,8 +32,10 @@ func TestCheckEndpointRequiresExactAllowlistedBaseURL(t *testing.T) {
 func TestValidateRejectsBadBudget(t *testing.T) {
 	cfg := config.Defaults().Policy
 	cfg.Risk.MaxFiles = 0
-	if err := Validate(cfg); err == nil {
-		t.Fatal("expected budget validation error")
+	err := Validate(cfg)
+	var diagnostic *config.PolicyValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Path != "policy.risk.max_files" {
+		t.Fatalf("budget validation error = %v", err)
 	}
 }
 

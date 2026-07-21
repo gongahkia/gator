@@ -67,6 +67,9 @@ func Load(path string) (Config, error) {
 	if err := applyEnv(&cfg); err != nil {
 		return Config{}, err
 	}
+	if err := ValidatePolicy(cfg.Policy); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 
