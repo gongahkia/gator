@@ -1,3 +1,5 @@
+local git_boundary = require("gator.core.git")
+
 local M = {}
 
 local function fail(message)
@@ -22,18 +24,21 @@ function M.detect(opts)
 		or type(opts.cwd) ~= "string"
 		or opts.cwd == ""
 		or (opts.run ~= nil and type(opts.run) ~= "function")
+		or (opts.git ~= nil and not git_boundary.is(opts.git))
 	then
-		fail("detect requires cwd and optional run")
+		fail("detect requires cwd and optional Git boundary")
+	end
+	if opts.run ~= nil and opts.git ~= nil then
+		fail("detect accepts either run or git")
 	end
 	local cwd = vim.uv.fs_realpath(opts.cwd)
 	if not cwd or vim.fn.isdirectory(cwd) ~= 1 then
 		fail("cwd must be an existing directory")
 	end
-	local run = opts.run
-		or function(argv, path)
-			local value = vim.system(argv, { cwd = path, text = true }):wait()
-			return { code = value.code, stdout = value.stdout or "" }
-		end
+	local git = opts.git or git_boundary.new({ run = opts.run })
+	local run = function(argv, path)
+		return git:run(argv, path)
+	end
 	if result(run, { "git", "rev-parse", "--is-inside-work-tree" }, cwd, "Git worktree check") ~= "true" then
 		fail("cwd is not a Git worktree")
 	end
