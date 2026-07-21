@@ -1,6 +1,6 @@
 local redact = require("gator.policy.redact")
 
-local M = {}
+local M = { service_states = { "registered", "running", "stopped", "cancelled", "failed" } }
 local Runtime = {}
 
 Runtime.__index = Runtime
@@ -21,6 +21,33 @@ local function timestamp(value)
 		fail("clock must return a non-negative integer timestamp")
 	end
 	return value
+end
+
+local function service(value)
+	if type(value) ~= "table" or type(value.start) ~= "function" or type(value.stop) ~= "function" then
+		fail("service must expose start and stop")
+	end
+	return value
+end
+
+local function status(entry)
+	return vim.deepcopy({
+		name = entry.name,
+		state = entry.state,
+		started_at = entry.started_at,
+		stopped_at = entry.stopped_at,
+		failure = entry.failure,
+	})
+end
+
+local function reason(value)
+	if value == nil then
+		return "shutdown"
+	end
+	if type(value) ~= "string" or value == "" then
+		fail("service stop reason must be non-empty text")
+	end
+	return redact.text(value)
 end
 
 function M.new(opts)
@@ -47,6 +74,8 @@ function M.new(opts)
 			return prefix .. "-" .. sequence
 		end,
 		sequence = 0,
+		services = {},
+		service_order = {},
 	}, Runtime)
 end
 
@@ -76,6 +105,124 @@ function Runtime:next_id(prefix)
 		fail("identifier failed: " .. tostring(value))
 	end
 	return identifier(value, "identifier")
+end
+
+function Runtime:register(name, value)
+	if not M.is(self) then
+		fail("register requires a runtime")
+	end
+	name = identifier(name, "service name")
+	service(value)
+	if self.services[name] then
+		fail("service is already registered: " .. name)
+	end
+	self.services[name] = { name = name, service = value, state = "registered" }
+	table.insert(self.service_order, name)
+	return status(self.services[name])
+end
+
+function Runtime:status(name)
+	if not M.is(self) then
+		fail("status requires a runtime")
+	end
+	name = identifier(name, "service name")
+	if not self.services[name] then
+		fail("service is unavailable: " .. name)
+	end
+	return status(self.services[name])
+end
+
+function Runtime:services()
+	if not M.is(self) then
+		fail("services requires a runtime")
+	end
+	local result = {}
+	for _, name in ipairs(self.service_order) do
+		table.insert(result, status(self.services[name]))
+	end
+	return result
+end
+
+function Runtime:start(name, opts)
+	if not M.is(self) then
+		fail("start requires a runtime")
+	end
+	name = identifier(name, "service name")
+	if opts == nil then
+		opts = {}
+	end
+	if type(opts) ~= "table" then
+		fail("service start options must be a table")
+	end
+	local entry = self.services[name]
+	if not entry then
+		fail("service is unavailable: " .. name)
+	end
+	if entry.state == "running" then
+		return status(entry)
+	end
+	local started_at = self:now()
+	local ok, handle = pcall(entry.service.start, entry.service, vim.deepcopy(opts))
+	if not ok then
+		entry.state = "failed"
+		entry.failure = redact.text(tostring(handle))
+		fail("service failed to start: " .. name .. ": " .. entry.failure)
+	end
+	entry.handle = handle
+	entry.state = "running"
+	entry.started_at = started_at
+	entry.stopped_at = nil
+	entry.failure = nil
+	return status(entry)
+end
+
+function Runtime:stop(name, value)
+	if not M.is(self) then
+		fail("stop requires a runtime")
+	end
+	name = identifier(name, "service name")
+	local entry = self.services[name]
+	if not entry then
+		fail("service is unavailable: " .. name)
+	end
+	if entry.state ~= "running" then
+		return false
+	end
+	value = reason(value)
+	local stopped_at = self:now()
+	local ok, detail = pcall(entry.service.stop, entry.service, entry.handle, value)
+	if not ok then
+		entry.failure = redact.text(tostring(detail))
+		fail("service failed to stop: " .. name .. ": " .. entry.failure)
+	end
+	entry.handle = nil
+	entry.state = value == "cancelled" and "cancelled" or "stopped"
+	entry.stopped_at = stopped_at
+	entry.failure = nil
+	return status(entry)
+end
+
+function Runtime:shutdown(value)
+	if not M.is(self) then
+		fail("shutdown requires a runtime")
+	end
+	value = reason(value)
+	local result, failures = {}, {}
+	for index = #self.service_order, 1, -1 do
+		local name = self.service_order[index]
+		if self.services[name].state == "running" then
+			local ok, stopped = pcall(self.stop, self, name, value)
+			if ok then
+				table.insert(result, stopped)
+			else
+				table.insert(failures, redact.text(tostring(stopped)))
+			end
+		end
+	end
+	if #failures > 0 then
+		fail("service shutdown failed: " .. table.concat(failures, "; "))
+	end
+	return result
 end
 
 return M
