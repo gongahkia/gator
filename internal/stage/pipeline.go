@@ -73,6 +73,18 @@ func (p *Pipeline) RunLoop(ctx context.Context, env *envelope.Envelope) (*envelo
 	return p.RunFrom(ctx, env)
 }
 
+func (p *Pipeline) RunToPlan(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
+	env, err := p.RunOnce(ctx, "gather", env)
+	if err != nil || stop(env) {
+		return env, err
+	}
+	env, err = p.RunOnce(ctx, "compress", env)
+	if err != nil || stop(env) {
+		return env, err
+	}
+	return p.RunOnce(ctx, "plan", env)
+}
+
 func (p *Pipeline) RunFrom(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
 	if env == nil {
 		return nil, fmt.Errorf("cannot resume nil envelope")

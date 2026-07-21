@@ -1,4 +1,4 @@
-Run the full agent pipeline
+Create a review session with a proposed plan
 
 Usage:
   paw run [flags]
@@ -10,7 +10,7 @@ Examples:
     PAW_BRAIN_BASE_URL=https://api.z.ai/api/paas/v4 \
     PAW_BRAIN_API_KEY=$ZAI_API_KEY \
     PAW_BRAIN_MODEL=glm-4.6 \
-    paw run --instruction "add retry backoff"
+    paw run --instruction "plan retry backoff"
   paw run --explain
   paw run --instruction "inspect flaky tests" --raw-context
 

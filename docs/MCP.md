@@ -105,8 +105,8 @@ or execute the full `gather | compress | plan | edit | verify` loop.
 Use MCP sidecar mode when an MCP host already owns the conversation, planning, editing, and user
 approval flow, and only needs paw's repository context or validated digest.
 
-Use native `paw run` when paw should own the full agent pipeline, including planning, patch
-generation, patch application, and verification.
+Use native `paw run` to gather context, generate a plan, and persist an active review session. It
+does not generate patches, modify the workspace, or run verification.
 
 ## Smoke Test
 

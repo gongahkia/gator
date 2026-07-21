@@ -18,6 +18,7 @@ import (
 	"github.com/gongahkia/paw/internal/llm/faketest"
 	pawlog "github.com/gongahkia/paw/internal/log"
 	"github.com/gongahkia/paw/internal/policy"
+	"github.com/gongahkia/paw/internal/session"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -132,6 +133,98 @@ allowed_base_urls = ["https://api.openai.com/v1"]
 	}
 	if _, statErr := os.Stat(filepath.Join(dir, ".paw")); !os.IsNotExist(statErr) {
 		t.Fatalf("unexpected .paw dir after fail-fast: %v", statErr)
+	}
+}
+
+func TestRunCreatesReviewSessionWithoutEditing(t *testing.T) {
+	isolateEnv(t)
+	server := faketest.NewServer()
+	t.Cleanup(server.Close)
+	configureBrain(t, server.URL)
+	server.RespondOpenAI("Prior VerifyResult JSON", `{"done":false,"reasoning":"change Add","next_action":{"kind":"edit_file","description":"return a + b","target_path":"calc.go"}}`)
+
+	dir := t.TempDir()
+	chdir(t, dir)
+	writeTestFile(t, dir, "calc.go", "package demo\n\nfunc Add(a, b int) int { return a - b }\n")
+	stdout, _, err := executeRootErr(t, append(configArgs(t), "run", "--raw-context", "--quiet", "--instruction", "fix Add"), "")
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	var out envelope.Envelope
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("decode run output: %v\n%s", err, stdout)
+	}
+	if out.Stage != "plan" || out.Plan == nil || out.Patch != nil || out.Verify != nil {
+		t.Fatalf("run output = %#v", out)
+	}
+	if got := readTestFile(t, dir, "calc.go"); !strings.Contains(got, "return a - b") {
+		t.Fatalf("workspace changed:\n%s", got)
+	}
+	if requests := server.Requests(); len(requests) != 1 {
+		t.Fatalf("model requests = %d", len(requests))
+	}
+	manifests, err := session.List(dir)
+	if err != nil {
+		t.Fatalf("list sessions: %v", err)
+	}
+	if len(manifests) != 1 || manifests[0].Status != session.StatusActive {
+		t.Fatalf("sessions = %#v", manifests)
+	}
+	store, err := session.Open(dir, manifests[0].ID)
+	if err != nil {
+		t.Fatalf("open session: %v", err)
+	}
+	events, err := store.Events()
+	if err != nil {
+		t.Fatalf("read session events: %v", err)
+	}
+	if len(events) != 2 || events[0].Type != "session.created" || events[1].Type != "plan.proposed" {
+		t.Fatalf("session events = %#v", events)
+	}
+	var proposal struct {
+		TaskID      string         `json:"task_id"`
+		Instruction string         `json:"instruction"`
+		Plan        *envelope.Plan `json:"plan"`
+	}
+	if err := json.Unmarshal(events[1].Data, &proposal); err != nil {
+		t.Fatalf("decode proposed plan: %v", err)
+	}
+	if proposal.TaskID != out.TaskID || proposal.Instruction != "fix Add" || proposal.Plan == nil || proposal.Plan.NextAction == nil || proposal.Plan.NextAction.TargetPath != "calc.go" {
+		t.Fatalf("proposal = %#v", proposal)
+	}
+}
+
+func TestRunRecordsFailedReviewSession(t *testing.T) {
+	isolateEnv(t)
+	server := faketest.NewServer()
+	t.Cleanup(server.Close)
+	configureBrain(t, server.URL)
+	server.Respond("brain planning stage", 500, `{"error":"plan unavailable"}`)
+
+	dir := t.TempDir()
+	chdir(t, dir)
+	writeTestFile(t, dir, "notes.txt", "target\n")
+	_, _, err := executeRootErr(t, append(configArgs(t), "run", "--raw-context", "--quiet", "--instruction", "target"), "")
+	if err == nil {
+		t.Fatal("run error = nil")
+	}
+	manifests, listErr := session.List(dir)
+	if listErr != nil {
+		t.Fatalf("list sessions: %v", listErr)
+	}
+	if len(manifests) != 1 || manifests[0].Status != session.StatusFailed {
+		t.Fatalf("sessions = %#v", manifests)
+	}
+	store, openErr := session.Open(dir, manifests[0].ID)
+	if openErr != nil {
+		t.Fatalf("open session: %v", openErr)
+	}
+	events, eventsErr := store.Events()
+	if eventsErr != nil {
+		t.Fatalf("read session events: %v", eventsErr)
+	}
+	if len(events) != 2 || events[0].Type != "session.created" || events[1].Type != "plan.failed" {
+		t.Fatalf("session events = %#v", events)
 	}
 }
 

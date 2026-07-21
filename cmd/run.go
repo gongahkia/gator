@@ -3,9 +3,11 @@ package cmd
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gongahkia/paw/internal/compress"
 	"github.com/gongahkia/paw/internal/config"
@@ -16,6 +18,7 @@ import (
 	pawlog "github.com/gongahkia/paw/internal/log"
 	"github.com/gongahkia/paw/internal/plan"
 	"github.com/gongahkia/paw/internal/policy"
+	"github.com/gongahkia/paw/internal/session"
 	"github.com/gongahkia/paw/internal/stage"
 	"github.com/gongahkia/paw/internal/ui"
 	"github.com/gongahkia/paw/internal/verify"
@@ -36,19 +39,19 @@ var (
 
 var runCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run the full agent pipeline",
+	Short: "Create a review session with a proposed plan",
 	Example: `  paw run --instruction "fix the failing test"
   paw run --instruction-file task.md
   env PAW_BRAIN_TRANSPORT=openai \
     PAW_BRAIN_BASE_URL=https://api.z.ai/api/paas/v4 \
     PAW_BRAIN_API_KEY=$ZAI_API_KEY \
     PAW_BRAIN_MODEL=glm-4.6 \
-    paw run --instruction "add retry backoff"
+    paw run --instruction "plan retry backoff"
   paw run --explain
   paw run --instruction "inspect flaky tests" --raw-context`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if runExplain {
-			cmd.Println("gather | compress | plan | edit | verify")
+			cmd.Println("gather | compress | plan | session")
 			return nil
 		}
 		if runNoninteractive || os.Getenv("PAW_NONINTERACTIVE") != "" {
@@ -80,6 +83,13 @@ var runCmd = &cobra.Command{
 		env := envelope.NewEnvelope(id, instruction, cwd)
 		env.Budget.MaxTurns = cfg.MaxTurns
 		env.Budget.MaxBrainTokens = cfg.MaxBrainTokens
+		store, manifest, err := session.CreateNew(cwd, time.Now(), nil)
+		if err != nil {
+			return fmt.Errorf("create review session: %w", err)
+		}
+		if _, err := store.Append(session.Event{Type: "session.created"}); err != nil {
+			return fmt.Errorf("record review session creation: %w", err)
+		}
 		traceOpts := runTraceOptions(cmd, runQuiet)
 		traceHandle, tracer, err := setupRunTracer(id, traceOpts...)
 		if err != nil {
@@ -88,11 +98,23 @@ var runCmd = &cobra.Command{
 		defer func() { _ = traceHandle.Close() }()
 		pipeline.SetTracer(tracer)
 		pipeline.SetProgress(ui.NewProgress(cmd.ErrOrStderr(), ui.WithQuiet(runQuiet), ui.WithColorizer(ui.NewColorizer(cmd.ErrOrStderr(), ui.WithNoColor(noColor))), ui.WithLogger(pawlog.From(cmd.Context())), ui.WithStructured(pawlog.IsJSON(logFormat))))
-		out, err := pipeline.RunLoop(cmd.Context(), env)
+		out, err := pipeline.RunToPlan(cmd.Context(), env)
 		if err != nil {
+			if recordErr := recordReviewFailure(store, manifest, out, err); recordErr != nil {
+				return fmt.Errorf("%w; record review failure: %v", err, recordErr)
+			}
 			return err
 		}
-		return writeRunResult(cmd, out)
+		if err := recordReviewPlan(store, out); err != nil {
+			if recordErr := recordReviewFailure(store, manifest, out, err); recordErr != nil {
+				return fmt.Errorf("record proposed plan: %w; record review failure: %v", err, recordErr)
+			}
+			return fmt.Errorf("record proposed plan: %w", err)
+		}
+		if !runQuiet {
+			pawlog.From(cmd.Context()).Info("review session created", "session_id", manifest.ID, "status", manifest.Status)
+		}
+		return writeEnvelope(cmd, out)
 	},
 }
 
@@ -107,6 +129,44 @@ func init() {
 	runCmd.Flags().BoolVar(&runNoninteractive, "noninteractive", false, "disable interactive prompts")
 	runCmd.Flags().BoolVar(&runExplain, "explain", false, "print composed pipeline")
 	runCmd.Flags().BoolVar(&runQuiet, "quiet", false, "suppress progress output")
+}
+
+func recordReviewPlan(store *session.Store, env *envelope.Envelope) error {
+	if env == nil || env.Plan == nil {
+		return fmt.Errorf("plan stage completed without a plan")
+	}
+	data, err := json.Marshal(struct {
+		TaskID      string          `json:"task_id"`
+		Instruction string          `json:"instruction"`
+		Plan        *envelope.Plan  `json:"plan"`
+		Budget      envelope.Budget `json:"budget"`
+	}{TaskID: env.TaskID, Instruction: env.Instruction, Plan: env.Plan, Budget: env.Budget})
+	if err != nil {
+		return err
+	}
+	_, err = store.Append(session.Event{Type: "plan.proposed", Data: data})
+	return err
+}
+
+func recordReviewFailure(store *session.Store, manifest session.Manifest, env *envelope.Envelope, runErr error) error {
+	manifest.Status = session.StatusFailed
+	manifest.UpdatedAt = time.Now().UTC()
+	if err := store.SaveManifest(manifest); err != nil {
+		return err
+	}
+	stage := ""
+	if env != nil {
+		stage = env.Stage
+	}
+	data, err := json.Marshal(struct {
+		Stage string `json:"stage,omitempty"`
+		Error string `json:"error"`
+	}{Stage: stage, Error: runErr.Error()})
+	if err != nil {
+		return err
+	}
+	_, err = store.Append(session.Event{Type: "plan.failed", Data: data})
+	return err
 }
 
 func readInstruction() (string, error) {

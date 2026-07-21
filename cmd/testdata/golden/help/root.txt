@@ -16,7 +16,7 @@ Available Commands:
   models      Inspect configured models
   plan        Plan the next agent step
   resume      Resume a run from its trace
-  run         Run the full agent pipeline
+  run         Create a review session with a proposed plan
   session     Inspect persisted paw sessions
   stats       Summarize a run trace
   verify      Run verification command

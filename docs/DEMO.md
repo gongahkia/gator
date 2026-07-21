@@ -1,7 +1,7 @@
 # Demo Recording
 
 The README demo is generated from a deterministic local fixture. It starts a temporary
-OpenAI-compatible fake server, creates a small failing Go module, runs `paw`, and records the repair.
+OpenAI-compatible fake server, creates a small failing Go module, runs `paw`, and records the proposed review session.
 No model API key or network service is required.
 
 Regenerate the cast and GIF from a clean checkout:

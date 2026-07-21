@@ -39,7 +39,7 @@ func TestExecuteExitCodes(t *testing.T) {
 			want: int(ExitSystemError),
 		},
 		{
-			name: "verify failed",
+			name: "review session skips verification",
 			setup: func(t *testing.T) (string, []string, []string) {
 				server := faketest.NewServer()
 				t.Cleanup(server.Close)
@@ -51,7 +51,7 @@ func TestExecuteExitCodes(t *testing.T) {
 				args := []string{"--config", config, "run", "--raw-context", "--instruction", "target", "--max-turns", "1", "--quiet"}
 				return dir, args, []string{"PAW_VERIFY_CMD=exit 7"}
 			},
-			want: int(ExitVerifyFailed),
+			want: int(ExitSuccess),
 		},
 		{
 			name: "success",

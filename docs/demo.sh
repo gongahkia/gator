@@ -114,6 +114,10 @@ max_turns = 2
 transport = "openai"
 base_url = "http://127.0.0.1:${PORT}/v1"
 model = "demo-brain"
+
+[policy.provider]
+allowed_transports = ["openai"]
+allow_loopback = true
 EOF
 
 echo '$ go test ./...'
@@ -121,7 +125,8 @@ go test ./... || true
 echo
 echo '$ paw run --raw-context --instruction "fix the failing test"'
 PAW_VERIFY_CMD="go test ./..." "$PAW_BIN" --config config.toml run --raw-context --quiet --instruction "fix the failing test" > result.json
-echo "verify: passed"
+echo "review session:"
+"$PAW_BIN" session list
 echo
 echo '$ sed -n "1,6p" calc.go'
 sed -n "1,6p" calc.go

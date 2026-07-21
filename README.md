@@ -1,6 +1,6 @@
 # paw
 
-`paw` is a Go CLI coding-agent harness that productizes a known context-pruning pattern: a small "drone" model compresses raw repository/tool output into a validated digest before a larger "brain" model plans and edits. The drone does not make code decisions. Go validation checks schema shape, paths, line ranges, and verbatim spans before the brain sees the digest.
+`paw` is a Go CLI coding-agent harness that productizes a known context-pruning pattern: a small "drone" model compresses raw repository/tool output into a validated digest before a larger "brain" model plans a reviewable change. The drone does not make code decisions. Go validation checks schema shape, paths, line ranges, and verbatim spans before the brain sees the digest.
 
 This project does not claim to invent small-model context compression. See [RELATED_WORK.md](RELATED_WORK.md) and [DESIGN.md](DESIGN.md) for the positioning.
 
@@ -79,10 +79,12 @@ Pipeline shape:
 paw run --explain
 ```
 
+`run` creates an active review session and does not modify the workspace. Inspect it with `paw session list` and `paw session show <session-id> --json`.
+
 Output:
 
 ```txt
-gather | compress | plan | edit | verify
+gather | compress | plan | session
 ```
 
 Resume an interrupted task from its trace:

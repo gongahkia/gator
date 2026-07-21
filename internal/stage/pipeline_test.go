@@ -59,6 +59,23 @@ func TestRunLoopStopsOnDonePlan(t *testing.T) {
 	}
 }
 
+func TestRunToPlanStopsBeforeEdit(t *testing.T) {
+	var order []string
+	p := testPipeline(t, &order, map[string]func(*envelope.Envelope){
+		"plan": func(env *envelope.Envelope) {
+			env.Plan = &envelope.Plan{NextAction: &envelope.NextAction{Kind: "edit_file", Description: "edit", TargetPath: "x"}}
+		},
+	})
+	got, err := p.RunToPlan(context.Background(), envelope.NewEnvelope("task", "fix", "/repo"))
+	if err != nil {
+		t.Fatalf("run to plan: %v", err)
+	}
+	assertOrder(t, order, []string{"gather", "compress", "plan"})
+	if got.Plan == nil || got.Patch != nil || got.Verify != nil {
+		t.Fatalf("review envelope = %#v", got)
+	}
+}
+
 func TestRunLoopIncrementsTurnAfterFailedVerify(t *testing.T) {
 	var order []string
 	verifyCalls := 0
