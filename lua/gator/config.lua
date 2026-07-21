@@ -20,7 +20,7 @@ M.defaults = {
 }
 
 local function fail(message)
-	error("gator configuration: " .. message, 3)
+	error("gator configuration: " .. redact.text(tostring(message)), 3)
 end
 
 local function sensitive(key)

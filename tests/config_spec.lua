@@ -68,3 +68,11 @@ assert(not pcall(config.resolve_sources, {
 	{ source = "file", ref = path, settings = {} },
 	{ source = "file", ref = path .. ".override", settings = {} },
 }), "configuration layers must reject duplicate sources")
+
+local ok, diagnostic = pcall(config.resolve_sources, {
+	{ source = "token: private-value", ref = path, settings = {} },
+})
+assert(
+	not ok and not diagnostic:find("private%-value"),
+	"configuration diagnostics must redact sensitive source values before callers receive them"
+)
