@@ -13,6 +13,7 @@ local M = {
 	markdown = require("gator.ui.markdown"),
 	palette = require("gator.ui.palette"),
 	picker = require("gator.ui.picker"),
+	provider_picker = require("gator.ui.provider_picker"),
 	selection = require("gator.ui.selection"),
 	task_file_picker = require("gator.ui.task_file_picker"),
 	sidebar = require("gator.ui.sidebar"),
