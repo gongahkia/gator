@@ -158,6 +158,27 @@ local function settings(value)
 	return value
 end
 
+function M.migrate(value)
+	if type(value) ~= "table" then
+		fail("legacy settings must be an object")
+	end
+	local document = vim.deepcopy(value)
+	safe(document, "settings")
+	fields(document, root_fields, "settings")
+	local from_version = document.schema_version or 1
+	if type(from_version) ~= "number" or from_version % 1 ~= 0 then
+		fail("settings.schema_version must be an integer")
+	end
+	if from_version == M.schema_version then
+		return document, { migrated = false, from_version = from_version, to_version = from_version }
+	end
+	if from_version ~= 1 then
+		fail("settings.schema_version is unsupported: " .. from_version)
+	end
+	document.schema_version = M.schema_version
+	return document, { migrated = true, from_version = from_version, to_version = M.schema_version }
+end
+
 local function source(value, index)
 	if type(value) ~= "table" then
 		fail("configuration source " .. index .. " must be an object")
@@ -169,10 +190,15 @@ local function source(value, index)
 	if type(value.ref) ~= "string" or value.ref == "" then
 		fail("configuration source " .. index .. " ref must be a non-empty string")
 	end
+	local settings_value, migration = value.settings
+	if value.source == "file" then
+		settings_value, migration = M.migrate(settings_value)
+	end
 	return {
 		source = value.source,
 		ref = value.ref,
-		settings = fragment(value.settings),
+		settings = fragment(settings_value),
+		migration = migration,
 		index = index,
 	}
 end
@@ -216,12 +242,27 @@ function M.resolve_sources(values)
 	end)
 	local value = vim.deepcopy(M.defaults)
 	local provenance = {}
+	local migrations = {}
 	record_provenance(provenance, value, "defaults", "gator.defaults", "")
 	for _, entry in ipairs(sources) do
 		value = vim.tbl_deep_extend("force", value, entry.settings)
 		record_provenance(provenance, entry.settings, entry.source, entry.ref, "")
+		if entry.migration and entry.migration.migrated then
+			provenance.schema_version = {
+				source = "migration",
+				ref = entry.ref,
+				from_version = entry.migration.from_version,
+				to_version = entry.migration.to_version,
+			}
+			table.insert(migrations, {
+				source = entry.source,
+				ref = entry.ref,
+				from_version = entry.migration.from_version,
+				to_version = entry.migration.to_version,
+			})
+		end
 	end
-	return { settings = settings(value), provenance = vim.deepcopy(provenance) }
+	return { settings = settings(value), provenance = vim.deepcopy(provenance), migrations = vim.deepcopy(migrations) }
 end
 
 function M.resolve(opts)
@@ -229,7 +270,7 @@ function M.resolve(opts)
 		opts = {}
 	end
 	local value = M.resolve_sources({ { source = "setup", ref = "gator.setup", settings = opts } })
-	return value.settings, value.provenance
+	return value.settings, value.provenance, value.migrations
 end
 
 function M.load(path)
@@ -239,14 +280,14 @@ function M.load(path)
 	end
 	if vim.fn.filereadable(path) == 0 then
 		local value = M.resolve_sources()
-		return value.settings, value.provenance
+		return value.settings, value.provenance, value.migrations
 	end
 	local ok, document = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), "\n"))
 	if not ok or type(document) ~= "table" then
 		fail("settings file is not a JSON object: " .. path)
 	end
 	local value = M.resolve_sources({ { source = "file", ref = path, settings = document } })
-	return value.settings, value.provenance
+	return value.settings, value.provenance, value.migrations
 end
 
 return M

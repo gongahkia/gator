@@ -22,6 +22,27 @@ assert(not pcall(config.load, path), "invalid user defaults must fail explicitly
 assert(not pcall(config.resolve, { schema_version = 1 }), "legacy configuration schemas must fail explicitly")
 assert(not pcall(config.resolve, { schema_version = "2" }), "configuration schemas must require an integer version")
 
+helpers.write(path, '{"schema_version":1,"ui":{"layout":"modal"}}')
+local migrated, migrated_provenance, migrations = config.load(path)
+assert(
+	migrated.schema_version == 2
+		and migrated.ui.layout == "modal"
+		and migrations[1].from_version == 1
+		and migrations[1].to_version == 2
+		and migrated_provenance.schema_version.source == "migration",
+	"legacy configuration files must migrate to schema v2 with provenance"
+)
+local legacy = '{"context":{"mode":"inspect"}}'
+helpers.write(path, legacy)
+assert(
+	config.load(path).schema_version == 2
+		and config.load(path).context.mode == "inspect"
+		and table.concat(vim.fn.readfile(path), "\n") == legacy,
+	"unversioned legacy configuration files must migrate without a durable rewrite"
+)
+helpers.write(path, '{"schema_version":3}')
+assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
+
 local layered = config.resolve_sources({
 	{
 		source = "setup",

@@ -73,6 +73,8 @@ local settings, provenance = require("gator.config").load()
 require("gator").setup(settings)
 ```
 
+Unversioned and schema-v1 configuration files are migrated to schema v2 in memory; Gator does not rewrite the file.
+
 Do not put provider credentials, tokens, secrets, passwords, or API keys in Gator configuration.
 
 ## Commands and workflow
