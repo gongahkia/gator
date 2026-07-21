@@ -1,0 +1,3 @@
+{"type":"result","subtype":"success","is_error":false,"session_id":"claude-fixture","usage":{"input_tokens":2,"output_tokens":3,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}
+{"type":"system","subtype":"files_persisted","files":[{"filename":"lua/gator/init.lua","file_id":"file-fixture"}],"failed":[],"processed_at":"2026-07-21T00:00:00Z","session_id":"claude-fixture"}
+{"type":"system","subtype":"compact_boundary","session_id":"claude-fixture","compact_metadata":{"trigger":"auto","pre_tokens":5}}

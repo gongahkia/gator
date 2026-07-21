@@ -80,6 +80,17 @@ assert(
 	"Claude fixture must preserve structured session and completion data"
 )
 
+local claude_signals = {}
+assert(fixtures.replay_jsonl(root .. "/claude_signals.jsonl", function(record)
+	table.insert(claude_signals, record)
+end) == 3, "Claude signal fixture must replay every record")
+assert(
+	claude_signals[1].usage.input_tokens == 2
+		and claude_signals[2].files[1].filename == "lua/gator/init.lua"
+		and claude_signals[3].compact_metadata.pre_tokens == 5,
+	"Claude signal fixture must preserve usage, persisted-file, and compaction records"
+)
+
 local gemini = {}
 assert(fixtures.replay_jsonl(root .. "/gemini_stream.jsonl", function(record)
 	table.insert(gemini, record)

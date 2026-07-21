@@ -31,6 +31,13 @@ local function session(value, context, name)
 	return value
 end
 
+local function integer(value, name)
+	if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
+		fail(name .. " must be a non-negative integer")
+	end
+	return value
+end
+
 local function optional_session(value, context, name)
 	if value ~= nil then
 		session(value, context, name)
@@ -58,6 +65,13 @@ local function assistant(value, context)
 	return #events > 0 and events or nil
 end
 
+local function usage(value)
+	object(value, "result usage")
+	local input = integer(value.input_tokens, "result usage.input_tokens")
+	local output = integer(value.output_tokens, "result usage.output_tokens")
+	return { type = "usage.update", payload = { input = input, output = output, total = input + output } }
+end
+
 local function result(value, context)
 	object(value, "result event")
 	optional_session(value.session_id, context, "result event")
@@ -65,22 +79,75 @@ local function result(value, context)
 	if type(value.is_error) ~= "boolean" then
 		fail("result event.is_error must be a boolean")
 	end
+	local events = {}
+	if value.usage ~= nil then
+		events[#events + 1] = usage(value.usage)
+	end
 	if subtype == "success" and value.is_error == false then
-		return { type = "run.completed", payload = { status = "completed" } }
+		events[#events + 1] = { type = "run.completed", payload = { status = "completed" } }
+		return #events == 1 and events[1] or events
 	end
 	if value.is_error ~= true then
 		fail("result event subtype and error state are inconsistent")
 	end
 	local message = type(value.result) == "string" and redact.text(value.result) or "Claude stream failed"
-	return { type = "run.error", payload = { kind = "provider", message = message, retryable = false } }
+	events[#events + 1] = { type = "run.error", payload = { kind = "provider", message = message, retryable = false } }
+	return #events == 1 and events[1] or events
+end
+
+local function path(value)
+	value = text(value, "persisted file.filename")
+	if value:sub(1, 1) == "/" or value:match("^%a:[/\\]") or value:find("..", 1, true) then
+		fail("persisted file.filename must be a relative repository path")
+	end
+	return value
+end
+
+local function compacted(value, context)
+	session(value.session_id, context, "compact boundary")
+	local metadata = object(value.compact_metadata, "compact boundary.compact_metadata")
+	if metadata.trigger ~= "auto" and metadata.trigger ~= "manual" then
+		fail("compact boundary trigger is unsupported")
+	end
+	return {
+		type = "context.compacted",
+		payload = { before = integer(metadata.pre_tokens, "compact boundary pre_tokens"), trigger = metadata.trigger },
+	}
+end
+
+local function files_persisted(value, context)
+	session(value.session_id, context, "files persisted")
+	if type(value.files) ~= "table" or not vim.islist(value.files) then
+		fail("files persisted.files must be an array")
+	end
+	if type(value.failed) ~= "table" or not vim.islist(value.failed) then
+		fail("files persisted.failed must be an array")
+	end
+	text(value.processed_at, "files persisted.processed_at")
+	local events = {}
+	for _, file in ipairs(value.files) do
+		object(file, "persisted file")
+		text(file.file_id, "persisted file.file_id")
+		events[#events + 1] = { type = "file.change", payload = { path = path(file.filename), kind = "modified" } }
+	end
+	return #events > 0 and events or nil
 end
 
 local function decode(raw, context)
 	object(raw, "stream event")
 	local kind = text(raw.type, "stream event.type")
-	if kind == "system" and raw.subtype == "init" then
-		session(raw.session_id, context, "native init")
-		return { type = "run.started", payload = {} }
+	if kind == "system" then
+		if raw.subtype == "init" then
+			session(raw.session_id, context, "native init")
+			return { type = "run.started", payload = {} }
+		end
+		if raw.subtype == "compact_boundary" then
+			return compacted(raw, context)
+		end
+		if raw.subtype == "files_persisted" then
+			return files_persisted(raw, context)
+		end
+		return nil
 	end
 	if kind == "assistant" then
 		return assistant(raw, context)
