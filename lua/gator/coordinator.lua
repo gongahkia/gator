@@ -15,6 +15,7 @@ local actions = {
 	palette = { fields = { id = true } },
 }
 local action_names = { "open", "health", "close", "cancel_operation", "capture_selection", "palette" }
+local operation_kinds = { operation = true, launch = true, handoff = true }
 
 local function fail(message)
 	error("Gator coordinator: " .. message, 3)
@@ -49,6 +50,33 @@ local function require_string(value, name)
 	return value
 end
 
+local function identifier(value, name)
+	value = require_string(value, name)
+	if not value:match("^[a-z][a-z0-9_-]*$") then
+		fail(name .. " must be a lowercase identifier")
+	end
+	return value
+end
+
+local function operation_key(value, redactor)
+	value = require_string(value, "operation key")
+	if #value > 255 or not value:match("^[%w][%w_-]*$") then
+		fail("operation key must be an opaque identifier up to 255 characters")
+	end
+	if redactor.text(value) ~= value then
+		fail("operation key must not contain sensitive data")
+	end
+	return value
+end
+
+local function operation_kind(value)
+	value = value or "operation"
+	if type(value) ~= "string" or not operation_kinds[value] then
+		fail("operation kind is unavailable: " .. tostring(value))
+	end
+	return value
+end
+
 function M.new(opts)
 	local container = dependencies.new()
 	local report = container:require("compat").require_supported()
@@ -57,6 +85,7 @@ function M.new(opts)
 	local value = setmetatable({
 		_dependencies = container,
 		_operations = {},
+		_operation_keys = {},
 		_state = container:require("state").new(settings, report),
 	}, Coordinator)
 	return value
@@ -138,22 +167,36 @@ function Coordinator:start_operation(opts)
 		fail("start_operation requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "id" and key ~= "cancel" then
+		if key ~= "id" and key ~= "key" and key ~= "kind" and key ~= "cancel" then
 			fail("start_operation contains unsupported field: " .. tostring(key))
 		end
 	end
-	local id = require_string(opts.id, "operation id")
-	if not id:match("^[a-z][a-z0-9_-]*$") then
-		fail("operation id must be a lowercase identifier")
-	end
+	local id = identifier(opts.id, "operation id")
+	local key = operation_key(opts.key or id, self:dependency("redact"))
+	local kind = operation_kind(opts.kind)
 	if opts.cancel ~= nil and type(opts.cancel) ~= "function" then
 		fail("operation cancel must be a function")
+	end
+	local existing = self._operation_keys[key]
+	if existing then
+		if existing.kind ~= kind then
+			fail("operation key is already active for " .. existing.kind)
+		end
+		return existing
 	end
 	if self._operations[id] then
 		fail("operation is already active: " .. id)
 	end
-	local value = setmetatable({ coordinator = self, id = id, token = cancellation.new(), active = true }, Operation)
+	local value = setmetatable({
+		coordinator = self,
+		id = id,
+		key = key,
+		kind = kind,
+		token = cancellation.new(),
+		active = true,
+	}, Operation)
 	self._operations[id] = value
+	self._operation_keys[key] = value
 	if opts.cancel then
 		value.token:on_cancel(opts.cancel)
 	end
@@ -195,7 +238,16 @@ function Operation:status()
 		fail("operation status requires an active operation")
 	end
 	local token = self.token:status()
-	return { id = self.id, active = self.active, cancelled = token.cancelled, reason = token.reason }
+	local state = token.cancelled and "cancelled" or (self.active and "running" or "completed")
+	return {
+		id = self.id,
+		key = self.key,
+		kind = self.kind,
+		state = state,
+		active = self.active,
+		cancelled = token.cancelled,
+		reason = token.reason,
+	}
 end
 
 function Operation:complete()
