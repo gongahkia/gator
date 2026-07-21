@@ -61,6 +61,46 @@ func TestStorePersistsManifestAndEvents(t *testing.T) {
 	}
 }
 
+func TestLoadManifestAcceptsV2Fixture(t *testing.T) {
+	dir := t.TempDir()
+	data, err := os.ReadFile(filepath.Join("testdata", "manifest-v2.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := (&Store{dir: dir}).LoadManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SchemaVersion != SchemaVersion || manifest.ID != "session-fixture-v2" {
+		t.Fatalf("manifest = %#v", manifest)
+	}
+}
+
+func TestLoadManifestRejectsLegacyFixtureWithoutRewrite(t *testing.T) {
+	dir := t.TempDir()
+	data, err := os.ReadFile(filepath.Join("testdata", "manifest-v1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "manifest.json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&Store{dir: dir}).LoadManifest(); !errors.Is(err, ErrMigrationRequired) {
+		t.Fatalf("load legacy manifest error = %v", err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, data) {
+		t.Fatal("legacy manifest was rewritten")
+	}
+}
+
 func TestCreateRejectsTraversalID(t *testing.T) {
 	cwd := t.TempDir()
 	manifest, err := NewManifest("session-../escape", cwd, time.Now())

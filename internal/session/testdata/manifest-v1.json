@@ -1,0 +1,12 @@
+{
+  "schema_version": "paw.session/1",
+  "id": "session-fixture-v1",
+  "cwd": "/workspace",
+  "status": "active",
+  "workspace": {
+    "root": "/workspace",
+    "is_git": false
+  },
+  "created_at": "2026-07-21T00:00:00Z",
+  "updated_at": "2026-07-21T00:00:00Z"
+}

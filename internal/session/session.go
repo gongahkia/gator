@@ -16,11 +16,16 @@ import (
 	"github.com/gongahkia/paw/internal/workspace"
 )
 
-const SchemaVersion = "paw.session/2"
+const (
+	SchemaVersion       = "paw.session/2"
+	LegacySchemaVersion = "paw.session/1"
+)
 
 var (
-	ErrInvalidSessionID = errors.New("invalid session id")
-	ErrInvalidManifest  = errors.New("invalid session manifest")
+	ErrInvalidSessionID  = errors.New("invalid session id")
+	ErrInvalidManifest   = errors.New("invalid session manifest")
+	ErrMigrationRequired = errors.New("session state migration required")
+	ErrUnsupportedSchema = errors.New("unsupported session schema")
 )
 
 type Status string
@@ -288,7 +293,10 @@ func (s *Store) Events() ([]Event, error) {
 			}
 			return nil, fmt.Errorf("decode session event %d: %w", len(events)+1, err)
 		}
-		if event.SchemaVersion != SchemaVersion || event.Sequence != len(events)+1 {
+		if err := validateSchemaVersion(event.SchemaVersion); err != nil {
+			return nil, fmt.Errorf("invalid session event %d: %w", len(events)+1, err)
+		}
+		if event.Sequence != len(events)+1 {
 			return nil, fmt.Errorf("invalid session event %d", len(events)+1)
 		}
 		events = append(events, event)
@@ -297,8 +305,8 @@ func (s *Store) Events() ([]Event, error) {
 }
 
 func validateManifest(manifest Manifest) error {
-	if manifest.SchemaVersion != SchemaVersion {
-		return fmt.Errorf("%w: schema version %q", ErrInvalidManifest, manifest.SchemaVersion)
+	if err := validateSchemaVersion(manifest.SchemaVersion); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidManifest, err)
 	}
 	if err := validateID(manifest.ID); err != nil {
 		return err
@@ -315,6 +323,17 @@ func validateManifest(manifest Manifest) error {
 		return fmt.Errorf("%w: timestamps are required", ErrInvalidManifest)
 	}
 	return nil
+}
+
+func validateSchemaVersion(version string) error {
+	switch version {
+	case SchemaVersion:
+		return nil
+	case LegacySchemaVersion:
+		return fmt.Errorf("%w: %q must remain in the legacy trace workflow", ErrMigrationRequired, version)
+	default:
+		return fmt.Errorf("%w: %q", ErrUnsupportedSchema, version)
+	}
 }
 
 func validateID(id string) error {
