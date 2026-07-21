@@ -1,0 +1,2 @@
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"gator-fixture"},{"type":"toolCall","id":"tool-fixture","name":"edit","arguments":{"path":"lua/gator/init.lua"}}],"usage":{"input":2,"output":3,"cacheRead":0,"cacheWrite":0,"totalTokens":5,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}}}}
+{"type":"compaction_end","reason":"threshold","result":{"summary":"token=fixture-secret","firstKeptEntryId":"entry-fixture","tokensBefore":10,"estimatedTokensAfter":4},"aborted":false,"willRetry":false}

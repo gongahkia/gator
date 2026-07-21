@@ -36,6 +36,35 @@ assert(
 	"Pi stream messages must apply configured redaction before normalization"
 )
 
+local signals = {}
+fixtures.replay_jsonl(vim.g.gator_test.root .. "/tests/fixtures/adapters/pi_signals.jsonl", function(record)
+	for _, event in ipairs(value:feed(record, { run_id = "run-pi", session_id = "pi-fixture" })) do
+		table.insert(signals, event)
+	end
+end)
+assert(
+	signals[1].type == "message.completed"
+		and signals[2].type == "usage.update"
+		and signals[2].payload.input == 2
+		and signals[2].payload.total == 5
+		and signals[3].type == "file.change"
+		and signals[3].payload.path == "lua/gator/init.lua"
+		and signals[4].type == "context.compacted"
+		and signals[4].payload.before == 10
+		and signals[4].payload.after == 4
+		and signals[4].payload.summary == "token=[REDACTED]",
+	"Pi stream records must normalize usage, file-change, and compaction signals"
+)
+
+local invalid_compaction = stream.new()
+assert(not pcall(invalid_compaction.feed, invalid_compaction, {
+	type = "compaction_end",
+	reason = "threshold",
+	result = { summary = "fixture", firstKeptEntryId = "entry-fixture", tokensBefore = 2, estimatedTokensAfter = 3 },
+	aborted = false,
+	willRetry = false,
+}, { run_id = "run-pi" }), "Pi streams must reject compaction records that increase context tokens")
+
 local invalid = stream.new()
 assert(
 	not pcall(

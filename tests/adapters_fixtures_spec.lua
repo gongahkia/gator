@@ -145,6 +145,15 @@ assert(
 	"Pi fixture must preserve RPC state, commands, and streamed responses"
 )
 
+local pi_signals = {}
+assert(fixtures.replay_jsonl(root .. "/pi_signals.jsonl", function(record)
+	table.insert(pi_signals, record)
+end) == 2, "Pi signal fixture must replay every record")
+assert(
+	pi_signals[1].message.usage.totalTokens == 5 and pi_signals[2].result.tokensBefore == 10,
+	"Pi signal fixture must preserve usage and compaction records"
+)
+
 local terminal = {}
 assert(fixtures.replay_terminal(root .. "/terminal.json", function(chunk, index)
 	terminal[index] = chunk

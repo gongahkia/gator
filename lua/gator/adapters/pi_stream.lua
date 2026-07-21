@@ -21,7 +21,7 @@ local function fields(value, allowed, name)
 end
 
 local function text(message, name)
-	fields(message, { role = true, content = true }, name)
+	fields(message, { role = true, content = true, usage = true }, name)
 	if message.role ~= "assistant" then
 		return nil
 	end
@@ -41,6 +41,97 @@ local function text(message, name)
 		end
 	end
 	return table.concat(parts)
+end
+
+local function integer(value, name)
+	if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
+		fail(name .. " must be a non-negative integer")
+	end
+	return value
+end
+
+local function usage(message)
+	if message.usage == nil then
+		return nil
+	end
+	fields(message.usage, {
+		input = true,
+		output = true,
+		cacheRead = true,
+		cacheWrite = true,
+		cacheWrite1h = true,
+		reasoning = true,
+		totalTokens = true,
+		cost = true,
+	}, "assistant usage")
+	return {
+		type = "usage.update",
+		payload = {
+			input = integer(message.usage.input, "assistant usage.input"),
+			output = integer(message.usage.output, "assistant usage.output"),
+			total = integer(message.usage.totalTokens, "assistant usage.totalTokens"),
+		},
+	}
+end
+
+local function path(value)
+	if type(value) ~= "string" or value == "" or value:sub(1, 1) == "/" or value:find("..", 1, true) then
+		fail("tool path must be a relative repository path")
+	end
+	return value
+end
+
+local function file_changes(message)
+	local events = {}
+	for index, part in ipairs(message.content) do
+		if part.type == "toolCall" and (part.name == "write" or part.name == "edit") then
+			if type(part.arguments) ~= "table" or vim.islist(part.arguments) then
+				fail("toolCall content[" .. index .. "].arguments must be an object")
+			end
+			events[#events + 1] =
+				{ type = "file.change", payload = { path = path(part.arguments.path), kind = "modified" } }
+		end
+	end
+	return events
+end
+
+local function compaction(value)
+	fields(
+		value,
+		{ type = true, reason = true, result = true, aborted = true, willRetry = true, errorMessage = true },
+		"compaction_end"
+	)
+	if value.reason ~= "manual" and value.reason ~= "threshold" and value.reason ~= "overflow" then
+		fail("compaction_end reason is unsupported")
+	end
+	if type(value.aborted) ~= "boolean" or type(value.willRetry) ~= "boolean" then
+		fail("compaction_end aborted and willRetry must be booleans")
+	end
+	if value.result == nil then
+		return {
+			type = "context.compaction_failed",
+			payload = {
+				reason = value.reason,
+				aborted = value.aborted,
+				will_retry = value.willRetry,
+				error = value.errorMessage,
+			},
+		}
+	end
+	fields(
+		value.result,
+		{ summary = true, firstKeptEntryId = true, tokensBefore = true, estimatedTokensAfter = true, details = true },
+		"compaction result"
+	)
+	if type(value.result.summary) ~= "string" then
+		fail("compaction result.summary must be a string")
+	end
+	local before = integer(value.result.tokensBefore, "compaction result.tokensBefore")
+	local after = integer(value.result.estimatedTokensAfter, "compaction result.estimatedTokensAfter")
+	if after > before then
+		fail("compaction cannot increase context tokens")
+	end
+	return { type = "context.compacted", payload = { before = before, after = after, summary = value.result.summary } }
 end
 
 local function decode(raw)
@@ -71,6 +162,16 @@ local function decode(raw)
 			payload = { message_count = #raw.messages, will_retry = raw.willRetry == true },
 		}
 	end
+	if raw.type == "compaction_start" then
+		fields(raw, { type = true, reason = true }, "compaction_start")
+		if raw.reason ~= "manual" and raw.reason ~= "threshold" and raw.reason ~= "overflow" then
+			fail("compaction_start reason is unsupported")
+		end
+		return { type = "context.compaction_started", payload = { reason = raw.reason } }
+	end
+	if raw.type == "compaction_end" then
+		return compaction(raw)
+	end
 	if raw.type ~= "message_start" and raw.type ~= "message_update" and raw.type ~= "message_end" then
 		return nil
 	end
@@ -80,7 +181,17 @@ local function decode(raw)
 		return nil
 	end
 	local action = raw.type == "message_start" and "started" or raw.type == "message_update" and "delta" or "completed"
-	return { type = "message." .. action, payload = { text = value } }
+	local events = { { type = "message." .. action, payload = { text = value } } }
+	if raw.type == "message_end" then
+		local update = usage(raw.message)
+		if update then
+			events[#events + 1] = update
+		end
+		for _, change in ipairs(file_changes(raw.message)) do
+			events[#events + 1] = change
+		end
+	end
+	return events
 end
 
 function M.new(opts)
