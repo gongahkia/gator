@@ -21,6 +21,7 @@ local M = {
 	task = require("gator.core.task"),
 	task_file = require("gator.core.task_file"),
 	thread = require("gator.core.thread"),
+	tool_event = require("gator.core.tool_event"),
 }
 
 return M
