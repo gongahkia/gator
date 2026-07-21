@@ -1,4 +1,5 @@
 local errors = require("gator.error")
+local redact = require("gator.policy.redact")
 local M = {}
 local Task = {}
 
@@ -94,7 +95,7 @@ local function evidence(value)
 		validate_fields(reference, { kind = true, ref = true }, "evidence " .. index)
 		result[index] = {
 			kind = require_string(reference.kind, "evidence " .. index .. " kind"),
-			ref = require_string(reference.ref, "evidence " .. index .. " ref"),
+			ref = redact.text(require_string(reference.ref, "evidence " .. index .. " ref")),
 		}
 	end
 	return result
@@ -132,7 +133,7 @@ function M.new(attrs)
 
 	return setmetatable({
 		id = id,
-		objective = require_string(attrs.objective, "objective"),
+		objective = redact.text(require_string(attrs.objective, "objective")),
 		lifecycle = lifecycle,
 		workspace = workspace(attrs.workspace),
 		sessions = sessions(attrs.sessions or {}),

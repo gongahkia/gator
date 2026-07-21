@@ -1,5 +1,6 @@
 local errors = require("gator.error")
 local filesystem = require("gator.core.filesystem")
+local redact = require("gator.policy.redact")
 local M = {}
 local Run = {}
 local Store = {}
@@ -49,7 +50,7 @@ end
 local function safe_value(value, path)
 	local kind = type(value)
 	if kind == "string" or kind == "number" or kind == "boolean" then
-		return value
+		return kind == "string" and redact.text(value) or value
 	end
 	if kind ~= "table" then
 		fail(path .. " must be JSON-compatible")

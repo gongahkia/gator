@@ -28,6 +28,14 @@ assert(
 	"runs must preserve process and workspace data"
 )
 assert(streamed.timing.started_at == 1 and streamed.usage.input_tokens == 10, "runs must preserve timing and usage")
+assert(run.event({
+	id = "event-redacted",
+	run_id = "run-one",
+	type = "stream.delta",
+	at = 3,
+	payload = { text = "token: private-value" },
+}).payload.text
+	:find("private%-value") == nil, "run payload text must redact before becoming persistable")
 
 local store = run.open(helpers.tempdir("runs") .. "/runs.json")
 store:put(streamed)

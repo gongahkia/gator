@@ -21,6 +21,12 @@ assert(not task.is(record), "persistent task records must be plain tables")
 record.sessions[1].id = "modified"
 assert(entity.sessions[1].id == "native-session-1", "task records must not mutate entities")
 assert(task.from_record(task.to_record(entity)).id == entity.id, "task records must round-trip")
+assert(task.new({
+	id = "task-redacted",
+	objective = "token: private-value",
+	evidence = { { kind = "test", ref = "ghp_private" } },
+}).objective
+	:find("private%-value") == nil, "task content must redact before becoming persistable")
 
 local ok = pcall(task.new, { id = "Task-001", objective = "invalid" })
 assert(not ok, "task identifiers must be stable lowercase identifiers")
