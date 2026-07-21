@@ -40,6 +40,10 @@ local first = event.new({
 assert(store:advance(first) == 0 and store:get("run-cursor") == 0, "event cursors must persist accepted sequence zero")
 local reopened = cursor.open("/fixture/cursors.json", { filesystem = store.filesystem })
 assert(reopened:get("run-cursor") == 0, "event cursors must survive storage reopens")
+assert(
+	reopened:classify(first).status == "duplicate",
+	"event cursors must identify replayed provider events without advancing durable state"
+)
 assert(not pcall(reopened.advance, reopened, first), "event cursors must reject duplicate provider events")
 local gap = event.new({
 	schema_version = 1,
@@ -50,4 +54,5 @@ local gap = event.new({
 	type = "message.delta",
 	at = 2,
 })
+assert(reopened:classify(gap).status == "gap", "event cursors must retain explicit sequence gaps")
 assert(not pcall(reopened.advance, reopened, gap), "event cursors must reject sequence gaps")

@@ -5,6 +5,16 @@ local runtime = require("gator").module("core").runtime
 local function cursor()
 	local values = {}
 	return {
+		classify = function(_, value)
+			local sequence = values[value.run_id] or -1
+			if value.sequence <= sequence then
+				return { status = "duplicate", sequence = sequence }
+			end
+			if value.sequence == sequence + 1 then
+				return { status = "next", sequence = sequence }
+			end
+			return { status = "gap", sequence = sequence, expected = sequence + 1 }
+		end,
 		assert_next = function(_, value)
 			assert(value.sequence == (values[value.run_id] or -1) + 1, "event sequence must be contiguous")
 		end,
@@ -50,6 +60,12 @@ assert(
 		and received[1].provider.session_id == "native-ingest"
 		and received[1].payload.text:find("private%-value") == nil,
 	"event ingestion must preserve native session identity and redacted payloads"
+)
+service:submit(value)
+scheduled[2]()
+assert(
+	#received == 1 and service:status().deduplicated == 1 and service:status().pending == 0,
+	"event ingestion must drop replayed events after reconnects without blocking later work"
 )
 local failing_scheduled = {}
 local failing = ingest.new({

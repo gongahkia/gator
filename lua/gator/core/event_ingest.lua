@@ -44,6 +44,7 @@ function M.new(opts)
 	end
 	if
 		type(opts.cursor) ~= "table"
+		or type(opts.cursor.classify) ~= "function"
 		or type(opts.cursor.assert_next) ~= "function"
 		or type(opts.cursor.advance) ~= "function"
 	then
@@ -74,6 +75,7 @@ function M.new(opts)
 		limit = limit,
 		overflow = overflow,
 		dropped = 0,
+		deduplicated = 0,
 		active = false,
 		scheduled = false,
 	}, Ingest)
@@ -119,6 +121,7 @@ function Ingest:status()
 		limit = self.limit,
 		overflow = self.overflow,
 		dropped = self.dropped,
+		deduplicated = self.deduplicated,
 		last_error = self.last_error,
 	}
 end
@@ -174,27 +177,36 @@ function Ingest:drain()
 	self.scheduled = false
 	while self.active and #self.pending > 0 do
 		local value = self.pending[1]
-		local sequenced, sequence = pcall(self.cursor.assert_next, self.cursor, value)
-		if not sequenced then
-			self.last_error = redact.text(tostring(sequence))
+		local classified, decision = pcall(self.cursor.classify, self.cursor, value)
+		if not classified then
+			self.last_error = redact.text(tostring(decision))
 			return false
 		end
-		local ok, detail =
-			pcall(self.sink.append, self.sink, provider_event.from_record(provider_event.to_record(value)))
-		if not ok then
-			self.last_error = redact.text(tostring(detail))
-			if self.on_error then
-				pcall(self.on_error, self.last_error)
+		if decision.status == "duplicate" then
+			table.remove(self.pending, 1)
+			self.deduplicated = self.deduplicated + 1
+			self.last_error = nil
+		elseif decision.status ~= "next" then
+			self.last_error = "provider event sequence gap: expected " .. tostring(decision.expected)
+			return false
+		else
+			local ok, detail =
+				pcall(self.sink.append, self.sink, provider_event.from_record(provider_event.to_record(value)))
+			if not ok then
+				self.last_error = redact.text(tostring(detail))
+				if self.on_error then
+					pcall(self.on_error, self.last_error)
+				end
+				return false
 			end
-			return false
+			local advanced, cursor = pcall(self.cursor.advance, self.cursor, value)
+			if not advanced then
+				self.last_error = redact.text(tostring(cursor))
+				return false
+			end
+			table.remove(self.pending, 1)
+			self.last_error = nil
 		end
-		local advanced, cursor = pcall(self.cursor.advance, self.cursor, value)
-		if not advanced then
-			self.last_error = redact.text(tostring(cursor))
-			return false
-		end
-		table.remove(self.pending, 1)
-		self.last_error = nil
 	end
 	return true
 end

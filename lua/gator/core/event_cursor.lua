@@ -113,6 +113,21 @@ function Store:assert_next(value)
 	return expected
 end
 
+function Store:classify(value)
+	if not provider_event.is(value) then
+		fail("cursor requires a normalized provider event")
+	end
+	local sequence = self:get(value.run_id)
+	if value.sequence <= sequence then
+		return { status = "duplicate", sequence = sequence }
+	end
+	local expected = sequence + 1
+	if value.sequence == expected then
+		return { status = "next", sequence = sequence }
+	end
+	return { status = "gap", sequence = sequence, expected = expected }
+end
+
 function Store:advance(value)
 	self:assert_next(value)
 	local data = self:read()
