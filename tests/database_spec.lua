@@ -182,6 +182,14 @@ assert(not pcall(db.append_evidence_excerpt, db, stored_excerpt) and not pcall(d
 	at = 11,
 }), "SQLite evidence excerpts must remain append-only and task-bound")
 
+assert(
+	not pcall(db.delete_evidence_excerpt, db, "evidence-one", false)
+		and db:delete_evidence_excerpt("evidence-one", true).verified
+		and #db:list_evidence_excerpts("task-one") == 0
+		and not db:delete_evidence_excerpt("evidence-one", true),
+	"SQLite evidence deletion must require confirmation and verify durable removal"
+)
+
 local atomic_task = task.new({ id = "task-one", objective = "Atomic task operation", created_at = 1, updated_at = 12 })
 assert(
 	db:commit_task_operation({ task = atomic_task, operation = { id = "operation-one", kind = "review", at = 12 } }).task.objective

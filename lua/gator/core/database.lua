@@ -655,6 +655,30 @@ function Database:list_evidence_excerpts(id)
 	return result
 end
 
+function Database:delete_evidence_excerpt(id, confirm)
+	id = run_id(id)
+	if confirm ~= true then
+		fail("evidence deletion requires explicit confirmation")
+	end
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before evidence deletion")
+	end
+	local existing = vim.trim(self:exec("SELECT id FROM evidence_excerpts WHERE id = " .. quote(id) .. ";"))
+	if existing == "" then
+		return false
+	end
+	self:exec(
+		table.concat(
+			{ "BEGIN IMMEDIATE;", "DELETE FROM evidence_excerpts WHERE id = " .. quote(id) .. ";", "COMMIT;" },
+			"\n"
+		)
+	)
+	if vim.trim(self:exec("SELECT id FROM evidence_excerpts WHERE id = " .. quote(id) .. ";")) ~= "" then
+		fail("evidence deletion could not be verified")
+	end
+	return { id = id, deleted = true, verified = true }
+end
+
 function Database:commit_task_operation(value)
 	if type(value) ~= "table" then
 		fail("task operation transaction must be a table")
