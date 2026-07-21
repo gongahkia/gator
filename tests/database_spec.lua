@@ -48,11 +48,21 @@ helpers.write(
 )
 
 assert(db:migrate(root), "new local state must migrate")
-assert(db:version() == 4, "SQLite migrations must record every schema version")
+assert(db:version() == 5, "SQLite migrations must record every schema version")
 assert(db:exec("SELECT count(*) FROM session_metadata;"):match("1"), "active session metadata must survive migration")
 assert(db:exec("SELECT count(*) FROM threads;"):match("1"), "thread evidence must survive migration")
 assert(db:exec("SELECT count(*) FROM runs;"):match("1"), "run evidence must survive migration")
 assert(db:get_run("run-legacy").events[1].id == "event-legacy", "SQLite migrations must preserve legacy run events")
+local indexes =
+	vim.split(db:exec("SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name;"), "\n", { trimempty = true })
+assert(
+	vim.tbl_contains(indexes, "runs_by_task")
+		and vim.tbl_contains(indexes, "runs_by_session")
+		and vim.tbl_contains(indexes, "runs_by_workspace")
+		and vim.tbl_contains(indexes, "runs_by_started_at")
+		and vim.tbl_contains(indexes, "session_metadata_by_session"),
+	"SQLite migrations must publish task, session, workspace, and time query indexes"
+)
 assert(not db:migrate(root), "current schemas must not reapply migrations")
 assert(vim.fn.filereadable(root .. "/sessions.json") == 1, "migration must retain legacy state files")
 
@@ -89,9 +99,9 @@ assert(not pcall(pending.put_task, pending, first), "SQLite task writes must req
 local previous = helpers.tempdir("v1-database") .. "/state.sqlite3"
 local upgraded = database.open(previous)
 upgraded:exec(
-	"CREATE TABLE runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); PRAGMA user_version = 1;"
+	"CREATE TABLE task_evidence (task_id TEXT NOT NULL, ref TEXT NOT NULL, record_json TEXT NOT NULL, PRIMARY KEY (task_id, ref)); CREATE TABLE session_metadata (task_id TEXT NOT NULL, provider TEXT NOT NULL, session_id TEXT NOT NULL, record_json TEXT NOT NULL, PRIMARY KEY (task_id, provider, session_id)); CREATE TABLE threads (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); CREATE TABLE runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); PRAGMA user_version = 1;"
 )
-assert(upgraded:migrate() and upgraded:version() == 4, "SQLite migrations must upgrade version one databases")
+assert(upgraded:migrate() and upgraded:version() == 5, "SQLite migrations must upgrade version one databases")
 
 local persisted_run = run.new({
 	id = "run-sqlite",

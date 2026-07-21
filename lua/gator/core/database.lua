@@ -2,7 +2,7 @@ local errors = require("gator.error")
 local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
 local task = require("gator.core.task")
-local M = { schema_version = 4, evidence_excerpt_max_bytes = 4096 }
+local M = { schema_version = 5, evidence_excerpt_max_bytes = 4096 }
 local Database = {}
 
 Database.__index = Database
@@ -230,6 +230,18 @@ local migrations = {
 		return {
 			"CREATE TABLE evidence_excerpts (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, kind TEXT NOT NULL, at INTEGER NOT NULL, record_json TEXT NOT NULL);",
 			"CREATE INDEX evidence_excerpts_by_task ON evidence_excerpts (task_id, at, id);",
+		}
+	end,
+	[5] = function()
+		return {
+			"CREATE INDEX task_evidence_by_task ON task_evidence (task_id, ref);",
+			"CREATE INDEX session_metadata_by_session ON session_metadata (provider, session_id, task_id);",
+			"CREATE INDEX threads_by_task ON threads (task_id, id);",
+			"CREATE INDEX runs_by_task ON runs (task_id, id);",
+			"CREATE INDEX runs_by_session ON runs (json_extract(record_json, '$.provider.name'), json_extract(record_json, '$.provider.session_id'), id);",
+			"CREATE INDEX runs_by_workspace ON runs (json_extract(record_json, '$.workspace.root'), id);",
+			"CREATE INDEX runs_by_started_at ON runs (json_extract(record_json, '$.timing.started_at'), id);",
+			"CREATE INDEX run_events_by_time ON run_events (at, id);",
 		}
 	end,
 }
