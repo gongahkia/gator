@@ -51,6 +51,7 @@ The supported configuration surface is:
 
 ```lua
 require("gator").setup({
+  schema_version = 2,
   ui = {
     layout = "adaptive", -- "adaptive" or "modal"
     keymaps = {},

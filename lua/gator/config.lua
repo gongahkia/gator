@@ -1,7 +1,10 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
+M.schema_version = 2
+
 M.defaults = {
+	schema_version = M.schema_version,
 	ui = {
 		layout = "adaptive",
 		keymaps = {},
@@ -65,12 +68,27 @@ local function fields(value, allowed, path)
 	end
 end
 
+local function schema_version(value)
+	if type(value) ~= "number" or value % 1 ~= 0 then
+		fail("settings.schema_version must be an integer")
+	end
+	if value ~= M.schema_version then
+		fail("settings.schema_version is unsupported: " .. value)
+	end
+	return value
+end
+
 local function settings(value)
-	fields(
-		value,
-		{ ui = true, context = true, sessions = true, workspaces = true, persistence = true, telemetry = true },
-		"settings"
-	)
+	fields(value, {
+		schema_version = true,
+		ui = true,
+		context = true,
+		sessions = true,
+		workspaces = true,
+		persistence = true,
+		telemetry = true,
+	}, "settings")
+	schema_version(value.schema_version)
 	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, motion = true }, "settings.ui")
 	fields(value.context, { mode = true, trust = true }, "settings.context")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
@@ -133,11 +151,18 @@ function M.resolve(opts)
 		fail("settings must be an object")
 	end
 	safe(opts, "settings")
-	fields(
-		opts,
-		{ ui = true, context = true, sessions = true, workspaces = true, persistence = true, telemetry = true },
-		"settings"
-	)
+	fields(opts, {
+		schema_version = true,
+		ui = true,
+		context = true,
+		sessions = true,
+		workspaces = true,
+		persistence = true,
+		telemetry = true,
+	}, "settings")
+	if opts.schema_version ~= nil then
+		schema_version(opts.schema_version)
+	end
 	local config = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
 	return settings(config)
 end
