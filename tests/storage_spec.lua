@@ -1,4 +1,7 @@
 local storage = require("gator").module("core").storage
+local database = require("gator").module("core").database
+local task = require("gator").module("core").task
+local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 
 local backend = { api_version = 1 }
 for _, name in ipairs(storage.json_contract().methods) do
@@ -42,3 +45,21 @@ assert(
 	"storage resolution must select the injected JSON backend"
 )
 assert(not pcall(storage.resolve, { kind = "missing" }), "storage resolution must reject unavailable backends")
+
+local root = helpers.tempdir("storage-migration")
+local source = database.open(root .. "/state.sqlite3")
+assert(source:migrate(root), "SQLite source must migrate before export")
+source:put_task(task.new({ id = "task-migrate", objective = "Migrate storage", created_at = 1, updated_at = 1 }))
+local migrated = storage.migrate_sqlite_to_json({ source = source, target = selected.backend, confirm = true })
+assert(
+	migrated.tasks[1].id == "task-migrate" and selected.backend:get_task("task-migrate").objective == "Migrate storage",
+	"confirmed migrations must preserve SQLite task records in JSON"
+)
+assert(
+	not pcall(storage.migrate_sqlite_to_json, { source = source, target = selected.backend, confirm = true }),
+	"migrations must reject non-empty JSON targets"
+)
+assert(
+	not pcall(storage.migrate_sqlite_to_json, { source = source, target = selected.backend, confirm = false }),
+	"migrations must require explicit confirmation"
+)

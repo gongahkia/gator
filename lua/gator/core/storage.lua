@@ -79,4 +79,40 @@ function M.resolve(opts)
 	return { kind = kind, backend = json_backend.open(path, { filesystem = opts.filesystem }) }
 end
 
+function M.migrate_sqlite_to_json(opts)
+	if type(opts) ~= "table" then
+		fail("migration requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "source" and key ~= "target" and key ~= "confirm" then
+			fail("migration contains unsupported field: " .. tostring(key))
+		end
+	end
+	if opts.confirm ~= true then
+		fail("migration requires explicit confirmation")
+	end
+	if type(opts.source) ~= "table" or type(opts.source.preview_export) ~= "function" then
+		fail("migration source must expose an export preview")
+	end
+	M.validate_json_backend(opts.target)
+	if type(opts.target.read) ~= "function" or type(opts.target.write) ~= "function" then
+		fail("migration target must expose atomic document access")
+	end
+	local target = opts.target:read()
+	if #target.tasks > 0 or #target.runs > 0 or #target.evidence_excerpts > 0 or #target.operations > 0 then
+		fail("migration target must be empty")
+	end
+	local preview = opts.source:preview_export()
+	if type(preview) ~= "table" or preview.schema_version ~= M.json_backend.api_version then
+		fail("migration source preview has an unsupported schema")
+	end
+	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+		if type(preview[key]) ~= "table" or not vim.islist(preview[key]) then
+			fail("migration source preview contains invalid " .. key)
+		end
+	end
+	opts.target:write(vim.deepcopy(preview))
+	return opts.target:preview_export()
+end
+
 return M
