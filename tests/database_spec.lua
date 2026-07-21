@@ -197,6 +197,19 @@ assert(
 		}) and db:get_task("task-one").objective == "Atomic task operation",
 	"failed task operation receipts must roll back their task update"
 )
+assert(db:query_tasks({ lifecycle = "draft", updated_after = 10 })[1].id == "task-one" and db:query_runs({
+	task_id = "task-one",
+	provider = "codex",
+	session_id = "native-one",
+	workspace_root = root,
+	state = "running",
+	started_after = 4,
+	started_before = 4,
+})[1].id == "run-sqlite", "SQLite repositories must query canonical task and run filters deterministically")
+assert(
+	not pcall(db.query_tasks, db, { limit = 0 }) and not pcall(db.query_runs, db, { state = "missing" }),
+	"SQLite repository queries must reject unavailable filters"
+)
 
 local corrupt = helpers.tempdir("corrupt-database")
 helpers.write(corrupt .. "/sessions.json", "not json")

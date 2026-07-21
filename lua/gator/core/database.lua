@@ -174,6 +174,35 @@ local function task_upsert(record)
 		.. ") ON CONFLICT(id) DO UPDATE SET record_json = excluded.record_json, created_at = excluded.created_at, updated_at = excluded.updated_at;"
 end
 
+local function query(value, allowed, name)
+	if value == nil then
+		return {}
+	end
+	if type(value) ~= "table" then
+		fail(name .. " must be a table")
+	end
+	for key in pairs(value) do
+		if not allowed[key] then
+			fail(name .. " contains unsupported field: " .. tostring(key))
+		end
+	end
+	return value
+end
+
+local function query_time(value, name)
+	if value ~= nil and (type(value) ~= "number" or value < 0 or value % 1 ~= 0) then
+		fail(name .. " must be a non-negative integer timestamp")
+	end
+	return value
+end
+
+local function query_limit(value)
+	if value ~= nil and (type(value) ~= "number" or value < 1 or value % 1 ~= 0) then
+		fail("query limit must be a positive integer")
+	end
+	return value
+end
+
 local function migration_one(legacy_dir)
 	legacy_dir = legacy_dir or ""
 	if type(legacy_dir) ~= "string" or legacy_dir == "" then
@@ -384,6 +413,42 @@ function Database:list_tasks()
 	return result
 end
 
+function Database:query_tasks(opts)
+	opts = query(opts, { lifecycle = true, updated_after = true, updated_before = true, limit = true }, "task query")
+	if opts.lifecycle ~= nil and (type(opts.lifecycle) ~= "string" or not task.lifecycle[opts.lifecycle]) then
+		fail("task query lifecycle is unavailable")
+	end
+	query_time(opts.updated_after, "task query updated_after")
+	query_time(opts.updated_before, "task query updated_before")
+	query_limit(opts.limit)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before task queries")
+	end
+	local where = {}
+	if opts.lifecycle then
+		table.insert(where, "json_extract(record_json, '$.lifecycle') = " .. quote(opts.lifecycle))
+	end
+	if opts.updated_after then
+		table.insert(where, "updated_at >= " .. opts.updated_after)
+	end
+	if opts.updated_before then
+		table.insert(where, "updated_at <= " .. opts.updated_before)
+	end
+	local statement = "SELECT record_json FROM tasks"
+	if #where > 0 then
+		statement = statement .. " WHERE " .. table.concat(where, " AND ")
+	end
+	statement = statement .. " ORDER BY updated_at, id"
+	if opts.limit then
+		statement = statement .. " LIMIT " .. opts.limit
+	end
+	local result = {}
+	for _, value in ipairs(vim.split(self:exec(statement .. ";"), "\n", { trimempty = true })) do
+		table.insert(result, decode_task(value))
+	end
+	return result
+end
+
 function Database:append_run(value)
 	local record = run_record(value)
 	if self:version() ~= M.schema_version then
@@ -470,6 +535,72 @@ function Database:list_runs(task_value)
 	query = query .. " ORDER BY id;"
 	local result = {}
 	for _, value in ipairs(vim.split(self:exec(query), "\n", { trimempty = true })) do
+		local record = decode_run(value, {})
+		table.insert(result, self:get_run(record.id))
+	end
+	return result
+end
+
+function Database:query_runs(opts)
+	opts = query(opts, {
+		task_id = true,
+		provider = true,
+		session_id = true,
+		workspace_root = true,
+		state = true,
+		started_after = true,
+		started_before = true,
+		limit = true,
+	}, "run query")
+	if opts.task_id ~= nil then
+		task_id(opts.task_id)
+	end
+	for _, key in ipairs({ "provider", "session_id", "workspace_root" }) do
+		if opts[key] ~= nil and (type(opts[key]) ~= "string" or opts[key] == "") then
+			fail("run query " .. key .. " must be non-empty text")
+		end
+	end
+	if opts.state ~= nil and (type(opts.state) ~= "string" or not run.states[opts.state]) then
+		fail("run query state is unavailable")
+	end
+	query_time(opts.started_after, "run query started_after")
+	query_time(opts.started_before, "run query started_before")
+	query_limit(opts.limit)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before run queries")
+	end
+	local where = {}
+	if opts.task_id then
+		table.insert(where, "task_id = " .. quote(opts.task_id))
+	end
+	if opts.provider then
+		table.insert(where, "json_extract(record_json, '$.provider.name') = " .. quote(opts.provider))
+	end
+	if opts.session_id then
+		table.insert(where, "json_extract(record_json, '$.provider.session_id') = " .. quote(opts.session_id))
+	end
+	if opts.workspace_root then
+		table.insert(where, "json_extract(record_json, '$.workspace.root') = " .. quote(opts.workspace_root))
+	end
+	if opts.state then
+		table.insert(where, "json_extract(record_json, '$.state') = " .. quote(opts.state))
+	end
+	if opts.started_after then
+		table.insert(where, "json_extract(record_json, '$.timing.started_at') >= " .. opts.started_after)
+	end
+	if opts.started_before then
+		table.insert(where, "json_extract(record_json, '$.timing.started_at') <= " .. opts.started_before)
+	end
+	local statement = "SELECT record_json FROM runs"
+	if #where > 0 then
+		statement = statement .. " WHERE " .. table.concat(where, " AND ")
+	end
+	statement = statement .. " ORDER BY json_extract(record_json, '$.timing.started_at'), id"
+	if opts.limit then
+		statement = statement .. " LIMIT " .. opts.limit
+	end
+	local result = {}
+	for _, value in ipairs(vim.split(self:exec(statement .. ";"), "\n", { trimempty = true })) do
 		local record = decode_run(value, {})
 		table.insert(result, self:get_run(record.id))
 	end
