@@ -166,6 +166,9 @@ Config precedence, later wins:
 
 Execution-policy schema and fields: [docs/POLICY.md](docs/POLICY.md).
 
+`paw` has no telemetry runtime: network traffic is limited to configured, policy-authorized model
+providers and explicit local tooling.
+
 | env var | config field | default |
 | --- | --- | --- |
 | `PAW_BRAIN_TRANSPORT` | `brain.transport` | `ollama` |
