@@ -2,7 +2,7 @@ local errors = require("gator.error")
 local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
 local task = require("gator.core.task")
-local M = { schema_version = 6, evidence_excerpt_max_bytes = 4096 }
+local M = { schema_version = 6, export_schema_version = 1, evidence_excerpt_max_bytes = 4096 }
 local Database = {}
 
 Database.__index = Database
@@ -736,6 +736,34 @@ function Database:list_task_operations(id)
 		table.insert(result, operation(record, id))
 	end
 	return result
+end
+
+function Database:preview_export(opts)
+	opts = query(opts, { task_id = true }, "export preview")
+	if opts.task_id ~= nil then
+		task_id(opts.task_id)
+	end
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before export previews")
+	end
+	local tasks = opts.task_id and (self:get_task(opts.task_id) and { self:get_task(opts.task_id) } or {})
+		or self:list_tasks()
+	local records =
+		{ schema_version = M.export_schema_version, tasks = {}, runs = {}, evidence_excerpts = {}, operations = {} }
+	for _, value in ipairs(tasks) do
+		local task_value = task.to_record(value)
+		table.insert(records.tasks, task_value)
+		for _, run_value in ipairs(self:query_runs({ task_id = task_value.id })) do
+			table.insert(records.runs, run.to_record(run_value))
+		end
+		vim.list_extend(records.evidence_excerpts, self:list_evidence_excerpts(task_value.id))
+		vim.list_extend(records.operations, self:list_task_operations(task_value.id))
+	end
+	return vim.deepcopy(records)
+end
+
+function Database:export_bundle(opts)
+	return vim.json.encode(self:preview_export(opts))
 end
 
 return M

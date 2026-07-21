@@ -218,6 +218,23 @@ assert(
 	not pcall(db.query_tasks, db, { limit = 0 }) and not pcall(db.query_runs, db, { state = "missing" }),
 	"SQLite repository queries must reject unavailable filters"
 )
+local bundle = db:preview_export({ task_id = "task-one" })
+assert(
+	bundle.schema_version == 1
+		and bundle.tasks[1].id == "task-one"
+		and bundle.runs[1].id == "run-sqlite"
+		and bundle.evidence_excerpts[1] == nil
+		and bundle.operations[1].id == "operation-one",
+	"SQLite export previews must bundle one task's redacted local records without writing"
+)
+assert(
+	vim.json.decode(db:export_bundle({ task_id = "task-one" })).tasks[1].id == "task-one",
+	"SQLite export bundles must encode the reviewed preview without a transfer"
+)
+assert(
+	not pcall(db.preview_export, db, { unsupported = true }),
+	"SQLite export previews must reject unsupported filters"
+)
 
 local corrupt = helpers.tempdir("corrupt-database")
 helpers.write(corrupt .. "/sessions.json", "not json")
