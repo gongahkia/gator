@@ -36,7 +36,7 @@ local fields = {
 	review = true,
 	compatibility = true,
 }
-local statuses = { ready = true, loading = true, failed = true, recovering = true }
+local statuses = { ready = true, loading = true, degraded = true, failed = true, recovering = true }
 
 local function object(value, name)
 	if type(value) ~= "table" or (vim.islist(value) and next(value) ~= nil) then
@@ -63,7 +63,7 @@ end
 local function workspace(value)
 	object(value, "workspace")
 	if not statuses[value.status] then
-		fail("workspace.status must be ready, loading, failed, or recovering")
+		fail("workspace.status must be ready, loading, degraded, failed, or recovering")
 	end
 	if value.detail ~= nil and (type(value.detail) ~= "string" or value.detail == "") then
 		fail("workspace.detail must be a non-empty string")

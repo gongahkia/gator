@@ -29,7 +29,7 @@ local M = {
 }
 local panels = {}
 local accessibility = require("gator.ui.accessibility")
-local statuses = { ready = true, loading = true, failed = true, recovering = true }
+local statuses = { ready = true, loading = true, degraded = true, failed = true, recovering = true }
 
 local function fail(message)
 	error("Gator UI: " .. message, 3)
@@ -51,7 +51,7 @@ end
 
 local function workspace_state(state)
 	if type(state.workspace) ~= "table" or not statuses[state.workspace.status] then
-		fail("workspace state must expose ready, loading, failed, or recovering status")
+		fail("workspace state must expose ready, loading, degraded, failed, or recovering status")
 	end
 	if state.workspace.detail ~= nil and (type(state.workspace.detail) ~= "string" or state.workspace.detail == "") then
 		fail("workspace detail must be a non-empty string")
@@ -157,6 +157,9 @@ local function render(panel)
 	local task_values, session_values, entries = tasks(state), sessions(state), context_entries(state)
 	local lines =
 		{ "Gator workspace", "State: " .. workspace.status .. (workspace.detail and " · " .. workspace.detail or "") }
+	if workspace.status == "degraded" then
+		table.insert(lines, "Degraded: some provider features are unavailable · run health / recover providers")
+	end
 	if #task_values == 0 then
 		table.insert(lines, "Tasks: empty · create or import a task to begin")
 	else

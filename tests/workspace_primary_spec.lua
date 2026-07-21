@@ -65,6 +65,12 @@ assert(
 assert(content():find("State: loading · refreshing providers", 1, true), "loading state must render explicitly")
 ui.set_status(state, "failed", "provider probe failed")
 assert(content():find("State: failed · provider probe failed", 1, true), "failure state must render explicitly")
+ui.set_status(state, "degraded", "one provider is unavailable")
+assert(
+	content():find("State: degraded · one provider is unavailable", 1, true)
+		and content():find("Degraded: some provider features are unavailable", 1, true),
+	"degraded state must explain recovery without hiding the workspace"
+)
 ui.set_status(state, "recovering", "retrying provider probe")
 assert(content():find("State: recovering · retrying provider probe", 1, true), "recovery state must render explicitly")
 ui.set_status(state, "ready", "workspace synchronized")
