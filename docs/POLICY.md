@@ -1,7 +1,9 @@
 # Execution policy
 
 `paw` merges the `[policy]` TOML table from the standard config sources. The current schema is
-`paw.policy/1`; policy validation rejects another version.
+`paw.policy/1`; policy validation rejects another version. Policy fields use the same precedence as
+the rest of configuration: built-in defaults, user config, nearest repo `.paw/config.toml`, explicit
+`--config`, then supported `PAW_POLICY_*` environment overrides. There is no separate policy file.
 
 ```toml
 [policy]

@@ -123,6 +123,66 @@ func TestLoadPolicyV1Fixture(t *testing.T) {
 	}
 }
 
+func TestLoadPolicyPrecedence(t *testing.T) {
+	clearPawEnv(t)
+	userConfig := setTestHome(t)
+	writeConfigAt(t, userConfig, `
+[policy.risk]
+max_files = 2
+`)
+	repo := t.TempDir()
+	mkdir(t, filepath.Join(repo, ".git"))
+	writeConfigAt(t, filepath.Join(repo, ".paw", "config.toml"), `
+[policy.provider]
+allowed_transports = ["openai"]
+
+[policy.risk]
+max_files = 3
+max_lines = 300
+`)
+	explicit := writeConfig(t, `
+[policy.risk]
+max_files = 4
+`)
+	chdir(t, repo)
+	t.Setenv("PAW_POLICY_ALLOWED_TRANSPORTS", "anthropic")
+	t.Setenv("PAW_POLICY_AUTO_APPROVE", "true")
+
+	cfg, err := Load(explicit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Policy.Version != PolicySchemaVersion || strings.Join(cfg.Policy.Provider.AllowedTransports, ",") != "anthropic" || cfg.Policy.Risk.MaxFiles != 4 || cfg.Policy.Risk.MaxLines != 300 || !cfg.Policy.Approval.AutoApprove {
+		t.Fatalf("policy precedence = %#v", cfg.Policy)
+	}
+}
+
+func TestPolicyRepoDiscoveryUsesNearestConfig(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	repo := t.TempDir()
+	mkdir(t, filepath.Join(repo, ".git"))
+	writeConfigAt(t, filepath.Join(repo, ".paw", "config.toml"), `
+[policy.risk]
+max_commands = 3
+`)
+	nested := filepath.Join(repo, "services", "api")
+	mkdir(t, nested)
+	writeConfigAt(t, filepath.Join(repo, "services", ".paw", "config.toml"), `
+[policy.risk]
+max_commands = 2
+`)
+	chdir(t, nested)
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Policy.Risk.MaxCommands != 2 {
+		t.Fatalf("nearest policy max commands = %d", cfg.Policy.Risk.MaxCommands)
+	}
+}
+
 func TestLoadOllamaAutoPullOptIn(t *testing.T) {
 	clearPawEnv(t)
 	path := writeConfig(t, `ollama_auto_pull = true`)
@@ -391,6 +451,11 @@ func clearPawEnv(t *testing.T) {
 		"PAW_GATHER_MAX_FILE_BYTES",
 		"PAW_VERIFY_CMD",
 		"PAW_VERIFY_TIMEOUT",
+		"PAW_POLICY_ALLOWED_TRANSPORTS",
+		"PAW_POLICY_ALLOWED_BASE_URLS",
+		"PAW_POLICY_ALLOW_LOOPBACK",
+		"PAW_POLICY_BLOCK_SECRETS",
+		"PAW_POLICY_AUTO_APPROVE",
 	} {
 		t.Setenv(key, "")
 	}
