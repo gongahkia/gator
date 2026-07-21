@@ -70,5 +70,7 @@ doctor diagnostics.
 `policy.egress.max_files` and `policy.egress.max_bytes` are hard limits; approval receipts cannot
 override either limit.
 
+`paw doctor --json` includes policy validation and endpoint-policy preflight findings.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

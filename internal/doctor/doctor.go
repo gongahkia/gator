@@ -18,6 +18,7 @@ import (
 	"github.com/gongahkia/paw/internal/config"
 	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/llm"
+	"github.com/gongahkia/paw/internal/policy"
 	"github.com/gongahkia/paw/internal/verify"
 )
 
@@ -68,6 +69,9 @@ func Run(ctx context.Context, opts Options) Report {
 	}
 	if r.shouldRunSection("config") {
 		r.checkConfig(loadErr, cfg)
+	}
+	if r.shouldRunSection("policy") {
+		r.checkPolicy(loadErr, cfg)
 	}
 	if r.shouldRunSection("verify") {
 		r.checkVerify(ctx, cfg)
@@ -271,6 +275,36 @@ func (r *runner) checkConfig(loadErr error, cfg config.Config) {
 	r.checkEnvOverrides()
 	if cfg.TLS.InsecureSkipVerify {
 		r.add(Finding{ID: "config.tls_insecure", Section: "config", Severity: SeverityWarning, Status: StatusWarn, Message: "TLS verification is disabled", Fix: "unset PAW_INSECURE_SKIP_TLS_VERIFY or remove tls.insecure_skip_verify"})
+	}
+}
+
+func (r *runner) checkPolicy(loadErr error, cfg config.Config) {
+	if loadErr != nil {
+		var diagnostic *config.PolicyValidationError
+		if errors.As(loadErr, &diagnostic) {
+			r.add(Finding{ID: "policy.validation", Section: "policy", Severity: SeverityError, Status: StatusFail, Message: "policy validation failed", Detail: diagnostic.Error()})
+			return
+		}
+		r.add(Finding{ID: "policy.validation", Section: "policy", Severity: SeverityWarning, Status: StatusSkipped, Message: "policy validation skipped because config failed to load", Detail: loadErr.Error()})
+		return
+	}
+	if err := policy.Validate(cfg.Policy); err != nil {
+		r.add(Finding{ID: "policy.validation", Section: "policy", Severity: SeverityError, Status: StatusFail, Message: "policy validation failed", Detail: err.Error()})
+		return
+	}
+	r.add(Finding{ID: "policy.validation", Section: "policy", Severity: SeverityInfo, Status: StatusOK, Message: "policy validated", Detail: cfg.Policy.Version})
+	for _, endpoint := range []struct {
+		name string
+		cfg  config.EndpointConfig
+	}{
+		{name: "brain", cfg: cfg.Brain},
+		{name: "drone", cfg: cfg.Drone},
+	} {
+		if err := policy.CheckEndpoint(cfg.Policy, endpoint.cfg.Transport, endpoint.cfg.BaseURL); err != nil {
+			r.add(Finding{ID: "policy.endpoint." + endpoint.name, Section: "policy", Severity: SeverityError, Status: StatusFail, Message: endpoint.name + " endpoint denied by policy", Detail: err.Error()})
+			continue
+		}
+		r.add(Finding{ID: "policy.endpoint." + endpoint.name, Section: "policy", Severity: SeverityInfo, Status: StatusOK, Message: endpoint.name + " endpoint allowed by policy"})
 	}
 }
 
