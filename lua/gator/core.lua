@@ -35,6 +35,7 @@ local M = {
 	task_run_accounting = require("gator.core.task_run_accounting"),
 	thread = require("gator.core.thread"),
 	tool_event = require("gator.core.tool_event"),
+	transport_faults = require("gator.core.transport_faults"),
 	usage_event = require("gator.core.usage_event"),
 }
 
