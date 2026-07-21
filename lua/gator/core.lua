@@ -10,6 +10,7 @@ local M = {
 	lifecycle = require("gator.core.lifecycle"),
 	launch_queue = require("gator.core.launch_queue"),
 	provider_event = require("gator.core.provider_event"),
+	provider_status = require("gator.core.provider_status"),
 	retention = require("gator.core.retention"),
 	runtime = require("gator.core.runtime"),
 	run = require("gator.core.run"),
