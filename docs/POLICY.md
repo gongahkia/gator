@@ -43,5 +43,9 @@ auto_approve = false
 `policy.git.allowed_remotes` contains exact Git remote names. `allow_push` requires at least one
 allowlisted remote; a push to any other remote is denied.
 
+`policy.command.allow` and `policy.command.deny` contain exact shell command strings. Deny entries
+take precedence. A nonempty allowlist denies every command not listed; otherwise
+`require_approval` marks each non-denied command as requiring approval.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

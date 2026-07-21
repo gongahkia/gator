@@ -13,7 +13,10 @@ import (
 
 const SchemaVersion = config.PolicySchemaVersion
 
-var ErrDenied = errors.New("policy denied operation")
+var (
+	ErrDenied           = errors.New("policy denied operation")
+	ErrApprovalRequired = errors.New("policy requires approval")
+)
 
 func Validate(cfg config.PolicyConfig) error {
 	return config.ValidatePolicy(cfg)
@@ -52,6 +55,25 @@ func allowsTransport(allowed []string, transport string) bool {
 		}
 	}
 	return false
+}
+
+func CheckCommand(cfg config.PolicyConfig, command string) error {
+	if err := Validate(cfg); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command) == "" {
+		return fmt.Errorf("%w: command is required", ErrDenied)
+	}
+	if slices.Contains(cfg.Command.Deny, command) {
+		return fmt.Errorf("%w: command %q is denylisted", ErrDenied, command)
+	}
+	if len(cfg.Command.Allow) > 0 && !slices.Contains(cfg.Command.Allow, command) {
+		return fmt.Errorf("%w: command %q is not allowlisted", ErrDenied, command)
+	}
+	if cfg.Command.RequireApproval {
+		return fmt.Errorf("%w: command %q", ErrApprovalRequired, command)
+	}
+	return nil
 }
 
 func CheckGitRemote(cfg config.PolicyConfig, remote string) error {

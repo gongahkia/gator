@@ -32,6 +32,9 @@ func ValidatePolicy(cfg PolicyConfig) error {
 			return invalidPolicy(fmt.Sprintf("policy.provider.allowed_base_urls[%d]", i), "%v", err)
 		}
 	}
+	if err := validateCommandPolicy(cfg.Command); err != nil {
+		return err
+	}
 	if err := validateGitPolicy(cfg.Git); err != nil {
 		return err
 	}
@@ -73,6 +76,31 @@ func validatePolicyURL(raw string) error {
 	}
 	if u.RawQuery != "" || u.Fragment != "" {
 		return fmt.Errorf("must not contain query or fragment")
+	}
+	return nil
+}
+
+func validateCommandPolicy(command CommandPolicy) error {
+	if err := validateCommandList("policy.command.allow", command.Allow); err != nil {
+		return err
+	}
+	return validateCommandList("policy.command.deny", command.Deny)
+}
+
+func validateCommandList(path string, commands []string) error {
+	seen := make(map[string]struct{}, len(commands))
+	for i, command := range commands {
+		itemPath := fmt.Sprintf("%s[%d]", path, i)
+		if strings.TrimSpace(command) == "" {
+			return invalidPolicy(itemPath, "must not be empty")
+		}
+		if command != strings.TrimSpace(command) {
+			return invalidPolicy(itemPath, "must not have leading or trailing whitespace")
+		}
+		if _, ok := seen[command]; ok {
+			return invalidPolicy(itemPath, "duplicates %q", command)
+		}
+		seen[command] = struct{}{}
 	}
 	return nil
 }

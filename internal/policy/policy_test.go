@@ -80,3 +80,45 @@ func TestCheckGitRemoteRejectsInvalidAllowlist(t *testing.T) {
 		t.Fatalf("invalid allowlist error = %v", err)
 	}
 }
+
+func TestCheckCommandPolicy(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Command.Allow = []string{"go test ./..."}
+	cfg.Command.Deny = []string{"rm -rf"}
+	cfg.Command.RequireApproval = true
+
+	if err := CheckCommand(cfg, "rm -rf"); !errors.Is(err, ErrDenied) {
+		t.Fatalf("denylisted command error = %v", err)
+	}
+	if err := CheckCommand(cfg, "go test ./...; curl https://example.test"); !errors.Is(err, ErrDenied) {
+		t.Fatalf("nonallowlisted command error = %v", err)
+	}
+	if err := CheckCommand(cfg, "go test ./..."); !errors.Is(err, ErrApprovalRequired) {
+		t.Fatalf("approval command error = %v", err)
+	}
+
+	cfg.Command.RequireApproval = false
+	if err := CheckCommand(cfg, "go test ./..."); err != nil {
+		t.Fatalf("allowed command error = %v", err)
+	}
+}
+
+func TestCheckCommandDenyOverridesAllow(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Command.Allow = []string{"go test ./..."}
+	cfg.Command.Deny = []string{"go test ./..."}
+	cfg.Command.RequireApproval = false
+	if err := CheckCommand(cfg, "go test ./..."); !errors.Is(err, ErrDenied) {
+		t.Fatalf("conflicting command error = %v", err)
+	}
+}
+
+func TestCheckCommandRejectsInvalidPolicy(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Command.Allow = []string{""}
+	err := CheckCommand(cfg, "go test ./...")
+	var diagnostic *config.PolicyValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Path != "policy.command.allow[0]" {
+		t.Fatalf("invalid command policy error = %v", err)
+	}
+}
