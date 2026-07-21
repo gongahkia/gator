@@ -119,6 +119,22 @@ func TestCreateRejectsManifestForOtherWorkspace(t *testing.T) {
 	}
 }
 
+func TestSessionRootIsRepoLocal(t *testing.T) {
+	cwd := t.TempDir()
+	root, err := SessionRoot(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(canonical, ".paw", "sessions")
+	if root != want {
+		t.Fatalf("session root = %q, want %q", root, want)
+	}
+}
+
 func TestSessionRootRejectsEscapingPawSymlink(t *testing.T) {
 	cwd := t.TempDir()
 	outside := t.TempDir()

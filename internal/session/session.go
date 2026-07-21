@@ -101,11 +101,7 @@ func NewManifest(id, cwd string, now time.Time) (Manifest, error) {
 }
 
 func SessionRoot(cwd string) (string, error) {
-	dir, err := workspace.ResolvePath(cwd, ".paw/sessions")
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, ".paw", "sessions"), nil
+	return workspace.ResolvePath(cwd, ".paw/sessions")
 }
 
 func Create(cwd string, manifest Manifest) (*Store, error) {
