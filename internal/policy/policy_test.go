@@ -66,4 +66,17 @@ func TestCheckGitRemoteRequiresPushAndRemote(t *testing.T) {
 	if err := CheckGitRemote(cfg, "origin"); err != nil {
 		t.Fatalf("allowlisted remote denied: %v", err)
 	}
+	if err := CheckGitRemote(cfg, "origin-mirror"); !errors.Is(err, ErrDenied) {
+		t.Fatalf("nonallowlisted remote error = %v", err)
+	}
+}
+
+func TestCheckGitRemoteRejectsInvalidAllowlist(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Git.AllowPush = true
+	err := CheckGitRemote(cfg, "origin")
+	var diagnostic *config.PolicyValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Path != "policy.git.allowed_remotes" {
+		t.Fatalf("invalid allowlist error = %v", err)
+	}
 }

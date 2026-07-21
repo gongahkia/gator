@@ -21,7 +21,7 @@ max_commands = 3
 allowed_remotes = ["origin"]
 allow_branch = true
 allow_commit = true
-allow_push = false
+allow_push = true
 
 [policy.egress]
 max_files = 8

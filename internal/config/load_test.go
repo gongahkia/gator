@@ -119,8 +119,44 @@ func TestLoadPolicyV1Fixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	policy := cfg.Policy
-	if policy.Version != PolicySchemaVersion || strings.Join(policy.Provider.AllowedTransports, ",") != "ollama,openai" || policy.Command.Allow[0] != "go test ./..." || policy.Risk.MaxCommands != 3 || !policy.Git.AllowCommit || policy.Git.AllowPush || policy.Egress.MaxBytes != 4096 || policy.Approval.AutoApprove {
+	if policy.Version != PolicySchemaVersion || strings.Join(policy.Provider.AllowedTransports, ",") != "ollama,openai" || policy.Command.Allow[0] != "go test ./..." || policy.Risk.MaxCommands != 3 || !policy.Git.AllowCommit || !policy.Git.AllowPush || strings.Join(policy.Git.AllowedRemotes, ",") != "origin" || policy.Egress.MaxBytes != 4096 || policy.Approval.AutoApprove {
 		t.Fatalf("policy = %#v", policy)
+	}
+}
+
+func TestLoadRejectsPushWithoutAllowlistedRemote(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	path := writeConfig(t, `
+[policy.git]
+allow_push = true
+`)
+	_, err := Load(path)
+	var diagnostic *PolicyValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Path != "policy.git.allowed_remotes" {
+		t.Fatalf("push allowlist error = %v", err)
+	}
+}
+
+func TestValidatePolicyRejectsInvalidGitRemoteEntries(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		remotes []string
+		path    string
+	}{
+		{name: "empty", remotes: []string{""}, path: "policy.git.allowed_remotes[0]"},
+		{name: "whitespace", remotes: []string{" origin"}, path: "policy.git.allowed_remotes[0]"},
+		{name: "duplicate", remotes: []string{"origin", "origin"}, path: "policy.git.allowed_remotes[1]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := Defaults().Policy
+			cfg.Git.AllowedRemotes = tc.remotes
+			err := ValidatePolicy(cfg)
+			var diagnostic *PolicyValidationError
+			if !errors.As(err, &diagnostic) || diagnostic.Path != tc.path {
+				t.Fatalf("validation error = %v", err)
+			}
+		})
 	}
 }
 

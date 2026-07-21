@@ -32,6 +32,9 @@ func ValidatePolicy(cfg PolicyConfig) error {
 			return invalidPolicy(fmt.Sprintf("policy.provider.allowed_base_urls[%d]", i), "%v", err)
 		}
 	}
+	if err := validateGitPolicy(cfg.Git); err != nil {
+		return err
+	}
 	if err := positivePolicy("policy.risk.max_files", cfg.Risk.MaxFiles); err != nil {
 		return err
 	}
@@ -70,6 +73,27 @@ func validatePolicyURL(raw string) error {
 	}
 	if u.RawQuery != "" || u.Fragment != "" {
 		return fmt.Errorf("must not contain query or fragment")
+	}
+	return nil
+}
+
+func validateGitPolicy(git GitPolicy) error {
+	if git.AllowPush && len(git.AllowedRemotes) == 0 {
+		return invalidPolicy("policy.git.allowed_remotes", "is required when allow_push is true")
+	}
+	seen := make(map[string]struct{}, len(git.AllowedRemotes))
+	for i, remote := range git.AllowedRemotes {
+		path := fmt.Sprintf("policy.git.allowed_remotes[%d]", i)
+		if strings.TrimSpace(remote) == "" {
+			return invalidPolicy(path, "must not be empty")
+		}
+		if remote != strings.TrimSpace(remote) {
+			return invalidPolicy(path, "must not have leading or trailing whitespace")
+		}
+		if _, ok := seen[remote]; ok {
+			return invalidPolicy(path, "duplicates %q", remote)
+		}
+		seen[remote] = struct{}{}
 	}
 	return nil
 }

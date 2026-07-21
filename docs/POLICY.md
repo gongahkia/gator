@@ -40,5 +40,8 @@ block_secrets = true
 auto_approve = false
 ```
 
+`policy.git.allowed_remotes` contains exact Git remote names. `allow_push` requires at least one
+allowlisted remote; a push to any other remote is denied.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

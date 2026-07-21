@@ -55,11 +55,14 @@ func allowsTransport(allowed []string, transport string) bool {
 }
 
 func CheckGitRemote(cfg config.PolicyConfig, remote string) error {
+	if err := Validate(cfg); err != nil {
+		return err
+	}
 	if !cfg.Git.AllowPush {
 		return fmt.Errorf("%w: git push is disabled", ErrDenied)
 	}
 	if !slices.Contains(cfg.Git.AllowedRemotes, remote) {
-		return fmt.Errorf("%w: git remote %q", ErrDenied, remote)
+		return fmt.Errorf("%w: git remote %q is not allowlisted", ErrDenied, remote)
 	}
 	return nil
 }
