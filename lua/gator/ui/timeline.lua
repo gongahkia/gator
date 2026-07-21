@@ -3,6 +3,7 @@ local timelines = {}
 local motion = require("gator.ui.motion")
 local accessibility = require("gator.ui.accessibility")
 local redact = require("gator.policy.redact")
+local panel_window = require("gator.ui.window")
 local approvals = { not_required = true, pending = true, granted = true, denied = true }
 local statuses = { pending = true, running = true, succeeded = true, failed = true }
 local max_output_lines = 200
@@ -296,14 +297,22 @@ function M.open(opts)
 		update_motion(timeline)
 		return timeline.window
 	end
-	vim.cmd("botright 14new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 14new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-timeline"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	timeline =
-		{ window = window, buffer = buffer, calls = value, collapsed = {}, frame = "", tabpage = tabpage, selected = 1 }
+	timeline = {
+		window = window,
+		buffer = buffer,
+		calls = value,
+		collapsed = {},
+		frame = "",
+		tabpage = tabpage,
+		selected = 1,
+		previous = opened.previous,
+	}
 	timelines[tabpage] = timeline
 	replace(timeline, value)
 	render(timeline)
@@ -347,7 +356,7 @@ function M.close()
 	if timeline.action_motion then
 		timeline.action_motion.stop()
 	end
-	vim.api.nvim_win_close(timeline.window, true)
+	panel_window.close(timeline.window, timeline.previous)
 	timelines[tabpage] = nil
 	return true
 end

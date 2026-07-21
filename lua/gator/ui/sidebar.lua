@@ -2,6 +2,7 @@ local M = {}
 local sidebars = {}
 local motion = require("gator.ui.motion")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 
 local function fail(message)
 	error("Gator sidebar: " .. message, 3)
@@ -128,14 +129,21 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(sidebar.window)
 		return sidebar.window
 	end
-	vim.cmd("topleft vertical 40new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("topleft vertical 40new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-sidebar"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	sidebar =
-		{ window = window, buffer = buffer, sessions = sessions, selected = 1, on_input = opts.on_input, frame = "" }
+	sidebar = {
+		window = window,
+		buffer = buffer,
+		sessions = sessions,
+		selected = 1,
+		on_input = opts.on_input,
+		frame = "",
+		previous = opened.previous,
+	}
 	sidebars[tabpage] = sidebar
 	render(sidebar)
 	bind(sidebar)
@@ -179,7 +187,7 @@ function M.close()
 	if sidebar.stream_motion then
 		sidebar.stream_motion.stop()
 	end
-	vim.api.nvim_win_close(sidebar.window, true)
+	panel_window.close(sidebar.window, sidebar.previous)
 	sidebars[tabpage] = nil
 	return true
 end

@@ -3,6 +3,7 @@ local deep_link = require("gator.core.deep_link")
 local session = require("gator.core.session")
 local redact = require("gator.policy.redact")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 local M = {}
 local panels = {}
 
@@ -133,8 +134,8 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
-	vim.cmd("botright 10new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 10new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-session-actions"
 	vim.bo[buffer].bufhidden = "wipe"
@@ -151,6 +152,7 @@ function M.open(opts)
 		cancelled = function()
 			cancelled = true
 		end,
+		previous = opened.previous,
 	}
 	panels[tabpage] = panel
 	render(panel)
@@ -203,7 +205,7 @@ function M.close()
 		return false
 	end
 	panel.cancelled()
-	vim.api.nvim_win_close(panel.window, true)
+	panel_window.close(panel.window, panel.previous)
 	panels[tabpage] = nil
 	return true
 end

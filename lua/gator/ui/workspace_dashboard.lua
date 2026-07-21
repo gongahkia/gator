@@ -3,6 +3,7 @@ local dashboards = {}
 local kinds = { project = true, worktree = true }
 local collision_kinds = { generated = true, overlap = true }
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 
 local function fail(message)
 	error("Gator workspace dashboard: " .. message, 3)
@@ -223,13 +224,20 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(dashboard.window)
 		return dashboard.window
 	end
-	vim.cmd("botright 14new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 14new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-workspaces"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	dashboard = { window = window, buffer = buffer, workspaces = value, selected = 1, on_select = opts.on_select }
+	dashboard = {
+		window = window,
+		buffer = buffer,
+		workspaces = value,
+		selected = 1,
+		on_select = opts.on_select,
+		previous = opened.previous,
+	}
 	dashboards[tabpage] = dashboard
 	render(dashboard)
 	bind(dashboard)
@@ -266,7 +274,7 @@ function M.close()
 	if not dashboard then
 		return false
 	end
-	vim.api.nvim_win_close(dashboard.window, true)
+	panel_window.close(dashboard.window, dashboard.previous)
 	dashboards[tabpage] = nil
 	return true
 end

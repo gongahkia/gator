@@ -1,6 +1,7 @@
 local provider_event = require("gator.core.provider_event")
 local redact = require("gator.policy.redact")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 local M = {}
 local panels = {}
 local states = { ready = true, unavailable = true, failed = true }
@@ -208,8 +209,8 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
-	vim.cmd("botright 14new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 14new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-usage"
 	vim.bo[buffer].bufhidden = "wipe"
@@ -222,6 +223,7 @@ function M.open(opts)
 		reason = next_value.reason,
 		on_cancel = next_value.on_cancel,
 		selected = 1,
+		previous = opened.previous,
 	}
 	panels[tabpage] = panel
 	render(panel)
@@ -255,7 +257,7 @@ function M.close()
 	if not panel then
 		return false
 	end
-	vim.api.nvim_win_close(panel.window, true)
+	panel_window.close(panel.window, panel.previous)
 	panels[tabpage] = nil
 	return true
 end

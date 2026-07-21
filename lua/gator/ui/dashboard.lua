@@ -1,6 +1,7 @@
 local M = {}
 local dashboards = {}
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 
 local function fail(message)
 	error("Gator dashboard: " .. message, 3)
@@ -145,13 +146,20 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(dashboard.window)
 		return dashboard.window
 	end
-	vim.cmd("botright 12new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 12new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-dashboard"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	dashboard = { window = window, buffer = buffer, tasks = tasks, selected = 1, on_open = opts.on_open }
+	dashboard = {
+		window = window,
+		buffer = buffer,
+		tasks = tasks,
+		selected = 1,
+		on_open = opts.on_open,
+		previous = opened.previous,
+	}
 	dashboards[tabpage] = dashboard
 	render(dashboard)
 	bind(dashboard)
@@ -188,7 +196,7 @@ function M.close()
 	if not dashboard then
 		return false
 	end
-	vim.api.nvim_win_close(dashboard.window, true)
+	panel_window.close(dashboard.window, dashboard.previous)
 	dashboards[tabpage] = nil
 	return true
 end

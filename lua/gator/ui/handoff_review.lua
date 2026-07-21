@@ -3,6 +3,7 @@ local handoff = require("gator.context.handoff")
 local transfer = require("gator.context.transfer")
 local redact = require("gator.policy.redact")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 local M = {}
 local panels = {}
 local modes = { manual = true, explicit = true, automatic = true }
@@ -153,14 +154,15 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
-	vim.cmd("botright 14new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 14new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-handoff"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
 	panel = next_value
 	panel.window, panel.buffer = window, buffer
+	panel.previous = opened.previous
 	panels[tabpage] = panel
 	render(panel)
 	bind(panel)
@@ -219,7 +221,7 @@ function M.close()
 	if not panel then
 		return false
 	end
-	vim.api.nvim_win_close(panel.window, true)
+	panel_window.close(panel.window, panel.previous)
 	panels[tabpage] = nil
 	return true
 end

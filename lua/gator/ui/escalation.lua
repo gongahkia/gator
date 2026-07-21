@@ -1,5 +1,6 @@
 local accessibility = require("gator.ui.accessibility")
 local overlay = require("gator.policy.overlay")
+local panel_window = require("gator.ui.window")
 local M = {}
 local escalations = {}
 local modes = { read_only = 0, plan = 1, default = 2 }
@@ -102,8 +103,8 @@ function M.request(opts)
 	if current() then
 		fail("an escalation acknowledgement is already open in this tab")
 	end
-	vim.cmd("botright " .. math.max(8, #value + 6) .. "new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright " .. math.max(8, #value + 6) .. "new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
@@ -116,6 +117,7 @@ function M.request(opts)
 		changes = value,
 		on_acknowledge = opts.on_acknowledge,
 		on_cancel = opts.on_cancel,
+		previous = opened.previous,
 	}
 	local _, tabpage = current()
 	escalations[tabpage] = escalation
@@ -136,7 +138,7 @@ function M.acknowledge()
 		fail("no escalation acknowledgement is open in this tab")
 	end
 	escalations[tabpage] = nil
-	vim.api.nvim_win_close(escalation.window, true)
+	panel_window.close(escalation.window, escalation.previous)
 	return escalation.on_acknowledge({
 		provider = escalation.provider,
 		baseline = overlay.to_record(escalation.baseline),
@@ -151,7 +153,7 @@ function M.cancel()
 		return false
 	end
 	escalations[tabpage] = nil
-	vim.api.nvim_win_close(escalation.window, true)
+	panel_window.close(escalation.window, escalation.previous)
 	if escalation.on_cancel then
 		escalation.on_cancel()
 	end

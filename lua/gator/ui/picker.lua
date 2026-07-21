@@ -1,6 +1,7 @@
 local M = {}
 local pickers = {}
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 
 local function fail(message)
 	error("Gator picker: " .. message, 3)
@@ -107,8 +108,8 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(picker.window)
 		return picker.window
 	end
-	vim.cmd("botright 12new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 12new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype, vim.bo[buffer].bufhidden = "gator-picker", "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
@@ -122,6 +123,7 @@ function M.open(opts)
 		selected = 1,
 		on_select = opts.on_select,
 		on_cancel = opts.on_cancel,
+		previous = opened.previous,
 	}
 	pickers[tabpage] = picker
 	render(picker)
@@ -182,7 +184,7 @@ function M.close()
 	if not picker then
 		return false
 	end
-	vim.api.nvim_win_close(picker.window, true)
+	panel_window.close(picker.window, picker.previous)
 	pickers[tabpage] = nil
 	return true
 end

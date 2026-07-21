@@ -1,5 +1,6 @@
 local pack = require("gator.context.pack")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 local M = {}
 local inspectors = {}
 
@@ -135,8 +136,8 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(inspector.window)
 		return inspector.window
 	end
-	vim.cmd("botright 14new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 14new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-context"
 	vim.bo[buffer].bufhidden = "wipe"
@@ -148,6 +149,7 @@ function M.open(opts)
 		included = included,
 		on_confirm = opts.on_confirm,
 		selected = 1,
+		previous = opened.previous,
 	}
 	inspectors[tabpage] = inspector
 	render(inspector)
@@ -260,7 +262,7 @@ function M.close()
 	if not inspector then
 		return false
 	end
-	vim.api.nvim_win_close(inspector.window, true)
+	panel_window.close(inspector.window, inspector.previous)
 	inspectors[tabpage] = nil
 	return true
 end

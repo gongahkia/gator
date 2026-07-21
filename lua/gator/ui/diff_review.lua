@@ -1,6 +1,7 @@
 local run = require("gator.core.run")
 local redact = require("gator.policy.redact")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 local M = {}
 local reviews = {}
 local decisions = { pending = true, accepted = true, rejected = true }
@@ -312,8 +313,8 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(review.window)
 		return review.window
 	end
-	vim.cmd("botright 12new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 12new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-review"
 	vim.bo[buffer].bufhidden = "wipe"
@@ -328,6 +329,7 @@ function M.open(opts)
 		hunk = 1,
 		diffs = {},
 		sequence = 0,
+		previous = opened.previous,
 	}
 	reviews[tabpage] = review
 	render(review)
@@ -463,9 +465,7 @@ function M.close()
 		return false
 	end
 	close_diffs(review)
-	if vim.api.nvim_win_is_valid(review.window) then
-		vim.api.nvim_win_close(review.window, true)
-	end
+	panel_window.close(review.window, review.previous)
 	reviews[tabpage] = nil
 	return true
 end

@@ -2,6 +2,7 @@ local M = {}
 local renderers = {}
 local namespace = vim.api.nvim_create_namespace("gator-markdown")
 local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
 
 local function fail(message)
 	error("Gator markdown: " .. message, 3)
@@ -88,13 +89,13 @@ function M.open()
 		vim.api.nvim_set_current_win(renderer.window)
 		return renderer.window
 	end
-	vim.cmd("botright 16new")
-	local window = vim.api.nvim_get_current_win()
+	local opened = panel_window.open("botright 16new")
+	local window = opened.window
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype = "gator-markdown"
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
-	renderer = { window = window, buffer = buffer, text = "", blocks = {} }
+	renderer = { window = window, buffer = buffer, text = "", blocks = {}, previous = opened.previous }
 	renderers[tabpage] = renderer
 	render(renderer)
 	bind(renderer)
@@ -131,7 +132,7 @@ function M.close()
 	if not renderer then
 		return false
 	end
-	vim.api.nvim_win_close(renderer.window, true)
+	panel_window.close(renderer.window, renderer.previous)
 	renderers[tabpage] = nil
 	return true
 end
