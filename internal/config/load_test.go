@@ -105,8 +105,21 @@ func TestDefaultsAreLocalFirst(t *testing.T) {
 	if cfg.Verify.Timeout != 2*time.Minute {
 		t.Fatalf("verify defaults = %#v", cfg.Verify)
 	}
-	if cfg.Policy.Version != "paw.policy/1" || !cfg.Policy.Provider.AllowLoopback || !cfg.Policy.Egress.BlockSecrets || cfg.Policy.Approval.AutoApprove {
+	if cfg.Policy.Version != PolicySchemaVersion || !cfg.Policy.Provider.AllowLoopback || !cfg.Policy.Egress.BlockSecrets || cfg.Policy.Approval.AutoApprove {
 		t.Fatalf("policy defaults = %#v", cfg.Policy)
+	}
+}
+
+func TestLoadPolicyV1Fixture(t *testing.T) {
+	clearPawEnv(t)
+	setTestHome(t)
+	cfg, err := Load(filepath.Join("testdata", "policy-v1.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy := cfg.Policy
+	if policy.Version != PolicySchemaVersion || strings.Join(policy.Provider.AllowedTransports, ",") != "ollama,openai" || policy.Command.Allow[0] != "go test ./..." || policy.Risk.MaxCommands != 3 || !policy.Git.AllowCommit || policy.Git.AllowPush || policy.Egress.MaxBytes != 4096 || policy.Approval.AutoApprove {
+		t.Fatalf("policy = %#v", policy)
 	}
 }
 

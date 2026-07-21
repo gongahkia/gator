@@ -11,7 +11,7 @@ import (
 	"github.com/gongahkia/paw/internal/config"
 )
 
-const SchemaVersion = "paw.policy/1"
+const SchemaVersion = config.PolicySchemaVersion
 
 var ErrDenied = errors.New("policy denied operation")
 

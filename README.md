@@ -164,6 +164,8 @@ Config precedence, later wins:
 | 4 | explicit `--config` path |
 | 5 | `PAW_*` environment variables |
 
+Execution-policy schema and fields: [docs/POLICY.md](docs/POLICY.md).
+
 | env var | config field | default |
 | --- | --- | --- |
 | `PAW_BRAIN_TRANSPORT` | `brain.transport` | `ollama` |

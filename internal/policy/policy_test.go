@@ -37,6 +37,14 @@ func TestValidateRejectsBadBudget(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsUnknownSchemaVersion(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Version = "paw.policy/unknown"
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected version validation error")
+	}
+}
+
 func TestCheckGitRemoteRequiresPushAndRemote(t *testing.T) {
 	cfg := config.Defaults().Policy
 	if err := CheckGitRemote(cfg, "origin"); !errors.Is(err, ErrDenied) {

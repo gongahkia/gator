@@ -30,7 +30,7 @@ func Defaults() Config {
 			Timeout: 2 * time.Minute,
 		},
 		Policy: PolicyConfig{
-			Version: "paw.policy/1",
+			Version: PolicySchemaVersion,
 			Provider: ProviderPolicy{
 				AllowedTransports: []string{"ollama"},
 				AllowLoopback:     true,

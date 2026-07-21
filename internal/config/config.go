@@ -2,6 +2,8 @@ package config
 
 import "time"
 
+const PolicySchemaVersion = "paw.policy/1"
+
 type EndpointConfig struct {
 	Transport string `toml:"transport"`
 	BaseURL   string `toml:"base_url"`

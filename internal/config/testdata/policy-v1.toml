@@ -1,0 +1,32 @@
+[policy]
+version = "paw.policy/1"
+
+[policy.provider]
+allowed_transports = ["ollama", "openai"]
+allowed_base_urls = ["https://api.example.test/v1"]
+allow_loopback = true
+
+[policy.command]
+allow = ["go test ./..."]
+deny = ["rm -rf"]
+require_approval = true
+
+[policy.risk]
+max_files = 4
+max_lines = 120
+max_tokens = 4096
+max_commands = 3
+
+[policy.git]
+allowed_remotes = ["origin"]
+allow_branch = true
+allow_commit = true
+allow_push = false
+
+[policy.egress]
+max_files = 8
+max_bytes = 4096
+block_secrets = true
+
+[policy.approval]
+auto_approve = false
