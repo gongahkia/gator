@@ -1,0 +1,3 @@
+{"id":7,"method":"item/commandExecution/requestApproval","params":{"threadId":"codex-fixture","turnId":"turn-fixture","itemId":"command-fixture","startedAtMs":1,"command":"token=fixture-secret","reason":"token=fixture-secret"}}
+{"id":"file-approval","method":"item/fileChange/requestApproval","params":{"threadId":"codex-fixture","turnId":"turn-fixture","itemId":"file-fixture","startedAtMs":2,"reason":"write fixture"}}
+{"id":"permissions-approval","method":"item/permissions/requestApproval","params":{"threadId":"codex-fixture","turnId":"turn-fixture","itemId":"permissions-fixture","startedAtMs":3,"cwd":"/tmp/gator","permissions":{"network":{"enabled":true}},"reason":"network fixture"}}

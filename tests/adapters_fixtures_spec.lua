@@ -49,6 +49,17 @@ assert(
 	"Codex stream fixture must preserve native turn and assistant-message notifications"
 )
 
+local codex_permissions = {}
+assert(fixtures.replay_jsonl(root .. "/codex_permissions.jsonl", function(record)
+	table.insert(codex_permissions, record)
+end) == 3, "Codex permission fixture must replay every native request")
+assert(
+	codex_permissions[1].method == "item/commandExecution/requestApproval"
+		and codex_permissions[2].params.itemId == "file-fixture"
+		and codex_permissions[3].params.permissions.network.enabled,
+	"Codex permission fixture must preserve command, file, and permission approval requests"
+)
+
 local claude = {}
 assert(fixtures.replay_jsonl(root .. "/claude_stream.jsonl", function(record)
 	table.insert(claude, record)
