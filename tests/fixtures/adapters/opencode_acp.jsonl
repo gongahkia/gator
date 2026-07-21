@@ -3,3 +3,6 @@
 {"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"/workspace","mcpServers":[]}}
 {"jsonrpc":"2.0","id":2,"result":{"sessionId":"opencode-fixture","configOptions":[]}}
 {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"opencode-fixture","update":{"sessionUpdate":"available_commands_update","availableCommands":[{"name":"help","description":"Show provider help"}]}}}
+{"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":"opencode-fixture"}}
+{"jsonrpc":"2.0","id":3,"method":"session/resume","params":{"cwd":"/workspace","sessionId":"opencode-missing","mcpServers":[]}}
+{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"Invalid params: session not found: opencode-missing","data":{"sessionId":"opencode-missing"}}}

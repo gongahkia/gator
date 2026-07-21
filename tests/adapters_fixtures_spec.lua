@@ -167,13 +167,17 @@ assert(
 local opencode = {}
 assert(fixtures.replay_jsonrpc(root .. "/opencode_acp.jsonl", function(message)
 	table.insert(opencode, message)
-end) == 5, "OpenCode ACP fixture must replay every record")
+end) == 8, "OpenCode ACP fixture must replay every record")
 assert(
 	opencode[2].result.agentCapabilities.loadSession
 		and opencode[2].result.agentCapabilities.sessionCapabilities.resume ~= nil
 		and opencode[4].result.sessionId == "opencode-fixture"
-		and opencode[5].params.update.availableCommands[1].name == "help",
-	"OpenCode fixture must preserve ACP capabilities, sessions, and command updates"
+		and opencode[5].params.update.availableCommands[1].name == "help"
+		and opencode[6].method == "session/cancel"
+		and opencode[6].params.sessionId == "opencode-fixture"
+		and opencode[8].error.code == -32602
+		and opencode[8].error.data.sessionId == "opencode-missing",
+	"OpenCode fixture must preserve ACP capabilities, sessions, cancellation, and safe failures"
 )
 
 local pi = {}
