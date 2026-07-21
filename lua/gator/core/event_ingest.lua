@@ -23,7 +23,15 @@ function M.new(opts)
 		fail("new requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "runtime" and key ~= "id" and key ~= "sink" and key ~= "schedule" and key ~= "on_error" then
+		if
+			key ~= "runtime"
+			and key ~= "id"
+			and key ~= "sink"
+			and key ~= "schedule"
+			and key ~= "on_error"
+			and key ~= "limit"
+			and key ~= "overflow"
+		then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -39,6 +47,14 @@ function M.new(opts)
 	if opts.on_error ~= nil and type(opts.on_error) ~= "function" then
 		fail("on_error must be a function")
 	end
+	local limit = opts.limit or 1024
+	if type(limit) ~= "number" or limit < 1 or limit % 1 ~= 0 then
+		fail("limit must be a positive integer")
+	end
+	local overflow = opts.overflow or "reject"
+	if overflow ~= "reject" and overflow ~= "drop_oldest" and overflow ~= "drop_newest" then
+		fail("overflow policy is unavailable: " .. tostring(overflow))
+	end
 	local value = setmetatable({
 		runtime = opts.runtime,
 		id = identifier(opts.id or "provider-events", "service id"),
@@ -46,6 +62,9 @@ function M.new(opts)
 		schedule = opts.schedule or vim.schedule,
 		on_error = opts.on_error,
 		pending = {},
+		limit = limit,
+		overflow = overflow,
+		dropped = 0,
 		active = false,
 		scheduled = false,
 	}, Ingest)
@@ -85,7 +104,14 @@ function Ingest:status()
 	if not M.is(self) then
 		fail("status requires an event ingester")
 	end
-	return { active = self.active, pending = #self.pending, last_error = self.last_error }
+	return {
+		active = self.active,
+		pending = #self.pending,
+		limit = self.limit,
+		overflow = self.overflow,
+		dropped = self.dropped,
+		last_error = self.last_error,
+	}
 end
 
 function Ingest:request_drain()
@@ -116,6 +142,16 @@ function Ingest:submit(value)
 	end
 	if not provider_event.is(value) then
 		fail("submit requires a normalized provider event")
+	end
+	if #self.pending >= self.limit then
+		if self.overflow == "reject" then
+			fail("event ingestion queue is full")
+		end
+		self.dropped = self.dropped + 1
+		if self.overflow == "drop_newest" then
+			return self:status()
+		end
+		table.remove(self.pending, 1)
 	end
 	table.insert(self.pending, provider_event.from_record(provider_event.to_record(value)))
 	self:request_drain()

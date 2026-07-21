@@ -62,3 +62,48 @@ assert(
 	failing:stop("cancelled").state == "cancelled" and failing:status().pending == 0,
 	"event ingestion must cancel queued work"
 )
+
+local bounded = ingest.new({
+	runtime = runtime.new(),
+	id = "bounded-events",
+	limit = 1,
+	schedule = function() end,
+	sink = {
+		append = function() end,
+	},
+})
+bounded:start()
+bounded:submit(value)
+assert(not pcall(bounded.submit, bounded, value), "event ingestion must reject overflow by default")
+local replacement = event.new({
+	schema_version = 1,
+	id = "event-ingest-two",
+	run_id = "run-ingest",
+	provider = { name = "codex" },
+	sequence = 1,
+	type = "message.delta",
+	at = 2,
+})
+local newest_scheduled, newest_received = {}, {}
+local newest = ingest.new({
+	runtime = runtime.new(),
+	id = "drop-oldest-events",
+	limit = 1,
+	overflow = "drop_oldest",
+	schedule = function(callback)
+		table.insert(newest_scheduled, callback)
+	end,
+	sink = {
+		append = function(_, item)
+			table.insert(newest_received, item)
+		end,
+	},
+})
+newest:start()
+newest:submit(value)
+newest:submit(replacement)
+newest_scheduled[1]()
+assert(
+	newest:status().dropped == 1 and newest_received[1].id == "event-ingest-two",
+	"event ingestion must apply configured overflow policy without blocking providers"
+)
