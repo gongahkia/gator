@@ -1,4 +1,5 @@
 local run = require("gator").module("core").run
+local filesystem = require("gator").module("core").filesystem
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local value = run.new({
 	id = "run-one",
@@ -50,3 +51,43 @@ ok = pcall(run.append_event, value, {
 	payload = {},
 })
 assert(not ok, "events must not attach to a different run")
+
+local files = {}
+local boundary = filesystem.new({
+	readable = function(path)
+		return files[path] ~= nil
+	end,
+	read = function(path)
+		return files[path]
+	end,
+	mkdir = function()
+		return true
+	end,
+	write = function(path, content)
+		files[path] = content
+		return true
+	end,
+	rename = function(source, target)
+		files[target], files[source] = files[source], nil
+		return true
+	end,
+	remove = function(path)
+		files[path] = nil
+		return true
+	end,
+})
+local injected = run.open("/fixture/runs.json", { filesystem = boundary })
+assert(
+	injected:put(streamed).id == "run-one" and injected:get("run-one").events[1].id == "event-one",
+	"run stores must use the injected local filesystem boundary"
+)
+local unavailable = filesystem.new({
+	mkdir = function()
+		return true
+	end,
+	write = function()
+		return false, "write unavailable"
+	end,
+})
+local unavailable_store = run.open(helpers.tempdir("runs-unavailable") .. "/runs.json", { filesystem = unavailable })
+assert(not pcall(unavailable_store.put, unavailable_store, streamed), "filesystem write failures must remain explicit")

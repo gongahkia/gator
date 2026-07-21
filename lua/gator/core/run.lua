@@ -1,4 +1,5 @@
 local errors = require("gator.error")
+local filesystem = require("gator.core.filesystem")
 local M = {}
 local Run = {}
 local Store = {}
@@ -243,11 +244,11 @@ function M.append_event(value, event)
 	return M.from_record(record)
 end
 
-local function records(path)
-	if vim.fn.filereadable(path) == 0 then
+local function records(fs, path)
+	if not fs:readable(path) then
 		return {}
 	end
-	local ok, document = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), "\n"))
+	local ok, document = pcall(vim.json.decode, fs:read(path))
 	if not ok or type(document) ~= "table" then
 		fail("run file is not valid JSON: " .. path)
 	end
@@ -257,34 +258,48 @@ local function records(path)
 	return document.runs
 end
 
-local function write(path, values)
+local function write(fs, path, values)
 	local parent = vim.fn.fnamemodify(path, ":h")
-	if vim.fn.mkdir(parent, "p") < 0 then
+	if not fs:mkdir(parent) then
 		fail("cannot create run directory: " .. parent)
 	end
 	local temporary = path .. ".tmp-" .. vim.uv.hrtime()
-	local ok, err = pcall(vim.fn.writefile, { vim.json.encode({ schema_version = 1, runs = values }) }, temporary)
-	if not ok then
-		fail("cannot write run file: " .. err)
+	local written, write_err = fs:write(temporary, vim.json.encode({ schema_version = 1, runs = values }))
+	if not written then
+		fail("cannot write run file: " .. tostring(write_err))
 	end
-	local renamed, rename_err = vim.uv.fs_rename(temporary, path)
+	local renamed, rename_err = fs:rename(temporary, path)
 	if not renamed then
-		vim.fn.delete(temporary)
-		fail("cannot replace run file: " .. rename_err)
+		fs:remove(temporary)
+		fail("cannot replace run file: " .. tostring(rename_err))
 	end
 end
 
-function M.open(path)
+function M.open(path, opts)
 	path = path or vim.fn.stdpath("state") .. "/gator/runs.json"
 	if type(path) ~= "string" or path == "" then
 		fail("path must be a non-empty string")
 	end
-	return setmetatable({ path = path }, Store)
+	if opts == nil then
+		opts = {}
+	end
+	if type(opts) ~= "table" then
+		fail("open options must be a table")
+	end
+	for key in pairs(opts) do
+		if key ~= "filesystem" then
+			fail("open options contain unsupported field: " .. tostring(key))
+		end
+	end
+	if opts.filesystem ~= nil and not filesystem.is(opts.filesystem) then
+		fail("filesystem must be created by gator.core.filesystem.new")
+	end
+	return setmetatable({ path = path, filesystem = opts.filesystem or filesystem.new() }, Store)
 end
 
 function Store:put(value)
 	local run = M.to_record(value)
-	local values = records(self.path)
+	local values = records(self.filesystem, self.path)
 	local replaced = false
 	for index, record in ipairs(values) do
 		if M.from_record(record).id == run.id then
@@ -298,13 +313,13 @@ function Store:put(value)
 	table.sort(values, function(left, right)
 		return M.from_record(left).id < M.from_record(right).id
 	end)
-	write(self.path, values)
+	write(self.filesystem, self.path, values)
 	return M.from_record(run)
 end
 
 function Store:get(id)
 	id = require_identifier(id, "id")
-	for _, record in ipairs(records(self.path)) do
+	for _, record in ipairs(records(self.filesystem, self.path)) do
 		local run = M.from_record(record)
 		if run.id == id then
 			return run
@@ -318,7 +333,7 @@ function Store:list(task_id)
 		require_identifier(task_id, "task_id")
 	end
 	local result = {}
-	for _, record in ipairs(records(self.path)) do
+	for _, record in ipairs(records(self.filesystem, self.path)) do
 		local run = M.from_record(record)
 		if task_id == nil or run.task_id == task_id then
 			table.insert(result, run)
