@@ -16,6 +16,7 @@ local M = {
 	launch_queue = require("gator.core.launch_queue"),
 	output_excerpt = require("gator.core.output_excerpt"),
 	process_classification = require("gator.core.process_classification"),
+	provider_availability = require("gator.core.provider_availability"),
 	provider_event = require("gator.core.provider_event"),
 	provider_status = require("gator.core.provider_status"),
 	retention = require("gator.core.retention"),
