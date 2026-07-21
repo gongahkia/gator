@@ -1,5 +1,6 @@
 local storage = require("gator").module("core").storage
 local database = require("gator").module("core").database
+local run = require("gator").module("core").run
 local task = require("gator").module("core").task
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 
@@ -62,4 +63,54 @@ assert(
 assert(
 	not pcall(storage.migrate_sqlite_to_json, { source = source, target = selected.backend, confirm = false }),
 	"migrations must require explicit confirmation"
+)
+
+local json_source = storage.resolve({
+	kind = "json",
+	path = "/fixture/json-to-sqlite.json",
+	filesystem = selected.backend.filesystem,
+}).backend
+local json_task =
+	task.new({ id = "task-json-migrate", objective = "Restore JSON storage", created_at = 2, updated_at = 2 })
+json_source:put_task(json_task)
+json_source:append_run(run.new({
+	id = "run-json-migrate",
+	task_id = "task-json-migrate",
+	provider = { name = "codex", session_id = "native-migrate" },
+	process = { pid = 2, executable = "codex" },
+	workspace = { kind = "project", root = root },
+	state = "completed",
+	timing = { started_at = 2, ended_at = 3 },
+	usage = {},
+	events = { { id = "event-json-migrate", run_id = "run-json-migrate", type = "stream.delta", at = 3, payload = {} } },
+}))
+json_source:append_evidence_excerpt({
+	id = "evidence-json-migrate",
+	task_id = "task-json-migrate",
+	kind = "summary",
+	at = 3,
+	text = "Migrated evidence",
+})
+json_source:commit_task_operation({
+	task = json_task,
+	operation = { id = "operation-json-migrate", kind = "review", at = 3 },
+})
+local sqlite_target = database.open(root .. "/json-to-sqlite.sqlite3")
+local imported = storage.migrate_json_to_sqlite({ source = json_source, target = sqlite_target, confirm = true })
+assert(
+	imported.tasks[1].id == "task-json-migrate"
+		and sqlite_target:get_run("run-json-migrate").events[1].id == "event-json-migrate"
+		and sqlite_target:list_evidence_excerpts("task-json-migrate")[1].id == "evidence-json-migrate"
+		and sqlite_target:list_task_operations("task-json-migrate")[1].id == "operation-json-migrate",
+	"confirmed migrations must preserve JSON tasks, runs, evidence, and operations in SQLite"
+)
+assert(
+	not pcall(storage.migrate_json_to_sqlite, { source = json_source, target = sqlite_target, confirm = true }),
+	"migrations must reject non-empty SQLite targets"
+)
+local cancelled = database.open(root .. "/cancelled.sqlite3")
+assert(
+	not pcall(storage.migrate_json_to_sqlite, { source = json_source, target = cancelled, confirm = false })
+		and cancelled:version() == 0,
+	"JSON-to-SQLite migrations must cancel before initializing the target"
 )

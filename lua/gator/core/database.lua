@@ -174,6 +174,87 @@ local function task_upsert(record)
 		.. ") ON CONFLICT(id) DO UPDATE SET record_json = excluded.record_json, created_at = excluded.created_at, updated_at = excluded.updated_at;"
 end
 
+local function import_bundle(value)
+	if type(value) ~= "table" or value.schema_version ~= M.export_schema_version then
+		fail("import bundle has an unsupported schema")
+	end
+	for key in pairs(value) do
+		if
+			key ~= "schema_version"
+			and key ~= "tasks"
+			and key ~= "runs"
+			and key ~= "evidence_excerpts"
+			and key ~= "operations"
+		then
+			fail("import bundle contains unsupported field: " .. tostring(key))
+		end
+	end
+	local records = { tasks = {}, runs = {}, evidence_excerpts = {}, operations = {} }
+	local task_ids, ids, event_ids = {}, { runs = {}, evidence_excerpts = {}, operations = {} }, {}
+	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+		if type(value[key]) ~= "table" or not vim.islist(value[key]) then
+			fail("import bundle " .. key .. " must be an array")
+		end
+	end
+	for _, value in ipairs(value.tasks) do
+		local record = task_record(value)
+		if task_ids[record.id] then
+			fail("import bundle contains duplicate task: " .. record.id)
+		end
+		task_ids[record.id] = true
+		table.insert(records.tasks, record)
+	end
+	for _, value in ipairs(value.runs) do
+		local record = run_record(value)
+		if not task_ids[record.task_id] then
+			fail("import bundle run belongs to an unavailable task: " .. record.task_id)
+		end
+		if ids.runs[record.id] then
+			fail("import bundle contains duplicate run: " .. record.id)
+		end
+		ids.runs[record.id] = true
+		for _, event in ipairs(record.events) do
+			if event_ids[event.id] then
+				fail("import bundle contains duplicate run event: " .. event.id)
+			end
+			event_ids[event.id] = true
+		end
+		table.insert(records.runs, record)
+	end
+	for _, value in ipairs(value.evidence_excerpts) do
+		local record = excerpt(value)
+		if not task_ids[record.task_id] then
+			fail("import bundle evidence belongs to an unavailable task: " .. record.task_id)
+		end
+		if ids.evidence_excerpts[record.id] then
+			fail("import bundle contains duplicate evidence: " .. record.id)
+		end
+		ids.evidence_excerpts[record.id] = true
+		table.insert(records.evidence_excerpts, record)
+	end
+	for _, value in ipairs(value.operations) do
+		local record = operation(value, task_id(value.task_id))
+		if not task_ids[record.task_id] then
+			fail("import bundle operation belongs to an unavailable task: " .. record.task_id)
+		end
+		if ids.operations[record.id] then
+			fail("import bundle contains duplicate operation: " .. record.id)
+		end
+		ids.operations[record.id] = true
+		table.insert(records.operations, record)
+	end
+	return records
+end
+
+local function empty_database(database)
+	local counts = vim.trim(
+		database:exec(
+			"SELECT (SELECT count(*) FROM task_evidence), (SELECT count(*) FROM session_metadata), (SELECT count(*) FROM threads), (SELECT count(*) FROM tasks), (SELECT count(*) FROM runs), (SELECT count(*) FROM run_events), (SELECT count(*) FROM evidence_excerpts), (SELECT count(*) FROM task_operations);"
+		)
+	)
+	return counts == "0|0|0|0|0|0|0|0"
+end
+
 local function query(value, allowed, name)
 	if value == nil then
 		return {}
@@ -710,6 +791,72 @@ function Database:commit_task_operation(value)
 		"COMMIT;",
 	}, "\n"))
 	return { task = task.from_record(record), operation = vim.deepcopy(receipt) }
+end
+
+function Database:import_bundle(value)
+	local records = import_bundle(value)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before imports")
+	end
+	if not empty_database(self) then
+		fail("database must be empty before imports")
+	end
+	local statements = { "BEGIN IMMEDIATE;" }
+	for _, record in ipairs(records.tasks) do
+		table.insert(statements, task_upsert(record))
+	end
+	for _, record in ipairs(records.runs) do
+		local stored = vim.deepcopy(record)
+		stored.events = {}
+		table.insert(
+			statements,
+			"INSERT INTO runs (id, task_id, record_json) VALUES ("
+				.. quote(stored.id)
+				.. ", "
+				.. quote(stored.task_id)
+				.. ", "
+				.. quote(vim.json.encode(stored))
+				.. ");"
+		)
+		for _, event in ipairs(record.events) do
+			table.insert(statements, event_insert(event))
+		end
+	end
+	for _, record in ipairs(records.evidence_excerpts) do
+		table.insert(
+			statements,
+			"INSERT INTO evidence_excerpts (id, task_id, kind, at, record_json) VALUES ("
+				.. quote(record.id)
+				.. ", "
+				.. quote(record.task_id)
+				.. ", "
+				.. quote(record.kind)
+				.. ", "
+				.. record.at
+				.. ", "
+				.. quote(vim.json.encode(record))
+				.. ");"
+		)
+	end
+	for _, record in ipairs(records.operations) do
+		table.insert(
+			statements,
+			"INSERT INTO task_operations (id, task_id, kind, at, record_json) VALUES ("
+				.. quote(record.id)
+				.. ", "
+				.. quote(record.task_id)
+				.. ", "
+				.. quote(record.kind)
+				.. ", "
+				.. record.at
+				.. ", "
+				.. quote(vim.json.encode(record))
+				.. ");"
+		)
+	end
+	table.insert(statements, "COMMIT;")
+	self:exec(table.concat(statements, "\n"))
+	return self:preview_export()
 end
 
 function Database:list_task_operations(id)

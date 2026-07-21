@@ -115,4 +115,41 @@ function M.migrate_sqlite_to_json(opts)
 	return opts.target:preview_export()
 end
 
+function M.migrate_json_to_sqlite(opts)
+	if type(opts) ~= "table" then
+		fail("migration requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "source" and key ~= "target" and key ~= "confirm" then
+			fail("migration contains unsupported field: " .. tostring(key))
+		end
+	end
+	if opts.confirm ~= true then
+		fail("migration requires explicit confirmation")
+	end
+	M.validate_json_backend(opts.source)
+	if type(opts.target) ~= "table" then
+		fail("migration target must be a SQLite database")
+	end
+	for _, name in ipairs({ "migrate", "version", "import_bundle" }) do
+		if type(opts.target[name]) ~= "function" then
+			fail("migration target must expose " .. name)
+		end
+	end
+	local preview = opts.source:preview_export()
+	if type(preview) ~= "table" or preview.schema_version ~= M.json_backend.api_version then
+		fail("migration source preview has an unsupported schema")
+	end
+	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+		if type(preview[key]) ~= "table" or not vim.islist(preview[key]) then
+			fail("migration source preview contains invalid " .. key)
+		end
+	end
+	opts.target:migrate()
+	if opts.target:version() ~= database.schema_version then
+		fail("migration target has an unsupported SQLite schema")
+	end
+	return opts.target:import_bundle(vim.deepcopy(preview))
+end
+
 return M
