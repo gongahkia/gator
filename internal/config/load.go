@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -27,6 +28,21 @@ func Defaults() Config {
 		MaxBrainTokens: 200000,
 		Verify: VerifyConfig{
 			Timeout: 2 * time.Minute,
+		},
+		Policy: PolicyConfig{
+			Version: "paw.policy/1",
+			Provider: ProviderPolicy{
+				AllowedTransports: []string{"ollama"},
+				AllowLoopback:     true,
+			},
+			Command: CommandPolicy{RequireApproval: true},
+			Risk: RiskPolicy{
+				MaxFiles:    12,
+				MaxLines:    800,
+				MaxTokens:   120000,
+				MaxCommands: 8,
+			},
+			Egress: EgressPolicy{MaxFiles: 80, MaxBytes: 512 * 1024, BlockSecrets: true},
 		},
 	}
 }
@@ -179,7 +195,18 @@ func applyEnv(cfg *Config) error {
 		return err
 	}
 	setString("PAW_VERIFY_CMD", &cfg.Verify.Command)
-	return setDuration("PAW_VERIFY_TIMEOUT", &cfg.Verify.Timeout)
+	if err := setDuration("PAW_VERIFY_TIMEOUT", &cfg.Verify.Timeout); err != nil {
+		return err
+	}
+	setCSV("PAW_POLICY_ALLOWED_TRANSPORTS", &cfg.Policy.Provider.AllowedTransports)
+	setCSV("PAW_POLICY_ALLOWED_BASE_URLS", &cfg.Policy.Provider.AllowedBaseURLs)
+	if err := setBool("PAW_POLICY_ALLOW_LOOPBACK", &cfg.Policy.Provider.AllowLoopback); err != nil {
+		return err
+	}
+	if err := setBool("PAW_POLICY_BLOCK_SECRETS", &cfg.Policy.Egress.BlockSecrets); err != nil {
+		return err
+	}
+	return setBool("PAW_POLICY_AUTO_APPROVE", &cfg.Policy.Approval.AutoApprove)
 }
 
 func setString(key string, dst *string) {
@@ -225,4 +252,19 @@ func setBool(key string, dst *bool) error {
 	}
 	*dst = b
 	return nil
+}
+
+func setCSV(key string, dst *[]string) {
+	v := os.Getenv(key)
+	if v == "" {
+		return
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	*dst = out
 }

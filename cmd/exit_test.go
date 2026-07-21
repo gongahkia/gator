@@ -121,6 +121,9 @@ transport = "openai"
 base_url = "`+baseURL+`"
 api_key = "test-key"
 model = "test-brain"
+
+[policy.provider]
+allowed_transports = ["ollama", "openai"]
 `), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

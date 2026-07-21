@@ -11,9 +11,11 @@ import (
 
 	"github.com/gongahkia/paw/internal/compress"
 	"github.com/gongahkia/paw/internal/config"
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/gather"
 	"github.com/gongahkia/paw/internal/llm"
+	"github.com/gongahkia/paw/internal/policy"
 )
 
 type Runner interface {
@@ -33,9 +35,17 @@ func (r StageRunner) Gather(ctx context.Context, cwd, instruction string) (*enve
 }
 
 func (r StageRunner) Compress(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
+	prepared, _, err := egress.Prepare(r.Config.Policy.Egress, env.Raw)
+	if err != nil {
+		return nil, err
+	}
+	in := *env
+	in.Raw = prepared.Raw
 	var drone llm.Client
-	var err error
 	if !r.DisableCompress {
+		if err := policy.CheckEndpoint(r.Config.Policy, r.Config.Drone.Transport, r.Config.Drone.BaseURL); err != nil {
+			return nil, fmt.Errorf("drone endpoint: %w", err)
+		}
 		drone, err = llm.NewDroneClient(llm.FactoryConfig{Drone: llm.EndpointConfig{
 			Transport: r.Config.Drone.Transport,
 			BaseURL:   r.Config.Drone.BaseURL,
@@ -52,7 +62,7 @@ func (r StageRunner) Compress(ctx context.Context, env *envelope.Envelope) (*env
 	}
 	stage := compress.New(drone)
 	stage.DisableCompress = r.DisableCompress
-	return stage.Run(ctx, env)
+	return stage.Run(ctx, &in)
 }
 
 func (r StageRunner) Digest(ctx context.Context, cwd, instruction string) (*envelope.Envelope, error) {

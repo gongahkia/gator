@@ -115,6 +115,10 @@ func TestRunFailsFastOnMissingBrainKey(t *testing.T) {
 transport = "openai"
 base_url = "https://api.openai.com/v1"
 model = "gpt-test"
+
+[policy.provider]
+allowed_transports = ["openai"]
+allowed_base_urls = ["https://api.openai.com/v1"]
 `), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -321,6 +325,7 @@ func resetCLIState(t *testing.T) {
 	mcpServeDisableCompress = false
 	modelsListQuery = ""
 	modelsListProvider = ""
+	sessionJSON = false
 	rootCmd.SetArgs(nil)
 	rootCmd.SetIn(strings.NewReader(""))
 	rootCmd.SetOut(io.Discard)
@@ -373,6 +378,11 @@ func isolateEnv(t *testing.T) {
 		"PAW_VERIFY_TIMEOUT",
 		"PAW_TRACE_MODE",
 		"PAW_BENCH_TRACE_MODE",
+		"PAW_POLICY_ALLOWED_TRANSPORTS",
+		"PAW_POLICY_ALLOWED_BASE_URLS",
+		"PAW_POLICY_ALLOW_LOOPBACK",
+		"PAW_POLICY_BLOCK_SECRETS",
+		"PAW_POLICY_AUTO_APPROVE",
 	} {
 		t.Setenv(key, "")
 	}
@@ -384,6 +394,7 @@ func configureBrain(t *testing.T, baseURL string) {
 	t.Setenv("PAW_BRAIN_BASE_URL", baseURL)
 	t.Setenv("PAW_BRAIN_API_KEY", "test-key")
 	t.Setenv("PAW_BRAIN_MODEL", "test-brain")
+	t.Setenv("PAW_POLICY_ALLOWED_TRANSPORTS", "ollama,openai")
 }
 
 func configArgs(t *testing.T) []string {

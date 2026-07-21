@@ -1,0 +1,144 @@
+package session
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestNewIDUsesEntropyAndTime(t *testing.T) {
+	id, err := NewID(time.Date(2026, 7, 21, 12, 30, 45, 123, time.UTC), bytes.NewReader(bytes.Repeat([]byte{0xab}, 10)))
+	if err != nil {
+		t.Fatalf("new id: %v", err)
+	}
+	if id != "session-20260721T123045.000000123Z-abababababababababab" {
+		t.Fatalf("id = %q", id)
+	}
+}
+
+func TestStorePersistsManifestAndEvents(t *testing.T) {
+	cwd := t.TempDir()
+	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	manifest, err := NewManifest("session-test-01", cwd, now)
+	if err != nil {
+		t.Fatalf("manifest: %v", err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	got, err := store.LoadManifest()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.ID != manifest.ID || got.Cwd != manifest.Cwd || got.Status != StatusActive {
+		t.Fatalf("manifest = %#v", got)
+	}
+	event, err := store.Append(Event{Type: "session.started", At: now, Data: json.RawMessage(`{"source":"test"}`)})
+	if err != nil {
+		t.Fatalf("append: %v", err)
+	}
+	if event.Sequence != 1 || event.SessionID != manifest.ID {
+		t.Fatalf("event = %#v", event)
+	}
+	events, err := store.Events()
+	if err != nil {
+		t.Fatalf("events: %v", err)
+	}
+	if len(events) != 1 || events[0].Type != "session.started" {
+		t.Fatalf("events = %#v", events)
+	}
+	info, err := os.Stat(filepath.Join(store.Dir(), "manifest.json"))
+	if err != nil {
+		t.Fatalf("stat manifest: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("manifest mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestCreateRejectsTraversalID(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-../escape", cwd, time.Now())
+	if err == nil || !errors.Is(err, ErrInvalidSessionID) || manifest.ID != "" {
+		t.Fatalf("manifest = %#v err = %v", manifest, err)
+	}
+}
+
+func TestCreateRejectsManifestForOtherWorkspace(t *testing.T) {
+	manifest, err := NewManifest("session-other-workspace", t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Create(t.TempDir(), manifest); err == nil {
+		t.Fatal("expected workspace mismatch")
+	}
+}
+
+func TestSessionRootRejectsEscapingPawSymlink(t *testing.T) {
+	cwd := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(cwd, ".paw")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := SessionRoot(cwd); err == nil {
+		t.Fatal("expected symlink containment error")
+	}
+}
+
+func TestEventsRejectCorruptSequence(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-corrupt-01", cwd, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store.Dir(), "events.ndjson"), []byte(`{"schema_version":"paw.session/2","sequence":2}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Events(); err == nil {
+		t.Fatal("expected corrupt event error")
+	}
+}
+
+func TestListOrdersNewestSessionFirst(t *testing.T) {
+	cwd := t.TempDir()
+	older, err := NewManifest("session-list-older", cwd, time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	newer, err := NewManifest("session-list-newer", cwd, time.Date(2026, 7, 22, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Create(cwd, older); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Create(cwd, newer); err != nil {
+		t.Fatal(err)
+	}
+	manifests, err := List(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifests) != 2 || manifests[0].ID != newer.ID || manifests[1].ID != older.ID {
+		t.Fatalf("manifests = %#v", manifests)
+	}
+}
+
+func TestListReturnsEmptySliceForNewWorkspace(t *testing.T) {
+	manifests, err := List(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifests == nil || len(manifests) != 0 {
+		t.Fatalf("manifests = %#v", manifests)
+	}
+}

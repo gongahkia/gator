@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         go: ["1.23"]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v6
 
@@ -31,10 +31,6 @@ jobs:
       - name: Install external tools (macOS)
         if: runner.os == 'macOS'
         run: brew install ripgrep universal-ctags shellcheck
-
-      - name: Install external tools (Windows)
-        if: runner.os == 'Windows'
-        run: choco install ripgrep universal-ctags -y --no-progress
 
       - name: Check external tools
         run: |

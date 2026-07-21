@@ -50,6 +50,10 @@ insecure_skip_verify = false
 	t.Setenv("PAW_VERIFY_TIMEOUT", "15s")
 	t.Setenv("PAW_TLS_CA_FILE", "/env/ca.pem")
 	t.Setenv("PAW_INSECURE_SKIP_TLS_VERIFY", "true")
+	t.Setenv("PAW_POLICY_ALLOWED_TRANSPORTS", "ollama,openai")
+	t.Setenv("PAW_POLICY_ALLOWED_BASE_URLS", "https://one.example/v1, https://two.example/v1")
+	t.Setenv("PAW_POLICY_ALLOW_LOOPBACK", "false")
+	t.Setenv("PAW_POLICY_AUTO_APPROVE", "true")
 
 	cfg, err := Load(path)
 	if err != nil {
@@ -79,6 +83,9 @@ insecure_skip_verify = false
 	if cfg.TLS.CAFile != "/env/ca.pem" || !cfg.TLS.InsecureSkipVerify {
 		t.Fatalf("tls precedence failed: %#v", cfg.TLS)
 	}
+	if got, want := strings.Join(cfg.Policy.Provider.AllowedTransports, ","), "ollama,openai"; got != want || strings.Join(cfg.Policy.Provider.AllowedBaseURLs, ",") != "https://one.example/v1,https://two.example/v1" || cfg.Policy.Provider.AllowLoopback || !cfg.Policy.Approval.AutoApprove {
+		t.Fatalf("policy env precedence failed: %#v", cfg.Policy)
+	}
 }
 
 func TestDefaultsAreLocalFirst(t *testing.T) {
@@ -97,6 +104,9 @@ func TestDefaultsAreLocalFirst(t *testing.T) {
 	}
 	if cfg.Verify.Timeout != 2*time.Minute {
 		t.Fatalf("verify defaults = %#v", cfg.Verify)
+	}
+	if cfg.Policy.Version != "paw.policy/1" || !cfg.Policy.Provider.AllowLoopback || !cfg.Policy.Egress.BlockSecrets || cfg.Policy.Approval.AutoApprove {
+		t.Fatalf("policy defaults = %#v", cfg.Policy)
 	}
 }
 

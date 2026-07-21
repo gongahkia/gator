@@ -124,6 +124,16 @@ func TestInvalidDigestInputReturnsStructuredError(t *testing.T) {
 	}
 }
 
+func TestStageRunnerBlocksSecretBearingDigest(t *testing.T) {
+	cfg := config.Defaults()
+	runner := StageRunner{Config: cfg, DisableCompress: true}
+	env := envelope.NewEnvelope("task", "inspect", t.TempDir())
+	env.Raw = &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Text: "token=sk-abcdefghijklmnopqrstuvwxyz123456"}}}
+	if _, err := runner.Compress(context.Background(), env); err == nil || !strings.Contains(err.Error(), "egress blocked") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func serveLines(t *testing.T, server *Server, lines ...string) string {
 	t.Helper()
 	var in bytes.Buffer

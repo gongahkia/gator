@@ -15,6 +15,7 @@ import (
 	"github.com/gongahkia/paw/internal/llm"
 	pawlog "github.com/gongahkia/paw/internal/log"
 	"github.com/gongahkia/paw/internal/plan"
+	"github.com/gongahkia/paw/internal/policy"
 	"github.com/gongahkia/paw/internal/stage"
 	"github.com/gongahkia/paw/internal/ui"
 	"github.com/gongahkia/paw/internal/verify"
@@ -150,6 +151,14 @@ func llmConfig(cfg config.Config) llm.FactoryConfig {
 }
 
 func newAgentPipeline(cfg config.Config, rawContext bool, disableCompress bool) (*stage.Pipeline, error) {
+	if err := policy.CheckEndpoint(cfg.Policy, cfg.Brain.Transport, cfg.Brain.BaseURL); err != nil {
+		return nil, fmt.Errorf("brain endpoint: %w", err)
+	}
+	if !disableCompress && !rawContext {
+		if err := policy.CheckEndpoint(cfg.Policy, cfg.Drone.Transport, cfg.Drone.BaseURL); err != nil {
+			return nil, fmt.Errorf("drone endpoint: %w", err)
+		}
+	}
 	brain, err := llm.NewBrainClient(llmConfig(cfg))
 	if err != nil {
 		return nil, err

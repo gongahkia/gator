@@ -17,6 +17,7 @@ Available Commands:
   plan        Plan the next agent step
   resume      Resume a run from its trace
   run         Run the full agent pipeline
+  session     Inspect persisted paw sessions
   stats       Summarize a run trace
   verify      Run verification command
   version     Print version information
