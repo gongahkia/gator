@@ -74,7 +74,7 @@ function M.new(opts)
 			return prefix .. "-" .. sequence
 		end,
 		sequence = 0,
-		services = {},
+		_service_registry = {},
 		service_order = {},
 	}, Runtime)
 end
@@ -113,12 +113,12 @@ function Runtime:register(name, value)
 	end
 	name = identifier(name, "service name")
 	service(value)
-	if self.services[name] then
+	if self._service_registry[name] then
 		fail("service is already registered: " .. name)
 	end
-	self.services[name] = { name = name, service = value, state = "registered" }
+	self._service_registry[name] = { name = name, service = value, state = "registered" }
 	table.insert(self.service_order, name)
-	return status(self.services[name])
+	return status(self._service_registry[name])
 end
 
 function Runtime:status(name)
@@ -126,10 +126,10 @@ function Runtime:status(name)
 		fail("status requires a runtime")
 	end
 	name = identifier(name, "service name")
-	if not self.services[name] then
+	if not self._service_registry[name] then
 		fail("service is unavailable: " .. name)
 	end
-	return status(self.services[name])
+	return status(self._service_registry[name])
 end
 
 function Runtime:services()
@@ -138,7 +138,7 @@ function Runtime:services()
 	end
 	local result = {}
 	for _, name in ipairs(self.service_order) do
-		table.insert(result, status(self.services[name]))
+		table.insert(result, status(self._service_registry[name]))
 	end
 	return result
 end
@@ -154,7 +154,7 @@ function Runtime:start(name, opts)
 	if type(opts) ~= "table" then
 		fail("service start options must be a table")
 	end
-	local entry = self.services[name]
+	local entry = self._service_registry[name]
 	if not entry then
 		fail("service is unavailable: " .. name)
 	end
@@ -181,7 +181,7 @@ function Runtime:stop(name, value)
 		fail("stop requires a runtime")
 	end
 	name = identifier(name, "service name")
-	local entry = self.services[name]
+	local entry = self._service_registry[name]
 	if not entry then
 		fail("service is unavailable: " .. name)
 	end
@@ -210,7 +210,7 @@ function Runtime:shutdown(value)
 	local result, failures = {}, {}
 	for index = #self.service_order, 1, -1 do
 		local name = self.service_order[index]
-		if self.services[name].state == "running" then
+		if self._service_registry[name].state == "running" then
 			local ok, stopped = pcall(self.stop, self, name, value)
 			if ok then
 				table.insert(result, stopped)
