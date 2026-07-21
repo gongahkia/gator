@@ -60,6 +60,17 @@ assert(
 	"Codex permission fixture must preserve command, file, and permission approval requests"
 )
 
+local codex_signals = {}
+assert(fixtures.replay_jsonl(root .. "/codex_signals.jsonl", function(record)
+	table.insert(codex_signals, record)
+end) == 4, "Codex signal fixture must replay every native notification")
+assert(
+	codex_signals[1].params.tokenUsage.last.totalTokens == 5
+		and codex_signals[2].params.changes[1].kind.type == "update"
+		and codex_signals[4].params.item.type == "contextCompaction",
+	"Codex signal fixture must preserve usage, patch, and compaction notifications"
+)
+
 local claude = {}
 assert(fixtures.replay_jsonl(root .. "/claude_stream.jsonl", function(record)
 	table.insert(claude, record)

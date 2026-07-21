@@ -78,6 +78,45 @@ local function item(value, name)
 	return value
 end
 
+local function usage(value)
+	fields(value, {
+		cachedInputTokens = true,
+		inputTokens = true,
+		outputTokens = true,
+		reasoningOutputTokens = true,
+		totalTokens = true,
+	}, "token usage")
+	for _, name in ipairs({ "cachedInputTokens", "inputTokens", "outputTokens", "reasoningOutputTokens", "totalTokens" }) do
+		integer(value[name], "token usage." .. name)
+	end
+	return value
+end
+
+local function path(value)
+	value = string(value, "file change path")
+	if value:sub(1, 1) == "/" or value:match("^%a:[/\\]") or value:find("..", 1, true) then
+		fail("file change path must be a relative repository path")
+	end
+	return value
+end
+
+local function file_change(value)
+	fields(value, { diff = true, kind = true, path = true }, "file change")
+	if type(value.diff) ~= "string" then
+		fail("file change.diff must be a string")
+	end
+	fields(value.kind, { type = true, move_path = true }, "file change.kind")
+	local kinds = { add = "created", delete = "deleted", update = "modified" }
+	local kind = kinds[value.kind.type]
+	if not kind then
+		fail("file change.kind.type is unsupported")
+	end
+	if value.kind.move_path ~= nil and type(value.kind.move_path) ~= "string" then
+		fail("file change.kind.move_path must be a string")
+	end
+	return { type = "file.change", payload = { path = path(value.path), kind = kind } }
+end
+
 local function decode(raw, context)
 	if type(raw) ~= "table" or vim.islist(raw) then
 		fail("record must be an object")
@@ -90,6 +129,45 @@ local function decode(raw, context)
 	end
 	fields(raw, { method = true, params = true }, "notification")
 	local method = string(raw.method, "notification.method")
+	if method == "thread/tokenUsage/updated" then
+		fields(raw.params, { threadId = true, tokenUsage = true, turnId = true }, method .. " params")
+		thread(raw.params.threadId, context, method .. " params")
+		string(raw.params.turnId, method .. " params.turnId")
+		fields(
+			raw.params.tokenUsage,
+			{ last = true, modelContextWindow = true, total = true },
+			method .. " params.tokenUsage"
+		)
+		local value = usage(raw.params.tokenUsage.last)
+		usage(raw.params.tokenUsage.total)
+		if raw.params.tokenUsage.modelContextWindow ~= nil and raw.params.tokenUsage.modelContextWindow ~= vim.NIL then
+			integer(raw.params.tokenUsage.modelContextWindow, method .. " params.tokenUsage.modelContextWindow")
+		end
+		return {
+			type = "usage.update",
+			payload = { input = value.inputTokens, output = value.outputTokens, total = value.totalTokens },
+		}
+	end
+	if method == "item/fileChange/patchUpdated" then
+		fields(raw.params, { changes = true, itemId = true, threadId = true, turnId = true }, method .. " params")
+		thread(raw.params.threadId, context, method .. " params")
+		string(raw.params.turnId, method .. " params.turnId")
+		string(raw.params.itemId, method .. " params.itemId")
+		if type(raw.params.changes) ~= "table" or not vim.islist(raw.params.changes) or #raw.params.changes == 0 then
+			fail(method .. " params.changes must be a non-empty array")
+		end
+		local events = {}
+		for index, value in ipairs(raw.params.changes) do
+			events[index] = file_change(value)
+		end
+		return events
+	end
+	if method == "thread/compacted" then
+		fields(raw.params, { threadId = true, turnId = true }, method .. " params")
+		thread(raw.params.threadId, context, method .. " params")
+		string(raw.params.turnId, method .. " params.turnId")
+		return { type = "context.compacted", payload = {} }
+	end
 	if method == "turn/started" or method == "turn/completed" then
 		fields(raw.params, { threadId = true, turn = true }, method .. " params")
 		thread(raw.params.threadId, context, method .. " params")
@@ -112,6 +190,12 @@ local function decode(raw, context)
 		string(raw.params.turnId, method .. " params.turnId")
 		integer(raw.params[suffix], method .. " params." .. suffix)
 		local value = item(raw.params.item, method .. " params.item")
+		if value.type == "contextCompaction" then
+			return {
+				type = method == "item/started" and "context.compaction_started" or "context.compacted",
+				payload = {},
+			}
+		end
 		if value.type ~= "agentMessage" then
 			return nil
 		end

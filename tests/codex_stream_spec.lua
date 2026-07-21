@@ -27,6 +27,37 @@ assert(
 	"Codex notifications must normalize native turn and assistant-message lifecycles"
 )
 
+local signals = {}
+fixtures.replay_jsonl(vim.g.gator_test.root .. "/tests/fixtures/adapters/codex_signals.jsonl", function(record)
+	for _, event in ipairs(value:feed(record, { run_id = "run-codex", session_id = "codex-fixture" })) do
+		table.insert(signals, event)
+	end
+end)
+assert(
+	signals[1].type == "usage.update"
+		and signals[1].payload.input == 2
+		and signals[1].payload.total == 5
+		and signals[2].type == "file.change"
+		and signals[2].payload.path == "lua/gator/init.lua"
+		and signals[2].payload.kind == "modified"
+		and signals[2].payload.diff == nil
+		and signals[3].payload.kind == "created"
+		and signals[4].type == "context.compaction_started"
+		and signals[5].type == "context.compacted",
+	"Codex stream records must normalize usage, file changes, and compaction signals"
+)
+
+local invalid_file = stream.new()
+assert(not pcall(invalid_file.feed, invalid_file, {
+	method = "item/fileChange/patchUpdated",
+	params = {
+		threadId = "codex-fixture",
+		turnId = "turn-fixture",
+		itemId = "file-fixture",
+		changes = { { path = "../secret", kind = { type = "update" }, diff = "fixture" } },
+	},
+}, { run_id = "run-codex", session_id = "codex-fixture" }), "Codex streams must reject unsafe provider file paths")
+
 local failed = stream.new()
 local error = failed:feed({
 	method = "error",

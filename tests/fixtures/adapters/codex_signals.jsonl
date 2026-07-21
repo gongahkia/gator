@@ -1,0 +1,4 @@
+{"method":"thread/tokenUsage/updated","params":{"threadId":"codex-fixture","turnId":"turn-fixture","tokenUsage":{"last":{"cachedInputTokens":1,"inputTokens":2,"outputTokens":3,"reasoningOutputTokens":0,"totalTokens":5},"total":{"cachedInputTokens":2,"inputTokens":4,"outputTokens":6,"reasoningOutputTokens":0,"totalTokens":10}}}}
+{"method":"item/fileChange/patchUpdated","params":{"threadId":"codex-fixture","turnId":"turn-fixture","itemId":"file-fixture","changes":[{"path":"lua/gator/init.lua","kind":{"type":"update"},"diff":"token=fixture-secret"},{"path":"README.md","kind":{"type":"add"},"diff":"token=fixture-secret"}]}}
+{"method":"item/started","params":{"threadId":"codex-fixture","turnId":"turn-fixture","startedAtMs":3,"item":{"id":"compaction-fixture","type":"contextCompaction"}}}
+{"method":"item/completed","params":{"threadId":"codex-fixture","turnId":"turn-fixture","completedAtMs":4,"item":{"id":"compaction-fixture","type":"contextCompaction"}}}
