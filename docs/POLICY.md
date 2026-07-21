@@ -57,5 +57,8 @@ limits.
 Provider approvals are recorded as receipts bound to the exact transport, base URL, and egress
 manifest digest.
 
+Gathered context is scanned for GitHub tokens, OpenAI keys, AWS access keys, private keys, and JWTs.
+The manifest records finding kinds and counts only.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

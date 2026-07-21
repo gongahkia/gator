@@ -62,6 +62,21 @@ func TestGatherIncludesVerifyFailure(t *testing.T) {
 	}
 }
 
+func TestGatherManifestDetectsSecretWithoutRecordingValue(t *testing.T) {
+	dir := t.TempDir()
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	writeFile(t, dir, "config.env", "OPENAI_TOKEN="+secret+"\n")
+	got := gatherDir(t, dir, config.GatherConfig{MaxDepth: 1, MaxFileBytes: 4096}, "inspect OPENAI_TOKEN")
+	if got.Egress == nil || len(got.Egress.Findings) != 1 || got.Egress.Findings[0].Kind != "openai_key" {
+		t.Fatalf("egress manifest = %#v", got.Egress)
+	}
+	for _, unit := range got.Egress.Units {
+		if strings.Contains(unit.SHA256, secret) {
+			t.Fatalf("egress unit leaked secret: %#v", unit)
+		}
+	}
+}
+
 func TestGatherCleanGitRepoOmitsGitUnits(t *testing.T) {
 	dir := cleanGitRepo(t)
 	got := gatherDir(t, dir, config.GatherConfig{MaxDepth: 2, MaxFileBytes: 4096}, "inspect alpha")

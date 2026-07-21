@@ -45,7 +45,6 @@ func Build(raw *envelope.RawContext) Manifest {
 		return Manifest{}
 	}
 	manifest := Manifest{Units: make([]UnitManifest, 0, len(raw.Units))}
-	counts := map[string]int{}
 	for _, unit := range raw.Units {
 		sum := sha256.Sum256([]byte(unit.Text))
 		manifest.Units = append(manifest.Units, UnitManifest{
@@ -56,12 +55,22 @@ func Build(raw *envelope.RawContext) Manifest {
 			SHA256: hex.EncodeToString(sum[:]),
 		})
 		manifest.TotalBytes += len(unit.Text)
+	}
+	manifest.Findings = Detect(raw)
+	return manifest
+}
+
+func Detect(raw *envelope.RawContext) []Finding {
+	if raw == nil {
+		return nil
+	}
+	counts := map[string]int{}
+	for _, unit := range raw.Units {
 		for _, finding := range scan(unit.Text) {
 			counts[finding.Kind] += finding.Count
 		}
 	}
-	manifest.Findings = findingsFromCounts(counts)
-	return manifest
+	return findingsFromCounts(counts)
 }
 
 func Redact(raw *envelope.RawContext) RedactionResult {

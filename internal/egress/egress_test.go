@@ -21,6 +21,33 @@ func TestBuildReportsSecretKindsWithoutValues(t *testing.T) {
 	}
 }
 
+func TestDetectReportsHighConfidenceSecretKinds(t *testing.T) {
+	raw := &envelope.RawContext{Units: []envelope.RawUnit{{Text: strings.Join([]string{
+		"ghp_abcdefghijklmnopqrst",
+		"sk-abcdefghijklmnopqrst",
+		"AKIAABCDEFGHIJKLMNOP",
+		"-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----",
+		"eyJabcdefghij.abcdefghij.abcdefghij",
+	}, "\n")}}}
+	findings := Detect(raw)
+	if got := findingsByKind(findings); !equalFindings(got, map[string]int{
+		"github_token":   1,
+		"openai_key":     1,
+		"aws_access_key": 1,
+		"private_key":    1,
+		"jwt":            1,
+	}) {
+		t.Fatalf("findings = %#v", findings)
+	}
+}
+
+func TestDetectIgnoresNearMisses(t *testing.T) {
+	raw := &envelope.RawContext{Units: []envelope.RawUnit{{Text: "sk-short AKIA123 eyJshort.short.short"}}}
+	if findings := Detect(raw); len(findings) != 0 {
+		t.Fatalf("findings = %#v", findings)
+	}
+}
+
 func TestRedactRemovesDetectedValues(t *testing.T) {
 	raw := &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Text: "token=sk-abcdefghijklmnopqrstuvwxyz123456"}}}
 	result := Redact(raw)
@@ -95,4 +122,24 @@ func TestProviderApprovalReceiptRejectsMissingFields(t *testing.T) {
 	if err := VerifyProviderApproval(manifest, "openai", "https://api.example.test/v1"); !errors.Is(err, ErrInvalidProviderApproval) {
 		t.Fatalf("missing receipt error = %v", err)
 	}
+}
+
+func findingsByKind(findings []Finding) map[string]int {
+	result := make(map[string]int, len(findings))
+	for _, finding := range findings {
+		result[finding.Kind] = finding.Count
+	}
+	return result
+}
+
+func equalFindings(got, want map[string]int) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for kind, count := range want {
+		if got[kind] != count {
+			return false
+		}
+	}
+	return true
 }
