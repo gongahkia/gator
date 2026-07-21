@@ -6,6 +6,7 @@ local M = {
 	git = require("gator.core.git"),
 	json_backend = require("gator.core.json_backend"),
 	lifecycle = require("gator.core.lifecycle"),
+	launch_queue = require("gator.core.launch_queue"),
 	provider_event = require("gator.core.provider_event"),
 	retention = require("gator.core.retention"),
 	runtime = require("gator.core.runtime"),
