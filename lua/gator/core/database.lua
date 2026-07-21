@@ -1,6 +1,7 @@
 local errors = require("gator.error")
+local run = require("gator.core.run")
 local task = require("gator.core.task")
-local M = { schema_version = 2 }
+local M = { schema_version = 3 }
 local Database = {}
 
 Database.__index = Database
@@ -48,6 +49,59 @@ local function decode_task(value)
 		fail("task record has invalid JSON")
 	end
 	return task.from_record(task_record(record))
+end
+
+local function run_id(value)
+	if type(value) ~= "string" or not value:match("^[a-z][a-z0-9_-]*$") then
+		fail("run id must be a lowercase identifier")
+	end
+	return value
+end
+
+local function run_record(value)
+	local ok, entity = pcall(run.from_record, value)
+	if not ok then
+		fail("run record is invalid")
+	end
+	return run.to_record(entity)
+end
+
+local function event_record(value, expected_run_id)
+	local ok, event = pcall(run.event, value)
+	if not ok or event.run_id ~= expected_run_id then
+		fail("run event is invalid")
+	end
+	return event
+end
+
+local function decode_run(value, events)
+	local ok, record = pcall(vim.json.decode, value)
+	if not ok or type(record) ~= "table" then
+		fail("run record has invalid JSON")
+	end
+	record = run_record(record)
+	record.events = events
+	return run.from_record(record)
+end
+
+local function decode_event(value, expected_run_id)
+	local ok, record = pcall(vim.json.decode, value)
+	if not ok or type(record) ~= "table" then
+		fail("run event has invalid JSON")
+	end
+	return event_record(record, expected_run_id)
+end
+
+local function event_insert(value)
+	return "INSERT INTO run_events (id, run_id, at, record_json) VALUES ("
+		.. quote(value.id)
+		.. ", "
+		.. quote(value.run_id)
+		.. ", "
+		.. value.at
+		.. ", "
+		.. quote(vim.json.encode(value))
+		.. ");"
 end
 
 local function migration_one(legacy_dir)
@@ -127,6 +181,14 @@ local migrations = {
 			"CREATE INDEX tasks_updated_at ON tasks (updated_at, id);",
 		}
 	end,
+	[3] = function()
+		return {
+			"CREATE TABLE run_events (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, at INTEGER NOT NULL, record_json TEXT NOT NULL);",
+			"CREATE INDEX run_events_by_run ON run_events (run_id, at, id);",
+			"INSERT INTO run_events (id, run_id, at, record_json) SELECT json_extract(event.value, '$.id'), runs.id, json_extract(event.value, '$.at'), json(event.value) FROM runs, json_each(runs.record_json, '$.events') AS event;",
+			"UPDATE runs SET record_json = json_set(record_json, '$.events', json('[]'));",
+		}
+	end,
 }
 
 function M.open(path)
@@ -145,7 +207,7 @@ function Database:exec(sql)
 	if vim.fn.mkdir(parent, "p") < 0 then
 		fail("cannot create database directory: " .. parent)
 	end
-	local result = vim.system({ "sqlite3", "-batch", self.path }, { stdin = sql, text = true }):wait()
+	local result = vim.system({ "sqlite3", "-batch", "-bail", self.path }, { stdin = sql, text = true }):wait()
 	if result.code ~= 0 then
 		fail(result.stderr ~= "" and result.stderr or "sqlite3 exited " .. result.code)
 	end
@@ -232,6 +294,98 @@ function Database:list_tasks()
 		}))
 	do
 		table.insert(result, decode_task(value))
+	end
+	return result
+end
+
+function Database:append_run(value)
+	local record = run_record(value)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before run writes")
+	end
+	local events = vim.deepcopy(record.events)
+	record.events = {}
+	local statements = {
+		"BEGIN IMMEDIATE;",
+		"INSERT INTO runs (id, task_id, record_json) VALUES ("
+			.. quote(record.id)
+			.. ", "
+			.. quote(record.task_id)
+			.. ", "
+			.. quote(vim.json.encode(record))
+			.. ");",
+	}
+	for _, event in ipairs(events) do
+		table.insert(statements, event_insert(event))
+	end
+	table.insert(statements, "COMMIT;")
+	self:exec(table.concat(statements, "\n"))
+	return run.from_record(vim.tbl_extend("force", record, { events = events }))
+end
+
+function Database:append_run_event(id, value)
+	id = run_id(id)
+	local event = event_record(value, id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before run event writes")
+	end
+	if not self:get_run(id) then
+		fail("run is unavailable: " .. id)
+	end
+	self:exec(table.concat({ "BEGIN IMMEDIATE;", event_insert(event), "COMMIT;" }, "\n"))
+	return vim.deepcopy(event)
+end
+
+function Database:list_run_events(id)
+	id = run_id(id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before run event reads")
+	end
+	local result = {}
+	for _, value in
+		ipairs(
+			vim.split(
+				self:exec("SELECT record_json FROM run_events WHERE run_id = " .. quote(id) .. " ORDER BY at, id;"),
+				"\n",
+				{
+					trimempty = true,
+				}
+			)
+		)
+	do
+		table.insert(result, decode_event(value, id))
+	end
+	return result
+end
+
+function Database:get_run(id)
+	id = run_id(id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before run reads")
+	end
+	local value = vim.trim(self:exec("SELECT record_json FROM runs WHERE id = " .. quote(id) .. ";"))
+	if value == "" then
+		return nil
+	end
+	return decode_run(value, self:list_run_events(id))
+end
+
+function Database:list_runs(task_value)
+	if task_value ~= nil then
+		task_id(task_value)
+	end
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before run reads")
+	end
+	local query = "SELECT record_json FROM runs"
+	if task_value then
+		query = query .. " WHERE task_id = " .. quote(task_value)
+	end
+	query = query .. " ORDER BY id;"
+	local result = {}
+	for _, value in ipairs(vim.split(self:exec(query), "\n", { trimempty = true })) do
+		local record = decode_run(value, {})
+		table.insert(result, self:get_run(record.id))
 	end
 	return result
 end
