@@ -55,6 +55,7 @@ local M = {
 	opencode_context = require("gator.adapters.opencode_context"),
 	pi = require("gator.adapters.pi"),
 	pi_handshake = require("gator.adapters.pi_handshake"),
+	pi_control = require("gator.adapters.pi_control"),
 	pi_stream = require("gator.adapters.pi_stream"),
 	pi_transport = require("gator.adapters.pi_transport"),
 	pi_sessions = require("gator.adapters.pi_sessions"),
