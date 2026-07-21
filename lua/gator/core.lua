@@ -4,6 +4,7 @@ local M = {
 	database = require("gator.core.database"),
 	deep_link = require("gator.core.deep_link"),
 	error_event = require("gator.core.error_event"),
+	event_fanout = require("gator.core.event_fanout"),
 	approval_event = require("gator.core.approval_event"),
 	event_cursor = require("gator.core.event_cursor"),
 	event_ingest = require("gator.core.event_ingest"),
