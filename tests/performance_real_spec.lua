@@ -5,6 +5,7 @@ local automatic = require("gator").module("context").automatic
 local stream = require("gator").module("adapters").stream
 local worktree = require("gator").module("workspace").worktree
 local diff_review = require("gator").module("ui").diff_review
+local timeline = require("gator").module("ui").timeline
 local core_run = require("gator").module("core").run
 local retrieval = require("gator").module("performance").retrieval
 local protocol = require("gator").module("indexer").protocol
@@ -35,6 +36,7 @@ end
 table.insert(payload, vim.json.encode({ type = "complete", reason = "fixture" }))
 local stream_payload = table.concat(payload, "\n") .. "\n"
 local events = 0
+local ui_updates = 0
 local worktree_root = helpers.tempdir("performance-worktree-root")
 local worktree_parent = helpers.tempdir("performance-worktree-parent")
 local before, after = {}, {}
@@ -83,6 +85,45 @@ local report = suite.run({
 			})
 			parser:feed(stream_payload)
 		end,
+		ui_loop = function()
+			timeline.open({
+				calls = {
+					{
+						id = "performance-stream-call",
+						provider = "fixture",
+						session_id = "performance-stream-session",
+						name = "stream_update",
+						arguments = "{}",
+						approval = "not_required",
+						output = "chunk 0",
+						status = "running",
+					},
+				},
+			})
+			for index = 1, 2000 do
+				timeline.update({
+					{
+						id = "performance-stream-call",
+						provider = "fixture",
+						session_id = "performance-stream-session",
+						name = "stream_update",
+						arguments = "{}",
+						approval = "not_required",
+						output = "chunk " .. index,
+						status = "running",
+					},
+				})
+				ui_updates = ui_updates + 1
+			end
+			assert(
+				vim.wait(1000, function()
+					local value = timeline.inspect()
+					return value and not value.refresh_pending
+				end),
+				"benchmark must drain coalesced timeline updates"
+			)
+			assert(timeline.close(), "benchmark must cancel its timeline")
+		end,
 		worktree = function()
 			worktree.create({
 				root = worktree_root,
@@ -127,6 +168,10 @@ local report = suite.run({
 	path = artifact,
 })
 assert(
-	#report.metrics == 6 and #report.regressions == 0 and events == 15000 and vim.fn.filereadable(artifact) == 1,
+	#report.metrics == 7
+		and #report.regressions == 0
+		and events == 15000
+		and ui_updates == 6000
+		and vim.fn.filereadable(artifact) == 1,
 	"real performance cases must exercise fixture-backed Gator operations and emit a regression artifact"
 )
