@@ -63,6 +63,7 @@ local M = {
 	copilot_context = require("gator.adapters.copilot_context"),
 	opencode = require("gator.adapters.opencode"),
 	opencode_handshake = require("gator.adapters.opencode_handshake"),
+	opencode_stream = require("gator.adapters.opencode_stream"),
 	opencode_sessions = require("gator.adapters.opencode_sessions"),
 	opencode_policy = require("gator.adapters.opencode_policy"),
 	opencode_context = require("gator.adapters.opencode_context"),

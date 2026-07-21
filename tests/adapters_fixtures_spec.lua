@@ -180,6 +180,18 @@ assert(
 	"OpenCode fixture must preserve ACP capabilities, sessions, cancellation, and safe failures"
 )
 
+local opencode_stream = {}
+assert(fixtures.replay_jsonrpc(root .. "/opencode_stream.jsonl", function(message)
+	table.insert(opencode_stream, message)
+end) == 6, "OpenCode stream fixture must replay every record")
+assert(
+	opencode_stream[1].params.update.sessionUpdate == "agent_message_chunk"
+		and opencode_stream[3].params.update.toolCallId == "tool-fixture"
+		and opencode_stream[5].params.update.used == 3
+		and opencode_stream[6].error.code == -32603,
+	"OpenCode stream fixture must preserve message, tool, usage, and failure updates"
+)
+
 local pi = {}
 assert(fixtures.replay_jsonl(root .. "/pi_rpc.jsonl", function(record)
 	table.insert(pi, record)
