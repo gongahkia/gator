@@ -1,7 +1,8 @@
 local errors = require("gator.error")
+local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
 local task = require("gator.core.task")
-local M = { schema_version = 3 }
+local M = { schema_version = 4, evidence_excerpt_max_bytes = 4096 }
 local Database = {}
 
 Database.__index = Database
@@ -104,6 +105,42 @@ local function event_insert(value)
 		.. ");"
 end
 
+local function excerpt(value)
+	if type(value) ~= "table" then
+		fail("evidence excerpt must be a table")
+	end
+	for key in pairs(value) do
+		if key ~= "id" and key ~= "task_id" and key ~= "kind" and key ~= "text" and key ~= "at" then
+			fail("evidence excerpt contains unsupported field: " .. tostring(key))
+		end
+	end
+	local text = value.text
+	if type(text) ~= "string" or text == "" then
+		fail("evidence excerpt text must be non-empty")
+	end
+	if type(value.kind) ~= "string" or not value.kind:match("^[a-z][a-z0-9_-]*$") then
+		fail("evidence excerpt kind must be a lowercase identifier")
+	end
+	if type(value.at) ~= "number" or value.at < 0 or value.at % 1 ~= 0 then
+		fail("evidence excerpt at must be a non-negative integer timestamp")
+	end
+	return {
+		id = run_id(value.id),
+		task_id = task_id(value.task_id),
+		kind = value.kind,
+		text = redact.text(text):sub(1, M.evidence_excerpt_max_bytes),
+		at = value.at,
+	}
+end
+
+local function decode_excerpt(value)
+	local ok, record = pcall(vim.json.decode, value)
+	if not ok then
+		fail("evidence excerpt has invalid JSON")
+	end
+	return excerpt(record)
+end
+
 local function migration_one(legacy_dir)
 	legacy_dir = legacy_dir or ""
 	if type(legacy_dir) ~= "string" or legacy_dir == "" then
@@ -187,6 +224,12 @@ local migrations = {
 			"CREATE INDEX run_events_by_run ON run_events (run_id, at, id);",
 			"INSERT INTO run_events (id, run_id, at, record_json) SELECT json_extract(event.value, '$.id'), runs.id, json_extract(event.value, '$.at'), json(event.value) FROM runs, json_each(runs.record_json, '$.events') AS event;",
 			"UPDATE runs SET record_json = json_set(record_json, '$.events', json('[]'));",
+		}
+	end,
+	[4] = function()
+		return {
+			"CREATE TABLE evidence_excerpts (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, kind TEXT NOT NULL, at INTEGER NOT NULL, record_json TEXT NOT NULL);",
+			"CREATE INDEX evidence_excerpts_by_task ON evidence_excerpts (task_id, at, id);",
 		}
 	end,
 }
@@ -386,6 +429,54 @@ function Database:list_runs(task_value)
 	for _, value in ipairs(vim.split(self:exec(query), "\n", { trimempty = true })) do
 		local record = decode_run(value, {})
 		table.insert(result, self:get_run(record.id))
+	end
+	return result
+end
+
+function Database:append_evidence_excerpt(value)
+	local record = excerpt(value)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before evidence writes")
+	end
+	if not self:get_task(record.task_id) then
+		fail("task is unavailable: " .. record.task_id)
+	end
+	self:exec(table.concat({
+		"BEGIN IMMEDIATE;",
+		"INSERT INTO evidence_excerpts (id, task_id, kind, at, record_json) VALUES ("
+			.. quote(record.id)
+			.. ", "
+			.. quote(record.task_id)
+			.. ", "
+			.. quote(record.kind)
+			.. ", "
+			.. record.at
+			.. ", "
+			.. quote(vim.json.encode(record))
+			.. ");",
+		"COMMIT;",
+	}, "\n"))
+	return vim.deepcopy(record)
+end
+
+function Database:list_evidence_excerpts(id)
+	id = task_id(id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before evidence reads")
+	end
+	local result = {}
+	for _, value in
+		ipairs(
+			vim.split(
+				self:exec(
+					"SELECT record_json FROM evidence_excerpts WHERE task_id = " .. quote(id) .. " ORDER BY at, id;"
+				),
+				"\n",
+				{ trimempty = true }
+			)
+		)
+	do
+		table.insert(result, decode_excerpt(value))
 	end
 	return result
 end

@@ -48,7 +48,7 @@ helpers.write(
 )
 
 assert(db:migrate(root), "new local state must migrate")
-assert(db:version() == 3, "SQLite migrations must record every schema version")
+assert(db:version() == 4, "SQLite migrations must record every schema version")
 assert(db:exec("SELECT count(*) FROM session_metadata;"):match("1"), "active session metadata must survive migration")
 assert(db:exec("SELECT count(*) FROM threads;"):match("1"), "thread evidence must survive migration")
 assert(db:exec("SELECT count(*) FROM runs;"):match("1"), "run evidence must survive migration")
@@ -91,7 +91,7 @@ local upgraded = database.open(previous)
 upgraded:exec(
 	"CREATE TABLE runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); PRAGMA user_version = 1;"
 )
-assert(upgraded:migrate() and upgraded:version() == 3, "SQLite migrations must upgrade version one databases")
+assert(upgraded:migrate() and upgraded:version() == 4, "SQLite migrations must upgrade version one databases")
 
 local persisted_run = run.new({
 	id = "run-sqlite",
@@ -151,6 +151,26 @@ assert(
 	not pcall(db.append_run, db, atomic) and not db:get_run("run-atomic"),
 	"failed run event appends must roll back the enclosing run record"
 )
+local stored_excerpt = db:append_evidence_excerpt({
+	id = "evidence-one",
+	task_id = "task-one",
+	kind = "validation",
+	text = "token: private-value " .. string.rep("x", database.evidence_excerpt_max_bytes),
+	at = 10,
+})
+assert(
+	#stored_excerpt.text == database.evidence_excerpt_max_bytes
+		and stored_excerpt.text:find("private%-value") == nil
+		and db:list_evidence_excerpts("task-one")[1].id == "evidence-one",
+	"SQLite evidence excerpts must redact and bound durable output"
+)
+assert(not pcall(db.append_evidence_excerpt, db, stored_excerpt) and not pcall(db.append_evidence_excerpt, db, {
+	id = "evidence-missing",
+	task_id = "task-missing",
+	kind = "validation",
+	text = "missing",
+	at = 11,
+}), "SQLite evidence excerpts must remain append-only and task-bound")
 
 local corrupt = helpers.tempdir("corrupt-database")
 helpers.write(corrupt .. "/sessions.json", "not json")
