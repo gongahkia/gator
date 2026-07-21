@@ -38,6 +38,17 @@ assert(
 	"Codex fixture must preserve sanitized app-server transport traffic"
 )
 
+local codex_stream = {}
+assert(fixtures.replay_jsonl(root .. "/codex_stream.jsonl", function(record)
+	table.insert(codex_stream, record)
+end) == 5, "Codex stream fixture must replay every native notification")
+assert(
+	codex_stream[1].method == "turn/started"
+		and codex_stream[3].params.delta == "gator-fixture"
+		and codex_stream[5].params.turn.status == "completed",
+	"Codex stream fixture must preserve native turn and assistant-message notifications"
+)
+
 local claude = {}
 assert(fixtures.replay_jsonl(root .. "/claude_stream.jsonl", function(record)
 	table.insert(claude, record)

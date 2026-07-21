@@ -1,0 +1,5 @@
+{"method":"turn/started","params":{"threadId":"codex-fixture","turn":{"id":"turn-fixture","items":[],"status":"inProgress"}}}
+{"method":"item/started","params":{"threadId":"codex-fixture","turnId":"turn-fixture","startedAtMs":1,"item":{"id":"item-fixture","type":"agentMessage","text":""}}}
+{"method":"item/agentMessage/delta","params":{"threadId":"codex-fixture","turnId":"turn-fixture","itemId":"item-fixture","delta":"gator-fixture"}}
+{"method":"item/completed","params":{"threadId":"codex-fixture","turnId":"turn-fixture","completedAtMs":2,"item":{"id":"item-fixture","type":"agentMessage","text":"gator-fixture"}}}
+{"method":"turn/completed","params":{"threadId":"codex-fixture","turn":{"id":"turn-fixture","items":[],"status":"completed"}}}
