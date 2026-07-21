@@ -119,6 +119,13 @@ func resolveFuturePath(path string) (string, error) {
 		if !errors.Is(err, os.ErrNotExist) {
 			return "", err
 		}
+		info, lstatErr := os.Lstat(current)
+		if lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("%w: resolve symlink %s: %w", ErrPathEscapesRoot, current, err)
+		}
+		if lstatErr != nil && !errors.Is(lstatErr, os.ErrNotExist) {
+			return "", lstatErr
+		}
 		parent := filepath.Dir(current)
 		if parent == current {
 			return "", err
