@@ -48,7 +48,7 @@ helpers.write(
 )
 
 assert(db:migrate(root), "new local state must migrate")
-assert(db:version() == 5, "SQLite migrations must record every schema version")
+assert(db:version() == 6, "SQLite migrations must record every schema version")
 assert(db:exec("SELECT count(*) FROM session_metadata;"):match("1"), "active session metadata must survive migration")
 assert(db:exec("SELECT count(*) FROM threads;"):match("1"), "thread evidence must survive migration")
 assert(db:exec("SELECT count(*) FROM runs;"):match("1"), "run evidence must survive migration")
@@ -101,7 +101,7 @@ local upgraded = database.open(previous)
 upgraded:exec(
 	"CREATE TABLE task_evidence (task_id TEXT NOT NULL, ref TEXT NOT NULL, record_json TEXT NOT NULL, PRIMARY KEY (task_id, ref)); CREATE TABLE session_metadata (task_id TEXT NOT NULL, provider TEXT NOT NULL, session_id TEXT NOT NULL, record_json TEXT NOT NULL, PRIMARY KEY (task_id, provider, session_id)); CREATE TABLE threads (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); CREATE TABLE runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); PRAGMA user_version = 1;"
 )
-assert(upgraded:migrate() and upgraded:version() == 5, "SQLite migrations must upgrade version one databases")
+assert(upgraded:migrate() and upgraded:version() == 6, "SQLite migrations must upgrade version one databases")
 
 local persisted_run = run.new({
 	id = "run-sqlite",
@@ -181,6 +181,22 @@ assert(not pcall(db.append_evidence_excerpt, db, stored_excerpt) and not pcall(d
 	text = "missing",
 	at = 11,
 }), "SQLite evidence excerpts must remain append-only and task-bound")
+
+local atomic_task = task.new({ id = "task-one", objective = "Atomic task operation", created_at = 1, updated_at = 12 })
+assert(
+	db:commit_task_operation({ task = atomic_task, operation = { id = "operation-one", kind = "review", at = 12 } }).task.objective
+			== "Atomic task operation"
+		and db:list_task_operations("task-one")[1].id == "operation-one",
+	"SQLite task operations must commit a canonical task and immutable receipt together"
+)
+local rejected_task = task.new({ id = "task-one", objective = "Must roll back", created_at = 1, updated_at = 13 })
+assert(
+	not pcall(db.commit_task_operation, db, {
+			task = rejected_task,
+			operation = { id = "operation-one", kind = "review", at = 13 },
+		}) and db:get_task("task-one").objective == "Atomic task operation",
+	"failed task operation receipts must roll back their task update"
+)
 
 local corrupt = helpers.tempdir("corrupt-database")
 helpers.write(corrupt .. "/sessions.json", "not json")

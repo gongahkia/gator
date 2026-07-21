@@ -2,7 +2,7 @@ local errors = require("gator.error")
 local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
 local task = require("gator.core.task")
-local M = { schema_version = 5, evidence_excerpt_max_bytes = 4096 }
+local M = { schema_version = 6, evidence_excerpt_max_bytes = 4096 }
 local Database = {}
 
 Database.__index = Database
@@ -141,6 +141,39 @@ local function decode_excerpt(value)
 	return excerpt(record)
 end
 
+local function operation(value, expected_task_id)
+	if type(value) ~= "table" then
+		fail("task operation must be a table")
+	end
+	for key in pairs(value) do
+		if key ~= "id" and key ~= "task_id" and key ~= "kind" and key ~= "at" then
+			fail("task operation contains unsupported field: " .. tostring(key))
+		end
+	end
+	if value.task_id ~= nil and value.task_id ~= expected_task_id then
+		fail("task operation belongs to a different task")
+	end
+	if type(value.kind) ~= "string" or not value.kind:match("^[a-z][a-z0-9_-]*$") then
+		fail("task operation kind must be a lowercase identifier")
+	end
+	if type(value.at) ~= "number" or value.at < 0 or value.at % 1 ~= 0 then
+		fail("task operation at must be a non-negative integer timestamp")
+	end
+	return { id = run_id(value.id), task_id = expected_task_id, kind = value.kind, at = value.at }
+end
+
+local function task_upsert(record)
+	return "INSERT INTO tasks (id, record_json, created_at, updated_at) VALUES ("
+		.. quote(record.id)
+		.. ", "
+		.. quote(vim.json.encode(record))
+		.. ", "
+		.. record.created_at
+		.. ", "
+		.. record.updated_at
+		.. ") ON CONFLICT(id) DO UPDATE SET record_json = excluded.record_json, created_at = excluded.created_at, updated_at = excluded.updated_at;"
+end
+
 local function migration_one(legacy_dir)
 	legacy_dir = legacy_dir or ""
 	if type(legacy_dir) ~= "string" or legacy_dir == "" then
@@ -244,6 +277,12 @@ local migrations = {
 			"CREATE INDEX run_events_by_time ON run_events (at, id);",
 		}
 	end,
+	[6] = function()
+		return {
+			"CREATE TABLE task_operations (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, kind TEXT NOT NULL, at INTEGER NOT NULL, record_json TEXT NOT NULL);",
+			"CREATE INDEX task_operations_by_task ON task_operations (task_id, at, id);",
+		}
+	end,
 }
 
 function M.open(path)
@@ -312,15 +351,7 @@ function Database:put_task(value)
 	end
 	self:exec(table.concat({
 		"BEGIN IMMEDIATE;",
-		"INSERT INTO tasks (id, record_json, created_at, updated_at) VALUES ("
-			.. quote(record.id)
-			.. ", "
-			.. quote(vim.json.encode(record))
-			.. ", "
-			.. record.created_at
-			.. ", "
-			.. record.updated_at
-			.. ") ON CONFLICT(id) DO UPDATE SET record_json = excluded.record_json, created_at = excluded.created_at, updated_at = excluded.updated_at;",
+		task_upsert(record),
 		"COMMIT;",
 	}, "\n"))
 	return task.from_record(record)
@@ -489,6 +520,65 @@ function Database:list_evidence_excerpts(id)
 		)
 	do
 		table.insert(result, decode_excerpt(value))
+	end
+	return result
+end
+
+function Database:commit_task_operation(value)
+	if type(value) ~= "table" then
+		fail("task operation transaction must be a table")
+	end
+	for key in pairs(value) do
+		if key ~= "task" and key ~= "operation" then
+			fail("task operation transaction contains unsupported field: " .. tostring(key))
+		end
+	end
+	local record = task_record(value.task)
+	local receipt = operation(value.operation, record.id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before task operation writes")
+	end
+	self:exec(table.concat({
+		"BEGIN IMMEDIATE;",
+		task_upsert(record),
+		"INSERT INTO task_operations (id, task_id, kind, at, record_json) VALUES ("
+			.. quote(receipt.id)
+			.. ", "
+			.. quote(receipt.task_id)
+			.. ", "
+			.. quote(receipt.kind)
+			.. ", "
+			.. receipt.at
+			.. ", "
+			.. quote(vim.json.encode(receipt))
+			.. ");",
+		"COMMIT;",
+	}, "\n"))
+	return { task = task.from_record(record), operation = vim.deepcopy(receipt) }
+end
+
+function Database:list_task_operations(id)
+	id = task_id(id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before task operation reads")
+	end
+	local result = {}
+	for _, value in
+		ipairs(
+			vim.split(
+				self:exec(
+					"SELECT record_json FROM task_operations WHERE task_id = " .. quote(id) .. " ORDER BY at, id;"
+				),
+				"\n",
+				{ trimempty = true }
+			)
+		)
+	do
+		local ok, record = pcall(vim.json.decode, value)
+		if not ok then
+			fail("task operation has invalid JSON")
+		end
+		table.insert(result, operation(record, id))
 	end
 	return result
 end
