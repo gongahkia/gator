@@ -5,6 +5,7 @@ local M = {
 	approval_event = require("gator.core.approval_event"),
 	event_cursor = require("gator.core.event_cursor"),
 	event_ingest = require("gator.core.event_ingest"),
+	file_event = require("gator.core.file_event"),
 	filesystem = require("gator.core.filesystem"),
 	git = require("gator.core.git"),
 	json_backend = require("gator.core.json_backend"),
