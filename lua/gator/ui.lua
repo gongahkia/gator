@@ -11,6 +11,7 @@ local M = {
 	event_details = require("gator.ui.event_details"),
 	escalation = require("gator.ui.escalation"),
 	accessibility = require("gator.ui.accessibility"),
+	approval_details = require("gator.ui.approval_details"),
 	markdown = require("gator.ui.markdown"),
 	palette = require("gator.ui.palette"),
 	picker = require("gator.ui.picker"),
