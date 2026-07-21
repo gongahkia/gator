@@ -11,6 +11,10 @@ assert(
 )
 local help = vim.system({ "claude", "--help" }, { text = true }):wait()
 assert(
-	help.code == 0 and (help.stdout or ""):find("stream-json", 1, true),
+	help.code == 0
+		and (help.stdout or ""):find("--input-format", 1, true)
+		and (help.stdout or ""):find("--output-format", 1, true)
+		and (help.stdout or ""):find("stream-json", 1, true)
+		and (help.stdout or ""):find("--verbose", 1, true),
 	"protected Claude verification requires structured stream support"
 )
