@@ -15,6 +15,7 @@ local M = {
 	lifecycle = require("gator.core.lifecycle"),
 	launch_queue = require("gator.core.launch_queue"),
 	output_excerpt = require("gator.core.output_excerpt"),
+	process_classification = require("gator.core.process_classification"),
 	provider_event = require("gator.core.provider_event"),
 	provider_status = require("gator.core.provider_status"),
 	retention = require("gator.core.retention"),
