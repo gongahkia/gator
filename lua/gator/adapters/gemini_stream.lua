@@ -33,6 +33,26 @@ local function session(value, context, name)
 	return value
 end
 
+local function integer(value, name)
+	if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
+		fail(name .. " must be a non-negative integer")
+	end
+	return value
+end
+
+local function path(value)
+	if
+		type(value) ~= "string"
+		or value == ""
+		or value:sub(1, 1) == "/"
+		or value:match("^%a:[/\\]")
+		or value:find("..", 1, true)
+	then
+		return nil
+	end
+	return value
+end
+
 local function sensitive(key)
 	key = key:lower()
 	return key:match("token")
@@ -85,33 +105,65 @@ local function message(value)
 	return { type = value.delta == true and "message.delta" or "message.completed", payload = { text = content } }
 end
 
-local function tool_use(value)
+local function tool_use(value, calls, commit)
 	object(value, "tool-use event")
 	local parameters = value.parameters or {}
 	object(parameters, "tool-use event.parameters")
+	local id = text(value.tool_id, "tool-use event.tool_id")
+	local name = text(value.tool_name, "tool-use event.tool_name")
+	if commit and (name == "write_file" or name == "replace") then
+		local file = path(parameters.file_path)
+		if file then
+			calls[id] = { path = file, kind = "modified" }
+		end
+	end
 	return {
 		type = "tool.call",
 		payload = {
-			call_id = text(value.tool_id, "tool-use event.tool_id"),
-			name = text(value.tool_name, "tool-use event.tool_name"),
+			call_id = id,
+			name = name,
 			input = safe(parameters, "tool-use event.parameters"),
 		},
 	}
 end
 
-local function tool_result(value)
+local function tool_result(value, calls, commit)
 	object(value, "tool-result event")
 	local states = { success = "completed", error = "failed", cancelled = "cancelled", canceled = "cancelled" }
 	local state = states[text(value.status, "tool-result event.status")]
 	if not state then
 		fail("tool-result event.status is unsupported")
 	end
-	return {
+	local id = text(value.tool_id, "tool-result event.tool_id")
+	local events = {
 		type = "tool.result",
 		payload = {
-			call_id = text(value.tool_id, "tool-result event.tool_id"),
+			call_id = id,
 			state = state,
 			output = value.output == nil and {} or safe(value.output, "tool-result event.output"),
+		},
+	}
+	local change = calls[id]
+	if change and state == "completed" then
+		events = { events, { type = "file.change", payload = vim.deepcopy(change) } }
+	end
+	if commit then
+		calls[id] = nil
+	end
+	return events
+end
+
+local function usage(value)
+	local stats = object(value.stats, "result event.stats")
+	return {
+		type = "usage.update",
+		payload = {
+			input = integer(stats.input_tokens, "result event.stats.input_tokens"),
+			output = integer(stats.output_tokens, "result event.stats.output_tokens"),
+			total = integer(stats.total_tokens, "result event.stats.total_tokens"),
+			cached = integer(stats.cached, "result event.stats.cached"),
+			duration_ms = integer(stats.duration_ms, "result event.stats.duration_ms"),
+			tool_calls = integer(stats.tool_calls, "result event.stats.tool_calls"),
 		},
 	}
 end
@@ -119,17 +171,25 @@ end
 local function result(value)
 	object(value, "result event")
 	local status = text(value.status, "result event.status")
+	local events = {}
+	if value.stats ~= nil then
+		events[#events + 1] = usage(value)
+	end
 	if status == "success" then
-		return { type = "run.completed", payload = { status = "completed" } }
+		events[#events + 1] = { type = "run.completed", payload = { status = "completed" } }
+		return #events == 1 and events[1] or events
 	end
 	if status ~= "error" and status ~= "failed" and status ~= "cancelled" and status ~= "canceled" then
 		fail("result event.status is unsupported")
 	end
-	local message = type(value.error) == "string" and redact.text(value.error) or "Gemini stream failed"
-	return {
+	local message = type(value.error) == "string" and redact.text(value.error)
+		or type(value.error) == "table" and type(value.error.message) == "string" and redact.text(value.error.message)
+		or "Gemini stream failed"
+	events[#events + 1] = {
 		type = "run.error",
 		payload = { kind = "provider", message = message, retryable = false },
 	}
+	return #events == 1 and events[1] or events
 end
 
 local function provider_error(value)
@@ -143,7 +203,7 @@ local function provider_error(value)
 	}
 end
 
-local function decode(raw, context)
+local function decode(raw, context, calls, commit)
 	object(raw, "stream event")
 	local kind = text(raw.type, "stream event.type")
 	if kind == "init" then
@@ -154,10 +214,10 @@ local function decode(raw, context)
 		return message(raw)
 	end
 	if kind == "tool_use" then
-		return tool_use(raw)
+		return tool_use(raw, calls, commit)
 	end
 	if kind == "tool_result" then
-		return tool_result(raw)
+		return tool_result(raw, calls, commit)
 	end
 	if kind == "error" then
 		return provider_error(raw)
@@ -178,9 +238,25 @@ function M.new(opts)
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
-	return setmetatable({
-		decoder = decoder.new({ provider = "gemini", decode = decode, event_id = opts.event_id, now = opts.now }),
-	}, Stream)
+	local value = setmetatable({ tool_calls = {} }, Stream)
+	value.decoder = decoder.new({
+		provider = "gemini",
+		decode = function(raw, context)
+			return decode(raw, context, value.tool_calls, true)
+		end,
+		event_id = opts.event_id,
+		now = opts.now,
+	})
+	return value
+end
+
+function M.signals()
+	return {
+		provider = "gemini",
+		usage = { available = true },
+		file_changes = { available = true },
+		compaction = { available = false, reason = "Gemini stream-json does not emit compaction events" },
+	}
 end
 
 function M.unavailable(reason)
@@ -212,7 +288,7 @@ function Stream:feed(raw, context)
 	if self.decoder:status().state ~= "ready" then
 		return self.decoder:decode(raw, context)
 	end
-	if decode(raw, context or {}) == nil then
+	if decode(raw, context or {}, self.tool_calls, false) == nil then
 		return {}
 	end
 	return self.decoder:decode(raw, context)

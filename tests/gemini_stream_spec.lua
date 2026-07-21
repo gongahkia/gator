@@ -15,7 +15,7 @@ fixtures.replay_jsonl(vim.g.gator_test.root .. "/tests/fixtures/adapters/gemini_
 	end
 end)
 assert(
-	#events == 5
+	#events == 6
 		and events[1].type == "run.started"
 		and events[2].type == "tool.call"
 		and events[2].payload.name == "list_directory"
@@ -23,17 +23,62 @@ assert(
 		and events[3].payload.state == "completed"
 		and events[4].type == "message.delta"
 		and events[4].payload.text == "README.md"
-		and events[5].type == "run.completed",
+		and events[5].type == "usage.update"
+		and events[5].payload.input == 2
+		and events[5].payload.total == 5
+		and events[6].type == "run.completed",
 	"Gemini streams must normalize native init, tool, assistant, and completion events"
 )
 
-local failed = stream.new()
-local error = failed:feed({ type = "result", status = "error", error = "token=fixture-secret" }, {
+local signals = stream.new()
+signals:feed({
+	type = "tool_use",
+	tool_id = "write-fixture",
+	tool_name = "write_file",
+	parameters = { file_path = "lua/gator/init.lua", content = "fixture" },
+}, { run_id = "run-gemini", session_id = "gemini-fixture" })
+local file_events = signals:feed({ type = "tool_result", tool_id = "write-fixture", status = "success" }, {
 	run_id = "run-gemini",
 	session_id = "gemini-fixture",
-})[1]
+})
 assert(
-	error.type == "run.error" and error.payload.message == "token=[REDACTED]" and not error.payload.retryable,
+	file_events[1].type == "tool.result"
+		and file_events[2].type == "file.change"
+		and file_events[2].payload.path == "lua/gator/init.lua"
+		and file_events[2].payload.kind == "modified",
+	"Gemini successful write tools must normalize file-change signals"
+)
+assert(
+	stream.signals().usage.available
+		and stream.signals().file_changes.available
+		and not stream.signals().compaction.available,
+	"Gemini signal support must expose unavailable compaction explicitly"
+)
+
+local failed = stream.new()
+local error_events = failed:feed({
+	type = "result",
+	status = "error",
+	error = { type = "provider", message = "token=fixture-secret" },
+	stats = {
+		total_tokens = 3,
+		input_tokens = 2,
+		output_tokens = 1,
+		cached = 0,
+		input = 2,
+		duration_ms = 1,
+		tool_calls = 0,
+	},
+}, {
+	run_id = "run-gemini",
+	session_id = "gemini-fixture",
+})
+local error = error_events[2]
+assert(
+	error_events[1].type == "usage.update"
+		and error.type == "run.error"
+		and error.payload.message == "token=[REDACTED]"
+		and not error.payload.retryable,
 	"Gemini stream failures must remain explicit and redacted"
 )
 
