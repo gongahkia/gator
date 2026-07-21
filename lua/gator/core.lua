@@ -22,6 +22,7 @@ local M = {
 	retention = require("gator.core.retention"),
 	runtime = require("gator.core.runtime"),
 	run = require("gator.core.run"),
+	run_limits = require("gator.core.run_limits"),
 	run_reconciliation = require("gator.core.run_reconciliation"),
 	stream_reconnect = require("gator.core.stream_reconnect"),
 	supervisor = require("gator.core.supervisor"),
