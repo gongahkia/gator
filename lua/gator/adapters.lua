@@ -22,6 +22,7 @@ local M = {
 	codex_context = require("gator.adapters.codex_context"),
 	claude = require("gator.adapters.claude"),
 	claude_handshake = require("gator.adapters.claude_handshake"),
+	claude_permission = require("gator.adapters.claude_permission"),
 	claude_stream = require("gator.adapters.claude_stream"),
 	claude_sessions = require("gator.adapters.claude_sessions"),
 	claude_policy = require("gator.adapters.claude_policy"),
