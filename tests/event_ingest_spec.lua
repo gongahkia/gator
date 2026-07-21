@@ -2,10 +2,23 @@ local ingest = require("gator").module("core").event_ingest
 local event = require("gator").module("core").provider_event
 local runtime = require("gator").module("core").runtime
 
+local function cursor()
+	local values = {}
+	return {
+		assert_next = function(_, value)
+			assert(value.sequence == (values[value.run_id] or -1) + 1, "event sequence must be contiguous")
+		end,
+		advance = function(_, value)
+			values[value.run_id] = value.sequence
+		end,
+	}
+end
+
 local scheduled, received = {}, {}
 local service = ingest.new({
 	runtime = runtime.new(),
 	id = "provider-events",
+	cursor = cursor(),
 	schedule = function(callback)
 		table.insert(scheduled, callback)
 	end,
@@ -42,6 +55,7 @@ local failing_scheduled = {}
 local failing = ingest.new({
 	runtime = runtime.new(),
 	id = "failing-events",
+	cursor = cursor(),
 	schedule = function(callback)
 		table.insert(failing_scheduled, callback)
 	end,
@@ -66,6 +80,7 @@ assert(
 local bounded = ingest.new({
 	runtime = runtime.new(),
 	id = "bounded-events",
+	cursor = cursor(),
 	limit = 1,
 	schedule = function() end,
 	sink = {
@@ -80,7 +95,7 @@ local replacement = event.new({
 	id = "event-ingest-two",
 	run_id = "run-ingest",
 	provider = { name = "codex" },
-	sequence = 1,
+	sequence = 0,
 	type = "message.delta",
 	at = 2,
 })
@@ -88,6 +103,7 @@ local newest_scheduled, newest_received = {}, {}
 local newest = ingest.new({
 	runtime = runtime.new(),
 	id = "drop-oldest-events",
+	cursor = cursor(),
 	limit = 1,
 	overflow = "drop_oldest",
 	schedule = function(callback)

@@ -27,6 +27,7 @@ function M.new(opts)
 			key ~= "runtime"
 			and key ~= "id"
 			and key ~= "sink"
+			and key ~= "cursor"
 			and key ~= "schedule"
 			and key ~= "on_error"
 			and key ~= "limit"
@@ -40,6 +41,13 @@ function M.new(opts)
 	end
 	if type(opts.sink) ~= "table" or type(opts.sink.append) ~= "function" then
 		fail("new requires an event sink append function")
+	end
+	if
+		type(opts.cursor) ~= "table"
+		or type(opts.cursor.assert_next) ~= "function"
+		or type(opts.cursor.advance) ~= "function"
+	then
+		fail("new requires a persistent event cursor")
 	end
 	if opts.schedule ~= nil and type(opts.schedule) ~= "function" then
 		fail("schedule must be a function")
@@ -59,6 +67,7 @@ function M.new(opts)
 		runtime = opts.runtime,
 		id = identifier(opts.id or "provider-events", "service id"),
 		sink = opts.sink,
+		cursor = opts.cursor,
 		schedule = opts.schedule or vim.schedule,
 		on_error = opts.on_error,
 		pending = {},
@@ -165,6 +174,11 @@ function Ingest:drain()
 	self.scheduled = false
 	while self.active and #self.pending > 0 do
 		local value = self.pending[1]
+		local sequenced, sequence = pcall(self.cursor.assert_next, self.cursor, value)
+		if not sequenced then
+			self.last_error = redact.text(tostring(sequence))
+			return false
+		end
 		local ok, detail =
 			pcall(self.sink.append, self.sink, provider_event.from_record(provider_event.to_record(value)))
 		if not ok then
@@ -172,6 +186,11 @@ function Ingest:drain()
 			if self.on_error then
 				pcall(self.on_error, self.last_error)
 			end
+			return false
+		end
+		local advanced, cursor = pcall(self.cursor.advance, self.cursor, value)
+		if not advanced then
+			self.last_error = redact.text(tostring(cursor))
 			return false
 		end
 		table.remove(self.pending, 1)
