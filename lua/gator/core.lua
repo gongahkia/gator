@@ -15,6 +15,7 @@ local M = {
 	session_metadata = require("gator.core.session_metadata"),
 	storage = require("gator.core.storage"),
 	task = require("gator.core.task"),
+	task_file = require("gator.core.task_file"),
 	thread = require("gator.core.thread"),
 }
 
