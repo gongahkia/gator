@@ -1,6 +1,6 @@
 local M = {}
 
-M.range = { minimum = { 0, 80, 7 }, maximum = { 0, 80, 7 } }
+M.range = { minimum = { 0, 80, 7 }, maximum = { 0, 80, 10 } }
 
 local function fail(message)
 	error("Gator Pi adapter: " .. message, 3)
