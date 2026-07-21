@@ -13,6 +13,7 @@ local M = {
 	json_backend = require("gator.core.json_backend"),
 	lifecycle = require("gator.core.lifecycle"),
 	launch_queue = require("gator.core.launch_queue"),
+	output_excerpt = require("gator.core.output_excerpt"),
 	provider_event = require("gator.core.provider_event"),
 	provider_status = require("gator.core.provider_status"),
 	retention = require("gator.core.retention"),
