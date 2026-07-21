@@ -1,7 +1,7 @@
 local dependencies = require("gator.coordinator.dependencies")
 local cancellation = require("gator.coordinator.cancellation")
 
-local M = { name = "coordinator", api_version = 1 }
+local M = { name = "coordinator", api_version = 1, inspection_schema_version = 1 }
 local Coordinator = {}
 local Operation = {}
 Coordinator.__index = Coordinator
@@ -119,6 +119,26 @@ function Coordinator:state()
 		fail("state requires an initialized coordinator")
 	end
 	return self._state
+end
+
+function Coordinator:inspect()
+	if not M.is(self) then
+		fail("inspect requires an initialized coordinator")
+	end
+	local state = self:state()
+	local operations = {}
+	for _, operation in pairs(self._operation_keys) do
+		table.insert(operations, operation:status())
+	end
+	table.sort(operations, function(left, right)
+		return left.id == right.id and left.key < right.key or left.id < right.id
+	end)
+	return {
+		schema_version = M.inspection_schema_version,
+		state_version = state:version(),
+		state = state:snapshot(),
+		operations = operations,
+	}
 end
 
 function Coordinator:open()

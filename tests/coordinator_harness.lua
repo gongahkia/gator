@@ -36,7 +36,7 @@ function Harness:state()
 	if not M.is(self) or self.closed then
 		fail("state requires an active harness")
 	end
-	return self.gator._state:snapshot()
+	return self.gator.inspect().state
 end
 
 function Harness:dispatch(action, opts)

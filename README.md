@@ -12,6 +12,8 @@ Provider CLIs are optional and provider-owned. Install and authenticate each CLI
 
 Automation can read the versioned local compatibility manifest through `require("gator").compatibility_manifest()` or its JSON form, `compatibility_manifest_json()`. It reports only Neovim version and local capability status; it does not probe, store, or expose provider credentials.
 
+UI consumers can read immutable coordinator state and operation snapshots through `require("gator").inspect()`; the returned `schema_version` is the inspection contract version.
+
 ## Install
 
 With `lazy.nvim`:

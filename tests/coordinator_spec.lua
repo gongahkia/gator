@@ -20,4 +20,19 @@ assert(not pcall(coordinator.new, { unsupported = true }), "coordinator must rej
 assert(not pcall(value.state, {}), "coordinator methods must reject invalid receivers")
 assert(value:module("core").name == "core", "coordinator must resolve public modules through its container")
 
+local operation = value:start_operation({ id = "inspection-run", key = "inspection-run-key", kind = "launch" })
+value:cancel_operation("inspection-run", "token: private-value")
+local inspection = value:inspect()
+assert(
+	inspection.schema_version == 1
+		and inspection.state_version == 0
+		and inspection.state.config.telemetry.enabled
+		and inspection.operations[1].state == "cancelled"
+		and inspection.operations[1].reason:find("private%-value") == nil,
+	"coordinator inspection must expose versioned, redacted state and operation snapshots"
+)
+inspection.state.config.telemetry.enabled = false
+assert(value:inspect().state.config.telemetry.enabled, "coordinator inspection snapshots must not mutate live state")
+assert(not pcall(value.inspect, {}), "coordinator inspection must reject invalid receivers")
+
 coordinator.new()

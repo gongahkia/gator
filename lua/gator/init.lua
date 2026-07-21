@@ -41,6 +41,13 @@ function M.compatibility_manifest_json(opts)
 	return compat.manifest_json(opts)
 end
 
+function M.inspect()
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:inspect()
+end
+
 function M.open()
 	return M.dispatch("open")
 end
