@@ -382,6 +382,60 @@ function M.is_watcher(value)
 	return getmetatable(value) == Watcher
 end
 
+local function task_copy(value, name)
+	local ok, record = pcall(task.to_record, value)
+	if not ok then
+		fail(name .. " must be a canonical task")
+	end
+	return task.from_record(record), record
+end
+
+function M.resolve_conflict(opts)
+	if type(opts) ~= "table" then
+		fail("task-file conflict resolution requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "file" and key ~= "operational" and key ~= "strategy" then
+			fail("task-file conflict resolution contains unsupported field: " .. tostring(key))
+		end
+	end
+	local file, file_record = task_copy(opts.file, "task-file conflict file")
+	local operational, operational_record
+	if opts.operational ~= nil then
+		operational, operational_record = task_copy(opts.operational, "task-file conflict operational state")
+		if operational.id ~= file.id then
+			fail("task-file conflict tasks must share an id")
+		end
+	end
+	if
+		opts.strategy ~= nil
+		and opts.strategy ~= "file"
+		and opts.strategy ~= "operational"
+		and opts.strategy ~= "cancel"
+	then
+		fail("task-file conflict strategy is unavailable: " .. tostring(opts.strategy))
+	end
+	if opts.strategy == "cancel" then
+		return { resolution = "cancelled" }
+	end
+	if not operational then
+		if opts.strategy == "operational" then
+			fail("task-file operational state is unavailable")
+		end
+		return { resolution = "file", task = file }
+	end
+	if vim.deep_equal(file_record, operational_record) then
+		return { resolution = "identical", task = file }
+	end
+	if opts.strategy == nil then
+		fail("task-file conflict requires an explicit strategy")
+	end
+	if opts.strategy == "file" then
+		return { resolution = "file", task = file }
+	end
+	return { resolution = "operational", task = operational }
+end
+
 function Watcher:import()
 	if not M.is_watcher(self) then
 		fail("task-file import requires a watcher")
@@ -389,7 +443,39 @@ function Watcher:import()
 	if not self.filesystem:readable(self.path) then
 		fail("task-file is unavailable: " .. self.path)
 	end
-	local ok, persisted = pcall(self.backend.put_task, self.backend, M.parse(self.filesystem:read(self.path)))
+	local incoming = M.parse(self.filesystem:read(self.path))
+	local found, operational = pcall(self.backend.get_task, self.backend, incoming.id)
+	if not found then
+		fail("cannot read operational task state: " .. tostring(operational))
+	end
+	local strategy
+	if operational and not vim.deep_equal(task.to_record(incoming), task.to_record(operational)) then
+		if not self.on_conflict then
+			fail("task-file conflict requires an explicit strategy")
+		end
+		local decided, value = pcall(self.on_conflict, {
+			path = self.path,
+			file = task.from_record(task.to_record(incoming)),
+			operational = task.from_record(task.to_record(operational)),
+		})
+		if not decided then
+			fail("task-file conflict callback failed: " .. tostring(value))
+		end
+		strategy = value
+	end
+	local resolution = M.resolve_conflict({ file = incoming, operational = operational, strategy = strategy })
+	self.last_resolution = resolution.resolution
+	if resolution.resolution == "cancelled" then
+		return false
+	end
+	local ok, persisted
+	if resolution.resolution == "operational" then
+		M.write(self.path, resolution.task, { filesystem = self.filesystem })
+		ok = true
+		persisted = resolution.task
+	else
+		ok, persisted = pcall(self.backend.put_task, self.backend, resolution.task)
+	end
 	if not ok then
 		fail("cannot persist external task-file: " .. tostring(persisted))
 	end
@@ -447,7 +533,12 @@ function Watcher:status()
 	if not M.is_watcher(self) then
 		fail("task-file status requires a watcher")
 	end
-	return { path = self.path, active = self.active, last_error = self.last_error }
+	return {
+		path = self.path,
+		active = self.active,
+		last_error = self.last_error,
+		last_resolution = self.last_resolution,
+	}
 end
 
 function M.watch(path, opts)
@@ -456,17 +547,28 @@ function M.watch(path, opts)
 		fail("task-file watch requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "filesystem" and key ~= "backend" and key ~= "on_change" and key ~= "on_error" and key ~= "watch" then
+		if
+			key ~= "filesystem"
+			and key ~= "backend"
+			and key ~= "on_change"
+			and key ~= "on_error"
+			and key ~= "on_conflict"
+			and key ~= "watch"
+		then
 			fail("task-file watch contains unsupported field: " .. tostring(key))
 		end
 	end
 	if opts.filesystem ~= nil and not filesystem.is(opts.filesystem) then
 		fail("task-file watch filesystem must be a Gator filesystem")
 	end
-	if type(opts.backend) ~= "table" or type(opts.backend.put_task) ~= "function" then
-		fail("task-file watch backend must expose put_task")
+	if
+		type(opts.backend) ~= "table"
+		or type(opts.backend.put_task) ~= "function"
+		or type(opts.backend.get_task) ~= "function"
+	then
+		fail("task-file watch backend must expose put_task and get_task")
 	end
-	for _, name in ipairs({ "on_change", "on_error", "watch" }) do
+	for _, name in ipairs({ "on_change", "on_error", "on_conflict", "watch" }) do
 		if opts[name] ~= nil and type(opts[name]) ~= "function" then
 			fail("task-file watch " .. name .. " must be a function")
 		end
@@ -478,6 +580,7 @@ function M.watch(path, opts)
 		backend = opts.backend,
 		on_change = opts.on_change,
 		on_error = opts.on_error,
+		on_conflict = opts.on_conflict,
 		active = true,
 	}, Watcher)
 	local ok, stopper = pcall(opts.watch or native_watch, path, function(err, changed)

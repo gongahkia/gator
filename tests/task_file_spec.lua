@@ -116,7 +116,7 @@ assert(not pcall(format.write, "/fixture/task-write-failure.md", parsed, {
 	}),
 }), "task-file projections must expose filesystem write failures")
 
-local watched, callback, stopped = {}, nil, false
+local watched, callback, stopped, operational = {}, nil, false, nil
 files["/fixture/task-external.md"] = definition
 local watcher = format.watch("/fixture/task-external.md", {
 	filesystem = filesystem.new({
@@ -130,9 +130,16 @@ local watcher = format.watch("/fixture/task-external.md", {
 	backend = {
 		put_task = function(_, value)
 			watched[#watched + 1] = value
+			operational = value
 			return value
 		end,
+		get_task = function()
+			return operational
+		end,
 	},
+	on_conflict = function()
+		return "file"
+	end,
 	watch = function(_, value)
 		callback = value
 		return function()
@@ -156,4 +163,17 @@ assert(
 assert(
 	watcher:stop() and stopped and callback(nil, "task-external.md") == false,
 	"task-file watchers must be cancellable"
+)
+
+local external = format.parse(definition:gsub("- lifecycle: planned", "- lifecycle: running", 1))
+assert(
+	format.resolve_conflict({ file = external, operational = parsed, strategy = "file" }).task.lifecycle == "running"
+		and format.resolve_conflict({ file = external, operational = parsed, strategy = "operational" }).task.lifecycle == "planned"
+		and format.resolve_conflict({ file = external, operational = parsed, strategy = "cancel" }).resolution
+			== "cancelled",
+	"task-file conflicts must select file, operational, or cancelled outcomes explicitly"
+)
+assert(
+	not pcall(format.resolve_conflict, { file = external, operational = parsed }),
+	"task-file conflicts must reject implicit overwrites"
 )
