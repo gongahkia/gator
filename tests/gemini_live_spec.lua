@@ -37,6 +37,31 @@ for line in vim.gsplit(result.stdout or "", "\n", { plain = true, trimempty = tr
 		complete = complete or (event.type == "result" and event.status == "success")
 	end
 end
+local resumed
+local resumed_session_id
+local resumed_complete = false
+if session_id then
+	resumed = vim.system({
+		"gemini",
+		"--resume",
+		session_id,
+		"--prompt",
+		"Reply exactly: gator-live-recovered",
+		"--approval-mode",
+		"plan",
+		"--output-format",
+		"stream-json",
+	}, { cwd = workspace, text = true }):wait()
+	for line in vim.gsplit(resumed.stdout or "", "\n", { plain = true, trimempty = true }) do
+		local ok, event = pcall(vim.json.decode, line)
+		if ok and type(event) == "table" then
+			if event.type == "init" and type(event.session_id) == "string" and event.session_id ~= "" then
+				resumed_session_id = event.session_id
+			end
+			resumed_complete = resumed_complete or (event.type == "result" and event.status == "success")
+		end
+	end
+end
 local deleted
 if session_id then
 	deleted = vim.system({ "gemini", "--delete-session", session_id }, { cwd = workspace, text = true }):wait()
@@ -45,6 +70,10 @@ vim.fn.delete(workspace, "d")
 assert(result.code == 0, "authenticated Gemini verification requires a successful headless run")
 assert(session_id, "authenticated Gemini verification requires a native session id")
 assert(complete, "authenticated Gemini verification requires a successful stream result")
+assert(
+	resumed and resumed.code == 0 and resumed_session_id == session_id and resumed_complete,
+	"Gemini E2E must recover the same native session"
+)
 assert(
 	deleted and deleted.code == 0 and (deleted.stdout or ""):match("^Deleted session "),
 	"Gemini E2E must delete its native session"
