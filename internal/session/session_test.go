@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -103,6 +104,67 @@ func TestStorePersistsManifestAndEvents(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("manifest mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestAppendAssignsContiguousSequencesUnderConcurrency(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-journal-concurrent", cwd, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const writers = 32
+	errs := make(chan error, writers)
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := store.Append(Event{Type: "session.updated"})
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	events, err := store.Events()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != writers {
+		t.Fatalf("events = %d, want %d", len(events), writers)
+	}
+	for i, event := range events {
+		if event.Sequence != i+1 || event.SessionID != manifest.ID {
+			t.Fatalf("event %d = %#v", i, event)
+		}
+	}
+}
+
+func TestEventsRejectWrongSessionID(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-journal-binding", cwd, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := []byte(`{"schema_version":"paw.session/2","session_id":"session-other","sequence":1,"at":"2026-07-21T00:00:00Z","type":"session.started"}` + "\n")
+	if err := os.WriteFile(filepath.Join(store.Dir(), "events.ndjson"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Events(); err == nil {
+		t.Fatal("expected session binding error")
 	}
 }
 

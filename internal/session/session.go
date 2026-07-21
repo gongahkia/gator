@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gongahkia/paw/internal/workspace"
@@ -28,6 +29,7 @@ var (
 	ErrMigrationRequired  = errors.New("session state migration required")
 	ErrUnsupportedSchema  = errors.New("unsupported session schema")
 	ErrSessionIDCollision = errors.New("session id collision")
+	journalMu             sync.Mutex
 )
 
 type Status string
@@ -256,11 +258,13 @@ func (s *Store) Append(event Event) (Event, error) {
 	if s == nil {
 		return Event{}, errors.New("nil session store")
 	}
+	journalMu.Lock()
+	defer journalMu.Unlock()
 	manifest, err := s.LoadManifest()
 	if err != nil {
 		return Event{}, err
 	}
-	events, err := s.Events()
+	events, err := s.events(manifest.ID)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Event{}, err
 	}
@@ -297,6 +301,16 @@ func (s *Store) Events() ([]Event, error) {
 	if s == nil {
 		return nil, errors.New("nil session store")
 	}
+	journalMu.Lock()
+	defer journalMu.Unlock()
+	manifest, err := s.LoadManifest()
+	if err != nil {
+		return nil, err
+	}
+	return s.events(manifest.ID)
+}
+
+func (s *Store) events(sessionID string) ([]Event, error) {
 	file, err := os.Open(filepath.Join(s.dir, "events.ndjson"))
 	if err != nil {
 		return nil, err
@@ -315,7 +329,7 @@ func (s *Store) Events() ([]Event, error) {
 		if err := validateSchemaVersion(event.SchemaVersion); err != nil {
 			return nil, fmt.Errorf("invalid session event %d: %w", len(events)+1, err)
 		}
-		if event.Sequence != len(events)+1 {
+		if event.SessionID != sessionID || event.Sequence != len(events)+1 || strings.TrimSpace(event.Type) == "" {
 			return nil, fmt.Errorf("invalid session event %d", len(events)+1)
 		}
 		events = append(events, event)
