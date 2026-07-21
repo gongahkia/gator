@@ -96,10 +96,34 @@ func TestCheckCommandPolicy(t *testing.T) {
 	if err := CheckCommand(cfg, "go test ./..."); !errors.Is(err, ErrApprovalRequired) {
 		t.Fatalf("approval command error = %v", err)
 	}
+	cfg.Approval.AutoApprove = true
+	if err := CheckCommand(cfg, "go test ./..."); err != nil {
+		t.Fatalf("autoapproved command error = %v", err)
+	}
+	if err := CheckCommand(cfg, "rm -rf"); !errors.Is(err, ErrDenied) {
+		t.Fatalf("autoapproved denylisted command error = %v", err)
+	}
 
 	cfg.Command.RequireApproval = false
 	if err := CheckCommand(cfg, "go test ./..."); err != nil {
 		t.Fatalf("allowed command error = %v", err)
+	}
+}
+
+func TestCheckAutoApproval(t *testing.T) {
+	cfg := config.Defaults().Policy
+	if err := CheckAutoApproval(cfg); !errors.Is(err, ErrApprovalRequired) {
+		t.Fatalf("default autoapproval error = %v", err)
+	}
+	cfg.Approval.AutoApprove = true
+	if err := CheckAutoApproval(cfg); err != nil {
+		t.Fatalf("enabled autoapproval error = %v", err)
+	}
+	cfg.Version = "paw.policy/unknown"
+	err := CheckAutoApproval(cfg)
+	var diagnostic *config.PolicyValidationError
+	if !errors.As(err, &diagnostic) || diagnostic.Path != "policy.version" {
+		t.Fatalf("invalid autoapproval policy error = %v", err)
 	}
 }
 

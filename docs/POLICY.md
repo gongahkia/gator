@@ -50,5 +50,9 @@ take precedence. A nonempty allowlist denies every command not listed; otherwise
 `policy.risk` limits apply independently to each milestone's file, line, token, and command risk.
 An estimate exceeding any one limit is denied.
 
+`policy.approval.auto_approve` defaults to false. Setting it to true permits automatic approval at
+approval gates, but does not bypass command denies, command allowlists, remote allowlists, or risk
+limits.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

@@ -64,6 +64,20 @@ func allowsTransport(allowed []string, transport string) bool {
 	return false
 }
 
+func CheckAutoApproval(cfg config.PolicyConfig) error {
+	if err := Validate(cfg); err != nil {
+		return err
+	}
+	return checkAutoApproval(cfg)
+}
+
+func checkAutoApproval(cfg config.PolicyConfig) error {
+	if !cfg.Approval.AutoApprove {
+		return ErrApprovalRequired
+	}
+	return nil
+}
+
 func CheckCommand(cfg config.PolicyConfig, command string) error {
 	if err := Validate(cfg); err != nil {
 		return err
@@ -78,7 +92,9 @@ func CheckCommand(cfg config.PolicyConfig, command string) error {
 		return fmt.Errorf("%w: command %q is not allowlisted", ErrDenied, command)
 	}
 	if cfg.Command.RequireApproval {
-		return fmt.Errorf("%w: command %q", ErrApprovalRequired, command)
+		if err := checkAutoApproval(cfg); err != nil {
+			return fmt.Errorf("%w: command %q", err, command)
+		}
 	}
 	return nil
 }
