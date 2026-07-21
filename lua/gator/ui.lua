@@ -271,6 +271,74 @@ function M.set_status(state, status, detail)
 	return state:update({ workspace = { status = status, detail = detail } }).workspace
 end
 
+function M.create_task(state, opts)
+	if not state_store.is(state) or type(opts) ~= "table" then
+		fail("create_task requires initialized Gator state and options")
+	end
+	for key in pairs(opts) do
+		if key ~= "id" and key ~= "objective" and key ~= "captures" and key ~= "now" then
+			fail("create_task contains unsupported field: " .. tostring(key))
+		end
+	end
+	if type(opts.id) ~= "string" or not opts.id:match("^[a-z][a-z0-9_-]*$") then
+		fail("create_task id must be a lowercase identifier")
+	end
+	if type(opts.objective) ~= "string" or opts.objective == "" then
+		fail("create_task objective must be non-empty text")
+	end
+	local now = opts.now or os.time()
+	if type(now) ~= "number" or now < 0 or now % 1 ~= 0 then
+		fail("create_task now must be a non-negative integer")
+	end
+	local captures = opts.captures or {}
+	if type(captures) ~= "table" or not vim.islist(captures) then
+		fail("create_task captures must be an array")
+	end
+	local evidence = {}
+	for index, capture in ipairs(captures) do
+		local entry = context_pack.entry(capture)
+		evidence[index] = { kind = entry.kind, ref = entry.ref }
+	end
+	local task = core_task.new({
+		id = opts.id,
+		objective = opts.objective,
+		lifecycle = "draft",
+		evidence = evidence,
+		created_at = now,
+		updated_at = now,
+	})
+	state:mutate(function(next)
+		for _, existing in ipairs(next.tasks) do
+			if core_task.is(existing) and existing.id == task.id then
+				fail("create_task id is already present")
+			end
+		end
+		table.insert(next.tasks, task)
+	end)
+	return core_task.to_record(task)
+end
+
+function M.prompt_task(state, opts)
+	if not state_store.is(state) or type(opts) ~= "table" or type(opts.on_created) ~= "function" then
+		fail("prompt_task requires initialized Gator state, options, and callback")
+	end
+	for key in pairs(opts) do
+		if key ~= "id" and key ~= "captures" and key ~= "now" and key ~= "on_created" then
+			fail("prompt_task contains unsupported field: " .. tostring(key))
+		end
+	end
+	vim.ui.input({ prompt = "Gator task: " }, function(objective)
+		if type(objective) == "string" and objective ~= "" then
+			opts.on_created(M.create_task(state, {
+				id = opts.id,
+				objective = objective,
+				captures = opts.captures,
+				now = opts.now,
+			}))
+		end
+	end)
+end
+
 local function subscribe(panel)
 	if not state_store.is(panel.state) then
 		return
