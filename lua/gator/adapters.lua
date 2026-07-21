@@ -45,6 +45,7 @@ local M = {
 	droid_stream = require("gator.adapters.droid_stream"),
 	gemini = require("gator.adapters.gemini"),
 	gemini_handshake = require("gator.adapters.gemini_handshake"),
+	gemini_stream = require("gator.adapters.gemini_stream"),
 	gemini_sessions = require("gator.adapters.gemini_sessions"),
 	gemini_policy = require("gator.adapters.gemini_policy"),
 	gemini_context = require("gator.adapters.gemini_context"),
