@@ -57,6 +57,33 @@ for line in vim.gsplit(result.stdout or "", "\n", { plain = true, trimempty = tr
 		end
 	end
 end
+local recovered
+local recovered_id
+local recovered_text
+if session_id then
+	recovered = vim.system({
+		"opencode",
+		"run",
+		"--session",
+		session_id,
+		"--agent",
+		"plan",
+		"--format",
+		"json",
+		"Reply exactly: gator-live-recovery",
+	}, { cwd = workspace, text = true }):wait()
+	for line in vim.gsplit(recovered.stdout or "", "\n", { plain = true, trimempty = true }) do
+		local ok, event = pcall(vim.json.decode, line)
+		if ok and type(event) == "table" then
+			if type(event.sessionID) == "string" and event.sessionID ~= "" then
+				recovered_id = event.sessionID
+			end
+			if event.type == "text" and type(event.part) == "table" and type(event.part.text) == "string" then
+				recovered_text = event.part.text
+			end
+		end
+	end
+end
 local deleted
 if session_id then
 	deleted = vim.system({ "opencode", "session", "delete", session_id }, { cwd = workspace, text = true }):wait()
@@ -65,4 +92,13 @@ vim.fn.delete(workspace, "d")
 assert(result.code == 0, "authenticated OpenCode verification requires a successful headless run")
 assert(session_id, "authenticated OpenCode verification requires a native session id")
 assert(vim.trim(text or "") == "gator-live-e2e", "OpenCode E2E must preserve its exact response")
+assert(
+	recovered and recovered.code == 0,
+	"authenticated OpenCode verification requires successful same-session recovery"
+)
+assert(recovered_id == session_id, "OpenCode recovery E2E must preserve the provider session id")
+assert(
+	vim.trim(recovered_text or "") == "gator-live-recovery",
+	"OpenCode recovery E2E must preserve its exact response"
+)
 assert(deleted and deleted.code == 0, "OpenCode E2E must delete its native test session")
