@@ -96,14 +96,16 @@ func (s *Server) LastRequest() Request {
 	if len(s.requests) == 0 {
 		return Request{}
 	}
-	return s.requests[len(s.requests)-1]
+	return cloneRequest(s.requests[len(s.requests)-1])
 }
 
 func (s *Server) Requests() []Request {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make([]Request, len(s.requests))
-	copy(out, s.requests)
+	for i, request := range s.requests {
+		out[i] = cloneRequest(request)
+	}
 	return out
 }
 
@@ -160,4 +162,9 @@ func mustJSON(v any) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+func cloneRequest(request Request) Request {
+	request.Header = request.Header.Clone()
+	return request
 }
