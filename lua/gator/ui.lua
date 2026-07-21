@@ -8,6 +8,7 @@ local M = {
 	context_inspector = require("gator.ui.context_inspector"),
 	dashboard = require("gator.ui.dashboard"),
 	diff_review = require("gator.ui.diff_review"),
+	event_details = require("gator.ui.event_details"),
 	escalation = require("gator.ui.escalation"),
 	accessibility = require("gator.ui.accessibility"),
 	markdown = require("gator.ui.markdown"),
