@@ -1,4 +1,5 @@
 local redact = require("gator.policy.redact")
+local task = require("gator.core.task")
 
 local M = {
 	api_version = 1,
@@ -129,6 +130,115 @@ function M.validate_layout(value)
 		sections[name].last_line = next_name and sections[next_name].first_line - 2 or #document
 	end
 	return { schema_version = M.schema_version, sections = sections }
+end
+
+local function section_lines(document, section)
+	local result = {}
+	for index = section.first_line, section.last_line do
+		table.insert(result, document[index])
+	end
+	return result
+end
+
+local function metadata(value)
+	local allowed, result = {}, {}
+	for _, name in ipairs(M.metadata.required) do
+		allowed[name] = true
+	end
+	for _, name in ipairs(M.metadata.optional) do
+		allowed[name] = true
+	end
+	for _, line in ipairs(value) do
+		if vim.trim(line) ~= "" then
+			local name, field = line:match("^%- ([a-z][a-z-]*): (.+)$")
+			if not name or not allowed[name] then
+				fail("task-file metadata field is unavailable")
+			end
+			if result[name] then
+				fail("task-file metadata field is duplicated: " .. name)
+			end
+			result[name] = field
+		end
+	end
+	for _, name in ipairs(M.metadata.required) do
+		if not result[name] then
+			fail("task-file metadata is missing " .. name)
+		end
+	end
+	if (result["workspace-kind"] == nil) ~= (result["workspace-root"] == nil) then
+		fail("task-file workspace metadata must include kind and root together")
+	end
+	for _, name in ipairs({ "created-at", "updated-at" }) do
+		if not result[name]:match("^%d+$") then
+			fail("task-file metadata " .. name .. " must be an integer timestamp")
+		end
+		result[name] = tonumber(result[name])
+	end
+	return result
+end
+
+local function sessions(value)
+	local result, index = {}, 1
+	while index <= #value do
+		if vim.trim(value[index]) == "" then
+			index = index + 1
+		else
+			local provider = value[index]:match("^%- provider: (.+)$")
+			local id = value[index + 1] and value[index + 1]:match("^  id: (.+)$")
+			local owner = value[index + 2] and value[index + 2]:match("^  owner: (.+)$")
+			if not provider or not id or not owner then
+				fail("task-file session records must declare provider, id, and owner")
+			end
+			table.insert(result, { provider = provider, id = id, owner = owner })
+			index = index + 3
+		end
+	end
+	return result
+end
+
+local function evidence(value)
+	local result, index = {}, 1
+	while index <= #value do
+		if vim.trim(value[index]) == "" then
+			index = index + 1
+		else
+			local kind = value[index]:match("^%- kind: (.+)$")
+			local ref = value[index + 1] and value[index + 1]:match("^  ref: (.+)$")
+			if not kind or not ref then
+				fail("task-file evidence records must declare kind and ref")
+			end
+			table.insert(result, { kind = kind, ref = ref })
+			index = index + 2
+		end
+	end
+	return result
+end
+
+function M.parse(value)
+	local layout = M.validate_layout(value)
+	local document = lines(value)
+	local objective = vim.trim(table.concat(section_lines(document, layout.sections.objective), "\n"))
+	if objective == "" then
+		fail("task-file objective must be non-empty")
+	end
+	local fields = metadata(section_lines(document, layout.sections.metadata))
+	local record = {
+		id = fields.id,
+		objective = objective,
+		lifecycle = fields.lifecycle,
+		created_at = fields["created-at"],
+		updated_at = fields["updated-at"],
+		sessions = sessions(section_lines(document, layout.sections.sessions)),
+		evidence = evidence(section_lines(document, layout.sections.evidence)),
+	}
+	if fields["workspace-kind"] then
+		record.workspace = { kind = fields["workspace-kind"], root = fields["workspace-root"] }
+	end
+	local ok, entity = pcall(task.from_record, record)
+	if not ok then
+		fail("task-file definition is invalid")
+	end
+	return entity
 end
 
 return M

@@ -26,3 +26,42 @@ local unsupported = template:gsub("gator%-task: 1", "gator-task: 2", 1)
 assert(not pcall(format.validate_layout, unsupported), "task-file formats must reject unavailable schema versions")
 local missing = template:gsub("## Sessions\n\n", "", 1)
 assert(not pcall(format.validate_layout, missing), "task-file formats must reject missing canonical sections")
+
+local definition = table.concat({
+	"---",
+	"gator-task: 1",
+	"---",
+	"",
+	"# Gator Task",
+	"",
+	"## Objective",
+	"Persist a user-authored task definition.",
+	"",
+	"## Metadata",
+	"- id: task-markdown",
+	"- lifecycle: planned",
+	"- created-at: 1",
+	"- updated-at: 2",
+	"- workspace-kind: project",
+	"- workspace-root: /workspace/gator",
+	"",
+	"## Sessions",
+	"- provider: codex",
+	"  id: native-markdown",
+	"  owner: provider",
+	"",
+	"## Evidence",
+	"- kind: test",
+	"  ref: token: private-value",
+	"",
+}, "\n")
+local parsed = format.parse(definition)
+assert(
+	parsed.id == "task-markdown"
+		and parsed.workspace.root == "/workspace/gator"
+		and parsed.sessions[1].owner == "provider"
+		and parsed.evidence[1].ref:find("private%-value") == nil,
+	"task-file parsers must preserve canonical fields while redacting durable evidence"
+)
+local invalid = definition:gsub("  owner: provider", "  owner: gator", 1)
+assert(not pcall(format.parse, invalid), "task-file parsers must reject non-provider-owned sessions")
