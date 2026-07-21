@@ -86,6 +86,7 @@ function M.new(opts)
 		_dependencies = container,
 		_operations = {},
 		_operation_keys = {},
+		_startup_recovery = nil,
 		_state = container:require("state").new(settings, report),
 	}, Coordinator)
 	return value
@@ -121,7 +122,24 @@ function Coordinator:state()
 end
 
 function Coordinator:open()
+	self:bootstrap_recovery()
 	return self:dependency("ui").open(self:state())
+end
+
+function Coordinator:bootstrap_recovery()
+	if not M.is(self) then
+		fail("bootstrap_recovery requires an initialized coordinator")
+	end
+	if not self._startup_recovery then
+		local core = self:module("core")
+		self._startup_recovery = self:dependency("startup").recover({
+			state = self:state(),
+			load = function()
+				return core.run.open():list()
+			end,
+		})
+	end
+	return vim.deepcopy(self._startup_recovery)
 end
 
 function Coordinator:health()

@@ -24,6 +24,7 @@ function M.setup(opts)
 	end
 	M._coordinator = coordinator.new(opts)
 	M._state = M._coordinator:state()
+	M._coordinator:bootstrap_recovery()
 	return M
 end
 
