@@ -37,6 +37,15 @@ assert(
 	"Gemini stream failures must remain explicit and redacted"
 )
 
+local warning = stream.new():feed({ type = "error", message = "token=fixture-secret" }, {
+	run_id = "run-gemini",
+	session_id = "gemini-fixture",
+})[1]
+assert(
+	warning.type == "run.error" and warning.payload.message == "token=[REDACTED]" and warning.payload.retryable,
+	"Gemini nonfatal stream errors must remain explicit and redacted"
+)
+
 local sensitive = stream.new()
 local call = sensitive:feed({
 	type = "tool_use",

@@ -132,6 +132,17 @@ local function result(value)
 	}
 end
 
+local function provider_error(value)
+	object(value, "error event")
+	local message = type(value.message) == "string" and redact.text(value.message)
+		or type(value.error) == "string" and redact.text(value.error)
+		or "Gemini stream reported an error"
+	return {
+		type = "run.error",
+		payload = { kind = "provider", message = message, retryable = true },
+	}
+end
+
 local function decode(raw, context)
 	object(raw, "stream event")
 	local kind = text(raw.type, "stream event.type")
@@ -147,6 +158,9 @@ local function decode(raw, context)
 	end
 	if kind == "tool_result" then
 		return tool_result(raw)
+	end
+	if kind == "error" then
+		return provider_error(raw)
 	end
 	if kind == "result" then
 		return result(raw)
