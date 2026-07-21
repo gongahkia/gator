@@ -156,6 +156,22 @@ func TestRunOnceWritesTrace(t *testing.T) {
 	}
 }
 
+func TestTracerScrubsDetectedSecrets(t *testing.T) {
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	var trace bytes.Buffer
+	tracer := NewTracer(&trace)
+	env := envelope.NewEnvelope("task", secret, "/repo")
+	env.Raw = &envelope.RawContext{Units: []envelope.RawUnit{{ID: "u001", Text: secret}}}
+	env.Patch = &envelope.Patch{UnifiedDiff: secret}
+	env.Verify = &envelope.VerifyResult{FailureDigest: secret}
+	if err := tracer.Write(TraceEvent{Stage: "edit", Envelope: env}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(trace.String(), secret) || !strings.Contains(trace.String(), "[REDACTED:openai_key]") {
+		t.Fatalf("trace = %s", trace.String())
+	}
+}
+
 func TestRunOnceWritesCompactTrace(t *testing.T) {
 	var trace bytes.Buffer
 	var order []string

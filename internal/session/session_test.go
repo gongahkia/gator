@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -106,6 +107,33 @@ func TestStorePersistsManifestAndEvents(t *testing.T) {
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("manifest mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestAppendScrubsSecretEventData(t *testing.T) {
+	cwd := t.TempDir()
+	manifest, err := NewManifest("session-scrub-event", cwd, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	event, err := store.Append(Event{Type: "session.note", Data: json.RawMessage(`{"value":"` + secret + `"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(event.Data), secret) {
+		t.Fatalf("event data leaked secret: %s", event.Data)
+	}
+	data, err := os.ReadFile(filepath.Join(store.Dir(), "events.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), secret) {
+		t.Fatalf("session event file leaked secret: %s", data)
 	}
 }
 

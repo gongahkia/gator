@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/paw/internal/config"
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/llm"
 	"github.com/gongahkia/paw/internal/verify"
 )
@@ -55,7 +56,7 @@ func Run(ctx context.Context, opts Options) Report {
 	r.report = Report{
 		SchemaVersion: 1,
 		Version:       r.opts.Version,
-		CWD:           r.opts.CWD,
+		CWD:           egress.ScrubText(r.opts.CWD),
 	}
 	r.gitRoot = findGitRoot(r.opts.CWD)
 	cfg, loadErr := r.loadConfig()
@@ -422,6 +423,18 @@ func (r *runner) add(f Finding) {
 	}
 	if selectorMatches(r.skip, f.ID, f.Section) {
 		return
+	}
+	f.Message = egress.ScrubText(f.Message)
+	f.Detail = egress.ScrubText(f.Detail)
+	f.Fix = egress.ScrubText(f.Fix)
+	f.Command = egress.ScrubText(f.Command)
+	f.Path = egress.ScrubText(f.Path)
+	if len(f.Metadata) > 0 {
+		metadata := make(map[string]string, len(f.Metadata))
+		for key, value := range f.Metadata {
+			metadata[egress.ScrubText(key)] = egress.ScrubText(value)
+		}
+		f.Metadata = metadata
 	}
 	r.report.Findings = append(r.report.Findings, f)
 }

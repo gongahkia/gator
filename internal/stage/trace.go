@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 )
 
@@ -69,6 +70,7 @@ func (t *Tracer) Write(event TraceEvent) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	event.TraceMode = t.mode
+	event.Envelope = egress.ScrubEnvelope(event.Envelope)
 	if t.mode == TraceModeCompact {
 		event.Envelope = compactEnvelope(event.Envelope)
 	}

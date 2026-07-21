@@ -64,5 +64,8 @@ Detected secret values are redacted before compression or raw-context model requ
 When `block_secrets` is true, detected secret-bearing context also requires a matching provider
 approval receipt before model egress.
 
+High-confidence secret values are scrubbed from traces, session event data, verification output, and
+doctor diagnostics.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

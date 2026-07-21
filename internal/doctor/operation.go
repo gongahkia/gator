@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/paw/internal/config"
+	"github.com/gongahkia/paw/internal/egress"
 )
 
 func repairConfigPath(opts Options, sources []configSource, gitRoot string) string {
@@ -84,13 +85,13 @@ func (r *runner) logOperation(action, status, path, detail string, opErr error) 
 	}
 	op := Operation{
 		Timestamp: r.opts.Now().UTC().Format(time.RFC3339Nano),
-		Action:    action,
+		Action:    egress.ScrubText(action),
 		Status:    status,
-		Path:      path,
-		Detail:    detail,
+		Path:      egress.ScrubText(path),
+		Detail:    egress.ScrubText(detail),
 	}
 	if opErr != nil {
-		op.Error = opErr.Error()
+		op.Error = egress.ScrubText(opErr.Error())
 	}
 	_ = AppendOperation(r.opts.CWD, op)
 }

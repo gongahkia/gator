@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/workspace"
 )
 
@@ -281,6 +282,7 @@ func (s *Store) Append(event Event) (Event, error) {
 	if strings.TrimSpace(event.Type) == "" {
 		return Event{}, errors.New("session event type is required")
 	}
+	event.Data = egress.ScrubJSON(event.Data)
 	data, err := json.Marshal(event)
 	if err != nil {
 		return Event{}, fmt.Errorf("marshal session event: %w", err)

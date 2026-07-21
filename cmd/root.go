@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/gongahkia/paw/internal/egress"
 	pawlog "github.com/gongahkia/paw/internal/log"
 	"github.com/spf13/cobra"
 )
@@ -30,7 +31,7 @@ func Execute() {
 		if logErr != nil {
 			logger, _ = pawlog.Install(pawlog.Config{Writer: os.Stderr})
 		}
-		logger.Error("command failed", "error", err.Error(), "exit_code", int(code))
+		logger.Error("command failed", "error", egress.ScrubText(err.Error()), "exit_code", int(code))
 		os.Exit(int(code))
 	}
 }

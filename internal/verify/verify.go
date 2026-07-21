@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 )
 
@@ -65,7 +66,7 @@ func (v *Verify) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Enve
 		Passed:        err == nil && !timedOut,
 		ExitCode:      exitCode,
 		Command:       cmdText,
-		FailureDigest: failureDigest(output, v.MaxDigestBytes),
+		FailureDigest: egress.ScrubText(failureDigest(output, v.MaxDigestBytes)),
 		RawTailBytes:  len(output),
 		StdoutBytes:   stdout.Len(),
 		StderrBytes:   stderr.Len(),

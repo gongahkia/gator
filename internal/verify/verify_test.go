@@ -93,6 +93,18 @@ func TestVerifyRecordsStderrBytes(t *testing.T) {
 	}
 }
 
+func TestVerifyScrubsSecretFailureDigest(t *testing.T) {
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	stage := New("printf 'FAIL " + secret + "'; exit 1")
+	got, err := stage.Run(context.Background(), &envelope.Envelope{Cwd: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got.Verify.FailureDigest, secret) || !strings.Contains(got.Verify.FailureDigest, "[REDACTED:openai_key]") {
+		t.Fatalf("failure digest = %q", got.Verify.FailureDigest)
+	}
+}
+
 func TestVerifyTimeoutRecordsFailure(t *testing.T) {
 	stage := New("sleep 2")
 	stage.Timeout = 50 * time.Millisecond

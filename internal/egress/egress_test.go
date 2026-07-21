@@ -1,6 +1,7 @@
 package egress
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -45,6 +46,31 @@ func TestDetectIgnoresNearMisses(t *testing.T) {
 	raw := &envelope.RawContext{Units: []envelope.RawUnit{{Text: "sk-short AKIA123 eyJshort.short.short"}}}
 	if findings := Detect(raw); len(findings) != 0 {
 		t.Fatalf("findings = %#v", findings)
+	}
+}
+
+func TestScrubEnvelopeAndJSONRemoveSecretValues(t *testing.T) {
+	secret := "sk-abcdefghijklmnopqrstuvwxyz123456"
+	env := envelope.NewEnvelope("task", secret, "/repo")
+	env.Raw = &envelope.RawContext{Units: []envelope.RawUnit{{Path: secret, Text: secret}}}
+	env.Digest = &envelope.ContextDigest{Summary: secret, Items: []envelope.DigestItem{{Path: secret, Spans: []envelope.DigestSpan{{Quote: secret}}}}}
+	env.Patch = &envelope.Patch{UnifiedDiff: secret, Files: []string{secret}, Note: secret}
+	env.Verify = &envelope.VerifyResult{Command: secret, FailureDigest: secret}
+	env.Egress = &envelope.EgressManifest{Units: []envelope.EgressUnit{{Path: secret}}, ProviderApproval: &envelope.ProviderApprovalReceipt{Transport: secret, BaseURL: secret}}
+	scrubbed := ScrubEnvelope(env)
+	encoded, err := json.Marshal(scrubbed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), secret) {
+		t.Fatalf("scrubbed envelope leaked secret: %s", encoded)
+	}
+	if !strings.Contains(scrubbed.Raw.Units[0].Text, "[REDACTED:openai_key]") || !strings.Contains(env.Raw.Units[0].Text, secret) {
+		t.Fatalf("scrubbed raw=%q original raw=%q", scrubbed.Raw.Units[0].Text, env.Raw.Units[0].Text)
+	}
+	jsonData := ScrubJSON(json.RawMessage(`{"` + secret + `":"` + secret + `"}`))
+	if strings.Contains(string(jsonData), secret) {
+		t.Fatalf("scrubbed JSON leaked secret: %s", jsonData)
 	}
 }
 

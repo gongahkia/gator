@@ -93,6 +93,124 @@ func Redact(raw *envelope.RawContext) RedactionResult {
 	return RedactionResult{Raw: &out, Findings: findingsFromCounts(counts)}
 }
 
+func ScrubText(text string) string {
+	text, _ = redact(text)
+	return text
+}
+
+func ScrubJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return nil
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return json.RawMessage(ScrubText(string(raw)))
+	}
+	encoded, err := json.Marshal(scrubJSONValue(value))
+	if err != nil {
+		return json.RawMessage(ScrubText(string(raw)))
+	}
+	return encoded
+}
+
+func ScrubEnvelope(env *envelope.Envelope) *envelope.Envelope {
+	if env == nil {
+		return nil
+	}
+	out := *env
+	out.Instruction = ScrubText(env.Instruction)
+	if env.Raw != nil {
+		raw := *env.Raw
+		raw.Units = make([]envelope.RawUnit, len(env.Raw.Units))
+		raw.TotalBytes = 0
+		for i, unit := range env.Raw.Units {
+			unit.Path = ScrubText(unit.Path)
+			unit.Text = ScrubText(unit.Text)
+			raw.Units[i] = unit
+			raw.TotalBytes += len(unit.Text)
+		}
+		out.Raw = &raw
+	}
+	if env.Digest != nil {
+		digest := *env.Digest
+		digest.Summary = ScrubText(digest.Summary)
+		digest.Items = make([]envelope.DigestItem, len(env.Digest.Items))
+		for i, item := range env.Digest.Items {
+			item.Path = ScrubText(item.Path)
+			item.Spans = append([]envelope.DigestSpan(nil), item.Spans...)
+			for j := range item.Spans {
+				item.Spans[j].Quote = ScrubText(item.Spans[j].Quote)
+			}
+			digest.Items[i] = item
+		}
+		out.Digest = &digest
+	}
+	if env.Plan != nil {
+		plan := *env.Plan
+		plan.Reasoning = ScrubText(plan.Reasoning)
+		if env.Plan.NextAction != nil {
+			action := *env.Plan.NextAction
+			action.Description = ScrubText(action.Description)
+			action.TargetPath = ScrubText(action.TargetPath)
+			plan.NextAction = &action
+		}
+		out.Plan = &plan
+	}
+	if env.Patch != nil {
+		patch := *env.Patch
+		patch.UnifiedDiff = ScrubText(patch.UnifiedDiff)
+		patch.Note = ScrubText(patch.Note)
+		patch.Files = append([]string(nil), patch.Files...)
+		for i := range patch.Files {
+			patch.Files[i] = ScrubText(patch.Files[i])
+		}
+		out.Patch = &patch
+	}
+	if env.Verify != nil {
+		verify := *env.Verify
+		verify.Command = ScrubText(verify.Command)
+		verify.FailureDigest = ScrubText(verify.FailureDigest)
+		out.Verify = &verify
+	}
+	if env.Egress != nil {
+		manifest := *env.Egress
+		manifest.Units = append([]envelope.EgressUnit(nil), env.Egress.Units...)
+		for i := range manifest.Units {
+			manifest.Units[i].Path = ScrubText(manifest.Units[i].Path)
+		}
+		manifest.Findings = append([]envelope.EgressFinding(nil), env.Egress.Findings...)
+		if env.Egress.ProviderApproval != nil {
+			receipt := *env.Egress.ProviderApproval
+			receipt.Transport = ScrubText(receipt.Transport)
+			receipt.BaseURL = ScrubText(receipt.BaseURL)
+			manifest.ProviderApproval = &receipt
+		}
+		out.Egress = &manifest
+	}
+	return &out
+}
+
+func scrubJSONValue(value any) any {
+	switch value := value.(type) {
+	case string:
+		return ScrubText(value)
+	case []any:
+		out := make([]any, len(value))
+		for i := range value {
+			out[i] = scrubJSONValue(value[i])
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(value))
+		for key, item := range value {
+			out[ScrubText(key)] = scrubJSONValue(item)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
 func Enforce(cfg config.EgressPolicy, manifest Manifest) error {
 	if err := enforceLimits(cfg, manifest); err != nil {
 		return err
