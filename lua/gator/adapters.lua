@@ -16,6 +16,7 @@ local M = {
 	codex_handshake = require("gator.adapters.codex_handshake"),
 	codex_stream = require("gator.adapters.codex_stream"),
 	codex_permission = require("gator.adapters.codex_permission"),
+	codex_control = require("gator.adapters.codex_control"),
 	codex_sessions = require("gator.adapters.codex_sessions"),
 	codex_policy = require("gator.adapters.codex_policy"),
 	codex_context = require("gator.adapters.codex_context"),
