@@ -10,6 +10,7 @@ local M = {
 	diff_review = require("gator.ui.diff_review"),
 	event_details = require("gator.ui.event_details"),
 	escalation = require("gator.ui.escalation"),
+	handoff_review = require("gator.ui.handoff_review"),
 	accessibility = require("gator.ui.accessibility"),
 	approval_details = require("gator.ui.approval_details"),
 	markdown = require("gator.ui.markdown"),
