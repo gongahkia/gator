@@ -151,21 +151,13 @@ func llmConfig(cfg config.Config) llm.FactoryConfig {
 }
 
 func newAgentPipeline(cfg config.Config, rawContext bool, disableCompress bool) (*stage.Pipeline, error) {
-	if err := policy.CheckEndpoint(cfg.Policy, cfg.Brain.Transport, cfg.Brain.BaseURL); err != nil {
-		return nil, fmt.Errorf("brain endpoint: %w", err)
-	}
-	if !disableCompress && !rawContext {
-		if err := policy.CheckEndpoint(cfg.Policy, cfg.Drone.Transport, cfg.Drone.BaseURL); err != nil {
-			return nil, fmt.Errorf("drone endpoint: %w", err)
-		}
-	}
-	brain, err := llm.NewBrainClient(llmConfig(cfg))
+	brain, err := newBrainClient(cfg)
 	if err != nil {
 		return nil, err
 	}
 	var drone llm.Client
 	if !disableCompress && !rawContext {
-		drone, err = llm.NewDroneClient(llmConfig(cfg))
+		drone, err = newDroneClient(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -186,6 +178,20 @@ func newAgentPipeline(cfg config.Config, rawContext bool, disableCompress bool) 
 		editStage,
 		verifyStage,
 	)
+}
+
+func newBrainClient(cfg config.Config) (llm.Client, error) {
+	if err := policy.CheckEndpoint(cfg.Policy, cfg.Brain.Transport, cfg.Brain.BaseURL); err != nil {
+		return nil, fmt.Errorf("brain endpoint: %w", err)
+	}
+	return llm.NewBrainClient(llmConfig(cfg))
+}
+
+func newDroneClient(cfg config.Config) (llm.Client, error) {
+	if err := policy.CheckEndpoint(cfg.Policy, cfg.Drone.Transport, cfg.Drone.BaseURL); err != nil {
+		return nil, fmt.Errorf("drone endpoint: %w", err)
+	}
+	return llm.NewDroneClient(llmConfig(cfg))
 }
 
 func taskID(instruction, cwd string) string {

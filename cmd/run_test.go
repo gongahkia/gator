@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,9 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gongahkia/paw/internal/config"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm/faketest"
 	pawlog "github.com/gongahkia/paw/internal/log"
+	"github.com/gongahkia/paw/internal/policy"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -129,6 +132,20 @@ allowed_base_urls = ["https://api.openai.com/v1"]
 	}
 	if _, statErr := os.Stat(filepath.Join(dir, ".paw")); !os.IsNotExist(statErr) {
 		t.Fatalf("unexpected .paw dir after fail-fast: %v", statErr)
+	}
+}
+
+func TestProviderClientsRejectUnallowlistedEndpoints(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Brain.Transport = "openai"
+	cfg.Brain.BaseURL = "https://api.example.test/v1"
+	if _, err := newBrainClient(cfg); !errors.Is(err, policy.ErrDenied) {
+		t.Fatalf("brain allowlist error = %v", err)
+	}
+	cfg.Drone.Transport = "openai"
+	cfg.Drone.BaseURL = "https://api.example.test/v1"
+	if _, err := newDroneClient(cfg); !errors.Is(err, policy.ErrDenied) {
+		t.Fatalf("drone allowlist error = %v", err)
 	}
 }
 

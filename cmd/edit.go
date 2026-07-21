@@ -3,7 +3,6 @@ package cmd
 import (
 	"github.com/gongahkia/paw/internal/config"
 	editstage "github.com/gongahkia/paw/internal/edit"
-	"github.com/gongahkia/paw/internal/llm"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +20,7 @@ var editCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		brain, err := llm.NewBrainClient(llmConfig(cfg))
+		brain, err := newBrainClient(cfg)
 		if err != nil {
 			return err
 		}

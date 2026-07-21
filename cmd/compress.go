@@ -31,7 +31,7 @@ var compressCmd = &cobra.Command{
 		}
 		var drone llm.Client
 		if !compressDisableCompress {
-			drone, err = llm.NewDroneClient(llmConfig(cfg))
+			drone, err = newDroneClient(cfg)
 			if err != nil {
 				return err
 			}

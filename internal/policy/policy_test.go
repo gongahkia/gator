@@ -29,6 +29,15 @@ func TestCheckEndpointRequiresExactAllowlistedBaseURL(t *testing.T) {
 	}
 }
 
+func TestCheckEndpointMatchesTransportCaseInsensitively(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Provider.AllowedTransports = []string{"OpenAI"}
+	cfg.Provider.AllowedBaseURLs = []string{"https://api.example.test/v1"}
+	if err := CheckEndpoint(cfg, "openai", "https://api.example.test/v1"); err != nil {
+		t.Fatalf("mixed-case allowlisted transport denied: %v", err)
+	}
+}
+
 func TestValidateRejectsBadBudget(t *testing.T) {
 	cfg := config.Defaults().Policy
 	cfg.Risk.MaxFiles = 0

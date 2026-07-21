@@ -23,7 +23,7 @@ func CheckEndpoint(cfg config.PolicyConfig, transport, baseURL string) error {
 	if err := Validate(cfg); err != nil {
 		return err
 	}
-	if !slices.Contains(cfg.Provider.AllowedTransports, strings.ToLower(transport)) {
+	if !allowsTransport(cfg.Provider.AllowedTransports, transport) {
 		return fmt.Errorf("%w: transport %q", ErrDenied, transport)
 	}
 	if isCLITransport(transport) {
@@ -43,6 +43,15 @@ func CheckEndpoint(cfg config.PolicyConfig, transport, baseURL string) error {
 		}
 	}
 	return fmt.Errorf("%w: endpoint %q is not allowlisted", ErrDenied, normalized)
+}
+
+func allowsTransport(allowed []string, transport string) bool {
+	for _, candidate := range allowed {
+		if strings.EqualFold(candidate, transport) {
+			return true
+		}
+	}
+	return false
 }
 
 func CheckGitRemote(cfg config.PolicyConfig, remote string) error {

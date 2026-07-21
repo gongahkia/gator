@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"github.com/gongahkia/paw/internal/config"
-	"github.com/gongahkia/paw/internal/llm"
 	planstage "github.com/gongahkia/paw/internal/plan"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +20,7 @@ var planCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		brain, err := llm.NewBrainClient(llmConfig(cfg))
+		brain, err := newBrainClient(cfg)
 		if err != nil {
 			return err
 		}
