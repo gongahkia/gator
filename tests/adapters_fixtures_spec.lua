@@ -32,10 +32,10 @@ assert(
 local codex = {}
 assert(fixtures.replay_jsonl(root .. "/codex_appserver.jsonl", function(record)
 	table.insert(codex, record)
-end) == 4, "Codex app-server fixture must replay every record")
+end) == 5, "Codex app-server fixture must replay every record")
 assert(
-	codex[3].method == "account/read" and codex[4].result.account.type == "chatgpt",
-	"Codex fixture must preserve authenticated app-server traffic"
+	codex[2].result.platformOs == "macos" and codex[4].method == "account/read" and codex[5].result.requiresOpenaiAuth,
+	"Codex fixture must preserve sanitized app-server transport traffic"
 )
 
 local claude = {}

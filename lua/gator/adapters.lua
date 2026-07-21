@@ -12,6 +12,7 @@ local M = {
 	aider_sessions = require("gator.adapters.aider_sessions"),
 	aider_stream = require("gator.adapters.aider_stream"),
 	codex = require("gator.adapters.codex"),
+	codex_transport = require("gator.adapters.codex_transport"),
 	codex_sessions = require("gator.adapters.codex_sessions"),
 	codex_policy = require("gator.adapters.codex_policy"),
 	codex_context = require("gator.adapters.codex_context"),

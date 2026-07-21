@@ -1,4 +1,5 @@
 {"method":"initialize","id":1,"params":{"clientInfo":{"name":"gator","title":"Gator","version":"1"}}}
+{"id":1,"result":{"userAgent":"gator-fixture/0.144","codexHome":"/tmp/gator-codex","platformFamily":"unix","platformOs":"macos"}}
 {"method":"initialized","params":{}}
-{"method":"account/read","id":2,"params":{"refreshToken":false}}
-{"id":2,"result":{"account":{"type":"chatgpt"},"requiresOpenaiAuth":true}}
+{"method":"account/read","id":2,"params":{}}
+{"id":2,"result":{"requiresOpenaiAuth":true}}
