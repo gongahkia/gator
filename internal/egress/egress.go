@@ -94,14 +94,33 @@ func Redact(raw *envelope.RawContext) RedactionResult {
 }
 
 func Enforce(cfg config.EgressPolicy, manifest Manifest) error {
+	if err := enforceLimits(cfg, manifest); err != nil {
+		return err
+	}
+	if cfg.BlockSecrets && len(manifest.Findings) > 0 {
+		return fmt.Errorf("egress blocked: %d high-confidence secret kinds detected", len(manifest.Findings))
+	}
+	return nil
+}
+
+func EnforceWithProviderApproval(cfg config.EgressPolicy, manifest Manifest, transport, baseURL string) error {
+	if err := enforceLimits(cfg, manifest); err != nil {
+		return err
+	}
+	if cfg.BlockSecrets && len(manifest.Findings) > 0 {
+		if err := VerifyProviderApproval(manifest, transport, baseURL); err != nil {
+			return fmt.Errorf("egress blocked: secret findings require provider approval: %w", err)
+		}
+	}
+	return nil
+}
+
+func enforceLimits(cfg config.EgressPolicy, manifest Manifest) error {
 	if len(manifest.Units) > cfg.MaxFiles {
 		return fmt.Errorf("egress units %d exceed policy limit %d", len(manifest.Units), cfg.MaxFiles)
 	}
 	if manifest.TotalBytes > cfg.MaxBytes {
 		return fmt.Errorf("egress bytes %d exceed policy limit %d", manifest.TotalBytes, cfg.MaxBytes)
-	}
-	if cfg.BlockSecrets && len(manifest.Findings) > 0 {
-		return fmt.Errorf("egress blocked: %d high-confidence secret kinds detected", len(manifest.Findings))
 	}
 	return nil
 }
@@ -120,6 +139,17 @@ func RedactForEgress(raw *envelope.RawContext) (RedactionResult, Manifest) {
 	manifest := Build(result.Raw)
 	manifest.Findings = result.Findings
 	return result, manifest
+}
+
+func PrepareWithProviderApproval(cfg config.EgressPolicy, raw *envelope.RawContext, prior *Manifest, transport, baseURL string) (RedactionResult, Manifest, error) {
+	result, manifest := RedactForEgress(raw)
+	if prior != nil {
+		manifest.ProviderApproval = prior.ProviderApproval
+	}
+	if err := EnforceWithProviderApproval(cfg, manifest, transport, baseURL); err != nil {
+		return RedactionResult{}, manifest, err
+	}
+	return result, manifest, nil
 }
 
 func Approve(manifest Manifest, transport, baseURL string, now time.Time, autoApproved bool) (Manifest, error) {

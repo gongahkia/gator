@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gongahkia/paw/internal/config"
+	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
 	"github.com/gongahkia/paw/internal/llm/faketest"
@@ -58,6 +61,37 @@ func TestCompressRedactsSecretsBeforeModelEgress(t *testing.T) {
 	}
 	if got.Egress == nil || len(got.Egress.Findings) != 1 || got.Egress.Findings[0].Kind != "openai_key" {
 		t.Fatalf("egress manifest = %#v", got.Egress)
+	}
+}
+
+func TestCompressBlocksSecretWithoutProviderApproval(t *testing.T) {
+	client := &captureCompressClient{content: digestJSON(t, validDigest())}
+	stage := New(client)
+	stage.SetEgressPolicy(config.Defaults().Policy.Egress, "openai", "https://api.example.test/v1")
+	env := rawEnvelope()
+	env.Raw.Units = append(env.Raw.Units, envelope.RawUnit{ID: "u003", Text: "token=sk-abcdefghijklmnopqrstuvwxyz123456"})
+	if _, err := stage.Run(context.Background(), env); err == nil || !strings.Contains(err.Error(), "egress blocked") {
+		t.Fatalf("secret egress error = %v", err)
+	}
+	if len(client.request.Messages) != 0 {
+		t.Fatalf("model request = %#v", client.request)
+	}
+}
+
+func TestCompressAllowsSecretWithMatchingProviderApproval(t *testing.T) {
+	client := &captureCompressClient{content: digestJSON(t, validDigest())}
+	stage := New(client)
+	stage.SetEgressPolicy(config.Defaults().Policy.Egress, "openai", "https://api.example.test/v1")
+	env := rawEnvelope()
+	env.Raw.Units = append(env.Raw.Units, envelope.RawUnit{ID: "u003", Text: "token=sk-abcdefghijklmnopqrstuvwxyz123456"})
+	_, manifest := egress.RedactForEgress(env.Raw)
+	approved, err := egress.Approve(manifest, "openai", "https://api.example.test/v1", time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.Egress = &approved
+	if _, err := stage.Run(context.Background(), env); err != nil {
+		t.Fatalf("approved egress error = %v", err)
 	}
 }
 

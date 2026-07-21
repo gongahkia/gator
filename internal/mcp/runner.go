@@ -11,7 +11,6 @@ import (
 
 	"github.com/gongahkia/paw/internal/compress"
 	"github.com/gongahkia/paw/internal/config"
-	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/gather"
 	"github.com/gongahkia/paw/internal/llm"
@@ -35,14 +34,8 @@ func (r StageRunner) Gather(ctx context.Context, cwd, instruction string) (*enve
 }
 
 func (r StageRunner) Compress(ctx context.Context, env *envelope.Envelope) (*envelope.Envelope, error) {
-	prepared, manifest, err := egress.Prepare(r.Config.Policy.Egress, env.Raw)
-	if err != nil {
-		return nil, err
-	}
-	in := *env
-	in.Raw = prepared.Raw
-	in.Egress = &manifest
 	var drone llm.Client
+	var err error
 	if !r.DisableCompress {
 		if err := policy.CheckEndpoint(r.Config.Policy, r.Config.Drone.Transport, r.Config.Drone.BaseURL); err != nil {
 			return nil, fmt.Errorf("drone endpoint: %w", err)
@@ -63,7 +56,8 @@ func (r StageRunner) Compress(ctx context.Context, env *envelope.Envelope) (*env
 	}
 	stage := compress.New(drone)
 	stage.DisableCompress = r.DisableCompress
-	return stage.Run(ctx, &in)
+	stage.SetEgressPolicy(r.Config.Policy.Egress, r.Config.Drone.Transport, r.Config.Drone.BaseURL)
+	return stage.Run(ctx, env)
 }
 
 func (r StageRunner) Digest(ctx context.Context, cwd, instruction string) (*envelope.Envelope, error) {

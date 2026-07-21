@@ -165,6 +165,11 @@ func newAgentPipeline(cfg config.Config, rawContext bool, disableCompress bool) 
 	compressStage := compress.New(drone)
 	compressStage.DisableCompress = disableCompress
 	compressStage.RawContext = rawContext
+	if disableCompress || rawContext {
+		compressStage.SetEgressPolicy(cfg.Policy.Egress, cfg.Brain.Transport, cfg.Brain.BaseURL)
+	} else {
+		compressStage.SetEgressPolicy(cfg.Policy.Egress, cfg.Drone.Transport, cfg.Drone.BaseURL)
+	}
 	planStage := plan.New(brain)
 	planStage.UseRawContext = rawContext
 	editStage := edit.New(brain)

@@ -61,6 +61,8 @@ Gathered context is scanned for GitHub tokens, OpenAI keys, AWS access keys, pri
 The manifest records finding kinds and counts only.
 
 Detected secret values are redacted before compression or raw-context model requests.
+When `block_secrets` is true, detected secret-bearing context also requires a matching provider
+approval receipt before model egress.
 
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

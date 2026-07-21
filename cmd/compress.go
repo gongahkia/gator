@@ -38,6 +38,11 @@ var compressCmd = &cobra.Command{
 		}
 		stage := compress.New(drone)
 		stage.DisableCompress = compressDisableCompress
+		if compressDisableCompress {
+			stage.SetEgressPolicy(cfg.Policy.Egress, cfg.Brain.Transport, cfg.Brain.BaseURL)
+		} else {
+			stage.SetEgressPolicy(cfg.Policy.Egress, cfg.Drone.Transport, cfg.Drone.BaseURL)
+		}
 		out, err := stage.Run(cmd.Context(), env)
 		if err != nil {
 			return err

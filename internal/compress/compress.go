@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/gongahkia/paw/internal/budget"
+	"github.com/gongahkia/paw/internal/config"
 	"github.com/gongahkia/paw/internal/egress"
 	"github.com/gongahkia/paw/internal/envelope"
 	"github.com/gongahkia/paw/internal/llm"
@@ -15,6 +16,9 @@ const maxCompressOutputTokens = 1024
 
 type Compress struct {
 	Client          llm.Client
+	EgressPolicy    *config.EgressPolicy
+	EgressTransport string
+	EgressBaseURL   string
 	DisableCompress bool
 	RawContext      bool
 	UsedFallback    bool
@@ -24,6 +28,12 @@ type Compress struct {
 
 func New(client llm.Client) *Compress {
 	return &Compress{Client: client}
+}
+
+func (c *Compress) SetEgressPolicy(policy config.EgressPolicy, transport, baseURL string) {
+	c.EgressPolicy = &policy
+	c.EgressTransport = transport
+	c.EgressBaseURL = baseURL
 }
 
 func (c *Compress) Name() string {
@@ -40,9 +50,19 @@ func (c *Compress) ValidationDropCounts() map[string]int {
 
 func (c *Compress) Run(ctx context.Context, in *envelope.Envelope) (*envelope.Envelope, error) {
 	out := *in
-	redacted, manifest := egress.RedactForEgress(in.Raw)
-	if in.Egress != nil && len(in.Egress.Findings) > 0 {
-		manifest.Findings = append([]egress.Finding(nil), in.Egress.Findings...)
+	var redacted egress.RedactionResult
+	var manifest egress.Manifest
+	if c.EgressPolicy != nil {
+		var err error
+		redacted, manifest, err = egress.PrepareWithProviderApproval(*c.EgressPolicy, in.Raw, in.Egress, c.EgressTransport, c.EgressBaseURL)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		redacted, manifest = egress.RedactForEgress(in.Raw)
+		if in.Egress != nil && len(in.Egress.Findings) > 0 {
+			manifest.Findings = append([]egress.Finding(nil), in.Egress.Findings...)
+		}
 	}
 	out.Raw = redacted.Raw
 	out.Egress = &manifest
