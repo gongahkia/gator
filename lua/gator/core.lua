@@ -2,6 +2,7 @@ local M = {
 	name = "core",
 	api_version = 1,
 	database = require("gator.core.database"),
+	approval_event = require("gator.core.approval_event"),
 	event_cursor = require("gator.core.event_cursor"),
 	event_ingest = require("gator.core.event_ingest"),
 	filesystem = require("gator.core.filesystem"),
