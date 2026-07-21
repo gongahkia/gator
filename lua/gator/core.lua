@@ -2,6 +2,7 @@ local M = {
 	name = "core",
 	api_version = 1,
 	database = require("gator.core.database"),
+	event_ingest = require("gator.core.event_ingest"),
 	filesystem = require("gator.core.filesystem"),
 	git = require("gator.core.git"),
 	json_backend = require("gator.core.json_backend"),
