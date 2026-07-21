@@ -55,10 +55,11 @@ jobs:
           version: v2.12.2
 
       - name: Check shell scripts
-        if: runner.os != 'Windows'
         run: |
           sh -n install.sh
           shellcheck install.sh
+          sh -n scripts/wsl-smoke.sh
+          shellcheck scripts/wsl-smoke.sh
 
       - name: Test
         run: go test ./... -race -cover

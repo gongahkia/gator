@@ -6,6 +6,12 @@ This project does not claim to invent small-model context compression. See [RELA
 
 [![paw run demo](docs/demo.gif)](docs/DEMO.md)
 
+## Platforms
+
+Supported release targets are macOS and Linux. WSL2 is supported through the Linux binary; run
+`make wsl-smoke` from a WSL2 checkout to validate the local toolchain. Native Windows binaries,
+CI, and release archives are not provided.
+
 ## Install
 
 Quick install:

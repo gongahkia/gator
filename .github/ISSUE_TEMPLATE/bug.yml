@@ -23,7 +23,7 @@ body:
       options:
         - macOS
         - Linux
-        - Windows
+        - WSL2
         - Other
     validations:
       required: true

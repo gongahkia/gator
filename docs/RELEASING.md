@@ -37,6 +37,8 @@ Paste those values into `MACOS_CERTIFICATE` and `MACOS_NOTARY_KEY`.
 ## Release Flow
 
 1. Confirm `make test` and `make lint` pass.
+   On a WSL2 host, also run `make wsl-smoke`; this project does not publish or validate native
+   Windows artifacts.
 2. Confirm GoReleaser config is valid:
 
    ```sh
@@ -87,6 +89,9 @@ Repeat for `darwin_amd64` on Intel macOS or under a matching validation host.
 
 Current release archives are `tar.gz` files containing a signed/notarized Mach-O binary. There is no
 `.app`, `.pkg`, or `.dmg` artifact to staple in this layout.
+
+Linux release archives also serve WSL2. Validate them from a WSL2 checkout with `make wsl-smoke`;
+there is no native Windows archive or CI guarantee.
 
 ## References
 

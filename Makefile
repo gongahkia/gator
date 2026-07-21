@@ -9,7 +9,7 @@ BENCH_JOBS_DIR ?= .paw/bench-jobs
 BENCH_N_CONCURRENT ?= 4
 BENCH_LOCAL_OUT ?= .paw/local-bench/latest.txt
 
-.PHONY: build build-linux test lint fmt release-snapshot bench-local bench-smoke bench-oracle bench-full bench-swebench clean
+.PHONY: build build-linux test lint fmt release-snapshot wsl-smoke bench-local bench-smoke bench-oracle bench-full bench-swebench clean
 
 build:
 	mkdir -p bin
@@ -31,6 +31,9 @@ fmt:
 release-snapshot:
 	goreleaser check
 	goreleaser release --snapshot --clean --skip=publish
+
+wsl-smoke:
+	./scripts/wsl-smoke.sh
 
 bench-local:
 	mkdir -p .paw/local-bench
