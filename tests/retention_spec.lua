@@ -22,3 +22,40 @@ local ok = pcall(manager.prune, manager, plan, false)
 assert(not ok, "retention cleanup must require explicit confirmation")
 assert(#manager:prune(plan, true) == 2, "confirmed retention cleanup must remove planned files")
 assert(vim.fn.filereadable(paths.transcripts .. "/fresh.log") == 1, "retention cleanup must preserve fresh files")
+
+helpers.write(paths.telemetry .. "/scheduled.log", "stale")
+vim.uv.fs_utime(paths.telemetry .. "/scheduled.log", 1, 1)
+local timer, planned = {}, nil
+timer.start = function(self, delay, repeat_ms, callback)
+	self.delay, self.repeat_ms, self.callback = delay, repeat_ms, callback
+end
+timer.stop = function(self)
+	self.stopped = true
+end
+timer.close = function(self)
+	self.closed = true
+end
+local schedule = manager:schedule({
+	interval_ms = 5,
+	timer = timer,
+	now = function()
+		return 100
+	end,
+	on_plan = function(value)
+		planned = value
+	end,
+	confirm = true,
+})
+timer.callback()
+assert(
+	vim.wait(100, function()
+		return planned ~= nil
+	end)
+		and #planned == 1
+		and vim.fn.filereadable(paths.telemetry .. "/scheduled.log") == 0,
+	"scheduled retention must plan and prune only after explicit scheduler confirmation"
+)
+assert(
+	schedule:cancel() and not schedule:cancel() and timer.stopped and timer.closed,
+	"retention schedules must cancel cleanly"
+)

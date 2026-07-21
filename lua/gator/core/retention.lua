@@ -1,8 +1,10 @@
 local errors = require("gator.error")
 local M = {}
 local Retention = {}
+local Schedule = {}
 
 Retention.__index = Retention
+Schedule.__index = Schedule
 M.categories = { "transcripts", "indices", "worktree_records", "telemetry" }
 
 local function fail(detail)
@@ -146,6 +148,66 @@ function Retention:prune(plan, confirm)
 		end
 	end
 	return removed
+end
+
+function Retention:schedule(opts)
+	if getmetatable(self) ~= Retention or type(opts) ~= "table" then
+		fail("schedule requires a retention manager and options")
+	end
+	for key in pairs(opts) do
+		if key ~= "interval_ms" and key ~= "timer" and key ~= "now" and key ~= "on_plan" and key ~= "confirm" then
+			fail("schedule contains unsupported field: " .. tostring(key))
+		end
+	end
+	if type(opts.interval_ms) ~= "number" or opts.interval_ms < 1 or opts.interval_ms % 1 ~= 0 then
+		fail("schedule interval_ms must be a positive integer")
+	end
+	if opts.now ~= nil and type(opts.now) ~= "function" then
+		fail("schedule now must be a function")
+	end
+	if opts.on_plan ~= nil and type(opts.on_plan) ~= "function" then
+		fail("schedule on_plan must be a function")
+	end
+	if opts.confirm ~= nil and type(opts.confirm) ~= "boolean" then
+		fail("schedule confirm must be boolean")
+	end
+	local timer = opts.timer or vim.uv.new_timer()
+	if
+		type(timer) ~= "table"
+		or type(timer.start) ~= "function"
+		or type(timer.stop) ~= "function"
+		or type(timer.close) ~= "function"
+	then
+		fail("schedule timer must expose start, stop, and close")
+	end
+	local value = setmetatable({ timer = timer, active = true }, Schedule)
+	timer:start(
+		opts.interval_ms,
+		opts.interval_ms,
+		vim.schedule_wrap(function()
+			if not value.active then
+				return
+			end
+			local plan = self:plan(opts.now and opts.now() or nil)
+			if opts.on_plan then
+				opts.on_plan(vim.deepcopy(plan))
+			end
+			if opts.confirm then
+				self:prune(plan, true)
+			end
+		end)
+	)
+	return value
+end
+
+function Schedule:cancel()
+	if getmetatable(self) ~= Schedule or not self.active then
+		return false
+	end
+	self.active = false
+	self.timer:stop()
+	self.timer:close()
+	return true
 end
 
 return M
