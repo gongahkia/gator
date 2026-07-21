@@ -119,7 +119,7 @@ func TestLoadPolicyV1Fixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	policy := cfg.Policy
-	if policy.Version != PolicySchemaVersion || strings.Join(policy.Provider.AllowedTransports, ",") != "ollama,openai" || policy.Command.Allow[0] != "go test ./..." || policy.Command.Deny[0] != "rm -rf" || !policy.Command.RequireApproval || policy.Risk.MaxCommands != 3 || !policy.Git.AllowCommit || !policy.Git.AllowPush || strings.Join(policy.Git.AllowedRemotes, ",") != "origin" || policy.Egress.MaxBytes != 4096 || policy.Approval.AutoApprove {
+	if policy.Version != PolicySchemaVersion || strings.Join(policy.Provider.AllowedTransports, ",") != "ollama,openai" || policy.Command.Allow[0] != "go test ./..." || policy.Command.Deny[0] != "rm -rf" || !policy.Command.RequireApproval || policy.Risk.MaxFiles != 4 || policy.Risk.MaxLines != 120 || policy.Risk.MaxTokens != 4096 || policy.Risk.MaxCommands != 3 || !policy.Git.AllowCommit || !policy.Git.AllowPush || strings.Join(policy.Git.AllowedRemotes, ",") != "origin" || policy.Egress.MaxBytes != 4096 || policy.Approval.AutoApprove {
 		t.Fatalf("policy = %#v", policy)
 	}
 }

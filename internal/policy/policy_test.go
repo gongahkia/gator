@@ -122,3 +122,30 @@ func TestCheckCommandRejectsInvalidPolicy(t *testing.T) {
 		t.Fatalf("invalid command policy error = %v", err)
 	}
 }
+
+func TestCheckRiskBudget(t *testing.T) {
+	cfg := config.Defaults().Policy
+	cfg.Risk.MaxFiles = 1
+	cfg.Risk.MaxLines = 2
+	cfg.Risk.MaxTokens = 3
+	cfg.Risk.MaxCommands = 4
+	if err := CheckRiskBudget(cfg, RiskBudget{Files: 1, Lines: 2, Tokens: 3, Commands: 4}); err != nil {
+		t.Fatalf("risk at limits error = %v", err)
+	}
+	for _, tc := range []struct {
+		name string
+		risk RiskBudget
+	}{
+		{name: "files", risk: RiskBudget{Files: 2}},
+		{name: "lines", risk: RiskBudget{Lines: 3}},
+		{name: "tokens", risk: RiskBudget{Tokens: 4}},
+		{name: "commands", risk: RiskBudget{Commands: 5}},
+		{name: "negative", risk: RiskBudget{Files: -1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := CheckRiskBudget(cfg, tc.risk); !errors.Is(err, ErrDenied) {
+				t.Fatalf("risk error = %v", err)
+			}
+		})
+	}
+}

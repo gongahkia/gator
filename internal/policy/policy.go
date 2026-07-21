@@ -18,6 +18,13 @@ var (
 	ErrApprovalRequired = errors.New("policy requires approval")
 )
 
+type RiskBudget struct {
+	Files    int
+	Lines    int
+	Tokens   int
+	Commands int
+}
+
 func Validate(cfg config.PolicyConfig) error {
 	return config.ValidatePolicy(cfg)
 }
@@ -72,6 +79,30 @@ func CheckCommand(cfg config.PolicyConfig, command string) error {
 	}
 	if cfg.Command.RequireApproval {
 		return fmt.Errorf("%w: command %q", ErrApprovalRequired, command)
+	}
+	return nil
+}
+
+func CheckRiskBudget(cfg config.PolicyConfig, risk RiskBudget) error {
+	if err := Validate(cfg); err != nil {
+		return err
+	}
+	for _, limit := range []struct {
+		name  string
+		value int
+		max   int
+	}{
+		{name: "files", value: risk.Files, max: cfg.Risk.MaxFiles},
+		{name: "lines", value: risk.Lines, max: cfg.Risk.MaxLines},
+		{name: "tokens", value: risk.Tokens, max: cfg.Risk.MaxTokens},
+		{name: "commands", value: risk.Commands, max: cfg.Risk.MaxCommands},
+	} {
+		if limit.value < 0 {
+			return fmt.Errorf("%w: risk %s must not be negative", ErrDenied, limit.name)
+		}
+		if limit.value > limit.max {
+			return fmt.Errorf("%w: risk %s %d exceeds limit %d", ErrDenied, limit.name, limit.value, limit.max)
+		}
 	}
 	return nil
 }

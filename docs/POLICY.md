@@ -47,5 +47,8 @@ allowlisted remote; a push to any other remote is denied.
 take precedence. A nonempty allowlist denies every command not listed; otherwise
 `require_approval` marks each non-denied command as requiring approval.
 
+`policy.risk` limits apply independently to each milestone's file, line, token, and command risk.
+An estimate exceeding any one limit is denied.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.
