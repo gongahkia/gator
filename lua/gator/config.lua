@@ -2,6 +2,7 @@ local M = {}
 local redact = require("gator.policy.redact")
 
 M.schema_version = 2
+M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
 	schema_version = M.schema_version,
@@ -68,6 +69,16 @@ local function fields(value, allowed, path)
 	end
 end
 
+local root_fields = {
+	schema_version = true,
+	ui = true,
+	context = true,
+	sessions = true,
+	workspaces = true,
+	persistence = true,
+	telemetry = true,
+}
+
 local function schema_version(value)
 	if type(value) ~= "number" or value % 1 ~= 0 then
 		fail("settings.schema_version must be an integer")
@@ -78,16 +89,20 @@ local function schema_version(value)
 	return value
 end
 
+local function fragment(value)
+	if type(value) ~= "table" then
+		fail("settings must be an object")
+	end
+	safe(value, "settings")
+	fields(value, root_fields, "settings")
+	if value.schema_version ~= nil then
+		schema_version(value.schema_version)
+	end
+	return value
+end
+
 local function settings(value)
-	fields(value, {
-		schema_version = true,
-		ui = true,
-		context = true,
-		sessions = true,
-		workspaces = true,
-		persistence = true,
-		telemetry = true,
-	}, "settings")
+	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
 	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, motion = true }, "settings.ui")
 	fields(value.context, { mode = true, trust = true }, "settings.context")
@@ -143,28 +158,78 @@ local function settings(value)
 	return value
 end
 
+local function source(value, index)
+	if type(value) ~= "table" then
+		fail("configuration source " .. index .. " must be an object")
+	end
+	fields(value, { source = true, ref = true, settings = true }, "configuration source " .. index)
+	if value.source ~= "file" and value.source ~= "setup" then
+		fail("configuration source " .. index .. " is unavailable: " .. tostring(value.source))
+	end
+	if type(value.ref) ~= "string" or value.ref == "" then
+		fail("configuration source " .. index .. " ref must be a non-empty string")
+	end
+	return {
+		source = value.source,
+		ref = value.ref,
+		settings = fragment(value.settings),
+		index = index,
+	}
+end
+
+local function record_provenance(result, value, source_value, ref, path)
+	if type(value) == "table" and not vim.islist(value) then
+		if next(value) == nil and path ~= "" then
+			result[path] = { source = source_value, ref = ref }
+			return
+		end
+		for key, child in pairs(value) do
+			record_provenance(result, child, source_value, ref, path == "" and key or path .. "." .. key)
+		end
+		return
+	end
+	if path ~= "" then
+		result[path] = { source = source_value, ref = ref }
+	end
+end
+
+function M.resolve_sources(values)
+	if values == nil then
+		values = {}
+	end
+	if type(values) ~= "table" or not vim.islist(values) then
+		fail("configuration sources must be an array")
+	end
+	local sources, seen = {}, {}
+	for index, value in ipairs(values) do
+		local entry = source(value, index)
+		if seen[entry.source] then
+			fail("configuration source is duplicated: " .. entry.source)
+		end
+		seen[entry.source] = true
+		table.insert(sources, entry)
+	end
+	table.sort(sources, function(left, right)
+		local left_priority = M.source_precedence[left.source]
+		local right_priority = M.source_precedence[right.source]
+		return left_priority == right_priority and left.index < right.index or left_priority < right_priority
+	end)
+	local value = vim.deepcopy(M.defaults)
+	local provenance = {}
+	record_provenance(provenance, value, "defaults", "gator.defaults", "")
+	for _, entry in ipairs(sources) do
+		value = vim.tbl_deep_extend("force", value, entry.settings)
+		record_provenance(provenance, entry.settings, entry.source, entry.ref, "")
+	end
+	return { settings = settings(value), provenance = vim.deepcopy(provenance) }
+end
+
 function M.resolve(opts)
 	if opts == nil then
 		opts = {}
 	end
-	if type(opts) ~= "table" then
-		fail("settings must be an object")
-	end
-	safe(opts, "settings")
-	fields(opts, {
-		schema_version = true,
-		ui = true,
-		context = true,
-		sessions = true,
-		workspaces = true,
-		persistence = true,
-		telemetry = true,
-	}, "settings")
-	if opts.schema_version ~= nil then
-		schema_version(opts.schema_version)
-	end
-	local config = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
-	return settings(config)
+	local value = M.resolve_sources({ { source = "setup", ref = "gator.setup", settings = opts } })
+	return value.settings, value.provenance
 end
 
 function M.load(path)
@@ -173,13 +238,15 @@ function M.load(path)
 		fail("settings path must be a non-empty string")
 	end
 	if vim.fn.filereadable(path) == 0 then
-		return M.resolve({})
+		local value = M.resolve_sources()
+		return value.settings, value.provenance
 	end
 	local ok, document = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), "\n"))
 	if not ok or type(document) ~= "table" then
 		fail("settings file is not a JSON object: " .. path)
 	end
-	return M.resolve(document)
+	local value = M.resolve_sources({ { source = "file", ref = path, settings = document } })
+	return value.settings, value.provenance
 end
 
 return M

@@ -66,10 +66,11 @@ require("gator").setup({
 })
 ```
 
-To opt into `stdpath("config") .. "/gator.json"`, load it explicitly:
+To opt into `stdpath("config") .. "/gator.json"`, load it explicitly. The optional second result identifies the source for each resolved field:
 
 ```lua
-require("gator").setup(require("gator.config").load())
+local settings, provenance = require("gator.config").load()
+require("gator").setup(settings)
 ```
 
 Do not put provider credentials, tokens, secrets, passwords, or API keys in Gator configuration.
