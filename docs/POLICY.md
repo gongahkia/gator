@@ -67,5 +67,8 @@ approval receipt before model egress.
 High-confidence secret values are scrubbed from traces, session event data, verification output, and
 doctor diagnostics.
 
+`policy.egress.max_files` and `policy.egress.max_bytes` are hard limits; approval receipts cannot
+override either limit.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

@@ -95,6 +95,29 @@ func TestCompressAllowsSecretWithMatchingProviderApproval(t *testing.T) {
 	}
 }
 
+func TestCompressEnforcesConfiguredEgressLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		policy config.EgressPolicy
+		want   string
+	}{
+		{name: "files", policy: config.EgressPolicy{MaxFiles: 1, MaxBytes: 4096}, want: "egress units"},
+		{name: "bytes", policy: config.EgressPolicy{MaxFiles: 80, MaxBytes: 1}, want: "egress bytes"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &captureCompressClient{content: digestJSON(t, validDigest())}
+			stage := New(client)
+			stage.SetEgressPolicy(tc.policy, "openai", "https://api.example.test/v1")
+			if _, err := stage.Run(context.Background(), rawEnvelope()); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("egress limit error = %v", err)
+			}
+			if len(client.request.Messages) != 0 {
+				t.Fatalf("model request = %#v", client.request)
+			}
+		})
+	}
+}
+
 func TestCompressDropsHallucinatedPath(t *testing.T) {
 	stage, got := runCompress(t, digestWithInvalidItem(envelope.DigestItem{
 		UnitID:    "u001",
