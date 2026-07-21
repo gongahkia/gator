@@ -1,7 +1,6 @@
 local filesystem = require("gator.core.filesystem")
 local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
-local storage = require("gator.core.storage")
 local task = require("gator.core.task")
 
 local M = { api_version = 1, schema_version = 1 }
@@ -69,7 +68,7 @@ function M.open(path, opts)
 		{ path = path, filesystem = opts.filesystem or filesystem.new(), api_version = M.api_version },
 		Backend
 	)
-	storage.validate_json_backend(value)
+	require("gator.core.storage").validate_json_backend(value)
 	return value
 end
 
