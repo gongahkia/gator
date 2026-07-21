@@ -106,6 +106,66 @@ func TestStorePersistsManifestAndEvents(t *testing.T) {
 	}
 }
 
+func TestSaveManifestRejectsInvalidWithoutReplacingExisting(t *testing.T) {
+	cwd := t.TempDir()
+	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	manifest, err := NewManifest("session-atomic-01", cwd, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(store.Dir(), "manifest.json")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveManifest(Manifest{}); !errors.Is(err, ErrInvalidManifest) {
+		t.Fatalf("save invalid manifest error = %v", err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatal("invalid manifest replaced persisted manifest")
+	}
+}
+
+func TestSaveManifestReplacesExistingSnapshot(t *testing.T) {
+	cwd := t.TempDir()
+	now := time.Date(2026, 7, 21, 0, 0, 0, 0, time.UTC)
+	manifest, err := NewManifest("session-atomic-02", cwd, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := Create(cwd, manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Status = StatusStopped
+	manifest.UpdatedAt = now.Add(time.Minute)
+	if err := store.SaveManifest(manifest); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.LoadManifest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != StatusStopped || !got.UpdatedAt.Equal(manifest.UpdatedAt) {
+		t.Fatalf("manifest = %#v", got)
+	}
+	entries, err := os.ReadDir(store.Dir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "manifest.json" {
+		t.Fatalf("session entries = %#v", entries)
+	}
+}
+
 func TestLoadManifestAcceptsV2Fixture(t *testing.T) {
 	dir := t.TempDir()
 	data, err := os.ReadFile(filepath.Join("testdata", "manifest-v2.json"))
