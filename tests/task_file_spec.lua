@@ -65,3 +65,53 @@ assert(
 )
 local invalid = definition:gsub("  owner: provider", "  owner: gator", 1)
 assert(not pcall(format.parse, invalid), "task-file parsers must reject non-provider-owned sessions")
+
+local filesystem = require("gator").module("core").filesystem
+local files = {}
+local projected = format.write("/fixture/task-markdown.md", parsed, {
+	filesystem = filesystem.new({
+		readable = function(path)
+			return files[path] ~= nil
+		end,
+		read = function(path)
+			return files[path]
+		end,
+		mkdir = function()
+			return true
+		end,
+		write = function(path, value)
+			files[path] = value
+			return true
+		end,
+		rename = function(source, target)
+			files[target], files[source] = files[source], nil
+			return true
+		end,
+		remove = function(path)
+			files[path] = nil
+			return true
+		end,
+	}),
+})
+local round_trip = format.parse(projected.content)
+assert(
+	files[projected.path] == projected.content
+		and round_trip.id == parsed.id
+		and round_trip.sessions[1].id == "native-markdown"
+		and round_trip.evidence[1].ref:find("private%-value") == nil,
+	"task-file projections must atomically preserve canonical records and redacted evidence"
+)
+assert(
+	not pcall(format.write, "/fixture/task.txt", parsed),
+	"task-file projections must reject non-Markdown destinations"
+)
+assert(not pcall(format.write, "/fixture/task-write-failure.md", parsed, {
+	filesystem = filesystem.new({
+		mkdir = function()
+			return true
+		end,
+		write = function()
+			return false
+		end,
+	}),
+}), "task-file projections must expose filesystem write failures")
