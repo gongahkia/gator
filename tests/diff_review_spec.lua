@@ -13,9 +13,23 @@ local agent_run = run.new({
 local window = diff_review.open({
 	run = agent_run,
 	changes = { { path = "lua/gator/init.lua", before = "local old = true\n", after = "local new = true\n" } },
+	validations = {
+		{
+			command_id = "unit",
+			code = 0,
+			passed = true,
+			policy = { provenance = { source = "project-policy", ref = ".gator/policy.json" } },
+			evidence = { { stream = "stdout", text = "passed token=fixture-secret" } },
+		},
+	},
 })
 
 assert(vim.api.nvim_win_is_valid(window), "diff review opening must create a window")
+local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
+assert(
+	content:find("passed · unit · exit 0 · project-policy", 1, true) and not content:find("fixture-secret", 1, true),
+	"diff review must render redacted policy-provenanced validation results"
+)
 assert(diff_review.select(1).path == "lua/gator/init.lua", "diff review selection must preserve changed file paths")
 local split = diff_review.open_selected()
 assert(vim.wo[split.before].diff and vim.wo[split.after].diff, "diff review must open native diff windows")
@@ -36,3 +50,8 @@ assert(
 
 local ok = pcall(diff_review.open, { run = agent_run, changes = { { path = "file", before = "old" } } })
 assert(not ok, "incomplete diff content must fail explicitly")
+ok = pcall(diff_review.open, {
+	run = agent_run,
+	validations = { { command_id = "unit", code = 0, passed = true, evidence = {} } },
+})
+assert(not ok, "diff review must reject validation results without policy provenance")

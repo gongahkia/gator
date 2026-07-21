@@ -1,8 +1,10 @@
 local run = require("gator.core.run")
+local redact = require("gator.policy.redact")
 local accessibility = require("gator.ui.accessibility")
 local M = {}
 local reviews = {}
 local decisions = { pending = true, accepted = true, rejected = true }
+local max_validation_lines = 40
 
 local function fail(message)
 	error("Gator diff review: " .. message, 3)
@@ -67,6 +69,64 @@ local function changes(value)
 	return result
 end
 
+local function validation_text(value, name)
+	if type(value) ~= "string" or value == "" then
+		fail(name .. " must be non-empty text")
+	end
+	return redact.text(value)
+end
+
+local function validations(value)
+	if value == nil then
+		return {}
+	end
+	if type(value) ~= "table" or not vim.islist(value) then
+		fail("validations must be an array")
+	end
+	local result = {}
+	for index, validation in ipairs(value) do
+		if type(validation) ~= "table" then
+			fail("validation " .. index .. " must be a table")
+		end
+		for key in pairs(validation) do
+			if key ~= "command_id" and key ~= "code" and key ~= "passed" and key ~= "evidence" and key ~= "policy" then
+				fail("validation " .. index .. " contains unsupported field: " .. tostring(key))
+			end
+		end
+		if type(validation.code) ~= "number" or validation.code % 1 ~= 0 then
+			fail("validation " .. index .. " code must be an integer")
+		end
+		if type(validation.passed) ~= "boolean" then
+			fail("validation " .. index .. " passed must be boolean")
+		end
+		if type(validation.evidence) ~= "table" or not vim.islist(validation.evidence) then
+			fail("validation " .. index .. " evidence must be an array")
+		end
+		if type(validation.policy) ~= "table" or type(validation.policy.provenance) ~= "table" then
+			fail("validation " .. index .. " must retain policy provenance")
+		end
+		if type(validation.policy.provenance.source) ~= "string" or validation.policy.provenance.source == "" then
+			fail("validation " .. index .. " policy source must be non-empty")
+		end
+		local evidence = {}
+		for evidence_index, item in ipairs(validation.evidence) do
+			if type(item) ~= "table" or (item.stream ~= "stdout" and item.stream ~= "stderr") then
+				fail("validation " .. index .. " evidence " .. evidence_index .. " stream is invalid")
+			end
+			evidence[evidence_index] =
+				{ stream = item.stream, text = validation_text(item.text, "validation evidence") }
+		end
+		result[index] = {
+			command_id = validation_text(validation.command_id, "validation " .. index .. " command_id"),
+			code = validation.code,
+			passed = validation.passed,
+			policy = { provenance = vim.deepcopy(validation.policy.provenance) },
+			evidence = evidence,
+		}
+	end
+	return result
+end
+
 local function selected_hunk(review)
 	local change = review.changes[review.selected]
 	return change and change.hunks[review.hunk] or nil
@@ -120,6 +180,41 @@ local function render(review)
 						.. hunk.decision
 						.. annotation
 				)
+			end
+		end
+	end
+	if #review.validations == 0 then
+		table.insert(lines, "Validation: unavailable · no policy-approved validation results")
+	else
+		table.insert(lines, "Validation:")
+		local rendered = 0
+		for _, validation in ipairs(review.validations) do
+			table.insert(
+				lines,
+				"  "
+					.. (validation.passed and "passed" or "failed")
+					.. " · "
+					.. validation.command_id
+					.. " · exit "
+					.. validation.code
+					.. " · "
+					.. validation.policy.provenance.source
+			)
+			for _, evidence in ipairs(validation.evidence) do
+				for _, line in ipairs(vim.split(evidence.text, "\n", { plain = true, trimempty = false })) do
+					if rendered >= max_validation_lines then
+						table.insert(lines, "  validation output truncated in Gator")
+						break
+					end
+					table.insert(lines, "    " .. evidence.stream .. ": " .. line)
+					rendered = rendered + 1
+				end
+				if rendered >= max_validation_lines then
+					break
+				end
+			end
+			if rendered >= max_validation_lines then
+				break
 			end
 		end
 	end
@@ -198,12 +293,19 @@ function M.open(opts)
 	if type(opts) ~= "table" or not run.is(opts.run) then
 		fail("open requires a Gator run")
 	end
+	for key in pairs(opts) do
+		if key ~= "run" and key ~= "changes" and key ~= "validations" then
+			fail("open contains unsupported field: " .. tostring(key))
+		end
+	end
 	local value = changes(opts.changes or {})
+	local validation_values = validations(opts.validations)
 	local review, tabpage = current()
 	if review then
 		close_diffs(review)
 		review.run = opts.run
 		review.changes = value
+		review.validations = validation_values
 		review.selected = math.min(review.selected, math.max(#value, 1))
 		review.hunk = 1
 		render(review)
@@ -221,6 +323,7 @@ function M.open(opts)
 		buffer = buffer,
 		run = opts.run,
 		changes = value,
+		validations = validation_values,
 		selected = 1,
 		hunk = 1,
 		diffs = {},
