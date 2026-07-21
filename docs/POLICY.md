@@ -54,5 +54,8 @@ An estimate exceeding any one limit is denied.
 approval gates, but does not bypass command denies, command allowlists, remote allowlists, or risk
 limits.
 
+Provider approvals are recorded as receipts bound to the exact transport, base URL, and egress
+manifest digest.
+
 Omitted values retain the built-in defaults. Environment overrides use the `PAW_POLICY_*` variables
 listed in the main configuration reference.

@@ -3,12 +3,20 @@ package egress
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/gongahkia/paw/internal/config"
 	"github.com/gongahkia/paw/internal/envelope"
 )
+
+const ProviderApprovalSchemaVersion = "paw.provider-approval/1"
+
+var ErrInvalidProviderApproval = errors.New("invalid provider approval receipt")
 
 type Finding = envelope.EgressFinding
 type UnitManifest = envelope.EgressUnit
@@ -95,6 +103,83 @@ func Prepare(cfg config.EgressPolicy, raw *envelope.RawContext) (RedactionResult
 		return RedactionResult{}, manifest, err
 	}
 	return Redact(raw), manifest, nil
+}
+
+func Approve(manifest Manifest, transport, baseURL string, now time.Time, autoApproved bool) (Manifest, error) {
+	receipt, err := NewProviderApprovalReceipt(manifest, transport, baseURL, now, autoApproved)
+	if err != nil {
+		return Manifest{}, err
+	}
+	manifest.ProviderApproval = &receipt
+	return manifest, nil
+}
+
+func NewProviderApprovalReceipt(manifest Manifest, transport, baseURL string, now time.Time, autoApproved bool) (envelope.ProviderApprovalReceipt, error) {
+	if err := validateReceiptDestination(transport, baseURL); err != nil {
+		return envelope.ProviderApprovalReceipt{}, err
+	}
+	if now.IsZero() {
+		return envelope.ProviderApprovalReceipt{}, fmt.Errorf("%w: approved_at is required", ErrInvalidProviderApproval)
+	}
+	digest, err := manifestDigest(manifest)
+	if err != nil {
+		return envelope.ProviderApprovalReceipt{}, err
+	}
+	return envelope.ProviderApprovalReceipt{
+		SchemaVersion:  ProviderApprovalSchemaVersion,
+		Transport:      transport,
+		BaseURL:        baseURL,
+		ManifestSHA256: digest,
+		ApprovedAt:     now.UTC(),
+		AutoApproved:   autoApproved,
+	}, nil
+}
+
+func VerifyProviderApproval(manifest Manifest, transport, baseURL string) error {
+	if err := validateReceiptDestination(transport, baseURL); err != nil {
+		return err
+	}
+	receipt := manifest.ProviderApproval
+	if receipt == nil {
+		return fmt.Errorf("%w: receipt is required", ErrInvalidProviderApproval)
+	}
+	if receipt.SchemaVersion != ProviderApprovalSchemaVersion {
+		return fmt.Errorf("%w: unsupported schema %q", ErrInvalidProviderApproval, receipt.SchemaVersion)
+	}
+	if receipt.Transport != transport || receipt.BaseURL != baseURL {
+		return fmt.Errorf("%w: provider destination does not match receipt", ErrInvalidProviderApproval)
+	}
+	if receipt.ApprovedAt.IsZero() {
+		return fmt.Errorf("%w: approved_at is required", ErrInvalidProviderApproval)
+	}
+	digest, err := manifestDigest(manifest)
+	if err != nil {
+		return err
+	}
+	if receipt.ManifestSHA256 != digest {
+		return fmt.Errorf("%w: manifest digest does not match receipt", ErrInvalidProviderApproval)
+	}
+	return nil
+}
+
+func validateReceiptDestination(transport, baseURL string) error {
+	if transport == "" || transport != strings.TrimSpace(transport) {
+		return fmt.Errorf("%w: transport is required", ErrInvalidProviderApproval)
+	}
+	if baseURL == "" || baseURL != strings.TrimSpace(baseURL) {
+		return fmt.Errorf("%w: base_url is required", ErrInvalidProviderApproval)
+	}
+	return nil
+}
+
+func manifestDigest(manifest Manifest) (string, error) {
+	manifest.ProviderApproval = nil
+	encoded, err := json.Marshal(manifest)
+	if err != nil {
+		return "", fmt.Errorf("encode egress manifest: %w", err)
+	}
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func scan(text string) []Finding {

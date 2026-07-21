@@ -1,8 +1,10 @@
 package egress
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/paw/internal/config"
 	"github.com/gongahkia/paw/internal/envelope"
@@ -61,5 +63,36 @@ func TestPrepareRedactsWhenSecretBlockingIsExplicitlyDisabled(t *testing.T) {
 	}
 	if strings.Contains(result.Raw.Units[0].Text, "abcdefghijklmnopqrstuvwxyz") {
 		t.Fatalf("raw = %q", result.Raw.Units[0].Text)
+	}
+}
+
+func TestProviderApprovalReceiptBindsManifestAndDestination(t *testing.T) {
+	manifest := Manifest{Units: []UnitManifest{{ID: "u001", Kind: "file_slice", Bytes: 3, SHA256: "abc"}}, TotalBytes: 3}
+	approved, err := Approve(manifest, "openai", "https://api.example.test/v1", time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyProviderApproval(approved, "openai", "https://api.example.test/v1"); err != nil {
+		t.Fatalf("verify receipt: %v", err)
+	}
+	if err := VerifyProviderApproval(approved, "openai", "https://other.example.test/v1"); !errors.Is(err, ErrInvalidProviderApproval) {
+		t.Fatalf("other endpoint error = %v", err)
+	}
+	approved.TotalBytes++
+	if err := VerifyProviderApproval(approved, "openai", "https://api.example.test/v1"); !errors.Is(err, ErrInvalidProviderApproval) {
+		t.Fatalf("tampered manifest error = %v", err)
+	}
+}
+
+func TestProviderApprovalReceiptRejectsMissingFields(t *testing.T) {
+	manifest := Manifest{}
+	if _, err := NewProviderApprovalReceipt(manifest, "", "https://api.example.test/v1", time.Now(), false); !errors.Is(err, ErrInvalidProviderApproval) {
+		t.Fatalf("missing transport error = %v", err)
+	}
+	if _, err := NewProviderApprovalReceipt(manifest, "openai", "https://api.example.test/v1", time.Time{}, false); !errors.Is(err, ErrInvalidProviderApproval) {
+		t.Fatalf("missing timestamp error = %v", err)
+	}
+	if err := VerifyProviderApproval(manifest, "openai", "https://api.example.test/v1"); !errors.Is(err, ErrInvalidProviderApproval) {
+		t.Fatalf("missing receipt error = %v", err)
 	}
 }

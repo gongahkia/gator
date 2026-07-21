@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEnvelopeRoundTrip(t *testing.T) {
@@ -66,9 +67,10 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 		TotalBytes: 13,
 	}
 	env.Egress = &EgressManifest{
-		Units:      []EgressUnit{{ID: "u001", Kind: "file_slice", Path: "main.go", Bytes: 13, SHA256: "digest"}},
-		TotalBytes: 13,
-		Findings:   []EgressFinding{{Kind: "openai_key", Count: 1}},
+		Units:            []EgressUnit{{ID: "u001", Kind: "file_slice", Path: "main.go", Bytes: 13, SHA256: "digest"}},
+		TotalBytes:       13,
+		Findings:         []EgressFinding{{Kind: "openai_key", Count: 1}},
+		ProviderApproval: &ProviderApprovalReceipt{SchemaVersion: "paw.provider-approval/1", Transport: "openai", BaseURL: "https://api.example.test/v1", ManifestSHA256: "digest", ApprovedAt: time.Unix(0, 0).UTC()},
 	}
 	env.Done = true
 
