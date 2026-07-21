@@ -3,6 +3,7 @@ local context = require("gator.context.pack")
 local errors = require("gator.error")
 local event = require("gator.core.run").event
 local overlay = require("gator.policy.overlay")
+local runtime = require("gator.core.runtime")
 local task = require("gator.core.task")
 local M = {}
 local Supervisor = {}
@@ -116,10 +117,24 @@ function M.new(opts)
 	if type(opts) ~= "table" or type(opts.manager) ~= "table" or type(opts.manager.launch) ~= "function" then
 		fail("new requires an asynchronous process supervisor")
 	end
+	for key in pairs(opts) do
+		if key ~= "manager" and key ~= "now" and key ~= "runtime" then
+			fail("new contains unsupported field: " .. tostring(key))
+		end
+	end
 	if opts.now ~= nil and type(opts.now) ~= "function" then
 		fail("now must be a function")
 	end
-	return setmetatable({ manager = opts.manager, now = opts.now or os.time }, Supervisor)
+	if opts.runtime ~= nil and not runtime.is(opts.runtime) then
+		fail("runtime must be created by gator.core.runtime.new")
+	end
+	if opts.runtime and opts.now then
+		fail("new accepts either runtime or now")
+	end
+	return setmetatable(
+		{ manager = opts.manager, runtime = opts.runtime or runtime.new({ clock = opts.now }) },
+		Supervisor
+	)
 end
 
 function Supervisor:start(opts)
@@ -128,10 +143,10 @@ function Supervisor:start(opts)
 	local function emit(status)
 		sequence = sequence + 1
 		local record = event({
-			id = value.id .. "-lifecycle-" .. sequence,
+			id = self.runtime:next_id(value.id .. "-lifecycle"),
 			run_id = value.id,
 			type = "run." .. status.state,
-			at = timestamp(self.now()),
+			at = timestamp(self.runtime:now()),
 			payload = normalized(status),
 		})
 		events[#events + 1] = record

@@ -2,6 +2,7 @@ local adapters = require("gator").module("adapters")
 local context = require("gator").module("context").pack
 local overlay = require("gator").module("policy").overlay
 local process = adapters.process
+local runtime = require("gator").module("core").runtime
 local supervisor = require("gator").module("core").supervisor
 local task = require("gator").module("core").task
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
@@ -51,9 +52,14 @@ local manager = process.new({
 local events = {}
 local native = supervisor.new({
 	manager = manager,
-	now = function()
-		return 7
-	end,
+	runtime = runtime.new({
+		clock = function()
+			return 7
+		end,
+		identifier = function(_, sequence)
+			return "fixture-event-" .. sequence
+		end,
+	}),
 })
 local value = native:start({
 	id = "run-supervisor",
@@ -79,6 +85,7 @@ local value = native:start({
 assert(
 	value.status.state == "running"
 		and value.provider == "codex"
+		and value.events[1].id == "fixture-event-1"
 		and value.events[1].type == "run.running"
 		and value.events[1].payload.output.stdout_bytes == #"provider output",
 	"native run contract must normalize validated provider launches without persisting raw output"
@@ -121,3 +128,7 @@ assert(not pcall(native.start, native, {
 	mode = "jsonrpc",
 	adapter = { launch = function() end },
 }), "run contract must refuse policies not proven through narrowed run overrides")
+assert(
+	not pcall(supervisor.new, { manager = manager, now = os.time, runtime = runtime.new() }),
+	"run supervisors must reject ambiguous runtime clock injection"
+)
