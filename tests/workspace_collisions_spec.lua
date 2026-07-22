@@ -9,6 +9,7 @@ local value = collisions.detect({
 	},
 })
 assert(#value.warnings == 2, "active overlaps and generated artifacts must produce warnings")
+assert(value.state == "completed", "completed collision scans must remain explicit")
 assert(
 	value.warnings[1].kind == "generated"
 		and value.warnings[1].path == "dist/bundle.js"
@@ -28,3 +29,9 @@ assert(
 	),
 	"changed paths must remain worktree-relative"
 )
+assert(collisions.detect({
+	worktrees = {},
+	cancelled = function()
+		return true
+	end,
+}).state == "cancelled", "cancelled collision scans must remain explicit")

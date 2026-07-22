@@ -93,14 +93,35 @@ local function ids(value)
 	return result
 end
 
+local function cancelled(callback)
+	if callback == nil then
+		return false
+	end
+	local ok, value = pcall(callback)
+	if not ok or type(value) ~= "boolean" then
+		return nil
+	end
+	return value
+end
+
 function M.detect(opts)
 	if type(opts) ~= "table" then
 		fail("detect requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "worktrees" and key ~= "generated" then
+		if key ~= "worktrees" and key ~= "generated" and key ~= "cancelled" then
 			fail("options contain unsupported field: " .. tostring(key))
 		end
+	end
+	if opts.cancelled ~= nil and type(opts.cancelled) ~= "function" then
+		fail("cancelled must be a function")
+	end
+	local stopped = cancelled(opts.cancelled)
+	if stopped == nil then
+		return { state = "failed", warnings = {}, failure = "cancellation check failed" }
+	end
+	if stopped then
+		return { state = "cancelled", warnings = {} }
 	end
 	local artifacts = patterns(opts.generated)
 	local paths = {}
@@ -124,7 +145,7 @@ function M.detect(opts)
 	table.sort(warnings, function(left, right)
 		return left.kind == right.kind and left.path < right.path or left.kind < right.kind
 	end)
-	return { warnings = warnings }
+	return { state = "completed", warnings = warnings }
 end
 
 return M
