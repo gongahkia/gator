@@ -14,6 +14,7 @@ local M = {
 	handoff_pack = require("gator.context.handoff_pack"),
 	handoff_pack_review = require("gator.context.handoff_pack_review"),
 	handoff_summary = require("gator.context.handoff_summary"),
+	handoff_target = require("gator.context.handoff_target"),
 	lexical = require("gator.context.lexical"),
 	instructions = require("gator.context.instructions"),
 	pack = require("gator.context.pack"),

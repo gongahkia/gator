@@ -54,19 +54,23 @@ function M.compatibility(opts)
 end
 
 local function payload_entry(value)
-	return redact.value({
+	local transfer = { eligible = value.transfer.eligible }
+	if not transfer.eligible then
+		transfer.reason = redact.text(value.transfer.reason)
+	end
+	return {
 		id = value.id,
-		kind = value.kind,
-		ref = value.ref,
-		provenance = value.provenance,
+		kind = redact.text(value.kind),
+		ref = redact.text(value.ref),
+		provenance = { source = redact.text(value.provenance.source), ref = redact.text(value.provenance.ref) },
 		trust = value.trust,
-		transfer = value.transfer,
-		annotation = value.annotation,
+		transfer = transfer,
+		annotation = value.annotation and redact.text(value.annotation) or nil,
 		pinned = value.pinned,
-		revision = value.revision,
-		retrieval_source = value.retrieval_source,
-		policy_decision = value.policy_decision,
-	})
+		revision = value.revision and redact.text(value.revision) or nil,
+		retrieval_source = value.retrieval_source and redact.text(value.retrieval_source) or nil,
+		policy_decision = value.policy_decision and redact.text(value.policy_decision) or nil,
+	}
 end
 
 local function approved(record)
@@ -122,7 +126,7 @@ function M.launch_payload(opts)
 			reason = redact.text(reason),
 		}
 	end
-	return redact.value({
+	return {
 		available = true,
 		kind = "gator.handoff.launch",
 		provider = target.provider,
@@ -135,7 +139,7 @@ function M.launch_payload(opts)
 		},
 		prompt = context.prompt,
 		context = { entries = context.entries },
-	})
+	}
 end
 
 return M
