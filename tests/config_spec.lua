@@ -23,13 +23,27 @@ assert(not pcall(config.resolve, { schema_version = 1 }), "legacy configuration 
 assert(not pcall(config.resolve, { schema_version = "2" }), "configuration schemas must require an integer version")
 local handoff = config.resolve({ context = { handoff = { author = "gator", max_chars = 2048 } } }).context.handoff
 assert(
-	handoff.author == "gator" and handoff.max_chars == 2048,
-	"handoff authoring settings must resolve with validated author and content bounds"
+	handoff.author == "gator" and handoff.max_chars == 2048 and handoff.review == "required",
+	"handoff authoring settings must inherit required review enforcement"
 )
+local optional_handoff = config.resolve({
+	context = { handoff = { author = "gator", max_chars = 2048, review = "optional" } },
+}).context.handoff
+assert(optional_handoff.review == "optional", "handoff authoring settings must resolve optional review enforcement")
 assert(
-	not pcall(config.resolve, { context = { handoff = { author = "invalid", max_chars = 1 } } })
-		and not pcall(config.resolve, { context = { handoff = { author = "user", max_chars = 0 } } }),
-	"handoff authoring settings must reject unsupported authors and invalid bounds"
+	not pcall(
+			config.resolve,
+			{ context = { handoff = { author = "invalid", max_chars = 1, review = "required" } } }
+		)
+		and not pcall(
+			config.resolve,
+			{ context = { handoff = { author = "user", max_chars = 0, review = "required" } } }
+		)
+		and not pcall(
+			config.resolve,
+			{ context = { handoff = { author = "user", max_chars = 1, review = "invalid" } } }
+		),
+	"handoff authoring settings must reject unsupported authors, bounds, and review modes"
 )
 
 helpers.write(path, '{"schema_version":1,"ui":{"layout":"modal"}}')

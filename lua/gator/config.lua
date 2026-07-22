@@ -12,7 +12,11 @@ M.defaults = {
 		screen_reader = true,
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 	},
-	context = { mode = "manual", trust = "provenance", handoff = { author = "user", max_chars = 4096 } },
+	context = {
+		mode = "manual",
+		trust = "provenance",
+		handoff = { author = "user", max_chars = 4096, review = "required" },
+	},
 	sessions = { transfer = "manual" },
 	workspaces = { mode = "project", max_write_runs = 1 },
 	persistence = { sharing = "local" },
@@ -135,7 +139,7 @@ local function settings(value)
 	if not vim.tbl_contains({ "provenance", "repository", "manual" }, value.context.trust) then
 		fail("context.trust must be provenance, repository, or manual")
 	end
-	fields(value.context.handoff, { author = true, max_chars = true }, "settings.context.handoff")
+	fields(value.context.handoff, { author = true, max_chars = true, review = true }, "settings.context.handoff")
 	if not vim.tbl_contains({ "user", "source", "gator" }, value.context.handoff.author) then
 		fail("context.handoff.author must be user, source, or gator")
 	end
@@ -145,6 +149,9 @@ local function settings(value)
 		or value.context.handoff.max_chars % 1 ~= 0
 	then
 		fail("context.handoff.max_chars must be a positive integer")
+	end
+	if value.context.handoff.review ~= "required" and value.context.handoff.review ~= "optional" then
+		fail("context.handoff.review must be required or optional")
 	end
 	if value.sessions.transfer ~= "manual" then
 		fail("sessions.transfer must be manual")

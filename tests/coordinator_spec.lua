@@ -2,11 +2,12 @@ local coordinator = require("gator.coordinator")
 local consent = require("gator.telemetry.consent")
 local motion = require("gator.ui.motion")
 local redact = require("gator.policy.redact")
+local review = require("gator.context.handoff_pack_review")
 local summary = require("gator.context.handoff_summary")
 
 local value = coordinator.new({
 	ui = { motion = { enabled = false, interval_ms = 16, reduced = false } },
-	context = { handoff = { author = "gator", max_chars = 2048 } },
+	context = { handoff = { author = "gator", max_chars = 2048, review = "optional" } },
 	telemetry = { enabled = true, redaction_patterns = { "private%-[%w]+" } },
 })
 
@@ -22,6 +23,7 @@ assert(
 	summary.settings().author == "gator" and summary.settings().max_chars == 2048,
 	"coordinator must configure handoff summary authoring settings"
 )
+assert(review.settings().review == "optional", "coordinator must configure handoff review enforcement")
 assert(not pcall(coordinator.new, { unsupported = true }), "coordinator must reject unsupported settings")
 assert(not pcall(value.state, {}), "coordinator methods must reject invalid receivers")
 assert(value:module("core").name == "core", "coordinator must resolve public modules through its container")

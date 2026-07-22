@@ -20,7 +20,10 @@ local source = handoff_pack.new({
 	entries = { entry("entry-one"), entry("entry-two") },
 })
 local value = review.new({ pack = source })
-assert(review.is(value) and value:status().state == "ready", "handoff pack reviews must begin ready")
+assert(
+	review.is(value) and value:status().state == "ready" and value:status().mode == "required",
+	"handoff pack reviews must begin in required enforcement mode"
+)
 value:append(entry("entry-three"))
 value:annotate("entry-three", "review token=fixture-secret")
 value:move("entry-three", 1)
@@ -36,6 +39,8 @@ assert(
 		and value:status().entries[1].annotation:find("fixture-secret", 1, true) == nil,
 	"handoff reviews must support ordered add, annotate, move, and remove operations with redaction"
 )
+assert(not pcall(value.commit, value), "required reviews must reject unapproved commits")
+value:approve()
 local committed = value:commit()
 assert(
 	handoff_pack.is(committed)
@@ -49,6 +54,10 @@ assert(
 	"completed handoff reviews must reject further edits"
 )
 
+review.configure({ review = "optional" })
+local optional = review.new({ pack = source })
+assert(optional:commit().id == source.id, "optional reviews must permit direct commits")
+review.configure({ review = "required" })
 local cancelled = review.new({ pack = source })
 assert(
 	cancelled:cancel() and cancelled:status().state == "cancelled" and not cancelled:commit(),

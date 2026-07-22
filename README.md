@@ -65,7 +65,7 @@ require("gator").setup({
   context = {
     mode = "manual",
     trust = "provenance",
-    handoff = { author = "user", max_chars = 4096 }, -- author: "user", "source", or "gator"
+    handoff = { author = "user", max_chars = 4096, review = "required" }, -- author: "user", "source", or "gator"; review: "required" or "optional"
   },
   sessions = { transfer = "manual" },
   workspaces = { mode = "project", max_write_runs = 1 },

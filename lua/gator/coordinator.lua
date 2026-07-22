@@ -26,7 +26,11 @@ local function configure(container, settings)
 	container:require("accessibility").configure(settings.ui)
 	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
 	container:require("consent").configure({ enabled = settings.telemetry.enabled })
-	container:require("context").handoff_summary.configure(settings.context.handoff)
+	container:require("context").handoff_summary.configure({
+		author = settings.context.handoff.author,
+		max_chars = settings.context.handoff.max_chars,
+	})
+	container:require("context").handoff_pack_review.configure({ review = settings.context.handoff.review })
 end
 
 local function options(action, value)

@@ -1,8 +1,9 @@
 local pack = require("gator.context.handoff_pack")
 local context_pack = require("gator.context.pack")
 local redact = require("gator.policy.redact")
-local M = {}
+local M = { defaults = { review = "required" } }
 local Review = {}
+local settings = vim.deepcopy(M.defaults)
 
 Review.__index = Review
 
@@ -39,6 +40,18 @@ local function require_ready(value)
 	end
 end
 
+function M.configure(value)
+	if type(value) ~= "table" or (value.review ~= "required" and value.review ~= "optional") then
+		fail("review settings must declare required or optional enforcement")
+	end
+	settings = { review = value.review }
+	return vim.deepcopy(settings)
+end
+
+function M.settings()
+	return vim.deepcopy(settings)
+end
+
 function M.new(opts)
 	if type(opts) ~= "table" then
 		fail("new requires options")
@@ -52,7 +65,13 @@ function M.new(opts)
 		fail("new requires a canonical handoff pack")
 	end
 	local value = pack.to_record(opts.pack)
-	return setmetatable({ id = value.id, task_id = value.task_id, entries = value.entries, state = "ready" }, Review)
+	return setmetatable({
+		id = value.id,
+		task_id = value.task_id,
+		entries = value.entries,
+		state = "ready",
+		mode = settings.review,
+	}, Review)
 end
 
 function M.is(value)
@@ -63,7 +82,14 @@ function Review:status()
 	if not M.is(self) then
 		fail("status requires a handoff pack review")
 	end
-	return vim.deepcopy({ id = self.id, task_id = self.task_id, state = self.state, entries = self.entries })
+	return vim.deepcopy({
+		id = self.id,
+		task_id = self.task_id,
+		state = self.state,
+		mode = self.mode,
+		approved = self.approved or false,
+		entries = self.entries,
+	})
 end
 
 function Review:append(entry)
@@ -125,12 +151,24 @@ function Review:annotate(id, value)
 	return self:status()
 end
 
+function Review:approve()
+	if not M.is(self) then
+		fail("approve requires a handoff pack review")
+	end
+	require_ready(self)
+	self.approved = true
+	return self:status()
+end
+
 function Review:commit()
 	if not M.is(self) then
 		fail("commit requires a handoff pack review")
 	end
 	if self.state ~= "ready" then
 		return nil
+	end
+	if self.mode == "required" and not self.approved then
+		fail("review approval is required before commit")
 	end
 	self.state = "completed"
 	return pack.new({ id = self.id, task_id = self.task_id, entries = self.entries })
