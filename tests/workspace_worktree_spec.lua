@@ -10,7 +10,7 @@ local value = worktree.create({
 	base = "HEAD",
 	run = function(argv)
 		table.insert(calls, argv)
-		return { code = 0 }
+		return { code = 0, stdout = "" }
 	end,
 })
 assert(
@@ -30,7 +30,7 @@ assert(not pcall(worktree.create, {
 	base = "HEAD",
 	run = function(argv)
 		table.insert(calls, argv)
-		return { code = 0 }
+		return { code = 0, stdout = "" }
 	end,
 }), "existing worktree paths must be rejected")
 assert(#calls == before, "collision checks must run before Git worktree creation")
@@ -41,10 +41,39 @@ local ok = pcall(worktree.create, {
 	base = "HEAD",
 	run = function(argv)
 		table.insert(calls, argv)
-		return { code = 0 }
+		return { code = 0, stdout = "" }
 	end,
 	launch = function()
 		return false
 	end,
 })
-assert(not ok and calls[#calls][3] == "remove", "worktree launch failure must roll back the created worktree")
+assert(
+	not ok and calls[#calls - 1][3] == "remove" and calls[#calls][2] == "branch" and calls[#calls][3] == "--delete",
+	"worktree launch failure must roll back the created worktree and branch"
+)
+local unavailable, unavailable_error = pcall(worktree.create, {
+	root = root,
+	path = parent .. "/task-unavailable",
+	branch = "gator/task-unavailable",
+	base = "HEAD",
+	run = function()
+		return { state = "unavailable", stderr = "token=fixture-secret" }
+	end,
+})
+assert(not unavailable and unavailable_error:find("is unavailable", 1, true), "unavailable Git must remain explicit")
+local cancelled, cancelled_error = pcall(worktree.create, {
+	root = root,
+	path = parent .. "/task-cancelled",
+	branch = "gator/task-cancelled",
+	base = "HEAD",
+	run = function()
+		error("cancelled allocation must not invoke Git")
+	end,
+	cancelled = function()
+		return true
+	end,
+})
+assert(
+	not cancelled and cancelled_error:find("was cancelled", 1, true),
+	"worktree allocation must support cancellation"
+)

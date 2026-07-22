@@ -1,13 +1,35 @@
+local git_boundary = require("gator.core.git")
+
 local M = {}
+
 local function fail(message)
 	error("Gator workspace worktree: " .. message, 3)
 end
-local function invoke(run, argv, cwd, name)
-	local ok, result = pcall(run, argv, cwd)
-	if not ok or type(result) ~= "table" or result.code ~= 0 then
+
+local function invoke(git, argv, cwd, name, cancelled)
+	local ok, result = pcall(git.run, git, argv, cwd, { cancelled = cancelled })
+	if not ok or type(result) ~= "table" then
+		fail(name .. " failed")
+	end
+	if result.state == "unavailable" then
+		fail(name .. " is unavailable")
+	end
+	if result.state == "cancelled" then
+		fail(name .. " was cancelled")
+	end
+	if result.state ~= "completed" or result.code ~= 0 then
 		fail(name .. " failed")
 	end
 end
+
+local function rollback(git, root, path, branch)
+	local removed = pcall(invoke, git, { "git", "worktree", "remove", "--force", path }, root, "worktree rollback")
+	if not removed then
+		return false
+	end
+	return pcall(invoke, git, { "git", "branch", "--delete", "--force", branch }, root, "worktree branch rollback")
+end
+
 function M.create(opts)
 	if
 		type(opts) ~= "table"
@@ -20,9 +42,14 @@ function M.create(opts)
 		or type(opts.base) ~= "string"
 		or opts.base == ""
 		or (opts.run ~= nil and type(opts.run) ~= "function")
+		or (opts.git ~= nil and not git_boundary.is(opts.git))
 		or (opts.launch ~= nil and type(opts.launch) ~= "function")
+		or (opts.cancelled ~= nil and type(opts.cancelled) ~= "function")
 	then
-		fail("create requires root, path, branch, base, and optional run and launch")
+		fail("create requires root, path, branch, base, and optional Git boundary, launch, and cancellation check")
+	end
+	if opts.run ~= nil and opts.git ~= nil then
+		fail("create accepts either run or git")
 	end
 	if not opts.branch:match("^[A-Za-z0-9][A-Za-z0-9._/-]*$") then
 		fail("branch is invalid")
@@ -36,16 +63,20 @@ function M.create(opts)
 	if vim.uv.fs_stat(path) then
 		fail("worktree path already exists")
 	end
-	local run = opts.run
-		or function(argv, cwd)
-			local result = vim.system(argv, { cwd = cwd, text = true }):wait()
-			return { code = result.code }
-		end
-	invoke(run, { "git", "worktree", "add", "-b", opts.branch, path, opts.base }, root, "worktree creation")
+	local git = opts.git or git_boundary.new({ run = opts.run })
+	invoke(
+		git,
+		{ "git", "worktree", "add", "-b", opts.branch, path, opts.base },
+		root,
+		"worktree creation",
+		opts.cancelled
+	)
 	if opts.launch then
 		local launched, value = pcall(opts.launch, path)
 		if not launched or value == false then
-			pcall(invoke, run, { "git", "worktree", "remove", "--force", path }, root, "worktree rollback")
+			if not rollback(git, root, path, opts.branch) then
+				fail("worktree rollback failed")
+			end
 			fail("worktree launch failed")
 		end
 	end

@@ -132,7 +132,7 @@ local report = suite.run({
 				base = "HEAD",
 				run = function(argv)
 					assert(argv[2] == "worktree" and argv[3] == "add", "benchmark must exercise worktree creation")
-					return { code = 0 }
+					return { code = 0, stdout = "" }
 				end,
 			})
 		end,
