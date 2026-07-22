@@ -26,6 +26,7 @@ local function configure(container, settings)
 	container:require("accessibility").configure(settings.ui)
 	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
 	container:require("consent").configure({ enabled = settings.telemetry.enabled })
+	container:require("context").handoff_summary.configure(settings.context.handoff)
 end
 
 local function options(action, value)

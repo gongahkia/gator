@@ -12,7 +12,7 @@ M.defaults = {
 		screen_reader = true,
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 	},
-	context = { mode = "manual", trust = "provenance" },
+	context = { mode = "manual", trust = "provenance", handoff = { author = "user", max_chars = 4096 } },
 	sessions = { transfer = "manual" },
 	workspaces = { mode = "project", max_write_runs = 1 },
 	persistence = { sharing = "local" },
@@ -105,7 +105,7 @@ local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
 	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, motion = true }, "settings.ui")
-	fields(value.context, { mode = true, trust = true }, "settings.context")
+	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
 	fields(value.workspaces, { mode = true, max_write_runs = true }, "settings.workspaces")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
@@ -134,6 +134,17 @@ local function settings(value)
 	end
 	if not vim.tbl_contains({ "provenance", "repository", "manual" }, value.context.trust) then
 		fail("context.trust must be provenance, repository, or manual")
+	end
+	fields(value.context.handoff, { author = true, max_chars = true }, "settings.context.handoff")
+	if not vim.tbl_contains({ "user", "source", "gator" }, value.context.handoff.author) then
+		fail("context.handoff.author must be user, source, or gator")
+	end
+	if
+		type(value.context.handoff.max_chars) ~= "number"
+		or value.context.handoff.max_chars < 1
+		or value.context.handoff.max_chars % 1 ~= 0
+	then
+		fail("context.handoff.max_chars must be a positive integer")
 	end
 	if value.sessions.transfer ~= "manual" then
 		fail("sessions.transfer must be manual")

@@ -3,6 +3,17 @@ local evidence = require("gator").module("context").handoff_evidence
 local handoff_pack = require("gator").module("context").handoff_pack
 local pack = require("gator").module("context").pack
 
+assert(
+	summary.configure({ author = "gator", max_chars = 64 }).author == "gator" and summary.settings().max_chars == 64,
+	"summary authoring settings must configure a validated default author and bound"
+)
+assert(
+	not pcall(summary.configure, { author = "invalid", max_chars = 1 })
+		and not pcall(summary.configure, { author = "user", max_chars = 0 }),
+	"summary authoring settings must reject invalid values"
+)
+summary.configure(summary.defaults)
+
 local source = handoff_pack.new({
 	id = "pack-user-summary",
 	task_id = "task-user-summary",

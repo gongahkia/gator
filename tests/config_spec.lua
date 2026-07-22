@@ -21,6 +21,16 @@ helpers.write(path, "not-json")
 assert(not pcall(config.load, path), "invalid user defaults must fail explicitly")
 assert(not pcall(config.resolve, { schema_version = 1 }), "legacy configuration schemas must fail explicitly")
 assert(not pcall(config.resolve, { schema_version = "2" }), "configuration schemas must require an integer version")
+local handoff = config.resolve({ context = { handoff = { author = "gator", max_chars = 2048 } } }).context.handoff
+assert(
+	handoff.author == "gator" and handoff.max_chars == 2048,
+	"handoff authoring settings must resolve with validated author and content bounds"
+)
+assert(
+	not pcall(config.resolve, { context = { handoff = { author = "invalid", max_chars = 1 } } })
+		and not pcall(config.resolve, { context = { handoff = { author = "user", max_chars = 0 } } }),
+	"handoff authoring settings must reject unsupported authors and invalid bounds"
+)
 
 helpers.write(path, '{"schema_version":1,"ui":{"layout":"modal"}}')
 local migrated, migrated_provenance, migrations = config.load(path)
@@ -61,6 +71,7 @@ assert(
 		and layered.settings.workspaces.max_write_runs == 3
 		and layered.provenance["ui.layout"].source == "setup"
 		and layered.provenance["ui.screen_reader"].source == "file"
+		and layered.provenance["context.handoff.author"].source == "defaults"
 		and layered.provenance["context.mode"].source == "defaults",
 	"configuration layers must use deterministic precedence with field provenance"
 )

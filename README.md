@@ -62,7 +62,11 @@ require("gator").setup({
     screen_reader = true,
     motion = { enabled = true, interval_ms = 120, reduced = false },
   },
-  context = { mode = "manual", trust = "provenance" },
+  context = {
+    mode = "manual",
+    trust = "provenance",
+    handoff = { author = "user", max_chars = 4096 }, -- author: "user", "source", or "gator"
+  },
   sessions = { transfer = "manual" },
   workspaces = { mode = "project", max_write_runs = 1 },
   persistence = { sharing = "local" },

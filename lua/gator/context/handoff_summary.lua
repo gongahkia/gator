@@ -1,8 +1,9 @@
 local pack = require("gator.context.handoff_pack")
 local evidence = require("gator.context.handoff_evidence")
 local redact = require("gator.policy.redact")
-local M = { schema_version = 1 }
+local M = { schema_version = 1, defaults = { author = "user", max_chars = 4096 } }
 local Summary = {}
+local settings = vim.deepcopy(M.defaults)
 
 Summary.__index = Summary
 
@@ -21,7 +22,38 @@ local function content(value)
 	if type(value) ~= "string" or value == "" then
 		fail("content must be non-empty text")
 	end
-	return redact.text(value)
+	local result = redact.text(value)
+	if #result > settings.max_chars then
+		fail("content exceeds configured max_chars")
+	end
+	return result
+end
+
+local function authoring(value)
+	if type(value) ~= "table" then
+		fail("authoring settings must be a table")
+	end
+	for key in pairs(value) do
+		if key ~= "author" and key ~= "max_chars" then
+			fail("authoring settings contain unsupported field: " .. tostring(key))
+		end
+	end
+	if value.author ~= "user" and value.author ~= "source" and value.author ~= "gator" then
+		fail("authoring author must be user, source, or gator")
+	end
+	if type(value.max_chars) ~= "number" or value.max_chars < 1 or value.max_chars % 1 ~= 0 then
+		fail("authoring max_chars must be a positive integer")
+	end
+	return { author = value.author, max_chars = value.max_chars }
+end
+
+function M.configure(value)
+	settings = authoring(value)
+	return vim.deepcopy(settings)
+end
+
+function M.settings()
+	return vim.deepcopy(settings)
 end
 
 local function attrs(value)
