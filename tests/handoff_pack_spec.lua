@@ -1,4 +1,6 @@
 local handoff_pack = require("gator").module("context").handoff_pack
+local context_pack = require("gator").module("context").pack
+local task = require("gator").module("core").task
 
 local entries = {
 	{
@@ -51,4 +53,55 @@ assert(
 		{ schema_version = 2, id = "handoff-pack", task_id = "task-handoff", entries = {} }
 	),
 	"handoff packs must reject unsupported record schemas"
+)
+
+local function entry(id, kind)
+	return context_pack.entry({
+		id = id,
+		kind = kind,
+		ref = kind .. "://" .. id,
+		provenance = { source = "fixture", ref = id },
+		trust = "manual",
+		token_estimate = { status = "estimated", tokens = 1 },
+		transfer = { eligible = true },
+	})
+end
+
+local source_task = task.new({
+	id = "task-build-handoff",
+	objective = "continue with token=fixture-secret",
+	lifecycle = "planned",
+	sessions = { { provider = "codex", id = "native-session", owner = "provider" } },
+})
+local built = handoff_pack.build({
+	id = "handoff-build",
+	task = source_task,
+	files = { { entry = entry("file-handoff", "file") } },
+	diffs = { { entry = entry("diff-handoff", "diff") } },
+	diagnostics = { { entry = entry("diagnostic-handoff", "diagnostic") } },
+	instructions = { entry("instruction-handoff", "instruction") },
+})
+assert(
+	built.task_id == source_task.id
+		and vim.deep_equal(
+			vim.tbl_map(function(value)
+				return value.id
+			end, built.entries),
+			{ "task-task-build-handoff", "file-handoff", "diff-handoff", "diagnostic-handoff", "instruction-handoff" }
+		),
+	"handoff packs must order task, file, diff, diagnostic, and instruction sources"
+)
+assert(
+	built.entries[1].content:find("fixture-secret", 1, true) == nil
+		and built.entries[1].content ~= ""
+		and built.entries[1].ref == "gator-task://task-build-handoff",
+	"task handoff entries must contain redacted task intent without provider session ownership"
+)
+assert(
+	not pcall(handoff_pack.build, { id = "handoff-invalid", task = source_task, files = "invalid" }),
+	"handoff pack building must reject invalid source groups"
+)
+assert(
+	not pcall(handoff_pack.build, { id = "handoff-invalid", task = {}, files = {} }),
+	"handoff pack building must require canonical task sources"
 )
