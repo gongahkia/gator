@@ -34,6 +34,19 @@ assert(
 		and value.policy.provenance.source == "project-policy",
 	"validation must stream policy-provenanced command evidence"
 )
+local failed = validation.execute({
+	policy = policy,
+	command_id = "unit",
+	workspace = { kind = "worktree", root = root },
+	run = function(_, _, emit)
+		emit("stderr", "test failure\n")
+		return { code = 2 }
+	end,
+})
+assert(
+	not failed.passed and failed.code == 2 and failed.evidence[1].stream == "stderr",
+	"nonzero policy-approved validations must retain explicit failure evidence"
+)
 assert(
 	not pcall(
 		validation.execute,
