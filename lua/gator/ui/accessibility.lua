@@ -7,6 +7,7 @@ local actions = {
 	toggle = true,
 	accept = true,
 	reject = true,
+	undo = true,
 	prompt = true,
 	help = true,
 }

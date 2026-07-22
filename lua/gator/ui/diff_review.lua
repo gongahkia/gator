@@ -219,7 +219,7 @@ local function render(review)
 			end
 		end
 	end
-	table.insert(lines, "j/k hunk · <CR> open diff · a accept · r reject · q close · ? help")
+	table.insert(lines, "j/k hunk · <CR> open diff · a accept · r reject · u undo · q close · ? help")
 	accessibility.render(review.buffer, lines, "gator-review")
 end
 
@@ -246,37 +246,46 @@ local function move_hunk(review, offset)
 end
 
 local function bind(review)
-	accessibility.panel(
-		review.buffer,
-		{ next = "j", previous = "k", confirm = "<CR>", accept = "a", reject = "r", cancel = "q", help = "?" },
-		{
-			next = function()
-				move_hunk(review, 1)
-			end,
-			previous = function()
-				move_hunk(review, -1)
-			end,
-			confirm = function()
-				if review.changes[review.selected] then
-					M.open_selected()
-				end
-			end,
-			accept = function()
-				if selected_hunk(review) then
-					M.stage("accepted")
-				end
-			end,
-			reject = function()
-				if selected_hunk(review) then
-					M.stage("rejected")
-				end
-			end,
-			cancel = M.close,
-			help = function()
-				vim.notify("Gator review: j/k hunk, <CR> open diff, a accept, r reject, q close", vim.log.levels.INFO)
-			end,
-		}
-	)
+	accessibility.panel(review.buffer, {
+		next = "j",
+		previous = "k",
+		confirm = "<CR>",
+		accept = "a",
+		reject = "r",
+		undo = "u",
+		cancel = "q",
+		help = "?",
+	}, {
+		next = function()
+			move_hunk(review, 1)
+		end,
+		previous = function()
+			move_hunk(review, -1)
+		end,
+		confirm = function()
+			if review.changes[review.selected] then
+				M.open_selected()
+			end
+		end,
+		accept = function()
+			if selected_hunk(review) then
+				M.stage("accepted")
+			end
+		end,
+		reject = function()
+			if selected_hunk(review) then
+				M.stage("rejected")
+			end
+		end,
+		undo = M.undo,
+		cancel = M.close,
+		help = function()
+			vim.notify(
+				"Gator review: j/k hunk, <CR> open diff, a accept, r reject, u undo, q close",
+				vim.log.levels.INFO
+			)
+		end,
+	})
 end
 
 local function scratch(review, side, content)
@@ -309,6 +318,7 @@ function M.open(opts)
 		review.validations = validation_values
 		review.selected = math.min(review.selected, math.max(#value, 1))
 		review.hunk = 1
+		review.history = {}
 		render(review)
 		vim.api.nvim_set_current_win(review.window)
 		return review.window
@@ -328,6 +338,7 @@ function M.open(opts)
 		selected = 1,
 		hunk = 1,
 		diffs = {},
+		history = {},
 		sequence = 0,
 		previous = opened.previous,
 	}
@@ -407,9 +418,24 @@ function M.stage(decision)
 	if not hunk then
 		fail("no hunk is selected")
 	end
+	table.insert(review.history, { hunk = hunk, decision = hunk.decision, annotation = hunk.annotation })
 	hunk.decision = decision
 	render(review)
 	return vim.deepcopy(hunk)
+end
+
+function M.undo()
+	local review = current()
+	if not review then
+		fail("no diff review is open in this tab")
+	end
+	local history = table.remove(review.history)
+	if not history then
+		fail("no staged decision is available to undo")
+	end
+	history.hunk.decision, history.hunk.annotation = history.decision, history.annotation
+	render(review)
+	return vim.deepcopy(history.hunk)
 end
 
 function M.annotate(annotation)

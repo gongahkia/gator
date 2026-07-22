@@ -25,6 +25,9 @@ local second = diff_review.next_hunk()
 assert(first.id ~= second.id and second.after_start > first.after_start, "native diffs must expose adjacent hunks")
 assert(diff_review.previous_hunk().id == first.id, "hunk navigation must move in both directions")
 assert(diff_review.stage("accepted").decision == "accepted", "hunk decisions must remain staged")
+assert(diff_review.undo().decision == "pending", "staged review decisions must be undoable")
+assert(diff_review.stage("rejected").decision == "rejected", "review hunks must support rejection")
+assert(diff_review.undo().decision == "pending", "rejected review decisions must be undoable")
 assert(
 	diff_review.annotate("verified manually").annotation == "verified manually",
 	"hunks must retain review annotations"
