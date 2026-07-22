@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       provider:
-        description: Authenticated provider to verify
+        description: Authenticated provider to verify, or the complete handoff matrix
         required: true
         type: choice
         options:
@@ -17,9 +17,12 @@ on:
           - droid
           - gemini
           - goose
+          - kimi
+          - vibe
           - copilot
           - opencode
           - pi
+          - handoff-matrix
 
 permissions:
   contents: read
@@ -33,7 +36,7 @@ jobs:
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: [self-hosted, gator-live-agents]
     environment: protected-live-agents
-    timeout-minutes: 15
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Verify trusted runner prerequisites
@@ -56,8 +59,11 @@ jobs:
             droid) make live-droid-e2e ;;
             gemini) make live-gemini-e2e ;;
             goose) make live-goose-e2e ;;
+            kimi) make live-kimi-e2e ;;
+            vibe) make live-vibe-e2e ;;
             copilot) make live-copilot-e2e ;;
             opencode) make live-opencode-e2e ;;
             pi) make live-pi-e2e ;;
+            handoff-matrix) make live-handoff-e2e ;;
             *) exit 64 ;;
           esac

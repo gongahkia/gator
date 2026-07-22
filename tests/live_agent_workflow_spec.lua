@@ -36,9 +36,12 @@ for _, target in ipairs({
 	"make live-droid-e2e",
 	"make live-gemini-e2e",
 	"make live-goose-e2e",
+	"make live-kimi-e2e",
+	"make live-vibe-e2e",
 	"make live-copilot-e2e",
 	"make live-opencode-e2e",
 	"make live-pi-e2e",
+	"make live-handoff-e2e",
 }) do
 	assert(workflow:find(target, 1, true), "live-agent workflow must route the provider target: " .. target)
 end
