@@ -65,6 +65,32 @@ local conflict = merge.apply({
 	end,
 })
 assert(conflict.status == "conflict" and conflict.phase == "merge", "unresolved merge conflicts must be reported")
+local rebase = merge.apply({
+	target_root = target,
+	source_root = source,
+	source_branch = "gator/task",
+	mode = "rebase",
+	retry_rebase = false,
+	confirm = true,
+	run = function(argv)
+		if argv[2] == "status" then
+			return { code = 0, stdout = "" }
+		end
+		if argv[2] == "rev-parse" then
+			return { code = 0, stdout = "source-sha\n" }
+		end
+		if argv[2] == "branch" then
+			return { code = 0, stdout = "main\n" }
+		end
+		if argv[2] == "rebase" then
+			assert(argv[3] == "main", "rebase mode must update the source against the target branch")
+			return { code = 0, stdout = "" }
+		end
+		assert(argv[2] == "merge" and argv[3] == "--ff-only", "rebase mode must only fast-forward the target")
+		return { code = 0, stdout = "" }
+	end,
+})
+assert(rebase.status == "merged" and rebase.mode == "rebase", "guarded rebase strategy must report merged state")
 assert(not pcall(merge.apply, {
 	target_root = target,
 	source_root = source,
