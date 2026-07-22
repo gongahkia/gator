@@ -29,6 +29,10 @@ local function branch(value, name)
 	return value
 end
 
+local function resolved(name, task_id, source)
+	return { name = name, branch = name, worktree_name = name, task_id = task_id, source = source }
+end
+
 function M.resolve(opts)
 	if type(opts) ~= "table" then
 		fail("resolve requires options")
@@ -42,13 +46,13 @@ function M.resolve(opts)
 		fail("task_id must be a lowercase identifier")
 	end
 	if opts.override ~= nil then
-		return { name = branch(opts.override, "override"), task_id = opts.task_id, source = "override" }
+		return resolved(branch(opts.override, "override"), opts.task_id, "override")
 	end
 	local prefix = opts.prefix or "gator"
 	if type(prefix) ~= "string" or prefix == "" then
 		fail("prefix must be a non-empty string")
 	end
-	return { name = branch(prefix .. "/" .. opts.task_id, "derived branch"), task_id = opts.task_id, source = "derived" }
+	return resolved(branch(prefix .. "/" .. opts.task_id, "derived branch"), opts.task_id, "derived")
 end
 
 return M
