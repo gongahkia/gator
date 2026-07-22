@@ -1,8 +1,9 @@
 local errors = require("gator.error")
+local handoff_lineage = require("gator.core.handoff_lineage")
 local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
 local task = require("gator.core.task")
-local M = { schema_version = 6, export_schema_version = 1, evidence_excerpt_max_bytes = 4096 }
+local M = { schema_version = 7, export_schema_version = 1, evidence_excerpt_max_bytes = 4096 }
 local Database = {}
 
 Database.__index = Database
@@ -65,6 +66,22 @@ local function run_record(value)
 		fail("run record is invalid")
 	end
 	return run.to_record(entity)
+end
+
+local function lineage_record(value)
+	local ok, entity = pcall(handoff_lineage.from_record, value)
+	if not ok then
+		fail("handoff lineage record is invalid")
+	end
+	return handoff_lineage.to_record(entity)
+end
+
+local function decode_lineage(value)
+	local ok, record = pcall(vim.json.decode, value)
+	if not ok or type(record) ~= "table" then
+		fail("handoff lineage has invalid JSON")
+	end
+	return handoff_lineage.from_record(lineage_record(record))
 end
 
 local function event_record(value, expected_run_id)
@@ -178,20 +195,25 @@ local function import_bundle(value)
 	if type(value) ~= "table" or value.schema_version ~= M.export_schema_version then
 		fail("import bundle has an unsupported schema")
 	end
+	if value.handoff_lineages == nil then
+		value.handoff_lineages = {}
+	end
 	for key in pairs(value) do
 		if
 			key ~= "schema_version"
 			and key ~= "tasks"
 			and key ~= "runs"
+			and key ~= "handoff_lineages"
 			and key ~= "evidence_excerpts"
 			and key ~= "operations"
 		then
 			fail("import bundle contains unsupported field: " .. tostring(key))
 		end
 	end
-	local records = { tasks = {}, runs = {}, evidence_excerpts = {}, operations = {} }
-	local task_ids, ids, event_ids = {}, { runs = {}, evidence_excerpts = {}, operations = {} }, {}
-	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+	local records = { tasks = {}, runs = {}, handoff_lineages = {}, evidence_excerpts = {}, operations = {} }
+	local task_ids, ids, event_ids =
+		{}, { runs = {}, handoff_lineages = {}, evidence_excerpts = {}, operations = {} }, {}
+	for _, key in ipairs({ "tasks", "runs", "handoff_lineages", "evidence_excerpts", "operations" }) do
 		if type(value[key]) ~= "table" or not vim.islist(value[key]) then
 			fail("import bundle " .. key .. " must be an array")
 		end
@@ -221,6 +243,17 @@ local function import_bundle(value)
 		end
 		table.insert(records.runs, record)
 	end
+	for _, value in ipairs(value.handoff_lineages) do
+		local record = lineage_record(value)
+		if not task_ids[record.task_id] then
+			fail("import bundle handoff lineage belongs to an unavailable task: " .. record.task_id)
+		end
+		if ids.handoff_lineages[record.id] then
+			fail("import bundle contains duplicate handoff lineage: " .. record.id)
+		end
+		ids.handoff_lineages[record.id] = true
+		table.insert(records.handoff_lineages, record)
+	end
 	for _, value in ipairs(value.evidence_excerpts) do
 		local record = excerpt(value)
 		if not task_ids[record.task_id] then
@@ -249,10 +282,10 @@ end
 local function empty_database(database)
 	local counts = vim.trim(
 		database:exec(
-			"SELECT (SELECT count(*) FROM task_evidence), (SELECT count(*) FROM session_metadata), (SELECT count(*) FROM threads), (SELECT count(*) FROM tasks), (SELECT count(*) FROM runs), (SELECT count(*) FROM run_events), (SELECT count(*) FROM evidence_excerpts), (SELECT count(*) FROM task_operations);"
+			"SELECT (SELECT count(*) FROM task_evidence), (SELECT count(*) FROM session_metadata), (SELECT count(*) FROM threads), (SELECT count(*) FROM tasks), (SELECT count(*) FROM runs), (SELECT count(*) FROM run_events), (SELECT count(*) FROM handoff_lineages), (SELECT count(*) FROM evidence_excerpts), (SELECT count(*) FROM task_operations);"
 		)
 	)
-	return counts == "0|0|0|0|0|0|0|0"
+	return counts == "0|0|0|0|0|0|0|0|0"
 end
 
 local function query(value, allowed, name)
@@ -391,6 +424,12 @@ local migrations = {
 		return {
 			"CREATE TABLE task_operations (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, kind TEXT NOT NULL, at INTEGER NOT NULL, record_json TEXT NOT NULL);",
 			"CREATE INDEX task_operations_by_task ON task_operations (task_id, at, id);",
+		}
+	end,
+	[7] = function()
+		return {
+			"CREATE TABLE handoff_lineages (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, at INTEGER NOT NULL, record_json TEXT NOT NULL);",
+			"CREATE INDEX handoff_lineages_by_task ON handoff_lineages (task_id, at, id);",
 		}
 	end,
 }
@@ -714,6 +753,58 @@ function Database:append_evidence_excerpt(value)
 	return vim.deepcopy(record)
 end
 
+function Database:append_handoff_lineage(value)
+	local record = lineage_record(value)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before handoff lineage writes")
+	end
+	if not self:get_task(record.task_id) then
+		fail("task is unavailable: " .. record.task_id)
+	end
+	self:exec(table.concat({
+		"BEGIN IMMEDIATE;",
+		"INSERT INTO handoff_lineages (id, task_id, at, record_json) VALUES (" .. quote(record.id) .. ", " .. quote(
+			record.task_id
+		) .. ", " .. record.at .. ", " .. quote(vim.json.encode(record)) .. ");",
+		"COMMIT;",
+	}, "\n"))
+	return handoff_lineage.from_record(record)
+end
+
+function Database:get_handoff_lineage(id)
+	id = run_id(id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before handoff lineage reads")
+	end
+	local value = vim.trim(self:exec("SELECT record_json FROM handoff_lineages WHERE id = " .. quote(id) .. ";"))
+	if value == "" then
+		return nil
+	end
+	return decode_lineage(value)
+end
+
+function Database:list_handoff_lineages(id)
+	id = task_id(id)
+	if self:version() ~= M.schema_version then
+		fail("database schema must migrate before handoff lineage reads")
+	end
+	local result = {}
+	for _, value in
+		ipairs(
+			vim.split(
+				self:exec(
+					"SELECT record_json FROM handoff_lineages WHERE task_id = " .. quote(id) .. " ORDER BY at, id;"
+				),
+				"\n",
+				{ trimempty = true }
+			)
+		)
+	do
+		table.insert(result, decode_lineage(value))
+	end
+	return result
+end
+
 function Database:list_evidence_excerpts(id)
 	id = task_id(id)
 	if self:version() ~= M.schema_version then
@@ -822,6 +913,20 @@ function Database:import_bundle(value)
 			table.insert(statements, event_insert(event))
 		end
 	end
+	for _, record in ipairs(records.handoff_lineages) do
+		table.insert(
+			statements,
+			"INSERT INTO handoff_lineages (id, task_id, at, record_json) VALUES ("
+				.. quote(record.id)
+				.. ", "
+				.. quote(record.task_id)
+				.. ", "
+				.. record.at
+				.. ", "
+				.. quote(vim.json.encode(record))
+				.. ");"
+		)
+	end
 	for _, record in ipairs(records.evidence_excerpts) do
 		table.insert(
 			statements,
@@ -895,13 +1000,22 @@ function Database:preview_export(opts)
 	end
 	local tasks = opts.task_id and (self:get_task(opts.task_id) and { self:get_task(opts.task_id) } or {})
 		or self:list_tasks()
-	local records =
-		{ schema_version = M.export_schema_version, tasks = {}, runs = {}, evidence_excerpts = {}, operations = {} }
+	local records = {
+		schema_version = M.export_schema_version,
+		tasks = {},
+		runs = {},
+		handoff_lineages = {},
+		evidence_excerpts = {},
+		operations = {},
+	}
 	for _, value in ipairs(tasks) do
 		local task_value = task.to_record(value)
 		table.insert(records.tasks, task_value)
 		for _, run_value in ipairs(self:query_runs({ task_id = task_value.id })) do
 			table.insert(records.runs, run.to_record(run_value))
+		end
+		for _, lineage in ipairs(self:list_handoff_lineages(task_value.id)) do
+			table.insert(records.handoff_lineages, handoff_lineage.to_record(lineage))
 		end
 		vim.list_extend(records.evidence_excerpts, self:list_evidence_excerpts(task_value.id))
 		vim.list_extend(records.operations, self:list_task_operations(task_value.id))

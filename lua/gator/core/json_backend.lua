@@ -1,4 +1,5 @@
 local filesystem = require("gator.core.filesystem")
+local handoff_lineage = require("gator.core.handoff_lineage")
 local redact = require("gator.policy.redact")
 local run = require("gator.core.run")
 local task = require("gator.core.task")
@@ -30,14 +31,24 @@ local function document(value)
 	if type(value) ~= "table" or value.schema_version ~= M.schema_version then
 		fail("JSON backend document has an unsupported schema")
 	end
-	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+	if value.handoff_lineages == nil then
+		value.handoff_lineages = {}
+	end
+	for _, key in ipairs({ "tasks", "runs", "handoff_lineages", "evidence_excerpts", "operations" }) do
 		arrays(value[key])
 	end
 	return value
 end
 
 local function default_document()
-	return { schema_version = M.schema_version, tasks = {}, runs = {}, evidence_excerpts = {}, operations = {} }
+	return {
+		schema_version = M.schema_version,
+		tasks = {},
+		runs = {},
+		handoff_lineages = {},
+		evidence_excerpts = {},
+		operations = {},
+	}
 end
 
 local function task_record(value)
@@ -54,6 +65,14 @@ local function run_record(value)
 		fail("run record is invalid")
 	end
 	return run.to_record(entity)
+end
+
+local function lineage_record(value)
+	local ok, entity = pcall(handoff_lineage.from_record, value)
+	if not ok then
+		fail("handoff lineage record is invalid")
+	end
+	return handoff_lineage.to_record(entity)
 end
 
 function M.open(path, opts)
@@ -134,6 +153,46 @@ function Backend:list_tasks()
 	local result = {}
 	for _, record in ipairs(self:read().tasks) do
 		table.insert(result, task.from_record(task_record(record)))
+	end
+	return result
+end
+
+function Backend:append_handoff_lineage(value)
+	local record = lineage_record(value)
+	if not self:get_task(record.task_id) then
+		fail("task is unavailable")
+	end
+	local data = self:read()
+	for _, existing in ipairs(data.handoff_lineages) do
+		if existing.id == record.id then
+			fail("handoff lineage already exists")
+		end
+	end
+	table.insert(data.handoff_lineages, record)
+	table.sort(data.handoff_lineages, function(left, right)
+		return left.at == right.at and left.id < right.id or left.at < right.at
+	end)
+	self:write(data)
+	return handoff_lineage.from_record(record)
+end
+
+function Backend:get_handoff_lineage(value)
+	value = id(value, "handoff lineage id")
+	for _, record in ipairs(self:read().handoff_lineages) do
+		if record.id == value then
+			return handoff_lineage.from_record(lineage_record(record))
+		end
+	end
+	return nil
+end
+
+function Backend:list_handoff_lineages(task_id)
+	task_id = id(task_id, "task id")
+	local result = {}
+	for _, record in ipairs(self:read().handoff_lineages) do
+		if record.task_id == task_id then
+			table.insert(result, handoff_lineage.from_record(lineage_record(record)))
+		end
 	end
 	return result
 end
@@ -353,12 +412,16 @@ function Backend:preview_export(opts)
 	end
 	local tasks = opts.task_id and (self:get_task(opts.task_id) and { self:get_task(opts.task_id) } or {})
 		or self:list_tasks()
-	local result = { schema_version = 1, tasks = {}, runs = {}, evidence_excerpts = {}, operations = {} }
+	local result =
+		{ schema_version = 1, tasks = {}, runs = {}, handoff_lineages = {}, evidence_excerpts = {}, operations = {} }
 	for _, value in ipairs(tasks) do
 		local record = task.to_record(value)
 		table.insert(result.tasks, record)
 		for _, child in ipairs(self:list_runs(record.id)) do
 			table.insert(result.runs, run.to_record(child))
+		end
+		for _, lineage in ipairs(self:list_handoff_lineages(record.id)) do
+			table.insert(result.handoff_lineages, handoff_lineage.to_record(lineage))
 		end
 		vim.list_extend(result.evidence_excerpts, self:list_evidence_excerpts(record.id))
 		vim.list_extend(result.operations, self:list_task_operations(record.id))

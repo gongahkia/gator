@@ -11,6 +11,7 @@ local M = {
 	file_event = require("gator.core.file_event"),
 	filesystem = require("gator.core.filesystem"),
 	git = require("gator.core.git"),
+	handoff_lineage = require("gator.core.handoff_lineage"),
 	json_backend = require("gator.core.json_backend"),
 	lifecycle = require("gator.core.lifecycle"),
 	launch_queue = require("gator.core.launch_queue"),

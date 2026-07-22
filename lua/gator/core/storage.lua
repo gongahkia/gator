@@ -6,6 +6,9 @@ local M = {
 			"put_task",
 			"get_task",
 			"list_tasks",
+			"append_handoff_lineage",
+			"get_handoff_lineage",
+			"list_handoff_lineages",
 			"query_tasks",
 			"append_run",
 			"append_run_event",
@@ -99,14 +102,20 @@ function M.migrate_sqlite_to_json(opts)
 		fail("migration target must expose atomic document access")
 	end
 	local target = opts.target:read()
-	if #target.tasks > 0 or #target.runs > 0 or #target.evidence_excerpts > 0 or #target.operations > 0 then
+	if
+		#target.tasks > 0
+		or #target.runs > 0
+		or #target.handoff_lineages > 0
+		or #target.evidence_excerpts > 0
+		or #target.operations > 0
+	then
 		fail("migration target must be empty")
 	end
 	local preview = opts.source:preview_export()
 	if type(preview) ~= "table" or preview.schema_version ~= M.json_backend.api_version then
 		fail("migration source preview has an unsupported schema")
 	end
-	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+	for _, key in ipairs({ "tasks", "runs", "handoff_lineages", "evidence_excerpts", "operations" }) do
 		if type(preview[key]) ~= "table" or not vim.islist(preview[key]) then
 			fail("migration source preview contains invalid " .. key)
 		end
@@ -140,7 +149,7 @@ function M.migrate_json_to_sqlite(opts)
 	if type(preview) ~= "table" or preview.schema_version ~= M.json_backend.api_version then
 		fail("migration source preview has an unsupported schema")
 	end
-	for _, key in ipairs({ "tasks", "runs", "evidence_excerpts", "operations" }) do
+	for _, key in ipairs({ "tasks", "runs", "handoff_lineages", "evidence_excerpts", "operations" }) do
 		if type(preview[key]) ~= "table" or not vim.islist(preview[key]) then
 			fail("migration source preview contains invalid " .. key)
 		end

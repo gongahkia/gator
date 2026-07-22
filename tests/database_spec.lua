@@ -48,7 +48,7 @@ helpers.write(
 )
 
 assert(db:migrate(root), "new local state must migrate")
-assert(db:version() == 6, "SQLite migrations must record every schema version")
+assert(db:version() == 7, "SQLite migrations must record every schema version")
 assert(db:exec("SELECT count(*) FROM session_metadata;"):match("1"), "active session metadata must survive migration")
 assert(db:exec("SELECT count(*) FROM threads;"):match("1"), "thread evidence must survive migration")
 assert(db:exec("SELECT count(*) FROM runs;"):match("1"), "run evidence must survive migration")
@@ -101,7 +101,7 @@ local upgraded = database.open(previous)
 upgraded:exec(
 	"CREATE TABLE task_evidence (task_id TEXT NOT NULL, ref TEXT NOT NULL, record_json TEXT NOT NULL, PRIMARY KEY (task_id, ref)); CREATE TABLE session_metadata (task_id TEXT NOT NULL, provider TEXT NOT NULL, session_id TEXT NOT NULL, record_json TEXT NOT NULL, PRIMARY KEY (task_id, provider, session_id)); CREATE TABLE threads (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); CREATE TABLE runs (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, record_json TEXT NOT NULL); PRAGMA user_version = 1;"
 )
-assert(upgraded:migrate() and upgraded:version() == 6, "SQLite migrations must upgrade version one databases")
+assert(upgraded:migrate() and upgraded:version() == 7, "SQLite migrations must upgrade version one databases")
 
 local persisted_run = run.new({
 	id = "run-sqlite",
