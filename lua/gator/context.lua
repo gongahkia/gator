@@ -8,6 +8,7 @@ local M = {
 	file = require("gator.context.file"),
 	inspect = require("gator.context.inspect"),
 	handoff = require("gator.context.handoff"),
+	handoff_evidence = require("gator.context.handoff_evidence"),
 	handoff_pack = require("gator.context.handoff_pack"),
 	lexical = require("gator.context.lexical"),
 	instructions = require("gator.context.instructions"),
