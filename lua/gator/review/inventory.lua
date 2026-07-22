@@ -102,6 +102,26 @@ local function files(output)
 	return result
 end
 
+local function hunks(task_id, path, output)
+	local result = {}
+	for header in output:gmatch("[^\n]+") do
+		local before_start, before_count, after_start, after_count =
+			header:match("^@@ %-(%d+),?(%d*) %+(%d+),?(%d*) @@")
+		if before_start then
+			before_count = before_count == "" and 1 or tonumber(before_count)
+			after_count = after_count == "" and 1 or tonumber(after_count)
+			table.insert(result, {
+				id = "hunk-" .. vim.fn.sha256(task_id .. "\0" .. path .. "\0" .. header):sub(1, 16),
+				before_start = tonumber(before_start),
+				before_count = before_count,
+				after_start = tonumber(after_start),
+				after_count = after_count,
+			})
+		end
+	end
+	return result
+end
+
 function M.build(opts)
 	if type(opts) ~= "table" then
 		fail("build requires options")
@@ -114,17 +134,23 @@ function M.build(opts)
 	if opts.run ~= nil and type(opts.run) ~= "function" then
 		fail("run must be a function")
 	end
-	local value = workspace(opts.workspace)
+	local task_id, value = identifier(opts.task_id, "task_id"), workspace(opts.workspace)
 	local run = opts.run
 		or function(argv, cwd)
 			local result = vim.system(argv, { cwd = cwd, text = true }):wait()
 			return { code = result.code, stdout = result.stdout or "" }
 		end
-	return {
-		task_id = identifier(opts.task_id, "task_id"),
-		workspace = value,
-		files = files(invoke(run, { "git", "status", "--porcelain=v1", "-z", "--untracked-files=all" }, value.root)),
-	}
+	local inventory =
+		files(invoke(run, { "git", "status", "--porcelain=v1", "-z", "--untracked-files=all" }, value.root))
+	for _, file in ipairs(inventory) do
+		file.hunks = file.category == "untracked" and {}
+			or hunks(
+				task_id,
+				file.path,
+				invoke(run, { "git", "diff", "--no-ext-diff", "--unified=0", "HEAD", "--", file.path }, value.root)
+			)
+	end
+	return { task_id = task_id, workspace = value, files = inventory }
 end
 
 return M
