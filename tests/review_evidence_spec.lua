@@ -15,15 +15,25 @@ store:record({
 store:record({ task_id = "task-evidence", kind = "approval", reviewer = "alice", approved = true, at = 2 })
 store:record({
 	task_id = "task-evidence",
+	kind = "test",
+	command_id = "integration",
+	output_ref = "test://integration-2",
+	passed = false,
+	at = 3,
+})
+store:record({
+	task_id = "task-evidence",
 	kind = "revision",
 	base_revision = "base-1",
 	head_revision = "head-1",
-	at = 3,
+	at = 4,
 })
 local restored = evidence.open(path):task("task-evidence")
 assert(
 	restored.reviewers[1] == "alice"
 		and restored.tests[1].output_ref == "test://unit-1"
+		and not restored.tests[2].passed
+		and restored.tests[2].output_ref == "test://integration-2"
 		and restored.approvals[1].approved
 		and restored.revisions[1].head_revision == "head-1",
 	"review and test evidence must persist with the task"
