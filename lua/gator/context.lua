@@ -11,6 +11,7 @@ local M = {
 	handoff_cost = require("gator.context.handoff_cost"),
 	handoff_draft = require("gator.context.handoff_draft"),
 	handoff_evidence = require("gator.context.handoff_evidence"),
+	handoff_guard = require("gator.context.handoff_guard"),
 	handoff_lineage = require("gator.context.handoff_lineage"),
 	handoff_pack = require("gator.context.handoff_pack"),
 	handoff_pack_review = require("gator.context.handoff_pack_review"),
