@@ -22,6 +22,7 @@ local value = monitor.inspect({
 	},
 })
 assert(value.dirty, "changed Git paths must mark a workspace dirty")
+assert(value.state == "completed", "successful workspace monitoring must remain explicit")
 assert(
 	table.concat(value.changed_paths, ",") == "lua/gator/init.lua,new.lua,old.lua,untracked file",
 	"monitoring must retain modified, renamed, and untracked paths"
@@ -29,9 +30,30 @@ assert(
 assert(value.agents[1].live and not value.agents[1].detached, "live agents must remain attached")
 assert(not value.agents[2].live and value.agents[2].detached, "missing active processes must be detached")
 assert(not value.agents[3].live and not value.agents[3].detached, "terminal processes must not be detached")
-assert(not pcall(monitor.inspect, {
+assert(monitor.inspect({
 	root = root,
 	run = function()
-		return { code = 1, stdout = "" }
+		return { state = "unavailable", stderr = "token=fixture-secret" }
 	end,
-}), "Git failures must be explicit")
+}).state == "unavailable", "unavailable Git status must remain explicit")
+local calls = 0
+assert(monitor.inspect({
+	root = root,
+	run = function()
+		calls = calls + 1
+		error("cancelled monitor must not invoke Git")
+	end,
+	cancelled = function()
+		return true
+	end,
+}).state == "cancelled" and calls == 0, "cancelled monitoring must not invoke Git")
+assert(monitor.inspect({
+	root = root,
+	run = function()
+		return { code = 0, stdout = "" }
+	end,
+	alive = function()
+		error("liveness failure")
+	end,
+	agents = { { id = "agent-failing", provider = "codex", session_id = "native-four", pid = 40, state = "running" } },
+}).state == "failed", "liveness failures must remain explicit")

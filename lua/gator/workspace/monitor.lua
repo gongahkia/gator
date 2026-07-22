@@ -1,3 +1,5 @@
+local git_boundary = require("gator.core.git")
+
 local M = {}
 local active = { starting = true, running = true, cancelling = true }
 
@@ -16,20 +18,47 @@ local function directory(value)
 	return path
 end
 
-local function invoke(run, argv, cwd)
-	local ok, result = pcall(run, argv, cwd)
-	if not ok or type(result) ~= "table" or result.code ~= 0 or type(result.stdout) ~= "string" then
-		fail("Git status failed")
-	end
-	return result.stdout
+local function outcome(state, fields)
+	fields = fields or {}
+	fields.state = state
+	return fields
 end
 
-local function agents(value, alive)
+local function cancelled(callback)
+	if callback == nil then
+		return false
+	end
+	local ok, value = pcall(callback)
+	if not ok or type(value) ~= "boolean" then
+		return nil
+	end
+	return value
+end
+
+local function invoke(git, argv, cwd, callback)
+	local ok, result = pcall(git.run, git, argv, cwd, { cancelled = callback })
+	if not ok or type(result) ~= "table" then
+		return outcome("failed", { failure = "Git status failed" })
+	end
+	if result.state ~= "completed" or result.code ~= 0 or type(result.stdout) ~= "string" then
+		return outcome(result.state or "failed", { failure = "Git status failed" })
+	end
+	return outcome("completed", { stdout = result.stdout })
+end
+
+local function agents(value, alive, callback)
 	if type(value) ~= "table" or not vim.islist(value) then
 		fail("agents must be an array")
 	end
 	local result, ids = {}, {}
 	for index, agent in ipairs(value) do
+		local stopped = cancelled(callback)
+		if stopped == nil then
+			return nil, outcome("failed", { failure = "cancellation check failed" })
+		end
+		if stopped then
+			return nil, outcome("cancelled")
+		end
 		if type(agent) ~= "table" then
 			fail("agent " .. index .. " must be a table")
 		end
@@ -66,7 +95,7 @@ local function agents(value, alive)
 		if active[agent.state] then
 			local ok, value = pcall(alive, agent.pid)
 			if not ok or type(value) ~= "boolean" then
-				fail("agent liveness probe failed")
+				return nil, outcome("failed", { failure = "agent liveness probe failed" })
 			end
 			live = value
 		end
@@ -122,38 +151,66 @@ function M.inspect(opts)
 		fail("inspect requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "root" and key ~= "agents" and key ~= "run" and key ~= "alive" then
+		if
+			key ~= "root"
+			and key ~= "agents"
+			and key ~= "run"
+			and key ~= "git"
+			and key ~= "alive"
+			and key ~= "cancelled"
+		then
 			fail("options contain unsupported field: " .. tostring(key))
 		end
 	end
 	if opts.run ~= nil and type(opts.run) ~= "function" then
 		fail("run must be a function")
 	end
+	if opts.git ~= nil and not git_boundary.is(opts.git) then
+		fail("git must be a Git boundary")
+	end
+	if opts.run ~= nil and opts.git ~= nil then
+		fail("inspect accepts either run or git")
+	end
 	if opts.alive ~= nil and type(opts.alive) ~= "function" then
 		fail("alive must be a function")
 	end
+	if opts.cancelled ~= nil and type(opts.cancelled) ~= "function" then
+		fail("cancelled must be a function")
+	end
 	local root = directory(opts.root)
-	local run = opts.run
-		or function(argv, cwd)
-			local result = vim.system(argv, { cwd = cwd, text = true }):wait()
-			return { code = result.code, stdout = result.stdout or "" }
-		end
-	local alive = opts.alive
-		or function(pid)
-			if type(vim.uv.kill) ~= "function" then
-				fail("process liveness probing is unavailable")
-			end
-			return vim.uv.kill(pid, 0) == true
-		end
-	local changed =
-		changed_paths(invoke(run, { "git", "status", "--porcelain=v1", "-z", "--untracked-files=all" }, root))
+	local stopped = cancelled(opts.cancelled)
+	if stopped == nil then
+		return outcome("failed", { root = root, failure = "cancellation check failed" })
+	end
+	if stopped then
+		return outcome("cancelled", { root = root })
+	end
+	local git = opts.git or git_boundary.new({ run = opts.run })
+	local status =
+		invoke(git, { "git", "status", "--porcelain=v1", "-z", "--untracked-files=all" }, root, opts.cancelled)
+	if status.state ~= "completed" then
+		status.root = root
+		return status
+	end
+	if opts.alive == nil and type(vim.uv.kill) ~= "function" then
+		return outcome("unavailable", { root = root, failure = "process liveness probing is unavailable" })
+	end
+	local alive = opts.alive or function(pid)
+		return vim.uv.kill(pid, 0) == true
+	end
+	local changed = changed_paths(status.stdout)
 	local agent_values = opts.agents == nil and {} or opts.agents
-	return {
+	local agent_values, agent_state = agents(agent_values, alive, opts.cancelled)
+	if not agent_values then
+		agent_state.root = root
+		return agent_state
+	end
+	return outcome("completed", {
 		root = root,
 		dirty = #changed > 0,
 		changed_paths = changed,
-		agents = agents(agent_values, alive),
-	}
+		agents = agent_values,
+	})
 end
 
 return M
