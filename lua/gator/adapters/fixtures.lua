@@ -167,4 +167,70 @@ function M.replay_process(path, callbacks)
 	return status
 end
 
+function M.conform(opts)
+	if type(opts) ~= "table" then
+		fail("conform requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "cases" then
+			fail("conform contains unsupported field: " .. tostring(key))
+		end
+	end
+	local cases = require_list(opts.cases, "conformance cases")
+	if #cases == 0 then
+		fail("conformance cases must not be empty")
+	end
+	local names, results = {}, {}
+	for index, case in ipairs(cases) do
+		if type(case) ~= "table" then
+			fail("conformance case " .. index .. " must be an object")
+		end
+		for key in pairs(case) do
+			if key ~= "name" and key ~= "kind" and key ~= "path" and key ~= "verify" then
+				fail("conformance case " .. index .. " contains unsupported field: " .. tostring(key))
+			end
+		end
+		if type(case.name) ~= "string" or not case.name:match("^[a-z][a-z0-9_-]*$") then
+			fail("conformance case " .. index .. " name must be a lowercase identifier")
+		end
+		if names[case.name] then
+			fail("conformance cases contain duplicate name: " .. case.name)
+		end
+		if case.kind ~= "jsonl" and case.kind ~= "jsonrpc" and case.kind ~= "terminal" and case.kind ~= "process" then
+			fail("conformance case " .. index .. " kind is unsupported")
+		end
+		if type(case.path) ~= "string" or case.path == "" then
+			fail("conformance case " .. index .. " path must be non-empty text")
+		end
+		require_callback(case.verify, "conformance verify")
+		names[case.name] = true
+		local result = { kind = case.kind, records = {} }
+		if case.kind == "process" then
+			result.stdout, result.stderr = {}, {}
+			result.status = M.replay_process(case.path, {
+				stdout = function(chunk)
+					table.insert(result.stdout, chunk)
+				end,
+				stderr = function(chunk)
+					table.insert(result.stderr, chunk)
+				end,
+			})
+			result.count = #result.stdout + #result.stderr
+		else
+			result.count = M["replay_" .. case.kind](case.path, function(record)
+				table.insert(result.records, record)
+			end)
+		end
+		local ok, verified = pcall(case.verify, result)
+		if not ok then
+			fail("conformance case " .. case.name .. " verification failed: " .. tostring(verified))
+		end
+		if not verified then
+			fail("conformance case " .. case.name .. " verification returned false")
+		end
+		table.insert(results, { name = case.name, result = result })
+	end
+	return results
+end
+
 return M
