@@ -7,7 +7,7 @@ local function contract(context, tool)
 		provider = "claude",
 		transport = supported,
 		auth = supported,
-		session = supported,
+		session = { available = true, modes = { "create" } },
 		permission = supported,
 		model = supported,
 		command = supported,

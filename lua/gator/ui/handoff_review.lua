@@ -62,7 +62,7 @@ local function value(opts)
 	if opts.on_cancel ~= nil and type(opts.on_cancel) ~= "function" then
 		fail("on_cancel must be a function")
 	end
-	local preflight = handoff.tools({ capabilities = opts.target_capabilities })
+	local preflight = handoff.compatibility({ capabilities = opts.target_capabilities })
 	local state = preflight.available == false and "unavailable" or "ready"
 	local reason = state == "unavailable" and redact.text(preflight.reason) or nil
 	if opts.mode == "automatic" and not opts.opt_in then

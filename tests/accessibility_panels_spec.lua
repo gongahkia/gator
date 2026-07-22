@@ -271,6 +271,7 @@ window = handoff_review.open({
 	target_provider = "claude",
 	content = "initial summary",
 	target_capabilities = contract("claude", {
+		session = { available = true, modes = { "create" } },
 		context = { available = true, modes = { "agent_retrieval" } },
 		tool = { available = true, modes = { "native" } },
 	}),
