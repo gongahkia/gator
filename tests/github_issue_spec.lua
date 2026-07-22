@@ -61,6 +61,10 @@ assert(
 		and not value.pack.entries[2].transfer.eligible,
 	"issue imports must retain body, labels, and only selected comments under explicit manual trust"
 )
+assert(
+	value.pack.entries[1].token_estimate.status == "unavailable" and not value.pack.entries[1].transfer.eligible,
+	"imported GitHub issue context must remain unavailable for automatic transfer"
+)
 assert(not pcall(issue.import, {
 	number = 150,
 	task_id = "task-github-issue",
