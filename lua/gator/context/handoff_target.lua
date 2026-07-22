@@ -100,15 +100,41 @@ local function launch(value)
 	return result
 end
 
+local function finish(self, state, detail)
+	self.state = state
+	self.reason = detail
+	self.pending_attempt = nil
+	local value = {
+		kind = "gator.handoff.outcome",
+		id = self.id,
+		pack_id = self.pack_id,
+		task_id = self.task_id,
+		provider = self.provider,
+		state = state,
+		attempts = self.attempts,
+		retries = self.retries,
+		reason = detail,
+	}
+	if self.value then
+		value.session = session.reference(self.value)
+	end
+	table.insert(self._outcomes, value)
+	return value
+end
+
 local function unavailable(id, payload)
-	return setmetatable({
+	local value = setmetatable({
 		id = id,
 		pack_id = payload.pack_id,
 		task_id = payload.task_id,
 		provider = payload.provider,
-		state = "unavailable",
-		reason = reason(payload.reason, "target handoff is unavailable"),
+		state = "ready",
+		attempts = 0,
+		retries = 0,
+		_outcomes = {},
 	}, Request)
+	finish(value, "unavailable", reason(payload.reason, "target handoff is unavailable"))
+	return value
 end
 
 function M.new(opts)
@@ -134,6 +160,9 @@ function M.new(opts)
 		task_id = payload.task_id,
 		provider = payload.provider,
 		state = "ready",
+		attempts = 0,
+		retries = 0,
+		_outcomes = {},
 		payload = payload,
 		create = opts.create,
 	}, Request)
@@ -153,12 +182,29 @@ function Request:status()
 		task_id = self.task_id,
 		provider = self.provider,
 		state = self.state,
+		attempts = self.attempts,
+		retries = self.retries,
 		reason = self.reason,
+		outcome = self._outcomes[#self._outcomes],
 	}
 	if self.value then
 		result.session = session.reference(self.value)
 	end
 	return vim.deepcopy(result)
+end
+
+function Request:outcome()
+	if not M.is(self) then
+		fail("outcome requires a target handoff request")
+	end
+	return vim.deepcopy(self._outcomes[#self._outcomes])
+end
+
+function Request:outcomes()
+	if not M.is(self) then
+		fail("outcomes requires a target handoff request")
+	end
+	return vim.deepcopy(self._outcomes)
 end
 
 function Request:payload()
@@ -171,16 +217,16 @@ function Request:payload()
 	return vim.deepcopy(self.payload)
 end
 
-function Request:complete(native, detail)
+function Request:complete(native, detail, attempt)
 	if not M.is(self) then
 		fail("complete requires a target handoff request")
 	end
-	if self.state ~= "pending" then
+	attempt = attempt or self.pending_attempt
+	if self.state ~= "pending" or attempt ~= self.pending_attempt then
 		return false
 	end
 	if detail ~= nil then
-		self.state = "failed"
-		self.reason = reason(detail, "target provider failed to create a handoff session")
+		finish(self, "failed", reason(detail, "target provider failed to create a handoff session"))
 		return false
 	end
 	local ok, value = pcall(session.new, {
@@ -190,12 +236,11 @@ function Request:complete(native, detail)
 		owner = native and native.owner,
 	})
 	if not ok or value.provider ~= self.provider then
-		self.state = "failed"
-		self.reason = "target provider returned an invalid handoff session"
+		finish(self, "failed", "target provider returned an invalid handoff session")
 		return false
 	end
 	self.value = value
-	self.state = "completed"
+	finish(self, "completed")
 	return true
 end
 
@@ -207,30 +252,43 @@ function Request:dispatch()
 		return false
 	end
 	self.state = "pending"
+	self.attempts = self.attempts + 1
+	local attempt = self.attempts
+	self.pending_attempt = attempt
 	local ok, native, detail = pcall(self.create, vim.deepcopy(self.payload), function(value, failure)
-		self:complete(value, failure)
+		return self:complete(value, failure, attempt)
 	end)
 	if not ok then
 		if self.state == "pending" then
-			self.state = "failed"
-			self.reason = reason(native, "target provider failed to create a handoff session")
+			finish(self, "failed", reason(native, "target provider failed to create a handoff session"))
 		end
 		return false
 	end
 	if native == false and self.state == "pending" then
-		self.state = "failed"
-		self.reason = reason(detail, "target provider rejected the handoff session")
+		finish(self, "failed", reason(detail, "target provider rejected the handoff session"))
 		return false
 	end
 	if type(native) == "table" and self.state == "pending" then
-		return self:complete(native, detail)
+		return self:complete(native, detail, attempt)
 	end
 	if native ~= nil and native ~= true then
-		self.state = "failed"
-		self.reason = "target provider returned an unsupported handoff session result"
+		finish(self, "failed", "target provider returned an unsupported handoff session result")
 		return false
 	end
-	return self.state ~= "failed"
+	return self.state == "pending" or self.state == "completed"
+end
+
+function Request:retry()
+	if not M.is(self) then
+		fail("retry requires a target handoff request")
+	end
+	if self.state ~= "failed" and self.state ~= "cancelled" then
+		return false
+	end
+	self.state = "ready"
+	self.reason = nil
+	self.retries = self.retries + 1
+	return true
 end
 
 function Request:session()
@@ -255,8 +313,7 @@ function Request:cancel(detail)
 	if self.state ~= "ready" and self.state ~= "pending" then
 		return false
 	end
-	self.state = "cancelled"
-	self.reason = reason(detail, "target handoff session creation was cancelled")
+	finish(self, "cancelled", reason(detail, "target handoff session creation was cancelled"))
 	return true
 end
 
