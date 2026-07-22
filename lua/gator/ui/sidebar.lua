@@ -64,6 +64,24 @@ local function render(sidebar)
 	accessibility.render(sidebar.buffer, lines, "gator-sidebar")
 end
 
+local function replace(sidebar, sessions)
+	local selected = sidebar.sessions[sidebar.selected]
+	sidebar.sessions = sessions
+	sidebar.selected = 1
+	if selected then
+		for index, value in ipairs(sessions) do
+			if
+				value.task_id == selected.task_id
+				and value.provider == selected.provider
+				and value.id == selected.id
+			then
+				sidebar.selected = index
+				break
+			end
+		end
+	end
+end
+
 local function bind(sidebar)
 	accessibility.panel(sidebar.buffer, { next = "j", previous = "k", prompt = "<CR>", cancel = "q", help = "?" }, {
 		next = function()
@@ -114,6 +132,20 @@ local function update_motion(sidebar)
 	sidebar.frame = ""
 end
 
+local function schedule_render(sidebar)
+	if sidebar.refresh_pending then
+		return
+	end
+	sidebar.refresh_pending = true
+	vim.schedule(function()
+		sidebar.refresh_pending = false
+		if vim.api.nvim_win_is_valid(sidebar.window) then
+			render(sidebar)
+			update_motion(sidebar)
+		end
+	end)
+end
+
 function M.open(opts)
 	if type(opts) ~= "table" or type(opts.on_input) ~= "function" then
 		fail("open requires an on_input callback")
@@ -121,9 +153,8 @@ function M.open(opts)
 	local sessions = validate_sessions(opts.sessions or {})
 	local sidebar, tabpage = current()
 	if sidebar then
-		sidebar.sessions = sessions
+		replace(sidebar, sessions)
 		sidebar.on_input = opts.on_input
-		sidebar.selected = math.min(sidebar.selected, math.max(#sessions, 1))
 		render(sidebar)
 		update_motion(sidebar)
 		vim.api.nvim_set_current_win(sidebar.window)
@@ -164,6 +195,15 @@ function M.select(index)
 	return vim.deepcopy(sidebar.sessions[index])
 end
 
+function M.update(sessions)
+	local sidebar = current()
+	if not sidebar then
+		fail("no Gator conversation sidebar is open in this tab")
+	end
+	replace(sidebar, validate_sessions(sessions))
+	schedule_render(sidebar)
+end
+
 function M.route_input(text)
 	local sidebar = current()
 	if not sidebar then
@@ -190,6 +230,18 @@ function M.close()
 	panel_window.close(sidebar.window, sidebar.previous)
 	sidebars[tabpage] = nil
 	return true
+end
+
+function M.inspect()
+	local sidebar = current()
+	if not sidebar then
+		return nil
+	end
+	return {
+		refresh_pending = sidebar.refresh_pending == true,
+		sessions = #sidebar.sessions,
+		selected = sidebar.selected,
+	}
 end
 
 return M
