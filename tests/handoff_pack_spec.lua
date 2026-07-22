@@ -105,3 +105,41 @@ assert(
 	not pcall(handoff_pack.build, { id = "handoff-invalid", task = {}, files = {} }),
 	"handoff pack building must require canonical task sources"
 )
+
+local evaluated_source = handoff_pack.new({
+	id = "pack-handoff-trust",
+	task_id = "task-handoff",
+	entries = {
+		vim.tbl_extend("force", entry("entry-provenance-handoff", "file"), { trust = "provenance" }),
+		vim.tbl_extend("force", entry("entry-repository-handoff", "diff"), { trust = "repository" }),
+		vim.tbl_extend("force", entry("entry-manual-handoff", "instruction"), { trust = "manual" }),
+	},
+})
+local evaluated, decisions = handoff_pack.evaluate({ pack = evaluated_source, mode = "repository" })
+assert(
+	#decisions == #evaluated_source.entries
+		and decisions[1].allowed
+		and decisions[2].allowed
+		and not decisions[3].allowed
+		and decisions[2].provenance.ref == "entry-repository-handoff"
+		and decisions[3].trust == "manual",
+	"handoff trust evaluation must audit provenance and trust for every ordered entry"
+)
+assert(
+	evaluated.entries[2].policy_decision == "allowed by repository trust"
+		and evaluated.entries[3].policy_decision:find("does not allow manual", 1, true)
+		and evaluated_source.entries[2].policy_decision == nil,
+	"handoff trust evaluation must visibly annotate a new immutable pack without mutating its source"
+)
+local strict, strict_decisions = handoff_pack.evaluate({ pack = evaluated_source, mode = "manual" })
+assert(
+	#strict.entries == 3
+		and not strict_decisions[1].allowed
+		and strict.entries[1].policy_decision:find("strict manual", 1, true),
+	"manual handoff trust must deny every entry pending explicit selection"
+)
+assert(
+	not pcall(handoff_pack.evaluate, { pack = evaluated_source, mode = "invalid" })
+		and not pcall(handoff_pack.evaluate, { pack = {}, mode = "manual" }),
+	"handoff trust evaluation must reject invalid policies and pack records"
+)

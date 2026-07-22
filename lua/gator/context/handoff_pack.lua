@@ -1,5 +1,6 @@
 local pack = require("gator.context.pack")
 local task = require("gator.core.task")
+local trust = require("gator.context.trust")
 local M = { schema_version = 1 }
 local HandoffPack = {}
 
@@ -132,6 +133,35 @@ function M.build(opts)
 		end
 	end
 	return M.new({ id = opts.id, task_id = opts.task.id, entries = result })
+end
+
+function M.evaluate(opts)
+	if type(opts) ~= "table" then
+		fail("evaluate requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "pack" and key ~= "mode" then
+			fail("evaluate contains unsupported field: " .. tostring(key))
+		end
+	end
+	if not M.is(opts.pack) then
+		fail("evaluate requires a canonical handoff pack")
+	end
+	local value = M.to_record(opts.pack)
+	local entries, decisions = {}, {}
+	for index, entry in ipairs(value.entries) do
+		local decision = trust.decide(opts.mode, entry)
+		entries[index] = vim.deepcopy(entry)
+		entries[index].policy_decision = decision.reason
+		decisions[index] = {
+			id = entry.id,
+			provenance = vim.deepcopy(entry.provenance),
+			trust = entry.trust,
+			allowed = decision.allowed,
+			reason = decision.reason,
+		}
+	end
+	return M.new({ id = value.id, task_id = value.task_id, entries = entries }), decisions
 end
 
 return M
