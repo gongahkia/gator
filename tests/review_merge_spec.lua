@@ -91,6 +91,35 @@ local rebase = merge.apply({
 	end,
 })
 assert(rebase.status == "merged" and rebase.mode == "rebase", "guarded rebase strategy must report merged state")
+local commands = {}
+local rebase_conflict = merge.apply({
+	target_root = target,
+	source_root = source,
+	source_branch = "gator/task",
+	mode = "rebase",
+	retry_rebase = false,
+	confirm = true,
+	run = function(argv)
+		table.insert(commands, table.concat(argv, " "))
+		if argv[2] == "status" then
+			return { code = 0, stdout = "" }
+		end
+		if argv[2] == "rev-parse" then
+			return { code = 0, stdout = "source-sha\n" }
+		end
+		if argv[2] == "branch" then
+			return { code = 0, stdout = "main\n" }
+		end
+		assert(argv[2] == "rebase", "rebase-conflict fixture must not merge after a rebase failure")
+		return { code = 1, stderr = "CONFLICT (content): rebase conflict\n" }
+	end,
+})
+assert(
+	rebase_conflict.status == "conflict"
+		and rebase_conflict.phase == "rebase"
+		and not table.concat(commands, "\n"):find("merge", 1, true),
+	"rebase conflicts must be reported without silent resolution or merge continuation"
+)
 assert(not pcall(merge.apply, {
 	target_root = target,
 	source_root = source,
