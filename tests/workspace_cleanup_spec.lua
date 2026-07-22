@@ -5,14 +5,19 @@ local root = helpers.tempdir("workspace-cleanup")
 local clean = root .. "/clean"
 local dirty = root .. "/dirty"
 local active = root .. "/active"
+local locked = root .. "/locked"
 assert(
-	vim.fn.mkdir(clean, "p") == 1 and vim.fn.mkdir(dirty, "p") == 1 and vim.fn.mkdir(active, "p") == 1,
+	vim.fn.mkdir(clean, "p") == 1
+		and vim.fn.mkdir(dirty, "p") == 1
+		and vim.fn.mkdir(active, "p") == 1
+		and vim.fn.mkdir(locked, "p") == 1,
 	"must create worktree fixtures"
 )
 local resolved_root = assert(vim.uv.fs_realpath(root))
 local resolved_clean = assert(vim.uv.fs_realpath(clean))
 local resolved_dirty = assert(vim.uv.fs_realpath(dirty))
 local resolved_active = assert(vim.uv.fs_realpath(active))
+local resolved_locked = assert(vim.uv.fs_realpath(locked))
 local removed = {}
 local function run(argv, cwd)
 	if argv[2] == "worktree" and argv[3] == "list" then
@@ -26,7 +31,9 @@ local function run(argv, cwd)
 				.. resolved_dirty
 				.. "\nbranch refs/heads/gator/dirty\n\nworktree "
 				.. resolved_active
-				.. "\nbranch refs/heads/gator/active\n",
+				.. "\nbranch refs/heads/gator/active\n\nworktree "
+				.. resolved_locked
+				.. "\nbranch refs/heads/gator/locked\nlocked protected fixture\n",
 		}
 	end
 	if argv[2] == "status" then
@@ -46,7 +53,7 @@ local manager = cleanup.new({
 	end,
 })
 local plan = manager:plan()
-assert(#plan == 1 and plan[1].path == resolved_clean, "only clean inactive worktrees must be recoverable")
+assert(#plan == 1 and plan[1].path == resolved_clean, "only clean inactive unlocked worktrees must be recoverable")
 assert(not pcall(manager.prune, manager, plan, false), "destructive cleanup must require confirmation")
 assert(
 	#manager:prune(plan, true) == 1 and removed[1] == resolved_clean,
