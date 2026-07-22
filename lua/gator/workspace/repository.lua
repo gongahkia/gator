@@ -8,7 +8,16 @@ end
 
 local function result(run, argv, cwd, name)
 	local ok, value = pcall(run, argv, cwd)
-	if not ok or type(value) ~= "table" or value.code ~= 0 or type(value.stdout) ~= "string" then
+	if not ok or type(value) ~= "table" then
+		fail(name .. " failed")
+	end
+	if value.state == "unavailable" then
+		fail(name .. " is unavailable")
+	end
+	if value.state == "cancelled" then
+		fail(name .. " was cancelled")
+	end
+	if value.state ~= "completed" or value.code ~= 0 or type(value.stdout) ~= "string" then
 		fail(name .. " failed")
 	end
 	local output = vim.trim(value.stdout)
@@ -25,8 +34,9 @@ function M.detect(opts)
 		or opts.cwd == ""
 		or (opts.run ~= nil and type(opts.run) ~= "function")
 		or (opts.git ~= nil and not git_boundary.is(opts.git))
+		or (opts.cancelled ~= nil and type(opts.cancelled) ~= "function")
 	then
-		fail("detect requires cwd and optional Git boundary")
+		fail("detect requires cwd and optional Git boundary and cancellation check")
 	end
 	if opts.run ~= nil and opts.git ~= nil then
 		fail("detect accepts either run or git")
@@ -37,7 +47,7 @@ function M.detect(opts)
 	end
 	local git = opts.git or git_boundary.new({ run = opts.run })
 	local run = function(argv, path)
-		return git:run(argv, path)
+		return git:run(argv, path, { cancelled = opts.cancelled })
 	end
 	if result(run, { "git", "rev-parse", "--is-inside-work-tree" }, cwd, "Git worktree check") ~= "true" then
 		fail("cwd is not a Git worktree")
