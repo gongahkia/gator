@@ -17,6 +17,44 @@ local gator = require("gator").setup({
 local ui = require("gator.ui")
 local pack = require("gator.context.pack")
 local run = require("gator.core.run")
+local adapters = require("gator").module("adapters")
+local approval_event = require("gator").module("core").approval_event
+local provider_event = require("gator").module("core").provider_event
+local session = require("gator").module("core").session
+local usage_event = require("gator").module("core").usage_event
+
+local function contract(provider, overrides)
+	local ready = { available = true, modes = { "native" } }
+	local attrs = {
+		provider = provider,
+		transport = ready,
+		auth = ready,
+		session = ready,
+		permission = ready,
+		model = ready,
+		command = ready,
+		tool = ready,
+		context = ready,
+		usage = ready,
+	}
+	for key, value in pairs(overrides or {}) do
+		attrs[key] = value
+	end
+	return adapters.capabilities.new(attrs)
+end
+
+local function event(id, sequence, event_type, payload)
+	return provider_event.new({
+		schema_version = provider_event.schema_version,
+		id = id,
+		run_id = "run-accessibility",
+		provider = { name = "codex", session_id = "native-accessibility" },
+		sequence = sequence,
+		type = event_type,
+		at = sequence,
+		payload = payload,
+	})
+end
 
 local function mapping(window, lhs, action)
 	local value = vim.api.nvim_buf_call(vim.api.nvim_win_get_buf(window), function()
@@ -121,6 +159,144 @@ window = context.open({
 })
 panel(window, { ["]"] = "next", ["t"] = "toggle", ["c"] = "confirm", ["x"] = "cancel", ["h"] = "help" })
 assert(context.close(), "context inspector must close after accessibility inspection")
+
+local event_details = ui.event_details
+local event_cancelled = false
+window = event_details.open({
+	events = {
+		event("event-message-accessibility", 1, "message.delta", { text = "message" }),
+		event("event-thought-accessibility", 2, "message.thought", { summary = "reasoning" }),
+	},
+	on_cancel = function()
+		event_cancelled = true
+	end,
+})
+panel(window, { ["]"] = "next", ["["] = "previous", ["x"] = "cancel", ["h"] = "help" })
+press("]")
+assert(event_details.inspect().selected == 2, "event details must navigate with the configured next key")
+press("x")
+assert(event_cancelled and not event_details.inspect(), "event details must cancel with the configured key")
+
+local approval_details = ui.approval_details
+local approval_decision
+window = approval_details.open({
+	request = approval_event.request({
+		id = "approval-accessibility",
+		run_id = "run-accessibility",
+		provider = { name = "codex", session_id = "native-accessibility" },
+		sequence = 3,
+		at = 3,
+		request_id = "request-accessibility",
+		action = "write file",
+	}),
+	on_decide = function(value)
+		approval_decision = value.decision
+	end,
+})
+panel(window, { ["a"] = "accept", ["r"] = "reject", ["x"] = "cancel", ["h"] = "help" })
+press("r")
+assert(
+	approval_decision == "denied" and not approval_details.inspect(),
+	"approval details must deny with the configured reject key"
+)
+
+local usage_details = ui.usage_details
+local usage_cancelled = false
+window = usage_details.open({
+	events = {
+		usage_event.usage({
+			id = "usage-accessibility",
+			run_id = "run-accessibility",
+			provider = { name = "codex", session_id = "native-accessibility" },
+			sequence = 4,
+			at = 4,
+			input_tokens = 1,
+			output_tokens = 2,
+			total_tokens = 3,
+		}),
+		usage_event.compaction({
+			id = "compaction-accessibility",
+			run_id = "run-accessibility",
+			provider = { name = "codex", session_id = "native-accessibility" },
+			sequence = 5,
+			at = 5,
+			before_tokens = 8,
+			after_tokens = 4,
+			summary = "compacted",
+		}),
+	},
+	on_cancel = function()
+		usage_cancelled = true
+	end,
+})
+panel(window, { ["]"] = "next", ["["] = "previous", ["x"] = "cancel", ["h"] = "help" })
+press("]")
+assert(usage_details.inspect().selected == 2, "usage details must navigate with the configured next key")
+press("x")
+assert(usage_cancelled and not usage_details.inspect(), "usage details must cancel with the configured key")
+
+local session_actions = ui.session_actions
+local opened_link
+local session_cancelled = false
+window = session_actions.open({
+	session = session.new({
+		task_id = "task-accessibility",
+		provider = "codex",
+		id = "native-accessibility",
+		owner = "provider",
+	}),
+	capabilities = contract("codex", { session = { available = true, modes = { "deep_link" } } }),
+	native_resolve = function()
+		return "codex://thread/native-accessibility"
+	end,
+	on_open = function(uri)
+		opened_link = uri
+	end,
+	on_reference = function() end,
+	on_cancel = function()
+		session_cancelled = true
+	end,
+})
+panel(window, { ["]"] = "next", ["["] = "previous", ["c"] = "confirm", ["x"] = "cancel", ["h"] = "help" })
+press("c")
+assert(opened_link == "codex://thread/native-accessibility", "session actions must confirm with the configured key")
+press("x")
+assert(session_cancelled and not session_actions.inspect(), "session actions must cancel with the configured key")
+
+local handoff_review = ui.handoff_review
+local handoff
+window = handoff_review.open({
+	mode = "manual",
+	source_provider = "codex",
+	target_provider = "claude",
+	content = "initial summary",
+	target_capabilities = contract("claude", {
+		context = { available = true, modes = { "agent_retrieval" } },
+		tool = { available = true, modes = { "native" } },
+	}),
+	opt_in = false,
+	on_confirm = function(summary)
+		handoff = summary
+	end,
+})
+panel(window, { ["c"] = "confirm", ["p"] = "prompt", ["x"] = "cancel", ["h"] = "help" })
+local input = vim.ui.input
+vim.ui.input = function(_, callback)
+	callback("edited summary")
+end
+press("p")
+vim.ui.input = input
+assert(
+	table
+		.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
+		:find("edited summary", 1, true),
+	"handoff review must edit with the configured prompt key"
+)
+press("c")
+assert(
+	handoff and handoff.content == "edited summary" and not handoff_review.inspect(),
+	"handoff review must confirm with the configured key"
+)
 
 local review = ui.diff_review
 window = review.open({
