@@ -11,6 +11,7 @@ local tools = {
 	{ name = "gator.search_context", description = "Search Gator's local retrieval index" },
 	{ name = "gator.read_context", description = "Read an approved Gator context reference" },
 }
+local path_placeholder = "[REDACTED PATH]"
 
 function M.tools(opts)
 	if type(opts) ~= "table" or not capabilities.is(opts.capabilities) then
@@ -54,6 +55,20 @@ function M.compatibility(opts)
 end
 
 local function payload_entry(value)
+	local function candidate_text(text)
+		text = redact.text(text)
+		if
+			text:match("^/")
+			or text:match("^~[/\\]")
+			or text:match("^%a:[/\\]")
+			or text:find("///", 1, true)
+			or text:find("../", 1, true)
+			or text:find("..\\", 1, true)
+		then
+			return path_placeholder
+		end
+		return text
+	end
 	local transfer = { eligible = value.transfer.eligible }
 	if not transfer.eligible then
 		transfer.reason = redact.text(value.transfer.reason)
@@ -61,15 +76,15 @@ local function payload_entry(value)
 	return {
 		id = value.id,
 		kind = redact.text(value.kind),
-		ref = redact.text(value.ref),
-		provenance = { source = redact.text(value.provenance.source), ref = redact.text(value.provenance.ref) },
+		ref = candidate_text(value.ref),
+		provenance = { source = candidate_text(value.provenance.source), ref = candidate_text(value.provenance.ref) },
 		trust = value.trust,
 		transfer = transfer,
-		annotation = value.annotation and redact.text(value.annotation) or nil,
+		annotation = value.annotation and candidate_text(value.annotation) or nil,
 		pinned = value.pinned,
-		revision = value.revision and redact.text(value.revision) or nil,
-		retrieval_source = value.retrieval_source and redact.text(value.retrieval_source) or nil,
-		policy_decision = value.policy_decision and redact.text(value.policy_decision) or nil,
+		revision = value.revision and candidate_text(value.revision) or nil,
+		retrieval_source = value.retrieval_source and candidate_text(value.retrieval_source) or nil,
+		policy_decision = value.policy_decision and candidate_text(value.policy_decision) or nil,
 	}
 end
 

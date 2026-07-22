@@ -59,8 +59,10 @@ assert(
 		and payload.target.session.owner == "provider"
 		and payload.target.transport == "native"
 		and payload.context.entries[2].content == nil
+		and payload.context.entries[2].ref == "[REDACTED PATH]"
+		and payload.context.entries[2].provenance.ref == "[REDACTED PATH]"
 		and not rendered:find("fixture-secret", 1, true),
-	"launch payloads must use fresh provider-owned targets and redact approved references without raw entry content"
+	"launch payloads must use fresh provider-owned targets and redact secrets, unsafe paths, and raw entry content"
 )
 payload.context.entries[2].ref = "mutated"
 assert(source.entries[2].ref ~= "mutated", "launch payloads must not mutate approved handoff packs")
@@ -101,4 +103,30 @@ assert(
 assert(
 	not pcall(handoff.launch_payload, { pack = {}, capabilities = {} }),
 	"launch payloads must reject invalid approved packs and capability records"
+)
+
+local traversal = pack.new({
+	id = "handoff-traversal",
+	task_id = "task-launch",
+	entries = {
+		source.entries[1],
+		vim.tbl_extend("force", {}, source.entries[2], {
+			id = "file-traversal",
+			ref = "../.ssh/token=fixture-secret",
+			provenance = { source = "buffer", ref = "C:\\Users\\fixture-secret" },
+			annotation = "~/token=fixture-secret",
+		}),
+	},
+})
+local sanitized = handoff.launch_payload({
+	pack = traversal,
+	capabilities = contract({ available = true, modes = { "agent_retrieval" } }, supported),
+})
+assert(
+	sanitized.available
+		and sanitized.context.entries[2].ref == "[REDACTED PATH]"
+		and sanitized.context.entries[2].provenance.ref == "[REDACTED PATH]"
+		and sanitized.context.entries[2].annotation == "[REDACTED PATH]"
+		and not vim.inspect(sanitized):find("fixture-secret", 1, true),
+	"launch payloads must redact traversal, home, Windows, and credential-bearing transfer candidates"
 )
