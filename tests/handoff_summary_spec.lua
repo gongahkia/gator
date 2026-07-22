@@ -1,4 +1,5 @@
 local summary = require("gator").module("context").handoff_summary
+local evidence = require("gator").module("context").handoff_evidence
 local handoff_pack = require("gator").module("context").handoff_pack
 local pack = require("gator").module("context").pack
 
@@ -55,3 +56,47 @@ assert(not pcall(summary.from_record, {
 	author = "user",
 	content = "summary",
 }), "user summaries must reject unsupported record schemas")
+
+local source_evidence = evidence.new({
+	task_id = "task-user-summary",
+	state = "ready",
+	source = {
+		provider = "codex",
+		run_id = "run-summary",
+		session = { provider = "codex", id = "native-summary", owner = "provider" },
+	},
+	decisions = {
+		{ event_id = "decision-summary", type = "message.thought", at = 1, summary = "inspect token=evidence-secret" },
+	},
+	outcomes = { { event_id = "outcome-summary", type = "message.completed", at = 2, summary = "implemented" } },
+})
+local generated = summary.synthesize({ id = "summary-gator", pack = source, evidence = source_evidence })
+assert(
+	generated.author == "gator"
+		and generated.state == "ready"
+		and generated.content:find("Source provider: codex", 1, true)
+		and generated.content:find("Decisions:", 1, true)
+		and generated.content:find("Outcomes:", 1, true),
+	"local synthesis must create a deterministic summary from source evidence"
+)
+assert(
+	generated.content:find("pack-secret", 1, true) == nil
+		and generated.content:find("evidence-secret", 1, true) == nil
+		and generated.content:find("native-summary", 1, true) == nil,
+	"local synthesis must redact evidence and exclude raw pack content and source session IDs"
+)
+local unavailable = summary.synthesize({
+	id = "summary-unavailable",
+	pack = source,
+	evidence = evidence.new({
+		task_id = "task-user-summary",
+		state = "unavailable",
+		reason = "source evidence unavailable",
+	}),
+})
+assert(
+	unavailable.state == "unavailable"
+		and unavailable.content == nil
+		and unavailable.reason == "source evidence unavailable",
+	"local synthesis must expose unavailable source evidence"
+)
