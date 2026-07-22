@@ -41,6 +41,10 @@ assert(
 		and command[6]:find("publish%-secret") == nil,
 	"confirmed publishing must send only selected, redacted review evidence through gh"
 )
+assert(
+	value.body:find("publish%-secret") == nil,
+	"published evidence summaries must remain redacted after confirmation"
+)
 assert(not pcall(publish.review_evidence, {
 	number = 155,
 	records = { { task_id = "task-publish", kind = "reviewer", reviewer = "reviewer-one" } },
