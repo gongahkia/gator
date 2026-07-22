@@ -28,29 +28,36 @@ local target = session.new({
 	id = "native-sk-target",
 	owner = "provider",
 })
+local source_snapshot = {
+	id = "snapshot-source",
+	run_id = "run-source",
+	type = "workspace.git_snapshot",
+	at = 2,
+	payload = { root = "/tmp/token=fixture-secret" },
+}
+local target_snapshot = { id = "snapshot-target", run_id = "run-target", type = "workspace.git_snapshot", at = 3 }
 local value = lineage.new({
 	id = "lineage-one",
 	pack = source_pack,
 	evidence = source_evidence,
 	target = target,
-	source_snapshot = {
-		id = "snapshot-source",
-		run_id = "run-source",
-		type = "workspace.git_snapshot",
-		at = 2,
-		payload = { root = "/tmp/token=fixture-secret" },
-	},
-	target_snapshot = { id = "snapshot-target", run_id = "run-target", type = "workspace.git_snapshot", at = 3 },
+	source_snapshot = source_snapshot,
+	target_snapshot = target_snapshot,
 	at = 4,
 })
+source_snapshot.id = "snapshot-changed"
+source_snapshot.payload.root = "/tmp/changed"
+local record = lineage.to_record(value)
+record.snapshots.source.id = "snapshot-record-mutated"
 local rendered = vim.inspect(lineage.to_record(value))
 assert(
 	lineage.is(value)
 		and value.source.session.id == "native-sk-source"
 		and value.target.id == "native-sk-target"
+		and value.snapshots.source.id == "snapshot-source"
 		and value.snapshots.source.payload == nil
 		and not rendered:find("fixture-secret", 1, true),
-	"lineage records must preserve provider-owned source and target sessions with path-free snapshot references"
+	"lineage records must preserve immutable path-free snapshot references and provider-owned sessions"
 )
 
 local root = helpers.tempdir("handoff-lineage")

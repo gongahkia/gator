@@ -100,6 +100,17 @@ assert(
 	not policy.available and policy.reason:find("blocked by policy", 1, true),
 	"launch payloads must reject known blocked entries before transfer"
 )
+local revoked = pack.evaluate({ pack = source, mode = "manual" })
+local revoked_payload = handoff.launch_payload({
+	pack = revoked,
+	capabilities = contract({ available = true, modes = { "agent_retrieval" } }, supported),
+})
+assert(
+	not revoked_payload.available
+		and revoked_payload.reason:find("blocked by policy", 1, true)
+		and source.entries[2].policy_decision == "allowed by repository trust",
+	"revoked trust must deny a new launch without changing the previously approved pack"
+)
 assert(
 	not pcall(handoff.launch_payload, { pack = {}, capabilities = {} }),
 	"launch payloads must reject invalid approved packs and capability records"
