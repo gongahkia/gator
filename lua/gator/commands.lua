@@ -7,6 +7,18 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorHealth", function()
 		require("gator").dispatch("health")
 	end, { desc = "Check Gator health" })
+	vim.api.nvim_create_user_command("GatorExportDiagnostics", function()
+		vim.schedule(function()
+			local ok, result = pcall(require("gator").export_diagnostics)
+			local message = ok and (result.state == "ready" and "Diagnostic export: " .. result.path or result.reason)
+				or require("gator.policy.redact").text(tostring(result))
+			vim.notify(
+				message,
+				ok and result.state == "ready" and vim.log.levels.INFO or vim.log.levels.WARN,
+				{ title = "Gator" }
+			)
+		end)
+	end, { desc = "Write a local redacted diagnostic export" })
 	vim.api.nvim_create_user_command("GatorCaptureSelection", function(opts)
 		require("gator").dispatch("capture_selection", {
 			target = opts.args,

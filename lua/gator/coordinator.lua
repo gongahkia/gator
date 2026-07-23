@@ -9,12 +9,14 @@ Operation.__index = Operation
 local actions = {
 	open = { fields = {} },
 	health = { fields = {} },
+	export_diagnostics = { fields = {} },
 	close = { fields = {} },
 	cancel_operation = { fields = { id = true, reason = true } },
 	capture_selection = { fields = { target = true, buffer = true, first_line = true, last_line = true } },
 	palette = { fields = { id = true } },
 }
-local action_names = { "open", "health", "close", "cancel_operation", "capture_selection", "palette" }
+local action_names =
+	{ "open", "health", "export_diagnostics", "close", "cancel_operation", "capture_selection", "palette" }
 local operation_kinds = { operation = true, launch = true, handoff = true }
 
 local function fail(message)
@@ -172,6 +174,17 @@ function Coordinator:health()
 	vim.cmd("checkhealth gator")
 end
 
+function Coordinator:export_diagnostics()
+	if not M.is(self) then
+		fail("export_diagnostics requires an initialized coordinator")
+	end
+	local current = self:state()
+	return self:module("core").diagnostic_export.write({
+		state = current,
+		storage = { sharing = current.config.persistence.sharing },
+	})
+end
+
 function Coordinator:dispatch(action, opts)
 	if not M.is(self) then
 		fail("dispatch requires an initialized coordinator")
@@ -185,6 +198,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "health" then
 		return self:health()
+	end
+	if action == "export_diagnostics" then
+		return self:export_diagnostics()
 	end
 	if action == "close" then
 		return self:dependency("ui").close()

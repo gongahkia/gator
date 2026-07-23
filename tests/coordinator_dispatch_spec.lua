@@ -15,7 +15,7 @@ palette.register({
 assert(
 	vim.deep_equal(
 		coordinator.actions(),
-		{ "open", "health", "close", "cancel_operation", "capture_selection", "palette" }
+		{ "open", "health", "export_diagnostics", "close", "cancel_operation", "capture_selection", "palette" }
 	),
 	"coordinator must expose supported action names"
 )
@@ -24,6 +24,13 @@ assert(
 	"dispatcher must route palette actions"
 )
 assert(invoked[1] == "palette", "dispatcher must preserve action results")
+local diagnostic = gator.export_diagnostics()
+assert(
+	diagnostic.state == "ready"
+		and vim.fn.filereadable(diagnostic.path) == 1
+		and vim.json.decode(table.concat(vim.fn.readfile(diagnostic.path), "\n")).network_telemetry == false,
+	"dispatcher must write local-only diagnostic exports"
+)
 
 local window = gator.dispatch("open")
 assert(vim.api.nvim_win_is_valid(window), "dispatcher must route workspace opening")

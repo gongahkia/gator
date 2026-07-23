@@ -56,6 +56,10 @@ function M.health()
 	return M.dispatch("health")
 end
 
+function M.export_diagnostics()
+	return M.dispatch("export_diagnostics")
+end
+
 function M.dispatch(action, opts)
 	if not coordinator.is_action(action) then
 		error("unknown Gator action: " .. tostring(action))

@@ -3,6 +3,7 @@ local M = {
 	api_version = 1,
 	database = require("gator.core.database"),
 	deep_link = require("gator.core.deep_link"),
+	diagnostic_export = require("gator.core.diagnostic_export"),
 	error_event = require("gator.core.error_event"),
 	event_fanout = require("gator.core.event_fanout"),
 	approval_event = require("gator.core.approval_event"),
