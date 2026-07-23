@@ -1,3 +1,6 @@
+local redact = require("gator.policy.redact")
+local transport_faults = require("gator.core.transport_faults")
+
 local M = {}
 
 local function fail(message)
@@ -34,6 +37,13 @@ end
 local function require_list(value, name)
 	if type(value) ~= "table" or not vim.islist(value) then
 		fail(name .. " must be an array")
+	end
+	return value
+end
+
+local function replay_kind(value)
+	if value ~= "jsonl" and value ~= "jsonrpc" and value ~= "terminal" then
+		fail("fault replay kind is unsupported: " .. tostring(value))
 	end
 	return value
 end
@@ -165,6 +175,76 @@ function M.replay_process(path, callbacks)
 		callbacks.exit(status)
 	end
 	return status
+end
+
+function M.replay_with_faults(opts)
+	if type(opts) ~= "table" then
+		fail("fault replay requires options")
+	end
+	for key in pairs(opts) do
+		if
+			key ~= "kind"
+			and key ~= "path"
+			and key ~= "operation"
+			and key ~= "failures"
+			and key ~= "on_record"
+			and key ~= "cancel"
+		then
+			fail("fault replay contains unsupported field: " .. tostring(key))
+		end
+	end
+	local kind = replay_kind(opts.kind)
+	if type(opts.path) ~= "string" or opts.path == "" then
+		fail("fault replay path must be non-empty text")
+	end
+	if opts.operation ~= nil and type(opts.operation) ~= "string" then
+		fail("fault replay operation must be text")
+	end
+	require_callback(opts.on_record, "fault replay")
+	if opts.cancel ~= nil and type(opts.cancel) ~= "function" then
+		fail("fault replay cancel must be a function")
+	end
+	local controller = transport_faults.new({ failures = opts.failures or {} })
+	local records = {}
+	local ok, reason = pcall(M["replay_" .. kind], opts.path, function(record)
+		table.insert(records, vim.deepcopy(record))
+	end)
+	if not ok then
+		return { state = "failed", count = 0, kind = "malformed_fixture", reason = redact.text(tostring(reason)) }
+	end
+	local delivered = 0
+	for index, record in ipairs(records) do
+		if opts.cancel then
+			local callback_ok, cancelled = pcall(opts.cancel, index)
+			if not callback_ok or type(cancelled) ~= "boolean" then
+				return {
+					state = "failed",
+					count = delivered,
+					kind = "cancel_callback",
+					reason = redact.text(
+						callback_ok and "cancel callback must return a boolean" or tostring(cancelled)
+					),
+				}
+			end
+			if cancelled then
+				controller:cancel("fixture replay was cancelled")
+				return { state = "cancelled", count = delivered, reason = controller:status().reason }
+			end
+		end
+		local result = controller:call(opts.operation or "record", function()
+			return opts.on_record(vim.deepcopy(record), index)
+		end)
+		if result.state ~= "ready" then
+			return {
+				state = result.state,
+				count = delivered,
+				kind = result.kind,
+				reason = result.reason,
+			}
+		end
+		delivered = index
+	end
+	return { state = "ready", count = delivered }
 end
 
 function M.conform(opts)
