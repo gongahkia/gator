@@ -1,13 +1,24 @@
 local suite = require("gator").module("performance").suite
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local cases = {}
-for _, name in ipairs({ "startup", "context", "stream", "ui_loop", "worktree", "diff", "indexer" }) do
+for _, name in ipairs({
+	"startup",
+	"context",
+	"stream",
+	"ui_loop",
+	"worktree",
+	"diff",
+	"indexer",
+	"timeline",
+	"storage",
+	"handoff",
+}) do
 	cases[name] = function() end
 end
 
 local function clocks(first_duration, sustained)
 	local ticks, current = {}, 0
-	for pair = 1, 21 do
+	for pair = 1, 30 do
 		local duration = sustained or (pair == 1 and first_duration or 5)
 		table.insert(ticks, current * 1000000)
 		table.insert(ticks, (current + duration) * 1000000)
@@ -19,7 +30,18 @@ local function clocks(first_duration, sustained)
 end
 
 local budgets = {}
-for _, name in ipairs({ "startup", "context", "stream", "ui_loop", "worktree", "diff", "indexer" }) do
+for _, name in ipairs({
+	"startup",
+	"context",
+	"stream",
+	"ui_loop",
+	"worktree",
+	"diff",
+	"indexer",
+	"timeline",
+	"storage",
+	"handoff",
+}) do
 	budgets[name] = { duration_ms = 10, memory_kb_delta = 10, variance_percent = 0, sustained_samples = 3 }
 end
 local stable = suite.run({

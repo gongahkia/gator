@@ -1,5 +1,16 @@
 local M = { api_version = 1, schema_version = 2 }
-local names = { "startup", "context", "stream", "ui_loop", "worktree", "diff", "indexer" }
+local names = {
+	"startup",
+	"context",
+	"stream",
+	"ui_loop",
+	"worktree",
+	"diff",
+	"indexer",
+	"timeline",
+	"storage",
+	"handoff",
+}
 
 local function fail(message)
 	error("Gator performance suite: " .. message, 3)

@@ -7,8 +7,11 @@ local worktree = require("gator").module("workspace").worktree
 local diff_review = require("gator").module("ui").diff_review
 local timeline = require("gator").module("ui").timeline
 local core_run = require("gator").module("core").run
+local core_task = require("gator").module("core").task
 local retrieval = require("gator").module("performance").retrieval
 local protocol = require("gator").module("indexer").protocol
+local storage = require("gator").module("core").storage
+local handoff_pack = require("gator").module("context").handoff_pack
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 
 local entries = {}
@@ -60,6 +63,54 @@ for index = 1, 256 do
 end
 local artifact = (vim.env.GATOR_TEST_ROOT ~= "" and vim.env.GATOR_TEST_ROOT or helpers.tempdir("performance-real"))
 	.. "/benchmark-report.json"
+local storage_backend =
+	storage.resolve({ kind = "json", path = helpers.tempdir("performance-storage") .. "/state.json" }).backend
+local storage_updates = 0
+local handoff_task = core_task.new({
+	id = "performance-handoff",
+	objective = "benchmark handoff construction",
+	created_at = 1,
+	updated_at = 1,
+})
+local function benchmark_timeline()
+	timeline.open({
+		calls = {
+			{
+				id = "performance-stream-call",
+				provider = "fixture",
+				session_id = "performance-stream-session",
+				name = "stream_update",
+				arguments = "{}",
+				approval = "not_required",
+				output = "chunk 0",
+				status = "running",
+			},
+		},
+	})
+	for index = 1, 2000 do
+		timeline.update({
+			{
+				id = "performance-stream-call",
+				provider = "fixture",
+				session_id = "performance-stream-session",
+				name = "stream_update",
+				arguments = "{}",
+				approval = "not_required",
+				output = "chunk " .. index,
+				status = "running",
+			},
+		})
+		ui_updates = ui_updates + 1
+	end
+	assert(
+		vim.wait(1000, function()
+			local value = timeline.inspect()
+			return value and not value.refresh_pending
+		end),
+		"benchmark must drain coalesced timeline updates"
+	)
+	assert(timeline.close(), "benchmark must cancel its timeline")
+end
 local report = suite.run({
 	samples = budgets.samples,
 	budgets = budgets.values,
@@ -85,45 +136,7 @@ local report = suite.run({
 			})
 			parser:feed(stream_payload)
 		end,
-		ui_loop = function()
-			timeline.open({
-				calls = {
-					{
-						id = "performance-stream-call",
-						provider = "fixture",
-						session_id = "performance-stream-session",
-						name = "stream_update",
-						arguments = "{}",
-						approval = "not_required",
-						output = "chunk 0",
-						status = "running",
-					},
-				},
-			})
-			for index = 1, 2000 do
-				timeline.update({
-					{
-						id = "performance-stream-call",
-						provider = "fixture",
-						session_id = "performance-stream-session",
-						name = "stream_update",
-						arguments = "{}",
-						approval = "not_required",
-						output = "chunk " .. index,
-						status = "running",
-					},
-				})
-				ui_updates = ui_updates + 1
-			end
-			assert(
-				vim.wait(1000, function()
-					local value = timeline.inspect()
-					return value and not value.refresh_pending
-				end),
-				"benchmark must drain coalesced timeline updates"
-			)
-			assert(timeline.close(), "benchmark must cancel its timeline")
-		end,
+		ui_loop = benchmark_timeline,
 		worktree = function()
 			worktree.create({
 				root = worktree_root,
@@ -164,14 +177,33 @@ local report = suite.run({
 				end,
 			})
 		end,
+		timeline = benchmark_timeline,
+		storage = function()
+			storage_updates = storage_updates + 1
+			storage_backend:put_task(core_task.new({
+				id = "performance-storage",
+				objective = "benchmark storage",
+				created_at = 1,
+				updated_at = storage_updates,
+			}))
+			storage_backend:preview_export({ task_id = "performance-storage" })
+		end,
+		handoff = function()
+			local value = handoff_pack.build({
+				id = "performance-handoff-pack",
+				task = handoff_task,
+				files = entries,
+			})
+			handoff_pack.evaluate({ pack = value, mode = "repository" })
+		end,
 	},
 	path = artifact,
 })
 assert(
-	#report.metrics == 7
+	#report.metrics == 10
 		and #report.regressions == 0
 		and events == 15000
-		and ui_updates == 6000
+		and ui_updates == 12000
 		and vim.fn.filereadable(artifact) == 1,
 	"real performance cases must exercise fixture-backed Gator operations and emit a regression artifact"
 )
