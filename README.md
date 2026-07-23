@@ -92,6 +92,7 @@ Do not put provider credentials, tokens, secrets, passwords, or API keys in Gato
 | `:Gator` | Opens the task/session/context/review workspace. |
 | `:GatorHealth` | Runs local compatibility, workspace, policy, sidecar, and provider readiness checks. |
 | `:GatorExportDiagnostics` | Writes one local, redacted rolling diagnostic JSON export; it never sends telemetry. |
+| `:GatorBetaReadiness` | Verifies local beta prerequisites and writes a local rolling readiness/failure-report bundle. |
 | `:{range}GatorCaptureSelection task:<id>` | Captures a visual/line selection as provenance-tracked context for a task. |
 | `:{range}GatorCaptureSelection session:<provider>:<id>` | Captures context for an opaque provider-native session. |
 | `:GatorPalette <action>` | Runs a registered Gator palette action. |

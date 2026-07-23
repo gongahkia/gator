@@ -1,6 +1,7 @@
 local M = {
 	name = "core",
 	api_version = 1,
+	beta_readiness = require("gator.core.beta_readiness"),
 	database = require("gator.core.database"),
 	deep_link = require("gator.core.deep_link"),
 	diagnostic_export = require("gator.core.diagnostic_export"),

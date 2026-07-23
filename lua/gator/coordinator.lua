@@ -10,13 +10,22 @@ local actions = {
 	open = { fields = {} },
 	health = { fields = {} },
 	export_diagnostics = { fields = {} },
+	verify_beta_readiness = { fields = {} },
 	close = { fields = {} },
 	cancel_operation = { fields = { id = true, reason = true } },
 	capture_selection = { fields = { target = true, buffer = true, first_line = true, last_line = true } },
 	palette = { fields = { id = true } },
 }
-local action_names =
-	{ "open", "health", "export_diagnostics", "close", "cancel_operation", "capture_selection", "palette" }
+local action_names = {
+	"open",
+	"health",
+	"export_diagnostics",
+	"verify_beta_readiness",
+	"close",
+	"cancel_operation",
+	"capture_selection",
+	"palette",
+}
 local operation_kinds = { operation = true, launch = true, handoff = true }
 
 local function fail(message)
@@ -185,6 +194,70 @@ function Coordinator:export_diagnostics()
 	})
 end
 
+function Coordinator:verify_beta_readiness()
+	if not M.is(self) then
+		fail("verify_beta_readiness requires an initialized coordinator")
+	end
+	local current = self:state()
+	local platform = self:module("performance").platform.inspect()
+	local platform_checks = {}
+	for _, check in ipairs(platform.checks) do
+		platform_checks[check.name] = check
+	end
+	local required_platform = { "platform", "executable.git", "filesystem", "worktree" }
+	local unavailable = {}
+	for _, name in ipairs(required_platform) do
+		local check = platform_checks[name]
+		if not check or not check.available then
+			table.insert(unavailable, name)
+		end
+	end
+	local beta = self:module("core").beta_readiness
+	local report = beta.verify({
+		checks = {
+			{
+				name = "compatibility.neovim",
+				check = function()
+					return current.compatibility.supported and { state = "ready" }
+						or { state = "failed", detail = "supported Neovim is required for public beta" }
+				end,
+			},
+			{
+				name = "platform.local_workspace",
+				check = function()
+					return #unavailable == 0 and { state = "ready" }
+						or {
+							state = "unavailable",
+							detail = "unavailable requirements: " .. table.concat(unavailable, ", "),
+						}
+				end,
+			},
+			{
+				name = "storage.local_only",
+				check = function()
+					return current.config.persistence.sharing == "local" and { state = "ready" }
+						or { state = "unavailable", detail = "local-only storage is required" }
+				end,
+			},
+			{
+				name = "trust.configured",
+				check = function()
+					return current.config.context.trust ~= nil and { state = "ready" }
+						or { state = "failed", detail = "context trust policy is unavailable" }
+				end,
+			},
+			{
+				name = "accessibility.screen_reader",
+				check = function()
+					return current.config.ui.screen_reader and { state = "ready" }
+						or { state = "unavailable", detail = "screen-reader output is disabled" }
+				end,
+			},
+		},
+	})
+	return beta.write({ report = report, storage = { sharing = current.config.persistence.sharing } })
+end
+
 function Coordinator:dispatch(action, opts)
 	if not M.is(self) then
 		fail("dispatch requires an initialized coordinator")
@@ -201,6 +274,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "export_diagnostics" then
 		return self:export_diagnostics()
+	end
+	if action == "verify_beta_readiness" then
+		return self:verify_beta_readiness()
 	end
 	if action == "close" then
 		return self:dependency("ui").close()

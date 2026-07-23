@@ -13,10 +13,16 @@ palette.register({
 })
 
 assert(
-	vim.deep_equal(
-		coordinator.actions(),
-		{ "open", "health", "export_diagnostics", "close", "cancel_operation", "capture_selection", "palette" }
-	),
+	vim.deep_equal(coordinator.actions(), {
+		"open",
+		"health",
+		"export_diagnostics",
+		"verify_beta_readiness",
+		"close",
+		"cancel_operation",
+		"capture_selection",
+		"palette",
+	}),
 	"coordinator must expose supported action names"
 )
 assert(
@@ -30,6 +36,13 @@ assert(
 		and vim.fn.filereadable(diagnostic.path) == 1
 		and vim.json.decode(table.concat(vim.fn.readfile(diagnostic.path), "\n")).network_telemetry == false,
 	"dispatcher must write local-only diagnostic exports"
+)
+local readiness = gator.verify_beta_readiness()
+assert(
+	readiness.state == "ready"
+		and vim.fn.filereadable(readiness.path) == 1
+		and vim.json.decode(table.concat(vim.fn.readfile(readiness.path), "\n")).state == "ready",
+	"dispatcher must write public-beta readiness reports"
 )
 
 local window = gator.dispatch("open")
