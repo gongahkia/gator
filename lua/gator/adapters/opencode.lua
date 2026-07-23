@@ -1,6 +1,6 @@
 local M = {}
 
-M.range = { minimum = { 1, 17, 15 }, maximum = { 1, 17, 15 } }
+M.range = { minimum = { 1, 17, 15 }, maximum = { 1, 18, 0 } }
 
 local function fail(message)
 	error("Gator OpenCode adapter: " .. message, 3)

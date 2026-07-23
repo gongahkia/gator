@@ -11,7 +11,7 @@ local native = handshake.new({
 			result = {
 				protocolVersion = 1,
 				authMethods = { { id = "opencode-login", description = "native only" } },
-				agentInfo = { name = "OpenCode", version = "1.17.15" },
+				agentInfo = { name = "OpenCode", version = "1.18.0" },
 				agentCapabilities = {
 					loadSession = true,
 					mcpCapabilities = { http = true, sse = true },

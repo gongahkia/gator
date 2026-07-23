@@ -5,7 +5,7 @@ local value = opencode.probe({
 	run = function(argv, input)
 		table.insert(calls, { argv = argv, input = input })
 		if argv[2] == "--version" then
-			return { code = 0, stdout = "1.17.15" }
+			return { code = 0, stdout = "1.18.0" }
 		end
 		return {
 			code = 0,
@@ -31,6 +31,16 @@ assert(
 	#calls == 2 and calls[2].argv[2] == "acp" and calls[2].input:find('"initialize"', 1, true),
 	"OpenCode probe must request an ACP initialization profile"
 )
+local legacy = opencode.probe({
+	cwd = vim.g.gator_test.root,
+	run = function(argv)
+		if argv[2] == "--version" then
+			return { code = 0, stdout = "1.17.15" }
+		end
+		return { code = 0, stdout = [[{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{}}}]] }
+	end,
+})
+assert(legacy.supported, "OpenCode probe must retain the verified 1.17.15 ACP baseline")
 local unavailable = opencode.probe({
 	cwd = vim.g.gator_test.root,
 	run = function()
@@ -42,7 +52,7 @@ local unsupported = opencode.probe({
 	cwd = vim.g.gator_test.root,
 	run = function(argv)
 		if argv[2] == "--version" then
-			return { code = 0, stdout = "1.18.2" }
+			return { code = 0, stdout = "1.18.1" }
 		end
 		return { code = 1, stdout = "" }
 	end,
@@ -52,7 +62,7 @@ assert(
 		and not unsupported.supported
 		and not unsupported.capabilities.acp
 		and unsupported.capability_error,
-	"unverified OpenCode versions and unavailable ACP profiles must remain explicit"
+	"OpenCode versions above the verified range and unavailable ACP profiles must remain explicit"
 )
 local authenticated = opencode.auth({
 	run = function(argv)
