@@ -42,13 +42,13 @@ jobs:
       - run: make check
       - run: make benchmark
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmarks-${{ matrix.os }}-nvim-${{ matrix.neovim }}
           path: .gator-test/benchmark-report.json
           if-no-files-found: warn
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: failure-artifacts-${{ matrix.os }}-nvim-${{ matrix.neovim }}
           path: .gator-test
