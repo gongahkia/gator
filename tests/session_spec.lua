@@ -37,6 +37,14 @@ ok = pcall(session.new, {
 	owner = "gator",
 })
 assert(not ok, "session ownership must remain provider-native")
+local history = session.new({
+	task_id = "task-session",
+	provider = "aider",
+	id = "/local/history.md",
+	owner = "gator",
+	mode = "history",
+})
+assert(history.mode == "history", "sessions must retain Gator-owned local history mode")
 ok = pcall(session.new, {
 	task_id = "task-session",
 	provider = "codex",

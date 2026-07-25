@@ -108,9 +108,9 @@ Run `require("gator").setup()` before `:GatorCaptureSelection`.
 
 ### Launch a task
 
-From a Git workspace, open `:Gator`, choose **Create local task**, enter an objective, then choose **Launch selected task**. Gator writes the task to `.gator/tasks/<id>.md`, creates a provider-native session, and opens its interactive terminal with the objective supplied.
+From a Git workspace, open `:Gator`, choose **Create local task**, enter an objective, then choose **Launch selected task**. Gator writes the task to `.gator/tasks/<id>.md` and presents only locally-ready providers.
 
-Use **Attach selected session** to focus an open terminal or resume its provider-native session after reopening Neovim. `.gator/` is ignored by default, so task files remain local to the checkout.
+Claude Code, Codex, OpenCode, and Pi retain their interactive terminals. Managed providers open a Gator conversation panel: use `i` to prompt, `c` to cancel the current run, and `q` to close the panel. One-shot providers become review-ready when their run exits; **Attach selected session** resumes a documented session or reopens its local history. `.gator/` is ignored by default, so task files remain local to the checkout.
 
 The palette provides the same workflow:
 
@@ -122,7 +122,7 @@ The palette provides the same workflow:
 :GatorPalette action:refresh-providers
 ```
 
-Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi can also launch and resume only after its native session probe passes and you explicitly set `providers.pi.user_confirmed = true`; its picker entry is labelled user-confirmed because Pi has no machine-readable credential-status command.
+Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Droid, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. “User-confirmed” means only that you say the CLI is configured; Gator does not verify credentials. ACP providers use Gator approval UI only when they send an ACP permission request; Aider, Amp, Cursor, and Droid retain their provider-default policy. Copilot launch is supported, but its documented ACP profile does not support session reattach.
 
 ### Capture context
 
@@ -159,7 +159,7 @@ The default configuration is:
 
 ```lua
 require("gator").setup({
-  schema_version = 2,
+  schema_version = 3,
   ui = {
     layout = "adaptive",
     keymaps = {},
@@ -172,7 +172,14 @@ require("gator").setup({
     handoff = { author = "user", max_chars = 4096, review = "required" },
   },
   sessions = { transfer = "manual" },
-  providers = { pi = { user_confirmed = false } },
+  providers = {
+    pi = { user_confirmed = false },
+    aider = { user_confirmed = false }, amp = { user_confirmed = false },
+    cline = { user_confirmed = false }, copilot = { user_confirmed = false },
+    cursor = { user_confirmed = false }, droid = { user_confirmed = false },
+    gemini = { user_confirmed = false }, goose = { user_confirmed = false },
+    kimi = { user_confirmed = false }, vibe = { user_confirmed = false },
+  },
   workspaces = { mode = "project", max_write_runs = 1 },
   persistence = { sharing = "local" },
   telemetry = { enabled = false, redaction_patterns = {} },
@@ -190,7 +197,7 @@ local settings, provenance = require("gator.config").load()
 require("gator").setup(settings)
 ```
 
-The optional `provenance` result identifies the source for each resolved field. Unversioned and schema-v1 files migrate to schema v2 in memory; Gator does not rewrite the file.
+The optional `provenance` result identifies the source for each resolved field. Unversioned, schema-v1, and schema-v2 files migrate to schema v3 in memory; Gator does not rewrite the file.
 
 > [!WARNING]
 > Do not put provider credentials, tokens, secrets, passwords, or API keys in Gator configuration.
@@ -214,7 +221,7 @@ Providers
 
 Gator provides adapters for Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Droid, Gemini CLI, Goose, Kimi Code CLI, Mistral Vibe, Copilot CLI, OpenCode, and Pi.
 
-Installed capabilities are probed, not assumed. Run `:GatorHealth` from the project you plan to use; an operation is available only when the installed CLI advertises the required capability. See the [provider support matrix](docs/PROVIDERS.md) for fixture-tested versions, auth probes, verified capabilities, and limitations.
+Installed capabilities are probed, not assumed. Run `:GatorHealth` from the project you plan to use; an operation is available only when the installed CLI advertises the required capability. See the [provider support matrix](docs/PROVIDERS.md) for fixture-tested versions, auth probes, managed transport, and limitations.
 
 Privacy and safety
 ------------------

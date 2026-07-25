@@ -10,6 +10,7 @@ local actions = {
 	reject = true,
 	undo = true,
 	prompt = true,
+	close = true,
 	help = true,
 }
 local settings = { keymaps = {}, screen_reader = true }

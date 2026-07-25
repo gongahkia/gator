@@ -72,14 +72,22 @@ local function sessions(value)
 		if type(session) ~= "table" then
 			fail("session " .. index .. " must be a table")
 		end
-		validate_fields(session, { provider = true, id = true, owner = true }, "session " .. index)
-		if session.owner ~= "provider" then
-			fail("session " .. index .. " must remain provider-owned")
+		validate_fields(session, { provider = true, id = true, owner = true, mode = true }, "session " .. index)
+		if session.owner ~= "provider" and session.owner ~= "gator" then
+			fail("session " .. index .. " owner is unsupported")
+		end
+		local mode = session.mode or "terminal"
+		if mode ~= "terminal" and mode ~= "acp" and mode ~= "stream" and mode ~= "json" and mode ~= "history" then
+			fail("session " .. index .. " mode is unsupported")
+		end
+		if session.owner == "gator" and mode ~= "history" then
+			fail("session " .. index .. " gator ownership requires history mode")
 		end
 		result[index] = {
 			provider = require_string(session.provider, "session " .. index .. " provider"),
 			id = require_string(session.id, "session " .. index .. " id"),
 			owner = session.owner,
+			mode = mode,
 		}
 	end
 	return result

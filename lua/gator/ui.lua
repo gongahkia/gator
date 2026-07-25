@@ -22,6 +22,7 @@ local M = {
 	session_actions = require("gator.ui.session_actions"),
 	task_file_picker = require("gator.ui.task_file_picker"),
 	sidebar = require("gator.ui.sidebar"),
+	conversation = require("gator.ui.conversation"),
 	timeline = require("gator.ui.timeline"),
 	usage_details = require("gator.ui.usage_details"),
 	workspace_dashboard = require("gator.ui.workspace_dashboard"),
@@ -236,8 +237,12 @@ end
 local function open_sessions(panel)
 	M.sidebar.open({
 		sessions = sessions(panel.state),
-		on_input = function(session)
-			M.set_status(panel.state, "ready", "input routed to " .. session.provider .. " session " .. session.id)
+		on_input = function(session, text)
+			if panel.workflow and type(panel.workflow.prompt_session) == "function" then
+				panel.workflow:prompt_session(session, text)
+			else
+				M.set_status(panel.state, "ready", "input routed to " .. session.provider .. " session " .. session.id)
+			end
 		end,
 	})
 end

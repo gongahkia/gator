@@ -38,6 +38,12 @@ ok = pcall(task.new, {
 	sessions = { { provider = "codex", id = "native", owner = "gator" } },
 })
 assert(not ok, "tasks must reject non-provider-owned sessions")
+local history = task.new({
+	id = "task-003-history",
+	objective = "invalid",
+	sessions = { { provider = "aider", id = "/local/history.md", owner = "gator", mode = "history" } },
+})
+assert(history.sessions[1].owner == "gator", "tasks must permit only Gator-owned local history sessions")
 ok = pcall(task.new, {
 	id = "task-004",
 	objective = "invalid",

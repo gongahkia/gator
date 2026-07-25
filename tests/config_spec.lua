@@ -7,7 +7,7 @@ local path = helpers.tempdir("config") .. "/gator.json"
 helpers.write(path, '{"schema_version":2,"ui":{"layout":"modal"},"workspaces":{"mode":"worktree","max_write_runs":2}}')
 local value = config.load(path)
 assert(
-	value.schema_version == 2
+	value.schema_version == 3
 		and value.ui.layout == "modal"
 		and value.workspaces.mode == "worktree"
 		and value.workspaces.max_write_runs == 2,
@@ -34,6 +34,11 @@ assert(
 	config.resolve({ providers = { pi = { user_confirmed = true } } }).providers.pi.user_confirmed,
 	"Pi launch must require an explicit local user confirmation"
 )
+local managed_provider = config.resolve({ providers = { gemini = { user_confirmed = true } } }).providers
+assert(
+	managed_provider.gemini.user_confirmed and not managed_provider.copilot.user_confirmed,
+	"managed providers must require an explicit per-provider local confirmation"
+)
 assert(
 	not pcall(
 			config.resolve,
@@ -47,29 +52,30 @@ assert(
 			config.resolve,
 			{ context = { handoff = { author = "user", max_chars = 1, review = "invalid" } } }
 		)
-		and not pcall(config.resolve, { providers = { pi = { user_confirmed = "yes" } } }),
+		and not pcall(config.resolve, { providers = { pi = { user_confirmed = "yes" } } })
+		and not pcall(config.resolve, { providers = { unknown = { user_confirmed = true } } }),
 	"handoff authoring settings must reject unsupported authors, bounds, and review modes"
 )
 
 helpers.write(path, '{"schema_version":1,"ui":{"layout":"modal"}}')
 local migrated, migrated_provenance, migrations = config.load(path)
 assert(
-	migrated.schema_version == 2
+	migrated.schema_version == 3
 		and migrated.ui.layout == "modal"
 		and migrations[1].from_version == 1
-		and migrations[1].to_version == 2
+		and migrations[1].to_version == 3
 		and migrated_provenance.schema_version.source == "migration",
-	"legacy configuration files must migrate to schema v2 with provenance"
+	"legacy configuration files must migrate to schema v3 with provenance"
 )
 local legacy = '{"context":{"mode":"inspect"}}'
 helpers.write(path, legacy)
 assert(
-	config.load(path).schema_version == 2
+	config.load(path).schema_version == 3
 		and config.load(path).context.mode == "inspect"
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":3}')
+helpers.write(path, '{"schema_version":4}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

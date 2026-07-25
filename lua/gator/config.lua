@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 2
+M.schema_version = 3
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -18,7 +18,19 @@ M.defaults = {
 		handoff = { author = "user", max_chars = 4096, review = "required" },
 	},
 	sessions = { transfer = "manual" },
-	providers = { pi = { user_confirmed = false } },
+	providers = {
+		pi = { user_confirmed = false },
+		aider = { user_confirmed = false },
+		amp = { user_confirmed = false },
+		cline = { user_confirmed = false },
+		copilot = { user_confirmed = false },
+		cursor = { user_confirmed = false },
+		droid = { user_confirmed = false },
+		gemini = { user_confirmed = false },
+		goose = { user_confirmed = false },
+		kimi = { user_confirmed = false },
+		vibe = { user_confirmed = false },
+	},
 	workspaces = { mode = "project", max_write_runs = 1 },
 	persistence = { sharing = "local" },
 	telemetry = { enabled = false, redaction_patterns = {} },
@@ -107,14 +119,30 @@ local function fragment(value)
 	return value
 end
 
+local provider_names = {
+	pi = true,
+	aider = true,
+	amp = true,
+	cline = true,
+	copilot = true,
+	cursor = true,
+	droid = true,
+	gemini = true,
+	goose = true,
+	kimi = true,
+	vibe = true,
+}
+
 local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
 	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, motion = true }, "settings.ui")
 	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
-	fields(value.providers, { pi = true }, "settings.providers")
-	fields(value.providers.pi, { user_confirmed = true }, "settings.providers.pi")
+	fields(value.providers, provider_names, "settings.providers")
+	for name in pairs(provider_names) do
+		fields(value.providers[name], { user_confirmed = true }, "settings.providers." .. name)
+	end
 	fields(value.workspaces, { mode = true, max_write_runs = true }, "settings.workspaces")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
@@ -160,8 +188,10 @@ local function settings(value)
 	if value.sessions.transfer ~= "manual" then
 		fail("sessions.transfer must be manual")
 	end
-	if type(value.providers.pi.user_confirmed) ~= "boolean" then
-		fail("providers.pi.user_confirmed must be boolean")
+	for name in pairs(provider_names) do
+		if type(value.providers[name].user_confirmed) ~= "boolean" then
+			fail("providers." .. name .. ".user_confirmed must be boolean")
+		end
 	end
 	if not vim.tbl_contains({ "project", "worktree" }, value.workspaces.mode) then
 		fail("workspaces.mode must be project or worktree")
@@ -197,7 +227,7 @@ function M.migrate(value)
 	if from_version == M.schema_version then
 		return document, { migrated = false, from_version = from_version, to_version = from_version }
 	end
-	if from_version ~= 1 then
+	if from_version ~= 1 and from_version ~= 2 then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
 	document.schema_version = M.schema_version

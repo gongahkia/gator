@@ -1,4 +1,5 @@
 local capabilities = require("gator.adapters.capabilities")
+local managed_adapter = require("gator.adapters.managed")
 local native_terminal = require("gator.adapters.native_terminal")
 local terminal = require("gator.adapters.terminal")
 local task = require("gator.core.task")
@@ -8,6 +9,9 @@ local session = require("gator.core.session")
 local health = require("gator.health")
 local palette = require("gator.ui.palette")
 local provider_picker = require("gator.ui.provider_picker")
+local conversation = require("gator.ui.conversation")
+local approval_details = require("gator.ui.approval_details")
+local approval_event = require("gator.core.approval_event")
 local state_store = require("gator.state")
 
 local M = { name = "workflow", api_version = 1 }
@@ -61,17 +65,21 @@ local function records(state)
 	return result
 end
 
-local function catalog_contract(record)
-	local ready = { available = true, modes = { "native" } }
-	local unavailable = { available = false, reason = "unavailable for native terminal workflow" }
+local function catalog_contract(record, transport_name)
+	local ready = { available = true, modes = { transport_name } }
+	local unavailable = { available = false, reason = "unavailable for this Gator workflow" }
 	local auth = record.authentication == "user_confirmed" and { available = true, modes = { "user_confirmed" } }
 		or ready
+	local permission = transport_name == "managed"
+			and record.mode == "acp"
+			and { available = true, modes = { "user_decision" } }
+		or unavailable
 	return capabilities.new({
 		provider = record.provider,
 		transport = ready,
 		auth = auth,
 		session = ready,
-		permission = unavailable,
+		permission = permission,
 		model = unavailable,
 		command = unavailable,
 		tool = unavailable,
@@ -85,7 +93,14 @@ function M.new(opts)
 		fail("new requires initialized state")
 	end
 	for key in pairs(opts) do
-		if key ~= "state" and key ~= "root" and key ~= "terminal" and key ~= "bridge" and key ~= "readiness" then
+		if
+			key ~= "state"
+			and key ~= "root"
+			and key ~= "terminal"
+			and key ~= "bridge"
+			and key ~= "readiness"
+			and key ~= "managed"
+		then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -98,15 +113,29 @@ function M.new(opts)
 	if opts.readiness ~= nil and type(opts.readiness) ~= "function" then
 		fail("readiness must be a function")
 	end
+	if
+		opts.managed ~= nil
+		and (
+			type(opts.managed.open) ~= "function"
+			or type(opts.managed.send) ~= "function"
+			or type(opts.managed.cancel) ~= "function"
+			or type(opts.managed.is_active) ~= "function"
+		)
+	then
+		fail("managed must implement open, send, cancel, and is_active")
+	end
 	local value = setmetatable({
 		state = opts.state,
 		root = project_root(opts.root),
 		terminal = opts.terminal or terminal.new(),
 		bridge = opts.bridge or native_terminal.new(),
 		readiness = opts.readiness or health.launch_catalog,
+		managed = opts.managed or managed_adapter.new(),
 		active = {},
 		palette = {},
 		providers = {},
+		provider_modes = {},
+		permission_sequence = 0,
 	}, Workflow)
 	value:load()
 	value:refresh()
@@ -220,7 +249,7 @@ function Workflow:load()
 end
 
 function Workflow:refresh()
-	local available = {}
+	local available, modes = {}, {}
 	for _, value in
 		ipairs(self.readiness({
 			cwd = self.root,
@@ -228,10 +257,22 @@ function Workflow:refresh()
 		}))
 	do
 		if value.available and native_terminal.supports(value.provider) then
-			available[value.provider] = catalog_contract(value)
+			available[value.provider] = catalog_contract(value, "native")
+			modes[value.provider] = "terminal"
+		end
+	end
+	local confirmations = {}
+	for name, provider in pairs(self.state.config.providers) do
+		confirmations[name] = provider.user_confirmed
+	end
+	for _, value in ipairs(managed_adapter.catalog({ cwd = self.root, user_confirmed = confirmations })) do
+		if value.available then
+			available[value.provider] = catalog_contract(value, "managed")
+			modes[value.provider] = value.mode
 		end
 	end
 	self.providers = available
+	self.provider_modes = modes
 	self:register_palette()
 	return vim.deepcopy(available)
 end
@@ -247,6 +288,171 @@ function Workflow:transition(value, target)
 		value = lifecycle.transition(value, "planned")
 	end
 	return lifecycle.transition(value, target)
+end
+
+function Workflow:history_path(value)
+	local directory = self.root .. "/.gator/aider"
+	if vim.fn.mkdir(directory, "p") ~= 1 and vim.fn.isdirectory(directory) ~= 1 then
+		fail("cannot create managed Aider history directory")
+	end
+	return directory .. "/" .. value.id .. ".md"
+end
+
+function Workflow:managed_reference(task_id, provider_name)
+	local value = self:task(task_id)
+	for _, reference in ipairs(value.sessions) do
+		if reference.provider == provider_name and reference.mode == self.provider_modes[provider_name] then
+			return reference
+		end
+	end
+	return nil
+end
+
+function Workflow:mark_running(value)
+	local next_value = self:transition(value, "running")
+	self:write(next_value)
+	self:replace(next_value)
+	self:select(next_value.id)
+	return next_value
+end
+
+function Workflow:managed_callbacks(value, provider_name)
+	local run_id = value.id .. "-managed"
+	return {
+		on_session = function(reference)
+			local current = records(self.state)[value.id]
+			if not current then
+				return
+			end
+			local linked = session.link(
+				current,
+				session.new({
+					task_id = value.id,
+					provider = reference.provider,
+					id = reference.id,
+					owner = reference.owner,
+					mode = reference.mode,
+				})
+			)
+			self:mark_running(linked)
+			pcall(conversation.update, { session_id = reference.id, state = "running" })
+		end,
+		on_event = function(event)
+			local state = event.type == "error" and "failed" or event.type == "complete" and "ready" or "running"
+			pcall(conversation.update, { state = state, text = event.text })
+		end,
+		on_permission = function(request, respond)
+			self.permission_sequence = self.permission_sequence + 1
+			local provider = { name = provider_name }
+			if request.session_id then
+				provider.session_id = request.session_id
+			end
+			local ok, event = pcall(approval_event.request, {
+				id = value.id .. "-approval-" .. self.permission_sequence,
+				run_id = run_id,
+				provider = provider,
+				sequence = self.permission_sequence,
+				at = os.time(),
+				request_id = request.request_id,
+				action = request.action,
+				details = request.details,
+			})
+			if not ok then
+				respond("cancelled")
+				return
+			end
+			local opened = pcall(approval_details.open, {
+				request = event,
+				on_decide = function(decision)
+					return respond(decision.decision)
+				end,
+			})
+			if not opened then
+				respond("cancelled")
+			end
+		end,
+		on_exit = function(result)
+			local current = records(self.state)[value.id]
+			if not current or current.lifecycle ~= "running" then
+				return
+			end
+			local next_value = self:transition(current, result.code == 0 and "awaiting_review" or "failed")
+			self:write(next_value)
+			self:replace(next_value)
+			pcall(conversation.update, { state = result.code == 0 and "ready" or "failed" })
+		end,
+	}
+end
+
+function Workflow:open_managed(value, provider_name, reference, prompt)
+	local mode = self.provider_modes[provider_name]
+	if not mode or not managed_adapter.supports(provider_name) then
+		fail("provider is unavailable for managed launch: " .. provider_name)
+	end
+	local callbacks = self:managed_callbacks(value, provider_name)
+	local history = mode == "history" and self:history_path(value) or nil
+	local started = mode == "acp" or (type(prompt) == "string" and vim.trim(prompt) ~= "")
+	if started then
+		value = self:mark_running(value)
+	end
+	local ok, opened = pcall(self.managed.open, self.managed, {
+		provider = provider_name,
+		cwd = value.workspace.root,
+		task_id = value.id,
+		session = reference,
+		history = history,
+		prompt = prompt,
+		on_session = callbacks.on_session,
+		on_event = callbacks.on_event,
+		on_permission = callbacks.on_permission,
+		on_exit = callbacks.on_exit,
+	})
+	if not ok then
+		local current = records(self.state)[value.id]
+		if current and current.lifecycle == "running" then
+			local failed = self:transition(current, "failed")
+			self:write(failed)
+			self:replace(failed)
+		end
+		fail(opened)
+	end
+	local initial = reference and reference.id or (mode == "history" and history or value.id)
+	conversation.open({
+		provider = provider_name,
+		session_id = initial,
+		state = "starting",
+		on_input = function(text)
+			self:prompt_session({ task_id = value.id, provider = provider_name, id = initial }, text)
+		end,
+		on_cancel = function()
+			local current = self:managed_reference(value.id, provider_name)
+			return current and self.managed:cancel(current) or false
+		end,
+	})
+	return opened
+end
+
+function Workflow:prompt_session(reference, prompt)
+	if type(reference) ~= "table" or type(reference.task_id) ~= "string" then
+		fail("session input must identify its task")
+	end
+	if type(prompt) ~= "string" or vim.trim(prompt) == "" then
+		fail("session input must be non-empty text")
+	end
+	local value = self:task(reference.task_id)
+	local linked = self:managed_reference(value.id, reference.provider)
+	if not linked then
+		fail("linked managed session is unavailable")
+	end
+	if value.lifecycle ~= "running" then
+		value = self:mark_running(value)
+	end
+	if self.managed:is_active(linked) then
+		self.managed:send(linked, prompt)
+		return true
+	end
+	self:open_managed(value, linked.provider, linked, prompt)
+	return true
 end
 
 function Workflow:open_terminal(value, prepared, resumed)
@@ -288,7 +494,14 @@ function Workflow:launch(provider_name)
 	local value = self:task()
 	provider_name = identifier(provider_name, "provider")
 	if not self.providers[provider_name] then
-		fail("provider is unavailable for native launch: " .. provider_name)
+		fail("provider is unavailable for launch: " .. provider_name)
+	end
+	if self.provider_modes[provider_name] ~= "terminal" then
+		local ok, failure = pcall(self.open_managed, self, value, provider_name, nil, value.objective)
+		if not ok then
+			vim.notify(tostring(failure), vim.log.levels.ERROR, { title = "Gator" })
+		end
+		return
 	end
 	self.bridge:start(
 		{ provider = provider_name, cwd = value.workspace.root, prompt = value.objective },
@@ -310,6 +523,16 @@ function Workflow:attach()
 	local reference = value.sessions[1]
 	if not reference then
 		fail("selected task has no linked provider session")
+	end
+	if reference.mode ~= "terminal" then
+		if not managed_adapter.can_resume(reference.provider) then
+			fail("provider does not document managed-session resume: " .. reference.provider)
+		end
+		local ok, failure = pcall(self.open_managed, self, value, reference.provider, reference, nil)
+		if not ok then
+			vim.notify(tostring(failure), vim.log.levels.ERROR, { title = "Gator" })
+		end
+		return true
 	end
 	local terminal_id = value.id .. "-" .. reference.provider
 	local ok = pcall(self.terminal.attach, self.terminal, terminal_id)

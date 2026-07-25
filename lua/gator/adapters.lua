@@ -83,6 +83,7 @@ local M = {
 	auth = require("gator.adapters.auth"),
 	fixtures = require("gator.adapters.fixtures"),
 	model_usage = require("gator.adapters.model_usage"),
+	managed = require("gator.adapters.managed"),
 	process = require("gator.adapters.process"),
 	supervisor = require("gator.adapters.process"),
 	rpc = require("gator.adapters.rpc"),

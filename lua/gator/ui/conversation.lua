@@ -1,0 +1,125 @@
+local accessibility = require("gator.ui.accessibility")
+local panel_window = require("gator.ui.window")
+local redact = require("gator.policy.redact")
+
+local M = {}
+local panels = {}
+
+local function fail(message)
+	error("Gator conversation: " .. redact.text(tostring(message)), 3)
+end
+
+local function current()
+	local tabpage = vim.api.nvim_get_current_tabpage()
+	local panel = panels[tabpage]
+	if panel and vim.api.nvim_win_is_valid(panel.window) then
+		return panel, tabpage
+	end
+	panels[tabpage] = nil
+	return nil, tabpage
+end
+
+local function render(panel)
+	local lines = { "Gator agent · " .. panel.provider .. " · " .. panel.session_id .. " · " .. panel.state, "" }
+	if #panel.lines == 0 then
+		table.insert(lines, "Waiting for provider output")
+	else
+		vim.list_extend(lines, panel.lines)
+	end
+	table.insert(lines, "")
+	table.insert(lines, "i prompt · c cancel · q close · ? help")
+	accessibility.render(panel.buffer, lines, "gator-conversation")
+end
+
+local function input(panel)
+	vim.ui.input({ prompt = "Gator prompt: " }, function(value)
+		if type(value) == "string" and vim.trim(value) ~= "" then
+			table.insert(panel.lines, "> " .. redact.text(value))
+			render(panel)
+			panel.on_input(value)
+		end
+	end)
+end
+
+local function bind(panel)
+	accessibility.panel(panel.buffer, { prompt = "i", cancel = "c", close = "q", help = "?" }, {
+		prompt = function()
+			input(panel)
+		end,
+		cancel = function()
+			panel.on_cancel()
+		end,
+		close = M.close,
+		help = function()
+			vim.notify("Gator agent: i prompt, c cancel, q close", vim.log.levels.INFO)
+		end,
+	})
+end
+
+function M.open(opts)
+	if type(opts) ~= "table" or type(opts.on_input) ~= "function" or type(opts.on_cancel) ~= "function" then
+		fail("open requires input and cancel callbacks")
+	end
+	for _, name in ipairs({ "provider", "session_id", "state" }) do
+		if type(opts[name]) ~= "string" or opts[name] == "" then
+			fail(name .. " must be non-empty text")
+		end
+	end
+	local panel, tabpage = current()
+	if panel then
+		panel.provider, panel.session_id, panel.state = opts.provider, opts.session_id, opts.state
+		panel.on_input, panel.on_cancel = opts.on_input, opts.on_cancel
+		render(panel)
+		vim.api.nvim_set_current_win(panel.window)
+		return panel.window
+	end
+	local opened = panel_window.open("botright 18new")
+	local buffer = vim.api.nvim_create_buf(false, true)
+	vim.bo[buffer].filetype, vim.bo[buffer].bufhidden = "gator-conversation", "wipe"
+	vim.api.nvim_win_set_buf(opened.window, buffer)
+	panel = {
+		window = opened.window,
+		buffer = buffer,
+		provider = opts.provider,
+		session_id = opts.session_id,
+		state = opts.state,
+		lines = {},
+		on_input = opts.on_input,
+		on_cancel = opts.on_cancel,
+		previous = opened.previous,
+	}
+	panels[tabpage] = panel
+	render(panel)
+	bind(panel)
+	return panel.window
+end
+
+function M.update(opts)
+	local panel = current()
+	if not panel or type(opts) ~= "table" then
+		fail("update requires an open panel and options")
+	end
+	if opts.session_id ~= nil then
+		panel.session_id = redact.text(opts.session_id)
+	end
+	if opts.state ~= nil then
+		panel.state = redact.text(opts.state)
+	end
+	if opts.text ~= nil and opts.text ~= "" then
+		table.insert(panel.lines, redact.text(opts.text))
+	end
+	render(panel)
+	return true
+end
+
+function M.close()
+	local panel, tabpage = current()
+	if not panel then
+		return false
+	end
+	panel_window.close(panel.window, panel.previous)
+	panels[tabpage] = nil
+	return true
+end
+
+return M

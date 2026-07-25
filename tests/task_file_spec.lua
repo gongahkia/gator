@@ -2,7 +2,7 @@ local format = require("gator").module("core").task_file
 
 local specification = format.specification()
 assert(
-	specification.schema_version == 1
+	specification.schema_version == 2
 		and specification.marker == "gator-task"
 		and vim.deep_equal(specification.metadata.required, { "id", "lifecycle", "created-at", "updated-at" }),
 	"task-file format must publish the versioned marker and canonical metadata fields"
@@ -16,13 +16,13 @@ assert(
 local template = format.template()
 local layout = format.validate_layout(template)
 assert(
-	layout.schema_version == 1
+	layout.schema_version == 2
 		and layout.sections.objective.first_line < layout.sections.metadata.first_line
 		and layout.sections.sessions.first_line < layout.sections.evidence.first_line,
 	"task-file templates must provide ordered versioned sections"
 )
 
-local unsupported = template:gsub("gator%-task: 1", "gator-task: 2", 1)
+local unsupported = template:gsub("gator%-task: 2", "gator-task: 3", 1)
 assert(not pcall(format.validate_layout, unsupported), "task-file formats must reject unavailable schema versions")
 local missing = template:gsub("## Sessions\n\n", "", 1)
 assert(not pcall(format.validate_layout, missing), "task-file formats must reject missing canonical sections")
@@ -65,6 +65,13 @@ assert(
 )
 local invalid = definition:gsub("  owner: provider", "  owner: gator", 1)
 assert(not pcall(format.parse, invalid), "task-file parsers must reject non-provider-owned sessions")
+local history_definition = definition:gsub("provider: codex", "provider: aider", 1)
+history_definition = history_definition:gsub("id: native%-markdown", "id: /local/history.md", 1)
+history_definition = history_definition:gsub("owner: provider", "owner: gator\n  mode: history", 1)
+assert(
+	format.parse(history_definition).sessions[1].mode == "history",
+	"task files must retain Gator-owned Aider history links"
+)
 
 local filesystem = require("gator").module("core").filesystem
 local files = {}
@@ -96,6 +103,7 @@ local projected = format.write("/fixture/task-markdown.md", parsed, {
 local round_trip = format.parse(projected.content)
 assert(
 	files[projected.path] == projected.content
+		and projected.content:find("gator%-task: 2", 1, false)
 		and round_trip.id == parsed.id
 		and round_trip.sessions[1].id == "native-markdown"
 		and round_trip.evidence[1].ref:find("private%-value") == nil,

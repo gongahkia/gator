@@ -23,15 +23,17 @@ function M.open(opts)
 		if not capabilities.is(provider) then
 			fail("providers must contain capability contracts")
 		end
-		local transport = capabilities.supports(provider, "transport", "native")
+		local native_transport = capabilities.supports(provider, "transport", "native")
+		local managed_transport = capabilities.supports(provider, "transport", "managed")
 		local native_auth = capabilities.supports(provider, "auth", "native")
 		local user_confirmed = capabilities.supports(provider, "auth", "user_confirmed")
-		if transport and (native_auth or user_confirmed) then
+		if (native_transport or managed_transport) and (native_auth or user_confirmed) then
 			available[provider.provider] = provider
 			items[#items + 1] = {
 				id = provider.provider,
 				label = provider.provider
-					.. (user_confirmed and " · user-confirmed; ready to launch" or " · ready to launch"),
+					.. (user_confirmed and " · user-confirmed; ready" or " · ready")
+					.. (managed_transport and " in Gator" or " to launch"),
 			}
 		end
 	end

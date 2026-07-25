@@ -7,7 +7,7 @@ Watcher.__index = Watcher
 
 local M = {
 	api_version = 1,
-	schema_version = 1,
+	schema_version = 2,
 	marker = "gator-task",
 	scalar_encoding = "plain-or-json-string",
 	title = "# Gator Task",
@@ -21,7 +21,7 @@ local M = {
 		required = { "id", "lifecycle", "created-at", "updated-at" },
 		optional = { "workspace-kind", "workspace-root" },
 	},
-	session_fields = { "provider", "id", "owner" },
+	session_fields = { "provider", "id", "owner", "mode" },
 	evidence_fields = { "kind", "ref" },
 }
 
@@ -39,7 +39,7 @@ local function markdown_path(value)
 end
 
 local function version(value)
-	if type(value) ~= "number" or value % 1 ~= 0 or value ~= M.schema_version then
+	if type(value) ~= "number" or value % 1 ~= 0 or (value ~= 1 and value ~= M.schema_version) then
 		fail("task-file schema version is unsupported: " .. tostring(value))
 	end
 	return value
@@ -73,10 +73,10 @@ function M.template(value)
 	if value == nil then
 		value = M.schema_version
 	end
-	version(value)
+	value = version(value)
 	return table.concat({
 		"---",
-		M.marker .. ": " .. M.schema_version,
+		M.marker .. ": " .. value,
 		"---",
 		"",
 		M.title,
@@ -102,7 +102,7 @@ function M.validate_layout(value)
 	if document[2]:sub(1, #prefix) ~= prefix or not encoded:match("^%d+$") then
 		fail("task-file frontmatter must declare " .. M.marker)
 	end
-	version(tonumber(encoded))
+	local schema_version = version(tonumber(encoded))
 	if document[4] ~= "" or document[5] ~= M.title then
 		fail("task-file must declare the canonical title after frontmatter")
 	end
@@ -137,7 +137,7 @@ function M.validate_layout(value)
 		local next_name = section_order[index + 1]
 		sections[name].last_line = next_name and sections[next_name].first_line - 2 or #document
 	end
-	return { schema_version = M.schema_version, sections = sections }
+	return { schema_version = schema_version, sections = sections }
 end
 
 local function section_lines(document, section)
@@ -210,6 +210,7 @@ local function sessions(value)
 			local provider = value[index]:match("^%- provider: (.+)$")
 			local id = value[index + 1] and value[index + 1]:match("^  id: (.+)$")
 			local owner = value[index + 2] and value[index + 2]:match("^  owner: (.+)$")
+			local mode = value[index + 3] and value[index + 3]:match("^  mode: (.+)$")
 			if not provider or not id or not owner then
 				fail("task-file session records must declare provider, id, and owner")
 			end
@@ -217,8 +218,9 @@ local function sessions(value)
 				provider = decode_scalar(provider, "session provider"),
 				id = decode_scalar(id, "session id"),
 				owner = decode_scalar(owner, "session owner"),
+				mode = mode and decode_scalar(mode, "session mode") or "terminal",
 			})
-			index = index + 3
+			index = index + (mode and 4 or 3)
 		end
 	end
 	return result
@@ -310,6 +312,7 @@ function M.render(value)
 		table.insert(document, "- provider: " .. encode_scalar(session.provider))
 		table.insert(document, "  id: " .. encode_scalar(session.id))
 		table.insert(document, "  owner: " .. encode_scalar(session.owner))
+		table.insert(document, "  mode: " .. encode_scalar(session.mode))
 	end
 	table.insert(document, "")
 	table.insert(document, M.headings.evidence)
