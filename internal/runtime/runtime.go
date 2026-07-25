@@ -54,6 +54,7 @@ type AgentInvocation struct {
 	Prompt         string           `json:"prompt"`
 	IdempotencyKey string           `json:"idempotency_key"`
 	Attachments    []map[string]any `json:"attachments,omitempty"`
+	Memory         string           `json:"memory,omitempty"`
 	Provider       AgentProvider    `json:"provider"`
 }
 

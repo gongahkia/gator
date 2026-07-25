@@ -38,10 +38,11 @@ type Service struct {
 	http      *http.Client
 	mu        sync.Mutex
 	gateways  map[string]context.CancelFunc
+	ctx       context.Context
 }
 
 func New(st *store.Store, invoke Invoker, artifactsDir string) *Service {
-	return &Service{store: st, invoke: invoke, artifacts: filepath.Join(artifactsDir, "channels"), http: &http.Client{Timeout: 30 * time.Second}, gateways: map[string]context.CancelFunc{}}
+	return &Service{store: st, invoke: invoke, artifacts: filepath.Join(artifactsDir, "channels"), http: &http.Client{Timeout: 30 * time.Second}, gateways: map[string]context.CancelFunc{}, ctx: context.Background()}
 }
 
 func (s *Service) CreateAccount(ctx context.Context, value domain.ChannelAccount) (domain.ChannelAccount, error) {
@@ -72,7 +73,11 @@ func (s *Service) CreateAccount(ctx context.Context, value domain.ChannelAccount
 			return domain.ChannelAccount{}, fmt.Errorf("invalid secret reference for %q", name)
 		}
 	}
-	return s.store.CreateChannelAccount(ctx, value)
+	created, err := s.store.CreateChannelAccount(ctx, value)
+	if err == nil && created.Adapter == "discord" {
+		s.startDiscordGateways(s.ctx)
+	}
+	return created, err
 }
 
 func (s *Service) Pair(ctx context.Context, accountID, externalID string, expiresAt *time.Time) (domain.ChannelPairing, error) {
@@ -334,6 +339,11 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 		_, _, _ = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ExternalID, Direction: "inbound", PlatformID: value.PlatformID, IdempotencyKey: "in:" + value.PlatformID, Text: value.Text, Attachments: value.Attachments, State: "rejected", Error: "identity is not paired"})
 		return nil
 	}
+	attachments, err := s.materializeAttachments(ctx, account, value.PlatformID, value.Attachments)
+	if err != nil {
+		return err
+	}
+	value.Attachments = attachments
 	message, created, err := s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ExternalID, Direction: "inbound", PlatformID: value.PlatformID, IdempotencyKey: "in:" + value.PlatformID, Text: value.Text, Attachments: value.Attachments, State: "received"})
 	if err != nil || !created {
 		return err
@@ -342,7 +352,12 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 	if err != nil {
 		return err
 	}
-	response, err := s.invoke.InvokeAgent(ctx, account.RunID, runtime.AgentInvocation{SessionID: session.ID, ExternalID: value.ExternalID, Role: "operator", Prompt: value.Text, IdempotencyKey: "agent:" + account.ID + ":" + value.PlatformID, Attachments: value.Attachments})
+	prompt := trimSummary(session.Summary + "\nUser: " + value.Text)
+	if len(value.Attachments) > 0 {
+		encoded, _ := json.Marshal(value.Attachments)
+		prompt += "\nAttached managed artifacts: " + string(encoded)
+	}
+	response, err := s.invoke.InvokeAgent(ctx, account.RunID, runtime.AgentInvocation{SessionID: session.ID, ExternalID: value.ExternalID, Role: "operator", Prompt: prompt, IdempotencyKey: "agent:" + account.ID + ":" + value.PlatformID, Attachments: value.Attachments})
 	if err != nil {
 		_, _, _ = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ExternalID, Direction: "outbound", IdempotencyKey: "out:" + value.PlatformID, Text: "Agent invocation failed.", Attachments: routeAttachment(value), State: "pending", Error: err.Error()})
 		return err
@@ -355,7 +370,145 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 	return nil
 }
 
+func (s *Service) materializeAttachments(ctx context.Context, account domain.ChannelAccount, messageID string, attachments []map[string]any) ([]map[string]any, error) {
+	result := make([]map[string]any, 0, len(attachments))
+	for index, attachment := range attachments {
+		value := make(map[string]any, len(attachment)+2)
+		for key, item := range attachment {
+			value[key] = item
+		}
+		url, headers, err := s.attachmentURL(ctx, account, attachment)
+		if err != nil {
+			return nil, err
+		}
+		if url == "" {
+			result = append(result, value)
+			continue
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		for key, item := range headers {
+			request.Header.Set(key, item)
+		}
+		response, err := s.http.Do(request)
+		if err != nil {
+			return nil, err
+		}
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			response.Body.Close()
+			return nil, fmt.Errorf("attachment download status %d", response.StatusCode)
+		}
+		name := safeFileName(stringValue(attachment, "name"))
+		if name == "" {
+			name = safeFileName(stringValue(attachment, "filename"))
+		}
+		if name == "" {
+			name = fmt.Sprintf("attachment-%d", index+1)
+		}
+		directory := filepath.Join(s.artifacts, account.ID, safeFileName(messageID))
+		if err := os.MkdirAll(directory, 0o750); err != nil {
+			response.Body.Close()
+			return nil, err
+		}
+		path := filepath.Join(directory, name)
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+		if err != nil {
+			response.Body.Close()
+			return nil, err
+		}
+		written, copyErr := io.Copy(file, io.LimitReader(response.Body, 10<<20+1))
+		closeErr := file.Close()
+		response.Body.Close()
+		if copyErr != nil {
+			return nil, copyErr
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+		if written > 10<<20 {
+			_ = os.Remove(path)
+			return nil, fmt.Errorf("attachment exceeds 10 MiB")
+		}
+		value["managed_path"] = path
+		value["bytes"] = written
+		result = append(result, value)
+	}
+	return result, nil
+}
+
+func (s *Service) attachmentURL(ctx context.Context, account domain.ChannelAccount, attachment map[string]any) (string, map[string]string, error) {
+	if url := stringValue(attachment, "url"); url != "" {
+		if !strings.HasPrefix(url, "https://") {
+			return "", nil, fmt.Errorf("attachment URL must use https")
+		}
+		headers := map[string]string{}
+		if account.Adapter == "slack" {
+			if token := s.secret(account, "bot_token"); token != "" {
+				headers["Authorization"] = "Bearer " + token
+			}
+		}
+		return url, headers, nil
+	}
+	switch account.Adapter {
+	case "telegram":
+		fileID := stringValue(attachment, "platform_file_id")
+		token := s.secret(account, "bot_token")
+		if fileID == "" || token == "" {
+			return "", nil, nil
+		}
+		var response struct {
+			OK     bool `json:"ok"`
+			Result struct {
+				Path string `json:"file_path"`
+			} `json:"result"`
+		}
+		if err := s.getJSON(ctx, "https://api.telegram.org/bot"+token+"/getFile?file_id="+fileID, nil, &response); err != nil {
+			return "", nil, err
+		}
+		if !response.OK || response.Result.Path == "" {
+			return "", nil, fmt.Errorf("telegram attachment lookup failed")
+		}
+		return "https://api.telegram.org/file/bot" + token + "/" + response.Result.Path, nil, nil
+	case "whatsapp":
+		mediaID := stringValue(attachment, "id")
+		token := s.secret(account, "access_token")
+		if mediaID == "" || token == "" {
+			return "", nil, nil
+		}
+		var response struct {
+			URL string `json:"url"`
+		}
+		if err := s.getJSON(ctx, "https://graph.facebook.com/v22.0/"+mediaID, map[string]string{"Authorization": "Bearer " + token}, &response); err != nil {
+			return "", nil, err
+		}
+		return response.URL, map[string]string{"Authorization": "Bearer " + token}, nil
+	}
+	return "", nil, nil
+}
+
+func (s *Service) getJSON(ctx context.Context, url string, headers map[string]string, out any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+	response, err := s.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("attachment API status %d", response.StatusCode)
+	}
+	return json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(out)
+}
+
 func (s *Service) Start(ctx context.Context) {
+	s.ctx = ctx
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -560,6 +713,26 @@ func validEnvRef(value string) bool {
 func stringSetting(values map[string]any, key string) (string, bool) {
 	value, ok := values[key].(string)
 	return strings.TrimSpace(value), ok && strings.TrimSpace(value) != ""
+}
+func stringValue(values map[string]any, key string) string {
+	value, _ := values[key].(string)
+	return strings.TrimSpace(value)
+}
+func safeFileName(value string) string {
+	value = filepath.Base(strings.TrimSpace(value))
+	if value == "." || value == "/" || value == "" {
+		return ""
+	}
+	value = strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == 0 {
+			return -1
+		}
+		return r
+	}, value)
+	if len(value) > 128 {
+		value = value[:128]
+	}
+	return value
 }
 
 func (s *Service) startDiscordGateways(ctx context.Context) {
