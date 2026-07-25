@@ -47,6 +47,7 @@
     "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": []}
   },
   "plugins": [],
+  "workflow": {"max_fixes": 2},
   "runtime": {
     "default_target": "docker",
     "kubernetes": {

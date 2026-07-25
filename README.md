@@ -1,6 +1,6 @@
 # Norbot
 
-Norbot is a local-first, provider-agnostic agentic app builder. A Bubble Tea TUI drives explicit Planner → Builder → Verifier → Deployer approvals; Go API and workers own durable state, generated artifacts, Docker or Kubernetes workspaces, deployments, and OpenTelemetry visibility.
+Norbot is a local-first, provider-agnostic agentic app builder. A Bubble Tea TUI drives explicit Planner → Code → Test → bounded Fix → Deployer approvals; Go API and workers own durable state, generated artifacts, Docker or Kubernetes workspaces, deployments, and OpenTelemetry visibility.
 
 ## Install
 
@@ -12,6 +12,22 @@ docker compose exec norbot norbot tui --api http://127.0.0.1:8080
 ```
 
 `norbot init` creates a config interactively. It records a Docker or Kubernetes default; every run can override that default and permanently pins its selected backend.
+
+## Reviews, skills, and health
+
+Builder responses are stored as immutable, digest-checked code/fix proposals. Code approval applies a proposal, deterministic test output becomes a second approval gate, and failed tests require an explicit `fix` action; `workflow.max_fixes` defaults to `2`. `GET /api/runs/{id}/revisions`, `/usage`, and `/skills` expose patch/report, reported-or-estimated token usage, and selected-skill provenance.
+
+Marketplace imports accept HTTPS Git and OCI bundles containing `SKILL.md` and `skill.json`. Imports are copied into Norbot-managed storage by SHA-256 digest, reject executable/unsafe archives, remain `scanned` until an operator activates them, and can be selected with `skill_digests` when creating a run. Private source credentials are environment-variable references only.
+
+`norbot health` prints detailed health and returns nonzero only for a critical down dependency; `norbot health --json`, `GET /api/health/detail`, `GET /api/health/stream`, and `h` in the TUI provide the same redacted diagnostics.
+
+## Channels
+
+Norbot is the central HTTPS gateway for Telegram, Slack HTTP Events, Discord signed interactions plus Gateway messages, and official WhatsApp Cloud API. Channel accounts bind to one deployed agentic app, persist only environment-variable secret references, and require explicit pairing before an identity can invoke the app. Sessions retain summaries for 30 days and can be exported or reset through the API.
+
+Create an account through `POST /api/channels/accounts`, then pair an external platform identity through `POST /api/channels/accounts/{id}/pairings`. Configure each provider webhook to `https://<public-host>/api/channels/<account-id>/webhook`; Telegram needs `webhook_secret` and `bot_token`, Slack `signing_secret` and `bot_token`, Discord `public_key` plus `bot_token`, and WhatsApp `verify_token`, `app_secret`, and `access_token`. The account `settings` needs `public_key` for Discord and `phone_number_id` for WhatsApp.
+
+For Docker, set `NORBOT_PUBLIC_HTTPS_DOMAIN` and run `docker compose --profile public up --build`; the included Caddy reverse proxy obtains TLS for a publicly resolvable DNS name. Kubernetes-generated apps retain their existing ingress path; the Norbot gateway itself must be deployed behind a public TLS reverse proxy reachable by the platform webhooks.
 
 ## Kubernetes
 
@@ -38,7 +54,7 @@ norbot tui --api http://127.0.0.1:8080
 - Every stage pauses for explicit approval. Failures and expired worker leases pause for retry, revision, or abandonment; Norbot never auto-replays a recovered job.
 - Per-stage providers and deployment target are chosen at run creation and recorded with each event; later config changes do not alter an existing run.
 - Provider credentials are environment references only; Norbot never stores raw secrets.
-- Agentic generated apps contain an app-local SQLite typed-tool executor, audit log, and parameter-bound approval API. OpenClaw is not used.
+- Agentic generated apps contain a durable session/idempotency store, typed-tool executor, audit log, and parameter-bound approval API. OpenClaw is not used.
 - Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, Docker Compose or Kubernetes rollout, or smoke failure.
 
 Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
@@ -48,8 +64,10 @@ Configure provider API keys in `.env`; add CLI providers with isolated runner im
 - `POST /api/runs` creates and queues a planner run. It accepts optional `deployment_target: "docker"|"kubernetes"` and `public_ingress` fields.
 - `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events` inspect state and stream replayable events.
 - `PUT /api/runs/{id}/graph` edits a planner graph only while it awaits planner approval.
-- `POST /api/runs/{id}/approval` approves, revises, retries, or abandons a run.
-- `GET /api/health`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
+- `POST /api/runs/{id}/approval` approves, revises, explicitly starts a fix, retries, or abandons a run.
+- `GET /api/health`, `/api/health/detail`, `/api/health/stream`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
+- `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the verified declarative skill catalog.
+- `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.
 - `GET /api/runtime` returns the default target and Kubernetes/ingress availability for onboarding and TUI target selection.
 - `GET /api/runs/{id}/deployment`, `/logs`; `POST .../start`, `POST .../stop`; and `DELETE .../deployment` control deployed apps.
 

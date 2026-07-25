@@ -56,7 +56,7 @@ services:
     image: caddy:2.10-alpine
     profiles: ["public"]
     environment:
-      NORBOT_PUBLIC_HTTPS_DOMAIN: ${NORBOT_PUBLIC_HTTPS_DOMAIN:?set a public DNS name for channel webhooks}
+      NORBOT_PUBLIC_HTTPS_DOMAIN: ${NORBOT_PUBLIC_HTTPS_DOMAIN:-}
     volumes:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
