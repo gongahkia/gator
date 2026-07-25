@@ -6,6 +6,7 @@
       "model": "gpt-5",
       "base_url": "https://api.openai.com/v1",
       "credential_env": "OPENAI_API_KEY",
+      "budget": {"max_concurrent": 2, "requests_per_minute": 60},
       "stages": ["planner", "builder", "verifier"]
     },
     {
@@ -14,6 +15,7 @@
       "model": "claude-sonnet-4-6",
       "base_url": "https://api.anthropic.com",
       "credential_env": "ANTHROPIC_API_KEY",
+      "budget": {"max_concurrent": 2, "requests_per_minute": 50},
       "stages": ["planner", "builder", "verifier"]
     },
     {
@@ -22,6 +24,7 @@
       "model": "gemini-3.6-flash",
       "base_url": "https://generativelanguage.googleapis.com/v1beta",
       "credential_env": "GEMINI_API_KEY",
+      "budget": {"max_concurrent": 2, "requests_per_minute": 60},
       "stages": ["planner", "builder", "verifier"]
     },
     {
@@ -30,15 +33,18 @@
       "image": "ghcr.io/openai/codex:latest",
       "network": "bridge",
       "credential_env": "OPENAI_API_KEY",
+      "budget": {"max_concurrent": 1, "requests_per_minute": 20},
       "command": ["codex", "exec", "--json"],
       "stages": ["planner", "builder", "verifier"]
     }
   ],
   "profiles": ["frontend-only", "full-stack", "agentic"],
   "tool_policy": {
-    "http": {"enabled": true, "approval_required": true},
-    "database": {"enabled": true, "approval_required": true},
-    "artifact": {"enabled": true, "approval_required": false},
-    "shell": {"enabled": false, "approval_required": true}
-  }
+    "artifact_read": {"enabled": true, "approval_required": false, "roles": ["researcher", "builder"]},
+    "http_get": {"enabled": true, "approval_required": false, "roles": ["researcher"], "allowed_hosts": ["api.example.com"]},
+    "http_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
+    "database_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
+    "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": []}
+  },
+  "plugins": []
 }

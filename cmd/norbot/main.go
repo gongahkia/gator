@@ -15,6 +15,7 @@ import (
 	"github.com/gongahkia/norbot/internal/api"
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/engine"
+	"github.com/gongahkia/norbot/internal/extension"
 	"github.com/gongahkia/norbot/internal/store"
 	"github.com/gongahkia/norbot/internal/tui"
 )
@@ -49,6 +50,10 @@ func serveCommand(args []string) {
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("load config", "error", err)
+		os.Exit(1)
+	}
+	if _, err := extension.LoadProcessPlugins(cfg.Manifest.Plugins); err != nil {
+		logger.Error("load process plugins", "error", err)
 		os.Exit(1)
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
