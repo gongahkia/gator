@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
 )
@@ -72,6 +73,11 @@ type graphMsg struct {
 	run domain.Run
 	err error
 }
+type providersMsg struct {
+	providers []config.Provider
+	err       error
+}
+type tickMsg time.Time
 
 type mode string
 
@@ -91,6 +97,9 @@ type Model struct {
 	mode          mode
 	input         textinput.Model
 	profile       domain.Profile
+	providers     []config.Provider
+	selections    map[domain.Stage]string
+	providerStage int
 	message       string
 	err           error
 	width, height int
@@ -100,12 +109,12 @@ func Run(apiBase string) error {
 	input := textinput.New()
 	input.Placeholder = "Describe the app"
 	input.CharLimit = 4000
-	model := Model{client: client{base: apiBase, http: &http.Client{Timeout: 10 * time.Second}}, input: input, profile: domain.ProfileFullStack}
+	model := Model{client: client{base: apiBase, http: &http.Client{Timeout: 10 * time.Second}}, input: input, profile: domain.ProfileFullStack, selections: map[domain.Stage]string{}}
 	_, err := tea.NewProgram(model, tea.WithAltScreen()).Run()
 	return err
 }
 
-func (m Model) Init() tea.Cmd { return m.refresh() }
+func (m Model) Init() tea.Cmd { return tea.Batch(m.refresh(), m.fetchProviders(), tick()) }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch typed := msg.(type) {
@@ -136,6 +145,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = normal
 		}
 		return m, nil
+	case providersMsg:
+		m.err = typed.err
+		if typed.err == nil {
+			m.providers = typed.providers
+			m.ensureSelections()
+		}
+		return m, nil
+	case tickMsg:
+		return m, tea.Batch(m.refresh(), tick())
 	case tea.KeyMsg:
 		return m.key(typed)
 	}
@@ -153,13 +171,13 @@ func (m Model) key(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	if m.mode == createMode {
-		return m.createKey(value)
+		return m.createKey(key)
 	}
 	if m.mode == reviseMode {
-		return m.reviseKey(value)
+		return m.reviseKey(key)
 	}
 	if m.mode == labelMode {
-		return m.labelKey(value)
+		return m.labelKey(key)
 	}
 	if m.mode == graphMode {
 		return m.graphKey(value)
@@ -212,7 +230,8 @@ func (m Model) key(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) createKey(value string) (tea.Model, tea.Cmd) {
+func (m Model) createKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	value := key.String()
 	switch value {
 	case "esc":
 		m.mode = normal
@@ -220,6 +239,15 @@ func (m Model) createKey(value string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "p":
 		m.profile = nextProfile(m.profile)
+		return m, nil
+	case "tab":
+		m.providerStage = (m.providerStage + 1) % len(stageChoices)
+		return m, nil
+	case "left", "h":
+		m.cycleProvider(-1)
+		return m, nil
+	case "right", "l":
+		m.cycleProvider(1)
 		return m, nil
 	case "enter":
 		prompt := strings.TrimSpace(m.input.Value())
@@ -231,9 +259,12 @@ func (m Model) createKey(value string) (tea.Model, tea.Cmd) {
 		m.input.Blur()
 		return m, m.create(prompt)
 	}
-	return m, nil
+	var command tea.Cmd
+	m.input, command = m.input.Update(key)
+	return m, command
 }
-func (m Model) reviseKey(value string) (tea.Model, tea.Cmd) {
+func (m Model) reviseKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	value := key.String()
 	switch value {
 	case "esc":
 		m.mode = normal
@@ -251,9 +282,12 @@ func (m Model) reviseKey(value string) (tea.Model, tea.Cmd) {
 			return m, m.action(run.ID, domain.ApprovalRevise, feedback)
 		}
 	}
-	return m, nil
+	var command tea.Cmd
+	m.input, command = m.input.Update(key)
+	return m, command
 }
-func (m Model) labelKey(value string) (tea.Model, tea.Cmd) {
+func (m Model) labelKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	value := key.String()
 	switch value {
 	case "esc":
 		m.mode = graphMode
@@ -267,7 +301,9 @@ func (m Model) labelKey(value string) (tea.Model, tea.Cmd) {
 			m.input.Blur()
 		}
 	}
-	return m, nil
+	var command tea.Cmd
+	m.input, command = m.input.Update(key)
+	return m, command
 }
 func (m Model) graphKey(value string) (tea.Model, tea.Cmd) {
 	run, ok := m.run()
@@ -328,7 +364,9 @@ func (m Model) View() string {
 		body.WriteString(mutedStyle.Render(m.message) + "\n")
 	}
 	if m.mode == createMode {
+		stage := stageChoices[m.providerStage]
 		body.WriteString(titleStyle.Render("New "+string(m.profile)+" run") + "\n" + m.input.View() + "\n")
+		body.WriteString(mutedStyle.Render("p profile · tab stage · ←/→ provider · selected "+string(stage)+": "+m.selections[stage]) + "\n")
 		return body.String()
 	}
 	if m.mode == reviseMode {
@@ -413,9 +451,69 @@ func (m Model) refresh() tea.Cmd {
 func (m Model) create(prompt string) tea.Cmd {
 	return func() tea.Msg {
 		var run domain.Run
-		err := m.client.do(http.MethodPost, "/api/runs", engine.CreateRunInput{Prompt: prompt, Profile: m.profile}, &run)
+		providers := make(map[domain.Stage]string, len(m.selections))
+		for stage, providerID := range m.selections {
+			providers[stage] = providerID
+		}
+		err := m.client.do(http.MethodPost, "/api/runs", engine.CreateRunInput{Prompt: prompt, Profile: m.profile, Providers: providers}, &run)
 		return actionMsg{run, err}
 	}
+}
+
+var stageChoices = []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}
+
+func tick() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg { return tickMsg(time.Now()) })
+}
+
+func (m Model) fetchProviders() tea.Cmd {
+	return func() tea.Msg {
+		var providers []config.Provider
+		err := m.client.do(http.MethodGet, "/api/providers", nil, &providers)
+		return providersMsg{providers: providers, err: err}
+	}
+}
+
+func (m *Model) ensureSelections() {
+	for _, stage := range stageChoices {
+		if m.selections[stage] != "" {
+			continue
+		}
+		for _, option := range m.providers {
+			for _, supported := range option.Stages {
+				if supported == stage {
+					m.selections[stage] = option.ID
+					break
+				}
+			}
+			if m.selections[stage] != "" {
+				break
+			}
+		}
+	}
+}
+
+func (m *Model) cycleProvider(delta int) {
+	stage := stageChoices[m.providerStage]
+	candidates := []string{}
+	for _, option := range m.providers {
+		for _, supported := range option.Stages {
+			if supported == stage {
+				candidates = append(candidates, option.ID)
+			}
+		}
+	}
+	if len(candidates) == 0 {
+		return
+	}
+	current := 0
+	for index, id := range candidates {
+		if id == m.selections[stage] {
+			current = index
+			break
+		}
+	}
+	m.selections[stage] = candidates[(current+delta+len(candidates))%len(candidates)]
 }
 func (m Model) action(id string, action domain.ApprovalAction, feedback string) tea.Cmd {
 	return func() tea.Msg {

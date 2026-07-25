@@ -177,6 +177,23 @@ func (s *Store) UpdateGraph(ctx context.Context, runID string, graph domain.Grap
 	return s.GetRun(ctx, runID)
 }
 
+func (s *Store) SetPlannerGraph(ctx context.Context, runID string, graph domain.Graph) error {
+	encoded, err := json.Marshal(graph)
+	if err != nil {
+		return err
+	}
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `UPDATE runs SET graph=$2,updated_at=now() WHERE id=$1 AND stage='planner' AND status='running'`, runID, encoded)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() != 1 {
+			return fmt.Errorf("planner graph update conflict")
+		}
+		return s.insertEvent(ctx, tx, runID, "planner_graph_generated", "Planner generated workflow graph", map[string]any{"graph": graph})
+	})
+}
+
 func (s *Store) Approve(ctx context.Context, runID string, action domain.ApprovalAction, feedback string) (domain.Run, error) {
 	err := s.withTx(ctx, func(tx pgx.Tx) error {
 		run, err := scanRun(tx.QueryRow(ctx, runQuery+` WHERE id=$1 FOR UPDATE`, runID))

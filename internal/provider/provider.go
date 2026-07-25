@@ -36,7 +36,7 @@ type Invoker struct {
 
 func (i Invoker) Invoke(ctx context.Context, provider config.Provider, request Request) (Result, error) {
 	if provider.Kind == "cli" {
-		output, err := i.Workspace.RunCLI(ctx, request.RunID, provider.Command, request.Prompt, provider.CredentialEnv)
+		output, err := i.Workspace.RunCLI(ctx, request.RunID, provider.Image, provider.Network, provider.Command, request.Prompt, provider.CredentialEnv)
 		if err != nil {
 			return Result{}, err
 		}

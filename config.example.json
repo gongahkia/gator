@@ -27,6 +27,9 @@
     {
       "id": "codex",
       "kind": "cli",
+      "image": "ghcr.io/openai/codex:latest",
+      "network": "bridge",
+      "credential_env": "OPENAI_API_KEY",
       "command": ["codex", "exec", "--json"],
       "stages": ["planner", "builder", "verifier"]
     }

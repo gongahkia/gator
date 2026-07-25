@@ -148,6 +148,12 @@ func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
 	return runtime.DetectCapacity(ctx, s.config.DockerBin, s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
 }
 
+func (s *Service) ProviderOptions() []config.Provider {
+	options := make([]config.Provider, len(s.config.Manifest.Providers))
+	copy(options, s.config.Manifest.Providers)
+	return options
+}
+
 func (s *Service) StartWorkers(ctx context.Context) {
 	var workers sync.WaitGroup
 	for index := 0; index < s.config.Workers; index++ {
@@ -204,7 +210,17 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 	if !ok {
 		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
 	}
-	prompt := stagePrompt(run, job.Stage)
+	generatedFiles := []string(nil)
+	if job.Stage == domain.StageBuilder {
+		generatedFiles, err = generateApp(s.workspace, run)
+		if err != nil {
+			return err
+		}
+		if err := s.workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
+			return err
+		}
+	}
+	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli")
 	result, err := s.invoker.Invoke(ctx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
 	if err != nil {
 		return err
@@ -221,12 +237,30 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 	if err := s.workspace.MirrorToVolume(ctx, run.ID, path); err != nil {
 		return err
 	}
-	if job.Stage == domain.StageBuilder {
-		files, err := generateApp(s.workspace, run)
-		if err != nil {
-			return err
+	if job.Stage == domain.StagePlanner {
+		if graph, ok := graphFromResponse(result.Text); ok {
+			if err := s.store.SetPlannerGraph(ctx, run.ID, graph); err != nil {
+				return err
+			}
+			run.Graph = graph
 		}
-		artifact["generated_files"] = files
+	}
+	if job.Stage == domain.StageBuilder {
+		if providerConfig.Kind == "cli" {
+			if err := s.workspace.SyncGeneratedApp(ctx, run.ID); err != nil {
+				return err
+			}
+		} else {
+			files, err := applyBuilderResponse(s.workspace, run, result.Text)
+			if err != nil {
+				return err
+			}
+			generatedFiles = append(generatedFiles, files...)
+			if err := s.workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
+				return err
+			}
+		}
+		artifact["generated_files"] = generatedFiles
 	}
 	if job.Stage == domain.StageVerifier {
 		report, err := verifyApp(s.workspace, run)
@@ -268,8 +302,78 @@ func verifyApp(workspace runtime.Workspace, run domain.Run) (map[string]any, err
 	return map[string]any{"status": "pass", "checks": required, "summary": "Generated profile contract is present. Operator approval is required before local deployment."}, nil
 }
 
-func stagePrompt(run domain.Run, stage domain.Stage) string {
-	return fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nGraph: %+v\nPlanner feedback: %s\nReturn concise implementation notes; do not reveal credentials or execute unapproved external actions.", stage, run.ID, run.Profile, run.Prompt, run.Graph, run.Feedback)
+func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool) string {
+	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nGraph: %+v\nPlanner feedback: %s\nDo not reveal credentials or execute unapproved external actions.\n", stage, run.ID, run.Profile, run.Prompt, run.Graph, run.Feedback)
+	if isCLI && stage == domain.StageBuilder {
+		return base + "The approved baseline is in /workspace/generated-app. Modify only that directory, then return a concise summary."
+	}
+	if stage == domain.StagePlanner {
+		return base + "Return strict JSON without markdown: {\"graph\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]},\"notes\":\"...\"}. Graph requires input and output nodes."
+	}
+	if stage == domain.StageBuilder {
+		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/path/to/file\":\"complete source\"}}. Include only approved files, use safe relative paths, and preserve required profile files."
+	}
+	return base + "Return concise verification notes."
+}
+
+func graphFromResponse(text string) (domain.Graph, bool) {
+	payload, err := responseObject(text)
+	if err != nil {
+		return domain.Graph{}, false
+	}
+	raw, ok := payload["graph"]
+	if !ok {
+		return domain.Graph{}, false
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return domain.Graph{}, false
+	}
+	var graph domain.Graph
+	if err := json.Unmarshal(encoded, &graph); err != nil || graph.Validate() != nil {
+		return domain.Graph{}, false
+	}
+	return graph, true
+}
+
+func applyBuilderResponse(workspace runtime.Workspace, run domain.Run, text string) ([]string, error) {
+	payload, err := responseObject(text)
+	if err != nil {
+		return nil, fmt.Errorf("builder must return one JSON object: %w", err)
+	}
+	rawFiles, ok := payload["files"].(map[string]any)
+	if !ok || len(rawFiles) == 0 || len(rawFiles) > 64 {
+		return nil, fmt.Errorf("builder output requires 1-64 files")
+	}
+	paths := make([]string, 0, len(rawFiles))
+	for path, rawContent := range rawFiles {
+		content, ok := rawContent.(string)
+		if !ok || len(content) > 512<<10 {
+			return nil, fmt.Errorf("invalid builder content for %q", path)
+		}
+		if !strings.HasPrefix(path, "generated-app/") || strings.HasPrefix(path, "/") || strings.Contains(path, "..") {
+			return nil, fmt.Errorf("builder path %q is outside generated-app", path)
+		}
+		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil {
+			return nil, err
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
+}
+
+func responseObject(text string) (map[string]any, error) {
+	start := strings.Index(text, "{")
+	if start < 0 {
+		return nil, fmt.Errorf("JSON object not found")
+	}
+	decoder := json.NewDecoder(strings.NewReader(text[start:]))
+	decoder.UseNumber()
+	payload := map[string]any{}
+	if err := decoder.Decode(&payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
 
 func newID() (string, error) {

@@ -17,6 +17,8 @@ type Provider struct {
 	BaseURL       string         `json:"base_url"`
 	CredentialEnv string         `json:"credential_env"`
 	Command       []string       `json:"command"`
+	Image         string         `json:"image"`
+	Network       string         `json:"network"`
 	Stages        []domain.Stage `json:"stages"`
 }
 
@@ -84,8 +86,8 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("duplicate provider id %q", p.ID)
 		}
 		seen[p.ID] = struct{}{}
-		if p.Kind == "cli" && len(p.Command) == 0 {
-			return fmt.Errorf("cli provider %q needs command", p.ID)
+		if p.Kind == "cli" && (len(p.Command) == 0 || p.Image == "") {
+			return fmt.Errorf("cli provider %q needs command and image", p.ID)
 		}
 		if p.Kind != "cli" && (p.BaseURL == "" || p.Model == "" || p.CredentialEnv == "") {
 			return fmt.Errorf("api provider %q needs base_url, model, and credential_env", p.ID)

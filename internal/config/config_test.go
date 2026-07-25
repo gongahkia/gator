@@ -7,8 +7,8 @@ import (
 
 func TestManifestRejectsDuplicateProvider(t *testing.T) {
 	manifest := Manifest{Providers: []Provider{
-		{ID: "one", Kind: "cli", Command: []string{"agent"}},
-		{ID: "one", Kind: "cli", Command: []string{"agent"}},
+		{ID: "one", Kind: "cli", Image: "agent:latest", Command: []string{"agent"}},
+		{ID: "one", Kind: "cli", Image: "agent:latest", Command: []string{"agent"}},
 	}, Profiles: []domain.Profile{domain.ProfileFullStack}}
 	if err := manifest.Validate(); err == nil {
 		t.Fatal("expected duplicate provider failure")
@@ -16,7 +16,7 @@ func TestManifestRejectsDuplicateProvider(t *testing.T) {
 }
 
 func TestManifestProviderRespectsStage(t *testing.T) {
-	manifest := Manifest{Providers: []Provider{{ID: "one", Kind: "cli", Command: []string{"agent"}, Stages: []domain.Stage{domain.StagePlanner}}}}
+	manifest := Manifest{Providers: []Provider{{ID: "one", Kind: "cli", Image: "agent:latest", Command: []string{"agent"}, Stages: []domain.Stage{domain.StagePlanner}}}}
 	if _, ok := manifest.Provider("one", domain.StagePlanner); !ok {
 		t.Fatal("provider should support planner")
 	}

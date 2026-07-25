@@ -26,6 +26,8 @@ norbot tui --api http://127.0.0.1:8080
 - Provider credentials are environment references only; Norbot never stores raw secrets.
 - Agentic generated apps contain an app-local typed-tool harness and approval queue. OpenClaw is not used.
 
+Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
+
 ## API
 
 - `POST /api/runs` creates and queues a planner run.

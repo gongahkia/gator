@@ -85,17 +85,44 @@ func (w Workspace) MirrorToVolume(ctx context.Context, runID, relative string) e
 	return err
 }
 
-func (w Workspace) RunCLI(ctx context.Context, runID string, command []string, prompt string, credentialEnv string) (string, error) {
+func (w Workspace) MirrorGeneratedApp(ctx context.Context, runID string) error {
+	source := filepath.Join(w.RunPath(runID), "generated-app")
+	if _, err := os.Stat(source); err != nil {
+		return err
+	}
+	if _, err := w.Runner.Run(ctx, w.DockerBin, "exec", w.Name(runID), "mkdir", "-p", "/workspace/generated-app"); err != nil {
+		return err
+	}
+	_, err := w.Runner.Run(ctx, w.DockerBin, "cp", source+"/.", w.Name(runID)+":/workspace/generated-app")
+	return err
+}
+
+func (w Workspace) SyncGeneratedApp(ctx context.Context, runID string) error {
+	target := filepath.Join(w.RunPath(runID), "generated-app")
+	if err := os.MkdirAll(target, 0o750); err != nil {
+		return err
+	}
+	_, err := w.Runner.Run(ctx, w.DockerBin, "cp", w.Name(runID)+":/workspace/generated-app/.", target)
+	return err
+}
+
+func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, command []string, prompt string, credentialEnv string) (string, error) {
 	if len(command) == 0 {
 		return "", fmt.Errorf("empty cli command")
 	}
-	args := []string{"exec", "-i"}
+	if image == "" {
+		return "", fmt.Errorf("cli runner image is required")
+	}
+	if network == "" {
+		network = "bridge"
+	}
+	args := []string{"run", "--rm", "-i", "--label", "norbot.run_id=" + runID, "--label", "norbot.role=agent", "--network", network, "-v", w.Volume(runID) + ":/workspace", "-w", "/workspace"}
 	if credentialEnv != "" {
 		if value, ok := os.LookupEnv(credentialEnv); ok {
 			args = append(args, "-e", credentialEnv+"="+value)
 		}
 	}
-	args = append(args, w.Name(runID))
+	args = append(args, image)
 	args = append(args, command...)
 	execCommand := exec.CommandContext(ctx, w.DockerBin, args...)
 	execCommand.Stdin = strings.NewReader(prompt)

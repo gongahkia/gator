@@ -23,14 +23,24 @@ func generateApp(workspace runtime.Workspace, run domain.Run) ([]string, error) 
 import("fmt";"log";"net/http";"os")
 func main(){http.HandleFunc("/api/health",func(w http.ResponseWriter,r *http.Request){w.Header().Set("content-type","application/json");fmt.Fprint(w,` + "`{\"status\":\"ok\"}`" + `)});port:=os.Getenv("PORT");if port==""{port="8000"};log.Fatal(http.ListenAndServe(":"+port,nil))}`
 		files["generated-app/backend/Dockerfile"] = "FROM golang:1.26-alpine AS build\nWORKDIR /app\nCOPY . .\nRUN go build -o server .\nFROM alpine:3.21\nCOPY --from=build /app/server /server\nEXPOSE 8000\nCMD [\"/server\"]\n"
-		files["generated-app/docker-compose.yml"] = `services:
+		compose := `services:
   frontend:
     build: ./frontend
     ports: ["${NORBOT_PUBLIC_PORT}:80"]
   backend:
     build: ./backend
-    environment: ["PORT=8000"]
 `
+		if run.Profile == domain.ProfileAgentic {
+			compose += `    volumes: ["agent_state:/var/lib/app"]
+    environment: ["PORT=8000", "APPROVAL_QUEUE_PATH=/var/lib/app/approvals.json"]
+volumes:
+  agent_state:
+`
+		} else {
+			compose += `    environment: ["PORT=8000"]
+`
+		}
+		files["generated-app/docker-compose.yml"] = compose
 	} else {
 		files["generated-app/docker-compose.yml"] = `services:
   frontend:
@@ -54,6 +64,13 @@ func main(){http.HandleFunc("/api/health",func(w http.ResponseWriter,r *http.Req
 
 const agentHarnessSource = `package main
 
+import (
+  "encoding/json"
+  "os"
+  "path/filepath"
+  "sync"
+)
+
 // ToolSpec is a typed, policy-gated app capability.
 type ToolSpec struct { Name string; Kind string; ApprovalRequired bool }
 // Approval is persisted by the generated app before a consequential tool call.
@@ -61,4 +78,17 @@ type Approval struct { ID string; Tool string; Input string; Status string }
 // Registry exposes only tools approved by the generated app's policy.
 type Registry struct { Tools map[string]ToolSpec }
 func (r Registry) Allowed(name string) bool { _, ok := r.Tools[name]; return ok }
+
+// ApprovalQueue persists action approvals on the app-owned state volume.
+type ApprovalQueue struct { path string; mu sync.Mutex }
+func NewApprovalQueue(path string) *ApprovalQueue { return &ApprovalQueue{path:path} }
+func (q *ApprovalQueue) Submit(next Approval) error {
+  q.mu.Lock(); defer q.mu.Unlock()
+  if err:=os.MkdirAll(filepath.Dir(q.path),0o750); err!=nil{return err}
+  items:=[]Approval{}
+  if data,err:=os.ReadFile(q.path);err==nil{if err:=json.Unmarshal(data,&items);err!=nil{return err}}
+  next.Status="pending";items=append(items,next)
+  data,err:=json.Marshal(items);if err!=nil{return err}
+  return os.WriteFile(q.path,data,0o600)
+}
 `

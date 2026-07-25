@@ -33,6 +33,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/capacity", s.capacity)
+	mux.HandleFunc("GET /api/providers", s.providers)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
 	mux.HandleFunc("POST /api/runs", s.createRun)
@@ -55,6 +56,10 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) capacity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.service.Capacity(r.Context()))
+}
+
+func (s *Server) providers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.service.ProviderOptions())
 }
 
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
