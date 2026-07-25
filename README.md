@@ -39,10 +39,12 @@ Table of Contents
   - [Keyboard controls](#keyboard-controls)
 - [Configuration](#configuration)
   - [File-based configuration](#file-based-configuration)
+- [Advanced use](#advanced-use)
 - [Providers](#providers)
 - [Privacy and safety](#privacy-and-safety)
 - [Diagnostics and troubleshooting](#diagnostics-and-troubleshooting)
 - [Development](#development)
+- [Uninstall](#uninstall)
 - [Support and security](#support-and-security)
 - [License](#license)
 
@@ -192,6 +194,20 @@ The optional `provenance` result identifies the source for each resolved field. 
 > [!WARNING]
 > Do not put provider credentials, tokens, secrets, passwords, or API keys in Gator configuration.
 
+Advanced use
+------------
+
+Automation can inspect local compatibility and immutable coordinator state:
+
+```lua
+local gator = require("gator")
+local manifest = gator.compatibility_manifest()
+local manifest_json = gator.compatibility_manifest_json()
+local snapshot = gator.inspect()
+```
+
+The compatibility manifest reports Neovim version and local capability status only. `inspect()` returns a versioned snapshot; its `schema_version` is the inspection contract version. Neither API probes, stores, or exposes provider credentials.
+
 Providers
 ---------
 
@@ -204,7 +220,7 @@ Privacy and safety
 
 Gator is a native-first meta-harness: it can narrow a provider action or require confirmation, but it does not broaden provider permissions. Provider runs are checked against task, context pack, narrowed run policy, and advertised capabilities before launch.
 
-Gator does not persist provider credentials, output, or transcripts, and it has no general persistent activity log. Telemetry is disabled by default. Local diagnostic exports are redacted and never sent automatically.
+Gator does not persist provider credentials, output, or transcripts, and it has no general persistent activity log. Telemetry is disabled by default. Local diagnostic exports are redacted and not sent automatically.
 
 > [!IMPORTANT]
 > Extensions, provider CLIs, and marketplace packages run with your user privileges. Review their source, release provenance, requested permissions, and dependency changes before enabling them. Do not install code that asks you to disable sandboxing, expand permissions, or share credentials.
@@ -235,6 +251,18 @@ make sidecar
 - `make sidecar` starts the optional Rust indexer.
 
 See [Contributing](CONTRIBUTING.md) for prerequisites and contribution requirements, and [Performance](docs/PERFORMANCE.md) for benchmark limits.
+
+Uninstall
+---------
+
+Remove Gator through the plugin manager or delete the native-package directory used during installation. To remove local Gator configuration and state, first inspect these paths in Neovim:
+
+```vim
+:echo stdpath('config') .. '/gator.json'
+:echo stdpath('state') .. '/gator'
+```
+
+Delete only the inspected paths if you also want to remove Gator's local configuration, run/session metadata, review evidence, and workspace links. Provider CLI credentials are managed outside Gator.
 
 Support and security
 --------------------
