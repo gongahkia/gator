@@ -39,13 +39,14 @@ For a local Kubernetes option, `kind` runs the cluster nodes as Docker container
 
 ```sh
 brew install kind kubectl
-norbot kube local
+brew install cilium-cli # enables safe Kubernetes HTTP sandbox tools
+norbot kube local --cilium
 set -a; source .norbot/local-kubernetes.env; set +a
 NORBOT_CONFIG_HOST=config.local-kubernetes.json \
 NORBOT_KUBECONFIG_HOST="$HOME/.kube/config" docker compose up --build
 ```
 
-`kind`’s default networking does not by itself prove NetworkPolicy enforcement. Local bootstrap leaves HTTPS sandbox tools fail-closed unless you explicitly rerun it with `--confirm-network-policy` after installing/confirming an enforcing CNI. `--confirm-network-policy` is operator attestation, not an automatic proof. Docker deployment and non-network sandbox tools remain available.
+`kind`’s default networking does not by itself prove NetworkPolicy enforcement. `--cilium` creates a new Kind cluster with the default CNI disabled, installs Cilium, and waits for Cilium status before enabling HTTPS sandbox tools. Without it, local bootstrap leaves those tools fail-closed. `--confirm-network-policy` is available for another already-confirmed CNI, but is operator attestation rather than an automatic proof. Docker deployment and non-network sandbox tools remain available.
 
 For a remote cluster, use `norbot init --target kubernetes`, create the registry Secret, then `norbot kube bootstrap`. The operator needs namespace-creation access for bootstrap, then namespaced access only to Norbot resources. Set `runtime.kubernetes.registry_repository` and `registry_pull_secret`; optional ingress is disabled unless its class, base domain, and controller namespace are all configured.
 

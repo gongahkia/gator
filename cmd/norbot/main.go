@@ -272,6 +272,7 @@ func kubeLocalCommand(args []string) {
 	registryPort := flags.Int("registry-port", 5001, "host port for the local OCI registry")
 	configPath := flags.String("config", "config.local-kubernetes.json", "local Kubernetes config output")
 	envPath := flags.String("env", ".norbot/local-kubernetes.env", "local secret environment file")
+	cilium := flags.Bool("cilium", false, "create a new Kind cluster with Cilium NetworkPolicy enforcement")
 	confirmPolicy := flags.Bool("confirm-network-policy", false, "confirm the installed CNI enforces NetworkPolicy")
 	force := flags.Bool("force", false, "overwrite generated local config and environment files")
 	_ = flags.Parse(args)
@@ -283,7 +284,11 @@ func kubeLocalCommand(args []string) {
 		fmt.Fprintln(os.Stderr, "run norbot kube local from the Norbot repository root:", err)
 		os.Exit(1)
 	}
-	for _, binary := range []string{"docker", "kind", "kubectl"} {
+	binaries := []string{"docker", "kind", "kubectl"}
+	if *cilium {
+		binaries = append(binaries, "cilium")
+	}
+	for _, binary := range binaries {
 		if _, err := exec.LookPath(binary); err != nil {
 			fmt.Fprintf(os.Stderr, "local Kubernetes requires %s in PATH\n", binary)
 			os.Exit(1)
@@ -300,8 +305,13 @@ func kubeLocalCommand(args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if !linePresent(clusters, *name) {
-		if _, err := localCommand(ctx, "", "kind", "create", "cluster", "--name", *name); err != nil {
+	exists := linePresent(clusters, *name)
+	if *cilium && exists {
+		fmt.Fprintln(os.Stderr, "--cilium requires a new Kind cluster; choose an unused --name")
+		os.Exit(1)
+	}
+	if !exists {
+		if err := createLocalKind(ctx, *name, *cilium); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -311,6 +321,16 @@ func kubeLocalCommand(args []string) {
 		os.Exit(1)
 	}
 	contextName := "kind-" + *name
+	if *cilium {
+		if _, err := localCommand(ctx, "", "cilium", "install", "--context", contextName, "--wait"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if _, err := localCommand(ctx, "", "cilium", "status", "--context", contextName, "--wait"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 	registryConfig := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: local-registry-hosting\n  namespace: kube-public\ndata:\n  localRegistryHosting.v1: |\n    host: \"kind-registry:5000\"\n    help: \"https://kind.sigs.k8s.io/docs/user/local-registry/\"\n"
 	if _, err := localCommandInput(ctx, "", registryConfig, "kubectl", "--context", contextName, "apply", "-f", "-"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -344,7 +364,7 @@ func kubeLocalCommand(args []string) {
 	if paths := filepath.SplitList(strings.TrimSpace(os.Getenv("KUBECONFIG"))); len(paths) > 0 && paths[0] != "" {
 		hostKubeconfig = paths[0]
 	}
-	kube := config.Kubernetes{Kubeconfig: "/etc/norbot/kubeconfig", Context: contextName, Namespace: *namespace, ServiceAccount: "norbot-runtime", RegistryRepository: "kind-registry:5000/norbot", RegistryPullSecret: "registry-pull", RegistryInsecure: true, EgressProxyImage: "kind-registry:5000/norbot-egress-proxy:local", EgressProxySecret: "norbot-egress-proxy", EgressProxySecretKey: "secret", EgressProxyPort: 8181, NetworkPolicyEnforced: *confirmPolicy}
+	kube := config.Kubernetes{Kubeconfig: "/etc/norbot/kubeconfig", Context: contextName, Namespace: *namespace, ServiceAccount: "norbot-runtime", RegistryRepository: "kind-registry:5000/norbot", RegistryPullSecret: "registry-pull", RegistryInsecure: true, EgressProxyImage: "kind-registry:5000/norbot-egress-proxy:local", EgressProxySecret: "norbot-egress-proxy", EgressProxySecretKey: "secret", EgressProxyPort: 8181, NetworkPolicyEnforced: *confirmPolicy || *cilium}
 	manifest := config.InitialManifest(domain.DeploymentKubernetes, kube)
 	manifest.Runtime.Sandbox = config.Sandbox{Image: "alpine:3.21", CPUMilli: 500, MemoryMiB: 512, TimeoutS: 60, EgressProxyURL: "http://norbot-egress-proxy." + *namespace + ".svc.cluster.local:8181", EgressProxySecret: "NORBOT_EGRESS_PROXY_SECRET"}
 	if err := config.WriteManifest(*configPath, manifest, *force); err != nil {
@@ -364,9 +384,33 @@ func kubeLocalCommand(args []string) {
 	}
 	fmt.Println("local Kubernetes bootstrap complete")
 	fmt.Println("start Norbot with: set -a; source " + *envPath + "; set +a; NORBOT_CONFIG_HOST=" + *configPath + " NORBOT_KUBECONFIG_HOST=" + hostKubeconfig + " docker compose up --build")
-	if !*confirmPolicy {
+	if !*confirmPolicy && !*cilium {
 		fmt.Println("HTTPS sandbox tools are fail-closed until a NetworkPolicy-enforcing CNI is installed and you rerun with --confirm-network-policy.")
 	}
+}
+
+func createLocalKind(ctx context.Context, name string, cilium bool) error {
+	args := []string{"create", "cluster", "--name", name}
+	if !cilium {
+		_, err := localCommand(ctx, "", "kind", args...)
+		return err
+	}
+	file, err := os.CreateTemp("", "norbot-kind-cilium-*.yaml")
+	if err != nil {
+		return err
+	}
+	path := file.Name()
+	defer os.Remove(path)
+	if _, err := file.WriteString("kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnetworking:\n  disableDefaultCNI: true\n"); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	args = append(args, "--config", path)
+	_, err = localCommand(ctx, "", "kind", args...)
+	return err
 }
 
 func ensureLocalRegistry(ctx context.Context, port int) error {
