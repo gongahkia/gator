@@ -112,6 +112,12 @@ func (s *Store) ResetSession(ctx context.Context, accountID, externalID string) 
 	}
 	return nil
 }
+func (s *Store) ChannelSessionByID(ctx context.Context, id string) (domain.ChannelSession, error) {
+	var value domain.ChannelSession
+	err := s.pool.QueryRow(ctx, `SELECT id,account_id,external_id,summary,expires_at,created_at,updated_at FROM channel_sessions WHERE id=$1`, id).Scan(&value.ID,&value.AccountID,&value.ExternalID,&value.Summary,&value.ExpiresAt,&value.CreatedAt,&value.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) { return domain.ChannelSession{}, ErrNotFound }
+	return value, err
+}
 func (s *Store) ExpireSessions(ctx context.Context) (int, error) {
 	result, err := s.pool.Exec(ctx, `DELETE FROM channel_sessions WHERE expires_at<=now()`)
 	if err != nil {
@@ -133,7 +139,7 @@ func (s *Store) CreateChannelMessage(ctx context.Context, value domain.ChannelMe
 		return domain.ChannelMessage{}, false, err
 	}
 	var raw []byte
-	err = s.pool.QueryRow(ctx, `INSERT INTO channel_messages(account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(account_id,idempotency_key) DO NOTHING RETURNING id,attachments,created_at,delivered_at`, value.AccountID, value.ExternalID, value.Direction, value.PlatformID, value.IdempotencyKey, value.Text, attachments, value.State, value.Error).Scan(&value.ID, &raw, &value.CreatedAt, &value.DeliveredAt)
+	err = s.pool.QueryRow(ctx, `INSERT INTO channel_messages(account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error,next_attempt_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,CASE WHEN $8='pending' THEN now() ELSE NULL END) ON CONFLICT(account_id,idempotency_key) DO NOTHING RETURNING id,attachments,created_at,delivered_at,attempts,next_attempt_at`, value.AccountID, value.ExternalID, value.Direction, value.PlatformID, value.IdempotencyKey, value.Text, attachments, value.State, value.Error).Scan(&value.ID, &raw, &value.CreatedAt, &value.DeliveredAt, &value.Attempts, &value.NextAttemptAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ChannelMessage{}, false, nil
 	}
@@ -149,7 +155,7 @@ func (s *Store) PendingOutboundMessages(ctx context.Context, limit int) ([]domai
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id,account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error,created_at,delivered_at FROM channel_messages WHERE state='pending' AND direction='outbound' ORDER BY id LIMIT $1`, limit)
+	rows, err := s.pool.Query(ctx, `SELECT id,account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error,created_at,delivered_at,attempts,next_attempt_at FROM channel_messages WHERE state='pending' AND direction='outbound' AND next_attempt_at<=now() ORDER BY id LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +180,12 @@ func (s *Store) CompleteChannelMessage(ctx context.Context, id int64, state, err
 	}
 	return nil
 }
+func (s *Store) RetryChannelMessage(ctx context.Context, id int64, errText string, retryAt time.Time) error {
+	result, err := s.pool.Exec(ctx, `UPDATE channel_messages SET attempts=attempts+1,error=$2,next_attempt_at=$3 WHERE id=$1 AND state='pending'`, id,errText,retryAt)
+	if err != nil { return err }; if result.RowsAffected()!=1{return ErrNotFound}; return nil
+}
 func (s *Store) ChannelMessages(ctx context.Context, accountID, externalID string) ([]domain.ChannelMessage, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id,account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error,created_at,delivered_at FROM channel_messages WHERE account_id=$1 AND external_id=$2 ORDER BY id`, accountID, externalID)
+	rows, err := s.pool.Query(ctx, `SELECT id,account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error,created_at,delivered_at,attempts,next_attempt_at FROM channel_messages WHERE account_id=$1 AND external_id=$2 ORDER BY id`, accountID, externalID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +224,7 @@ func scanChannelAccount(row interface{ Scan(...any) error }) (domain.ChannelAcco
 func scanChannelMessage(row interface{ Scan(...any) error }) (domain.ChannelMessage, error) {
 	var value domain.ChannelMessage
 	var raw []byte
-	err := row.Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.Direction, &value.PlatformID, &value.IdempotencyKey, &value.Text, &raw, &value.State, &value.Error, &value.CreatedAt, &value.DeliveredAt)
+	err := row.Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.Direction, &value.PlatformID, &value.IdempotencyKey, &value.Text, &raw, &value.State, &value.Error, &value.CreatedAt, &value.DeliveredAt, &value.Attempts, &value.NextAttemptAt)
 	if err != nil {
 		return domain.ChannelMessage{}, err
 	}
