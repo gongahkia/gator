@@ -54,10 +54,30 @@ type Runtime struct {
 }
 
 type Sandbox struct {
-	Image     string `json:"image"`
-	CPUMilli  int64  `json:"cpu_milli"`
-	MemoryMiB int64  `json:"memory_mib"`
-	TimeoutS  int    `json:"timeout_seconds"`
+	Image             string `json:"image"`
+	CPUMilli          int64  `json:"cpu_milli"`
+	MemoryMiB         int64  `json:"memory_mib"`
+	TimeoutS          int    `json:"timeout_seconds"`
+	EgressProxyURL    string `json:"egress_proxy_url"`
+	EgressProxySecret string `json:"egress_proxy_secret_env"`
+}
+
+type OIDC struct {
+	Issuer       string   `json:"issuer"`
+	Audience     string   `json:"audience"`
+	GroupsClaim  string   `json:"groups_claim"`
+	OperatorGroups []string `json:"operator_groups"`
+}
+
+type Security struct { OIDC OIDC `json:"oidc"` }
+
+type ArtifactStore struct {
+	Endpoint       string `json:"endpoint"`
+	Region         string `json:"region"`
+	Bucket         string `json:"bucket"`
+	AccessKeyEnv   string `json:"access_key_env"`
+	SecretKeyEnv   string `json:"secret_key_env"`
+	ForcePathStyle bool   `json:"force_path_style"`
 }
 
 type Workflow struct {
@@ -89,6 +109,8 @@ type Manifest struct {
 	Plugins    []ProcessPlugin       `json:"plugins"`
 	Runtime    Runtime               `json:"runtime"`
 	Workflow   Workflow              `json:"workflow"`
+	Security   Security              `json:"security"`
+	Artifacts  ArtifactStore         `json:"artifacts"`
 }
 
 type Config struct {
@@ -144,6 +166,12 @@ func (m Manifest) Validate() error {
 	if len(m.Providers) == 0 {
 		return fmt.Errorf("manifest needs at least one provider")
 	}
+	if err := m.ValidateSecurity(); err != nil {
+		return err
+	}
+	if err := m.ValidateArtifacts(); err != nil {
+		return err
+	}
 	seen := map[string]struct{}{}
 	for _, p := range m.Providers {
 		if p.ID == "" || p.Kind == "" {
@@ -197,9 +225,40 @@ func (m Manifest) Validate() error {
 	return m.ValidateRuntime()
 }
 
+func (m Manifest) ValidateSecurity() error {
+	o := m.Security.OIDC
+	if o.Issuer == "" && o.Audience == "" && len(o.OperatorGroups) == 0 && o.GroupsClaim == "" {
+		return nil
+	}
+	if o.Issuer == "" || o.Audience == "" || len(o.OperatorGroups) == 0 {
+		return fmt.Errorf("oidc issuer, audience, and operator_groups must be configured together")
+	}
+	if o.GroupsClaim == "" {
+		return fmt.Errorf("oidc groups_claim is required when oidc is configured")
+	}
+	return nil
+}
+
+func (m Manifest) ValidateArtifacts() error {
+	a := m.Artifacts
+	if a.Endpoint == "" && a.Bucket == "" && a.AccessKeyEnv == "" && a.SecretKeyEnv == "" {
+		return nil
+	}
+	if a.Endpoint == "" || a.Bucket == "" || a.AccessKeyEnv == "" || a.SecretKeyEnv == "" {
+		return fmt.Errorf("artifact endpoint, bucket, access_key_env, and secret_key_env must be configured together")
+	}
+	if !strings.HasPrefix(a.Endpoint, "https://") && !strings.HasPrefix(a.Endpoint, "http://127.0.0.1") && !strings.HasPrefix(a.Endpoint, "http://localhost") {
+		return fmt.Errorf("artifact endpoint must use https outside localhost")
+	}
+	return nil
+}
+
 func (m Manifest) ValidateRuntime() error {
 	if s := m.Runtime.Sandbox; s.CPUMilli < 0 || s.MemoryMiB < 0 || s.TimeoutS < 0 {
 		return fmt.Errorf("sandbox resources cannot be negative")
+	}
+	if s := m.Runtime.Sandbox; (s.EgressProxyURL == "") != (s.EgressProxySecret == "") {
+		return fmt.Errorf("sandbox egress_proxy_url and egress_proxy_secret_env must be configured together")
 	}
 	target := m.Runtime.DefaultTarget
 	if target == "" {

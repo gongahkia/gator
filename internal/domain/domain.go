@@ -364,6 +364,55 @@ type ChannelMessage struct {
 	Error          string           `json:"error,omitempty"`
 	CreatedAt      time.Time        `json:"created_at"`
 	DeliveredAt    *time.Time       `json:"delivered_at,omitempty"`
+	Attempts       int              `json:"attempts,omitempty"`
+	NextAttemptAt  *time.Time       `json:"next_attempt_at,omitempty"`
+}
+
+type AgentTurn struct {
+	ID             string           `json:"id"`
+	RunID          string           `json:"run_id"`
+	SessionID      string           `json:"session_id"`
+	ExternalID     string           `json:"external_id"`
+	Role           string           `json:"role"`
+	IdempotencyKey string           `json:"idempotency_key"`
+	Prompt         string           `json:"prompt"`
+	History        []map[string]any `json:"history"`
+	State          string           `json:"state"`
+	Final          string           `json:"final,omitempty"`
+	ProviderID     string           `json:"provider_id"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
+}
+
+type AgentAction struct {
+	ID          string         `json:"id"`
+	TurnID      string         `json:"turn_id"`
+	RunID       string         `json:"run_id"`
+	Tool        string         `json:"tool"`
+	Role        string         `json:"role"`
+	Params      map[string]any `json:"params"`
+	Digest      string         `json:"digest"`
+	State       string         `json:"state"`
+	Result      map[string]any `json:"result,omitempty"`
+	Error       string         `json:"error,omitempty"`
+	ApprovedBy  string         `json:"approved_by,omitempty"`
+	DecidedAt   *time.Time     `json:"decided_at,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type ManagedArtifact struct {
+	ID          string    `json:"id"`
+	RunID       string    `json:"run_id,omitempty"`
+	OwnerType   string    `json:"owner_type"`
+	OwnerID     string    `json:"owner_id"`
+	Key         string    `json:"key"`
+	Filename    string    `json:"filename"`
+	ContentType string    `json:"content_type"`
+	Size        int64     `json:"size"`
+	Digest      string    `json:"digest"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Event struct {

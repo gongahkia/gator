@@ -14,7 +14,9 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/gongahkia/norbot/internal/auth"
 	"github.com/gongahkia/norbot/internal/channel"
+	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
 	"github.com/gongahkia/norbot/internal/runtime"
@@ -28,6 +30,7 @@ type Server struct {
 	log      *slog.Logger
 	skills   *skill.Service
 	channels *channel.Service
+	auth     *auth.Validator
 }
 
 func New(service *engine.Service, st *store.Store, logger *slog.Logger) *Server {
@@ -44,6 +47,11 @@ func NewWithComponents(service *engine.Service, st *store.Store, logger *slog.Lo
 	server := NewWithSkills(service, st, logger, skills)
 	server.channels = channels
 	return server
+}
+
+func (s *Server) WithOIDC(value config.OIDC) *Server {
+	if value.Issuer != "" { s.auth = auth.New(value) }
+	return s
 }
 
 func (s *Server) Handler() http.Handler {
@@ -85,8 +93,23 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{id}/deployment/start", s.startDeployment)
 	mux.HandleFunc("POST /api/runs/{id}/deployment/stop", s.stopDeployment)
 	mux.HandleFunc("DELETE /api/runs/{id}/deployment", s.deleteDeployment)
-	return requestLog(s.log, otelhttp.NewHandler(mux, "norbot.http"))
+	return requestLog(s.log, otelhttp.NewHandler(s.requireOperator(mux), "norbot.http"))
 }
+
+func (s *Server) requireOperator(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.auth == nil || r.URL.Path == "/api/health" || strings.HasPrefix(r.URL.Path, "/api/channels/") && strings.HasSuffix(r.URL.Path, "/webhook") {
+			next.ServeHTTP(w, r); return
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer"))
+		if value == "" || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") { writeError(w, http.StatusUnauthorized, fmt.Errorf("bearer token is required")); return }
+		principal, err := s.auth.Validate(r.Context(), value)
+		if err != nil { writeError(w, http.StatusForbidden, fmt.Errorf("operator authorization failed")); return }
+		r = r.WithContext(context.WithValue(r.Context(), operatorContextKey{}, principal.Subject))
+		next.ServeHTTP(w, r)
+	})
+}
+type operatorContextKey struct{}
 
 func (s *Server) skillImports(w http.ResponseWriter, r *http.Request) {
 	if s.skills == nil {

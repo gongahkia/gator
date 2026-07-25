@@ -228,6 +228,69 @@ CREATE TABLE IF NOT EXISTS channel_messages (
   UNIQUE(account_id,idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS channel_messages_pending_idx ON channel_messages(state,created_at) WHERE state='pending';
+ALTER TABLE channel_messages ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0;
+ALTER TABLE channel_messages ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS channel_messages_retry_idx ON channel_messages(state,next_attempt_at,id) WHERE state='pending' AND direction='outbound';
+CREATE TABLE IF NOT EXISTS managed_artifacts (
+  id TEXT PRIMARY KEY,
+  run_id TEXT REFERENCES runs(id) ON DELETE SET NULL,
+  owner_type TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  object_key TEXT NOT NULL UNIQUE,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+  size_bytes BIGINT NOT NULL,
+  digest TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS managed_artifacts_expiry_idx ON managed_artifacts(expires_at);
+CREATE TABLE IF NOT EXISTS agent_turns (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  history JSONB NOT NULL DEFAULT '[]'::jsonb,
+  state TEXT NOT NULL,
+  final TEXT NOT NULL DEFAULT '',
+  provider_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(run_id,idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS agent_turns_session_idx ON agent_turns(session_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS agent_actions (
+  id TEXT PRIMARY KEY,
+  turn_id TEXT NOT NULL REFERENCES agent_turns(id) ON DELETE CASCADE,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  tool TEXT NOT NULL,
+  role TEXT NOT NULL,
+  params JSONB NOT NULL,
+  digest TEXT NOT NULL,
+  state TEXT NOT NULL,
+  result JSONB NOT NULL DEFAULT '{}'::jsonb,
+  error TEXT NOT NULL DEFAULT '',
+  approved_by TEXT NOT NULL DEFAULT '',
+  decided_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS agent_actions_pending_idx ON agent_actions(state,created_at) WHERE state='pending';
+CREATE TABLE IF NOT EXISTS sandbox_executions (
+  id TEXT PRIMARY KEY,
+  action_id TEXT REFERENCES agent_actions(id) ON DELETE SET NULL,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  target TEXT NOT NULL,
+  tool TEXT NOT NULL,
+  state TEXT NOT NULL,
+  exit_code INT NOT NULL DEFAULT 0,
+  output TEXT NOT NULL DEFAULT '',
+  started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 

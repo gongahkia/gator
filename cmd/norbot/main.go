@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -202,6 +203,10 @@ func serveCommand(args []string) {
 		logger.Error("load config", "error", err)
 		os.Exit(1)
 	}
+	if host, _, splitErr := net.SplitHostPort(cfg.HTTPAddr); splitErr == nil && host != "127.0.0.1" && host != "::1" && host != "localhost" && cfg.Manifest.Security.OIDC.Issuer == "" {
+		fmt.Fprintln(os.Stderr, "public norbot API requires security.oidc configuration")
+		os.Exit(1)
+	}
 	plugins, err := extension.LoadProcessPlugins(cfg.Manifest.Plugins)
 	if err != nil {
 		logger.Error("load process plugins", "error", err)
@@ -235,7 +240,7 @@ func serveCommand(args []string) {
 	skills := skill.New(st, cfg.ArtifactsDir)
 	channels := channel.New(st, service, cfg.ArtifactsDir)
 	channels.Start(ctx)
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.NewWithComponents(service, st, logger, skills, channels).Handler(), ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.NewWithComponents(service, st, logger, skills, channels).WithOIDC(cfg.Manifest.Security.OIDC).Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
