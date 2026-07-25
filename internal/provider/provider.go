@@ -14,6 +14,7 @@ import (
 
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/extension"
 	"github.com/gongahkia/norbot/internal/runtime"
 )
 
@@ -39,9 +40,24 @@ type RateLimit struct {
 type Invoker struct {
 	HTTPClient *http.Client
 	Workspace  runtime.Workspace
+	Extensions *extension.Registry
 }
 
 func (i Invoker) Invoke(ctx context.Context, provider config.Provider, request Request) (Result, error) {
+	if provider.Kind == "plugin" {
+		if i.Extensions == nil {
+			return Result{}, fmt.Errorf("process plugin registry is not configured")
+		}
+		adapter, ok := i.Extensions.Providers[provider.ID]
+		if !ok || !adapter.Supports(request.Stage) {
+			return Result{}, fmt.Errorf("plugin provider %q does not support %s", provider.ID, request.Stage)
+		}
+		response, err := adapter.Invoke(ctx, extension.Request{RunID: request.RunID, Stage: request.Stage, Prompt: request.Prompt})
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{Text: response.Text, Provider: provider.ID, Model: "process-plugin", Metadata: response.Metadata}, nil
+	}
 	if provider.Kind == "cli" {
 		output, err := i.Workspace.RunCLI(ctx, request.RunID, provider.Image, provider.Network, provider.Command, request.Prompt, provider.CredentialEnv)
 		if err != nil {

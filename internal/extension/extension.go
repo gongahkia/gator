@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -106,6 +107,25 @@ type ProcessClient struct {
 	spec config.ProcessPlugin
 	seq  *atomic.Int64
 }
+
+type ProcessCapabilities struct {
+	APIVersion string               `json:"api_version"`
+	Providers  []ProviderCapability `json:"providers"`
+	Tools      []ToolCapability     `json:"tools"`
+	Profiles   []ProfileCapability  `json:"profiles"`
+}
+type ProviderCapability struct {
+	ID     string         `json:"id"`
+	Stages []domain.Stage `json:"stages"`
+}
+type ToolCapability struct {
+	ID               string `json:"id"`
+	Kind             string `json:"kind"`
+	ApprovalRequired bool   `json:"approval_required"`
+}
+type ProfileCapability struct {
+	ID string `json:"id"`
+}
 type rpcRequest struct {
 	JSONRPC string `json:"jsonrpc"`
 	ID      int64  `json:"id"`
@@ -142,7 +162,93 @@ func (r *ProcessRegistry) IDs() []string {
 	for id := range r.clients {
 		ids = append(ids, id)
 	}
+	sort.Strings(ids)
 	return ids
+}
+
+func RegisterProcessPlugins(ctx context.Context, registry *Registry, processes *ProcessRegistry) error {
+	if registry == nil || processes == nil {
+		return fmt.Errorf("registry and process plugins are required")
+	}
+	for _, pluginID := range processes.IDs() {
+		var capabilities ProcessCapabilities
+		if err := processes.Call(ctx, pluginID, "norbot.initialize", map[string]string{"api_version": APIVersion}, &capabilities); err != nil {
+			return fmt.Errorf("initialize plugin %q: %w", pluginID, err)
+		}
+		if capabilities.APIVersion != APIVersion {
+			return fmt.Errorf("plugin %q targets %q, need %s", pluginID, capabilities.APIVersion, APIVersion)
+		}
+		for _, capability := range capabilities.Providers {
+			if capability.ID == "" {
+				return fmt.Errorf("plugin %q returned blank provider id", pluginID)
+			}
+			if err := registry.RegisterProvider(processProvider{id: capability.ID, stages: capability.Stages, pluginID: pluginID, processes: processes}); err != nil {
+				return err
+			}
+		}
+		for _, capability := range capabilities.Tools {
+			if capability.ID == "" || capability.Kind == "" {
+				return fmt.Errorf("plugin %q returned invalid tool", pluginID)
+			}
+			if err := registry.RegisterTool(processTool{id: capability.ID, spec: ToolSpec{Kind: capability.Kind, ApprovalRequired: capability.ApprovalRequired}}); err != nil {
+				return err
+			}
+		}
+		for _, capability := range capabilities.Profiles {
+			if capability.ID == "" {
+				return fmt.Errorf("plugin %q returned blank profile id", pluginID)
+			}
+			if err := registry.RegisterProfile(processProfile{id: capability.ID, pluginID: pluginID, processes: processes}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+type processProvider struct {
+	id        string
+	stages    []domain.Stage
+	pluginID  string
+	processes *ProcessRegistry
+}
+
+func (p processProvider) ID() string         { return p.id }
+func (p processProvider) APIVersion() string { return APIVersion }
+func (p processProvider) Supports(stage domain.Stage) bool {
+	for _, candidate := range p.stages {
+		if candidate == stage {
+			return true
+		}
+	}
+	return false
+}
+func (p processProvider) Invoke(ctx context.Context, request Request) (Response, error) {
+	var response Response
+	err := p.processes.Call(ctx, p.pluginID, "provider.invoke", map[string]any{"provider_id": p.id, "request": request}, &response)
+	return response, err
+}
+
+type processTool struct {
+	id   string
+	spec ToolSpec
+}
+
+func (p processTool) ID() string         { return p.id }
+func (p processTool) APIVersion() string { return APIVersion }
+func (p processTool) Spec() ToolSpec     { return p.spec }
+
+type processProfile struct {
+	id, pluginID string
+	processes    *ProcessRegistry
+}
+
+func (p processProfile) ID() string         { return p.id }
+func (p processProfile) APIVersion() string { return APIVersion }
+func (p processProfile) Generate(ctx context.Context, request GenerateRequest) (GenerateResult, error) {
+	var result GenerateResult
+	err := p.processes.Call(ctx, p.pluginID, "profile.generate", map[string]any{"profile_id": p.id, "request": request}, &result)
+	return result, err
 }
 
 func (r *ProcessRegistry) Call(ctx context.Context, pluginID, method string, params any, result any) error {

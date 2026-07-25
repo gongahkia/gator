@@ -89,7 +89,6 @@ CREATE TABLE IF NOT EXISTS jobs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS jobs_claim_idx ON jobs(state, created_at) WHERE state = 'queued';
-CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';
 CREATE TABLE IF NOT EXISTS deployments (
   run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
   project_name TEXT NOT NULL,
@@ -115,7 +114,8 @@ CREATE TABLE IF NOT EXISTS provider_observations (
   observed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;`)
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
@@ -295,8 +295,8 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 			}
 			return s.insertEvent(ctx, tx, runID, "stage_retry_requested", string(run.Stage)+" retry queued", map[string]any{"stage": run.Stage})
 		case domain.ApprovalAbandon:
-			if run.Status.Terminal() {
-				return fmt.Errorf("terminal run cannot be abandoned")
+			if run.Status == domain.StatusAbandoned || run.Status == domain.StatusCompleted {
+				return fmt.Errorf("completed or abandoned run cannot be abandoned")
 			}
 			if _, err := tx.Exec(ctx, `UPDATE runs SET status='abandoned',updated_at=now() WHERE id=$1`, runID); err != nil {
 				return err
@@ -379,6 +379,13 @@ func (s *Store) RecoverExpiredJobs(ctx context.Context) (int, error) {
 
 func (s *Store) MarkStageRunning(ctx context.Context, job domain.Job, provider string) error {
 	return s.withTx(ctx, func(tx pgx.Tx) error {
+		owned, err := tx.Exec(ctx, `UPDATE jobs SET lease_expires_at=lease_expires_at WHERE id=$1 AND state='running' AND worker_id=$2`, job.ID, job.WorkerID)
+		if err != nil {
+			return err
+		}
+		if owned.RowsAffected() != 1 {
+			return fmt.Errorf("job %d is no longer owned by %q", job.ID, job.WorkerID)
+		}
 		result, err := tx.Exec(ctx, `UPDATE runs SET status='running',updated_at=now() WHERE id=$1 AND stage=$2 AND status='queued'`, job.RunID, job.Stage)
 		if err != nil {
 			return err
@@ -392,12 +399,19 @@ func (s *Store) MarkStageRunning(ctx context.Context, job domain.Job, provider s
 
 func (s *Store) MarkStageAwaitingApproval(ctx context.Context, job domain.Job, metadata map[string]any) error {
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE runs SET status='awaiting_approval',updated_at=now() WHERE id=$1 AND stage=$2`, job.RunID, job.Stage)
+		jobResult, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now(),lease_expires_at=NULL WHERE id=$1 AND state='running' AND worker_id=$2`, job.ID, job.WorkerID)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now(),lease_expires_at=NULL WHERE id=$1 AND worker_id=$2`, job.ID, job.WorkerID); err != nil {
+		if jobResult.RowsAffected() != 1 {
+			return fmt.Errorf("job %d is no longer owned by %q", job.ID, job.WorkerID)
+		}
+		runResult, err := tx.Exec(ctx, `UPDATE runs SET status='awaiting_approval',updated_at=now() WHERE id=$1 AND stage=$2 AND status='running'`, job.RunID, job.Stage)
+		if err != nil {
 			return err
+		}
+		if runResult.RowsAffected() != 1 {
+			return fmt.Errorf("run is no longer running %s", job.Stage)
 		}
 		return s.insertEvent(ctx, tx, job.RunID, "stage_approval_required", string(job.Stage)+" completed; approval required", metadata)
 	})
@@ -405,12 +419,19 @@ func (s *Store) MarkStageAwaitingApproval(ctx context.Context, job domain.Job, m
 
 func (s *Store) CompleteRun(ctx context.Context, job domain.Job, metadata map[string]any) error {
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE runs SET status='completed',updated_at=now() WHERE id=$1 AND stage='deployer'`, job.RunID)
+		jobResult, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now(),lease_expires_at=NULL WHERE id=$1 AND state='running' AND worker_id=$2`, job.ID, job.WorkerID)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now(),lease_expires_at=NULL WHERE id=$1 AND worker_id=$2`, job.ID, job.WorkerID); err != nil {
+		if jobResult.RowsAffected() != 1 {
+			return fmt.Errorf("job %d is no longer owned by %q", job.ID, job.WorkerID)
+		}
+		runResult, err := tx.Exec(ctx, `UPDATE runs SET status='completed',updated_at=now() WHERE id=$1 AND stage='deployer' AND status='running'`, job.RunID)
+		if err != nil {
 			return err
+		}
+		if runResult.RowsAffected() != 1 {
+			return fmt.Errorf("deployer run is no longer running")
 		}
 		return s.insertEvent(ctx, tx, job.RunID, "run_completed", "Deployment completed", metadata)
 	})
@@ -418,12 +439,19 @@ func (s *Store) CompleteRun(ctx context.Context, job domain.Job, metadata map[st
 
 func (s *Store) FailJob(ctx context.Context, job domain.Job, failure string) error {
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `UPDATE runs SET status='failed',failure_reason=$2,updated_at=now() WHERE id=$1 AND stage=$3 AND status='running'`, job.RunID, failure, job.Stage)
+		jobResult, err := tx.Exec(ctx, `UPDATE jobs SET state='failed',completed_at=now(),lease_expires_at=NULL,last_error=$2 WHERE id=$1 AND state='running' AND worker_id=$3`, job.ID, failure, job.WorkerID)
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='failed',completed_at=now(),lease_expires_at=NULL,last_error=$2 WHERE id=$1 AND worker_id=$3`, job.ID, failure, job.WorkerID); err != nil {
+		if jobResult.RowsAffected() != 1 {
+			return fmt.Errorf("job %d is no longer owned by %q", job.ID, job.WorkerID)
+		}
+		runResult, err := tx.Exec(ctx, `UPDATE runs SET status='failed',failure_reason=$2,updated_at=now() WHERE id=$1 AND stage=$3 AND status='running'`, job.RunID, failure, job.Stage)
+		if err != nil {
 			return err
+		}
+		if runResult.RowsAffected() != 1 {
+			return fmt.Errorf("run is no longer running %s", job.Stage)
 		}
 		return s.insertEvent(ctx, tx, job.RunID, "stage_failed", string(job.Stage)+" failed; operator decision required", map[string]any{"stage": job.Stage, "error": failure})
 	})
@@ -433,6 +461,18 @@ func (s *Store) UpsertDeployment(ctx context.Context, runID, project, publicURL,
 	_, err := s.pool.Exec(ctx, `INSERT INTO deployments (run_id,project_name,public_url,status,error_message) VALUES ($1,$2,$3,$4,$5)
 ON CONFLICT (run_id) DO UPDATE SET project_name=EXCLUDED.project_name,public_url=EXCLUDED.public_url,status=EXCLUDED.status,error_message=EXCLUDED.error_message,updated_at=now()`, runID, project, publicURL, status, errorMessage)
 	return err
+}
+
+func (s *Store) GetDeployment(ctx context.Context, runID string) (domain.Deployment, error) {
+	var deployment domain.Deployment
+	err := s.pool.QueryRow(ctx, `SELECT run_id,project_name,public_url,status,error_message,updated_at FROM deployments WHERE run_id=$1`, runID).Scan(&deployment.RunID, &deployment.ProjectName, &deployment.PublicURL, &deployment.Status, &deployment.ErrorMessage, &deployment.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Deployment{}, ErrNotFound
+	}
+	if err != nil {
+		return domain.Deployment{}, err
+	}
+	return deployment, nil
 }
 
 func (s *Store) RecordProviderObservation(ctx context.Context, observation ProviderObservation) error {

@@ -102,6 +102,8 @@ func (g Graph) Validate() error {
 		return fmt.Errorf("graph requires input and output nodes")
 	}
 	edges := map[string]struct{}{}
+	adjacency := make(map[string][]string, len(g.Nodes))
+	reverse := make(map[string][]string, len(g.Nodes))
 	for _, edge := range g.Edges {
 		if edge.ID == "" || edge.Source == "" || edge.Target == "" {
 			return fmt.Errorf("every edge requires id, source, and target")
@@ -116,8 +118,33 @@ func (g Graph) Validate() error {
 			return fmt.Errorf("duplicate edge id %q", edge.ID)
 		}
 		edges[edge.ID] = struct{}{}
+		if edge.Source == edge.Target { return fmt.Errorf("edge %q cannot self-reference", edge.ID) }
+		adjacency[edge.Source] = append(adjacency[edge.Source], edge.Target)
+		reverse[edge.Target] = append(reverse[edge.Target], edge.Source)
 	}
+	starts, outputs := []string{}, []string{}
+	for _, node := range g.Nodes {
+		if node.Kind == "input" { starts = append(starts, node.ID) }
+		if node.Kind == "output" { outputs = append(outputs, node.ID) }
+	}
+	if hasCycle(nodes, adjacency) { return fmt.Errorf("graph cannot contain cycles") }
+	if !allReachable(starts, adjacency, nodes) { return fmt.Errorf("every node must be reachable from an input") }
+	if !allReachable(outputs, reverse, nodes) { return fmt.Errorf("every node must reach an output") }
 	return nil
+}
+
+func allReachable(starts []string, adjacency map[string][]string, nodes map[string]struct{}) bool {
+	seen := map[string]bool{}; queue := append([]string(nil), starts...)
+	for len(queue) > 0 { current := queue[0]; queue = queue[1:]; if seen[current] { continue }; seen[current] = true; queue = append(queue, adjacency[current]...) }
+	return len(seen) == len(nodes)
+}
+
+func hasCycle(nodes map[string]struct{}, adjacency map[string][]string) bool {
+	state := map[string]uint8{}
+	var visit func(string) bool
+	visit = func(id string) bool { if state[id] == 1 { return true }; if state[id] == 2 { return false }; state[id] = 1; for _, next := range adjacency[id] { if visit(next) { return true } }; state[id] = 2; return false }
+	for id := range nodes { if visit(id) { return true } }
+	return false
 }
 
 func DefaultGraph() Graph {

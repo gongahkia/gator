@@ -45,6 +45,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{id}/approval", s.approve)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.cancel)
 	mux.HandleFunc("POST /api/runs/{id}/cleanup", s.cleanup)
+	mux.HandleFunc("GET /api/runs/{id}/deployment", s.deploymentStatus)
+	mux.HandleFunc("GET /api/runs/{id}/deployment/logs", s.deploymentLogs)
+	mux.HandleFunc("POST /api/runs/{id}/deployment/start", s.startDeployment)
+	mux.HandleFunc("POST /api/runs/{id}/deployment/stop", s.stopDeployment)
+	mux.HandleFunc("DELETE /api/runs/{id}/deployment", s.deleteDeployment)
 	return requestLog(s.log, otelhttp.NewHandler(mux, "norbot.http"))
 }
 
@@ -99,10 +104,7 @@ func (s *Server) providers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-	_, _ = fmt.Fprintln(w, "# HELP norbot_up Norbot API availability")
-	_, _ = fmt.Fprintln(w, "# TYPE norbot_up gauge")
-	_, _ = fmt.Fprintln(w, "norbot_up 1")
+	s.service.Metrics().Handler(w, r)
 }
 
 func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
@@ -196,6 +198,75 @@ func (s *Server) cleanup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleaned"})
+}
+
+func (s *Server) deploymentStatus(w http.ResponseWriter, r *http.Request) {
+	value, err := s.service.DeploymentStatus(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+
+func (s *Server) deploymentLogs(w http.ResponseWriter, r *http.Request) {
+	lines, err := strconv.Atoi(r.URL.Query().Get("lines"))
+	if err != nil || lines == 0 {
+		lines = 200
+	}
+	logs, err := s.service.DeploymentLogs(r.Context(), r.PathValue("id"), lines)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"logs": logs, "lines": lines})
+}
+
+func (s *Server) startDeployment(w http.ResponseWriter, r *http.Request) {
+	value, err := s.service.StartDeployment(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+
+func (s *Server) stopDeployment(w http.ResponseWriter, r *http.Request) {
+	value, err := s.service.StopDeployment(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+
+func (s *Server) deleteDeployment(w http.ResponseWriter, r *http.Request) {
+	value, err := s.service.DeleteDeployment(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {

@@ -73,6 +73,12 @@ type graphMsg struct {
 	run domain.Run
 	err error
 }
+type deploymentMsg struct {
+	info       engine.DeploymentInfo
+	deployment domain.Deployment
+	logs       string
+	err        error
+}
 type providersMsg struct {
 	providers []config.Provider
 	err       error
@@ -94,6 +100,8 @@ type Model struct {
 	runs          []domain.Run
 	selected      int
 	node          int
+	edge          int
+	edgeSource    int
 	mode          mode
 	input         textinput.Model
 	profile       domain.Profile
@@ -101,6 +109,7 @@ type Model struct {
 	selections    map[domain.Stage]string
 	providerStage int
 	message       string
+	deploymentLog string
 	err           error
 	width, height int
 }
@@ -150,6 +159,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if typed.err == nil {
 			m.providers = typed.providers
 			m.ensureSelections()
+		}
+		return m, nil
+	case deploymentMsg:
+		m.err = typed.err
+		if typed.err == nil {
+			if typed.logs != "" {
+				m.deploymentLog = typed.logs
+				m.message = "Deployment logs loaded."
+			} else if typed.info.Deployment.RunID != "" {
+				m.message = "Deployment: " + typed.info.Deployment.Status + " (" + fmt.Sprint(len(typed.info.Runtime.Services)) + " services)."
+			} else {
+				m.message = "Deployment: " + typed.deployment.Status
+			}
 		}
 		return m, nil
 	case tickMsg:
@@ -213,18 +235,40 @@ func (m Model) key(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input.Focus()
 		}
 	case "t":
-		if run, ok := m.run(); ok && run.Status == domain.StatusFailed {
+		if run, ok := m.run(); ok && (run.Status == domain.StatusFailed || run.Status == domain.StatusInterrupted) {
 			return m, m.action(run.ID, domain.ApprovalRetry, "")
 		}
 	case "x":
-		if run, ok := m.run(); ok && !run.Status.Terminal() {
+		if run, ok := m.run(); ok && run.Status != domain.StatusAbandoned && run.Status != domain.StatusCompleted {
 			return m, m.action(run.ID, domain.ApprovalAbandon, "")
+		}
+	case "i":
+		if run, ok := m.run(); ok {
+			return m, m.deploymentStatus(run.ID)
+		}
+	case "l":
+		if run, ok := m.run(); ok {
+			return m, m.deploymentLogs(run.ID)
+		}
+	case "S":
+		if run, ok := m.run(); ok {
+			return m, m.deploymentAction(run.ID, "start")
+		}
+	case "P":
+		if run, ok := m.run(); ok {
+			return m, m.deploymentAction(run.ID, "stop")
+		}
+	case "D":
+		if run, ok := m.run(); ok {
+			return m, m.deleteDeployment(run.ID)
 		}
 	case "g":
 		if run, ok := m.run(); ok && run.Stage == domain.StagePlanner && run.Status == domain.StatusAwaiting {
 			m.mode = graphMode
 			m.node = 0
-			m.message = "Graph edit: n add optional, d delete optional, e label, c connect next, s save, esc cancel."
+			m.edgeSource = -1
+			m.edge = 0
+			m.message = "Graph: n add · d delete node · c select/connect edge · [/] edge · x delete edge · HJKL move · e label · s save."
 		}
 	}
 	return m, nil
@@ -313,7 +357,12 @@ func (m Model) graphKey(value string) (tea.Model, tea.Cmd) {
 	}
 	switch value {
 	case "esc":
-		m.mode = normal
+		if m.edgeSource >= 0 {
+			m.edgeSource = -1
+			m.message = "Edge selection cancelled."
+		} else {
+			m.mode = normal
+		}
 	case "up", "k":
 		if m.node > 0 {
 			m.node--
@@ -331,22 +380,72 @@ func (m Model) graphKey(value string) (tea.Model, tea.Cmd) {
 		}
 	case "n":
 		id := fmt.Sprintf("tool-optional-%d", len(run.Graph.Nodes)+1)
-		node := domain.GraphNode{ID: id, Label: "Optional tool", Kind: "tool", Optional: true}
+		node := domain.GraphNode{ID: id, Label: "Optional tool", Kind: "tool", Optional: true, Data: map[string]any{"x": 0, "y": 0}}
 		output := len(run.Graph.Nodes) - 1
 		run.Graph.Nodes = append(run.Graph.Nodes[:output], append([]domain.GraphNode{node}, run.Graph.Nodes[output:]...)...)
-		run.Graph.Edges = linearEdges(run.Graph.Nodes)
+		previous, next := run.Graph.Nodes[output-1].ID, run.Graph.Nodes[output+1].ID
+		run.Graph.Edges = removeEdge(run.Graph.Edges, previous, next)
+		run.Graph.Edges = append(run.Graph.Edges, edge(previous, id), edge(id, next))
 		m.replace(run)
 		m.node = output
 	case "d":
 		if m.node < len(run.Graph.Nodes) && run.Graph.Nodes[m.node].Optional {
+			removed := run.Graph.Nodes[m.node].ID
+			predecessors, successors := graphNeighbours(run.Graph, removed)
 			run.Graph.Nodes = append(run.Graph.Nodes[:m.node], run.Graph.Nodes[m.node+1:]...)
-			run.Graph.Edges = linearEdges(run.Graph.Nodes)
+			run.Graph.Edges = removeNodeEdges(run.Graph.Edges, removed)
+			for _, source := range predecessors {
+				for _, target := range successors {
+					if source != target && !hasEdge(run.Graph.Edges, source, target) {
+						run.Graph.Edges = append(run.Graph.Edges, edge(source, target))
+					}
+				}
+			}
 			m.replace(run)
 			m.node = max(0, m.node-1)
 		}
 	case "c":
-		run.Graph.Edges = linearEdges(run.Graph.Nodes)
-		m.replace(run)
+		if m.edgeSource < 0 {
+			m.edgeSource = m.node
+			m.message = "Select edge target, then press c. Esc cancels."
+		} else if m.edgeSource == m.node {
+			m.err = fmt.Errorf("an edge cannot target itself")
+		} else {
+			source, target := run.Graph.Nodes[m.edgeSource].ID, run.Graph.Nodes[m.node].ID
+			if hasEdge(run.Graph.Edges, source, target) {
+				m.err = fmt.Errorf("edge already exists")
+			} else {
+				run.Graph.Edges = append(run.Graph.Edges, edge(source, target))
+				if err := run.Graph.Validate(); err != nil {
+					run.Graph.Edges = run.Graph.Edges[:len(run.Graph.Edges)-1]
+					m.err = err
+				} else {
+					m.replace(run)
+					m.message = "Edge added."
+				}
+			}
+			m.edgeSource = -1
+		}
+	case "[":
+		if len(run.Graph.Edges) > 0 {
+			m.edge = (m.edge - 1 + len(run.Graph.Edges)) % len(run.Graph.Edges)
+		}
+	case "]":
+		if len(run.Graph.Edges) > 0 {
+			m.edge = (m.edge + 1) % len(run.Graph.Edges)
+		}
+	case "x":
+		if len(run.Graph.Edges) > 0 {
+			run.Graph.Edges = append(run.Graph.Edges[:m.edge], run.Graph.Edges[m.edge+1:]...)
+			m.edge = min(m.edge, max(0, len(run.Graph.Edges)-1))
+			m.replace(run)
+			m.message = "Edge deleted."
+		}
+	case "H", "J", "K", "L":
+		if m.node < len(run.Graph.Nodes) {
+			moveNode(&run.Graph.Nodes[m.node], value)
+			m.replace(run)
+		}
 	case "s":
 		return m, m.saveGraph(run)
 	}
@@ -356,7 +455,7 @@ func (m Model) graphKey(value string) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	var body strings.Builder
 	body.WriteString(titleStyle.Render("Norbot") + "  " + mutedStyle.Render("provider-agnostic, operator-gated app builder") + "\n")
-	body.WriteString(mutedStyle.Render("n new · p profile · a approve · v revise planner · t retry · x abandon · g edit graph · r refresh · q quit") + "\n\n")
+	body.WriteString(mutedStyle.Render("n new · p profile · a approve · v revise · t retry · x abandon · g graph · i status · l logs · S start · P stop · D delete · r refresh · q quit") + "\n\n")
 	if m.err != nil {
 		body.WriteString(errorStyle.Render("error: "+m.err.Error()) + "\n")
 	}
@@ -390,9 +489,15 @@ func (m Model) View() string {
 	}
 	if run, ok := m.run(); ok {
 		body.WriteString("\n" + titleStyle.Render("Workflow graph") + "\n" + drawGraph(run.Graph, m.node, m.mode == graphMode) + "\n")
+		if m.mode == graphMode && len(run.Graph.Edges) > 0 {
+			body.WriteString(mutedStyle.Render("Edge "+fmt.Sprintf("%d/%d: %s → %s", m.edge+1, len(run.Graph.Edges), run.Graph.Edges[m.edge].Source, run.Graph.Edges[m.edge].Target)) + "\n")
+		}
 		body.WriteString(mutedStyle.Render("Run "+run.ID+" · provider "+run.Providers[run.Stage]) + "\n")
 		if run.FailureReason != "" {
 			body.WriteString(errorStyle.Render(run.FailureReason) + "\n")
+		}
+		if m.deploymentLog != "" {
+			body.WriteString("\n" + titleStyle.Render("Deployment logs") + "\n" + tailLines(m.deploymentLog, 12) + "\n")
 		}
 	}
 	return body.String()
@@ -402,12 +507,83 @@ func drawGraph(graph domain.Graph, selected int, editing bool) string {
 	labels := make([]string, 0, len(graph.Nodes))
 	for i, node := range graph.Nodes {
 		label := "[" + node.Kind + ": " + node.Label + "]"
+		if node.Data != nil {
+			x, xOK := node.Data["x"].(int)
+			y, yOK := node.Data["y"].(int)
+			if xOK || yOK {
+				label += fmt.Sprintf(" (%d,%d)", x, y)
+			}
+		}
 		if editing && i == selected {
 			label = selectedStyle.Render("▸ " + label)
 		}
 		labels = append(labels, label)
 	}
-	return strings.Join(labels, " ──▶ ")
+	edges := make([]string, 0, len(graph.Edges))
+	for _, edge := range graph.Edges {
+		edges = append(edges, edge.Source+" → "+edge.Target)
+	}
+	return strings.Join(labels, "  ") + "\n" + mutedStyle.Render(strings.Join(edges, " · "))
+}
+
+func edge(source, target string) domain.GraphEdge {
+	return domain.GraphEdge{ID: source + "-to-" + target, Source: source, Target: target}
+}
+func hasEdge(edges []domain.GraphEdge, source, target string) bool {
+	for _, item := range edges {
+		if item.Source == source && item.Target == target {
+			return true
+		}
+	}
+	return false
+}
+func removeEdge(edges []domain.GraphEdge, source, target string) []domain.GraphEdge {
+	result := edges[:0]
+	for _, item := range edges {
+		if item.Source != source || item.Target != target {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+func removeNodeEdges(edges []domain.GraphEdge, node string) []domain.GraphEdge {
+	result := edges[:0]
+	for _, item := range edges {
+		if item.Source != node && item.Target != node {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+func graphNeighbours(graph domain.Graph, node string) ([]string, []string) {
+	predecessors, successors := []string{}, []string{}
+	for _, item := range graph.Edges {
+		if item.Target == node {
+			predecessors = append(predecessors, item.Source)
+		}
+		if item.Source == node {
+			successors = append(successors, item.Target)
+		}
+	}
+	return predecessors, successors
+}
+func moveNode(node *domain.GraphNode, direction string) {
+	if node.Data == nil {
+		node.Data = map[string]any{}
+	}
+	x, _ := node.Data["x"].(int)
+	y, _ := node.Data["y"].(int)
+	switch direction {
+	case "H":
+		x--
+	case "L":
+		x++
+	case "K":
+		y--
+	case "J":
+		y++
+	}
+	node.Data["x"], node.Data["y"] = x, y
 }
 func linearEdges(nodes []domain.GraphNode) []domain.GraphEdge {
 	edges := make([]domain.GraphEdge, 0, max(0, len(nodes)-1))
@@ -528,4 +704,46 @@ func (m Model) saveGraph(run domain.Run) tea.Cmd {
 		err := m.client.do(http.MethodPut, "/api/runs/"+run.ID+"/graph", run.Graph, &saved)
 		return graphMsg{saved, err}
 	}
+}
+func (m Model) deploymentStatus(id string) tea.Cmd {
+	return func() tea.Msg {
+		var info engine.DeploymentInfo
+		err := m.client.do(http.MethodGet, "/api/runs/"+id+"/deployment", nil, &info)
+		return deploymentMsg{info: info, err: err}
+	}
+}
+func (m Model) deploymentLogs(id string) tea.Cmd {
+	return func() tea.Msg {
+		var out struct {
+			Logs string `json:"logs"`
+		}
+		err := m.client.do(http.MethodGet, "/api/runs/"+id+"/deployment/logs?lines=200", nil, &out)
+		return deploymentMsg{logs: out.Logs, err: err}
+	}
+}
+func (m Model) deploymentAction(id, action string) tea.Cmd {
+	return func() tea.Msg {
+		if action == "start" {
+			var info engine.DeploymentInfo
+			err := m.client.do(http.MethodPost, "/api/runs/"+id+"/deployment/start", nil, &info)
+			return deploymentMsg{info: info, err: err}
+		}
+		var deployment domain.Deployment
+		err := m.client.do(http.MethodPost, "/api/runs/"+id+"/deployment/"+action, nil, &deployment)
+		return deploymentMsg{deployment: deployment, err: err}
+	}
+}
+func (m Model) deleteDeployment(id string) tea.Cmd {
+	return func() tea.Msg {
+		var deployment domain.Deployment
+		err := m.client.do(http.MethodDelete, "/api/runs/"+id+"/deployment", nil, &deployment)
+		return deploymentMsg{deployment: deployment, err: err}
+	}
+}
+func tailLines(value string, count int) string {
+	lines := strings.Split(strings.TrimSpace(value), "\n")
+	if len(lines) > count {
+		lines = lines[len(lines)-count:]
+	}
+	return strings.Join(lines, "\n")
 }

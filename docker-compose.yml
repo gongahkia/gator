@@ -20,6 +20,7 @@ services:
       - ./deploy/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
       - "127.0.0.1:4318:4318"
+      - "127.0.0.1:8889:8889"
 
   jaeger:
     image: jaegertracing/all-in-one:1.67.0
@@ -33,7 +34,7 @@ services:
     env_file: .env
     environment:
       NORBOT_DATABASE_URL: ${NORBOT_DATABASE_URL:-postgres://norbot:norbot@postgres:5432/norbot?sslmode=disable}
-      NORBOT_HTTP_ADDR: ${NORBOT_HTTP_ADDR:-127.0.0.1:8080}
+      NORBOT_HTTP_ADDR: ${NORBOT_HTTP_ADDR:-0.0.0.0:8080}
       NORBOT_ARTIFACTS_DIR: ${NORBOT_ARTIFACTS_DIR:-/var/lib/norbot/artifacts}
       NORBOT_CONFIG: ${NORBOT_CONFIG:-/etc/norbot/config.json}
       NORBOT_OTEL_ENDPOINT: ${NORBOT_OTEL_ENDPOINT:-otel-collector:4318}

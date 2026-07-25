@@ -117,7 +117,7 @@ func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, com
 	if network == "" {
 		network = "bridge"
 	}
-	args := []string{"run", "--rm", "-i", "--label", "norbot.run_id=" + runID, "--label", "norbot.role=agent", "--network", network, "-v", w.Volume(runID) + ":/workspace", "-w", "/workspace"}
+	args := []string{"run", "--rm", "-i", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=256", "--memory=4g", "--cpus=2", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "--label", "norbot.run_id=" + runID, "--label", "norbot.role=agent", "--network", network, "-v", w.Volume(runID) + ":/workspace", "-w", "/workspace"}
 	if credentialEnv != "" {
 		if value, ok := os.LookupEnv(credentialEnv); ok {
 			args = append(args, "-e", credentialEnv+"="+value)
@@ -152,9 +152,10 @@ type Capacity struct {
 }
 
 type QuotaFactor struct {
-	ProviderID        string `json:"provider_id"`
-	ConfiguredLimit   int    `json:"configured_limit,omitempty"`
-	ObservedRemaining *int   `json:"observed_remaining,omitempty"`
+	ProviderID                 string `json:"provider_id"`
+	ConfiguredLimit            int    `json:"configured_limit,omitempty"`
+	ConfiguredRequestsPerMinute int    `json:"configured_requests_per_minute,omitempty"`
+	ObservedRemaining          *int   `json:"observed_remaining,omitempty"`
 }
 
 func DetectCapacity(ctx context.Context, dockerBin string, configuredWorkers, maxWorkers int, runner CommandRunner) Capacity {
@@ -186,6 +187,7 @@ func (c *Capacity) ApplyProviderQuotas(factors []QuotaFactor) {
 	quota := 0
 	for _, factor := range factors {
 		limit := factor.ConfiguredLimit
+		if factor.ConfiguredRequestsPerMinute > 0 && (limit == 0 || factor.ConfiguredRequestsPerMinute < limit) { limit = factor.ConfiguredRequestsPerMinute }
 		if factor.ObservedRemaining != nil && (*factor.ObservedRemaining < limit || limit == 0) {
 			limit = *factor.ObservedRemaining
 		}
@@ -242,7 +244,7 @@ func ProjectName(runID string) string {
 }
 
 func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (string, error) {
-	port, err := reservePort()
+	port, err := ReservePort()
 	if err != nil {
 		return "", err
 	}
@@ -276,25 +278,42 @@ func (d Deployment) Delete(ctx context.Context, runID, root string) error {
 func (d Deployment) Status(ctx context.Context, runID, root string) (DeploymentStatus, error) {
 	project := ProjectName(runID)
 	output, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "ps", "--format", "json")
-	if err != nil { return DeploymentStatus{}, err }
+	if err != nil {
+		return DeploymentStatus{}, err
+	}
 	services := []map[string]any{}
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		if strings.TrimSpace(line) == "" { continue }
+	trimmed := strings.TrimSpace(string(output))
+	if strings.HasPrefix(trimmed, "[") {
+		if err := json.Unmarshal([]byte(trimmed), &services); err != nil {
+			return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err)
+		}
+		return DeploymentStatus{Project: project, Services: services}, nil
+	}
+	for _, line := range strings.Split(trimmed, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
 		var service map[string]any
-		if err := json.Unmarshal([]byte(line), &service); err != nil { return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err) }
+		if err := json.Unmarshal([]byte(line), &service); err != nil {
+			return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err)
+		}
 		services = append(services, service)
 	}
 	return DeploymentStatus{Project: project, Services: services}, nil
 }
 
 func (d Deployment) Logs(ctx context.Context, runID, root string, lines int) (string, error) {
-	if lines < 1 || lines > 10000 { return "", fmt.Errorf("log line limit must be 1-10000") }
+	if lines < 1 || lines > 10000 {
+		return "", fmt.Errorf("log line limit must be 1-10000")
+	}
 	output, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "logs", "--no-color", "--tail", strconv.Itoa(lines))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	return string(output), nil
 }
 
-func reservePort() (int, error) {
+func ReservePort() (int, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return 0, err

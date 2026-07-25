@@ -39,3 +39,20 @@ func TestProviderSelectionCyclesWithinStage(t *testing.T) {
 		t.Fatalf("provider=%q", model.selections[domain.StagePlanner])
 	}
 }
+
+func TestGraphEditorCreatesArbitraryEdge(t *testing.T) {
+	run := domain.Run{ID: "run", Graph: domain.DefaultGraph()}
+	model := Model{runs: []domain.Run{run}, mode: graphMode, node: 0, edgeSource: -1}
+	next, _ := model.graphKey("c")
+	model = next.(Model)
+	model.node = 2
+	next, _ = model.graphKey("c")
+	model = next.(Model)
+	updated, ok := model.run()
+	if !ok || !hasEdge(updated.Graph.Edges, "input-request", "output-deployment") {
+		t.Fatalf("edges=%#v", updated.Graph.Edges)
+	}
+	if err := updated.Graph.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

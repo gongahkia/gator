@@ -16,6 +16,15 @@ func TestGraphRejectsUnknownEdgeEndpoint(t *testing.T) {
 	}
 }
 
+func TestGraphRejectsCycleAndDisconnectedNode(t *testing.T) {
+	cycle := DefaultGraph()
+	cycle.Edges = append(cycle.Edges, GraphEdge{ID: "output-to-input", Source: "output-deployment", Target: "input-request"})
+	if err := cycle.Validate(); err == nil { t.Fatal("expected cycle error") }
+	disconnected := DefaultGraph()
+	disconnected.Nodes = append(disconnected.Nodes, GraphNode{ID:"orphan",Label:"Orphan",Kind:"tool",Optional:true})
+	if err := disconnected.Validate(); err == nil { t.Fatal("expected disconnected node error") }
+}
+
 func TestStageOrder(t *testing.T) {
 	next, ok := StageVerifier.Next()
 	if !ok || next != StageDeployer {

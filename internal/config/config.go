@@ -22,6 +22,7 @@ type Provider struct {
 	Network       string         `json:"network"`
 	Stages        []domain.Stage `json:"stages"`
 	Budget        ProviderBudget `json:"budget"`
+	PluginID      string         `json:"plugin_id"`
 }
 
 type ProviderBudget struct {
@@ -104,10 +105,13 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("duplicate provider id %q", p.ID)
 		}
 		seen[p.ID] = struct{}{}
+		if p.Kind == "plugin" && p.PluginID == "" {
+			return fmt.Errorf("plugin provider %q needs plugin_id", p.ID)
+		}
 		if p.Kind == "cli" && (len(p.Command) == 0 || p.Image == "") {
 			return fmt.Errorf("cli provider %q needs command and image", p.ID)
 		}
-		if p.Kind != "cli" && (p.BaseURL == "" || p.Model == "" || p.CredentialEnv == "") {
+		if p.Kind != "cli" && p.Kind != "plugin" && (p.BaseURL == "" || p.Model == "" || p.CredentialEnv == "") {
 			return fmt.Errorf("api provider %q needs base_url, model, and credential_env", p.ID)
 		}
 		if p.Budget.MaxConcurrent < 0 || p.Budget.RequestsPerMinute < 0 {
@@ -134,6 +138,13 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("duplicate plugin id %q", plugin.ID)
 		}
 		pluginIDs[plugin.ID] = struct{}{}
+	}
+	for _, provider := range m.Providers {
+		if provider.Kind == "plugin" {
+			if _, ok := pluginIDs[provider.PluginID]; !ok {
+				return fmt.Errorf("provider %q references unknown plugin %q", provider.ID, provider.PluginID)
+			}
+		}
 	}
 	return nil
 }

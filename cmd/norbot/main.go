@@ -52,12 +52,18 @@ func serveCommand(args []string) {
 		logger.Error("load config", "error", err)
 		os.Exit(1)
 	}
-	if _, err := extension.LoadProcessPlugins(cfg.Manifest.Plugins); err != nil {
+	plugins, err := extension.LoadProcessPlugins(cfg.Manifest.Plugins)
+	if err != nil {
 		logger.Error("load process plugins", "error", err)
 		os.Exit(1)
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	extensions := extension.NewRegistry()
+	if err := extension.RegisterProcessPlugins(ctx, extensions, plugins); err != nil {
+		logger.Error("register process plugins", "error", err)
+		os.Exit(1)
+	}
 	shutdownTelemetry, err := api.SetupTelemetry(ctx, cfg.OTelEndpoint)
 	if err != nil {
 		logger.Error("setup telemetry", "error", err)
@@ -74,7 +80,7 @@ func serveCommand(args []string) {
 		logger.Error("migrate database", "error", err)
 		os.Exit(1)
 	}
-	service := engine.New(st, cfg, logger)
+	service := engine.NewWithExtensions(st, cfg, logger, extensions)
 	service.StartWorkers(ctx)
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.New(service, st, logger).Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {

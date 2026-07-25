@@ -13,11 +13,17 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/extension"
 	"github.com/gongahkia/norbot/internal/provider"
 	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/store"
+	"github.com/gongahkia/norbot/internal/telemetry"
 )
 
 type CreateRunInput struct {
@@ -31,6 +37,11 @@ type ApprovalInput struct {
 	Feedback string                `json:"feedback"`
 }
 
+type DeploymentInfo struct {
+	Deployment domain.Deployment        `json:"deployment"`
+	Runtime    runtime.DeploymentStatus `json:"runtime"`
+}
+
 type Service struct {
 	store      *store.Store
 	config     config.Config
@@ -38,16 +49,26 @@ type Service struct {
 	deployment runtime.Deployment
 	invoker    provider.Invoker
 	log        *slog.Logger
+	metrics    *telemetry.Metrics
 }
 
 func New(st *store.Store, cfg config.Config, logger *slog.Logger) *Service {
+	return NewWithExtensions(st, cfg, logger, extension.NewRegistry())
+}
+
+func NewWithExtensions(st *store.Store, cfg config.Config, logger *slog.Logger, extensions *extension.Registry) *Service {
 	workspace := runtime.Workspace{DockerBin: cfg.DockerBin, ArtifactsDir: cfg.ArtifactsDir, Runner: runtime.OSRunner{}}
+	if extensions == nil {
+		extensions = extension.NewRegistry()
+	}
 	return &Service{
 		store: st, config: cfg, workspace: workspace,
 		deployment: runtime.Deployment{DockerBin: cfg.DockerBin, Runner: runtime.OSRunner{}},
-		invoker:    provider.Invoker{Workspace: workspace}, log: logger,
+		invoker:    provider.Invoker{Workspace: workspace, Extensions: extensions}, log: logger, metrics: telemetry.NewMetrics(),
 	}
 }
+
+func (s *Service) Metrics() *telemetry.Metrics { return s.metrics }
 
 func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.Run, error) {
 	input.Prompt = strings.TrimSpace(input.Prompt)
@@ -121,7 +142,7 @@ func (s *Service) Cancel(ctx context.Context, runID string) (domain.Run, error) 
 			return domain.Run{}, err
 		}
 	}
-	_ = s.deployment.Stop(ctx, runID, s.workspace.RunPath(runID))
+	_ = s.deployment.Delete(ctx, runID, s.workspace.RunPath(runID))
 	if err := s.workspace.Cleanup(ctx, runID); err != nil {
 		s.log.Warn("workspace cleanup failed after cancel", "run_id", runID, "error", err)
 	}
@@ -137,11 +158,87 @@ func (s *Service) Cleanup(ctx context.Context, runID string) error {
 	if !run.Status.Terminal() {
 		return fmt.Errorf("cancel an active run before cleanup")
 	}
-	_ = s.deployment.Stop(ctx, runID, s.workspace.RunPath(runID))
+	_ = s.deployment.Delete(ctx, runID, s.workspace.RunPath(runID))
 	if err := s.workspace.Cleanup(ctx, runID); err != nil {
 		return err
 	}
 	return s.store.RecordEvent(ctx, runID, "run_cleanup_completed", "Docker workspace and deployment cleaned; host artifacts retained", nil)
+}
+
+func (s *Service) DeploymentStatus(ctx context.Context, runID string) (DeploymentInfo, error) {
+	if _, err := s.store.GetRun(ctx, runID); err != nil {
+		return DeploymentInfo{}, err
+	}
+	deployment, err := s.store.GetDeployment(ctx, runID)
+	if err != nil {
+		return DeploymentInfo{}, err
+	}
+	status, err := s.deployment.Status(ctx, runID, s.workspace.RunPath(runID))
+	if err != nil {
+		return DeploymentInfo{}, err
+	}
+	return DeploymentInfo{Deployment: deployment, Runtime: status}, nil
+}
+
+func (s *Service) DeploymentLogs(ctx context.Context, runID string, lines int) (string, error) {
+	if _, err := s.store.GetDeployment(ctx, runID); err != nil {
+		return "", err
+	}
+	return s.deployment.Logs(ctx, runID, s.workspace.RunPath(runID), lines)
+}
+
+func (s *Service) StartDeployment(ctx context.Context, runID string) (DeploymentInfo, error) {
+	deployment, err := s.store.GetDeployment(ctx, runID)
+	if err != nil {
+		return DeploymentInfo{}, err
+	}
+	if err := s.deployment.Start(ctx, runID, s.workspace.RunPath(runID)); err != nil {
+		return DeploymentInfo{}, err
+	}
+	if err := s.store.UpsertDeployment(ctx, runID, deployment.ProjectName, deployment.PublicURL, "running", ""); err != nil {
+		return DeploymentInfo{}, err
+	}
+	if err := s.store.RecordEvent(ctx, runID, "deployment_started", "Deployment started by operator", nil); err != nil {
+		return DeploymentInfo{}, err
+	}
+	s.metrics.ObserveDeployment("started")
+	return s.DeploymentStatus(ctx, runID)
+}
+
+func (s *Service) StopDeployment(ctx context.Context, runID string) (domain.Deployment, error) {
+	deployment, err := s.store.GetDeployment(ctx, runID)
+	if err != nil {
+		return domain.Deployment{}, err
+	}
+	if err := s.deployment.Stop(ctx, runID, s.workspace.RunPath(runID)); err != nil {
+		return domain.Deployment{}, err
+	}
+	if err := s.store.UpsertDeployment(ctx, runID, deployment.ProjectName, deployment.PublicURL, "stopped", ""); err != nil {
+		return domain.Deployment{}, err
+	}
+	if err := s.store.RecordEvent(ctx, runID, "deployment_stopped", "Deployment stopped by operator", nil); err != nil {
+		return domain.Deployment{}, err
+	}
+	s.metrics.ObserveDeployment("stopped")
+	return s.store.GetDeployment(ctx, runID)
+}
+
+func (s *Service) DeleteDeployment(ctx context.Context, runID string) (domain.Deployment, error) {
+	deployment, err := s.store.GetDeployment(ctx, runID)
+	if err != nil {
+		return domain.Deployment{}, err
+	}
+	if err := s.deployment.Delete(ctx, runID, s.workspace.RunPath(runID)); err != nil {
+		return domain.Deployment{}, err
+	}
+	if err := s.store.UpsertDeployment(ctx, runID, deployment.ProjectName, deployment.PublicURL, "deleted", ""); err != nil {
+		return domain.Deployment{}, err
+	}
+	if err := s.store.RecordEvent(ctx, runID, "deployment_deleted", "Deployment deleted by operator", nil); err != nil {
+		return domain.Deployment{}, err
+	}
+	s.metrics.ObserveDeployment("deleted")
+	return s.store.GetDeployment(ctx, runID)
 }
 
 func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
@@ -157,7 +254,7 @@ func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
 	}
 	factors := make([]runtime.QuotaFactor, 0, len(s.config.Manifest.Providers))
 	for _, configured := range s.config.Manifest.Providers {
-		factor := runtime.QuotaFactor{ProviderID: configured.ID, ConfiguredLimit: configured.Budget.MaxConcurrent}
+		factor := runtime.QuotaFactor{ProviderID: configured.ID, ConfiguredLimit: configured.Budget.MaxConcurrent, ConfiguredRequestsPerMinute: configured.Budget.RequestsPerMinute}
 		if observation, ok := latest[configured.ID]; ok {
 			factor.ObservedRemaining = observation.RemainingRequests
 		}
@@ -283,7 +380,18 @@ func workerIdentity() string {
 	return fmt.Sprintf("%s-%d", host, os.Getpid())
 }
 
-func (s *Service) execute(ctx context.Context, job domain.Job) error {
+func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
+	ctx, span := otel.Tracer("norbot.engine").Start(ctx, "stage.execute")
+	span.SetAttributes(attribute.String("norbot.run_id", job.RunID), attribute.String("norbot.stage", string(job.Stage)), attribute.Int("norbot.attempt", job.Attempt), attribute.String("norbot.worker_id", job.WorkerID))
+	finishMetric := s.metrics.StartStage(string(job.Stage))
+	defer func() {
+		finishMetric(err)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+	}()
 	run, err := s.store.GetRun(ctx, job.RunID)
 	if err != nil {
 		return err
@@ -307,7 +415,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 	}
 	generatedFiles := []string(nil)
 	if job.Stage == domain.StageBuilder {
-		generatedFiles, err = generateApp(s.workspace, run)
+		generatedFiles, err = generateApp(s.workspace, run, s.config.Manifest.ToolPolicy)
 		if err != nil {
 			return err
 		}
@@ -316,7 +424,16 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 		}
 	}
 	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli")
-	result, err := s.invoker.Invoke(ctx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
+	providerStarted := time.Now()
+	providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
+	providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
+	result, err := s.invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
+	s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
+	if err != nil {
+		providerSpan.RecordError(err)
+		providerSpan.SetStatus(codes.Error, err.Error())
+	}
+	providerSpan.End()
 	if err != nil {
 		return err
 	}
@@ -363,8 +480,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 		artifact["generated_files"] = generatedFiles
 	}
 	if job.Stage == domain.StageVerifier {
-		report, err := verifyApp(s.workspace, run)
+		report, err := verifyApp(ctx, s.workspace, run)
 		if err != nil {
+			artifact["verification"] = report
+			if encoded, marshalErr := json.MarshalIndent(artifact, "", "  "); marshalErr == nil {
+				if _, writeErr := s.workspace.WriteArtifact(run.ID, path, encoded); writeErr == nil {
+					_ = s.workspace.MirrorToVolume(ctx, run.ID, path)
+				}
+			}
 			return err
 		}
 		artifact["verification"] = report
@@ -373,34 +496,114 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 }
 
 func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) error {
+	ctx, span := otel.Tracer("norbot.deployment").Start(ctx, "deployment.create")
+	defer span.End()
+	span.SetAttributes(attribute.String("norbot.run_id", run.ID), attribute.String("norbot.project", runtime.ProjectName(run.ID)))
 	root := s.workspace.RunPath(run.ID)
 	if err := s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), "", "building", ""); err != nil {
 		return err
 	}
 	url, err := s.deployment.Deploy(ctx, run, root)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		s.metrics.ObserveDeployment("failed")
 		_ = s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), "", "failed", err.Error())
 		return err
 	}
 	if err := s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), url, "running", ""); err != nil {
 		return err
 	}
+	s.metrics.ObserveDeployment("created")
 	return s.store.CompleteRun(ctx, job, map[string]any{"project": runtime.ProjectName(run.ID), "public_url": url})
 }
 
-func verifyApp(workspace runtime.Workspace, run domain.Run) (map[string]any, error) {
+func verifyApp(ctx context.Context, workspace runtime.Workspace, run domain.Run) (map[string]any, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
 	root := filepath.Join(workspace.RunPath(run.ID), "generated-app")
-	required := []string{"docker-compose.yml", "frontend/package.json", "frontend/src/main.jsx"}
+	required := []string{"docker-compose.yml", "frontend/package.json", "frontend/package-lock.json", "frontend/src/main.jsx"}
 	if run.Profile != domain.ProfileFrontend {
-		required = append(required, "backend/main.go", "backend/go.mod")
+		required = append(required, "backend/main.go", "backend/go.mod", "backend/go.sum")
+	}
+	if run.Profile == domain.ProfileAgentic {
+		required = append(required, "backend/harness.go", "backend/tool_policy.json")
 	}
 	for _, relative := range required {
 		if _, err := os.Stat(filepath.Join(root, relative)); err != nil {
 			return nil, fmt.Errorf("generated app missing %s", relative)
 		}
 	}
-	return map[string]any{"status": "pass", "checks": required, "summary": "Generated profile contract is present. Operator approval is required before local deployment."}, nil
+	runner := workspace.Runner
+	if runner == nil {
+		runner = runtime.OSRunner{}
+	}
+	dockerBin := workspace.DockerBin
+	if dockerBin == "" {
+		dockerBin = "docker"
+	}
+	project := runtime.ProjectName("verify-" + run.ID)
+	port, err := reserveVerificationPort()
+	if err != nil {
+		return nil, err
+	}
+	envFile := filepath.Join(root, ".norbot.verify.env")
+	if err := os.WriteFile(envFile, []byte("NORBOT_PUBLIC_PORT="+fmt.Sprint(port)+"\n"), 0o600); err != nil {
+		return nil, err
+	}
+	defer os.Remove(envFile)
+	compose := []string{"compose", "-p", project, "--project-directory", root, "--env-file", envFile}
+	checks := []string{"profile contract", "locked frontend dependencies", "compose config"}
+	runCommand := func(name string, args ...string) error {
+		if _, err := runner.Run(ctx, name, args...); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := runCommand(dockerBin, append(compose, "config", "--quiet")...); err != nil {
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, err)
+	}
+	frontend := []string{"run", "--rm", "-v", workspace.Volume(run.ID) + ":/workspace", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", "npm ci && npm test && npm run build && npm audit --omit=dev --audit-level=high"}
+	if err := runCommand(dockerBin, frontend...); err != nil {
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend test/build/audit: %w", err))
+	}
+	checks = append(checks, "npm ci/test/build/audit")
+	if run.Profile != domain.ProfileFrontend {
+		backend := []string{"run", "--rm", "-v", workspace.Volume(run.ID) + ":/workspace", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", "go test ./... && go build ./... && go install golang.org/x/vuln/cmd/govulncheck@v1.6.0 && govulncheck ./..."}
+		if err := runCommand(dockerBin, backend...); err != nil {
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go test/build/govulncheck: %w", err))
+		}
+		checks = append(checks, "go test/build/govulncheck")
+	}
+	deployed := false
+	defer func() {
+		if deployed {
+			_, _ = runner.Run(context.Background(), dockerBin, append(compose, "down", "--remove-orphans", "--volumes")...)
+		}
+	}()
+	if err := runCommand(dockerBin, append(compose, "up", "--build", "-d", "--wait", "--wait-timeout", "90")...); err != nil {
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("compose smoke startup: %w", err))
+	}
+	deployed = true
+	network := project + "_default"
+	if err := runCommand(dockerBin, "run", "--rm", "--network", network, "curlimages/curl:8.12.1", "-fsS", "http://frontend/"); err != nil {
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend smoke: %w", err))
+	}
+	if run.Profile != domain.ProfileFrontend {
+		if err := runCommand(dockerBin, "run", "--rm", "--network", network, "curlimages/curl:8.12.1", "-fsS", "http://backend:8000/api/health"); err != nil {
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("backend smoke: %w", err))
+		}
+	}
+	checks = append(checks, "compose build/health/smoke")
+	return map[string]any{"status": "pass", "checks": checks, "summary": "Locked dependency, build, test, vulnerability scan, Compose health, and network smoke checks passed. Operator approval is required before deployment."}, nil
 }
+
+func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, cause error) (map[string]any, error) {
+	logs, _ := runner.Run(ctx, dockerBin, append(compose, "logs", "--no-color", "--tail", "200")...)
+	return map[string]any{"status": "fail", "checks": checks, "logs": string(logs)}, fmt.Errorf("verification failed: %w", cause)
+}
+
+func reserveVerificationPort() (int, error) { return runtime.ReservePort() }
 
 func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool) string {
 	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nGraph: %+v\nPlanner feedback: %s\nDo not reveal credentials or execute unapproved external actions.\n", stage, run.ID, run.Profile, run.Prompt, run.Graph, run.Feedback)

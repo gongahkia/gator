@@ -20,6 +20,8 @@ func TestOpenAIResponsesAdapter(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			t.Fatal("missing auth")
 		}
+		w.Header().Set("x-ratelimit-remaining-requests", "7")
+		w.Header().Set("x-ratelimit-reset-requests", "1s")
 		_, _ = io.WriteString(w, `{"id":"resp_1","output_text":"planned"}`)
 	}))
 	defer server.Close()
@@ -32,6 +34,7 @@ func TestOpenAIResponsesAdapter(t *testing.T) {
 	if result.Text != "planned" || result.Provider != "openai" {
 		t.Fatalf("unexpected result %#v", result)
 	}
+	if result.RateLimit.RemainingRequests == nil || *result.RateLimit.RemainingRequests != 7 || result.RateLimit.ResetAt == nil { t.Fatalf("rate limit=%#v", result.RateLimit) }
 	_ = os.Unsetenv("TEST_OPENAI")
 }
 

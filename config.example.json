@@ -43,7 +43,7 @@
     "artifact_read": {"enabled": true, "approval_required": false, "roles": ["researcher", "builder"]},
     "http_get": {"enabled": true, "approval_required": false, "roles": ["researcher"], "allowed_hosts": ["api.example.com"]},
     "http_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
-    "database_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
+    "database_mutate": {"enabled": true, "approval_required": true, "roles": ["operator"]},
     "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": []}
   },
   "plugins": []

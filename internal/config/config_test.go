@@ -24,3 +24,8 @@ func TestManifestProviderRespectsStage(t *testing.T) {
 		t.Fatal("provider should not support builder")
 	}
 }
+
+func TestManifestRejectsUnknownPluginProvider(t *testing.T) {
+	manifest := Manifest{Providers: []Provider{{ID:"external",Kind:"plugin",PluginID:"missing",Stages:[]domain.Stage{domain.StagePlanner}}},Profiles:[]domain.Profile{domain.ProfileFullStack}}
+	if err := manifest.Validate(); err == nil { t.Fatal("expected unknown plugin error") }
+}
