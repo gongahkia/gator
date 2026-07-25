@@ -57,7 +57,8 @@ local definition = table.concat({
 }, "\n")
 local parsed = format.parse(definition)
 assert(
-	parsed.id == "task-markdown"
+	format.validate_layout(definition).schema_version == 1
+		and parsed.id == "task-markdown"
 		and parsed.workspace.root == "/workspace/gator"
 		and parsed.sessions[1].owner == "provider"
 		and parsed.evidence[1].ref:find("private%-value") == nil,
