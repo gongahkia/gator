@@ -99,6 +99,10 @@ Do not put provider credentials, tokens, secrets, passwords, or API keys in Gato
 
 Run `require("gator").setup()` before `:GatorCaptureSelection`. Open `:Gator` to inspect explicit empty, loading, failure, recovery, and unavailable-provider states. Core actions open task, linked-session, context-inspection, and review panels when their local evidence is available.
 
+## Diagnostics and logging
+
+Gator does not persist provider credentials, provider output, or transcripts, and it has no general persistent activity log. For local debugging, use `:GatorHealth`, `:GatorExportDiagnostics`, and `:GatorBetaReadiness`; the latter two write local redacted reports and do not send telemetry. See [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md) for report locations, collection steps, Neovim-log handling, and safe issue-reporting guidance.
+
 ## Keyboard and screen reader UX
 
 Every Gator panel is keyboard-first and buffer-local: `j`/`k` moves the current selection, `<CR>` confirms or opens it, `q` closes or cancels, and `?` shows panel help. Context uses `<Space>` to include or exclude an entry; review uses `a`/`r` to accept or reject a hunk; timelines use `<Space>` to collapse or expand a call. Focus stays in the review controls after opening a diff, and closing the primary workspace restores the prior user window.
@@ -126,7 +130,7 @@ Provider runs are validated against their task, context pack, narrowed run polic
 2. Resolve the reported requirement: Neovim version, Git workspace, configuration/policy issue, optional sidecar dependency, or provider CLI readiness.
 3. For an unavailable provider, verify its installed CLI/version against [docs/PROVIDERS.md](docs/PROVIDERS.md) and complete authentication in that provider’s own CLI.
 4. Reopen `:Gator`; its workspace exposes recovery and unavailable-provider state rather than assuming a provider is usable.
-5. For a reproducible plugin failure, run `make check` from the repository checkout.
+5. For a reproducible plugin failure, follow [docs/DIAGNOSTICS.md](docs/DIAGNOSTICS.md); run `make check` from a repository checkout when available.
 
 ## Optional sidecar and development
 
