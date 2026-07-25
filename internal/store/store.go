@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS runs (
   profile TEXT NOT NULL,
 	deployment_target TEXT NOT NULL DEFAULT 'docker',
 	public_ingress BOOLEAN NOT NULL DEFAULT FALSE,
+	max_fixes INT NOT NULL DEFAULT 2,
   stage TEXT NOT NULL,
   status TEXT NOT NULL,
   providers JSONB NOT NULL,
@@ -115,11 +116,42 @@ CREATE TABLE IF NOT EXISTS provider_observations (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   observed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS revisions (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  attempt INT NOT NULL,
+  baseline_digest TEXT NOT NULL,
+  patch_digest TEXT NOT NULL,
+  files JSONB NOT NULL DEFAULT '{}'::jsonb,
+  report JSONB NOT NULL DEFAULT '{}'::jsonb,
+  state TEXT NOT NULL DEFAULT 'proposed',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS revisions_run_id_idx ON revisions(run_id,id DESC);
+CREATE TABLE IF NOT EXISTS provider_usage (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL,
+  revision_id BIGINT REFERENCES revisions(id) ON DELETE SET NULL,
+  provider_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INT NOT NULL DEFAULT 0,
+  output_tokens INT NOT NULL DEFAULT 0,
+  cached_tokens INT NOT NULL DEFAULT 0,
+  source TEXT NOT NULL,
+  estimator TEXT NOT NULL DEFAULT '',
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS provider_usage_run_id_idx ON provider_usage(run_id,id DESC);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS deployment_target TEXT NOT NULL DEFAULT 'docker';
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS public_ingress BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS max_fixes INT NOT NULL DEFAULT 2;
 UPDATE runs SET deployment_target='docker' WHERE deployment_target IS NULL OR deployment_target='';
 CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`)
 	if err != nil {
@@ -138,8 +170,8 @@ func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
 		return err
 	}
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO runs (id,prompt,profile,deployment_target,public_ingress,stage,status,providers,graph,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)`, run.ID, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.Stage, run.Status, providers, graph, run.CreatedAt)
+		_, err := tx.Exec(ctx, `INSERT INTO runs (id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)`, run.ID, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, providers, graph, run.CreatedAt)
 		if err != nil {
 			return err
 		}
@@ -249,6 +281,14 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 			if run.Status != domain.StatusAwaiting {
 				return fmt.Errorf("run is not awaiting approval")
 			}
+			if run.Stage == domain.StageVerifier {
+				var report []byte
+				err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report)
+				if err != nil { return fmt.Errorf("test report unavailable: %w", err) }
+				var decoded map[string]any
+				if err := json.Unmarshal(report, &decoded); err != nil { return err }
+				if decoded["status"] == "fail" { return fmt.Errorf("failed test report requires explicit fix approval") }
+			}
 			if run.Stage == domain.StageDeployer {
 				if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
 					return err
@@ -308,6 +348,22 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 				return err
 			}
 			return s.insertEvent(ctx, tx, runID, "run_abandoned", "Run abandoned by operator", nil)
+		case domain.ApprovalFix:
+			if run.Status != domain.StatusAwaiting || run.Stage != domain.StageVerifier {
+				return fmt.Errorf("fix is available only while a failed test report is awaiting approval")
+			}
+			var report []byte
+			if err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report); err != nil { return fmt.Errorf("test report unavailable: %w", err) }
+			var decoded map[string]any
+			if err := json.Unmarshal(report, &decoded); err != nil { return err }
+			if decoded["status"] != "fail" { return fmt.Errorf("fix requires a failed test report") }
+			var attempts int
+			if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM revisions WHERE run_id=$1 AND kind='fix'`, runID).Scan(&attempts); err != nil { return err }
+			if attempts >= run.MaxFixes { return fmt.Errorf("maximum fix attempts (%d) reached", run.MaxFixes) }
+			attempt := attempts + 2
+			if _, err := tx.Exec(ctx, `UPDATE runs SET stage='builder',status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil { return err }
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'builder',$2)`, runID, attempt); err != nil { return err }
+			return s.insertEvent(ctx, tx, runID, "fix_approved", "Operator approved bounded fix attempt", map[string]any{"attempt": attempt, "feedback": feedback})
 		default:
 			return fmt.Errorf("unknown approval action")
 		}
@@ -575,14 +631,14 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 	return err
 }
 
-const runQuery = `SELECT id,prompt,profile,deployment_target,public_ingress,stage,status,providers,graph,feedback,failure_reason,created_at,updated_at FROM runs`
+const runQuery = `SELECT id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,feedback,failure_reason,created_at,updated_at FROM runs`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanRun(row rowScanner) (domain.Run, error) {
 	var run domain.Run
 	var providers, graph []byte
-	err := row.Scan(&run.ID, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.Stage, &run.Status, &providers, &graph, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
+	err := row.Scan(&run.ID, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &providers, &graph, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Run{}, ErrNotFound
 	}

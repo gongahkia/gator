@@ -3,12 +3,14 @@ package engine
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -32,11 +34,13 @@ type CreateRunInput struct {
 	Providers        map[domain.Stage]string `json:"providers"`
 	DeploymentTarget domain.DeploymentTarget `json:"deployment_target"`
 	PublicIngress    bool                    `json:"public_ingress"`
+	MaxFixes         int                     `json:"max_fixes"`
 }
 
 type ApprovalInput struct {
 	Action   domain.ApprovalAction `json:"action"`
 	Feedback string                `json:"feedback"`
+	RevisionID int64               `json:"revision_id"`
 }
 
 type DeploymentInfo struct {
@@ -139,7 +143,11 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 		return domain.Run{}, err
 	}
 	now := time.Now().UTC()
-	run := domain.Run{ID: id, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: domain.DefaultGraph(), CreatedAt: now, UpdatedAt: now}
+	maxFixes := input.MaxFixes
+	if maxFixes == 0 { maxFixes = s.config.Manifest.Workflow.MaxFixes }
+	if maxFixes == 0 { maxFixes = 2 }
+	if maxFixes < 0 || maxFixes > 10 { return domain.Run{}, fmt.Errorf("max_fixes must be between 0 and 10") }
+	run := domain.Run{ID: id, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: domain.DefaultGraph(), CreatedAt: now, UpdatedAt: now}
 	if err := s.store.CreateRun(ctx, run); err != nil {
 		return domain.Run{}, err
 	}
@@ -180,6 +188,19 @@ func (s *Service) UpdateGraph(ctx context.Context, runID string, graph domain.Gr
 }
 
 func (s *Service) Approve(ctx context.Context, runID string, input ApprovalInput) (domain.Run, error) {
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil { return domain.Run{}, err }
+	if input.Action == domain.ApprovalApprove && run.Status == domain.StatusAwaiting && run.Stage == domain.StageBuilder {
+		revision, err := s.store.LatestRevision(ctx, runID)
+		if err != nil { return domain.Run{}, err }
+		if input.RevisionID != 0 && input.RevisionID != revision.ID { return domain.Run{}, fmt.Errorf("revision is no longer current") }
+		if revision.State != "proposed" { return domain.Run{}, fmt.Errorf("code revision is no longer proposed") }
+		workspace, _, err := s.backendForRun(ctx, run)
+		if err != nil { return domain.Run{}, err }
+		if err := applyRevision(workspace, run, revision); err != nil { return domain.Run{}, err }
+		if err := workspace.MirrorGeneratedApp(ctx, runID); err != nil { return domain.Run{}, err }
+		if err := s.store.ApproveRevision(ctx, runID, revision.ID); err != nil { return domain.Run{}, err }
+	}
 	return s.store.Approve(ctx, runID, input.Action, strings.TrimSpace(input.Feedback))
 }
 

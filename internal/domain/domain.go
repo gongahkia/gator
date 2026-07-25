@@ -216,6 +216,7 @@ type Run struct {
 	Profile          Profile          `json:"profile"`
 	DeploymentTarget DeploymentTarget `json:"deployment_target"`
 	PublicIngress    bool             `json:"public_ingress"`
+	MaxFixes         int              `json:"max_fixes"`
 	Stage            Stage            `json:"stage"`
 	Status           Status           `json:"status"`
 	Providers        map[Stage]string `json:"providers"`
@@ -224,6 +225,46 @@ type Run struct {
 	FailureReason    string           `json:"failure_reason,omitempty"`
 	CreatedAt        time.Time        `json:"created_at"`
 	UpdatedAt        time.Time        `json:"updated_at"`
+}
+
+type ReviewKind string
+
+const (
+	ReviewCode ReviewKind = "code"
+	ReviewTest ReviewKind = "test"
+	ReviewFix  ReviewKind = "fix"
+)
+
+func (k ReviewKind) Valid() bool { return k == ReviewCode || k == ReviewTest || k == ReviewFix }
+
+type Revision struct {
+	ID             int64          `json:"id"`
+	RunID          string         `json:"run_id"`
+	Kind           ReviewKind     `json:"kind"`
+	Attempt        int            `json:"attempt"`
+	BaselineDigest string         `json:"baseline_digest"`
+	PatchDigest    string         `json:"patch_digest"`
+	Files          map[string]string `json:"files,omitempty"`
+	Report         map[string]any `json:"report,omitempty"`
+	State          string         `json:"state"`
+	CreatedAt      time.Time      `json:"created_at"`
+	ApprovedAt     *time.Time     `json:"approved_at,omitempty"`
+}
+
+type UsageRecord struct {
+	ID             int64      `json:"id"`
+	RunID          string     `json:"run_id"`
+	Stage          Stage      `json:"stage"`
+	RevisionID     *int64     `json:"revision_id,omitempty"`
+	ProviderID     string     `json:"provider_id"`
+	Model          string     `json:"model"`
+	InputTokens    int        `json:"input_tokens"`
+	OutputTokens   int        `json:"output_tokens"`
+	CachedTokens   int        `json:"cached_tokens"`
+	Source         string     `json:"source"`
+	Estimator      string     `json:"estimator,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type Event struct {
@@ -260,4 +301,5 @@ const (
 	ApprovalRevise  ApprovalAction = "revise"
 	ApprovalRetry   ApprovalAction = "retry"
 	ApprovalAbandon ApprovalAction = "abandon"
+	ApprovalFix     ApprovalAction = "fix"
 )

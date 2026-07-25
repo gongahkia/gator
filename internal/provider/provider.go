@@ -30,6 +30,13 @@ type Result struct {
 	Model     string         `json:"model"`
 	Metadata  map[string]any `json:"metadata"`
 	RateLimit RateLimit      `json:"rate_limit"`
+	Usage     TokenUsage     `json:"usage"`
+}
+
+type TokenUsage struct {
+	InputTokens  *int `json:"input_tokens,omitempty"`
+	OutputTokens *int `json:"output_tokens,omitempty"`
+	CachedTokens *int `json:"cached_tokens,omitempty"`
 }
 
 type RateLimit struct {
@@ -187,7 +194,29 @@ func result(p config.Provider, text string, payload map[string]any, rateLimit Ra
 	if rateLimit.ResetAt != nil {
 		metadata["rate_limit_reset_at"] = rateLimit.ResetAt.UTC().Format(time.RFC3339)
 	}
-	return Result{Text: text, Provider: p.ID, Model: p.Model, Metadata: metadata, RateLimit: rateLimit}
+	usage := usageFromPayload(payload)
+	return Result{Text: text, Provider: p.ID, Model: p.Model, Metadata: metadata, RateLimit: rateLimit, Usage: usage}
+}
+
+func usageFromPayload(payload map[string]any) TokenUsage {
+	raw := asObject(payload["usage"])
+	if raw == nil { return TokenUsage{} }
+	lookup := func(keys ...string) *int {
+		for _, key := range keys {
+			value, ok := raw[key]
+			if !ok { continue }
+			switch v := value.(type) {
+			case float64: if v >= 0 { n := int(v); return &n }
+			case json.Number: if n, err := v.Int64(); err == nil && n >= 0 { value := int(n); return &value }
+			}
+		}
+		return nil
+	}
+	cached := lookup("cache_read_input_tokens", "cached_content_token_count")
+	if details := asObject(raw["input_tokens_details"]); details != nil && cached == nil {
+		if value, ok := details["cached_tokens"].(float64); ok && value >= 0 { n := int(value); cached = &n }
+	}
+	return TokenUsage{InputTokens: lookup("input_tokens", "prompt_tokens"), OutputTokens: lookup("output_tokens", "completion_tokens", "candidates_token_count"), CachedTokens: cached}
 }
 
 func rateLimitFromHeaders(headers http.Header) RateLimit {

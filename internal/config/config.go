@@ -52,6 +52,10 @@ type Runtime struct {
 	Kubernetes    Kubernetes              `json:"kubernetes"`
 }
 
+type Workflow struct {
+	MaxFixes int `json:"max_fixes"`
+}
+
 type Kubernetes struct {
 	Kubeconfig                 string `json:"kubeconfig"`
 	Context                    string `json:"context"`
@@ -76,6 +80,7 @@ type Manifest struct {
 	ToolPolicy map[string]ToolPolicy `json:"tool_policy"`
 	Plugins    []ProcessPlugin       `json:"plugins"`
 	Runtime    Runtime               `json:"runtime"`
+	Workflow   Workflow              `json:"workflow"`
 }
 
 type Config struct {
@@ -125,6 +130,9 @@ func Load() (Config, error) {
 }
 
 func (m Manifest) Validate() error {
+	if m.Workflow.MaxFixes < 0 || m.Workflow.MaxFixes > 10 {
+		return fmt.Errorf("workflow max_fixes must be between 0 and 10")
+	}
 	if len(m.Providers) == 0 {
 		return fmt.Errorf("manifest needs at least one provider")
 	}
@@ -238,7 +246,7 @@ func InitialManifest(target domain.DeploymentTarget, kube Kubernetes) Manifest {
 	if target == "" {
 		target = domain.DeploymentDocker
 	}
-	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}}
+	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}}
 }
 
 func WriteManifest(path string, manifest Manifest, force bool) error {
