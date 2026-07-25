@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.124.0
+    image: otel/opentelemetry-collector-contrib:0.123.0
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./deploy/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
