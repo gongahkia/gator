@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -44,6 +45,35 @@ type DeploymentBackend interface {
 	Delete(context.Context, string, string) error
 	Status(context.Context, string, string) (DeploymentStatus, error)
 	Logs(context.Context, string, string, int) (string, error)
+}
+
+type AgentInvocation struct {
+	SessionID      string           `json:"session_id"`
+	ExternalID     string           `json:"external_id"`
+	Role           string           `json:"role"`
+	Prompt         string           `json:"prompt"`
+	IdempotencyKey string           `json:"idempotency_key"`
+	Attachments    []map[string]any `json:"attachments,omitempty"`
+	Provider       AgentProvider    `json:"provider"`
+}
+
+type AgentProvider struct {
+	Kind          string `json:"kind"`
+	BaseURL       string `json:"base_url"`
+	Model         string `json:"model"`
+	CredentialEnv string `json:"credential_env"`
+}
+
+type AgentResponse struct {
+	Final       string         `json:"final"`
+	State       string         `json:"state"`
+	Status      string         `json:"status"`
+	Summary     string         `json:"summary,omitempty"`
+	Diagnostics map[string]any `json:"diagnostics,omitempty"`
+}
+
+type AgentBackend interface {
+	InvokeAgent(context.Context, domain.Run, string, AgentInvocation) (AgentResponse, error)
 }
 
 type OSRunner struct{}
@@ -347,6 +377,35 @@ func (d Deployment) Logs(ctx context.Context, runID, root string, lines int) (st
 		return "", err
 	}
 	return string(output), nil
+}
+
+func (d Deployment) InvokeAgent(ctx context.Context, run domain.Run, root string, input AgentInvocation) (AgentResponse, error) {
+	if run.Profile != domain.ProfileAgentic {
+		return AgentResponse{}, fmt.Errorf("run is not an agentic application")
+	}
+	payload, err := json.Marshal(input)
+	if err != nil {
+		return AgentResponse{}, err
+	}
+	args := []string{"compose", "-p", ProjectName(run.ID), "--project-directory", filepath.Join(root, "generated-app"), "exec", "-T", "backend", "wget", "-qO-", "--header=Content-Type: application/json", "--post-file=-", "http://127.0.0.1:8000/api/agents/run"}
+	command := exec.CommandContext(ctx, d.DockerBin, args...)
+	command.Stdin = bytes.NewReader(payload)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return AgentResponse{}, fmt.Errorf("invoke agent: %w: %s", err, tail(string(output), 1000))
+	}
+	var response AgentResponse
+	if err := json.Unmarshal(output, &response); err != nil {
+		return AgentResponse{}, fmt.Errorf("decode agent response: %w", err)
+	}
+	if response.State == "" {
+		if response.Status != "" {
+			response.State = response.Status
+		} else {
+			response.State = "completed"
+		}
+	}
+	return response, nil
 }
 
 func ReservePort() (int, error) {

@@ -14,29 +14,58 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/gongahkia/norbot/internal/channel"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
+	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
 )
 
 type Server struct {
-	service *engine.Service
-	store   *store.Store
-	log     *slog.Logger
+	service  *engine.Service
+	store    *store.Store
+	log      *slog.Logger
+	skills   *skill.Service
+	channels *channel.Service
 }
 
 func New(service *engine.Service, st *store.Store, logger *slog.Logger) *Server {
 	return &Server{service: service, store: st, log: logger}
 }
 
+func NewWithSkills(service *engine.Service, st *store.Store, logger *slog.Logger, skills *skill.Service) *Server {
+	server := New(service, st, logger)
+	server.skills = skills
+	return server
+}
+
+func NewWithComponents(service *engine.Service, st *store.Store, logger *slog.Logger, skills *skill.Service, channels *channel.Service) *Server {
+	server := NewWithSkills(service, st, logger, skills)
+	server.channels = channels
+	return server
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.health)
+	mux.HandleFunc("GET /api/health/detail", s.healthDetail)
+	mux.HandleFunc("GET /api/health/stream", s.healthStream)
 	mux.HandleFunc("GET /api/capacity", s.capacity)
 	mux.HandleFunc("POST /api/capacity/recommendations", s.recommendCapacity)
 	mux.HandleFunc("POST /api/capacity/recommendations/{id}/accept", s.acceptCapacity)
 	mux.HandleFunc("GET /api/providers", s.providers)
 	mux.HandleFunc("GET /api/runtime", s.runtimeOptions)
+	mux.HandleFunc("GET /api/skills/imports", s.skillImports)
+	mux.HandleFunc("POST /api/skills/imports", s.importSkill)
+	mux.HandleFunc("POST /api/skills/imports/{id}/activate", s.activateSkill)
+	mux.HandleFunc("GET /api/channels/accounts", s.channelAccounts)
+	mux.HandleFunc("POST /api/channels/accounts", s.createChannelAccount)
+	mux.HandleFunc("POST /api/channels/accounts/{id}/pairings", s.pairChannel)
+	mux.HandleFunc("DELETE /api/channels/accounts/{id}/pairings/{external}", s.unpairChannel)
+	mux.HandleFunc("GET /api/channels/accounts/{id}/sessions/{external}", s.exportChannelSession)
+	mux.HandleFunc("DELETE /api/channels/accounts/{id}/sessions/{external}", s.resetChannelSession)
+	mux.HandleFunc("GET /api/channels/{account}/webhook", s.channelWebhook)
+	mux.HandleFunc("POST /api/channels/{account}/webhook", s.channelWebhook)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
 	mux.HandleFunc("POST /api/runs", s.createRun)
@@ -44,6 +73,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
+	mux.HandleFunc("GET /api/runs/{id}/skills", s.runSkills)
 	mux.HandleFunc("PUT /api/runs/{id}/graph", s.updateGraph)
 	mux.HandleFunc("POST /api/runs/{id}/approval", s.approve)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.cancel)
@@ -56,12 +86,205 @@ func (s *Server) Handler() http.Handler {
 	return requestLog(s.log, otelhttp.NewHandler(mux, "norbot.http"))
 }
 
+func (s *Server) skillImports(w http.ResponseWriter, r *http.Request) {
+	if s.skills == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("skill marketplace is not configured"))
+		return
+	}
+	values, err := s.skills.Imports(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
+	if s.skills == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("skill marketplace is not configured"))
+		return
+	}
+	var input skill.ImportInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	imported, pkg, err := s.skills.Import(r.Context(), input)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"import": imported, "package": pkg})
+}
+
+func (s *Server) activateSkill(w http.ResponseWriter, r *http.Request) {
+	if s.skills == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("skill marketplace is not configured"))
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid skill import id"))
+		return
+	}
+	value, err := s.skills.Activate(r.Context(), id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusConflict, fmt.Errorf("skill import is not scan-approved"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+
+func (s *Server) channelAccounts(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	values, err := s.channels.Accounts(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) createChannelAccount(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	var input domain.ChannelAccount
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	value, err := s.channels.CreateAccount(r.Context(), input)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, value)
+}
+
+func (s *Server) pairChannel(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	var input struct {
+		ExternalID string     `json:"external_id"`
+		ExpiresAt  *time.Time `json:"expires_at"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	value, err := s.channels.Pair(r.Context(), r.PathValue("id"), strings.TrimSpace(input.ExternalID), input.ExpiresAt)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, value)
+}
+
+func (s *Server) unpairChannel(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	err := s.channels.Unpair(r.Context(), r.PathValue("id"), r.PathValue("external"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "unpaired"})
+}
+
+func (s *Server) exportChannelSession(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	values, err := s.channels.ExportSession(r.Context(), r.PathValue("id"), r.PathValue("external"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) resetChannelSession(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	err := s.channels.ResetSession(r.Context(), r.PathValue("id"), r.PathValue("external"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "reset"})
+}
+
+func (s *Server) channelWebhook(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		return
+	}
+	s.channels.HandleWebhook(w, r)
+}
+
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.ListRuns(r.Context()); err != nil {
 		writeError(w, http.StatusServiceUnavailable, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "service": "norbot", "time": time.Now().UTC()})
+}
+
+func (s *Server) healthDetail(w http.ResponseWriter, r *http.Request) {
+	report := s.service.Health(r.Context())
+	status := http.StatusOK
+	if report.State == domain.HealthDown {
+		status = http.StatusServiceUnavailable
+	}
+	writeJSON(w, status, report)
+}
+
+func (s *Server) healthStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("streaming unavailable"))
+		return
+	}
+	for {
+		report := s.service.Health(r.Context())
+		payload, err := json.Marshal(report)
+		if err != nil {
+			return
+		}
+		_, _ = fmt.Fprintf(w, "event: health\ndata: %s\n\n", payload)
+		flusher.Flush()
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(10 * time.Second):
+		}
+	}
 }
 
 func (s *Server) capacity(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +384,15 @@ func (s *Server) revisions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) usage(w http.ResponseWriter, r *http.Request) {
 	values, err := s.store.Usage(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) runSkills(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.RunSkills(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

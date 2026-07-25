@@ -1,0 +1,3 @@
+{$NORBOT_PUBLIC_HTTPS_DOMAIN} {
+  reverse_proxy norbot:8080
+}

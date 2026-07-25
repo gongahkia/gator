@@ -87,6 +87,10 @@ type runtimeMsg struct {
 	runtime engine.RuntimeOptions
 	err     error
 }
+type healthMsg struct {
+	report domain.HealthReport
+	err    error
+}
 type tickMsg time.Time
 
 type mode string
@@ -117,6 +121,7 @@ type Model struct {
 	providerStage int
 	message       string
 	deploymentLog string
+	health        domain.HealthReport
 	err           error
 	width, height int
 }
@@ -131,7 +136,7 @@ func Run(apiBase string) error {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.refresh(), m.fetchProviders(), m.fetchRuntime(), tick())
+	return tea.Batch(m.refresh(), m.fetchProviders(), m.fetchRuntime(), m.fetchHealth(), tick())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -175,6 +180,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if typed.err == nil {
 			m.runtime = typed.runtime
 		}
+		return m, nil
+	case healthMsg:
+		m.err = typed.err
+		if typed.err == nil { m.health = typed.report; m.message = "Health: " + string(typed.report.State) }
 		return m, nil
 	case deploymentMsg:
 		m.err = typed.err
@@ -222,6 +231,12 @@ func (m Model) key(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch value {
 	case "r":
 		return m, m.refresh()
+	case "h":
+		return m, m.fetchHealth()
+	case "f":
+		if run, ok := m.run(); ok && run.Status == domain.StatusAwaiting && run.Stage == domain.StageVerifier {
+			return m, m.action(run.ID, domain.ApprovalFix, "")
+		}
 	case "up", "k":
 		if m.selected > 0 {
 			m.selected--
@@ -478,12 +493,17 @@ func (m Model) graphKey(value string) (tea.Model, tea.Cmd) {
 func (m Model) View() string {
 	var body strings.Builder
 	body.WriteString(titleStyle.Render("Norbot") + "  " + mutedStyle.Render("provider-agnostic, operator-gated app builder") + "\n")
-	body.WriteString(mutedStyle.Render("n new · p profile · a approve · v revise · t retry · x abandon · g graph · i status · l logs · S start · P stop · D delete · r refresh · q quit") + "\n\n")
+	body.WriteString(mutedStyle.Render("n new · p profile · a approve · f fix · v revise · t retry · x abandon · g graph · i status · l logs · h health · S start · P stop · D delete · r refresh · q quit") + "\n\n")
 	if m.err != nil {
 		body.WriteString(errorStyle.Render("error: "+m.err.Error()) + "\n")
 	}
 	if m.message != "" {
 		body.WriteString(mutedStyle.Render(m.message) + "\n")
+	}
+	if len(m.health.Checks) > 0 {
+		body.WriteString(titleStyle.Render("Health: "+string(m.health.State)) + "\n")
+		for _, check := range m.health.Checks { body.WriteString(fmt.Sprintf("%-25s %-9s %s\n", check.ID, check.State, check.Message)) }
+		body.WriteString("\n")
 	}
 	if m.mode == createMode {
 		stage := stageChoices[m.providerStage]
@@ -682,6 +702,14 @@ func (m Model) fetchRuntime() tea.Cmd {
 		var options engine.RuntimeOptions
 		err := m.client.do(http.MethodGet, "/api/runtime", nil, &options)
 		return runtimeMsg{runtime: options, err: err}
+	}
+}
+
+func (m Model) fetchHealth() tea.Cmd {
+	return func() tea.Msg {
+		var report domain.HealthReport
+		err := m.client.do(http.MethodGet, "/api/health/detail", nil, &report)
+		return healthMsg{report: report, err: err}
 	}
 }
 

@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -15,11 +17,13 @@ import (
 	"time"
 
 	"github.com/gongahkia/norbot/internal/api"
+	"github.com/gongahkia/norbot/internal/channel"
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
 	"github.com/gongahkia/norbot/internal/extension"
 	"github.com/gongahkia/norbot/internal/runtime"
+	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
 	"github.com/gongahkia/norbot/internal/tui"
 )
@@ -41,8 +45,52 @@ func main() {
 		serveCommand(os.Args[2:])
 		return
 	}
-	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap | norbot serve | norbot tui --api http://127.0.0.1:8080")
+	if len(os.Args) > 1 && os.Args[1] == "health" {
+		healthCommand(os.Args[2:])
+		return
+	}
+	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap | norbot serve | norbot health [--json] | norbot tui --api http://127.0.0.1:8080")
 	os.Exit(2)
+}
+
+func healthCommand(args []string) {
+	flags := flag.NewFlagSet("health", flag.ExitOnError)
+	asJSON := flags.Bool("json", false, "write JSON")
+	_ = flags.Parse(args)
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	st, err := store.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	report := engine.New(st, cfg, slog.New(slog.NewTextHandler(io.Discard, nil))).Health(ctx)
+	if *asJSON {
+		data, err := json.MarshalIndent(report, "", "  ")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(string(data))
+	} else {
+		fmt.Printf("%s\n", strings.ToUpper(string(report.State)))
+		for _, check := range report.Checks {
+			fmt.Printf("%-28s %-9s %4dms %s\n", check.ID, check.State, check.LatencyMS, check.Message)
+		}
+	}
+	if report.State == domain.HealthDown {
+		os.Exit(1)
+	}
 }
 
 func initCommand(args []string) {
@@ -184,7 +232,10 @@ func serveCommand(args []string) {
 	}
 	service := engine.NewWithExtensions(st, cfg, logger, extensions)
 	service.StartWorkers(ctx)
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.New(service, st, logger).Handler(), ReadHeaderTimeout: 10 * time.Second}
+	skills := skill.New(st, cfg.ArtifactsDir)
+	channels := channel.New(st, service, cfg.ArtifactsDir)
+	channels.Start(ctx)
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.NewWithComponents(service, st, logger, skills, channels).Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

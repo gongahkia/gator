@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -201,10 +202,14 @@ func (k *KubernetesRuntime) copyToWorkspace(ctx context.Context, runID, source, 
 }
 
 func (k *KubernetesRuntime) exec(ctx context.Context, runID string, command []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	return k.execPod(ctx, k.WorkspacePod(runID), "workspace", command, stdin, stdout, stderr)
+}
+
+func (k *KubernetesRuntime) execPod(ctx context.Context, pod, container string, command []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if k.restConfig == nil {
 		return fmt.Errorf("kubernetes pod exec requires a REST config")
 	}
-	req := k.client.CoreV1().RESTClient().Post().Resource("pods").Name(k.WorkspacePod(runID)).Namespace(k.config.Namespace).SubResource("exec").VersionedParams(&corev1.PodExecOptions{Container: "workspace", Command: command, Stdin: stdin != nil, Stdout: stdout != nil, Stderr: stderr != nil, TTY: false}, scheme.ParameterCodec)
+	req := k.client.CoreV1().RESTClient().Post().Resource("pods").Name(pod).Namespace(k.config.Namespace).SubResource("exec").VersionedParams(&corev1.PodExecOptions{Container: container, Command: command, Stdin: stdin != nil, Stdout: stdout != nil, Stderr: stderr != nil, TTY: false}, scheme.ParameterCodec)
 	executor, err := remotecommand.NewSPDYExecutor(k.restConfig, "POST", req.URL())
 	if err != nil {
 		return err
@@ -337,6 +342,39 @@ func (k *KubernetesRuntime) Logs(ctx context.Context, runID, root string, lines 
 		}
 	}
 	return out.String(), nil
+}
+
+func (k *KubernetesRuntime) InvokeAgent(ctx context.Context, run domain.Run, root string, input AgentInvocation) (AgentResponse, error) {
+	if run.Profile != domain.ProfileAgentic {
+		return AgentResponse{}, fmt.Errorf("run is not an agentic application")
+	}
+	pods, err := k.client.CoreV1().Pods(k.config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=" + k.backendName(run.ID)})
+	if err != nil {
+		return AgentResponse{}, err
+	}
+	if len(pods.Items) != 1 {
+		return AgentResponse{}, fmt.Errorf("expected one backend pod, found %d", len(pods.Items))
+	}
+	payload, err := json.Marshal(input)
+	if err != nil {
+		return AgentResponse{}, err
+	}
+	var output, stderr bytes.Buffer
+	if err := k.execPod(ctx, pods.Items[0].Name, "backend", []string{"wget", "-qO-", "--header=Content-Type: application/json", "--post-file=-", "http://127.0.0.1:8000/api/agents/run"}, bytes.NewReader(payload), &output, &stderr); err != nil {
+		return AgentResponse{}, fmt.Errorf("invoke agent: %w: %s", err, stderr.String())
+	}
+	var response AgentResponse
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		return AgentResponse{}, fmt.Errorf("decode agent response: %w", err)
+	}
+	if response.State == "" {
+		if response.Status != "" {
+			response.State = response.Status
+		} else {
+			response.State = "completed"
+		}
+	}
+	return response, nil
 }
 
 func (k *KubernetesRuntime) Verify(ctx context.Context, run domain.Run) (map[string]any, error) {

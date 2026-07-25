@@ -50,6 +50,14 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 
 func (s *Store) Close() { s.pool.Close() }
 
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
+func (s *Store) QueueDepth(ctx context.Context) (int, error) {
+	var value int
+	err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jobs WHERE state IN ('queued','running')`).Scan(&value)
+	return value, err
+}
+
 func (s *Store) Migrate(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 CREATE TABLE IF NOT EXISTS runs (
@@ -175,6 +183,51 @@ CREATE TABLE IF NOT EXISTS run_skills (
   selected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY(run_id,skill_digest)
 );
+CREATE TABLE IF NOT EXISTS channel_accounts (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  adapter TEXT NOT NULL,
+  name TEXT NOT NULL,
+  secret_refs JSONB NOT NULL DEFAULT '{}'::jsonb,
+  settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(run_id,adapter,name)
+);
+CREATE TABLE IF NOT EXISTS channel_pairings (
+  account_id TEXT NOT NULL REFERENCES channel_accounts(id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  paired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  PRIMARY KEY(account_id,external_id)
+);
+CREATE TABLE IF NOT EXISTS channel_sessions (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES channel_accounts(id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(account_id,external_id)
+);
+CREATE TABLE IF NOT EXISTS channel_messages (
+  id BIGSERIAL PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES channel_accounts(id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  platform_id TEXT NOT NULL DEFAULT '',
+  idempotency_key TEXT NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+  state TEXT NOT NULL,
+  error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  delivered_at TIMESTAMPTZ,
+  UNIQUE(account_id,idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS channel_messages_pending_idx ON channel_messages(state,created_at) WHERE state='pending';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 

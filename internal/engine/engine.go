@@ -35,6 +35,7 @@ type CreateRunInput struct {
 	DeploymentTarget domain.DeploymentTarget `json:"deployment_target"`
 	PublicIngress    bool                    `json:"public_ingress"`
 	MaxFixes         int                     `json:"max_fixes"`
+	SkillDigests     []string                `json:"skill_digests"`
 }
 
 type ApprovalInput struct {
@@ -138,6 +139,11 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	if err != nil {
 		return domain.Run{}, err
 	}
+	for _, digest := range input.SkillDigests {
+		if _, err := s.store.ActiveSkill(ctx, digest); err != nil {
+			return domain.Run{}, fmt.Errorf("selected skill %q is not active", digest)
+		}
+	}
 	id, err := newID()
 	if err != nil {
 		return domain.Run{}, err
@@ -156,6 +162,11 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	run := domain.Run{ID: id, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: domain.DefaultGraph(), CreatedAt: now, UpdatedAt: now}
 	if err := s.store.CreateRun(ctx, run); err != nil {
 		return domain.Run{}, err
+	}
+	if len(input.SkillDigests) > 0 {
+		if err := s.store.SelectRunSkills(ctx, id, input.SkillDigests); err != nil {
+			return domain.Run{}, err
+		}
 	}
 	if err := workspace.Ensure(ctx, id); err != nil {
 		return domain.Run{}, err
@@ -301,6 +312,39 @@ func (s *Service) DeploymentLogs(ctx context.Context, runID string, lines int) (
 		return "", err
 	}
 	return backend.Logs(ctx, runID, workspace.RunPath(runID), lines)
+}
+
+func (s *Service) InvokeAgent(ctx context.Context, runID string, input runtime.AgentInvocation) (runtime.AgentResponse, error) {
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return runtime.AgentResponse{}, err
+	}
+	if run.Profile != domain.ProfileAgentic {
+		return runtime.AgentResponse{}, fmt.Errorf("channel accounts require an agentic deployment")
+	}
+	if input.Role == "" {
+		input.Role = "operator"
+	}
+	if input.Provider.Kind == "" {
+		providerID := run.Providers[domain.StageBuilder]
+		providerConfig, ok := s.config.Manifest.Provider(providerID, domain.StageBuilder)
+		if !ok || (providerConfig.Kind != "openai_responses" && providerConfig.Kind != "openai_compatible" && providerConfig.Kind != "anthropic_messages" && providerConfig.Kind != "gemini_generate_content") {
+			return runtime.AgentResponse{}, fmt.Errorf("agentic application requires an HTTP model provider")
+		}
+		input.Provider = runtime.AgentProvider{Kind: providerConfig.Kind, BaseURL: providerConfig.BaseURL, Model: providerConfig.Model, CredentialEnv: providerConfig.CredentialEnv}
+	}
+	if _, err := s.store.GetDeployment(ctx, runID); err != nil {
+		return runtime.AgentResponse{}, err
+	}
+	workspace, backend, err := s.backendForRun(ctx, run)
+	if err != nil {
+		return runtime.AgentResponse{}, err
+	}
+	invoker, ok := backend.(runtime.AgentBackend)
+	if !ok {
+		return runtime.AgentResponse{}, fmt.Errorf("runtime does not support private agent invocation")
+	}
+	return invoker.InvokeAgent(ctx, run, workspace.RunPath(runID), input)
 }
 
 func (s *Service) StartDeployment(ctx context.Context, runID string) (DeploymentInfo, error) {
@@ -581,7 +625,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			return err
 		}
 	}
-	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli")
+	skills, err := s.store.RunSkills(ctx, run.ID)
+	if err != nil {
+		return err
+	}
+	if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
+		return err
+	}
+	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli", skills)
 	providerStarted := time.Now()
 	providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
 	providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
@@ -820,8 +871,15 @@ func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dock
 
 func reserveVerificationPort() (int, error) { return runtime.ReservePort() }
 
-func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool) string {
+func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain.SkillPackage) string {
 	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nGraph: %+v\nPlanner feedback: %s\nDo not reveal credentials or execute unapproved external actions.\n", stage, run.ID, run.Profile, run.Prompt, run.Graph, run.Feedback)
+	if len(skills) > 0 {
+		entries := make([]string, 0, len(skills))
+		for _, skill := range skills {
+			entries = append(entries, skill.Name+"@"+skill.Version+" ("+skill.Digest+")")
+		}
+		base += "Approved declarative skills: " + strings.Join(entries, ", ") + ". Their materialized manifests are under /workspace/selected-skills.\n"
+	}
 	if isCLI && stage == domain.StageBuilder {
 		return base + "The approved baseline is in /workspace/generated-app. Modify only that directory, then return a concise summary."
 	}
@@ -879,9 +937,13 @@ func builderFiles(text string) (map[string]string, error) {
 
 func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, text string) ([]string, error) {
 	files, err := builderFiles(text)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	for path, content := range files {
-		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil { return nil, err }
+		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil {
+			return nil, err
+		}
 	}
 	return mapKeys(files), nil
 }
@@ -1008,6 +1070,47 @@ func mapKeys(values map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func materializeRunSkills(workspace runtime.WorkspaceBackend, runID string, skills []domain.SkillPackage) error {
+	manifest := make([]map[string]any, 0, len(skills))
+	for _, skill := range skills {
+		files := []string{}
+		err := filepath.Walk(skill.Path, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			relative, err := filepath.Rel(skill.Path, path)
+			if err != nil {
+				return err
+			}
+			contents, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			target := filepath.ToSlash(filepath.Join("selected-skills", strings.TrimPrefix(skill.Digest, "sha256:"), relative))
+			if _, err := workspace.WriteArtifact(runID, target, contents); err != nil {
+				return err
+			}
+			files = append(files, target)
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		manifest = append(manifest, map[string]any{"digest": skill.Digest, "id": skill.ID, "version": skill.Version, "files": files, "manifest": skill.Manifest})
+	}
+	encoded, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err := workspace.WriteArtifact(runID, "selected-skills/manifest.json", encoded); err != nil {
+		return err
+	}
+	return workspace.MirrorToVolume(context.Background(), runID, "selected-skills")
 }
 
 func (s *Service) recordUsage(ctx context.Context, runID string, stage domain.Stage, revisionID *int64, providerID string, result provider.Result, prompt string) error {

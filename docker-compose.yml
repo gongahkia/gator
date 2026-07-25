@@ -52,6 +52,24 @@ services:
       otel-collector:
         condition: service_started
 
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: ["public"]
+    environment:
+      NORBOT_PUBLIC_HTTPS_DOMAIN: ${NORBOT_PUBLIC_HTTPS_DOMAIN:?set a public DNS name for channel webhooks}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      norbot:
+        condition: service_started
+
 volumes:
   postgres_data:
   norbot_artifacts:
+  caddy_data:
+  caddy_config:

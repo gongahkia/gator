@@ -292,9 +292,78 @@ type SkillImport struct {
 }
 
 type SkillSelection struct {
-	RunID        string    `json:"run_id"`
-	SkillDigest  string    `json:"skill_digest"`
-	SelectedAt   time.Time `json:"selected_at"`
+	RunID       string    `json:"run_id"`
+	SkillDigest string    `json:"skill_digest"`
+	SelectedAt  time.Time `json:"selected_at"`
+}
+
+type HealthState string
+
+const (
+	HealthHealthy  HealthState = "healthy"
+	HealthDegraded HealthState = "degraded"
+	HealthDown     HealthState = "down"
+)
+
+type HealthCheck struct {
+	ID          string         `json:"id"`
+	State       HealthState    `json:"state"`
+	Critical    bool           `json:"critical"`
+	LatencyMS   int64          `json:"latency_ms"`
+	Message     string         `json:"message"`
+	Diagnostics map[string]any `json:"diagnostics,omitempty"`
+	LogTail     string         `json:"log_tail,omitempty"`
+	CheckedAt   time.Time      `json:"checked_at"`
+}
+
+type HealthReport struct {
+	State     HealthState   `json:"state"`
+	Checks    []HealthCheck `json:"checks"`
+	CheckedAt time.Time     `json:"checked_at"`
+}
+
+type ChannelAccount struct {
+	ID         string            `json:"id"`
+	RunID      string            `json:"run_id"`
+	Adapter    string            `json:"adapter"`
+	Name       string            `json:"name"`
+	SecretRefs map[string]string `json:"secret_refs"`
+	Settings   map[string]any    `json:"settings"`
+	Enabled    bool              `json:"enabled"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+}
+
+type ChannelPairing struct {
+	AccountID  string     `json:"account_id"`
+	ExternalID string     `json:"external_id"`
+	PairedAt   time.Time  `json:"paired_at"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+}
+
+type ChannelSession struct {
+	ID         string    `json:"id"`
+	AccountID  string    `json:"account_id"`
+	ExternalID string    `json:"external_id"`
+	Summary    string    `json:"summary"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type ChannelMessage struct {
+	ID             int64            `json:"id"`
+	AccountID      string           `json:"account_id"`
+	ExternalID     string           `json:"external_id"`
+	Direction      string           `json:"direction"`
+	PlatformID     string           `json:"platform_id"`
+	IdempotencyKey string           `json:"idempotency_key"`
+	Text           string           `json:"text"`
+	Attachments    []map[string]any `json:"attachments,omitempty"`
+	State          string           `json:"state"`
+	Error          string           `json:"error,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
+	DeliveredAt    *time.Time       `json:"delivered_at,omitempty"`
 }
 
 type Event struct {
