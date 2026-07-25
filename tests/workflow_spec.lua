@@ -29,14 +29,18 @@ local bridge = {
 		callback({ session = opts.session, command = { opts.provider, "resume", opts.session.id } })
 	end,
 }
-local current = state.new(config.resolve(), { supported = true })
+local current = state.new(config.resolve({ providers = { pi = { user_confirmed = true } } }), { supported = true })
 local value = workflow.new({
 	state = current,
 	root = root,
 	terminal = terminal,
 	bridge = bridge,
-	readiness = function()
-		return { { provider = "claude", available = true } }
+	readiness = function(opts)
+		assert(opts.pi_user_confirmed, "workflow must pass the explicit Pi confirmation to provider readiness")
+		return {
+			{ provider = "claude", available = true },
+			{ provider = "pi", available = true, authentication = "user_confirmed" },
+		}
 	end,
 })
 
@@ -50,7 +54,8 @@ assert(
 assert(
 	vim.tbl_contains(require("gator.ui.palette").complete(""), "action:create-task")
 		and vim.tbl_contains(require("gator.ui.palette").complete(""), "task:" .. created.id)
-		and vim.tbl_contains(require("gator.ui.palette").complete(""), "provider:claude"),
+		and vim.tbl_contains(require("gator.ui.palette").complete(""), "provider:claude")
+		and vim.tbl_contains(require("gator.ui.palette").complete(""), "provider:pi"),
 	"workflow setup must register built-in, task, and ready-provider palette entries"
 )
 

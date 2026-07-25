@@ -31,6 +31,10 @@ local optional_handoff = config.resolve({
 }).context.handoff
 assert(optional_handoff.review == "optional", "handoff authoring settings must resolve optional review enforcement")
 assert(
+	config.resolve({ providers = { pi = { user_confirmed = true } } }).providers.pi.user_confirmed,
+	"Pi launch must require an explicit local user confirmation"
+)
+assert(
 	not pcall(
 			config.resolve,
 			{ context = { handoff = { author = "invalid", max_chars = 1, review = "required" } } }
@@ -42,7 +46,8 @@ assert(
 		and not pcall(
 			config.resolve,
 			{ context = { handoff = { author = "user", max_chars = 1, review = "invalid" } } }
-		),
+		)
+		and not pcall(config.resolve, { providers = { pi = { user_confirmed = "yes" } } }),
 	"handoff authoring settings must reject unsupported authors, bounds, and review modes"
 )
 

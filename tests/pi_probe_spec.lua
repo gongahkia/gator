@@ -5,10 +5,10 @@ local value = pi.probe({
 	run = function(argv, input)
 		table.insert(calls, { argv = argv, input = input })
 		if argv[2] == "--version" then
-			return { code = 0, stdout = "0.80.10" }
+			return { code = 0, stdout = "0.82.0" }
 		end
 		if argv[2] == "--help" then
-			return { code = 0, stdout = "--mode rpc --continue --resume --session --tools --exclude-tools" }
+			return { code = 0, stdout = "--mode rpc --continue --resume --session --session-id --tools --exclude-tools" }
 		end
 		return {
 			code = 0,
@@ -44,7 +44,7 @@ local unsupported = pi.probe({
 	cwd = vim.g.gator_test.root,
 	run = function(argv)
 		if argv[2] == "--version" then
-			return { code = 0, stdout = "0.80.11" }
+			return { code = 0, stdout = "0.82.1" }
 		end
 		return { code = 1, stdout = "" }
 	end,

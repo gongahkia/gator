@@ -3,7 +3,7 @@ local health = require("gator.health")
 local catalog = health.launch_catalog({
 	cwd = vim.g.gator_test.root,
 	executable = function(name)
-		return name == "claude" or name == "codex" or name == "opencode"
+		return name == "claude" or name == "codex" or name == "opencode" or name == "pi"
 	end,
 	run = function(argv, _, input)
 		if argv[1] == "claude" and argv[2] == "--version" then
@@ -37,8 +37,21 @@ local catalog = health.launch_catalog({
 		if argv[1] == "opencode" and argv[2] == "providers" then
 			return { code = 0, stdout = "1 credential" }
 		end
+		if argv[1] == "pi" and argv[2] == "--version" then
+			return { code = 0, stdout = "0.82.0" }
+		end
+		if argv[1] == "pi" and argv[2] == "--help" then
+			return { code = 0, stdout = "--mode rpc --session --session-id --tools --exclude-tools" }
+		end
+		if argv[1] == "pi" and argv[2] == "--mode" then
+			return {
+				code = 0,
+				stdout = [[{"id":"gator-probe","type":"response","command":"get_state","success":true,"data":{"sessionFile":"pi-session"}}]],
+			}
+		end
 		error("unexpected provider probe")
 	end,
+	pi_user_confirmed = true,
 })
 
 local ready = {}
@@ -46,6 +59,35 @@ for _, record in ipairs(catalog) do
 	ready[record.provider] = record.available
 end
 assert(
-	ready.claude and ready.codex and ready.opencode,
-	"native launch catalog must expose only providers with verified executable, support, authentication, and bridge capability"
+	ready.claude and ready.codex and ready.opencode and ready.pi,
+	"native launch catalog must expose verified providers and explicitly user-confirmed Pi"
+)
+local unconfirmed = health.launch_catalog({
+	cwd = vim.g.gator_test.root,
+	executable = function(name)
+		return name == "pi"
+	end,
+	run = function(argv, _, input)
+		if argv[2] == "--version" then
+			return { code = 0, stdout = "0.82.0" }
+		end
+		if argv[2] == "--help" then
+			return { code = 0, stdout = "--mode rpc --session --session-id --tools --exclude-tools" }
+		end
+		assert(argv[2] == "--mode" and input:find('"get_state"', 1, true), "Pi must retain its credential-free probe")
+		return {
+			code = 0,
+			stdout = [[{"id":"gator-probe","type":"response","command":"get_state","success":true,"data":{"sessionFile":"pi-session"}}]],
+		}
+	end,
+})
+local pi
+for _, record in ipairs(unconfirmed) do
+	if record.provider == "pi" then
+		pi = record
+	end
+end
+assert(
+	pi and not pi.available and pi.reason == "Pi requires explicit providers.pi.user_confirmed opt-in",
+	"Pi must remain unavailable without explicit local user confirmation"
 )

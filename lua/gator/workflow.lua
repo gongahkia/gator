@@ -61,13 +61,15 @@ local function records(state)
 	return result
 end
 
-local function catalog_contract(provider)
+local function catalog_contract(record)
 	local ready = { available = true, modes = { "native" } }
 	local unavailable = { available = false, reason = "unavailable for native terminal workflow" }
+	local auth = record.authentication == "user_confirmed" and { available = true, modes = { "user_confirmed" } }
+		or ready
 	return capabilities.new({
-		provider = provider,
+		provider = record.provider,
 		transport = ready,
-		auth = ready,
+		auth = auth,
 		session = ready,
 		permission = unavailable,
 		model = unavailable,
@@ -219,9 +221,14 @@ end
 
 function Workflow:refresh()
 	local available = {}
-	for _, value in ipairs(self.readiness({ cwd = self.root })) do
+	for _, value in
+		ipairs(self.readiness({
+			cwd = self.root,
+			pi_user_confirmed = self.state.config.providers.pi.user_confirmed,
+		}))
+	do
 		if value.available and native_terminal.supports(value.provider) then
-			available[value.provider] = catalog_contract(value.provider)
+			available[value.provider] = catalog_contract(value)
 		end
 	end
 	self.providers = available

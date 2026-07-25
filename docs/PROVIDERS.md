@@ -1,6 +1,6 @@
 # Provider support matrix
 
-Gator is a native-first meta-harness: providers own authentication, model selection, sessions, tool loops, compaction, and sandboxing. Gator owns editor UX, context provenance, lifecycle evidence, and permission narrowing. The health check runs each listed version/capability probe with a three-second bound; it only reports ready when that probe and a non-interactive auth probe both pass.
+Gator is a native-first meta-harness: providers own authentication, model selection, sessions, tool loops, compaction, and sandboxing. Gator owns editor UX, context provenance, lifecycle evidence, and permission narrowing. Health probes use a three-second bound except Pi's credential-free RPC profile, which permits ten seconds for CLI startup; a provider is verified ready only when its probe and non-interactive auth probe pass.
 
 “Fixture-tested” names the exact CLI version exercised by checked-in adapter tests. A range is enforced only where stated. Capability lists are probes, not promises: an operation is unavailable unless the installed CLI advertises it.
 
@@ -19,8 +19,8 @@ Gator is a native-first meta-harness: providers own authentication, model select
 | Mistral Vibe | `vibe` and `vibe-acp` | 2.1.0 | unavailable: no non-interactive status command | ACP/stdio, load/list/close/fork, context/images, JSON, plan | resume unavailable unless advertised | fixture + local authenticated E2E |
 | Copilot CLI | `copilot` | 0.0.411; enforced 0.0.411–0.0.999 | unavailable: no machine-readable status contract | ACP/stdio, resume | native login remains provider-owned; auth cannot be checked | fixture + local authenticated E2E |
 | OpenCode | `opencode` | 1.18.0; enforced 1.17.15–1.18.0 | `opencode providers list` | ACP/stdio, load/list/close/fork/resume, MCP HTTP/SSE, context/images, native terminal launch/resume | Gator creates an ACP session before opening the TUI; other versions and missing ACP are unsupported | fixture + local authenticated E2E |
-| Pi | `pi` | 0.80.7; exact enforced | unavailable: RPC has no credential-status contract | RPC/stdio, state, create/resume, tool filters | list/close sessions and auth status are unavailable; local run is offline | fixture + local offline E2E |
+| Pi | `pi` | 0.82.0; exact enforced | unavailable: RPC has no credential-status contract | RPC/stdio, state, create/resume, tool filters, native terminal launch/resume | set `providers.pi.user_confirmed = true` only after configuring Pi credentials; Gator labels this user-confirmed, not auth-verified | fixture + local offline E2E |
 
 `:GatorHealth` does not read credentials. “Authentication probe passed” means the provider’s own status command reported login; it does not expose or validate credential material. Run `make live-handoff-e2e` locally on a machine authenticated to every provider; it runs native checks before the directed cross-provider handoff matrix.
 
-The local task launcher enables only Claude Code, Codex, and OpenCode. Each must pass executable, supported-version, provider-native authentication, and session-bridge checks; all other providers remain unavailable because Gator cannot verify the same launch contract.
+The local task launcher enables Claude Code, Codex, and OpenCode when they pass executable, supported-version, provider-native authentication, and session-bridge checks. Pi requires the same executable, version, and session checks plus `providers.pi.user_confirmed = true`; Gator never reads, stores, or verifies Pi credentials.

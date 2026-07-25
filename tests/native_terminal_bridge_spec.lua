@@ -24,6 +24,24 @@ assert(
 	vim.deep_equal(resumed.command, { "claude", "--resume", created.session.id }),
 	"Claude terminal resume must preserve the exact provider session id"
 )
+local pi
+bridge:start({ provider = "pi", cwd = vim.g.gator_test.root, prompt = "Review Pi" }, function(value, reason)
+	assert(reason == nil, "Pi terminal bridge must create a provider-owned session id")
+	pi = value
+end)
+assert(
+	vim.deep_equal(pi.command, { "pi", "--session-id", pi.session.id, "Review Pi" }),
+	"Pi launch must create the provider session before opening its native terminal"
+)
+local pi_resumed
+bridge:resume({ provider = "pi", session = pi.session }, function(value, reason)
+	assert(reason == nil, "Pi terminal bridge must resume a known provider session")
+	pi_resumed = value
+end)
+assert(
+	vim.deep_equal(pi_resumed.command, { "pi", "--session", pi.session.id }),
+	"Pi resume must preserve the exact provider session id"
+)
 assert(
 	not pcall(
 		bridge.start,

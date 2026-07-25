@@ -122,7 +122,7 @@ The palette provides the same workflow:
 :GatorPalette action:refresh-providers
 ```
 
-Only Claude Code, Codex, and OpenCode currently provide the verified native-terminal launch bridge. Each requires a supported executable, provider-native authentication, and a ready session bridge; unavailable providers remain unavailable.
+Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi can also launch and resume only after its native session probe passes and you explicitly set `providers.pi.user_confirmed = true`; its picker entry is labelled user-confirmed because Pi has no machine-readable credential-status command.
 
 ### Capture context
 
@@ -172,6 +172,7 @@ require("gator").setup({
     handoff = { author = "user", max_chars = 4096, review = "required" },
   },
   sessions = { transfer = "manual" },
+  providers = { pi = { user_confirmed = false } },
   workspaces = { mode = "project", max_write_runs = 1 },
   persistence = { sharing = "local" },
   telemetry = { enabled = false, redaction_patterns = {} },

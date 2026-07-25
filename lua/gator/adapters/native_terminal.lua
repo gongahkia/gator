@@ -5,7 +5,7 @@ local Bridge = {}
 
 Bridge.__index = Bridge
 
-local supported = { claude = true, codex = true, opencode = true }
+local supported = { claude = true, codex = true, opencode = true, pi = true }
 
 local function fail(message)
 	error("Gator native terminal bridge: " .. redact.text(tostring(message)), 3)
@@ -175,6 +175,14 @@ function Bridge:start(opts, callback)
 		})
 		return
 	end
+	if provider_name == "pi" then
+		local id = text(self.uuid(), "generated session id")
+		callback({
+			session = { provider = "pi", id = id, owner = "provider" },
+			command = { executable, "--session-id", id, prompt },
+		})
+		return
+	end
 	if provider_name == "codex" then
 		rpc_client(
 			{ spawn = self.spawn, command = { executable, "app-server", "--stdio" }, cwd = cwd },
@@ -240,6 +248,8 @@ function Bridge:resume(opts, callback)
 	local argv
 	if provider_name == "claude" then
 		argv = { executable, "--resume", value.id }
+	elseif provider_name == "pi" then
+		argv = { executable, "--session", value.id }
 	elseif provider_name == "codex" then
 		argv = { executable, "resume", value.id }
 	else

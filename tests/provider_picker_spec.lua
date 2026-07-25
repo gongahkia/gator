@@ -31,3 +31,17 @@ assert(
 	selected.provider == "codex" and selected.capabilities.transport.available,
 	"provider picker must pass only capability-ready providers to launch"
 )
+picker.open({
+	providers = {
+		contract("pi", nil, { available = true, modes = { "user_confirmed" } }),
+	},
+	on_launch = function(value)
+		selected = value
+	end,
+})
+assert(
+	require("gator.ui").picker.select(1).label == "pi · user-confirmed; ready to launch",
+	"provider picker must label user-confirmed providers distinctly"
+)
+require("gator.ui").picker.confirm()
+assert(selected.provider == "pi", "provider picker must permit explicitly user-confirmed providers")

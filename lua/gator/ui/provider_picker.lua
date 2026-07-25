@@ -24,10 +24,15 @@ function M.open(opts)
 			fail("providers must contain capability contracts")
 		end
 		local transport = capabilities.supports(provider, "transport", "native")
-		local auth = capabilities.supports(provider, "auth", "native")
-		if transport and auth then
+		local native_auth = capabilities.supports(provider, "auth", "native")
+		local user_confirmed = capabilities.supports(provider, "auth", "user_confirmed")
+		if transport and (native_auth or user_confirmed) then
 			available[provider.provider] = provider
-			items[#items + 1] = { id = provider.provider, label = provider.provider .. " · ready to launch" }
+			items[#items + 1] = {
+				id = provider.provider,
+				label = provider.provider
+					.. (user_confirmed and " · user-confirmed; ready to launch" or " · ready to launch"),
+			}
 		end
 	end
 	table.sort(items, function(left, right)

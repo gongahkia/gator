@@ -23,12 +23,14 @@ for _, provider in ipairs(providers) do
 	provider_modules[provider.name] = "gator.adapters." .. provider.name
 end
 
-local terminal_providers = { claude = true, codex = true, opencode = true }
+local terminal_providers = { claude = true, codex = true, opencode = true, pi = true }
 local terminal_capabilities = {
 	claude = { "cli", "resume" },
 	codex = { "rpc" },
 	opencode = { "acp", "session_resume" },
+	pi = { "stdio", "session_create", "session_resume" },
 }
+local pi_probe_timeout_ms = 10000
 
 local function fail(message)
 	error("invalid Gator health check: " .. message, 3)
@@ -145,14 +147,16 @@ function M.readiness(opts)
 		return vim.fn.executable(name) == 1
 	end
 	local run = opts.run
-		or function(argv, directory, input)
-			local value = vim.system(argv, { cwd = directory, stdin = input, text = true, timeout = 3000 }):wait()
+		or function(argv, directory, input, timeout_ms)
+			local value = vim.system(argv, {
+				cwd = directory,
+				stdin = input,
+				text = true,
+				timeout = timeout_ms or 3000,
+			}):wait()
 			return { code = value.code, stdout = value.stdout or "" }
 		end
 	local cwd = opts.cwd or vim.fn.getcwd()
-	local function probe_run(argv, input)
-		return run(argv, cwd, input)
-	end
 	local records = {}
 	local function add(component, level, message, repair)
 		table.insert(records, { component = component, level = level, message = message, repair = repair })
@@ -167,6 +171,9 @@ function M.readiness(opts)
 		return nil
 	end
 	local function probe(provider, adapter)
+		local function probe_run(argv, input)
+			return run(argv, cwd, input, provider.name == "pi" and pi_probe_timeout_ms or 3000)
+		end
 		if opts.probe then
 			return opts.probe(provider.name, provider.executable, probe_run)
 		end
@@ -177,6 +184,9 @@ function M.readiness(opts)
 		return adapter.probe(args)
 	end
 	local function auth(provider, adapter)
+		local function probe_run(argv, input)
+			return run(argv, cwd, input, provider.name == "pi" and pi_probe_timeout_ms or 3000)
+		end
 		if opts.auth then
 			return opts.auth(provider.name, provider.executable, probe_run)
 		end
@@ -300,7 +310,7 @@ function M.launch_catalog(opts)
 		fail("launch catalog requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "cwd" and key ~= "run" and key ~= "executable" then
+		if key ~= "cwd" and key ~= "run" and key ~= "executable" and key ~= "pi_user_confirmed" then
 			fail("launch catalog contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -312,13 +322,22 @@ function M.launch_catalog(opts)
 		return vim.fn.executable(name) == 1
 	end
 	local run = opts.run
-		or function(argv, directory, input)
-			local result = vim.system(argv, { cwd = directory, stdin = input, text = true, timeout = 3000 }):wait()
+		or function(argv, directory, input, timeout_ms)
+			local result = vim.system(argv, {
+				cwd = directory,
+				stdin = input,
+				text = true,
+				timeout = timeout_ms or 3000,
+			}):wait()
 			return { code = result.code, stdout = result.stdout or "" }
 		end
 	if type(executable) ~= "function" or type(run) ~= "function" then
 		fail("launch catalog executable and run must be functions")
 	end
+	if opts.pi_user_confirmed ~= nil and type(opts.pi_user_confirmed) ~= "boolean" then
+		fail("launch catalog pi_user_confirmed must be boolean")
+	end
+	local pi_user_confirmed = opts.pi_user_confirmed == true
 	local records = {}
 	for _, provider in ipairs(providers) do
 		if terminal_providers[provider.name] then
@@ -332,7 +351,7 @@ function M.launch_catalog(opts)
 					local args = {
 						executable = provider.executable,
 						run = function(argv, input)
-							return run(argv, cwd, input)
+							return run(argv, cwd, input, provider.name == "pi" and pi_probe_timeout_ms or 3000)
 						end,
 					}
 					if provider.cwd then
@@ -352,17 +371,25 @@ function M.launch_catalog(opts)
 							break
 						end
 					end
-					if not record.reason then
-						local ok, auth = pcall(adapter.auth, {
-							executable = provider.executable,
-							run = function(argv, input)
-								return run(argv, cwd, input)
-							end,
-						})
-						if ok and type(auth) == "table" and auth.authenticated then
+					if provider.name == "pi" and not pi_user_confirmed then
+						record.reason = "Pi requires explicit providers.pi.user_confirmed opt-in"
+					elseif not record.reason then
+						if provider.name == "pi" then
 							record.available = true
+							record.authentication = "user_confirmed"
 						else
-							record.reason = (type(auth) == "table" and auth.reason) or "authentication is not verified"
+							local ok, auth = pcall(adapter.auth, {
+								executable = provider.executable,
+								run = function(argv, input)
+									return run(argv, cwd, input)
+								end,
+							})
+							if ok and type(auth) == "table" and auth.authenticated then
+								record.available = true
+							else
+								record.reason = (type(auth) == "table" and auth.reason)
+									or "authentication is not verified"
+							end
 						end
 					end
 				end

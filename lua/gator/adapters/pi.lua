@@ -1,6 +1,6 @@
 local M = {}
 
-M.range = { minimum = { 0, 80, 7 }, maximum = { 0, 80, 10 } }
+M.range = { minimum = { 0, 82, 0 }, maximum = { 0, 82, 0 } }
 
 local function fail(message)
 	error("Gator Pi adapter: " .. message, 3)
@@ -122,8 +122,8 @@ function M.probe(opts)
 			rpc = valid,
 			stdio = valid,
 			state = valid,
-			session_create = valid,
-			session_resume = valid,
+			session_create = valid and output:find("--session-id", 1, true) ~= nil,
+			session_resume = valid and output:find("--session", 1, true) ~= nil,
 			session_list = false,
 			session_close = false,
 			tool_filters = output:find("--tools", 1, true) ~= nil and output:find("--exclude-tools", 1, true) ~= nil,
