@@ -20,6 +20,32 @@ type CommandRunner interface {
 	Run(context.Context, string, ...string) ([]byte, error)
 }
 
+type WorkspaceBackend interface {
+	Ensure(context.Context, string) error
+	RunPath(string) string
+	WriteArtifact(string, string, []byte) (string, error)
+	MirrorToVolume(context.Context, string, string) error
+	MirrorGeneratedApp(context.Context, string) error
+	SyncGeneratedApp(context.Context, string) error
+	RunCLI(context.Context, string, string, string, []string, string, string, string, string) (string, error)
+	Cleanup(context.Context, string) error
+}
+
+type ArtifactWorkspace interface {
+	RunPath(string) string
+	WriteArtifact(string, string, []byte) (string, error)
+}
+
+type DeploymentBackend interface {
+	Target() domain.DeploymentTarget
+	Deploy(context.Context, domain.Run, string) (string, error)
+	Stop(context.Context, string, string) error
+	Start(context.Context, string, string) error
+	Delete(context.Context, string, string) error
+	Status(context.Context, string, string) (DeploymentStatus, error)
+	Logs(context.Context, string, string, int) (string, error)
+}
+
 type OSRunner struct{}
 
 func (OSRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
@@ -107,7 +133,7 @@ func (w Workspace) SyncGeneratedApp(ctx context.Context, runID string) error {
 	return err
 }
 
-func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, command []string, prompt string, credentialEnv string) (string, error) {
+func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, command []string, prompt, credentialEnv, credentialSecret, credentialSecretKey string) (string, error) {
 	if len(command) == 0 {
 		return "", fmt.Errorf("empty cli command")
 	}
@@ -152,10 +178,10 @@ type Capacity struct {
 }
 
 type QuotaFactor struct {
-	ProviderID                 string `json:"provider_id"`
-	ConfiguredLimit            int    `json:"configured_limit,omitempty"`
+	ProviderID                  string `json:"provider_id"`
+	ConfiguredLimit             int    `json:"configured_limit,omitempty"`
 	ConfiguredRequestsPerMinute int    `json:"configured_requests_per_minute,omitempty"`
-	ObservedRemaining          *int   `json:"observed_remaining,omitempty"`
+	ObservedRemaining           *int   `json:"observed_remaining,omitempty"`
 }
 
 func DetectCapacity(ctx context.Context, dockerBin string, configuredWorkers, maxWorkers int, runner CommandRunner) Capacity {
@@ -187,7 +213,9 @@ func (c *Capacity) ApplyProviderQuotas(factors []QuotaFactor) {
 	quota := 0
 	for _, factor := range factors {
 		limit := factor.ConfiguredLimit
-		if factor.ConfiguredRequestsPerMinute > 0 && (limit == 0 || factor.ConfiguredRequestsPerMinute < limit) { limit = factor.ConfiguredRequestsPerMinute }
+		if factor.ConfiguredRequestsPerMinute > 0 && (limit == 0 || factor.ConfiguredRequestsPerMinute < limit) {
+			limit = factor.ConfiguredRequestsPerMinute
+		}
 		if factor.ObservedRemaining != nil && (*factor.ObservedRemaining < limit || limit == 0) {
 			limit = *factor.ObservedRemaining
 		}
@@ -234,9 +262,15 @@ type Deployment struct {
 	Runner    CommandRunner
 }
 
+func (d Deployment) Target() domain.DeploymentTarget { return domain.DeploymentDocker }
+
 type DeploymentStatus struct {
-	Project  string           `json:"project"`
-	Services []map[string]any `json:"services"`
+	Target    domain.DeploymentTarget `json:"target"`
+	Project   string                  `json:"project"`
+	Namespace string                  `json:"namespace,omitempty"`
+	Workload  string                  `json:"workload,omitempty"`
+	Image     string                  `json:"image,omitempty"`
+	Services  []map[string]any        `json:"services"`
 }
 
 func ProjectName(runID string) string {
@@ -287,7 +321,7 @@ func (d Deployment) Status(ctx context.Context, runID, root string) (DeploymentS
 		if err := json.Unmarshal([]byte(trimmed), &services); err != nil {
 			return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err)
 		}
-		return DeploymentStatus{Project: project, Services: services}, nil
+		return DeploymentStatus{Target: d.Target(), Project: project, Services: services}, nil
 	}
 	for _, line := range strings.Split(trimmed, "\n") {
 		if strings.TrimSpace(line) == "" {
@@ -299,7 +333,7 @@ func (d Deployment) Status(ctx context.Context, runID, root string) (DeploymentS
 		}
 		services = append(services, service)
 	}
-	return DeploymentStatus{Project: project, Services: services}, nil
+	return DeploymentStatus{Target: d.Target(), Project: project, Services: services}, nil
 }
 
 func (d Deployment) Logs(ctx context.Context, runID, root string, lines int) (string, error) {

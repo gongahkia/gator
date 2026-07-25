@@ -12,17 +12,19 @@ import (
 )
 
 type Provider struct {
-	ID            string         `json:"id"`
-	Kind          string         `json:"kind"`
-	Model         string         `json:"model"`
-	BaseURL       string         `json:"base_url"`
-	CredentialEnv string         `json:"credential_env"`
-	Command       []string       `json:"command"`
-	Image         string         `json:"image"`
-	Network       string         `json:"network"`
-	Stages        []domain.Stage `json:"stages"`
-	Budget        ProviderBudget `json:"budget"`
-	PluginID      string         `json:"plugin_id"`
+	ID                  string         `json:"id"`
+	Kind                string         `json:"kind"`
+	Model               string         `json:"model"`
+	BaseURL             string         `json:"base_url"`
+	CredentialEnv       string         `json:"credential_env"`
+	Command             []string       `json:"command"`
+	Image               string         `json:"image"`
+	Network             string         `json:"network"`
+	Stages              []domain.Stage `json:"stages"`
+	Budget              ProviderBudget `json:"budget"`
+	PluginID            string         `json:"plugin_id"`
+	KubernetesSecret    string         `json:"kubernetes_secret"`
+	KubernetesSecretKey string         `json:"kubernetes_secret_key"`
 }
 
 type ProviderBudget struct {
@@ -45,11 +47,35 @@ type ProcessPlugin struct {
 	Methods []string `json:"methods"`
 }
 
+type Runtime struct {
+	DefaultTarget domain.DeploymentTarget `json:"default_target"`
+	Kubernetes    Kubernetes              `json:"kubernetes"`
+}
+
+type Kubernetes struct {
+	Kubeconfig                 string `json:"kubeconfig"`
+	Context                    string `json:"context"`
+	Namespace                  string `json:"namespace"`
+	ServiceAccount             string `json:"service_account"`
+	RegistryRepository         string `json:"registry_repository"`
+	RegistryPullSecret         string `json:"registry_pull_secret"`
+	IngressClass               string `json:"ingress_class"`
+	IngressBaseDomain          string `json:"ingress_base_domain"`
+	IngressControllerNamespace string `json:"ingress_controller_namespace"`
+	WorkspaceImage             string `json:"workspace_image"`
+	KanikoImage                string `json:"kaniko_image"`
+	VerifierImage              string `json:"verifier_image"`
+	CPUMilli                   int64  `json:"cpu_milli"`
+	MemoryMiB                  int64  `json:"memory_mib"`
+	Replicas                   int32  `json:"replicas"`
+}
+
 type Manifest struct {
 	Providers  []Provider            `json:"providers"`
 	Profiles   []domain.Profile      `json:"profiles"`
 	ToolPolicy map[string]ToolPolicy `json:"tool_policy"`
 	Plugins    []ProcessPlugin       `json:"plugins"`
+	Runtime    Runtime               `json:"runtime"`
 }
 
 type Config struct {
@@ -88,6 +114,12 @@ func Load() (Config, error) {
 	}
 	if err := cfg.Manifest.Validate(); err != nil {
 		return Config{}, err
+	}
+	if target := strings.TrimSpace(os.Getenv("NORBOT_DEPLOYMENT_TARGET")); target != "" {
+		cfg.Manifest.Runtime.DefaultTarget = domain.DeploymentTarget(target)
+		if err := cfg.Manifest.ValidateRuntime(); err != nil {
+			return Config{}, err
+		}
 	}
 	return cfg, nil
 }
@@ -146,7 +178,60 @@ func (m Manifest) Validate() error {
 			}
 		}
 	}
+	return m.ValidateRuntime()
+}
+
+func (m Manifest) ValidateRuntime() error {
+	target := m.Runtime.DefaultTarget
+	if target == "" {
+		target = domain.DeploymentDocker
+	}
+	if !target.Valid() {
+		return fmt.Errorf("unsupported runtime default_target %q", target)
+	}
+	if target != domain.DeploymentKubernetes {
+		return nil
+	}
+	k := m.Runtime.Kubernetes
+	if k.Kubeconfig == "" || k.Namespace == "" || k.ServiceAccount == "" || k.RegistryRepository == "" || k.RegistryPullSecret == "" {
+		return fmt.Errorf("kubernetes runtime needs kubeconfig, namespace, service_account, registry_repository, and registry_pull_secret")
+	}
+	if (k.IngressClass == "") != (k.IngressBaseDomain == "") || (k.IngressClass != "" && k.IngressControllerNamespace == "") {
+		return fmt.Errorf("kubernetes ingress_class, ingress_base_domain, and ingress_controller_namespace must be configured together")
+	}
+	if k.CPUMilli < 0 || k.MemoryMiB < 0 || k.Replicas < 0 {
+		return fmt.Errorf("kubernetes resources cannot be negative")
+	}
 	return nil
+}
+
+func (m Manifest) DefaultTarget() domain.DeploymentTarget {
+	if m.Runtime.DefaultTarget == "" {
+		return domain.DeploymentDocker
+	}
+	return m.Runtime.DefaultTarget
+}
+
+func (k Kubernetes) Normalized() Kubernetes {
+	if k.WorkspaceImage == "" {
+		k.WorkspaceImage = "alpine:3.21"
+	}
+	if k.KanikoImage == "" {
+		k.KanikoImage = "gcr.io/kaniko-project/executor:v1.23.2"
+	}
+	if k.VerifierImage == "" {
+		k.VerifierImage = "golang:1.26-alpine"
+	}
+	if k.CPUMilli == 0 {
+		k.CPUMilli = 500
+	}
+	if k.MemoryMiB == 0 {
+		k.MemoryMiB = 512
+	}
+	if k.Replicas == 0 {
+		k.Replicas = 1
+	}
+	return k
 }
 
 func (m Manifest) Provider(id string, stage domain.Stage) (Provider, bool) {

@@ -39,7 +39,7 @@ type RateLimit struct {
 
 type Invoker struct {
 	HTTPClient *http.Client
-	Workspace  runtime.Workspace
+	Workspace  runtime.WorkspaceBackend
 	Extensions *extension.Registry
 }
 
@@ -59,7 +59,7 @@ func (i Invoker) Invoke(ctx context.Context, provider config.Provider, request R
 		return Result{Text: response.Text, Provider: provider.ID, Model: "process-plugin", Metadata: response.Metadata}, nil
 	}
 	if provider.Kind == "cli" {
-		output, err := i.Workspace.RunCLI(ctx, request.RunID, provider.Image, provider.Network, provider.Command, request.Prompt, provider.CredentialEnv)
+		output, err := i.Workspace.RunCLI(ctx, request.RunID, provider.Image, provider.Network, provider.Command, request.Prompt, provider.CredentialEnv, provider.KubernetesSecret, provider.KubernetesSecretKey)
 		if err != nil {
 			return Result{}, err
 		}

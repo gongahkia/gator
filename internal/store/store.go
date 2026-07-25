@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
   prompt TEXT NOT NULL,
   profile TEXT NOT NULL,
+	deployment_target TEXT NOT NULL DEFAULT 'docker',
+	public_ingress BOOLEAN NOT NULL DEFAULT FALSE,
   stage TEXT NOT NULL,
   status TEXT NOT NULL,
   providers JSONB NOT NULL,
@@ -115,6 +117,10 @@ CREATE TABLE IF NOT EXISTS provider_observations (
 );
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS deployment_target TEXT NOT NULL DEFAULT 'docker';
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS public_ingress BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE runs SET deployment_target='docker' WHERE deployment_target IS NULL OR deployment_target='';
 CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
@@ -132,12 +138,12 @@ func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
 		return err
 	}
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO runs (id,prompt,profile,stage,status,providers,graph,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)`, run.ID, run.Prompt, run.Profile, run.Stage, run.Status, providers, graph, run.CreatedAt)
+		_, err := tx.Exec(ctx, `INSERT INTO runs (id,prompt,profile,deployment_target,public_ingress,stage,status,providers,graph,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)`, run.ID, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.Stage, run.Status, providers, graph, run.CreatedAt)
 		if err != nil {
 			return err
 		}
-		return s.insertEvent(ctx, tx, run.ID, "run_created", "Run created and planner queued", map[string]any{"profile": run.Profile, "providers": run.Providers})
+		return s.insertEvent(ctx, tx, run.ID, "run_created", "Run created and planner queued", map[string]any{"profile": run.Profile, "providers": run.Providers, "deployment_target": run.DeploymentTarget, "public_ingress": run.PublicIngress})
 	})
 }
 
@@ -569,14 +575,14 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 	return err
 }
 
-const runQuery = `SELECT id,prompt,profile,stage,status,providers,graph,feedback,failure_reason,created_at,updated_at FROM runs`
+const runQuery = `SELECT id,prompt,profile,deployment_target,public_ingress,stage,status,providers,graph,feedback,failure_reason,created_at,updated_at FROM runs`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanRun(row rowScanner) (domain.Run, error) {
 	var run domain.Run
 	var providers, graph []byte
-	err := row.Scan(&run.ID, &run.Prompt, &run.Profile, &run.Stage, &run.Status, &providers, &graph, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
+	err := row.Scan(&run.ID, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.Stage, &run.Status, &providers, &graph, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Run{}, ErrNotFound
 	}

@@ -62,6 +62,15 @@ func (p Profile) Valid() bool {
 	return p == ProfileFrontend || p == ProfileFullStack || p == ProfileAgentic
 }
 
+type DeploymentTarget string
+
+const (
+	DeploymentDocker     DeploymentTarget = "docker"
+	DeploymentKubernetes DeploymentTarget = "kubernetes"
+)
+
+func (t DeploymentTarget) Valid() bool { return t == DeploymentDocker || t == DeploymentKubernetes }
+
 type Graph struct {
 	Nodes []GraphNode `json:"nodes"`
 	Edges []GraphEdge `json:"edges"`
@@ -118,32 +127,72 @@ func (g Graph) Validate() error {
 			return fmt.Errorf("duplicate edge id %q", edge.ID)
 		}
 		edges[edge.ID] = struct{}{}
-		if edge.Source == edge.Target { return fmt.Errorf("edge %q cannot self-reference", edge.ID) }
+		if edge.Source == edge.Target {
+			return fmt.Errorf("edge %q cannot self-reference", edge.ID)
+		}
 		adjacency[edge.Source] = append(adjacency[edge.Source], edge.Target)
 		reverse[edge.Target] = append(reverse[edge.Target], edge.Source)
 	}
 	starts, outputs := []string{}, []string{}
 	for _, node := range g.Nodes {
-		if node.Kind == "input" { starts = append(starts, node.ID) }
-		if node.Kind == "output" { outputs = append(outputs, node.ID) }
+		if node.Kind == "input" {
+			starts = append(starts, node.ID)
+		}
+		if node.Kind == "output" {
+			outputs = append(outputs, node.ID)
+		}
 	}
-	if hasCycle(nodes, adjacency) { return fmt.Errorf("graph cannot contain cycles") }
-	if !allReachable(starts, adjacency, nodes) { return fmt.Errorf("every node must be reachable from an input") }
-	if !allReachable(outputs, reverse, nodes) { return fmt.Errorf("every node must reach an output") }
+	if hasCycle(nodes, adjacency) {
+		return fmt.Errorf("graph cannot contain cycles")
+	}
+	if !allReachable(starts, adjacency, nodes) {
+		return fmt.Errorf("every node must be reachable from an input")
+	}
+	if !allReachable(outputs, reverse, nodes) {
+		return fmt.Errorf("every node must reach an output")
+	}
 	return nil
 }
 
 func allReachable(starts []string, adjacency map[string][]string, nodes map[string]struct{}) bool {
-	seen := map[string]bool{}; queue := append([]string(nil), starts...)
-	for len(queue) > 0 { current := queue[0]; queue = queue[1:]; if seen[current] { continue }; seen[current] = true; queue = append(queue, adjacency[current]...) }
+	seen := map[string]bool{}
+	queue := append([]string(nil), starts...)
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if seen[current] {
+			continue
+		}
+		seen[current] = true
+		queue = append(queue, adjacency[current]...)
+	}
 	return len(seen) == len(nodes)
 }
 
 func hasCycle(nodes map[string]struct{}, adjacency map[string][]string) bool {
 	state := map[string]uint8{}
 	var visit func(string) bool
-	visit = func(id string) bool { if state[id] == 1 { return true }; if state[id] == 2 { return false }; state[id] = 1; for _, next := range adjacency[id] { if visit(next) { return true } }; state[id] = 2; return false }
-	for id := range nodes { if visit(id) { return true } }
+	visit = func(id string) bool {
+		if state[id] == 1 {
+			return true
+		}
+		if state[id] == 2 {
+			return false
+		}
+		state[id] = 1
+		for _, next := range adjacency[id] {
+			if visit(next) {
+				return true
+			}
+		}
+		state[id] = 2
+		return false
+	}
+	for id := range nodes {
+		if visit(id) {
+			return true
+		}
+	}
 	return false
 }
 
@@ -162,17 +211,19 @@ func DefaultGraph() Graph {
 }
 
 type Run struct {
-	ID            string           `json:"id"`
-	Prompt        string           `json:"prompt"`
-	Profile       Profile          `json:"profile"`
-	Stage         Stage            `json:"stage"`
-	Status        Status           `json:"status"`
-	Providers     map[Stage]string `json:"providers"`
-	Graph         Graph            `json:"graph"`
-	Feedback      string           `json:"feedback,omitempty"`
-	FailureReason string           `json:"failure_reason,omitempty"`
-	CreatedAt     time.Time        `json:"created_at"`
-	UpdatedAt     time.Time        `json:"updated_at"`
+	ID               string           `json:"id"`
+	Prompt           string           `json:"prompt"`
+	Profile          Profile          `json:"profile"`
+	DeploymentTarget DeploymentTarget `json:"deployment_target"`
+	PublicIngress    bool             `json:"public_ingress"`
+	Stage            Stage            `json:"stage"`
+	Status           Status           `json:"status"`
+	Providers        map[Stage]string `json:"providers"`
+	Graph            Graph            `json:"graph"`
+	Feedback         string           `json:"feedback,omitempty"`
+	FailureReason    string           `json:"failure_reason,omitempty"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
 }
 
 type Event struct {
