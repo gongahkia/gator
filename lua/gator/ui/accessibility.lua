@@ -1,4 +1,5 @@
 local M = {}
+local highlight = require("gator.ui.highlight")
 local actions = {
 	next = true,
 	previous = true,
@@ -76,6 +77,7 @@ function M.text(buffer, lines)
 	end
 	vim.bo[buffer].modifiable = true
 	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
+	highlight.apply(buffer, lines)
 	vim.bo[buffer].modifiable = false
 	vim.bo[buffer].filetype = "gator-text"
 end
@@ -90,6 +92,7 @@ function M.render(buffer, lines, filetype)
 	end
 	vim.bo[buffer].modifiable = true
 	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
+	highlight.apply(buffer, lines)
 	vim.bo[buffer].modifiable = false
 	vim.bo[buffer].filetype = filetype
 end
