@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -20,17 +21,34 @@ type Provider struct {
 	Image         string         `json:"image"`
 	Network       string         `json:"network"`
 	Stages        []domain.Stage `json:"stages"`
+	Budget        ProviderBudget `json:"budget"`
+}
+
+type ProviderBudget struct {
+	MaxConcurrent     int `json:"max_concurrent"`
+	RequestsPerMinute int `json:"requests_per_minute"`
 }
 
 type ToolPolicy struct {
-	Enabled          bool `json:"enabled"`
-	ApprovalRequired bool `json:"approval_required"`
+	Enabled          bool     `json:"enabled"`
+	ApprovalRequired bool     `json:"approval_required"`
+	Roles            []string `json:"roles"`
+	AllowedHosts     []string `json:"allowed_hosts"`
+	AllowedCommands  []string `json:"allowed_commands"`
+}
+
+type ProcessPlugin struct {
+	ID      string   `json:"id"`
+	Command string   `json:"command"`
+	SHA256  string   `json:"sha256"`
+	Methods []string `json:"methods"`
 }
 
 type Manifest struct {
 	Providers  []Provider            `json:"providers"`
 	Profiles   []domain.Profile      `json:"profiles"`
 	ToolPolicy map[string]ToolPolicy `json:"tool_policy"`
+	Plugins    []ProcessPlugin       `json:"plugins"`
 }
 
 type Config struct {
@@ -92,6 +110,9 @@ func (m Manifest) Validate() error {
 		if p.Kind != "cli" && (p.BaseURL == "" || p.Model == "" || p.CredentialEnv == "") {
 			return fmt.Errorf("api provider %q needs base_url, model, and credential_env", p.ID)
 		}
+		if p.Budget.MaxConcurrent < 0 || p.Budget.RequestsPerMinute < 0 {
+			return fmt.Errorf("provider %q has negative budget", p.ID)
+		}
 	}
 	if len(m.Profiles) == 0 {
 		return fmt.Errorf("manifest needs at least one profile")
@@ -100,6 +121,19 @@ func (m Manifest) Validate() error {
 		if !profile.Valid() {
 			return fmt.Errorf("unsupported profile %q", profile)
 		}
+	}
+	pluginIDs := map[string]struct{}{}
+	for _, plugin := range m.Plugins {
+		if plugin.ID == "" || !filepath.IsAbs(plugin.Command) || len(plugin.Methods) == 0 {
+			return fmt.Errorf("plugin requires id, absolute command, and methods")
+		}
+		if len(plugin.SHA256) != 64 {
+			return fmt.Errorf("plugin %q requires a 64-character sha256 digest", plugin.ID)
+		}
+		if _, exists := pluginIDs[plugin.ID]; exists {
+			return fmt.Errorf("duplicate plugin id %q", plugin.ID)
+		}
+		pluginIDs[plugin.ID] = struct{}{}
 	}
 	return nil
 }

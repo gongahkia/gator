@@ -64,12 +64,15 @@ CREATE TABLE IF NOT EXISTS jobs (
   stage TEXT NOT NULL,
   attempt INT NOT NULL DEFAULT 1,
   state TEXT NOT NULL DEFAULT 'queued',
+  worker_id TEXT NOT NULL DEFAULT '',
   claimed_at TIMESTAMPTZ,
+  lease_expires_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   last_error TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS jobs_claim_idx ON jobs(state, created_at) WHERE state = 'queued';
+CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';
 CREATE TABLE IF NOT EXISTS deployments (
   run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
   project_name TEXT NOT NULL,
@@ -77,7 +80,25 @@ CREATE TABLE IF NOT EXISTS deployments (
   status TEXT NOT NULL,
   error_message TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);`)
+);
+CREATE TABLE IF NOT EXISTS capacity_recommendations (
+  id BIGSERIAL PRIMARY KEY,
+  recommended_workers INT NOT NULL,
+  accepted_workers INT,
+  factors JSONB NOT NULL DEFAULT '{}'::jsonb,
+  generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  accepted_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS provider_observations (
+  id BIGSERIAL PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  remaining_requests INT,
+  reset_at TIMESTAMPTZ,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  observed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
@@ -246,8 +267,8 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 			}
 			return s.insertEvent(ctx, tx, runID, "planner_revision_requested", "Planner revision queued", map[string]any{"feedback": feedback})
 		case domain.ApprovalRetry:
-			if run.Status != domain.StatusFailed {
-				return fmt.Errorf("retry is available only for failed runs")
+			if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted {
+				return fmt.Errorf("retry is available only for failed or interrupted runs")
 			}
 			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
 				return err
@@ -274,14 +295,17 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 	return s.GetRun(ctx, runID)
 }
 
-func (s *Store) ClaimJob(ctx context.Context) (domain.Job, bool, error) {
+func (s *Store) ClaimJob(ctx context.Context, workerID string, lease time.Duration) (domain.Job, bool, error) {
+	if workerID == "" || lease <= 0 {
+		return domain.Job{}, false, fmt.Errorf("worker id and positive lease are required")
+	}
 	var job domain.Job
 	err := s.withTx(ctx, func(tx pgx.Tx) error {
 		row := tx.QueryRow(ctx, `WITH next AS (
   SELECT id FROM jobs WHERE state='queued' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1
-) UPDATE jobs SET state='running',claimed_at=now() WHERE id=(SELECT id FROM next)
-RETURNING id,run_id,stage,attempt`)
-		err := row.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt)
+) UPDATE jobs SET state='running',worker_id=$1,claimed_at=now(),lease_expires_at=now()+$2::interval WHERE id=(SELECT id FROM next)
+RETURNING id,run_id,stage,attempt,worker_id,lease_expires_at`, workerID, lease.String())
+		err := row.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt, &job.WorkerID, &job.LeaseExpiresAt)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -294,6 +318,46 @@ RETURNING id,run_id,stage,attempt`)
 		return domain.Job{}, false, nil
 	}
 	return job, true, nil
+}
+
+func (s *Store) HeartbeatJob(ctx context.Context, job domain.Job, lease time.Duration) error {
+	result, err := s.pool.Exec(ctx, `UPDATE jobs SET lease_expires_at=now()+$3::interval WHERE id=$1 AND state='running' AND worker_id=$2`, job.ID, job.WorkerID, lease.String())
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("job %d lease is no longer owned by %q", job.ID, job.WorkerID)
+	}
+	return nil
+}
+
+func (s *Store) RecoverExpiredJobs(ctx context.Context) (int, error) {
+	var recovered int
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT id,run_id,stage,attempt FROM jobs WHERE state='running' AND lease_expires_at < now() FOR UPDATE SKIP LOCKED`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var job domain.Job
+			if err := rows.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `UPDATE jobs SET state='interrupted',completed_at=now(),last_error='worker lease expired' WHERE id=$1`, job.ID); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `UPDATE runs SET status='interrupted',failure_reason='worker lease expired; operator retry required',updated_at=now() WHERE id=$1 AND stage=$2 AND status='running'`, job.RunID, job.Stage); err != nil {
+				return err
+			}
+			if err := s.insertEvent(ctx, tx, job.RunID, "stage_interrupted", string(job.Stage)+" worker lease expired; operator retry required", map[string]any{"stage": job.Stage, "attempt": job.Attempt}); err != nil {
+				return err
+			}
+			recovered++
+		}
+		return rows.Err()
+	})
+	return recovered, err
 }
 
 func (s *Store) MarkStageRunning(ctx context.Context, job domain.Job, provider string) error {
@@ -315,7 +379,7 @@ func (s *Store) MarkStageAwaitingApproval(ctx context.Context, job domain.Job, m
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now() WHERE id=$1`, job.ID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now(),lease_expires_at=NULL WHERE id=$1 AND worker_id=$2`, job.ID, job.WorkerID); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, job.RunID, "stage_approval_required", string(job.Stage)+" completed; approval required", metadata)
@@ -328,7 +392,7 @@ func (s *Store) CompleteRun(ctx context.Context, job domain.Job, metadata map[st
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now() WHERE id=$1`, job.ID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now(),lease_expires_at=NULL WHERE id=$1 AND worker_id=$2`, job.ID, job.WorkerID); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, job.RunID, "run_completed", "Deployment completed", metadata)
@@ -341,7 +405,7 @@ func (s *Store) FailJob(ctx context.Context, job domain.Job, failure string) err
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='failed',completed_at=now(),last_error=$2 WHERE id=$1`, job.ID, failure); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='failed',completed_at=now(),lease_expires_at=NULL,last_error=$2 WHERE id=$1 AND worker_id=$3`, job.ID, failure, job.WorkerID); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, job.RunID, "stage_failed", string(job.Stage)+" failed; operator decision required", map[string]any{"stage": job.Stage, "error": failure})

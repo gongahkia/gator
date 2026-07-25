@@ -155,6 +155,7 @@ func (s *Service) ProviderOptions() []config.Provider {
 }
 
 func (s *Service) StartWorkers(ctx context.Context) {
+	go s.recoverLeases(ctx)
 	var workers sync.WaitGroup
 	for index := 0; index < s.config.Workers; index++ {
 		workers.Add(1)
@@ -167,11 +168,12 @@ func (s *Service) StartWorkers(ctx context.Context) {
 }
 
 func (s *Service) worker(ctx context.Context, workerID int) {
+	identity := fmt.Sprintf("%s-%d", workerIdentity(), workerID)
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		job, claimed, err := s.store.ClaimJob(ctx)
+		job, claimed, err := s.store.ClaimJob(ctx, identity, 2*time.Minute)
 		if err != nil {
 			s.log.Error("claim job", "worker", workerID, "error", err)
 			sleep(ctx, time.Second)
@@ -181,11 +183,72 @@ func (s *Service) worker(ctx context.Context, workerID int) {
 			sleep(ctx, 300*time.Millisecond)
 			continue
 		}
-		if err := s.execute(ctx, job); err != nil {
+		if err := s.executeLeased(ctx, job); err != nil {
 			s.log.Error("stage failed", "run_id", job.RunID, "stage", job.Stage, "attempt", job.Attempt, "error", err)
 			_ = s.store.FailJob(context.Background(), job, err.Error())
 		}
 	}
+}
+
+func (s *Service) recoverLeases(ctx context.Context) {
+	for {
+		recovered, err := s.store.RecoverExpiredJobs(ctx)
+		if err != nil {
+			s.log.Error("recover expired jobs", "error", err)
+		} else if recovered > 0 {
+			s.log.Warn("interrupted expired jobs", "count", recovered)
+		}
+		sleep(ctx, 15*time.Second)
+		if ctx.Err() != nil {
+			return
+		}
+	}
+}
+
+func (s *Service) executeLeased(ctx context.Context, job domain.Job) error {
+	stageCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	heartbeatErr := make(chan error, 1)
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-stageCtx.Done():
+				return
+			case <-ticker.C:
+				if err := s.store.HeartbeatJob(stageCtx, job, 2*time.Minute); err != nil {
+					select {
+					case heartbeatErr <- err:
+					default:
+					}
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	err := s.execute(stageCtx, job)
+	close(done)
+	select {
+	case leaseErr := <-heartbeatErr:
+		if err == nil {
+			return fmt.Errorf("lease heartbeat: %w", leaseErr)
+		}
+	default:
+	}
+	return err
+}
+
+func workerIdentity() string {
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		host = "norbot"
+	}
+	return fmt.Sprintf("%s-%d", host, os.Getpid())
 }
 
 func (s *Service) execute(ctx context.Context, job domain.Job) error {

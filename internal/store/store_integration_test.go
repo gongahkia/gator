@@ -35,7 +35,7 @@ func TestRunApprovalLifecycleIntegration(t *testing.T) {
 	if err := st.Enqueue(ctx, run.ID, domain.StagePlanner, 1); err != nil {
 		t.Fatal(err)
 	}
-	job, claimed, err := st.ClaimJob(ctx)
+	job, claimed, err := st.ClaimJob(ctx, "integration-worker", time.Minute)
 	if err != nil || !claimed {
 		t.Fatalf("claim=%t err=%v", claimed, err)
 	}

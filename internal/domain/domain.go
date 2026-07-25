@@ -37,16 +37,17 @@ func (s Stage) Next() (Stage, bool) {
 type Status string
 
 const (
-	StatusQueued    Status = "queued"
-	StatusRunning   Status = "running"
-	StatusAwaiting  Status = "awaiting_approval"
-	StatusFailed    Status = "failed"
-	StatusAbandoned Status = "abandoned"
-	StatusCompleted Status = "completed"
+	StatusQueued      Status = "queued"
+	StatusRunning     Status = "running"
+	StatusAwaiting    Status = "awaiting_approval"
+	StatusFailed      Status = "failed"
+	StatusInterrupted Status = "interrupted"
+	StatusAbandoned   Status = "abandoned"
+	StatusCompleted   Status = "completed"
 )
 
 func (s Status) Terminal() bool {
-	return s == StatusFailed || s == StatusAbandoned || s == StatusCompleted
+	return s == StatusFailed || s == StatusInterrupted || s == StatusAbandoned || s == StatusCompleted
 }
 
 type Profile string
@@ -157,10 +158,12 @@ type Event struct {
 }
 
 type Job struct {
-	ID      int64  `json:"id"`
-	RunID   string `json:"run_id"`
-	Stage   Stage  `json:"stage"`
-	Attempt int    `json:"attempt"`
+	ID             int64      `json:"id"`
+	RunID          string     `json:"run_id"`
+	Stage          Stage      `json:"stage"`
+	Attempt        int        `json:"attempt"`
+	WorkerID       string     `json:"worker_id,omitempty"`
+	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 }
 
 type ApprovalAction string
