@@ -36,6 +36,10 @@ assert(
 )
 vim.cmd("GatorPalette task:start-task")
 assert(invoked[1] == "task", "native palette command must route task commands")
+vim.cmd("GatorPalette")
+require("gator.ui").picker.filter("task:start-task")
+require("gator.ui").picker.confirm()
+assert(invoked[2] == "task", "empty palette command must open a selectable command palette")
 assert(#palette.list() == 4, "palette must list every supported command kind")
 assert(palette.unregister("provider:resume-session"), "palette entries must be removable")
 

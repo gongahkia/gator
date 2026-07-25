@@ -318,6 +318,9 @@ function Coordinator:dispatch(action, opts)
 		})
 	end
 	self:workflow()
+	if opts.id == nil or opts.id == "" then
+		return self:dependency("ui").palette.open()
+	end
 	return self:dependency("ui").palette.execute(require_string(opts.id, "palette id"))
 end
 

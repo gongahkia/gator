@@ -95,7 +95,7 @@ Do not put provider credentials, tokens, secrets, passwords, or API keys in Gato
 | `:GatorBetaReadiness` | Verifies local beta prerequisites and writes a local rolling readiness/failure-report bundle. |
 | `:{range}GatorCaptureSelection task:<id>` | Captures a visual/line selection as provenance-tracked context for a task. |
 | `:{range}GatorCaptureSelection session:<provider>:<id>` | Captures context for an opaque provider-native session. |
-| `:GatorPalette <kind:name>` | Runs a registered Gator action, task, or ready provider command. |
+| `:GatorPalette [kind:name]` | Opens the registered command palette or runs a specific action, task, or ready provider command. |
 
 Run `require("gator").setup()` before `:GatorCaptureSelection`. Open `:Gator` to inspect explicit empty, loading, failure, recovery, and unavailable-provider states. Core actions open task, linked-session, context-inspection, and review panels when their local evidence is available.
 
@@ -113,7 +113,7 @@ The same actions are available through completion-backed palette entries:
 :GatorPalette action:refresh-providers
 ```
 
-Opening `:GatorPalette` after the workspace loads also completes `task:<id>` and `provider:<name>` entries. Providers are selectable only when `:GatorHealth` can verify the executable, supported version, provider-native authentication, and native-terminal session bridge. Current terminal bridges cover Claude Code, Codex, and OpenCode; unavailable providers remain unavailable rather than falling back to broader permissions or manual credential handling.
+`:GatorPalette` opens a filterable picker; its completion also exposes `task:<id>` and `provider:<name>` entries. Providers are selectable only when `:GatorHealth` can verify the executable, supported version, provider-native authentication, and native-terminal session bridge. Current terminal bridges cover Claude Code, Codex, and OpenCode; unavailable providers remain unavailable rather than falling back to broader permissions or manual credential handling.
 
 ## Diagnostics and logging
 

@@ -1,6 +1,7 @@
 local M = {}
 local entries = {}
 local kinds = { action = true, adapter = true, task = true, provider = true }
+local picker = require("gator.ui.picker")
 
 local function fail(message)
 	error("Gator palette: " .. message, 3)
@@ -80,6 +81,20 @@ function M.list()
 		table.insert(result, { id = id, kind = entry.kind, name = entry.name })
 	end
 	return result
+end
+
+function M.open()
+	local items = {}
+	for _, entry in ipairs(M.list()) do
+		table.insert(items, { id = entry.id, label = entry.kind .. " · " .. entry.name })
+	end
+	return picker.open({
+		title = "Gator palette",
+		items = items,
+		on_select = function(item)
+			M.execute(item.id)
+		end,
+	})
 end
 
 return M

@@ -73,8 +73,11 @@ local function rpc_client(opts, initialized, callback)
 		sequence = sequence + 1
 		local id = sequence
 		pending[id] = done
-		local ok, detail =
-			pcall(process.write, process, vim.json.encode({ id = id, method = method, params = params }) .. "\n")
+		local message = { id = id, method = method, params = params }
+		if opts.jsonrpc then
+			message.jsonrpc = "2.0"
+		end
+		local ok, detail = pcall(process.write, process, vim.json.encode(message) .. "\n")
 		if not ok or detail == false then
 			pending[id] = nil
 			finish(nil, "provider RPC write failed")
@@ -122,6 +125,9 @@ local function rpc_client(opts, initialized, callback)
 	end
 	process = value
 	initialized(request, finish)
+	vim.defer_fn(function()
+		finish(nil, "provider RPC initialization timed out")
+	end, 10000)
 end
 
 function M.new(opts)
@@ -170,29 +176,33 @@ function Bridge:start(opts, callback)
 		return
 	end
 	if provider_name == "codex" then
-		rpc_client({ spawn = self.spawn, command = { executable, "app-server" }, cwd = cwd }, function(request, finish)
-			request("initialize", { clientInfo = { name = "gator", version = "1" } }, function(_, err)
-				if err then
-					finish(nil, "Codex app-server initialization failed")
-					return
-				end
-				request("thread/start", { cwd = cwd }, function(result, start_err)
-					local id = result and result.thread and result.thread.id
-					if start_err or type(id) ~= "string" or id == "" then
-						finish(nil, "Codex thread creation failed")
+		rpc_client(
+			{ spawn = self.spawn, command = { executable, "app-server", "--stdio" }, cwd = cwd },
+			function(request, finish)
+				request("initialize", { clientInfo = { name = "gator", version = "1" } }, function(_, err)
+					if err then
+						finish(nil, "Codex app-server initialization failed")
 						return
 					end
-					finish({
-						session = { provider = "codex", id = id, owner = "provider" },
-						command = { executable, "resume", id, prompt },
-					})
+					request("thread/start", { cwd = cwd, ephemeral = false }, function(result, start_err)
+						local id = result and result.thread and result.thread.id
+						if start_err or type(id) ~= "string" or id == "" then
+							finish(nil, "Codex thread creation failed")
+							return
+						end
+						finish({
+							session = { provider = "codex", id = id, owner = "provider" },
+							command = { executable, "resume", id, prompt },
+						})
+					end)
 				end)
-			end)
-		end, callback)
+			end,
+			callback
+		)
 		return
 	end
 	rpc_client(
-		{ spawn = self.spawn, command = { executable, "acp", "--cwd", cwd }, cwd = cwd },
+		{ spawn = self.spawn, command = { executable, "acp", "--cwd", cwd }, cwd = cwd, jsonrpc = true },
 		function(request, finish)
 			request("initialize", {
 				protocolVersion = 1,

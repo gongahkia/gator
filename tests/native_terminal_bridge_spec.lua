@@ -33,3 +33,59 @@ assert(
 	),
 	"providers without a verified native terminal bridge must fail closed"
 )
+
+local requests, spawned = {}, {}
+local function spawn(command, opts)
+	table.insert(spawned, { command = command, cwd = opts.cwd })
+	local process = {}
+	function process:write(frame)
+		local request = vim.json.decode(frame)
+		table.insert(requests, request)
+		local result
+		if request.method == "thread/start" then
+			result = { thread = { id = "codex-thread" } }
+		elseif request.method == "session/new" then
+			result = { sessionId = "opencode-session" }
+		else
+			result = {}
+		end
+		opts.stdout(nil, vim.json.encode({ id = request.id, result = result }) .. "\n")
+		return true
+	end
+	function process:kill()
+		return true
+	end
+	return process
+end
+local rpc_bridge = require("gator.adapters.native_terminal").new({ spawn = spawn })
+local codex
+rpc_bridge:start({ provider = "codex", cwd = vim.g.gator_test.root, prompt = "Review Codex" }, function(value, reason)
+	assert(reason == nil, "Codex terminal bridge must create a recoverable provider thread")
+	codex = value
+end)
+assert(
+	vim.deep_equal(spawned[1].command, { "codex", "app-server", "--stdio" })
+		and requests[2].method == "thread/start"
+		and requests[2].params.ephemeral == false
+		and vim.deep_equal(codex.command, { "codex", "resume", "codex-thread", "Review Codex" }),
+	"Codex launch must create a persistent app-server thread before opening its native terminal"
+)
+local opencode
+rpc_bridge:start(
+	{ provider = "opencode", cwd = vim.g.gator_test.root, prompt = "Review OpenCode" },
+	function(value, reason)
+		assert(reason == nil, "OpenCode terminal bridge must create an ACP session")
+		opencode = value
+	end
+)
+assert(
+	vim.deep_equal(spawned[2].command, { "opencode", "acp", "--cwd", vim.g.gator_test.root })
+		and requests[3].jsonrpc == "2.0"
+		and requests[4].jsonrpc == "2.0"
+		and requests[4].method == "session/new"
+		and vim.deep_equal(
+			opencode.command,
+			{ "opencode", "--session", "opencode-session", "--prompt", "Review OpenCode" }
+		),
+	"OpenCode launch must negotiate ACP and preserve the provider-owned session id in its terminal command"
+)

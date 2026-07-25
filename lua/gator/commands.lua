@@ -46,7 +46,7 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorPalette", function(opts)
 		require("gator").dispatch("palette", { id = opts.args })
 	end, {
-		nargs = 1,
+		nargs = "?",
 		complete = function(arglead)
 			local gator = require("gator")
 			if not gator._coordinator then
@@ -55,7 +55,7 @@ function M.register()
 			pcall(gator._coordinator.workflow, gator._coordinator)
 			return require("gator.ui").palette.complete(arglead)
 		end,
-		desc = "Run a registered Gator action, adapter, task, or provider command",
+		desc = "Open or run a registered Gator command palette entry",
 	})
 end
 
