@@ -52,8 +52,68 @@ func main() {
 		healthCommand(os.Args[2:])
 		return
 	}
-	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap | norbot serve | norbot health [--json] | norbot tui --api http://127.0.0.1:8080")
+	if len(os.Args) > 2 && os.Args[1] == "live-e2e" && os.Args[2] == "inbound" {
+		liveInboundCommand(os.Args[3:])
+		return
+	}
+	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap | norbot serve | norbot health [--json] | norbot live-e2e inbound | norbot tui --api http://127.0.0.1:8080")
 	os.Exit(2)
+}
+
+func liveInboundCommand(args []string) {
+	flags := flag.NewFlagSet("live-e2e inbound", flag.ExitOnError)
+	account := flags.String("account", "", "channel account id")
+	external := flags.String("external", "", "dedicated human test identity")
+	marker := flags.String("marker", "", "unique message marker")
+	timeout := flags.Duration("timeout", 10*time.Minute, "maximum wait")
+	_ = flags.Parse(args)
+	if *account == "" || *external == "" || *marker == "" {
+		fmt.Fprintln(os.Stderr, "usage: norbot live-e2e inbound --account ID --external ID --marker TEXT")
+		os.Exit(2)
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+	st, err := store.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("send marker from the dedicated human identity:", *marker)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	seen := false
+	for {
+		messages, err := st.ChannelMessages(ctx, *account, *external)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		for _, message := range messages {
+			if message.Direction == "inbound" && strings.Contains(message.Text, *marker) {
+				seen = true
+			}
+			if seen && message.Direction == "outbound" && message.State == "delivered" {
+				fmt.Println("live inbound and reply delivery verified")
+				return
+			}
+		}
+		select {
+		case <-ctx.Done():
+			fmt.Fprintln(os.Stderr, "live inbound assertion timed out")
+			os.Exit(1)
+		case <-ticker.C:
+		}
+	}
 }
 
 func healthCommand(args []string) {

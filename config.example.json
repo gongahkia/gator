@@ -44,12 +44,20 @@
     "http_get": {"enabled": true, "approval_required": false, "roles": ["researcher"], "allowed_hosts": ["api.example.com"]},
     "http_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
     "database_mutate": {"enabled": true, "approval_required": true, "roles": ["operator"]},
+    "file_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
     "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": []}
   },
   "plugins": [],
   "workflow": {"max_fixes": 2},
+  "security": {
+    "oidc": {"issuer": "https://issuer.example.com", "audience": "norbot", "groups_claim": "groups", "operator_groups": ["norbot-operators"]}
+  },
+  "artifacts": {
+    "endpoint": "https://s3.example.com", "region": "us-east-1", "bucket": "norbot-artifacts", "access_key_env": "NORBOT_S3_ACCESS_KEY", "secret_key_env": "NORBOT_S3_SECRET_KEY", "force_path_style": true
+  },
   "runtime": {
     "default_target": "docker",
+    "sandbox": {"image": "alpine:3.21", "cpu_milli": 500, "memory_mib": 512, "timeout_seconds": 60, "egress_proxy_url": "http://host.docker.internal:8181", "egress_proxy_secret_env": "NORBOT_EGRESS_PROXY_SECRET"},
     "kubernetes": {
       "kubeconfig": "/absolute/path/to/kubeconfig",
       "context": "",

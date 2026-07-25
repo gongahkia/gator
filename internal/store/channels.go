@@ -97,9 +97,9 @@ func (s *Store) IsPaired(ctx context.Context, accountID, externalID string) (boo
 	return value, err
 }
 
-func (s *Store) Session(ctx context.Context, accountID, externalID, id string, expiresAt time.Time) (domain.ChannelSession, error) {
+func (s *Store) Session(ctx context.Context, accountID, externalID, replyID, id string, expiresAt time.Time) (domain.ChannelSession, error) {
 	var value domain.ChannelSession
-	err := s.pool.QueryRow(ctx, `INSERT INTO channel_sessions(id,account_id,external_id,expires_at) VALUES($1,$2,$3,$4) ON CONFLICT(account_id,external_id) DO UPDATE SET expires_at=EXCLUDED.expires_at,updated_at=now() RETURNING id,account_id,external_id,summary,expires_at,created_at,updated_at`, id, accountID, externalID, expiresAt).Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.Summary, &value.ExpiresAt, &value.CreatedAt, &value.UpdatedAt)
+	err := s.pool.QueryRow(ctx, `INSERT INTO channel_sessions(id,account_id,external_id,reply_id,expires_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(account_id,external_id) DO UPDATE SET reply_id=EXCLUDED.reply_id,expires_at=EXCLUDED.expires_at,updated_at=now() RETURNING id,account_id,external_id,reply_id,summary,expires_at,created_at,updated_at`, id, accountID, externalID, replyID, expiresAt).Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.ReplyID, &value.Summary, &value.ExpiresAt, &value.CreatedAt, &value.UpdatedAt)
 	return value, err
 }
 func (s *Store) ResetSession(ctx context.Context, accountID, externalID string) error {
@@ -114,7 +114,7 @@ func (s *Store) ResetSession(ctx context.Context, accountID, externalID string) 
 }
 func (s *Store) ChannelSessionByID(ctx context.Context, id string) (domain.ChannelSession, error) {
 	var value domain.ChannelSession
-	err := s.pool.QueryRow(ctx, `SELECT id,account_id,external_id,summary,expires_at,created_at,updated_at FROM channel_sessions WHERE id=$1`, id).Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.Summary, &value.ExpiresAt, &value.CreatedAt, &value.UpdatedAt)
+	err := s.pool.QueryRow(ctx, `SELECT id,account_id,external_id,reply_id,summary,expires_at,created_at,updated_at FROM channel_sessions WHERE id=$1`, id).Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.ReplyID, &value.Summary, &value.ExpiresAt, &value.CreatedAt, &value.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ChannelSession{}, ErrNotFound
 	}

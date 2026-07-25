@@ -54,7 +54,7 @@ norbot tui --api http://127.0.0.1:8080
 - Every stage pauses for explicit approval. Failures and expired worker leases pause for retry, revision, or abandonment; Norbot never auto-replays a recovered job.
 - Per-stage providers and deployment target are chosen at run creation and recorded with each event; later config changes do not alter an existing run.
 - Provider credentials are environment references only; Norbot never stores raw secrets.
-- Agentic generated apps contain a durable session/idempotency store, typed-tool executor, audit log, and parameter-bound approval API. OpenClaw is not used.
+- Norbot owns agent sessions, provider credentials, typed tools, approval audit, sandbox execution, and idempotency. Generated apps receive neither model credentials nor a local tool executor. OpenClaw is not used.
 - Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, Docker Compose or Kubernetes rollout, or smoke failure.
 
 Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
@@ -68,9 +68,12 @@ Configure provider API keys in `.env`; add CLI providers with isolated runner im
 - `GET /api/health`, `/api/health/detail`, `/api/health/stream`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
 - `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the verified declarative skill catalog.
 - `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.
+- `GET /api/agent/actions` and `POST /api/agent/actions/{id}/decision` expose central, durable tool approvals; a decision resumes its exact persisted turn once.
 - `GET /api/runtime` returns the default target and Kubernetes/ingress availability for onboarding and TUI target selection.
 - `GET /api/runs/{id}/deployment`, `/logs`; `POST .../start`, `POST .../stop`; and `DELETE .../deployment` control deployed apps.
 
 `/metrics` is a Prometheus scrape endpoint; traces export through the OpenTelemetry Collector to Jaeger.
 
 `docker compose` remains the supported Norbot installation path. Docker runs require Docker; Kubernetes runs require only kubeconfig access from the Norbot control plane.
+
+For the required human inbound proof on dedicated Telegram, Slack, Discord, and WhatsApp identities, send a unique marker and run `norbot live-e2e inbound --account <account-id> --external <identity-id> --marker <marker>`. It succeeds only after Norbot records that inbound message and a delivered outbound reply.

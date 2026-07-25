@@ -510,14 +510,14 @@ func (k *KubernetesRuntime) applyApplication(ctx context.Context, run domain.Run
 		backend += "-" + suffix
 	}
 	if run.Profile != domain.ProfileFrontend {
-		if err := k.applyDeployment(ctx, backend, run.ID, "backend", images["backend"], 8000, k.config.Replicas, true); err != nil {
+		if err := k.applyDeployment(ctx, backend, run.ID, "backend", images["backend"], 8000, k.config.Replicas); err != nil {
 			return err
 		}
 		if err := k.applyService(ctx, backend, run.ID, "backend", 8000); err != nil {
 			return err
 		}
 	}
-	if err := k.applyDeployment(ctx, frontend, run.ID, "frontend", images["frontend"], 80, k.config.Replicas, false); err != nil {
+	if err := k.applyDeployment(ctx, frontend, run.ID, "frontend", images["frontend"], 80, k.config.Replicas); err != nil {
 		return err
 	}
 	if err := k.applyService(ctx, frontend, run.ID, "frontend", 80); err != nil {
@@ -534,7 +534,7 @@ func (k *KubernetesRuntime) applyApplication(ctx context.Context, run domain.Run
 	return nil
 }
 
-func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, component, image string, port int32, replicas int32, agent bool) error {
+func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, component, image string, port int32, replicas int32) error {
 	labels := k.labels(runID, "application")
 	labels["app.kubernetes.io/name"] = name
 	labels["norbot.component"] = component
@@ -545,10 +545,6 @@ func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, co
 	if component == "backend" {
 		container.ReadinessProbe = httpProbe(port, "/api/health")
 		container.LivenessProbe = httpProbe(port, "/api/health")
-	}
-	if agent {
-		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: "workspace", MountPath: "/var/lib/app", SubPath: "agent-state"})
-		container.Env = append(container.Env, corev1.EnvVar{Name: "AGENT_STATE_PATH", Value: "/var/lib/app/agent.db"}, corev1.EnvVar{Name: "AGENT_TOOL_POLICY_PATH", Value: "/app/tool_policy.json"})
 	}
 	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}, Spec: appsv1.DeploymentSpec{Replicas: &replicas, Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app.kubernetes.io/name": name}}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: k.config.ServiceAccount, AutomountServiceAccountToken: ptr(false), SecurityContext: &corev1.PodSecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: k.config.RegistryPullSecret}}, Containers: []corev1.Container{container}, Volumes: workspaceVolume(k.PVC(runID))}}}}
 	return k.upsertDeployment(ctx, deployment)

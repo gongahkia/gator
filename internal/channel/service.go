@@ -94,6 +94,34 @@ func (s *Service) Unpair(ctx context.Context, accountID, externalID string) erro
 func (s *Service) Accounts(ctx context.Context) ([]domain.ChannelAccount, error) {
 	return s.store.ChannelAccounts(ctx)
 }
+
+func (s *Service) QueueOutbound(ctx context.Context, accountID, externalID, text string) (domain.ChannelMessage, error) {
+	account, err := s.store.ChannelAccount(ctx, accountID)
+	if err != nil {
+		return domain.ChannelMessage{}, err
+	}
+	if !account.Enabled {
+		return domain.ChannelMessage{}, fmt.Errorf("channel account is disabled")
+	}
+	paired, err := s.store.IsPaired(ctx, accountID, externalID)
+	if err != nil {
+		return domain.ChannelMessage{}, err
+	}
+	if !paired {
+		return domain.ChannelMessage{}, fmt.Errorf("channel identity is not paired")
+	}
+	value, created, err := s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: accountID, ExternalID: externalID, Direction: "outbound", IdempotencyKey: "operator:" + randomID(), Text: strings.TrimSpace(text), State: "pending"})
+	if err != nil {
+		return domain.ChannelMessage{}, err
+	}
+	if !created {
+		return domain.ChannelMessage{}, fmt.Errorf("outbound message idempotency collision")
+	}
+	return value, nil
+}
+func (s *Service) Messages(ctx context.Context, accountID, externalID string) ([]domain.ChannelMessage, error) {
+	return s.store.ChannelMessages(ctx, accountID, externalID)
+}
 func (s *Service) ResetSession(ctx context.Context, accountID, externalID string) error {
 	return s.store.ResetSession(ctx, accountID, externalID)
 }
@@ -353,7 +381,7 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 	if err != nil || !created {
 		return err
 	}
-	session, err := s.store.Session(ctx, account.ID, value.ExternalID, randomID(), time.Now().UTC().Add(30*24*time.Hour))
+	session, err := s.store.Session(ctx, account.ID, value.ExternalID, value.ReplyID, randomID(), time.Now().UTC().Add(30*24*time.Hour))
 	if err != nil {
 		return err
 	}
@@ -579,7 +607,11 @@ func (s *Service) DecideAgentAction(ctx context.Context, id, decision, operator 
 		return response, action, err
 	}
 	_ = s.store.UpdateSessionSummary(ctx, session.ID, trimSummary(session.Summary+"\nassistant: "+response.Final))
-	_, _, err = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: session.ExternalID, Direction: "outbound", IdempotencyKey: "resume:" + action.ID, Text: response.Final, Attachments: responseArtifacts(response), State: "pending"})
+	replyID := session.ReplyID
+	if replyID == "" {
+		replyID = session.ExternalID
+	}
+	_, _, err = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: replyID, Direction: "outbound", IdempotencyKey: "resume:" + action.ID, Text: response.Final, Attachments: responseArtifacts(response), State: "pending"})
 	return response, action, err
 }
 

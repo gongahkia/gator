@@ -24,12 +24,14 @@ jobs:
       - name: verify required secrets
         env:
           NORBOT_E2E_KUBECONFIG: ${{ secrets.NORBOT_E2E_KUBECONFIG }}
+          NORBOT_E2E_OPERATOR_JWT: ${{ secrets.NORBOT_E2E_OPERATOR_JWT }}
+          NORBOT_E2E_PROVIDER_MODEL: ${{ secrets.NORBOT_E2E_PROVIDER_MODEL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
-        run: test -n "$NORBOT_E2E_KUBECONFIG" -a -n "$OPENAI_API_KEY" -a -n "$TELEGRAM_BOT_TOKEN" -a -n "$SLACK_BOT_TOKEN" -a -n "$DISCORD_BOT_TOKEN" -a -n "$WHATSAPP_ACCESS_TOKEN"
+        run: test -n "$NORBOT_E2E_KUBECONFIG" -a -n "$NORBOT_E2E_OPERATOR_JWT" -a -n "$NORBOT_E2E_PROVIDER_MODEL" -a -n "$OPENAI_API_KEY" -a -n "$TELEGRAM_BOT_TOKEN" -a -n "$SLACK_BOT_TOKEN" -a -n "$DISCORD_BOT_TOKEN" -a -n "$WHATSAPP_ACCESS_TOKEN"
       - name: deterministic tests
         run: make test
       - name: write kubeconfig
@@ -40,6 +42,16 @@ jobs:
           NORBOT_E2E_LIVE: "1"
           NORBOT_E2E_PUBLIC_URL: ${{ inputs.public_url }}
           NORBOT_E2E_NAMESPACE: ${{ inputs.namespace }}
+          NORBOT_E2E_OPERATOR_JWT: ${{ secrets.NORBOT_E2E_OPERATOR_JWT }}
+          NORBOT_E2E_PROVIDER_MODEL: ${{ secrets.NORBOT_E2E_PROVIDER_MODEL }}
+          NORBOT_E2E_TELEGRAM_ACCOUNT: ${{ secrets.NORBOT_E2E_TELEGRAM_ACCOUNT }}
+          NORBOT_E2E_TELEGRAM_TARGET: ${{ secrets.NORBOT_E2E_TELEGRAM_TARGET }}
+          NORBOT_E2E_SLACK_ACCOUNT: ${{ secrets.NORBOT_E2E_SLACK_ACCOUNT }}
+          NORBOT_E2E_SLACK_TARGET: ${{ secrets.NORBOT_E2E_SLACK_TARGET }}
+          NORBOT_E2E_DISCORD_ACCOUNT: ${{ secrets.NORBOT_E2E_DISCORD_ACCOUNT }}
+          NORBOT_E2E_DISCORD_TARGET: ${{ secrets.NORBOT_E2E_DISCORD_TARGET }}
+          NORBOT_E2E_WHATSAPP_ACCOUNT: ${{ secrets.NORBOT_E2E_WHATSAPP_ACCOUNT }}
+          NORBOT_E2E_WHATSAPP_TARGET: ${{ secrets.NORBOT_E2E_WHATSAPP_TARGET }}
           KUBECONFIG: ${{ runner.temp }}/kubeconfig
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

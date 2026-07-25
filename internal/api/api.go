@@ -72,6 +72,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/channels/accounts", s.createChannelAccount)
 	mux.HandleFunc("POST /api/channels/accounts/{id}/pairings", s.pairChannel)
 	mux.HandleFunc("DELETE /api/channels/accounts/{id}/pairings/{external}", s.unpairChannel)
+	mux.HandleFunc("POST /api/channels/accounts/{id}/messages", s.queueChannelMessage)
+	mux.HandleFunc("GET /api/channels/accounts/{id}/messages/{external}", s.channelMessages)
 	mux.HandleFunc("GET /api/channels/accounts/{id}/sessions/{external}", s.exportChannelSession)
 	mux.HandleFunc("DELETE /api/channels/accounts/{id}/sessions/{external}", s.resetChannelSession)
 	mux.HandleFunc("GET /api/channels/{account}/webhook", s.channelWebhook)
@@ -124,7 +126,7 @@ type operatorContextKey struct{}
 
 func (s *Server) skillImports(w http.ResponseWriter, r *http.Request) {
 	if s.skills == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("skill marketplace is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("skill marketplace is unavailable"))
 		return
 	}
 	values, err := s.skills.Imports(r.Context())
@@ -137,7 +139,7 @@ func (s *Server) skillImports(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
 	if s.skills == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("skill marketplace is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("skill marketplace is unavailable"))
 		return
 	}
 	var input skill.ImportInput
@@ -155,7 +157,7 @@ func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) activateSkill(w http.ResponseWriter, r *http.Request) {
 	if s.skills == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("skill marketplace is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("skill marketplace is unavailable"))
 		return
 	}
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -177,7 +179,7 @@ func (s *Server) activateSkill(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) channelAccounts(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	values, err := s.channels.Accounts(r.Context())
@@ -190,7 +192,7 @@ func (s *Server) channelAccounts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createChannelAccount(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	var input domain.ChannelAccount
@@ -208,7 +210,7 @@ func (s *Server) createChannelAccount(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) pairChannel(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	var input struct {
@@ -229,7 +231,7 @@ func (s *Server) pairChannel(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) unpairChannel(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	err := s.channels.Unpair(r.Context(), r.PathValue("id"), r.PathValue("external"))
@@ -243,10 +245,42 @@ func (s *Server) unpairChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unpaired"})
 }
+func (s *Server) queueChannelMessage(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
+		return
+	}
+	var input struct {
+		ExternalID string `json:"external_id"`
+		Text       string `json:"text"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	value, err := s.channels.QueueOutbound(r.Context(), r.PathValue("id"), strings.TrimSpace(input.ExternalID), input.Text)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, value)
+}
+func (s *Server) channelMessages(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
+		return
+	}
+	values, err := s.channels.Messages(r.Context(), r.PathValue("id"), r.PathValue("external"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
 
 func (s *Server) exportChannelSession(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	values, err := s.channels.ExportSession(r.Context(), r.PathValue("id"), r.PathValue("external"))
@@ -259,7 +293,7 @@ func (s *Server) exportChannelSession(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) resetChannelSession(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	err := s.channels.ResetSession(r.Context(), r.PathValue("id"), r.PathValue("external"))
@@ -276,7 +310,7 @@ func (s *Server) resetChannelSession(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) channelWebhook(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
-		writeError(w, http.StatusNotImplemented, fmt.Errorf("channel gateway is not configured"))
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
 		return
 	}
 	s.channels.HandleWebhook(w, r)

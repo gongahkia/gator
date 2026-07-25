@@ -21,7 +21,9 @@ Go shared-library plugins are intentionally not used: process isolation and dige
 
 ## Generated agent apps
 
-The `agentic` profile has separate SQLite action/audit and application databases. The generated `tool_policy.json` is copied from the selected manifest and is enforced at startup; undeclared tools are disabled. `artifact_read` and allowlisted HTTPS `http_get` can run automatically for scoped roles. HTTP writes, database mutation, and shell requests are parameter-validated, persisted with an immutable digest, expire after 30 minutes, and require one operator approval or rejection at the generated app's `/api/approvals` endpoints. The embedded provider loop is bounded to five turns, ten tool calls, and ten minutes.
+The `agentic` profile is controlled by Norbot, not the generated app. Norbot holds provider credentials and durable turn/action state, validates the manifest tool policy, and records immutable digests and decisions. `artifact_read` and allowlisted HTTPS `http_get` can run for scoped roles; HTTP writes, database mutation, file writes, and shell actions require explicit operator approval. Approval or rejection resumes the exact persisted turn once. Shell runs with no network; approved HTTP writes use the signed managed egress proxy. `database_mutate` is limited to parameterized mutations of each run's `app_<run-id>.agent_state` table.
+
+Public deployments require `security.oidc`: issuer, audience, groups claim, and operator groups. Only signed platform webhooks and `/api/health` bypass OIDC. Configure a reachable managed egress proxy URL plus its shared-secret environment variable before enabling HTTP-write tools. The Norbot process starts the signed CONNECT proxy on `NORBOT_EGRESS_PROXY_ADDR` (or the configured URL port); Kubernetes should expose that listener through a namespace-local Service.
 
 ## Runtime target
 
