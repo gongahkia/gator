@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/norbot/internal/channel"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
+	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
 )
@@ -74,6 +75,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
 	mux.HandleFunc("GET /api/runs/{id}/skills", s.runSkills)
+	mux.HandleFunc("POST /api/runs/{id}/sandbox", s.runSandbox)
 	mux.HandleFunc("PUT /api/runs/{id}/graph", s.updateGraph)
 	mux.HandleFunc("POST /api/runs/{id}/approval", s.approve)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.cancel)
@@ -398,6 +400,20 @@ func (s *Server) runSkills(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) runSandbox(w http.ResponseWriter, r *http.Request) {
+	var input runtime.SandboxRequest
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	result, err := s.service.RunSandbox(r.Context(), r.PathValue("id"), input)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) updateGraph(w http.ResponseWriter, r *http.Request) {

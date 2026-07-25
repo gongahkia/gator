@@ -13,7 +13,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 )
 
@@ -75,6 +77,21 @@ type AgentResponse struct {
 
 type AgentBackend interface {
 	InvokeAgent(context.Context, domain.Run, string, AgentInvocation) (AgentResponse, error)
+}
+
+type SandboxRequest struct {
+	Command       []string
+	AllowedHosts  []string
+	ReadOnlyPaths []string
+}
+type SandboxResult struct {
+	Output     string `json:"output"`
+	ExitCode   int    `json:"exit_code"`
+	DurationMS int64  `json:"duration_ms"`
+	Network    string `json:"network"`
+}
+type SandboxBackend interface {
+	RunSandbox(context.Context, string, SandboxRequest, config.Sandbox) (SandboxResult, error)
 }
 
 type OSRunner struct{}
@@ -189,6 +206,27 @@ func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, com
 		return string(output), fmt.Errorf("workspace cli: %w", err)
 	}
 	return string(output), nil
+}
+
+func (w Workspace) RunSandbox(ctx context.Context, runID string, request SandboxRequest, policy config.Sandbox) (SandboxResult, error) {
+	if len(request.Command) == 0 {
+		return SandboxResult{}, fmt.Errorf("sandbox command is required")
+	}
+	if len(request.AllowedHosts) > 0 {
+		return SandboxResult{}, fmt.Errorf("Docker sandbox allowlisted egress requires a managed proxy")
+	}
+	p := policy.Normalized()
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutS)*time.Second)
+	defer cancel()
+	started := time.Now()
+	args := []string{"run", "--rm", "--network", "none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=128", "--memory", fmt.Sprintf("%dm", p.MemoryMiB), "--cpus", fmt.Sprintf("%.3f", float64(p.CPUMilli)/1000), "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "-v", w.Volume(runID) + ":/workspace:ro", "-w", "/workspace", p.Image}
+	args = append(args, request.Command...)
+	out, err := w.Runner.Run(ctx, w.DockerBin, args...)
+	result := SandboxResult{Output: string(out), DurationMS: time.Since(started).Milliseconds(), Network: "none"}
+	if err != nil {
+		return result, err
+	}
+	return result, nil
 }
 
 func (w Workspace) Cleanup(ctx context.Context, runID string) error {

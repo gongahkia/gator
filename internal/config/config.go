@@ -50,6 +50,14 @@ type ProcessPlugin struct {
 type Runtime struct {
 	DefaultTarget domain.DeploymentTarget `json:"default_target"`
 	Kubernetes    Kubernetes              `json:"kubernetes"`
+	Sandbox       Sandbox                 `json:"sandbox"`
+}
+
+type Sandbox struct {
+	Image     string `json:"image"`
+	CPUMilli  int64  `json:"cpu_milli"`
+	MemoryMiB int64  `json:"memory_mib"`
+	TimeoutS  int    `json:"timeout_seconds"`
 }
 
 type Workflow struct {
@@ -190,6 +198,9 @@ func (m Manifest) Validate() error {
 }
 
 func (m Manifest) ValidateRuntime() error {
+	if s := m.Runtime.Sandbox; s.CPUMilli < 0 || s.MemoryMiB < 0 || s.TimeoutS < 0 {
+		return fmt.Errorf("sandbox resources cannot be negative")
+	}
 	target := m.Runtime.DefaultTarget
 	if target == "" {
 		target = domain.DeploymentDocker
@@ -211,6 +222,22 @@ func (m Manifest) ValidateRuntime() error {
 		return fmt.Errorf("kubernetes resources cannot be negative")
 	}
 	return nil
+}
+
+func (s Sandbox) Normalized() Sandbox {
+	if s.Image == "" {
+		s.Image = "alpine:3.21"
+	}
+	if s.CPUMilli == 0 {
+		s.CPUMilli = 500
+	}
+	if s.MemoryMiB == 0 {
+		s.MemoryMiB = 512
+	}
+	if s.TimeoutS == 0 {
+		s.TimeoutS = 60
+	}
+	return s
 }
 
 func (m Manifest) DefaultTarget() domain.DeploymentTarget {

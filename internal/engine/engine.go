@@ -347,6 +347,22 @@ func (s *Service) InvokeAgent(ctx context.Context, runID string, input runtime.A
 	return invoker.InvokeAgent(ctx, run, workspace.RunPath(runID), input)
 }
 
+func (s *Service) RunSandbox(ctx context.Context, runID string, request runtime.SandboxRequest) (runtime.SandboxResult, error) {
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return runtime.SandboxResult{}, err
+	}
+	workspace, _, err := s.backendForRun(ctx, run)
+	if err != nil {
+		return runtime.SandboxResult{}, err
+	}
+	executor, ok := workspace.(runtime.SandboxBackend)
+	if !ok {
+		return runtime.SandboxResult{}, fmt.Errorf("runtime sandbox is unavailable for %s", run.DeploymentTarget)
+	}
+	return executor.RunSandbox(ctx, runID, request, s.config.Manifest.Runtime.Sandbox)
+}
+
 func (s *Service) StartDeployment(ctx context.Context, runID string) (DeploymentInfo, error) {
 	deployment, err := s.store.GetDeployment(ctx, runID)
 	if err != nil {

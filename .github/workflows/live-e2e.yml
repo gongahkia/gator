@@ -1,0 +1,49 @@
+name: live-e2e
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_url:
+        description: Public HTTPS Norbot URL
+        required: true
+        type: string
+      namespace:
+        description: Disposable Kubernetes namespace
+        required: true
+        type: string
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    environment: live-e2e
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version-file: go.mod}
+      - name: verify required secrets
+        env:
+          NORBOT_E2E_KUBECONFIG: ${{ secrets.NORBOT_E2E_KUBECONFIG }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+        run: test -n "$NORBOT_E2E_KUBECONFIG" -a -n "$OPENAI_API_KEY" -a -n "$TELEGRAM_BOT_TOKEN" -a -n "$SLACK_BOT_TOKEN" -a -n "$DISCORD_BOT_TOKEN" -a -n "$WHATSAPP_ACCESS_TOKEN"
+      - name: deterministic tests
+        run: make test
+      - name: write kubeconfig
+        env: {NORBOT_E2E_KUBECONFIG: ${{ secrets.NORBOT_E2E_KUBECONFIG }}}
+        run: install -m 600 /dev/null "$RUNNER_TEMP/kubeconfig" && printf '%s' "$NORBOT_E2E_KUBECONFIG" > "$RUNNER_TEMP/kubeconfig"
+      - name: live suite
+        env:
+          NORBOT_E2E_LIVE: "1"
+          NORBOT_E2E_PUBLIC_URL: ${{ inputs.public_url }}
+          NORBOT_E2E_NAMESPACE: ${{ inputs.namespace }}
+          KUBECONFIG: ${{ runner.temp }}/kubeconfig
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.WHATSAPP_ACCESS_TOKEN }}
+        run: go test -tags=livee2e ./internal/e2e -count=1 -v
