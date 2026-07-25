@@ -1,0 +1,283 @@
+package store
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/gongahkia/norbot/internal/domain"
+)
+
+var ErrNotFound = errors.New("not found")
+
+type Store struct {
+	pool *pgxpool.Pool
+}
+
+func Open(ctx context.Context, databaseURL string) (*Store, error) {
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("open postgres: %w", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
+	return &Store{pool: pool}, nil
+}
+
+func (s *Store) Close() { s.pool.Close() }
+
+func (s *Store) Migrate(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `
+CREATE TABLE IF NOT EXISTS runs (
+  id TEXT PRIMARY KEY,
+  prompt TEXT NOT NULL,
+  profile TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  status TEXT NOT NULL,
+  providers JSONB NOT NULL,
+  graph JSONB NOT NULL,
+  feedback TEXT NOT NULL DEFAULT '',
+  failure_reason TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS runs_updated_at_idx ON runs(updated_at DESC);
+CREATE TABLE IF NOT EXISTS run_events (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS run_events_run_id_id_idx ON run_events(run_id, id);
+CREATE TABLE IF NOT EXISTS jobs (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL,
+  attempt INT NOT NULL DEFAULT 1,
+  state TEXT NOT NULL DEFAULT 'queued',
+  claimed_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  last_error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS jobs_claim_idx ON jobs(state, created_at) WHERE state = 'queued';
+CREATE TABLE IF NOT EXISTS deployments (
+  run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+  project_name TEXT NOT NULL,
+  public_url TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL,
+  error_message TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);`)
+	if err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
+	providers, err := json.Marshal(run.Providers)
+	if err != nil { return err }
+	graph, err := json.Marshal(run.Graph)
+	if err != nil { return err }
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO runs (id,prompt,profile,stage,status,providers,graph,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)`, run.ID, run.Prompt, run.Profile, run.Stage, run.Status, providers, graph, run.CreatedAt)
+		if err != nil { return err }
+		return s.insertEvent(ctx, tx, run.ID, "run_created", "Run created and planner queued", map[string]any{"profile": run.Profile, "providers": run.Providers})
+	})
+}
+
+func (s *Store) Enqueue(ctx context.Context, runID string, stage domain.Stage, attempt int) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,$3)`, runID, stage, attempt)
+		if err != nil { return err }
+		return s.insertEvent(ctx, tx, runID, "stage_queued", string(stage)+" queued", map[string]any{"stage": stage, "attempt": attempt})
+	})
+}
+
+func (s *Store) GetRun(ctx context.Context, id string) (domain.Run, error) {
+	row := s.pool.QueryRow(ctx, runQuery+` WHERE id=$1`, id)
+	return scanRun(row)
+}
+
+func (s *Store) ListRuns(ctx context.Context) ([]domain.Run, error) {
+	rows, err := s.pool.Query(ctx, runQuery+` ORDER BY updated_at DESC LIMIT 100`)
+	if err != nil { return nil, err }
+	defer rows.Close()
+	runs := []domain.Run{}
+	for rows.Next() {
+		run, err := scanRun(rows)
+		if err != nil { return nil, err }
+		runs = append(runs, run)
+	}
+	return runs, rows.Err()
+}
+
+func (s *Store) Events(ctx context.Context, runID string, afterID int64) ([]domain.Event, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id,run_id,event_type,message,metadata,created_at FROM run_events WHERE run_id=$1 AND id>$2 ORDER BY id ASC LIMIT 500`, runID, afterID)
+	if err != nil { return nil, err }
+	defer rows.Close()
+	events := []domain.Event{}
+	for rows.Next() {
+		var event domain.Event
+		var metadata []byte
+		if err := rows.Scan(&event.ID, &event.RunID, &event.Type, &event.Message, &metadata, &event.CreatedAt); err != nil { return nil, err }
+		if err := json.Unmarshal(metadata, &event.Metadata); err != nil { return nil, err }
+		events = append(events, event)
+	}
+	return events, rows.Err()
+}
+
+func (s *Store) UpdateGraph(ctx context.Context, runID string, graph domain.Graph) (domain.Run, error) {
+	encoded, err := json.Marshal(graph)
+	if err != nil { return domain.Run{}, err }
+	err = s.withTx(ctx, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `UPDATE runs SET graph=$2,updated_at=now() WHERE id=$1 AND stage='planner' AND status='awaiting_approval'`, runID, encoded)
+		if err != nil { return err }
+		if result.RowsAffected() != 1 { return ErrNotFound }
+		return s.insertEvent(ctx, tx, runID, "graph_updated", "Planner graph updated by operator", map[string]any{"graph": graph})
+	})
+	if err != nil { return domain.Run{}, err }
+	return s.GetRun(ctx, runID)
+}
+
+func (s *Store) Approve(ctx context.Context, runID string, action domain.ApprovalAction, feedback string) (domain.Run, error) {
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		run, err := scanRun(tx.QueryRow(ctx, runQuery+` WHERE id=$1 FOR UPDATE`, runID))
+		if err != nil { return err }
+		switch action {
+		case domain.ApprovalApprove:
+			if run.Status != domain.StatusAwaiting { return fmt.Errorf("run is not awaiting approval") }
+			next, hasNext := run.Stage.Next()
+			if !hasNext {
+				return fmt.Errorf("deployer approval is processed by the queued deployer job")
+			}
+			if _, err := tx.Exec(ctx, `UPDATE runs SET stage=$2,status='queued',feedback='',updated_at=now() WHERE id=$1`, runID, next); err != nil { return err }
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,1)`, runID, next); err != nil { return err }
+			return s.insertEvent(ctx, tx, runID, "stage_approved", string(run.Stage)+" approved; "+string(next)+" queued", map[string]any{"stage": run.Stage, "next_stage": next})
+		case domain.ApprovalRevise:
+			if run.Status != domain.StatusAwaiting || run.Stage != domain.StagePlanner { return fmt.Errorf("revision is available only while planner approval is pending") }
+			if feedback == "" { return fmt.Errorf("revision feedback is required") }
+			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil { return err }
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,'planner',COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID); err != nil { return err }
+			return s.insertEvent(ctx, tx, runID, "planner_revision_requested", "Planner revision queued", map[string]any{"feedback": feedback})
+		case domain.ApprovalRetry:
+			if run.Status != domain.StatusFailed { return fmt.Errorf("retry is available only for failed runs") }
+			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil { return err }
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,$2,COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID, run.Stage); err != nil { return err }
+			return s.insertEvent(ctx, tx, runID, "stage_retry_requested", string(run.Stage)+" retry queued", map[string]any{"stage": run.Stage})
+		case domain.ApprovalAbandon:
+			if run.Status.Terminal() { return fmt.Errorf("terminal run cannot be abandoned") }
+			if _, err := tx.Exec(ctx, `UPDATE runs SET status='abandoned',updated_at=now() WHERE id=$1`, runID); err != nil { return err }
+			return s.insertEvent(ctx, tx, runID, "run_abandoned", "Run abandoned by operator", nil)
+		default:
+			return fmt.Errorf("unknown approval action")
+		}
+	})
+	if err != nil { return domain.Run{}, err }
+	return s.GetRun(ctx, runID)
+}
+
+func (s *Store) ClaimJob(ctx context.Context) (domain.Job, bool, error) {
+	var job domain.Job
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		row := tx.QueryRow(ctx, `WITH next AS (
+  SELECT id FROM jobs WHERE state='queued' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1
+) UPDATE jobs SET state='running',claimed_at=now() WHERE id=(SELECT id FROM next)
+RETURNING id,run_id,stage,attempt`)
+		err := row.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt)
+		if errors.Is(err, pgx.ErrNoRows) { return nil }
+		return err
+	})
+	if err != nil { return domain.Job{}, false, err }
+	if job.ID == 0 { return domain.Job{}, false, nil }
+	return job, true, nil
+}
+
+func (s *Store) MarkStageRunning(ctx context.Context, job domain.Job, provider string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `UPDATE runs SET status='running',updated_at=now() WHERE id=$1 AND stage=$2 AND status='queued'`, job.RunID, job.Stage)
+		if err != nil { return err }
+		if result.RowsAffected() != 1 { return fmt.Errorf("run is no longer ready for %s", job.Stage) }
+		return s.insertEvent(ctx, tx, job.RunID, "stage_started", string(job.Stage)+" started", map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": provider})
+	})
+}
+
+func (s *Store) MarkStageAwaitingApproval(ctx context.Context, job domain.Job, metadata map[string]any) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE runs SET status='awaiting_approval',updated_at=now() WHERE id=$1 AND stage=$2`, job.RunID, job.Stage)
+		if err != nil { return err }
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now() WHERE id=$1`, job.ID); err != nil { return err }
+		return s.insertEvent(ctx, tx, job.RunID, "stage_approval_required", string(job.Stage)+" completed; approval required", metadata)
+	})
+}
+
+func (s *Store) CompleteRun(ctx context.Context, job domain.Job, metadata map[string]any) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE runs SET status='completed',updated_at=now() WHERE id=$1 AND stage='deployer'`, job.RunID)
+		if err != nil { return err }
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='completed',completed_at=now() WHERE id=$1`, job.ID); err != nil { return err }
+		return s.insertEvent(ctx, tx, job.RunID, "run_completed", "Deployment completed", metadata)
+	})
+}
+
+func (s *Store) FailJob(ctx context.Context, job domain.Job, failure string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE runs SET status='failed',failure_reason=$2,updated_at=now() WHERE id=$1 AND stage=$3 AND status='running'`, job.RunID, failure, job.Stage)
+		if err != nil { return err }
+		if _, err := tx.Exec(ctx, `UPDATE jobs SET state='failed',completed_at=now(),last_error=$2 WHERE id=$1`, job.ID, failure); err != nil { return err }
+		return s.insertEvent(ctx, tx, job.RunID, "stage_failed", string(job.Stage)+" failed; operator decision required", map[string]any{"stage": job.Stage, "error": failure})
+	})
+}
+
+func (s *Store) UpsertDeployment(ctx context.Context, runID, project, publicURL, status, errorMessage string) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO deployments (run_id,project_name,public_url,status,error_message) VALUES ($1,$2,$3,$4,$5)
+ON CONFLICT (run_id) DO UPDATE SET project_name=EXCLUDED.project_name,public_url=EXCLUDED.public_url,status=EXCLUDED.status,error_message=EXCLUDED.error_message,updated_at=now()`, runID, project, publicURL, status, errorMessage)
+	return err
+}
+
+func (s *Store) withTx(ctx context.Context, fn func(pgx.Tx) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil { return err }
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := fn(tx); err != nil { return err }
+	return tx.Commit(ctx)
+}
+
+func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message string, metadata map[string]any) error {
+	if metadata == nil { metadata = map[string]any{} }
+	encoded, err := json.Marshal(metadata)
+	if err != nil { return err }
+	_, err = tx.Exec(ctx, `INSERT INTO run_events (run_id,event_type,message,metadata) VALUES ($1,$2,$3,$4)`, runID, typ, message, encoded)
+	return err
+}
+
+const runQuery = `SELECT id,prompt,profile,stage,status,providers,graph,feedback,failure_reason,created_at,updated_at FROM runs`
+
+type rowScanner interface { Scan(...any) error }
+
+func scanRun(row rowScanner) (domain.Run, error) {
+	var run domain.Run
+	var providers, graph []byte
+	err := row.Scan(&run.ID, &run.Prompt, &run.Profile, &run.Stage, &run.Status, &providers, &graph, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) { return domain.Run{}, ErrNotFound }
+	if err != nil { return domain.Run{}, err }
+	if err := json.Unmarshal(providers, &run.Providers); err != nil { return domain.Run{}, err }
+	if err := json.Unmarshal(graph, &run.Graph); err != nil { return domain.Run{}, err }
+	return run, nil
+}
+
+func RetryBackoff(attempt int) time.Duration {
+	if attempt < 1 { attempt = 1 }
+	return time.Duration(attempt) * time.Second
+}

@@ -1,0 +1,6 @@
+.DS_Store
+.env
+.norbot/
+artifacts/
+bin/
+coverage.out

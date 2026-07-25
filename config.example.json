@@ -1,0 +1,41 @@
+{
+  "providers": [
+    {
+      "id": "openai",
+      "kind": "openai_responses",
+      "model": "gpt-5",
+      "base_url": "https://api.openai.com/v1",
+      "credential_env": "OPENAI_API_KEY",
+      "stages": ["planner", "builder", "verifier"]
+    },
+    {
+      "id": "anthropic",
+      "kind": "anthropic_messages",
+      "model": "claude-sonnet-4-6",
+      "base_url": "https://api.anthropic.com",
+      "credential_env": "ANTHROPIC_API_KEY",
+      "stages": ["planner", "builder", "verifier"]
+    },
+    {
+      "id": "gemini",
+      "kind": "gemini_generate_content",
+      "model": "gemini-3.6-flash",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "credential_env": "GEMINI_API_KEY",
+      "stages": ["planner", "builder", "verifier"]
+    },
+    {
+      "id": "codex",
+      "kind": "cli",
+      "command": ["codex", "exec", "--json"],
+      "stages": ["planner", "builder", "verifier"]
+    }
+  ],
+  "profiles": ["frontend-only", "full-stack", "agentic"],
+  "tool_policy": {
+    "http": {"enabled": true, "approval_required": true},
+    "database": {"enabled": true, "approval_required": true},
+    "artifact": {"enabled": true, "approval_required": false},
+    "shell": {"enabled": false, "approval_required": true}
+  }
+}
