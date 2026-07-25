@@ -200,21 +200,36 @@ func result(p config.Provider, text string, payload map[string]any, rateLimit Ra
 
 func usageFromPayload(payload map[string]any) TokenUsage {
 	raw := asObject(payload["usage"])
-	if raw == nil { return TokenUsage{} }
+	if raw == nil {
+		return TokenUsage{}
+	}
 	lookup := func(keys ...string) *int {
 		for _, key := range keys {
 			value, ok := raw[key]
-			if !ok { continue }
+			if !ok {
+				continue
+			}
 			switch v := value.(type) {
-			case float64: if v >= 0 { n := int(v); return &n }
-			case json.Number: if n, err := v.Int64(); err == nil && n >= 0 { value := int(n); return &value }
+			case float64:
+				if v >= 0 {
+					n := int(v)
+					return &n
+				}
+			case json.Number:
+				if n, err := v.Int64(); err == nil && n >= 0 {
+					value := int(n)
+					return &value
+				}
 			}
 		}
 		return nil
 	}
 	cached := lookup("cache_read_input_tokens", "cached_content_token_count")
 	if details := asObject(raw["input_tokens_details"]); details != nil && cached == nil {
-		if value, ok := details["cached_tokens"].(float64); ok && value >= 0 { n := int(value); cached = &n }
+		if value, ok := details["cached_tokens"].(float64); ok && value >= 0 {
+			n := int(value)
+			cached = &n
+		}
 	}
 	return TokenUsage{InputTokens: lookup("input_tokens", "prompt_tokens"), OutputTokens: lookup("output_tokens", "completion_tokens", "candidates_token_count"), CachedTokens: cached}
 }

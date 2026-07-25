@@ -146,6 +146,35 @@ CREATE TABLE IF NOT EXISTS provider_usage (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS provider_usage_run_id_idx ON provider_usage(run_id,id DESC);
+CREATE TABLE IF NOT EXISTS skill_packages (
+  digest TEXT PRIMARY KEY,
+  skill_id TEXT NOT NULL,
+  version TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  manifest JSONB NOT NULL,
+  path TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS skill_imports (
+  id BIGSERIAL PRIMARY KEY,
+  source_type TEXT NOT NULL,
+  source_uri TEXT NOT NULL,
+  source_ref TEXT NOT NULL DEFAULT '',
+  credential_env TEXT NOT NULL DEFAULT '',
+  digest TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL,
+  findings JSONB NOT NULL DEFAULT '{}'::jsonb,
+  activated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS skill_imports_state_idx ON skill_imports(state,created_at DESC);
+CREATE TABLE IF NOT EXISTS run_skills (
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  skill_digest TEXT NOT NULL REFERENCES skill_packages(digest) ON DELETE RESTRICT,
+  selected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY(run_id,skill_digest)
+);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 
@@ -284,10 +313,16 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 			if run.Stage == domain.StageVerifier {
 				var report []byte
 				err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report)
-				if err != nil { return fmt.Errorf("test report unavailable: %w", err) }
+				if err != nil {
+					return fmt.Errorf("test report unavailable: %w", err)
+				}
 				var decoded map[string]any
-				if err := json.Unmarshal(report, &decoded); err != nil { return err }
-				if decoded["status"] == "fail" { return fmt.Errorf("failed test report requires explicit fix approval") }
+				if err := json.Unmarshal(report, &decoded); err != nil {
+					return err
+				}
+				if decoded["status"] == "fail" {
+					return fmt.Errorf("failed test report requires explicit fix approval")
+				}
 			}
 			if run.Stage == domain.StageDeployer {
 				if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
@@ -353,16 +388,37 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 				return fmt.Errorf("fix is available only while a failed test report is awaiting approval")
 			}
 			var report []byte
-			if err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report); err != nil { return fmt.Errorf("test report unavailable: %w", err) }
+			if err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report); err != nil {
+				return fmt.Errorf("test report unavailable: %w", err)
+			}
 			var decoded map[string]any
-			if err := json.Unmarshal(report, &decoded); err != nil { return err }
-			if decoded["status"] != "fail" { return fmt.Errorf("fix requires a failed test report") }
+			if err := json.Unmarshal(report, &decoded); err != nil {
+				return err
+			}
+			if decoded["status"] != "fail" {
+				return fmt.Errorf("fix requires a failed test report")
+			}
+			if feedback == "" {
+				encoded, err := json.Marshal(decoded)
+				if err != nil {
+					return err
+				}
+				feedback = "failed verification diagnostics: " + string(encoded)
+			}
 			var attempts int
-			if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM revisions WHERE run_id=$1 AND kind='fix'`, runID).Scan(&attempts); err != nil { return err }
-			if attempts >= run.MaxFixes { return fmt.Errorf("maximum fix attempts (%d) reached", run.MaxFixes) }
+			if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM revisions WHERE run_id=$1 AND kind='fix'`, runID).Scan(&attempts); err != nil {
+				return err
+			}
+			if attempts >= run.MaxFixes {
+				return fmt.Errorf("maximum fix attempts (%d) reached", run.MaxFixes)
+			}
 			attempt := attempts + 2
-			if _, err := tx.Exec(ctx, `UPDATE runs SET stage='builder',status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil { return err }
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'builder',$2)`, runID, attempt); err != nil { return err }
+			if _, err := tx.Exec(ctx, `UPDATE runs SET stage='builder',status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'builder',$2)`, runID, attempt); err != nil {
+				return err
+			}
 			return s.insertEvent(ctx, tx, runID, "fix_approved", "Operator approved bounded fix attempt", map[string]any{"attempt": attempt, "feedback": feedback})
 		default:
 			return fmt.Errorf("unknown approval action")

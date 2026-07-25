@@ -38,9 +38,9 @@ type CreateRunInput struct {
 }
 
 type ApprovalInput struct {
-	Action   domain.ApprovalAction `json:"action"`
-	Feedback string                `json:"feedback"`
-	RevisionID int64               `json:"revision_id"`
+	Action     domain.ApprovalAction `json:"action"`
+	Feedback   string                `json:"feedback"`
+	RevisionID int64                 `json:"revision_id"`
 }
 
 type DeploymentInfo struct {
@@ -144,9 +144,15 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	}
 	now := time.Now().UTC()
 	maxFixes := input.MaxFixes
-	if maxFixes == 0 { maxFixes = s.config.Manifest.Workflow.MaxFixes }
-	if maxFixes == 0 { maxFixes = 2 }
-	if maxFixes < 0 || maxFixes > 10 { return domain.Run{}, fmt.Errorf("max_fixes must be between 0 and 10") }
+	if maxFixes == 0 {
+		maxFixes = s.config.Manifest.Workflow.MaxFixes
+	}
+	if maxFixes == 0 {
+		maxFixes = 2
+	}
+	if maxFixes < 0 || maxFixes > 10 {
+		return domain.Run{}, fmt.Errorf("max_fixes must be between 0 and 10")
+	}
 	run := domain.Run{ID: id, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: domain.DefaultGraph(), CreatedAt: now, UpdatedAt: now}
 	if err := s.store.CreateRun(ctx, run); err != nil {
 		return domain.Run{}, err
@@ -189,17 +195,33 @@ func (s *Service) UpdateGraph(ctx context.Context, runID string, graph domain.Gr
 
 func (s *Service) Approve(ctx context.Context, runID string, input ApprovalInput) (domain.Run, error) {
 	run, err := s.store.GetRun(ctx, runID)
-	if err != nil { return domain.Run{}, err }
+	if err != nil {
+		return domain.Run{}, err
+	}
 	if input.Action == domain.ApprovalApprove && run.Status == domain.StatusAwaiting && run.Stage == domain.StageBuilder {
 		revision, err := s.store.LatestRevision(ctx, runID)
-		if err != nil { return domain.Run{}, err }
-		if input.RevisionID != 0 && input.RevisionID != revision.ID { return domain.Run{}, fmt.Errorf("revision is no longer current") }
-		if revision.State != "proposed" { return domain.Run{}, fmt.Errorf("code revision is no longer proposed") }
+		if err != nil {
+			return domain.Run{}, err
+		}
+		if input.RevisionID != 0 && input.RevisionID != revision.ID {
+			return domain.Run{}, fmt.Errorf("revision is no longer current")
+		}
+		if revision.State != "proposed" {
+			return domain.Run{}, fmt.Errorf("code revision is no longer proposed")
+		}
 		workspace, _, err := s.backendForRun(ctx, run)
-		if err != nil { return domain.Run{}, err }
-		if err := applyRevision(workspace, run, revision); err != nil { return domain.Run{}, err }
-		if err := workspace.MirrorGeneratedApp(ctx, runID); err != nil { return domain.Run{}, err }
-		if err := s.store.ApproveRevision(ctx, runID, revision.ID); err != nil { return domain.Run{}, err }
+		if err != nil {
+			return domain.Run{}, err
+		}
+		if err := applyRevision(workspace, run, revision); err != nil {
+			return domain.Run{}, err
+		}
+		if err := workspace.MirrorGeneratedApp(ctx, runID); err != nil {
+			return domain.Run{}, err
+		}
+		if err := s.store.ApproveRevision(ctx, runID, revision.ID); err != nil {
+			return domain.Run{}, err
+		}
 	}
 	return s.store.Approve(ctx, runID, input.Action, strings.TrimSpace(input.Feedback))
 }
@@ -550,7 +572,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
 	}
 	generatedFiles := []string(nil)
-	if job.Stage == domain.StageBuilder {
+	if job.Stage == domain.StageBuilder && job.Attempt == 1 {
 		generatedFiles, err = generateApp(workspace, run, s.config.Manifest.ToolPolicy)
 		if err != nil {
 			return err
@@ -574,23 +596,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	if err != nil {
 		return err
 	}
+	var revisionID *int64
 	if result.RateLimit.RemainingRequests != nil || result.RateLimit.ResetAt != nil {
 		if err := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, RemainingRequests: result.RateLimit.RemainingRequests, ResetAt: result.RateLimit.ResetAt, Metadata: result.Metadata}); err != nil {
 			s.log.Warn("record provider quota observation", "provider", providerConfig.ID, "error", err)
 		}
 	}
 	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
-	encoded, err := json.MarshalIndent(artifact, "", "  ")
-	if err != nil {
-		return err
-	}
 	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
-	if _, err := workspace.WriteArtifact(run.ID, path, encoded); err != nil {
-		return err
-	}
-	if err := workspace.MirrorToVolume(ctx, run.ID, path); err != nil {
-		return err
-	}
 	if job.Stage == domain.StagePlanner {
 		if graph, ok := graphFromResponse(result.Text); ok {
 			if err := s.store.SetPlannerGraph(ctx, run.ID, graph); err != nil {
@@ -601,33 +614,84 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	}
 	if job.Stage == domain.StageBuilder {
 		if providerConfig.Kind == "cli" {
-			if err := workspace.SyncGeneratedApp(ctx, run.ID); err != nil {
-				return err
-			}
-		} else {
-			files, err := applyBuilderResponse(workspace, run, result.Text)
+			baseline, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
 			if err != nil {
 				return err
 			}
-			generatedFiles = append(generatedFiles, files...)
+			if err := workspace.SyncGeneratedApp(ctx, run.ID); err != nil {
+				return err
+			}
+			current, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
+			if err != nil {
+				return err
+			}
+			files, err := changedFiles(baseline, current)
+			if err != nil {
+				return err
+			}
+			if err := restoreGeneratedApp(workspace.RunPath(run.ID), baseline); err != nil {
+				return err
+			}
 			if err := workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
 				return err
 			}
+			revision, err := s.store.CreateRevision(ctx, domain.Revision{RunID: run.ID, Kind: revisionKind(job.Attempt), Attempt: job.Attempt, BaselineDigest: digestFiles(baseline), PatchDigest: digestStringMap(files), Files: files, Report: map[string]any{"provider": result.Provider, "model": result.Model}})
+			if err != nil {
+				return err
+			}
+			revisionID = &revision.ID
+			generatedFiles = mapKeys(files)
+		} else {
+			files, err := builderFiles(result.Text)
+			if err != nil {
+				return err
+			}
+			baseline, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
+			if err != nil {
+				return err
+			}
+			revision, err := s.store.CreateRevision(ctx, domain.Revision{RunID: run.ID, Kind: revisionKind(job.Attempt), Attempt: job.Attempt, BaselineDigest: digestFiles(baseline), PatchDigest: digestStringMap(files), Files: files, Report: map[string]any{"provider": result.Provider, "model": result.Model}})
+			if err != nil {
+				return err
+			}
+			revisionID = &revision.ID
+			generatedFiles = append(generatedFiles, mapKeys(files)...)
 		}
 		artifact["generated_files"] = generatedFiles
+		artifact["revision_id"] = *revisionID
+		artifact["review_kind"] = revisionKind(job.Attempt)
+	}
+	if err := s.recordUsage(ctx, run.ID, job.Stage, revisionID, providerConfig.ID, result, prompt); err != nil {
+		s.log.Warn("record provider usage", "run_id", run.ID, "error", err)
 	}
 	if job.Stage == domain.StageVerifier {
-		report, err := verifyApp(ctx, workspace, run)
+		revision, err := s.store.LatestRevision(ctx, run.ID)
 		if err != nil {
-			artifact["verification"] = report
-			if encoded, marshalErr := json.MarshalIndent(artifact, "", "  "); marshalErr == nil {
-				if _, writeErr := workspace.WriteArtifact(run.ID, path, encoded); writeErr == nil {
-					_ = workspace.MirrorToVolume(ctx, run.ID, path)
-				}
-			}
 			return err
 		}
+		report, err := verifyApp(ctx, workspace, run)
+		if err != nil {
+			if report == nil {
+				report = map[string]any{}
+			}
+			report["status"] = "fail"
+			report["error"] = err.Error()
+		}
 		artifact["verification"] = report
+		artifact["revision_id"] = revision.ID
+		if err := s.store.RecordRevisionReport(ctx, run.ID, revision.ID, report, "tested"); err != nil {
+			return err
+		}
+	}
+	encoded, err := json.MarshalIndent(artifact, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err := workspace.WriteArtifact(run.ID, path, encoded); err != nil {
+		return err
+	}
+	if err := workspace.MirrorToVolume(ctx, run.ID, path); err != nil {
+		return err
 	}
 	_ = deployment
 	return s.store.MarkStageAwaitingApproval(ctx, job, artifact)
@@ -790,7 +854,7 @@ func graphFromResponse(text string) (domain.Graph, bool) {
 	return graph, true
 }
 
-func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, text string) ([]string, error) {
+func builderFiles(text string) (map[string]string, error) {
 	payload, err := responseObject(text)
 	if err != nil {
 		return nil, fmt.Errorf("builder must return one JSON object: %w", err)
@@ -799,7 +863,7 @@ func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, t
 	if !ok || len(rawFiles) == 0 || len(rawFiles) > 64 {
 		return nil, fmt.Errorf("builder output requires 1-64 files")
 	}
-	paths := make([]string, 0, len(rawFiles))
+	files := make(map[string]string, len(rawFiles))
 	for path, rawContent := range rawFiles {
 		content, ok := rawContent.(string)
 		if !ok || len(content) > 512<<10 {
@@ -808,12 +872,170 @@ func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, t
 		if !strings.HasPrefix(path, "generated-app/") || strings.HasPrefix(path, "/") || strings.Contains(path, "..") {
 			return nil, fmt.Errorf("builder path %q is outside generated-app", path)
 		}
-		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil {
-			return nil, err
-		}
-		paths = append(paths, path)
+		files[path] = content
 	}
-	return paths, nil
+	return files, nil
+}
+
+func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, text string) ([]string, error) {
+	files, err := builderFiles(text)
+	if err != nil { return nil, err }
+	for path, content := range files {
+		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil { return nil, err }
+	}
+	return mapKeys(files), nil
+}
+
+func applyRevision(workspace runtime.ArtifactWorkspace, run domain.Run, revision domain.Revision) error {
+	if revision.State != "proposed" || len(revision.Files) == 0 {
+		return fmt.Errorf("revision is not an applicable proposal")
+	}
+	if digestStringMap(revision.Files) != revision.PatchDigest {
+		return fmt.Errorf("revision patch digest mismatch")
+	}
+	if current, err := digestGeneratedApp(workspace.RunPath(run.ID)); err != nil {
+		return err
+	} else if current != revision.BaselineDigest {
+		return fmt.Errorf("workspace baseline changed; revision cannot be applied")
+	}
+	for path, content := range revision.Files {
+		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func revisionKind(attempt int) domain.ReviewKind {
+	if attempt > 1 {
+		return domain.ReviewFix
+	}
+	return domain.ReviewCode
+}
+
+func snapshotGeneratedApp(runPath string) (map[string]string, error) {
+	root := filepath.Join(runPath, "generated-app")
+	files := map[string]string{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("non-regular generated file %s", path)
+		}
+		relative, err := filepath.Rel(runPath, path)
+		if err != nil {
+			return err
+		}
+		value, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(relative)] = string(value)
+		return nil
+	})
+	return files, err
+}
+
+func changedFiles(baseline, current map[string]string) (map[string]string, error) {
+	result := map[string]string{}
+	for path, content := range current {
+		if baseline[path] != content {
+			result[path] = content
+		}
+	}
+	for path := range baseline {
+		if _, ok := current[path]; !ok {
+			return nil, fmt.Errorf("builder cannot delete required or existing file %q", path)
+		}
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("builder produced no file changes")
+	}
+	return result, nil
+}
+
+func restoreGeneratedApp(runPath string, files map[string]string) error {
+	root := filepath.Join(runPath, "generated-app")
+	if err := os.RemoveAll(root); err != nil {
+		return err
+	}
+	for path, content := range files {
+		if !strings.HasPrefix(path, "generated-app/") {
+			return fmt.Errorf("invalid snapshot path")
+		}
+		full := filepath.Join(runPath, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			return err
+		}
+		if err := os.WriteFile(full, []byte(content), 0o640); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func digestGeneratedApp(runPath string) (string, error) {
+	files, err := snapshotGeneratedApp(runPath)
+	if err != nil {
+		return "", err
+	}
+	return digestFiles(files), nil
+}
+
+func digestFiles(files map[string]string) string { return digestStringMap(files) }
+
+func digestStringMap(values map[string]string) string {
+	keys := mapKeys(values)
+	sort.Strings(keys)
+	hash := sha256.New()
+	for _, key := range keys {
+		_, _ = hash.Write([]byte(key))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(values[key]))
+		_, _ = hash.Write([]byte{0})
+	}
+	return "sha256:" + hex.EncodeToString(hash.Sum(nil))
+}
+
+func mapKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (s *Service) recordUsage(ctx context.Context, runID string, stage domain.Stage, revisionID *int64, providerID string, result provider.Result, prompt string) error {
+	input, output, cached := result.Usage.InputTokens, result.Usage.OutputTokens, result.Usage.CachedTokens
+	source, estimator := "reported", ""
+	if input == nil || output == nil {
+		source, estimator = "estimated", "chars_div_4_v1"
+		inputValue, outputValue := estimateTokens(prompt), estimateTokens(result.Text)
+		if input == nil {
+			input = &inputValue
+		}
+		if output == nil {
+			output = &outputValue
+		}
+	}
+	if cached == nil {
+		zero := 0
+		cached = &zero
+	}
+	_, err := s.store.RecordUsage(ctx, domain.UsageRecord{RunID: runID, Stage: stage, RevisionID: revisionID, ProviderID: providerID, Model: result.Model, InputTokens: *input, OutputTokens: *output, CachedTokens: *cached, Source: source, Estimator: estimator, Metadata: result.Metadata})
+	return err
+}
+
+func estimateTokens(value string) int {
+	if len(value) == 0 {
+		return 0
+	}
+	return (len(value) + 3) / 4
 }
 
 func responseObject(text string) (map[string]any, error) {

@@ -42,6 +42,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs", s.createRun)
 	mux.HandleFunc("GET /api/runs/{id}", s.getRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
+	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
+	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
 	mux.HandleFunc("PUT /api/runs/{id}/graph", s.updateGraph)
 	mux.HandleFunc("POST /api/runs/{id}/approval", s.approve)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.cancel)
@@ -146,6 +148,24 @@ func (s *Server) getRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) revisions(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.ListRevisions(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) usage(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.Usage(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
 }
 
 func (s *Server) updateGraph(w http.ResponseWriter, r *http.Request) {

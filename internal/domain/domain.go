@@ -238,33 +238,63 @@ const (
 func (k ReviewKind) Valid() bool { return k == ReviewCode || k == ReviewTest || k == ReviewFix }
 
 type Revision struct {
-	ID             int64          `json:"id"`
-	RunID          string         `json:"run_id"`
-	Kind           ReviewKind     `json:"kind"`
-	Attempt        int            `json:"attempt"`
-	BaselineDigest string         `json:"baseline_digest"`
-	PatchDigest    string         `json:"patch_digest"`
+	ID             int64             `json:"id"`
+	RunID          string            `json:"run_id"`
+	Kind           ReviewKind        `json:"kind"`
+	Attempt        int               `json:"attempt"`
+	BaselineDigest string            `json:"baseline_digest"`
+	PatchDigest    string            `json:"patch_digest"`
 	Files          map[string]string `json:"files,omitempty"`
-	Report         map[string]any `json:"report,omitempty"`
-	State          string         `json:"state"`
-	CreatedAt      time.Time      `json:"created_at"`
-	ApprovedAt     *time.Time     `json:"approved_at,omitempty"`
+	Report         map[string]any    `json:"report,omitempty"`
+	State          string            `json:"state"`
+	CreatedAt      time.Time         `json:"created_at"`
+	ApprovedAt     *time.Time        `json:"approved_at,omitempty"`
 }
 
 type UsageRecord struct {
-	ID             int64      `json:"id"`
-	RunID          string     `json:"run_id"`
-	Stage          Stage      `json:"stage"`
-	RevisionID     *int64     `json:"revision_id,omitempty"`
-	ProviderID     string     `json:"provider_id"`
-	Model          string     `json:"model"`
-	InputTokens    int        `json:"input_tokens"`
-	OutputTokens   int        `json:"output_tokens"`
-	CachedTokens   int        `json:"cached_tokens"`
-	Source         string     `json:"source"`
-	Estimator      string     `json:"estimator,omitempty"`
-	Metadata       map[string]any `json:"metadata,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID           int64          `json:"id"`
+	RunID        string         `json:"run_id"`
+	Stage        Stage          `json:"stage"`
+	RevisionID   *int64         `json:"revision_id,omitempty"`
+	ProviderID   string         `json:"provider_id"`
+	Model        string         `json:"model"`
+	InputTokens  int            `json:"input_tokens"`
+	OutputTokens int            `json:"output_tokens"`
+	CachedTokens int            `json:"cached_tokens"`
+	Source       string         `json:"source"`
+	Estimator    string         `json:"estimator,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+}
+
+type SkillPackage struct {
+	Digest      string         `json:"digest"`
+	ID          string         `json:"id"`
+	Version     string         `json:"version"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Manifest    map[string]any `json:"manifest"`
+	Path        string         `json:"path"`
+	CreatedAt   time.Time      `json:"created_at"`
+}
+
+type SkillImport struct {
+	ID            int64          `json:"id"`
+	SourceType    string         `json:"source_type"`
+	SourceURI     string         `json:"source_uri"`
+	SourceRef     string         `json:"source_ref"`
+	CredentialEnv string         `json:"credential_env,omitempty"`
+	Digest        string         `json:"digest,omitempty"`
+	State         string         `json:"state"`
+	Findings      map[string]any `json:"findings"`
+	ActivatedAt   *time.Time     `json:"activated_at,omitempty"`
+	CreatedAt     time.Time      `json:"created_at"`
+}
+
+type SkillSelection struct {
+	RunID        string    `json:"run_id"`
+	SkillDigest  string    `json:"skill_digest"`
+	SelectedAt   time.Time `json:"selected_at"`
 }
 
 type Event struct {
