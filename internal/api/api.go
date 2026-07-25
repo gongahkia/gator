@@ -33,6 +33,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/capacity", s.capacity)
+	mux.HandleFunc("POST /api/capacity/recommendations", s.recommendCapacity)
+	mux.HandleFunc("POST /api/capacity/recommendations/{id}/accept", s.acceptCapacity)
 	mux.HandleFunc("GET /api/providers", s.providers)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
@@ -56,6 +58,40 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) capacity(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.service.Capacity(r.Context()))
+}
+
+func (s *Server) recommendCapacity(w http.ResponseWriter, r *http.Request) {
+	recommendation, err := s.service.RecommendCapacity(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, recommendation)
+}
+
+func (s *Server) acceptCapacity(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid recommendation id"))
+		return
+	}
+	var input struct {
+		Workers int `json:"workers"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	recommendation, err := s.service.AcceptCapacity(r.Context(), id, input.Workers)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, recommendation)
 }
 
 func (s *Server) providers(w http.ResponseWriter, r *http.Request) {

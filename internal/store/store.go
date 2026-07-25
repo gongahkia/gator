@@ -19,6 +19,23 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
+type ProviderObservation struct {
+	ProviderID        string         `json:"provider_id"`
+	RemainingRequests *int           `json:"remaining_requests,omitempty"`
+	ResetAt           *time.Time     `json:"reset_at,omitempty"`
+	Metadata          map[string]any `json:"metadata"`
+	ObservedAt        time.Time      `json:"observed_at"`
+}
+
+type CapacityRecommendation struct {
+	ID                 int64          `json:"id"`
+	RecommendedWorkers int            `json:"recommended_workers"`
+	AcceptedWorkers    *int           `json:"accepted_workers,omitempty"`
+	Factors            map[string]any `json:"factors"`
+	GeneratedAt        time.Time      `json:"generated_at"`
+	AcceptedAt         *time.Time     `json:"accepted_at,omitempty"`
+}
+
 func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
@@ -416,6 +433,72 @@ func (s *Store) UpsertDeployment(ctx context.Context, runID, project, publicURL,
 	_, err := s.pool.Exec(ctx, `INSERT INTO deployments (run_id,project_name,public_url,status,error_message) VALUES ($1,$2,$3,$4,$5)
 ON CONFLICT (run_id) DO UPDATE SET project_name=EXCLUDED.project_name,public_url=EXCLUDED.public_url,status=EXCLUDED.status,error_message=EXCLUDED.error_message,updated_at=now()`, runID, project, publicURL, status, errorMessage)
 	return err
+}
+
+func (s *Store) RecordProviderObservation(ctx context.Context, observation ProviderObservation) error {
+	metadata, err := json.Marshal(observation.Metadata)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `INSERT INTO provider_observations (provider_id,remaining_requests,reset_at,metadata) VALUES ($1,$2,$3,$4)`, observation.ProviderID, observation.RemainingRequests, observation.ResetAt, metadata)
+	return err
+}
+
+func (s *Store) LatestProviderObservations(ctx context.Context) ([]ProviderObservation, error) {
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT ON (provider_id) provider_id,remaining_requests,reset_at,metadata,observed_at FROM provider_observations ORDER BY provider_id,observed_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	values := []ProviderObservation{}
+	for rows.Next() {
+		var value ProviderObservation
+		var metadata []byte
+		if err := rows.Scan(&value.ProviderID, &value.RemainingRequests, &value.ResetAt, &metadata, &value.ObservedAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(metadata, &value.Metadata); err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, rows.Err()
+}
+
+func (s *Store) CreateCapacityRecommendation(ctx context.Context, recommended int, factors map[string]any) (CapacityRecommendation, error) {
+	encoded, err := json.Marshal(factors)
+	if err != nil {
+		return CapacityRecommendation{}, err
+	}
+	var value CapacityRecommendation
+	var raw []byte
+	err = s.pool.QueryRow(ctx, `INSERT INTO capacity_recommendations (recommended_workers,factors) VALUES ($1,$2) RETURNING id,recommended_workers,accepted_workers,factors,generated_at,accepted_at`, recommended, encoded).Scan(&value.ID, &value.RecommendedWorkers, &value.AcceptedWorkers, &raw, &value.GeneratedAt, &value.AcceptedAt)
+	if err != nil {
+		return CapacityRecommendation{}, err
+	}
+	if err := json.Unmarshal(raw, &value.Factors); err != nil {
+		return CapacityRecommendation{}, err
+	}
+	return value, nil
+}
+
+func (s *Store) AcceptCapacityRecommendation(ctx context.Context, id int64, workers int) (CapacityRecommendation, error) {
+	if workers < 1 {
+		return CapacityRecommendation{}, fmt.Errorf("accepted workers must be positive")
+	}
+	var value CapacityRecommendation
+	var raw []byte
+	err := s.pool.QueryRow(ctx, `UPDATE capacity_recommendations SET accepted_workers=$2,accepted_at=now() WHERE id=$1 RETURNING id,recommended_workers,accepted_workers,factors,generated_at,accepted_at`, id, workers).Scan(&value.ID, &value.RecommendedWorkers, &value.AcceptedWorkers, &raw, &value.GeneratedAt, &value.AcceptedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CapacityRecommendation{}, ErrNotFound
+	}
+	if err != nil {
+		return CapacityRecommendation{}, err
+	}
+	if err := json.Unmarshal(raw, &value.Factors); err != nil {
+		return CapacityRecommendation{}, err
+	}
+	return value, nil
 }
 
 func (s *Store) RecordEvent(ctx context.Context, runID, typ, message string, metadata map[string]any) error {

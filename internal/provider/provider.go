@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,10 +24,16 @@ type Request struct {
 }
 
 type Result struct {
-	Text     string         `json:"text"`
-	Provider string         `json:"provider"`
-	Model    string         `json:"model"`
-	Metadata map[string]any `json:"metadata"`
+	Text      string         `json:"text"`
+	Provider  string         `json:"provider"`
+	Model     string         `json:"model"`
+	Metadata  map[string]any `json:"metadata"`
+	RateLimit RateLimit      `json:"rate_limit"`
+}
+
+type RateLimit struct {
+	RemainingRequests *int       `json:"remaining_requests,omitempty"`
+	ResetAt           *time.Time `json:"reset_at,omitempty"`
 }
 
 type Invoker struct {
@@ -62,7 +69,7 @@ func (i Invoker) Invoke(ctx context.Context, provider config.Provider, request R
 
 func (i Invoker) openAIResponses(ctx context.Context, p config.Provider, key string, request Request) (Result, error) {
 	body := map[string]any{"model": p.Model, "input": request.Prompt}
-	payload, err := i.postJSON(ctx, joinURL(p.BaseURL, "/responses"), body, map[string]string{"Authorization": "Bearer " + key})
+	payload, rateLimit, err := i.postJSON(ctx, joinURL(p.BaseURL, "/responses"), body, map[string]string{"Authorization": "Bearer " + key})
 	if err != nil {
 		return Result{}, err
 	}
@@ -76,12 +83,12 @@ func (i Invoker) openAIResponses(ctx context.Context, p config.Provider, key str
 			}
 		}
 	}
-	return result(p, text, payload), nil
+	return result(p, text, payload, rateLimit), nil
 }
 
 func (i Invoker) openAICompatible(ctx context.Context, p config.Provider, key string, request Request) (Result, error) {
 	body := map[string]any{"model": p.Model, "messages": []map[string]string{{"role": "user", "content": request.Prompt}}}
-	payload, err := i.postJSON(ctx, joinURL(p.BaseURL, "/chat/completions"), body, map[string]string{"Authorization": "Bearer " + key})
+	payload, rateLimit, err := i.postJSON(ctx, joinURL(p.BaseURL, "/chat/completions"), body, map[string]string{"Authorization": "Bearer " + key})
 	if err != nil {
 		return Result{}, err
 	}
@@ -89,12 +96,12 @@ func (i Invoker) openAICompatible(ctx context.Context, p config.Provider, key st
 	for _, choice := range objectSlice(payload["choices"]) {
 		text += stringField(asObject(choice["message"]), "content")
 	}
-	return result(p, text, payload), nil
+	return result(p, text, payload, rateLimit), nil
 }
 
 func (i Invoker) anthropic(ctx context.Context, p config.Provider, key string, request Request) (Result, error) {
 	body := map[string]any{"model": p.Model, "max_tokens": 4096, "messages": []map[string]string{{"role": "user", "content": request.Prompt}}}
-	payload, err := i.postJSON(ctx, joinURL(p.BaseURL, "/v1/messages"), body, map[string]string{"x-api-key": key, "anthropic-version": "2023-06-01"})
+	payload, rateLimit, err := i.postJSON(ctx, joinURL(p.BaseURL, "/v1/messages"), body, map[string]string{"x-api-key": key, "anthropic-version": "2023-06-01"})
 	if err != nil {
 		return Result{}, err
 	}
@@ -102,12 +109,12 @@ func (i Invoker) anthropic(ctx context.Context, p config.Provider, key string, r
 	for _, content := range objectSlice(payload["content"]) {
 		text += stringField(content, "text")
 	}
-	return result(p, text, payload), nil
+	return result(p, text, payload, rateLimit), nil
 }
 
 func (i Invoker) gemini(ctx context.Context, p config.Provider, key string, request Request) (Result, error) {
 	body := map[string]any{"contents": []map[string]any{{"parts": []map[string]string{{"text": request.Prompt}}}}}
-	payload, err := i.postJSON(ctx, joinURL(p.BaseURL, "/models/"+p.Model+":generateContent?key="+key), body, nil)
+	payload, rateLimit, err := i.postJSON(ctx, joinURL(p.BaseURL, "/models/"+p.Model+":generateContent?key="+key), body, nil)
 	if err != nil {
 		return Result{}, err
 	}
@@ -117,17 +124,17 @@ func (i Invoker) gemini(ctx context.Context, p config.Provider, key string, requ
 			text += stringField(part, "text")
 		}
 	}
-	return result(p, text, payload), nil
+	return result(p, text, payload, rateLimit), nil
 }
 
-func (i Invoker) postJSON(ctx context.Context, url string, body any, headers map[string]string) (map[string]any, error) {
+func (i Invoker) postJSON(ctx context.Context, url string, body any, headers map[string]string) (map[string]any, RateLimit, error) {
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return nil, RateLimit{}, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(encoded))
 	if err != nil {
-		return nil, err
+		return nil, RateLimit{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	for key, value := range headers {
@@ -139,25 +146,58 @@ func (i Invoker) postJSON(ctx context.Context, url string, body any, headers map
 	}
 	response, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, RateLimit{}, err
 	}
 	defer response.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if err != nil {
-		return nil, err
+		return nil, RateLimit{}, err
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("provider status %d: %s", response.StatusCode, tail(string(raw), 1000))
+		return nil, RateLimit{}, fmt.Errorf("provider status %d: %s", response.StatusCode, tail(string(raw), 1000))
 	}
 	payload := map[string]any{}
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, fmt.Errorf("decode provider response: %w", err)
+		return nil, RateLimit{}, fmt.Errorf("decode provider response: %w", err)
 	}
-	return payload, nil
+	return payload, rateLimitFromHeaders(response.Header), nil
 }
 
-func result(p config.Provider, text string, payload map[string]any) Result {
-	return Result{Text: text, Provider: p.ID, Model: p.Model, Metadata: map[string]any{"kind": p.Kind, "response_id": stringField(payload, "id")}}
+func result(p config.Provider, text string, payload map[string]any, rateLimit RateLimit) Result {
+	metadata := map[string]any{"kind": p.Kind, "response_id": stringField(payload, "id")}
+	if rateLimit.RemainingRequests != nil {
+		metadata["rate_limit_remaining_requests"] = *rateLimit.RemainingRequests
+	}
+	if rateLimit.ResetAt != nil {
+		metadata["rate_limit_reset_at"] = rateLimit.ResetAt.UTC().Format(time.RFC3339)
+	}
+	return Result{Text: text, Provider: p.ID, Model: p.Model, Metadata: metadata, RateLimit: rateLimit}
+}
+
+func rateLimitFromHeaders(headers http.Header) RateLimit {
+	result := RateLimit{}
+	for _, key := range []string{"x-ratelimit-remaining-requests", "anthropic-ratelimit-requests-remaining", "x-goog-ratelimit-remaining-requests"} {
+		if value, err := strconv.Atoi(strings.TrimSpace(headers.Get(key))); err == nil && value >= 0 {
+			result.RemainingRequests = &value
+			break
+		}
+	}
+	for _, key := range []string{"x-ratelimit-reset-requests", "anthropic-ratelimit-requests-reset", "x-goog-ratelimit-reset"} {
+		value := strings.TrimSpace(headers.Get(key))
+		if value == "" {
+			continue
+		}
+		if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+			result.ResetAt = &parsed
+			break
+		}
+		if duration, err := time.ParseDuration(value); err == nil {
+			reset := time.Now().UTC().Add(duration)
+			result.ResetAt = &reset
+			break
+		}
+	}
+	return result
 }
 func joinURL(base, path string) string { return strings.TrimRight(base, "/") + path }
 func stringField(object map[string]any, key string) string {

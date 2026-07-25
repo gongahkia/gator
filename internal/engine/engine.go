@@ -145,7 +145,39 @@ func (s *Service) Cleanup(ctx context.Context, runID string) error {
 }
 
 func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
-	return runtime.DetectCapacity(ctx, s.config.DockerBin, s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
+	capacity := runtime.DetectCapacity(ctx, s.config.DockerBin, s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
+	observations, err := s.store.LatestProviderObservations(ctx)
+	if err != nil {
+		s.log.Warn("load provider capacity observations", "error", err)
+		return capacity
+	}
+	latest := make(map[string]store.ProviderObservation, len(observations))
+	for _, observation := range observations {
+		latest[observation.ProviderID] = observation
+	}
+	factors := make([]runtime.QuotaFactor, 0, len(s.config.Manifest.Providers))
+	for _, configured := range s.config.Manifest.Providers {
+		factor := runtime.QuotaFactor{ProviderID: configured.ID, ConfiguredLimit: configured.Budget.MaxConcurrent}
+		if observation, ok := latest[configured.ID]; ok {
+			factor.ObservedRemaining = observation.RemainingRequests
+		}
+		factors = append(factors, factor)
+	}
+	capacity.ApplyProviderQuotas(factors)
+	return capacity
+}
+
+func (s *Service) RecommendCapacity(ctx context.Context) (store.CapacityRecommendation, error) {
+	capacity := s.Capacity(ctx)
+	factors := map[string]any{"cpus": capacity.CPUs, "memory_bytes": capacity.MemoryBytes, "docker_available": capacity.DockerAvailable, "quota_workers": capacity.QuotaWorkers, "providers": capacity.QuotaFactors}
+	return s.store.CreateCapacityRecommendation(ctx, capacity.RecommendedWorkers, factors)
+}
+
+func (s *Service) AcceptCapacity(ctx context.Context, id int64, workers int) (store.CapacityRecommendation, error) {
+	if workers > s.config.MaxWorkers {
+		return store.CapacityRecommendation{}, fmt.Errorf("accepted workers exceed NORBOT_MAX_WORKERS")
+	}
+	return s.store.AcceptCapacityRecommendation(ctx, id, workers)
 }
 
 func (s *Service) ProviderOptions() []config.Provider {
@@ -287,6 +319,11 @@ func (s *Service) execute(ctx context.Context, job domain.Job) error {
 	result, err := s.invoker.Invoke(ctx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
 	if err != nil {
 		return err
+	}
+	if result.RateLimit.RemainingRequests != nil || result.RateLimit.ResetAt != nil {
+		if err := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, RemainingRequests: result.RateLimit.RemainingRequests, ResetAt: result.RateLimit.ResetAt, Metadata: result.Metadata}); err != nil {
+			s.log.Warn("record provider quota observation", "provider", providerConfig.ID, "error", err)
+		}
 	}
 	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
 	encoded, err := json.MarshalIndent(artifact, "", "  ")

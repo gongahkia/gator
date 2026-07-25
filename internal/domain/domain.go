@@ -157,6 +157,15 @@ type Event struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
+type Deployment struct {
+	RunID        string    `json:"run_id"`
+	ProjectName  string    `json:"project_name"`
+	PublicURL    string    `json:"public_url,omitempty"`
+	Status       string    `json:"status"`
+	ErrorMessage string    `json:"error_message,omitempty"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type Job struct {
 	ID             int64      `json:"id"`
 	RunID          string     `json:"run_id"`

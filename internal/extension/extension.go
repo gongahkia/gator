@@ -101,17 +101,37 @@ func (r *Registry) RegisterProfile(profile Profile) error {
 
 // ProcessRegistry accepts only digest-pinned local executables. Plugins speak one
 // JSON-RPC 2.0 request/response over stdio for every invocation.
-type ProcessRegistry struct { clients map[string]ProcessClient }
-type ProcessClient struct { spec config.ProcessPlugin; seq *atomic.Int64 }
-type rpcRequest struct { JSONRPC string `json:"jsonrpc"`; ID int64 `json:"id"`; Method string `json:"method"`; Params any `json:"params"` }
-type rpcResponse struct { JSONRPC string `json:"jsonrpc"`; ID int64 `json:"id"`; Result json.RawMessage `json:"result"`; Error *rpcError `json:"error"` }
-type rpcError struct { Code int `json:"code"`; Message string `json:"message"` }
+type ProcessRegistry struct{ clients map[string]ProcessClient }
+type ProcessClient struct {
+	spec config.ProcessPlugin
+	seq  *atomic.Int64
+}
+type rpcRequest struct {
+	JSONRPC string `json:"jsonrpc"`
+	ID      int64  `json:"id"`
+	Method  string `json:"method"`
+	Params  any    `json:"params"`
+}
+type rpcResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      int64           `json:"id"`
+	Result  json.RawMessage `json:"result"`
+	Error   *rpcError       `json:"error"`
+}
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
 
 func LoadProcessPlugins(specs []config.ProcessPlugin) (*ProcessRegistry, error) {
 	registry := &ProcessRegistry{clients: make(map[string]ProcessClient, len(specs))}
 	for _, spec := range specs {
-		if err := verifyDigest(spec.Command, spec.SHA256); err != nil { return nil, fmt.Errorf("verify plugin %q: %w", spec.ID, err) }
-		if _, exists := registry.clients[spec.ID]; exists { return nil, fmt.Errorf("duplicate process plugin %q", spec.ID) }
+		if err := verifyDigest(spec.Command, spec.SHA256); err != nil {
+			return nil, fmt.Errorf("verify plugin %q: %w", spec.ID, err)
+		}
+		if _, exists := registry.clients[spec.ID]; exists {
+			return nil, fmt.Errorf("duplicate process plugin %q", spec.ID)
+		}
 		registry.clients[spec.ID] = ProcessClient{spec: spec, seq: &atomic.Int64{}}
 	}
 	return registry, nil
@@ -119,54 +139,102 @@ func LoadProcessPlugins(specs []config.ProcessPlugin) (*ProcessRegistry, error) 
 
 func (r *ProcessRegistry) IDs() []string {
 	ids := make([]string, 0, len(r.clients))
-	for id := range r.clients { ids = append(ids, id) }
+	for id := range r.clients {
+		ids = append(ids, id)
+	}
 	return ids
 }
 
 func (r *ProcessRegistry) Call(ctx context.Context, pluginID, method string, params any, result any) error {
 	client, ok := r.clients[pluginID]
-	if !ok { return fmt.Errorf("unknown process plugin %q", pluginID) }
+	if !ok {
+		return fmt.Errorf("unknown process plugin %q", pluginID)
+	}
 	return client.Call(ctx, method, params, result)
 }
 
 func (p ProcessClient) Call(ctx context.Context, method string, params any, result any) error {
-	if !allowedMethod(p.spec.Methods, method) { return fmt.Errorf("plugin %q does not allow method %q", p.spec.ID, method) }
-	if err := verifyDigest(p.spec.Command, p.spec.SHA256); err != nil { return fmt.Errorf("plugin digest changed: %w", err) }
+	if !allowedMethod(p.spec.Methods, method) {
+		return fmt.Errorf("plugin %q does not allow method %q", p.spec.ID, method)
+	}
+	if err := verifyDigest(p.spec.Command, p.spec.SHA256); err != nil {
+		return fmt.Errorf("plugin digest changed: %w", err)
+	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	command := exec.CommandContext(ctx, p.spec.Command)
-	stdin, err := command.StdinPipe(); if err != nil { return err }
-	stdout, err := command.StdoutPipe(); if err != nil { return err }
-	stderr, err := command.StderrPipe(); if err != nil { return err }
-	if err := command.Start(); err != nil { return err }
+	stdin, err := command.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := command.StderrPipe()
+	if err != nil {
+		return err
+	}
+	if err := command.Start(); err != nil {
+		return err
+	}
 	id := p.seq.Add(1)
-	request, err := json.Marshal(rpcRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params}); if err != nil { return err }
-	if _, err := stdin.Write(append(request, '\n')); err != nil { return err }
-	if err := stdin.Close(); err != nil { return err }
-	line, err := bufio.NewReader(io.LimitReader(stdout, 1<<20)).ReadBytes('\n'); if err != nil { return fmt.Errorf("plugin response: %w", err) }
+	request, err := json.Marshal(rpcRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params})
+	if err != nil {
+		return err
+	}
+	if _, err := stdin.Write(append(request, '\n')); err != nil {
+		return err
+	}
+	if err := stdin.Close(); err != nil {
+		return err
+	}
+	line, err := bufio.NewReader(io.LimitReader(stdout, 1<<20)).ReadBytes('\n')
+	if err != nil {
+		return fmt.Errorf("plugin response: %w", err)
+	}
 	if err := command.Wait(); err != nil {
 		stderrBytes, _ := io.ReadAll(io.LimitReader(stderr, 8<<10))
 		return fmt.Errorf("plugin exited: %w: %s", err, strings.TrimSpace(string(stderrBytes)))
 	}
 	var response rpcResponse
-	if err := json.Unmarshal(line, &response); err != nil { return fmt.Errorf("decode plugin response: %w", err) }
-	if response.JSONRPC != "2.0" || response.ID != id { return fmt.Errorf("invalid plugin JSON-RPC response") }
-	if response.Error != nil { return fmt.Errorf("plugin error %d: %s", response.Error.Code, response.Error.Message) }
-	if result != nil && len(response.Result) > 0 { return json.Unmarshal(response.Result, result) }
+	if err := json.Unmarshal(line, &response); err != nil {
+		return fmt.Errorf("decode plugin response: %w", err)
+	}
+	if response.JSONRPC != "2.0" || response.ID != id {
+		return fmt.Errorf("invalid plugin JSON-RPC response")
+	}
+	if response.Error != nil {
+		return fmt.Errorf("plugin error %d: %s", response.Error.Code, response.Error.Message)
+	}
+	if result != nil && len(response.Result) > 0 {
+		return json.Unmarshal(response.Result, result)
+	}
 	return nil
 }
 
 func verifyDigest(path, expected string) error {
-	file, err := os.Open(path); if err != nil { return err }
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
 	defer file.Close()
 	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil { return err }
+	if _, err := io.Copy(hash, file); err != nil {
+		return err
+	}
 	actual := hex.EncodeToString(hash.Sum(nil))
-	if !strings.EqualFold(actual, strings.TrimPrefix(expected, "sha256:")) { return fmt.Errorf("expected sha256:%s, got sha256:%s", expected, actual) }
+	if !strings.EqualFold(actual, strings.TrimPrefix(expected, "sha256:")) {
+		return fmt.Errorf("expected sha256:%s, got sha256:%s", expected, actual)
+	}
 	return nil
 }
 
 func allowedMethod(methods []string, method string) bool {
-	for _, allowed := range methods { if allowed == method { return true } }
+	for _, allowed := range methods {
+		if allowed == method {
+			return true
+		}
+	}
 	return false
 }

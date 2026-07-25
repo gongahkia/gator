@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -140,12 +141,20 @@ func (w Workspace) Cleanup(ctx context.Context, runID string) error {
 }
 
 type Capacity struct {
-	CPUs               int    `json:"cpus"`
-	MemoryBytes        int64  `json:"memory_bytes"`
-	DockerAvailable    bool   `json:"docker_available"`
-	ConfiguredWorkers  int    `json:"configured_workers"`
-	RecommendedWorkers int    `json:"recommended_workers"`
-	Recommendation     string `json:"recommendation"`
+	CPUs               int           `json:"cpus"`
+	MemoryBytes        int64         `json:"memory_bytes"`
+	DockerAvailable    bool          `json:"docker_available"`
+	ConfiguredWorkers  int           `json:"configured_workers"`
+	RecommendedWorkers int           `json:"recommended_workers"`
+	Recommendation     string        `json:"recommendation"`
+	QuotaWorkers       int           `json:"quota_workers,omitempty"`
+	QuotaFactors       []QuotaFactor `json:"quota_factors,omitempty"`
+}
+
+type QuotaFactor struct {
+	ProviderID        string `json:"provider_id"`
+	ConfiguredLimit   int    `json:"configured_limit,omitempty"`
+	ObservedRemaining *int   `json:"observed_remaining,omitempty"`
 }
 
 func DetectCapacity(ctx context.Context, dockerBin string, configuredWorkers, maxWorkers int, runner CommandRunner) Capacity {
@@ -170,6 +179,25 @@ func DetectCapacity(ctx context.Context, dockerBin string, configuredWorkers, ma
 		capacity.Recommendation = "Configured workers are within the local CPU/RAM recommendation."
 	}
 	return capacity
+}
+
+func (c *Capacity) ApplyProviderQuotas(factors []QuotaFactor) {
+	c.QuotaFactors = factors
+	quota := 0
+	for _, factor := range factors {
+		limit := factor.ConfiguredLimit
+		if factor.ObservedRemaining != nil && (*factor.ObservedRemaining < limit || limit == 0) {
+			limit = *factor.ObservedRemaining
+		}
+		if limit > 0 && (quota == 0 || limit < quota) {
+			quota = limit
+		}
+	}
+	c.QuotaWorkers = quota
+	if quota > 0 && quota < c.RecommendedWorkers {
+		c.RecommendedWorkers = quota
+		c.Recommendation = "Provider quota limits the local worker recommendation; operator confirmation is required before increasing workers."
+	}
 }
 
 func memoryBytes(ctx context.Context, runner CommandRunner) int64 {
@@ -204,6 +232,11 @@ type Deployment struct {
 	Runner    CommandRunner
 }
 
+type DeploymentStatus struct {
+	Project  string           `json:"project"`
+	Services []map[string]any `json:"services"`
+}
+
 func ProjectName(runID string) string {
 	return "norbot-" + strings.ToLower(runID)
 }
@@ -214,7 +247,7 @@ func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (st
 		return "", err
 	}
 	project := ProjectName(run.ID)
-	args := []string{"compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "up", "--build", "-d"}
+	args := []string{"compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "up", "--build", "-d", "--wait", "--wait-timeout", "90"}
 	command := exec.CommandContext(ctx, d.DockerBin, args...)
 	command.Dir = filepath.Join(root, "generated-app")
 	command.Env = append(os.Environ(), "NORBOT_PUBLIC_PORT="+strconv.Itoa(port), "NORBOT_RUN_ID="+run.ID)
@@ -226,8 +259,39 @@ func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (st
 }
 
 func (d Deployment) Stop(ctx context.Context, runID, root string) error {
-	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "down", "--remove-orphans")
+	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "stop")
 	return err
+}
+
+func (d Deployment) Start(ctx context.Context, runID, root string) error {
+	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "start", "--wait", "--wait-timeout", "90")
+	return err
+}
+
+func (d Deployment) Delete(ctx context.Context, runID, root string) error {
+	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "down", "--remove-orphans", "--volumes")
+	return err
+}
+
+func (d Deployment) Status(ctx context.Context, runID, root string) (DeploymentStatus, error) {
+	project := ProjectName(runID)
+	output, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "ps", "--format", "json")
+	if err != nil { return DeploymentStatus{}, err }
+	services := []map[string]any{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if strings.TrimSpace(line) == "" { continue }
+		var service map[string]any
+		if err := json.Unmarshal([]byte(line), &service); err != nil { return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err) }
+		services = append(services, service)
+	}
+	return DeploymentStatus{Project: project, Services: services}, nil
+}
+
+func (d Deployment) Logs(ctx context.Context, runID, root string, lines int) (string, error) {
+	if lines < 1 || lines > 10000 { return "", fmt.Errorf("log line limit must be 1-10000") }
+	output, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "logs", "--no-color", "--tail", strconv.Itoa(lines))
+	if err != nil { return "", err }
+	return string(output), nil
 }
 
 func reservePort() (int, error) {
