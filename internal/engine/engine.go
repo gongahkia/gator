@@ -1,0 +1,289 @@
+package engine
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gongahkia/norbot/internal/config"
+	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/provider"
+	"github.com/gongahkia/norbot/internal/runtime"
+	"github.com/gongahkia/norbot/internal/store"
+)
+
+type CreateRunInput struct {
+	Prompt    string                  `json:"prompt"`
+	Profile   domain.Profile          `json:"profile"`
+	Providers map[domain.Stage]string `json:"providers"`
+}
+
+type ApprovalInput struct {
+	Action   domain.ApprovalAction `json:"action"`
+	Feedback string                `json:"feedback"`
+}
+
+type Service struct {
+	store      *store.Store
+	config     config.Config
+	workspace  runtime.Workspace
+	deployment runtime.Deployment
+	invoker    provider.Invoker
+	log        *slog.Logger
+}
+
+func New(st *store.Store, cfg config.Config, logger *slog.Logger) *Service {
+	workspace := runtime.Workspace{DockerBin: cfg.DockerBin, ArtifactsDir: cfg.ArtifactsDir, Runner: runtime.OSRunner{}}
+	return &Service{
+		store: st, config: cfg, workspace: workspace,
+		deployment: runtime.Deployment{DockerBin: cfg.DockerBin, Runner: runtime.OSRunner{}},
+		invoker:    provider.Invoker{Workspace: workspace}, log: logger,
+	}
+}
+
+func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.Run, error) {
+	input.Prompt = strings.TrimSpace(input.Prompt)
+	if input.Prompt == "" {
+		return domain.Run{}, fmt.Errorf("prompt is required")
+	}
+	if !input.Profile.Valid() {
+		return domain.Run{}, fmt.Errorf("unsupported profile %q", input.Profile)
+	}
+	providers, err := s.normalizeProviders(input.Providers)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	id, err := newID()
+	if err != nil {
+		return domain.Run{}, err
+	}
+	now := time.Now().UTC()
+	run := domain.Run{ID: id, Prompt: input.Prompt, Profile: input.Profile, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: domain.DefaultGraph(), CreatedAt: now, UpdatedAt: now}
+	if err := s.store.CreateRun(ctx, run); err != nil {
+		return domain.Run{}, err
+	}
+	if err := s.workspace.Ensure(ctx, id); err != nil {
+		return domain.Run{}, err
+	}
+	if err := s.store.Enqueue(ctx, id, domain.StagePlanner, 1); err != nil {
+		return domain.Run{}, err
+	}
+	return s.store.GetRun(ctx, id)
+}
+
+func (s *Service) normalizeProviders(requested map[domain.Stage]string) (map[domain.Stage]string, error) {
+	result := map[domain.Stage]string{domain.StageDeployer: "local-deployer"}
+	for _, stage := range []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier} {
+		id := strings.TrimSpace(requested[stage])
+		if id == "" {
+			for _, candidate := range s.config.Manifest.Providers {
+				if _, ok := s.config.Manifest.Provider(candidate.ID, stage); ok {
+					id = candidate.ID
+					break
+				}
+			}
+		}
+		if _, ok := s.config.Manifest.Provider(id, stage); !ok {
+			return nil, fmt.Errorf("no configured provider %q for %s", id, stage)
+		}
+		result[stage] = id
+	}
+	return result, nil
+}
+
+func (s *Service) UpdateGraph(ctx context.Context, runID string, graph domain.Graph) (domain.Run, error) {
+	if err := graph.Validate(); err != nil {
+		return domain.Run{}, err
+	}
+	return s.store.UpdateGraph(ctx, runID, graph)
+}
+
+func (s *Service) Approve(ctx context.Context, runID string, input ApprovalInput) (domain.Run, error) {
+	return s.store.Approve(ctx, runID, input.Action, strings.TrimSpace(input.Feedback))
+}
+
+func (s *Service) Cancel(ctx context.Context, runID string) (domain.Run, error) {
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	if !run.Status.Terminal() {
+		run, err = s.store.Approve(ctx, runID, domain.ApprovalAbandon, "")
+		if err != nil {
+			return domain.Run{}, err
+		}
+	}
+	_ = s.deployment.Stop(ctx, runID, s.workspace.RunPath(runID))
+	if err := s.workspace.Cleanup(ctx, runID); err != nil {
+		s.log.Warn("workspace cleanup failed after cancel", "run_id", runID, "error", err)
+	}
+	_ = s.store.RecordEvent(ctx, runID, "run_cancelled", "Run cancelled; Docker workspace and deployment cleanup requested", nil)
+	return s.store.GetRun(ctx, runID)
+}
+
+func (s *Service) Cleanup(ctx context.Context, runID string) error {
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+	if !run.Status.Terminal() {
+		return fmt.Errorf("cancel an active run before cleanup")
+	}
+	_ = s.deployment.Stop(ctx, runID, s.workspace.RunPath(runID))
+	if err := s.workspace.Cleanup(ctx, runID); err != nil {
+		return err
+	}
+	return s.store.RecordEvent(ctx, runID, "run_cleanup_completed", "Docker workspace and deployment cleaned; host artifacts retained", nil)
+}
+
+func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
+	return runtime.DetectCapacity(ctx, s.config.DockerBin, s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
+}
+
+func (s *Service) StartWorkers(ctx context.Context) {
+	var workers sync.WaitGroup
+	for index := 0; index < s.config.Workers; index++ {
+		workers.Add(1)
+		go func(workerID int) {
+			defer workers.Done()
+			s.worker(ctx, workerID)
+		}(index + 1)
+	}
+	go func() { <-ctx.Done(); workers.Wait() }()
+}
+
+func (s *Service) worker(ctx context.Context, workerID int) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		job, claimed, err := s.store.ClaimJob(ctx)
+		if err != nil {
+			s.log.Error("claim job", "worker", workerID, "error", err)
+			sleep(ctx, time.Second)
+			continue
+		}
+		if !claimed {
+			sleep(ctx, 300*time.Millisecond)
+			continue
+		}
+		if err := s.execute(ctx, job); err != nil {
+			s.log.Error("stage failed", "run_id", job.RunID, "stage", job.Stage, "attempt", job.Attempt, "error", err)
+			_ = s.store.FailJob(context.Background(), job, err.Error())
+		}
+	}
+}
+
+func (s *Service) execute(ctx context.Context, job domain.Job) error {
+	run, err := s.store.GetRun(ctx, job.RunID)
+	if err != nil {
+		return err
+	}
+	if run.Status != domain.StatusQueued || run.Stage != job.Stage {
+		return fmt.Errorf("stale job")
+	}
+	providerID := run.Providers[job.Stage]
+	if err := s.store.MarkStageRunning(ctx, job, providerID); err != nil {
+		return err
+	}
+	if err := s.workspace.Ensure(ctx, run.ID); err != nil {
+		return err
+	}
+	if job.Stage == domain.StageDeployer {
+		return s.deploy(ctx, run, job)
+	}
+	providerConfig, ok := s.config.Manifest.Provider(providerID, job.Stage)
+	if !ok {
+		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
+	}
+	prompt := stagePrompt(run, job.Stage)
+	result, err := s.invoker.Invoke(ctx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
+	if err != nil {
+		return err
+	}
+	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
+	encoded, err := json.MarshalIndent(artifact, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
+	if _, err := s.workspace.WriteArtifact(run.ID, path, encoded); err != nil {
+		return err
+	}
+	if err := s.workspace.MirrorToVolume(ctx, run.ID, path); err != nil {
+		return err
+	}
+	if job.Stage == domain.StageBuilder {
+		files, err := generateApp(s.workspace, run)
+		if err != nil {
+			return err
+		}
+		artifact["generated_files"] = files
+	}
+	if job.Stage == domain.StageVerifier {
+		report, err := verifyApp(s.workspace, run)
+		if err != nil {
+			return err
+		}
+		artifact["verification"] = report
+	}
+	return s.store.MarkStageAwaitingApproval(ctx, job, artifact)
+}
+
+func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) error {
+	root := s.workspace.RunPath(run.ID)
+	if err := s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), "", "building", ""); err != nil {
+		return err
+	}
+	url, err := s.deployment.Deploy(ctx, run, root)
+	if err != nil {
+		_ = s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), "", "failed", err.Error())
+		return err
+	}
+	if err := s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), url, "running", ""); err != nil {
+		return err
+	}
+	return s.store.CompleteRun(ctx, job, map[string]any{"project": runtime.ProjectName(run.ID), "public_url": url})
+}
+
+func verifyApp(workspace runtime.Workspace, run domain.Run) (map[string]any, error) {
+	root := filepath.Join(workspace.RunPath(run.ID), "generated-app")
+	required := []string{"docker-compose.yml", "frontend/package.json", "frontend/src/main.jsx"}
+	if run.Profile != domain.ProfileFrontend {
+		required = append(required, "backend/main.go", "backend/go.mod")
+	}
+	for _, relative := range required {
+		if _, err := os.Stat(filepath.Join(root, relative)); err != nil {
+			return nil, fmt.Errorf("generated app missing %s", relative)
+		}
+	}
+	return map[string]any{"status": "pass", "checks": required, "summary": "Generated profile contract is present. Operator approval is required before local deployment."}, nil
+}
+
+func stagePrompt(run domain.Run, stage domain.Stage) string {
+	return fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nGraph: %+v\nPlanner feedback: %s\nReturn concise implementation notes; do not reveal credentials or execute unapproved external actions.", stage, run.ID, run.Profile, run.Prompt, run.Graph, run.Feedback)
+}
+
+func newID() (string, error) {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+func sleep(ctx context.Context, duration time.Duration) {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
+}

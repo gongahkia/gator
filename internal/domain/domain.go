@@ -37,10 +37,10 @@ func (s Stage) Next() (Stage, bool) {
 type Status string
 
 const (
-	StatusQueued   Status = "queued"
-	StatusRunning  Status = "running"
-	StatusAwaiting Status = "awaiting_approval"
-	StatusFailed   Status = "failed"
+	StatusQueued    Status = "queued"
+	StatusRunning   Status = "running"
+	StatusAwaiting  Status = "awaiting_approval"
+	StatusFailed    Status = "failed"
 	StatusAbandoned Status = "abandoned"
 	StatusCompleted Status = "completed"
 )
@@ -52,9 +52,9 @@ func (s Status) Terminal() bool {
 type Profile string
 
 const (
-	ProfileFrontend Profile = "frontend-only"
+	ProfileFrontend  Profile = "frontend-only"
 	ProfileFullStack Profile = "full-stack"
-	ProfileAgentic Profile = "agentic"
+	ProfileAgentic   Profile = "agentic"
 )
 
 func (p Profile) Valid() bool {

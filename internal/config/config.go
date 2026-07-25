@@ -26,9 +26,9 @@ type ToolPolicy struct {
 }
 
 type Manifest struct {
-	Providers  []Provider              `json:"providers"`
-	Profiles   []domain.Profile        `json:"profiles"`
-	ToolPolicy map[string]ToolPolicy   `json:"tool_policy"`
+	Providers  []Provider            `json:"providers"`
+	Profiles   []domain.Profile      `json:"profiles"`
+	ToolPolicy map[string]ToolPolicy `json:"tool_policy"`
 }
 
 type Config struct {
