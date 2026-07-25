@@ -377,6 +377,48 @@ func (k *KubernetesRuntime) InvokeAgent(ctx context.Context, run domain.Run, roo
 	return response, nil
 }
 
+func (k *KubernetesRuntime) RunSandbox(ctx context.Context, runID string, request SandboxRequest, policy config.Sandbox) (SandboxResult, error) {
+	if len(request.Command) == 0 {
+		return SandboxResult{}, fmt.Errorf("sandbox command is required")
+	}
+	if err := k.Ensure(ctx, runID); err != nil {
+		return SandboxResult{}, err
+	}
+	p := policy.Normalized()
+	if len(request.AllowedHosts) > 0 && (p.EgressProxyURL == "" || p.EgressProxySecret == "") {
+		return SandboxResult{}, fmt.Errorf("sandbox egress requires configured managed proxy")
+	}
+	name := k.Name(runID) + "-sandbox-" + shortID()
+	image := p.Image
+	if request.Image != "" {
+		image = request.Image
+	}
+	noRoot, readOnly, allowEscalation := true, true, false
+	container := corev1.Container{Name: "sandbox", Image: image, WorkingDir: "/workspace", Resources: corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceCPU: *resource.NewMilliQuantity(p.CPUMilli, resource.DecimalSI), corev1.ResourceMemory: *resource.NewQuantity(p.MemoryMiB<<20, resource.BinarySI)}, Limits: corev1.ResourceList{corev1.ResourceCPU: *resource.NewMilliQuantity(p.CPUMilli, resource.DecimalSI), corev1.ResourceMemory: *resource.NewQuantity(p.MemoryMiB<<20, resource.BinarySI)}}, SecurityContext: &corev1.SecurityContext{RunAsNonRoot: &noRoot, ReadOnlyRootFilesystem: &readOnly, AllowPrivilegeEscalation: &allowEscalation, Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, VolumeMounts: []corev1.VolumeMount{{Name: "workspace", MountPath: "/workspace", ReadOnly: true}, {Name: "scratch", MountPath: "/scratch"}}}
+	if strings.HasPrefix(image, "curlimages/curl") {
+		container.Args = request.Command
+	} else {
+		container.Command = request.Command
+	}
+	if len(request.AllowedHosts) > 0 {
+		container.Env = []corev1.EnvVar{{Name: "HTTPS_PROXY", Value: p.EgressProxyURL}, {Name: "HTTP_PROXY", Value: p.EgressProxyURL}, {Name: "NO_PROXY", Value: ""}, {Name: "NORBOT_EGRESS_TOKEN", Value: os.Getenv(p.EgressProxySecret)}}
+	}
+	job := oneShotJob(name, k.config, runID, "sandbox", container, []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: k.PVC(runID), ReadOnly: true}}}, {Name: "scratch", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}})
+	deadline := int64(p.TimeoutS)
+	job.Spec.ActiveDeadlineSeconds = &deadline
+	started := time.Now()
+	output, err := k.runJob(ctx, job, true)
+	result := SandboxResult{Output: output, DurationMS: time.Since(started).Milliseconds(), Network: "none"}
+	if len(request.AllowedHosts) > 0 {
+		result.Network = "managed-proxy"
+	}
+	if err != nil {
+		result.ExitCode = 1
+		return result, err
+	}
+	return result, nil
+}
+
 func (k *KubernetesRuntime) Verify(ctx context.Context, run domain.Run) (map[string]any, error) {
 	if err := k.Ensure(ctx, run.ID); err != nil {
 		return nil, err

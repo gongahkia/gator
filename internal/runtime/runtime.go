@@ -80,9 +80,10 @@ type AgentBackend interface {
 }
 
 type SandboxRequest struct {
-	Command       []string
-	AllowedHosts  []string
-	ReadOnlyPaths []string
+	Image         string   `json:"image,omitempty"`
+	Command       []string `json:"command"`
+	AllowedHosts  []string `json:"allowed_hosts,omitempty"`
+	ReadOnlyPaths []string `json:"read_only_paths,omitempty"`
 }
 type SandboxResult struct {
 	Output     string `json:"output"`
@@ -212,17 +213,29 @@ func (w Workspace) RunSandbox(ctx context.Context, runID string, request Sandbox
 	if len(request.Command) == 0 {
 		return SandboxResult{}, fmt.Errorf("sandbox command is required")
 	}
-	if len(request.AllowedHosts) > 0 {
-		return SandboxResult{}, fmt.Errorf("Docker sandbox allowlisted egress requires a managed proxy")
-	}
 	p := policy.Normalized()
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(p.TimeoutS)*time.Second)
 	defer cancel()
 	started := time.Now()
-	args := []string{"run", "--rm", "--network", "none", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=128", "--memory", fmt.Sprintf("%dm", p.MemoryMiB), "--cpus", fmt.Sprintf("%.3f", float64(p.CPUMilli)/1000), "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "-v", w.Volume(runID) + ":/workspace:ro", "-w", "/workspace", p.Image}
+	network := "none"
+	args := []string{"run", "--rm", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=128", "--memory", fmt.Sprintf("%dm", p.MemoryMiB), "--cpus", fmt.Sprintf("%.3f", float64(p.CPUMilli)/1000), "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "--tmpfs", "/scratch:rw,noexec,nosuid,size=64m", "-v", w.Volume(runID) + ":/workspace:ro", "-w", "/workspace"}
+	if len(request.AllowedHosts) > 0 {
+		if p.EgressProxyURL == "" || p.EgressProxySecret == "" {
+			return SandboxResult{}, fmt.Errorf("sandbox egress requires configured managed proxy")
+		}
+		network = "bridge"
+		args = append(args, "--network", network, "-e", "HTTPS_PROXY="+p.EgressProxyURL, "-e", "HTTP_PROXY="+p.EgressProxyURL, "-e", "NO_PROXY=", "-e", "NORBOT_EGRESS_TOKEN="+os.Getenv(p.EgressProxySecret))
+	} else {
+		args = append(args, "--network", "none")
+	}
+	image := p.Image
+	if request.Image != "" {
+		image = request.Image
+	}
+	args = append(args, image)
 	args = append(args, request.Command...)
 	out, err := w.Runner.Run(ctx, w.DockerBin, args...)
-	result := SandboxResult{Output: string(out), DurationMS: time.Since(started).Milliseconds(), Network: "none"}
+	result := SandboxResult{Output: string(out), DurationMS: time.Since(started).Milliseconds(), Network: network}
 	if err != nil {
 		return result, err
 	}

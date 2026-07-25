@@ -63,13 +63,15 @@ type Sandbox struct {
 }
 
 type OIDC struct {
-	Issuer       string   `json:"issuer"`
-	Audience     string   `json:"audience"`
-	GroupsClaim  string   `json:"groups_claim"`
+	Issuer         string   `json:"issuer"`
+	Audience       string   `json:"audience"`
+	GroupsClaim    string   `json:"groups_claim"`
 	OperatorGroups []string `json:"operator_groups"`
 }
 
-type Security struct { OIDC OIDC `json:"oidc"` }
+type Security struct {
+	OIDC OIDC `json:"oidc"`
+}
 
 type ArtifactStore struct {
 	Endpoint       string `json:"endpoint"`

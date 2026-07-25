@@ -325,26 +325,15 @@ func (s *Service) InvokeAgent(ctx context.Context, runID string, input runtime.A
 	if input.Role == "" {
 		input.Role = "operator"
 	}
-	if input.Provider.Kind == "" {
-		providerID := run.Providers[domain.StageBuilder]
-		providerConfig, ok := s.config.Manifest.Provider(providerID, domain.StageBuilder)
-		if !ok || (providerConfig.Kind != "openai_responses" && providerConfig.Kind != "openai_compatible" && providerConfig.Kind != "anthropic_messages" && providerConfig.Kind != "gemini_generate_content") {
-			return runtime.AgentResponse{}, fmt.Errorf("agentic application requires an HTTP model provider")
-		}
-		input.Provider = runtime.AgentProvider{Kind: providerConfig.Kind, BaseURL: providerConfig.BaseURL, Model: providerConfig.Model, CredentialEnv: providerConfig.CredentialEnv}
+	providerID := run.Providers[domain.StageBuilder]
+	providerConfig, ok := s.config.Manifest.Provider(providerID, domain.StageBuilder)
+	if !ok || (providerConfig.Kind != "openai_responses" && providerConfig.Kind != "openai_compatible" && providerConfig.Kind != "anthropic_messages" && providerConfig.Kind != "gemini_generate_content") {
+		return runtime.AgentResponse{}, fmt.Errorf("agentic application requires an HTTP model provider")
 	}
 	if _, err := s.store.GetDeployment(ctx, runID); err != nil {
 		return runtime.AgentResponse{}, err
 	}
-	workspace, backend, err := s.backendForRun(ctx, run)
-	if err != nil {
-		return runtime.AgentResponse{}, err
-	}
-	invoker, ok := backend.(runtime.AgentBackend)
-	if !ok {
-		return runtime.AgentResponse{}, fmt.Errorf("runtime does not support private agent invocation")
-	}
-	return invoker.InvokeAgent(ctx, run, workspace.RunPath(runID), input)
+	return s.invokeCentralAgent(ctx, run, input)
 }
 
 func (s *Service) RunSandbox(ctx context.Context, runID string, request runtime.SandboxRequest) (runtime.SandboxResult, error) {
@@ -352,15 +341,7 @@ func (s *Service) RunSandbox(ctx context.Context, runID string, request runtime.
 	if err != nil {
 		return runtime.SandboxResult{}, err
 	}
-	workspace, _, err := s.backendForRun(ctx, run)
-	if err != nil {
-		return runtime.SandboxResult{}, err
-	}
-	executor, ok := workspace.(runtime.SandboxBackend)
-	if !ok {
-		return runtime.SandboxResult{}, fmt.Errorf("runtime sandbox is unavailable for %s", run.DeploymentTarget)
-	}
-	return executor.RunSandbox(ctx, runID, request, s.config.Manifest.Runtime.Sandbox)
+	return s.runSandbox(ctx, run, request)
 }
 
 func (s *Service) StartDeployment(ctx context.Context, runID string) (DeploymentInfo, error) {

@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -29,6 +31,9 @@ import (
 
 type Invoker interface {
 	InvokeAgent(context.Context, string, runtime.AgentInvocation) (runtime.AgentResponse, error)
+}
+type ActionInvoker interface {
+	DecideAgentAction(context.Context, string, string, string) (runtime.AgentResponse, domain.AgentAction, error)
 }
 
 type Service struct {
@@ -364,7 +369,8 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 	}
 	if response.Final != "" {
 		_ = s.store.UpdateSessionSummary(ctx, session.ID, trimSummary(session.Summary+"\nuser: "+value.Text+"\nassistant: "+response.Final))
-		_, _, err = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ReplyID, Direction: "outbound", IdempotencyKey: "out:" + message.PlatformID, Text: response.Final, Attachments: routeAttachment(value), State: "pending"})
+		attachments := append(routeAttachment(value), responseArtifacts(response)...)
+		_, _, err = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ReplyID, Direction: "outbound", IdempotencyKey: "out:" + message.PlatformID, Text: response.Final, Attachments: attachments, State: "pending"})
 		return err
 	}
 	return nil
@@ -536,12 +542,53 @@ func (s *Service) flush(ctx context.Context) error {
 			continue
 		}
 		if err = s.deliver(ctx, account, message); err != nil {
+			if retryableDelivery(err) && message.Attempts < 7 {
+				_ = s.store.RetryChannelMessage(ctx, message.ID, err.Error(), time.Now().UTC().Add(deliveryBackoff(message.Attempts+1)))
+				continue
+			}
 			_ = s.store.CompleteChannelMessage(ctx, message.ID, "failed", err.Error())
 			continue
 		}
 		_ = s.store.CompleteChannelMessage(ctx, message.ID, "delivered", "")
 	}
 	return nil
+}
+
+func (s *Service) DecideAgentAction(ctx context.Context, id, decision, operator string) (runtime.AgentResponse, domain.AgentAction, error) {
+	invoker, ok := s.invoke.(ActionInvoker)
+	if !ok {
+		return runtime.AgentResponse{}, domain.AgentAction{}, fmt.Errorf("agent action runtime is unavailable")
+	}
+	response, action, err := invoker.DecideAgentAction(ctx, id, decision, operator)
+	if err != nil {
+		return response, action, err
+	}
+	if response.Final == "" {
+		return response, action, nil
+	}
+	turn, err := s.store.AgentTurn(ctx, action.TurnID)
+	if err != nil {
+		return response, action, err
+	}
+	session, err := s.store.ChannelSessionByID(ctx, turn.SessionID)
+	if err != nil {
+		return response, action, err
+	}
+	account, err := s.store.ChannelAccount(ctx, session.AccountID)
+	if err != nil {
+		return response, action, err
+	}
+	_ = s.store.UpdateSessionSummary(ctx, session.ID, trimSummary(session.Summary+"\nassistant: "+response.Final))
+	_, _, err = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: session.ExternalID, Direction: "outbound", IdempotencyKey: "resume:" + action.ID, Text: response.Final, Attachments: responseArtifacts(response), State: "pending"})
+	return response, action, err
+}
+
+func responseArtifacts(response runtime.AgentResponse) []map[string]any {
+	if response.Diagnostics == nil {
+		return nil
+	}
+	values, _ := response.Diagnostics["artifacts"].([]map[string]any)
+	return values
 }
 func (s *Service) deliver(ctx context.Context, account domain.ChannelAccount, message domain.ChannelMessage) error {
 	switch account.Adapter {
@@ -562,20 +609,44 @@ func (s *Service) telegramSend(ctx context.Context, account domain.ChannelAccoun
 	if token == "" {
 		return fmt.Errorf("telegram bot_token secret ref is unset")
 	}
-	return s.postJSON(ctx, "https://api.telegram.org/bot"+token+"/sendMessage", nil, map[string]any{"chat_id": message.ExternalID, "text": message.Text})
+	if message.Text != "" {
+		if err := s.postJSON(ctx, "https://api.telegram.org/bot"+token+"/sendMessage", nil, map[string]any{"chat_id": message.ExternalID, "text": message.Text}); err != nil {
+			return err
+		}
+	}
+	for _, file := range outboundFiles(message.Attachments) {
+		method, field := "sendDocument", "document"
+		if strings.HasPrefix(file.ContentType, "image/") {
+			method, field = "sendPhoto", "photo"
+		}
+		if err := s.telegramFile(ctx, "https://api.telegram.org/bot"+token+"/"+method, message.ExternalID, field, file); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (s *Service) slackSend(ctx context.Context, account domain.ChannelAccount, message domain.ChannelMessage) error {
 	token := s.secret(account, "bot_token")
 	if token == "" {
 		return fmt.Errorf("slack bot_token secret ref is unset")
 	}
-	return s.postJSON(ctx, "https://slack.com/api/chat.postMessage", map[string]string{"Authorization": "Bearer " + token}, map[string]any{"channel": message.ExternalID, "text": message.Text})
+	files := outboundFiles(message.Attachments)
+	if len(files) == 0 {
+		return s.postJSON(ctx, "https://slack.com/api/chat.postMessage", map[string]string{"Authorization": "Bearer " + token}, map[string]any{"channel": message.ExternalID, "text": message.Text})
+	}
+	for index, file := range files {
+		if err := s.slackFile(ctx, token, message.ExternalID, ternary(index == 0, message.Text, ""), file); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (s *Service) discordSend(ctx context.Context, account domain.ChannelAccount, message domain.ChannelMessage) error {
 	route := route(message.Attachments)
+	files := outboundFiles(message.Attachments)
 	if token, ok := route["interaction_token"].(string); ok {
 		appID, _ := route["application_id"].(string)
-		return s.postJSON(ctx, "https://discord.com/api/v10/webhooks/"+appID+"/"+token, nil, map[string]any{"content": message.Text})
+		return s.discordPayload(ctx, "https://discord.com/api/v10/webhooks/"+appID+"/"+token, nil, message.Text, files)
 	}
 	bot := s.secret(account, "bot_token")
 	channelID := message.ExternalID
@@ -585,7 +656,7 @@ func (s *Service) discordSend(ctx context.Context, account domain.ChannelAccount
 	if bot == "" || channelID == "" {
 		return fmt.Errorf("discord reply route unavailable")
 	}
-	return s.postJSON(ctx, "https://discord.com/api/v10/channels/"+channelID+"/messages", map[string]string{"Authorization": "Bot " + bot}, map[string]any{"content": message.Text})
+	return s.discordPayload(ctx, "https://discord.com/api/v10/channels/"+channelID+"/messages", map[string]string{"Authorization": "Bot " + bot}, message.Text, files)
 }
 func (s *Service) whatsappSend(ctx context.Context, account domain.ChannelAccount, message domain.ChannelMessage) error {
 	token := s.secret(account, "access_token")
@@ -593,7 +664,17 @@ func (s *Service) whatsappSend(ctx context.Context, account domain.ChannelAccoun
 	if token == "" || phone == "" {
 		return fmt.Errorf("whatsapp access_token or phone_number_id unavailable")
 	}
-	return s.postJSON(ctx, "https://graph.facebook.com/v22.0/"+phone+"/messages", map[string]string{"Authorization": "Bearer " + token}, map[string]any{"messaging_product": "whatsapp", "to": message.ExternalID, "type": "text", "text": map[string]string{"body": message.Text}})
+	if message.Text != "" {
+		if err := s.postJSON(ctx, "https://graph.facebook.com/v22.0/"+phone+"/messages", map[string]string{"Authorization": "Bearer " + token}, map[string]any{"messaging_product": "whatsapp", "to": message.ExternalID, "type": "text", "text": map[string]string{"body": message.Text}}); err != nil {
+			return err
+		}
+	}
+	for _, file := range outboundFiles(message.Attachments) {
+		if err := s.whatsappFile(ctx, token, phone, message.ExternalID, file); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (s *Service) postJSON(ctx context.Context, url string, headers map[string]string, payload any) error {
 	body, err := json.Marshal(payload)
@@ -618,6 +699,277 @@ func (s *Service) postJSON(ctx context.Context, url string, headers map[string]s
 		return fmt.Errorf("channel API status %d: %s", response.StatusCode, strings.TrimSpace(string(raw)))
 	}
 	return nil
+}
+
+type outboundFile struct {
+	Path, Name, ContentType string
+	Size                    int64
+}
+
+func outboundFiles(values []map[string]any) []outboundFile {
+	files := []outboundFile{}
+	for _, value := range values {
+		path, _ := value["path"].(string)
+		if path == "" {
+			continue
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 10<<20 {
+			continue
+		}
+		name, _ := value["filename"].(string)
+		if name == "" {
+			name = filepath.Base(path)
+		}
+		contentType, _ := value["content_type"].(string)
+		if contentType == "" {
+			contentType = mime.TypeByExtension(filepath.Ext(name))
+		}
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		files = append(files, outboundFile{Path: path, Name: safeFileName(name), ContentType: contentType, Size: info.Size()})
+	}
+	return files
+}
+
+func (s *Service) telegramFile(ctx context.Context, url, chat, field string, file outboundFile) error {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	_ = writer.WriteField("chat_id", chat)
+	part, err := writer.CreateFormFile(field, file.Name)
+	if err != nil {
+		return err
+	}
+	source, err := os.Open(file.Path)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(part, source)
+	closeErr := source.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response, err := s.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return deliveryStatusError(response)
+	}
+	return nil
+}
+func (s *Service) slackFile(ctx context.Context, token, channel, comment string, file outboundFile) error {
+	headers := map[string]string{"Authorization": "Bearer " + token}
+	var offer struct {
+		OK        bool   `json:"ok"`
+		UploadURL string `json:"upload_url"`
+		FileID    string `json:"file_id"`
+		Error     string `json:"error"`
+	}
+	if err := s.postJSONDecode(ctx, "https://slack.com/api/files.getUploadURLExternal", headers, map[string]any{"filename": file.Name, "length": file.Size}, &offer); err != nil {
+		return err
+	}
+	if !offer.OK || offer.UploadURL == "" || offer.FileID == "" {
+		return fmt.Errorf("slack upload offer failed: %s", offer.Error)
+	}
+	source, err := os.Open(file.Path)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, offer.UploadURL, source)
+	if err != nil {
+		source.Close()
+		return err
+	}
+	request.Header.Set("Content-Type", file.ContentType)
+	response, err := s.http.Do(request)
+	source.Close()
+	if err != nil {
+		return err
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		defer response.Body.Close()
+		return deliveryStatusError(response)
+	}
+	response.Body.Close()
+	var done struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	err = s.postJSONDecode(ctx, "https://slack.com/api/files.completeUploadExternal", headers, map[string]any{"files": []map[string]string{{"id": offer.FileID, "title": file.Name}}, "channel_id": channel, "initial_comment": comment}, &done)
+	if err != nil {
+		return err
+	}
+	if !done.OK {
+		return fmt.Errorf("slack upload completion failed: %s", done.Error)
+	}
+	return nil
+}
+func (s *Service) discordPayload(ctx context.Context, url string, headers map[string]string, text string, files []outboundFile) error {
+	if len(files) == 0 {
+		return s.postJSON(ctx, url, headers, map[string]any{"content": text})
+	}
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	attachments := make([]map[string]any, 0, len(files))
+	for index, file := range files {
+		attachments = append(attachments, map[string]any{"id": index, "filename": file.Name})
+		part, err := writer.CreateFormFile(fmt.Sprintf("files[%d]", index), file.Name)
+		if err != nil {
+			return err
+		}
+		source, err := os.Open(file.Path)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(part, source)
+		closeErr := source.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	payload, _ := json.Marshal(map[string]any{"content": text, "attachments": attachments})
+	part, err := writer.CreateFormField("payload_json")
+	if err != nil {
+		return err
+	}
+	if _, err = part.Write(payload); err != nil {
+		return err
+	}
+	if err = writer.Close(); err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+	response, err := s.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return deliveryStatusError(response)
+	}
+	return nil
+}
+func (s *Service) whatsappFile(ctx context.Context, token, phone, to string, file outboundFile) error {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	_ = writer.WriteField("messaging_product", "whatsapp")
+	part, err := writer.CreateFormFile("file", file.Name)
+	if err != nil {
+		return err
+	}
+	source, err := os.Open(file.Path)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(part, source)
+	closeErr := source.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err = writer.Close(); err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://graph.facebook.com/v22.0/"+phone+"/media", body)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	request.Header.Set("Authorization", "Bearer "+token)
+	response, err := s.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return deliveryStatusError(response)
+	}
+	var upload struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&upload); err != nil {
+		return err
+	}
+	if upload.ID == "" {
+		return fmt.Errorf("whatsapp media response missing id")
+	}
+	kind := "document"
+	if strings.HasPrefix(file.ContentType, "image/") {
+		kind = "image"
+	}
+	return s.postJSON(ctx, "https://graph.facebook.com/v22.0/"+phone+"/messages", map[string]string{"Authorization": "Bearer " + token}, map[string]any{"messaging_product": "whatsapp", "to": to, "type": kind, kind: map[string]string{"id": upload.ID, "filename": file.Name}})
+}
+func (s *Service) postJSONDecode(ctx context.Context, url string, headers map[string]string, payload any, target any) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	for key, value := range headers {
+		request.Header.Set(key, value)
+	}
+	response, err := s.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return deliveryStatusError(response)
+	}
+	return json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(target)
+}
+func deliveryStatusError(response *http.Response) error {
+	raw, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	return fmt.Errorf("channel API status %d: %s", response.StatusCode, strings.TrimSpace(string(raw)))
+}
+func retryableDelivery(err error) bool {
+	value := err.Error()
+	return strings.Contains(value, "status 429") || strings.Contains(value, "status 500") || strings.Contains(value, "status 502") || strings.Contains(value, "status 503") || strings.Contains(value, "status 504")
+}
+func deliveryBackoff(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+	if attempt > 7 {
+		attempt = 7
+	}
+	return time.Duration(1<<(attempt-1)) * time.Second
+}
+func ternary(condition bool, yes, no string) string {
+	if condition {
+		return yes
+	}
+	return no
 }
 
 func (s *Service) secret(account domain.ChannelAccount, key string) string {

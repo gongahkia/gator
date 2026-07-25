@@ -32,7 +32,7 @@ func TestGenerateAgenticProfile(t *testing.T) {
 	if len(files) == 0 {
 		t.Fatal("no generated files")
 	}
-	if _, err := os.Stat(filepath.Join(root, "run-1", "generated-app", "backend", "harness.go")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, "run-1", "generated-app", "backend", "AGENT_RUNTIME.md")); err != nil {
 		t.Fatal(err)
 	}
 	command := exec.Command("go", "test", "./...")
@@ -68,18 +68,14 @@ func TestVerifierRunsDeterministicChecks(t *testing.T) {
 	}
 }
 
-func TestAgenticTemplateWritesEnforcedToolPolicy(t *testing.T) {
+func TestAgenticTemplateDoesNotShipToolExecutor(t *testing.T) {
 	root := t.TempDir()
 	policy := map[string]config.ToolPolicy{"http_get": {Enabled: true, Roles: []string{"researcher"}, AllowedHosts: []string{"api.example.test"}}}
 	if _, err := generateApp(runtime.Workspace{ArtifactsDir: root}, domain.Run{ID: "policy", Profile: domain.ProfileAgentic}, policy); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "policy", "generated-app", "backend", "tool_policy.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(data), "api.example.test") {
-		t.Fatalf("policy=%s", data)
+	if _, err := os.Stat(filepath.Join(root, "policy", "generated-app", "backend", "harness.go")); !os.IsNotExist(err) {
+		t.Fatalf("agent tool executor must not ship: %v", err)
 	}
 }
 

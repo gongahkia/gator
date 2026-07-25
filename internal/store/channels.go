@@ -114,8 +114,10 @@ func (s *Store) ResetSession(ctx context.Context, accountID, externalID string) 
 }
 func (s *Store) ChannelSessionByID(ctx context.Context, id string) (domain.ChannelSession, error) {
 	var value domain.ChannelSession
-	err := s.pool.QueryRow(ctx, `SELECT id,account_id,external_id,summary,expires_at,created_at,updated_at FROM channel_sessions WHERE id=$1`, id).Scan(&value.ID,&value.AccountID,&value.ExternalID,&value.Summary,&value.ExpiresAt,&value.CreatedAt,&value.UpdatedAt)
-	if errors.Is(err, pgx.ErrNoRows) { return domain.ChannelSession{}, ErrNotFound }
+	err := s.pool.QueryRow(ctx, `SELECT id,account_id,external_id,summary,expires_at,created_at,updated_at FROM channel_sessions WHERE id=$1`, id).Scan(&value.ID, &value.AccountID, &value.ExternalID, &value.Summary, &value.ExpiresAt, &value.CreatedAt, &value.UpdatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ChannelSession{}, ErrNotFound
+	}
 	return value, err
 }
 func (s *Store) ExpireSessions(ctx context.Context) (int, error) {
@@ -181,8 +183,14 @@ func (s *Store) CompleteChannelMessage(ctx context.Context, id int64, state, err
 	return nil
 }
 func (s *Store) RetryChannelMessage(ctx context.Context, id int64, errText string, retryAt time.Time) error {
-	result, err := s.pool.Exec(ctx, `UPDATE channel_messages SET attempts=attempts+1,error=$2,next_attempt_at=$3 WHERE id=$1 AND state='pending'`, id,errText,retryAt)
-	if err != nil { return err }; if result.RowsAffected()!=1{return ErrNotFound}; return nil
+	result, err := s.pool.Exec(ctx, `UPDATE channel_messages SET attempts=attempts+1,error=$2,next_attempt_at=$3 WHERE id=$1 AND state='pending'`, id, errText, retryAt)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
 }
 func (s *Store) ChannelMessages(ctx context.Context, accountID, externalID string) ([]domain.ChannelMessage, error) {
 	rows, err := s.pool.Query(ctx, `SELECT id,account_id,external_id,direction,platform_id,idempotency_key,text,attachments,state,error,created_at,delivered_at,attempts,next_attempt_at FROM channel_messages WHERE account_id=$1 AND external_id=$2 ORDER BY id`, accountID, externalID)

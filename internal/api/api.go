@@ -19,7 +19,6 @@ import (
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
-	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
 )
@@ -50,7 +49,9 @@ func NewWithComponents(service *engine.Service, st *store.Store, logger *slog.Lo
 }
 
 func (s *Server) WithOIDC(value config.OIDC) *Server {
-	if value.Issuer != "" { s.auth = auth.New(value) }
+	if value.Issuer != "" {
+		s.auth = auth.New(value)
+	}
 	return s
 }
 
@@ -83,7 +84,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
 	mux.HandleFunc("GET /api/runs/{id}/skills", s.runSkills)
-	mux.HandleFunc("POST /api/runs/{id}/sandbox", s.runSandbox)
+	mux.HandleFunc("GET /api/agent/actions", s.agentActions)
+	mux.HandleFunc("GET /api/agent/actions/{id}", s.agentAction)
+	mux.HandleFunc("POST /api/agent/actions/{id}/decision", s.agentActionDecision)
 	mux.HandleFunc("PUT /api/runs/{id}/graph", s.updateGraph)
 	mux.HandleFunc("POST /api/runs/{id}/approval", s.approve)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.cancel)
@@ -99,16 +102,24 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) requireOperator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.auth == nil || r.URL.Path == "/api/health" || strings.HasPrefix(r.URL.Path, "/api/channels/") && strings.HasSuffix(r.URL.Path, "/webhook") {
-			next.ServeHTTP(w, r); return
+			next.ServeHTTP(w, r)
+			return
 		}
 		value := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer"))
-		if value == "" || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") { writeError(w, http.StatusUnauthorized, fmt.Errorf("bearer token is required")); return }
+		if value == "" || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
+			writeError(w, http.StatusUnauthorized, fmt.Errorf("bearer token is required"))
+			return
+		}
 		principal, err := s.auth.Validate(r.Context(), value)
-		if err != nil { writeError(w, http.StatusForbidden, fmt.Errorf("operator authorization failed")); return }
+		if err != nil {
+			writeError(w, http.StatusForbidden, fmt.Errorf("operator authorization failed"))
+			return
+		}
 		r = r.WithContext(context.WithValue(r.Context(), operatorContextKey{}, principal.Subject))
 		next.ServeHTTP(w, r)
 	})
 }
+
 type operatorContextKey struct{}
 
 func (s *Server) skillImports(w http.ResponseWriter, r *http.Request) {
@@ -425,18 +436,53 @@ func (s *Server) runSkills(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, values)
 }
 
-func (s *Server) runSandbox(w http.ResponseWriter, r *http.Request) {
-	var input runtime.SandboxRequest
+func (s *Server) agentActions(w http.ResponseWriter, r *http.Request) {
+	values, err := s.service.PendingAgentActions(r.Context(), 100)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+func (s *Server) agentAction(w http.ResponseWriter, r *http.Request) {
+	value, err := s.service.AgentAction(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+func (s *Server) agentActionDecision(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Decision string `json:"decision"`
+	}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	result, err := s.service.RunSandbox(r.Context(), r.PathValue("id"), input)
+	operator, _ := r.Context().Value(operatorContextKey{}).(string)
+	if operator == "" {
+		operator = "local-operator"
+	}
+	if s.channels != nil {
+		response, action, err := s.channels.DecideAgentAction(r.Context(), r.PathValue("id"), input.Decision, operator)
+		if err != nil {
+			writeError(w, http.StatusUnprocessableEntity, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"action": action, "response": response})
+		return
+	}
+	response, action, err := s.service.DecideAgentAction(r.Context(), r.PathValue("id"), input.Decision, operator)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, map[string]any{"action": action, "response": response})
 }
 
 func (s *Server) updateGraph(w http.ResponseWriter, r *http.Request) {

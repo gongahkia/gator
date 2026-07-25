@@ -385,20 +385,20 @@ type AgentTurn struct {
 }
 
 type AgentAction struct {
-	ID          string         `json:"id"`
-	TurnID      string         `json:"turn_id"`
-	RunID       string         `json:"run_id"`
-	Tool        string         `json:"tool"`
-	Role        string         `json:"role"`
-	Params      map[string]any `json:"params"`
-	Digest      string         `json:"digest"`
-	State       string         `json:"state"`
-	Result      map[string]any `json:"result,omitempty"`
-	Error       string         `json:"error,omitempty"`
-	ApprovedBy  string         `json:"approved_by,omitempty"`
-	DecidedAt   *time.Time     `json:"decided_at,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID         string         `json:"id"`
+	TurnID     string         `json:"turn_id"`
+	RunID      string         `json:"run_id"`
+	Tool       string         `json:"tool"`
+	Role       string         `json:"role"`
+	Params     map[string]any `json:"params"`
+	Digest     string         `json:"digest"`
+	State      string         `json:"state"`
+	Result     map[string]any `json:"result,omitempty"`
+	Error      string         `json:"error,omitempty"`
+	ApprovedBy string         `json:"approved_by,omitempty"`
+	DecidedAt  *time.Time     `json:"decided_at,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 type ManagedArtifact struct {
