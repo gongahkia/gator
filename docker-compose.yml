@@ -36,16 +36,23 @@ services:
       NORBOT_DATABASE_URL: ${NORBOT_DATABASE_URL:-postgres://norbot:norbot@postgres:5432/norbot?sslmode=disable}
       NORBOT_HTTP_ADDR: ${NORBOT_HTTP_ADDR:-0.0.0.0:8080}
       NORBOT_ARTIFACTS_DIR: ${NORBOT_ARTIFACTS_DIR:-/var/lib/norbot/artifacts}
-      NORBOT_CONFIG: ${NORBOT_CONFIG:-/etc/norbot/config.json}
+      NORBOT_CONFIG: /etc/norbot/config.json
       NORBOT_OTEL_ENDPOINT: ${NORBOT_OTEL_ENDPOINT:-otel-collector:4318}
       NORBOT_WORKERS: ${NORBOT_WORKERS:-2}
       NORBOT_MAX_WORKERS: ${NORBOT_MAX_WORKERS:-4}
+      NORBOT_EGRESS_PROXY_SECRET: ${NORBOT_EGRESS_PROXY_SECRET:-}
+      NORBOT_S3_ACCESS_KEY: ${NORBOT_S3_ACCESS_KEY:-}
+      NORBOT_S3_SECRET_KEY: ${NORBOT_S3_SECRET_KEY:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./config.json:/etc/norbot/config.json:ro
+      - ${NORBOT_CONFIG_HOST:-./config.json}:/etc/norbot/config.json:ro
+      - ${NORBOT_KUBECONFIG_HOST:-./deploy/empty-kubeconfig}:/etc/norbot/kubeconfig:ro
       - norbot_artifacts:/var/lib/norbot/artifacts
     ports:
       - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8181:8181"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

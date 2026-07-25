@@ -13,6 +13,8 @@ docker compose exec norbot norbot tui --api http://127.0.0.1:8080
 
 `norbot init` creates a config interactively. It records a Docker or Kubernetes default; every run can override that default and permanently pins its selected backend.
 
+The example config disables remote artifact storage and managed sandbox HTTP writes by default, so the first Docker Compose boot needs only a provider key. Enable either deliberately after bootstrap.
+
 ## Reviews, skills, and health
 
 Builder responses are stored as immutable, digest-checked code/fix proposals. Code approval applies a proposal, deterministic test output becomes a second approval gate, and failed tests require an explicit `fix` action; `workflow.max_fixes` defaults to `2`. `GET /api/runs/{id}/revisions`, `/usage`, and `/skills` expose patch/report, reported-or-estimated token usage, and selected-skill provenance.
@@ -33,13 +35,25 @@ For Docker, set `NORBOT_PUBLIC_HTTPS_DOMAIN` and run `docker compose --profile p
 
 Kubernetes is additive; Docker Compose remains fully supported. Kubernetes runs use kubeconfig/client-go, a per-run PVC, isolated Jobs, Kaniko builds to an existing OCI registry Secret, temporary live verification, and retained application/PVC resources until deletion.
 
+For a local Kubernetes option, `kind` runs the cluster nodes as Docker containers on this Mac. It is not a replacement for Docker Compose: Docker Compose still runs the Norbot control plane, while `kind` runs the generated apps, verifier, sandbox Jobs, and egress proxy. The bootstrap creates an in-cluster OCI registry, namespace, ServiceAccount/RBAC, registry Secret, signed egress-proxy Deployment/Service, NetworkPolicies, a Compose-ready Kubernetes config, and a local 0600 proxy-secret file.
+
 ```sh
-norbot init --target kubernetes
-norbot kube secret-template > registry-pull.yaml # add registry credentials before applying
-norbot kube bootstrap
+brew install kind kubectl
+norbot kube local
+set -a; source .norbot/local-kubernetes.env; set +a
+NORBOT_CONFIG_HOST=config.local-kubernetes.json \
+NORBOT_KUBECONFIG_HOST="$HOME/.kube/config" docker compose up --build
 ```
 
-The operator must provide a kubeconfig with namespace creation access for bootstrap, then namespaced access only to Norbot resources. Set `runtime.kubernetes.registry_repository` and `registry_pull_secret`; optional ingress is disabled unless its class, base domain, and controller namespace are all configured. The generated workload defaults to one replica, ClusterIP service, restricted security context, and DNS/TCP-443 egress policy.
+`kind`’s default networking does not by itself prove NetworkPolicy enforcement. Local bootstrap leaves HTTPS sandbox tools fail-closed unless you explicitly rerun it with `--confirm-network-policy` after installing/confirming an enforcing CNI. `--confirm-network-policy` is operator attestation, not an automatic proof. Docker deployment and non-network sandbox tools remain available.
+
+For a remote cluster, use `norbot init --target kubernetes`, create the registry Secret, then `norbot kube bootstrap`. The operator needs namespace-creation access for bootstrap, then namespaced access only to Norbot resources. Set `runtime.kubernetes.registry_repository` and `registry_pull_secret`; optional ingress is disabled unless its class, base domain, and controller namespace are all configured.
+
+## Artifact storage and managed egress
+
+Set `artifacts.enabled` to `true` with an HTTPS S3 or S3-compatible endpoint, bucket, and environment-variable credential references to enable durable channel input/output and agent file artifacts. Norbot transfers objects with the AWS Go v2 S3 client, retains a digest and 30-day expiry record in Postgres, verifies downloads before upload, and removes the remote object before its metadata during expiry cleanup. The default remains local files only.
+
+For Docker HTTP-write tools, set `runtime.sandbox.egress_proxy_url` to `http://host.docker.internal:8181` and `egress_proxy_secret_env` to `NORBOT_EGRESS_PROXY_SECRET`; Compose publishes that loopback-only listener. Kubernetes uses a separate namespace-local proxy Deployment and Service. Sandboxes can connect only to DNS and that Service; the proxy checks the signed host allowlist, permits HTTPS/443 only, resolves and dials public IPs only, and is the sole workload with public HTTPS egress.
 
 For remote use, bind the API to loopback and run the TUI through SSH:
 

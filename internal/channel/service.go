@@ -24,6 +24,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/gongahkia/norbot/internal/artifact"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/store"
@@ -40,14 +41,19 @@ type Service struct {
 	store     *store.Store
 	invoke    Invoker
 	artifacts string
+	objects   artifact.Store
 	http      *http.Client
 	mu        sync.Mutex
 	gateways  map[string]context.CancelFunc
 	ctx       context.Context
 }
 
-func New(st *store.Store, invoke Invoker, artifactsDir string) *Service {
-	return &Service{store: st, invoke: invoke, artifacts: filepath.Join(artifactsDir, "channels"), http: &http.Client{Timeout: 30 * time.Second}, gateways: map[string]context.CancelFunc{}, ctx: context.Background()}
+func New(st *store.Store, invoke Invoker, artifactsDir string, objects ...artifact.Store) *Service {
+	var objectStore artifact.Store
+	if len(objects) > 0 {
+		objectStore = objects[0]
+	}
+	return &Service{store: st, invoke: invoke, artifacts: filepath.Join(artifactsDir, "channels"), objects: objectStore, http: &http.Client{Timeout: 30 * time.Second}, gateways: map[string]context.CancelFunc{}, ctx: context.Background()}
 }
 
 func (s *Service) CreateAccount(ctx context.Context, value domain.ChannelAccount) (domain.ChannelAccount, error) {
@@ -374,11 +380,13 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 	}
 	attachments, err := s.materializeAttachments(ctx, account, value.PlatformID, value.Attachments)
 	if err != nil {
+		s.releaseAttachments(ctx, attachments)
 		return err
 	}
 	value.Attachments = attachments
 	message, created, err := s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ExternalID, Direction: "inbound", PlatformID: value.PlatformID, IdempotencyKey: "in:" + value.PlatformID, Text: value.Text, Attachments: value.Attachments, State: "received"})
 	if err != nil || !created {
+		s.releaseAttachments(ctx, value.Attachments)
 		return err
 	}
 	session, err := s.store.Session(ctx, account.ID, value.ExternalID, value.ReplyID, randomID(), time.Now().UTC().Add(30*24*time.Hour))
@@ -404,19 +412,44 @@ func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, val
 	return nil
 }
 
+func (s *Service) releaseAttachments(ctx context.Context, attachments []map[string]any) {
+	for _, attachment := range attachments {
+		if path := stringValue(attachment, "managed_path"); path != "" {
+			_ = os.Remove(path)
+		}
+		id := stringValue(attachment, "artifact_id")
+		if id == "" || s.objects == nil {
+			continue
+		}
+		record, err := s.store.ManagedArtifact(ctx, id)
+		if err != nil {
+			continue
+		}
+		if s.objects.Delete(ctx, record.Key) == nil {
+			_ = s.store.DeleteManagedArtifact(ctx, record.ID)
+		}
+	}
+}
+
 func (s *Service) materializeAttachments(ctx context.Context, account domain.ChannelAccount, messageID string, attachments []map[string]any) ([]map[string]any, error) {
 	result := make([]map[string]any, 0, len(attachments))
+	completed := false
+	defer func() {
+		if !completed {
+			s.releaseAttachments(context.Background(), result)
+		}
+	}()
 	for index, attachment := range attachments {
 		value := make(map[string]any, len(attachment)+2)
 		for key, item := range attachment {
 			value[key] = item
 		}
+		result = append(result, value)
 		url, headers, err := s.attachmentURL(ctx, account, attachment)
 		if err != nil {
 			return nil, err
 		}
 		if url == "" {
-			result = append(result, value)
 			continue
 		}
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -467,8 +500,42 @@ func (s *Service) materializeAttachments(ctx context.Context, account domain.Cha
 		}
 		value["managed_path"] = path
 		value["bytes"] = written
-		result = append(result, value)
+		value["filename"] = name
+		contentType := response.Header.Get("Content-Type")
+		if mediaType, _, parseErr := mime.ParseMediaType(contentType); parseErr == nil {
+			contentType = mediaType
+		}
+		if contentType == "" {
+			contentType = mime.TypeByExtension(filepath.Ext(name))
+		}
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		value["content_type"] = contentType
+		if s.objects != nil {
+			content, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return nil, readErr
+			}
+			key, keyErr := artifact.Key("channel-input", account.ID, safeFileName(messageID), strconv.Itoa(index+1), name)
+			if keyErr != nil {
+				return nil, keyErr
+			}
+			object, putErr := s.objects.Put(ctx, artifact.Object{Key: key, ContentType: contentType}, content)
+			if putErr != nil {
+				return nil, putErr
+			}
+			record, createErr := s.store.CreateManagedArtifact(ctx, domain.ManagedArtifact{ID: randomID(), RunID: account.RunID, OwnerType: "channel_attachment", OwnerID: account.ID + ":" + messageID, Key: object.Key, Filename: name, ContentType: object.ContentType, Size: object.Size, Digest: object.Digest, ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour)})
+			if createErr != nil {
+				_ = s.objects.Delete(context.Background(), object.Key)
+				return nil, createErr
+			}
+			value["artifact_id"] = record.ID
+			value["object_key"] = record.Key
+			value["digest"] = record.Digest
+		}
 	}
+	completed = true
 	return result, nil
 }
 
@@ -553,6 +620,7 @@ func (s *Service) Start(ctx context.Context) {
 			case <-ticker.C:
 				_ = s.flush(ctx)
 				_, _ = s.store.ExpireSessions(ctx)
+				s.reapArtifacts(ctx)
 			}
 		}
 	}()
@@ -569,7 +637,14 @@ func (s *Service) flush(ctx context.Context) error {
 			_ = s.store.CompleteChannelMessage(ctx, message.ID, "failed", err.Error())
 			continue
 		}
-		if err = s.deliver(ctx, account, message); err != nil {
+		prepared, cleanup, prepareErr := s.materializeOutbound(ctx, account, message)
+		if prepareErr != nil {
+			_ = s.store.CompleteChannelMessage(ctx, message.ID, "failed", prepareErr.Error())
+			continue
+		}
+		err = s.deliver(ctx, account, prepared)
+		cleanup()
+		if err != nil {
 			if retryableDelivery(err) && message.Attempts < 7 {
 				_ = s.store.RetryChannelMessage(ctx, message.ID, err.Error(), time.Now().UTC().Add(deliveryBackoff(message.Attempts+1)))
 				continue
@@ -580,6 +655,90 @@ func (s *Service) flush(ctx context.Context) error {
 		_ = s.store.CompleteChannelMessage(ctx, message.ID, "delivered", "")
 	}
 	return nil
+}
+
+func (s *Service) materializeOutbound(ctx context.Context, account domain.ChannelAccount, message domain.ChannelMessage) (domain.ChannelMessage, func(), error) {
+	paths := []string{}
+	cleanup := func() {
+		for _, value := range paths {
+			_ = os.Remove(value)
+		}
+	}
+	for _, attachment := range message.Attachments {
+		id := stringValue(attachment, "artifact_id")
+		if id == "" {
+			continue
+		}
+		if s.objects == nil {
+			cleanup()
+			return message, cleanup, fmt.Errorf("managed artifact storage is unavailable")
+		}
+		record, err := s.store.ManagedArtifact(ctx, id)
+		if err != nil {
+			cleanup()
+			return message, cleanup, err
+		}
+		if record.RunID != account.RunID || !record.ExpiresAt.After(time.Now().UTC()) {
+			cleanup()
+			return message, cleanup, fmt.Errorf("managed artifact is unavailable")
+		}
+		reader, _, err := s.objects.Open(ctx, record.Key)
+		if err != nil {
+			cleanup()
+			return message, cleanup, err
+		}
+		data, readErr := io.ReadAll(io.LimitReader(reader, artifact.MaxObjectBytes+1))
+		closeErr := reader.Close()
+		if readErr != nil {
+			cleanup()
+			return message, cleanup, readErr
+		}
+		if closeErr != nil {
+			cleanup()
+			return message, cleanup, closeErr
+		}
+		if len(data) > artifact.MaxObjectBytes || runtime.ArtifactDigest(data) != record.Digest {
+			cleanup()
+			return message, cleanup, fmt.Errorf("managed artifact integrity check failed")
+		}
+		file, err := os.CreateTemp(s.artifacts, "outbound-*")
+		if err != nil {
+			cleanup()
+			return message, cleanup, err
+		}
+		path := file.Name()
+		if _, err = file.Write(data); err == nil {
+			err = file.Chmod(0o640)
+		}
+		if closeErr = file.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			_ = os.Remove(path)
+			cleanup()
+			return message, cleanup, err
+		}
+		attachment["path"] = path
+		attachment["filename"] = record.Filename
+		attachment["content_type"] = record.ContentType
+		paths = append(paths, path)
+	}
+	return message, cleanup, nil
+}
+
+func (s *Service) reapArtifacts(ctx context.Context) {
+	if s.objects == nil {
+		return
+	}
+	records, err := s.store.ExpiredManagedArtifacts(ctx, time.Now().UTC(), 100)
+	if err != nil {
+		return
+	}
+	for _, record := range records {
+		if s.objects.Delete(ctx, record.Key) == nil {
+			_ = s.store.DeleteManagedArtifact(ctx, record.ID)
+		}
+	}
 }
 
 func (s *Service) DecideAgentAction(ctx context.Context, id, decision, operator string) (runtime.AgentResponse, domain.AgentAction, error) {

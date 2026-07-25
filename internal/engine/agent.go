@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/norbot/internal/artifact"
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/provider"
@@ -40,6 +42,18 @@ func (s *Service) invokeCentralAgent(ctx context.Context, run domain.Run, input 
 	}
 	if input.IdempotencyKey == "" || input.SessionID == "" || input.ExternalID == "" {
 		return runtime.AgentResponse{}, fmt.Errorf("session_id, external_id, and idempotency_key are required")
+	}
+	workspace, _, err := s.backendForRun(ctx, run)
+	if err != nil {
+		return runtime.AgentResponse{}, err
+	}
+	attachments, err := s.stageAgentAttachments(ctx, workspace, run.ID, input.Attachments)
+	if err != nil {
+		return runtime.AgentResponse{}, err
+	}
+	if len(attachments) > 0 {
+		encoded, _ := json.Marshal(attachments)
+		input.Prompt += "\nMounted artifact paths: " + string(encoded)
 	}
 	turn, created, err := s.store.CreateAgentTurn(ctx, domain.AgentTurn{ID: mustID(), RunID: run.ID, SessionID: input.SessionID, ExternalID: input.ExternalID, Role: input.Role, IdempotencyKey: input.IdempotencyKey, Prompt: input.Prompt, History: []map[string]any{{"kind": "user", "content": input.Prompt}}, State: "running", ProviderID: providerID})
 	if err != nil {
@@ -264,12 +278,35 @@ func (s *Service) executeTool(ctx context.Context, run domain.Run, action domain
 		if !ok {
 			return nil, fmt.Errorf("file_write content must be a string")
 		}
+		if len(content) > artifact.MaxObjectBytes {
+			return nil, fmt.Errorf("file_write exceeds 10 MiB")
+		}
 		path := "agent-output/" + action.ID + "/" + action.Params["path"].(string)
 		written, err := workspace.WriteArtifact(run.ID, path, []byte(content))
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"path": written, "size": len(content)}, nil
+		result := map[string]any{"path": written, "size": len(content), "filename": filepath.Base(path), "content_type": contentType(path)}
+		if s.artifacts == nil {
+			return result, nil
+		}
+		key, err := artifact.Key("agent-output", run.ID, action.ID, filepath.Base(path))
+		if err != nil {
+			return nil, err
+		}
+		object, err := s.artifacts.Put(ctx, artifact.Object{Key: key, ContentType: contentType(path)}, []byte(content))
+		if err != nil {
+			return nil, err
+		}
+		record, err := s.store.CreateManagedArtifact(ctx, domain.ManagedArtifact{ID: mustID(), RunID: run.ID, OwnerType: "agent_action", OwnerID: action.ID, Key: object.Key, Filename: filepath.Base(path), ContentType: object.ContentType, Size: object.Size, Digest: object.Digest, ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour)})
+		if err != nil {
+			_ = s.artifacts.Delete(context.Background(), object.Key)
+			return nil, err
+		}
+		result["artifact_id"] = record.ID
+		result["object_key"] = record.Key
+		result["digest"] = record.Digest
+		return result, nil
 	case "http_get":
 		return agentHTTP(ctx, action.Params)
 	case "http_write":
@@ -382,7 +419,13 @@ func turnResponse(turn domain.AgentTurn) runtime.AgentResponse {
 		outcome, _ := event["outcome"].(map[string]any)
 		path, _ := outcome["path"].(string)
 		if path != "" {
-			artifacts = append(artifacts, map[string]any{"path": path, "filename": filepath.Base(path)})
+			value := map[string]any{"path": path, "filename": filepath.Base(path)}
+			for _, key := range []string{"artifact_id", "object_key", "content_type", "size", "digest"} {
+				if item, ok := outcome[key]; ok {
+					value[key] = item
+				}
+			}
+			artifacts = append(artifacts, value)
 		}
 	}
 	diagnostics := map[string]any{}
@@ -390,6 +433,82 @@ func turnResponse(turn domain.AgentTurn) runtime.AgentResponse {
 		diagnostics["artifacts"] = artifacts
 	}
 	return runtime.AgentResponse{Final: turn.Final, State: turn.State, Status: turn.State, Summary: turn.Final, Diagnostics: diagnostics}
+}
+
+func (s *Service) stageAgentAttachments(ctx context.Context, workspace runtime.WorkspaceBackend, runID string, input []map[string]any) ([]map[string]any, error) {
+	if len(input) == 0 {
+		return nil, nil
+	}
+	if err := workspace.Ensure(ctx, runID); err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, 0, len(input))
+	for index, attachment := range input {
+		value := make(map[string]any, len(attachment)+1)
+		for key, item := range attachment {
+			value[key] = item
+		}
+		name := filepath.Base(stringValue(attachment, "filename"))
+		if name == "." || name == "" {
+			name = filepath.Base(stringValue(attachment, "name"))
+		}
+		if name == "." || name == "" || !safeAgentPath(name) {
+			continue
+		}
+		var content []byte
+		if local := stringValue(attachment, "managed_path"); local != "" {
+			var err error
+			content, err = os.ReadFile(local)
+			if err != nil {
+				return nil, err
+			}
+		} else if id := stringValue(attachment, "artifact_id"); id != "" {
+			if s.artifacts == nil {
+				return nil, fmt.Errorf("managed artifact storage is unavailable")
+			}
+			record, err := s.store.ManagedArtifact(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if !record.ExpiresAt.After(time.Now().UTC()) {
+				return nil, fmt.Errorf("managed artifact %q has expired", id)
+			}
+			reader, _, err := s.artifacts.Open(ctx, record.Key)
+			if err != nil {
+				return nil, err
+			}
+			content, err = io.ReadAll(io.LimitReader(reader, artifact.MaxObjectBytes+1))
+			closeErr := reader.Close()
+			if err != nil {
+				return nil, err
+			}
+			if closeErr != nil {
+				return nil, closeErr
+			}
+		} else {
+			continue
+		}
+		if len(content) > artifact.MaxObjectBytes {
+			return nil, fmt.Errorf("managed artifact exceeds 10 MiB")
+		}
+		relative := fmt.Sprintf("agent-input/%d-%s", index+1, name)
+		if _, err := workspace.WriteArtifact(runID, relative, content); err != nil {
+			return nil, err
+		}
+		if err := workspace.MirrorToVolume(ctx, runID, relative); err != nil {
+			return nil, err
+		}
+		value["workspace_path"] = relative
+		result = append(result, value)
+	}
+	return result, nil
+}
+
+func contentType(name string) string {
+	if value := mime.TypeByExtension(filepath.Ext(name)); value != "" {
+		return value
+	}
+	return "application/octet-stream"
 }
 func mustID() string {
 	value, err := newID()

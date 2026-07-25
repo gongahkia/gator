@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/gongahkia/norbot/internal/artifact"
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/extension"
@@ -63,13 +64,18 @@ type Service struct {
 	extensions       *extension.Registry
 	log              *slog.Logger
 	metrics          *telemetry.Metrics
+	artifacts        artifact.Store
 }
 
 func New(st *store.Store, cfg config.Config, logger *slog.Logger) *Service {
-	return NewWithExtensions(st, cfg, logger, extension.NewRegistry())
+	return NewWithExtensionsAndArtifacts(st, cfg, logger, extension.NewRegistry(), nil)
 }
 
 func NewWithExtensions(st *store.Store, cfg config.Config, logger *slog.Logger, extensions *extension.Registry) *Service {
+	return NewWithExtensionsAndArtifacts(st, cfg, logger, extensions, nil)
+}
+
+func NewWithExtensionsAndArtifacts(st *store.Store, cfg config.Config, logger *slog.Logger, extensions *extension.Registry, artifacts artifact.Store) *Service {
 	workspace := runtime.Workspace{DockerBin: cfg.DockerBin, ArtifactsDir: cfg.ArtifactsDir, Runner: runtime.OSRunner{}}
 	if extensions == nil {
 		extensions = extension.NewRegistry()
@@ -77,7 +83,7 @@ func NewWithExtensions(st *store.Store, cfg config.Config, logger *slog.Logger, 
 	return &Service{
 		store: st, config: cfg, dockerWorkspace: workspace,
 		dockerDeployment: runtime.Deployment{DockerBin: cfg.DockerBin, Runner: runtime.OSRunner{}},
-		extensions:       extensions, log: logger, metrics: telemetry.NewMetrics(),
+		extensions:       extensions, log: logger, metrics: telemetry.NewMetrics(), artifacts: artifacts,
 	}
 }
 

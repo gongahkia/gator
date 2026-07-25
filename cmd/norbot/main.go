@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,12 +15,15 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gongahkia/norbot/internal/api"
+	"github.com/gongahkia/norbot/internal/artifact"
 	"github.com/gongahkia/norbot/internal/channel"
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
@@ -52,12 +57,39 @@ func main() {
 		healthCommand(os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "egress-proxy" {
+		egressProxyCommand(os.Args[2:])
+		return
+	}
 	if len(os.Args) > 2 && os.Args[1] == "live-e2e" && os.Args[2] == "inbound" {
 		liveInboundCommand(os.Args[3:])
 		return
 	}
-	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap | norbot serve | norbot health [--json] | norbot live-e2e inbound | norbot tui --api http://127.0.0.1:8080")
+	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template | norbot serve | norbot egress-proxy | norbot health [--json] | norbot live-e2e inbound | norbot tui --api http://127.0.0.1:8080")
 	os.Exit(2)
+}
+
+func egressProxyCommand(args []string) {
+	flags := flag.NewFlagSet("egress-proxy", flag.ExitOnError)
+	address := flags.String("addr", envOr("NORBOT_EGRESS_PROXY_ADDR", ":8181"), "listen address")
+	_ = flags.Parse(args)
+	secret := strings.TrimSpace(os.Getenv("NORBOT_EGRESS_PROXY_SECRET"))
+	server, err := egress.Serve(*address, secret)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func envOr(key, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func liveInboundCommand(args []string) {
@@ -197,8 +229,12 @@ func initCommand(args []string) {
 
 func kubeCommand(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube secret-template")
+		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube local | norbot kube secret-template")
 		os.Exit(2)
+	}
+	if args[0] == "local" {
+		kubeLocalCommand(args[1:])
+		return
 	}
 	flags := flag.NewFlagSet("kube "+args[0], flag.ExitOnError)
 	_ = flags.Parse(args[1:])
@@ -219,7 +255,7 @@ func kubeCommand(args []string) {
 		fmt.Print(runtime.RegistrySecretTemplate(cfg.Manifest.Runtime.Kubernetes.RegistryPullSecret))
 		return
 	default:
-		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube secret-template")
+		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube local | norbot kube secret-template")
 		os.Exit(2)
 	}
 	if err != nil {
@@ -227,6 +263,191 @@ func kubeCommand(args []string) {
 		os.Exit(1)
 	}
 	fmt.Println("kubernetes bootstrap complete")
+}
+
+func kubeLocalCommand(args []string) {
+	flags := flag.NewFlagSet("kube local", flag.ExitOnError)
+	name := flags.String("name", "norbot-local", "kind cluster name")
+	namespace := flags.String("namespace", "norbot", "Norbot namespace")
+	registryPort := flags.Int("registry-port", 5001, "host port for the local OCI registry")
+	configPath := flags.String("config", "config.local-kubernetes.json", "local Kubernetes config output")
+	envPath := flags.String("env", ".norbot/local-kubernetes.env", "local secret environment file")
+	confirmPolicy := flags.Bool("confirm-network-policy", false, "confirm the installed CNI enforces NetworkPolicy")
+	force := flags.Bool("force", false, "overwrite generated local config and environment files")
+	_ = flags.Parse(args)
+	if !validKubeLocalName(*name) || !validKubeLocalName(*namespace) || *registryPort < 1024 || *registryPort > 65535 {
+		fmt.Fprintln(os.Stderr, "name/namespace must be lowercase DNS labels and registry-port must be 1024..65535")
+		os.Exit(2)
+	}
+	if _, err := os.Stat("Dockerfile"); err != nil {
+		fmt.Fprintln(os.Stderr, "run norbot kube local from the Norbot repository root:", err)
+		os.Exit(1)
+	}
+	for _, binary := range []string{"docker", "kind", "kubectl"} {
+		if _, err := exec.LookPath(binary); err != nil {
+			fmt.Fprintf(os.Stderr, "local Kubernetes requires %s in PATH\n", binary)
+			os.Exit(1)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if _, err := localCommand(ctx, "", "docker", "info"); err != nil {
+		fmt.Fprintln(os.Stderr, "Docker daemon is unavailable:", err)
+		os.Exit(1)
+	}
+	clusters, err := localCommand(ctx, "", "kind", "get", "clusters")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if !linePresent(clusters, *name) {
+		if _, err := localCommand(ctx, "", "kind", "create", "cluster", "--name", *name); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	if err := ensureLocalRegistry(ctx, *registryPort); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	contextName := "kind-" + *name
+	registryConfig := "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: local-registry-hosting\n  namespace: kube-public\ndata:\n  localRegistryHosting.v1: |\n    host: \"kind-registry:5000\"\n    help: \"https://kind.sigs.k8s.io/docs/user/local-registry/\"\n"
+	if _, err := localCommandInput(ctx, "", registryConfig, "kubectl", "--context", contextName, "apply", "-f", "-"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	secret, err := localEgressSecret(*envPath, *force)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	resources := "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: " + *namespace + "\n---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: registry-pull\n  namespace: " + *namespace + "\ntype: kubernetes.io/dockerconfigjson\nstringData:\n  .dockerconfigjson: '{\"auths\":{}}'\n---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: norbot-egress-proxy\n  namespace: " + *namespace + "\ntype: Opaque\nstringData:\n  secret: \"" + secret + "\"\n"
+	if _, err := localCommandInput(ctx, "", resources, "kubectl", "--context", contextName, "apply", "-f", "-"); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	proxyHostImage := fmt.Sprintf("localhost:%d/norbot-egress-proxy:local", *registryPort)
+	if _, err := localCommand(ctx, ".", "docker", "build", "-t", proxyHostImage, "."); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if _, err := localCommand(ctx, "", "docker", "push", proxyHostImage); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	hostKubeconfig := filepath.Join(userHome, ".kube", "config")
+	if paths := filepath.SplitList(strings.TrimSpace(os.Getenv("KUBECONFIG"))); len(paths) > 0 && paths[0] != "" {
+		hostKubeconfig = paths[0]
+	}
+	kube := config.Kubernetes{Kubeconfig: "/etc/norbot/kubeconfig", Context: contextName, Namespace: *namespace, ServiceAccount: "norbot-runtime", RegistryRepository: "kind-registry:5000/norbot", RegistryPullSecret: "registry-pull", RegistryInsecure: true, EgressProxyImage: "kind-registry:5000/norbot-egress-proxy:local", EgressProxySecret: "norbot-egress-proxy", EgressProxySecretKey: "secret", EgressProxyPort: 8181, NetworkPolicyEnforced: *confirmPolicy}
+	manifest := config.InitialManifest(domain.DeploymentKubernetes, kube)
+	manifest.Runtime.Sandbox = config.Sandbox{Image: "alpine:3.21", CPUMilli: 500, MemoryMiB: 512, TimeoutS: 60, EgressProxyURL: "http://norbot-egress-proxy." + *namespace + ".svc.cluster.local:8181", EgressProxySecret: "NORBOT_EGRESS_PROXY_SECRET"}
+	if err := config.WriteManifest(*configPath, manifest, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	bootstrapKube := kube
+	bootstrapKube.Kubeconfig = hostKubeconfig
+	kubeRuntime, err := runtime.NewKubernetesRuntime(bootstrapKube, ".norbot/artifacts")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := kubeRuntime.Bootstrap(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("local Kubernetes bootstrap complete")
+	fmt.Println("start Norbot with: set -a; source " + *envPath + "; set +a; NORBOT_CONFIG_HOST=" + *configPath + " NORBOT_KUBECONFIG_HOST=" + hostKubeconfig + " docker compose up --build")
+	if !*confirmPolicy {
+		fmt.Println("HTTPS sandbox tools are fail-closed until a NetworkPolicy-enforcing CNI is installed and you rerun with --confirm-network-policy.")
+	}
+}
+
+func ensureLocalRegistry(ctx context.Context, port int) error {
+	if _, err := localCommand(ctx, "", "docker", "inspect", "kind-registry"); err != nil {
+		if _, err := localCommand(ctx, "", "docker", "run", "-d", "--restart=always", "-p", fmt.Sprintf("127.0.0.1:%d:5000", port), "--network", "bridge", "--name", "kind-registry", "registry:3"); err != nil {
+			return err
+		}
+	}
+	if _, err := localCommand(ctx, "", "docker", "network", "connect", "kind", "kind-registry"); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return err
+	}
+	return nil
+}
+
+func localEgressSecret(path string, force bool) (string, error) {
+	if data, err := os.ReadFile(path); err == nil {
+		if !force {
+			for _, line := range strings.Split(string(data), "\n") {
+				if value, ok := strings.CutPrefix(line, "NORBOT_EGRESS_PROXY_SECRET="); ok && strings.TrimSpace(value) != "" {
+					return strings.TrimSpace(value), nil
+				}
+			}
+			return "", fmt.Errorf("local secret file has no NORBOT_EGRESS_PROXY_SECRET")
+		}
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	secret := hex.EncodeToString(bytes)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte("NORBOT_EGRESS_PROXY_SECRET="+secret+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	return secret, nil
+}
+
+func localCommand(ctx context.Context, dir, command string, args ...string) (string, error) {
+	process := exec.CommandContext(ctx, command, args...)
+	process.Dir = dir
+	output, err := process.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s %s: %w: %s", command, strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return string(output), nil
+}
+
+func localCommandInput(ctx context.Context, dir, input, command string, args ...string) (string, error) {
+	process := exec.CommandContext(ctx, command, args...)
+	process.Dir = dir
+	process.Stdin = strings.NewReader(input)
+	output, err := process.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("%s %s: %w: %s", command, strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return string(output), nil
+}
+
+func linePresent(output, target string) bool {
+	for _, line := range strings.Split(output, "\n") {
+		if strings.TrimSpace(line) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func validKubeLocalName(value string) bool {
+	if value == "" || len(value) > 63 || value[0] == '-' || value[len(value)-1] == '-' {
+		return false
+	}
+	for _, char := range value {
+		if !(char >= 'a' && char <= 'z') && !(char >= '0' && char <= '9') && char != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func prompt(reader *bufio.Reader, label, fallback string) string {
@@ -297,7 +518,12 @@ func serveCommand(args []string) {
 		logger.Error("migrate database", "error", err)
 		os.Exit(1)
 	}
-	service := engine.NewWithExtensions(st, cfg, logger, extensions)
+	objects, err := artifact.New(cfg.Manifest.Artifacts)
+	if err != nil {
+		logger.Error("configure artifact storage", "error", err)
+		os.Exit(1)
+	}
+	service := engine.NewWithExtensionsAndArtifacts(st, cfg, logger, extensions, objects)
 	service.StartWorkers(ctx)
 	var proxy *http.Server
 	if cfg.Manifest.Runtime.Sandbox.EgressProxyURL != "" {
@@ -323,7 +549,7 @@ func serveCommand(args []string) {
 		}()
 	}
 	skills := skill.New(st, cfg.ArtifactsDir)
-	channels := channel.New(st, service, cfg.ArtifactsDir)
+	channels := channel.New(st, service, cfg.ArtifactsDir, objects)
 	channels.Start(ctx)
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.NewWithComponents(service, st, logger, skills, channels).WithOIDC(cfg.Manifest.Security.OIDC).Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {

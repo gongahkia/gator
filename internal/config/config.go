@@ -74,6 +74,7 @@ type Security struct {
 }
 
 type ArtifactStore struct {
+	Enabled        bool   `json:"enabled"`
 	Endpoint       string `json:"endpoint"`
 	Region         string `json:"region"`
 	Bucket         string `json:"bucket"`
@@ -93,6 +94,7 @@ type Kubernetes struct {
 	ServiceAccount             string `json:"service_account"`
 	RegistryRepository         string `json:"registry_repository"`
 	RegistryPullSecret         string `json:"registry_pull_secret"`
+	RegistryInsecure           bool   `json:"registry_insecure"`
 	IngressClass               string `json:"ingress_class"`
 	IngressBaseDomain          string `json:"ingress_base_domain"`
 	IngressControllerNamespace string `json:"ingress_controller_namespace"`
@@ -102,6 +104,11 @@ type Kubernetes struct {
 	CPUMilli                   int64  `json:"cpu_milli"`
 	MemoryMiB                  int64  `json:"memory_mib"`
 	Replicas                   int32  `json:"replicas"`
+	EgressProxyImage           string `json:"egress_proxy_image"`
+	EgressProxySecret          string `json:"egress_proxy_secret"`
+	EgressProxySecretKey       string `json:"egress_proxy_secret_key"`
+	EgressProxyPort            int32  `json:"egress_proxy_port"`
+	NetworkPolicyEnforced      bool   `json:"network_policy_enforced"`
 }
 
 type Manifest struct {
@@ -243,7 +250,7 @@ func (m Manifest) ValidateSecurity() error {
 
 func (m Manifest) ValidateArtifacts() error {
 	a := m.Artifacts
-	if a.Endpoint == "" && a.Bucket == "" && a.AccessKeyEnv == "" && a.SecretKeyEnv == "" {
+	if !a.Enabled {
 		return nil
 	}
 	if a.Endpoint == "" || a.Bucket == "" || a.AccessKeyEnv == "" || a.SecretKeyEnv == "" {
@@ -273,6 +280,7 @@ func (m Manifest) ValidateRuntime() error {
 		return nil
 	}
 	k := m.Runtime.Kubernetes
+	s := m.Runtime.Sandbox
 	if k.Kubeconfig == "" || k.Namespace == "" || k.ServiceAccount == "" || k.RegistryRepository == "" || k.RegistryPullSecret == "" {
 		return fmt.Errorf("kubernetes runtime needs kubeconfig, namespace, service_account, registry_repository, and registry_pull_secret")
 	}
@@ -281,6 +289,15 @@ func (m Manifest) ValidateRuntime() error {
 	}
 	if k.CPUMilli < 0 || k.MemoryMiB < 0 || k.Replicas < 0 {
 		return fmt.Errorf("kubernetes resources cannot be negative")
+	}
+	proxyConfigured := k.EgressProxyImage != "" || k.EgressProxySecret != "" || k.EgressProxySecretKey != "" || k.EgressProxyPort != 0
+	if proxyConfigured {
+		if s.EgressProxyURL == "" || s.EgressProxySecret == "" || k.EgressProxyImage == "" || k.EgressProxySecret == "" || k.EgressProxySecretKey == "" {
+			return fmt.Errorf("kubernetes egress proxy needs sandbox proxy configuration, image, secret, and secret key")
+		}
+		if k.EgressProxyPort < 0 || k.EgressProxyPort > 65535 {
+			return fmt.Errorf("kubernetes egress proxy port is invalid")
+		}
 	}
 	return nil
 }
@@ -326,6 +343,9 @@ func (k Kubernetes) Normalized() Kubernetes {
 	}
 	if k.Replicas == 0 {
 		k.Replicas = 1
+	}
+	if k.EgressProxyPort == 0 {
+		k.EgressProxyPort = 8181
 	}
 	return k
 }

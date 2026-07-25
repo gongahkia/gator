@@ -76,6 +76,21 @@ func (k *KubernetesRuntime) Validate(ctx context.Context) error {
 	if _, err := k.client.CoreV1().Secrets(k.config.Namespace).Get(ctx, k.config.RegistryPullSecret, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("get registry pull secret %q: %w", k.config.RegistryPullSecret, err)
 	}
+	if k.config.EgressProxyImage != "" {
+		secret, err := k.client.CoreV1().Secrets(k.config.Namespace).Get(ctx, k.config.EgressProxySecret, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("get egress proxy secret %q: %w", k.config.EgressProxySecret, err)
+		}
+		if len(secret.Data[k.config.EgressProxySecretKey]) == 0 {
+			return fmt.Errorf("egress proxy secret %q has no %q key", k.config.EgressProxySecret, k.config.EgressProxySecretKey)
+		}
+		if _, err := k.client.CoreV1().Services(k.config.Namespace).Get(ctx, k.EgressProxyService(), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("get egress proxy service: %w", err)
+		}
+		if _, err := k.client.AppsV1().Deployments(k.config.Namespace).Get(ctx, k.EgressProxyService(), metav1.GetOptions{}); err != nil {
+			return fmt.Errorf("get egress proxy deployment: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -245,6 +260,7 @@ func (k *KubernetesRuntime) RunCLI(ctx context.Context, runID, image, network st
 func (k *KubernetesRuntime) Cleanup(ctx context.Context, runID string) error {
 	selector := k.runSelector(runID)
 	_ = k.client.BatchV1().Jobs(k.config.Namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector})
+	_ = k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Delete(ctx, k.Name(runID)+"-sandbox-network", metav1.DeleteOptions{})
 	_ = k.client.CoreV1().Pods(k.config.Namespace).Delete(ctx, k.WorkspacePod(runID), metav1.DeleteOptions{})
 	if err := k.client.CoreV1().PersistentVolumeClaims(k.config.Namespace).Delete(ctx, k.PVC(runID), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -388,6 +404,15 @@ func (k *KubernetesRuntime) RunSandbox(ctx context.Context, runID string, reques
 	if len(request.AllowedHosts) > 0 && (p.EgressProxyURL == "" || p.EgressProxySecret == "") {
 		return SandboxResult{}, fmt.Errorf("sandbox egress requires configured managed proxy")
 	}
+	if len(request.AllowedHosts) > 0 {
+		if !k.config.NetworkPolicyEnforced {
+			return SandboxResult{}, fmt.Errorf("sandbox egress is disabled until network_policy_enforced is explicitly confirmed")
+		}
+		if err := k.applySandboxNetworkPolicy(ctx, runID); err != nil {
+			return SandboxResult{}, err
+		}
+		defer k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Delete(context.Background(), k.Name(runID)+"-sandbox-network", metav1.DeleteOptions{})
+	}
 	name := k.Name(runID) + "-sandbox-" + shortID()
 	image := p.Image
 	if request.Image != "" {
@@ -401,7 +426,7 @@ func (k *KubernetesRuntime) RunSandbox(ctx context.Context, runID string, reques
 		container.Command = request.Command
 	}
 	if len(request.AllowedHosts) > 0 {
-		container.Env = []corev1.EnvVar{{Name: "HTTPS_PROXY", Value: p.EgressProxyURL}, {Name: "HTTP_PROXY", Value: p.EgressProxyURL}, {Name: "NO_PROXY", Value: ""}, {Name: "NORBOT_EGRESS_TOKEN", Value: os.Getenv(p.EgressProxySecret)}}
+		container.Env = []corev1.EnvVar{{Name: "HTTPS_PROXY", Value: p.EgressProxyURL}, {Name: "HTTP_PROXY", Value: p.EgressProxyURL}, {Name: "NO_PROXY", Value: ""}}
 	}
 	job := oneShotJob(name, k.config, runID, "sandbox", container, []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: k.PVC(runID), ReadOnly: true}}}, {Name: "scratch", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}})
 	deadline := int64(p.TimeoutS)
@@ -488,7 +513,11 @@ func (k *KubernetesRuntime) buildImage(ctx context.Context, run domain.Run, comp
 	if suffix != "" {
 		destination += "-" + suffix
 	}
-	container := hardenedContainer("kaniko", k.config.KanikoImage, []string{"/kaniko/executor", "--context=dir:///workspace/generated-app/" + component, "--dockerfile=/workspace/generated-app/" + component + "/Dockerfile", "--destination=" + destination, "--digest-file=/dev/termination-log", "--snapshotMode=redo"}, k.PVC(run.ID), "/workspace", k.config)
+	command := []string{"/kaniko/executor", "--context=dir:///workspace/generated-app/" + component, "--dockerfile=/workspace/generated-app/" + component + "/Dockerfile", "--destination=" + destination, "--digest-file=/dev/termination-log", "--snapshotMode=redo"}
+	if k.config.RegistryInsecure {
+		command = append(command, "--insecure", "--skip-tls-verify")
+	}
+	container := hardenedContainer("kaniko", k.config.KanikoImage, command, k.PVC(run.ID), "/workspace", k.config)
 	container.SecurityContext.ReadOnlyRootFilesystem = ptr(false)
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: "registry", MountPath: "/kaniko/.docker", ReadOnly: true})
 	volumes := append(workspaceVolume(k.PVC(run.ID)), corev1.Volume{Name: "registry", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: k.config.RegistryPullSecret, Items: []corev1.KeyToPath{{Key: ".dockerconfigjson", Path: "config.json"}}}}})
@@ -572,7 +601,7 @@ func (k *KubernetesRuntime) applyService(ctx context.Context, name, runID, compo
 }
 func (k *KubernetesRuntime) applyNetworkPolicy(ctx context.Context, runID, frontend, backend string) error {
 	labels := k.labels(runID, "application")
-	policy := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: k.Name(runID) + "-network", Labels: labels}, Spec: networkingv1.NetworkPolicySpec{PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID}}, PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress}, Ingress: []networkingv1.NetworkPolicyIngressRule{{From: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID}}}}}}, Egress: []networkingv1.NetworkPolicyEgressRule{{Ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr(corev1.ProtocolUDP), Port: ptr(intstr.FromInt(53))}, {Protocol: ptr(corev1.ProtocolTCP), Port: ptr(intstr.FromInt(53))}, {Protocol: ptr(corev1.ProtocolTCP), Port: ptr(intstr.FromInt(443))}}}, {To: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID}}}}}}}}
+	policy := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: k.Name(runID) + "-network", Labels: labels}, Spec: networkingv1.NetworkPolicySpec{PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID, roleLabel: "application"}}, PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress}, Ingress: []networkingv1.NetworkPolicyIngressRule{{From: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID, roleLabel: "application"}}}}}}, Egress: []networkingv1.NetworkPolicyEgressRule{{Ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr(corev1.ProtocolUDP), Port: ptr(intstr.FromInt(53))}, {Protocol: ptr(corev1.ProtocolTCP), Port: ptr(intstr.FromInt(53))}, {Protocol: ptr(corev1.ProtocolTCP), Port: ptr(intstr.FromInt(443))}}}, {To: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID, roleLabel: "application"}}}}}}}}
 	if k.config.IngressControllerNamespace != "" {
 		policy.Spec.Ingress = append(policy.Spec.Ingress, networkingv1.NetworkPolicyIngressRule{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": k.config.IngressControllerNamespace}}}}})
 	}
