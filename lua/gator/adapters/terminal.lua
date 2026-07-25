@@ -67,10 +67,21 @@ function Manager:open(opts)
 	if opts.cwd ~= nil and (type(opts.cwd) ~= "string" or opts.cwd == "") then
 		fail("cwd must be a non-empty string")
 	end
+	if opts.on_exit ~= nil and type(opts.on_exit) ~= "function" then
+		fail("on_exit must be a function")
+	end
 	vim.cmd("botright 16new")
 	local window = vim.api.nvim_get_current_win()
 	local buffer = vim.api.nvim_get_current_buf()
-	local job_id = self.termopen(command(opts.command), { cwd = opts.cwd })
+	local job_id = self.termopen(command(opts.command), {
+		cwd = opts.cwd,
+		on_exit = function(_, code, event)
+			self.sessions[id] = nil
+			if opts.on_exit then
+				opts.on_exit({ id = id, code = code, event = event })
+			end
+		end,
+	})
 	if type(job_id) ~= "number" or job_id < 1 then
 		vim.api.nvim_win_close(window, true)
 		fail("terminal launch failed")

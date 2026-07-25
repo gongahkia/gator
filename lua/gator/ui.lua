@@ -201,6 +201,15 @@ local function render(panel)
 		"Run health / recover providers",
 		"Close workspace",
 	}
+	if panel.workflow then
+		vim.list_extend(actions, {
+			"Create local task",
+			"Import local tasks",
+			"Launch selected task",
+			"Attach selected session",
+			"Refresh launch providers",
+		})
+	end
 	for index, action in ipairs(actions) do
 		table.insert(lines, (panel.selected == index and "> " or "  ") .. action)
 	end
@@ -208,10 +217,17 @@ local function render(panel)
 	accessibility.render(panel.buffer, lines, "gator")
 end
 
+local function action_count(panel)
+	return panel.workflow and 11 or 6
+end
+
 local function open_dashboard(panel)
 	M.dashboard.open({
 		tasks = task_rows(panel.state),
 		on_open = function(task)
+			if panel.workflow then
+				panel.workflow:select(task.id)
+			end
 			M.set_status(panel.state, "ready", "selected task " .. task.id)
 		end,
 	})
@@ -251,18 +267,58 @@ local function recover(panel)
 	vim.cmd("checkhealth gator")
 end
 
+local function create_task(panel)
+	panel.workflow:prompt_create()
+end
+
+local function import_tasks(panel)
+	local report = panel.workflow:load()
+	if #report.failures > 0 then
+		vim.notify(table.concat(report.failures, "\n"), vim.log.levels.WARN, { title = "Gator" })
+	end
+end
+
+local function launch_task(panel)
+	panel.workflow:open_provider_picker()
+end
+
+local function attach_session(panel)
+	panel.workflow:attach()
+end
+
+local function refresh_providers(panel)
+	panel.workflow:refresh()
+	M.set_status(panel.state, "ready", "launch providers refreshed")
+end
+
 local function bind(panel)
 	accessibility.panel(panel.buffer, { next = "j", previous = "k", confirm = "<CR>", cancel = "q", help = "?" }, {
 		next = function()
-			panel.selected = panel.selected % 6 + 1
+			panel.selected = panel.selected % action_count(panel) + 1
 			render(panel)
 		end,
 		previous = function()
-			panel.selected = panel.selected == 1 and 6 or panel.selected - 1
+			panel.selected = panel.selected == 1 and action_count(panel) or panel.selected - 1
 			render(panel)
 		end,
 		confirm = function()
-			({ open_dashboard, open_sessions, inspect_context, open_review, recover, M.close })[panel.selected](panel)
+			local actions = {
+				open_dashboard,
+				open_sessions,
+				inspect_context,
+				open_review,
+				recover,
+				M.close,
+				create_task,
+				import_tasks,
+				launch_task,
+				attach_session,
+				refresh_providers,
+			}
+			local ok, err = pcall(actions[panel.selected], panel)
+			if not ok then
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			end
 		end,
 		cancel = M.close,
 		help = function()
@@ -375,9 +431,13 @@ local function unsubscribe(panel)
 	end
 end
 
-function M.open(state)
+function M.open(state, opts)
 	if not state_store.is(state) or type(state.config) ~= "table" or type(state.config.context) ~= "table" then
 		fail("open requires initialized Gator state")
+	end
+	opts = opts or {}
+	if type(opts) ~= "table" or (opts.workflow ~= nil and type(opts.workflow) ~= "table") then
+		fail("open options must provide an optional workflow")
 	end
 	accessibility.configure(state.config.ui)
 	workspace_state(state)
@@ -385,6 +445,7 @@ function M.open(state)
 	if panel then
 		unsubscribe(panel)
 		panel.state = state
+		panel.workflow = opts.workflow
 		subscribe(panel)
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
@@ -398,7 +459,8 @@ function M.open(state)
 	vim.bo[buffer].bufhidden = "wipe"
 	vim.api.nvim_win_set_buf(window, buffer)
 	vim.api.nvim_win_set_height(window, height())
-	panel = { window = window, buffer = buffer, previous = previous, state = state, selected = 1 }
+	panel =
+		{ window = window, buffer = buffer, previous = previous, state = state, workflow = opts.workflow, selected = 1 }
 	panels[tabpage] = panel
 	subscribe(panel)
 	render(panel)

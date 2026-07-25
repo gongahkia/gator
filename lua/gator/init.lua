@@ -21,7 +21,7 @@ end
 function M.setup(opts)
 	local next = coordinator.new(opts)
 	if M._coordinator then
-		M._coordinator:cancel_all("Gator configuration changed")
+		M._coordinator:dispose()
 	end
 	M._coordinator = next
 	M._state = M._coordinator:state()

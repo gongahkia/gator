@@ -23,6 +23,13 @@ for _, provider in ipairs(providers) do
 	provider_modules[provider.name] = "gator.adapters." .. provider.name
 end
 
+local terminal_providers = { claude = true, codex = true, opencode = true }
+local terminal_capabilities = {
+	claude = { "cli", "resume" },
+	codex = { "rpc" },
+	opencode = { "acp", "session_resume" },
+}
+
 local function fail(message)
 	error("invalid Gator health check: " .. message, 3)
 end
@@ -283,6 +290,85 @@ function M.readiness(opts)
 		add("telemetry", "ok", "Telemetry collection and transmission are explicitly enabled")
 	else
 		add("telemetry", "ok", "Telemetry collection and transmission are disabled pending explicit consent")
+	end
+	return records
+end
+
+function M.launch_catalog(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("launch catalog requires options")
+	end
+	for key in pairs(opts) do
+		if key ~= "cwd" and key ~= "run" and key ~= "executable" then
+			fail("launch catalog contains unsupported field: " .. tostring(key))
+		end
+	end
+	local cwd = opts.cwd or vim.fn.getcwd()
+	if type(cwd) ~= "string" or cwd == "" then
+		fail("launch catalog cwd must be a non-empty string")
+	end
+	local executable = opts.executable or function(name)
+		return vim.fn.executable(name) == 1
+	end
+	local run = opts.run
+		or function(argv, directory, input)
+			local result = vim.system(argv, { cwd = directory, stdin = input, text = true, timeout = 3000 }):wait()
+			return { code = result.code, stdout = result.stdout or "" }
+		end
+	if type(executable) ~= "function" or type(run) ~= "function" then
+		fail("launch catalog executable and run must be functions")
+	end
+	local records = {}
+	for _, provider in ipairs(providers) do
+		if terminal_providers[provider.name] then
+			local record = { provider = provider.name, available = false }
+			if not executable(provider.executable) then
+				record.reason = provider.executable .. " is unavailable"
+			else
+				local loaded, adapter = pcall(require, provider_modules[provider.name])
+				local probe
+				if loaded then
+					local args = {
+						executable = provider.executable,
+						run = function(argv, input)
+							return run(argv, cwd, input)
+						end,
+					}
+					if provider.cwd then
+						args.cwd = cwd
+					end
+					local ok, value = pcall(adapter.probe, args)
+					probe = ok and value or nil
+				end
+				if type(probe) ~= "table" or not probe.available then
+					record.reason = (probe and probe.reason) or "version or capability probe failed"
+				elseif probe.supported == false then
+					record.reason = "installed version is outside Gator's supported range"
+				else
+					for _, capability in ipairs(terminal_capabilities[provider.name]) do
+						if type(probe.capabilities) ~= "table" or probe.capabilities[capability] ~= true then
+							record.reason = "native terminal capability is unavailable: " .. capability
+							break
+						end
+					end
+					if not record.reason then
+						local ok, auth = pcall(adapter.auth, {
+							executable = provider.executable,
+							run = function(argv, input)
+								return run(argv, cwd, input)
+							end,
+						})
+						if ok and type(auth) == "table" and auth.authenticated then
+							record.available = true
+						else
+							record.reason = (type(auth) == "table" and auth.reason) or "authentication is not verified"
+						end
+					end
+				end
+			end
+			table.insert(records, record)
+		end
 	end
 	return records
 end

@@ -48,6 +48,11 @@ function M.register()
 	end, {
 		nargs = 1,
 		complete = function(arglead)
+			local gator = require("gator")
+			if not gator._coordinator then
+				gator.setup()
+			end
+			pcall(gator._coordinator.workflow, gator._coordinator)
 			return require("gator.ui").palette.complete(arglead)
 		end,
 		desc = "Run a registered Gator action, adapter, task, or provider command",

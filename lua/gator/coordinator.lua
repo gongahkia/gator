@@ -1,5 +1,6 @@
 local dependencies = require("gator.coordinator.dependencies")
 local cancellation = require("gator.coordinator.cancellation")
+local workflow = require("gator.workflow")
 
 local M = { name = "coordinator", api_version = 1, inspection_schema_version = 1 }
 local Coordinator = {}
@@ -103,6 +104,7 @@ function M.new(opts)
 		_operations = {},
 		_operation_keys = {},
 		_startup_recovery = nil,
+		_workflow = nil,
 		_state = container:require("state").new(settings, report),
 	}, Coordinator)
 	return value
@@ -159,7 +161,31 @@ end
 
 function Coordinator:open()
 	self:bootstrap_recovery()
-	return self:dependency("ui").open(self:state())
+	local value
+	local ok, result = pcall(self.workflow, self)
+	if ok then
+		value = result
+	else
+		self:dependency("ui").set_status(self:state(), "degraded", "local task workflow unavailable")
+	end
+	return self:dependency("ui").open(self:state(), { workflow = value })
+end
+
+function Coordinator:workflow()
+	if not M.is(self) then
+		fail("workflow requires an initialized coordinator")
+	end
+	if not self._workflow then
+		self._workflow = workflow.new({ state = self:state() })
+	end
+	return self._workflow
+end
+
+function Coordinator:dispose()
+	if self._workflow and type(self._workflow.close) == "function" then
+		self._workflow:close()
+	end
+	return self:cancel_all("Gator configuration changed")
 end
 
 function Coordinator:bootstrap_recovery()
@@ -291,6 +317,7 @@ function Coordinator:dispatch(action, opts)
 			last_line = opts.last_line,
 		})
 	end
+	self:workflow()
 	return self:dependency("ui").palette.execute(require_string(opts.id, "palette id"))
 end
 

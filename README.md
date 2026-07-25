@@ -89,15 +89,31 @@ Do not put provider credentials, tokens, secrets, passwords, or API keys in Gato
 
 | Command | Supported behavior |
 | --- | --- |
-| `:Gator` | Opens the task/session/context/review workspace. |
+| `:Gator` | Opens the task/session/context/review workspace, including local task creation, import, launch, and session attach actions. |
 | `:GatorHealth` | Runs local compatibility, workspace, policy, sidecar, and provider readiness checks. |
 | `:GatorExportDiagnostics` | Writes one local, redacted rolling diagnostic JSON export; it never sends telemetry. |
 | `:GatorBetaReadiness` | Verifies local beta prerequisites and writes a local rolling readiness/failure-report bundle. |
 | `:{range}GatorCaptureSelection task:<id>` | Captures a visual/line selection as provenance-tracked context for a task. |
 | `:{range}GatorCaptureSelection session:<provider>:<id>` | Captures context for an opaque provider-native session. |
-| `:GatorPalette <action>` | Runs a registered Gator palette action. |
+| `:GatorPalette <kind:name>` | Runs a registered Gator action, task, or ready provider command. |
 
 Run `require("gator").setup()` before `:GatorCaptureSelection`. Open `:Gator` to inspect explicit empty, loading, failure, recovery, and unavailable-provider states. Core actions open task, linked-session, context-inspection, and review panels when their local evidence is available.
+
+## Local task and terminal workflow
+
+From a Git workspace, open `:Gator`, choose **Create local task**, enter an objective, then choose **Launch selected task**. Gator writes the task to `.gator/tasks/<id>.md`, creates a provider-native session, and opens the provider's interactive terminal with the objective already supplied. Select **Attach selected session** to focus the terminal while it is open or resume the provider-native session after reopening Neovim. `.gator/` is ignored by default, so task files remain local to the checkout.
+
+The same actions are available through completion-backed palette entries:
+
+```vim
+:GatorPalette action:create-task
+:GatorPalette action:import-tasks
+:GatorPalette action:launch-task
+:GatorPalette action:attach-session
+:GatorPalette action:refresh-providers
+```
+
+Opening `:GatorPalette` after the workspace loads also completes `task:<id>` and `provider:<name>` entries. Providers are selectable only when `:GatorHealth` can verify the executable, supported version, provider-native authentication, and native-terminal session bridge. Current terminal bridges cover Claude Code, Codex, and OpenCode; unavailable providers remain unavailable rather than falling back to broader permissions or manual credential handling.
 
 ## Diagnostics and logging
 
