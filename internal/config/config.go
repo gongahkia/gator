@@ -234,6 +234,34 @@ func (k Kubernetes) Normalized() Kubernetes {
 	return k
 }
 
+func InitialManifest(target domain.DeploymentTarget, kube Kubernetes) Manifest {
+	if target == "" {
+		target = domain.DeploymentDocker
+	}
+	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}}
+}
+
+func WriteManifest(path string, manifest Manifest, force bool) error {
+	if err := manifest.Validate(); err != nil {
+		return err
+	}
+	if !force {
+		if _, err := os.Stat(path); err == nil {
+			return fmt.Errorf("config %s already exists; use --force", path)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o600)
+}
+
 func (m Manifest) Provider(id string, stage domain.Stage) (Provider, bool) {
 	for _, provider := range m.Providers {
 		if provider.ID != id {

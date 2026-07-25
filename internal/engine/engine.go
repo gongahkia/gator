@@ -44,6 +44,12 @@ type DeploymentInfo struct {
 	Runtime    runtime.DeploymentStatus `json:"runtime"`
 }
 
+type RuntimeOptions struct {
+	DefaultTarget        domain.DeploymentTarget `json:"default_target"`
+	KubernetesConfigured bool                    `json:"kubernetes_configured"`
+	IngressConfigured    bool                    `json:"ingress_configured"`
+}
+
 type Service struct {
 	store            *store.Store
 	config           config.Config
@@ -71,6 +77,12 @@ func NewWithExtensions(st *store.Store, cfg config.Config, logger *slog.Logger, 
 }
 
 func (s *Service) Metrics() *telemetry.Metrics { return s.metrics }
+
+func (s *Service) RuntimeOptions() RuntimeOptions {
+	k := s.config.Manifest.Runtime.Kubernetes
+	configured := k.Kubeconfig != "" && k.Namespace != "" && k.ServiceAccount != "" && k.RegistryRepository != "" && k.RegistryPullSecret != ""
+	return RuntimeOptions{DefaultTarget: s.config.Manifest.DefaultTarget(), KubernetesConfigured: configured, IngressConfigured: configured && k.IngressClass != "" && k.IngressBaseDomain != ""}
+}
 
 func (s *Service) backendFor(ctx context.Context, target domain.DeploymentTarget) (runtime.WorkspaceBackend, runtime.DeploymentBackend, error) {
 	if target == domain.DeploymentDocker {
@@ -110,6 +122,9 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	}
 	if input.PublicIngress && target != domain.DeploymentKubernetes {
 		return domain.Run{}, fmt.Errorf("public_ingress requires deployment_target kubernetes")
+	}
+	if input.PublicIngress && (s.config.Manifest.Runtime.Kubernetes.IngressClass == "" || s.config.Manifest.Runtime.Kubernetes.IngressBaseDomain == "") {
+		return domain.Run{}, fmt.Errorf("public_ingress requires configured kubernetes ingress")
 	}
 	workspace, _, err := s.backendFor(ctx, target)
 	if err != nil {
@@ -328,6 +343,17 @@ func (s *Service) DeleteDeployment(ctx context.Context, runID string) (domain.De
 
 func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
 	capacity := runtime.DetectCapacity(ctx, s.config.DockerBin, s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
+	if s.config.Manifest.DefaultTarget() == domain.DeploymentKubernetes {
+		if kube, err := runtime.NewKubernetesRuntime(s.config.Manifest.Runtime.Kubernetes, s.config.ArtifactsDir); err != nil {
+			capacity.Target = domain.DeploymentKubernetes
+			capacity.Recommendation = "Kubernetes configuration is unavailable: " + err.Error()
+		} else if detected, err := kube.Capacity(ctx, s.config.Workers, s.config.MaxWorkers); err != nil {
+			capacity.Target = domain.DeploymentKubernetes
+			capacity.Recommendation = "Kubernetes capacity is unavailable: " + err.Error()
+		} else {
+			capacity = detected
+		}
+	}
 	observations, err := s.store.LatestProviderObservations(ctx)
 	if err != nil {
 		s.log.Warn("load provider capacity observations", "error", err)
@@ -351,7 +377,7 @@ func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
 
 func (s *Service) RecommendCapacity(ctx context.Context) (store.CapacityRecommendation, error) {
 	capacity := s.Capacity(ctx)
-	factors := map[string]any{"cpus": capacity.CPUs, "memory_bytes": capacity.MemoryBytes, "docker_available": capacity.DockerAvailable, "quota_workers": capacity.QuotaWorkers, "providers": capacity.QuotaFactors}
+	factors := map[string]any{"target": capacity.Target, "cpus": capacity.CPUs, "memory_bytes": capacity.MemoryBytes, "docker_available": capacity.DockerAvailable, "kubernetes_available": capacity.KubernetesAvailable, "quota_workers": capacity.QuotaWorkers, "providers": capacity.QuotaFactors}
 	return s.store.CreateCapacityRecommendation(ctx, capacity.RecommendedWorkers, factors)
 }
 

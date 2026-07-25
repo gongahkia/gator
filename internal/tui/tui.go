@@ -83,6 +83,10 @@ type providersMsg struct {
 	providers []config.Provider
 	err       error
 }
+type runtimeMsg struct {
+	runtime engine.RuntimeOptions
+	err     error
+}
 type tickMsg time.Time
 
 type mode string
@@ -106,6 +110,9 @@ type Model struct {
 	input         textinput.Model
 	profile       domain.Profile
 	providers     []config.Provider
+	runtime       engine.RuntimeOptions
+	target        domain.DeploymentTarget
+	publicIngress bool
 	selections    map[domain.Stage]string
 	providerStage int
 	message       string
@@ -123,7 +130,9 @@ func Run(apiBase string) error {
 	return err
 }
 
-func (m Model) Init() tea.Cmd { return tea.Batch(m.refresh(), m.fetchProviders(), tick()) }
+func (m Model) Init() tea.Cmd {
+	return tea.Batch(m.refresh(), m.fetchProviders(), m.fetchRuntime(), tick())
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch typed := msg.(type) {
@@ -159,6 +168,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if typed.err == nil {
 			m.providers = typed.providers
 			m.ensureSelections()
+		}
+		return m, nil
+	case runtimeMsg:
+		m.err = typed.err
+		if typed.err == nil {
+			m.runtime = typed.runtime
 		}
 		return m, nil
 	case deploymentMsg:
@@ -280,6 +295,14 @@ func (m Model) createKey(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.mode = normal
 		m.input.Blur()
+		return m, nil
+	case "o":
+		m.cycleTarget()
+		return m, nil
+	case "I":
+		if m.target == domain.DeploymentKubernetes && m.runtime.IngressConfigured {
+			m.publicIngress = !m.publicIngress
+		}
 		return m, nil
 	case "p":
 		m.profile = nextProfile(m.profile)
@@ -465,7 +488,11 @@ func (m Model) View() string {
 	if m.mode == createMode {
 		stage := stageChoices[m.providerStage]
 		body.WriteString(titleStyle.Render("New "+string(m.profile)+" run") + "\n" + m.input.View() + "\n")
-		body.WriteString(mutedStyle.Render("p profile · tab stage · ←/→ provider · selected "+string(stage)+": "+m.selections[stage]) + "\n")
+		target := string(m.target)
+		if target == "" {
+			target = "default (" + string(m.runtime.DefaultTarget) + ")"
+		}
+		body.WriteString(mutedStyle.Render("p profile · tab stage · ←/→ provider · o target · I ingress · selected "+string(stage)+": "+m.selections[stage]+" · target: "+target+" · ingress: "+fmt.Sprint(m.publicIngress)) + "\n")
 		return body.String()
 	}
 	if m.mode == reviseMode {
@@ -485,14 +512,14 @@ func (m Model) View() string {
 		if i == m.selected {
 			prefix = selectedStyle.Render("> ")
 		}
-		body.WriteString(fmt.Sprintf("%s%s  %-20s %-18s %s\n", prefix, run.ID, run.Stage, run.Status, run.Profile))
+		body.WriteString(fmt.Sprintf("%s%s  %-20s %-18s %-14s %s\n", prefix, run.ID, run.Stage, run.Status, run.DeploymentTarget, run.Profile))
 	}
 	if run, ok := m.run(); ok {
 		body.WriteString("\n" + titleStyle.Render("Workflow graph") + "\n" + drawGraph(run.Graph, m.node, m.mode == graphMode) + "\n")
 		if m.mode == graphMode && len(run.Graph.Edges) > 0 {
 			body.WriteString(mutedStyle.Render("Edge "+fmt.Sprintf("%d/%d: %s → %s", m.edge+1, len(run.Graph.Edges), run.Graph.Edges[m.edge].Source, run.Graph.Edges[m.edge].Target)) + "\n")
 		}
-		body.WriteString(mutedStyle.Render("Run "+run.ID+" · provider "+run.Providers[run.Stage]) + "\n")
+		body.WriteString(mutedStyle.Render("Run "+run.ID+" · provider "+run.Providers[run.Stage]+" · target "+string(run.DeploymentTarget)) + "\n")
 		if run.FailureReason != "" {
 			body.WriteString(errorStyle.Render(run.FailureReason) + "\n")
 		}
@@ -631,7 +658,7 @@ func (m Model) create(prompt string) tea.Cmd {
 		for stage, providerID := range m.selections {
 			providers[stage] = providerID
 		}
-		err := m.client.do(http.MethodPost, "/api/runs", engine.CreateRunInput{Prompt: prompt, Profile: m.profile, Providers: providers}, &run)
+		err := m.client.do(http.MethodPost, "/api/runs", engine.CreateRunInput{Prompt: prompt, Profile: m.profile, Providers: providers, DeploymentTarget: m.target, PublicIngress: m.publicIngress}, &run)
 		return actionMsg{run, err}
 	}
 }
@@ -647,6 +674,30 @@ func (m Model) fetchProviders() tea.Cmd {
 		var providers []config.Provider
 		err := m.client.do(http.MethodGet, "/api/providers", nil, &providers)
 		return providersMsg{providers: providers, err: err}
+	}
+}
+
+func (m Model) fetchRuntime() tea.Cmd {
+	return func() tea.Msg {
+		var options engine.RuntimeOptions
+		err := m.client.do(http.MethodGet, "/api/runtime", nil, &options)
+		return runtimeMsg{runtime: options, err: err}
+	}
+}
+
+func (m *Model) cycleTarget() {
+	choices := []domain.DeploymentTarget{"", domain.DeploymentDocker}
+	if m.runtime.KubernetesConfigured {
+		choices = append(choices, domain.DeploymentKubernetes)
+	}
+	for index, target := range choices {
+		if target == m.target {
+			m.target = choices[(index+1)%len(choices)]
+			break
+		}
+	}
+	if m.target != domain.DeploymentKubernetes {
+		m.publicIngress = false
 	}
 }
 

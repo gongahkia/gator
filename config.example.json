@@ -46,5 +46,22 @@
     "database_mutate": {"enabled": true, "approval_required": true, "roles": ["operator"]},
     "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": []}
   },
-  "plugins": []
+  "plugins": [],
+  "runtime": {
+    "default_target": "docker",
+    "kubernetes": {
+      "kubeconfig": "/absolute/path/to/kubeconfig",
+      "context": "",
+      "namespace": "norbot",
+      "service_account": "norbot-runtime",
+      "registry_repository": "registry.example.com/norbot",
+      "registry_pull_secret": "registry-pull",
+      "ingress_class": "",
+      "ingress_base_domain": "",
+      "ingress_controller_namespace": "",
+      "cpu_milli": 500,
+      "memory_mib": 512,
+      "replicas": 1
+    }
+  }
 }

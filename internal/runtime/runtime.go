@@ -167,14 +167,16 @@ func (w Workspace) Cleanup(ctx context.Context, runID string) error {
 }
 
 type Capacity struct {
-	CPUs               int           `json:"cpus"`
-	MemoryBytes        int64         `json:"memory_bytes"`
-	DockerAvailable    bool          `json:"docker_available"`
-	ConfiguredWorkers  int           `json:"configured_workers"`
-	RecommendedWorkers int           `json:"recommended_workers"`
-	Recommendation     string        `json:"recommendation"`
-	QuotaWorkers       int           `json:"quota_workers,omitempty"`
-	QuotaFactors       []QuotaFactor `json:"quota_factors,omitempty"`
+	CPUs                int                     `json:"cpus"`
+	MemoryBytes         int64                   `json:"memory_bytes"`
+	DockerAvailable     bool                    `json:"docker_available"`
+	KubernetesAvailable bool                    `json:"kubernetes_available"`
+	Target              domain.DeploymentTarget `json:"target"`
+	ConfiguredWorkers   int                     `json:"configured_workers"`
+	RecommendedWorkers  int                     `json:"recommended_workers"`
+	Recommendation      string                  `json:"recommendation"`
+	QuotaWorkers        int                     `json:"quota_workers,omitempty"`
+	QuotaFactors        []QuotaFactor           `json:"quota_factors,omitempty"`
 }
 
 type QuotaFactor struct {
@@ -185,7 +187,7 @@ type QuotaFactor struct {
 }
 
 func DetectCapacity(ctx context.Context, dockerBin string, configuredWorkers, maxWorkers int, runner CommandRunner) Capacity {
-	capacity := Capacity{CPUs: runtime.NumCPU(), ConfiguredWorkers: configuredWorkers}
+	capacity := Capacity{CPUs: runtime.NumCPU(), ConfiguredWorkers: configuredWorkers, Target: domain.DeploymentDocker}
 	capacity.MemoryBytes = memoryBytes(ctx, runner)
 	if _, err := runner.Run(ctx, dockerBin, "info", "--format", "{{.ServerVersion}}"); err == nil {
 		capacity.DockerAvailable = true

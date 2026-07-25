@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/gongahkia/norbot/internal/domain"
+	"path/filepath"
 	"testing"
 )
 
@@ -26,6 +27,30 @@ func TestManifestProviderRespectsStage(t *testing.T) {
 }
 
 func TestManifestRejectsUnknownPluginProvider(t *testing.T) {
-	manifest := Manifest{Providers: []Provider{{ID:"external",Kind:"plugin",PluginID:"missing",Stages:[]domain.Stage{domain.StagePlanner}}},Profiles:[]domain.Profile{domain.ProfileFullStack}}
-	if err := manifest.Validate(); err == nil { t.Fatal("expected unknown plugin error") }
+	manifest := Manifest{Providers: []Provider{{ID: "external", Kind: "plugin", PluginID: "missing", Stages: []domain.Stage{domain.StagePlanner}}}, Profiles: []domain.Profile{domain.ProfileFullStack}}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("expected unknown plugin error")
+	}
+}
+
+func TestKubernetesRuntimeValidationAndInitialWrite(t *testing.T) {
+	kube := Kubernetes{Kubeconfig: "/tmp/kubeconfig", Namespace: "norbot", ServiceAccount: "norbot-runtime", RegistryRepository: "registry.example/norbot", RegistryPullSecret: "registry-pull"}
+	manifest := InitialManifest(domain.DeploymentKubernetes, kube)
+	if err := manifest.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := WriteManifest(path, manifest, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteManifest(path, manifest, false); err == nil {
+		t.Fatal("overwrite must require force")
+	}
+}
+
+func TestKubernetesIngressConfigurationIsAllOrNothing(t *testing.T) {
+	manifest := InitialManifest(domain.DeploymentKubernetes, Kubernetes{Kubeconfig: "/tmp/kubeconfig", Namespace: "norbot", ServiceAccount: "norbot-runtime", RegistryRepository: "registry.example/norbot", RegistryPullSecret: "registry-pull", IngressClass: "nginx"})
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("partial ingress configuration accepted")
+	}
 }

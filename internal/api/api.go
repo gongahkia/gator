@@ -36,6 +36,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/capacity/recommendations", s.recommendCapacity)
 	mux.HandleFunc("POST /api/capacity/recommendations/{id}/accept", s.acceptCapacity)
 	mux.HandleFunc("GET /api/providers", s.providers)
+	mux.HandleFunc("GET /api/runtime", s.runtimeOptions)
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
 	mux.HandleFunc("POST /api/runs", s.createRun)
@@ -101,6 +102,10 @@ func (s *Server) acceptCapacity(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) providers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.service.ProviderOptions())
+}
+
+func (s *Server) runtimeOptions(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.service.RuntimeOptions())
 }
 
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {

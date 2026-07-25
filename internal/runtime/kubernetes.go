@@ -69,10 +69,41 @@ func (k *KubernetesRuntime) Validate(ctx context.Context) error {
 	if _, err := k.client.CoreV1().Namespaces().Get(ctx, k.config.Namespace, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("get kubernetes namespace %q: %w", k.config.Namespace, err)
 	}
+	if _, err := k.client.CoreV1().ServiceAccounts(k.config.Namespace).Get(ctx, k.config.ServiceAccount, metav1.GetOptions{}); err != nil {
+		return fmt.Errorf("get kubernetes service account %q: %w", k.config.ServiceAccount, err)
+	}
 	if _, err := k.client.CoreV1().Secrets(k.config.Namespace).Get(ctx, k.config.RegistryPullSecret, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("get registry pull secret %q: %w", k.config.RegistryPullSecret, err)
 	}
 	return nil
+}
+
+func (k *KubernetesRuntime) Capacity(ctx context.Context, configuredWorkers, maxWorkers int) (Capacity, error) {
+	nodes, err := k.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return Capacity{}, fmt.Errorf("list kubernetes nodes: %w", err)
+	}
+	capacity := Capacity{ConfiguredWorkers: configuredWorkers, KubernetesAvailable: true, Target: domain.DeploymentKubernetes}
+	var cpuMilli, memoryBytes int64
+	for _, node := range nodes.Items {
+		if node.Spec.Unschedulable {
+			continue
+		}
+		cpuMilli += node.Status.Allocatable.Cpu().MilliValue()
+		memoryBytes += node.Status.Allocatable.Memory().Value()
+	}
+	capacity.CPUs = int(cpuMilli / 1000)
+	capacity.MemoryBytes = memoryBytes
+	byCPU, byMemory := int(cpuMilli/(k.config.CPUMilli*2)), int(memoryBytes/(4<<30))
+	if byCPU < 1 {
+		byCPU = 1
+	}
+	if byMemory < 1 {
+		byMemory = 1
+	}
+	capacity.RecommendedWorkers = min(maxWorkers, min(byCPU, byMemory))
+	capacity.Recommendation = "Kubernetes allocatable CPU/RAM recommendation; provider quotas and namespace quotas are applied separately."
+	return capacity, nil
 }
 func (k *KubernetesRuntime) Name(runID string) string         { return ProjectName(runID) }
 func (k *KubernetesRuntime) PVC(runID string) string          { return k.Name(runID) + "-workspace" }
@@ -80,6 +111,10 @@ func (k *KubernetesRuntime) WorkspacePod(runID string) string { return k.Name(ru
 func (k *KubernetesRuntime) RunPath(runID string) string      { return filepath.Join(k.artifactsDir, runID) }
 func (k *KubernetesRuntime) labels(runID, role string) map[string]string {
 	return map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: role}
+}
+
+func (k *KubernetesRuntime) runSelector(runID string) string {
+	return labels.Set(map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID}).AsSelector().String()
 }
 
 func (k *KubernetesRuntime) Ensure(ctx context.Context, runID string) error {
@@ -111,12 +146,12 @@ func (k *KubernetesRuntime) Ensure(ctx context.Context, runID string) error {
 func workspacePod(cfg config.Kubernetes, runID, pvc string) *corev1.Pod {
 	noRoot := true
 	uid := int64(65532)
-	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: ProjectName(runID) + "-workspace", Labels: map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: "workspace"}}, Spec: corev1.PodSpec{ServiceAccountName: cfg.ServiceAccount, AutomountServiceAccountToken: ptr(false), RestartPolicy: corev1.RestartPolicyAlways, SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &noRoot, RunAsUser: &uid, FSGroup: &uid, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, Containers: []corev1.Container{{Name: "workspace", Image: cfg.WorkspaceImage, Command: []string{"sh", "-ceu", "mkdir -p /workspace && sleep infinity"}, VolumeMounts: []corev1.VolumeMount{{Name: "workspace", MountPath: "/workspace"}}, SecurityContext: restrictedSecurityContext()}}, Volumes: []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc}}}}}}
+	return &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: ProjectName(runID) + "-workspace", Labels: map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: "workspace"}}, Spec: corev1.PodSpec{ServiceAccountName: cfg.ServiceAccount, AutomountServiceAccountToken: ptr(false), RestartPolicy: corev1.RestartPolicyAlways, SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: &noRoot, RunAsUser: &uid, FSGroup: &uid, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, Containers: []corev1.Container{{Name: "workspace", Image: cfg.WorkspaceImage, Command: []string{"sh", "-ceu", "mkdir -p /workspace/agent-state && sleep infinity"}, VolumeMounts: []corev1.VolumeMount{{Name: "workspace", MountPath: "/workspace"}}, SecurityContext: restrictedSecurityContext()}}, Volumes: []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc}}}}}}
 }
 
 func restrictedSecurityContext() *corev1.SecurityContext {
-	noRoot, readOnly := true, true
-	return &corev1.SecurityContext{RunAsNonRoot: &noRoot, ReadOnlyRootFilesystem: &readOnly, AllowPrivilegeEscalation: &noRoot, Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}
+	noRoot, readOnly, allowEscalation := true, true, false
+	return &corev1.SecurityContext{RunAsNonRoot: &noRoot, ReadOnlyRootFilesystem: &readOnly, AllowPrivilegeEscalation: &allowEscalation, Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}
 }
 func ptr[T any](v T) *T { return &v }
 
@@ -203,7 +238,7 @@ func (k *KubernetesRuntime) RunCLI(ctx context.Context, runID, image, network st
 }
 
 func (k *KubernetesRuntime) Cleanup(ctx context.Context, runID string) error {
-	selector := labels.Set(k.labels(runID, "")).AsSelector().String()
+	selector := k.runSelector(runID)
 	_ = k.client.BatchV1().Jobs(k.config.Namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: selector})
 	_ = k.client.CoreV1().Pods(k.config.Namespace).Delete(ctx, k.WorkspacePod(runID), metav1.DeleteOptions{})
 	if err := k.client.CoreV1().PersistentVolumeClaims(k.config.Namespace).Delete(ctx, k.PVC(runID), metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -264,7 +299,7 @@ func (k *KubernetesRuntime) Delete(ctx context.Context, runID, root string) erro
 
 func (k *KubernetesRuntime) Status(ctx context.Context, runID, root string) (DeploymentStatus, error) {
 	project := k.Name(runID)
-	selector := labels.Set(k.labels(runID, "application")).AsSelector().String()
+	selector := k.runSelector(runID) + "," + roleLabel + "=application"
 	pods, err := k.client.CoreV1().Pods(k.config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return DeploymentStatus{}, err
@@ -280,7 +315,7 @@ func (k *KubernetesRuntime) Logs(ctx context.Context, runID, root string, lines 
 	if lines < 1 || lines > 10000 {
 		return "", fmt.Errorf("log line limit must be 1-10000")
 	}
-	selector := labels.Set(k.labels(runID, "application")).AsSelector().String()
+	selector := k.runSelector(runID) + "," + roleLabel + "=application"
 	pods, err := k.client.CoreV1().Pods(k.config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return "", err
@@ -374,7 +409,7 @@ func (k *KubernetesRuntime) buildImage(ctx context.Context, run domain.Run, comp
 		destination += "-" + suffix
 	}
 	container := hardenedContainer("kaniko", k.config.KanikoImage, []string{"/kaniko/executor", "--context=dir:///workspace/generated-app/" + component, "--dockerfile=/workspace/generated-app/" + component + "/Dockerfile", "--destination=" + destination, "--digest-file=/dev/termination-log", "--snapshotMode=redo"}, k.PVC(run.ID), "/workspace", k.config)
-	container.SecurityContext = nil
+	container.SecurityContext.ReadOnlyRootFilesystem = ptr(false)
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: "registry", MountPath: "/kaniko/.docker", ReadOnly: true})
 	volumes := append(workspaceVolume(k.PVC(run.ID)), corev1.Volume{Name: "registry", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: k.config.RegistryPullSecret, Items: []corev1.KeyToPath{{Key: ".dockerconfigjson", Path: "config.json"}}}}})
 	output, err := k.runJob(ctx, oneShotJob(name, k.config, run.ID, "kaniko", container, volumes), true)
@@ -423,7 +458,7 @@ func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, co
 	labels := k.labels(runID, "application")
 	labels["app.kubernetes.io/name"] = name
 	labels["norbot.component"] = component
-	container := hardenedContainer(component, image, nil, k.PVC(runID), "/app", k.config)
+	container := hardenedContainer(component, image, nil, k.PVC(runID), "", k.config)
 	container.Ports = []corev1.ContainerPort{{ContainerPort: port}}
 	container.ReadinessProbe = httpProbe(port, "/")
 	container.LivenessProbe = httpProbe(port, "/")
@@ -442,7 +477,7 @@ func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, co
 func httpProbe(port int32, path string) *corev1.Probe {
 	return &corev1.Probe{ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: path, Port: intstr.FromInt32(port)}}, InitialDelaySeconds: 3, PeriodSeconds: 5, TimeoutSeconds: 3, FailureThreshold: 12}
 }
-func (k *KubernetesRuntime) applyService(ctx, name, runID, component string, port int32) error {
+func (k *KubernetesRuntime) applyService(ctx context.Context, name, runID, component string, port int32) error {
 	labels := k.labels(runID, "application")
 	labels["app.kubernetes.io/name"] = name
 	labels["norbot.component"] = component
@@ -459,9 +494,12 @@ func (k *KubernetesRuntime) applyService(ctx, name, runID, component string, por
 	}
 	return err
 }
-func (k *KubernetesRuntime) applyNetworkPolicy(ctx, runID, frontend, backend string) error {
+func (k *KubernetesRuntime) applyNetworkPolicy(ctx context.Context, runID, frontend, backend string) error {
 	labels := k.labels(runID, "application")
 	policy := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: k.Name(runID) + "-network", Labels: labels}, Spec: networkingv1.NetworkPolicySpec{PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID}}, PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress}, Ingress: []networkingv1.NetworkPolicyIngressRule{{From: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID}}}}}}, Egress: []networkingv1.NetworkPolicyEgressRule{{Ports: []networkingv1.NetworkPolicyPort{{Protocol: ptr(corev1.ProtocolUDP), Port: ptr(intstr.FromInt(53))}, {Protocol: ptr(corev1.ProtocolTCP), Port: ptr(intstr.FromInt(53))}, {Protocol: ptr(corev1.ProtocolTCP), Port: ptr(intstr.FromInt(443))}}}, {To: []networkingv1.NetworkPolicyPeer{{PodSelector: &metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID}}}}}}}}
+	if k.config.IngressControllerNamespace != "" {
+		policy.Spec.Ingress = append(policy.Spec.Ingress, networkingv1.NetworkPolicyIngressRule{From: []networkingv1.NetworkPolicyPeer{{NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"kubernetes.io/metadata.name": k.config.IngressControllerNamespace}}}}})
+	}
 	_, err := k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Create(ctx, policy, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		existing, getErr := k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Get(ctx, policy.Name, metav1.GetOptions{})
@@ -514,7 +552,7 @@ func (k *KubernetesRuntime) upsertDeployment(ctx context.Context, deployment *ap
 	_, err = k.client.AppsV1().Deployments(k.config.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
 	return err
 }
-func (k *KubernetesRuntime) deleteApplication(ctx, runID, suffix string) error {
+func (k *KubernetesRuntime) deleteApplication(ctx context.Context, runID, suffix string) error {
 	frontend := k.frontendName(runID)
 	backend := k.backendName(runID)
 	if suffix != "" {
@@ -601,7 +639,8 @@ func workspaceVolume(pvc string) []corev1.Volume {
 func oneShotJob(name string, cfg config.Kubernetes, runID, role string, container corev1.Container, volumes []corev1.Volume) *batchv1.Job {
 	backoff := int32(0)
 	deadline := int64(900)
-	return &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: role}}, Spec: batchv1.JobSpec{BackoffLimit: &backoff, ActiveDeadlineSeconds: &deadline, TTLSecondsAfterFinished: ptr(int32(300)), Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: role}}, Spec: corev1.PodSpec{ServiceAccountName: cfg.ServiceAccount, AutomountServiceAccountToken: ptr(false), RestartPolicy: corev1.RestartPolicyNever, SecurityContext: &corev1.PodSecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: cfg.RegistryPullSecret}}, Containers: []corev1.Container{container}, Volumes: volumes}}}}
+	uid := int64(65532)
+	return &batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: role}}, Spec: batchv1.JobSpec{BackoffLimit: &backoff, ActiveDeadlineSeconds: &deadline, TTLSecondsAfterFinished: ptr(int32(300)), Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app.kubernetes.io/managed-by": "norbot", runLabel: runID, roleLabel: role}}, Spec: corev1.PodSpec{ServiceAccountName: cfg.ServiceAccount, AutomountServiceAccountToken: ptr(false), RestartPolicy: corev1.RestartPolicyNever, SecurityContext: &corev1.PodSecurityContext{RunAsNonRoot: ptr(true), RunAsUser: &uid, FSGroup: &uid, SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: cfg.RegistryPullSecret}}, Containers: []corev1.Container{container}, Volumes: volumes}}}}
 }
 func (k *KubernetesRuntime) runJob(ctx context.Context, job *batchv1.Job, cleanup bool) (string, error) {
 	jobs := k.client.BatchV1().Jobs(k.config.Namespace)
@@ -638,7 +677,7 @@ func (k *KubernetesRuntime) runJob(ctx context.Context, job *batchv1.Job, cleanu
 	}
 	return logs, nil
 }
-func (k *KubernetesRuntime) jobLogs(ctx, jobName string) (string, error) {
+func (k *KubernetesRuntime) jobLogs(ctx context.Context, jobName string) (string, error) {
 	pods, err := k.client.CoreV1().Pods(k.config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "job-name=" + jobName})
 	if err != nil {
 		return "", err
