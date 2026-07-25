@@ -206,6 +206,7 @@ CREATE TABLE IF NOT EXISTS channel_sessions (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES channel_accounts(id) ON DELETE CASCADE,
   external_id TEXT NOT NULL,
+	 reply_id TEXT NOT NULL DEFAULT '',
   summary TEXT NOT NULL DEFAULT '',
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -230,6 +231,7 @@ CREATE TABLE IF NOT EXISTS channel_messages (
 CREATE INDEX IF NOT EXISTS channel_messages_pending_idx ON channel_messages(state,created_at) WHERE state='pending';
 ALTER TABLE channel_messages ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0;
 ALTER TABLE channel_messages ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ;
+ALTER TABLE channel_sessions ADD COLUMN IF NOT EXISTS reply_id TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS channel_messages_retry_idx ON channel_messages(state,next_attempt_at,id) WHERE state='pending' AND direction='outbound';
 CREATE TABLE IF NOT EXISTS managed_artifacts (
   id TEXT PRIMARY KEY,

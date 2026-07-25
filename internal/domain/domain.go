@@ -345,6 +345,7 @@ type ChannelSession struct {
 	ID         string    `json:"id"`
 	AccountID  string    `json:"account_id"`
 	ExternalID string    `json:"external_id"`
+	ReplyID    string    `json:"reply_id"`
 	Summary    string    `json:"summary"`
 	ExpiresAt  time.Time `json:"expires_at"`
 	CreatedAt  time.Time `json:"created_at"`

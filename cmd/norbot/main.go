@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/gongahkia/norbot/internal/channel"
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/egress"
 	"github.com/gongahkia/norbot/internal/engine"
 	"github.com/gongahkia/norbot/internal/extension"
 	"github.com/gongahkia/norbot/internal/runtime"
@@ -237,6 +239,29 @@ func serveCommand(args []string) {
 	}
 	service := engine.NewWithExtensions(st, cfg, logger, extensions)
 	service.StartWorkers(ctx)
+	var proxy *http.Server
+	if cfg.Manifest.Runtime.Sandbox.EgressProxyURL != "" {
+		parsed, parseErr := url.Parse(cfg.Manifest.Runtime.Sandbox.EgressProxyURL)
+		secret := os.Getenv(cfg.Manifest.Runtime.Sandbox.EgressProxySecret)
+		if parseErr != nil || parsed.Port() == "" || secret == "" {
+			logger.Error("invalid sandbox egress proxy configuration")
+			os.Exit(1)
+		}
+		address := os.Getenv("NORBOT_EGRESS_PROXY_ADDR")
+		if address == "" {
+			address = "0.0.0.0:" + parsed.Port()
+		}
+		proxy, err = egress.Serve(address, secret)
+		if err != nil {
+			logger.Error("create egress proxy", "error", err)
+			os.Exit(1)
+		}
+		go func() {
+			if err := proxy.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Error("egress proxy", "error", err)
+			}
+		}()
+	}
 	skills := skill.New(st, cfg.ArtifactsDir)
 	channels := channel.New(st, service, cfg.ArtifactsDir)
 	channels.Start(ctx)
@@ -246,6 +271,9 @@ func serveCommand(args []string) {
 		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = api.Shutdown(stopCtx, server)
+		if proxy != nil {
+			_ = proxy.Shutdown(stopCtx)
+		}
 	}()
 	logger.Info("norbot listening", "addr", cfg.HTTPAddr, "workers", cfg.Workers)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

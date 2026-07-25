@@ -790,7 +790,7 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		required = append(required, "backend/main.go", "backend/go.mod", "backend/go.sum")
 	}
 	if run.Profile == domain.ProfileAgentic {
-		required = append(required, "backend/harness.go", "backend/tool_policy.json")
+		required = append(required, "backend/AGENT_RUNTIME.md")
 	}
 	for _, relative := range required {
 		if _, err := os.Stat(filepath.Join(root, relative)); err != nil {

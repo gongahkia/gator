@@ -80,10 +80,11 @@ type AgentBackend interface {
 }
 
 type SandboxRequest struct {
-	Image         string   `json:"image,omitempty"`
-	Command       []string `json:"command"`
-	AllowedHosts  []string `json:"allowed_hosts,omitempty"`
-	ReadOnlyPaths []string `json:"read_only_paths,omitempty"`
+	Image         string            `json:"image,omitempty"`
+	Command       []string          `json:"command"`
+	AllowedHosts  []string          `json:"allowed_hosts,omitempty"`
+	ReadOnlyPaths []string          `json:"read_only_paths,omitempty"`
+	ProxyHeaders  map[string]string `json:"proxy_headers,omitempty"`
 }
 type SandboxResult struct {
 	Output     string `json:"output"`
@@ -224,7 +225,7 @@ func (w Workspace) RunSandbox(ctx context.Context, runID string, request Sandbox
 			return SandboxResult{}, fmt.Errorf("sandbox egress requires configured managed proxy")
 		}
 		network = "bridge"
-		args = append(args, "--network", network, "-e", "HTTPS_PROXY="+p.EgressProxyURL, "-e", "HTTP_PROXY="+p.EgressProxyURL, "-e", "NO_PROXY=", "-e", "NORBOT_EGRESS_TOKEN="+os.Getenv(p.EgressProxySecret))
+		args = append(args, "--network", network, "-e", "HTTPS_PROXY="+p.EgressProxyURL, "-e", "HTTP_PROXY="+p.EgressProxyURL, "-e", "NO_PROXY=")
 	} else {
 		args = append(args, "--network", "none")
 	}

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -303,10 +304,28 @@ func (s *Service) sandboxHTTP(ctx context.Context, run domain.Run, action domain
 	method := action.Params["method"].(string)
 	rawURL := action.Params["url"].(string)
 	body, _ := action.Params["body"].(string)
-	command := []string{"--fail-with-body", "--silent", "--show-error", "--request", method, "--data-raw", body, rawURL}
-	request := runtime.SandboxRequest{Image: "curlimages/curl:8.12.1", Command: command, AllowedHosts: []string{mustHost(rawURL)}}
+	host := mustHost(rawURL)
+	signature, err := s.egressSignature(host)
+	if err != nil {
+		return nil, err
+	}
+	command := []string{"--fail-with-body", "--silent", "--show-error", "--proxy-header", "X-Norbot-Egress-Hosts: " + host, "--proxy-header", "X-Norbot-Egress-Signature: " + signature, "--request", method, "--data-raw", body, rawURL}
+	request := runtime.SandboxRequest{Image: "curlimages/curl:8.12.1", Command: command, AllowedHosts: []string{host}}
 	result, err := s.runSandbox(ctx, run, request)
 	return map[string]any{"output": result.Output, "exit_code": result.ExitCode, "duration_ms": result.DurationMS}, err
+}
+func (s *Service) egressSignature(hosts string) (string, error) {
+	ref := s.config.Manifest.Runtime.Sandbox.EgressProxySecret
+	if ref == "" {
+		return "", fmt.Errorf("sandbox egress proxy is not configured")
+	}
+	secret := os.Getenv(ref)
+	if secret == "" {
+		return "", fmt.Errorf("sandbox egress proxy secret is unavailable")
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(hosts))
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 func (s *Service) runSandbox(ctx context.Context, run domain.Run, request runtime.SandboxRequest) (runtime.SandboxResult, error) {
 	workspace, _, err := s.backendForRun(ctx, run)
