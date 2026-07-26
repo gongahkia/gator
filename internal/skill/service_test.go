@@ -3,6 +3,7 @@ package skill
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -81,5 +82,23 @@ func TestAdaptedSkillRejectsExecutableFiles(t *testing.T) {
 	_, _, _, err := inspectCandidate(discoveredSkill{Root: root, Path: "."}, ImportInput{SourceURI: "https://github.com/example/repo", Mode: "adapted"})
 	if err == nil {
 		t.Fatal("adapted skill accepted executable")
+	}
+}
+
+func TestLinkedRepositoriesReadsSafeGitHubRepositoryLinks(t *testing.T) {
+	readme := strings.Join([]string{
+		"[calendar](https://github.com/example/calendar-skill)",
+		"https://github.com/example/research-skill/tree/main",
+		"https://github.com/example/calendar-skill.",
+		"https://github.com/example/calendar-skill/issues",
+		"https://example.com/not-a-source",
+	}, "\n")
+	repositories, stats := linkedRepositories(readme, "https://github.com/example/catalogue")
+	want := []string{"https://github.com/example/calendar-skill.git", "https://github.com/example/research-skill.git"}
+	if len(repositories) != len(want) || repositories[0] != want[0] || repositories[1] != want[1] {
+		t.Fatalf("repositories=%#v", repositories)
+	}
+	if stats.RepositoriesDiscovered != len(want) || stats.RepositoriesScanned != 0 || stats.RepositoriesSkipped != 0 {
+		t.Fatalf("stats=%#v", stats)
 	}
 }

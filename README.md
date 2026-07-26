@@ -26,6 +26,8 @@ Skill imports accept HTTPS Git and OCI sources. Norbot recursively discovers eve
 
 Each candidate is independently limited to 128 regular non-executable files, 1 MiB per file, and 10 MiB total. Imports are copied into Norbot-managed storage by SHA-256 digest, stay `scanned` until explicitly activated, and only activated digests can be selected when creating a run. Adapted imports declare no executable tools or capabilities: their source files are available as read-only instructions only. Private source credentials are environment-variable references only.
 
+For catalogue repositories, `follow_readme_links: true` reads the root `README.md`, extracts up to 32 canonical public GitHub repository links, and scans each linked repository independently. Credentials are never sent to linked repositories; invalid, unsafe, or non-skill links are reported as skipped.
+
 `norbot health` prints detailed health and returns nonzero only for a critical down dependency; `norbot health --json`, `GET /api/health/detail`, `/api/health/stream`, and the web console provide the same redacted diagnostics.
 
 ## Channels

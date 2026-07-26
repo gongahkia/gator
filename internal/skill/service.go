@@ -12,9 +12,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -28,25 +30,37 @@ const (
 	maxSkillBytes      = 10 << 20
 	maxFileBytes       = 1 << 20
 	maxSkillsPerImport = 64
+	maxCatalogueRepos  = 32
 )
 
+var githubRepositoryURL = regexp.MustCompile(`https://github\.com/[^\s\)\]\}>"']+`)
+
 type ImportInput struct {
-	SourceType    string `json:"source_type"`
-	SourceURI     string `json:"source_uri"`
-	SourceRef     string `json:"source_ref"`
-	CredentialEnv string `json:"credential_env"`
-	Mode          string `json:"mode"`
+	SourceType        string `json:"source_type"`
+	SourceURI         string `json:"source_uri"`
+	SourceRef         string `json:"source_ref"`
+	CredentialEnv     string `json:"credential_env"`
+	Mode              string `json:"mode"`
+	FollowReadmeLinks bool   `json:"follow_readme_links"`
 }
 
 type RejectedSkill struct {
-	Path  string `json:"path"`
-	Error string `json:"error"`
+	SourceURI string `json:"source_uri,omitempty"`
+	Path      string `json:"path"`
+	Error     string `json:"error"`
+}
+
+type CatalogueStats struct {
+	RepositoriesDiscovered int `json:"repositories_discovered"`
+	RepositoriesScanned    int `json:"repositories_scanned"`
+	RepositoriesSkipped    int `json:"repositories_skipped"`
 }
 
 type ImportResult struct {
-	Imports  []domain.SkillImport  `json:"imports"`
-	Packages []domain.SkillPackage `json:"packages"`
-	Rejected []RejectedSkill       `json:"rejected"`
+	Imports   []domain.SkillImport  `json:"imports"`
+	Packages  []domain.SkillPackage `json:"packages"`
+	Rejected  []RejectedSkill       `json:"rejected"`
+	Catalogue *CatalogueStats       `json:"catalogue,omitempty"`
 }
 
 type discoveredSkill struct {
@@ -104,40 +118,82 @@ func (s *Service) ImportAll(ctx context.Context, input ImportInput) (ImportResul
 	if err != nil {
 		return ImportResult{}, err
 	}
-	candidates, err := discoverSkills(root)
-	if err != nil {
+	result := ImportResult{}
+	if err := s.importSource(ctx, root, input, &result); err != nil {
 		return ImportResult{}, err
 	}
-	result := ImportResult{}
-	for _, candidate := range candidates {
-		pkg, findings, mode, err := inspectCandidate(candidate, input)
-		if err != nil {
-			result.Rejected = append(result.Rejected, RejectedSkill{Path: candidate.Path, Error: err.Error()})
-			continue
-		}
-		destination := filepath.Join(s.artifactsDir, strings.TrimPrefix(pkg.Digest, "sha256:"))
-		if err := copyBundle(candidate.Root, destination); err != nil {
-			return ImportResult{}, err
-		}
-		pkg.Path = destination
-		pkg, err = s.store.UpsertSkillPackage(ctx, pkg)
+	if input.FollowReadmeLinks {
+		repositories, stats, err := discoverReadmeRepositories(root, input.SourceURI)
 		if err != nil {
 			return ImportResult{}, err
 		}
-		imported, err := s.store.CreateSkillImport(ctx, domain.SkillImport{SourceType: input.SourceType, SourceURI: input.SourceURI, SourceRef: input.SourceRef, CredentialEnv: input.CredentialEnv, BundlePath: candidate.Path, Mode: mode, Digest: pkg.Digest, State: "scanned", Findings: findings})
-		if err != nil {
-			return ImportResult{}, err
+		result.Catalogue = &stats
+		for index, repository := range repositories {
+			if len(result.Imports)+len(result.Rejected) >= maxSkillsPerImport {
+				stats.RepositoriesSkipped += len(repositories) - index
+				break
+			}
+			stats.RepositoriesScanned++
+			linkedRoot := filepath.Join(temporary, "catalogue", fmt.Sprintf("%03d", index))
+			linkedInput := input
+			linkedInput.SourceType, linkedInput.SourceURI, linkedInput.SourceRef, linkedInput.CredentialEnv, linkedInput.FollowReadmeLinks = "git", repository, "", "", false
+			if err := materializeGit(ctx, linkedRoot, linkedInput); err != nil {
+				result.Rejected = append(result.Rejected, RejectedSkill{SourceURI: repository, Error: err.Error()})
+				continue
+			}
+			before := len(result.Imports) + len(result.Rejected)
+			if err := s.importSource(ctx, linkedRoot, linkedInput, &result); err != nil {
+				result.Rejected = append(result.Rejected, RejectedSkill{SourceURI: repository, Error: err.Error()})
+				continue
+			}
+			if len(result.Imports)+len(result.Rejected) == before {
+				result.Rejected = append(result.Rejected, RejectedSkill{SourceURI: repository, Error: "no SKILL.md files found"})
+			}
 		}
-		result.Imports = append(result.Imports, imported)
-		result.Packages = append(result.Packages, pkg)
 	}
 	if len(result.Imports) == 0 {
 		if len(result.Rejected) > 0 {
 			return ImportResult{}, fmt.Errorf("no safe skill bundles found: %s", result.Rejected[0].Error)
 		}
+		if result.Catalogue != nil && result.Catalogue.RepositoriesDiscovered > 0 {
+			return ImportResult{}, fmt.Errorf("no SKILL.md files found in the source or its README-linked repositories")
+		}
 		return ImportResult{}, fmt.Errorf("no SKILL.md files found")
 	}
 	return result, nil
+}
+
+func (s *Service) importSource(ctx context.Context, root string, input ImportInput, result *ImportResult) error {
+	candidates, err := discoverSkills(root)
+	if err != nil {
+		return err
+	}
+	for _, candidate := range candidates {
+		if len(result.Imports)+len(result.Rejected) >= maxSkillsPerImport {
+			return nil
+		}
+		pkg, findings, mode, err := inspectCandidate(candidate, input)
+		if err != nil {
+			result.Rejected = append(result.Rejected, RejectedSkill{SourceURI: input.SourceURI, Path: candidate.Path, Error: err.Error()})
+			continue
+		}
+		destination := filepath.Join(s.artifactsDir, strings.TrimPrefix(pkg.Digest, "sha256:"))
+		if err := copyBundle(candidate.Root, destination); err != nil {
+			return err
+		}
+		pkg.Path = destination
+		pkg, err = s.store.UpsertSkillPackage(ctx, pkg)
+		if err != nil {
+			return err
+		}
+		imported, err := s.store.CreateSkillImport(ctx, domain.SkillImport{SourceType: input.SourceType, SourceURI: input.SourceURI, SourceRef: input.SourceRef, CredentialEnv: input.CredentialEnv, BundlePath: candidate.Path, Mode: mode, Digest: pkg.Digest, State: "scanned", Findings: findings})
+		if err != nil {
+			return err
+		}
+		result.Imports = append(result.Imports, imported)
+		result.Packages = append(result.Packages, pkg)
+	}
+	return nil
 }
 
 func (s *Service) Activate(ctx context.Context, id int64) (domain.SkillImport, error) {
@@ -336,6 +392,85 @@ func parseOCI(uri, ref string) (string, string, string, error) {
 		}
 	}
 	return registry, remainder, ref, nil
+}
+
+func discoverReadmeRepositories(root, currentSource string) ([]string, CatalogueStats, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, CatalogueStats{}, err
+	}
+	for _, entry := range entries {
+		if !strings.EqualFold(entry.Name(), "readme.md") || entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, CatalogueStats{}, err
+		}
+		if !info.Mode().IsRegular() || info.Size() > maxFileBytes {
+			return nil, CatalogueStats{}, fmt.Errorf("README.md is not a safe catalogue file")
+		}
+		body, err := os.ReadFile(filepath.Join(root, entry.Name()))
+		if err != nil {
+			return nil, CatalogueStats{}, err
+		}
+		repositories, stats := linkedRepositories(string(body), currentSource)
+		return repositories, stats, nil
+	}
+	return nil, CatalogueStats{}, nil
+}
+
+func linkedRepositories(readme, currentSource string) ([]string, CatalogueStats) {
+	current, _ := canonicalGitHubRepository(currentSource)
+	seen := map[string]bool{}
+	repositories := []string{}
+	stats := CatalogueStats{}
+	for _, raw := range githubRepositoryURL.FindAllString(readme, -1) {
+		repository, ok := canonicalGitHubRepository(raw)
+		if !ok || repository == current || seen[repository] {
+			continue
+		}
+		seen[repository] = true
+		stats.RepositoriesDiscovered++
+		if len(repositories) >= maxCatalogueRepos {
+			stats.RepositoriesSkipped++
+			continue
+		}
+		repositories = append(repositories, repository)
+	}
+	return repositories, stats
+}
+
+func canonicalGitHubRepository(raw string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimRight(raw, ".,;:"))
+	if err != nil || parsed.Scheme != "https" || !strings.EqualFold(parsed.Host, "github.com") || parsed.User != nil || parsed.Port() != "" {
+		return "", false
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 2 {
+		return "", false
+	}
+	if len(parts) > 2 && parts[2] != "tree" && parts[2] != "blob" {
+		return "", false
+	}
+	owner, repository := parts[0], strings.TrimSuffix(parts[1], ".git")
+	if !validGitHubSegment(owner) || !validGitHubSegment(repository) {
+		return "", false
+	}
+	return "https://github.com/" + owner + "/" + repository + ".git", true
+}
+
+func validGitHubSegment(value string) bool {
+	if value == "" || len(value) > 100 {
+		return false
+	}
+	for _, character := range value {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' || character >= '0' && character <= '9' || character == '-' || character == '_' || character == '.' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func discoverSkills(root string) ([]discoveredSkill, error) {
