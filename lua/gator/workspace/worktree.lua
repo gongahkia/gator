@@ -82,4 +82,32 @@ function M.create(opts)
 	end
 	return { root = root, path = path, branch = opts.branch, base = opts.base }
 end
+
+function M.remove(opts)
+	if
+		type(opts) ~= "table"
+		or type(opts.root) ~= "string"
+		or opts.root == ""
+		or type(opts.path) ~= "string"
+		or opts.path == ""
+		or type(opts.branch) ~= "string"
+		or opts.branch == ""
+		or (opts.run ~= nil and type(opts.run) ~= "function")
+		or (opts.git ~= nil and not git_boundary.is(opts.git))
+	then
+		fail("remove requires root, path, branch, and optional Git boundary")
+	end
+	if opts.run ~= nil and opts.git ~= nil then
+		fail("remove accepts either run or git")
+	end
+	local root = vim.uv.fs_realpath(opts.root)
+	local path = vim.uv.fs_realpath(opts.path)
+	if not root or not path or root == path then
+		fail("remove requires a linked worktree")
+	end
+	local git = opts.git or git_boundary.new({ run = opts.run })
+	invoke(git, { "git", "worktree", "remove", "--force", path }, root, "worktree removal")
+	invoke(git, { "git", "branch", "--delete", "--force", opts.branch }, root, "worktree branch removal")
+	return true
+end
 return M

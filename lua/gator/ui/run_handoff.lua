@@ -26,10 +26,47 @@ local function render(panel)
 		"Transcript: " .. panel.source.transcript,
 		"",
 	}
+	if #panel.conflicts > 0 then
+		table.insert(lines, "Target conflicts: " .. #panel.conflicts .. " · choose apply/skip for each on launch")
+		for _, conflict in ipairs(panel.conflicts) do
+			table.insert(lines, "- " .. redact.text(conflict.path) .. " · " .. redact.text(conflict.reason))
+		end
+		table.insert(lines, "")
+	end
+	if panel.preview and panel.preview ~= "" then
+		vim.list_extend(lines, { "## Target-worktree diff", "", "```diff", panel.preview, "```", "" })
+	end
 	vim.list_extend(lines, vim.split(panel.body, "\n", { plain = true, trimempty = false }))
 	table.insert(lines, "")
 	table.insert(lines, "<CR> launch new session · e edit note/bundle · q cancel · ? help")
 	accessibility.render(panel.buffer, lines, "gator-handoff")
+end
+
+local function confirm(panel)
+	local decisions = {}
+	local function next_conflict(index)
+		local conflict = panel.conflicts[index]
+		if not conflict then
+			panel.confirmed = true
+			panel.on_confirm(panel.body, decisions)
+			M.close()
+			return
+		end
+		vim.ui.select({ "Apply source snapshot", "Skip source snapshot", "Cancel" }, {
+			prompt = "Gator handoff conflict · " .. redact.text(conflict.path) .. " · " .. redact.text(
+				conflict.reason
+			),
+		}, function(choice)
+			if choice == "Apply source snapshot" then
+				decisions[conflict.path] = "apply"
+				next_conflict(index + 1)
+			elseif choice == "Skip source snapshot" then
+				decisions[conflict.path] = "skip"
+				next_conflict(index + 1)
+			end
+		end)
+	end
+	next_conflict(1)
 end
 
 function M.open(opts)
@@ -42,10 +79,24 @@ function M.open(opts)
 	then
 		fail("open requires source, target, body, and confirm callback")
 	end
+	if opts.preview ~= nil and type(opts.preview) ~= "string" then
+		fail("preview must be text")
+	end
+	if opts.conflicts ~= nil and (type(opts.conflicts) ~= "table" or not vim.islist(opts.conflicts)) then
+		fail("conflicts must be an array")
+	end
+	if opts.on_cancel ~= nil and type(opts.on_cancel) ~= "function" then
+		fail("cancel callback must be a function")
+	end
 	local panel, tabpage = current()
 	if panel then
+		if panel.on_cancel and not panel.confirmed then
+			panel.on_cancel()
+		end
 		panel.source, panel.target, panel.profile, panel.body, panel.on_confirm =
 			opts.source, opts.target, opts.profile, opts.body, opts.on_confirm
+		panel.preview, panel.conflicts, panel.on_cancel, panel.confirmed =
+			opts.preview, vim.deepcopy(opts.conflicts or {}), opts.on_cancel, false
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
@@ -63,13 +114,16 @@ function M.open(opts)
 		profile = opts.profile,
 		body = redact.text(opts.body),
 		on_confirm = opts.on_confirm,
+		preview = redact.text(opts.preview or ""),
+		conflicts = vim.deepcopy(opts.conflicts or {}),
+		on_cancel = opts.on_cancel,
+		confirmed = false,
 	}
 	panels[tabpage] = panel
 	render(panel)
 	accessibility.panel(buffer, { confirm = "<CR>", edit = "e", cancel = "q", help = "?" }, {
 		confirm = function()
-			panel.on_confirm(panel.body)
-			M.close()
+			confirm(panel)
 		end,
 		edit = function()
 			vim.ui.input({ prompt = "Gator handoff note/bundle: ", default = panel.body }, function(value)
@@ -81,7 +135,10 @@ function M.open(opts)
 		end,
 		cancel = M.close,
 		help = function()
-			vim.notify("Gator handoff: <CR> launch, e edit, q cancel", vim.log.levels.INFO)
+			vim.notify(
+				"Gator handoff: <CR> launch, e edit, q cancel; conflicts require per-file apply/skip",
+				vim.log.levels.INFO
+			)
 		end,
 	})
 	return panel.window
@@ -91,6 +148,9 @@ function M.close()
 	local panel, tabpage = current()
 	if not panel then
 		return false
+	end
+	if panel.on_cancel and not panel.confirmed then
+		panel.on_cancel()
 	end
 	panel_window.close(panel.window, panel.previous)
 	panels[tabpage] = nil

@@ -48,11 +48,18 @@ assert(
 	loading.enabled and loading.spinner == "whirly.hanoi" and loading.interval_ms == 80,
 	"loading configuration must select a bundled spinner and optional cadence override"
 )
-local budget = config.resolve({ budget = { max_tokens = 1000, action = "stop" } }).budget
+local budget = config.resolve({ budget = { max_tokens = 1000, action = "stop", max_concurrent_runs = 2 } }).budget
 assert(
-	budget.max_tokens == 1000 and budget.action == "stop",
+	budget.max_tokens == 1000 and budget.action == "stop" and budget.max_concurrent_runs == 2,
 	"budget configuration must preserve explicit limits and actions"
 )
+local review = config.resolve({ review = { commands = { unit = { argv = { "make", "test" } } } } }).review
+assert(review.commands.unit.argv[2] == "test", "review commands must be explicit argv arrays")
+local acp = config.resolve({
+	acp = { commands = { localagent = { argv = { "local-agent", "--acp" } } } },
+	launch = { default_provider = "localagent" },
+}).acp
+assert(acp.commands.localagent.argv[1] == "local-agent", "ACP commands must require an explicit configured argv")
 assert(
 	not pcall(
 			config.resolve,
@@ -71,6 +78,8 @@ assert(
 		and not pcall(config.resolve, { ui = { loading = { spinner = "unknown" } } })
 		and not pcall(config.resolve, { ui = { loading = { interval_ms = 15 } } })
 		and not pcall(config.resolve, { budget = { max_tokens = -1 } })
+		and not pcall(config.resolve, { review = { commands = { invalid = { argv = {} } } } })
+		and not pcall(config.resolve, { acp = { commands = { Invalid = { argv = { "agent" } } } } })
 		and not pcall(config.resolve, { budget = { action = "invalid" } }),
 	"handoff authoring settings must reject unsupported authors, bounds, and review modes"
 )
@@ -93,7 +102,7 @@ assert(
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":7}')
+helpers.write(path, '{"schema_version":8}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

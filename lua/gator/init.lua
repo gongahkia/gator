@@ -76,6 +76,14 @@ function M.handoff(run_id, provider, opts)
 	return M._coordinator:workflow():handoff(run_id, provider, opts)
 end
 
+function M.send_context(opts)
+	return M.dispatch("send_context", opts)
+end
+
+function M.review(run_id)
+	return M.dispatch("review", { run_id = run_id })
+end
+
 function M.health()
 	return M.dispatch("health")
 end

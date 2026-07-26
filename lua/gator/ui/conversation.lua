@@ -32,10 +32,16 @@ local function render(panel)
 	accessibility.render(panel.buffer, lines, "gator-conversation")
 end
 
+local function append_lines(target, value)
+	for _, line in ipairs(vim.split(redact.text(value), "\n", { plain = true, trimempty = false })) do
+		table.insert(target, line)
+	end
+end
+
 local function input(panel)
 	vim.ui.input({ prompt = "Gator prompt: " }, function(value)
 		if type(value) == "string" and vim.trim(value) ~= "" then
-			table.insert(panel.lines, "> " .. redact.text(value))
+			append_lines(panel.lines, "> " .. value)
 			panel.on_message("user", value)
 			render(panel)
 			panel.on_input(value)
@@ -71,10 +77,20 @@ function M.open(opts)
 	if opts.run_id ~= nil and (type(opts.run_id) ~= "string" or opts.run_id == "") then
 		fail("run_id must be non-empty text")
 	end
+	if opts.history ~= nil and (type(opts.history) ~= "table" or not vim.islist(opts.history)) then
+		fail("history must be an array")
+	end
 	for _, name in ipairs({ "provider", "session_id", "state" }) do
 		if type(opts[name]) ~= "string" or opts[name] == "" then
 			fail(name .. " must be non-empty text")
 		end
+	end
+	local history = {}
+	for _, value in ipairs(opts.history or {}) do
+		if type(value) ~= "string" then
+			fail("history must contain text")
+		end
+		append_lines(history, value)
 	end
 	local panel, tabpage = current()
 	if panel then
@@ -97,7 +113,7 @@ function M.open(opts)
 		session_id = opts.session_id,
 		run_id = opts.run_id,
 		state = opts.state,
-		lines = {},
+		lines = history,
 		on_input = opts.on_input,
 		on_cancel = opts.on_cancel,
 		on_detach = opts.on_detach or function() end,
@@ -126,7 +142,7 @@ function M.update(opts)
 	end
 	if opts.text ~= nil and opts.text ~= "" then
 		local value = redact.text(opts.text)
-		table.insert(panel.lines, value)
+		append_lines(panel.lines, value)
 		panel.on_message("assistant", value)
 	end
 	render(panel)

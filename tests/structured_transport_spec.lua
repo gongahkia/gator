@@ -67,6 +67,63 @@ assert(
 assert(pi.cancel() and sent[#sent].type == "abort", "Pi chat cancellation must use the RPC abort command")
 
 manager, sent, process = fake_manager()
+local resumed_pi = nil
+manager:resume({
+	provider = "pi",
+	cwd = vim.fn.getcwd(),
+	session = { id = "pi-existing", path = "/tmp/pi-existing.jsonl" },
+	on_session = function(value)
+		resumed_pi = value
+	end,
+})
+assert(
+	vim.deep_equal(process.argv, { "pi", "--mode", "rpc", "--session", "/tmp/pi-existing.jsonl" })
+		and sent[1].type == "get_state",
+	"Pi chat resume must reopen the documented persisted session without fabricating a prompt"
+)
+process.stdout(nil, vim.json.encode({
+	type = "response",
+	command = "get_state",
+	success = true,
+	data = { sessionId = "pi-existing", sessionFile = "/tmp/pi-existing.jsonl" },
+}) .. "\n")
+assert(
+	resumed_pi.id == "pi-existing" and resumed_pi.path == "/tmp/pi-existing.jsonl" and resumed_pi.resume_supported,
+	"Pi resume must retain the durable session identity and path"
+)
+
+manager, sent, process = fake_manager()
+local rejected_pi = nil
+manager:resume({
+	provider = "pi",
+	cwd = vim.fn.getcwd(),
+	session = { id = "pi-existing" },
+	on_session = function()
+		rejected_pi = "accepted"
+	end,
+	on_event = function(kind, value)
+		rejected_pi = kind == "error" and value or rejected_pi
+	end,
+})
+process.stdout(nil, vim.json.encode({
+	type = "response",
+	command = "get_state",
+	success = true,
+	data = { sessionId = "pi-other" },
+}) .. "\n")
+assert(
+	rejected_pi == "provider resume returned a different session identity",
+	"Pi resume must reject a provider response that does not confirm the stored session"
+)
+
+manager, sent, process = fake_manager()
+manager:fork({ provider = "pi", cwd = vim.fn.getcwd(), session = { id = "pi-existing" }, prompt = "continue" })
+assert(
+	vim.deep_equal(process.argv, { "pi", "--mode", "rpc", "--fork", "pi-existing" }),
+	"Pi native forks must use Pi's documented session fork flag"
+)
+
+manager, sent, process = fake_manager()
 local codex_session, codex_events = nil, {}
 manager:open({
 	provider = "codex",
@@ -101,6 +158,58 @@ process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", method = "turn/completed"
 assert(
 	codex_events[1].value == "done" and codex_events[2].kind == "settled",
 	"Codex deltas and turn completion must update chat state"
+)
+
+manager, sent, process = fake_manager()
+local resumed_codex = nil
+manager:resume({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	session = { id = "thread-existing" },
+	on_session = function(value)
+		resumed_codex = value
+	end,
+})
+process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 1, result = {} }) .. "\n")
+assert(
+	sent[3].method == "thread/resume" and sent[3].params.threadId == "thread-existing",
+	"Codex chat resume must use the documented App Server thread resume request"
+)
+process.stdout(
+	nil,
+	vim.json.encode({ jsonrpc = "2.0", id = 2, result = { thread = { id = "thread-existing" } } }) .. "\n"
+)
+assert(
+	resumed_codex.id == "thread-existing" and resumed_codex.resume_supported and #sent == 3,
+	"Codex resume must reopen history without creating a synthetic turn"
+)
+
+manager, sent, process = fake_manager()
+local rejected_codex = nil
+manager:resume({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	session = { id = "thread-existing" },
+	on_session = function()
+		rejected_codex = "accepted"
+	end,
+	on_event = function(kind, value)
+		rejected_codex = kind == "error" and value or rejected_codex
+	end,
+})
+process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 1, result = {} }) .. "\n")
+process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 2, result = { thread = { id = "thread-other" } } }) .. "\n")
+assert(
+	rejected_codex == "provider resume returned a different session identity",
+	"Codex resume must reject a provider response that does not confirm the stored thread"
+)
+
+manager, sent, process = fake_manager()
+manager:fork({ provider = "codex", cwd = vim.fn.getcwd(), session = { id = "thread-existing" }, prompt = "continue" })
+process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 1, result = {} }) .. "\n")
+assert(
+	sent[3].method == "thread/fork" and sent[3].params.threadId == "thread-existing",
+	"Codex native forks must use the App Server thread fork request"
 )
 
 manager, sent, process = fake_manager()

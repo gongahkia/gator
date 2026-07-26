@@ -9,9 +9,12 @@ local provider_picker = require("gator.ui.provider_picker")
 local conversation = require("gator.ui.conversation")
 local run_graph = require("gator.ui.run_graph")
 local handoff_review = require("gator.ui.run_handoff")
+local review_ui = require("gator.ui.run_review")
 local loading_ui = require("gator.ui.loading")
 local worktree = require("gator.workspace.worktree")
 local state_store = require("gator.state")
+local review_validation = require("gator.review.validation")
+local policy_overlay = require("gator.policy.overlay")
 
 local M = { name = "workflow", api_version = 2 }
 local Workflow = {}
@@ -66,6 +69,13 @@ local function writers(value)
 	return active_state(value) and (value.role == "primary" or value.role == "writer")
 end
 
+local function context_kind(value)
+	if value ~= "selection" and value ~= "diagnostic" and value ~= "hunk" and value ~= "bundle" then
+		fail("context kind must be selection, diagnostic, hunk, or bundle")
+	end
+	return value
+end
+
 function M.new(opts)
 	opts = opts or {}
 	if type(opts) ~= "table" or not state_store.is(opts.state) then
@@ -82,6 +92,8 @@ function M.new(opts)
 			and key ~= "structured"
 			and key ~= "loading"
 			and key ~= "handoff_review"
+			and key ~= "review_ui"
+			and key ~= "review_validation"
 		then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
@@ -98,11 +110,14 @@ function M.new(opts)
 		structured = opts.structured or structured.new(),
 		loading = opts.loading or loading_ui,
 		handoff_review = opts.handoff_review or handoff_review,
+		review_ui = opts.review_ui or review_ui,
+		review_validation = opts.review_validation or review_validation,
 		loading_handles = {},
 		providers = {},
 		active = {},
 		transcripts = {},
 		pending_summary = {},
+		review_sessions = {},
 	}, Workflow)
 	value:refresh()
 	return value
@@ -110,6 +125,17 @@ end
 
 function Workflow:runs()
 	return self.store:list()
+end
+
+function Workflow:recover()
+	local recovered = 0
+	for _, run in ipairs(self:runs()) do
+		if active_state(run) and run.state ~= "detached" then
+			self:update(run.id, { state = "detached" })
+			recovered = recovered + 1
+		end
+	end
+	return recovered
 end
 
 function Workflow:run(id)
@@ -176,7 +202,14 @@ function Workflow:refresh()
 	for name, value in pairs(self.state.config.providers) do
 		confirmations[name] = value.user_confirmed
 	end
-	for _, record in ipairs(managed_adapter.catalog({ cwd = self.root, user_confirmed = confirmations })) do
+	self.managed:configure({ commands = self.state.config.acp.commands })
+	for _, record in
+		ipairs(managed_adapter.catalog({
+			cwd = self.root,
+			user_confirmed = confirmations,
+			commands = self.state.config.acp.commands,
+		}))
+	do
 		if record.available then
 			providers[record.provider] = {
 				provider = record.provider,
@@ -300,6 +333,29 @@ function Workflow:workspace(id, force_worktree)
 	return { kind = "worktree", root = created.path, branch = created.branch }
 end
 
+function Workflow:handoff_workspace(source, force_worktree)
+	if force_worktree then
+		return self:workspace(run_store.id("handoff"), true)
+	end
+	return { kind = "project", root = self.root }
+end
+
+function Workflow:discard_workspace(workspace)
+	if type(workspace) ~= "table" or workspace.kind ~= "worktree" then
+		return false
+	end
+	local ok = pcall(worktree.remove, {
+		root = self.root,
+		path = workspace.root,
+		branch = workspace.branch,
+	})
+	if not ok then
+		vim.notify("Gator: retained unlaunched handoff worktree at " .. workspace.root, vim.log.levels.WARN)
+		return false
+	end
+	return true
+end
+
 function Workflow:bundle(opts, workspace)
 	if opts.bundle_body then
 		local body = text(opts.bundle_body, "handoff bundle")
@@ -318,11 +374,14 @@ function Workflow:bundle(opts, workspace)
 end
 
 function Workflow:open_conversation(run)
+	local transcript = self:transcript(run)
+	local history = transcript and vim.split(transcript, "\n", { plain = true, trimempty = false }) or {}
 	conversation.open({
 		provider = run.provider,
 		session_id = run.session and run.session.id or run.id,
 		run_id = run.id,
 		state = run.state,
+		history = history,
 		on_input = function(message)
 			self:send(run.id, message)
 		end,
@@ -378,16 +437,19 @@ function Workflow:open_terminal(run, prepared)
 	})
 end
 
-function Workflow:open_structured(run, prompt)
+function Workflow:open_structured(run, prompt, operation, existing_session)
 	local opened = self.structured:open({
 		provider = run.provider,
 		run_id = run.id,
 		cwd = run.workspace.root,
 		prompt = prompt,
+		operation = operation,
+		session = existing_session,
 		on_session = function(session)
 			self:close_loading(run.id)
-			self:update(run.id, { session = session, state = "running" })
-			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = "running" })
+			local state = prompt and "running" or "waiting_input"
+			self:update(run.id, { session = session, state = state })
+			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
 		end,
 		on_event = function(kind, value)
 			if kind == "text" then
@@ -428,11 +490,11 @@ function Workflow:open_structured(run, prompt)
 		end,
 	})
 	self.active[run.id] = { kind = "structured", handle = opened }
-	self:open_conversation(run)
+	self:open_conversation(self:run(run.id))
 	return run
 end
 
-function Workflow:open_managed(run, prompt)
+function Workflow:open_managed(run, prompt, existing_session)
 	local history
 	if self.providers[run.provider].managed_mode == "history" then
 		local directory = self.store.directory .. "/aider"
@@ -451,17 +513,26 @@ function Workflow:open_managed(run, prompt)
 		provider = run.provider,
 		cwd = run.workspace.root,
 		run_id = run.id,
+		session = existing_session,
 		history = history,
 		prompt = prompt,
 		on_session = function(session)
 			self:close_loading(run.id)
 			reference = session
 			self.active[run.id] = { kind = "managed", reference = session }
+			local state = prompt and "running" or "waiting_input"
 			self:update(run.id, {
-				state = "running",
-				session = { id = session.id, resume_supported = managed_adapter.can_resume(run.provider) },
+				state = state,
+				session = {
+					id = session.id,
+					provider = session.provider,
+					owner = session.owner,
+					mode = session.mode,
+					resume_supported = self.managed:can_resume(run.provider, session),
+					capabilities = session.capabilities,
+				},
 			})
-			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = "running" })
+			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
 		end,
 		on_event = function(event)
 			if event.type == "text" or event.type == "complete" then
@@ -495,7 +566,7 @@ function Workflow:open_managed(run, prompt)
 	if reference then
 		self.active[run.id] = { kind = "managed", reference = reference }
 	end
-	self:open_conversation(run)
+	self:open_conversation(self:run(run.id))
 	return opened
 end
 
@@ -507,12 +578,33 @@ function Workflow:launch(opts)
 	local chosen = self:provider(opts.provider)
 	local transport = self:resolve_transport(chosen, opts.transport)
 	local id = run_store.id("run")
-	local workspace = self:workspace(id, opts.force_worktree == true)
+	local workspace = opts.workspace or self:workspace(id, opts.force_worktree == true)
+	if type(workspace) ~= "table" or (workspace.kind ~= "project" and workspace.kind ~= "worktree") then
+		fail("workspace must identify a project or worktree")
+	end
+	if type(workspace.root) ~= "string" or not vim.uv.fs_realpath(workspace.root) then
+		fail("workspace root must resolve")
+	end
+	if opts.native_session_operation ~= nil then
+		if
+			opts.native_session_operation ~= "fork"
+			or transport ~= "chat"
+			or not structured.supports(chosen.provider)
+		then
+			fail("native session operation is unavailable for this provider transport")
+		end
+		if type(opts.native_session) ~= "table" or type(opts.native_session.id) ~= "string" then
+			fail("native session fork requires a provider session")
+		end
+	end
 	local body, estimate = self:bundle(opts, workspace)
 	local bundle_id = run_store.id("bundle")
 	self.store:bundle(bundle_id, body)
 	if opts.handoff_snapshot then
-		self.store:materialize_handoff(bundle_id, body, opts.handoff_snapshot, workspace.root)
+		self.store:materialize_handoff(bundle_id, body, opts.handoff_snapshot, workspace.root, {
+			decisions = opts.handoff_decisions,
+			apply = opts.apply_handoff_snapshot,
+		})
 	elseif workspace.kind == "worktree" then
 		self.store:materialize_bundle(bundle_id, body, workspace.root)
 	end
@@ -538,10 +630,13 @@ function Workflow:launch(opts)
 	})
 	local prompt = objective .. "\n\nUse this Gator context bundle:\n\n" .. body
 	if opts.handoff_snapshot then
+		local state = opts.apply_handoff_snapshot == false and "were retained" or "were applied and retained"
 		prompt = prompt
-			.. "\n\nReviewed source-file snapshots were applied and retained at .gator/handoffs/"
+			.. "\n\nReviewed source-file snapshots "
+			.. state
+			.. " at .gator/handoffs/"
 			.. bundle_id
-			.. "/files/ in this workspace."
+			.. "/files/."
 	end
 	self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
 	if transport == "terminal" then
@@ -559,7 +654,9 @@ function Workflow:launch(opts)
 			end
 		end)
 	elseif structured.supports(run.provider) then
-		local ok, err = pcall(self.open_structured, self, run, prompt)
+		local operation = opts.native_session_operation
+		local existing = opts.native_session
+		local ok, err = pcall(self.open_structured, self, run, prompt, operation, existing)
 		if not ok then
 			self:close_loading(run.id)
 			error(err, 0)
@@ -580,7 +677,6 @@ end
 function Workflow:send(id, message)
 	message = text(message, "prompt")
 	local run = self:run(id)
-	self:append_transcript(id, "user", message)
 	local active = self.active[id]
 	if not active then
 		fail("run is not active in this Neovim instance")
@@ -597,8 +693,285 @@ function Workflow:send(id, message)
 	else
 		fail("native terminal runs accept input in their terminal")
 	end
+	self:append_transcript(id, "user", message)
 	self:update(run.id, { state = "running" })
 	return true
+end
+
+function Workflow:send_context(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("send context requires options")
+	end
+	local run_id = opts.run_id
+	if run_id == nil then
+		local choices = {}
+		for _, candidate in ipairs(self:runs()) do
+			local active = self.active[candidate.id]
+			if
+				candidate.transport == "chat"
+				and active
+				and (active.kind == "structured" or active.kind == "managed")
+			then
+				table.insert(choices, candidate)
+			end
+		end
+		if #choices == 0 then
+			fail("no active structured Gator chat can receive editor context")
+		end
+		vim.ui.select(choices, {
+			prompt = "Send editor context to Gator run",
+			format_item = function(value)
+				return value.id .. " · " .. value.provider .. " · " .. value.objective
+			end,
+		}, function(choice)
+			if choice then
+				opts.run_id = choice.id
+				local ok, err = pcall(self.send_context, self, opts)
+				if not ok then
+					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
+			end
+		end)
+		return true
+	end
+	local run = self:run(run_id)
+	local active = self.active[run.id]
+	if run.transport ~= "chat" or not active or (active.kind ~= "structured" and active.kind ~= "managed") then
+		fail("editor context can be sent only to an active structured Gator chat")
+	end
+	if opts.kind == nil then
+		vim.ui.select(
+			{ "selection", "diagnostic", "hunk", "bundle" },
+			{ prompt = "Gator context kind" },
+			function(choice)
+				if choice then
+					opts.kind = choice
+					local ok, err = pcall(self.send_context, self, opts)
+					if not ok then
+						vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					end
+				end
+			end
+		)
+		return true
+	end
+	local kind = context_kind(opts.kind)
+	if kind == "bundle" and opts.bundle_id == nil then
+		vim.ui.input({ prompt = "Gator context bundle id: " }, function(value)
+			if type(value) == "string" and vim.trim(value) ~= "" then
+				opts.bundle_id = value
+				local ok, err = pcall(self.send_context, self, opts)
+				if not ok then
+					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
+			end
+		end)
+		return true
+	end
+	local message
+	if kind == "selection" then
+		local selected = capture.current(opts)
+		message = table.concat({
+			"## Gator follow-up editor context",
+			"- Kind: selection",
+			"- Path: `" .. selected.path .. "`",
+			"- Lines: " .. selected.first_line .. "-" .. selected.last_line,
+			"- Changedtick: " .. selected.changedtick,
+			"",
+			"```" .. selected.language,
+			selected.text,
+			"```",
+		}, "\n")
+	elseif kind == "diagnostic" then
+		local diagnostics = capture.diagnostics(opts)
+		local lines = {
+			"## Gator follow-up editor context",
+			"- Kind: diagnostic",
+			"- Path: `" .. diagnostics.path .. "`",
+			"- Lines: " .. diagnostics.first_line .. "-" .. diagnostics.last_line,
+			"",
+		}
+		for _, item in ipairs(diagnostics.values) do
+			table.insert(
+				lines,
+				"- " .. item.severity .. " " .. item.line .. ":" .. item.column .. " · " .. item.message
+			)
+		end
+		message = table.concat(lines, "\n")
+	elseif kind == "hunk" then
+		local hunk = capture.hunk({ root = run.workspace.root, buffer = opts.buffer })
+		message = table.concat({
+			"## Gator follow-up editor context",
+			"- Kind: Git hunk",
+			"- Path: `" .. hunk.path .. "`",
+			"",
+			"```diff",
+			hunk.text,
+			"```",
+		}, "\n")
+	else
+		local bundle = self.store:read_bundle(opts.bundle_id)
+		if not bundle then
+			fail("context bundle is unavailable: " .. tostring(opts.bundle_id))
+		end
+		message = "## Gator follow-up editor context\n- Kind: named bundle\n- Bundle: `"
+			.. opts.bundle_id
+			.. "`\n\n"
+			.. bundle
+	end
+	return self:send(run.id, message)
+end
+
+function Workflow:attach_context(id)
+	return self:send_context({ run_id = id })
+end
+
+function Workflow:review_context(run)
+	local base_sha = capture.head(run.workspace.root)
+	if not base_sha then
+		fail("review requires a Git workspace with HEAD")
+	end
+	local diff = capture.diff(run.workspace.root) or ""
+	return { base_sha = base_sha, diff = diff, diff_sha256 = vim.fn.sha256(diff) }
+end
+
+function Workflow:review(id)
+	if id == nil then
+		local runs = self:runs()
+		if #runs == 0 then
+			fail("no Gator runs are available for review")
+		end
+		vim.ui.select(runs, {
+			prompt = "Review Gator run",
+			format_item = function(value)
+				return value.id .. " · " .. value.provider .. " · " .. value.role .. " · " .. value.state
+			end,
+		}, function(choice)
+			if choice then
+				local ok, err = pcall(self.review, self, choice.id)
+				if not ok then
+					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
+			end
+		end)
+		return true
+	end
+	local run = self:run(id)
+	local context = self:review_context(run)
+	local commands = vim.tbl_keys(self.state.config.review.commands)
+	table.sort(commands)
+	self.review_sessions[run.id] = context
+	return self.review_ui.open({
+		run = run,
+		workspace = run.workspace.root,
+		base_sha = context.base_sha,
+		diff_sha256 = context.diff_sha256,
+		diff = context.diff,
+		commands = commands,
+		on_test = function(command_id)
+			vim.ui.select({ "Run approved test", "Cancel" }, {
+				prompt = "Gator review · run " .. command_id .. " in " .. run.workspace.root,
+			}, function(choice)
+				if choice == "Run approved test" then
+					local ok, err = pcall(self.execute_review_test, self, run.id, command_id, true)
+					if not ok then
+						vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					end
+				end
+			end)
+		end,
+		on_decision = function(decision)
+			local ok, err = pcall(self.record_review_decision, self, run.id, decision)
+			if not ok then
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				return
+			end
+			self.review_ui.close()
+			if decision == "handoff" then
+				self:handoff(run.id)
+			end
+		end,
+	})
+end
+
+function Workflow:review_policy(run)
+	return policy_overlay.new({
+		scope = "run",
+		target = run.id,
+		rules = { test_commands = vim.deepcopy(self.state.config.review.commands) },
+		provenance = { source = "gator.setup", ref = "review.commands" },
+	})
+end
+
+function Workflow:execute_review_test(id, command_id, confirmed)
+	if confirmed ~= true then
+		fail("review test execution requires explicit confirmation")
+	end
+	local run = self:run(id)
+	local context = self.review_sessions[run.id]
+	if not context then
+		fail("open a Gator review before running its approved test")
+	end
+	local current = self:review_context(run)
+	if current.base_sha ~= context.base_sha or current.diff_sha256 ~= context.diff_sha256 then
+		fail("review is stale because the target worktree changed")
+	end
+	local output = {}
+	local result = self.review_validation.execute({
+		policy = self:review_policy(run),
+		command_id = command_id,
+		workspace = run.workspace,
+		on_evidence = function(value)
+			table.insert(output, "[" .. value.stream .. "]\n" .. value.text)
+		end,
+	})
+	local record = self.store:write_review({
+		id = run_store.id("review"),
+		run_id = run.id,
+		state = result.passed and "passed" or "failed",
+		base_sha = context.base_sha,
+		diff_sha256 = context.diff_sha256,
+		command_id = result.command_id,
+		argv = result.argv,
+		exit_code = result.code,
+		passed = result.passed,
+		created_at = now(),
+	}, table.concat(output, "\n"))
+	self:update(run.id, { review = { id = record.review.id, state = record.review.state } })
+	vim.notify(
+		"Gator review test "
+			.. result.command_id
+			.. " "
+			.. (result.passed and "passed" or "failed")
+			.. " · evidence "
+			.. record.output_ref,
+		result.passed and vim.log.levels.INFO or vim.log.levels.WARN
+	)
+	return record
+end
+
+function Workflow:record_review_decision(id, decision)
+	if decision ~= "accepted" and decision ~= "changes_requested" and decision ~= "handoff" then
+		fail("review decision is unavailable")
+	end
+	local run = self:run(id)
+	local context = self.review_sessions[run.id] or self:review_context(run)
+	local current = self:review_context(run)
+	if current.base_sha ~= context.base_sha or current.diff_sha256 ~= context.diff_sha256 then
+		fail("review is stale because the target worktree changed")
+	end
+	local record = self.store:write_review({
+		id = run_store.id("review"),
+		run_id = run.id,
+		state = decision,
+		base_sha = context.base_sha,
+		diff_sha256 = context.diff_sha256,
+		decision = decision,
+		created_at = now(),
+	}, "Review decision: " .. decision)
+	self:update(run.id, { review = { id = record.review.id, state = record.review.state } })
+	return record
 end
 
 function Workflow:cancel(id)
@@ -639,15 +1012,26 @@ function Workflow:focus(id)
 		return self.terminal:attach(active.terminal_id)
 	end
 	if run.transport == "chat" then
-		return self:open_conversation(run)
+		if self.active[id] then
+			return self:open_conversation(run)
+		end
+		return self:resume(id)
 	end
 	return self:resume(id)
 end
 
 function Workflow:resume(id)
 	local run = self:run(id)
-	if run.transport ~= "terminal" or not run.session or not run.session.resume_supported then
+	if not run.session or not run.session.resume_supported then
 		fail("this run cannot be resumed through Gator")
+	end
+	if run.transport == "chat" then
+		self:update(id, { state = "starting" })
+		self.loading_handles[run.id] = self.loading.open({ message = "Resuming " .. run.provider })
+		if structured.supports(run.provider) then
+			return self:open_structured(run, nil, "resume", run.session)
+		end
+		return self:open_managed(run, nil, run.session)
 	end
 	local ok = pcall(self.terminal.attach, self.terminal, id)
 	if ok then
@@ -664,6 +1048,17 @@ function Workflow:resume(id)
 		end
 	)
 	return true
+end
+
+function Workflow:fork(id)
+	local source = self:run(id)
+	if source.transport ~= "chat" or not source.session or not source.session.resume_supported then
+		fail("this run cannot be forked through Gator")
+	end
+	if not structured.supports(source.provider) then
+		fail(source.provider .. " does not expose a documented native chat fork contract")
+	end
+	return self:handoff(source.id, source.provider, { profile = "full", native_fork = true })
 end
 
 function Workflow:transcript(run)
@@ -753,23 +1148,38 @@ function Workflow:handoff(source_id, target, opts)
 		end)
 		return true
 	end
+	local workspace = self:handoff_workspace(source, opts.native_fork == true or writers(source))
+	local apply_snapshot = workspace.root ~= source.workspace.root
+	local conflicts = apply_snapshot and self.store:handoff_conflicts(snapshot, workspace.root) or {}
+	local preview = apply_snapshot and self.store:preview_handoff(snapshot, workspace.root)
+		or "Target is the source workspace; snapshots will be retained as an artifact but not applied again."
 	self.handoff_review.open({
 		source = source,
 		target = target,
 		profile = profile,
 		body = body,
-		on_confirm = function(reviewed)
+		preview = preview,
+		conflicts = conflicts,
+		on_cancel = function()
+			self:discard_workspace(workspace)
+		end,
+		on_confirm = function(reviewed, decisions)
 			local ok, err = pcall(self.launch, self, {
 				objective = "Continue the reviewed handoff from " .. source.provider,
 				provider = target,
 				bundle_body = reviewed,
 				parent_run_id = source.id,
 				role = "writer",
-				force_worktree = writers(source),
+				workspace = workspace,
 				remember = false,
 				handoff_snapshot = snapshot,
+				handoff_decisions = decisions,
+				apply_handoff_snapshot = apply_snapshot,
+				native_session_operation = opts.native_fork and "fork" or nil,
+				native_session = opts.native_fork and source.session or nil,
 			})
 			if not ok then
+				self:discard_workspace(workspace)
 				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end
 		end,

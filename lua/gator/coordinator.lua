@@ -11,6 +11,10 @@ local actions = {
 	open = { fields = { provider = true, buffer = true, first_line = true, last_line = true, transport = true } },
 	runs = { fields = {} },
 	handoff = { fields = { run_id = true, provider = true, profile = true } },
+	send_context = {
+		fields = { run_id = true, kind = true, bundle_id = true, buffer = true, first_line = true, last_line = true },
+	},
+	review = { fields = { run_id = true } },
 	health = { fields = {} },
 	export_diagnostics = { fields = {} },
 	verify_beta_readiness = { fields = {} },
@@ -22,6 +26,8 @@ local action_names = {
 	"open",
 	"runs",
 	"handoff",
+	"send_context",
+	"review",
 	"health",
 	"export_diagnostics",
 	"verify_beta_readiness",
@@ -183,8 +189,18 @@ function Coordinator:bootstrap_recovery()
 	if not M.is(self) then
 		fail("bootstrap_recovery requires an initialized coordinator")
 	end
-	if not self._startup_recovery then
-		self._startup_recovery = { state = "ready", recovered = 0, source = "project-local-runs" }
+	if not self._startup_recovery or self._startup_recovery.state == "unavailable" then
+		local ok, value = pcall(self.workflow, self)
+		if ok then
+			local recovered_ok, recovered = pcall(value.recover, value)
+			self._startup_recovery = {
+				state = recovered_ok and "ready" or "failed",
+				recovered = recovered_ok and recovered or 0,
+				source = "project-local-runs",
+			}
+		else
+			self._startup_recovery = { state = "unavailable", recovered = 0, source = "project-local-runs" }
+		end
 	end
 	return vim.deepcopy(self._startup_recovery)
 end
@@ -285,6 +301,12 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "handoff" then
 		return self:workflow():handoff(require_string(opts.run_id, "run_id"), opts.provider, { profile = opts.profile })
+	end
+	if action == "send_context" then
+		return self:workflow():send_context(opts)
+	end
+	if action == "review" then
+		return self:workflow():review(opts.run_id)
 	end
 	if action == "health" then
 		return self:health()

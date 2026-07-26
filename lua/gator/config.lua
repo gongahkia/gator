@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 6
+M.schema_version = 7
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -44,7 +44,10 @@ M.defaults = {
 	workspaces = { mode = "project" },
 	persistence = { sharing = "local" },
 	telemetry = { enabled = false, redaction_patterns = {} },
-	budget = { max_tokens = 0, action = "warn" },
+	budget = { max_tokens = 0, action = "warn", max_concurrent_runs = 0 },
+	review = { commands = {} },
+	acp = { commands = {} },
+	runbooks = { max_concurrent = 0, max_tokens = 0 },
 }
 
 local function fail(message)
@@ -111,6 +114,9 @@ local root_fields = {
 	persistence = true,
 	telemetry = true,
 	budget = true,
+	review = true,
+	acp = true,
+	runbooks = true,
 }
 
 local function schema_version(value)
@@ -150,6 +156,32 @@ local provider_names = {
 
 local launch_provider_names = vim.tbl_extend("force", { claude = true, codex = true, opencode = true }, provider_names)
 
+local function identifier(value, name)
+	if type(value) ~= "string" or not value:match("^[a-z][a-z0-9_-]*$") then
+		fail(name .. " must be a lowercase identifier")
+	end
+	return value
+end
+
+local function command_entries(value, path)
+	if type(value) ~= "table" or (vim.islist(value) and next(value) ~= nil) then
+		fail(path .. " must be an object")
+	end
+	for name, command in pairs(value) do
+		identifier(name, path .. " key")
+		fields(command, { argv = true }, path .. "." .. name)
+		if type(command.argv) ~= "table" or not vim.islist(command.argv) or #command.argv == 0 then
+			fail(path .. "." .. name .. ".argv must be a non-empty array")
+		end
+		for index, item in ipairs(command.argv) do
+			if type(item) ~= "string" or item == "" then
+				fail(path .. "." .. name .. ".argv[" .. index .. "] must be non-empty text")
+			end
+		end
+	end
+	return value
+end
+
 local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
@@ -168,7 +200,10 @@ local function settings(value)
 	fields(value.workspaces, { mode = true }, "settings.workspaces")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
-	fields(value.budget, { max_tokens = true, action = true }, "settings.budget")
+	fields(value.budget, { max_tokens = true, action = true, max_concurrent_runs = true }, "settings.budget")
+	fields(value.review, { commands = true }, "settings.review")
+	fields(value.acp, { commands = true }, "settings.acp")
+	fields(value.runbooks, { max_concurrent = true, max_tokens = true }, "settings.runbooks")
 	if not vim.tbl_contains({ "adaptive", "modal" }, value.ui.layout) then
 		fail("ui.layout must be adaptive or modal")
 	end
@@ -235,7 +270,13 @@ local function settings(value)
 	if type(value.context.handoff.source_summary) ~= "boolean" then
 		fail("context.handoff.source_summary must be boolean")
 	end
-	if value.launch.default_provider ~= "ask" and not launch_provider_names[value.launch.default_provider] then
+	command_entries(value.review.commands, "settings.review.commands")
+	command_entries(value.acp.commands, "settings.acp.commands")
+	local allowed_launch_providers = vim.deepcopy(launch_provider_names)
+	for name in pairs(value.acp.commands) do
+		allowed_launch_providers[name] = true
+	end
+	if value.launch.default_provider ~= "ask" and not allowed_launch_providers[value.launch.default_provider] then
 		fail("launch.default_provider must be ask or a supported provider")
 	end
 	if not vim.tbl_contains({ "auto", "chat", "terminal" }, value.launch.transport) then
@@ -264,6 +305,18 @@ local function settings(value)
 	if value.budget.action ~= "warn" and value.budget.action ~= "stop" then
 		fail("budget.action must be warn or stop")
 	end
+	if
+		type(value.budget.max_concurrent_runs) ~= "number"
+		or value.budget.max_concurrent_runs < 0
+		or value.budget.max_concurrent_runs % 1 ~= 0
+	then
+		fail("budget.max_concurrent_runs must be a non-negative integer")
+	end
+	for _, field in ipairs({ "max_concurrent", "max_tokens" }) do
+		if type(value.runbooks[field]) ~= "number" or value.runbooks[field] < 0 or value.runbooks[field] % 1 ~= 0 then
+			fail("runbooks." .. field .. " must be a non-negative integer")
+		end
+	end
 	redact.validate_patterns(value.telemetry.redaction_patterns)
 	return value
 end
@@ -282,7 +335,14 @@ function M.migrate(value)
 	if from_version == M.schema_version then
 		return document, { migrated = false, from_version = from_version, to_version = from_version }
 	end
-	if from_version ~= 1 and from_version ~= 2 and from_version ~= 3 and from_version ~= 4 and from_version ~= 5 then
+	if
+		from_version ~= 1
+		and from_version ~= 2
+		and from_version ~= 3
+		and from_version ~= 4
+		and from_version ~= 5
+		and from_version ~= 6
+	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
 	document.launch = document.launch or {}
@@ -299,6 +359,10 @@ function M.migrate(value)
 	document.ui = document.ui or {}
 	document.ui.loading = document.ui.loading or {}
 	document.budget = document.budget or {}
+	document.budget.max_concurrent_runs = document.budget.max_concurrent_runs or 0
+	document.review = document.review or {}
+	document.acp = document.acp or {}
+	document.runbooks = document.runbooks or {}
 	document.schema_version = M.schema_version
 	return document, { migrated = true, from_version = from_version, to_version = M.schema_version }
 end

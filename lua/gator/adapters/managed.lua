@@ -69,9 +69,9 @@ local function directory(value)
 	return value
 end
 
-local function profile(name)
+local function profile(name, profiles)
 	name = text(name, "provider")
-	local value = M.profiles[name]
+	local value = (profiles or M.profiles)[name]
 	if not value then
 		fail("provider is unavailable for managed sessions: " .. name)
 	end
@@ -94,7 +94,25 @@ local function session(value, provider_name, mode)
 	if value.owner == "gator" and mode ~= "history" then
 		fail("gator-owned sessions must use history mode")
 	end
-	return { provider = provider_name, id = value.id, owner = value.owner, mode = mode }
+	if value.capabilities ~= nil then
+		if
+			type(value.capabilities) ~= "table" or (vim.islist(value.capabilities) and next(value.capabilities) ~= nil)
+		then
+			fail("session capabilities must be an object")
+		end
+		for key, enabled in pairs(value.capabilities) do
+			if type(key) ~= "string" or type(enabled) ~= "boolean" then
+				fail("session capabilities must map names to booleans")
+			end
+		end
+	end
+	return {
+		provider = provider_name,
+		id = value.id,
+		owner = value.owner,
+		mode = mode,
+		capabilities = value.capabilities and vim.deepcopy(value.capabilities) or nil,
+	}
 end
 
 local function callback(value, name)
@@ -164,6 +182,19 @@ local function acp_text(params)
 	return nil
 end
 
+local function acp_capabilities(value)
+	local source = type(value) == "table" and value.agentCapabilities or nil
+	if type(source) ~= "table" then
+		return { loadSession = false, sessionResume = false, sessionList = false, sessionUsage = false }
+	end
+	return {
+		loadSession = source.loadSession == true,
+		sessionResume = source.sessionResume == true or source.resumeSession == true,
+		sessionList = source.sessionList == true or source.listSessions == true,
+		sessionUsage = source.sessionUsage == true or source.usage == true,
+	}
+end
+
 local function stream_text(value)
 	if type(value) ~= "table" then
 		return nil
@@ -201,9 +232,37 @@ function M.catalog(opts)
 	if type(opts.user_confirmed) ~= "table" then
 		fail("catalog user_confirmed must be a table")
 	end
+	if
+		opts.commands ~= nil
+		and (type(opts.commands) ~= "table" or (vim.islist(opts.commands) and next(opts.commands) ~= nil))
+	then
+		fail("catalog commands must be an object")
+	end
 	local cwd = directory(opts.cwd)
+	local profiles = vim.deepcopy(M.profiles)
+	for name, configured in pairs(opts.commands or {}) do
+		if type(name) ~= "string" or not name:match("^[a-z][a-z0-9_-]*$") then
+			fail("configured ACP provider name is invalid")
+		end
+		if
+			type(configured) ~= "table"
+			or type(configured.argv) ~= "table"
+			or not vim.islist(configured.argv)
+			or #configured.argv == 0
+			or type(configured.argv[1]) ~= "string"
+			or configured.argv[1] == ""
+		then
+			fail("configured ACP command is invalid")
+		end
+		profiles[name] = {
+			mode = "acp",
+			executable = configured.argv[1],
+			command = vim.deepcopy(configured.argv),
+			configured = true,
+		}
+	end
 	local result = {}
-	for name, value in pairs(M.profiles) do
+	for name, value in pairs(profiles) do
 		local resume_mode = name == "copilot" and "dynamic_acp_then_terminal" or "managed"
 		local record = {
 			provider = name,
@@ -214,6 +273,12 @@ function M.catalog(opts)
 		}
 		if vim.fn.executable(value.executable) ~= 1 then
 			record.reason = value.executable .. " is unavailable"
+		elseif value.configured then
+			record.available = true
+			record.authentication = "configured"
+			record.readiness_state = "configured"
+			record.readiness_signals =
+				{ "explicit ACP command", "executable detected", "capabilities negotiated at launch" }
 		elseif opts.user_confirmed[name] ~= true then
 			record.readiness_state = "detected"
 			record.readiness_signals = { "CLI executable detected" }
@@ -254,11 +319,12 @@ function M.new(opts)
 		type(opts) ~= "table"
 		or (opts.spawn ~= nil and type(opts.spawn) ~= "function")
 		or (opts.shutdown ~= nil and type(opts.shutdown) ~= "boolean")
+		or (opts.commands ~= nil and type(opts.commands) ~= "table")
 	then
 		fail("new requires optional spawn and shutdown settings")
 	end
 	for key in pairs(opts) do
-		if key ~= "spawn" and key ~= "shutdown" then
+		if key ~= "spawn" and key ~= "shutdown" and key ~= "commands" then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -266,7 +332,10 @@ function M.new(opts)
 		spawn = opts.spawn or default_spawn,
 		active = {},
 		sequence = 0,
+		profiles = vim.deepcopy(M.profiles),
+		configured = {},
 	}, Manager)
+	value:configure({ commands = opts.commands or {} })
 	if opts.shutdown then
 		local group = vim.api.nvim_create_augroup("GatorManagedSessions", { clear = true })
 		vim.api.nvim_create_autocmd("VimLeavePre", {
@@ -280,8 +349,56 @@ function M.new(opts)
 	return value
 end
 
+function Manager:configure(opts)
+	if type(opts) ~= "table" or (opts.commands ~= nil and type(opts.commands) ~= "table") then
+		fail("configure requires optional command settings")
+	end
+	for name in pairs(self.configured) do
+		self.profiles[name] = nil
+	end
+	self.configured = {}
+	for name, configured in pairs(opts.commands or {}) do
+		if type(name) ~= "string" or not name:match("^[a-z][a-z0-9_-]*$") then
+			fail("configured ACP provider name is invalid")
+		end
+		if
+			type(configured) ~= "table"
+			or type(configured.argv) ~= "table"
+			or not vim.islist(configured.argv)
+			or #configured.argv == 0
+			or type(configured.argv[1]) ~= "string"
+			or configured.argv[1] == ""
+		then
+			fail("configured ACP command is invalid")
+		end
+		self.profiles[name] = {
+			mode = "acp",
+			executable = configured.argv[1],
+			command = command(configured.argv),
+			configured = true,
+		}
+		self.configured[name] = true
+	end
+	return true
+end
+
+function Manager:profile(name)
+	return profile(name, self.profiles)
+end
+
+function Manager:can_resume(provider_name, reference)
+	local _, value = self:profile(provider_name)
+	if value.mode ~= "acp" then
+		return value.resume ~= false
+	end
+	if reference and type(reference.capabilities) == "table" then
+		return reference.capabilities.loadSession == true or reference.capabilities.sessionResume == true
+	end
+	return true
+end
+
 function Manager:is_active(reference)
-	local provider_name, value = profile(reference.provider)
+	local provider_name, value = self:profile(reference.provider)
 	local current = session(reference, provider_name, value.mode)
 	local run = self.active[provider_name .. "\0" .. current.id]
 	return run ~= nil and run.active == true and run.stopping ~= true
@@ -338,6 +455,15 @@ function Manager:_session(run, value)
 		if run.session.id ~= value then
 			fail("provider changed the active session id")
 		end
+		local announce = run.restoring == true
+		if run.capabilities then
+			announce = announce or not vim.deep_equal(run.session.capabilities, run.capabilities)
+			run.session.capabilities = vim.deepcopy(run.capabilities)
+		end
+		run.restoring = false
+		if announce then
+			run.on_session(vim.deepcopy(run.session))
+		end
 		return run.session
 	end
 	local next_key = run.provider .. "\0" .. value
@@ -353,6 +479,7 @@ function Manager:_session(run, value)
 		id = value,
 		owner = run.mode == "history" and "gator" or "provider",
 		mode = run.mode,
+		capabilities = run.capabilities,
 	}
 	run.on_session(vim.deepcopy(run.session))
 	return run.session
@@ -509,14 +636,22 @@ function Manager:_start_acp(run, prompt)
 			run.on_event({ type = "error", text = "ACP initialization failed" })
 			return
 		end
-		if run.provider == "copilot" and run.session then
-			local capabilities = type(initialized) == "table" and initialized.agentCapabilities or nil
-			if type(capabilities) ~= "table" or capabilities.loadSession ~= true then
+		run.capabilities = acp_capabilities(initialized)
+		local method = "session/new"
+		if run.session then
+			if run.capabilities.loadSession then
+				method = "session/load"
+			elseif run.capabilities.sessionResume then
+				method = "session/resume"
+			elseif run.provider == "copilot" then
 				self:_copilot_fallback(run, "Copilot ACP did not advertise session/load")
+				return
+			else
+				run.on_event({ type = "error", text = "ACP agent did not advertise session restore capability" })
+				self:_terminate(run)
 				return
 			end
 		end
-		local method = run.session and "session/load" or "session/new"
 		local params = run.session and { sessionId = run.session.id, cwd = run.cwd, mcpServers = {} }
 			or { cwd = run.cwd, mcpServers = {} }
 		self:_request(run, method, params, function(result, session_err)
@@ -536,11 +671,34 @@ function Manager:_start_acp(run, prompt)
 	end)
 end
 
+function Manager:list(reference, callback)
+	if type(callback) ~= "function" then
+		fail("session list requires a callback")
+	end
+	local provider_name, value = self:profile(reference.provider)
+	if value.mode ~= "acp" then
+		fail("session list is available only for ACP providers")
+	end
+	local current = session(reference, provider_name, value.mode)
+	local run = self.active[provider_name .. "\0" .. current.id]
+	if not run or not run.active or not run.capabilities or not run.capabilities.sessionList then
+		fail("ACP agent did not advertise session/list")
+	end
+	self:_request(run, "session/list", { cwd = run.cwd }, function(result, err)
+		if err then
+			callback(nil, "ACP session/list failed")
+			return
+		end
+		callback(vim.deepcopy(result), nil)
+	end)
+	return true
+end
+
 function Manager:open(opts)
 	if type(opts) ~= "table" then
 		fail("open requires options")
 	end
-	local provider_name, value = profile(opts.provider)
+	local provider_name, value = self:profile(opts.provider)
 	local mode, cwd = value.mode, directory(opts.cwd)
 	local current = session(opts.session, provider_name, mode)
 	if current and value.resume == false then
@@ -565,6 +723,7 @@ function Manager:open(opts)
 		mode = mode,
 		cwd = cwd,
 		session = current,
+		restoring = current ~= nil,
 		history = history,
 		buffer = "",
 		stderr = "",
@@ -598,7 +757,7 @@ function Manager:open(opts)
 end
 
 function Manager:send(reference, prompt)
-	local provider_name, value = profile(reference.provider)
+	local provider_name, value = self:profile(reference.provider)
 	local current = session(reference, provider_name, value.mode)
 	prompt = text(prompt, "prompt")
 	local key = provider_name .. "\0" .. current.id
@@ -631,7 +790,7 @@ function Manager:send(reference, prompt)
 end
 
 function Manager:cancel(reference)
-	local provider_name, value = profile(reference.provider)
+	local provider_name, value = self:profile(reference.provider)
 	local current = session(reference, provider_name, value.mode)
 	local run = self.active[provider_name .. "\0" .. current.id]
 	if not run or not run.active or run.stopping then
@@ -646,7 +805,7 @@ function Manager:cancel(reference)
 end
 
 function Manager:stop(reference)
-	local provider_name, value = profile(reference.provider)
+	local provider_name, value = self:profile(reference.provider)
 	local current = session(reference, provider_name, value.mode)
 	local run = self.active[provider_name .. "\0" .. current.id]
 	if not run or not run.active or run.stopping then

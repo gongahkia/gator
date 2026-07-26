@@ -14,7 +14,7 @@ local path = store:materialize_handoff("bundle-transfer", "# Reviewed bundle", {
 		{ path = "src/deleted.lua", state = "deleted" },
 		{ path = "binary.bin", state = "omitted", reason = "binary" },
 	},
-}, root)
+}, root, { decisions = { ["src/deleted.lua"] = "apply" } })
 assert(
 	vim.fn.filereadable(path .. "/files/src/example.lua") == 1
 		and helpers.read(path .. "/files/src/example.lua") == "return 'snapshot'"

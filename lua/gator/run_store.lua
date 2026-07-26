@@ -13,6 +13,14 @@ local states = {
 	stopped = true,
 	detached = true,
 }
+local review_states = {
+	pending = true,
+	passed = true,
+	failed = true,
+	accepted = true,
+	changes_requested = true,
+	handoff = true,
+}
 
 local function fail(message)
 	error("Gator run store: " .. redact.text(tostring(message)), 3)
@@ -112,6 +120,9 @@ local function normalize_run(value)
 				created_at = true,
 				updated_at = true,
 				process = true,
+				review = true,
+				runbook_id = true,
+				depends_on = true,
 			})[key]
 		then
 			fail("run contains unsupported field: " .. tostring(key))
@@ -121,7 +132,7 @@ local function normalize_run(value)
 	run.id = identifier(run.id, "run.id")
 	run.provider = identifier(run.provider, "run.provider")
 	run.role = run.role or "primary"
-	if not ({ primary = true, writer = true, reviewer = true, research = true })[run.role] then
+	if not ({ primary = true, writer = true, reviewer = true, research = true, integrator = true })[run.role] then
 		fail("run.role is unavailable")
 	end
 	if run.transport ~= "chat" and run.transport ~= "terminal" then
@@ -142,12 +153,68 @@ local function normalize_run(value)
 		if type(run.session.resume_supported) ~= "boolean" then
 			fail("run.session.resume_supported must be boolean")
 		end
+		if run.session.path ~= nil then
+			run.session.path = text(run.session.path, "run.session.path")
+		end
+		if run.session.provider ~= nil then
+			run.session.provider = identifier(run.session.provider, "run.session.provider")
+		end
+		if run.session.owner ~= nil and run.session.owner ~= "provider" and run.session.owner ~= "gator" then
+			fail("run.session.owner must be provider or gator")
+		end
+		if run.session.mode ~= nil and (type(run.session.mode) ~= "string" or run.session.mode == "") then
+			fail("run.session.mode must be non-empty text")
+		end
+		if run.session.capabilities ~= nil then
+			if
+				type(run.session.capabilities) ~= "table"
+				or (vim.islist(run.session.capabilities) and next(run.session.capabilities) ~= nil)
+			then
+				fail("run.session.capabilities must be an object")
+			end
+			for key, value in pairs(run.session.capabilities) do
+				if type(key) ~= "string" or type(value) ~= "boolean" then
+					fail("run.session.capabilities must map names to booleans")
+				end
+			end
+		end
 	end
 	if run.parent_run_id ~= nil then
 		run.parent_run_id = identifier(run.parent_run_id, "run.parent_run_id")
 	end
 	if run.bundle_id ~= nil then
 		run.bundle_id = identifier(run.bundle_id, "run.bundle_id")
+	end
+	if run.runbook_id ~= nil then
+		run.runbook_id = identifier(run.runbook_id, "run.runbook_id")
+	end
+	if run.depends_on ~= nil then
+		if type(run.depends_on) ~= "table" or not vim.islist(run.depends_on) then
+			fail("run.depends_on must be an array")
+		end
+		local seen = {}
+		for index, value in ipairs(run.depends_on) do
+			value = identifier(value, "run.depends_on[" .. index .. "]")
+			if value == run.id or seen[value] then
+				fail("run.depends_on must contain unique external run ids")
+			end
+			seen[value] = true
+			run.depends_on[index] = value
+		end
+	end
+	if run.review ~= nil then
+		if type(run.review) ~= "table" then
+			fail("run.review must be an object")
+		end
+		for key in pairs(run.review) do
+			if key ~= "id" and key ~= "state" then
+				fail("run.review contains unsupported field: " .. tostring(key))
+			end
+		end
+		run.review.id = identifier(run.review.id, "run.review.id")
+		if not review_states[run.review.state] then
+			fail("run.review.state is unavailable")
+		end
 	end
 	run.objective = redact.text(text(run.objective, "run.objective"))
 	if run.transcript ~= "available" and run.transcript ~= "unavailable" then
@@ -193,6 +260,8 @@ function M.new(root)
 		runs_directory = root .. "/.gator/runs",
 		bundles_directory = root .. "/.gator/bundles",
 		handoffs_directory = root .. "/.gator/handoffs",
+		reviews_directory = root .. "/.gator/reviews",
+		runbooks_directory = root .. "/.gator/runbooks",
 	}, Store)
 end
 
@@ -202,7 +271,14 @@ end
 
 function Store:ensure()
 	ignore(self.root)
-	for _, path in ipairs({ self.directory, self.runs_directory, self.bundles_directory, self.handoffs_directory }) do
+	for _, path in ipairs({
+		self.directory,
+		self.runs_directory,
+		self.bundles_directory,
+		self.handoffs_directory,
+		self.reviews_directory,
+		self.runbooks_directory,
+	}) do
 		if vim.fn.mkdir(path, "p") ~= 1 and vim.fn.isdirectory(path) ~= 1 then
 			fail("cannot create local Gator state directory")
 		end
@@ -265,6 +341,16 @@ function Store:bundle(id, body)
 	return path
 end
 
+function Store:read_bundle(id)
+	id = identifier(id, "bundle id")
+	self:ensure()
+	local path = self.bundles_directory .. "/" .. id .. ".md"
+	if vim.fn.filereadable(path) ~= 1 then
+		return nil
+	end
+	return table.concat(vim.fn.readfile(path), "\n")
+end
+
 function Store:materialize_bundle(id, body, root)
 	root = vim.uv.fs_realpath(text(root, "workspace root"))
 	if not root then
@@ -283,6 +369,69 @@ local function relative_path(value)
 		if segment == "." or segment == ".." then
 			fail("handoff file path must not escape its snapshot")
 		end
+	end
+	return value
+end
+
+local function git(root, argv)
+	local result = vim.system(argv, { cwd = root, text = false }):wait()
+	return result.code == 0 and (result.stdout or "") or nil
+end
+
+local function dirty_paths(root)
+	local output = git(root, { "git", "status", "--porcelain=v1", "-z", "--untracked-files=all" })
+	if output == nil then
+		fail("Git target status is unavailable")
+	end
+	local result, values, index = {}, vim.split(output, "\0", { plain = true, trimempty = true }), 1
+	while index <= #values do
+		local value = values[index]
+		if #value >= 4 then
+			local path = value:sub(4)
+			if relative_path(path) then
+				result[path] = value:sub(1, 2)
+			end
+			if value:sub(1, 1) == "R" or value:sub(1, 1) == "C" or value:sub(2, 2) == "R" or value:sub(2, 2) == "C" then
+				local source = values[index + 1]
+				if source and relative_path(source) then
+					result[source] = value:sub(1, 2)
+				end
+				index = index + 1
+			end
+		end
+		index = index + 1
+	end
+	return result
+end
+
+local function file_hash(path)
+	local stat = vim.uv.fs_lstat(path)
+	if not stat then
+		return nil, "missing"
+	end
+	if stat.type == "link" then
+		return nil, "symbolic link"
+	end
+	if stat.type ~= "file" then
+		return nil, "not a regular file"
+	end
+	local handle = vim.uv.fs_open(path, "r", 420)
+	if not handle then
+		return nil, "unreadable"
+	end
+	local value = vim.uv.fs_read(handle, stat.size, 0)
+	vim.uv.fs_close(handle)
+	if type(value) ~= "string" then
+		return nil, "unreadable"
+	end
+	return vim.fn.sha256(value), nil, value
+end
+
+local function sanitized_snapshot(snapshot)
+	local value = vim.deepcopy(snapshot)
+	value.root = nil
+	for _, file in ipairs(value.files or {}) do
+		file.apply_content = nil
 	end
 	return value
 end
@@ -343,8 +492,19 @@ local function delete_snapshot_file(root, allowed_root, path)
 	end
 end
 
-function Store:materialize_handoff(id, body, snapshot, root)
-	id = identifier(id, "bundle id")
+local function conflict_path(result, seen, path, reason, file)
+	if seen[path] then
+		return
+	end
+	seen[path] = true
+	table.insert(result, {
+		path = path,
+		reason = reason,
+		source_sha256 = file.content_sha256,
+	})
+end
+
+function Store:handoff_conflicts(snapshot, root)
 	if type(snapshot) ~= "table" or type(snapshot.files) ~= "table" then
 		fail("handoff snapshot must contain files")
 	end
@@ -352,10 +512,130 @@ function Store:materialize_handoff(id, body, snapshot, root)
 	if not root then
 		fail("workspace root must resolve")
 	end
+	local dirty = dirty_paths(root)
+	local target_head = git(root, { "git", "rev-parse", "--verify", "HEAD" })
+	target_head = target_head and vim.trim(target_head) or nil
+	local source_head = type(snapshot.base) == "table" and snapshot.base.head or nil
+	local result, seen = {}, {}
+	for _, file in ipairs(snapshot.files) do
+		local path = relative_path(file.path)
+		if file.state == "included" or file.state == "deleted" then
+			if type(source_head) == "string" and source_head ~= "" and target_head ~= source_head then
+				conflict_path(result, seen, path, "target base SHA differs from source snapshot", file)
+			end
+			if dirty[path] then
+				conflict_path(result, seen, path, "target path is modified or untracked (" .. dirty[path] .. ")", file)
+			end
+			if file.rename_from then
+				local source_path = relative_path(file.rename_from)
+				if dirty[source_path] then
+					conflict_path(
+						result,
+						seen,
+						path,
+						"rename source is modified or untracked (" .. dirty[source_path] .. ")",
+						file
+					)
+				end
+			end
+			local _, reason = file_hash(root .. "/" .. path)
+			if reason == "symbolic link" then
+				conflict_path(result, seen, path, "target path is a symbolic link", file)
+			end
+		end
+	end
+	table.sort(result, function(left, right)
+		return left.path < right.path
+	end)
+	return result
+end
+
+function Store:preview_handoff(snapshot, root)
+	if type(snapshot) ~= "table" or type(snapshot.files) ~= "table" then
+		fail("handoff snapshot must contain files")
+	end
+	root = vim.uv.fs_realpath(text(root, "workspace root"))
+	if not root then
+		fail("workspace root must resolve")
+	end
+	local lines = {}
+	for _, file in ipairs(snapshot.files) do
+		if file.state == "included" or file.state == "deleted" then
+			local path = relative_path(file.path)
+			local _, _, before = file_hash(root .. "/" .. path)
+			local after = file.state == "included" and file.apply_content or ""
+			if type(after) ~= "string" then
+				fail("included handoff file must contain text")
+			end
+			before = before or ""
+			if before ~= after then
+				local diff = vim.diff(before, after, { result_type = "unified", ctxlen = 3 })
+				table.insert(lines, "diff --gator a/" .. redact.text(path) .. " b/" .. redact.text(path))
+				if file.rename_from then
+					table.insert(lines, "rename from " .. redact.text(file.rename_from))
+					table.insert(lines, "rename to " .. redact.text(path))
+				end
+				vim.list_extend(lines, vim.split(redact.text(diff), "\n", { plain = true, trimempty = false }))
+			end
+		end
+	end
+	return #lines > 0 and table.concat(lines, "\n") or "No target-worktree changes would be applied."
+end
+
+local function decisions(value)
+	if value == nil then
+		return {}
+	end
+	if type(value) ~= "table" or vim.islist(value) then
+		fail("handoff decisions must be an object")
+	end
+	local result = {}
+	for path, choice in pairs(value) do
+		path = relative_path(path)
+		if choice ~= "apply" and choice ~= "skip" then
+			fail("handoff decision must be apply or skip")
+		end
+		result[path] = choice
+	end
+	return result
+end
+
+function Store:materialize_handoff(id, body, snapshot, root, opts)
+	id = identifier(id, "bundle id")
+	if type(snapshot) ~= "table" or type(snapshot.files) ~= "table" then
+		fail("handoff snapshot must contain files")
+	end
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("handoff materialization options must be an object")
+	end
+	for key in pairs(opts) do
+		if key ~= "decisions" and key ~= "apply" then
+			fail("handoff materialization option is unsupported: " .. tostring(key))
+		end
+	end
+	local selected = decisions(opts.decisions)
+	if opts.apply ~= nil and type(opts.apply) ~= "boolean" then
+		fail("handoff apply must be boolean")
+	end
+	local apply = opts.apply ~= false
+	root = vim.uv.fs_realpath(text(root, "workspace root"))
+	if not root then
+		fail("workspace root must resolve")
+	end
+	local conflicts = apply and self:handoff_conflicts(snapshot, root) or {}
+	for _, conflict in ipairs(conflicts) do
+		if not selected[conflict.path] then
+			fail("handoff target collision requires an explicit decision: " .. conflict.path)
+		end
+	end
 	local target = M.new(root)
 	target:ensure()
-	target:bundle(id, body)
 	local directory = target.handoffs_directory .. "/" .. id
+	if vim.uv.fs_stat(directory) then
+		fail("handoff artifact already exists")
+	end
+	target:bundle(id, body)
 	local files_root = directory .. "/files"
 	if vim.fn.mkdir(files_root, "p") ~= 1 and vim.fn.isdirectory(files_root) ~= 1 then
 		fail("cannot create handoff snapshot directory")
@@ -368,6 +648,15 @@ function Store:materialize_handoff(id, body, snapshot, root)
 	if not resolved_workspace_root then
 		fail("workspace root must resolve")
 	end
+	local manifest = {
+		schema_version = 1,
+		bundle_id = id,
+		snapshot = sanitized_snapshot(snapshot),
+		decisions = selected,
+		conflicts = conflicts,
+	}
+	manifest.sha256 = vim.fn.sha256(vim.json.encode(manifest.snapshot))
+	atomic(directory .. "/manifest.json", manifest)
 	for _, file in ipairs(snapshot.files) do
 		local path = relative_path(file.path)
 		if file.state == "included" then
@@ -378,12 +667,133 @@ function Store:materialize_handoff(id, body, snapshot, root)
 			if file.apply_content ~= nil and type(file.apply_content) ~= "string" then
 				fail("applied handoff file must contain text")
 			end
-			write_snapshot_file(root, resolved_workspace_root, path, file.apply_content or file.content, true)
+			local applied = file.apply_content or file.content
+			if file.content_sha256 and vim.fn.sha256(applied) ~= file.content_sha256 then
+				fail("handoff file content hash does not match manifest: " .. path)
+			end
+			if apply and selected[path] ~= "skip" then
+				if file.rename_from and file.kind ~= "copy" then
+					delete_snapshot_file(root, resolved_workspace_root, relative_path(file.rename_from))
+				end
+				write_snapshot_file(root, resolved_workspace_root, path, applied, true)
+				local mode = type(file.modes) == "table" and file.modes.worktree or nil
+				local numeric = type(mode) == "string" and tonumber(mode, 8) or nil
+				if numeric then
+					vim.uv.fs_chmod(root .. "/" .. path, numeric % 4096)
+				end
+			end
 		elseif file.state == "deleted" then
-			delete_snapshot_file(root, resolved_workspace_root, path)
+			if apply and selected[path] ~= "skip" then
+				delete_snapshot_file(root, resolved_workspace_root, path)
+			end
 		end
 	end
 	return directory
+end
+
+local function review_record(value)
+	if type(value) ~= "table" then
+		fail("review must be an object")
+	end
+	for key in pairs(value) do
+		if
+			key ~= "id"
+			and key ~= "run_id"
+			and key ~= "state"
+			and key ~= "base_sha"
+			and key ~= "diff_sha256"
+			and key ~= "command_id"
+			and key ~= "argv"
+			and key ~= "exit_code"
+			and key ~= "passed"
+			and key ~= "decision"
+			and key ~= "created_at"
+		then
+			fail("review contains unsupported field: " .. tostring(key))
+		end
+	end
+	local record = vim.deepcopy(value)
+	record.id = identifier(record.id, "review.id")
+	record.run_id = identifier(record.run_id, "review.run_id")
+	if not review_states[record.state] then
+		fail("review.state is unavailable")
+	end
+	record.base_sha = text(record.base_sha, "review.base_sha")
+	record.diff_sha256 = text(record.diff_sha256, "review.diff_sha256")
+	if record.command_id ~= nil then
+		record.command_id = identifier(record.command_id, "review.command_id")
+		if type(record.argv) ~= "table" or not vim.islist(record.argv) or #record.argv == 0 then
+			fail("review.argv must be a non-empty array when command_id is set")
+		end
+		for index, argument in ipairs(record.argv) do
+			record.argv[index] = text(argument, "review.argv[" .. index .. "]")
+		end
+		if type(record.exit_code) ~= "number" or record.exit_code % 1 ~= 0 or type(record.passed) ~= "boolean" then
+			fail("review command evidence must include an integer exit_code and passed boolean")
+		end
+	elseif record.argv ~= nil or record.exit_code ~= nil or record.passed ~= nil then
+		fail("review command fields require command_id")
+	end
+	if
+		record.decision ~= nil
+		and record.decision ~= "accepted"
+		and record.decision ~= "changes_requested"
+		and record.decision ~= "handoff"
+	then
+		fail("review.decision is unavailable")
+	end
+	if type(record.created_at) ~= "number" or record.created_at < 0 or record.created_at % 1 ~= 0 then
+		fail("review.created_at must be a non-negative integer")
+	end
+	return record
+end
+
+function Store:write_review(value, output)
+	local record = review_record(value)
+	if output ~= nil and type(output) ~= "string" then
+		fail("review output must be text")
+	end
+	self:ensure()
+	local directory = self.reviews_directory .. "/" .. record.run_id
+	if vim.fn.mkdir(directory, "p") ~= 1 and vim.fn.isdirectory(directory) ~= 1 then
+		fail("cannot create review directory")
+	end
+	local path = directory .. "/" .. record.id .. ".json"
+	if vim.uv.fs_stat(path) then
+		fail("review artifact already exists")
+	end
+	local output_path = directory .. "/" .. record.id .. ".log"
+	local retained = redact.text(output or "")
+	if vim.fn.writefile(vim.split(retained, "\n", { plain = true, trimempty = false }), output_path) ~= 0 then
+		fail("cannot write review output")
+	end
+	local document =
+		{ schema_version = 1, review = record, output_ref = "reviews/" .. record.run_id .. "/" .. record.id .. ".log" }
+	atomic(path, document)
+	return vim.deepcopy(document)
+end
+
+function Store:list_reviews(run_id)
+	run_id = identifier(run_id, "run id")
+	self:ensure()
+	local directory = self.reviews_directory .. "/" .. run_id
+	local result = {}
+	for _, path in ipairs(vim.fn.glob(directory .. "/*.json", false, true)) do
+		local document = json(path)
+		if not document or document.schema_version ~= 1 or type(document.review) ~= "table" then
+			fail("invalid review artifact: " .. path)
+		end
+		local record = review_record(document.review)
+		if record.run_id ~= run_id or type(document.output_ref) ~= "string" then
+			fail("invalid review artifact: " .. path)
+		end
+		record.output_ref = document.output_ref
+		table.insert(result, record)
+	end
+	table.sort(result, function(left, right)
+		return left.created_at > right.created_at
+	end)
+	return result
 end
 
 function Store:transcript(id, body)

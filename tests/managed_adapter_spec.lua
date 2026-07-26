@@ -203,3 +203,62 @@ assert(
 		and #fallback_writes == 1,
 	"Copilot must use terminal resume fallback without sending unsupported ACP session/load"
 )
+
+local configured_stdout, configured_argv, configured_session, listed = nil, nil, nil, nil
+local configured_handle = {}
+function configured_handle:write(frame)
+	local value = vim.json.decode(frame)
+	if value.method == "initialize" then
+		configured_stdout(nil, vim.json.encode({
+			jsonrpc = "2.0",
+			id = value.id,
+			result = { protocolVersion = 1, agentCapabilities = { loadSession = true, sessionList = true } },
+		}) .. "\n")
+	elseif value.method == "session/new" then
+		configured_stdout(
+			nil,
+			vim.json.encode({ jsonrpc = "2.0", id = value.id, result = { sessionId = "configured-session" } }) .. "\n"
+		)
+	elseif value.method == "session/list" then
+		configured_stdout(nil, vim.json.encode({
+			jsonrpc = "2.0",
+			id = value.id,
+			result = { sessions = { { sessionId = "configured-session" } } },
+		}) .. "\n")
+	end
+	return true
+end
+function configured_handle:kill()
+	return true
+end
+local configured = managed.new({
+	commands = { localagent = { argv = { "local-agent", "--acp" } } },
+	spawn = function(argv, opts)
+		configured_argv, configured_stdout = argv, opts.stdout
+		return configured_handle
+	end,
+})
+configured:open({
+	provider = "localagent",
+	cwd = root,
+	run_id = "configured-run",
+	on_session = function(value)
+		configured_session = value
+	end,
+})
+assert(
+	vim.deep_equal(configured_argv, { "local-agent", "--acp" })
+		and configured_session.capabilities.loadSession
+		and configured_session.capabilities.sessionList,
+	"explicitly configured ACP commands must launch only through negotiated capability state"
+)
+assert(
+	configured:list(configured_session, function(value)
+		listed = value
+	end),
+	"ACP session/list must be callable only after the agent advertises it"
+)
+assert(
+	listed.sessions[1].sessionId == "configured-session",
+	"capability-negotiated ACP session/list must preserve the agent response"
+)

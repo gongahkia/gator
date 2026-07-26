@@ -85,7 +85,26 @@ function Manager:open(opts)
 	if type(opts) ~= "table" or not M.supports(opts.provider) then
 		fail("open requires a structured provider")
 	end
-	local provider, cwd, prompt = opts.provider, text(opts.cwd, "cwd"), text(opts.prompt, "prompt")
+	local provider, cwd = opts.provider, text(opts.cwd, "cwd")
+	local prompt = opts.prompt
+	if prompt ~= nil then
+		prompt = text(prompt, "prompt")
+	end
+	local operation = opts.operation or "start"
+	if operation ~= "start" and operation ~= "resume" and operation ~= "fork" then
+		fail("operation must be start, resume, or fork")
+	end
+	local existing = opts.session
+	if operation == "start" then
+		if existing ~= nil then
+			fail("new structured sessions cannot provide an existing session")
+		end
+		if not prompt then
+			fail("new structured sessions require a prompt")
+		end
+	elseif type(existing) ~= "table" or type(existing.id) ~= "string" or existing.id == "" then
+		fail(operation .. " requires a provider session")
+	end
 	for _, name in ipairs({ "on_session", "on_event", "on_usage", "on_exit", "on_approval" }) do
 		if opts[name] ~= nil and type(opts[name]) ~= "function" then
 			fail(name .. " must be a function")
@@ -104,6 +123,8 @@ function Manager:open(opts)
 		pending = {},
 		permission = nil,
 		run_id = opts.run_id or "run-structured",
+		operation = operation,
+		existing = existing and vim.deepcopy(existing) or nil,
 	}
 	self.active[id] = current
 	local function notify(kind, value)
@@ -124,6 +145,26 @@ function Manager:open(opts)
 		local ok, result = pcall(current.handle.write, current.handle, vim.json.encode(value) .. "\n")
 		return ok and result ~= false
 	end
+	local send
+	local function accept_session(value)
+		if operation == "resume" and value.id ~= existing.id then
+			notify("error", "provider resume returned a different session identity")
+			current.closed = true
+			self.active[id] = nil
+			if current.handle then
+				pcall(current.handle.kill, current.handle, 15)
+			end
+			return false
+		end
+		current.session_id = value.id
+		if opts.on_session then
+			opts.on_session(value)
+		end
+		if prompt then
+			send(prompt)
+		end
+		return true
+	end
 	local function pi_command(command, message)
 		return write({ id = tostring(vim.uv.hrtime()), type = command, message = message })
 	end
@@ -136,7 +177,7 @@ function Manager:open(opts)
 		current.pending[request_id] = method
 		return true
 	end
-	local function send(message)
+	send = function(message)
 		message = text(message, "prompt")
 		if provider == "pi" then
 			local body = { id = tostring(vim.uv.hrtime()), type = "prompt", message = message }
@@ -215,11 +256,14 @@ function Manager:open(opts)
 				and message.success
 				and type(message.data) == "table"
 			then
-				current.session_id = message.data.sessionId
-				if current.session_id and opts.on_session then
-					opts.on_session({ id = current.session_id, resume_supported = false })
+				local session_id = message.data.sessionId
+				if type(session_id) == "string" and session_id ~= "" then
+					accept_session({
+						id = session_id,
+						path = message.data.sessionFile,
+						resume_supported = true,
+					})
 				end
-				send(prompt)
 				return
 			end
 			if message.type == "agent_start" then
@@ -263,19 +307,24 @@ function Manager:open(opts)
 			if requested == "initialize" then
 				current.initialized = true
 				write({ jsonrpc = "2.0", method = "initialized", params = vim.empty_dict() })
-				codex_request("thread/start", { cwd = cwd, ephemeral = false })
+				if current.operation == "start" then
+					codex_request("thread/start", { cwd = cwd, ephemeral = false })
+				elseif current.operation == "resume" then
+					codex_request("thread/resume", { threadId = current.existing.id, cwd = cwd })
+				else
+					codex_request("thread/fork", { threadId = current.existing.id, cwd = cwd })
+				end
 				return
 			end
-			if requested == "thread/start" and current.session_id == nil then
+			if
+				(requested == "thread/start" or requested == "thread/resume" or requested == "thread/fork")
+				and current.session_id == nil
+			then
 				local thread = message.result.thread or message.result
 				local session_id = thread.id or thread.threadId
 				if type(session_id) == "string" and session_id ~= "" then
-					current.session_id = session_id
 					establish_permission_bridge()
-					if opts.on_session then
-						opts.on_session({ id = session_id, resume_supported = false })
-					end
-					send(prompt)
+					accept_session({ id = session_id, resume_supported = true })
 				end
 				return
 			end
@@ -326,7 +375,19 @@ function Manager:open(opts)
 			end
 		end
 	end
-	local argv = provider == "pi" and { "pi", "--mode", "rpc", "--name", id } or { "codex", "app-server", "--stdio" }
+	local argv
+	if provider == "pi" then
+		argv = { "pi", "--mode", "rpc" }
+		if operation == "start" then
+			vim.list_extend(argv, { "--name", id })
+		elseif operation == "resume" then
+			vim.list_extend(argv, { "--session", existing.path or existing.id })
+		else
+			vim.list_extend(argv, { "--fork", existing.path or existing.id })
+		end
+	else
+		argv = { "codex", "app-server", "--stdio" }
+	end
 	local handle = self.spawn(argv, {
 		cwd = cwd,
 		text = true,
@@ -374,6 +435,24 @@ function Manager:open(opts)
 			return pcall(handle.kill, handle, 15)
 		end,
 	}
+end
+
+function Manager:resume(opts)
+	if type(opts) ~= "table" then
+		fail("resume requires options")
+	end
+	opts = vim.deepcopy(opts)
+	opts.operation = "resume"
+	return self:open(opts)
+end
+
+function Manager:fork(opts)
+	if type(opts) ~= "table" then
+		fail("fork requires options")
+	end
+	opts = vim.deepcopy(opts)
+	opts.operation = "fork"
+	return self:open(opts)
 end
 
 return M

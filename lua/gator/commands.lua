@@ -19,6 +19,20 @@ function M.register()
 		end
 		require("gator").dispatch("handoff", { run_id = run_id, provider = opts.fargs[2] })
 	end, { nargs = "+", desc = "Review and launch a provider handoff" })
+	vim.api.nvim_create_user_command("GatorSend", function(opts)
+		local args = opts.fargs
+		require("gator").dispatch("send_context", {
+			run_id = args[1],
+			kind = args[2],
+			bundle_id = args[3],
+			buffer = vim.api.nvim_get_current_buf(),
+			first_line = opts.range > 0 and opts.line1 or nil,
+			last_line = opts.range > 0 and opts.line2 or nil,
+		})
+	end, { nargs = "*", range = true, desc = "Send selected editor context to an active Gator chat" })
+	vim.api.nvim_create_user_command("GatorReview", function(opts)
+		require("gator").dispatch("review", { run_id = opts.args ~= "" and opts.args or nil })
+	end, { nargs = "?", desc = "Review a Gator run diff and approved test evidence" })
 	vim.api.nvim_create_user_command("GatorHealth", function()
 		require("gator").dispatch("health")
 	end, { desc = "Check Gator health" })

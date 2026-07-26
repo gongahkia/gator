@@ -63,7 +63,10 @@ local function render(panel)
 		end
 	end
 	table.insert(lines, "")
-	table.insert(lines, "<CR> focus · h handoff · p parallel writer · s stop · r resume · q close · ? help")
+	table.insert(
+		lines,
+		"<CR> focus · c context · f native fork · h handoff · p parallel writer · v review · s stop · r resume · q close · ? help"
+	)
 	accessibility.render(panel.buffer, lines, "gator-runs")
 end
 
@@ -77,6 +80,9 @@ local function bind(panel)
 		previous = "k",
 		confirm = "<CR>",
 		handoff = "h",
+		fork = "f",
+		context = "c",
+		review = "v",
 		parallel = "p",
 		stop = "s",
 		resume = "r",
@@ -107,6 +113,24 @@ local function bind(panel)
 				panel.workflow:handoff(run.id)
 			end
 		end,
+		fork = function()
+			local run = selected(panel)
+			if run then
+				panel.workflow:fork(run.id)
+			end
+		end,
+		context = function()
+			local run = selected(panel)
+			if run then
+				panel.workflow:attach_context(run.id)
+			end
+		end,
+		review = function()
+			local run = selected(panel)
+			if run then
+				panel.workflow:review(run.id)
+			end
+		end,
 		parallel = function()
 			local run = selected(panel)
 			if run then
@@ -129,7 +153,7 @@ local function bind(panel)
 		close = M.close,
 		help = function()
 			vim.notify(
-				"Gator runs: <CR> focus, h handoff, p parallel writer, s stop, r resume, q close",
+				"Gator runs: <CR> focus, c context, f native fork, h handoff, p parallel writer, v review, s stop, r resume, q close",
 				vim.log.levels.INFO
 			)
 		end,
