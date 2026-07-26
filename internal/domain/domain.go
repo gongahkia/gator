@@ -299,16 +299,16 @@ type Revision struct {
 }
 
 type OutboxEvent struct {
-	ID           int64          `json:"id"`
-	RunID        string         `json:"run_id,omitempty"`
-	Type         string         `json:"type"`
-	Payload      map[string]any `json:"payload"`
-	State        string         `json:"state"`
-	Attempts     int            `json:"attempts"`
-	WorkerID     string         `json:"worker_id,omitempty"`
-	LastError    string         `json:"last_error,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	DeliveredAt  *time.Time     `json:"delivered_at,omitempty"`
+	ID          int64          `json:"id"`
+	RunID       string         `json:"run_id,omitempty"`
+	Type        string         `json:"type"`
+	Payload     map[string]any `json:"payload"`
+	State       string         `json:"state"`
+	Attempts    int            `json:"attempts"`
+	WorkerID    string         `json:"worker_id,omitempty"`
+	LastError   string         `json:"last_error,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	DeliveredAt *time.Time     `json:"delivered_at,omitempty"`
 }
 
 type ApprovalOperation struct {
@@ -326,18 +326,18 @@ type ApprovalOperation struct {
 }
 
 type PlannerRevision struct {
-	ID             int64        `json:"id"`
-	RunID          string       `json:"run_id"`
-	Attempt        int          `json:"attempt"`
-	Source         string       `json:"source"`
-	ParentID       *int64       `json:"parent_id,omitempty"`
-	Architecture   Architecture `json:"architecture"`
-	Graph          Graph        `json:"graph"`
-	Digest         string       `json:"digest"`
-	Diff           []any        `json:"diff"`
-	State          string       `json:"state"`
-	CreatedAt      time.Time    `json:"created_at"`
-	ApprovedAt     *time.Time   `json:"approved_at,omitempty"`
+	ID           int64        `json:"id"`
+	RunID        string       `json:"run_id"`
+	Attempt      int          `json:"attempt"`
+	Source       string       `json:"source"`
+	ParentID     *int64       `json:"parent_id,omitempty"`
+	Architecture Architecture `json:"architecture"`
+	Graph        Graph        `json:"graph"`
+	Digest       string       `json:"digest"`
+	Diff         []any        `json:"diff"`
+	State        string       `json:"state"`
+	CreatedAt    time.Time    `json:"created_at"`
+	ApprovedAt   *time.Time   `json:"approved_at,omitempty"`
 }
 
 type UsageRecord struct {

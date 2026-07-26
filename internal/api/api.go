@@ -93,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
+	mux.HandleFunc("GET /api/runs/{id}/planner-revisions", s.plannerRevisions)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
 	mux.HandleFunc("GET /api/runs/{id}/skills", s.runSkills)
 	mux.HandleFunc("GET /api/agent/actions", s.agentActions)
@@ -539,6 +540,15 @@ func (s *Server) createChangeRun(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) revisions(w http.ResponseWriter, r *http.Request) {
 	values, err := s.store.ListRevisions(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func (s *Server) plannerRevisions(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.ListPlannerRevisions(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

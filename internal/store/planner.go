@@ -14,7 +14,7 @@ import (
 )
 
 func (s *Store) AppendPlannerRevision(ctx context.Context, runID string, attempt int, source string, architecture domain.Architecture, expected domain.Status) (domain.PlannerRevision, error) {
-	if attempt < 1 || source == "" {
+	if attempt < 0 || source == "" {
 		return domain.PlannerRevision{}, fmt.Errorf("invalid planner revision")
 	}
 	if err := architecture.Validate(); err != nil {
@@ -45,6 +45,13 @@ func (s *Store) AppendPlannerRevision(ctx context.Context, runID string, attempt
 			}
 			value.ParentID = &previous.ID
 		}
+		if attempt == 0 {
+			attempt = previous.Attempt + 1
+			if attempt < 1 {
+				attempt = 1
+			}
+		}
+		value.Attempt = attempt
 		value.Architecture, value.Graph = architecture, architecture.Workflow
 		value.Digest, err = plannerDigest(value.Architecture, value.Graph)
 		if err != nil {
@@ -144,8 +151,12 @@ func jsonDiff(before, after any, path string) []any {
 		return []any{map[string]any{"op": "replace", "path": diffPath(path), "value": after}}
 	}
 	keys := map[string]bool{}
-	for key := range beforeMap { keys[key] = true }
-	for key := range afterMap { keys[key] = true }
+	for key := range beforeMap {
+		keys[key] = true
+	}
+	for key := range afterMap {
+		keys[key] = true
+	}
 	encoded, _ := json.Marshal(mapKeysAny(keys))
 	var ordered []string
 	_ = json.Unmarshal(encoded, &ordered)
@@ -168,17 +179,23 @@ func jsonDiff(before, after any, path string) []any {
 
 func mapKeysAny(values map[string]bool) []string {
 	keys := make([]string, 0, len(values))
-	for key := range values { keys = append(keys, key) }
+	for key := range values {
+		keys = append(keys, key)
+	}
 	for left := 0; left < len(keys); left++ {
 		for right := left + 1; right < len(keys); right++ {
-			if keys[right] < keys[left] { keys[left], keys[right] = keys[right], keys[left] }
+			if keys[right] < keys[left] {
+				keys[left], keys[right] = keys[right], keys[left]
+			}
 		}
 	}
 	return keys
 }
 
 func diffPath(path string) string {
-	if path == "" { return "/" }
+	if path == "" {
+		return "/"
+	}
 	return path
 }
 
@@ -190,8 +207,15 @@ func escapeJSONPointer(value string) string {
 func stringReplaceAll(value, old, replacement string) string {
 	for {
 		index := -1
-		for i := 0; i+len(old) <= len(value); i++ { if value[i:i+len(old)] == old { index = i; break } }
-		if index < 0 { return value }
+		for i := 0; i+len(old) <= len(value); i++ {
+			if value[i:i+len(old)] == old {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			return value
+		}
 		value = value[:index] + replacement + value[index+len(old):]
 	}
 }

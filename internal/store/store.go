@@ -577,7 +577,7 @@ func (s *Store) UpdateGraph(ctx context.Context, runID string, graph domain.Grap
 }
 
 func (s *Store) UpdateArchitecture(ctx context.Context, runID string, architecture domain.Architecture) (domain.Run, error) {
-	_, err := s.AppendPlannerRevision(ctx, runID, nextPlannerAttempt(ctx, s, runID), "operator", architecture, domain.StatusAwaiting)
+	_, err := s.AppendPlannerRevision(ctx, runID, 0, "operator", architecture, domain.StatusAwaiting)
 	if err != nil {
 		return domain.Run{}, err
 	}
@@ -595,16 +595,8 @@ func (s *Store) SetPlannerGraph(ctx context.Context, runID string, graph domain.
 		return err
 	}
 	run.Architecture.Workflow = graph
-	_, err = s.AppendPlannerRevision(ctx, runID, nextPlannerAttempt(ctx, s, runID), "provider", run.Architecture, domain.StatusRunning)
+	_, err = s.AppendPlannerRevision(ctx, runID, 0, "provider", run.Architecture, domain.StatusRunning)
 	return err
-}
-
-func nextPlannerAttempt(ctx context.Context, s *Store, runID string) int {
-	var attempt int
-	if err := s.pool.QueryRow(ctx, `SELECT COALESCE(MAX(attempt),0)+1 FROM planner_revisions WHERE run_id=$1`, runID).Scan(&attempt); err != nil || attempt < 1 {
-		return 1
-	}
-	return attempt
 }
 
 func (s *Store) Approve(ctx context.Context, runID string, action domain.ApprovalAction, feedback string) (domain.Run, error) {
@@ -620,129 +612,129 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 	if err != nil {
 		return err
 	}
-		switch action {
-		case domain.ApprovalApprove:
-			if run.Status != domain.StatusAwaiting {
-				return fmt.Errorf("run is not awaiting approval")
-			}
-			if run.Stage == domain.StagePlanner {
-				if err := s.approvePlannerRevisionTx(ctx, tx, runID); err != nil {
-					return err
-				}
-			}
-			if run.Stage == domain.StageVerifier {
-				var report []byte
-				err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report)
-				if err != nil {
-					return fmt.Errorf("test report unavailable: %w", err)
-				}
-				var decoded map[string]any
-				if err := json.Unmarshal(report, &decoded); err != nil {
-					return err
-				}
-				if decoded["status"] == "fail" {
-					return fmt.Errorf("failed test report requires explicit fix approval")
-				}
-			}
-			if run.Stage == domain.StageDeployer {
-				if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
-					return err
-				}
-				if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'deployer',1)`, runID); err != nil {
-					return err
-				}
-				return s.insertEvent(ctx, tx, runID, "deployment_approved", "Deployment approved and queued", map[string]any{"stage": run.Stage})
-			}
-			next, hasNext := run.Stage.Next()
-			if !hasNext {
-				return fmt.Errorf("invalid stage")
-			}
-			if next == domain.StageDeployer {
-				if _, err := tx.Exec(ctx, `UPDATE runs SET stage='deployer',status='awaiting_approval',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
-					return err
-				}
-				return s.insertEvent(ctx, tx, runID, "deployment_approval_required", "Verification approved; deployment requires explicit approval", map[string]any{"stage": next})
-			}
-			if _, err := tx.Exec(ctx, `UPDATE runs SET stage=$2,status='queued',feedback='',updated_at=now() WHERE id=$1`, runID, next); err != nil {
+	switch action {
+	case domain.ApprovalApprove:
+		if run.Status != domain.StatusAwaiting {
+			return fmt.Errorf("run is not awaiting approval")
+		}
+		if run.Stage == domain.StagePlanner {
+			if err := s.approvePlannerRevisionTx(ctx, tx, runID); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,1)`, runID, next); err != nil {
-				return err
-			}
-			return s.insertEvent(ctx, tx, runID, "stage_approved", string(run.Stage)+" approved; "+string(next)+" queued", map[string]any{"stage": run.Stage, "next_stage": next})
-		case domain.ApprovalRevise:
-			if run.Status != domain.StatusAwaiting || run.Stage != domain.StagePlanner {
-				return fmt.Errorf("revision is available only while planner approval is pending")
-			}
-			if feedback == "" {
-				return fmt.Errorf("revision feedback is required")
-			}
-			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,'planner',COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID); err != nil {
-				return err
-			}
-			return s.insertEvent(ctx, tx, runID, "planner_revision_requested", "Planner revision queued", map[string]any{"feedback": feedback})
-		case domain.ApprovalRetry:
-			if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted {
-				return fmt.Errorf("retry is available only for failed or interrupted runs")
-			}
-			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,$2,COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID, run.Stage); err != nil {
-				return err
-			}
-			return s.insertEvent(ctx, tx, runID, "stage_retry_requested", string(run.Stage)+" retry queued", map[string]any{"stage": run.Stage})
-		case domain.ApprovalAbandon:
-			if run.Status == domain.StatusAbandoned || run.Status == domain.StatusCompleted {
-				return fmt.Errorf("completed or abandoned run cannot be abandoned")
-			}
-			if _, err := tx.Exec(ctx, `UPDATE runs SET status='abandoned',updated_at=now() WHERE id=$1`, runID); err != nil {
-				return err
-			}
-			return s.insertEvent(ctx, tx, runID, "run_abandoned", "Run abandoned by operator", nil)
-		case domain.ApprovalFix:
-			if run.Status != domain.StatusAwaiting || run.Stage != domain.StageVerifier {
-				return fmt.Errorf("fix is available only while a failed test report is awaiting approval")
-			}
+		}
+		if run.Stage == domain.StageVerifier {
 			var report []byte
-			if err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report); err != nil {
+			err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report)
+			if err != nil {
 				return fmt.Errorf("test report unavailable: %w", err)
 			}
 			var decoded map[string]any
 			if err := json.Unmarshal(report, &decoded); err != nil {
 				return err
 			}
-			if decoded["status"] != "fail" {
-				return fmt.Errorf("fix requires a failed test report")
+			if decoded["status"] == "fail" {
+				return fmt.Errorf("failed test report requires explicit fix approval")
 			}
-			if feedback == "" {
-				encoded, err := json.Marshal(decoded)
-				if err != nil {
-					return err
-				}
-				feedback = "failed verification diagnostics: " + string(encoded)
-			}
-			var attempts int
-			if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM revisions WHERE run_id=$1 AND kind='fix'`, runID).Scan(&attempts); err != nil {
-				return err
-			}
-			if attempts >= run.MaxFixes {
-				return fmt.Errorf("maximum fix attempts (%d) reached", run.MaxFixes)
-			}
-			attempt := attempts + 2
-			if _, err := tx.Exec(ctx, `UPDATE runs SET stage='builder',status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'builder',$2)`, runID, attempt); err != nil {
-				return err
-			}
-			return s.insertEvent(ctx, tx, runID, "fix_approved", "Operator approved bounded fix attempt", map[string]any{"attempt": attempt, "feedback": feedback})
-		default:
-			return fmt.Errorf("unknown approval action")
 		}
+		if run.Stage == domain.StageDeployer {
+			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'deployer',1)`, runID); err != nil {
+				return err
+			}
+			return s.insertEvent(ctx, tx, runID, "deployment_approved", "Deployment approved and queued", map[string]any{"stage": run.Stage})
+		}
+		next, hasNext := run.Stage.Next()
+		if !hasNext {
+			return fmt.Errorf("invalid stage")
+		}
+		if next == domain.StageDeployer {
+			if _, err := tx.Exec(ctx, `UPDATE runs SET stage='deployer',status='awaiting_approval',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
+				return err
+			}
+			return s.insertEvent(ctx, tx, runID, "deployment_approval_required", "Verification approved; deployment requires explicit approval", map[string]any{"stage": next})
+		}
+		if _, err := tx.Exec(ctx, `UPDATE runs SET stage=$2,status='queued',feedback='',updated_at=now() WHERE id=$1`, runID, next); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,1)`, runID, next); err != nil {
+			return err
+		}
+		return s.insertEvent(ctx, tx, runID, "stage_approved", string(run.Stage)+" approved; "+string(next)+" queued", map[string]any{"stage": run.Stage, "next_stage": next})
+	case domain.ApprovalRevise:
+		if run.Status != domain.StatusAwaiting || run.Stage != domain.StagePlanner {
+			return fmt.Errorf("revision is available only while planner approval is pending")
+		}
+		if feedback == "" {
+			return fmt.Errorf("revision feedback is required")
+		}
+		if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,'planner',COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID); err != nil {
+			return err
+		}
+		return s.insertEvent(ctx, tx, runID, "planner_revision_requested", "Planner revision queued", map[string]any{"feedback": feedback})
+	case domain.ApprovalRetry:
+		if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted {
+			return fmt.Errorf("retry is available only for failed or interrupted runs")
+		}
+		if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,$2,COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID, run.Stage); err != nil {
+			return err
+		}
+		return s.insertEvent(ctx, tx, runID, "stage_retry_requested", string(run.Stage)+" retry queued", map[string]any{"stage": run.Stage})
+	case domain.ApprovalAbandon:
+		if run.Status == domain.StatusAbandoned || run.Status == domain.StatusCompleted {
+			return fmt.Errorf("completed or abandoned run cannot be abandoned")
+		}
+		if _, err := tx.Exec(ctx, `UPDATE runs SET status='abandoned',updated_at=now() WHERE id=$1`, runID); err != nil {
+			return err
+		}
+		return s.insertEvent(ctx, tx, runID, "run_abandoned", "Run abandoned by operator", nil)
+	case domain.ApprovalFix:
+		if run.Status != domain.StatusAwaiting || run.Stage != domain.StageVerifier {
+			return fmt.Errorf("fix is available only while a failed test report is awaiting approval")
+		}
+		var report []byte
+		if err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report); err != nil {
+			return fmt.Errorf("test report unavailable: %w", err)
+		}
+		var decoded map[string]any
+		if err := json.Unmarshal(report, &decoded); err != nil {
+			return err
+		}
+		if decoded["status"] != "fail" {
+			return fmt.Errorf("fix requires a failed test report")
+		}
+		if feedback == "" {
+			encoded, err := json.Marshal(decoded)
+			if err != nil {
+				return err
+			}
+			feedback = "failed verification diagnostics: " + string(encoded)
+		}
+		var attempts int
+		if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM revisions WHERE run_id=$1 AND kind='fix'`, runID).Scan(&attempts); err != nil {
+			return err
+		}
+		if attempts >= run.MaxFixes {
+			return fmt.Errorf("maximum fix attempts (%d) reached", run.MaxFixes)
+		}
+		attempt := attempts + 2
+		if _, err := tx.Exec(ctx, `UPDATE runs SET stage='builder',status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'builder',$2)`, runID, attempt); err != nil {
+			return err
+		}
+		return s.insertEvent(ctx, tx, runID, "fix_approved", "Operator approved bounded fix attempt", map[string]any{"attempt": attempt, "feedback": feedback})
+	default:
+		return fmt.Errorf("unknown approval action")
+	}
 	return nil
 }
 

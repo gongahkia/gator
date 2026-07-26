@@ -313,17 +313,96 @@ func (s *Service) Approve(ctx context.Context, runID string, input ApprovalInput
 		if err != nil {
 			return domain.Run{}, err
 		}
+		baseline, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
+		if err != nil {
+			return domain.Run{}, err
+		}
+		if digestFiles(baseline) != revision.BaselineDigest {
+			return domain.Run{}, fmt.Errorf("workspace baseline changed; revision cannot be applied")
+		}
+		post := cloneFiles(baseline)
+		for path, content := range revision.Files {
+			post[path] = content
+		}
+		operation, err := s.store.CreateApprovalOperation(ctx, domain.ApprovalOperation{RunID: runID, RevisionID: revision.ID, BaselineDigest: revision.BaselineDigest, PostDigest: digestFiles(post), BaselineFiles: baseline})
+		if err != nil {
+			return domain.Run{}, err
+		}
+		return s.applyApprovalOperation(ctx, operation)
+	}
+	return s.store.Approve(ctx, runID, input.Action, strings.TrimSpace(input.Feedback))
+}
+
+func (s *Service) applyApprovalOperation(ctx context.Context, operation domain.ApprovalOperation) (domain.Run, error) {
+	run, err := s.store.GetRun(ctx, operation.RunID)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	revision, err := s.store.Revision(ctx, operation.RunID, operation.RevisionID)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	workspace, _, err := s.backendForRun(ctx, run)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	current, err := digestGeneratedApp(workspace.RunPath(run.ID))
+	if err != nil {
+		return domain.Run{}, err
+	}
+	if current != operation.PostDigest {
+		if current != operation.BaselineDigest {
+			if rollbackErr := restoreGeneratedApp(workspace.RunPath(run.ID), operation.BaselineFiles); rollbackErr == nil {
+				_ = workspace.MirrorGeneratedApp(ctx, run.ID)
+			}
+			_ = s.store.FailApprovalOperation(context.Background(), operation.ID, "workspace differed from journaled baseline and post-state")
+			return domain.Run{}, fmt.Errorf("workspace differed from journaled approval state")
+		}
+		if operation.State == "prepared" {
+			if err := s.store.MarkApprovalOperationApplying(ctx, operation.ID); err != nil {
+				return domain.Run{}, err
+			}
+		}
 		if err := applyRevision(workspace, run, revision); err != nil {
-			return domain.Run{}, err
-		}
-		if err := workspace.MirrorGeneratedApp(ctx, runID); err != nil {
-			return domain.Run{}, err
-		}
-		if err := s.store.ApproveRevision(ctx, runID, revision.ID); err != nil {
+			_ = s.store.FailApprovalOperation(context.Background(), operation.ID, err.Error())
 			return domain.Run{}, err
 		}
 	}
-	return s.store.Approve(ctx, runID, input.Action, strings.TrimSpace(input.Feedback))
+	if err := workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
+		_ = s.store.FailApprovalOperation(context.Background(), operation.ID, err.Error())
+		return domain.Run{}, err
+	}
+	if err := s.store.MarkApprovalWorkspaceApplied(ctx, operation.ID); err != nil {
+		return domain.Run{}, err
+	}
+	return s.store.FinalizeApprovalOperation(ctx, operation.ID)
+}
+
+func cloneFiles(input map[string]string) map[string]string {
+	result := make(map[string]string, len(input))
+	for path, content := range input {
+		result[path] = content
+	}
+	return result
+}
+
+func (s *Service) recoverApprovalOperations(ctx context.Context) {
+	for {
+		operations, err := s.store.RecoverableApprovalOperations(ctx)
+		if err != nil {
+			s.log.Error("list approval recovery operations", "error", err)
+		} else {
+			for _, operation := range operations {
+				if _, err := s.applyApprovalOperation(ctx, operation); err != nil {
+					s.log.Warn("recover approval operation", "id", operation.ID, "error", err)
+				}
+			}
+		}
+		sleep(ctx, 5*time.Second)
+		if ctx.Err() != nil {
+			return
+		}
+	}
 }
 
 func (s *Service) Cancel(ctx context.Context, runID string) (domain.Run, error) {
@@ -899,7 +978,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		if err != nil {
 			return err
 		}
-		report, err := verifyApp(ctx, workspace, run)
+		report, err := verifyApp(ctx, workspace, run, revision.Files)
 		if err != nil {
 			if report == nil {
 				report = map[string]any{}
@@ -958,7 +1037,7 @@ func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) er
 	return s.store.CompleteRun(ctx, job, map[string]any{"app_id": applicationID(run), "project": project, "public_url": url})
 }
 
-func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run) (map[string]any, error) {
+func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run, changedSets ...map[string]string) (map[string]any, error) {
 	if verifier, ok := workspace.(interface {
 		Verify(context.Context, domain.Run) (map[string]any, error)
 	}); ok && run.DeploymentTarget == domain.DeploymentKubernetes {
@@ -1012,17 +1091,51 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 	if err := runCommand(dockerBin, append(compose, "config", "--quiet")...); err != nil {
 		return verificationFailure(ctx, runner, dockerBin, compose, checks, err)
 	}
-	frontend := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", "npm ci && npm test && npm run build && npm audit --omit=dev --audit-level=high"}
+	frontendKey, err := dependencyCacheKey(root, "node:22-alpine", "frontend/package.json", "frontend/package-lock.json")
+	if err != nil {
+		return nil, err
+	}
+	frontendCache := verificationCacheVolume("node", frontendKey)
+	if err := ensureNodeCache(ctx, runner, dockerBin, docker.Volume(run.ID), frontendCache, frontendKey); err != nil {
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend dependency cache: %w", err))
+	}
+	frontendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", frontendCache + ":/workspace/generated-app/frontend/node_modules:ro", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu"}
+	changed := map[string]string{}
+	if len(changedSets) > 0 && changedSets[0] != nil {
+		changed = changedSets[0]
+	}
+	if fastFrontend(changed) {
+		if err := runCommand(dockerBin, append(frontendMount, "npm test")...); err != nil {
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast frontend test: %w", err))
+		}
+		checks = append(checks, "fast frontend test")
+	}
+	frontend := append(frontendMount, "npm test && npm run build && npm audit --omit=dev --audit-level=high")
 	if err := runCommand(dockerBin, frontend...); err != nil {
 		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend test/build/audit: %w", err))
 	}
-	checks = append(checks, "npm ci/test/build/audit")
+	checks = append(checks, "npm cache/test/build/audit")
 	if run.Profile != domain.ProfileFrontend {
-		backend := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", "go test ./... && go build ./... && go install golang.org/x/vuln/cmd/govulncheck@v1.6.0 && govulncheck ./..."}
+		backendKey, err := dependencyCacheKey(root, "golang:1.26-alpine", "backend/go.mod", "backend/go.sum")
+		if err != nil {
+			return nil, err
+		}
+		backendCache := verificationCacheVolume("go", backendKey)
+		if err := ensureGoCache(ctx, runner, dockerBin, docker.Volume(run.ID), backendCache, backendKey); err != nil {
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go dependency cache: %w", err))
+		}
+		backendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", backendCache + ":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu"}
+		if fastBackend(changed) {
+			if err := runCommand(dockerBin, append(backendMount, "GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./...")...); err != nil {
+				return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast Go test: %w", err))
+			}
+			checks = append(checks, "fast Go test")
+		}
+		backend := append(backendMount, "PATH=/cache/bin:$PATH GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./... && go build ./... && govulncheck ./...")
 		if err := runCommand(dockerBin, backend...); err != nil {
 			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go test/build/govulncheck: %w", err))
 		}
-		checks = append(checks, "go test/build/govulncheck")
+		checks = append(checks, "Go cache/test/build/govulncheck")
 	}
 	deployed := false
 	defer func() {
@@ -1050,6 +1163,71 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, cause error) (map[string]any, error) {
 	logs, _ := runner.Run(ctx, dockerBin, append(compose, "logs", "--no-color", "--tail", "200")...)
 	return map[string]any{"status": "fail", "checks": checks, "logs": string(logs)}, fmt.Errorf("verification failed: %w", cause)
+}
+
+func dependencyCacheKey(root, image string, files ...string) (string, error) {
+	hash := sha256.New()
+	_, _ = hash.Write([]byte(image))
+	for _, relative := range files {
+		content, err := os.ReadFile(filepath.Join(root, relative))
+		if err != nil {
+			return "", fmt.Errorf("read dependency lockfile %s: %w", relative, err)
+		}
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(relative))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write(content)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func verificationCacheVolume(ecosystem, key string) string {
+	if len(key) > 32 {
+		key = key[:32]
+	}
+	return "norbot_verify_" + ecosystem + "_" + key
+}
+
+func ensureNodeCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) error {
+	if _, err := runner.Run(ctx, dockerBin, "volume", "create", cacheVolume); err != nil {
+		return err
+	}
+	script := "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 -exec rm -rf {} +; npm ci; cp -a node_modules/. /cache/; printf '%s' '" + key + "' >/cache/.norbot-key; rm -rf node_modules; fi"
+	_, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", script)
+	return err
+}
+
+func ensureGoCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) error {
+	if _, err := runner.Run(ctx, dockerBin, "volume", "create", cacheVolume); err != nil {
+		return err
+	}
+	script := "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 -exec rm -rf {} +; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go mod download; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >/cache/.norbot-key; fi"
+	_, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", script)
+	return err
+}
+
+func fastFrontend(changed map[string]string) bool {
+	if len(changed) == 0 {
+		return true
+	}
+	for path := range changed {
+		if strings.HasPrefix(path, "generated-app/frontend/") || path == "generated-app/docker-compose.yml" {
+			return true
+		}
+	}
+	return false
+}
+
+func fastBackend(changed map[string]string) bool {
+	if len(changed) == 0 {
+		return true
+	}
+	for path := range changed {
+		if strings.HasPrefix(path, "generated-app/backend/") || path == "generated-app/docker-compose.yml" {
+			return true
+		}
+	}
+	return false
 }
 
 func reserveVerificationPort() (int, error) { return runtime.ReservePort() }
