@@ -378,7 +378,7 @@ function Workflow:open_managed(run, prompt)
 	local opened = self.managed:open({
 		provider = run.provider,
 		cwd = run.workspace.root,
-		task_id = run.id,
+		run_id = run.id,
 		history = history,
 		prompt = prompt,
 		on_session = function(session)

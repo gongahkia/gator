@@ -1,5 +1,4 @@
 local domains = {
-	task = true,
 	session = true,
 	context = true,
 	run = true,

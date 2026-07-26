@@ -29,13 +29,11 @@ Subscription.__index = Subscription
 
 local fields = {
 	config = true,
-	tasks = true,
 	context = true,
 	adapters = true,
 	workspace = true,
 	review = true,
 	compatibility = true,
-	active_task_id = true,
 }
 local statuses = { ready = true, loading = true, degraded = true, failed = true, recovering = true }
 
@@ -80,13 +78,6 @@ local function compatibility(value)
 	return value
 end
 
-local function active_task_id(value)
-	if value ~= false and (type(value) ~= "string" or not value:match("^[a-z][a-z0-9_-]*$")) then
-		fail("active_task_id must be a task identifier or false")
-	end
-	return value
-end
-
 local function validate(value)
 	object(value, "state")
 	for key in pairs(value) do
@@ -100,13 +91,11 @@ local function validate(value)
 		end
 	end
 	config(value.config)
-	list(value.tasks, "tasks")
 	object(value.context, "context")
 	object(value.adapters, "adapters")
 	workspace(value.workspace)
 	object(value.review, "review")
 	compatibility(value.compatibility)
-	active_task_id(value.active_task_id)
 	return value
 end
 
@@ -149,13 +138,11 @@ end
 function M.new(settings, compatibility)
 	local value = {
 		config = settings,
-		tasks = {},
 		context = {},
 		adapters = {},
 		workspace = { status = "ready" },
 		review = {},
 		compatibility = compatibility,
-		active_task_id = false,
 	}
 	validate(value)
 	return setmetatable({

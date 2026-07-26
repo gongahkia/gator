@@ -3,7 +3,6 @@ local M = {}
 local styles = {
 	unicode = {
 		brand = "🐊",
-		task = "📋",
 		session = "🔗",
 		context = "📎",
 		review = "🔎",
@@ -20,7 +19,6 @@ local styles = {
 	},
 	nerd_font = {
 		brand = "",
-		task = "󰄬",
 		session = "",
 		context = "󰆨",
 		review = "󰄬",
@@ -37,7 +35,6 @@ local styles = {
 	},
 	ascii = {
 		brand = "[G]",
-		task = "[T]",
 		session = "[S]",
 		context = "[C]",
 		review = "[R]",
@@ -54,7 +51,6 @@ local styles = {
 	},
 	none = {
 		brand = "",
-		task = "",
 		session = "",
 		context = "",
 		review = "",

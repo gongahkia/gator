@@ -546,12 +546,12 @@ function Manager:open(opts)
 	if current and value.resume == false then
 		fail(provider_name .. " does not document managed-session resume")
 	end
-	local task_id = text(opts.task_id, "task_id")
+	local run_id = text(opts.run_id, "run_id")
 	local history = opts.history
 	if mode == "history" then
 		history = text(history, "history")
 	end
-	local key = provider_name .. "\0" .. (current and current.id or task_id)
+	local key = provider_name .. "\0" .. (current and current.id or run_id)
 	if self.active[key] then
 		local active = self.active[key]
 		if opts.prompt and opts.prompt ~= "" and active.session then
