@@ -1,9 +1,24 @@
 local M = {}
 
 function M.register()
-	vim.api.nvim_create_user_command("Gator", function()
-		require("gator").dispatch("open")
-	end, { desc = "Open Gator" })
+	vim.api.nvim_create_user_command("Gator", function(opts)
+		require("gator").dispatch("open", {
+			provider = opts.args ~= "" and opts.args or nil,
+			buffer = vim.api.nvim_get_current_buf(),
+			first_line = opts.range > 0 and opts.line1 or nil,
+			last_line = opts.range > 0 and opts.line2 or nil,
+		})
+	end, { nargs = "?", range = true, desc = "Launch a coding agent with current context" })
+	vim.api.nvim_create_user_command("GatorRuns", function()
+		require("gator").dispatch("runs")
+	end, { desc = "Open Gator run graph" })
+	vim.api.nvim_create_user_command("GatorHandoff", function(opts)
+		local run_id = opts.fargs[1]
+		if not run_id then
+			error("GatorHandoff requires a source run id; use :GatorRuns to inspect runs", 0)
+		end
+		require("gator").dispatch("handoff", { run_id = run_id, provider = opts.fargs[2] })
+	end, { nargs = "+", desc = "Review and launch a provider handoff" })
 	vim.api.nvim_create_user_command("GatorHealth", function()
 		require("gator").dispatch("health")
 	end, { desc = "Check Gator health" })
@@ -31,27 +46,15 @@ function M.register()
 			)
 		end)
 	end, { desc = "Verify public-beta readiness and write a local failure report" })
-	vim.api.nvim_create_user_command("GatorStopSession", function()
-		local ok, result = pcall(require("gator").stop_session)
+	vim.api.nvim_create_user_command("GatorStopSession", function(opts)
+		local ok, result = pcall(require("gator").dispatch, "stop_session", { run_id = opts.args ~= "" and opts.args or nil })
 		vim.notify(
 			ok and "Gator session stopped; provider session remains resumable"
 				or require("gator.policy.redact").text(tostring(result)),
 			ok and vim.log.levels.INFO or vim.log.levels.ERROR,
 			{ title = "Gator" }
 		)
-	end, { desc = "Stop the active managed provider process" })
-	vim.api.nvim_create_user_command("GatorCaptureSelection", function(opts)
-		require("gator").dispatch("capture_selection", {
-			target = opts.args,
-			buffer = vim.api.nvim_get_current_buf(),
-			first_line = opts.line1,
-			last_line = opts.line2,
-		})
-	end, {
-		nargs = 1,
-		range = true,
-		desc = "Capture visual selection for task:<id> or session:<provider>:<id>",
-	})
+	end, { nargs = "?", desc = "Stop an active Gator-managed run" })
 end
 
 return M

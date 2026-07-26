@@ -20,7 +20,8 @@ local function current()
 end
 
 local function render(panel)
-	local lines = { "Gator agent · " .. panel.provider .. " · " .. panel.session_id .. " · " .. panel.state, "" }
+	local label = panel.run_id and ("run " .. panel.run_id) or panel.session_id
+	local lines = { "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. panel.state, "" }
 	if #panel.lines == 0 then
 		table.insert(lines, "Waiting for provider output")
 	else
@@ -35,6 +36,7 @@ local function input(panel)
 	vim.ui.input({ prompt = "Gator prompt: " }, function(value)
 		if type(value) == "string" and vim.trim(value) ~= "" then
 			table.insert(panel.lines, "> " .. redact.text(value))
+			panel.on_message("user", value)
 			render(panel)
 			panel.on_input(value)
 		end
@@ -63,6 +65,12 @@ function M.open(opts)
 	if opts.on_detach ~= nil and type(opts.on_detach) ~= "function" then
 		fail("on_detach must be a function")
 	end
+	if opts.on_message ~= nil and type(opts.on_message) ~= "function" then
+		fail("on_message must be a function")
+	end
+	if opts.run_id ~= nil and (type(opts.run_id) ~= "string" or opts.run_id == "") then
+		fail("run_id must be non-empty text")
+	end
 	for _, name in ipairs({ "provider", "session_id", "state" }) do
 		if type(opts[name]) ~= "string" or opts[name] == "" then
 			fail(name .. " must be non-empty text")
@@ -70,9 +78,9 @@ function M.open(opts)
 	end
 	local panel, tabpage = current()
 	if panel then
-		panel.provider, panel.session_id, panel.state = opts.provider, opts.session_id, opts.state
-		panel.on_input, panel.on_cancel, panel.on_detach =
-			opts.on_input, opts.on_cancel, opts.on_detach or function() end
+		panel.provider, panel.session_id, panel.run_id, panel.state = opts.provider, opts.session_id, opts.run_id, opts.state
+		panel.on_input, panel.on_cancel, panel.on_detach, panel.on_message =
+			opts.on_input, opts.on_cancel, opts.on_detach or function() end, opts.on_message or function() end
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
@@ -86,11 +94,13 @@ function M.open(opts)
 		buffer = buffer,
 		provider = opts.provider,
 		session_id = opts.session_id,
+		run_id = opts.run_id,
 		state = opts.state,
 		lines = {},
 		on_input = opts.on_input,
 		on_cancel = opts.on_cancel,
 		on_detach = opts.on_detach or function() end,
+		on_message = opts.on_message or function() end,
 		previous = opened.previous,
 	}
 	panels[tabpage] = panel
@@ -107,11 +117,16 @@ function M.update(opts)
 	if opts.session_id ~= nil then
 		panel.session_id = redact.text(opts.session_id)
 	end
+	if opts.run_id ~= nil then
+		panel.run_id = redact.text(opts.run_id)
+	end
 	if opts.state ~= nil then
 		panel.state = redact.text(opts.state)
 	end
 	if opts.text ~= nil and opts.text ~= "" then
-		table.insert(panel.lines, redact.text(opts.text))
+		local value = redact.text(opts.text)
+		table.insert(panel.lines, value)
+		panel.on_message("assistant", value)
 	end
 	render(panel)
 	return true

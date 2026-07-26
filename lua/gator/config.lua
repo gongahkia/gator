@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 3
+M.schema_version = 4
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -16,8 +16,15 @@ M.defaults = {
 	context = {
 		mode = "manual",
 		trust = "provenance",
-		handoff = { author = "user", max_chars = 4096, review = "required" },
+		handoff = {
+			author = "user",
+			max_chars = 4096,
+			review = "required",
+			profile = "full",
+			source_summary = false,
+		},
 	},
+	launch = { default_provider = "ask", transport = "auto" },
 	sessions = { transfer = "manual" },
 	providers = {
 		pi = { user_confirmed = false },
@@ -31,7 +38,7 @@ M.defaults = {
 		kimi = { user_confirmed = false },
 		vibe = { user_confirmed = false },
 	},
-	workspaces = { mode = "project", max_write_runs = 1 },
+	workspaces = { mode = "project" },
 	persistence = { sharing = "local" },
 	telemetry = { enabled = false, redaction_patterns = {} },
 }
@@ -90,6 +97,7 @@ local root_fields = {
 	schema_version = true,
 	ui = true,
 	context = true,
+	launch = true,
 	sessions = true,
 	providers = true,
 	workspaces = true,
@@ -132,17 +140,20 @@ local provider_names = {
 	vibe = true,
 }
 
+local launch_provider_names = vim.tbl_extend("force", { claude = true, codex = true, opencode = true }, provider_names)
+
 local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
 	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, icons = true, motion = true }, "settings.ui")
 	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
+	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
 	fields(value.providers, provider_names, "settings.providers")
 	for name in pairs(provider_names) do
 		fields(value.providers[name], { user_confirmed = true }, "settings.providers." .. name)
 	end
-	fields(value.workspaces, { mode = true, max_write_runs = true }, "settings.workspaces")
+	fields(value.workspaces, { mode = true }, "settings.workspaces")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
 	if not vim.tbl_contains({ "adaptive", "modal" }, value.ui.layout) then
@@ -173,7 +184,13 @@ local function settings(value)
 	if not vim.tbl_contains({ "provenance", "repository", "manual" }, value.context.trust) then
 		fail("context.trust must be provenance, repository, or manual")
 	end
-	fields(value.context.handoff, { author = true, max_chars = true, review = true }, "settings.context.handoff")
+	fields(value.context.handoff, {
+		author = true,
+		max_chars = true,
+		review = true,
+		profile = true,
+		source_summary = true,
+	}, "settings.context.handoff")
 	if not vim.tbl_contains({ "user", "source", "gator" }, value.context.handoff.author) then
 		fail("context.handoff.author must be user, source, or gator")
 	end
@@ -187,6 +204,18 @@ local function settings(value)
 	if value.context.handoff.review ~= "required" and value.context.handoff.review ~= "optional" then
 		fail("context.handoff.review must be required or optional")
 	end
+	if not vim.tbl_contains({ "full", "compact", "summary-first" }, value.context.handoff.profile) then
+		fail("context.handoff.profile must be full, compact, or summary-first")
+	end
+	if type(value.context.handoff.source_summary) ~= "boolean" then
+		fail("context.handoff.source_summary must be boolean")
+	end
+	if value.launch.default_provider ~= "ask" and not launch_provider_names[value.launch.default_provider] then
+		fail("launch.default_provider must be ask or a supported provider")
+	end
+	if not vim.tbl_contains({ "auto", "chat", "terminal" }, value.launch.transport) then
+		fail("launch.transport must be auto, chat, or terminal")
+	end
 	if value.sessions.transfer ~= "manual" then
 		fail("sessions.transfer must be manual")
 	end
@@ -197,13 +226,6 @@ local function settings(value)
 	end
 	if not vim.tbl_contains({ "project", "worktree" }, value.workspaces.mode) then
 		fail("workspaces.mode must be project or worktree")
-	end
-	if
-		type(value.workspaces.max_write_runs) ~= "number"
-		or value.workspaces.max_write_runs < 1
-		or value.workspaces.max_write_runs % 1 ~= 0
-	then
-		fail("workspaces.max_write_runs must be a positive integer")
 	end
 	if value.persistence.sharing ~= "local" then
 		fail("persistence.sharing must be local")
@@ -229,8 +251,17 @@ function M.migrate(value)
 	if from_version == M.schema_version then
 		return document, { migrated = false, from_version = from_version, to_version = from_version }
 	end
-	if from_version ~= 1 and from_version ~= 2 then
+	if from_version ~= 1 and from_version ~= 2 and from_version ~= 3 then
 		fail("settings.schema_version is unsupported: " .. from_version)
+	end
+	document.launch = document.launch or {}
+	document.workspaces = document.workspaces or {}
+	document.workspaces.max_write_runs = nil
+	document.context = document.context or {}
+	document.context.handoff = document.context.handoff or {}
+	document.context.handoff.profile = document.context.handoff.profile or "full"
+	if document.context.handoff.source_summary == nil then
+		document.context.handoff.source_summary = false
 	end
 	document.schema_version = M.schema_version
 	return document, { migrated = true, from_version = from_version, to_version = M.schema_version }
@@ -248,7 +279,7 @@ local function source(value, index)
 		fail("configuration source " .. index .. " ref must be a non-empty string")
 	end
 	local settings_value, migration = value.settings
-	if value.source == "file" then
+	if type(settings_value) == "table" and settings_value.schema_version ~= nil and settings_value.schema_version ~= M.schema_version then
 		settings_value, migration = M.migrate(settings_value)
 	end
 	return {

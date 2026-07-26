@@ -20,21 +20,32 @@ function M.open(opts)
 	end
 	local available, items = {}, {}
 	for _, provider in ipairs(opts.providers) do
-		if not capabilities.is(provider) then
-			fail("providers must contain capability contracts")
-		end
-		local native_transport = capabilities.supports(provider, "transport", "native")
-		local managed_transport = capabilities.supports(provider, "transport", "managed")
-		local native_auth = capabilities.supports(provider, "auth", "native")
-		local user_confirmed = capabilities.supports(provider, "auth", "user_confirmed")
-		if (native_transport or managed_transport) and (native_auth or user_confirmed) then
-			available[provider.provider] = provider
+		if capabilities.is(provider) then
+			local native_transport = capabilities.supports(provider, "transport", "native")
+			local managed_transport = capabilities.supports(provider, "transport", "managed")
+			local native_auth = capabilities.supports(provider, "auth", "native")
+			local user_confirmed = capabilities.supports(provider, "auth", "user_confirmed")
+			if (native_transport or managed_transport) and (native_auth or user_confirmed) then
+				available[provider.provider] = provider
+				items[#items + 1] = {
+					id = provider.provider,
+					label = provider.provider
+						.. (user_confirmed and " · user-confirmed; credentials not verified; ready" or " · ready")
+						.. (managed_transport and " in Gator" or " to launch"),
+				}
+			end
+		elseif type(provider) == "table" and type(provider.provider) == "string" and provider.available == true then
+			available[provider.provider] = vim.deepcopy(provider)
+			local ready = provider.readiness_state == "user_confirmed"
+			local transport = provider.chat and "chat" or "terminal"
 			items[#items + 1] = {
 				id = provider.provider,
 				label = provider.provider
-					.. (user_confirmed and " · user-confirmed; credentials not verified; ready" or " · ready")
-					.. (managed_transport and " in Gator" or " to launch"),
+					.. (ready and " · user-confirmed; credentials not verified" or " · ready")
+					.. " · " .. transport,
 			}
+		else
+			fail("providers must contain capability contracts or ready provider records")
 		end
 	end
 	table.sort(items, function(left, right)
@@ -44,7 +55,12 @@ function M.open(opts)
 		title = "Gator providers",
 		items = items,
 		on_select = function(item)
-			opts.on_launch({ provider = item.id, capabilities = capabilities.to_record(available[item.id]) })
+			local value = available[item.id]
+			opts.on_launch({
+				provider = item.id,
+				capabilities = capabilities.is(value) and capabilities.to_record(value) or nil,
+				record = capabilities.is(value) and nil or vim.deepcopy(value),
+			})
 		end,
 		on_cancel = opts.on_cancel,
 	})

@@ -1,645 +1,638 @@
-local capabilities = require("gator.adapters.capabilities")
+local health = require("gator.health")
 local managed_adapter = require("gator.adapters.managed")
 local native_terminal = require("gator.adapters.native_terminal")
+local structured = require("gator.adapters.structured")
 local terminal = require("gator.adapters.terminal")
-local task = require("gator.core.task")
-local task_file = require("gator.core.task_file")
-local lifecycle = require("gator.core.lifecycle")
-local session = require("gator.core.session")
-local health = require("gator.health")
+local run_store = require("gator.run_store")
+local capture = require("gator.context.capture")
 local provider_picker = require("gator.ui.provider_picker")
 local conversation = require("gator.ui.conversation")
-local approval_details = require("gator.ui.approval_details")
-local approval_event = require("gator.core.approval_event")
+local run_graph = require("gator.ui.run_graph")
+local handoff_review = require("gator.ui.run_handoff")
+local worktree = require("gator.workspace.worktree")
 local state_store = require("gator.state")
 
-local M = { name = "workflow", api_version = 1 }
+local M = { name = "workflow", api_version = 2 }
 local Workflow = {}
-
 Workflow.__index = Workflow
 
 local function fail(message)
 	error("Gator workflow: " .. tostring(message), 3)
 end
 
-local function identifier(value, name)
-	if type(value) ~= "string" or not value:match("^[a-z][a-z0-9_-]*$") then
-		fail(name .. " must be a lowercase identifier")
+local function text(value, name)
+	if type(value) ~= "string" or vim.trim(value) == "" then
+		fail(name .. " must be non-empty text")
+	end
+	return value
+end
+
+local function provider(value)
+	value = text(value, "provider")
+	if not value:match("^[a-z][a-z0-9_-]*$") then
+		fail("provider must be a lowercase identifier")
 	end
 	return value
 end
 
 local function project_root(value)
-	if value ~= nil then
-		if type(value) ~= "string" or value == "" then
-			fail("root must be a non-empty path")
-		end
+	if value then
 		local resolved = vim.uv.fs_realpath(value)
-		if not resolved or vim.fn.isdirectory(resolved) ~= 1 then
-			fail("root must resolve to a directory")
+		if resolved and vim.fn.isdirectory(resolved) == 1 then
+			return resolved
 		end
-		return resolved
+		fail("root must resolve to a directory")
 	end
 	local result = vim.system({ "git", "rev-parse", "--show-toplevel" }, { cwd = vim.fn.getcwd(), text = true }):wait()
-	local root = result.code == 0 and vim.trim(result.stdout or "") or ""
-	return project_root(root)
+	if result.code ~= 0 then
+		fail("current directory is not a Git workspace")
+	end
+	return project_root(vim.trim(result.stdout or ""))
 end
 
-local function slug(value)
-	value = value:lower():gsub("[^a-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
-	if value == "" then
-		value = "task"
-	end
-	if not value:match("^[a-z]") then
-		value = "task-" .. value
-	end
-	return value:sub(1, 63):gsub("-+$", "")
+local function now()
+	return os.time()
 end
 
-local function records(state)
-	local result = {}
-	for _, value in ipairs(state.tasks) do
-		result[value.id] = value
-	end
-	return result
+local function active_state(value)
+	return value.state == "starting" or value.state == "running" or value.state == "waiting_input" or value.state == "detached"
 end
 
-local function catalog_contract(record, transport_name)
-	local ready = { available = true, modes = { transport_name } }
-	local unavailable = { available = false, reason = "unavailable for this Gator workflow" }
-	local auth = record.readiness_state == "user_confirmed" and { available = true, modes = { "user_confirmed" } }
-		or ready
-	local permission = transport_name == "managed"
-			and record.mode == "acp"
-			and { available = true, modes = { "user_decision" } }
-		or unavailable
-	return capabilities.new({
-		provider = record.provider,
-		transport = ready,
-		auth = auth,
-		session = ready,
-		permission = permission,
-		model = unavailable,
-		command = unavailable,
-		tool = unavailable,
-		context = unavailable,
-		usage = unavailable,
-	})
+local function writers(value)
+	return active_state(value) and (value.role == "primary" or value.role == "writer")
 end
 
 function M.new(opts)
+	opts = opts or {}
 	if type(opts) ~= "table" or not state_store.is(opts.state) then
 		fail("new requires initialized state")
 	end
 	for key in pairs(opts) do
-		if
-			key ~= "state"
-			and key ~= "root"
-			and key ~= "terminal"
-			and key ~= "bridge"
-			and key ~= "readiness"
-			and key ~= "managed"
-		then
+		if key ~= "state" and key ~= "root" and key ~= "terminal" and key ~= "bridge" and key ~= "readiness" and key ~= "managed" and key ~= "structured" then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
-	if opts.terminal ~= nil and type(opts.terminal.open) ~= "function" then
-		fail("terminal must open native terminal sessions")
-	end
-	if opts.bridge ~= nil and (type(opts.bridge.start) ~= "function" or type(opts.bridge.resume) ~= "function") then
-		fail("bridge must create and resume native sessions")
-	end
-	if opts.readiness ~= nil and type(opts.readiness) ~= "function" then
-		fail("readiness must be a function")
-	end
-	if
-		opts.managed ~= nil
-		and (
-			type(opts.managed.open) ~= "function"
-			or type(opts.managed.send) ~= "function"
-			or type(opts.managed.cancel) ~= "function"
-			or type(opts.managed.stop) ~= "function"
-			or type(opts.managed.shutdown) ~= "function"
-			or type(opts.managed.is_active) ~= "function"
-		)
-	then
-		fail("managed must implement open, send, cancel, and is_active")
-	end
+	local root = project_root(opts.root)
 	local value = setmetatable({
 		state = opts.state,
-		root = project_root(opts.root),
+		root = root,
+		store = run_store.new(root),
 		terminal = opts.terminal or terminal.new(),
 		bridge = opts.bridge or native_terminal.new(),
 		readiness = opts.readiness or health.launch_catalog,
 		managed = opts.managed or managed_adapter.new({ shutdown = true }),
-		active = {},
+		structured = opts.structured or structured.new(),
 		providers = {},
-		provider_modes = {},
-		permission_sequence = 0,
+		active = {},
+		transcripts = {},
 	}, Workflow)
-	value:load()
 	value:refresh()
 	return value
 end
 
-function Workflow:task_path(id)
-	return self.root .. "/.gator/tasks/" .. identifier(id, "task id") .. ".md"
+function Workflow:runs()
+	return self.store:list()
 end
 
-function Workflow:active_task_id()
-	return self.active[vim.api.nvim_get_current_tabpage()] or self.state.active_task_id
-end
-
-function Workflow:select(id)
-	id = identifier(id, "task id")
-	if not records(self.state)[id] then
-		fail("task is unavailable: " .. id)
-	end
-	self.active[vim.api.nvim_get_current_tabpage()] = id
-	self.state:update({ active_task_id = id })
-	return id
-end
-
-function Workflow:task(id)
-	id = identifier(id or self:active_task_id(), "task id")
-	local value = records(self.state)[id]
+function Workflow:run(id)
+	local value = self.store:get(id)
 	if not value then
-		fail("task is unavailable: " .. id)
+		fail("run is unavailable: " .. tostring(id))
 	end
-	return task.from_record(task.to_record(value))
-end
-
-function Workflow:write(value)
-	return task_file.write(self:task_path(value.id), value)
-end
-
-function Workflow:replace(value)
-	self.state:mutate(function(next)
-		for index, existing in ipairs(next.tasks) do
-			if existing.id == value.id then
-				next.tasks[index] = task.from_record(task.to_record(value))
-				return
-			end
-		end
-		table.insert(next.tasks, task.from_record(task.to_record(value)))
-		table.sort(next.tasks, function(left, right)
-			return left.id < right.id
-		end)
-	end)
 	return value
 end
 
-function Workflow:create(objective)
-	if type(objective) ~= "string" or vim.trim(objective) == "" then
-		fail("task objective must be non-empty text")
-	end
-	local known, base = records(self.state), slug(objective)
-	local id, suffix = base, 1
-	id = base
-	while known[id] do
-		suffix = suffix + 1
-		id = base .. "-" .. suffix
-	end
-	local value = task.new({
-		id = id,
-		objective = objective,
-		workspace = { kind = "project", root = self.root },
-		created_at = os.time(),
-		updated_at = os.time(),
-	})
-	self:write(value)
-	self:replace(value)
-	self:select(id)
-	return value
+function Workflow:put(value)
+	return self.store:put(value)
 end
 
-function Workflow:prompt_create()
-	vim.ui.input({ prompt = "Gator task: " }, function(value)
-		if type(value) == "string" and vim.trim(value) ~= "" then
-			local ok, created = pcall(self.create, self, value)
-			if not ok then
-				vim.notify(tostring(created), vim.log.levels.ERROR, { title = "Gator" })
-			end
-		end
-	end)
-end
-
-function Workflow:load()
-	local found, failures, seen = {}, {}, {}
-	for _, path in ipairs(vim.fn.glob(self.root .. "/.gator/tasks/*.md", false, true)) do
-		local ok, value = pcall(function()
-			return task_file.parse(table.concat(vim.fn.readfile(path), "\n"))
-		end)
-		if not ok then
-			table.insert(failures, path .. ": " .. tostring(value))
-		elseif seen[value.id] then
-			table.insert(failures, path .. ": duplicate task id " .. value.id)
-		else
-			seen[value.id] = true
-			table.insert(found, value)
-		end
+function Workflow:update(id, patch)
+	local value = self:run(id)
+	for key, item in pairs(patch) do
+		value[key] = vim.deepcopy(item)
 	end
-	table.sort(found, function(left, right)
-		return left.id < right.id
-	end)
-	self.state:update({ tasks = found })
-	return { tasks = #found, failures = failures }
+	value.updated_at = now()
+	return self:put(value)
 end
 
 function Workflow:refresh()
-	local available, modes = {}, {}
-	for _, value in
-		ipairs(self.readiness({
-			cwd = self.root,
-			pi_user_confirmed = self.state.config.providers.pi.user_confirmed,
-		}))
-	do
-		if value.available and native_terminal.supports(value.provider) then
-			available[value.provider] = catalog_contract(value, "native")
-			modes[value.provider] = "terminal"
+	local providers = {}
+	local terminal_records = self.readiness({
+		cwd = self.root,
+		pi_user_confirmed = self.state.config.providers.pi.user_confirmed,
+	})
+	for _, record in ipairs(terminal_records) do
+		if record.available and native_terminal.supports(record.provider) then
+			providers[record.provider] = {
+				provider = record.provider,
+				available = true,
+				terminal = true,
+				chat = structured.supports(record.provider),
+				readiness_state = record.readiness_state,
+			}
 		end
 	end
 	local confirmations = {}
-	for name, provider in pairs(self.state.config.providers) do
-		confirmations[name] = provider.user_confirmed
+	for name, value in pairs(self.state.config.providers) do
+		confirmations[name] = value.user_confirmed
 	end
-	for _, value in ipairs(managed_adapter.catalog({ cwd = self.root, user_confirmed = confirmations })) do
-		if value.available then
-			available[value.provider] = catalog_contract(value, "managed")
-			modes[value.provider] = value.mode
+	for _, record in ipairs(managed_adapter.catalog({ cwd = self.root, user_confirmed = confirmations })) do
+		if record.available then
+			providers[record.provider] = {
+				provider = record.provider,
+				available = true,
+				chat = true,
+				terminal = native_terminal.supports(record.provider),
+				managed_mode = record.mode,
+				readiness_state = record.readiness_state,
+			}
 		end
 	end
-	self.providers = available
-	self.provider_modes = modes
-	return vim.deepcopy(available)
+	self.providers = providers
+	self.state:update({ adapters = vim.deepcopy(providers) })
+	return vim.deepcopy(providers)
 end
 
-function Workflow:availability()
-	local id = self:active_task_id()
-	local value = id and records(self.state)[id] or nil
-	if not value then
-		return { selected = false, attachable = false, stoppable = false }
+function Workflow:provider(name)
+	name = provider(name)
+	local value = self.providers[name]
+	if not value or not value.available then
+		fail("provider is unavailable for launch: " .. name)
 	end
-	local reference = value.sessions[1]
-	local attachable = reference ~= nil
-	local attach_reason
-	if reference and reference.mode ~= "terminal" and not managed_adapter.can_resume(reference.provider) then
-		attachable = false
-		attach_reason = "linked provider does not support managed-session resume"
-	end
-	local stoppable = false
-	for _, current in ipairs(value.sessions) do
-		if current.mode ~= "terminal" and self.managed:is_active(current) then
-			stoppable = true
-			break
-		end
-	end
-	return {
-		selected = true,
-		attachable = attachable,
-		attach_reason = attach_reason,
-		stoppable = stoppable,
-	}
+	return value
 end
 
-function Workflow:transition(value, target)
-	if value.lifecycle == target then
-		return value
+function Workflow:resolve_transport(record, requested)
+	requested = requested or self.state.config.launch.transport
+	if requested == "auto" then
+		return record.chat and "chat" or "terminal"
 	end
-	if value.lifecycle == "draft" and target == "running" then
-		value = lifecycle.transition(value, "planned")
+	if requested == "chat" and not record.chat then
+		fail(record.provider .. " does not expose a documented structured chat transport")
 	end
-	if value.lifecycle == "failed" and target == "running" then
-		value = lifecycle.transition(value, "planned")
+	if requested == "terminal" and not record.terminal then
+		fail(record.provider .. " does not expose a native terminal bridge")
 	end
-	return lifecycle.transition(value, target)
+	return requested
 end
 
-function Workflow:history_path(value)
-	local directory = self.root .. "/.gator/aider"
-	if vim.fn.mkdir(directory, "p") ~= 1 and vim.fn.isdirectory(directory) ~= 1 then
-		fail("cannot create managed Aider history directory")
+function Workflow:choose(opts)
+	self:refresh()
+	if opts.provider then
+		return self:launch(opts)
 	end
-	return directory .. "/" .. value.id .. ".md"
-end
-
-function Workflow:managed_reference(task_id, provider_name)
-	local value = self:task(task_id)
-	for _, reference in ipairs(value.sessions) do
-		if reference.provider == provider_name and reference.mode == self.provider_modes[provider_name] then
-			return reference
-		end
+	local project = self.store:project()
+	local candidate = project.default_provider
+	if not candidate and self.state.config.launch.default_provider ~= "ask" then
+		candidate = self.state.config.launch.default_provider
 	end
-	return nil
-end
-
-function Workflow:mark_running(value)
-	local next_value = self:transition(value, "running")
-	self:write(next_value)
-	self:replace(next_value)
-	self:select(next_value.id)
-	return next_value
-end
-
-function Workflow:managed_callbacks(value, provider_name)
-	local run_id = value.id .. "-managed"
-	return {
-		on_session = function(reference)
-			local current = records(self.state)[value.id]
-			if not current then
-				return
+	if candidate and self.providers[candidate] then
+		opts.provider = candidate
+		return self:launch(opts)
+	end
+	local choices = {}
+	for _, value in pairs(self.providers) do
+		table.insert(choices, value)
+	end
+	if #choices == 0 then
+		vim.notify("Gator: no ready providers; run :GatorHealth", vim.log.levels.WARN)
+		return false
+	end
+	return provider_picker.open({
+		providers = choices,
+		on_launch = function(choice)
+			opts.provider = choice.provider
+			local ok, err = pcall(self.launch, self, opts)
+			if not ok then
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end
-			local linked = session.link(
-				current,
-				session.new({
-					task_id = value.id,
-					provider = reference.provider,
-					id = reference.id,
-					owner = reference.owner,
-					mode = reference.mode,
-				})
-			)
-			self:mark_running(linked)
-			pcall(conversation.update, { session_id = reference.id, state = "running" })
 		end,
-		on_event = function(event)
-			local state = event.type == "error" and "failed" or event.type == "complete" and "ready" or "running"
-			pcall(conversation.update, { state = state, text = event.text })
-		end,
-		on_permission = function(request, respond)
-			self.permission_sequence = self.permission_sequence + 1
-			local provider = { name = provider_name }
-			if request.session_id then
-				provider.session_id = request.session_id
-			end
-			local ok, event = pcall(approval_event.request, {
-				id = value.id .. "-approval-" .. self.permission_sequence,
-				run_id = run_id,
-				provider = provider,
-				sequence = self.permission_sequence,
-				at = os.time(),
-				request_id = request.request_id,
-				action = request.action,
-				details = request.details,
+	})
+end
+
+function Workflow:prompt(opts)
+	opts = opts or {}
+	local selected = capture.current({ buffer = opts.buffer, first_line = opts.first_line, last_line = opts.last_line })
+	vim.ui.input({ prompt = "Gator: " }, function(objective)
+		if type(objective) == "string" and vim.trim(objective) ~= "" then
+			local ok, err = pcall(self.choose, self, {
+				objective = objective,
+				capture = selected,
+				provider = opts.provider,
+				transport = opts.transport,
 			})
 			if not ok then
-				respond("cancelled")
-				return
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end
-			local opened = pcall(approval_details.open, {
-				request = event,
-				on_decide = function(decision)
-					return respond(decision.decision)
-				end,
-			})
-			if not opened then
-				respond("cancelled")
-			end
-		end,
-		on_resume_fallback = function(request)
-			if type(request.session) ~= "table" then
-				vim.notify("Gator attach: " .. tostring(request.reason), vim.log.levels.ERROR)
-				return
-			end
-			pcall(conversation.close)
-			local ok, failure = pcall(self.open_terminal, self, value, {
-				session = request.session,
-				command = { "copilot", "--resume", request.session.id },
-			}, true)
-			if not ok then
-				vim.notify("Gator Copilot terminal fallback: " .. tostring(failure), vim.log.levels.ERROR)
-				return
-			end
-			vim.notify("Gator Copilot: ACP reattach unavailable; opened CLI resume fallback", vim.log.levels.WARN)
-		end,
-		on_exit = function(result)
-			if result.fallback or result.stopped then
-				return
-			end
-			local current = records(self.state)[value.id]
-			if not current or current.lifecycle ~= "running" then
-				return
-			end
-			local next_value = self:transition(current, result.code == 0 and "awaiting_review" or "failed")
-			self:write(next_value)
-			self:replace(next_value)
-			pcall(conversation.update, { state = result.code == 0 and "ready" or "failed" })
-		end,
-	}
-end
-
-function Workflow:open_managed(value, provider_name, reference, prompt)
-	local mode = self.provider_modes[provider_name]
-	if not mode or not managed_adapter.supports(provider_name) then
-		fail("provider is unavailable for managed launch: " .. provider_name)
-	end
-	local callbacks = self:managed_callbacks(value, provider_name)
-	local history = mode == "history" and self:history_path(value) or nil
-	local started = mode == "acp" or (type(prompt) == "string" and vim.trim(prompt) ~= "")
-	if started then
-		value = self:mark_running(value)
-	end
-	local ok, opened = pcall(self.managed.open, self.managed, {
-		provider = provider_name,
-		cwd = value.workspace.root,
-		task_id = value.id,
-		session = reference,
-		history = history,
-		prompt = prompt,
-		on_session = callbacks.on_session,
-		on_event = callbacks.on_event,
-		on_permission = callbacks.on_permission,
-		on_resume_fallback = callbacks.on_resume_fallback,
-		on_exit = callbacks.on_exit,
-	})
-	if not ok then
-		local current = records(self.state)[value.id]
-		if current and current.lifecycle == "running" then
-			local failed = self:transition(current, "failed")
-			self:write(failed)
-			self:replace(failed)
-		end
-		fail(opened)
-	end
-	if opened.fallback then
-		return opened
-	end
-	local initial = reference and reference.id or (mode == "history" and history or value.id)
-	conversation.open({
-		provider = provider_name,
-		session_id = initial,
-		state = "starting",
-		on_input = function(text)
-			self:prompt_session({ task_id = value.id, provider = provider_name, id = initial }, text)
-		end,
-		on_cancel = function()
-			local current = self:managed_reference(value.id, provider_name)
-			return current and self.managed:cancel(current) or false
-		end,
-		on_detach = function()
-			vim.notify("Gator session detached; use Attach session to reopen it", vim.log.levels.INFO)
-		end,
-	})
-	return opened
-end
-
-function Workflow:prompt_session(reference, prompt)
-	if type(reference) ~= "table" or type(reference.task_id) ~= "string" then
-		fail("session input must identify its task")
-	end
-	if type(prompt) ~= "string" or vim.trim(prompt) == "" then
-		fail("session input must be non-empty text")
-	end
-	local value = self:task(reference.task_id)
-	local linked = self:managed_reference(value.id, reference.provider)
-	if not linked then
-		fail("linked managed session is unavailable")
-	end
-	if value.lifecycle ~= "running" then
-		value = self:mark_running(value)
-	end
-	if self.managed:is_active(linked) then
-		self.managed:send(linked, prompt)
-		return true
-	end
-	self:open_managed(value, linked.provider, linked, prompt)
-	return true
-end
-
-function Workflow:open_terminal(value, prepared, resumed)
-	local terminal_id = value.id .. "-" .. prepared.session.provider
-	local opened = self.terminal:open({
-		id = terminal_id,
-		cwd = value.workspace.root,
-		command = prepared.command,
-		on_exit = function(result)
-			local current = records(self.state)[value.id]
-			if not current or current.lifecycle ~= "running" then
-				return
-			end
-			local next = self:transition(current, result.code == 0 and "awaiting_review" or "failed")
-			self:write(next)
-			self:replace(next)
-		end,
-	})
-	local linked = session.link(
-		value,
-		session.new({
-			task_id = value.id,
-			provider = prepared.session.provider,
-			id = prepared.session.id,
-			owner = "provider",
-		})
-	)
-	if not resumed then
-		linked = self:transition(linked, "planned")
-	end
-	linked = self:transition(linked, "running")
-	self:write(linked)
-	self:replace(linked)
-	self:select(linked.id)
-	return opened
-end
-
-function Workflow:launch(provider_name, refreshed)
-	local value = self:task()
-	provider_name = identifier(provider_name, "provider")
-	if not refreshed then
-		self:refresh()
-	end
-	if not self.providers[provider_name] then
-		fail("provider is unavailable for launch: " .. provider_name)
-	end
-	if self.provider_modes[provider_name] ~= "terminal" then
-		local ok, failure = pcall(self.open_managed, self, value, provider_name, nil, value.objective)
-		if not ok then
-			vim.notify(tostring(failure), vim.log.levels.ERROR, { title = "Gator" })
-		end
-		return
-	end
-	self.bridge:start(
-		{ provider = provider_name, cwd = value.workspace.root, prompt = value.objective },
-		function(prepared, reason)
-			if not prepared then
-				vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
-				return
-			end
-			local ok, failure = pcall(self.open_terminal, self, value, prepared, false)
-			if not ok then
-				vim.notify(tostring(failure), vim.log.levels.ERROR, { title = "Gator" })
-			end
-		end
-	)
-end
-
-function Workflow:attach()
-	local value = self:task()
-	local reference = value.sessions[1]
-	if not reference then
-		fail("selected task has no linked provider session")
-	end
-	if reference.mode ~= "terminal" then
-		if not managed_adapter.can_resume(reference.provider) then
-			fail("provider does not document managed-session resume: " .. reference.provider)
-		end
-		local ok, failure = pcall(self.open_managed, self, value, reference.provider, reference, nil)
-		if not ok then
-			vim.notify(tostring(failure), vim.log.levels.ERROR, { title = "Gator" })
-		end
-		return true
-	end
-	local terminal_id = value.id .. "-" .. reference.provider
-	local ok = pcall(self.terminal.attach, self.terminal, terminal_id)
-	if ok then
-		return true
-	end
-	self.bridge:resume({ provider = reference.provider, session = reference }, function(prepared, reason)
-		if not prepared then
-			vim.notify("Gator attach: " .. tostring(reason), vim.log.levels.ERROR)
-			return
-		end
-		local opened, failure = pcall(self.open_terminal, self, value, prepared, true)
-		if not opened then
-			vim.notify(tostring(failure), vim.log.levels.ERROR, { title = "Gator" })
 		end
 	end)
 	return true
 end
 
-function Workflow:stop_session()
-	local value = self:task()
-	for _, reference in ipairs(value.sessions) do
-		if reference.mode ~= "terminal" and self.managed:is_active(reference) then
-			if not self.managed:stop(reference) then
-				fail("managed session could not be stopped")
+function Workflow:workspace(id, force_worktree)
+	if not force_worktree then
+		for _, run in ipairs(self:runs()) do
+			if writers(run) then
+				force_worktree = true
+				break
 			end
-			pcall(conversation.close)
-			vim.notify("Gator session stopped; its provider session remains resumable", vim.log.levels.INFO)
-			return true
 		end
 	end
-	fail("selected task has no active managed session")
+	if not force_worktree then
+		return { kind = "project", root = self.root }
+	end
+	local parent = vim.fn.fnamemodify(self.root, ":h") .. "/gator-worktrees"
+	if vim.fn.mkdir(parent, "p") ~= 1 and vim.fn.isdirectory(parent) ~= 1 then
+		fail("cannot create Gator worktree parent")
+	end
+	local created = worktree.create({
+		root = self.root,
+		path = parent .. "/" .. id,
+		branch = "gator/" .. id,
+		base = "HEAD",
+	})
+	return { kind = "worktree", root = created.path, branch = created.branch }
 end
 
-function Workflow:open_provider_picker()
-	self:refresh()
-	local providers = {}
-	for _, value in pairs(self.providers) do
-		table.insert(providers, value)
+function Workflow:bundle(opts, workspace)
+	if opts.bundle_body then
+		local body = text(opts.bundle_body, "handoff bundle")
+		return body, { state = "estimated", input_tokens = capture.estimate(body) }
 	end
-	if #providers == 0 then
-		vim.notify("Gator launch: no ready providers; run :GatorHealth for details", vim.log.levels.WARN)
-		return false
-	end
-	return provider_picker.open({
-		providers = providers,
-		on_launch = function(value)
-			self:launch(value.provider, true)
+	return capture.bundle({
+		objective = opts.objective,
+		capture = opts.capture,
+		profile = opts.profile or self.state.config.context.handoff.profile,
+		max_chars = self.state.config.context.handoff.max_chars,
+		diff = capture.diff(workspace.root),
+		note = opts.note,
+		summary = opts.summary,
+		transcript = opts.transcript,
+	})
+end
+
+function Workflow:open_conversation(run)
+	conversation.open({
+		provider = run.provider,
+		session_id = run.session and run.session.id or run.id,
+		run_id = run.id,
+		state = run.state,
+		on_input = function(message)
+			self:send(run.id, message)
+		end,
+		on_cancel = function()
+			self:cancel(run.id)
+		end,
+		on_detach = function()
+			self:update(run.id, { state = "detached" })
+		end,
+		on_message = function(role, message)
+			if run.transcript == "available" then
+				self.transcripts[run.id] = self.transcripts[run.id] or {}
+				table.insert(self.transcripts[run.id], "## " .. role .. "\n" .. message)
+			end
 		end,
 	})
 end
 
+function Workflow:open_terminal(run, prepared)
+	local opened = self.terminal:open({
+		id = run.id,
+		cwd = run.workspace.root,
+		command = prepared.command,
+		on_exit = function(result)
+			local latest = self.store:get(run.id)
+			if latest and active_state(latest) then
+				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
+			end
+			self.active[run.id] = nil
+		end,
+	})
+	self.active[run.id] = { kind = "terminal", terminal_id = run.id }
+	return self:update(run.id, {
+		state = "running",
+		session = { id = prepared.session.id, resume_supported = true },
+		process = { job_id = opened.job_id },
+	})
+end
+
+function Workflow:open_structured(run, prompt)
+	local opened = self.structured:open({
+		provider = run.provider,
+		cwd = run.workspace.root,
+		prompt = prompt,
+		on_session = function(session)
+			self:update(run.id, { session = session, state = "running" })
+			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = "running" })
+		end,
+		on_event = function(kind, value)
+			if kind == "text" then
+				pcall(conversation.update, { run_id = run.id, text = value, state = "running" })
+			elseif kind == "settled" then
+				self:update(run.id, { state = "waiting_input" })
+				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
+			elseif kind == "error" then
+				pcall(conversation.update, { run_id = run.id, text = value, state = "failed" })
+			end
+		end,
+		on_usage = function(usage)
+			self:update(run.id, { usage = usage })
+		end,
+		on_exit = function(result)
+			local latest = self.store:get(run.id)
+			if latest and active_state(latest) then
+				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
+			end
+			self.active[run.id] = nil
+		end,
+	})
+	self.active[run.id] = { kind = "structured", handle = opened }
+	self:open_conversation(run)
+	return run
+end
+
+function Workflow:open_managed(run, prompt)
+	local history
+	if self.providers[run.provider].managed_mode == "history" then
+		local directory = self.store.directory .. "/aider"
+		vim.fn.mkdir(directory, "p")
+		history = directory .. "/" .. run.id .. ".md"
+	end
+	local reference
+	local function permission(request, respond)
+		vim.ui.select({ "approved", "denied", "cancelled" }, {
+			prompt = "Gator approval · " .. request.provider .. " · " .. request.action,
+		}, function(decision)
+			respond(decision or "cancelled")
+		end)
+	end
+	local opened = self.managed:open({
+		provider = run.provider,
+		cwd = run.workspace.root,
+		task_id = run.id,
+		history = history,
+		prompt = prompt,
+		on_session = function(session)
+			reference = session
+			self.active[run.id] = { kind = "managed", reference = session }
+			self:update(run.id, {
+				state = "running",
+				session = { id = session.id, resume_supported = managed_adapter.can_resume(run.provider) },
+			})
+			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = "running" })
+		end,
+		on_event = function(event)
+			if event.type == "text" or event.type == "complete" then
+				pcall(conversation.update, { run_id = run.id, text = event.text, state = event.type == "complete" and "waiting_input" or "running" })
+				if event.type == "complete" then
+					self:update(run.id, { state = "waiting_input" })
+				end
+			elseif event.type == "error" then
+				pcall(conversation.update, { run_id = run.id, text = event.text, state = "failed" })
+			end
+		end,
+		on_permission = permission,
+		on_exit = function(result)
+			local latest = self.store:get(run.id)
+			if latest and active_state(latest) then
+				self:update(run.id, { state = result.stopped and "stopped" or (result.code == 0 and "completed" or "failed") })
+			end
+			self.active[run.id] = nil
+		end,
+	})
+	if reference then
+		self.active[run.id] = { kind = "managed", reference = reference }
+	end
+	self:open_conversation(run)
+	return opened
+end
+
+function Workflow:launch(opts)
+	if type(opts) ~= "table" then
+		fail("launch requires options")
+	end
+	local objective = text(opts.objective, "objective")
+	local chosen = self:provider(opts.provider)
+	local transport = self:resolve_transport(chosen, opts.transport)
+	local id = run_store.id("run")
+	local workspace = self:workspace(id, opts.force_worktree == true)
+	local body, usage = self:bundle(opts, workspace)
+	local bundle_id = run_store.id("bundle")
+	self.store:bundle(bundle_id, body)
+	if workspace.kind == "worktree" then
+		self.store:materialize_bundle(bundle_id, body, workspace.root)
+	end
+	local run = self:put({
+		id = id,
+		provider = chosen.provider,
+		role = opts.role or "primary",
+		transport = transport,
+		state = "starting",
+		workspace = workspace,
+		parent_run_id = opts.parent_run_id,
+		bundle_id = bundle_id,
+		objective = objective,
+		transcript = transport == "terminal" and "unavailable" or "available",
+		usage = usage,
+		created_at = now(),
+		updated_at = now(),
+	})
+	local prompt = objective .. "\n\nUse this Gator context bundle:\n\n" .. body
+	if transport == "terminal" then
+		self.bridge:start({ provider = run.provider, cwd = workspace.root, prompt = prompt }, function(prepared, reason)
+			if not prepared then
+				self:update(run.id, { state = "failed" })
+				vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
+				return
+			end
+			local ok, err = pcall(self.open_terminal, self, run, prepared)
+			if not ok then
+				self:update(run.id, { state = "failed" })
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			end
+		end)
+	elseif structured.supports(run.provider) then
+		self:open_structured(run, prompt)
+	else
+		self:open_managed(run, prompt)
+	end
+	if opts.remember ~= false then
+		self.store:set_default_provider(run.provider)
+	end
+	return run
+end
+
+function Workflow:send(id, message)
+	message = text(message, "prompt")
+	local run = self:run(id)
+	local active = self.active[id]
+	if not active then
+		fail("run is not active in this Neovim instance")
+	end
+	if active.kind == "structured" then
+		if not active.handle.send(message) then
+			fail("structured provider rejected the prompt")
+		end
+	elseif active.kind == "managed" then
+		if not active.reference then
+			fail("provider session is not ready")
+		end
+		self.managed:send(active.reference, message)
+	else
+		fail("native terminal runs accept input in their terminal")
+	end
+	self:update(run.id, { state = "running" })
+	return true
+end
+
+function Workflow:cancel(id)
+	local active = self.active[id]
+	if not active then
+		return false
+	end
+	if active.kind == "structured" then
+		return active.handle.cancel()
+	elseif active.kind == "managed" then
+		return self.managed:cancel(active.reference)
+	end
+	return false
+end
+
+function Workflow:stop(id)
+	local run = self:run(id)
+	local active = self.active[id]
+	if active then
+		if active.kind == "terminal" then
+			self.terminal:close(active.terminal_id)
+		elseif active.kind == "structured" then
+			active.handle.stop()
+		elseif active.kind == "managed" and active.reference then
+			self.managed:stop(active.reference)
+		end
+		self.active[id] = nil
+	end
+	self:update(run.id, { state = "stopped" })
+	return true
+end
+
+function Workflow:focus(id)
+	local run = self:run(id)
+	local active = self.active[id]
+	if active and active.kind == "terminal" then
+		return self.terminal:attach(active.terminal_id)
+	end
+	if run.transport == "chat" then
+		return self:open_conversation(run)
+	end
+	return self:resume(id)
+end
+
+function Workflow:resume(id)
+	local run = self:run(id)
+	if run.transport ~= "terminal" or not run.session or not run.session.resume_supported then
+		fail("this run cannot be resumed through Gator")
+	end
+	local ok = pcall(self.terminal.attach, self.terminal, id)
+	if ok then
+		return true
+	end
+	self.bridge:resume({ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } }, function(prepared, reason)
+		if not prepared then
+			vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
+			return
+		end
+		self:open_terminal(run, prepared)
+	end)
+	return true
+end
+
+function Workflow:transcript(run)
+	local value = self.transcripts[run.id]
+	return value and table.concat(value, "\n\n") or nil
+end
+
+function Workflow:handoff(source_id, target, opts)
+	opts = opts or {}
+	local source = self:run(source_id)
+	if not target then
+		local choices = {}
+		for _, value in pairs(self.providers) do
+			if value.provider ~= source.provider then
+				table.insert(choices, value)
+			end
+		end
+		return provider_picker.open({
+			providers = choices,
+			on_launch = function(choice)
+				self:handoff(source_id, choice.provider, opts)
+			end,
+		})
+	end
+	target = self:provider(target).provider
+	local profile = opts.profile or self.state.config.context.handoff.profile
+	if profile == "summary-first" and not self.state.config.context.handoff.source_summary then
+		fail("summary-first handoff requires context.handoff.source_summary = true")
+	end
+	if profile == "summary-first" and source.transcript == "unavailable" then
+		fail("summary-first handoff is unavailable for terminal-originated runs")
+	end
+	local body
+	local bundle_path = self.store.bundles_directory .. "/" .. source.bundle_id .. ".md"
+	body = vim.fn.filereadable(bundle_path) == 1 and table.concat(vim.fn.readfile(bundle_path), "\n") or source.objective
+	if type(opts.summary) == "string" and vim.trim(opts.summary) ~= "" then
+		body = body .. "\n\n## Source-agent summary\n" .. opts.summary
+	end
+	if profile == "compact" then
+		body = body:sub(1, self.state.config.context.handoff.max_chars)
+	elseif profile == "full" then
+		local transcript = self:transcript(source)
+		if transcript then
+			body = body .. "\n\n## Gator-owned transcript\n" .. transcript
+		end
+	elseif profile == "summary-first" then
+		vim.ui.input({ prompt = "Source-agent handoff summary: " }, function(summary)
+			if type(summary) == "string" and vim.trim(summary) ~= "" then
+				self:handoff(source_id, target, { profile = "compact", summary = summary })
+			end
+		end)
+		return true
+	end
+	handoff_review.open({
+		source = source,
+		target = target,
+		profile = profile,
+		body = body,
+		on_confirm = function(reviewed)
+			local ok, err = pcall(self.launch, self, {
+				objective = "Continue the reviewed handoff from " .. source.provider,
+				provider = target,
+				bundle_body = reviewed,
+				parent_run_id = source.id,
+				role = "writer",
+				force_worktree = writers(source),
+				remember = false,
+			})
+			if not ok then
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			end
+		end,
+	})
+	return true
+end
+
+function Workflow:launch_parallel(id)
+	local source = self:run(id)
+	return self:handoff(source.id, nil, { profile = "compact" })
+end
+
+function Workflow:open_runs()
+	return run_graph.open(self)
+end
+
 function Workflow:close()
+	for id in pairs(vim.deepcopy(self.active)) do
+		pcall(self.stop, self, id)
+	end
 	self.managed:shutdown()
 	return true
 end

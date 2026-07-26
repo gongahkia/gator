@@ -1,0 +1,261 @@
+local redact = require("gator.policy.redact")
+
+local M = { schema_version = 1 }
+local Store = {}
+Store.__index = Store
+
+local states = {
+	starting = true,
+	running = true,
+	waiting_input = true,
+	completed = true,
+	failed = true,
+	stopped = true,
+	detached = true,
+}
+
+local function fail(message)
+	error("Gator run store: " .. redact.text(tostring(message)), 3)
+end
+
+local function text(value, name)
+	if type(value) ~= "string" or value == "" then
+		fail(name .. " must be non-empty text")
+	end
+	return value
+end
+
+local function identifier(value, name)
+	value = text(value, name)
+	if not value:match("^[a-z][a-z0-9_-]*$") then
+		fail(name .. " must be a lowercase identifier")
+	end
+	return value
+end
+
+local function json(path)
+	if vim.fn.filereadable(path) == 0 then
+		return nil
+	end
+	local ok, value = pcall(vim.json.decode, table.concat(vim.fn.readfile(path), "\n"))
+	if not ok or type(value) ~= "table" then
+		fail("invalid JSON: " .. path)
+	end
+	return value
+end
+
+local function atomic(path, value)
+	local temporary = path .. ".tmp-" .. tostring(vim.uv.hrtime())
+	local ok, err = pcall(vim.fn.writefile, { vim.json.encode(value) }, temporary)
+	if not ok or err ~= 0 then
+		fail("cannot write " .. path)
+	end
+	if not vim.uv.fs_rename(temporary, path) then
+		pcall(vim.fn.delete, temporary)
+		fail("cannot replace " .. path)
+	end
+end
+
+local function resolve_git_path(root, value)
+	if value:sub(1, 1) == "/" then
+		return value
+	end
+	return root .. "/" .. value
+end
+
+local function ignore(root)
+	local result = vim.system({ "git", "rev-parse", "--git-path", "info/exclude" }, { cwd = root, text = true }):wait()
+	if result.code ~= 0 then
+		fail("Git local exclude path is unavailable")
+	end
+	local path = resolve_git_path(root, vim.trim(result.stdout or ""))
+	if path == root .. "/" then
+		fail("Git local exclude path is empty")
+	end
+	local parent = vim.fn.fnamemodify(path, ":h")
+	if vim.fn.mkdir(parent, "p") ~= 1 and vim.fn.isdirectory(parent) ~= 1 then
+		fail("cannot create Git local exclude directory")
+	end
+	local lines = vim.fn.filereadable(path) == 1 and vim.fn.readfile(path) or {}
+	for _, line in ipairs(lines) do
+		if line == ".gator/" then
+			return path
+		end
+	end
+	table.insert(lines, ".gator/")
+	if vim.fn.writefile(lines, path) ~= 0 then
+		fail("cannot update Git local exclude")
+	end
+	return path
+end
+
+local function normalize_run(value)
+	if type(value) ~= "table" then
+		fail("run must be an object")
+	end
+	for key in pairs(value) do
+		if not ({
+			id = true,
+			provider = true,
+			role = true,
+			transport = true,
+			state = true,
+			workspace = true,
+			session = true,
+			parent_run_id = true,
+			bundle_id = true,
+			objective = true,
+			transcript = true,
+			usage = true,
+			created_at = true,
+			updated_at = true,
+			process = true,
+		})[key] then
+			fail("run contains unsupported field: " .. tostring(key))
+		end
+	end
+	local run = vim.deepcopy(value)
+	run.id = identifier(run.id, "run.id")
+	run.provider = identifier(run.provider, "run.provider")
+	run.role = run.role or "primary"
+	if not ({ primary = true, writer = true, reviewer = true, research = true })[run.role] then
+		fail("run.role is unavailable")
+	end
+	if run.transport ~= "chat" and run.transport ~= "terminal" then
+		fail("run.transport must be chat or terminal")
+	end
+	if not states[run.state] then
+		fail("run.state is unavailable")
+	end
+	if type(run.workspace) ~= "table" or (run.workspace.kind ~= "project" and run.workspace.kind ~= "worktree") then
+		fail("run.workspace must identify a project or worktree")
+	end
+	run.workspace.root = text(run.workspace.root, "run.workspace.root")
+	if run.session ~= nil then
+		if type(run.session) ~= "table" then
+			fail("run.session must be an object")
+		end
+		run.session.id = text(run.session.id, "run.session.id")
+		if type(run.session.resume_supported) ~= "boolean" then
+			fail("run.session.resume_supported must be boolean")
+		end
+	end
+	if run.parent_run_id ~= nil then
+		run.parent_run_id = identifier(run.parent_run_id, "run.parent_run_id")
+	end
+	if run.bundle_id ~= nil then
+		run.bundle_id = identifier(run.bundle_id, "run.bundle_id")
+	end
+	run.objective = text(run.objective, "run.objective")
+	if run.transcript ~= "available" and run.transcript ~= "unavailable" then
+		fail("run.transcript must be available or unavailable")
+	end
+	if type(run.usage) ~= "table" or not ({ reported = true, estimated = true, unknown = true })[run.usage.state] then
+		fail("run.usage must declare reported, estimated, or unknown")
+	end
+	for _, field in ipairs({ "input_tokens", "output_tokens", "total_tokens" }) do
+		if run.usage[field] ~= nil and (type(run.usage[field]) ~= "number" or run.usage[field] < 0) then
+			fail("run.usage." .. field .. " must be non-negative")
+		end
+	end
+	for _, field in ipairs({ "created_at", "updated_at" }) do
+		if type(run[field]) ~= "number" or run[field] < 0 or run[field] % 1 ~= 0 then
+			fail("run." .. field .. " must be a non-negative integer")
+		end
+	end
+	return run
+end
+
+function M.new(root)
+	root = vim.uv.fs_realpath(text(root, "project root"))
+	if not root or vim.fn.isdirectory(root) ~= 1 then
+		fail("project root must resolve to a directory")
+	end
+	return setmetatable({ root = root, directory = root .. "/.gator", runs_directory = root .. "/.gator/runs", bundles_directory = root .. "/.gator/bundles" }, Store)
+end
+
+function M.is(value)
+	return getmetatable(value) == Store
+end
+
+function Store:ensure()
+	ignore(self.root)
+	for _, path in ipairs({ self.directory, self.runs_directory, self.bundles_directory }) do
+		if vim.fn.mkdir(path, "p") ~= 1 and vim.fn.isdirectory(path) ~= 1 then
+			fail("cannot create local Gator state directory")
+		end
+	end
+	return self.directory
+end
+
+function Store:project()
+	self:ensure()
+	return json(self.directory .. "/project.json") or { schema_version = M.schema_version }
+end
+
+function Store:set_default_provider(provider)
+	provider = identifier(provider, "provider")
+	local value = self:project()
+	value.schema_version, value.default_provider = M.schema_version, provider
+	atomic(self.directory .. "/project.json", value)
+	return provider
+end
+
+function Store:list()
+	self:ensure()
+	local result = {}
+	for _, path in ipairs(vim.fn.glob(self.runs_directory .. "/*.json", false, true)) do
+		local value = json(path)
+		if value and value.schema_version == M.schema_version and type(value.run) == "table" then
+			table.insert(result, normalize_run(value.run))
+		else
+			fail("unsupported run record: " .. path)
+		end
+	end
+	table.sort(result, function(left, right)
+		return left.created_at > right.created_at
+	end)
+	return result
+end
+
+function Store:get(id)
+	id = identifier(id, "run id")
+	self:ensure()
+	local value = json(self.runs_directory .. "/" .. id .. ".json")
+	return value and normalize_run(value.run) or nil
+end
+
+function Store:put(value)
+	self:ensure()
+	local run = normalize_run(value)
+	atomic(self.runs_directory .. "/" .. run.id .. ".json", { schema_version = M.schema_version, run = run })
+	return vim.deepcopy(run)
+end
+
+function Store:bundle(id, body)
+	id = identifier(id, "bundle id")
+	body = text(body, "bundle body")
+	self:ensure()
+	local path = self.bundles_directory .. "/" .. id .. ".md"
+	if vim.fn.writefile(vim.split(body, "\n", { plain = true }), path) ~= 0 then
+		fail("cannot write context bundle")
+	end
+	return path
+end
+
+function Store:materialize_bundle(id, body, root)
+	root = vim.uv.fs_realpath(text(root, "workspace root"))
+	if not root then
+		fail("workspace root must resolve")
+	end
+	local target = M.new(root)
+	target:ensure()
+	return target:bundle(id, body)
+end
+
+function M.id(prefix)
+	prefix = prefix or "run"
+	return identifier(prefix .. "-" .. vim.fn.sha256(tostring(vim.uv.hrtime()) .. ":" .. tostring(math.random())):sub(1, 16), "generated id")
+end
+
+return M

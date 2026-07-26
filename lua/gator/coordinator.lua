@@ -8,23 +8,25 @@ local Operation = {}
 Coordinator.__index = Coordinator
 Operation.__index = Operation
 local actions = {
-	open = { fields = {} },
+	open = { fields = { provider = true, buffer = true, first_line = true, last_line = true, transport = true } },
+	runs = { fields = {} },
+	handoff = { fields = { run_id = true, provider = true, profile = true } },
 	health = { fields = {} },
 	export_diagnostics = { fields = {} },
 	verify_beta_readiness = { fields = {} },
 	close = { fields = {} },
 	cancel_operation = { fields = { id = true, reason = true } },
-	capture_selection = { fields = { target = true, buffer = true, first_line = true, last_line = true } },
-	stop_session = { fields = {} },
+	stop_session = { fields = { run_id = true } },
 }
 local action_names = {
 	"open",
+	"runs",
+	"handoff",
 	"health",
 	"export_diagnostics",
 	"verify_beta_readiness",
 	"close",
 	"cancel_operation",
-	"capture_selection",
 	"stop_session",
 }
 local operation_kinds = { operation = true, launch = true, handoff = true }
@@ -161,14 +163,7 @@ end
 
 function Coordinator:open()
 	self:bootstrap_recovery()
-	local value
-	local ok, result = pcall(self.workflow, self)
-	if ok then
-		value = result
-	else
-		self:dependency("ui").set_status(self:state(), "degraded", "local task workflow unavailable")
-	end
-	return self:dependency("ui").open(self:state(), { workflow = value })
+	return self:workflow():prompt()
 end
 
 function Coordinator:workflow()
@@ -193,13 +188,7 @@ function Coordinator:bootstrap_recovery()
 		fail("bootstrap_recovery requires an initialized coordinator")
 	end
 	if not self._startup_recovery then
-		local core = self:module("core")
-		self._startup_recovery = self:dependency("startup").recover({
-			state = self:state(),
-			load = function()
-				return core.run.open():list()
-			end,
-		})
+		self._startup_recovery = { state = "ready", recovered = 0, source = "project-local-runs" }
 	end
 	return vim.deepcopy(self._startup_recovery)
 end
@@ -293,7 +282,13 @@ function Coordinator:dispatch(action, opts)
 	end
 	opts = options(action, opts)
 	if action == "open" then
-		return self:open()
+		return self:workflow():prompt(opts)
+	end
+	if action == "runs" then
+		return self:workflow():open_runs()
+	end
+	if action == "handoff" then
+		return self:workflow():handoff(require_string(opts.run_id, "run_id"), opts.provider, { profile = opts.profile })
 	end
 	if action == "health" then
 		return self:health()
@@ -310,15 +305,17 @@ function Coordinator:dispatch(action, opts)
 	if action == "cancel_operation" then
 		return self:cancel_operation(opts.id, opts.reason)
 	end
-	if action == "capture_selection" then
-		return self:dependency("ui").selection.capture(self:state(), require_string(opts.target, "target"), {
-			buffer = opts.buffer,
-			first_line = opts.first_line,
-			last_line = opts.last_line,
-		})
-	end
 	if action == "stop_session" then
-		return self:workflow():stop_session()
+		if opts.run_id then
+			return self:workflow():stop(opts.run_id)
+		end
+		local runs = self:workflow():runs()
+		for _, run in ipairs(runs) do
+			if run.state == "starting" or run.state == "running" or run.state == "waiting_input" or run.state == "detached" then
+				return self:workflow():stop(run.id)
+			end
+		end
+		fail("no active Gator-managed run")
 	end
 end
 

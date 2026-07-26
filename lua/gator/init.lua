@@ -48,8 +48,32 @@ function M.inspect()
 	return M._coordinator:inspect()
 end
 
-function M.open()
-	return M.dispatch("open")
+function M.open(opts)
+	return M.dispatch("open", opts)
+end
+
+function M.launch(opts)
+	if type(opts) ~= "table" then
+		return M.dispatch("open")
+	end
+	if not M._coordinator then
+		M.setup()
+	end
+	if type(opts.objective) == "string" and vim.trim(opts.objective) ~= "" then
+		return M._coordinator:workflow():choose(opts)
+	end
+	return M.dispatch("open", opts)
+end
+
+function M.runs()
+	return M.dispatch("runs")
+end
+
+function M.handoff(run_id, provider, opts)
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:workflow():handoff(run_id, provider, opts)
 end
 
 function M.health()
@@ -73,9 +97,6 @@ function M.dispatch(action, opts)
 		error("unknown Gator action: " .. tostring(action))
 	end
 	if not M._coordinator then
-		if action == "capture_selection" then
-			error("Gator must be set up before capturing context", 0)
-		end
 		M.setup()
 	end
 	return M._coordinator:dispatch(action, opts)
