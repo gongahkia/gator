@@ -4,6 +4,7 @@ local M = {
 	accessibility = require("gator.ui.accessibility"),
 	approval_details = require("gator.ui.approval_details"),
 	conversation = require("gator.ui.conversation"),
+	context_inspector = require("gator.ui.context_inspector"),
 	glyphs = require("gator.ui.glyphs"),
 	picker = require("gator.ui.picker"),
 	provider_picker = require("gator.ui.provider_picker"),

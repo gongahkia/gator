@@ -11,6 +11,10 @@ local actions = {
 	reject = true,
 	undo = true,
 	prompt = true,
+	handoff = true,
+	parallel = true,
+	stop = true,
+	resume = true,
 	close = true,
 	help = true,
 }

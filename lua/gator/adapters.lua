@@ -83,7 +83,6 @@ local M = {
 	process = require("gator.adapters.process"),
 	supervisor = require("gator.adapters.process"),
 	rpc = require("gator.adapters.rpc"),
-	resume = require("gator.adapters.resume"),
 	stream = require("gator.adapters.stream"),
 	structured = require("gator.adapters.structured"),
 	terminal = require("gator.adapters.terminal"),
