@@ -2,10 +2,12 @@ package store
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -45,7 +47,7 @@ func (s *Store) ClaimOutbox(ctx context.Context, workerID string, lease time.Dur
 	var item domain.OutboxEvent
 	var payload []byte
 	err := s.withTx(ctx, func(tx pgx.Tx) error {
- 		row := tx.QueryRow(ctx, `WITH next AS (
+		row := tx.QueryRow(ctx, `WITH next AS (
   SELECT id FROM outbox_events WHERE state='queued' AND next_attempt_at<=now() ORDER BY next_attempt_at,created_at,id FOR UPDATE SKIP LOCKED LIMIT 1
 ) UPDATE outbox_events SET state='running',worker_id=$1,attempts=attempts+1,lease_expires_at=now()+$2::interval WHERE id=(SELECT id FROM next)
 RETURNING id,COALESCE(run_id,''),event_type,payload,state,attempts,worker_id,last_error,idempotency_key,created_at,next_attempt_at,delivered_at,dead_lettered_at`, workerID, lease.String())
@@ -153,7 +155,12 @@ func outboxRetryDelay(attempts int) time.Duration {
 		attempts = 1
 	}
 	seconds := math.Min(300, math.Pow(2, float64(attempts)))
-	return time.Duration(seconds*1000) * time.Millisecond
+	// avoid synchronized retry storms while preserving a bounded backoff window.
+	jitter, err := cryptorand.Int(cryptorand.Reader, big.NewInt(1001))
+	if err != nil {
+		return time.Duration(seconds*1000) * time.Millisecond
+	}
+	return time.Duration(seconds*1000+float64(jitter.Int64())) * time.Millisecond
 }
 
 func (s *Store) CompleteWorkspaceProvision(ctx context.Context, runID string) error {

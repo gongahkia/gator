@@ -72,7 +72,16 @@ type OIDC struct {
 }
 
 type Security struct {
-	OIDC OIDC `json:"oidc"`
+	OIDC   OIDC       `json:"oidc"`
+	Public bool       `json:"public"`
+	HTTP   HTTPPolicy `json:"http"`
+}
+
+type HTTPPolicy struct {
+	RequireHTTPS    bool   `json:"require_https"`
+	RatePerMinute   int    `json:"rate_per_minute"`
+	RateBurst       int    `json:"rate_burst"`
+	MetricsTokenEnv string `json:"metrics_token_env"`
 }
 
 type ArtifactStore struct {
@@ -83,6 +92,14 @@ type ArtifactStore struct {
 	AccessKeyEnv   string `json:"access_key_env"`
 	SecretKeyEnv   string `json:"secret_key_env"`
 	ForcePathStyle bool   `json:"force_path_style"`
+}
+
+// Retention is opt-in; zero keeps the corresponding records until an operator deletes them.
+type Retention struct {
+	AgentTurnsDays      int `json:"agent_turns_days"`
+	ChannelMessagesDays int `json:"channel_messages_days"`
+	RunEventsDays       int `json:"run_events_days"`
+	ProviderUsageDays   int `json:"provider_usage_days"`
 }
 
 type Workflow struct {
@@ -111,6 +128,12 @@ type Kubernetes struct {
 	EgressProxySecretKey       string `json:"egress_proxy_secret_key"`
 	EgressProxyPort            int32  `json:"egress_proxy_port"`
 	NetworkPolicyEnforced      bool   `json:"network_policy_enforced"`
+	QuotaCPUMilli              int64  `json:"quota_cpu_milli"`
+	QuotaMemoryMiB             int64  `json:"quota_memory_mib"`
+	QuotaStorageGiB            int64  `json:"quota_storage_gib"`
+	QuotaPods                  int64  `json:"quota_pods"`
+	QuotaJobs                  int64  `json:"quota_jobs"`
+	QuotaPVCs                  int64  `json:"quota_pvcs"`
 }
 
 type Manifest struct {
@@ -122,6 +145,7 @@ type Manifest struct {
 	Workflow   Workflow              `json:"workflow"`
 	Security   Security              `json:"security"`
 	Artifacts  ArtifactStore         `json:"artifacts"`
+	Retention  Retention             `json:"retention"`
 }
 
 type Config struct {
@@ -163,6 +187,11 @@ func Load() (Config, error) {
 	if err := cfg.Manifest.Validate(); err != nil {
 		return Config{}, err
 	}
+	if cfg.Manifest.Security.Public {
+		if strings.TrimSpace(os.Getenv(cfg.Manifest.Security.HTTP.MetricsTokenEnv)) == "" {
+			return Config{}, fmt.Errorf("public security requires metrics token env %s", cfg.Manifest.Security.HTTP.MetricsTokenEnv)
+		}
+	}
 	if target := strings.TrimSpace(os.Getenv("NORBOT_DEPLOYMENT_TARGET")); target != "" {
 		cfg.Manifest.Runtime.DefaultTarget = domain.DeploymentTarget(target)
 		if err := cfg.Manifest.ValidateRuntime(); err != nil {
@@ -183,6 +212,9 @@ func (m Manifest) Validate() error {
 		return err
 	}
 	if err := m.ValidateArtifacts(); err != nil {
+		return err
+	}
+	if err := m.ValidateRetention(); err != nil {
 		return err
 	}
 	seen := map[string]struct{}{}
@@ -238,10 +270,25 @@ func (m Manifest) Validate() error {
 	return m.ValidateRuntime()
 }
 
+func (m Manifest) ValidateRetention() error {
+	for name, days := range map[string]int{
+		"agent_turns_days": m.Retention.AgentTurnsDays, "channel_messages_days": m.Retention.ChannelMessagesDays,
+		"run_events_days": m.Retention.RunEventsDays, "provider_usage_days": m.Retention.ProviderUsageDays,
+	} {
+		if days < 0 || days > 3650 {
+			return fmt.Errorf("retention %s must be between 0 and 3650", name)
+		}
+	}
+	return nil
+}
+
 func (m Manifest) ValidateSecurity() error {
 	o := m.Security.OIDC
+	h := m.Security.HTTP
 	if o.Issuer == "" && o.Audience == "" && len(o.OperatorGroups) == 0 && o.GroupsClaim == "" && o.ClientID == "" && len(o.Scopes) == 0 {
-		return nil
+		if !m.Security.Public {
+			return nil
+		}
 	}
 	if o.Issuer == "" || o.Audience == "" || len(o.OperatorGroups) == 0 {
 		return fmt.Errorf("oidc issuer, audience, and operator_groups must be configured together")
@@ -251,6 +298,14 @@ func (m Manifest) ValidateSecurity() error {
 	}
 	if o.ClientID == "" {
 		return fmt.Errorf("oidc client_id is required when oidc is configured")
+	}
+	if m.Security.Public {
+		if !h.RequireHTTPS || h.MetricsTokenEnv == "" || h.RatePerMinute < 1 || h.RateBurst < 1 {
+			return fmt.Errorf("public security requires https, metrics_token_env, positive rate_per_minute, and positive rate_burst")
+		}
+		if !validEnvName(h.MetricsTokenEnv) {
+			return fmt.Errorf("metrics_token_env is invalid")
+		}
 	}
 	return nil
 }
@@ -294,13 +349,16 @@ func (m Manifest) ValidateRuntime() error {
 	if (k.IngressClass == "") != (k.IngressBaseDomain == "") || (k.IngressClass != "" && k.IngressControllerNamespace == "") {
 		return fmt.Errorf("kubernetes ingress_class, ingress_base_domain, and ingress_controller_namespace must be configured together")
 	}
-	if k.CPUMilli < 0 || k.MemoryMiB < 0 || k.Replicas < 0 {
+	if k.CPUMilli < 0 || k.MemoryMiB < 0 || k.Replicas < 0 || k.QuotaCPUMilli < 0 || k.QuotaMemoryMiB < 0 || k.QuotaStorageGiB < 0 || k.QuotaPods < 0 || k.QuotaJobs < 0 || k.QuotaPVCs < 0 {
 		return fmt.Errorf("kubernetes resources cannot be negative")
 	}
 	proxyConfigured := k.EgressProxyImage != "" || k.EgressProxySecret != "" || k.EgressProxySecretKey != "" || k.EgressProxyPort != 0
 	if proxyConfigured {
 		if s.EgressProxyURL == "" || s.EgressProxySecret == "" || k.EgressProxyImage == "" || k.EgressProxySecret == "" || k.EgressProxySecretKey == "" {
 			return fmt.Errorf("kubernetes egress proxy needs sandbox proxy configuration, image, secret, and secret key")
+		}
+		if !k.NetworkPolicyEnforced {
+			return fmt.Errorf("kubernetes egress proxy requires network_policy_enforced=true after an enforcement check")
 		}
 		if k.EgressProxyPort < 0 || k.EgressProxyPort > 65535 {
 			return fmt.Errorf("kubernetes egress proxy port is invalid")
@@ -354,6 +412,24 @@ func (k Kubernetes) Normalized() Kubernetes {
 	if k.EgressProxyPort == 0 {
 		k.EgressProxyPort = 8181
 	}
+	if k.QuotaCPUMilli == 0 {
+		k.QuotaCPUMilli = k.CPUMilli * 20
+	}
+	if k.QuotaMemoryMiB == 0 {
+		k.QuotaMemoryMiB = k.MemoryMiB * 20
+	}
+	if k.QuotaStorageGiB == 0 {
+		k.QuotaStorageGiB = 40
+	}
+	if k.QuotaPods == 0 {
+		k.QuotaPods = 50
+	}
+	if k.QuotaJobs == 0 {
+		k.QuotaJobs = 30
+	}
+	if k.QuotaPVCs == 0 {
+		k.QuotaPVCs = 30
+	}
 	return k
 }
 
@@ -361,7 +437,7 @@ func InitialManifest(target domain.DeploymentTarget, kube Kubernetes) Manifest {
 	if target == "" {
 		target = domain.DeploymentDocker
 	}
-	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}}
+	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}, Retention: Retention{AgentTurnsDays: 90, ChannelMessagesDays: 90, RunEventsDays: 365, ProviderUsageDays: 365}}
 }
 
 func WriteManifest(path string, manifest Manifest, force bool) error {
@@ -428,4 +504,16 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return parsed
+}
+
+func validEnvName(value string) bool {
+	if value == "" {
+		return false
+	}
+	for index, char := range value {
+		if !(char == '_' || char >= 'A' && char <= 'Z' || index > 0 && char >= '0' && char <= '9') {
+			return false
+		}
+	}
+	return true
 }

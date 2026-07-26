@@ -67,6 +67,15 @@ func TestKubernetesBootstrapIsNamespaced(t *testing.T) {
 	if _, err := client.CoreV1().ServiceAccounts("norbot").Get(ctx, "norbot-runtime", metav1.GetOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	quota, err := client.CoreV1().ResourceQuotas("norbot").Get(ctx, "norbot-runtime", metav1.GetOptions{})
+	pods := quota.Spec.Hard[corev1.ResourcePods]
+	if err != nil || pods.Sign() == 0 {
+		t.Fatalf("resource quota=%#v err=%v", quota, err)
+	}
+	limits, err := client.CoreV1().LimitRanges("norbot").Get(ctx, "norbot-runtime", metav1.GetOptions{})
+	if err != nil || len(limits.Spec.Limits) < 2 {
+		t.Fatalf("limit range=%#v err=%v", limits, err)
+	}
 	role, err := client.RbacV1().Roles("norbot").Get(ctx, "norbot-runtime", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)

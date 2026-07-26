@@ -49,11 +49,15 @@
   },
   "plugins": [],
   "workflow": {"max_fixes": 2},
-  "security": {},
+  "security": {
+    "public": false,
+    "http": {"require_https": false, "rate_per_minute": 240, "rate_burst": 60, "metrics_token_env": "NORBOT_METRICS_TOKEN"}
+  },
   "artifacts": {
     "enabled": false,
     "endpoint": "https://s3.example.com", "region": "us-east-1", "bucket": "norbot-artifacts", "access_key_env": "NORBOT_S3_ACCESS_KEY", "secret_key_env": "NORBOT_S3_SECRET_KEY", "force_path_style": true
   },
+  "retention": {"agent_turns_days": 90, "channel_messages_days": 90, "run_events_days": 365, "provider_usage_days": 365},
   "runtime": {
     "default_target": "docker",
     "sandbox": {"image": "alpine:3.21", "cpu_milli": 500, "memory_mib": 512, "timeout_seconds": 60, "egress_proxy_url": "", "egress_proxy_secret_env": ""},
@@ -69,7 +73,14 @@
       "ingress_controller_namespace": "",
       "cpu_milli": 500,
       "memory_mib": 512,
-      "replicas": 1
+      "replicas": 1,
+      "quota_cpu_milli": 10000,
+      "quota_memory_mib": 10240,
+      "quota_storage_gib": 40,
+      "quota_pods": 50,
+      "quota_jobs": 30,
+      "quota_pvcs": 30,
+      "network_policy_enforced": false
     }
   }
 }

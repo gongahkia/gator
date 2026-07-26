@@ -580,7 +580,7 @@ func serveCommand(args []string) {
 	skills := skill.New(st, cfg.ArtifactsDir)
 	channels := channel.New(st, service, cfg.ArtifactsDir, objects)
 	channels.Start(ctx)
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.NewWithComponents(service, st, logger, skills, channels).WithOIDC(cfg.Manifest.Security.OIDC).Handler(), ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: api.NewWithComponents(service, st, logger, skills, channels).WithOIDC(cfg.Manifest.Security.OIDC).WithSecurity(cfg.Manifest.Security).Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 90 * time.Second, MaxHeaderBytes: 16 << 10}
 	go func() {
 		<-ctx.Done()
 		stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

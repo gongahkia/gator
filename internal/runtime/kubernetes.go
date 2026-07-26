@@ -75,6 +75,12 @@ func (k *KubernetesRuntime) Validate(ctx context.Context) error {
 	if _, err := k.client.CoreV1().ServiceAccounts(k.config.Namespace).Get(ctx, k.config.ServiceAccount, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("get kubernetes service account %q: %w", k.config.ServiceAccount, err)
 	}
+	if _, err := k.client.CoreV1().ResourceQuotas(k.config.Namespace).Get(ctx, "norbot-runtime", metav1.GetOptions{}); err != nil {
+		return fmt.Errorf("get norbot resource quota: %w", err)
+	}
+	if _, err := k.client.CoreV1().LimitRanges(k.config.Namespace).Get(ctx, "norbot-runtime", metav1.GetOptions{}); err != nil {
+		return fmt.Errorf("get norbot limit range: %w", err)
+	}
 	if _, err := k.client.CoreV1().Secrets(k.config.Namespace).Get(ctx, k.config.RegistryPullSecret, metav1.GetOptions{}); err != nil {
 		return fmt.Errorf("get registry pull secret %q: %w", k.config.RegistryPullSecret, err)
 	}

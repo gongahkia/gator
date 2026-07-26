@@ -32,6 +32,8 @@ type Server struct {
 	channels *channel.Service
 	auth     *auth.Validator
 	oidc     config.OIDC
+	security config.Security
+	limiter  *clientLimiter
 }
 
 func New(service *engine.Service, st *store.Store, logger *slog.Logger) *Server {
@@ -55,6 +57,12 @@ func (s *Server) WithOIDC(value config.OIDC) *Server {
 	if value.Issuer != "" {
 		s.auth = auth.New(value)
 	}
+	return s
+}
+
+func (s *Server) WithSecurity(value config.Security) *Server {
+	s.security = value
+	s.limiter = newClientLimiter(value.HTTP)
 	return s
 }
 
@@ -84,6 +92,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/channels/{account}/webhook", s.channelWebhook)
 	mux.HandleFunc("POST /api/channels/{account}/webhook", s.channelWebhook)
 	mux.HandleFunc("GET /metrics", s.metrics)
+	mux.HandleFunc("GET /api/operations/outbox/dead", s.deadOutbox)
+	mux.HandleFunc("POST /api/operations/outbox/{id}/replay", s.replayOutbox)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
 	mux.HandleFunc("POST /api/runs", s.createRun)
 	mux.HandleFunc("GET /api/apps", s.listApps)
@@ -92,6 +102,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/runs/{id}/architecture", s.updateArchitecture)
 	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
+	mux.HandleFunc("GET /api/runs/{id}/event-history", s.eventHistory)
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/planner-revisions", s.plannerRevisions)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
@@ -110,7 +121,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{id}/deployment/stop", s.stopDeployment)
 	mux.HandleFunc("DELETE /api/runs/{id}/deployment", s.deleteDeployment)
 	mux.Handle("/", web.Handler())
-	return requestLog(s.log, otelhttp.NewHandler(s.requireOperator(mux), "norbot.http"))
+	if s.limiter == nil {
+		s.limiter = newClientLimiter(s.security.HTTP)
+	}
+	handler := s.protectMetrics(mux)
+	handler = s.rateLimit(handler)
+	handler = s.requireOperator(handler)
+	handler = s.securityHeaders(handler)
+	return requestLog(s.log, otelhttp.NewHandler(handler, "norbot.http"))
 }
 
 func (s *Server) requireOperator(next http.Handler) http.Handler {
@@ -446,25 +464,65 @@ func (s *Server) runtimeOptions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
-	s.service.Metrics().Handler(w, r)
+	gauges, err := s.store.OperationalGauges(r.Context())
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err)
+		return
+	}
+	s.service.Metrics().HandlerWithGauges(w, r, gauges)
+}
+
+func (s *Server) deadOutbox(w http.ResponseWriter, r *http.Request) {
+	items, err := s.store.DeadOutbox(r.Context(), queryLimit(r, 50))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+func (s *Server) replayOutbox(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid outbox event id"))
+		return
+	}
+	item, err := s.store.ReplayDeadOutbox(r.Context(), id, operatorFromRequest(r))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
-	runs, err := s.store.ListRuns(r.Context())
+	page, err := s.store.ListRunsPage(r.Context(), r.URL.Query().Get("cursor"), r.URL.Query().Get("status"), r.URL.Query().Get("app_id"), queryLimit(r, 50))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, runs)
+	writeJSON(w, http.StatusOK, page)
 }
 
 func (s *Server) listApps(w http.ResponseWriter, r *http.Request) {
-	apps, err := s.store.ListApps(r.Context())
+	page, err := s.store.ListAppsPage(r.Context(), r.URL.Query().Get("cursor"), queryLimit(r, 50))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, apps)
+	writeJSON(w, http.StatusOK, page)
+}
+
+func queryLimit(r *http.Request, fallback int) int {
+	value, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || value < 1 || value > 100 {
+		return fallback
+	}
+	return value
 }
 
 func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
@@ -801,6 +859,15 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 		}
 	}
+}
+
+func (s *Server) eventHistory(w http.ResponseWriter, r *http.Request) {
+	page, err := s.store.EventsPage(r.Context(), r.PathValue("id"), r.URL.Query().Get("cursor"), queryLimit(r, 100))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
 }
 
 func decodeJSON(r *http.Request, destination any) error {

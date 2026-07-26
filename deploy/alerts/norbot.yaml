@@ -1,0 +1,22 @@
+groups:
+  - name: norbot
+    rules:
+      - alert: NorbotOutboxDeadLetter
+        expr: norbot_operational_gauge{kind="outbox_dead"} > 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "Norbot has dead-lettered outbox events"
+          runbook: "Inspect /api/operations/outbox/dead, record replay reason, then replay only understood failures."
+      - alert: NorbotQueueLag
+        expr: norbot_operational_gauge{kind="queue_depth"} > 0 and increase(norbot_stage_runs_total{outcome="completed"}[15m]) == 0
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Norbot queue has no observed stage completion"
+      - alert: NorbotApprovalsAwaiting
+        expr: norbot_operational_gauge{kind="pending_approvals"} > 0
+        for: 24h
+        labels: {severity: ticket}
+        annotations:
+          summary: "Norbot approvals have been pending for 24 hours"

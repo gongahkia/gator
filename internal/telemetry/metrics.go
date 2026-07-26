@@ -73,6 +73,10 @@ func (m *Metrics) ObserveDeployment(action string) {
 }
 
 func (m *Metrics) Handler(w http.ResponseWriter, _ *http.Request) {
+	m.HandlerWithGauges(w, nil, nil)
+}
+
+func (m *Metrics) HandlerWithGauges(w http.ResponseWriter, _ *http.Request, gauges map[string]int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
@@ -98,6 +102,10 @@ func (m *Metrics) Handler(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintln(w, "# HELP norbot_deployment_actions_total Deployment lifecycle actions\n# TYPE norbot_deployment_actions_total counter")
 	for _, key := range ordered(m.deployments) {
 		fmt.Fprintf(w, "norbot_deployment_actions_total{action=%q} %d\n", key, m.deployments[key])
+	}
+	fmt.Fprintln(w, "# HELP norbot_operational_gauge Durable operational state\n# TYPE norbot_operational_gauge gauge")
+	for _, key := range ordered(gauges) {
+		fmt.Fprintf(w, "norbot_operational_gauge{kind=%q} %d\n", key, gauges[key])
 	}
 }
 

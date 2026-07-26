@@ -654,6 +654,8 @@ func (s *Service) StartWorkers(ctx context.Context) {
 	go s.recoverOutbox(ctx)
 	go s.outboxWorker(ctx)
 	go s.recoverApprovalOperations(ctx)
+	go s.expireAgentActions(ctx)
+	go s.purgeRetainedData(ctx)
 	var workers sync.WaitGroup
 	for index := 0; index < s.config.Workers; index++ {
 		workers.Add(1)
@@ -747,6 +749,36 @@ func (s *Service) recoverOutbox(ctx context.Context) {
 			s.log.Warn("recovered expired outbox", "count", recovered)
 		}
 		sleep(ctx, 15*time.Second)
+		if ctx.Err() != nil {
+			return
+		}
+	}
+}
+
+func (s *Service) expireAgentActions(ctx context.Context) {
+	for {
+		if expired, err := s.store.ExpirePendingAgentActions(ctx); err != nil {
+			s.log.Error("expire agent actions", "error", err)
+		} else if expired > 0 {
+			s.log.Warn("expired agent actions", "count", expired)
+		}
+		sleep(ctx, time.Minute)
+		if ctx.Err() != nil {
+			return
+		}
+	}
+}
+
+func (s *Service) purgeRetainedData(ctx context.Context) {
+	for {
+		retention := s.config.Manifest.Retention
+		result, err := s.store.PurgeRetainedData(ctx, retention.AgentTurnsDays, retention.ChannelMessagesDays, retention.RunEventsDays, retention.ProviderUsageDays)
+		if err != nil {
+			s.log.Error("purge retained data", "error", err)
+		} else if result.AgentTurns+result.ChannelMessages+result.RunEvents+result.ProviderUsage > 0 {
+			s.log.Info("purged retained data", "agent_turns", result.AgentTurns, "channel_messages", result.ChannelMessages, "run_events", result.RunEvents, "provider_usage", result.ProviderUsage)
+		}
+		sleep(ctx, time.Hour)
 		if ctx.Err() != nil {
 			return
 		}

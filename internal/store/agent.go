@@ -14,7 +14,7 @@ import (
 )
 
 const agentTurnColumns = `id,run_id,session_id,external_id,role,idempotency_key,prompt,history,state,final,provider_id,created_at,updated_at`
-const agentActionColumns = `id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,decided_at,created_at,updated_at`
+const agentActionColumns = `id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,decided_at,expires_at,approval_context,created_at,updated_at`
 
 func (s *Store) CreateAgentTurn(ctx context.Context, value domain.AgentTurn) (domain.AgentTurn, bool, error) {
 	history, err := json.Marshal(value.History)
@@ -62,7 +62,11 @@ func (s *Store) CreateAgentAction(ctx context.Context, value domain.AgentAction)
 	if err != nil {
 		return domain.AgentAction{}, err
 	}
-	return scanAgentAction(s.pool.QueryRow(ctx, `INSERT INTO agent_actions(id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now()) RETURNING `+agentActionColumns, value.ID, value.TurnID, value.RunID, value.Tool, value.Role, params, value.Digest, value.State, result, value.Error, value.ApprovedBy))
+	contextJSON, err := json.Marshal(value.ApprovalContext)
+	if err != nil {
+		return domain.AgentAction{}, err
+	}
+	return scanAgentAction(s.pool.QueryRow(ctx, `INSERT INTO agent_actions(id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,expires_at,approval_context,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),now()) RETURNING `+agentActionColumns, value.ID, value.TurnID, value.RunID, value.Tool, value.Role, params, value.Digest, value.State, result, value.Error, value.ApprovedBy, value.ExpiresAt, contextJSON))
 }
 func (s *Store) AgentAction(ctx context.Context, id string) (domain.AgentAction, error) {
 	return scanAgentAction(s.pool.QueryRow(ctx, `SELECT `+agentActionColumns+` FROM agent_actions WHERE id=$1`, id))
@@ -71,7 +75,7 @@ func (s *Store) PendingAgentActions(ctx context.Context, limit int) ([]domain.Ag
 	if limit < 1 || limit > 200 {
 		limit = 100
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+agentActionColumns+` FROM agent_actions WHERE state='pending' ORDER BY created_at LIMIT $1`, limit)
+	rows, err := s.pool.Query(ctx, `SELECT `+agentActionColumns+` FROM agent_actions WHERE state='pending' AND (expires_at IS NULL OR expires_at>now()) ORDER BY created_at LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +94,24 @@ func (s *Store) DecideAgentAction(ctx context.Context, id, state, operator strin
 	if state != "approved" && state != "rejected" {
 		return domain.AgentAction{}, fmt.Errorf("invalid action decision")
 	}
-	return scanAgentAction(s.pool.QueryRow(ctx, `UPDATE agent_actions SET state=$2,approved_by=$3,decided_at=now(),updated_at=now() WHERE id=$1 AND state='pending' RETURNING `+agentActionColumns, id, state, operator))
+	var value domain.AgentAction
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		var err error
+		value, err = scanAgentAction(tx.QueryRow(ctx, `UPDATE agent_actions SET state=$2,approved_by=$3,decided_at=now(),updated_at=now() WHERE id=$1 AND state='pending' AND (expires_at IS NULL OR expires_at>now()) RETURNING `+agentActionColumns, id, state, operator))
+		if err != nil {
+			return err
+		}
+		return s.insertAuditEvent(ctx, tx, operator, "agent_action."+state, "agent_action", id, map[string]any{"tool": value.Tool, "digest": value.Digest, "approval_context": value.ApprovalContext})
+	})
+	return value, err
+}
+
+func (s *Store) ExpirePendingAgentActions(ctx context.Context) (int, error) {
+	result, err := s.pool.Exec(ctx, `UPDATE agent_actions SET state='expired',error='approval expired',updated_at=now() WHERE state='pending' AND expires_at<=now()`)
+	if err != nil {
+		return 0, err
+	}
+	return int(result.RowsAffected()), nil
 }
 func (s *Store) CompleteAgentAction(ctx context.Context, id, state string, result map[string]any, errorText string) (domain.AgentAction, error) {
 	encoded, err := json.Marshal(result)
@@ -190,7 +211,8 @@ func scanAgentTurn(row interface{ Scan(...any) error }) (domain.AgentTurn, error
 func scanAgentAction(row interface{ Scan(...any) error }) (domain.AgentAction, error) {
 	var value domain.AgentAction
 	var params, result []byte
-	err := row.Scan(&value.ID, &value.TurnID, &value.RunID, &value.Tool, &value.Role, &params, &value.Digest, &value.State, &result, &value.Error, &value.ApprovedBy, &value.DecidedAt, &value.CreatedAt, &value.UpdatedAt)
+	var approvalContext []byte
+	err := row.Scan(&value.ID, &value.TurnID, &value.RunID, &value.Tool, &value.Role, &params, &value.Digest, &value.State, &result, &value.Error, &value.ApprovedBy, &value.DecidedAt, &value.ExpiresAt, &approvalContext, &value.CreatedAt, &value.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.AgentAction{}, ErrNotFound
 	}
@@ -201,6 +223,9 @@ func scanAgentAction(row interface{ Scan(...any) error }) (domain.AgentAction, e
 		return domain.AgentAction{}, err
 	}
 	if err := json.Unmarshal(result, &value.Result); err != nil {
+		return domain.AgentAction{}, err
+	}
+	if err := json.Unmarshal(approvalContext, &value.ApprovalContext); err != nil {
 		return domain.AgentAction{}, err
 	}
 	return value, nil

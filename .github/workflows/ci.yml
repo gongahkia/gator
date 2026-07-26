@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: norbot
+          POSTGRES_PASSWORD: norbot
+          POSTGRES_DB: norbot_test
+        options: >-
+          --health-cmd "pg_isready -U norbot -d norbot_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+        ports: [5432:5432]
+    env:
+      NORBOT_TEST_DATABASE_URL: postgres://norbot:norbot@127.0.0.1:5432/norbot_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with: {go-version-file: go.mod}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - run: npm --prefix web run build
+      - run: npm --prefix web audit --omit=dev --audit-level=high
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: NORBOT_E2E_DOCKER=1 go test ./internal/engine -run TestGeneratedProfileDockerE2E -count=1 -v
+      - run: docker build --tag norbot:ci .
+      - name: export SPDX SBOM
+        env: {GH_TOKEN: ${{ github.token }}}
+        run: gh api -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" > norbot.spdx.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: norbot-spdx, path: norbot.spdx.json, if-no-files-found: error}
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0

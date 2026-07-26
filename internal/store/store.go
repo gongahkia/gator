@@ -3,10 +3,13 @@ package store
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -440,6 +443,17 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS audit_events_target_idx ON audit_events(target_type,target_id,id DESC);
 `
 
+const migration003CacheLedgerCleanup = `
+DROP TABLE IF EXISTS verification_caches;
+`
+
+const migration004LifecycleIndexes = `
+CREATE INDEX IF NOT EXISTS agent_turns_retention_idx ON agent_turns(created_at) WHERE state<>'awaiting_approval';
+CREATE INDEX IF NOT EXISTS channel_messages_retention_idx ON channel_messages(created_at);
+CREATE INDEX IF NOT EXISTS run_events_retention_idx ON run_events(created_at);
+CREATE INDEX IF NOT EXISTS provider_usage_retention_idx ON provider_usage(created_at);
+`
+
 type migration struct {
 	Version int
 	Name    string
@@ -449,6 +463,8 @@ type migration struct {
 var migrations = []migration{
 	{Version: 1, Name: "initial_schema", SQL: migration001InitialSchema},
 	{Version: 2, Name: "operational_hardening", SQL: migration002OperationalHardening},
+	{Version: 3, Name: "cache_ledger_cleanup", SQL: migration003CacheLedgerCleanup},
+	{Version: 4, Name: "lifecycle_indexes", SQL: migration004LifecycleIndexes},
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
@@ -591,20 +607,42 @@ func (s *Store) GetRun(ctx context.Context, id string) (domain.Run, error) {
 }
 
 func (s *Store) ListRuns(ctx context.Context) ([]domain.Run, error) {
-	rows, err := s.pool.Query(ctx, runQuery+` ORDER BY updated_at DESC LIMIT 100`)
+	page, err := s.ListRunsPage(ctx, "", "", "", 100)
+	return page.Items, err
+}
+
+func (s *Store) ListRunsPage(ctx context.Context, cursor, status, appID string, limit int) (domain.RunPage, error) {
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+	where, args, err := runPageWhere(cursor, status, appID)
 	if err != nil {
-		return nil, err
+		return domain.RunPage{}, err
+	}
+	args = append(args, limit+1)
+	rows, err := s.pool.Query(ctx, runQuery+where+` ORDER BY updated_at DESC,id DESC LIMIT $`+strconv.Itoa(len(args)), args...)
+	if err != nil {
+		return domain.RunPage{}, err
 	}
 	defer rows.Close()
 	runs := []domain.Run{}
 	for rows.Next() {
 		run, err := scanRun(rows)
 		if err != nil {
-			return nil, err
+			return domain.RunPage{}, err
 		}
 		runs = append(runs, run)
 	}
-	return runs, rows.Err()
+	if err := rows.Err(); err != nil {
+		return domain.RunPage{}, err
+	}
+	page := domain.RunPage{Items: runs}
+	if len(page.Items) > limit {
+		last := page.Items[limit-1]
+		page.Items = page.Items[:limit]
+		page.NextCursor = encodePageCursor(last.UpdatedAt, last.ID)
+	}
+	return page, nil
 }
 
 func (s *Store) DeleteRun(ctx context.Context, id string) error {
@@ -619,9 +657,28 @@ func (s *Store) DeleteRun(ctx context.Context, id string) error {
 }
 
 func (s *Store) Events(ctx context.Context, runID string, afterID int64) ([]domain.Event, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id,run_id,event_type,message,metadata,created_at FROM run_events WHERE run_id=$1 AND id>$2 ORDER BY id ASC LIMIT 500`, runID, afterID)
+	page, err := s.EventsPage(ctx, runID, strconv.FormatInt(afterID, 10), 500)
 	if err != nil {
 		return nil, err
+	}
+	return page.Items, nil
+}
+
+func (s *Store) EventsPage(ctx context.Context, runID, cursor string, limit int) (domain.EventPage, error) {
+	if limit < 1 || limit > 500 {
+		limit = 100
+	}
+	afterID := int64(0)
+	if cursor != "" {
+		parsed, err := strconv.ParseInt(cursor, 10, 64)
+		if err != nil || parsed < 0 {
+			return domain.EventPage{}, fmt.Errorf("invalid event cursor")
+		}
+		afterID = parsed
+	}
+	rows, err := s.pool.Query(ctx, `SELECT id,run_id,event_type,message,metadata,created_at FROM run_events WHERE run_id=$1 AND id>$2 ORDER BY id ASC LIMIT $3`, runID, afterID, limit+1)
+	if err != nil {
+		return domain.EventPage{}, err
 	}
 	defer rows.Close()
 	events := []domain.Event{}
@@ -629,14 +686,23 @@ func (s *Store) Events(ctx context.Context, runID string, afterID int64) ([]doma
 		var event domain.Event
 		var metadata []byte
 		if err := rows.Scan(&event.ID, &event.RunID, &event.Type, &event.Message, &metadata, &event.CreatedAt); err != nil {
-			return nil, err
+			return domain.EventPage{}, err
 		}
 		if err := json.Unmarshal(metadata, &event.Metadata); err != nil {
-			return nil, err
+			return domain.EventPage{}, err
 		}
 		events = append(events, event)
 	}
-	return events, rows.Err()
+	if err := rows.Err(); err != nil {
+		return domain.EventPage{}, err
+	}
+	page := domain.EventPage{Items: events}
+	if len(page.Items) > limit {
+		last := page.Items[limit-1]
+		page.Items = page.Items[:limit]
+		page.NextCursor = strconv.FormatInt(last.ID, 10)
+	}
+	return page, nil
 }
 
 func (s *Store) UpdateGraph(ctx context.Context, runID string, graph domain.Graph) (domain.Run, error) {
@@ -1016,25 +1082,53 @@ WHERE d.app_id=requested.app_id AND d.is_current ORDER BY d.updated_at DESC LIMI
 }
 
 func (s *Store) ListApps(ctx context.Context) ([]domain.App, error) {
+	page, err := s.ListAppsPage(ctx, "", 100)
+	return page.Items, err
+}
+
+func (s *Store) ListAppsPage(ctx context.Context, cursor string, limit int) (domain.AppPage, error) {
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+	var args []any
+	where := ""
+	if cursor != "" {
+		updatedAt, appID, err := decodePageCursor(cursor)
+		if err != nil {
+			return domain.AppPage{}, err
+		}
+		args = append(args, updatedAt, appID)
+		where = ` WHERE (d.updated_at,d.app_id)<($1,$2)`
+	}
+	args = append(args, limit+1)
 	rows, err := s.pool.Query(ctx, `WITH latest_deployments AS (
   SELECT run_id,app_id,project_name,public_url,status,error_message,updated_at
   FROM deployments WHERE is_current
 )
 SELECT d.app_id,r.id,r.parent_run_id,r.prompt,r.profile,r.status,r.created_at,d.run_id,d.app_id,d.project_name,d.public_url,d.status,d.error_message,d.updated_at
-FROM latest_deployments d JOIN runs r ON d.run_id=r.id ORDER BY d.updated_at DESC LIMIT 100`)
+FROM latest_deployments d JOIN runs r ON d.run_id=r.id`+where+` ORDER BY d.updated_at DESC,d.app_id DESC LIMIT $`+strconv.Itoa(len(args)), args...)
 	if err != nil {
-		return nil, err
+		return domain.AppPage{}, err
 	}
 	defer rows.Close()
 	apps := []domain.App{}
 	for rows.Next() {
 		var app domain.App
 		if err := rows.Scan(&app.AppID, &app.RunID, &app.ParentRunID, &app.Prompt, &app.Profile, &app.RunStatus, &app.CreatedAt, &app.Deployment.RunID, &app.Deployment.AppID, &app.Deployment.ProjectName, &app.Deployment.PublicURL, &app.Deployment.Status, &app.Deployment.ErrorMessage, &app.Deployment.UpdatedAt); err != nil {
-			return nil, err
+			return domain.AppPage{}, err
 		}
 		apps = append(apps, app)
 	}
-	return apps, rows.Err()
+	if err := rows.Err(); err != nil {
+		return domain.AppPage{}, err
+	}
+	page := domain.AppPage{Items: apps}
+	if len(page.Items) > limit {
+		last := page.Items[limit-1]
+		page.Items = page.Items[:limit]
+		page.NextCursor = encodePageCursor(last.Deployment.UpdatedAt, last.AppID)
+	}
+	return page, nil
 }
 
 func (s *Store) UpsertAppSnapshot(ctx context.Context, snapshot domain.AppSnapshot) error {
@@ -1155,6 +1249,53 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 }
 
 const runQuery = `SELECT id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,workspace_status,providers,graph,architecture,feedback,failure_reason,created_at,updated_at FROM runs`
+
+type pageCursor struct {
+	UpdatedAt time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+}
+
+func runPageWhere(cursor, status, appID string) (string, []any, error) {
+	clauses := []string{}
+	args := []any{}
+	if status = strings.TrimSpace(status); status != "" {
+		clauses = append(clauses, "status=$"+strconv.Itoa(len(args)+1))
+		args = append(args, status)
+	}
+	if appID = strings.TrimSpace(appID); appID != "" {
+		clauses = append(clauses, "app_id=$"+strconv.Itoa(len(args)+1))
+		args = append(args, appID)
+	}
+	if cursor != "" {
+		updatedAt, id, err := decodePageCursor(cursor)
+		if err != nil {
+			return "", nil, err
+		}
+		clauses = append(clauses, "(updated_at,id)<($"+strconv.Itoa(len(args)+1)+",$"+strconv.Itoa(len(args)+2)+")")
+		args = append(args, updatedAt, id)
+	}
+	if len(clauses) == 0 {
+		return "", args, nil
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args, nil
+}
+
+func encodePageCursor(updatedAt time.Time, id string) string {
+	encoded, _ := json.Marshal(pageCursor{UpdatedAt: updatedAt.UTC(), ID: id})
+	return base64.RawURLEncoding.EncodeToString(encoded)
+}
+
+func decodePageCursor(value string) (time.Time, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return time.Time{}, "", fmt.Errorf("invalid page cursor")
+	}
+	var cursor pageCursor
+	if err := json.Unmarshal(raw, &cursor); err != nil || cursor.ID == "" || cursor.UpdatedAt.IsZero() {
+		return time.Time{}, "", fmt.Errorf("invalid page cursor")
+	}
+	return cursor.UpdatedAt, cursor.ID, nil
+}
 
 type rowScanner interface{ Scan(...any) error }
 

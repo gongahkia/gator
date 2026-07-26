@@ -217,11 +217,7 @@ func materializeGit(ctx context.Context, root string, input ImportInput) (source
 	if !strings.HasPrefix(input.SourceURI, "https://") {
 		return sourceProvenance{}, fmt.Errorf("git skill source must use https")
 	}
-	args := []string{"clone", "--depth", "1"}
-	if input.SourceRef != "" {
-		args = append(args, "--branch", input.SourceRef)
-	}
-	args = append(args, input.SourceURI, root)
+	args := []string{"clone", "--depth", "1", input.SourceURI, root}
 	command := exec.CommandContext(ctx, "git", args...)
 	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	if input.CredentialEnv != "" {
@@ -239,6 +235,21 @@ func materializeGit(ctx context.Context, root string, input ImportInput) (source
 		}
 		return sourceProvenance{}, fmt.Errorf("clone skill source: %s", detail)
 	}
+	if input.SourceRef != "" {
+		if strings.HasPrefix(input.SourceRef, "-") || len(input.SourceRef) > 256 {
+			return sourceProvenance{}, fmt.Errorf("source_ref is invalid")
+		}
+		fetch := exec.CommandContext(ctx, "git", "-C", root, "fetch", "--depth", "1", "origin", input.SourceRef)
+		fetch.Env = command.Env
+		if output, err := fetch.CombinedOutput(); err != nil {
+			return sourceProvenance{}, fmt.Errorf("resolve skill source_ref: %s", strings.TrimSpace(string(output)))
+		}
+		checkout := exec.CommandContext(ctx, "git", "-C", root, "checkout", "--detach", "FETCH_HEAD")
+		checkout.Env = command.Env
+		if output, err := checkout.CombinedOutput(); err != nil {
+			return sourceProvenance{}, fmt.Errorf("checkout skill source_ref: %s", strings.TrimSpace(string(output)))
+		}
+	}
 	resolved, err := gitMetadata(ctx, root, "rev-parse", "HEAD")
 	if err != nil {
 		return sourceProvenance{}, err
@@ -250,7 +261,11 @@ func materializeGit(ctx context.Context, root string, input ImportInput) (source
 	if err := os.RemoveAll(filepath.Join(root, ".git")); err != nil {
 		return sourceProvenance{}, err
 	}
-	return sourceProvenance{ResolvedRef: resolved, TreeDigest: "sha1:" + tree}, nil
+	format, err := gitMetadata(ctx, root, "rev-parse", "--show-object-format")
+	if err != nil {
+		return sourceProvenance{}, err
+	}
+	return sourceProvenance{ResolvedRef: "git:" + format + ":" + resolved, TreeDigest: "git:" + format + ":" + tree}, nil
 }
 
 func (s *Service) materializeOCI(ctx context.Context, root string, input ImportInput) (sourceProvenance, error) {
