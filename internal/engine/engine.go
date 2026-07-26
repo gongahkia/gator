@@ -1039,6 +1039,15 @@ func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) er
 }
 
 func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run, changedSets ...map[string]string) (map[string]any, error) {
+	changed := map[string]string{}
+	if len(changedSets) > 0 && changedSets[0] != nil {
+		changed = changedSets[0]
+	}
+	if verifier, ok := workspace.(interface {
+		VerifyChanged(context.Context, domain.Run, map[string]string) (map[string]any, error)
+	}); ok && run.DeploymentTarget == domain.DeploymentKubernetes {
+		return verifier.VerifyChanged(ctx, run, changed)
+	}
 	if verifier, ok := workspace.(interface {
 		Verify(context.Context, domain.Run) (map[string]any, error)
 	}); ok && run.DeploymentTarget == domain.DeploymentKubernetes {
@@ -1101,10 +1110,6 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend dependency cache: %w", err))
 	}
 	frontendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", frontendCache + ":/workspace/generated-app/frontend/node_modules:ro", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu"}
-	changed := map[string]string{}
-	if len(changedSets) > 0 && changedSets[0] != nil {
-		changed = changedSets[0]
-	}
 	if fastFrontend(changed) {
 		if err := runCommand(dockerBin, append(frontendMount, "npm test")...); err != nil {
 			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast frontend test: %w", err))
@@ -1193,7 +1198,7 @@ func ensureNodeCache(ctx context.Context, runner runtime.CommandRunner, dockerBi
 	if _, err := runner.Run(ctx, dockerBin, "volume", "create", cacheVolume); err != nil {
 		return err
 	}
-	script := "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 -exec rm -rf {} +; npm ci; cp -a node_modules/. /cache/; printf '%s' '" + key + "' >/cache/.norbot-key; rm -rf node_modules; fi"
+	script := cacheLockScript("/cache") + "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; npm ci; cp -a node_modules/. /cache/; printf '%s' '" + key + "' >/cache/.norbot-key; rm -rf node_modules; fi"
 	_, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", script)
 	return err
 }
@@ -1202,9 +1207,13 @@ func ensureGoCache(ctx context.Context, runner runtime.CommandRunner, dockerBin,
 	if _, err := runner.Run(ctx, dockerBin, "volume", "create", cacheVolume); err != nil {
 		return err
 	}
-	script := "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 -exec rm -rf {} +; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go mod download; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >/cache/.norbot-key; fi"
+	script := cacheLockScript("/cache") + "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go mod download; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >/cache/.norbot-key; fi"
 	_, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", script)
 	return err
+}
+
+func cacheLockScript(root string) string {
+	return "lock=" + root + "/.norbot-lock; deadline=$(( $(date +%s) + 300 )); until mkdir \"$lock\" 2>/dev/null; do [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo 'dependency cache lock timeout' >&2; exit 1; }; sleep 1; done; trap 'rmdir \"$lock\"' EXIT; "
 }
 
 func fastFrontend(changed map[string]string) bool {
@@ -1338,15 +1347,37 @@ func applyRevision(workspace runtime.ArtifactWorkspace, run domain.Run, revision
 	if digestStringMap(revision.Files) != revision.PatchDigest {
 		return fmt.Errorf("revision patch digest mismatch")
 	}
-	if current, err := digestGeneratedApp(workspace.RunPath(run.ID)); err != nil {
+	baseline, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
+	if err != nil {
 		return err
-	} else if current != revision.BaselineDigest {
+	}
+	if digestFiles(baseline) != revision.BaselineDigest {
 		return fmt.Errorf("workspace baseline changed; revision cannot be applied")
 	}
+	next := cloneFiles(baseline)
 	for path, content := range revision.Files {
-		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil {
-			return err
+		next[path] = content
+	}
+	runPath := workspace.RunPath(run.ID)
+	staged, err := os.MkdirTemp(runPath, ".approval-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(staged)
+	if err := restoreGeneratedApp(staged, next); err != nil {
+		return err
+	}
+	target := filepath.Join(runPath, "generated-app")
+	backup := staged + "-backup"
+	defer os.RemoveAll(backup)
+	if err := os.Rename(target, backup); err != nil {
+		return fmt.Errorf("stage existing generated app: %w", err)
+	}
+	if err := os.Rename(filepath.Join(staged, "generated-app"), target); err != nil {
+		if restoreErr := os.Rename(backup, target); restoreErr != nil {
+			return fmt.Errorf("activate staged revision: %w; restore baseline: %v", err, restoreErr)
 		}
+		return fmt.Errorf("activate staged revision: %w", err)
 	}
 	return nil
 }

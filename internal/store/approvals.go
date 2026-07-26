@@ -54,7 +54,7 @@ func (s *Store) CreateApprovalOperation(ctx context.Context, value domain.Approv
 }
 
 func (s *Store) ApprovalOperation(ctx context.Context, id int64) (domain.ApprovalOperation, error) {
-	return scanApprovalOperation(s.pool.QueryRow(ctx, approvalOperationQuery+` WHERE id=$1`), nil)
+	return scanApprovalOperation(s.pool.QueryRow(ctx, approvalOperationQuery+` WHERE id=$1`, id), nil)
 }
 
 func (s *Store) RecoverableApprovalOperations(ctx context.Context) ([]domain.ApprovalOperation, error) {

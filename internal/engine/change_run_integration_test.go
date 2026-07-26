@@ -22,7 +22,7 @@ func TestCreateChangeRunIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	t.Cleanup(st.Close)
 	if err := st.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestCreateChangeRunIntegration(t *testing.T) {
 	if _, err := workspace.WriteArtifact(parent.ID, "generated-app/frontend/src/main.jsx", []byte("export default null")); err != nil {
 		t.Fatal(err)
 	}
-	service := New(st, config.Config{ArtifactsDir: root}, nil)
+	service := New(st, config.Config{ArtifactsDir: root, Manifest: config.Manifest{Providers: []config.Provider{{ID: "test", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}}}}}, nil)
 	child, err := service.CreateChangeRun(ctx, parent.ID, "add search", false)
 	if err != nil {
 		t.Fatal(err)
@@ -58,4 +58,10 @@ func TestCreateChangeRunIntegration(t *testing.T) {
 	if architectural.Stage != domain.StagePlanner || architectural.AppID != parent.AppID {
 		t.Fatalf("architecture child=%#v", architectural)
 	}
+	t.Cleanup(func() {
+		_ = st.DeleteRun(context.Background(), child.ID)
+		_ = st.DeleteRun(context.Background(), architectural.ID)
+		_ = st.DeleteRun(context.Background(), parent.ID)
+		_ = st.DeleteAppSnapshot(context.Background(), child.BaseSnapshotDigest)
+	})
 }

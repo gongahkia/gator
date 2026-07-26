@@ -20,7 +20,7 @@ func TestRunApprovalLifecycleIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	t.Cleanup(st.Close)
 	if err := st.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestCreateRunWithInitialJobIsAtomicIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer st.Close()
+	t.Cleanup(st.Close)
 	if err := st.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -89,6 +89,7 @@ func TestCreateRunWithInitialJobIsAtomicIntegration(t *testing.T) {
 	if err := st.CreateRunWithInitialJob(ctx, run, nil, ""); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
 	created, err := st.GetRun(ctx, id)
 	if err != nil {
 		t.Fatal(err)
@@ -109,5 +110,67 @@ func TestCreateRunWithInitialJobIsAtomicIntegration(t *testing.T) {
 	}
 	if provisioned != 1 {
 		t.Fatalf("workspace outbox count=%d", provisioned)
+	}
+}
+
+func TestFinalizeApprovalOperationIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	id := "approval-" + time.Now().UTC().Format("20060102150405.000000000")
+	run := domain.Run{ID: id, Prompt: "approval", Profile: domain.ProfileFrontend, Stage: domain.StageBuilder, Status: domain.StatusAwaiting, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "local-deployer"}, Graph: domain.DefaultGraph(), Architecture: domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph()), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
+	revision, err := st.CreateRevision(ctx, domain.Revision{RunID: id, Kind: domain.ReviewCode, Attempt: 1, BaselineDigest: "sha256:baseline", PatchDigest: "sha256:patch", Files: map[string]string{"generated-app/frontend/src/main.jsx": "after"}, Report: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	op, err := st.CreateApprovalOperation(ctx, domain.ApprovalOperation{RunID: id, RevisionID: revision.ID, BaselineDigest: revision.BaselineDigest, PostDigest: "sha256:post", BaselineFiles: map[string]string{"generated-app/frontend/src/main.jsx": "before"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if op.State != "prepared" {
+		t.Fatalf("journal state=%q", op.State)
+	}
+	if current, err := st.Revision(ctx, id, revision.ID); err != nil || current.State != "proposed" {
+		t.Fatalf("journal mutated revision: %#v err=%v", current, err)
+	}
+	if err := st.MarkApprovalWorkspaceApplied(ctx, op.ID); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := st.FinalizeApprovalOperation(ctx, op.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Stage != domain.StageVerifier || updated.Status != domain.StatusQueued {
+		t.Fatalf("finalized run=%#v", updated)
+	}
+	if current, err := st.Revision(ctx, id, revision.ID); err != nil || current.State != "applied" {
+		t.Fatalf("revision=%#v err=%v", current, err)
+	}
+	if current, err := st.ApprovalOperation(ctx, op.ID); err != nil || current.State != "finalized" {
+		t.Fatalf("operation=%#v err=%v", current, err)
+	}
+	var jobs, events int
+	if err := st.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jobs WHERE run_id=$1 AND stage='verifier' AND state='queued'`, id).Scan(&jobs); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.pool.QueryRow(ctx, `SELECT COUNT(*) FROM outbox_events WHERE run_id=$1 AND event_type='run.event'`, id).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	if jobs != 1 || events < 2 {
+		t.Fatalf("jobs=%d run event outbox=%d", jobs, events)
 	}
 }

@@ -124,3 +124,21 @@ func TestKubernetesCapacityUsesAllocatableResources(t *testing.T) {
 		t.Fatalf("capacity=%#v", capacity)
 	}
 }
+
+func TestVerificationChangedPathSelection(t *testing.T) {
+	frontend := map[string]string{"generated-app/frontend/src/App.jsx": "changed"}
+	if !needsFastFrontend(frontend) || needsFastBackend(frontend) {
+		t.Fatalf("frontend selection is wrong: %#v", frontend)
+	}
+	backend := map[string]string{"generated-app/backend/main.go": "changed"}
+	if needsFastFrontend(backend) || !needsFastBackend(backend) {
+		t.Fatalf("backend selection is wrong: %#v", backend)
+	}
+	compose := map[string]string{"generated-app/docker-compose.yml": "changed"}
+	if !needsFastFrontend(compose) || !needsFastBackend(compose) {
+		t.Fatalf("compose selection is wrong: %#v", compose)
+	}
+	if !needsFastFrontend(nil) || !needsFastBackend(nil) {
+		t.Fatal("initial verification must run both fast checks")
+	}
+}

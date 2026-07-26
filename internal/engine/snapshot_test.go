@@ -43,3 +43,36 @@ func TestCaptureAppSnapshotIsContentAddressedAndImmutable(t *testing.T) {
 		t.Fatalf("digest=%s want=%s", actual, snapshot.Digest)
 	}
 }
+
+func TestApplyRevisionStagesThenReplacesGeneratedApp(t *testing.T) {
+	root := t.TempDir()
+	workspace := runtime.Workspace{ArtifactsDir: root}
+	run := domain.Run{ID: "approval"}
+	baseline := map[string]string{"generated-app/frontend/src/main.jsx": "before", "generated-app/frontend/package.json": "{}"}
+	for path, content := range baseline {
+		if _, err := workspace.WriteArtifact(run.ID, path, []byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files := map[string]string{"generated-app/frontend/src/main.jsx": "after"}
+	revision := domain.Revision{RunID: run.ID, State: "proposed", BaselineDigest: digestFiles(baseline), PatchDigest: digestStringMap(files), Files: files}
+	if err := applyRevision(workspace, run, revision); err != nil {
+		t.Fatal(err)
+	}
+	current, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current["generated-app/frontend/src/main.jsx"] != "after" || current["generated-app/frontend/package.json"] != "{}" {
+		t.Fatalf("current=%#v", current)
+	}
+	entries, err := os.ReadDir(workspace.RunPath(run.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.Name() != "generated-app" {
+			t.Fatalf("approval staging residue: %s", entry.Name())
+		}
+	}
+}

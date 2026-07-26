@@ -680,6 +680,18 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted {
 			return fmt.Errorf("retry is available only for failed or interrupted runs")
 		}
+		if run.WorkspaceStatus == "failed" {
+			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',workspace_status='provisioning',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs(run_id,stage,attempt,state) SELECT $1,$2,COALESCE(MAX(attempt),0)+1,'blocked' FROM jobs WHERE run_id=$1`, runID, run.Stage); err != nil {
+				return err
+			}
+			if err := s.insertEvent(ctx, tx, runID, "workspace_provision_retry_requested", "Workspace provisioning retry queued", map[string]any{"stage": run.Stage}); err != nil {
+				return err
+			}
+			return s.insertOutbox(ctx, tx, runID, "workspace.provision", map[string]any{"run_id": runID})
+		}
 		if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
 			return err
 		}
@@ -955,6 +967,11 @@ func (s *Store) AppSnapshot(ctx context.Context, digest string) (domain.AppSnaps
 		return domain.AppSnapshot{}, ErrNotFound
 	}
 	return snapshot, err
+}
+
+func (s *Store) DeleteAppSnapshot(ctx context.Context, digest string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM app_snapshots WHERE digest=$1`, digest)
+	return err
 }
 
 func (s *Store) RecordProviderObservation(ctx context.Context, observation ProviderObservation) error {

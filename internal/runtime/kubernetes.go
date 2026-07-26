@@ -450,51 +450,113 @@ func (k *KubernetesRuntime) RunSandbox(ctx context.Context, runID string, reques
 }
 
 func (k *KubernetesRuntime) Verify(ctx context.Context, run domain.Run) (map[string]any, error) {
+	return k.VerifyChanged(ctx, run, nil)
+}
+
+func (k *KubernetesRuntime) VerifyChanged(ctx context.Context, run domain.Run, changed map[string]string) (map[string]any, error) {
 	if err := k.Ensure(ctx, run.ID); err != nil {
 		return nil, err
 	}
 	checks := []string{"profile contract"}
+	fastChecks := []string{}
+	fullChecks := []string{}
+	failure := func(err error) (map[string]any, error) {
+		return map[string]any{"status": "fail", "checks": checks, "fast_checks": fastChecks, "full_checks": fullChecks}, err
+	}
 	frontendKey, err := k.verificationCacheKey(run.ID, "node:22-alpine", "generated-app/frontend/package.json", "generated-app/frontend/package-lock.json")
 	if err != nil {
-		return map[string]any{"status": "fail", "checks": checks}, err
+		return failure(err)
 	}
-	frontendCommand := "cache=/workspace/.norbot-cache/node-" + frontendKey + "; if [ ! -f \"$cache/.norbot-key\" ] || [ \"$(cat \"$cache/.norbot-key\")\" != '" + frontendKey + "' ]; then rm -rf \"$cache\"; mkdir -p \"$cache\"; npm ci; mv node_modules \"$cache/node_modules\"; printf '%s' '" + frontendKey + "' >\"$cache/.norbot-key\"; fi; rm -rf node_modules; ln -s \"$cache/node_modules\" node_modules; trap 'rm -f node_modules' EXIT; npm test && npm run build && npm audit --omit=dev --audit-level=high"
-	if _, err := k.runVerifier(ctx, run, "frontend", "node:22-alpine", []string{"sh", "-ceu", frontendCommand}, "/workspace/generated-app/frontend"); err != nil {
-		return map[string]any{"status": "fail", "checks": checks}, err
+	frontendPrefix := k.nodeVerificationPrefix(frontendKey)
+	if needsFastFrontend(changed) {
+		if _, err := k.runVerifier(ctx, run, "frontend-fast", "node:22-alpine", []string{"sh", "-ceu", frontendPrefix + "npm test"}, "/workspace/generated-app/frontend"); err != nil {
+			return failure(fmt.Errorf("fast frontend test: %w", err))
+		}
+		checks = append(checks, "fast frontend test")
+		fastChecks = append(fastChecks, "frontend test")
+	}
+	if _, err := k.runVerifier(ctx, run, "frontend", "node:22-alpine", []string{"sh", "-ceu", frontendPrefix + "npm test && npm run build && npm audit --omit=dev --audit-level=high"}, "/workspace/generated-app/frontend"); err != nil {
+		return failure(fmt.Errorf("frontend test/build/audit: %w", err))
 	}
 	checks = append(checks, "node dependency cache/test/build/audit")
+	fullChecks = append(fullChecks, "frontend dependency cache/test/build/audit")
 	if run.Profile != domain.ProfileFrontend {
 		backendKey, err := k.verificationCacheKey(run.ID, "golang:1.26-alpine", "generated-app/backend/go.mod", "generated-app/backend/go.sum")
 		if err != nil {
-			return map[string]any{"status": "fail", "checks": checks}, err
+			return failure(err)
 		}
-		backendCommand := "cache=/workspace/.norbot-cache/go-" + backendKey + "; mkdir -p \"$cache\"; if [ ! -f \"$cache/.norbot-key\" ] || [ \"$(cat \"$cache/.norbot-key\")\" != '" + backendKey + "' ]; then rm -rf \"$cache\"; mkdir -p \"$cache\"; GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" GOBIN=\"$cache/bin\" go mod download; GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" GOBIN=\"$cache/bin\" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + backendKey + "' >\"$cache/.norbot-key\"; fi; PATH=\"$cache/bin:$PATH\" GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" go test ./... && go build ./... && govulncheck ./..."
-		if _, err := k.runVerifier(ctx, run, "backend", "golang:1.26-alpine", []string{"sh", "-ceu", backendCommand}, "/workspace/generated-app/backend"); err != nil {
-			return map[string]any{"status": "fail", "checks": checks}, err
+		backendPrefix := k.goVerificationPrefix(backendKey)
+		if needsFastBackend(changed) {
+			if _, err := k.runVerifier(ctx, run, "backend-fast", "golang:1.26-alpine", []string{"sh", "-ceu", backendPrefix + "go test ./..."}, "/workspace/generated-app/backend"); err != nil {
+				return failure(fmt.Errorf("fast Go test: %w", err))
+			}
+			checks = append(checks, "fast Go test")
+			fastChecks = append(fastChecks, "Go test")
+		}
+		if _, err := k.runVerifier(ctx, run, "backend", "golang:1.26-alpine", []string{"sh", "-ceu", backendPrefix + "go test ./... && go build ./... && govulncheck ./..."}, "/workspace/generated-app/backend"); err != nil {
+			return failure(fmt.Errorf("Go test/build/govulncheck: %w", err))
 		}
 		checks = append(checks, "Go dependency cache/test/build/govulncheck")
+		fullChecks = append(fullChecks, "Go dependency cache/test/build/govulncheck")
 	}
 	images, err := k.buildImages(ctx, run, "verify")
 	if err != nil {
-		return map[string]any{"status": "fail", "checks": checks}, err
+		return failure(err)
 	}
 	if err := k.applyApplication(ctx, run, images, "verify", run.ID); err != nil {
-		return map[string]any{"status": "fail", "checks": checks}, err
+		return failure(err)
 	}
 	defer k.deleteApplication(context.Background(), run.ID, "verify")
 	if err := k.waitDeployment(ctx, k.frontendName(run.ID)+"-verify"); err != nil {
-		return map[string]any{"status": "fail", "checks": checks}, err
+		return failure(err)
 	}
 	if run.Profile != domain.ProfileFrontend {
 		if err := k.waitDeployment(ctx, k.backendName(run.ID)+"-verify"); err != nil {
-			return map[string]any{"status": "fail", "checks": checks}, err
+			return failure(err)
 		}
 	}
 	if _, err := k.runSmoke(ctx, run, "verify"); err != nil {
-		return map[string]any{"status": "fail", "checks": checks}, err
+		return failure(err)
 	}
 	checks = append(checks, "kaniko image build", "kubernetes rollout/health/smoke")
-	return map[string]any{"status": "pass", "checks": checks, "summary": "Kubernetes dependency, build, vulnerability, rollout, and in-cluster smoke checks passed. Operator approval is required before deployment."}, nil
+	fullChecks = append(fullChecks, "kaniko image build", "Kubernetes rollout/health/smoke")
+	return map[string]any{"status": "pass", "checks": checks, "fast_checks": fastChecks, "full_checks": fullChecks, "summary": "Kubernetes dependency, build, vulnerability, rollout, and in-cluster smoke checks passed. Operator approval is required before deployment."}, nil
+}
+
+func (k *KubernetesRuntime) nodeVerificationPrefix(key string) string {
+	return "cache=/workspace/.norbot-cache/node-" + key + "; " + kubernetesCacheLockPrefix() + "if [ ! -f \"$cache/.norbot-key\" ] || [ \"$(cat \"$cache/.norbot-key\")\" != '" + key + "' ]; then rm -rf \"$cache\"; mkdir -p \"$cache\"; npm ci; mv node_modules \"$cache/node_modules\"; printf '%s' '" + key + "' >\"$cache/.norbot-key\"; fi; rm -rf node_modules; ln -s \"$cache/node_modules\" node_modules; trap 'rm -f node_modules; rmdir \"$lock\"' EXIT; "
+}
+
+func (k *KubernetesRuntime) goVerificationPrefix(key string) string {
+	return "cache=/workspace/.norbot-cache/go-" + key + "; " + kubernetesCacheLockPrefix() + "if [ ! -f \"$cache/.norbot-key\" ] || [ \"$(cat \"$cache/.norbot-key\")\" != '" + key + "' ]; then rm -rf \"$cache\"; mkdir -p \"$cache\"; GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" GOBIN=\"$cache/bin\" go mod download; GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" GOBIN=\"$cache/bin\" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >\"$cache/.norbot-key\"; fi; PATH=\"$cache/bin:$PATH\" GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" "
+}
+
+func kubernetesCacheLockPrefix() string {
+	return "mkdir -p /workspace/.norbot-cache; lock=\"$cache.lock\"; deadline=$(( $(date +%s) + 300 )); until mkdir \"$lock\" 2>/dev/null; do [ \"$(date +%s)\" -lt \"$deadline\" ] || { echo 'dependency cache lock timeout' >&2; exit 1; }; sleep 1; done; trap 'rmdir \"$lock\"' EXIT; "
+}
+
+func needsFastFrontend(changed map[string]string) bool {
+	if len(changed) == 0 {
+		return true
+	}
+	for path := range changed {
+		if strings.HasPrefix(path, "generated-app/frontend/") || path == "generated-app/docker-compose.yml" {
+			return true
+		}
+	}
+	return false
+}
+
+func needsFastBackend(changed map[string]string) bool {
+	if len(changed) == 0 {
+		return true
+	}
+	for path := range changed {
+		if strings.HasPrefix(path, "generated-app/backend/") || path == "generated-app/docker-compose.yml" {
+			return true
+		}
+	}
+	return false
 }
 
 func (k *KubernetesRuntime) verificationCacheKey(runID, image string, files ...string) (string, error) {

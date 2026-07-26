@@ -69,6 +69,9 @@ func TestVerifierRunsDeterministicChecks(t *testing.T) {
 	if !strings.Contains(joined, "norbot_verify_node_") || !strings.Contains(joined, "norbot_verify_go_") {
 		t.Fatalf("dependency cache volumes were not used: %s", joined)
 	}
+	if !strings.Contains(joined, ".norbot-lock") {
+		t.Fatalf("dependency cache population is not serialized: %s", joined)
+	}
 }
 
 func TestDependencyCacheKeyTracksLockfilesAndToolchain(t *testing.T) {
