@@ -12,6 +12,7 @@ local M = {
 	escalation = require("gator.ui.escalation"),
 	handoff_review = require("gator.ui.handoff_review"),
 	accessibility = require("gator.ui.accessibility"),
+	glyphs = require("gator.ui.glyphs"),
 	approval_details = require("gator.ui.approval_details"),
 	markdown = require("gator.ui.markdown"),
 	palette = require("gator.ui.palette"),

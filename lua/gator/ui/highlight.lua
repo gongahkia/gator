@@ -77,7 +77,7 @@ function M.apply(buffer, lines)
 	vim.api.nvim_buf_clear_namespace(buffer, namespace, 0, -1)
 	for index, line in ipairs(lines) do
 		local row = index - 1
-		if line:match("^Gator ") then
+		if line:match("^Gator ") or line:match("^%S+ Gator ") then
 			add(buffer, "GatorTitle", row, 0, #line)
 		elseif line:match("^%s*[%a][%w _/-]*:%s*$") then
 			add(buffer, "GatorSection", row, 0, #line)

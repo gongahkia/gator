@@ -1,5 +1,6 @@
 local M = {}
 local highlight = require("gator.ui.highlight")
+local glyphs = require("gator.ui.glyphs")
 local actions = {
 	next = true,
 	previous = true,
@@ -13,7 +14,7 @@ local actions = {
 	close = true,
 	help = true,
 }
-local settings = { keymaps = {}, screen_reader = true }
+local settings = { keymaps = {}, screen_reader = true, icons = "unicode" }
 
 local function fail(message)
 	error("Gator accessibility: " .. message, 3)
@@ -41,7 +42,9 @@ function M.configure(opts)
 	if type(opts) ~= "table" or type(opts.keymaps) ~= "table" or type(opts.screen_reader) ~= "boolean" then
 		fail("settings require keymaps and screen_reader")
 	end
-	settings = { keymaps = vim.deepcopy(opts.keymaps), screen_reader = opts.screen_reader }
+	local icons = opts.icons or "unicode"
+	glyphs.configure(icons)
+	settings = { keymaps = vim.deepcopy(opts.keymaps), screen_reader = opts.screen_reader, icons = icons }
 	return vim.deepcopy(settings)
 end
 
@@ -87,13 +90,14 @@ function M.render(buffer, lines, filetype)
 	if type(filetype) ~= "string" or filetype == "" then
 		fail("render requires a non-empty filetype")
 	end
+	local rendered = glyphs.decorate(lines, filetype)
 	if settings.screen_reader then
-		M.text(buffer, lines)
+		M.text(buffer, rendered)
 		return
 	end
 	vim.bo[buffer].modifiable = true
-	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, lines)
-	highlight.apply(buffer, lines)
+	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, rendered)
+	highlight.apply(buffer, rendered)
 	vim.bo[buffer].modifiable = false
 	vim.bo[buffer].filetype = filetype
 end

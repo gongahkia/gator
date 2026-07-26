@@ -10,6 +10,7 @@ M.defaults = {
 		layout = "adaptive",
 		keymaps = {},
 		screen_reader = true,
+		icons = "unicode",
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 	},
 	context = {
@@ -134,7 +135,7 @@ local provider_names = {
 local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
-	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, motion = true }, "settings.ui")
+	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, icons = true, motion = true }, "settings.ui")
 	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
 	fields(value.providers, provider_names, "settings.providers")
@@ -157,6 +158,9 @@ local function settings(value)
 	end
 	if type(value.ui.screen_reader) ~= "boolean" then
 		fail("ui.screen_reader must be boolean")
+	end
+	if not vim.tbl_contains({ "unicode", "nerd_font", "ascii" }, value.ui.icons) then
+		fail("ui.icons must be unicode, nerd_font, or ascii")
 	end
 	if type(value.ui.motion) ~= "table" then
 		fail("ui.motion must be an object")
