@@ -54,3 +54,15 @@ func TestKubernetesIngressConfigurationIsAllOrNothing(t *testing.T) {
 		t.Fatal("partial ingress configuration accepted")
 	}
 }
+
+func TestPublicSecurityRequiresCompleteIngressControls(t *testing.T) {
+	manifest := InitialManifest(domain.DeploymentDocker, Kubernetes{})
+	manifest.Security = Security{Public: true, HTTP: HTTPPolicy{RequireHTTPS: true, MetricsTokenEnv: "NORBOT_METRICS_TOKEN", RatePerMinute: 120, RateBurst: 30}}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("public profile without OIDC validated")
+	}
+	manifest.Security.OIDC = OIDC{Issuer: "https://issuer.example", Audience: "norbot", GroupsClaim: "groups", OperatorGroups: []string{"operators"}, ClientID: "norbot"}
+	if err := manifest.Validate(); err != nil {
+		t.Fatalf("complete public profile rejected: %v", err)
+	}
+}

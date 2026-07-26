@@ -616,7 +616,7 @@ func (s *Store) ListRunsPage(ctx context.Context, cursor, status, appID string, 
 }
 
 type RunFilter struct {
-	Status, AppID, Search string
+	Status, AppID, Search       string
 	CreatedAfter, CreatedBefore *time.Time
 }
 

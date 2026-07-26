@@ -517,9 +517,13 @@ func runFilter(r *http.Request) (store.RunFilter, error) {
 	filter := store.RunFilter{Status: r.URL.Query().Get("status"), AppID: r.URL.Query().Get("app_id"), Search: r.URL.Query().Get("search")}
 	for key, target := range map[string]**time.Time{"created_after": &filter.CreatedAfter, "created_before": &filter.CreatedBefore} {
 		value := strings.TrimSpace(r.URL.Query().Get(key))
-		if value == "" { continue }
+		if value == "" {
+			continue
+		}
 		parsed, err := time.Parse(time.RFC3339, value)
-		if err != nil { return store.RunFilter{}, fmt.Errorf("%s must be RFC3339", key) }
+		if err != nil {
+			return store.RunFilter{}, fmt.Errorf("%s must be RFC3339", key)
+		}
 		*target = &parsed
 	}
 	return filter, nil

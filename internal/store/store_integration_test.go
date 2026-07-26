@@ -57,16 +57,28 @@ func TestRunApprovalLifecycleIntegration(t *testing.T) {
 
 func TestMigrationsRecordImmutableLedgerIntegration(t *testing.T) {
 	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
-	if databaseURL == "" { t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage") }
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
 	ctx := context.Background()
 	st, err := Open(ctx, databaseURL)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(st.Close)
-	if err := st.Migrate(ctx); err != nil { t.Fatal(err) }
-	if err := st.Migrate(ctx); err != nil { t.Fatalf("second migration must be a no-op: %v", err) }
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatalf("second migration must be a no-op: %v", err)
+	}
 	var count int
-	if err := st.pool.QueryRow(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil { t.Fatal(err) }
-	if count != len(migrations) { t.Fatalf("migration ledger count=%d migrations=%d", count, len(migrations)) }
+	if err := st.pool.QueryRow(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != len(migrations) {
+		t.Fatalf("migration ledger count=%d migrations=%d", count, len(migrations))
+	}
 }
 
 func TestCreateRunWithInitialJobIsAtomicIntegration(t *testing.T) {
