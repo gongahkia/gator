@@ -2,6 +2,7 @@ local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local config = require("gator.config")
 
 assert(config.resolve().schema_version == config.schema_version, "default settings must resolve to the current schema")
+assert(config.resolve().ui.icons == "unicode", "Unicode alligator glyphs must be the default UI style")
 
 local path = helpers.tempdir("config") .. "/gator.json"
 helpers.write(path, '{"schema_version":2,"ui":{"layout":"modal"},"workspaces":{"mode":"worktree","max_write_runs":2}}')

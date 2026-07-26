@@ -19,7 +19,7 @@ local styles = {
 		selected = "🐊",
 	},
 	nerd_font = {
-		brand = "󰈸",
+		brand = "🐊",
 		task = "󰄬",
 		session = "",
 		context = "󰆨",

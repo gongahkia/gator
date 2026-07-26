@@ -11,8 +11,8 @@ assert(vim.api.nvim_get_current_win() == panel, "opening Gator must focus its pa
 assert(vim.api.nvim_win_get_buf(user_window) == user_buffer, "opening Gator must preserve the user buffer")
 local lines = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(panel), 0, -1, false)
 assert(
-	lines[1] == "Gator workspace"
-		and vim.tbl_contains(lines, "Tasks: empty · create or import a task to begin")
+	lines[1] == "🐊 Gator workspace"
+		and vim.tbl_contains(lines, "📋 Tasks: empty · create or import a task to begin")
 		and vim.tbl_contains(lines, "Actions:"),
 	"opening Gator must render the primary task/session/context/review workspace"
 )
@@ -21,7 +21,7 @@ assert(
 	"workspace layouts must resolve narrow and wide widths explicitly"
 )
 assert(
-	vim.tbl_contains(lines, "Layout: " .. ui.layout(vim.api.nvim_win_get_width(panel))),
+	vim.tbl_contains(lines, "📁 Layout: " .. ui.layout(vim.api.nvim_win_get_width(panel))),
 	"workspace must render its active layout"
 )
 assert(vim.fn.maparg("q", "n", false, true).buffer == 1, "workspace close must be keyboard-accessible")
