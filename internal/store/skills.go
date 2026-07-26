@@ -21,7 +21,7 @@ func (s *Store) UpsertSkillPackage(ctx context.Context, value domain.SkillPackag
 	}
 	var raw []byte
 	err = s.pool.QueryRow(ctx, `INSERT INTO skill_packages(digest,skill_id,version,name,description,manifest,path)
-VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(digest) DO UPDATE SET manifest=EXCLUDED.manifest
+VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(digest) DO UPDATE SET skill_id=EXCLUDED.skill_id,version=EXCLUDED.version,name=EXCLUDED.name,description=EXCLUDED.description,manifest=EXCLUDED.manifest,path=EXCLUDED.path
 RETURNING manifest,created_at`, value.Digest, value.ID, value.Version, value.Name, value.Description, manifest, value.Path).Scan(&raw, &value.CreatedAt)
 	if err != nil {
 		return domain.SkillPackage{}, err
@@ -39,13 +39,16 @@ func (s *Store) CreateSkillImport(ctx context.Context, value domain.SkillImport)
 	if value.SourceURI == "" || value.State == "" {
 		return domain.SkillImport{}, fmt.Errorf("invalid skill import")
 	}
+	if value.Mode != "native" && value.Mode != "adapted" {
+		return domain.SkillImport{}, fmt.Errorf("invalid skill import mode")
+	}
 	findings, err := json.Marshal(value.Findings)
 	if err != nil {
 		return domain.SkillImport{}, err
 	}
 	var raw []byte
-	err = s.pool.QueryRow(ctx, `INSERT INTO skill_imports(source_type,source_uri,source_ref,credential_env,digest,state,findings)
-VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,findings,activated_at,created_at`, value.SourceType, value.SourceURI, value.SourceRef, value.CredentialEnv, value.Digest, value.State, findings).Scan(&value.ID, &raw, &value.ActivatedAt, &value.CreatedAt)
+	err = s.pool.QueryRow(ctx, `INSERT INTO skill_imports(source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,findings)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,findings,activated_at,created_at`, value.SourceType, value.SourceURI, value.SourceRef, value.CredentialEnv, value.BundlePath, value.Mode, value.Digest, value.State, findings).Scan(&value.ID, &raw, &value.ActivatedAt, &value.CreatedAt)
 	if err != nil {
 		return domain.SkillImport{}, err
 	}
@@ -56,7 +59,7 @@ VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,findings,activated_at,created_at`, val
 }
 
 func (s *Store) SkillImports(ctx context.Context) ([]domain.SkillImport, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id,source_type,source_uri,source_ref,credential_env,digest,state,findings,activated_at,created_at FROM skill_imports ORDER BY id DESC`)
+	rows, err := s.pool.Query(ctx, `SELECT id,source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,findings,activated_at,created_at FROM skill_imports ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +76,7 @@ func (s *Store) SkillImports(ctx context.Context) ([]domain.SkillImport, error) 
 }
 
 func (s *Store) ActivateSkillImport(ctx context.Context, id int64) (domain.SkillImport, error) {
-	row := s.pool.QueryRow(ctx, `UPDATE skill_imports SET state='active',activated_at=now() WHERE id=$1 AND state='scanned' RETURNING id,source_type,source_uri,source_ref,credential_env,digest,state,findings,activated_at,created_at`, id)
+	row := s.pool.QueryRow(ctx, `UPDATE skill_imports SET state='active',activated_at=now() WHERE id=$1 AND state='scanned' RETURNING id,source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,findings,activated_at,created_at`, id)
 	return scanSkillImport(row)
 }
 
@@ -135,7 +138,7 @@ func (s *Store) RunSkills(ctx context.Context, runID string) ([]domain.SkillPack
 func scanSkillImport(row interface{ Scan(...any) error }) (domain.SkillImport, error) {
 	var value domain.SkillImport
 	var raw []byte
-	err := row.Scan(&value.ID, &value.SourceType, &value.SourceURI, &value.SourceRef, &value.CredentialEnv, &value.Digest, &value.State, &raw, &value.ActivatedAt, &value.CreatedAt)
+	err := row.Scan(&value.ID, &value.SourceType, &value.SourceURI, &value.SourceRef, &value.CredentialEnv, &value.BundlePath, &value.Mode, &value.Digest, &value.State, &raw, &value.ActivatedAt, &value.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.SkillImport{}, ErrNotFound
 	}

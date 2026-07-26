@@ -172,6 +172,8 @@ CREATE TABLE IF NOT EXISTS skill_imports (
   source_uri TEXT NOT NULL,
   source_ref TEXT NOT NULL DEFAULT '',
   credential_env TEXT NOT NULL DEFAULT '',
+	bundle_path TEXT NOT NULL DEFAULT '',
+	mode TEXT NOT NULL DEFAULT 'native',
   digest TEXT NOT NULL DEFAULT '',
   state TEXT NOT NULL,
   findings JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -303,6 +305,8 @@ ALTER TABLE runs ADD COLUMN IF NOT EXISTS public_ingress BOOLEAN NOT NULL DEFAUL
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS max_fixes INT NOT NULL DEFAULT 2;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS parent_run_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS architecture JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS bundle_path TEXT NOT NULL DEFAULT '';
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'native';
 UPDATE runs SET deployment_target='docker' WHERE deployment_target IS NULL OR deployment_target='';
 UPDATE runs SET architecture=jsonb_build_object(
   'app_name','Generated app','app_type',profile,'stack','[]'::jsonb,'integrations','[]'::jsonb,
@@ -369,6 +373,17 @@ func (s *Store) ListRuns(ctx context.Context) ([]domain.Run, error) {
 		runs = append(runs, run)
 	}
 	return runs, rows.Err()
+}
+
+func (s *Store) DeleteRun(ctx context.Context, id string) error {
+	result, err := s.pool.Exec(ctx, `DELETE FROM runs WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) Events(ctx context.Context, runID string, afterID int64) ([]domain.Event, error) {

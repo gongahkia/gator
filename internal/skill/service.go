@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	maxSkillFiles = 128
-	maxSkillBytes = 10 << 20
-	maxFileBytes  = 1 << 20
+	maxSkillFiles      = 128
+	maxSkillBytes      = 10 << 20
+	maxFileBytes       = 1 << 20
+	maxSkillsPerImport = 64
 )
 
 type ImportInput struct {
@@ -34,6 +35,23 @@ type ImportInput struct {
 	SourceURI     string `json:"source_uri"`
 	SourceRef     string `json:"source_ref"`
 	CredentialEnv string `json:"credential_env"`
+	Mode          string `json:"mode"`
+}
+
+type RejectedSkill struct {
+	Path  string `json:"path"`
+	Error string `json:"error"`
+}
+
+type ImportResult struct {
+	Imports  []domain.SkillImport  `json:"imports"`
+	Packages []domain.SkillPackage `json:"packages"`
+	Rejected []RejectedSkill       `json:"rejected"`
+}
+
+type discoveredSkill struct {
+	Root string
+	Path string
 }
 
 type Service struct {
@@ -47,19 +65,33 @@ func New(st *store.Store, artifactsDir string) *Service {
 }
 
 func (s *Service) Import(ctx context.Context, input ImportInput) (domain.SkillImport, domain.SkillPackage, error) {
-	input.SourceType, input.SourceURI, input.SourceRef, input.CredentialEnv = strings.TrimSpace(input.SourceType), strings.TrimSpace(input.SourceURI), strings.TrimSpace(input.SourceRef), strings.TrimSpace(input.CredentialEnv)
+	result, err := s.ImportAll(ctx, input)
+	if err != nil {
+		return domain.SkillImport{}, domain.SkillPackage{}, err
+	}
+	return result.Imports[0], result.Packages[0], nil
+}
+
+func (s *Service) ImportAll(ctx context.Context, input ImportInput) (ImportResult, error) {
+	input.SourceType, input.SourceURI, input.SourceRef, input.CredentialEnv, input.Mode = strings.TrimSpace(input.SourceType), strings.TrimSpace(input.SourceURI), strings.TrimSpace(input.SourceRef), strings.TrimSpace(input.CredentialEnv), strings.ToLower(strings.TrimSpace(input.Mode))
 	if input.SourceType != "git" && input.SourceType != "oci" {
-		return domain.SkillImport{}, domain.SkillPackage{}, fmt.Errorf("source_type must be git or oci")
+		return ImportResult{}, fmt.Errorf("source_type must be git or oci")
 	}
 	if input.SourceURI == "" {
-		return domain.SkillImport{}, domain.SkillPackage{}, fmt.Errorf("source_uri is required")
+		return ImportResult{}, fmt.Errorf("source_uri is required")
 	}
 	if input.CredentialEnv != "" && !validEnvName(input.CredentialEnv) {
-		return domain.SkillImport{}, domain.SkillPackage{}, fmt.Errorf("credential_env is invalid")
+		return ImportResult{}, fmt.Errorf("credential_env is invalid")
+	}
+	if input.Mode == "" {
+		input.Mode = "auto"
+	}
+	if input.Mode != "auto" && input.Mode != "native" && input.Mode != "adapted" {
+		return ImportResult{}, fmt.Errorf("mode must be auto, native, or adapted")
 	}
 	temporary, err := os.MkdirTemp("", "norbot-skill-")
 	if err != nil {
-		return domain.SkillImport{}, domain.SkillPackage{}, err
+		return ImportResult{}, err
 	}
 	defer os.RemoveAll(temporary)
 	root := filepath.Join(temporary, "bundle")
@@ -70,26 +102,42 @@ func (s *Service) Import(ctx context.Context, input ImportInput) (domain.SkillIm
 		err = s.materializeOCI(ctx, root, input)
 	}
 	if err != nil {
-		return domain.SkillImport{}, domain.SkillPackage{}, err
+		return ImportResult{}, err
 	}
-	pkg, findings, err := inspect(root)
+	candidates, err := discoverSkills(root)
 	if err != nil {
-		return domain.SkillImport{}, domain.SkillPackage{}, err
+		return ImportResult{}, err
 	}
-	destination := filepath.Join(s.artifactsDir, strings.TrimPrefix(pkg.Digest, "sha256:"))
-	if err := copyBundle(root, destination); err != nil {
-		return domain.SkillImport{}, domain.SkillPackage{}, err
+	result := ImportResult{}
+	for _, candidate := range candidates {
+		pkg, findings, mode, err := inspectCandidate(candidate, input)
+		if err != nil {
+			result.Rejected = append(result.Rejected, RejectedSkill{Path: candidate.Path, Error: err.Error()})
+			continue
+		}
+		destination := filepath.Join(s.artifactsDir, strings.TrimPrefix(pkg.Digest, "sha256:"))
+		if err := copyBundle(candidate.Root, destination); err != nil {
+			return ImportResult{}, err
+		}
+		pkg.Path = destination
+		pkg, err = s.store.UpsertSkillPackage(ctx, pkg)
+		if err != nil {
+			return ImportResult{}, err
+		}
+		imported, err := s.store.CreateSkillImport(ctx, domain.SkillImport{SourceType: input.SourceType, SourceURI: input.SourceURI, SourceRef: input.SourceRef, CredentialEnv: input.CredentialEnv, BundlePath: candidate.Path, Mode: mode, Digest: pkg.Digest, State: "scanned", Findings: findings})
+		if err != nil {
+			return ImportResult{}, err
+		}
+		result.Imports = append(result.Imports, imported)
+		result.Packages = append(result.Packages, pkg)
 	}
-	pkg.Path = destination
-	pkg, err = s.store.UpsertSkillPackage(ctx, pkg)
-	if err != nil {
-		return domain.SkillImport{}, domain.SkillPackage{}, err
+	if len(result.Imports) == 0 {
+		if len(result.Rejected) > 0 {
+			return ImportResult{}, fmt.Errorf("no safe skill bundles found: %s", result.Rejected[0].Error)
+		}
+		return ImportResult{}, fmt.Errorf("no SKILL.md files found")
 	}
-	imported, err := s.store.CreateSkillImport(ctx, domain.SkillImport{SourceType: input.SourceType, SourceURI: input.SourceURI, SourceRef: input.SourceRef, CredentialEnv: input.CredentialEnv, Digest: pkg.Digest, State: "scanned", Findings: findings})
-	if err != nil {
-		return domain.SkillImport{}, domain.SkillPackage{}, err
-	}
-	return imported, pkg, nil
+	return result, nil
 }
 
 func (s *Service) Activate(ctx context.Context, id int64) (domain.SkillImport, error) {
@@ -120,7 +168,11 @@ func materializeGit(ctx context.Context, root string, input ImportInput) error {
 	}
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("clone skill source: %s", strings.TrimSpace(string(output)))
+		detail := strings.TrimSpace(string(output))
+		if detail == "" {
+			detail = err.Error()
+		}
+		return fmt.Errorf("clone skill source: %s", detail)
 	}
 	return os.RemoveAll(filepath.Join(root, ".git"))
 }
@@ -286,7 +338,40 @@ func parseOCI(uri, ref string) (string, string, string, error) {
 	return registry, remainder, ref, nil
 }
 
+func discoverSkills(root string) ([]discoveredSkill, error) {
+	candidates := []discoveredSkill{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !info.Mode().IsRegular() || !strings.EqualFold(info.Name(), "skill.md") {
+			return nil
+		}
+		if len(candidates) >= maxSkillsPerImport {
+			return fmt.Errorf("skill source exceeds %d discovered skills", maxSkillsPerImport)
+		}
+		bundleRoot := filepath.Dir(path)
+		relative, err := filepath.Rel(root, bundleRoot)
+		if err != nil || strings.HasPrefix(relative, "..") {
+			return fmt.Errorf("unsafe skill path")
+		}
+		candidates = append(candidates, discoveredSkill{Root: bundleRoot, Path: filepath.ToSlash(relative)})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].Path < candidates[j].Path })
+	return candidates, nil
+}
+
 func inspect(root string) (domain.SkillPackage, map[string]any, error) {
+	pkg, findings, _, err := inspectCandidate(discoveredSkill{Root: root, Path: "."}, ImportInput{Mode: "native"})
+	return pkg, findings, err
+}
+
+func inspectCandidate(candidate discoveredSkill, input ImportInput) (domain.SkillPackage, map[string]any, string, error) {
+	root := candidate.Root
 	files := map[string][]byte{}
 	total := int64(0)
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -324,10 +409,20 @@ func inspect(root string) (domain.SkillPackage, map[string]any, error) {
 		return nil
 	})
 	if err != nil {
-		return domain.SkillPackage{}, nil, err
+		return domain.SkillPackage{}, nil, "", err
 	}
-	if len(files["SKILL.md"]) == 0 || len(files["skill.json"]) == 0 {
-		return domain.SkillPackage{}, nil, fmt.Errorf("skill requires SKILL.md and skill.json")
+	skillPath, skillBody := matchingFile(files, "skill.md")
+	if skillPath == "" || len(skillBody) == 0 {
+		return domain.SkillPackage{}, nil, "", fmt.Errorf("skill requires SKILL.md")
+	}
+	manifestPath, manifestBody := matchingFile(files, "skill.json")
+	mode := input.Mode
+	if mode == "auto" {
+		if manifestPath != "" {
+			mode = "native"
+		} else {
+			mode = "adapted"
+		}
 	}
 	var manifest struct {
 		ID          string           `json:"id"`
@@ -336,16 +431,47 @@ func inspect(root string) (domain.SkillPackage, map[string]any, error) {
 		Description string           `json:"description"`
 		Tools       []map[string]any `json:"tools"`
 	}
-	if err := json.Unmarshal(files["skill.json"], &manifest); err != nil {
-		return domain.SkillPackage{}, nil, fmt.Errorf("invalid skill.json: %w", err)
-	}
-	if manifest.ID == "" || manifest.Version == "" || manifest.Name == "" {
-		return domain.SkillPackage{}, nil, fmt.Errorf("skill.json requires id, version, name")
-	}
-	for _, tool := range manifest.Tools {
-		if tool["id"] == nil || tool["kind"] == nil {
-			return domain.SkillPackage{}, nil, fmt.Errorf("skill tool requires id and kind")
+	metadata := map[string]any{}
+	if mode == "native" {
+		if manifestPath == "" {
+			return domain.SkillPackage{}, nil, "", fmt.Errorf("native skill requires skill.json")
 		}
+		if err := json.Unmarshal(manifestBody, &manifest); err != nil {
+			return domain.SkillPackage{}, nil, "", fmt.Errorf("invalid skill.json: %w", err)
+		}
+		if manifest.ID == "" || manifest.Version == "" || manifest.Name == "" {
+			return domain.SkillPackage{}, nil, "", fmt.Errorf("skill.json requires id, version, name")
+		}
+		for _, tool := range manifest.Tools {
+			if tool["id"] == nil || tool["kind"] == nil {
+				return domain.SkillPackage{}, nil, "", fmt.Errorf("skill tool requires id and kind")
+			}
+		}
+		if err := json.Unmarshal(manifestBody, &metadata); err != nil {
+			return domain.SkillPackage{}, nil, "", err
+		}
+	} else {
+		frontmatter := markdownFrontmatter(skillBody)
+		manifest.ID = "adapted-" + skillSlug(input.SourceURI+"-"+candidate.Path)
+		manifest.Version = frontmatter["version"]
+		if manifest.Version == "" {
+			manifest.Version = input.SourceRef
+		}
+		if manifest.Version == "" {
+			manifest.Version = "unversioned"
+		}
+		manifest.Name = frontmatter["name"]
+		if manifest.Name == "" {
+			manifest.Name = strings.ReplaceAll(filepath.Base(candidate.Path), "-", " ")
+			if candidate.Path == "." {
+				manifest.Name = skillSlug(input.SourceURI)
+			}
+		}
+		manifest.Description = frontmatter["description"]
+		if manifest.Description == "" {
+			manifest.Description = "Adapted external skill instructions."
+		}
+		metadata = map[string]any{"frontmatter": frontmatter, "tools": []any{}, "capabilities": []any{}}
 	}
 	keys := make([]string, 0, len(files))
 	for key := range files {
@@ -360,11 +486,58 @@ func inspect(root string) (domain.SkillPackage, map[string]any, error) {
 		_, _ = hash.Write([]byte{0})
 	}
 	digest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
-	metadata := map[string]any{}
-	if err := json.Unmarshal(files["skill.json"], &metadata); err != nil {
-		return domain.SkillPackage{}, nil, err
+	metadata["mode"] = mode
+	metadata["source_path"] = candidate.Path
+	metadata["skill_file"] = skillPath
+	findings := map[string]any{"status": "pass", "file_count": len(files), "bytes": total, "digest": digest, "validator": "skill-v2", "mode": mode, "path": candidate.Path, "name": manifest.Name, "id": manifest.ID, "version": manifest.Version}
+	return domain.SkillPackage{Digest: digest, ID: manifest.ID, Version: manifest.Version, Name: manifest.Name, Description: manifest.Description, Manifest: metadata}, findings, mode, nil
+}
+
+func matchingFile(files map[string][]byte, target string) (string, []byte) {
+	for path, body := range files {
+		if strings.EqualFold(path, target) {
+			return path, body
+		}
 	}
-	return domain.SkillPackage{Digest: digest, ID: manifest.ID, Version: manifest.Version, Name: manifest.Name, Description: manifest.Description, Manifest: metadata}, map[string]any{"status": "pass", "file_count": len(files), "bytes": total, "digest": digest, "validator": "skill-v1"}, nil
+	return "", nil
+}
+
+func markdownFrontmatter(body []byte) map[string]string {
+	text := strings.ReplaceAll(string(body), "\r\n", "\n")
+	if !strings.HasPrefix(text, "---\n") {
+		return map[string]string{}
+	}
+	end := strings.Index(text[4:], "\n---")
+	if end < 0 {
+		return map[string]string{}
+	}
+	values := map[string]string{}
+	for _, line := range strings.Split(text[4:4+end], "\n") {
+		key, value, ok := strings.Cut(line, ":")
+		if ok && strings.TrimSpace(key) != "" {
+			values[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), "\"'")
+		}
+	}
+	return values
+}
+
+func skillSlug(value string) string {
+	var builder strings.Builder
+	previousDash := false
+	for _, runeValue := range strings.ToLower(value) {
+		if runeValue >= 'a' && runeValue <= 'z' || runeValue >= '0' && runeValue <= '9' {
+			builder.WriteRune(runeValue)
+			previousDash = false
+		} else if !previousDash {
+			builder.WriteByte('-')
+			previousDash = true
+		}
+	}
+	value = strings.Trim(builder.String(), "-")
+	if value == "" {
+		return "external-skill"
+	}
+	return value[:min(len(value), 96)]
 }
 
 func copyBundle(source, destination string) error {

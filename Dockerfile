@@ -14,7 +14,7 @@ COPY --from=web-build /web/dist ./internal/web/dist
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/norbot ./cmd/norbot
 
 FROM alpine:3.21
-RUN apk add --no-cache docker-cli ca-certificates
+RUN apk add --no-cache docker-cli git ca-certificates
 COPY --from=build /out/norbot /usr/local/bin/norbot
 EXPOSE 8080
 ENTRYPOINT ["norbot"]

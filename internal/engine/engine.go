@@ -322,6 +322,25 @@ func (s *Service) Cleanup(ctx context.Context, runID string) error {
 	return s.store.RecordEvent(ctx, runID, "run_cleanup_completed", "Pinned workspace and deployment cleaned; host artifacts retained", map[string]any{"deployment_target": run.DeploymentTarget})
 }
 
+func (s *Service) DeleteRun(ctx context.Context, runID string) error {
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+	if !run.Status.Terminal() {
+		return fmt.Errorf("cancel an active run before removing it")
+	}
+	workspace, deployment, err := s.backendForRun(ctx, run)
+	if err != nil {
+		return err
+	}
+	_ = deployment.Delete(ctx, runID, workspace.RunPath(runID))
+	if err := workspace.Cleanup(ctx, runID); err != nil {
+		return err
+	}
+	return s.store.DeleteRun(ctx, runID)
+}
+
 func (s *Service) DeploymentStatus(ctx context.Context, runID string) (DeploymentInfo, error) {
 	run, err := s.store.GetRun(ctx, runID)
 	if err != nil {
@@ -918,7 +937,7 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		for _, skill := range skills {
 			entries = append(entries, skill.Name+"@"+skill.Version+" ("+skill.Digest+")")
 		}
-		base += "Approved declarative skills: " + strings.Join(entries, ", ") + ". Their materialized manifests are under /workspace/selected-skills.\n"
+		base += "Approved skills: " + strings.Join(entries, ", ") + ". Their materialized instructions and manifest are under /workspace/selected-skills.\n"
 	}
 	if isCLI && stage == domain.StageBuilder {
 		return base + "The approved baseline is in /workspace/generated-app. Modify only that directory, then return a concise summary."

@@ -117,11 +117,14 @@ func (s *Service) checkRuntime(ctx context.Context) domain.HealthCheck {
 
 func (s *Service) checkProvider(ctx context.Context, id, baseURL, credentialEnv, kind string) domain.HealthCheck {
 	started := time.Now()
-	if kind == "plugin" || kind == "cli" {
+	if kind == "plugin" {
 		return okCheck("provider:"+id, true, "locally configured", started, map[string]any{"kind": kind})
 	}
-	if strings.TrimSpace(os.Getenv(credentialEnv)) == "" {
+	if credentialEnv != "" && strings.TrimSpace(os.Getenv(credentialEnv)) == "" {
 		return domain.HealthCheck{ID: "provider:" + id, State: domain.HealthDown, Critical: true, LatencyMS: time.Since(started).Milliseconds(), Message: "credential env is unset", Diagnostics: map[string]any{"credential_env": credentialEnv}, CheckedAt: time.Now().UTC()}
+	}
+	if kind == "cli" {
+		return okCheck("provider:"+id, true, "runner and credential configured", started, map[string]any{"kind": kind, "credential_env": credentialEnv})
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodHead, baseURL, nil)
 	if err != nil {

@@ -102,6 +102,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{id}/approval", s.approve)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.cancel)
 	mux.HandleFunc("POST /api/runs/{id}/cleanup", s.cleanup)
+	mux.HandleFunc("DELETE /api/runs/{id}", s.deleteRun)
 	mux.HandleFunc("GET /api/runs/{id}/deployment", s.deploymentStatus)
 	mux.HandleFunc("GET /api/runs/{id}/deployment/logs", s.deploymentLogs)
 	mux.HandleFunc("POST /api/runs/{id}/deployment/start", s.startDeployment)
@@ -165,12 +166,12 @@ func (s *Server) importSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	imported, pkg, err := s.skills.Import(r.Context(), input)
+	result, err := s.skills.ImportAll(r.Context(), input)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"import": imported, "package": pkg})
+	writeJSON(w, http.StatusCreated, result)
 }
 
 func (s *Server) activateSkill(w http.ResponseWriter, r *http.Request) {
@@ -666,6 +667,18 @@ func (s *Server) cleanup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleaned"})
+}
+
+func (s *Server) deleteRun(w http.ResponseWriter, r *http.Request) {
+	if err := s.service.DeleteRun(r.Context(), r.PathValue("id")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, err)
+			return
+		}
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) deploymentStatus(w http.ResponseWriter, r *http.Request) {

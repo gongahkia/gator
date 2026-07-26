@@ -22,7 +22,9 @@ The example config disables remote artifact storage and managed sandbox HTTP wri
 
 Builder responses are stored as immutable, digest-checked code/fix proposals. Code approval applies a proposal, deterministic test output becomes a second approval gate, and failed tests require an explicit `fix` action; `workflow.max_fixes` defaults to `2`. `GET /api/runs/{id}/revisions`, `/usage`, and `/skills` expose patch/report, reported-or-estimated token usage, and selected-skill provenance.
 
-Marketplace imports accept HTTPS Git and OCI bundles containing `SKILL.md` and `skill.json`. Imports are copied into Norbot-managed storage by SHA-256 digest, reject executable/unsafe archives, remain `scanned` until an operator activates them, and can be selected with `skill_digests` when creating a run. Private source credentials are environment-variable references only.
+Skill imports accept HTTPS Git and OCI sources. Norbot recursively discovers every `SKILL.md` (up to 64 per source) and creates one independently scanned import for each directory. In `auto` mode, a directory with `skill.json` is imported as a native declarative bundle; any other `SKILL.md` is imported as an adapted read-only instruction bundle, with its identity and metadata derived from frontmatter and source path. `native` mode requires `skill.json`; `adapted` mode deliberately ignores manifests and derives metadata for every discovered skill.
+
+Each candidate is independently limited to 128 regular non-executable files, 1 MiB per file, and 10 MiB total. Imports are copied into Norbot-managed storage by SHA-256 digest, stay `scanned` until explicitly activated, and only activated digests can be selected when creating a run. Adapted imports declare no executable tools or capabilities: their source files are available as read-only instructions only. Private source credentials are environment-variable references only.
 
 `norbot health` prints detailed health and returns nonzero only for a critical down dependency; `norbot health --json`, `GET /api/health/detail`, `/api/health/stream`, and the web console provide the same redacted diagnostics.
 
@@ -86,7 +88,7 @@ Configure provider API keys in `.env`; add CLI providers with isolated runner im
 - `POST /api/runs/{id}/change-runs` creates a linked architecture revision cycle; `GET /api/apps` lists deployed applications.
 - `POST /api/runs/{id}/approval` approves, revises, explicitly starts a fix, retries, or abandons a run.
 - `GET /api/health`, `/api/health/detail`, `/api/health/stream`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
-- `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the verified declarative skill catalog.
+- `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the scanned native/adapted skill catalog.
 - `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.
 - `GET /api/agent/actions` and `POST /api/agent/actions/{id}/decision` expose central, durable tool approvals; a decision resumes its exact persisted turn once.
 - `GET /api/runtime` returns the default target and Kubernetes/ingress availability for web-console onboarding.

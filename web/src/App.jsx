@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import "./gnome.css";
 
-const NAV = [["create", "Create"], ["runs", "Runs"], ["apps", "Apps"], ["skills", "Skills"], ["channels", "Channels"], ["actions", "Agent actions"], ["capacity", "Capacity"], ["health", "Health"]];
+const NAV = [["runs", "Runs"], ["apps", "Apps"], ["skills", "Skills"], ["channels", "Channels"], ["actions", "Agent actions"], ["capacity", "Capacity"], ["health", "Health"]];
 const STAGES = [["planner", "Plan"], ["builder", "Build"], ["verifier", "Verify"], ["deployer", "Deploy"]];
 const ONBOARDING_KEY = "norbot.onboarding.v1";
 
@@ -79,51 +80,57 @@ function useAuth() {
     } catch (cause) { setError(cause.message); }
   }, [config]);
   const logout = useCallback(() => setToken(""), []);
-  return { config, token, error, login, logout };
+  const clearError = useCallback(() => setError(""), []);
+  return { config, token, error, login, logout, clearError };
 }
 
 function useAPI(token, logout) {
   return useCallback(async (path, options = {}) => {
-    const headers = { ...jsonHeaders, ...(options.headers || {}) };
+    const { allowError, ...request } = options; const headers = { ...jsonHeaders, ...(request.headers || {}) };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const response = await fetch(path, { ...options, headers });
+    const response = await fetch(path, { ...request, headers });
     if (response.status === 401) { logout(); throw new Error("Your session expired. Sign in again."); }
     const text = await response.text();
     const value = text ? JSON.parse(text) : null;
-    if (!response.ok) throw new Error(value?.error || `Request failed (${response.status})`);
-    return value;
+    if (!response.ok && !allowError) throw new Error(value?.error || `Request failed (${response.status})`);
+    return allowError ? { status: response.status, value } : value;
   }, [token, logout]);
 }
 
 function AuthGate({ auth, children }) {
-  if (!auth.config) return <main className="center"><p>Loading Norbot…</p></main>;
-  if (auth.config.enabled && !auth.token) return <main className="center"><section className="login"><p className="eyebrow">Norbot operator console</p><h1>Sign in to continue</h1><p>Use your operator identity to review and approve app-building work.</p>{auth.error && <p className="error">{auth.error}</p>}<button onClick={auth.login}>Sign in with OIDC</button></section></main>;
+  const errors = auth.error ? [{ id: "auth", message: auth.error, tone: "error" }] : [];
+  if (!auth.config) return <><main className="center"><p>Loading Norbot…</p></main><GnomeToasts toasts={errors} onboarding={false} onDismiss={auth.clearError}/></>;
+  if (auth.config.enabled && !auth.token) return <><main className="center"><section className="login"><p className="eyebrow">Norbot operator console</p><h1>Sign in to continue</h1><p>Use your operator identity to review and approve app-building work.</p><button onClick={auth.login}>Sign in with OIDC</button></section></main><GnomeToasts toasts={errors} onboarding={false} onDismiss={auth.clearError}/></>;
   return children;
 }
 
 function App() {
   const auth = useAuth();
   const api = useAPI(auth.token, auth.logout);
-  const [page, setPage] = useState("create");
+  const [page, setPage] = useState("runs");
   const [runs, setRuns] = useState([]);
   const [apps, setApps] = useState([]);
   const [selectedID, setSelectedID] = useState("");
   const [details, setDetails] = useState({ events: [], revisions: [], usage: [], skills: [], deployment: null });
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
+  const [toasts, setToasts] = useState([]);
   const [busy, setBusy] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem(ONBOARDING_KEY) !== "seen");
-  const selected = useMemo(() => runs.find((run) => run.id === selectedID) || runs[0], [runs, selectedID]);
+  const notify = useCallback((message, tone = "notice") => {
+    const text = String(message || "").trim();
+    if (!text) return;
+    setToasts((current) => [...current.slice(-3), { id: `${Date.now()}-${Math.random()}`, message: text, tone }]);
+  }, []);
+  const dismissToast = useCallback((id) => setToasts((current) => current.filter((toast) => toast.id !== id)), []);
+  const selected = useMemo(() => runs.find((run) => run.id === selectedID) || null, [runs, selectedID]);
   const loadRuns = useCallback(async () => {
     try {
       const value = await api("/api/runs");
       setRuns(value);
-      setSelectedID((current) => current || value[0]?.id || "");
-    } catch (cause) { setError(cause.message); }
-  }, [api]);
+    } catch (cause) { notify(cause.message, "error"); }
+  }, [api, notify]);
   const loadApps = useCallback(async () => {
-    try { setApps(await api("/api/apps")); } catch (cause) { setError(cause.message); }
-  }, [api]);
+    try { setApps(await api("/api/apps")); } catch (cause) { notify(cause.message, "error"); }
+  }, [api, notify]);
   const loadDetails = useCallback(async (run) => {
     if (!run?.id) return;
     const runID = run.id;
@@ -134,32 +141,33 @@ function App() {
       const [revisions, usage, skills] = await Promise.all(requests);
       const deployment = run.stage === "deployer" || run.status === "completed" ? await api(`/api/runs/${runID}/deployment`).catch(() => null) : null;
       setDetails((current) => ({ ...current, revisions, usage, skills, deployment }));
-    } catch (cause) { setError(cause.message); }
-  }, [api]);
+    } catch (cause) { notify(cause.message, "error"); }
+  }, [api, notify]);
   useEffect(() => { if (!auth.config || auth.config.enabled && !auth.token) return; loadRuns(); loadApps(); }, [auth.config, auth.token, loadRuns, loadApps]);
   useEffect(() => { loadDetails(selected); }, [selected, loadDetails]);
   const setEvents = useCallback((events) => setDetails((current) => ({ ...current, events })), []);
-  useRunEvents(selected?.id, auth.token, setEvents, setError);
-  const act = async (action) => {
-    setBusy(true); setError("");
-    try { const value = await action(); setNotice("Saved."); await loadRuns(); await loadApps(); if (selected) await loadDetails(selected); return value; }
-    catch (cause) { setError(cause.message); return null; } finally { setBusy(false); }
+  useRunEvents(selected?.id, auth.token, setEvents, notify);
+  const act = async (action, success) => {
+    setBusy(true);
+    try { const value = await action(); await loadRuns(); await loadApps(); if (success) notify(success); return value; }
+    catch (cause) { notify(cause.message, "error"); return null; } finally { setBusy(false); }
   };
   const createRun = (input) => act(async () => {
     const run = await api("/api/runs", { method: "POST", body: JSON.stringify(input) });
-    setSelectedID(run.id); setPage("runs"); return run;
-  });
-  const approve = (input) => act(() => api(`/api/runs/${selected.id}/approval`, { method: "POST", body: JSON.stringify(input) }));
-  const updateArchitecture = (architecture) => act(() => api(`/api/runs/${selected.id}/architecture`, { method: "PUT", body: JSON.stringify(architecture) }));
-  const start = (runID) => act(() => api(`/api/runs/${runID}/deployment/start`, { method: "POST" }));
-  const stop = (runID) => act(() => api(`/api/runs/${runID}/deployment/stop`, { method: "POST" }));
-  const destroy = (runID) => act(() => api(`/api/runs/${runID}/deployment`, { method: "DELETE" }));
-  const changeRun = (runID, change) => act(async () => { const run = await api(`/api/runs/${runID}/change-runs`, { method: "POST", body: JSON.stringify({ change }) }); setSelectedID(run.id); setPage("runs"); return run; });
+    setSelectedID(""); setPage("runs"); return run;
+  }, "Plan created.");
+  const approve = (runID, input) => act(() => api(`/api/runs/${runID}/approval`, { method: "POST", body: JSON.stringify(input) }), input.action === "retry" ? "Stage retry queued." : input.action === "revise" ? "Revision requested." : input.action === "fix" ? "Bounded fix approved." : "Approval recorded.");
+  const updateArchitecture = (architecture) => act(() => api(`/api/runs/${selected.id}/architecture`, { method: "PUT", body: JSON.stringify(architecture) }), "Architecture saved.");
+  const start = (runID) => act(() => api(`/api/runs/${runID}/deployment/start`, { method: "POST" }), "Application started.");
+  const stop = (runID) => act(() => api(`/api/runs/${runID}/deployment/stop`, { method: "POST" }), "Application stopped.");
+  const destroy = (runID) => act(() => api(`/api/runs/${runID}/deployment`, { method: "DELETE" }), "Deployment deleted.");
+  const removeRun = (runID) => act(() => api(`/api/runs/${runID}`, { method: "DELETE" }), "Run removed.");
+  const changeRun = (runID, change) => act(async () => { const run = await api(`/api/runs/${runID}/change-runs`, { method: "POST", body: JSON.stringify({ change }) }); setSelectedID(""); setPage("runs"); return run; }, "Change run created.");
   const dismissOnboarding = () => { localStorage.setItem(ONBOARDING_KEY, "seen"); setShowOnboarding(false); };
-  return <AuthGate auth={auth}><div className="app-shell"><aside><div className="brand">Norbot<span>operator console</span></div><nav>{NAV.map(([id, label]) => <button key={id} className={page === id ? "active" : ""} onClick={() => setPage(id)}>{label}</button>)}</nav><div className="aside-footer">{auth.config?.enabled && <button className="quiet" onClick={auth.logout}>Sign out</button>}<p>{plural(runs.length, "run")}</p></div></aside><main className="main"><header><div><p className="eyebrow">{NAV.find(([id]) => id === page)?.[1]}</p><h1>{page === "create" ? "Build an application" : page === "runs" ? "Review workflow" : page}</h1></div><button className="quiet" onClick={() => { loadRuns(); loadApps(); }}>Refresh</button></header>{notice && <p className="notice">{notice}</p>}{error && <p className="error">{error}</p>}{page === "create" && <CreatePage busy={busy} onCreate={createRun} />}{page === "runs" && <RunsPage runs={runs} selected={selected} details={details} busy={busy} onSelect={(id) => setSelectedID(id)} onApprove={approve} onUpdateArchitecture={updateArchitecture} onChange={changeRun} onCancel={() => act(() => api(`/api/runs/${selected.id}/cancel`, { method: "POST" }))} />}{page === "apps" && <AppsPage apps={apps} busy={busy} onStart={start} onStop={stop} onDelete={destroy} onChange={changeRun} />}{page === "skills" && <SkillsPage api={api} act={act} />}{page === "channels" && <ChannelsPage api={api} act={act} runs={runs} />}{page === "actions" && <ActionsPage api={api} act={act} />}{page === "capacity" && <CapacityPage api={api} act={act} />}{page === "health" && <HealthPage api={api} />}</main>{showOnboarding && <OnboardingDialog onDismiss={dismissOnboarding}/>}</div></AuthGate>;
+  return <AuthGate auth={auth}><div className="app-shell"><aside><div className="brand">Norbot<span>operator console</span></div><nav>{NAV.map(([id, label]) => <button key={id} className={page === id ? "active" : ""} onClick={() => setPage(id)}>{label}</button>)}</nav><div className="aside-footer">{auth.config?.enabled && <button className="quiet" onClick={auth.logout}>Sign out</button>}<p>{plural(runs.length, "run")}</p></div></aside><main className="main"><header><div><p className="eyebrow">{page === "create" ? "New run" : NAV.find(([id]) => id === page)?.[1]}</p><h1>{page === "create" ? "Build an application" : page === "runs" ? "Runs" : page}</h1></div><button className="quiet" onClick={() => { loadRuns(); loadApps(); }}>Refresh</button></header>{page === "create" && <CreatePage api={api} busy={busy} notify={notify} onCreate={createRun} onBack={() => setPage("runs")} />}{page === "runs" && <RunsPage runs={runs} selected={selected} details={details} busy={busy} onCreate={() => setPage("create")} onSelect={(id) => setSelectedID((current) => current === id ? "" : id)} onExpand={setSelectedID} onApprove={approve} onUpdateArchitecture={updateArchitecture} onChange={changeRun} onCancel={(runID) => act(() => api(`/api/runs/${runID}/cancel`, { method: "POST" }), "Run cancelled.")} onRemove={removeRun} />}{page === "apps" && <AppsPage apps={apps} busy={busy} onStart={start} onStop={stop} onDelete={destroy} onChange={changeRun} />}{page === "skills" && <SkillsPage api={api} act={act} notify={notify} />}{page === "channels" && <ChannelsPage api={api} act={act} runs={runs} notify={notify} />}{page === "actions" && <ActionsPage api={api} act={act} notify={notify} />}{page === "capacity" && <CapacityPage api={api} act={act} notify={notify} />}{page === "health" && <HealthPage api={api} notify={notify} />}</main><GnomeToasts toasts={toasts} onboarding={showOnboarding} onDismiss={dismissToast} onDismissOnboarding={dismissOnboarding}/></div></AuthGate>;
 }
 
-function useRunEvents(runID, token, setEvents, setError) {
+function useRunEvents(runID, token, setEvents, notify) {
   useEffect(() => {
     if (!runID) return undefined;
     const controller = new AbortController();
@@ -175,28 +183,44 @@ function useRunEvents(runID, token, setEvents, setError) {
           blocks.forEach((block) => { const raw = block.split("\n").find((line) => line.startsWith("data: "))?.slice(6); if (raw) { try { received.push(JSON.parse(raw)); } catch {} } });
           if (received.length) setEvents([...received]);
         }
-      } catch (cause) { if (!controller.signal.aborted) setError(cause.message); }
+      } catch (cause) { if (!controller.signal.aborted) notify(cause.message, "warning"); }
     };
     connect(); return () => controller.abort();
-  }, [runID, token, setEvents, setError]);
+  }, [runID, token, setEvents, notify]);
 }
 
-function CreatePage({ busy, onCreate }) {
-  const [prompt, setPrompt] = useState(""); const [profile, setProfile] = useState("full-stack"); const [target, setTarget] = useState("docker");
-  return <section className="stack wide"><section className="card hero"><p>Describe the app, then review each explicit approval gate before anything is deployed.</p><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Describe the application you want Norbot to build…" rows="7"/><div className="grid three"><Field label="Profile"><select value={profile} onChange={(event) => setProfile(event.target.value)}><option value="frontend-only">Frontend</option><option value="full-stack">Full stack</option><option value="agentic">Agentic</option></select></Field><Field label="Target"><select value={target} onChange={(event) => setTarget(event.target.value)}><option value="docker">Docker</option><option value="kubernetes">Kubernetes</option></select></Field><Field label="Approval model"><p>Plan · Code · Test/Fix · Deploy</p></Field></div><button disabled={busy || !prompt.trim()} onClick={() => onCreate({ prompt, profile, deployment_target: target })}>{busy ? "Creating…" : "Create plan"}</button></section></section>;
+function CreatePage({ api, busy, notify, onCreate, onBack }) {
+  const [prompt, setPrompt] = useState(""); const [profile, setProfile] = useState("full-stack"); const [target, setTarget] = useState("docker"); const [imports, setImports] = useState([]); const [skillDigests, setSkillDigests] = useState([]);
+  const loadSkills = useCallback(() => api("/api/skills/imports").then(setImports), [api]);
+  useEffect(() => { loadSkills().catch((cause) => notify(cause.message, "error")); }, [loadSkills, notify]);
+  const activeSkills = useMemo(() => [...new Map(imports.filter((item) => item.state === "active").map((item) => [item.digest, item])).values()], [imports]);
+  const toggleSkill = (digest) => setSkillDigests((current) => current.includes(digest) ? current.filter((item) => item !== digest) : [...current, digest]);
+  return <section className="stack wide"><section className="card hero"><div className="title-row"><div><h2>New run</h2><p>Describe the app, then review each explicit approval gate before anything is deployed.</p></div><button className="quiet" onClick={onBack}>− Cancel</button></div><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Describe the application you want Norbot to build…" rows="7"/><div className="grid three"><Field label="Profile"><select value={profile} onChange={(event) => setProfile(event.target.value)}><option value="frontend-only">Frontend</option><option value="full-stack">Full stack</option><option value="agentic">Agentic</option></select></Field><Field label="Target"><select value={target} onChange={(event) => setTarget(event.target.value)}><option value="docker">Docker</option><option value="kubernetes">Kubernetes</option></select></Field><Field label="Approval model"><p>Plan · Code · Test/Fix · Deploy</p></Field></div><section className="skill-picker"><div className="title-row"><div><h3>Approved skills</h3><p>Selected skills are copied read-only into this run’s isolated workspace.</p></div><button className="quiet" onClick={() => loadSkills().catch((cause) => notify(cause.message, "error"))}>Refresh skills</button></div>{activeSkills.length ? <div className="skill-options">{activeSkills.map((item) => <label key={item.digest}><input type="checkbox" checked={skillDigests.includes(item.digest)} onChange={() => toggleSkill(item.digest)}/><span><strong>{item.findings?.name || item.bundle_path || item.digest.slice(7, 19)}</strong><small>{item.mode} · {item.bundle_path || "."}</small></span></label>)}</div> : <p>No active skills. Import and activate skills first.</p>}</section><button disabled={busy || !prompt.trim()} onClick={() => onCreate({ prompt, profile, deployment_target: target, skill_digests: skillDigests })}>{busy ? "Creating…" : "Create plan"}</button></section></section>;
 }
 
-function OnboardingDialog({ onDismiss }) { return <div className="onboarding-backdrop"><section className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-title"><p className="eyebrow">Welcome to Norbot</p><h2 id="onboarding-title">What happens next</h2><ol><li>Norbot generates an editable architecture.</li><li>You approve the plan, code proposal, verification, and deployment separately.</li><li>Use linked change runs to evolve an application after approval.</li></ol><button autoFocus onClick={onDismiss}>Continue</button></section></div>; }
+function GnomeToasts({ toasts, onboarding, onDismiss, onDismissOnboarding }) { return <div className="gnome-toasts" aria-live="polite">{onboarding && <GnomeToast title="What happens next" tone="instruction" persistent onDismiss={onDismissOnboarding}><ol><li>Norbot generates an editable architecture.</li><li>You approve the plan, code proposal, verification, and deployment separately.</li><li>Use linked change runs to evolve an application after approval.</li></ol><button autoFocus onClick={onDismissOnboarding}>Continue</button></GnomeToast>}{toasts.map((toast) => <GnomeToast key={toast.id} title={toast.tone === "error" ? "Gnome alert" : toast.tone === "warning" ? "Gnome warning" : "Gnome note"} tone={toast.tone} message={toast.message} onDismiss={() => onDismiss(toast.id)}/>)}</div>; }
 
-function RunsPage({ runs, selected, details, busy, onSelect, onApprove, onUpdateArchitecture, onChange, onCancel }) {
-  if (!runs.length) return <Empty text="No runs yet. Create an application to start the approval workflow."/>;
-  return <div className="run-layout"><section className="run-list">{runs.map((run) => <button key={run.id} className={`run-row ${selected?.id === run.id ? "selected" : ""}`} onClick={() => onSelect(run.id)}><strong>{run.architecture?.app_name || run.prompt}</strong><span>{stageName(run.stage)} · {statusName(run.status)}</span><small>{run.id.slice(0, 12)} · {run.profile}</small></button>)}</section><RunDetail run={selected} details={details} busy={busy} onApprove={onApprove} onUpdateArchitecture={onUpdateArchitecture} onChange={onChange} onCancel={onCancel}/></div>;
+function GnomeToast({ title, tone, message, persistent, children, onDismiss }) { useEffect(() => { if (persistent) return undefined; const timer = window.setTimeout(onDismiss, 7000); return () => window.clearTimeout(timer); }, [persistent, onDismiss]); return <article className={`gnome-toast ${tone}`}><span className="gnome" aria-hidden="true">🧌</span><div><p className="eyebrow">{tone === "instruction" ? "Welcome to Norbot" : title}</p><h2>{title}</h2>{message && <p>{message}</p>}{children}</div><button className="toast-dismiss" aria-label={`Dismiss ${title}`} onClick={onDismiss}>×</button></article>; }
+
+function RunsPage({ runs, selected, details, busy, onCreate, onSelect, onExpand, onApprove, onUpdateArchitecture, onChange, onCancel, onRemove }) {
+  const live = runs.filter((run) => !["failed", "interrupted", "abandoned", "completed"].includes(run.status)); const finished = runs.filter((run) => run.status === "completed"); const failed = runs.filter((run) => ["failed", "interrupted", "abandoned"].includes(run.status));
+  const group = (label, items) => items.length ? <section className="run-list"><p className="eyebrow">{label} · {plural(items.length, "run")}</p>{items.map((run) => <article className={`run-entry ${selected?.id === run.id ? "selected" : ""}`} key={run.id}><div className={`run-row ${selected?.id === run.id ? "selected" : ""}`}><button className="run-summary" onClick={() => onSelect(run.id)}><strong>{run.architecture?.app_name || run.prompt}</strong><span>{stageName(run.stage)} · {statusName(run.status)}</span><small>{selected?.id === run.id ? "− Hide details" : "+ Details"}</small></button><RunCompactActions run={run} busy={busy} onOpen={() => onExpand(run.id)} onRetry={() => onApprove(run.id, { action: "retry" })} onCancel={() => onCancel(run.id)}/></div>{selected?.id === run.id && <div className="run-expanded"><RunDetail run={run} details={details} busy={busy} onApprove={(input) => onApprove(run.id, input)} onUpdateArchitecture={onUpdateArchitecture} onChange={onChange} onCancel={() => onCancel(run.id)} onRemove={() => onRemove(run.id)}/></div>}</article>)}</section> : null;
+  return <section className="stack"><div className="title-row"><div><h2>All runs</h2><p>Each run shows its current state. Expand one for its workflow and history.</p></div><button onClick={onCreate}>+ New run</button></div>{runs.length ? <section className="run-directory">{group("Live", live)}{group("Finished", finished)}{group("Failed / stopped", failed)}</section> : <Empty text="No runs yet. Use + New run to start one."/>}</section>;
 }
 
-function RunDetail({ run, details, busy, onApprove, onUpdateArchitecture, onChange, onCancel }) {
+function RunCompactActions({ run, busy, onOpen, onRetry, onCancel }) {
+  if (run.status === "failed" || run.status === "interrupted") return <div className="compact-actions"><button disabled={busy} onClick={onRetry}>Retry {stageName(run.stage)}</button><button className="quiet" onClick={onOpen}>Review details</button></div>;
+  if (["queued", "running"].includes(run.status)) return <div className="compact-actions"><button className="danger" disabled={busy} onClick={onCancel}>− Cancel</button><button className="quiet" onClick={onOpen}>View progress</button></div>;
+  if (run.status === "awaiting_approval") return <div className="compact-actions"><button className="quiet" onClick={onOpen}>Review {stageName(run.stage)}</button></div>;
+  return <div className="compact-actions"><button className="quiet" onClick={onOpen}>View details</button></div>;
+}
+
+function RunDetail({ run, details, busy, onApprove, onUpdateArchitecture, onChange, onCancel, onRemove }) {
   if (!run) return null;
   const revision = details.revisions?.[0]; const report = revision?.report || {}; const failed = report.status === "fail";
   const [feedback, setFeedback] = useState(""); const [change, setChange] = useState("");
+  const cancel = () => { if (window.confirm(`Cancel ${run.architecture?.app_name || "this run"}?`)) onCancel(); };
+  const remove = () => { if (window.confirm(`Remove ${run.architecture?.app_name || "this run"} and all run history?`)) onRemove(); };
   const action = () => {
     if (run.status === "failed" || run.status === "interrupted") return <button disabled={busy} onClick={() => onApprove({ action: "retry" })}>Retry {stageName(run.stage)}</button>;
     if (run.status !== "awaiting_approval") return null;
@@ -205,10 +229,10 @@ function RunDetail({ run, details, busy, onApprove, onUpdateArchitecture, onChan
     if (run.stage === "verifier") return failed ? <div className="actions"><input value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="Optional fix instructions"/><button disabled={busy} onClick={() => onApprove({ action: "fix", feedback })}>Approve bounded fix</button></div> : <button disabled={busy} onClick={() => onApprove({ action: "approve", revision_id: revision?.id })}>Approve checks</button>;
     return <button disabled={busy} onClick={() => onApprove({ action: "approve" })}>Approve deployment</button>;
   };
-  return <section className="stack"><section className="card"><div className="title-row"><div><p className="eyebrow">{statusName(run.status)}</p><h2>{run.architecture?.app_name || "Application run"}</h2><p>{run.prompt}</p></div>{!run.status.match(/completed|abandoned/) && <button className="danger" disabled={busy} onClick={onCancel}>Cancel</button>}</div><Stepper run={run}/>{run.failure_reason && <p className="error">{run.failure_reason}</p>}{action()}</section>{run.stage === "planner" && run.status === "awaiting_approval" ? <ArchitectureEditor architecture={run.architecture || newArchitecture(run.profile)} busy={busy} onSave={onUpdateArchitecture}/> : <ReviewPanel revision={revision} usage={details.usage} skills={details.skills} deployment={details.deployment}/>}<section className="card"><h2>Change this application</h2><div className="actions"><input value={change} onChange={(event) => setChange(event.target.value)} placeholder="Describe the requested change"/><button className="quiet" disabled={busy || !change.trim()} onClick={() => onChange(run.id, change)}>Create change run</button></div></section><EventLog events={details.events}/></section>;
+  return <section className="stack"><section className="card"><div className="title-row"><div><p className="eyebrow">{statusName(run.status)}</p><h2>{run.architecture?.app_name || "Application run"}</h2><p>{run.prompt}</p></div>{run.status.match(/failed|interrupted|abandoned|completed/) ? <button className="danger" disabled={busy} onClick={remove}>− Remove</button> : <button className="danger" disabled={busy} onClick={cancel}>− Cancel</button>}</div><Stepper run={run}/>{action()}</section>{run.stage === "planner" && run.status === "awaiting_approval" ? <ArchitectureEditor architecture={run.architecture || newArchitecture(run.profile)} busy={busy} onSave={onUpdateArchitecture}/> : <ReviewPanel revision={revision} usage={details.usage} skills={details.skills} deployment={details.deployment}/>} {run.status === "completed" && <section className="card"><h2>Change this application</h2><div className="actions"><input value={change} onChange={(event) => setChange(event.target.value)} placeholder="Describe the requested change"/><button className="quiet" disabled={busy || !change.trim()} onClick={() => onChange(run.id, change)}>Create change run</button></div></section>}<EventLog events={details.events}/></section>;
 }
 
-function Stepper({ run }) { const index = STAGES.findIndex(([id]) => id === run.stage); return <div className="stepper">{STAGES.map(([id, label], position) => <div key={id} className={position < index ? "done" : position === index ? "current" : ""}><span>{position + 1}</span>{label}<small>{position === index ? statusName(run.status) : position < index ? "complete" : "upcoming"}</small></div>)}</div>; }
+function Stepper({ run }) { const index = STAGES.findIndex(([id]) => id === run.stage); return <div className="stepper">{STAGES.map(([id, label], position) => <div key={id} className={position < index ? "done" : position === index ? "current" : ""}><span>{position + 1}</span>{label}</div>)}</div>; }
 
 function ArchitectureEditor({ architecture, busy, onSave }) {
   const [draft, setDraft] = useState(architecture); const [core, setCore] = useState(featureLines(architecture.core_features)); const [optional, setOptional] = useState(featureLines(architecture.optional_features));
@@ -226,33 +250,42 @@ function EventLog({ events }) { return <section className="card"><h2>Live events
 
 function AppsPage({ apps, busy, onStart, onStop, onDelete, onChange }) { const [change, setChange] = useState({}); if (!apps.length) return <Empty text="No deployed applications yet."/>; return <section className="cards">{apps.map((app) => <article className="card" key={app.run_id}><div className="title-row"><div><p className="eyebrow">{app.profile}</p><h2>{app.deployment.project_name || app.run_id}</h2><p>{statusName(app.deployment.status)} · {statusName(app.run_status)}</p></div><span className="badge">{app.deployment.status}</span></div>{app.deployment.public_url && <a href={app.deployment.public_url} target="_blank" rel="noreferrer">Open application ↗</a>}<div className="actions"><button disabled={busy} onClick={() => onStart(app.run_id)}>Start</button><button className="quiet" disabled={busy} onClick={() => onStop(app.run_id)}>Stop</button><button className="danger" disabled={busy} onClick={() => onDelete(app.run_id)}>Delete</button></div><div className="actions"><input value={change[app.run_id] || ""} onChange={(event) => setChange({ ...change, [app.run_id]: event.target.value })} placeholder="Describe a change"/><button className="quiet" disabled={busy || !change[app.run_id]?.trim()} onClick={() => onChange(app.run_id, change[app.run_id])}>Change run</button></div></article>)}</section>; }
 
-function SkillsPage({ api, act }) { const [imports, setImports] = useState([]); const [form, setForm] = useState({ source_type: "git", source_uri: "", source_ref: "", credential_env: "" }); const load = useCallback(() => api("/api/skills/imports").then(setImports), [api]); useEffect(() => { load().catch(() => {}); }, [load]); return <section className="stack"><section className="card"><h2>Import a skill bundle</h2><div className="grid two"><Field label="Source"><select value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value })}><option value="git">HTTPS Git</option><option value="oci">OCI</option></select></Field><Field label="Source URI"><input value={form.source_uri} onChange={(event) => setForm({ ...form, source_uri: event.target.value })} placeholder="https://…"/></Field><Field label="Reference"><input value={form.source_ref} onChange={(event) => setForm({ ...form, source_ref: event.target.value })}/></Field><Field label="Credential env reference"><input value={form.credential_env} onChange={(event) => setForm({ ...form, credential_env: event.target.value })}/></Field></div><button disabled={!form.source_uri} onClick={() => act(async () => { await api("/api/skills/imports", { method: "POST", body: JSON.stringify(form) }); await load(); })}>Import and scan</button></section><section className="card"><h2>Imports</h2><Table rows={imports} columns={["id", "source_type", "source_uri", "state", "digest"]} action={(item) => item.state === "scanned" ? <button onClick={() => act(async () => { await api(`/api/skills/imports/${item.id}/activate`, { method: "POST" }); await load(); })}>Activate</button> : null}/></section></section>; }
+function SkillsPage({ api, act, notify }) { const [imports, setImports] = useState([]); const [form, setForm] = useState({ source_type: "git", source_uri: "", source_ref: "", credential_env: "", mode: "auto" }); const load = useCallback(() => api("/api/skills/imports").then(setImports), [api]); useEffect(() => { load().catch((cause) => notify(cause.message, "error")); }, [load, notify]); const importBundle = async () => { const result = await act(async () => { const value = await api("/api/skills/imports", { method: "POST", body: JSON.stringify(form) }); await load(); return value; }, null); if (result) { notify(`Imported ${plural(result.imports?.length || 0, "skill")}${result.rejected?.length ? `; skipped ${plural(result.rejected.length, "unsafe bundle")}` : ""}.`, result.rejected?.length ? "warning" : "notice"); } }; return <section className="stack"><section className="card"><h2>Import skills from a repository</h2><p>Norbot recursively discovers each <code>SKILL.md</code>. Native bundles use <code>skill.json</code>; external instructions are adapted as read-only skills with no executable tools.</p><div className="grid two"><Field label="Source"><select value={form.source_type} onChange={(event) => setForm({ ...form, source_type: event.target.value })}><option value="git">HTTPS Git</option><option value="oci">OCI</option></select></Field><Field label="Source URI"><input value={form.source_uri} onChange={(event) => setForm({ ...form, source_uri: event.target.value })} placeholder="https://github.com/org/repository.git"/></Field><Field label="Reference"><input value={form.source_ref} onChange={(event) => setForm({ ...form, source_ref: event.target.value })} placeholder="main, tag, or digest"/></Field><Field label="Import mode"><select value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value })}><option value="auto">Auto — native where possible, otherwise adapt</option><option value="native">Native only — require skill.json</option><option value="adapted">Adapted only — derive safe metadata</option></select></Field><Field label="Credential env reference"><input value={form.credential_env} onChange={(event) => setForm({ ...form, credential_env: event.target.value })} placeholder="Optional private-source token env"/></Field></div><button disabled={!form.source_uri} onClick={importBundle}>Import and scan</button></section><section className="card"><h2>Imported skills</h2><Table rows={imports} columns={["id", "mode", "bundle_path", "source_uri", "state"]} action={(item) => item.state === "scanned" ? <button onClick={() => act(async () => { await api(`/api/skills/imports/${item.id}/activate`, { method: "POST" }); await load(); }, "Skill activated.")}>Activate</button> : null}/></section></section>; }
 
-function ChannelsPage({ api, act, runs }) {
+function ChannelsPage({ api, act, runs, notify }) {
   const [accounts, setAccounts] = useState([]); const [showForm, setShowForm] = useState(false); const [form, setForm] = useState({ run_id: runs[0]?.id || "", adapter: "telegram", name: "", secret_refs: "{}", settings: "{}" });
   const load = useCallback(() => api("/api/channels/accounts").then(setAccounts), [api]);
-  useEffect(() => { load().catch(() => {}); }, [load]);
+  useEffect(() => { load().catch((cause) => notify(cause.message, "error")); }, [load, notify]);
   useEffect(() => { setForm((current) => current.run_id || !runs[0]?.id ? current : { ...current, run_id: runs[0].id }); }, [runs]);
   const runName = (account) => runs.find((run) => run.id === account.run_id)?.architecture?.app_name || account.run_id.slice(0, 12);
   const disconnect = (account) => {
     if (!window.confirm(`Disconnect ${account.name}?`)) return;
-    act(async () => { await api(`/api/channels/accounts/${account.id}`, { method: "DELETE" }); await load(); });
+    act(async () => { await api(`/api/channels/accounts/${account.id}`, { method: "DELETE" }); await load(); }, "Channel disconnected.");
   };
-  return <section className="stack"><section className="card"><div className="title-row"><div><h2>Connected channels</h2><p>Each channel is attached to one application run.</p></div><button className="quiet" aria-expanded={showForm} onClick={() => setShowForm((current) => !current)}>{showForm ? "− Cancel" : "+ Connect channel"}</button></div>{accounts.length ? <div className="channel-list">{accounts.map((account) => <article className="channel-account" key={account.id}><div><p className="eyebrow">{account.adapter}</p><h3>{account.name}</h3><p>Attached to {runName(account)}</p></div><div className="channel-actions"><span className="badge">{account.enabled ? "connected" : "disabled"}</span><button className="danger" aria-label={`Disconnect ${account.name}`} onClick={() => disconnect(account)}>− Disconnect</button></div><small>Webhook: /api/channels/{account.id}/webhook</small></article>)}</div> : <p>No connected channels. Use + Connect channel to add one.</p>}</section>{showForm && <section className="card"><h2>Connect a channel</h2><div className="grid two"><Field label="Run"><select value={form.run_id} onChange={(event) => setForm({ ...form, run_id: event.target.value })}>{runs.map((run) => <option value={run.id} key={run.id}>{run.architecture?.app_name || run.id}</option>)}</select></Field><Field label="Provider"><select value={form.adapter} onChange={(event) => setForm({ ...form, adapter: event.target.value })}>{["telegram", "slack", "discord", "whatsapp"].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Account name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })}/></Field><Field label="Secret env references (JSON)"><input value={form.secret_refs} onChange={(event) => setForm({ ...form, secret_refs: event.target.value })}/></Field><Field label="Settings (JSON)"><input value={form.settings} onChange={(event) => setForm({ ...form, settings: event.target.value })}/></Field></div><button disabled={!form.run_id || !form.name} onClick={() => act(async () => { await api("/api/channels/accounts", { method: "POST", body: JSON.stringify({ ...form, secret_refs: JSON.parse(form.secret_refs), settings: JSON.parse(form.settings) }) }); setShowForm(false); await load(); })}>Create account</button></section>}</section>;
+  return <section className="stack"><section className="card"><div className="title-row"><div><h2>Connected channels</h2><p>Each channel is attached to one application run.</p></div><button className="quiet" aria-expanded={showForm} onClick={() => setShowForm((current) => !current)}>{showForm ? "− Cancel" : "+ Connect channel"}</button></div>{accounts.length ? <div className="channel-list">{accounts.map((account) => <article className="channel-account" key={account.id}><div><p className="eyebrow">{account.adapter}</p><h3>{account.name}</h3><p>Attached to {runName(account)}</p></div><div className="channel-actions"><span className="badge">{account.enabled ? "connected" : "disabled"}</span><button className="danger" aria-label={`Disconnect ${account.name}`} onClick={() => disconnect(account)}>− Disconnect</button></div><small>Webhook: /api/channels/{account.id}/webhook</small></article>)}</div> : <p>No connected channels. Use + Connect channel to add one.</p>}</section>{showForm && <section className="card"><h2>Connect a channel</h2><div className="grid two"><Field label="Run"><select value={form.run_id} onChange={(event) => setForm({ ...form, run_id: event.target.value })}>{runs.map((run) => <option value={run.id} key={run.id}>{run.architecture?.app_name || run.id}</option>)}</select></Field><Field label="Provider"><select value={form.adapter} onChange={(event) => setForm({ ...form, adapter: event.target.value })}>{["telegram", "slack", "discord", "whatsapp"].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Account name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })}/></Field><Field label="Secret env references (JSON)"><input value={form.secret_refs} onChange={(event) => setForm({ ...form, secret_refs: event.target.value })}/></Field><Field label="Settings (JSON)"><input value={form.settings} onChange={(event) => setForm({ ...form, settings: event.target.value })}/></Field></div><button disabled={!form.run_id || !form.name} onClick={() => act(async () => { await api("/api/channels/accounts", { method: "POST", body: JSON.stringify({ ...form, secret_refs: JSON.parse(form.secret_refs), settings: JSON.parse(form.settings) }) }); setShowForm(false); await load(); }, "Channel connected.")}>Create account</button></section>}</section>;
 }
 
-function ActionsPage({ api, act }) { const [actions, setActions] = useState([]); const load = useCallback(() => api("/api/agent/actions").then(setActions), [api]); useEffect(() => { load().catch(() => {}); }, [load]); return <section className="card"><h2>Pending agent actions</h2><Table rows={actions} columns={["id", "tool", "role", "run_id", "state"]} action={(item) => <div className="actions"><button onClick={() => act(async () => { await api(`/api/agent/actions/${item.id}/decision`, { method: "POST", body: JSON.stringify({ decision: "approved" }) }); await load(); })}>Approve</button><button className="danger" onClick={() => act(async () => { await api(`/api/agent/actions/${item.id}/decision`, { method: "POST", body: JSON.stringify({ decision: "rejected" }) }); await load(); })}>Reject</button></div>}/></section>; }
+function ActionsPage({ api, act, notify }) { const [actions, setActions] = useState([]); const load = useCallback(() => api("/api/agent/actions").then(setActions), [api]); useEffect(() => { load().catch((cause) => notify(cause.message, "error")); }, [load, notify]); return <section className="card"><h2>Pending agent actions</h2><Table rows={actions} columns={["id", "tool", "role", "run_id", "state"]} action={(item) => <div className="actions"><button onClick={() => act(async () => { await api(`/api/agent/actions/${item.id}/decision`, { method: "POST", body: JSON.stringify({ decision: "approved" }) }); await load(); }, "Agent action approved.")}>Approve</button><button className="danger" onClick={() => act(async () => { await api(`/api/agent/actions/${item.id}/decision`, { method: "POST", body: JSON.stringify({ decision: "rejected" }) }); await load(); }, "Agent action rejected.")}>Reject</button></div>}/></section>; }
 
-function CapacityPage({ api, act }) {
+function CapacityPage({ api, act, notify }) {
   const [capacity, setCapacity] = useState(null); const [workers, setWorkers] = useState(2); const [showJSON, setShowJSON] = useState(false);
-  const load = useCallback(() => api("/api/capacity").then(setCapacity), [api]); useEffect(() => { load().catch(() => {}); }, [load]);
-  return <section className="stack"><section className="card"><div className="title-row"><div><p className="eyebrow">Runtime</p><h2>Capacity</h2></div><button className="quiet" onClick={() => setShowJSON((current) => !current)}>{showJSON ? "Hide JSON" : "Show JSON"}</button></div>{showJSON ? <pre>{JSON.stringify(capacity, null, 2)}</pre> : capacity ? <><div className="metrics"><Metric label="Target" value={statusName(capacity.target)}/><Metric label="CPU" value={`${capacity.cpus} cores`}/><Metric label="Memory" value={formatBytes(capacity.memory_bytes)}/><Metric label="Workers" value={`${capacity.configured_workers} configured`}/><Metric label="Recommended" value={`${capacity.recommended_workers} workers`}/><Metric label="Quota" value={`${capacity.quota_workers} workers`}/><Metric label="Docker" value={capacity.docker_available ? "available" : "unavailable"}/><Metric label="Kubernetes" value={capacity.kubernetes_available ? "available" : "unavailable"}/></div><p className="capacity-note">{capacity.recommendation}</p><h3>Provider limits</h3><div className="table-wrap"><table><thead><tr><th>Provider</th><th>Concurrent</th><th>Requests/min</th></tr></thead><tbody>{asArray(capacity.quota_factors).map((factor) => <tr key={factor.provider_id}><td>{factor.provider_id}</td><td>{factor.configured_limit}</td><td>{factor.configured_requests_per_minute}</td></tr>)}</tbody></table></div></> : <p>Loading capacity…</p>}</section><section className="card"><h2>Record a worker recommendation</h2><div className="actions"><input type="number" min="1" value={workers} onChange={(event) => setWorkers(Number(event.target.value))}/><button onClick={() => act(async () => { await api("/api/capacity/recommendations", { method: "POST", body: JSON.stringify({ recommended_workers: workers, factors: { source: "operator-console" } }) }); await load(); })}>Save recommendation</button></div></section></section>;
+  const load = useCallback(() => api("/api/capacity").then(setCapacity), [api]); useEffect(() => { load().catch((cause) => notify(cause.message, "error")); }, [load, notify]);
+  return <section className="stack"><section className="card"><div className="title-row"><div><p className="eyebrow">Runtime</p><h2>Capacity</h2></div><button className="quiet" onClick={() => setShowJSON((current) => !current)}>{showJSON ? "Hide JSON" : "Show JSON"}</button></div>{showJSON ? <pre>{JSON.stringify(capacity, null, 2)}</pre> : capacity ? <><div className="metrics"><Metric label="Target" value={statusName(capacity.target)}/><Metric label="CPU" value={`${capacity.cpus} cores`}/><Metric label="Memory" value={formatBytes(capacity.memory_bytes)}/><Metric label="Workers" value={`${capacity.configured_workers} configured`}/><Metric label="Recommended" value={`${capacity.recommended_workers} workers`}/><Metric label="Quota" value={`${capacity.quota_workers} workers`}/><Metric label="Docker" value={capacity.docker_available ? "available" : "unavailable"}/><Metric label="Kubernetes" value={capacity.kubernetes_available ? "available" : "unavailable"}/></div><p className="capacity-note">{capacity.recommendation}</p><h3>Provider limits</h3><div className="table-wrap"><table><thead><tr><th>Provider</th><th>Concurrent</th><th>Requests/min</th></tr></thead><tbody>{asArray(capacity.quota_factors).map((factor) => <tr key={factor.provider_id}><td>{factor.provider_id}</td><td>{factor.configured_limit}</td><td>{factor.configured_requests_per_minute}</td></tr>)}</tbody></table></div></> : <p>Loading capacity…</p>}</section><section className="card"><h2>Record a worker recommendation</h2><div className="actions"><input type="number" min="1" value={workers} onChange={(event) => setWorkers(Number(event.target.value))}/><button onClick={() => act(async () => { await api("/api/capacity/recommendations", { method: "POST", body: JSON.stringify({ recommended_workers: workers, factors: { source: "operator-console" } }) }); await load(); }, "Worker recommendation saved.")}>Save recommendation</button></div></section></section>;
 }
 
-function HealthPage({ api }) { const [health, setHealth] = useState(null); const [detail, setDetail] = useState(null); const load = useCallback(async () => { setHealth(await api("/api/health")); setDetail(await api("/api/health/detail")); }, [api]); useEffect(() => { load().catch(() => {}); }, [load]); return <section className="stack"><section className="card"><div className="title-row"><div><h2>Service health</h2><p>{health?.status || "Loading…"}</p></div><button onClick={() => load()}>Refresh</button></div></section><section className="card"><pre>{JSON.stringify(detail, null, 2)}</pre></section></section>; }
+function HealthPage({ api, notify }) {
+  const [health, setHealth] = useState(null); const [detail, setDetail] = useState(null);
+  const load = useCallback(async () => { const [service, report] = await Promise.all([api("/api/health"), api("/api/health/detail", { allowError: true })]); setHealth(service); setDetail(report.value); }, [api]);
+  useEffect(() => { load().catch((cause) => notify(cause.message, "error")); }, [load, notify]);
+  const backend = health?.status === "ok" ? { id: "backend", state: "healthy", message: "control-plane API responding" } : { id: "backend", state: "down", message: "control-plane API is unavailable" };
+  const checks = [{ id: "frontend", state: "healthy", message: "operator console loaded" }, backend, ...asArray(detail?.checks)];
+  return <section className="stack"><section className="card"><div className="title-row"><div><p className="eyebrow">Control plane</p><h2>Service health</h2><p>{detail ? `Overall state: ${detail.state}` : "Loading service checks…"}</p></div><button onClick={() => load().catch((cause) => notify(cause.message, "error"))}>Refresh</button></div></section><section className="card"><h2>Detected services</h2><div className="health-checks">{checks.map((check) => <HealthCheck check={check} key={check.id}/>)}</div></section></section>;
+}
 
 function Field({ label, children }) { return <label className="field"><span>{label}</span>{children}</label>; }
 function Metric({ label, value }) { return <article className="metric"><span>{label}</span><strong>{value}</strong></article>; }
+function HealthCheck({ check }) { return <article className="health-check"><div><p className="eyebrow">{healthLabel(check)}</p><h3>{check.message || "No detail returned"}</h3>{check.diagnostics?.credential_env && <small>env: {check.diagnostics.credential_env}</small>}</div><div className="health-state"><span className="badge">{check.state}</span>{Number.isFinite(check.latency_ms) && <small>{check.latency_ms} ms</small>}</div></article>; }
+function healthLabel(check) { if (check.id === "frontend") return "Frontend"; if (check.id === "backend") return "Backend API"; if (check.id === "postgres") return "PostgreSQL"; if (check.id === "queue") return "Job queue"; if (check.id === "runtime") return check.diagnostics?.target === "docker" ? "Docker" : "Kubernetes"; if (check.id === "marketplace") return "Skill marketplace"; if (check.id === "channels") return "Channel gateway"; if (check.id.startsWith("provider:")) return `${statusName(check.id.slice(9))} API key & provider`; if (check.id.startsWith("deployment:")) return `Deployment ${check.id.slice(11, 23)}`; return statusName(check.id); }
 function formatBytes(value) { return Number.isFinite(value) ? `${(value / 1073741824).toFixed(1)} GiB` : "unknown"; }
 function Empty({ text }) { return <section className="card empty"><p>{text}</p></section>; }
 function Table({ rows, columns, action }) { return rows?.length ? <div className="table-wrap"><table><thead><tr>{columns.map((column) => <th key={column}>{column.replaceAll("_", " ")}</th>)}{action && <th>Actions</th>}</tr></thead><tbody>{rows.map((row) => <tr key={row.id || row.run_id}>{columns.map((column) => <td key={column}>{typeof row[column] === "object" ? JSON.stringify(row[column]) : String(row[column] ?? "")}</td>)}{action && <td>{action(row)}</td>}</tr>)}</tbody></table></div> : <p>No records.</p>; }

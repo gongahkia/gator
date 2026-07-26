@@ -245,6 +245,9 @@ func (w Workspace) RunSandbox(ctx context.Context, runID string, request Sandbox
 
 func (w Workspace) Cleanup(ctx context.Context, runID string) error {
 	_, _ = w.Runner.Run(ctx, w.DockerBin, "rm", "-f", w.Name(runID))
+	if _, err := w.Runner.Run(ctx, w.DockerBin, "volume", "inspect", w.Volume(runID)); err != nil {
+		return nil
+	}
 	_, err := w.Runner.Run(ctx, w.DockerBin, "volume", "rm", w.Volume(runID))
 	return err
 }

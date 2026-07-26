@@ -328,6 +328,8 @@ type SkillImport struct {
 	SourceURI     string         `json:"source_uri"`
 	SourceRef     string         `json:"source_ref"`
 	CredentialEnv string         `json:"credential_env,omitempty"`
+	BundlePath    string         `json:"bundle_path"`
+	Mode          string         `json:"mode"`
 	Digest        string         `json:"digest,omitempty"`
 	State         string         `json:"state"`
 	Findings      map[string]any `json:"findings"`
