@@ -158,9 +158,17 @@ function M.readiness(opts)
 		end
 	local cwd = opts.cwd or vim.fn.getcwd()
 	local records = {}
-	local function add(component, level, message, repair)
-		table.insert(records, { component = component, level = level, message = message, repair = repair })
+	local function add(component, level, message, repair, readiness_state)
+		table.insert(records, {
+			component = component,
+			level = level,
+			message = message,
+			repair = repair,
+			readiness_state = readiness_state,
+		})
 	end
+	local settings_ok, settings = pcall(config.resolve, opts.settings)
+	local confirmations = settings_ok and settings.providers or {}
 	local function version(value)
 		if type(value) == "string" then
 			return value
@@ -208,7 +216,8 @@ function M.readiness(opts)
 				"adapter." .. provider.name,
 				"warn",
 				"Adapter " .. provider.name .. " executable " .. provider.executable .. " is unavailable",
-				"Install " .. provider.executable .. " to enable this adapter."
+				"Install " .. provider.executable .. " to enable this adapter.",
+				"indeterminate"
 			)
 		else
 			local loaded, adapter = pcall(require, provider_modules[provider.name])
@@ -222,7 +231,8 @@ function M.readiness(opts)
 					"warn",
 					"Adapter " .. provider.name .. " version or capability probe failed",
 					(ok and result and result.reason)
-						or "Run the provider CLI manually, update it, then rerun :GatorHealth."
+						or "Run the provider CLI manually, update it, then rerun :GatorHealth.",
+					"indeterminate"
 				)
 			else
 				local authenticated, auth_result = pcall(auth, provider, adapter)
@@ -233,7 +243,13 @@ function M.readiness(opts)
 				local detected = version(result.version)
 				local capability = result.supported == false and "outside Gator's supported capability range"
 					or "capability probe passed"
+				local user_confirmed = type(confirmations[provider.name]) == "table"
+					and confirmations[provider.name].user_confirmed == true
+				local readiness_state = auth_ok and auth_result.authenticated and "detected"
+					or user_confirmed and "user_confirmed"
+					or "indeterminate"
 				local authentication = auth_ok and auth_result.authenticated and "authentication probe passed"
+					or user_confirmed and "readiness user-confirmed; credentials not verified: " .. (type(auth_reason) == "string" and auth_reason or "authentication status is unavailable")
 					or "authentication not verified: "
 						.. (type(auth_reason) == "string" and auth_reason or "authentication status is unavailable")
 				add(
@@ -246,7 +262,8 @@ function M.readiness(opts)
 						.. (detected and " " .. detected or "")
 						.. "; "
 						.. authentication,
-					"Use only advertised capabilities, verify provider-native login, then rerun :GatorHealth."
+					"Use only advertised capabilities, verify provider-native login, then rerun :GatorHealth.",
+					readiness_state
 				)
 			end
 		end
@@ -341,7 +358,7 @@ function M.launch_catalog(opts)
 	local records = {}
 	for _, provider in ipairs(providers) do
 		if terminal_providers[provider.name] then
-			local record = { provider = provider.name, available = false }
+			local record = { provider = provider.name, available = false, readiness_state = "indeterminate" }
 			if not executable(provider.executable) then
 				record.reason = provider.executable .. " is unavailable"
 			else
@@ -372,11 +389,14 @@ function M.launch_catalog(opts)
 						end
 					end
 					if provider.name == "pi" and not pi_user_confirmed then
-						record.reason = "Pi requires explicit providers.pi.user_confirmed opt-in"
+						record.readiness_state = "detected"
+						record.reason = "Pi is detected; explicit providers.pi.user_confirmed opt-in is required"
 					elseif not record.reason then
 						if provider.name == "pi" then
 							record.available = true
 							record.authentication = "user_confirmed"
+							record.readiness_state = "user_confirmed"
+							record.readiness_signals = { "CLI contract detected", "user-confirmed configuration" }
 						else
 							local ok, auth = pcall(adapter.auth, {
 								executable = provider.executable,
@@ -386,6 +406,7 @@ function M.launch_catalog(opts)
 							})
 							if ok and type(auth) == "table" and auth.authenticated then
 								record.available = true
+								record.readiness_state = "detected"
 							else
 								record.reason = (type(auth) == "table" and auth.reason)
 									or "authentication is not verified"

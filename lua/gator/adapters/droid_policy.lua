@@ -10,9 +10,9 @@ function M.map(value, contract)
 	if not overlay.is(value) or not capabilities.is(contract) or contract.provider ~= "droid" then
 		fail("map requires a Droid policy overlay and capability contract")
 	end
-	local available, reason = capabilities.supports(contract, "permission", "autonomy")
+	local available, reason = capabilities.supports(contract, "permission", "user_decision")
 	if not available then
-		fail("Droid autonomy mapping is unavailable: " .. reason)
+		fail("Droid approval mapping is unavailable: " .. reason)
 	end
 	for key in pairs(value.rules) do
 		if key ~= "write_allowed" then
@@ -22,7 +22,7 @@ function M.map(value, contract)
 	if type(value.rules.write_allowed) ~= "boolean" then
 		fail("policy requires explicit boolean write_allowed")
 	end
-	return value.rules.write_allowed and { args = { "--auto", "low" } } or {}
+	return { initialization = { autonomyLevel = "off" } }
 end
 
 return M

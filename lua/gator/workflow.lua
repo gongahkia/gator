@@ -68,10 +68,10 @@ end
 local function catalog_contract(record, transport_name)
 	local ready = { available = true, modes = { transport_name } }
 	local unavailable = { available = false, reason = "unavailable for this Gator workflow" }
-	local auth = record.authentication == "user_confirmed" and { available = true, modes = { "user_confirmed" } }
+	local auth = record.readiness_state == "user_confirmed" and { available = true, modes = { "user_confirmed" } }
 		or ready
 	local permission = transport_name == "managed"
-			and record.mode == "acp"
+			and (record.mode == "acp" or record.mode == "droid")
 			and { available = true, modes = { "user_decision" } }
 		or unavailable
 	return capabilities.new({
@@ -117,8 +117,10 @@ function M.new(opts)
 		opts.managed ~= nil
 		and (
 			type(opts.managed.open) ~= "function"
-			or type(opts.managed.send) ~= "function"
+		or type(opts.managed.send) ~= "function"
 			or type(opts.managed.cancel) ~= "function"
+			or type(opts.managed.stop) ~= "function"
+			or type(opts.managed.shutdown) ~= "function"
 			or type(opts.managed.is_active) ~= "function"
 		)
 	then
@@ -130,7 +132,7 @@ function M.new(opts)
 		terminal = opts.terminal or terminal.new(),
 		bridge = opts.bridge or native_terminal.new(),
 		readiness = opts.readiness or health.launch_catalog,
-		managed = opts.managed or managed_adapter.new(),
+		managed = opts.managed or managed_adapter.new({ shutdown = true }),
 		active = {},
 		palette = {},
 		providers = {},
@@ -371,7 +373,53 @@ function Workflow:managed_callbacks(value, provider_name)
 				respond("cancelled")
 			end
 		end,
+		on_question = function(request, respond)
+			local answers, index = {}, 1
+			local function next_question()
+				local question = request.questions[index]
+				if not question then
+					respond({ cancelled = false, answers = answers })
+					return
+				end
+				local function accepted(answer)
+					if type(answer) ~= "string" or answer == "" then
+						respond({ cancelled = true, answers = {} })
+						return
+					end
+					table.insert(answers, { index = question.index, question = question.question, answer = answer })
+					index = index + 1
+					next_question()
+				end
+				if #question.options > 0 then
+					vim.ui.select(question.options, {
+						prompt = "Droid " .. question.topic .. ": " .. question.question,
+					}, accepted)
+				else
+					vim.ui.input({ prompt = "Droid " .. question.topic .. ": " .. question.question .. " " }, accepted)
+				end
+			end
+			next_question()
+		end,
+		on_resume_fallback = function(request)
+			if type(request.session) ~= "table" then
+				vim.notify("Gator attach: " .. tostring(request.reason), vim.log.levels.ERROR)
+				return
+			end
+			pcall(conversation.close)
+			local ok, failure = pcall(self.open_terminal, self, value, {
+				session = request.session,
+				command = { "copilot", "--resume", request.session.id },
+			}, true)
+			if not ok then
+				vim.notify("Gator Copilot terminal fallback: " .. tostring(failure), vim.log.levels.ERROR)
+				return
+			end
+			vim.notify("Gator Copilot: ACP reattach unavailable; opened CLI resume fallback", vim.log.levels.WARN)
+		end,
 		on_exit = function(result)
+			if result.fallback or result.stopped then
+				return
+			end
 			local current = records(self.state)[value.id]
 			if not current or current.lifecycle ~= "running" then
 				return
@@ -405,6 +453,8 @@ function Workflow:open_managed(value, provider_name, reference, prompt)
 		on_session = callbacks.on_session,
 		on_event = callbacks.on_event,
 		on_permission = callbacks.on_permission,
+		on_question = callbacks.on_question,
+		on_resume_fallback = callbacks.on_resume_fallback,
 		on_exit = callbacks.on_exit,
 	})
 	if not ok then
@@ -415,6 +465,9 @@ function Workflow:open_managed(value, provider_name, reference, prompt)
 			self:replace(failed)
 		end
 		fail(opened)
+	end
+	if opened.fallback then
+		return opened
 	end
 	local initial = reference and reference.id or (mode == "history" and history or value.id)
 	conversation.open({
@@ -427,6 +480,9 @@ function Workflow:open_managed(value, provider_name, reference, prompt)
 		on_cancel = function()
 			local current = self:managed_reference(value.id, provider_name)
 			return current and self.managed:cancel(current) or false
+		end,
+		on_detach = function()
+			vim.notify("Gator session detached; use Attach session to reopen it", vim.log.levels.INFO)
 		end,
 	})
 	return opened
@@ -552,6 +608,21 @@ function Workflow:attach()
 	return true
 end
 
+function Workflow:stop_session()
+	local value = self:task()
+	for _, reference in ipairs(value.sessions) do
+		if reference.mode ~= "terminal" and self.managed:is_active(reference) then
+			if not self.managed:stop(reference) then
+				fail("managed session could not be stopped")
+			end
+			pcall(conversation.close)
+			vim.notify("Gator session stopped; its provider session remains resumable", vim.log.levels.INFO)
+			return true
+		end
+	end
+	fail("selected task has no active managed session")
+end
+
 function Workflow:open_provider_picker()
 	local providers = {}
 	for _, value in pairs(self.providers) do
@@ -588,6 +659,9 @@ function Workflow:register_palette()
 	add("action", "attach-session", function()
 		self:attach()
 	end)
+	add("action", "stop-session", function()
+		self:stop_session()
+	end)
 	add("action", "refresh-providers", function()
 		self:refresh()
 	end)
@@ -608,6 +682,7 @@ function Workflow:close()
 		palette.unregister(id)
 	end
 	self.palette = {}
+	self.managed:shutdown()
 	return true
 end
 

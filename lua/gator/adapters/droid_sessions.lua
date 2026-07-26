@@ -1,99 +1,103 @@
-local stream = require("gator.adapters.droid_stream")
 local M = {}
 
 local function fail(message)
 	error("Gator Droid sessions: " .. message, 3)
 end
 
-local function id(value, name)
+local function text(value, name)
 	if type(value) ~= "string" or value == "" then
-		fail(name .. " must be a non-empty opaque session id")
+		fail(name .. " must be non-empty text")
 	end
 	return value
 end
 
-local function options(value, name)
-	if
-		type(value) ~= "table"
-		or type(value.run) ~= "function"
-		or type(value.prompt) ~= "string"
-		or value.prompt == ""
-	then
-		fail(name .. " requires run and prompt")
+function M.command(opts)
+	if type(opts) ~= "table" then
+		fail("command requires cwd")
 	end
-	return value
-end
-
-local function execute(run, argv)
-	local ok, value = pcall(run, argv)
-	if not ok or type(value) ~= "table" or value.code ~= 0 or type(value.stdout) ~= "string" then
-		fail("Droid session request failed")
+	for key in pairs(opts) do
+		if key ~= "cwd" and key ~= "executable" then
+			fail("command contains unsupported field: " .. tostring(key))
+		end
 	end
-	local result = stream.parse(value.stdout)
-	if result.is_error then
-		fail("Droid session returned an error result")
-	end
-	return { provider = "droid", id = result.id, owner = "provider" }
+	return {
+		opts.executable or "droid",
+		"exec",
+		"--cwd",
+		text(opts.cwd, "cwd"),
+		"--input-format",
+		"stream-jsonrpc",
+		"--output-format",
+		"stream-jsonrpc",
+	}
 end
 
 function M.create(opts)
-	opts = options(opts, "create")
-	if type(opts.cwd) ~= "string" or opts.cwd == "" then
+	if type(opts) ~= "table" then
 		fail("create requires cwd")
 	end
 	for key in pairs(opts) do
-		if key ~= "run" and key ~= "prompt" and key ~= "cwd" and key ~= "executable" then
+		if key ~= "cwd" and key ~= "machine_id" then
 			fail("create contains unsupported field: " .. tostring(key))
 		end
 	end
-	return execute(
-		opts.run,
-		{ opts.executable or "droid", "exec", "--cwd", opts.cwd, "--output-format", "json", opts.prompt }
-	)
-end
-
-function M.list()
-	return { available = false, reason = "Droid CLI does not document a machine-readable session-list command schema" }
+	return {
+		method = "droid.initialize_session",
+		params = { machineId = opts.machine_id or "gator", cwd = text(opts.cwd, "cwd"), autonomyLevel = "off" },
+	}
 end
 
 function M.resume(opts)
-	opts = options(opts, "resume")
+	if type(opts) ~= "table" then
+		fail("resume requires id")
+	end
 	for key in pairs(opts) do
-		if key ~= "run" and key ~= "id" and key ~= "prompt" and key ~= "executable" then
+		if key ~= "id" then
 			fail("resume contains unsupported field: " .. tostring(key))
 		end
 	end
-	return execute(opts.run, {
-		opts.executable or "droid",
-		"exec",
-		"--session-id",
-		id(opts.id, "id"),
-		"--output-format",
-		"json",
-		opts.prompt,
-	})
+	return { method = "droid.load_session", params = { sessionId = text(opts.id, "id") } }
 end
 
-function M.fork(opts)
-	opts = options(opts, "fork")
+function M.prompt(opts)
+	if type(opts) ~= "table" then
+		fail("prompt requires text")
+	end
 	for key in pairs(opts) do
-		if key ~= "run" and key ~= "id" and key ~= "prompt" and key ~= "executable" then
-			fail("fork contains unsupported field: " .. tostring(key))
+		if key ~= "text" then
+			fail("prompt contains unsupported field: " .. tostring(key))
 		end
 	end
-	return execute(opts.run, {
-		opts.executable or "droid",
-		"exec",
-		"--fork",
-		id(opts.id, "id"),
-		"--output-format",
-		"json",
-		opts.prompt,
-	})
+	return { method = "droid.add_user_message", params = { text = text(opts.text, "text") } }
+end
+
+function M.interrupt()
+	return { method = "droid.interrupt_session", params = vim.empty_dict() }
+end
+
+function M.close_session(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("close_session requires optional reason")
+	end
+	for key in pairs(opts) do
+		if key ~= "reason" then
+			fail("close_session contains unsupported field: " .. tostring(key))
+		end
+	end
+	local reason = opts.reason or "other"
+	if reason ~= "clear" and reason ~= "logout" and reason ~= "prompt_input_exit" and reason ~= "other" then
+		fail("close_session reason is unsupported")
+	end
+	return { method = "droid.close_session", params = { reason = reason } }
+end
+
+function M.list()
+	return { available = false, reason = "Droid session discovery is not part of the managed JSON-RPC bridge" }
 end
 
 function M.close()
-	return { available = false, reason = "Droid CLI does not document provider-owned session close or deletion" }
+	return { available = false, reason = "Droid session deletion is not exposed by Gator" }
 end
 
 return M

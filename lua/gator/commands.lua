@@ -31,6 +31,14 @@ function M.register()
 			)
 		end)
 	end, { desc = "Verify public-beta readiness and write a local failure report" })
+	vim.api.nvim_create_user_command("GatorStopSession", function()
+		local ok, result = pcall(require("gator").stop_session)
+		vim.notify(
+			ok and "Gator session stopped; provider session remains resumable" or require("gator.policy.redact").text(tostring(result)),
+			ok and vim.log.levels.INFO or vim.log.levels.ERROR,
+			{ title = "Gator" }
+		)
+	end, { desc = "Stop the active managed provider process" })
 	vim.api.nvim_create_user_command("GatorCaptureSelection", function(opts)
 		require("gator").dispatch("capture_selection", {
 			target = opts.args,

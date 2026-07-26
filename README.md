@@ -103,6 +103,7 @@ Usage
 | `:{range}GatorCaptureSelection session:<provider>:<id>` | Capture context for an opaque provider-native session. |
 | `:GatorExportDiagnostics` | Write a local, redacted diagnostic JSON snapshot. |
 | `:GatorBetaReadiness` | Verify beta prerequisites and write a local readiness report. |
+| `:GatorStopSession` | Stop the active managed provider process; retain its provider-native session for later attach. |
 
 Run `require("gator").setup()` before `:GatorCaptureSelection`.
 
@@ -110,7 +111,7 @@ Run `require("gator").setup()` before `:GatorCaptureSelection`.
 
 From a Git workspace, open `:Gator`, choose **Create local task**, enter an objective, then choose **Launch selected task**. Gator writes the task to `.gator/tasks/<id>.md` and presents only locally-ready providers.
 
-Claude Code, Codex, OpenCode, and Pi retain their interactive terminals. Managed providers open a Gator conversation panel: use `i` to prompt, `c` to cancel the current run, and `q` to close the panel. One-shot providers become review-ready when their run exits; **Attach selected session** resumes a documented session or reopens its local history. `.gator/` is ignored by default, so task files remain local to the checkout.
+Claude Code, Codex, OpenCode, and Pi retain their interactive terminals. Managed providers open a Gator conversation panel: use `i` to prompt, `c` to cancel the current run, and `q` to detach the panel while retaining the provider process. Use `:GatorStopSession` or **Stop active session** to close the managed process; the provider-native session remains attachable. One-shot providers become review-ready when their run exits; **Attach selected session** resumes a documented session or reopens its local history. Gator also stops managed children during `VimLeavePre`. `.gator/` is ignored by default, so task files remain local to the checkout.
 
 The palette provides the same workflow:
 
@@ -119,10 +120,11 @@ The palette provides the same workflow:
 :GatorPalette action:import-tasks
 :GatorPalette action:launch-task
 :GatorPalette action:attach-session
+:GatorPalette action:stop-session
 :GatorPalette action:refresh-providers
 ```
 
-Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Droid, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. “User-confirmed” means only that you say the CLI is configured; Gator does not verify credentials. ACP providers use Gator approval UI only when they send an ACP permission request; Aider, Amp, Cursor, and Droid retain their provider-default policy. Copilot launch is supported, but its documented ACP profile does not support session reattach.
+Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Droid, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. Readiness is shown as **detected**, **user-confirmed**, or **indeterminate**; user confirmation is never credential verification. Droid uses a persistent JSON-RPC session, routes each permission request through Gator, and sends `droid.close_session` before terminating a stopped child. Copilot sends ACP `session/load` only when its initialize response advertises `agentCapabilities.loadSession`; otherwise it opens the interactive `copilot --resume <id>` fallback.
 
 ### Capture context
 

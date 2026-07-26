@@ -40,7 +40,14 @@ function M.new(attrs)
 		fail("owner must be provider or gator")
 	end
 	local mode = attrs.mode or "terminal"
-	if mode ~= "terminal" and mode ~= "acp" and mode ~= "stream" and mode ~= "json" and mode ~= "history" then
+	if
+		mode ~= "terminal"
+		and mode ~= "acp"
+		and mode ~= "stream"
+		and mode ~= "json"
+		and mode ~= "droid"
+		and mode ~= "history"
+	then
 		fail("mode is unsupported")
 	end
 	if attrs.owner == "gator" and mode ~= "history" then

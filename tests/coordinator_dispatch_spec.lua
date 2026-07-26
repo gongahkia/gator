@@ -21,6 +21,7 @@ assert(
 		"close",
 		"cancel_operation",
 		"capture_selection",
+		"stop_session",
 		"palette",
 	}),
 	"coordinator must expose supported action names"

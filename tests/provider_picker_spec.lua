@@ -40,7 +40,7 @@ picker.open({
 	end,
 })
 assert(
-	require("gator.ui").picker.select(1).label == "pi · user-confirmed; ready to launch",
+	require("gator.ui").picker.select(1).label == "pi · user-confirmed; credentials not verified; ready to launch",
 	"provider picker must label user-confirmed providers distinctly"
 )
 require("gator.ui").picker.confirm()

@@ -32,7 +32,7 @@ function M.open(opts)
 			items[#items + 1] = {
 				id = provider.provider,
 				label = provider.provider
-					.. (user_confirmed and " · user-confirmed; ready" or " · ready")
+					.. (user_confirmed and " · user-confirmed; credentials not verified; ready" or " · ready")
 					.. (managed_transport and " in Gator" or " to launch"),
 			}
 		end

@@ -27,7 +27,7 @@ local function render(panel)
 		vim.list_extend(lines, panel.lines)
 	end
 	table.insert(lines, "")
-	table.insert(lines, "i prompt · c cancel · q close · ? help")
+	table.insert(lines, "i prompt · c cancel · q detach · ? help")
 	accessibility.render(panel.buffer, lines, "gator-conversation")
 end
 
@@ -49,9 +49,9 @@ local function bind(panel)
 		cancel = function()
 			panel.on_cancel()
 		end,
-		close = M.close,
+		close = M.detach,
 		help = function()
-			vim.notify("Gator agent: i prompt, c cancel, q close", vim.log.levels.INFO)
+			vim.notify("Gator agent: i prompt, c cancel, q detach", vim.log.levels.INFO)
 		end,
 	})
 end
@@ -59,6 +59,9 @@ end
 function M.open(opts)
 	if type(opts) ~= "table" or type(opts.on_input) ~= "function" or type(opts.on_cancel) ~= "function" then
 		fail("open requires input and cancel callbacks")
+	end
+	if opts.on_detach ~= nil and type(opts.on_detach) ~= "function" then
+		fail("on_detach must be a function")
 	end
 	for _, name in ipairs({ "provider", "session_id", "state" }) do
 		if type(opts[name]) ~= "string" or opts[name] == "" then
@@ -68,7 +71,7 @@ function M.open(opts)
 	local panel, tabpage = current()
 	if panel then
 		panel.provider, panel.session_id, panel.state = opts.provider, opts.session_id, opts.state
-		panel.on_input, panel.on_cancel = opts.on_input, opts.on_cancel
+		panel.on_input, panel.on_cancel, panel.on_detach = opts.on_input, opts.on_cancel, opts.on_detach or function() end
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
@@ -86,6 +89,7 @@ function M.open(opts)
 		lines = {},
 		on_input = opts.on_input,
 		on_cancel = opts.on_cancel,
+		on_detach = opts.on_detach or function() end,
 		previous = opened.previous,
 	}
 	panels[tabpage] = panel
@@ -120,6 +124,15 @@ function M.close()
 	panel_window.close(panel.window, panel.previous)
 	panels[tabpage] = nil
 	return true
+end
+
+function M.detach()
+	local panel = current()
+	if not panel then
+		return false
+	end
+	panel.on_detach()
+	return M.close()
 end
 
 return M

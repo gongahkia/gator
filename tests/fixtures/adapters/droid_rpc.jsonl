@@ -1,3 +1,3 @@
-{"jsonrpc":"2.0","method":"droid.session_notification","params":{"type":"assistant_text_delta","messageId":"message-fixture","blockIndex":0,"textDelta":"gator-"}}
+{"jsonrpc":"2.0","method":"droid.session_notification","params":{"notification":{"type":"assistant_text_delta","messageId":"message-fixture","blockIndex":0,"textDelta":"gator-"}}}
 {"jsonrpc":"2.0","id":2,"result":{"sessionId":"droid-fixture"}}
-{"jsonrpc":"2.0","id":3,"method":"droid.request_permission","params":{"requestId":"permission-fixture"}}
+{"jsonrpc":"2.0","id":3,"method":"droid.request_permission","params":{"toolUses":[],"options":[{"label":"Allow once","value":"proceed_once"},{"label":"Cancel","value":"cancel"}]}}

@@ -77,7 +77,14 @@ local function sessions(value)
 			fail("session " .. index .. " owner is unsupported")
 		end
 		local mode = session.mode or "terminal"
-		if mode ~= "terminal" and mode ~= "acp" and mode ~= "stream" and mode ~= "json" and mode ~= "history" then
+		if
+			mode ~= "terminal"
+			and mode ~= "acp"
+			and mode ~= "stream"
+			and mode ~= "json"
+			and mode ~= "droid"
+			and mode ~= "history"
+		then
 			fail("session " .. index .. " mode is unsupported")
 		end
 		if session.owner == "gator" and mode ~= "history" then

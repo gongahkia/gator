@@ -88,6 +88,9 @@ for _, record in ipairs(unconfirmed) do
 	end
 end
 assert(
-	pi and not pi.available and pi.reason == "Pi requires explicit providers.pi.user_confirmed opt-in",
+	pi
+		and not pi.available
+		and pi.readiness_state == "detected"
+		and pi.reason:find("providers.pi.user_confirmed", 1, true),
 	"Pi must remain unavailable without explicit local user confirmation"
 )

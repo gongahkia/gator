@@ -64,6 +64,10 @@ function M.verify_beta_readiness()
 	return M.dispatch("verify_beta_readiness")
 end
 
+function M.stop_session()
+	return M.dispatch("stop_session")
+end
+
 function M.dispatch(action, opts)
 	if not coordinator.is_action(action) then
 		error("unknown Gator action: " .. tostring(action))

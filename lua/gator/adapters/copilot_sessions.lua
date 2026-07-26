@@ -47,8 +47,23 @@ function M.list()
 	return { available = false, reason = "Copilot ACP does not advertise a documented session-list contract" }
 end
 
-function M.resume()
-	return { available = false, reason = "Copilot ACP 0.0.x does not advertise session loading" }
+function M.resume(opts)
+	if type(opts) ~= "table" then
+		fail("resume requires request, cwd, and id")
+	end
+	if type(opts.cwd) ~= "string" or opts.cwd == "" then
+		fail("resume requires cwd")
+	end
+	for key in pairs(opts) do
+		if key ~= "request" and key ~= "cwd" and key ~= "id" then
+			fail("resume contains unsupported field: " .. tostring(key))
+		end
+	end
+	return session(request(client(opts.request), "session/load", {
+		sessionId = id(opts.id, "id"),
+		cwd = opts.cwd,
+		mcpServers = {},
+	}))
 end
 
 function M.close()

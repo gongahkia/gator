@@ -15,6 +15,7 @@ local actions = {
 	close = { fields = {} },
 	cancel_operation = { fields = { id = true, reason = true } },
 	capture_selection = { fields = { target = true, buffer = true, first_line = true, last_line = true } },
+	stop_session = { fields = {} },
 	palette = { fields = { id = true } },
 }
 local action_names = {
@@ -25,6 +26,7 @@ local action_names = {
 	"close",
 	"cancel_operation",
 	"capture_selection",
+	"stop_session",
 	"palette",
 }
 local operation_kinds = { operation = true, launch = true, handoff = true }
@@ -316,6 +318,9 @@ function Coordinator:dispatch(action, opts)
 			first_line = opts.first_line,
 			last_line = opts.last_line,
 		})
+	end
+	if action == "stop_session" then
+		return self:workflow():stop_session()
 	end
 	self:workflow()
 	if opts.id == nil or opts.id == "" then

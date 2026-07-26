@@ -10,7 +10,12 @@ assert(
 )
 assert(calls[1].method == "session/new" and calls[1].params.mcpServers[1] == nil, "Copilot creation must use ACP")
 assert(
-	not sessions.list().available and not sessions.resume().available and not sessions.close().available,
-	"unsupported Copilot history operations must remain explicit"
+	sessions.resume({ request = request, cwd = "/tmp", id = "copilot-new" }).id == "copilot-new"
+		and calls[2].method == "session/load"
+		and calls[2].params.sessionId == "copilot-new",
+	"Copilot session reattach must dynamically use ACP session loading"
 )
-assert(#calls == 1, "Copilot must not fabricate session-load requests")
+assert(
+	not sessions.list().available and not sessions.close().available and #calls == 2,
+	"Copilot history listing and deletion must remain explicit"
+)
