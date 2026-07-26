@@ -4,7 +4,7 @@ local value = codex.probe({
 	run = function(argv)
 		table.insert(calls, argv)
 		if argv[2] == "--version" then
-			return { code = 0, stdout = "codex-cli 0.144.4" }
+			return { code = 0, stdout = "codex-cli 0.145.0" }
 		end
 		return { code = 0, stdout = "--listen stdio://" }
 	end,

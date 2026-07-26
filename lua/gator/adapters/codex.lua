@@ -1,6 +1,6 @@
 local M = {}
 
-M.range = { minimum = { 0, 144, 0 }, maximum = { 0, 144, 999 } }
+M.range = { minimum = { 0, 145, 0 }, maximum = { 0, 145, 999 } }
 
 local function fail(message)
 	error("Gator Codex probe: " .. message, 3)

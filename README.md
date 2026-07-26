@@ -1,66 +1,22 @@
-<div align="center">
-  <h1>Gator</h1>
-  <p>Native-first coding-agent orchestration for Neovim.</p>
-  <p>
-    <a href="https://github.com/gongahkia/gator/actions/workflows/ci.yml"><img src="https://github.com/gongahkia/gator/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-    <a href="https://github.com/gongahkia/gator/blob/main/LICENSE"><img src="https://img.shields.io/github/license/gongahkia/gator" alt="License"></a>
-    <a href="https://github.com/gongahkia/gator/graphs/contributors"><img src="https://img.shields.io/github/contributors/gongahkia/gator" alt="Contributors"></a>
-    <a href="https://github.com/gongahkia/gator/stargazers"><img src="https://img.shields.io/github/stars/gongahkia/gator?style=flat" alt="Stars"></a>
-  </p>
-</div>
+# Gator
 
----
+Gator is a Neovim plugin for launching local coding-agent CLIs with editor context, then retaining a local run graph for focus, handoff, review, and parallel worktrees.
 
-Gator is a Neovim workspace for steering, reviewing, and coordinating existing coding-agent CLIs. Providers retain ownership of authentication, model selection, sessions, tool loops, compaction, and sandboxing; Gator adds local context provenance, task/run evidence, and editor-native workflows.
+It does not replace Codex, Pi, Claude, ACP agents, or their harnesses. Providers retain authentication, model choice, tools, permissions, compaction, and sessions. Gator records only runs it starts.
 
-Highlights
-----------
+## The normal flow
 
-- **Native-first** — uses provider-owned authentication and sessions; never broadens provider permissions.
-- **Local-first** — context, tasks, diagnostics, and persistence stay local by default.
-- **Evidence-driven** — validates task, context, policy, and provider capability before a run starts.
-- **Editor-native** — keyboard-first task, terminal, context, and review workflows inside Neovim.
-- **Extensible** — supports provider adapters and an optional Rust `gator-index` sidecar.
+1. Select code, or place the cursor in the relevant buffer.
+2. Run `:Gator` and enter a short objective.
+3. Pick a ready provider once. Gator remembers it for that Git project.
+4. Gator opens a structured chat when that provider exposes one; otherwise it opens the provider's native terminal in Neovim.
+5. Use `:GatorRuns` to focus, stop, resume, hand off, or start a parallel writer.
 
-Table of Contents
------------------
+The launched prompt receives the objective, exact selected/current source, and current Git diff. Gator writes local run metadata and bundles under `.gator/`; it adds that directory to Git's local `info/exclude`, never to tracked `.gitignore`.
 
-<!-- vim-markdown-toc GFM -->
+## Install
 
-- [Installation](#installation)
-  - [Requirements](#requirements)
-  - [lazy.nvim](#lazynvim)
-  - [Native package](#native-package)
-  - [First run](#first-run)
-- [Usage](#usage)
-  - [Commands](#commands)
-  - [Launch a task](#launch-a-task)
-  - [Capture context](#capture-context)
-  - [Keyboard controls](#keyboard-controls)
-- [Configuration](#configuration)
-  - [File-based configuration](#file-based-configuration)
-- [Advanced use](#advanced-use)
-- [Providers](#providers)
-- [Privacy and safety](#privacy-and-safety)
-- [Diagnostics and troubleshooting](#diagnostics-and-troubleshooting)
-- [Development](#development)
-- [Uninstall](#uninstall)
-- [Support and security](#support-and-security)
-- [License](#license)
-
-<!-- vim-markdown-toc -->
-
-Installation
-------------
-
-### Requirements
-
-- Neovim 0.11+
-- Git for workspace and review operations
-
-The optional `gator-index` sidecar additionally requires Rust stable and `sqlite3`. Provider CLIs are optional and must be installed and authenticated independently. Windows is not in the current CI matrix.
-
-### lazy.nvim
+Requirements: Neovim 0.11+, Git, and any provider CLIs you intend to use.
 
 ```lua
 {
@@ -71,206 +27,79 @@ The optional `gator-index` sidecar additionally requires Rust stable and `sqlite
 }
 ```
 
-### Native package
+For a temporary development checkout:
 
 ```sh
-git clone https://github.com/gongahkia/gator.git \
-  "${XDG_DATA_HOME:-$HOME/.local/share}/nvim/site/pack/gator/start/gator"
+nvim --cmd 'set rtp+=/absolute/path/to/gator' \
+  --cmd 'lua require("gator").setup()' .
 ```
 
-### First run
+Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
 
-Restart Neovim, then run:
+## Commands
 
-```vim
-:GatorHealth
-:Gator
-```
-
-`:GatorHealth` uses provider-native non-interactive probes where available. It does not read or store provider credentials.
-
-Usage
------
-
-### Commands
-
-| Command | Description |
+| Command | Use |
 | --- | --- |
-| `:Gator` | Open the task, session, context, and review workspace. |
-| `:GatorHealth` | Check compatibility, workspace, policy, sidecar, and provider readiness. |
-| `:{range}GatorCaptureSelection task:<id>` | Capture a line or visual selection as provenance-tracked task context. |
-| `:{range}GatorCaptureSelection session:<provider>:<id>` | Capture context for an opaque provider-native session. |
-| `:GatorExportDiagnostics` | Write a local, redacted diagnostic JSON snapshot. |
-| `:GatorBetaReadiness` | Verify beta prerequisites and write a local readiness report. |
-| `:GatorStopSession` | Stop the active managed provider process; retain its provider-native session for later attach. |
+| `:Gator [provider]` | Capture the visual range/current buffer and launch. |
+| `:GatorRuns` | Open the local run graph. |
+| `:GatorHandoff <run-id> [provider]` | Review a bundle and create a new target-provider session. |
+| `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |
+| `:GatorHealth` | Check provider readiness and compatibility. |
 
-Run `require("gator").setup()` before `:GatorCaptureSelection`.
-
-### Launch a task
-
-From a Git workspace, open `:Gator`, choose **Create local task**, enter an objective, then choose **Launch selected task**. Gator writes the task to `.gator/tasks/<id>.md` and presents only locally-ready providers.
-
-Claude Code, Codex, OpenCode, and Pi retain their interactive terminals. Managed providers open a Gator conversation panel: use `i` to prompt, `c` to cancel the current run, and `q` to detach the panel while retaining the provider process. Use `:GatorStopSession` or **Stop active session** to close the managed process; the provider-native session remains attachable. One-shot providers become review-ready when their run exits; **Attach selected session** resumes a documented session or reopens its local history. Gator also stops managed children during `VimLeavePre`. `.gator/` is ignored by default, so task files remain local to the checkout.
-
-Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. Readiness is shown as **detected**, **user-confirmed**, or **indeterminate**; user confirmation is never credential verification. Copilot sends ACP `session/load` only when its initialize response advertises `agentCapabilities.loadSession`; otherwise it opens the interactive `copilot --resume <id>` fallback.
-
-### Capture context
-
-Select lines in normal or visual mode, then target a task or provider-native session:
-
-```vim
-:'<,'>GatorCaptureSelection task:fix-parser
-:'<,'>GatorCaptureSelection session:codex:thread-id
-```
-
-Gator records provenance for captured context. Project instructions require explicit trust before transfer.
-
-### Keyboard controls
-
-Gator panels are keyboard-first and buffer-local:
-
-- `j` / `k` — move selection
-- `<CR>` — confirm or open
-- `q` — close or cancel
-- `?` — show panel help
-
-Context uses `<Space>` to include or exclude an entry; review uses `a` / `r` to accept or reject a hunk; timelines use `<Space>` to collapse or expand a call. Set `ui.screen_reader = true` (the default) for plain, read-only `gator-text` buffers.
-
-Configuration
--------------
-
-Minimal setup:
+There is no task dashboard, task import, task file, or task-ID workflow. A simple optional mapping is:
 
 ```lua
-require("gator").setup()
+vim.keymap.set({ "n", "v" }, "<leader>ag", "<cmd>Gator<CR>", { desc = "Gator launch" })
 ```
 
-The default configuration is:
+## Configuration
 
 ```lua
 require("gator").setup({
-  schema_version = 3,
-  ui = {
-    layout = "adaptive",
-    keymaps = {},
-    screen_reader = true,
-    icons = "unicode", -- 🐊; use "nerd_font", "ascii", or "none" when preferred
-    motion = { enabled = true, interval_ms = 120, reduced = false },
+  launch = {
+    default_provider = "ask", -- "ask" or a provider id
+    transport = "auto", -- "auto", "chat", or "terminal"
   },
   context = {
-    mode = "manual",
-    trust = "provenance",
-    handoff = { author = "user", max_chars = 4096, review = "required" },
+    handoff = {
+      profile = "full", -- "full", "compact", or "summary-first"
+      source_summary = false, -- explicit opt-in for summary-first review
+    },
   },
-  sessions = { transfer = "manual" },
   providers = {
-    pi = { user_confirmed = false },
-    aider = { user_confirmed = false }, amp = { user_confirmed = false },
-    cline = { user_confirmed = false }, copilot = { user_confirmed = false },
-		cursor = { user_confirmed = false },
-    gemini = { user_confirmed = false }, goose = { user_confirmed = false },
-    kimi = { user_confirmed = false }, vibe = { user_confirmed = false },
+    pi = { user_confirmed = true }, -- only after Pi is configured locally
   },
-  workspaces = { mode = "project", max_write_runs = 1 },
-  persistence = { sharing = "local" },
-  telemetry = { enabled = false, redaction_patterns = {} },
+  ui = { icons = "ascii" }, -- "unicode", "nerd_font", "ascii", or "none"
 })
 ```
 
-Override panel actions through `ui.keymaps`; an override applies only to panels that implement that action.
+Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 
-`ui.icons` controls Gator panel glyphs: `"unicode"` is the default 🐊/emoji style, `"nerd_font"` uses Nerd Font symbols, `"ascii"` is the terminal-safe fallback, and `"none"` disables decorative glyphs. Gator uses Neovim highlight groups rather than raw ANSI escape sequences.
+`auto` uses a Gator chat only for documented structured transports: Pi RPC, Codex App Server, and supported ACP/managed providers. Claude and unsupported/terminal-only providers retain their native Neovim terminal. Forcing `chat` on an unsupported provider fails explicitly.
 
-### File-based configuration
+## Handoffs and parallel runs
 
-To opt into `stdpath("config") .. "/gator.json"`, load it explicitly:
+Handoff creates a new provider session. It never claims to migrate an opaque provider-native session.
 
-```lua
-local settings, provenance = require("gator.config").load()
-require("gator").setup(settings)
-```
+- `full` transfers objective, selected context, diff, editable review bundle, and a Gator-owned chat transcript when available.
+- `compact` transfers a bounded bundle without the full transcript.
+- `summary-first` requires explicit opt-in and is unavailable for terminal-originated runs because Gator does not scrape terminal output.
 
-The optional `provenance` result identifies the source for each resolved field. Unversioned, schema-v1, and schema-v2 files migrate to schema v3 in memory; Gator does not rewrite the file.
+Every handoff is reviewed before launch. Terminal runs are labelled `transcript unavailable`. Usage is labelled `reported` only when a provider emits it, `estimated` for Gator's local context estimate, or `unknown`.
 
-> [!WARNING]
-> Do not put provider credentials, tokens, secrets, passwords, or API keys in Gator configuration.
+The first writer uses the current checkout. A further active writer gets an isolated Git worktree. Gator does not run a daemon, scheduler, process scanner, or automatic workflow queue.
 
-Advanced use
-------------
+## Provider boundaries
 
-Automation can inspect local compatibility and immutable coordinator state:
+Gator does not read, store, or verify provider credentials. `user_confirmed` means the user asserted local readiness where a CLI has no non-interactive auth-status contract; it is not credential verification.
 
-```lua
-local gator = require("gator")
-local manifest = gator.compatibility_manifest()
-local manifest_json = gator.compatibility_manifest_json()
-local snapshot = gator.inspect()
-```
+See [provider support](docs/PROVIDERS.md) for the transport matrix and version constraints.
 
-The compatibility manifest reports Neovim version and local capability status only. `inspect()` returns a versioned snapshot; its `schema_version` is the inspection contract version. Neither API probes, stores, or exposes provider credentials.
-
-Providers
----------
-
-Gator provides adapters for Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Gemini CLI, Goose, Kimi Code CLI, Mistral Vibe, Copilot CLI, OpenCode, and Pi.
-
-Installed capabilities are probed, not assumed. Run `:GatorHealth` from the project you plan to use; an operation is available only when the installed CLI advertises the required capability. See the [provider support matrix](docs/PROVIDERS.md) for fixture-tested versions, auth probes, managed transport, and limitations.
-
-Privacy and safety
-------------------
-
-Gator is a native-first meta-harness: it can narrow a provider action or require confirmation, but it does not broaden provider permissions. Provider runs are checked against task, context pack, narrowed run policy, and advertised capabilities before launch.
-
-Gator does not persist provider credentials, output, or transcripts, and it has no general persistent activity log. Telemetry is disabled by default. Local diagnostic exports are redacted and not sent automatically.
-
-> [!IMPORTANT]
-> Extensions, provider CLIs, and marketplace packages run with your user privileges. Review their source, release provenance, requested permissions, and dependency changes before enabling them. Do not install code that asks you to disable sandboxing, expand permissions, or share credentials.
-
-Diagnostics and troubleshooting
--------------------------------
-
-For a local diagnosis:
-
-1. Run `:GatorHealth` from the affected project.
-2. Run `:GatorExportDiagnostics`; for startup/readiness failures, also run `:GatorBetaReadiness`.
-3. Review the artifacts before sharing them.
-4. Check the provider's installed CLI/version against the [provider support matrix](docs/PROVIDERS.md).
-
-Diagnostic reports remain local until explicitly shared. Do not attach credentials, API keys, private prompts, provider transcripts, unredacted logs, or private repository paths. Full report locations and safe bug-reporting guidance are in [Diagnostics](docs/DIAGNOSTICS.md).
-
-Development
------------
+## Development
 
 ```sh
+make test
 make check
-make benchmark
-make sidecar
 ```
 
-- `make check` runs Lua tests, Rust indexer tests, format checks, and lint.
-- `make benchmark` runs fixture-backed performance budgets.
-- `make sidecar` starts the optional Rust indexer.
-
-See [Contributing](CONTRIBUTING.md) for prerequisites and contribution requirements, and [Performance](docs/PERFORMANCE.md) for benchmark limits.
-
-Uninstall
----------
-
-Remove Gator through the plugin manager or delete the native-package directory used during installation. To remove local Gator configuration and state, first inspect these paths in Neovim:
-
-```vim
-:echo stdpath('config') .. '/gator.json'
-:echo stdpath('state') .. '/gator'
-```
-
-Delete only the inspected paths if you also want to remove Gator's local configuration, run/session metadata, review evidence, and workspace links. Provider CLI credentials are managed outside Gator.
-
-Support and security
---------------------
-
-Use GitHub issues for reproducible bugs and feature requests; see [Support](SUPPORT.md). Report vulnerabilities privately through GitHub Security Advisories; see [Security](SECURITY.md).
-
-License
--------
-
-Gator is [MIT licensed](LICENSE). Supported behavior and release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+`make check` runs Lua tests, indexer tests, format checks, and lint.

@@ -85,6 +85,7 @@ function M.new(opts)
 		providers = {},
 		active = {},
 		transcripts = {},
+		pending_summary = {},
 	}, Workflow)
 	value:refresh()
 	return value
@@ -286,13 +287,19 @@ function Workflow:open_conversation(run)
 		on_detach = function()
 			self:update(run.id, { state = "detached" })
 		end,
-		on_message = function(role, message)
-			if run.transcript == "available" then
-				self.transcripts[run.id] = self.transcripts[run.id] or {}
-				table.insert(self.transcripts[run.id], "## " .. role .. "\n" .. message)
-			end
-		end,
+		on_message = function() end,
 	})
+end
+
+function Workflow:append_transcript(id, role, message)
+	local run = self:run(id)
+	if run.transcript ~= "available" or type(message) ~= "string" or message == "" then
+		return false
+	end
+	self.transcripts[id] = self.transcripts[id] or {}
+	table.insert(self.transcripts[id], "## " .. role .. "\n" .. message)
+	self.store:transcript(id, table.concat(self.transcripts[id], "\n\n"))
+	return true
 end
 
 function Workflow:open_terminal(run, prepared)
@@ -327,10 +334,12 @@ function Workflow:open_structured(run, prompt)
 		end,
 		on_event = function(kind, value)
 			if kind == "text" then
+				self:append_transcript(run.id, "assistant", value)
 				pcall(conversation.update, { run_id = run.id, text = value, state = "running" })
 			elseif kind == "settled" then
 				self:update(run.id, { state = "waiting_input" })
 				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
+				self:finish_summary(run.id)
 			elseif kind == "error" then
 				pcall(conversation.update, { run_id = run.id, text = value, state = "failed" })
 			end
@@ -383,9 +392,11 @@ function Workflow:open_managed(run, prompt)
 		end,
 		on_event = function(event)
 			if event.type == "text" or event.type == "complete" then
+				self:append_transcript(run.id, "assistant", event.text or "")
 				pcall(conversation.update, { run_id = run.id, text = event.text, state = event.type == "complete" and "waiting_input" or "running" })
 				if event.type == "complete" then
 					self:update(run.id, { state = "waiting_input" })
+					self:finish_summary(run.id)
 				end
 			elseif event.type == "error" then
 				pcall(conversation.update, { run_id = run.id, text = event.text, state = "failed" })
@@ -465,6 +476,7 @@ end
 function Workflow:send(id, message)
 	message = text(message, "prompt")
 	local run = self:run(id)
+	self:append_transcript(id, "user", message)
 	local active = self.active[id]
 	if not active then
 		fail("run is not active in this Neovim instance")
@@ -548,7 +560,22 @@ end
 
 function Workflow:transcript(run)
 	local value = self.transcripts[run.id]
-	return value and table.concat(value, "\n\n") or nil
+	return value and table.concat(value, "\n\n") or self.store:read_transcript(run.id)
+end
+
+function Workflow:finish_summary(id)
+	local pending = self.pending_summary[id]
+	if not pending then
+		return false
+	end
+	self.pending_summary[id] = nil
+	local parts = self.transcripts[id] or {}
+	local summary = table.concat(vim.list_slice(parts, pending.start_index + 1), "\n\n")
+	if vim.trim(summary) == "" then
+		vim.notify("Gator handoff: source agent returned no summary", vim.log.levels.WARN)
+		return false
+	end
+	return self:handoff(id, pending.target, { profile = "compact", summary = summary })
 end
 
 function Workflow:handoff(source_id, target, opts)
@@ -557,7 +584,7 @@ function Workflow:handoff(source_id, target, opts)
 	if not target then
 		local choices = {}
 		for _, value in pairs(self.providers) do
-			if value.provider ~= source.provider then
+			if opts.include_source or value.provider ~= source.provider then
 				table.insert(choices, value)
 			end
 		end
@@ -590,9 +617,19 @@ function Workflow:handoff(source_id, target, opts)
 			body = body .. "\n\n## Gator-owned transcript\n" .. transcript
 		end
 	elseif profile == "summary-first" then
-		vim.ui.input({ prompt = "Source-agent handoff summary: " }, function(summary)
-			if type(summary) == "string" and vim.trim(summary) ~= "" then
-				self:handoff(source_id, target, { profile = "compact", summary = summary })
+		local active = self.active[source.id]
+		if not active or source.transport ~= "chat" then
+			fail("summary-first handoff requires an active Gator chat source")
+		end
+		vim.ui.select({ "Ask source agent", "Cancel" }, { prompt = "Gator handoff summary" }, function(choice)
+			if choice ~= "Ask source agent" then
+				return
+			end
+			self.pending_summary[source.id] = { target = target, start_index = #(self.transcripts[source.id] or {}) }
+			local ok, err = pcall(self.send, self, source.id, "Prepare a concise handoff summary: current result, changes made, unresolved risks, and recommended next action.")
+			if not ok then
+				self.pending_summary[source.id] = nil
+				vim.notify("Gator handoff: " .. tostring(err), vim.log.levels.ERROR)
 			end
 		end)
 		return true
@@ -622,7 +659,7 @@ end
 
 function Workflow:launch_parallel(id)
 	local source = self:run(id)
-	return self:handoff(source.id, nil, { profile = "compact" })
+	return self:handoff(source.id, nil, { profile = "compact", include_source = true })
 end
 
 function Workflow:open_runs()

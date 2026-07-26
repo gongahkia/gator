@@ -1,31 +1,35 @@
-# Provider support matrix
+# Provider support
 
-Gator is a native-first meta-harness: providers own authentication, model selection, sessions, tool loops, compaction, and sandboxing. Gator owns editor UX, context provenance, lifecycle evidence, and permission narrowing. Health probes use a three-second bound except Pi's credential-free RPC profile, which permits ten seconds for CLI startup; a provider is verified ready only when its probe and non-interactive auth probe pass.
+Gator selects only adapters that pass their local executable/version/capability checks. Provider authentication remains provider-owned. `user_confirmed` is an explicit user readiness assertion for CLIs without a machine-readable auth-status command; it is not credential verification.
 
-“Fixture-tested” names the exact CLI version exercised by checked-in adapter tests. A range is enforced only where stated. Capability lists are probes, not promises: an operation is unavailable unless the installed CLI advertises it.
+| Provider | Auto transport | Resume/handoff truth |
+| --- | --- | --- |
+| Pi | Gator chat through `pi --mode rpc` | Gator obtains Pi's RPC session ID and records reported session usage; cross-provider handoff starts a new session. |
+| Codex | Gator chat through App Server when the tested protocol contract is available | Gator records a new App Server thread; terminal fallback uses Codex's provider-owned resume flow. |
+| Claude Code | Native Neovim terminal | Gator does not treat headless streaming as a durable interactive chat contract. |
+| OpenCode | Native Neovim terminal | Gator records the provider session created by its bridge. |
+| Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, Vibe | Managed/ACP chat only when each installed adapter advertises the required contract | Capability and resume behavior remain adapter-specific; Gator presents provider approval requests interactively where ACP emits them. |
 
-| Provider | Executable | Fixture-tested version | Auth probe | Advertised capabilities | Explicit limitations | Verification tier |
-| --- | --- | --- | --- | --- | --- | --- |
-| Aider | `aider` | 0.77.1 | unavailable: no provider-independent status contract | managed task-scoped local history via `--chat-history-file` and `--message` | not a provider-native session; provider-default policy; explicit user confirmation required | fixture + local authenticated E2E |
-| Amp | `amp` | 1.2.3 | unavailable: no non-interactive status contract | managed persistent JSON stream/input and provider thread resume | no ACP or Gator approval claim; explicit user confirmation required | fixture + local authenticated E2E |
-| Cline | `cline` | 1.3.0 | unavailable: no provider-independent status contract | managed ACP/stdio, create/resume, Gator ACP approval UI | ACP profile varies by CLI; explicit user confirmation required | fixture + local authenticated E2E |
-| Cursor Agent | `cursor-agent` | 1.2.3 | unavailable: `status` has no machine-readable schema | managed one-shot stream JSON and documented `--resume` | no machine-readable auth readiness; provider-default policy; explicit user confirmation required | fixture + local authenticated E2E |
-| Codex | `codex` | 0.144.4; enforced 0.144.x | `codex login status` | CLI, app-server RPC, native terminal launch/resume | Gator creates a non-ephemeral thread before opening `codex resume`; only detected app-server surface is advertised | fixture + local authenticated check |
-| Claude Code | `claude` | 2.1.119; enforced 2.1.x | `claude auth status` JSON | stream JSON, resume, native terminal launch/resume | Gator supplies a valid provider-owned UUID; no capabilities beyond CLI help are advertised | fixture + local authenticated check |
-| Gemini CLI | `gemini` | 0.46.0; enforced 0.46.x | unavailable: no non-interactive status contract | managed ACP/stdio, session load, Gator ACP approval UI | auth cannot be checked; explicit user confirmation required | fixture + local authenticated E2E |
-| Goose | `goose` | 1.36.0 | unavailable: no non-interactive status command | managed ACP/stdio, session load, Gator ACP approval UI | auth cannot be checked; explicit user confirmation required | fixture + local authenticated E2E |
-| Kimi Code CLI | `kimi` | 1.45.0 | unavailable: no non-interactive status command | managed ACP/stdio, session load, Gator ACP approval UI | explicit user confirmation required | fixture + local authenticated E2E |
-| Mistral Vibe | `vibe` and `vibe-acp` | 2.1.0 | unavailable: no non-interactive status command | managed ACP/stdio, session load, Gator ACP approval UI | explicit user confirmation required | fixture + local authenticated E2E |
-| Copilot CLI | `copilot` | 0.0.411; enforced 0.0.411–0.0.999 | unavailable: no machine-readable status contract | managed ACP/stdio, new sessions, capability-gated ACP session load, Gator ACP approval UI | Gator sends `session/load` only when initialize advertises `agentCapabilities.loadSession`; otherwise it opens interactive `copilot --resume <id>` and does not assume ID compatibility | fixture + local authenticated bridge E2E |
-| OpenCode | `opencode` | 1.18.0; enforced 1.17.15–1.18.0 | `opencode providers list` | ACP/stdio, load/list/close/fork/resume, MCP HTTP/SSE, context/images, native terminal launch/resume | Gator creates an ACP session before opening the TUI; other versions and missing ACP are unsupported | fixture + local authenticated E2E |
-| Pi | `pi` | 0.82.0; exact enforced | unavailable: RPC has no credential-status contract | RPC/stdio, state, create/resume, tool filters, native terminal launch/resume | set `providers.pi.user_confirmed = true` only after configuring Pi credentials; Gator labels this user-confirmed, not auth-verified | fixture + local offline E2E |
+Gator never scrapes a terminal to fabricate chat history. A terminal-originated run can still hand off its objective, captured source, diff, and an editable note, but is explicitly marked `transcript unavailable`.
 
-`:GatorHealth` does not read credentials. Readiness is `detected` when a supported CLI/auth contract is observed, `user_confirmed` when the user explicitly opts in without an auth-status API, or `indeterminate` otherwise. “Authentication probe passed” means the provider’s own status command reported login; it does not expose or validate credential material. Run `make live-handoff-e2e` locally on a machine authenticated to every provider; it runs native checks before the directed cross-provider handoff matrix.
+## Readiness
 
-The local task launcher enables Claude Code, Codex, and OpenCode when they pass executable, supported-version, provider-native authentication, and session-bridge checks. Pi requires the same executable, version, and session checks plus `providers.pi.user_confirmed = true`. Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, and Vibe require their documented managed contract plus `providers.<name>.user_confirmed = true`; this is user confirmation, not credential verification. Gator never reads, stores, or verifies credentials.
+Run `:GatorHealth` in the Git project you want to use. It reports an adapter as:
 
-## Managed session lifecycle
+- `detected`: executable and provider-native readiness/auth probe passed.
+- `user_confirmed`: executable/contract passed and the user enabled the adapter opt-in; credentials are not verified.
+- `indeterminate`: an executable, version, capability, or auth requirement is unavailable.
 
-`q` detaches a Gator conversation panel without terminating its managed provider child. Use **Stop active session** from `:Gator` or `:GatorStopSession` to terminate that child; a stopped provider-native session remains attachable. Gator stops managed children on `VimLeavePre`.
+Pi requires:
 
-Run `make live-copilot-e2e` only on a locally authenticated machine. Its bridge check uses a temporary empty workspace and verifies create, prompt, stop, fresh-process resume, and explicit fallback behavior; it does not run in CI or expose credentials.
+```lua
+require("gator").setup({
+  providers = { pi = { user_confirmed = true } },
+})
+```
+
+Set that only after configuring Pi's own local provider credentials.
+
+## Version policy
+
+Fixture-tested version ranges are enforced by each adapter probe. Gator does not treat a newer CLI version as compatible solely because its executable exists. Update an adapter range only with matching protocol fixtures and a local verification run.

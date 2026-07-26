@@ -111,7 +111,7 @@ function M._test()
 		local module = M.module(name)
 		assert(type(module) == "table", name .. " module must return a table")
 		assert(module.name == name, name .. " module must identify itself")
-		assert(module.api_version == 1, name .. " module must declare API version 1")
+		assert(type(module.api_version) == "number" and module.api_version >= 1, name .. " module must declare a supported API version")
 	end
 	local ok = pcall(M.module, "missing")
 	assert(not ok, "unknown modules must fail explicitly")

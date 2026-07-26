@@ -85,6 +85,7 @@ local M = {
 	rpc = require("gator.adapters.rpc"),
 	resume = require("gator.adapters.resume"),
 	stream = require("gator.adapters.stream"),
+	structured = require("gator.adapters.structured"),
 	terminal = require("gator.adapters.terminal"),
 }
 

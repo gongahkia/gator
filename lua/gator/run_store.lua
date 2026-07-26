@@ -146,7 +146,7 @@ local function normalize_run(value)
 	if run.bundle_id ~= nil then
 		run.bundle_id = identifier(run.bundle_id, "run.bundle_id")
 	end
-	run.objective = text(run.objective, "run.objective")
+	run.objective = redact.text(text(run.objective, "run.objective"))
 	if run.transcript ~= "available" and run.transcript ~= "unavailable" then
 		fail("run.transcript must be available or unavailable")
 	end
@@ -234,7 +234,7 @@ end
 
 function Store:bundle(id, body)
 	id = identifier(id, "bundle id")
-	body = text(body, "bundle body")
+	body = redact.text(text(body, "bundle body"))
 	self:ensure()
 	local path = self.bundles_directory .. "/" .. id .. ".md"
 	if vim.fn.writefile(vim.split(body, "\n", { plain = true }), path) ~= 0 then
@@ -251,6 +251,27 @@ function Store:materialize_bundle(id, body, root)
 	local target = M.new(root)
 	target:ensure()
 	return target:bundle(id, body)
+end
+
+function Store:transcript(id, body)
+	id = identifier(id, "run id")
+	body = redact.text(text(body, "transcript"))
+	self:ensure()
+	local directory = self.directory .. "/transcripts"
+	if vim.fn.mkdir(directory, "p") ~= 1 and vim.fn.isdirectory(directory) ~= 1 then
+		fail("cannot create transcript directory")
+	end
+	local path = directory .. "/" .. id .. ".md"
+	if vim.fn.writefile(vim.split(body, "\n", { plain = true }), path) ~= 0 then
+		fail("cannot write transcript")
+	end
+	return path
+end
+
+function Store:read_transcript(id)
+	id = identifier(id, "run id")
+	local path = self.directory .. "/transcripts/" .. id .. ".md"
+	return vim.fn.filereadable(path) == 1 and table.concat(vim.fn.readfile(path), "\n") or nil
 end
 
 function M.id(prefix)

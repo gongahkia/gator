@@ -1,12 +1,8 @@
 local M = {
 	name = "github",
-	api_version = 1,
-	artifacts = require("gator.github.artifacts"),
+	api_version = 2,
 	gh = require("gator.github.gh"),
-	issue = require("gator.github.issue"),
-	pull_request = require("gator.github.pull_request"),
 	publish = require("gator.github.publish"),
-	sync = require("gator.github.sync"),
 }
 
 return M
