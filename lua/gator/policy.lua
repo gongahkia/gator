@@ -6,7 +6,6 @@ local M = {
 	project = require("gator.policy.project"),
 	redact = require("gator.policy.redact"),
 	repository = require("gator.policy.repository"),
-	run = require("gator.policy.run"),
 }
 
 return M

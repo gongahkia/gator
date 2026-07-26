@@ -46,7 +46,7 @@ Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
 | `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |
 | `:GatorHealth` | Check provider readiness and compatibility. |
 
-There is no task dashboard, task import, task file, or task-ID workflow. A simple optional mapping is:
+There is no legacy dashboard, import, file, or ID workflow. A simple optional mapping is:
 
 ```lua
 vim.keymap.set({ "n", "v" }, "<leader>ag", "<cmd>Gator<CR>", { desc = "Gator launch" })

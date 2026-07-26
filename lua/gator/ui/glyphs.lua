@@ -137,8 +137,6 @@ function M.decorate(lines, filetype)
 			line = prefix(line, "brand")
 		elseif line:match("^State:") then
 			line = prefix(line, status(line))
-		elseif line:match("^Tasks:") then
-			line = prefix(line, "task")
 		elseif line:match("^Sessions:") then
 			line = prefix(line, "session")
 		elseif line:match("^Context:") then
