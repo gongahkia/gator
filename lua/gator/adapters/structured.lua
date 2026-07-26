@@ -1,4 +1,5 @@
 local redact = require("gator.policy.redact")
+local codex_permission = require("gator.adapters.codex_permission")
 
 local M = {}
 local Manager = {}
@@ -85,14 +86,25 @@ function Manager:open(opts)
 		fail("open requires a structured provider")
 	end
 	local provider, cwd, prompt = opts.provider, text(opts.cwd, "cwd"), text(opts.prompt, "prompt")
-	for _, name in ipairs({ "on_session", "on_event", "on_usage", "on_exit" }) do
+	for _, name in ipairs({ "on_session", "on_event", "on_usage", "on_exit", "on_approval" }) do
 		if opts[name] ~= nil and type(opts[name]) ~= "function" then
 			fail(name .. " must be a function")
 		end
 	end
 	self.sequence = self.sequence + 1
 	local id = provider .. "-" .. self.sequence
-	local current = { id = id, provider = provider, buffer = "", busy = false, closed = false, session_id = nil }
+	local current = {
+		id = id,
+		provider = provider,
+		buffer = "",
+		busy = false,
+		closed = false,
+		session_id = nil,
+		turn_id = nil,
+		pending = {},
+		permission = nil,
+		run_id = opts.run_id or "run-structured",
+	}
 	self.active[id] = current
 	local function notify(kind, value)
 		if opts.on_event then
@@ -117,7 +129,12 @@ function Manager:open(opts)
 	end
 	local function codex_request(method, params)
 		current.request_id = (current.request_id or 0) + 1
-		return write({ jsonrpc = "2.0", id = current.request_id, method = method, params = params })
+		local request_id = current.request_id
+		if not write({ jsonrpc = "2.0", id = request_id, method = method, params = params }) then
+			return false
+		end
+		current.pending[request_id] = method
+		return true
 	end
 	local function send(message)
 		message = text(message, "prompt")
@@ -128,14 +145,76 @@ function Manager:open(opts)
 			end
 			return write(body)
 		end
-		return codex_request("turn/start", {
-			threadId = current.session_id,
-			input = { { type = "text", text = message } },
+		local input = { { type = "text", text = message } }
+		if current.busy then
+			if not current.turn_id then
+				return false
+			end
+			return codex_request(
+				"turn/steer",
+				{ threadId = current.session_id, expectedTurnId = current.turn_id, input = input }
+			)
+		end
+		return codex_request("turn/start", { threadId = current.session_id, input = input })
+	end
+	local function establish_permission_bridge()
+		if provider ~= "codex" or current.permission then
+			return
+		end
+		current.permission = codex_permission.new({
+			respond = function(response)
+				if not write({ jsonrpc = "2.0", id = response.id, result = response.result }) then
+					error("Codex approval response could not be written")
+				end
+			end,
 		})
+	end
+	local function approval(message)
+		if not current.permission then
+			return false
+		end
+		local ok, emitted = pcall(current.permission.receive, current.permission, {
+			id = message.id,
+			method = message.method,
+			params = message.params,
+		}, {
+			run_id = current.run_id,
+			session_id = current.session_id,
+		})
+		if not ok then
+			notify("error", emitted)
+			return true
+		end
+		if not emitted or not emitted.payload then
+			return false
+		end
+		local function decide(decision)
+			local resolved, result =
+				pcall(current.permission.decide, current.permission, emitted.payload.request_id, decision)
+			if not resolved then
+				notify("error", result)
+			end
+			return resolved and result
+		end
+		if opts.on_approval then
+			opts.on_approval({
+				action = emitted.payload.action,
+				details = vim.deepcopy(emitted.payload.details),
+				command = type(message.params) == "table" and redact.text(message.params.command or "") or "",
+			}, decide)
+		else
+			decide("cancelled")
+		end
+		return true
 	end
 	local function handle_message(message)
 		if provider == "pi" then
-			if message.type == "response" and message.command == "get_state" and message.success and type(message.data) == "table" then
+			if
+				message.type == "response"
+				and message.command == "get_state"
+				and message.success
+				and type(message.data) == "table"
+			then
 				current.session_id = message.data.sessionId
 				if current.session_id and opts.on_session then
 					opts.on_session({ id = current.session_id, resume_supported = false })
@@ -159,29 +238,66 @@ function Manager:open(opts)
 			end
 			return
 		end
-		if message.id == 1 and message.result and not current.initialized then
-			current.initialized = true
-			write({ jsonrpc = "2.0", method = "initialized", params = vim.empty_dict() })
-			codex_request("thread/start", { cwd = cwd, ephemeral = false })
+		if message.id ~= nil and message.method then
+			if approval(message) then
+				return
+			end
+			write({
+				jsonrpc = "2.0",
+				id = message.id,
+				error = { code = -32601, message = "Gator does not implement " .. tostring(message.method) },
+			})
+			notify("error", "Codex requested unsupported client action: " .. tostring(message.method))
 			return
 		end
-		if message.id ~= nil and message.result and current.session_id == nil then
-			local thread = message.result.thread or message.result
-			local session_id = thread.id or thread.threadId
-			if type(session_id) == "string" and session_id ~= "" then
-				current.session_id = session_id
-				if opts.on_session then
-					opts.on_session({ id = session_id, resume_supported = true })
-				end
-				send(prompt)
+		if message.id ~= nil and (message.result ~= nil or message.error ~= nil) then
+			local requested = current.pending[message.id]
+			current.pending[message.id] = nil
+			if message.error then
+				notify(
+					"error",
+					redact.text(type(message.error) == "table" and message.error.message or "Codex request failed")
+				)
+				return
 			end
+			if requested == "initialize" then
+				current.initialized = true
+				write({ jsonrpc = "2.0", method = "initialized", params = vim.empty_dict() })
+				codex_request("thread/start", { cwd = cwd, ephemeral = false })
+				return
+			end
+			if requested == "thread/start" and current.session_id == nil then
+				local thread = message.result.thread or message.result
+				local session_id = thread.id or thread.threadId
+				if type(session_id) == "string" and session_id ~= "" then
+					current.session_id = session_id
+					establish_permission_bridge()
+					if opts.on_session then
+						opts.on_session({ id = session_id, resume_supported = false })
+					end
+					send(prompt)
+				end
+				return
+			end
+			if requested == "turn/start" or requested == "turn/steer" then
+				local turn = message.result and message.result.turn
+				if type(turn) == "table" and type(turn.id) == "string" then
+					current.turn_id = turn.id
+				end
+			end
+			return
 		end
 		local method = message.method
 		if method == "turn/started" then
 			current.busy = true
+			local turn = type(message.params) == "table" and message.params.turn or nil
+			if type(turn) == "table" and type(turn.id) == "string" then
+				current.turn_id = turn.id
+			end
 			notify("running")
 		elseif method == "turn/completed" or method == "turn/finished" then
 			current.busy = false
+			current.turn_id = nil
 			notify("settled")
 		end
 		usage(message.params or message.result)
@@ -244,7 +360,13 @@ function Manager:open(opts)
 		id = id,
 		send = send,
 		cancel = function()
-			return provider == "pi" and pi_command("abort") or write({ jsonrpc = "2.0", method = "turn/interrupt", params = { threadId = current.session_id } })
+			if provider == "pi" then
+				return pi_command("abort")
+			end
+			if not current.session_id or not current.turn_id then
+				return false
+			end
+			return codex_request("turn/interrupt", { threadId = current.session_id, turnId = current.turn_id })
 		end,
 		stop = function()
 			current.closed = true

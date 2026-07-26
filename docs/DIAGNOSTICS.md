@@ -1,6 +1,6 @@
 # Diagnostics and bug reports
 
-Gator is local-first. It does not persist provider credentials or provider output/transcripts. Do not enable telemetry to investigate a problem; telemetry is disabled by default and is not needed for a bug report.
+Gator is local-first. It does not persist provider credentials. Gator-owned chat transcripts and reviewed handoff artifacts are stored locally under `.gator/` after redaction; terminal output is never scraped. Do not enable telemetry to investigate a problem; telemetry is disabled by default and is not needed for a bug report.
 
 ## What Gator records
 

@@ -448,18 +448,18 @@ function Manager:_feed(run, chunk)
 		end
 		local line = run.buffer:sub(1, ending - 1):gsub("\r$", "")
 		run.buffer = run.buffer:sub(ending + 1)
-			if line ~= "" then
-				local ok, raw = pcall(vim.json.decode, line)
-				if ok and type(raw) == "table" then
-					if run.mode == "acp" then
-						self:_acp_line(run, raw)
-					elseif run.mode == "stream" then
-						self:_stream_line(run, raw)
-					end
-				else
-					run.on_event({ type = "error", text = "provider emitted invalid structured output" })
+		if line ~= "" then
+			local ok, raw = pcall(vim.json.decode, line)
+			if ok and type(raw) == "table" then
+				if run.mode == "acp" then
+					self:_acp_line(run, raw)
+				elseif run.mode == "stream" then
+					self:_stream_line(run, raw)
 				end
+			else
+				run.on_event({ type = "error", text = "provider emitted invalid structured output" })
 			end
+		end
 	end
 end
 

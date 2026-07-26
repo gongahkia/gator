@@ -21,8 +21,8 @@ assert(
 		and cancelled == 1,
 	"coordinator harness must exercise redacted operation cancellation through the public dispatcher"
 )
-local panel = value:dispatch("open")
-assert(vim.api.nvim_win_is_valid(panel), "coordinator harness must exercise a real keyboard-accessible cockpit open")
+local panel = value:dispatch("runs")
+assert(vim.api.nvim_win_is_valid(panel), "coordinator harness must exercise the run graph")
 assert(value:cleanup() and not value:cleanup(), "coordinator harness cleanup must be idempotent")
 assert(not pcall(value.dispatch, value, "open"), "closed coordinator harnesses must fail explicitly")
 assert(not pcall(harness.new, { settings = true }), "coordinator harness must reject invalid fixture settings")

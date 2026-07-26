@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 4
+M.schema_version = 6
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -12,6 +12,7 @@ M.defaults = {
 		screen_reader = true,
 		icons = "unicode",
 		motion = { enabled = true, interval_ms = 120, reduced = false },
+		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
 	},
 	context = {
 		mode = "manual",
@@ -19,6 +20,8 @@ M.defaults = {
 		handoff = {
 			author = "user",
 			max_chars = 4096,
+			max_files = 24,
+			max_file_chars = 65536,
 			review = "required",
 			profile = "full",
 			source_summary = false,
@@ -41,6 +44,7 @@ M.defaults = {
 	workspaces = { mode = "project" },
 	persistence = { sharing = "local" },
 	telemetry = { enabled = false, redaction_patterns = {} },
+	budget = { max_tokens = 0, action = "warn" },
 }
 
 local function fail(message)
@@ -49,6 +53,9 @@ end
 
 local function sensitive(key)
 	key = key:lower()
+	if key == "max_tokens" then
+		return false
+	end
 	return key:match("token")
 		or key:match("secret")
 		or key:match("credential")
@@ -103,6 +110,7 @@ local root_fields = {
 	workspaces = true,
 	persistence = true,
 	telemetry = true,
+	budget = true,
 }
 
 local function schema_version(value)
@@ -145,7 +153,11 @@ local launch_provider_names = vim.tbl_extend("force", { claude = true, codex = t
 local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
-	fields(value.ui, { layout = true, keymaps = true, screen_reader = true, icons = true, motion = true }, "settings.ui")
+	fields(
+		value.ui,
+		{ layout = true, keymaps = true, screen_reader = true, icons = true, motion = true, loading = true },
+		"settings.ui"
+	)
 	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
 	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
@@ -156,6 +168,7 @@ local function settings(value)
 	fields(value.workspaces, { mode = true }, "settings.workspaces")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
+	fields(value.budget, { max_tokens = true, action = true }, "settings.budget")
 	if not vim.tbl_contains({ "adaptive", "modal" }, value.ui.layout) then
 		fail("ui.layout must be adaptive or modal")
 	end
@@ -178,6 +191,7 @@ local function settings(value)
 	end
 	local motion = require("gator.ui.motion").resolve(value.ui.motion)
 	value.ui.motion = motion
+	value.ui.loading = require("gator.ui.loading").resolve(value.ui.loading)
 	if not vim.tbl_contains({ "manual", "inspect", "automatic" }, value.context.mode) then
 		fail("context.mode must be manual, inspect, or automatic")
 	end
@@ -187,6 +201,8 @@ local function settings(value)
 	fields(value.context.handoff, {
 		author = true,
 		max_chars = true,
+		max_files = true,
+		max_file_chars = true,
 		review = true,
 		profile = true,
 		source_summary = true,
@@ -200,6 +216,15 @@ local function settings(value)
 		or value.context.handoff.max_chars % 1 ~= 0
 	then
 		fail("context.handoff.max_chars must be a positive integer")
+	end
+	for _, field in ipairs({ "max_files", "max_file_chars" }) do
+		if
+			type(value.context.handoff[field]) ~= "number"
+			or value.context.handoff[field] < 0
+			or value.context.handoff[field] % 1 ~= 0
+		then
+			fail("context.handoff." .. field .. " must be a non-negative integer")
+		end
 	end
 	if value.context.handoff.review ~= "required" and value.context.handoff.review ~= "optional" then
 		fail("context.handoff.review must be required or optional")
@@ -233,6 +258,12 @@ local function settings(value)
 	if type(value.telemetry.enabled) ~= "boolean" then
 		fail("telemetry.enabled must be boolean")
 	end
+	if type(value.budget.max_tokens) ~= "number" or value.budget.max_tokens < 0 or value.budget.max_tokens % 1 ~= 0 then
+		fail("budget.max_tokens must be a non-negative integer")
+	end
+	if value.budget.action ~= "warn" and value.budget.action ~= "stop" then
+		fail("budget.action must be warn or stop")
+	end
 	redact.validate_patterns(value.telemetry.redaction_patterns)
 	return value
 end
@@ -251,7 +282,7 @@ function M.migrate(value)
 	if from_version == M.schema_version then
 		return document, { migrated = false, from_version = from_version, to_version = from_version }
 	end
-	if from_version ~= 1 and from_version ~= 2 and from_version ~= 3 then
+	if from_version ~= 1 and from_version ~= 2 and from_version ~= 3 and from_version ~= 4 and from_version ~= 5 then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
 	document.launch = document.launch or {}
@@ -260,9 +291,14 @@ function M.migrate(value)
 	document.context = document.context or {}
 	document.context.handoff = document.context.handoff or {}
 	document.context.handoff.profile = document.context.handoff.profile or "full"
+	document.context.handoff.max_files = document.context.handoff.max_files or 24
+	document.context.handoff.max_file_chars = document.context.handoff.max_file_chars or 65536
 	if document.context.handoff.source_summary == nil then
 		document.context.handoff.source_summary = false
 	end
+	document.ui = document.ui or {}
+	document.ui.loading = document.ui.loading or {}
+	document.budget = document.budget or {}
 	document.schema_version = M.schema_version
 	return document, { migrated = true, from_version = from_version, to_version = M.schema_version }
 end
@@ -279,7 +315,11 @@ local function source(value, index)
 		fail("configuration source " .. index .. " ref must be a non-empty string")
 	end
 	local settings_value, migration = value.settings
-	if type(settings_value) == "table" and settings_value.schema_version ~= nil and settings_value.schema_version ~= M.schema_version then
+	if
+		type(settings_value) == "table"
+		and settings_value.schema_version ~= nil
+		and settings_value.schema_version ~= M.schema_version
+	then
 		settings_value, migration = M.migrate(settings_value)
 	end
 	return {

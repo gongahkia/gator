@@ -8,7 +8,7 @@ local path = helpers.tempdir("config") .. "/gator.json"
 helpers.write(path, '{"schema_version":2,"ui":{"layout":"modal"},"workspaces":{"mode":"worktree","max_write_runs":2}}')
 local value = config.load(path)
 assert(
-	value.schema_version == 4
+	value.schema_version == config.schema_version
 		and value.ui.layout == "modal"
 		and value.workspaces.mode == "worktree"
 		and value.workspaces.mode == "worktree",
@@ -20,7 +20,10 @@ assert(
 )
 helpers.write(path, "not-json")
 assert(not pcall(config.load, path), "invalid user defaults must fail explicitly")
-assert(config.resolve({ schema_version = 1 }).schema_version == 4, "legacy configuration schemas must migrate in memory")
+assert(
+	config.resolve({ schema_version = 1 }).schema_version == config.schema_version,
+	"legacy configuration schemas must migrate in memory"
+)
 assert(not pcall(config.resolve, { schema_version = "2" }), "configuration schemas must require an integer version")
 local handoff = config.resolve({ context = { handoff = { author = "gator", max_chars = 2048 } } }).context.handoff
 assert(
@@ -40,6 +43,16 @@ assert(
 	managed_provider.gemini.user_confirmed and not managed_provider.copilot.user_confirmed,
 	"managed providers must require an explicit per-provider local confirmation"
 )
+local loading = config.resolve({ ui = { loading = { spinner = "whirly.hanoi", interval_ms = 80 } } }).ui.loading
+assert(
+	loading.enabled and loading.spinner == "whirly.hanoi" and loading.interval_ms == 80,
+	"loading configuration must select a bundled spinner and optional cadence override"
+)
+local budget = config.resolve({ budget = { max_tokens = 1000, action = "stop" } }).budget
+assert(
+	budget.max_tokens == 1000 and budget.action == "stop",
+	"budget configuration must preserve explicit limits and actions"
+)
 assert(
 	not pcall(
 			config.resolve,
@@ -54,29 +67,33 @@ assert(
 			{ context = { handoff = { author = "user", max_chars = 1, review = "invalid" } } }
 		)
 		and not pcall(config.resolve, { providers = { pi = { user_confirmed = "yes" } } })
-		and not pcall(config.resolve, { providers = { unknown = { user_confirmed = true } } }),
+		and not pcall(config.resolve, { providers = { unknown = { user_confirmed = true } } })
+		and not pcall(config.resolve, { ui = { loading = { spinner = "unknown" } } })
+		and not pcall(config.resolve, { ui = { loading = { interval_ms = 15 } } })
+		and not pcall(config.resolve, { budget = { max_tokens = -1 } })
+		and not pcall(config.resolve, { budget = { action = "invalid" } }),
 	"handoff authoring settings must reject unsupported authors, bounds, and review modes"
 )
 
 helpers.write(path, '{"schema_version":1,"ui":{"layout":"modal"}}')
 local migrated, migrated_provenance, migrations = config.load(path)
 assert(
-	migrated.schema_version == 4
+	migrated.schema_version == config.schema_version
 		and migrated.ui.layout == "modal"
 		and migrations[1].from_version == 1
-		and migrations[1].to_version == 4
+		and migrations[1].to_version == config.schema_version
 		and migrated_provenance.schema_version.source == "migration",
 	"legacy configuration files must migrate to schema v3 with provenance"
 )
 local legacy = '{"context":{"mode":"inspect"}}'
 helpers.write(path, legacy)
 assert(
-	config.load(path).schema_version == 4
+	config.load(path).schema_version == config.schema_version
 		and config.load(path).context.mode == "inspect"
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":5}')
+helpers.write(path, '{"schema_version":7}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

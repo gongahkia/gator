@@ -54,7 +54,7 @@ local runtime = managed.new({
 runtime:open({
 	provider = "gemini",
 	cwd = root,
-	task_id = "managed-task",
+	run_id = "managed-run",
 	prompt = "start",
 	on_session = function(value)
 		table.insert(sessions, value)
@@ -109,7 +109,7 @@ local aider = managed.new({
 aider:open({
 	provider = "aider",
 	cwd = root,
-	task_id = "managed-task",
+	run_id = "managed-run",
 	history = root .. "/aider-history.md",
 	prompt = "start",
 	on_session = function(value)
@@ -121,7 +121,7 @@ assert(
 		and aider_session.id == root .. "/aider-history.md"
 		and vim.tbl_contains(aider_argv, "--chat-history-file")
 		and vim.tbl_contains(aider_argv, "--message"),
-	"Aider managed runs must use a task-scoped Gator-owned history file"
+	"Aider managed runs must use a run-scoped Gator-owned history file"
 )
 
 local copilot_stdout, copilot_writes = nil, {}
@@ -155,7 +155,7 @@ local copilot = managed.new({
 copilot:open({
 	provider = "copilot",
 	cwd = root,
-	task_id = "managed-task",
+	run_id = "managed-run",
 	session = { provider = "copilot", id = "copilot-session", owner = "provider", mode = "acp" },
 })
 assert(
@@ -189,7 +189,7 @@ local fallback_runtime = managed.new({
 local fallback_run = fallback_runtime:open({
 	provider = "copilot",
 	cwd = root,
-	task_id = "managed-task",
+	run_id = "managed-run",
 	session = { provider = "copilot", id = "copilot-session", owner = "provider", mode = "acp" },
 	on_resume_fallback = function(value)
 		fallback = value

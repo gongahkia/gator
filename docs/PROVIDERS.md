@@ -10,7 +10,7 @@ Gator selects only adapters that pass their local executable/version/capability 
 | OpenCode | Native Neovim terminal | Gator records the provider session created by its bridge. |
 | Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, Vibe | Managed/ACP chat only when each installed adapter advertises the required contract | Capability and resume behavior remain adapter-specific; Gator presents provider approval requests interactively where ACP emits them. |
 
-Gator never scrapes a terminal to fabricate chat history. A terminal-originated run can still hand off its objective, captured source, diff, and an editable note, but is explicitly marked `transcript unavailable`.
+Gator never scrapes a terminal to fabricate chat history. A terminal-originated run can still hand off its objective, captured source, current diff, bounded changed-text-file snapshots, and an editable note, but is explicitly marked `transcript unavailable`. Cross-provider handoff creates a new provider session and materializes Gator-owned files under `.gator/handoffs/<bundle-id>/files/`; it does not claim to migrate opaque provider state.
 
 ## Readiness
 

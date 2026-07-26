@@ -4,11 +4,17 @@ local M = {
 	accessibility = require("gator.ui.accessibility"),
 	approval_details = require("gator.ui.approval_details"),
 	conversation = require("gator.ui.conversation"),
+	escalation = require("gator.ui.escalation"),
+	event_details = require("gator.ui.event_details"),
 	glyphs = require("gator.ui.glyphs"),
+	markdown = require("gator.ui.markdown"),
+	loading = require("gator.ui.loading"),
 	picker = require("gator.ui.picker"),
 	provider_picker = require("gator.ui.provider_picker"),
 	run_graph = require("gator.ui.run_graph"),
 	run_handoff = require("gator.ui.run_handoff"),
+	timeline = require("gator.ui.timeline"),
+	usage_details = require("gator.ui.usage_details"),
 }
 
 function M.close()
@@ -17,6 +23,7 @@ function M.close()
 	closed = M.run_graph.close() or closed
 	closed = M.run_handoff.close() or closed
 	closed = M.picker.close() or closed
+	closed = M.loading.close() or closed
 	return closed
 end
 

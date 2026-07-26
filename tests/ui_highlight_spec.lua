@@ -5,7 +5,7 @@ accessibility.render(buffer, {
 	"Gator workspace",
 	"State: ready · provider passed",
 	"Providers:",
-	"> Open task dashboard",
+	"> Open run graph",
 	"<CR> confirm · j/k navigate · q close · ? help",
 	"Review: unavailable · no evidence",
 	"State: failed · request rejected",

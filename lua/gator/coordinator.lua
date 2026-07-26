@@ -37,6 +37,7 @@ end
 
 local function configure(container, settings)
 	container:require("motion").configure(settings.ui.motion)
+	container:require("loading").configure(settings.ui.loading, settings.ui.motion)
 	container:require("accessibility").configure(settings.ui)
 	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
 	container:require("consent").configure({ enabled = settings.telemetry.enabled })
@@ -306,7 +307,12 @@ function Coordinator:dispatch(action, opts)
 		end
 		local runs = self:workflow():runs()
 		for _, run in ipairs(runs) do
-			if run.state == "starting" or run.state == "running" or run.state == "waiting_input" or run.state == "detached" then
+			if
+				run.state == "starting"
+				or run.state == "running"
+				or run.state == "waiting_input"
+				or run.state == "detached"
+			then
 				return self:workflow():stop(run.id)
 			end
 		end

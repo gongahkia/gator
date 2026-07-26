@@ -78,7 +78,8 @@ function M.open(opts)
 	end
 	local panel, tabpage = current()
 	if panel then
-		panel.provider, panel.session_id, panel.run_id, panel.state = opts.provider, opts.session_id, opts.run_id, opts.state
+		panel.provider, panel.session_id, panel.run_id, panel.state =
+			opts.provider, opts.session_id, opts.run_id, opts.state
 		panel.on_input, panel.on_cancel, panel.on_detach, panel.on_message =
 			opts.on_input, opts.on_cancel, opts.on_detach or function() end, opts.on_message or function() end
 		render(panel)

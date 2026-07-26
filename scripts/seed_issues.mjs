@@ -80,7 +80,6 @@ add("ui", "Implement a streaming markdown renderer", "Render agent text incremen
 add("ui", "Implement an agent tool-call timeline", "Present provider tool calls, arguments, approvals, outputs, and failures with collapse controls.", "adapters");
 add("ui", "Implement the native diff review panel", "Open changed files and real diff splits from an agent run with task context.", "core");
 add("ui", "Implement the workspace and worktree dashboard", "Inspect workspace state, linked tasks, dirty files, and agent activity.", "workspace");
-add("ui", "Implement the Gator command palette", "Expose actions, adapters, task commands, and provider commands through native completion.", "adapters");
 add("ui", "Implement native picker fallbacks", "Provide complete picker workflows without optional UI dependencies.", "ui");
 add("ui", "Implement keymap and accessibility configuration", "Support user-owned keymaps, keyboard-only workflows, and screen-reader-friendly text buffers.", "ui");
 
@@ -208,7 +207,7 @@ for (const agent of ["Cursor", "Cline", "Kimi CLI", "Mistral Vibe", "Goose", "Ai
   add("future", `Implement ${agent} capability probe and recorded transport fixture`, `Research current ${agent} CLI behavior, implement a version/capability probe, and record a conformance fixture for a future first-class adapter.`, "adapters");
 }
 
-if (tasks.length !== 159) throw new Error(`Expected 159 tasks, got ${tasks.length}`);
+if (tasks.length !== 158) throw new Error(`Expected 158 tasks, got ${tasks.length}`);
 
 function body(task) {
   return [

@@ -17,6 +17,18 @@ assert(
 )
 assert(manager:attach("terminal-one") == session.window, "terminal sessions must be attachable")
 assert(manager:close("terminal-one") and stopped[1] == 42, "terminal close must stop and clean up its job")
+local exited = manager:open({ id = "terminal-exit", command = { "agent", "run" }, cwd = "/tmp" })
+assert(
+	vim.bo[exited.buffer].bufhidden == "wipe" and not vim.bo[exited.buffer].buflisted,
+	"terminal fallbacks must use ephemeral unlisted buffers"
+)
+launched.opts.on_exit(0, 0, "exit")
+assert(
+	vim.wait(100, function()
+		return not vim.api.nvim_win_is_valid(exited.window)
+	end),
+	"terminal views must close when their provider process exits"
+)
 local unavailable = terminal.new({ termopen = false })
 assert(not unavailable:inspect().available, "unavailable terminal capability must be explicit")
 local ok = pcall(unavailable.open, unavailable, { id = "missing", command = { "agent" } })

@@ -16,7 +16,7 @@ local catalog = health.launch_catalog({
 			return { code = 0, stdout = [[{"loggedIn":true}]] }
 		end
 		if argv[1] == "codex" and argv[2] == "--version" then
-			return { code = 0, stdout = "codex-cli 0.144.4" }
+			return { code = 0, stdout = "codex-cli 0.145.0" }
 		end
 		if argv[1] == "codex" and argv[2] == "app-server" then
 			return { code = 0, stdout = "--listen stdio://" }

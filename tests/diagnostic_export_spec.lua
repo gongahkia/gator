@@ -7,7 +7,6 @@ local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 
 local value = state.new(config.resolve(), compat.inspect())
 value:update({
-	tasks = { { objective = "token: private-value" } },
 	context = { selections = { { path = "/private/path" } } },
 	workspace = { status = "degraded", detail = "token: private-value /private/path" },
 })
@@ -35,7 +34,7 @@ assert(
 		and not encoded:find("/private/path", 1, true)
 		and stored.workspace.status == "degraded"
 		and stored.configuration.persistence.sharing == "local",
-	"diagnostic exports must exclude task, context, path, and credential data while retaining safe local state"
+	"diagnostic exports must exclude context, path, and credential data while retaining safe local state"
 )
 local cancelled = diagnostic_export.write({
 	state = value,

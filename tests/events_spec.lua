@@ -1,10 +1,10 @@
 local events = require("gator").module("extensions").events
 local received = {}
-local task_listener = events.subscribe({
-	types = { "task.created" },
+local run_listener = events.subscribe({
+	types = { "run.created" },
 	handler = function(value)
 		table.insert(received, value)
-		value.payload.task.id = "changed"
+		value.payload.run.id = "changed"
 	end,
 })
 local all_listener = events.subscribe({
@@ -14,22 +14,22 @@ local all_listener = events.subscribe({
 })
 local emitted = events.emit({
 	schema_version = 1,
-	type = "task.created",
+	type = "run.created",
 	at = 1,
 	payload = {
-		task = { id = "task-one" },
+		run = { id = "run-one" },
 		session = { provider = "fixture", id = "native-session", owner = "provider" },
 	},
 })
 assert(
-	#received == 1 and received[1].type == "task.created" and emitted.payload.task.id == "task-one",
+	#received == 1 and received[1].type == "run.created" and emitted.payload.run.id == "run-one",
 	"event delivery must be versioned, filtered, and isolated from listeners"
 )
-assert(events.unsubscribe(task_listener) and events.unsubscribe(all_listener), "listeners must unsubscribe cleanly")
-assert(not events.unsubscribe(task_listener), "unknown listeners must not be silently removed")
+assert(events.unsubscribe(run_listener) and events.unsubscribe(all_listener), "listeners must unsubscribe cleanly")
+assert(not events.unsubscribe(run_listener), "unknown listeners must not be silently removed")
 assert(not pcall(events.emit, {
 	schema_version = 1,
-	type = "task.created",
+	type = "run.created",
 	at = 1,
 	payload = { token = "secret" },
 }), "events must reject credentials")

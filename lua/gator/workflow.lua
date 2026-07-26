@@ -9,6 +9,7 @@ local provider_picker = require("gator.ui.provider_picker")
 local conversation = require("gator.ui.conversation")
 local run_graph = require("gator.ui.run_graph")
 local handoff_review = require("gator.ui.run_handoff")
+local loading_ui = require("gator.ui.loading")
 local worktree = require("gator.workspace.worktree")
 local state_store = require("gator.state")
 
@@ -55,7 +56,10 @@ local function now()
 end
 
 local function active_state(value)
-	return value.state == "starting" or value.state == "running" or value.state == "waiting_input" or value.state == "detached"
+	return value.state == "starting"
+		or value.state == "running"
+		or value.state == "waiting_input"
+		or value.state == "detached"
 end
 
 local function writers(value)
@@ -68,7 +72,17 @@ function M.new(opts)
 		fail("new requires initialized state")
 	end
 	for key in pairs(opts) do
-		if key ~= "state" and key ~= "root" and key ~= "terminal" and key ~= "bridge" and key ~= "readiness" and key ~= "managed" and key ~= "structured" then
+		if
+			key ~= "state"
+			and key ~= "root"
+			and key ~= "terminal"
+			and key ~= "bridge"
+			and key ~= "readiness"
+			and key ~= "managed"
+			and key ~= "structured"
+			and key ~= "loading"
+			and key ~= "handoff_review"
+		then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -82,6 +96,9 @@ function M.new(opts)
 		readiness = opts.readiness or health.launch_catalog,
 		managed = opts.managed or managed_adapter.new({ shutdown = true }),
 		structured = opts.structured or structured.new(),
+		loading = opts.loading or loading_ui,
+		handoff_review = opts.handoff_review or handoff_review,
+		loading_handles = {},
 		providers = {},
 		active = {},
 		transcripts = {},
@@ -114,6 +131,28 @@ function Workflow:update(id, patch)
 	end
 	value.updated_at = now()
 	return self:put(value)
+end
+
+function Workflow:report_usage(id, usage)
+	if type(usage) ~= "table" or usage.state ~= "reported" then
+		fail("reported usage is required")
+	end
+	local run = self:run(id)
+	local budget = vim.deepcopy(run.budget)
+	if budget.limit_tokens > 0 then
+		budget.state = usage.total_tokens and usage.total_tokens >= budget.limit_tokens and "exhausted" or "tracking"
+	end
+	self:update(id, { usage = usage, budget = budget })
+	if budget.state == "exhausted" then
+		vim.notify(
+			"Gator budget reached for " .. run.provider .. " · " .. budget.limit_tokens .. " tokens",
+			vim.log.levels.WARN
+		)
+		if budget.action == "stop" then
+			self:cancel(id)
+		end
+	end
+	return budget
 end
 
 function Workflow:refresh()
@@ -178,7 +217,13 @@ function Workflow:resolve_transport(record, requested)
 end
 
 function Workflow:choose(opts)
-	self:refresh()
+	opts = opts or {}
+	local loading = self.loading.open({ message = "Checking local coding agents" })
+	local ok, result = pcall(self.refresh, self)
+	loading.close()
+	if not ok then
+		error(result, 0)
+	end
 	if opts.provider then
 		return self:launch(opts)
 	end
@@ -258,7 +303,7 @@ end
 function Workflow:bundle(opts, workspace)
 	if opts.bundle_body then
 		local body = text(opts.bundle_body, "handoff bundle")
-		return body, { state = "estimated", input_tokens = capture.estimate(body) }
+		return body, { input_tokens = capture.estimate(body) }
 	end
 	return capture.bundle({
 		objective = opts.objective,
@@ -302,12 +347,22 @@ function Workflow:append_transcript(id, role, message)
 	return true
 end
 
+function Workflow:close_loading(id)
+	local handle = self.loading_handles[id]
+	self.loading_handles[id] = nil
+	if handle and type(handle.close) == "function" then
+		pcall(handle.close)
+	end
+	return handle ~= nil
+end
+
 function Workflow:open_terminal(run, prepared)
 	local opened = self.terminal:open({
 		id = run.id,
 		cwd = run.workspace.root,
 		command = prepared.command,
 		on_exit = function(result)
+			self:close_loading(run.id)
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
 				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
@@ -326,9 +381,11 @@ end
 function Workflow:open_structured(run, prompt)
 	local opened = self.structured:open({
 		provider = run.provider,
+		run_id = run.id,
 		cwd = run.workspace.root,
 		prompt = prompt,
 		on_session = function(session)
+			self:close_loading(run.id)
 			self:update(run.id, { session = session, state = "running" })
 			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = "running" })
 		end,
@@ -345,9 +402,24 @@ function Workflow:open_structured(run, prompt)
 			end
 		end,
 		on_usage = function(usage)
-			self:update(run.id, { usage = usage })
+			self:report_usage(run.id, usage)
+		end,
+		on_approval = function(request, decide)
+			local detail = request.command ~= "" and (" · " .. request.command) or ""
+			pcall(
+				conversation.update,
+				{ run_id = run.id, text = "Approval requested: " .. request.action .. detail, state = "waiting_input" }
+			)
+			vim.ui.select({ "Approve once", "Deny", "Cancel" }, {
+				prompt = "Gator approval · " .. run.provider .. " · " .. request.action .. detail,
+			}, function(choice)
+				local decision = choice == "Approve once" and "approved"
+					or (choice == "Deny" and "denied" or "cancelled")
+				decide(decision)
+			end)
 		end,
 		on_exit = function(result)
+			self:close_loading(run.id)
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
 				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
@@ -382,6 +454,7 @@ function Workflow:open_managed(run, prompt)
 		history = history,
 		prompt = prompt,
 		on_session = function(session)
+			self:close_loading(run.id)
 			reference = session
 			self.active[run.id] = { kind = "managed", reference = session }
 			self:update(run.id, {
@@ -393,7 +466,11 @@ function Workflow:open_managed(run, prompt)
 		on_event = function(event)
 			if event.type == "text" or event.type == "complete" then
 				self:append_transcript(run.id, "assistant", event.text or "")
-				pcall(conversation.update, { run_id = run.id, text = event.text, state = event.type == "complete" and "waiting_input" or "running" })
+				pcall(conversation.update, {
+					run_id = run.id,
+					text = event.text,
+					state = event.type == "complete" and "waiting_input" or "running",
+				})
 				if event.type == "complete" then
 					self:update(run.id, { state = "waiting_input" })
 					self:finish_summary(run.id)
@@ -404,9 +481,13 @@ function Workflow:open_managed(run, prompt)
 		end,
 		on_permission = permission,
 		on_exit = function(result)
+			self:close_loading(run.id)
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
-				self:update(run.id, { state = result.stopped and "stopped" or (result.code == 0 and "completed" or "failed") })
+				self:update(
+					run.id,
+					{ state = result.stopped and "stopped" or (result.code == 0 and "completed" or "failed") }
+				)
 			end
 			self.active[run.id] = nil
 		end,
@@ -427,10 +508,12 @@ function Workflow:launch(opts)
 	local transport = self:resolve_transport(chosen, opts.transport)
 	local id = run_store.id("run")
 	local workspace = self:workspace(id, opts.force_worktree == true)
-	local body, usage = self:bundle(opts, workspace)
+	local body, estimate = self:bundle(opts, workspace)
 	local bundle_id = run_store.id("bundle")
 	self.store:bundle(bundle_id, body)
-	if workspace.kind == "worktree" then
+	if opts.handoff_snapshot then
+		self.store:materialize_handoff(bundle_id, body, opts.handoff_snapshot, workspace.root)
+	elseif workspace.kind == "worktree" then
 		self.store:materialize_bundle(bundle_id, body, workspace.root)
 	end
 	local run = self:put({
@@ -444,13 +527,26 @@ function Workflow:launch(opts)
 		bundle_id = bundle_id,
 		objective = objective,
 		transcript = transport == "terminal" and "unavailable" or "available",
-		usage = usage,
+		usage = { state = "unknown", context_tokens_estimate = estimate.input_tokens },
+		budget = {
+			limit_tokens = self.state.config.budget.max_tokens,
+			action = self.state.config.budget.action,
+			state = self.state.config.budget.max_tokens > 0 and "unknown" or "unbounded",
+		},
 		created_at = now(),
 		updated_at = now(),
 	})
 	local prompt = objective .. "\n\nUse this Gator context bundle:\n\n" .. body
+	if opts.handoff_snapshot then
+		prompt = prompt
+			.. "\n\nReviewed source-file snapshots were applied and retained at .gator/handoffs/"
+			.. bundle_id
+			.. "/files/ in this workspace."
+	end
+	self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
 	if transport == "terminal" then
 		self.bridge:start({ provider = run.provider, cwd = workspace.root, prompt = prompt }, function(prepared, reason)
+			self:close_loading(run.id)
 			if not prepared then
 				self:update(run.id, { state = "failed" })
 				vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
@@ -463,9 +559,17 @@ function Workflow:launch(opts)
 			end
 		end)
 	elseif structured.supports(run.provider) then
-		self:open_structured(run, prompt)
+		local ok, err = pcall(self.open_structured, self, run, prompt)
+		if not ok then
+			self:close_loading(run.id)
+			error(err, 0)
+		end
 	else
-		self:open_managed(run, prompt)
+		local ok, err = pcall(self.open_managed, self, run, prompt)
+		if not ok then
+			self:close_loading(run.id)
+			error(err, 0)
+		end
 	end
 	if opts.remember ~= false then
 		self.store:set_default_provider(run.provider)
@@ -512,6 +616,7 @@ end
 
 function Workflow:stop(id)
 	local run = self:run(id)
+	self:close_loading(id)
 	local active = self.active[id]
 	if active then
 		if active.kind == "terminal" then
@@ -548,13 +653,16 @@ function Workflow:resume(id)
 	if ok then
 		return true
 	end
-	self.bridge:resume({ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } }, function(prepared, reason)
-		if not prepared then
-			vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
-			return
+	self.bridge:resume(
+		{ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } },
+		function(prepared, reason)
+			if not prepared then
+				vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
+				return
+			end
+			self:open_terminal(run, prepared)
 		end
-		self:open_terminal(run, prepared)
-	end)
+	)
 	return true
 end
 
@@ -605,10 +713,16 @@ function Workflow:handoff(source_id, target, opts)
 	end
 	local body
 	local bundle_path = self.store.bundles_directory .. "/" .. source.bundle_id .. ".md"
-	body = vim.fn.filereadable(bundle_path) == 1 and table.concat(vim.fn.readfile(bundle_path), "\n") or source.objective
+	body = vim.fn.filereadable(bundle_path) == 1 and table.concat(vim.fn.readfile(bundle_path), "\n")
+		or source.objective
 	if type(opts.summary) == "string" and vim.trim(opts.summary) ~= "" then
 		body = body .. "\n\n## Source-agent summary\n" .. opts.summary
 	end
+	local snapshot = capture.snapshot(source.workspace.root, {
+		max_files = self.state.config.context.handoff.max_files,
+		max_file_chars = self.state.config.context.handoff.max_file_chars,
+	})
+	body = body .. "\n\n" .. capture.snapshot_markdown(snapshot)
 	if profile == "compact" then
 		body = body:sub(1, self.state.config.context.handoff.max_chars)
 	elseif profile == "full" then
@@ -626,7 +740,12 @@ function Workflow:handoff(source_id, target, opts)
 				return
 			end
 			self.pending_summary[source.id] = { target = target, start_index = #(self.transcripts[source.id] or {}) }
-			local ok, err = pcall(self.send, self, source.id, "Prepare a concise handoff summary: current result, changes made, unresolved risks, and recommended next action.")
+			local ok, err = pcall(
+				self.send,
+				self,
+				source.id,
+				"Prepare a concise handoff summary: current result, changes made, unresolved risks, and recommended next action."
+			)
 			if not ok then
 				self.pending_summary[source.id] = nil
 				vim.notify("Gator handoff: " .. tostring(err), vim.log.levels.ERROR)
@@ -634,7 +753,7 @@ function Workflow:handoff(source_id, target, opts)
 		end)
 		return true
 	end
-	handoff_review.open({
+	self.handoff_review.open({
 		source = source,
 		target = target,
 		profile = profile,
@@ -648,6 +767,7 @@ function Workflow:handoff(source_id, target, opts)
 				role = "writer",
 				force_worktree = writers(source),
 				remember = false,
+				handoff_snapshot = snapshot,
 			})
 			if not ok then
 				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
@@ -667,6 +787,9 @@ function Workflow:open_runs()
 end
 
 function Workflow:close()
+	for id in pairs(vim.deepcopy(self.loading_handles)) do
+		self:close_loading(id)
+	end
 	for id in pairs(vim.deepcopy(self.active)) do
 		pcall(self.stop, self, id)
 	end

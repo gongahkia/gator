@@ -86,7 +86,7 @@ local first = managed.new({ spawn = bridge_spawn(first_frames) })
 first:open({
 	provider = "copilot",
 	cwd = workspace,
-	task_id = "copilot-live-bridge",
+	run_id = "copilot-live-bridge",
 	prompt = "Reply exactly: gator-live-e2e. Do not use tools or edit files.",
 	on_session = function(value)
 		first_session = value
@@ -111,7 +111,7 @@ local resumed = managed.new({ spawn = bridge_spawn(resumed_frames) })
 resumed:open({
 	provider = "copilot",
 	cwd = workspace,
-	task_id = "copilot-live-bridge",
+	run_id = "copilot-live-bridge",
 	session = first_session,
 	prompt = "Reply exactly: gator-live-e2e. Do not use tools or edit files.",
 	on_event = function(event)

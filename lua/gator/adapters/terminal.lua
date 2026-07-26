@@ -73,6 +73,7 @@ function Manager:open(opts)
 	vim.cmd("botright 16new")
 	local window = vim.api.nvim_get_current_win()
 	local buffer = vim.api.nvim_get_current_buf()
+	vim.bo[buffer].bufhidden, vim.bo[buffer].buflisted = "wipe", false
 	local job_id = self.termopen(command(opts.command), {
 		cwd = opts.cwd,
 		on_exit = function(_, code, event)
@@ -80,6 +81,11 @@ function Manager:open(opts)
 			if opts.on_exit then
 				opts.on_exit({ id = id, code = code, event = event })
 			end
+			vim.schedule(function()
+				if vim.api.nvim_win_is_valid(window) then
+					vim.api.nvim_win_close(window, true)
+				end
+			end)
 		end,
 	})
 	if type(job_id) ~= "number" or job_id < 1 then

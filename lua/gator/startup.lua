@@ -1,4 +1,5 @@
-local M = { name = "startup", api_version = 2, deferred_modules = { "gator.adapters", "gator.indexer", "gator.github" } }
+local M =
+	{ name = "startup", api_version = 2, deferred_modules = { "gator.adapters", "gator.indexer", "gator.github" } }
 
 function M.recover(opts)
 	if type(opts) ~= "table" or type(opts.state) ~= "table" then

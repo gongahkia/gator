@@ -47,7 +47,8 @@ function M.register()
 		end)
 	end, { desc = "Verify public-beta readiness and write a local failure report" })
 	vim.api.nvim_create_user_command("GatorStopSession", function(opts)
-		local ok, result = pcall(require("gator").dispatch, "stop_session", { run_id = opts.args ~= "" and opts.args or nil })
+		local ok, result =
+			pcall(require("gator").dispatch, "stop_session", { run_id = opts.args ~= "" and opts.args or nil })
 		vim.notify(
 			ok and "Gator session stopped; provider session remains resumable"
 				or require("gator.policy.redact").text(tostring(result)),

@@ -9,6 +9,7 @@ local registry = {
 	config = { path = "gator.config" },
 	state = { path = "gator.state" },
 	motion = { path = "gator.ui.motion" },
+	loading = { path = "gator.ui.loading" },
 	accessibility = { path = "gator.ui.accessibility" },
 	redact = { path = "gator.policy.redact" },
 	consent = { path = "gator.telemetry.consent" },

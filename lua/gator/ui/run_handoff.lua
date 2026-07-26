@@ -33,12 +33,19 @@ local function render(panel)
 end
 
 function M.open(opts)
-	if type(opts) ~= "table" or type(opts.source) ~= "table" or type(opts.target) ~= "string" or type(opts.body) ~= "string" or type(opts.on_confirm) ~= "function" then
+	if
+		type(opts) ~= "table"
+		or type(opts.source) ~= "table"
+		or type(opts.target) ~= "string"
+		or type(opts.body) ~= "string"
+		or type(opts.on_confirm) ~= "function"
+	then
 		fail("open requires source, target, body, and confirm callback")
 	end
 	local panel, tabpage = current()
 	if panel then
-		panel.source, panel.target, panel.profile, panel.body, panel.on_confirm = opts.source, opts.target, opts.profile, opts.body, opts.on_confirm
+		panel.source, panel.target, panel.profile, panel.body, panel.on_confirm =
+			opts.source, opts.target, opts.profile, opts.body, opts.on_confirm
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window

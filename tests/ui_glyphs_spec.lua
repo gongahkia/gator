@@ -11,7 +11,10 @@ assert(
 )
 
 glyphs.configure("unicode")
-local unicode = glyphs.decorate({ "Gator runs", "State: ready", "No Gator-managed runs", "> Open runs", "j/k navigate · q close · ? help" }, "gator")
+local unicode = glyphs.decorate(
+	{ "Gator runs", "State: ready", "No Gator-managed runs", "> Open runs", "j/k navigate · q close · ? help" },
+	"gator"
+)
 assert(
 	unicode[1] == "🐊 Gator runs"
 		and unicode[2] == "✅ State: ready"
@@ -22,7 +25,10 @@ assert(
 )
 
 glyphs.configure("nerd_font")
-assert(glyphs.get("brand") ~= "🐊" and glyphs.decorate({ "Gator runs" }, "gator")[1]:find("Gator runs", 1, true), "Nerd Font mode must retain panel text")
+assert(
+	glyphs.get("brand") ~= "🐊" and glyphs.decorate({ "Gator runs" }, "gator")[1]:find("Gator runs", 1, true),
+	"Nerd Font mode must retain panel text"
+)
 
 glyphs.configure("ascii")
 local ascii = glyphs.decorate({ "Gator runs", "No matching runs" }, "gator")

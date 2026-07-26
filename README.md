@@ -49,7 +49,8 @@ Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
 There is no legacy dashboard, import, file, or ID workflow. A simple optional mapping is:
 
 ```lua
-vim.keymap.set({ "n", "v" }, "<leader>ag", "<cmd>Gator<CR>", { desc = "Gator launch" })
+vim.keymap.set("n", "<leader>ag", "<cmd>Gator<CR>", { desc = "Gator launch" })
+vim.keymap.set("x", "<leader>ag", ":Gator<CR>", { desc = "Gator launch selection" })
 ```
 
 ## Configuration
@@ -64,14 +65,29 @@ require("gator").setup({
     handoff = {
       profile = "full", -- "full", "compact", or "summary-first"
       source_summary = false, -- explicit opt-in for summary-first review
+      max_files = 24, -- changed text files copied into reviewed handoffs
+      max_file_chars = 65536, -- total copied-file character limit; 0 disables copies
     },
+  },
+  budget = {
+    max_tokens = 0, -- 0 is unbounded; enforced only for provider-reported usage
+    action = "warn", -- "warn" or "stop"
   },
   providers = {
     pi = { user_confirmed = true }, -- only after Pi is configured locally
   },
-  ui = { icons = "ascii" }, -- "unicode", "nerd_font", "ascii", or "none"
+  ui = {
+    icons = "ascii", -- "unicode", "nerd_font", "ascii", or "none"
+    loading = {
+      enabled = true,
+      spinner = "whirly.hanoi", -- `:lua =require("gator.ui.loading").presets()`
+      interval_ms = 0, -- 0 keeps the upstream cadence; otherwise >= 16 ms
+    },
+  },
 })
 ```
+
+Gator vendors 169 selectable loading animations from [Rattles](https://github.com/vyfor/rattles) and [Whirly](https://github.com/janlelis/whirly); see [loading dialogs](docs/LOADING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). `ui.motion.enabled = false` or `ui.motion.reduced = true` leaves the dialog visible but static.
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 
@@ -81,13 +97,13 @@ Provider selection precedence is explicit command/API provider, project-local re
 
 Handoff creates a new provider session. It never claims to migrate an opaque provider-native session.
 
-- `full` transfers objective, selected context, diff, editable review bundle, and a Gator-owned chat transcript when available.
+- `full` transfers objective, selected context, current source diff, bounded changed-text-file snapshots, editable review bundle, and a Gator-owned chat transcript when available.
 - `compact` transfers a bounded bundle without the full transcript.
 - `summary-first` requires explicit opt-in and is unavailable for terminal-originated runs because Gator does not scrape terminal output.
 
-Every handoff is reviewed before launch. Terminal runs are labelled `transcript unavailable`. Usage is labelled `reported` only when a provider emits it, `estimated` for Gator's local context estimate, or `unknown`.
+Every handoff is reviewed before launch. Included text-file snapshots are applied in the isolated target workspace and retained under `.gator/handoffs/<bundle-id>/files/`; binary, oversized, and omitted files are shown explicitly in the review. This is a portable Gator artifact, not a claim of provider-native session migration. Terminal runs are labelled `transcript unavailable`. Usage is `reported` only when a provider emits exact counts; otherwise it is `unknown` with a separate local context estimate. A configured token budget can warn or stop only runs with reported usage.
 
-The first writer uses the current checkout. A further active writer gets an isolated Git worktree. Gator does not run a daemon, scheduler, process scanner, or automatic workflow queue.
+The first writer uses the current checkout. A further active writer gets an isolated Git worktree. Chat, review, and terminal panes are ephemeral; terminal panes close when their provider exits. Gator does not run a daemon, scheduler, process scanner, or automatic workflow queue.
 
 ## Provider boundaries
 

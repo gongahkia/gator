@@ -42,7 +42,8 @@ function M.open(opts)
 				id = provider.provider,
 				label = provider.provider
 					.. (ready and " · user-confirmed; credentials not verified" or " · ready")
-					.. " · " .. transport,
+					.. " · "
+					.. transport,
 			}
 		else
 			fail("providers must contain capability contracts or ready provider records")

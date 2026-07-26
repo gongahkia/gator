@@ -28,19 +28,38 @@ local function render(panel)
 	else
 		for index, run in ipairs(runs) do
 			local parent = run.parent_run_id and (" ← " .. run.parent_run_id) or ""
-			local usage = run.usage.state == "reported" and "reported"
-				or run.usage.state == "estimated" and "estimated"
-				or "unknown"
-			table.insert(lines, string.format(
-				"%s %s · %s · %s · %s · %s%s",
-				index == panel.selected and ">" or " ",
-				run.id,
-				run.provider,
-				run.role,
-				run.state,
-				usage,
-				parent
-			))
+			local usage = run.usage.state == "reported"
+					and string.format(
+						"reported · in %s · out %s · total %s",
+						run.usage.input_tokens or "?",
+						run.usage.output_tokens or "?",
+						run.usage.total_tokens or "?"
+					)
+				or (run.usage.state == "estimated" and ("estimated · context ~" .. (run.usage.input_tokens or "?") .. " tokens"))
+				or ("unknown · context estimate ~" .. (run.usage.context_tokens_estimate or "?") .. " tokens")
+			local budget = run.budget.limit_tokens == 0 and "unbounded"
+				or (run.budget.state .. " · " .. (run.usage.total_tokens or "?") .. "/" .. run.budget.limit_tokens)
+			local workspace = vim.fn.fnamemodify(run.workspace.root, ":~:.")
+			table.insert(
+				lines,
+				string.format(
+					"%s %s · %s · %s · %s · %s%s",
+					index == panel.selected and ">" or " ",
+					run.id,
+					run.provider,
+					run.role,
+					run.state,
+					usage,
+					parent
+				)
+			)
+			table.insert(lines, "  Workspace: " .. run.workspace.kind .. " · " .. workspace)
+			table.insert(
+				lines,
+				"  Context: " .. (run.bundle_id or "unavailable") .. " · transcript " .. run.transcript
+			)
+			table.insert(lines, "  Usage: " .. usage)
+			table.insert(lines, "  Budget: " .. budget)
 		end
 	end
 	table.insert(lines, "")
@@ -109,7 +128,10 @@ local function bind(panel)
 		end,
 		close = M.close,
 		help = function()
-			vim.notify("Gator runs: <CR> focus, h handoff, p parallel writer, s stop, r resume, q close", vim.log.levels.INFO)
+			vim.notify(
+				"Gator runs: <CR> focus, h handoff, p parallel writer, s stop, r resume, q close",
+				vim.log.levels.INFO
+			)
 		end,
 	})
 end
@@ -129,7 +151,14 @@ function M.open(workflow)
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype, vim.bo[buffer].bufhidden = "gator-runs", "wipe"
 	vim.api.nvim_win_set_buf(opened.window, buffer)
-	panel = { window = opened.window, buffer = buffer, previous = opened.previous, workflow = workflow, runs = {}, selected = 1 }
+	panel = {
+		window = opened.window,
+		buffer = buffer,
+		previous = opened.previous,
+		workflow = workflow,
+		runs = {},
+		selected = 1,
+	}
 	panels[tabpage] = panel
 	render(panel)
 	bind(panel)
