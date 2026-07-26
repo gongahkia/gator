@@ -100,6 +100,18 @@ func (s *Service) Unpair(ctx context.Context, accountID, externalID string) erro
 func (s *Service) Accounts(ctx context.Context) ([]domain.ChannelAccount, error) {
 	return s.store.ChannelAccounts(ctx)
 }
+func (s *Service) DeleteAccount(ctx context.Context, accountID string) error {
+	if _, err := s.store.ChannelAccount(ctx, accountID); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if cancel := s.gateways[accountID]; cancel != nil {
+		cancel()
+		delete(s.gateways, accountID)
+	}
+	s.mu.Unlock()
+	return s.store.DeleteChannelAccount(ctx, accountID)
+}
 
 func (s *Service) QueueOutbound(ctx context.Context, accountID, externalID, text string) (domain.ChannelMessage, error) {
 	account, err := s.store.ChannelAccount(ctx, accountID)

@@ -41,6 +41,16 @@ func (s *Store) CreateChannelAccount(ctx context.Context, value domain.ChannelAc
 func (s *Store) ChannelAccount(ctx context.Context, id string) (domain.ChannelAccount, error) {
 	return scanChannelAccount(s.pool.QueryRow(ctx, channelAccountQuery+` WHERE id=$1`, id))
 }
+func (s *Store) DeleteChannelAccount(ctx context.Context, id string) error {
+	result, err := s.pool.Exec(ctx, `DELETE FROM channel_accounts WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
 func (s *Store) ChannelAccounts(ctx context.Context) ([]domain.ChannelAccount, error) {
 	rows, err := s.pool.Query(ctx, channelAccountQuery+` ORDER BY created_at DESC`)
 	if err != nil {

@@ -74,6 +74,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/skills/imports/{id}/activate", s.activateSkill)
 	mux.HandleFunc("GET /api/channels/accounts", s.channelAccounts)
 	mux.HandleFunc("POST /api/channels/accounts", s.createChannelAccount)
+	mux.HandleFunc("DELETE /api/channels/accounts/{id}", s.deleteChannelAccount)
 	mux.HandleFunc("POST /api/channels/accounts/{id}/pairings", s.pairChannel)
 	mux.HandleFunc("DELETE /api/channels/accounts/{id}/pairings/{external}", s.unpairChannel)
 	mux.HandleFunc("POST /api/channels/accounts/{id}/messages", s.queueChannelMessage)
@@ -223,6 +224,20 @@ func (s *Server) createChannelAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, value)
+}
+
+func (s *Server) deleteChannelAccount(w http.ResponseWriter, r *http.Request) {
+	if s.channels == nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
+		return
+	}
+	if err := s.channels.DeleteAccount(r.Context(), r.PathValue("id")); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+	} else if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+	} else {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+	}
 }
 
 func (s *Server) pairChannel(w http.ResponseWriter, r *http.Request) {
