@@ -612,10 +612,19 @@ func (s *Store) ListRuns(ctx context.Context) ([]domain.Run, error) {
 }
 
 func (s *Store) ListRunsPage(ctx context.Context, cursor, status, appID string, limit int) (domain.RunPage, error) {
+	return s.ListRunsFilteredPage(ctx, cursor, RunFilter{Status: status, AppID: appID}, limit)
+}
+
+type RunFilter struct {
+	Status, AppID, Search string
+	CreatedAfter, CreatedBefore *time.Time
+}
+
+func (s *Store) ListRunsFilteredPage(ctx context.Context, cursor string, filter RunFilter, limit int) (domain.RunPage, error) {
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
-	where, args, err := runPageWhere(cursor, status, appID)
+	where, args, err := runPageWhere(cursor, filter)
 	if err != nil {
 		return domain.RunPage{}, err
 	}
@@ -1255,16 +1264,28 @@ type pageCursor struct {
 	ID        string    `json:"id"`
 }
 
-func runPageWhere(cursor, status, appID string) (string, []any, error) {
+func runPageWhere(cursor string, filter RunFilter) (string, []any, error) {
 	clauses := []string{}
 	args := []any{}
-	if status = strings.TrimSpace(status); status != "" {
+	if status := strings.TrimSpace(filter.Status); status != "" {
 		clauses = append(clauses, "status=$"+strconv.Itoa(len(args)+1))
 		args = append(args, status)
 	}
-	if appID = strings.TrimSpace(appID); appID != "" {
+	if appID := strings.TrimSpace(filter.AppID); appID != "" {
 		clauses = append(clauses, "app_id=$"+strconv.Itoa(len(args)+1))
 		args = append(args, appID)
+	}
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		clauses = append(clauses, "(prompt ILIKE $"+strconv.Itoa(len(args)+1)+" OR app_id ILIKE $"+strconv.Itoa(len(args)+1)+" OR architecture->>'app_name' ILIKE $"+strconv.Itoa(len(args)+1)+")")
+		args = append(args, "%"+search+"%")
+	}
+	if filter.CreatedAfter != nil {
+		clauses = append(clauses, "created_at>=$"+strconv.Itoa(len(args)+1))
+		args = append(args, filter.CreatedAfter.UTC())
+	}
+	if filter.CreatedBefore != nil {
+		clauses = append(clauses, "created_at<$"+strconv.Itoa(len(args)+1))
+		args = append(args, filter.CreatedBefore.UTC())
 	}
 	if cursor != "" {
 		updatedAt, id, err := decodePageCursor(cursor)

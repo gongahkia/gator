@@ -6,6 +6,8 @@
 
 `scripts/restore-postgres.sh BACKUP.dump.enc` verifies the checksum, requires an explicit `RESTORE`, then replaces database objects. Test it against an isolated Compose project at least quarterly and record the measured recovery time.
 
+`NORBOT_RESTORE_DRILL=1 scripts/restore-drill-postgres.sh BACKUP.dump.enc` performs that isolated restore in an ephemeral PostgreSQL container and asserts that the migration ledger restored. Schedule it from the same independent-backup context; its pass/fail record is the RTO evidence. A production implementation still needs a tested WAL/base-backup pipeline for its selected RPO.
+
 Logical backups are a portable recovery baseline, not point-in-time recovery. A non-disposable production deployment must also archive PostgreSQL WAL and take base backups to independent object storage. Set and test an explicit RPO/RTO before public use. PostgreSQL documents the required relationship between a base backup and retained WAL for PITR: <https://www.postgresql.org/docs/current/continuous-archiving.html>.
 
 ## Public profile

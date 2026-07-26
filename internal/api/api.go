@@ -500,12 +500,29 @@ func (s *Server) replayOutbox(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
-	page, err := s.store.ListRunsPage(r.Context(), r.URL.Query().Get("cursor"), r.URL.Query().Get("status"), r.URL.Query().Get("app_id"), queryLimit(r, 50))
+	filter, err := runFilter(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.ListRunsFilteredPage(r.Context(), r.URL.Query().Get("cursor"), filter, queryLimit(r, 50))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+func runFilter(r *http.Request) (store.RunFilter, error) {
+	filter := store.RunFilter{Status: r.URL.Query().Get("status"), AppID: r.URL.Query().Get("app_id"), Search: r.URL.Query().Get("search")}
+	for key, target := range map[string]**time.Time{"created_after": &filter.CreatedAfter, "created_before": &filter.CreatedBefore} {
+		value := strings.TrimSpace(r.URL.Query().Get(key))
+		if value == "" { continue }
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil { return store.RunFilter{}, fmt.Errorf("%s must be RFC3339", key) }
+		*target = &parsed
+	}
+	return filter, nil
 }
 
 func (s *Server) listApps(w http.ResponseWriter, r *http.Request) {
