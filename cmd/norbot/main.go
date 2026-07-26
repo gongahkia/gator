@@ -33,7 +33,6 @@ import (
 	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
-	"github.com/gongahkia/norbot/internal/tui"
 )
 
 func main() {
@@ -43,10 +42,6 @@ func main() {
 	}
 	if len(os.Args) > 1 && os.Args[1] == "kube" {
 		kubeCommand(os.Args[2:])
-		return
-	}
-	if len(os.Args) > 1 && os.Args[1] == "tui" {
-		tuiCommand(os.Args[2:])
 		return
 	}
 	if len(os.Args) > 1 && os.Args[1] == "serve" {
@@ -65,7 +60,7 @@ func main() {
 		liveInboundCommand(os.Args[3:])
 		return
 	}
-	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template | norbot serve | norbot egress-proxy | norbot health [--json] | norbot live-e2e inbound | norbot tui --api http://127.0.0.1:8080")
+	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template | norbot serve | norbot egress-proxy | norbot health [--json] | norbot live-e2e inbound")
 	os.Exit(2)
 }
 
@@ -511,16 +506,6 @@ func prompt(reader *bufio.Reader, label, fallback string) string {
 	return value
 }
 
-func tuiCommand(args []string) {
-	flags := flag.NewFlagSet("tui", flag.ExitOnError)
-	apiBase := flags.String("api", "http://127.0.0.1:8080", "Norbot API base URL")
-	_ = flags.Parse(args)
-	if err := tui.Run(*apiBase); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
 func serveCommand(args []string) {
 	flags := flag.NewFlagSet("serve", flag.ExitOnError)
 	_ = flags.Parse(args)
@@ -530,7 +515,7 @@ func serveCommand(args []string) {
 		logger.Error("load config", "error", err)
 		os.Exit(1)
 	}
-	if host, _, splitErr := net.SplitHostPort(cfg.HTTPAddr); splitErr == nil && host != "127.0.0.1" && host != "::1" && host != "localhost" && cfg.Manifest.Security.OIDC.Issuer == "" {
+	if host, _, splitErr := net.SplitHostPort(cfg.HTTPAddr); splitErr == nil && host != "127.0.0.1" && host != "::1" && host != "localhost" && cfg.Manifest.Security.OIDC.Issuer == "" && !cfg.AllowUnauthenticatedLocal {
 		fmt.Fprintln(os.Stderr, "public norbot API requires security.oidc configuration")
 		os.Exit(1)
 	}

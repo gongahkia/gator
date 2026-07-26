@@ -62,6 +62,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
+	parent_run_id TEXT NOT NULL DEFAULT '',
   prompt TEXT NOT NULL,
   profile TEXT NOT NULL,
 	deployment_target TEXT NOT NULL DEFAULT 'docker',
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS runs (
   status TEXT NOT NULL,
   providers JSONB NOT NULL,
   graph JSONB NOT NULL,
+	architecture JSONB NOT NULL DEFAULT '{}'::jsonb,
   feedback TEXT NOT NULL DEFAULT '',
   failure_reason TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -299,7 +301,14 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS deployment_target TEXT NOT NULL DEFAULT 'docker';
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS public_ingress BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS max_fixes INT NOT NULL DEFAULT 2;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS parent_run_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS architecture JSONB NOT NULL DEFAULT '{}'::jsonb;
 UPDATE runs SET deployment_target='docker' WHERE deployment_target IS NULL OR deployment_target='';
+UPDATE runs SET architecture=jsonb_build_object(
+  'app_name','Generated app','app_type',profile,'stack','[]'::jsonb,'integrations','[]'::jsonb,
+  'core_features',jsonb_build_array(jsonb_build_object('id','core-request','name','Requested application','description','Deliver the approved user request.','role','app_logic','selected',true)),
+  'optional_features','[]'::jsonb,'workflow',graph
+) WHERE architecture='{}'::jsonb;
 CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
@@ -316,13 +325,17 @@ func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
 	if err != nil {
 		return err
 	}
+	architecture, err := json.Marshal(run.Architecture)
+	if err != nil {
+		return err
+	}
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO runs (id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)`, run.ID, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, providers, graph, run.CreatedAt)
+		_, err := tx.Exec(ctx, `INSERT INTO runs (id,parent_run_id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)`, run.ID, run.ParentRunID, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, providers, graph, architecture, run.CreatedAt)
 		if err != nil {
 			return err
 		}
-		return s.insertEvent(ctx, tx, run.ID, "run_created", "Run created and planner queued", map[string]any{"profile": run.Profile, "providers": run.Providers, "deployment_target": run.DeploymentTarget, "public_ingress": run.PublicIngress})
+		return s.insertEvent(ctx, tx, run.ID, "run_created", "Run created and planner queued", map[string]any{"profile": run.Profile, "providers": run.Providers, "deployment_target": run.DeploymentTarget, "public_ingress": run.PublicIngress, "parent_run_id": run.ParentRunID})
 	})
 }
 
@@ -398,6 +411,52 @@ func (s *Store) UpdateGraph(ctx context.Context, runID string, graph domain.Grap
 		return domain.Run{}, err
 	}
 	return s.GetRun(ctx, runID)
+}
+
+func (s *Store) UpdateArchitecture(ctx context.Context, runID string, architecture domain.Architecture) (domain.Run, error) {
+	encoded, err := json.Marshal(architecture)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	graph, err := json.Marshal(architecture.Workflow)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	err = s.withTx(ctx, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1 AND stage='planner' AND status='awaiting_approval'`, runID, encoded, graph)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() != 1 {
+			return ErrNotFound
+		}
+		return s.insertEvent(ctx, tx, runID, "architecture_updated", "Planner architecture updated by operator", map[string]any{"architecture": architecture})
+	})
+	if err != nil {
+		return domain.Run{}, err
+	}
+	return s.GetRun(ctx, runID)
+}
+
+func (s *Store) SetPlannerArchitecture(ctx context.Context, runID string, architecture domain.Architecture) error {
+	encoded, err := json.Marshal(architecture)
+	if err != nil {
+		return err
+	}
+	graph, err := json.Marshal(architecture.Workflow)
+	if err != nil {
+		return err
+	}
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		result, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1 AND stage='planner' AND status='running'`, runID, encoded, graph)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() != 1 {
+			return fmt.Errorf("planner architecture update conflict")
+		}
+		return s.insertEvent(ctx, tx, runID, "planner_architecture_generated", "Planner generated architecture", map[string]any{"architecture": architecture})
+	})
 }
 
 func (s *Store) SetPlannerGraph(ctx context.Context, runID string, graph domain.Graph) error {
@@ -711,6 +770,24 @@ func (s *Store) GetDeployment(ctx context.Context, runID string) (domain.Deploym
 	return deployment, nil
 }
 
+func (s *Store) ListApps(ctx context.Context) ([]domain.App, error) {
+	rows, err := s.pool.Query(ctx, `SELECT r.id,r.parent_run_id,r.prompt,r.profile,r.status,r.created_at,d.run_id,d.project_name,d.public_url,d.status,d.error_message,d.updated_at
+FROM runs r JOIN deployments d ON d.run_id=r.id ORDER BY d.updated_at DESC LIMIT 100`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	apps := []domain.App{}
+	for rows.Next() {
+		var app domain.App
+		if err := rows.Scan(&app.RunID, &app.ParentRunID, &app.Prompt, &app.Profile, &app.RunStatus, &app.CreatedAt, &app.Deployment.RunID, &app.Deployment.ProjectName, &app.Deployment.PublicURL, &app.Deployment.Status, &app.Deployment.ErrorMessage, &app.Deployment.UpdatedAt); err != nil {
+			return nil, err
+		}
+		apps = append(apps, app)
+	}
+	return apps, rows.Err()
+}
+
 func (s *Store) RecordProviderObservation(ctx context.Context, observation ProviderObservation) error {
 	metadata, err := json.Marshal(observation.Metadata)
 	if err != nil {
@@ -805,14 +882,14 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 	return err
 }
 
-const runQuery = `SELECT id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,feedback,failure_reason,created_at,updated_at FROM runs`
+const runQuery = `SELECT id,parent_run_id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,feedback,failure_reason,created_at,updated_at FROM runs`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanRun(row rowScanner) (domain.Run, error) {
 	var run domain.Run
-	var providers, graph []byte
-	err := row.Scan(&run.ID, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &providers, &graph, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
+	var providers, graph, architecture []byte
+	err := row.Scan(&run.ID, &run.ParentRunID, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &providers, &graph, &architecture, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Run{}, ErrNotFound
 	}
@@ -824,6 +901,12 @@ func scanRun(row rowScanner) (domain.Run, error) {
 	}
 	if err := json.Unmarshal(graph, &run.Graph); err != nil {
 		return domain.Run{}, err
+	}
+	if err := json.Unmarshal(architecture, &run.Architecture); err != nil {
+		return domain.Run{}, err
+	}
+	if run.Architecture.AppName == "" {
+		run.Architecture = domain.DefaultArchitecture(run.Profile, run.Graph)
 	}
 	return run, nil
 }

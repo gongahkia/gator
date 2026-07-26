@@ -49,9 +49,7 @@
   },
   "plugins": [],
   "workflow": {"max_fixes": 2},
-  "security": {
-    "oidc": {"issuer": "https://issuer.example.com", "audience": "norbot", "groups_claim": "groups", "operator_groups": ["norbot-operators"]}
-  },
+  "security": {},
   "artifacts": {
     "enabled": false,
     "endpoint": "https://s3.example.com", "region": "us-east-1", "bucket": "norbot-artifacts", "access_key_env": "NORBOT_S3_ACCESS_KEY", "secret_key_env": "NORBOT_S3_SECRET_KEY", "force_path_style": true

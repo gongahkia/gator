@@ -34,3 +34,10 @@ func TestStageOrder(t *testing.T) {
 		t.Fatal("deployer must be final")
 	}
 }
+
+func TestDefaultArchitectureIsValid(t *testing.T) {
+	architecture := DefaultArchitecture(ProfileFullStack, DefaultGraph())
+	if err := architecture.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -2,6 +2,7 @@ receivers:
   otlp:
     protocols:
       http:
+        endpoint: 0.0.0.0:4318
   prometheus:
     config:
       scrape_configs:
@@ -11,17 +12,15 @@ receivers:
 exporters:
   debug:
     verbosity: basic
-  otlp/jaeger:
-    endpoint: jaeger:4318
-    tls:
-      insecure: true
+  otlphttp/jaeger:
+    endpoint: http://jaeger:4318
   prometheus:
     endpoint: "0.0.0.0:8889"
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [debug, otlp/jaeger]
+      exporters: [debug, otlphttp/jaeger]
     metrics:
       receivers: [prometheus]
       exporters: [debug, prometheus]

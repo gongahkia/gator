@@ -37,6 +37,8 @@ type CreateRunInput struct {
 	PublicIngress    bool                    `json:"public_ingress"`
 	MaxFixes         int                     `json:"max_fixes"`
 	SkillDigests     []string                `json:"skill_digests"`
+	ParentRunID      string                  `json:"-"`
+	Architecture     *domain.Architecture    `json:"-"`
 }
 
 type ApprovalInput struct {
@@ -165,7 +167,13 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	if maxFixes < 0 || maxFixes > 10 {
 		return domain.Run{}, fmt.Errorf("max_fixes must be between 0 and 10")
 	}
-	run := domain.Run{ID: id, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: domain.DefaultGraph(), CreatedAt: now, UpdatedAt: now}
+	graph := domain.DefaultGraph()
+	architecture := domain.DefaultArchitecture(input.Profile, graph)
+	if input.Architecture != nil {
+		architecture = *input.Architecture
+		graph = architecture.Workflow
+	}
+	run := domain.Run{ID: id, ParentRunID: input.ParentRunID, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: graph, Architecture: architecture, CreatedAt: now, UpdatedAt: now}
 	if err := s.store.CreateRun(ctx, run); err != nil {
 		return domain.Run{}, err
 	}
@@ -207,7 +215,36 @@ func (s *Service) UpdateGraph(ctx context.Context, runID string, graph domain.Gr
 	if err := graph.Validate(); err != nil {
 		return domain.Run{}, err
 	}
-	return s.store.UpdateGraph(ctx, runID, graph)
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	run.Architecture.Workflow = graph
+	return s.UpdateArchitecture(ctx, runID, run.Architecture)
+}
+
+func (s *Service) UpdateArchitecture(ctx context.Context, runID string, architecture domain.Architecture) (domain.Run, error) {
+	if err := architecture.Validate(); err != nil {
+		return domain.Run{}, err
+	}
+	return s.store.UpdateArchitecture(ctx, runID, architecture)
+}
+
+func (s *Service) CreateChangeRun(ctx context.Context, runID, change string) (domain.Run, error) {
+	change = strings.TrimSpace(change)
+	if change == "" {
+		return domain.Run{}, fmt.Errorf("change request is required")
+	}
+	parent, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	input := CreateRunInput{
+		Prompt:  "Change request for " + parent.ID + ": " + change + "\n\nOriginal request: " + parent.Prompt,
+		Profile: parent.Profile, Providers: parent.Providers, DeploymentTarget: parent.DeploymentTarget,
+		PublicIngress: parent.PublicIngress, MaxFixes: parent.MaxFixes, ParentRunID: parent.ID, Architecture: &parent.Architecture,
+	}
+	return s.CreateRun(ctx, input)
 }
 
 func (s *Service) Approve(ctx context.Context, runID string, input ApprovalInput) (domain.Run, error) {
@@ -659,11 +696,11 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
 	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
 	if job.Stage == domain.StagePlanner {
-		if graph, ok := graphFromResponse(result.Text); ok {
-			if err := s.store.SetPlannerGraph(ctx, run.ID, graph); err != nil {
+		if architecture, ok := architectureFromResponse(result.Text, run); ok {
+			if err := s.store.SetPlannerArchitecture(ctx, run.ID, architecture); err != nil {
 				return err
 			}
-			run.Graph = graph
+			run.Graph, run.Architecture = architecture.Workflow, architecture
 		}
 	}
 	if job.Stage == domain.StageBuilder {
@@ -875,7 +912,7 @@ func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dock
 func reserveVerificationPort() (int, error) { return runtime.ReservePort() }
 
 func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain.SkillPackage) string {
-	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nGraph: %+v\nPlanner feedback: %s\nDo not reveal credentials or execute unapproved external actions.\n", stage, run.ID, run.Profile, run.Prompt, run.Graph, run.Feedback)
+	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nApproved architecture: %+v\nPlanner feedback: %s\nDo not reveal credentials or execute unapproved external actions.\n", stage, run.ID, run.Profile, run.Prompt, run.Architecture, run.Feedback)
 	if len(skills) > 0 {
 		entries := make([]string, 0, len(skills))
 		for _, skill := range skills {
@@ -887,7 +924,7 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		return base + "The approved baseline is in /workspace/generated-app. Modify only that directory, then return a concise summary."
 	}
 	if stage == domain.StagePlanner {
-		return base + "Return strict JSON without markdown: {\"graph\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]},\"notes\":\"...\"}. Graph requires input and output nodes."
+		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"...\",\"stack\":[],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]}},\"notes\":\"...\"}. Workflow requires input and output nodes."
 	}
 	if stage == domain.StageBuilder {
 		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/path/to/file\":\"complete source\"}}. Include only approved files, use safe relative paths, and preserve required profile files."
@@ -913,6 +950,27 @@ func graphFromResponse(text string) (domain.Graph, bool) {
 		return domain.Graph{}, false
 	}
 	return graph, true
+}
+
+func architectureFromResponse(text string, run domain.Run) (domain.Architecture, bool) {
+	payload, err := responseObject(text)
+	if err != nil {
+		return domain.Architecture{}, false
+	}
+	if raw, ok := payload["architecture"]; ok {
+		encoded, err := json.Marshal(raw)
+		if err == nil {
+			var architecture domain.Architecture
+			if json.Unmarshal(encoded, &architecture) == nil && architecture.Validate() == nil {
+				return architecture, true
+			}
+		}
+	}
+	if graph, ok := graphFromResponse(text); ok {
+		architecture := domain.DefaultArchitecture(run.Profile, graph)
+		return architecture, true
+	}
+	return domain.Architecture{}, false
 }
 
 func builderFiles(text string) (map[string]string, error) {

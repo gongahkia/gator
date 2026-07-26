@@ -35,6 +35,7 @@ services:
     environment:
       NORBOT_DATABASE_URL: ${NORBOT_DATABASE_URL:-postgres://norbot:norbot@postgres:5432/norbot?sslmode=disable}
       NORBOT_HTTP_ADDR: ${NORBOT_HTTP_ADDR:-0.0.0.0:8080}
+      NORBOT_ALLOW_UNAUTHENTICATED_LOCAL: ${NORBOT_ALLOW_UNAUTHENTICATED_LOCAL:-true}
       NORBOT_ARTIFACTS_DIR: ${NORBOT_ARTIFACTS_DIR:-/var/lib/norbot/artifacts}
       NORBOT_CONFIG: /etc/norbot/config.json
       NORBOT_OTEL_ENDPOINT: ${NORBOT_OTEL_ENDPOINT:-otel-collector:4318}

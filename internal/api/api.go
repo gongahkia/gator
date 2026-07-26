@@ -21,6 +21,7 @@ import (
 	"github.com/gongahkia/norbot/internal/engine"
 	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
+	"github.com/gongahkia/norbot/internal/web"
 )
 
 type Server struct {
@@ -30,6 +31,7 @@ type Server struct {
 	skills   *skill.Service
 	channels *channel.Service
 	auth     *auth.Validator
+	oidc     config.OIDC
 }
 
 func New(service *engine.Service, st *store.Store, logger *slog.Logger) *Server {
@@ -49,6 +51,7 @@ func NewWithComponents(service *engine.Service, st *store.Store, logger *slog.Lo
 }
 
 func (s *Server) WithOIDC(value config.OIDC) *Server {
+	s.oidc = value
 	if value.Issuer != "" {
 		s.auth = auth.New(value)
 	}
@@ -57,6 +60,7 @@ func (s *Server) WithOIDC(value config.OIDC) *Server {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/auth/config", s.authConfig)
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/health/detail", s.healthDetail)
 	mux.HandleFunc("GET /api/health/stream", s.healthStream)
@@ -81,7 +85,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
 	mux.HandleFunc("POST /api/runs", s.createRun)
+	mux.HandleFunc("GET /api/apps", s.listApps)
 	mux.HandleFunc("GET /api/runs/{id}", s.getRun)
+	mux.HandleFunc("GET /api/runs/{id}/architecture", s.architecture)
+	mux.HandleFunc("PUT /api/runs/{id}/architecture", s.updateArchitecture)
+	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
@@ -98,12 +106,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{id}/deployment/start", s.startDeployment)
 	mux.HandleFunc("POST /api/runs/{id}/deployment/stop", s.stopDeployment)
 	mux.HandleFunc("DELETE /api/runs/{id}/deployment", s.deleteDeployment)
+	mux.Handle("/", web.Handler())
 	return requestLog(s.log, otelhttp.NewHandler(s.requireOperator(mux), "norbot.http"))
 }
 
 func (s *Server) requireOperator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.auth == nil || r.URL.Path == "/api/health" || strings.HasPrefix(r.URL.Path, "/api/channels/") && strings.HasSuffix(r.URL.Path, "/webhook") {
+		if (r.URL.Path != "/metrics" && !strings.HasPrefix(r.URL.Path, "/api/")) || s.auth == nil || r.URL.Path == "/api/health" || r.URL.Path == "/api/auth/config" || strings.HasPrefix(r.URL.Path, "/api/channels/") && strings.HasSuffix(r.URL.Path, "/webhook") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -119,6 +128,14 @@ func (s *Server) requireOperator(next http.Handler) http.Handler {
 		}
 		r = r.WithContext(context.WithValue(r.Context(), operatorContextKey{}, principal.Subject))
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) authConfig(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"enabled": s.auth != nil,
+		"issuer":  s.oidc.Issuer, "client_id": s.oidc.ClientID,
+		"scopes": s.oidc.Scopes, "audience": s.oidc.Audience,
 	})
 }
 
@@ -416,6 +433,15 @@ func (s *Server) listRuns(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, runs)
 }
 
+func (s *Server) listApps(w http.ResponseWriter, r *http.Request) {
+	apps, err := s.store.ListApps(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, apps)
+}
+
 func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
 	var input engine.CreateRunInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -441,6 +467,57 @@ func (s *Server) getRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) architecture(w http.ResponseWriter, r *http.Request) {
+	run, err := s.store.GetRun(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run.Architecture)
+}
+
+func (s *Server) updateArchitecture(w http.ResponseWriter, r *http.Request) {
+	var architecture domain.Architecture
+	if err := decodeJSON(r, &architecture); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	run, err := s.service.UpdateArchitecture(r.Context(), r.PathValue("id"), architecture)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusConflict, fmt.Errorf("architecture can only be edited while planner approval is pending"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) createChangeRun(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Change string `json:"change"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	run, err := s.service.CreateChangeRun(r.Context(), r.PathValue("id"), input.Change)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, run)
 }
 
 func (s *Server) revisions(w http.ResponseWriter, r *http.Request) {

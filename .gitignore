@@ -5,3 +5,5 @@ config.json
 artifacts/
 bin/
 coverage.out
+web/node_modules/
+web/dist/

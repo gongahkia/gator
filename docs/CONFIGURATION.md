@@ -8,7 +8,7 @@ Norbot reads `config.json`; keep the file outside source control. The supplied `
 
 - API adapters require `model`, `base_url`, and `credential_env`.
 - CLI adapters require `image`, `command`, and optionally `credential_env`/`network`. Docker runs inject credentials from the selected local environment variable. Kubernetes CLI runs require `kubernetes_secret` and `kubernetes_secret_key`, referring to an existing Secret in Norbot's namespace.
-- `stages` is an allowlist. The TUI only offers compatible adapters for each stage.
+- `stages` is an allowlist. The web console only offers compatible adapters for each stage.
 - `budget.max_concurrent` and `budget.requests_per_minute` constrain capacity recommendations. API rate-limit response headers are persisted when available; a recommendation must be explicitly accepted through the API before it is recorded as operator-approved.
 
 Build an image for local Pi, OpenCode, Claude Code, or Codex with the CLI on `PATH`, then declare it as a `cli` provider. Credentials are injected only from the selected environment variable into that stage container. Do not put secrets in this file, artifacts, or generated apps.
@@ -43,8 +43,8 @@ Each Kubernetes run receives a PVC. Provider CLI, verifier, Kaniko, and smoke Jo
 
 ## Verification and lifecycle
 
-Verifier gates fail closed: locked frontend dependencies, npm test/build/audit, Go test/build/govulncheck, and backend-specific isolated smoke checks must pass before deployment approval. Docker uses Compose; Kubernetes uses temporary Jobs, Kaniko image builds, rollout, and in-cluster smoke before cleanup. Deployment API and TUI controls support status, logs, start, stop, and delete. Worker leases expire to `interrupted`; recovery never auto-replays work.
+Verifier gates fail closed: locked frontend dependencies, npm test/build/audit, Go test/build/govulncheck, and backend-specific isolated smoke checks must pass before deployment approval. Docker uses Compose; Kubernetes uses temporary Jobs, Kaniko image builds, rollout, and in-cluster smoke before cleanup. Deployment API and web console controls support status, logs, start, stop, and delete. Worker leases expire to `interrupted`; recovery never auto-replays work.
 
 ## Remote operation
 
-Keep `NORBOT_HTTP_ADDR=127.0.0.1:8080` on a host. Connect the local TUI through an SSH tunnel. Docker mode keeps workspaces/deployments on the host; Kubernetes mode keeps the Norbot control plane local while run workloads live in the selected cluster.
+Keep `NORBOT_HTTP_ADDR=127.0.0.1:8080` on a host and tunnel the web console over SSH when needed. Docker mode keeps workspaces/deployments on the host; Kubernetes mode keeps the Norbot control plane local while run workloads live in the selected cluster.

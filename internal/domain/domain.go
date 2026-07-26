@@ -90,6 +90,48 @@ type GraphEdge struct {
 	Target string `json:"target"`
 }
 
+type Architecture struct {
+	AppName          string    `json:"app_name"`
+	AppType          string    `json:"app_type"`
+	Stack            []string  `json:"stack"`
+	Integrations     []string  `json:"integrations"`
+	CoreFeatures     []Feature `json:"core_features"`
+	OptionalFeatures []Feature `json:"optional_features"`
+	Workflow         Graph     `json:"workflow"`
+}
+
+type Feature struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Role        string `json:"role"`
+	Selected    bool   `json:"selected"`
+}
+
+func DefaultArchitecture(profile Profile, graph Graph) Architecture {
+	appType := string(profile)
+	return Architecture{
+		AppName: "Generated app", AppType: appType,
+		CoreFeatures:     []Feature{{ID: "core-request", Name: "Requested application", Description: "Deliver the approved user request.", Role: "app_logic", Selected: true}},
+		OptionalFeatures: []Feature{}, Stack: []string{}, Integrations: []string{}, Workflow: graph,
+	}
+}
+
+func (a Architecture) Validate() error {
+	if a.AppName == "" || a.AppType == "" {
+		return fmt.Errorf("architecture requires app_name and app_type")
+	}
+	if err := a.Workflow.Validate(); err != nil {
+		return fmt.Errorf("architecture workflow: %w", err)
+	}
+	for _, feature := range append(append([]Feature{}, a.CoreFeatures...), a.OptionalFeatures...) {
+		if feature.ID == "" || feature.Name == "" || feature.Role == "" {
+			return fmt.Errorf("architecture features require id, name, and role")
+		}
+	}
+	return nil
+}
+
 func (g Graph) Validate() error {
 	if len(g.Nodes) < 2 {
 		return fmt.Errorf("graph requires at least two nodes")
@@ -212,6 +254,7 @@ func DefaultGraph() Graph {
 
 type Run struct {
 	ID               string           `json:"id"`
+	ParentRunID      string           `json:"parent_run_id,omitempty"`
 	Prompt           string           `json:"prompt"`
 	Profile          Profile          `json:"profile"`
 	DeploymentTarget DeploymentTarget `json:"deployment_target"`
@@ -221,6 +264,7 @@ type Run struct {
 	Status           Status           `json:"status"`
 	Providers        map[Stage]string `json:"providers"`
 	Graph            Graph            `json:"graph"`
+	Architecture     Architecture     `json:"architecture"`
 	Feedback         string           `json:"feedback,omitempty"`
 	FailureReason    string           `json:"failure_reason,omitempty"`
 	CreatedAt        time.Time        `json:"created_at"`
@@ -432,6 +476,16 @@ type Deployment struct {
 	Status       string    `json:"status"`
 	ErrorMessage string    `json:"error_message,omitempty"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type App struct {
+	RunID       string     `json:"run_id"`
+	ParentRunID string     `json:"parent_run_id,omitempty"`
+	Prompt      string     `json:"prompt"`
+	Profile     Profile    `json:"profile"`
+	RunStatus   Status     `json:"run_status"`
+	Deployment  Deployment `json:"deployment"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 type Job struct {

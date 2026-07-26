@@ -1,6 +1,6 @@
 # Norbot
 
-Norbot is a local-first, provider-agnostic agentic app builder. A Bubble Tea TUI drives explicit Planner → Code → Test → bounded Fix → Deployer approvals; Go API and workers own durable state, generated artifacts, Docker or Kubernetes workspaces, deployments, and OpenTelemetry visibility.
+Norbot is a local-first, provider-agnostic agentic app builder. Its embedded web console drives explicit Plan → Build → Verify/Fix → Deploy approvals; Go API and workers own durable state, generated artifacts, Docker or Kubernetes workspaces, deployments, and OpenTelemetry visibility.
 
 ## Install
 
@@ -8,8 +8,11 @@ Norbot is a local-first, provider-agnostic agentic app builder. A Bubble Tea TUI
 cp .env.example .env
 cp config.example.json config.json
 docker compose up --build
-docker compose exec norbot norbot tui --api http://127.0.0.1:8080
 ```
+
+Open `http://127.0.0.1:8080`. The default Compose setup is loopback-only and allows local unauthenticated access. For a shared deployment, configure `security.oidc` with an issuer, audience, groups claim, operator group, SPA `client_id`, and optional `scopes`, then set `NORBOT_ALLOW_UNAUTHENTICATED_LOCAL=false`.
+
+Existing local installs with the former placeholder `security.oidc` block must replace it with `"security": {}` before starting; configure a complete OIDC block instead for shared access.
 
 `norbot init` creates a config interactively. It records a Docker or Kubernetes default; every run can override that default and permanently pins its selected backend.
 
@@ -21,7 +24,7 @@ Builder responses are stored as immutable, digest-checked code/fix proposals. Co
 
 Marketplace imports accept HTTPS Git and OCI bundles containing `SKILL.md` and `skill.json`. Imports are copied into Norbot-managed storage by SHA-256 digest, reject executable/unsafe archives, remain `scanned` until an operator activates them, and can be selected with `skill_digests` when creating a run. Private source credentials are environment-variable references only.
 
-`norbot health` prints detailed health and returns nonzero only for a critical down dependency; `norbot health --json`, `GET /api/health/detail`, `GET /api/health/stream`, and `h` in the TUI provide the same redacted diagnostics.
+`norbot health` prints detailed health and returns nonzero only for a critical down dependency; `norbot health --json`, `GET /api/health/detail`, `/api/health/stream`, and the web console provide the same redacted diagnostics.
 
 ## Channels
 
@@ -56,12 +59,13 @@ Set `artifacts.enabled` to `true` with an HTTPS S3 or S3-compatible endpoint, bu
 
 For Docker HTTP-write tools, set `runtime.sandbox.egress_proxy_url` to `http://host.docker.internal:8181` and `egress_proxy_secret_env` to `NORBOT_EGRESS_PROXY_SECRET`; Compose publishes that loopback-only listener. Kubernetes uses a separate namespace-local proxy Deployment and Service. Sandboxes can connect only to DNS and that Service; the proxy checks the signed host allowlist, permits HTTPS/443 only, resolves and dials public IPs only, and is the sole workload with public HTTPS egress.
 
-For remote use, bind the API to loopback and run the TUI through SSH:
+For remote access, tunnel the embedded web console:
 
 ```sh
 ssh -L 8080:127.0.0.1:8080 host
-norbot tui --api http://127.0.0.1:8080
 ```
+
+Then open `http://127.0.0.1:8080` locally.
 
 ## Operating model
 
@@ -78,13 +82,14 @@ Configure provider API keys in `.env`; add CLI providers with isolated runner im
 
 - `POST /api/runs` creates and queues a planner run. It accepts optional `deployment_target: "docker"|"kubernetes"` and `public_ingress` fields.
 - `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events` inspect state and stream replayable events.
-- `PUT /api/runs/{id}/graph` edits a planner graph only while it awaits planner approval.
+- `GET/PUT /api/runs/{id}/architecture` reads or edits the typed planner architecture while approval is pending. `PUT /api/runs/{id}/graph` remains a compatibility projection.
+- `POST /api/runs/{id}/change-runs` creates a linked architecture revision cycle; `GET /api/apps` lists deployed applications.
 - `POST /api/runs/{id}/approval` approves, revises, explicitly starts a fix, retries, or abandons a run.
 - `GET /api/health`, `/api/health/detail`, `/api/health/stream`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
 - `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the verified declarative skill catalog.
 - `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.
 - `GET /api/agent/actions` and `POST /api/agent/actions/{id}/decision` expose central, durable tool approvals; a decision resumes its exact persisted turn once.
-- `GET /api/runtime` returns the default target and Kubernetes/ingress availability for onboarding and TUI target selection.
+- `GET /api/runtime` returns the default target and Kubernetes/ingress availability for web-console onboarding.
 - `GET /api/runs/{id}/deployment`, `/logs`; `POST .../start`, `POST .../stop`; and `DELETE .../deployment` control deployed apps.
 
 `/metrics` is a Prometheus scrape endpoint; traces export through the OpenTelemetry Collector to Jaeger.

@@ -67,6 +67,8 @@ type OIDC struct {
 	Audience       string   `json:"audience"`
 	GroupsClaim    string   `json:"groups_claim"`
 	OperatorGroups []string `json:"operator_groups"`
+	ClientID       string   `json:"client_id"`
+	Scopes         []string `json:"scopes"`
 }
 
 type Security struct {
@@ -123,14 +125,15 @@ type Manifest struct {
 }
 
 type Config struct {
-	DatabaseURL  string
-	HTTPAddr     string
-	ArtifactsDir string
-	OTelEndpoint string
-	Workers      int
-	MaxWorkers   int
-	DockerBin    string
-	Manifest     Manifest
+	DatabaseURL               string
+	HTTPAddr                  string
+	ArtifactsDir              string
+	OTelEndpoint              string
+	Workers                   int
+	MaxWorkers                int
+	DockerBin                 string
+	AllowUnauthenticatedLocal bool
+	Manifest                  Manifest
 }
 
 func Load() (Config, error) {
@@ -140,13 +143,14 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("NORBOT_WORKERS must be >=1 and <= NORBOT_MAX_WORKERS")
 	}
 	cfg := Config{
-		DatabaseURL:  env("NORBOT_DATABASE_URL", "postgres://norbot:norbot@127.0.0.1:5432/norbot?sslmode=disable"),
-		HTTPAddr:     env("NORBOT_HTTP_ADDR", "127.0.0.1:8080"),
-		ArtifactsDir: env("NORBOT_ARTIFACTS_DIR", ".norbot/artifacts"),
-		OTelEndpoint: strings.TrimSpace(os.Getenv("NORBOT_OTEL_ENDPOINT")),
-		Workers:      workers,
-		MaxWorkers:   maxWorkers,
-		DockerBin:    env("NORBOT_DOCKER_BIN", "docker"),
+		DatabaseURL:               env("NORBOT_DATABASE_URL", "postgres://norbot:norbot@127.0.0.1:5432/norbot?sslmode=disable"),
+		HTTPAddr:                  env("NORBOT_HTTP_ADDR", "127.0.0.1:8080"),
+		ArtifactsDir:              env("NORBOT_ARTIFACTS_DIR", ".norbot/artifacts"),
+		OTelEndpoint:              strings.TrimSpace(os.Getenv("NORBOT_OTEL_ENDPOINT")),
+		Workers:                   workers,
+		MaxWorkers:                maxWorkers,
+		DockerBin:                 env("NORBOT_DOCKER_BIN", "docker"),
+		AllowUnauthenticatedLocal: envBool("NORBOT_ALLOW_UNAUTHENTICATED_LOCAL", false),
 	}
 	path := env("NORBOT_CONFIG", "config.json")
 	data, err := os.ReadFile(path)
@@ -236,7 +240,7 @@ func (m Manifest) Validate() error {
 
 func (m Manifest) ValidateSecurity() error {
 	o := m.Security.OIDC
-	if o.Issuer == "" && o.Audience == "" && len(o.OperatorGroups) == 0 && o.GroupsClaim == "" {
+	if o.Issuer == "" && o.Audience == "" && len(o.OperatorGroups) == 0 && o.GroupsClaim == "" && o.ClientID == "" && len(o.Scopes) == 0 {
 		return nil
 	}
 	if o.Issuer == "" || o.Audience == "" || len(o.OperatorGroups) == 0 {
@@ -244,6 +248,9 @@ func (m Manifest) ValidateSecurity() error {
 	}
 	if o.GroupsClaim == "" {
 		return fmt.Errorf("oidc groups_claim is required when oidc is configured")
+	}
+	if o.ClientID == "" {
+		return fmt.Errorf("oidc client_id is required when oidc is configured")
 	}
 	return nil
 }
@@ -405,6 +412,18 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envBool(key string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return fallback
 	}
