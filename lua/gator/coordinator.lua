@@ -16,7 +16,6 @@ local actions = {
 	cancel_operation = { fields = { id = true, reason = true } },
 	capture_selection = { fields = { target = true, buffer = true, first_line = true, last_line = true } },
 	stop_session = { fields = {} },
-	palette = { fields = { id = true } },
 }
 local action_names = {
 	"open",
@@ -27,7 +26,6 @@ local action_names = {
 	"cancel_operation",
 	"capture_selection",
 	"stop_session",
-	"palette",
 }
 local operation_kinds = { operation = true, launch = true, handoff = true }
 
@@ -322,11 +320,6 @@ function Coordinator:dispatch(action, opts)
 	if action == "stop_session" then
 		return self:workflow():stop_session()
 	end
-	self:workflow()
-	if opts.id == nil or opts.id == "" then
-		return self:dependency("ui").palette.open()
-	end
-	return self:dependency("ui").palette.execute(require_string(opts.id, "palette id"))
 end
 
 function Coordinator:start_operation(opts)

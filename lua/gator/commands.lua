@@ -52,20 +52,6 @@ function M.register()
 		range = true,
 		desc = "Capture visual selection for task:<id> or session:<provider>:<id>",
 	})
-	vim.api.nvim_create_user_command("GatorPalette", function(opts)
-		require("gator").dispatch("palette", { id = opts.args })
-	end, {
-		nargs = "?",
-		complete = function(arglead)
-			local gator = require("gator")
-			if not gator._coordinator then
-				gator.setup()
-			end
-			pcall(gator._coordinator.workflow, gator._coordinator)
-			return require("gator.ui").palette.complete(arglead)
-		end,
-		desc = "Open or run a registered Gator command palette entry",
-	})
 end
 
 return M

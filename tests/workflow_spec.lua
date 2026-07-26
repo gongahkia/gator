@@ -6,6 +6,7 @@ local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 
 local root = helpers.tempdir("workflow")
 local opened, attached = {}, false
+local readiness_calls = 0
 local terminal = {
 	open = function(_, opts)
 		table.insert(opened, opts)
@@ -36,6 +37,7 @@ local value = workflow.new({
 	terminal = terminal,
 	bridge = bridge,
 	readiness = function(opts)
+		readiness_calls = readiness_calls + 1
 		assert(opts.pi_user_confirmed, "workflow must pass the explicit Pi confirmation to provider readiness")
 		return {
 			{ provider = "claude", available = true },
@@ -52,17 +54,19 @@ assert(
 	"task creation must persist a selected project-local Markdown task"
 )
 assert(
-	vim.tbl_contains(require("gator.ui.palette").complete(""), "action:create-task")
-		and vim.tbl_contains(require("gator.ui.palette").complete(""), "task:" .. created.id)
-		and vim.tbl_contains(require("gator.ui.palette").complete(""), "provider:claude")
-		and vim.tbl_contains(require("gator.ui.palette").complete(""), "provider:pi"),
-	"workflow setup must register built-in, task, and ready-provider palette entries"
+	value:availability().selected
+		and not value:availability().attachable
+		and value.providers.claude
+		and value.providers.pi,
+	"workflow setup must select created tasks and retain ready providers for the workspace launcher"
 )
 
+local refreshed_before_launch = readiness_calls
 value:launch("claude")
 local running = value:task(created.id)
 assert(
-	#opened == 1
+	readiness_calls == refreshed_before_launch + 1
+		and #opened == 1
 		and opened[1].command[1] == "claude"
 		and opened[1].command[2] == created.objective
 		and running.lifecycle == "running"

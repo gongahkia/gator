@@ -98,7 +98,6 @@ Usage
 | --- | --- |
 | `:Gator` | Open the task, session, context, and review workspace. |
 | `:GatorHealth` | Check compatibility, workspace, policy, sidecar, and provider readiness. |
-| `:GatorPalette [kind:name]` | Open the palette or execute a registered action, task, or provider entry. |
 | `:{range}GatorCaptureSelection task:<id>` | Capture a line or visual selection as provenance-tracked task context. |
 | `:{range}GatorCaptureSelection session:<provider>:<id>` | Capture context for an opaque provider-native session. |
 | `:GatorExportDiagnostics` | Write a local, redacted diagnostic JSON snapshot. |
@@ -112,17 +111,6 @@ Run `require("gator").setup()` before `:GatorCaptureSelection`.
 From a Git workspace, open `:Gator`, choose **Create local task**, enter an objective, then choose **Launch selected task**. Gator writes the task to `.gator/tasks/<id>.md` and presents only locally-ready providers.
 
 Claude Code, Codex, OpenCode, and Pi retain their interactive terminals. Managed providers open a Gator conversation panel: use `i` to prompt, `c` to cancel the current run, and `q` to detach the panel while retaining the provider process. Use `:GatorStopSession` or **Stop active session** to close the managed process; the provider-native session remains attachable. One-shot providers become review-ready when their run exits; **Attach selected session** resumes a documented session or reopens its local history. Gator also stops managed children during `VimLeavePre`. `.gator/` is ignored by default, so task files remain local to the checkout.
-
-The palette provides the same workflow:
-
-```vim
-:GatorPalette action:create-task
-:GatorPalette action:import-tasks
-:GatorPalette action:launch-task
-:GatorPalette action:attach-session
-:GatorPalette action:stop-session
-:GatorPalette action:refresh-providers
-```
 
 Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. Readiness is shown as **detected**, **user-confirmed**, or **indeterminate**; user confirmation is never credential verification. Copilot sends ACP `session/load` only when its initialize response advertises `agentCapabilities.loadSession`; otherwise it opens the interactive `copilot --resume <id>` fallback.
 

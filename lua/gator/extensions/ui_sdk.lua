@@ -1,4 +1,4 @@
-local palette = require("gator.ui.palette")
+local actions = require("gator.ui.actions")
 local M = { api_version = 1 }
 local panels = {}
 
@@ -68,7 +68,7 @@ function M.action(attrs)
 	if type(attrs) ~= "table" then
 		fail("action requires attributes")
 	end
-	return palette.register({ kind = "action", name = attrs.name, execute = attrs.execute })
+	return actions.register(attrs)
 end
 
 return M

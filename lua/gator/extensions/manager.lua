@@ -1,5 +1,5 @@
 local health = require("gator.health")
-local palette = require("gator.ui.palette")
+local actions = require("gator.ui.actions")
 local M = {}
 local Manager = {}
 
@@ -64,8 +64,8 @@ local function load(path)
 end
 
 local function remove(value)
-	for _, id in ipairs(value.palette) do
-		palette.unregister(id)
+	for _, id in ipairs(value.actions) do
+		actions.unregister(id)
 	end
 	for _, check in ipairs(value.health) do
 		health.unregister(check)
@@ -121,12 +121,12 @@ function Manager:load(value)
 	if not extension then
 		fail("extension was not discovered: " .. value)
 	end
-	local registrations = { palette = {}, health = {} }
+	local registrations = { actions = {}, health = {} }
 	local api = {
-		palette = {
+		actions = {
 			register = function(entry)
-				local id = palette.register(entry)
-				table.insert(registrations.palette, id)
+				local id = actions.register(entry)
+				table.insert(registrations.actions, id)
 				return id
 			end,
 		},
@@ -147,7 +147,7 @@ function Manager:load(value)
 		fail("extension setup failed: " .. tostring(cleanup))
 	end
 	self.loaded[value] =
-		{ path = extension.path, cleanup = cleanup, palette = registrations.palette, health = registrations.health }
+		{ path = extension.path, cleanup = cleanup, actions = registrations.actions, health = registrations.health }
 	return { name = value, path = extension.path }
 end
 

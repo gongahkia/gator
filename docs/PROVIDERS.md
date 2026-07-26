@@ -26,6 +26,6 @@ The local task launcher enables Claude Code, Codex, and OpenCode when they pass 
 
 ## Managed session lifecycle
 
-`q` detaches a Gator conversation panel without terminating its managed provider child. Use **Stop active session** from `:GatorPalette` or `:GatorStopSession` to terminate that child; a stopped provider-native session remains attachable. Gator stops managed children on `VimLeavePre`.
+`q` detaches a Gator conversation panel without terminating its managed provider child. Use **Stop active session** from `:Gator` or `:GatorStopSession` to terminate that child; a stopped provider-native session remains attachable. Gator stops managed children on `VimLeavePre`.
 
 Run `make live-copilot-e2e` only on a locally authenticated machine. Its bridge check uses a temporary empty workspace and verifies create, prompt, stop, fresh-process resume, and explicit fallback behavior; it does not run in CI or expose credentials.

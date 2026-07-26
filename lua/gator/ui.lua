@@ -14,8 +14,8 @@ local M = {
 	accessibility = require("gator.ui.accessibility"),
 	glyphs = require("gator.ui.glyphs"),
 	approval_details = require("gator.ui.approval_details"),
+	actions = require("gator.ui.actions"),
 	markdown = require("gator.ui.markdown"),
-	palette = require("gator.ui.palette"),
 	picker = require("gator.ui.picker"),
 	provider_picker = require("gator.ui.provider_picker"),
 	selection = require("gator.ui.selection"),
@@ -33,6 +33,7 @@ local panels = {}
 local accessibility = require("gator.ui.accessibility")
 local statuses = { ready = true, loading = true, degraded = true, failed = true, recovering = true }
 local narrow_width = 100
+local action_items
 
 local function fail(message)
 	error("Gator UI: " .. message, 3)
@@ -195,32 +196,14 @@ local function render(panel)
 	end
 	table.insert(lines, "")
 	table.insert(lines, "Actions:")
-	local actions = {
-		"Open task dashboard",
-		"Open linked sessions",
-		"Inspect captured context",
-		"Open review evidence",
-		"Run health / recover providers",
-		"Close workspace",
-	}
-	if panel.workflow then
-		vim.list_extend(actions, {
-			"Create local task",
-			"Import local tasks",
-			"Launch selected task",
-			"Attach selected session",
-			"Refresh launch providers",
-		})
-	end
+	local actions = action_items(panel)
+	panel.selected = math.min(panel.selected, #actions)
 	for index, action in ipairs(actions) do
-		table.insert(lines, (panel.selected == index and "> " or "  ") .. action)
+		local suffix = action.enabled and "" or " · unavailable: " .. action.reason
+		table.insert(lines, (panel.selected == index and "> " or "  ") .. action.label .. suffix)
 	end
 	table.insert(lines, "<CR> confirm · j/k navigate · q close · ? help")
 	accessibility.render(panel.buffer, lines, "gator")
-end
-
-local function action_count(panel)
-	return panel.workflow and 11 or 6
 end
 
 local function open_dashboard(panel)
@@ -297,31 +280,95 @@ local function refresh_providers(panel)
 	M.set_status(panel.state, "ready", "launch providers refreshed")
 end
 
+local function workflow_availability(panel)
+	if not panel.workflow or type(panel.workflow.availability) ~= "function" then
+		return { selected = false, attachable = false, stoppable = false }
+	end
+	return panel.workflow:availability()
+end
+
+local function stop_session(panel)
+	panel.workflow:stop_session()
+end
+
+action_items = function(panel)
+	local availability = workflow_availability(panel)
+	local review_ready = core_run.is(panel.state.review.run)
+		and type(panel.state.review.changes) == "table"
+		and vim.islist(panel.state.review.changes)
+	local result = {
+		{ label = "Open task dashboard", execute = open_dashboard },
+		{
+			label = "Open linked sessions",
+			execute = open_sessions,
+			enabled = #sessions(panel.state) > 0,
+			reason = "no linked provider sessions",
+		},
+		{ label = "Inspect captured context", execute = inspect_context },
+		{
+			label = "Open review evidence",
+			execute = open_review,
+			enabled = review_ready,
+			reason = "no reviewed run evidence",
+		},
+		{ label = "Run health / recover providers", execute = recover },
+	}
+	if panel.workflow then
+		vim.list_extend(result, {
+			{ label = "Create local task", execute = create_task },
+			{ label = "Import local tasks", execute = import_tasks },
+			{
+				label = "Launch selected task",
+				execute = launch_task,
+				enabled = availability.selected,
+				reason = "select or create a task first",
+			},
+			{
+				label = "Attach selected session",
+				execute = attach_session,
+				enabled = availability.attachable,
+				reason = availability.attach_reason or "selected task has no linked provider session",
+			},
+			{
+				label = "Stop active session",
+				execute = stop_session,
+				enabled = availability.stoppable,
+				reason = "selected task has no active managed session",
+			},
+			{ label = "Refresh launch providers", execute = refresh_providers },
+		})
+	end
+	for _, action in ipairs(M.actions.list()) do
+		table.insert(result, { label = action.label, execute = action.execute })
+	end
+	table.insert(result, { label = "Close workspace", execute = M.close })
+	for _, action in ipairs(result) do
+		if action.enabled == nil then
+			action.enabled = true
+		end
+	end
+	return result
+end
+
 local function bind(panel)
 	accessibility.panel(panel.buffer, { next = "j", previous = "k", confirm = "<CR>", cancel = "q", help = "?" }, {
 		next = function()
-			panel.selected = panel.selected % action_count(panel) + 1
+			local actions = action_items(panel)
+			panel.selected = panel.selected % #actions + 1
 			render(panel)
 		end,
 		previous = function()
-			panel.selected = panel.selected == 1 and action_count(panel) or panel.selected - 1
+			local actions = action_items(panel)
+			panel.selected = panel.selected == 1 and #actions or panel.selected - 1
 			render(panel)
 		end,
 		confirm = function()
-			local actions = {
-				open_dashboard,
-				open_sessions,
-				inspect_context,
-				open_review,
-				recover,
-				M.close,
-				create_task,
-				import_tasks,
-				launch_task,
-				attach_session,
-				refresh_providers,
-			}
-			local ok, err = pcall(actions[panel.selected], panel)
+			local action = action_items(panel)[panel.selected]
+			if not action.enabled then
+				vim.notify("Gator: " .. action.label .. " is unavailable: " .. action.reason, vim.log.levels.WARN)
+				return
+			end
+			local ok, err = pcall(action.execute, panel)
 			if not ok then
 				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end

@@ -1,4 +1,5 @@
 local sdk = require("gator").module("extensions").ui_sdk
+local actions = require("gator.ui.actions")
 assert(sdk.register({
 	name = "fixture-panel",
 	render = function(context)
@@ -16,6 +17,8 @@ assert(sdk.action({
 	execute = function()
 		return "action"
 	end,
-}) == "action:fixture-ui-action", "UI SDK must expose extension actions")
+}) == "fixture-ui-action", "UI SDK must expose workspace actions")
+assert(actions.list()[1].name == "fixture-ui-action", "UI SDK actions must be visible in the workspace registry")
+assert(actions.unregister("fixture-ui-action"), "UI SDK actions must unregister cleanly")
 assert(sdk.unregister("fixture-panel"), "UI SDK panels must unregister cleanly")
 assert(not pcall(sdk.open, "fixture-panel"), "unregistered panels must remain unavailable")

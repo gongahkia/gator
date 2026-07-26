@@ -7,7 +7,6 @@ local task_file = require("gator.core.task_file")
 local lifecycle = require("gator.core.lifecycle")
 local session = require("gator.core.session")
 local health = require("gator.health")
-local palette = require("gator.ui.palette")
 local provider_picker = require("gator.ui.provider_picker")
 local conversation = require("gator.ui.conversation")
 local approval_details = require("gator.ui.approval_details")
@@ -134,7 +133,6 @@ function M.new(opts)
 		readiness = opts.readiness or health.launch_catalog,
 		managed = opts.managed or managed_adapter.new({ shutdown = true }),
 		active = {},
-		palette = {},
 		providers = {},
 		provider_modes = {},
 		permission_sequence = 0,
@@ -188,7 +186,6 @@ function Workflow:replace(value)
 			return left.id < right.id
 		end)
 	end)
-	self:register_palette()
 	return value
 end
 
@@ -246,7 +243,6 @@ function Workflow:load()
 		return left.id < right.id
 	end)
 	self.state:update({ tasks = found })
-	self:register_palette()
 	return { tasks = #found, failures = failures }
 end
 
@@ -275,8 +271,35 @@ function Workflow:refresh()
 	end
 	self.providers = available
 	self.provider_modes = modes
-	self:register_palette()
 	return vim.deepcopy(available)
+end
+
+function Workflow:availability()
+	local id = self:active_task_id()
+	local value = id and records(self.state)[id] or nil
+	if not value then
+		return { selected = false, attachable = false, stoppable = false }
+	end
+	local reference = value.sessions[1]
+	local attachable = reference ~= nil
+	local attach_reason
+	if reference and reference.mode ~= "terminal" and not managed_adapter.can_resume(reference.provider) then
+		attachable = false
+		attach_reason = "linked provider does not support managed-session resume"
+	end
+	local stoppable = false
+	for _, current in ipairs(value.sessions) do
+		if current.mode ~= "terminal" and self.managed:is_active(current) then
+			stoppable = true
+			break
+		end
+	end
+	return {
+		selected = true,
+		attachable = attachable,
+		attach_reason = attach_reason,
+		stoppable = stoppable,
+	}
 end
 
 function Workflow:transition(value, target)
@@ -518,9 +541,12 @@ function Workflow:open_terminal(value, prepared, resumed)
 	return opened
 end
 
-function Workflow:launch(provider_name)
+function Workflow:launch(provider_name, refreshed)
 	local value = self:task()
 	provider_name = identifier(provider_name, "provider")
+	if not refreshed then
+		self:refresh()
+	end
 	if not self.providers[provider_name] then
 		fail("provider is unavailable for launch: " .. provider_name)
 	end
@@ -596,64 +622,24 @@ function Workflow:stop_session()
 end
 
 function Workflow:open_provider_picker()
+	self:refresh()
 	local providers = {}
 	for _, value in pairs(self.providers) do
 		table.insert(providers, value)
 	end
-	provider_picker.open({
+	if #providers == 0 then
+		vim.notify("Gator launch: no ready providers; run :GatorHealth for details", vim.log.levels.WARN)
+		return false
+	end
+	return provider_picker.open({
 		providers = providers,
 		on_launch = function(value)
-			self:launch(value.provider)
+			self:launch(value.provider, true)
 		end,
 	})
 end
 
-function Workflow:register_palette()
-	for _, id in ipairs(self.palette) do
-		palette.unregister(id)
-	end
-	self.palette = {}
-	local function add(kind, name, execute)
-		table.insert(self.palette, palette.register({ kind = kind, name = name, execute = execute }))
-	end
-	add("action", "create-task", function()
-		self:prompt_create()
-	end)
-	add("action", "import-tasks", function()
-		local report = self:load()
-		if #report.failures > 0 then
-			vim.notify(table.concat(report.failures, "\n"), vim.log.levels.WARN, { title = "Gator" })
-		end
-	end)
-	add("action", "launch-task", function()
-		self:open_provider_picker()
-	end)
-	add("action", "attach-session", function()
-		self:attach()
-	end)
-	add("action", "stop-session", function()
-		self:stop_session()
-	end)
-	add("action", "refresh-providers", function()
-		self:refresh()
-	end)
-	for _, value in ipairs(self.state.tasks) do
-		add("task", value.id, function()
-			self:select(value.id)
-		end)
-	end
-	for name in pairs(self.providers) do
-		add("provider", name, function()
-			self:launch(name)
-		end)
-	end
-end
-
 function Workflow:close()
-	for _, id in ipairs(self.palette) do
-		palette.unregister(id)
-	end
-	self.palette = {}
 	self.managed:shutdown()
 	return true
 end

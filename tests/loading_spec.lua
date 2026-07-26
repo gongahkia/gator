@@ -8,7 +8,7 @@ assert(not commands.GatorExportDiagnostics, "lazy module loading must not regist
 assert(not commands.GatorBetaReadiness, "lazy module loading must not register beta readiness commands")
 assert(not commands.GatorStopSession, "lazy module loading must not register managed-session commands")
 assert(not commands.GatorCaptureSelection, "lazy module loading must not register context commands")
-assert(not commands.GatorPalette, "lazy module loading must not register palette commands")
+assert(not commands.GatorPalette, "lazy module loading must not register removed palette commands")
 
 local gator = require("gator").setup()
 assert(gator._state, "lazy module loading must support setup")
@@ -28,5 +28,5 @@ assert(commands.GatorExportDiagnostics, "native package loading must register di
 assert(commands.GatorBetaReadiness, "native package loading must register beta readiness")
 assert(commands.GatorStopSession, "native package loading must register managed-session stop")
 assert(commands.GatorCaptureSelection, "native package loading must register selection capture")
-assert(commands.GatorPalette, "native package loading must register the command palette")
+assert(not commands.GatorPalette, "native package loading must not register the removed palette command")
 assert(require("gator")._state == gator._state, "plugin loading must preserve configured state")
