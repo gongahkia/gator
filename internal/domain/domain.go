@@ -299,16 +299,19 @@ type Revision struct {
 }
 
 type OutboxEvent struct {
-	ID          int64          `json:"id"`
-	RunID       string         `json:"run_id,omitempty"`
-	Type        string         `json:"type"`
-	Payload     map[string]any `json:"payload"`
-	State       string         `json:"state"`
-	Attempts    int            `json:"attempts"`
-	WorkerID    string         `json:"worker_id,omitempty"`
-	LastError   string         `json:"last_error,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	DeliveredAt *time.Time     `json:"delivered_at,omitempty"`
+	ID             int64          `json:"id"`
+	RunID          string         `json:"run_id,omitempty"`
+	Type           string         `json:"type"`
+	Payload        map[string]any `json:"payload"`
+	State          string         `json:"state"`
+	Attempts       int            `json:"attempts"`
+	WorkerID       string         `json:"worker_id,omitempty"`
+	LastError      string         `json:"last_error,omitempty"`
+	IdempotencyKey string         `json:"idempotency_key,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	NextAttemptAt  *time.Time     `json:"next_attempt_at,omitempty"`
+	DeliveredAt    *time.Time     `json:"delivered_at,omitempty"`
+	DeadLetteredAt *time.Time     `json:"dead_lettered_at,omitempty"`
 }
 
 type ApprovalOperation struct {
@@ -377,6 +380,11 @@ type SkillImport struct {
 	Mode          string         `json:"mode"`
 	Digest        string         `json:"digest,omitempty"`
 	State         string         `json:"state"`
+	ResolvedRef   string         `json:"resolved_ref,omitempty"`
+	TreeDigest    string         `json:"tree_digest,omitempty"`
+	TrustLevel    string         `json:"trust_level"`
+	ReviewedBy    string         `json:"reviewed_by,omitempty"`
+	ReviewedAt    *time.Time     `json:"reviewed_at,omitempty"`
 	Findings      map[string]any `json:"findings"`
 	ActivatedAt   *time.Time     `json:"activated_at,omitempty"`
 	CreatedAt     time.Time      `json:"created_at"`
@@ -489,6 +497,8 @@ type AgentAction struct {
 	Error      string         `json:"error,omitempty"`
 	ApprovedBy string         `json:"approved_by,omitempty"`
 	DecidedAt  *time.Time     `json:"decided_at,omitempty"`
+	ExpiresAt  *time.Time     `json:"expires_at,omitempty"`
+	ApprovalContext map[string]any `json:"approval_context,omitempty"`
 	CreatedAt  time.Time      `json:"created_at"`
 	UpdatedAt  time.Time      `json:"updated_at"`
 }

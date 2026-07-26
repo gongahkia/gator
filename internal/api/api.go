@@ -144,6 +144,14 @@ func (s *Server) authConfig(w http.ResponseWriter, r *http.Request) {
 
 type operatorContextKey struct{}
 
+func operatorFromRequest(r *http.Request) string {
+	operator, _ := r.Context().Value(operatorContextKey{}).(string)
+	if operator == "" {
+		return "local-operator"
+	}
+	return operator
+}
+
 func (s *Server) skillImports(w http.ResponseWriter, r *http.Request) {
 	if s.skills == nil {
 		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("skill marketplace is unavailable"))
@@ -185,7 +193,7 @@ func (s *Server) activateSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid skill import id"))
 		return
 	}
-	value, err := s.skills.Activate(r.Context(), id)
+	value, err := s.skills.Activate(r.Context(), id, operatorFromRequest(r))
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusConflict, fmt.Errorf("skill import is not scan-approved"))
 		return

@@ -68,6 +68,11 @@ type discoveredSkill struct {
 	Path string
 }
 
+type sourceProvenance struct {
+	ResolvedRef string
+	TreeDigest  string
+}
+
 type Service struct {
 	store        *store.Store
 	artifactsDir string
@@ -109,17 +114,18 @@ func (s *Service) ImportAll(ctx context.Context, input ImportInput) (ImportResul
 	}
 	defer os.RemoveAll(temporary)
 	root := filepath.Join(temporary, "bundle")
+	var provenance sourceProvenance
 	switch input.SourceType {
 	case "git":
-		err = materializeGit(ctx, root, input)
+		provenance, err = materializeGit(ctx, root, input)
 	case "oci":
-		err = s.materializeOCI(ctx, root, input)
+		provenance, err = s.materializeOCI(ctx, root, input)
 	}
 	if err != nil {
 		return ImportResult{}, err
 	}
 	result := ImportResult{}
-	if err := s.importSource(ctx, root, input, &result); err != nil {
+	if err := s.importSource(ctx, root, input, provenance, &result); err != nil {
 		return ImportResult{}, err
 	}
 	if input.FollowReadmeLinks {
@@ -137,12 +143,13 @@ func (s *Service) ImportAll(ctx context.Context, input ImportInput) (ImportResul
 			linkedRoot := filepath.Join(temporary, "catalogue", fmt.Sprintf("%03d", index))
 			linkedInput := input
 			linkedInput.SourceType, linkedInput.SourceURI, linkedInput.SourceRef, linkedInput.CredentialEnv, linkedInput.FollowReadmeLinks = "git", repository, "", "", false
-			if err := materializeGit(ctx, linkedRoot, linkedInput); err != nil {
+			linkedProvenance, err := materializeGit(ctx, linkedRoot, linkedInput)
+			if err != nil {
 				result.Rejected = append(result.Rejected, RejectedSkill{SourceURI: repository, Error: err.Error()})
 				continue
 			}
 			before := len(result.Imports) + len(result.Rejected)
-			if err := s.importSource(ctx, linkedRoot, linkedInput, &result); err != nil {
+			if err := s.importSource(ctx, linkedRoot, linkedInput, linkedProvenance, &result); err != nil {
 				result.Rejected = append(result.Rejected, RejectedSkill{SourceURI: repository, Error: err.Error()})
 				continue
 			}
@@ -163,7 +170,7 @@ func (s *Service) ImportAll(ctx context.Context, input ImportInput) (ImportResul
 	return result, nil
 }
 
-func (s *Service) importSource(ctx context.Context, root string, input ImportInput, result *ImportResult) error {
+func (s *Service) importSource(ctx context.Context, root string, input ImportInput, provenance sourceProvenance, result *ImportResult) error {
 	candidates, err := discoverSkills(root)
 	if err != nil {
 		return err
@@ -186,7 +193,9 @@ func (s *Service) importSource(ctx context.Context, root string, input ImportInp
 		if err != nil {
 			return err
 		}
-		imported, err := s.store.CreateSkillImport(ctx, domain.SkillImport{SourceType: input.SourceType, SourceURI: input.SourceURI, SourceRef: input.SourceRef, CredentialEnv: input.CredentialEnv, BundlePath: candidate.Path, Mode: mode, Digest: pkg.Digest, State: "scanned", Findings: findings})
+		findings["resolved_ref"] = provenance.ResolvedRef
+		findings["tree_digest"] = provenance.TreeDigest
+		imported, err := s.store.CreateSkillImport(ctx, domain.SkillImport{SourceType: input.SourceType, SourceURI: input.SourceURI, SourceRef: input.SourceRef, CredentialEnv: input.CredentialEnv, BundlePath: candidate.Path, Mode: mode, Digest: pkg.Digest, State: "scanned", ResolvedRef: provenance.ResolvedRef, TreeDigest: provenance.TreeDigest, TrustLevel: "untrusted", Findings: findings})
 		if err != nil {
 			return err
 		}
@@ -196,17 +205,17 @@ func (s *Service) importSource(ctx context.Context, root string, input ImportInp
 	return nil
 }
 
-func (s *Service) Activate(ctx context.Context, id int64) (domain.SkillImport, error) {
-	return s.store.ActivateSkillImport(ctx, id)
+func (s *Service) Activate(ctx context.Context, id int64, reviewer string) (domain.SkillImport, error) {
+	return s.store.ActivateSkillImport(ctx, id, reviewer)
 }
 
 func (s *Service) Imports(ctx context.Context) ([]domain.SkillImport, error) {
 	return s.store.SkillImports(ctx)
 }
 
-func materializeGit(ctx context.Context, root string, input ImportInput) error {
+func materializeGit(ctx context.Context, root string, input ImportInput) (sourceProvenance, error) {
 	if !strings.HasPrefix(input.SourceURI, "https://") {
-		return fmt.Errorf("git skill source must use https")
+		return sourceProvenance{}, fmt.Errorf("git skill source must use https")
 	}
 	args := []string{"clone", "--depth", "1"}
 	if input.SourceRef != "" {
@@ -218,7 +227,7 @@ func materializeGit(ctx context.Context, root string, input ImportInput) error {
 	if input.CredentialEnv != "" {
 		secret := os.Getenv(input.CredentialEnv)
 		if secret == "" {
-			return fmt.Errorf("credential env %s is not set", input.CredentialEnv)
+			return sourceProvenance{}, fmt.Errorf("credential env %s is not set", input.CredentialEnv)
 		}
 		command.Env = append(command.Env, "GIT_HTTP_EXTRAHEADER=Authorization: Basic "+base64.StdEncoding.EncodeToString([]byte(secret)))
 	}
@@ -228,26 +237,37 @@ func materializeGit(ctx context.Context, root string, input ImportInput) error {
 		if detail == "" {
 			detail = err.Error()
 		}
-		return fmt.Errorf("clone skill source: %s", detail)
+		return sourceProvenance{}, fmt.Errorf("clone skill source: %s", detail)
 	}
-	return os.RemoveAll(filepath.Join(root, ".git"))
+	resolved, err := gitMetadata(ctx, root, "rev-parse", "HEAD")
+	if err != nil {
+		return sourceProvenance{}, err
+	}
+	tree, err := gitMetadata(ctx, root, "rev-parse", "HEAD^{tree}")
+	if err != nil {
+		return sourceProvenance{}, err
+	}
+	if err := os.RemoveAll(filepath.Join(root, ".git")); err != nil {
+		return sourceProvenance{}, err
+	}
+	return sourceProvenance{ResolvedRef: resolved, TreeDigest: "sha1:" + tree}, nil
 }
 
-func (s *Service) materializeOCI(ctx context.Context, root string, input ImportInput) error {
+func (s *Service) materializeOCI(ctx context.Context, root string, input ImportInput) (sourceProvenance, error) {
 	registry, repository, reference, err := parseOCI(input.SourceURI, input.SourceRef)
 	if err != nil {
-		return err
+		return sourceProvenance{}, err
 	}
 	secret := ""
 	if input.CredentialEnv != "" {
 		secret = os.Getenv(input.CredentialEnv)
 		if secret == "" {
-			return fmt.Errorf("credential env %s is not set", input.CredentialEnv)
+			return sourceProvenance{}, fmt.Errorf("credential env %s is not set", input.CredentialEnv)
 		}
 	}
 	manifest, contentType, err := s.ociRequest(ctx, registry, repository, "manifests/"+reference, "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json", secret)
 	if err != nil {
-		return err
+		return sourceProvenance{}, err
 	}
 	var index struct {
 		Manifests []struct {
@@ -256,11 +276,11 @@ func (s *Service) materializeOCI(ctx context.Context, root string, input ImportI
 	}
 	if strings.Contains(contentType, "index") || bytes.Contains(manifest, []byte(`"manifests"`)) {
 		if err := json.Unmarshal(manifest, &index); err != nil || len(index.Manifests) == 0 {
-			return fmt.Errorf("invalid OCI index")
+			return sourceProvenance{}, fmt.Errorf("invalid OCI index")
 		}
 		manifest, _, err = s.ociRequest(ctx, registry, repository, "manifests/"+index.Manifests[0].Digest, "application/vnd.oci.image.manifest.v1+json", secret)
 		if err != nil {
-			return err
+			return sourceProvenance{}, err
 		}
 	}
 	var image struct {
@@ -270,21 +290,36 @@ func (s *Service) materializeOCI(ctx context.Context, root string, input ImportI
 		} `json:"layers"`
 	}
 	if err := json.Unmarshal(manifest, &image); err != nil || len(image.Layers) == 0 {
-		return fmt.Errorf("invalid OCI image manifest")
+		return sourceProvenance{}, fmt.Errorf("invalid OCI image manifest")
 	}
 	if err := os.MkdirAll(root, 0o750); err != nil {
-		return err
+		return sourceProvenance{}, err
 	}
 	for _, layer := range image.Layers {
 		blob, _, err := s.ociRequest(ctx, registry, repository, "blobs/"+layer.Digest, "application/octet-stream", secret)
 		if err != nil {
-			return err
+			return sourceProvenance{}, err
 		}
 		if err := extractLayer(root, blob, strings.Contains(layer.MediaType, "gzip") || strings.HasSuffix(layer.MediaType, "+gzip")); err != nil {
-			return err
+			return sourceProvenance{}, err
 		}
 	}
-	return nil
+	digest := sha256.Sum256(manifest)
+	return sourceProvenance{ResolvedRef: "sha256:" + hex.EncodeToString(digest[:]), TreeDigest: "sha256:" + hex.EncodeToString(digest[:])}, nil
+}
+
+func gitMetadata(ctx context.Context, root string, args ...string) (string, error) {
+	command := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...)
+	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("read git provenance: %w", err)
+	}
+	value := strings.TrimSpace(string(output))
+	if value == "" {
+		return "", fmt.Errorf("empty git provenance")
+	}
+	return value, nil
 }
 
 func (s *Service) ociRequest(ctx context.Context, registry, repository, path, accept, secret string) ([]byte, string, error) {

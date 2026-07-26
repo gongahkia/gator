@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,8 +60,7 @@ func (s *Store) QueueDepth(ctx context.Context) (int, error) {
 	return value, err
 }
 
-func (s *Store) Migrate(ctx context.Context) error {
-	_, err := s.pool.Exec(ctx, `
+const migration001InitialSchema = `
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
 	app_id TEXT NOT NULL DEFAULT '',
@@ -410,11 +411,94 @@ UPDATE deployments SET is_current=TRUE FROM latest_deployments WHERE deployments
 CREATE INDEX IF NOT EXISTS runs_app_updated_at_idx ON runs(app_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS deployments_app_updated_idx ON deployments(app_id, updated_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS deployments_current_app_idx ON deployments(app_id) WHERE is_current;
-CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`)
+CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`
+
+const migration002OperationalHardening = `
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMPTZ;
+ALTER TABLE outbox_events ADD COLUMN IF NOT EXISTS idempotency_key TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS outbox_events_due_idx ON outbox_events(state,next_attempt_at,id) WHERE state='queued';
+CREATE UNIQUE INDEX IF NOT EXISTS outbox_events_idempotency_idx ON outbox_events(event_type,idempotency_key) WHERE idempotency_key<>'';
+ALTER TABLE agent_actions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+ALTER TABLE agent_actions ADD COLUMN IF NOT EXISTS approval_context JSONB NOT NULL DEFAULT '{}'::jsonb;
+CREATE INDEX IF NOT EXISTS agent_actions_expiry_idx ON agent_actions(state,expires_at) WHERE state='pending';
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS resolved_ref TEXT NOT NULL DEFAULT '';
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS tree_digest TEXT NOT NULL DEFAULT '';
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS trust_level TEXT NOT NULL DEFAULT 'untrusted';
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS reviewed_by TEXT NOT NULL DEFAULT '';
+ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS skill_imports_provenance_idx ON skill_imports(source_uri,resolved_ref,tree_digest);
+CREATE TABLE IF NOT EXISTS audit_events (
+  id BIGSERIAL PRIMARY KEY,
+  actor TEXT NOT NULL DEFAULT '',
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS audit_events_target_idx ON audit_events(target_type,target_id,id DESC);
+`
+
+type migration struct {
+	Version int
+	Name    string
+	SQL     string
+}
+
+var migrations = []migration{
+	{Version: 1, Name: "initial_schema", SQL: migration001InitialSchema},
+	{Version: 2, Name: "operational_hardening", SQL: migration002OperationalHardening},
+}
+
+func (s *Store) Migrate(ctx context.Context) error {
+	connection, err := s.pool.Acquire(ctx)
 	if err != nil {
-		return fmt.Errorf("migrate: %w", err)
+		return fmt.Errorf("acquire migration connection: %w", err)
+	}
+	defer connection.Release()
+	if _, err := connection.Exec(ctx, `SELECT pg_advisory_lock(hashtext('norbot-schema-migrations'))`); err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer connection.Exec(context.Background(), `SELECT pg_advisory_unlock(hashtext('norbot-schema-migrations'))`)
+	if _, err := connection.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INT PRIMARY KEY,name TEXT NOT NULL,checksum TEXT NOT NULL,applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`); err != nil {
+		return fmt.Errorf("create migration ledger: %w", err)
+	}
+	for _, item := range migrations {
+		checksum := migrationChecksum(item.SQL)
+		var appliedChecksum string
+		err := connection.QueryRow(ctx, `SELECT checksum FROM schema_migrations WHERE version=$1`, item.Version).Scan(&appliedChecksum)
+		if errors.Is(err, pgx.ErrNoRows) {
+			tx, beginErr := connection.Begin(ctx)
+			if beginErr != nil {
+				return fmt.Errorf("begin migration %d: %w", item.Version, beginErr)
+			}
+			if _, execErr := tx.Exec(ctx, item.SQL); execErr != nil {
+				_ = tx.Rollback(ctx)
+				return fmt.Errorf("apply migration %d (%s): %w", item.Version, item.Name, execErr)
+			}
+			if _, execErr := tx.Exec(ctx, `INSERT INTO schema_migrations(version,name,checksum) VALUES($1,$2,$3)`, item.Version, item.Name, checksum); execErr != nil {
+				_ = tx.Rollback(ctx)
+				return fmt.Errorf("record migration %d: %w", item.Version, execErr)
+			}
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return fmt.Errorf("commit migration %d: %w", item.Version, commitErr)
+			}
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read migration %d: %w", item.Version, err)
+		}
+		if appliedChecksum != checksum {
+			return fmt.Errorf("migration %d (%s) checksum changed; migrations are immutable", item.Version, item.Name)
+		}
 	}
 	return nil
+}
+
+func migrationChecksum(sql string) string {
+	digest := sha256.Sum256([]byte(sql))
+	return hex.EncodeToString(digest[:])
 }
 
 func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
@@ -460,7 +544,7 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)`, run.ID, ru
 			}
 		}
 		for _, digest := range skillDigests {
-			result, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM skill_imports WHERE digest=$2 AND state='active') ON CONFLICT DO NOTHING`, run.ID, digest)
+			result, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM skill_imports WHERE digest=$2 AND state='active' AND trust_level='reviewed') ON CONFLICT DO NOTHING`, run.ID, digest)
 			if err != nil {
 				return err
 			}

@@ -47,8 +47,8 @@ func (s *Store) CreateSkillImport(ctx context.Context, value domain.SkillImport)
 		return domain.SkillImport{}, err
 	}
 	var raw []byte
-	err = s.pool.QueryRow(ctx, `INSERT INTO skill_imports(source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,findings)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,findings,activated_at,created_at`, value.SourceType, value.SourceURI, value.SourceRef, value.CredentialEnv, value.BundlePath, value.Mode, value.Digest, value.State, findings).Scan(&value.ID, &raw, &value.ActivatedAt, &value.CreatedAt)
+	err = s.pool.QueryRow(ctx, `INSERT INTO skill_imports(source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,resolved_ref,tree_digest,trust_level,findings)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,findings,activated_at,reviewed_at,created_at`, value.SourceType, value.SourceURI, value.SourceRef, value.CredentialEnv, value.BundlePath, value.Mode, value.Digest, value.State, value.ResolvedRef, value.TreeDigest, value.TrustLevel, findings).Scan(&value.ID, &raw, &value.ActivatedAt, &value.ReviewedAt, &value.CreatedAt)
 	if err != nil {
 		return domain.SkillImport{}, err
 	}
@@ -59,7 +59,7 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,findings,activated_at,created_at
 }
 
 func (s *Store) SkillImports(ctx context.Context) ([]domain.SkillImport, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id,source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,findings,activated_at,created_at FROM skill_imports ORDER BY id DESC`)
+	rows, err := s.pool.Query(ctx, `SELECT id,source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,resolved_ref,tree_digest,trust_level,reviewed_by,findings,activated_at,reviewed_at,created_at FROM skill_imports ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -75,15 +75,24 @@ func (s *Store) SkillImports(ctx context.Context) ([]domain.SkillImport, error) 
 	return values, rows.Err()
 }
 
-func (s *Store) ActivateSkillImport(ctx context.Context, id int64) (domain.SkillImport, error) {
-	row := s.pool.QueryRow(ctx, `UPDATE skill_imports SET state='active',activated_at=now() WHERE id=$1 AND state='scanned' RETURNING id,source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,findings,activated_at,created_at`, id)
-	return scanSkillImport(row)
+func (s *Store) ActivateSkillImport(ctx context.Context, id int64, reviewer string) (domain.SkillImport, error) {
+	var value domain.SkillImport
+	err := s.withTx(ctx, func(tx pgx.Tx) error {
+		row := tx.QueryRow(ctx, `UPDATE skill_imports SET state='active',trust_level='reviewed',reviewed_by=$2,reviewed_at=now(),activated_at=now() WHERE id=$1 AND state='scanned' RETURNING id,source_type,source_uri,source_ref,credential_env,bundle_path,mode,digest,state,resolved_ref,tree_digest,trust_level,reviewed_by,findings,activated_at,reviewed_at,created_at`, id, reviewer)
+		var err error
+		value, err = scanSkillImport(row)
+		if err != nil {
+			return err
+		}
+		return s.insertAuditEvent(ctx, tx, reviewer, "skill.activated", "skill_import", fmt.Sprint(id), map[string]any{"digest": value.Digest, "resolved_ref": value.ResolvedRef, "tree_digest": value.TreeDigest, "mode": value.Mode})
+	})
+	return value, err
 }
 
 func (s *Store) ActiveSkill(ctx context.Context, digest string) (domain.SkillPackage, error) {
 	var value domain.SkillPackage
 	var raw []byte
-	err := s.pool.QueryRow(ctx, `SELECT p.digest,p.skill_id,p.version,p.name,p.description,p.manifest,p.path,p.created_at FROM skill_packages p JOIN skill_imports i ON i.digest=p.digest WHERE p.digest=$1 AND i.state='active' ORDER BY i.id DESC LIMIT 1`, digest).Scan(&value.Digest, &value.ID, &value.Version, &value.Name, &value.Description, &raw, &value.Path, &value.CreatedAt)
+	err := s.pool.QueryRow(ctx, `SELECT p.digest,p.skill_id,p.version,p.name,p.description,p.manifest,p.path,p.created_at FROM skill_packages p JOIN skill_imports i ON i.digest=p.digest WHERE p.digest=$1 AND i.state='active' AND i.trust_level='reviewed' ORDER BY i.id DESC LIMIT 1`, digest).Scan(&value.Digest, &value.ID, &value.Version, &value.Name, &value.Description, &raw, &value.Path, &value.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.SkillPackage{}, ErrNotFound
 	}
@@ -99,7 +108,7 @@ func (s *Store) ActiveSkill(ctx context.Context, digest string) (domain.SkillPac
 func (s *Store) SelectRunSkills(ctx context.Context, runID string, digests []string) error {
 	return s.withTx(ctx, func(tx pgx.Tx) error {
 		for _, digest := range digests {
-			result, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM skill_imports WHERE digest=$2 AND state='active') ON CONFLICT DO NOTHING`, runID, digest)
+			result, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM skill_imports WHERE digest=$2 AND state='active' AND trust_level='reviewed') ON CONFLICT DO NOTHING`, runID, digest)
 			if err != nil {
 				return err
 			}
@@ -138,7 +147,7 @@ func (s *Store) RunSkills(ctx context.Context, runID string) ([]domain.SkillPack
 func scanSkillImport(row interface{ Scan(...any) error }) (domain.SkillImport, error) {
 	var value domain.SkillImport
 	var raw []byte
-	err := row.Scan(&value.ID, &value.SourceType, &value.SourceURI, &value.SourceRef, &value.CredentialEnv, &value.BundlePath, &value.Mode, &value.Digest, &value.State, &raw, &value.ActivatedAt, &value.CreatedAt)
+	err := row.Scan(&value.ID, &value.SourceType, &value.SourceURI, &value.SourceRef, &value.CredentialEnv, &value.BundlePath, &value.Mode, &value.Digest, &value.State, &value.ResolvedRef, &value.TreeDigest, &value.TrustLevel, &value.ReviewedBy, &raw, &value.ActivatedAt, &value.ReviewedAt, &value.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.SkillImport{}, ErrNotFound
 	}
