@@ -132,6 +132,25 @@ if fallback then
 		not has_method(resumed_frames, "session/load") and fallback.session.id == first_session.id,
 		"Copilot without loadSession capability must fall back before sending an ACP load request"
 	)
+	local terminal = vim.system({
+		"copilot",
+		"--resume",
+		first_session.id,
+		"--prompt",
+		"Reply exactly: gator-live-e2e",
+		"--available-tools",
+		"view",
+		"glob",
+		"grep",
+		"--no-custom-instructions",
+		"--silent",
+		"--stream",
+		"off",
+	}, { cwd = workspace, text = true }):wait()
+	assert(
+		terminal.code == 0 and vim.trim(terminal.stdout or "") == "gator-live-e2e",
+		"Copilot terminal fallback must resume the ACP-created provider session"
+	)
 else
 	assert(has_method(resumed_frames, "session/load"), "Copilot with loadSession capability must reattach through ACP")
 	assert(resumed:stop(first_session), "authenticated Copilot ACP reattach requires managed stdio shutdown")

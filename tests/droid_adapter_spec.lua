@@ -45,8 +45,10 @@ assert(
 	"Droid JSON-RPC stream must preserve notifications, responses, and permission requests"
 )
 assert(
-	not pcall(adapters.droid_stream.parse_jsonrpc_line, [[{"jsonrpc":"2.0","id":1,"method":"droid.session_notification","params":{"notification":{"type":"assistant_text_delta"}}}]])
-		and not pcall(adapters.droid_stream.parse_jsonrpc_line, [[{"jsonrpc":"2.0","id":true,"result":{}}]]),
+	not pcall(
+			adapters.droid_stream.parse_jsonrpc_line,
+			[[{"jsonrpc":"2.0","id":1,"method":"droid.session_notification","params":{"notification":{"type":"assistant_text_delta"}}}]]
+		) and not pcall(adapters.droid_stream.parse_jsonrpc_line, [[{"jsonrpc":"2.0","id":true,"result":{}}]]),
 	"Droid JSON-RPC validation must reject malformed notification and response envelopes"
 )
 

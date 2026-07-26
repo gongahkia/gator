@@ -274,7 +274,10 @@ function M.new(opts)
 		type(opts) ~= "table"
 		or (opts.spawn ~= nil and type(opts.spawn) ~= "function")
 		or (opts.shutdown ~= nil and type(opts.shutdown) ~= "boolean")
-		or (opts.stop_timeout_ms ~= nil and (type(opts.stop_timeout_ms) ~= "number" or opts.stop_timeout_ms < 1 or opts.stop_timeout_ms % 1 ~= 0))
+		or (
+			opts.stop_timeout_ms ~= nil
+			and (type(opts.stop_timeout_ms) ~= "number" or opts.stop_timeout_ms < 1 or opts.stop_timeout_ms % 1 ~= 0)
+		)
 	then
 		fail("new requires optional spawn and shutdown settings")
 	end

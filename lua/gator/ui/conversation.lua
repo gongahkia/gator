@@ -71,7 +71,8 @@ function M.open(opts)
 	local panel, tabpage = current()
 	if panel then
 		panel.provider, panel.session_id, panel.state = opts.provider, opts.session_id, opts.state
-		panel.on_input, panel.on_cancel, panel.on_detach = opts.on_input, opts.on_cancel, opts.on_detach or function() end
+		panel.on_input, panel.on_cancel, panel.on_detach =
+			opts.on_input, opts.on_cancel, opts.on_detach or function() end
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window

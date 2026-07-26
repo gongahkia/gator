@@ -117,7 +117,7 @@ function M.new(opts)
 		opts.managed ~= nil
 		and (
 			type(opts.managed.open) ~= "function"
-		or type(opts.managed.send) ~= "function"
+			or type(opts.managed.send) ~= "function"
 			or type(opts.managed.cancel) ~= "function"
 			or type(opts.managed.stop) ~= "function"
 			or type(opts.managed.shutdown) ~= "function"

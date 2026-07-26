@@ -227,7 +227,11 @@ assert(
 	droid:cancel(droid_sessions[1]) and droid_writes[5].method == "droid.interrupt_session",
 	"Droid cancellation must interrupt the active session"
 )
-droid_stdout(nil, [[{"jsonrpc":"2.0","id":99,"method":"droid.session_notification","params":{"notification":{"type":"assistant_text_delta"}}}]] .. "\n")
+droid_stdout(
+	nil,
+	[[{"jsonrpc":"2.0","id":99,"method":"droid.session_notification","params":{"notification":{"type":"assistant_text_delta"}}}]]
+		.. "\n"
+)
 droid_stdout(nil, [[{"jsonrpc":"2.0","id":100,"result":{}}]] .. "\n")
 assert(
 	droid_events[#droid_events - 1].text == "Droid emitted invalid JSON-RPC"
@@ -248,7 +252,10 @@ local timeout_handle = {}
 function timeout_handle:write(frame)
 	local value = vim.json.decode(frame)
 	if value.method == "droid.initialize_session" then
-		timeout_stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = value.id, result = { sessionId = "timeout-session" } }) .. "\n")
+		timeout_stdout(
+			nil,
+			vim.json.encode({ jsonrpc = "2.0", id = value.id, result = { sessionId = "timeout-session" } }) .. "\n"
+		)
 	end
 	return true
 end
@@ -271,12 +278,9 @@ timeout_runtime:open({
 		timeout_session = value
 	end,
 })
-assert(
-	timeout_session and timeout_runtime:stop(timeout_session) and vim.wait(100, function()
-		return timeout_kills == 1
-	end, 1),
-	"Droid stop must terminate a child when close_session does not answer within its bound"
-)
+assert(timeout_session and timeout_runtime:stop(timeout_session) and vim.wait(100, function()
+	return timeout_kills == 1
+end, 1), "Droid stop must terminate a child when close_session does not answer within its bound")
 
 local copilot_stdout, copilot_writes = nil, {}
 local copilot_handle = {}
@@ -284,14 +288,11 @@ function copilot_handle:write(frame)
 	local value = vim.json.decode(frame)
 	table.insert(copilot_writes, value)
 	if value.method == "initialize" then
-		copilot_stdout(
-			nil,
-			vim.json.encode({
-				jsonrpc = "2.0",
-				id = value.id,
-				result = { protocolVersion = 1, agentCapabilities = { loadSession = true } },
-			}) .. "\n"
-		)
+		copilot_stdout(nil, vim.json.encode({
+			jsonrpc = "2.0",
+			id = value.id,
+			result = { protocolVersion = 1, agentCapabilities = { loadSession = true } },
+		}) .. "\n")
 	elseif value.method == "session/load" then
 		copilot_stdout(
 			nil,

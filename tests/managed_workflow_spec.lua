@@ -88,7 +88,10 @@ runtime.active = false
 assert(value:attach() and #runtime.opened == 2, "managed sessions must reopen from their persisted provider session id")
 runtime.active = true
 assert(
-	value:stop_session() and runtime.stopped == 1 and not runtime.active and value:task(created.id).lifecycle == "running",
+	value:stop_session()
+		and runtime.stopped == 1
+		and not runtime.active
+		and value:task(created.id).lifecycle == "running",
 	"stopping a managed child must preserve a resumable provider session and running task"
 )
 ui.conversation.close()

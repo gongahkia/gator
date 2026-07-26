@@ -34,7 +34,8 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorStopSession", function()
 		local ok, result = pcall(require("gator").stop_session)
 		vim.notify(
-			ok and "Gator session stopped; provider session remains resumable" or require("gator.policy.redact").text(tostring(result)),
+			ok and "Gator session stopped; provider session remains resumable"
+				or require("gator.policy.redact").text(tostring(result)),
 			ok and vim.log.levels.INFO or vim.log.levels.ERROR,
 			{ title = "Gator" }
 		)

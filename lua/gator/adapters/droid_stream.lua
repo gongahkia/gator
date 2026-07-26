@@ -67,7 +67,12 @@ local function parse_jsonrpc_record(record, index)
 			end
 		elseif record.method == "droid.ask_user" then
 			local params = object(record.params, "Droid ask-user request " .. index .. " params")
-			if record.id == nil or type(params.toolCallId) ~= "string" or params.toolCallId == "" or type(params.questions) ~= "table" then
+			if
+				record.id == nil
+				or type(params.toolCallId) ~= "string"
+				or params.toolCallId == ""
+				or type(params.questions) ~= "table"
+			then
 				fail("Droid ask-user request " .. index .. " is invalid")
 			end
 		end
@@ -78,7 +83,11 @@ local function parse_jsonrpc_record(record, index)
 			params = vim.deepcopy(record.params),
 		}
 	end
-	if record.id == nil or (record.result == nil and record.error == nil) or (record.result ~= nil and record.error ~= nil) then
+	if
+		record.id == nil
+		or (record.result == nil and record.error == nil)
+		or (record.result ~= nil and record.error ~= nil)
+	then
 		fail("JSON-RPC response " .. index .. " is invalid")
 	end
 	rpc_id(record.id, "JSON-RPC response " .. index .. " id")
