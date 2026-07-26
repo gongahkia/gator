@@ -141,8 +141,6 @@ function M.decorate(lines, filetype)
 			line = prefix(line, "wait")
 		elseif line:match("^Degraded:") then
 			line = prefix(line, "warning")
-		elseif line:match("^> ") then
-			line = line .. " " .. icon("selected")
 		elseif line:find("navigate", 1, true) and line:find("help", 1, true) then
 			line = prefix(line, "keymap")
 		end

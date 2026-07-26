@@ -15,7 +15,7 @@ assert(
 	unicode[1] == "🐊 Gator workspace"
 		and unicode[2] == "✅ State: ready"
 		and unicode[3] == "📋 Tasks: empty"
-		and unicode[4] == "> Open tasks 🐊"
+		and unicode[4] == "> Open tasks"
 		and unicode[5] == "⌨ j/k navigate · q close · ? help",
 	"Unicode panels must use alligator and semantic glyphs"
 )
