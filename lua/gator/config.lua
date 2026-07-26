@@ -159,8 +159,8 @@ local function settings(value)
 	if type(value.ui.screen_reader) ~= "boolean" then
 		fail("ui.screen_reader must be boolean")
 	end
-	if not vim.tbl_contains({ "unicode", "nerd_font", "ascii" }, value.ui.icons) then
-		fail("ui.icons must be unicode, nerd_font, or ascii")
+	if not vim.tbl_contains({ "unicode", "nerd_font", "ascii", "none" }, value.ui.icons) then
+		fail("ui.icons must be unicode, nerd_font, ascii, or none")
 	end
 	if type(value.ui.motion) ~= "table" then
 		fail("ui.motion must be an object")

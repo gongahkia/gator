@@ -19,7 +19,7 @@ local styles = {
 		selected = "🐊",
 	},
 	nerd_font = {
-		brand = "🐊",
+		brand = "",
 		task = "󰄬",
 		session = "",
 		context = "󰆨",
@@ -52,6 +52,23 @@ local styles = {
 		keymap = "[keys]",
 		selected = "*",
 	},
+	none = {
+		brand = "",
+		task = "",
+		session = "",
+		context = "",
+		review = "",
+		provider = "",
+		workspace = "",
+		info = "",
+		success = "",
+		warning = "",
+		error = "",
+		empty = "",
+		wait = "",
+		keymap = "",
+		selected = "",
+	},
 }
 local style = "unicode"
 
@@ -64,7 +81,8 @@ local function icon(name)
 end
 
 local function prefix(value, name)
-	return icon(name) .. " " .. value
+	local value_icon = icon(name)
+	return value_icon == "" and value or value_icon .. " " .. value
 end
 
 local function status(line)
@@ -86,7 +104,7 @@ end
 
 function M.configure(value)
 	if type(value) ~= "string" or not styles[value] then
-		fail("style must be unicode, nerd_font, or ascii")
+		fail("style must be unicode, nerd_font, ascii, or none")
 	end
 	style = value
 	return style

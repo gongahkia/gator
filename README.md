@@ -166,7 +166,7 @@ require("gator").setup({
     layout = "adaptive",
     keymaps = {},
     screen_reader = true,
-    icons = "unicode", -- 🐊; use "nerd_font" or "ascii" when preferred
+    icons = "unicode", -- 🐊; use "nerd_font", "ascii", or "none" when preferred
     motion = { enabled = true, interval_ms = 120, reduced = false },
   },
   context = {
@@ -191,7 +191,7 @@ require("gator").setup({
 
 Override panel actions through `ui.keymaps`; an override applies only to panels that implement that action.
 
-`ui.icons` controls Gator panel glyphs: `"unicode"` is the default 🐊/emoji style, `"nerd_font"` uses Nerd Font symbols, and `"ascii"` is the terminal-safe fallback. Gator uses Neovim highlight groups rather than raw ANSI escape sequences.
+`ui.icons` controls Gator panel glyphs: `"unicode"` is the default 🐊/emoji style, `"nerd_font"` uses Nerd Font symbols, `"ascii"` is the terminal-safe fallback, and `"none"` disables decorative glyphs. Gator uses Neovim highlight groups rather than raw ANSI escape sequences.
 
 ### File-based configuration
 

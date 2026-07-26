@@ -5,8 +5,9 @@ local glyphs = require("gator.ui.glyphs")
 assert(
 	config.resolve({ ui = { icons = "nerd_font" } }).ui.icons == "nerd_font"
 		and config.resolve({ ui = { icons = "ascii" } }).ui.icons == "ascii"
+		and config.resolve({ ui = { icons = "none" } }).ui.icons == "none"
 		and not pcall(config.resolve, { ui = { icons = "unsupported" } }),
-	"UI glyph style must accept Unicode, Nerd Font, and ASCII modes only"
+	"UI glyph style must accept Unicode, Nerd Font, ASCII, and disabled modes only"
 )
 
 glyphs.configure("unicode")
@@ -26,6 +27,16 @@ assert(glyphs.get("task") ~= "📋" and glyphs.decorate({ "Gator workspace" }, "
 glyphs.configure("ascii")
 local ascii = glyphs.decorate({ "Gator workspace", "No matching tasks" }, "gator")
 assert(ascii[1] == "[G] Gator workspace" and ascii[2] == "[-] No matching tasks", "ASCII mode must avoid non-ASCII glyphs")
+
+glyphs.configure("none")
+assert(
+	vim.deep_equal(glyphs.decorate({ "Gator workspace", "State: ready", "Tasks: empty" }, "gator"), {
+		"Gator workspace",
+		"State: ready",
+		"Tasks: empty",
+	}),
+	"disabled mode must retain only panel text"
+)
 
 local buffer = vim.api.nvim_create_buf(false, true)
 accessibility.configure({ keymaps = {}, screen_reader = true, icons = "unicode" })
