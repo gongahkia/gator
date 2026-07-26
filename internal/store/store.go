@@ -339,9 +339,13 @@ WITH RECURSIVE app_roots AS (
 UPDATE runs SET app_id=app_roots.app_id FROM app_roots WHERE runs.id=app_roots.id AND runs.app_id='';
 UPDATE runs SET app_id=id WHERE app_id='';
 UPDATE deployments SET app_id=runs.app_id FROM runs WHERE deployments.run_id=runs.id AND deployments.app_id='';
-UPDATE deployments SET is_current=FALSE;
-WITH latest_deployments AS (
-  SELECT DISTINCT ON (app_id) run_id FROM deployments ORDER BY app_id,updated_at DESC
+WITH apps_without_current AS (
+  SELECT app_id FROM deployments GROUP BY app_id HAVING NOT bool_or(is_current)
+), latest_deployments AS (
+  SELECT DISTINCT ON (d.app_id) d.run_id
+  FROM deployments d JOIN apps_without_current a ON a.app_id=d.app_id
+  WHERE d.status IN ('running','stopped','deleted')
+  ORDER BY d.app_id,d.updated_at DESC
 )
 UPDATE deployments SET is_current=TRUE FROM latest_deployments WHERE deployments.run_id=latest_deployments.run_id;
 CREATE INDEX IF NOT EXISTS runs_app_updated_at_idx ON runs(app_id, updated_at DESC);
