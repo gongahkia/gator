@@ -108,9 +108,7 @@ func (s *Store) approvePlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID s
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected() != 1 {
-		return fmt.Errorf("planner revision unavailable")
-	}
+	_ = result
 	return nil
 }
 

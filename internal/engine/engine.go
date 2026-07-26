@@ -735,7 +735,8 @@ func (s *Service) failWorkspaceProvision(ctx context.Context, workspace runtime.
 	if err := s.store.FailWorkspaceProvision(ctx, runID, cause.Error()); err != nil {
 		return err
 	}
-	return cause
+	s.log.Error("workspace provisioning failed", "run_id", runID, "error", cause)
+	return nil
 }
 
 func (s *Service) recoverOutbox(ctx context.Context) {

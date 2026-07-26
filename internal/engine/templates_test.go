@@ -66,6 +66,43 @@ func TestVerifierRunsDeterministicChecks(t *testing.T) {
 			t.Fatalf("missing verifier command %q: %s", required, joined)
 		}
 	}
+	if !strings.Contains(joined, "norbot_verify_node_") || !strings.Contains(joined, "norbot_verify_go_") {
+		t.Fatalf("dependency cache volumes were not used: %s", joined)
+	}
+}
+
+func TestDependencyCacheKeyTracksLockfilesAndToolchain(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "frontend"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "frontend", "package.json"), []byte(`{"name":"app"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "frontend", "package-lock.json"), []byte(`{"lockfileVersion":3}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first, err := dependencyCacheKey(root, "node:22-alpine", "frontend/package.json", "frontend/package-lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := dependencyCacheKey(root, "node:23-alpine", "frontend/package.json", "frontend/package-lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("toolchain did not invalidate cache")
+	}
+	if err := os.WriteFile(filepath.Join(root, "frontend", "package-lock.json"), []byte(`{"lockfileVersion":4}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	third, err := dependencyCacheKey(root, "node:22-alpine", "frontend/package.json", "frontend/package-lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == third {
+		t.Fatal("lockfile did not invalidate cache")
+	}
 }
 
 func TestAgenticTemplateDoesNotShipToolExecutor(t *testing.T) {

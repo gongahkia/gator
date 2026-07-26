@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -452,15 +454,25 @@ func (k *KubernetesRuntime) Verify(ctx context.Context, run domain.Run) (map[str
 		return nil, err
 	}
 	checks := []string{"profile contract"}
-	if _, err := k.runVerifier(ctx, run, "frontend", "node:22-alpine", []string{"sh", "-ceu", "npm ci && npm test && npm run build && npm audit --omit=dev --audit-level=high"}, "/workspace/generated-app/frontend"); err != nil {
+	frontendKey, err := k.verificationCacheKey(run.ID, "node:22-alpine", "generated-app/frontend/package.json", "generated-app/frontend/package-lock.json")
+	if err != nil {
 		return map[string]any{"status": "fail", "checks": checks}, err
 	}
-	checks = append(checks, "npm ci/test/build/audit")
+	frontendCommand := "cache=/workspace/.norbot-cache/node-" + frontendKey + "; if [ ! -f \"$cache/.norbot-key\" ] || [ \"$(cat \"$cache/.norbot-key\")\" != '" + frontendKey + "' ]; then rm -rf \"$cache\"; mkdir -p \"$cache\"; npm ci; mv node_modules \"$cache/node_modules\"; printf '%s' '" + frontendKey + "' >\"$cache/.norbot-key\"; fi; rm -rf node_modules; ln -s \"$cache/node_modules\" node_modules; trap 'rm -f node_modules' EXIT; npm test && npm run build && npm audit --omit=dev --audit-level=high"
+	if _, err := k.runVerifier(ctx, run, "frontend", "node:22-alpine", []string{"sh", "-ceu", frontendCommand}, "/workspace/generated-app/frontend"); err != nil {
+		return map[string]any{"status": "fail", "checks": checks}, err
+	}
+	checks = append(checks, "node dependency cache/test/build/audit")
 	if run.Profile != domain.ProfileFrontend {
-		if _, err := k.runVerifier(ctx, run, "backend", "golang:1.26-alpine", []string{"sh", "-ceu", "go test ./... && go build ./... && go install golang.org/x/vuln/cmd/govulncheck@v1.6.0 && govulncheck ./..."}, "/workspace/generated-app/backend"); err != nil {
+		backendKey, err := k.verificationCacheKey(run.ID, "golang:1.26-alpine", "generated-app/backend/go.mod", "generated-app/backend/go.sum")
+		if err != nil {
 			return map[string]any{"status": "fail", "checks": checks}, err
 		}
-		checks = append(checks, "go test/build/govulncheck")
+		backendCommand := "cache=/workspace/.norbot-cache/go-" + backendKey + "; mkdir -p \"$cache\"; if [ ! -f \"$cache/.norbot-key\" ] || [ \"$(cat \"$cache/.norbot-key\")\" != '" + backendKey + "' ]; then rm -rf \"$cache\"; mkdir -p \"$cache\"; GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" GOBIN=\"$cache/bin\" go mod download; GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" GOBIN=\"$cache/bin\" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + backendKey + "' >\"$cache/.norbot-key\"; fi; PATH=\"$cache/bin:$PATH\" GOMODCACHE=\"$cache/mod\" GOCACHE=\"$cache/build\" go test ./... && go build ./... && govulncheck ./..."
+		if _, err := k.runVerifier(ctx, run, "backend", "golang:1.26-alpine", []string{"sh", "-ceu", backendCommand}, "/workspace/generated-app/backend"); err != nil {
+			return map[string]any{"status": "fail", "checks": checks}, err
+		}
+		checks = append(checks, "Go dependency cache/test/build/govulncheck")
 	}
 	images, err := k.buildImages(ctx, run, "verify")
 	if err != nil {
@@ -483,6 +495,22 @@ func (k *KubernetesRuntime) Verify(ctx context.Context, run domain.Run) (map[str
 	}
 	checks = append(checks, "kaniko image build", "kubernetes rollout/health/smoke")
 	return map[string]any{"status": "pass", "checks": checks, "summary": "Kubernetes dependency, build, vulnerability, rollout, and in-cluster smoke checks passed. Operator approval is required before deployment."}, nil
+}
+
+func (k *KubernetesRuntime) verificationCacheKey(runID, image string, files ...string) (string, error) {
+	hash := sha256.New()
+	_, _ = hash.Write([]byte(image))
+	for _, relative := range files {
+		content, err := os.ReadFile(filepath.Join(k.RunPath(runID), relative))
+		if err != nil {
+			return "", err
+		}
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(relative))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write(content)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func (k *KubernetesRuntime) runVerifier(ctx context.Context, run domain.Run, role, image string, command []string, directory string) (string, error) {
