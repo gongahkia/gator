@@ -264,6 +264,7 @@ type Run struct {
 	MaxFixes           int              `json:"max_fixes"`
 	Stage              Stage            `json:"stage"`
 	Status             Status           `json:"status"`
+	WorkspaceStatus    string           `json:"workspace_status"`
 	Providers          map[Stage]string `json:"providers"`
 	Graph              Graph            `json:"graph"`
 	Architecture       Architecture     `json:"architecture"`
@@ -295,6 +296,48 @@ type Revision struct {
 	State          string            `json:"state"`
 	CreatedAt      time.Time         `json:"created_at"`
 	ApprovedAt     *time.Time        `json:"approved_at,omitempty"`
+}
+
+type OutboxEvent struct {
+	ID           int64          `json:"id"`
+	RunID        string         `json:"run_id,omitempty"`
+	Type         string         `json:"type"`
+	Payload      map[string]any `json:"payload"`
+	State        string         `json:"state"`
+	Attempts     int            `json:"attempts"`
+	WorkerID     string         `json:"worker_id,omitempty"`
+	LastError    string         `json:"last_error,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	DeliveredAt  *time.Time     `json:"delivered_at,omitempty"`
+}
+
+type ApprovalOperation struct {
+	ID             int64             `json:"id"`
+	RunID          string            `json:"run_id"`
+	RevisionID     int64             `json:"revision_id"`
+	BaselineDigest string            `json:"baseline_digest"`
+	PostDigest     string            `json:"post_digest"`
+	BaselineFiles  map[string]string `json:"baseline_files,omitempty"`
+	State          string            `json:"state"`
+	Error          string            `json:"error,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
+	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
+}
+
+type PlannerRevision struct {
+	ID             int64        `json:"id"`
+	RunID          string       `json:"run_id"`
+	Attempt        int          `json:"attempt"`
+	Source         string       `json:"source"`
+	ParentID       *int64       `json:"parent_id,omitempty"`
+	Architecture   Architecture `json:"architecture"`
+	Graph          Graph        `json:"graph"`
+	Digest         string       `json:"digest"`
+	Diff           []any        `json:"diff"`
+	State          string       `json:"state"`
+	CreatedAt      time.Time    `json:"created_at"`
+	ApprovedAt     *time.Time   `json:"approved_at,omitempty"`
 }
 
 type UsageRecord struct {

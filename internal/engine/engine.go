@@ -162,7 +162,7 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	if input.PublicIngress && (s.config.Manifest.Runtime.Kubernetes.IngressClass == "" || s.config.Manifest.Runtime.Kubernetes.IngressBaseDomain == "") {
 		return domain.Run{}, fmt.Errorf("public_ingress requires configured kubernetes ingress")
 	}
-	workspace, _, err := s.backendFor(ctx, target)
+	_, _, err := s.backendFor(ctx, target)
 	if err != nil {
 		return domain.Run{}, err
 	}
@@ -212,17 +212,7 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 		baseSnapshotDigest = input.BaseSnapshot.Digest
 	}
 	run := domain.Run{ID: id, AppID: appID, ParentRunID: input.ParentRunID, BaseSnapshotDigest: baseSnapshotDigest, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: stage, Status: domain.StatusQueued, Providers: providers, Graph: graph, Architecture: architecture, CreatedAt: now, UpdatedAt: now}
-	if err := workspace.Ensure(ctx, id); err != nil {
-		return domain.Run{}, err
-	}
-	if input.BaseSnapshot != nil {
-		if err := materializeAppSnapshot(ctx, workspace, run, *input.BaseSnapshot); err != nil {
-			_ = workspace.Cleanup(context.Background(), id)
-			return domain.Run{}, err
-		}
-	}
 	if err := s.store.CreateRunWithInitialJob(ctx, run, input.SkillDigests, input.InheritSkillsFrom); err != nil {
-		_ = workspace.Cleanup(context.Background(), id)
 		return domain.Run{}, err
 	}
 	return s.store.GetRun(ctx, id)
@@ -582,6 +572,9 @@ func (s *Service) ProviderOptions() []config.Provider {
 
 func (s *Service) StartWorkers(ctx context.Context) {
 	go s.recoverLeases(ctx)
+	go s.recoverOutbox(ctx)
+	go s.outboxWorker(ctx)
+	go s.recoverApprovalOperations(ctx)
 	var workers sync.WaitGroup
 	for index := 0; index < s.config.Workers; index++ {
 		workers.Add(1)
@@ -591,6 +584,93 @@ func (s *Service) StartWorkers(ctx context.Context) {
 		}(index + 1)
 	}
 	go func() { <-ctx.Done(); workers.Wait() }()
+}
+
+func (s *Service) outboxWorker(ctx context.Context) {
+	identity := workerIdentity() + "-outbox"
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		item, claimed, err := s.store.ClaimOutbox(ctx, identity, 2*time.Minute)
+		if err != nil {
+			s.log.Error("claim outbox", "error", err)
+			sleep(ctx, time.Second)
+			continue
+		}
+		if !claimed {
+			sleep(ctx, 300*time.Millisecond)
+			continue
+		}
+		if err := s.processOutbox(ctx, item); err != nil {
+			s.log.Error("outbox delivery failed", "id", item.ID, "type", item.Type, "error", err)
+			_ = s.store.RetryOutbox(context.Background(), item, err.Error())
+			continue
+		}
+		if err := s.store.DeliverOutbox(ctx, item); err != nil {
+			s.log.Error("ack outbox", "id", item.ID, "error", err)
+		}
+	}
+}
+
+func (s *Service) processOutbox(ctx context.Context, item domain.OutboxEvent) error {
+	switch item.Type {
+	case "run.event":
+		s.log.Info("outbox event relayed", "id", item.ID, "run_id", item.RunID, "event_type", item.Payload["event_type"])
+		return nil
+	case "workspace.provision":
+		run, err := s.store.GetRun(ctx, item.RunID)
+		if err != nil {
+			return err
+		}
+		if run.WorkspaceStatus == "ready" {
+			return nil
+		}
+		workspace, _, err := s.backendForRun(ctx, run)
+		if err != nil {
+			return err
+		}
+		if err := workspace.Ensure(ctx, run.ID); err != nil {
+			return s.failWorkspaceProvision(ctx, workspace, run.ID, err)
+		}
+		if run.BaseSnapshotDigest != "" {
+			snapshot, err := s.store.AppSnapshot(ctx, run.BaseSnapshotDigest)
+			if err != nil {
+				return s.failWorkspaceProvision(ctx, workspace, run.ID, err)
+			}
+			if err := materializeAppSnapshot(ctx, workspace, run, snapshot); err != nil {
+				return s.failWorkspaceProvision(ctx, workspace, run.ID, err)
+			}
+		}
+		return s.store.CompleteWorkspaceProvision(ctx, run.ID)
+	default:
+		return fmt.Errorf("unsupported outbox event %q", item.Type)
+	}
+}
+
+func (s *Service) failWorkspaceProvision(ctx context.Context, workspace runtime.WorkspaceBackend, runID string, cause error) error {
+	cleanupErr := workspace.Cleanup(context.Background(), runID)
+	if cleanupErr != nil {
+		cause = fmt.Errorf("%w; cleanup workspace: %v", cause, cleanupErr)
+	}
+	if err := s.store.FailWorkspaceProvision(ctx, runID, cause.Error()); err != nil {
+		return err
+	}
+	return cause
+}
+
+func (s *Service) recoverOutbox(ctx context.Context) {
+	for {
+		if recovered, err := s.store.RecoverExpiredOutbox(ctx); err != nil {
+			s.log.Error("recover expired outbox", "error", err)
+		} else if recovered > 0 {
+			s.log.Warn("recovered expired outbox", "count", recovered)
+		}
+		sleep(ctx, 15*time.Second)
+		if ctx.Err() != nil {
+			return
+		}
+	}
 }
 
 func (s *Service) worker(ctx context.Context, workerID int) {
@@ -756,7 +836,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
 	if job.Stage == domain.StagePlanner {
 		if architecture, ok := architectureFromResponse(result.Text, run); ok {
-			if err := s.store.SetPlannerArchitecture(ctx, run.ID, architecture); err != nil {
+			if err := s.store.SetPlannerArchitecture(ctx, run.ID, job.Attempt, architecture); err != nil {
 				return err
 			}
 			run.Graph, run.Architecture = architecture.Workflow, architecture

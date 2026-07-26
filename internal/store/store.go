@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS runs (
 	max_fixes INT NOT NULL DEFAULT 2,
   stage TEXT NOT NULL,
   status TEXT NOT NULL,
+	workspace_status TEXT NOT NULL DEFAULT 'ready',
   providers JSONB NOT NULL,
   graph JSONB NOT NULL,
 	architecture JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -153,6 +154,63 @@ CREATE TABLE IF NOT EXISTS revisions (
   approved_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS revisions_run_id_idx ON revisions(run_id,id DESC);
+CREATE TABLE IF NOT EXISTS planner_revisions (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  attempt INT NOT NULL,
+  source TEXT NOT NULL,
+  parent_id BIGINT REFERENCES planner_revisions(id) ON DELETE SET NULL,
+  architecture JSONB NOT NULL,
+  graph JSONB NOT NULL,
+  digest TEXT NOT NULL,
+  diff JSONB NOT NULL DEFAULT '[]'::jsonb,
+  state TEXT NOT NULL DEFAULT 'proposed',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS planner_revisions_run_id_idx ON planner_revisions(run_id,id DESC);
+CREATE TABLE IF NOT EXISTS approval_operations (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  revision_id BIGINT NOT NULL REFERENCES revisions(id) ON DELETE CASCADE,
+  baseline_digest TEXT NOT NULL,
+  post_digest TEXT NOT NULL,
+  baseline_files JSONB NOT NULL,
+  state TEXT NOT NULL DEFAULT 'prepared',
+  error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS approval_operations_active_idx ON approval_operations(run_id,revision_id) WHERE state IN ('prepared','applying','workspace_applied');
+CREATE INDEX IF NOT EXISTS approval_operations_recovery_idx ON approval_operations(state,updated_at) WHERE state IN ('prepared','applying','workspace_applied');
+CREATE TABLE IF NOT EXISTS outbox_events (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT REFERENCES runs(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  state TEXT NOT NULL DEFAULT 'queued',
+  attempts INT NOT NULL DEFAULT 0,
+  worker_id TEXT NOT NULL DEFAULT '',
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  delivered_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS outbox_events_claim_idx ON outbox_events(state,created_at) WHERE state='queued';
+CREATE INDEX IF NOT EXISTS outbox_events_lease_idx ON outbox_events(lease_expires_at) WHERE state='running';
+CREATE TABLE IF NOT EXISTS verification_caches (
+  cache_key TEXT PRIMARY KEY,
+  runtime TEXT NOT NULL,
+  ecosystem TEXT NOT NULL,
+  location TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'building',
+  worker_id TEXT NOT NULL DEFAULT '',
+  lease_expires_at TIMESTAMPTZ,
+  last_error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS provider_usage (
   id BIGSERIAL PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -323,6 +381,7 @@ ALTER TABLE runs ADD COLUMN IF NOT EXISTS base_snapshot_digest TEXT NOT NULL DEF
 ALTER TABLE deployments ADD COLUMN IF NOT EXISTS app_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE deployments ADD COLUMN IF NOT EXISTS is_current BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS architecture JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS workspace_status TEXT NOT NULL DEFAULT 'ready';
 ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS bundle_path TEXT NOT NULL DEFAULT '';
 ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'native';
 UPDATE runs SET deployment_target='docker' WHERE deployment_target IS NULL OR deployment_target='';
@@ -383,8 +442,15 @@ func (s *Store) createRun(ctx context.Context, run domain.Run, skillDigests []st
 		return err
 	}
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO runs (id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`, run.ID, run.AppID, run.ParentRunID, run.BaseSnapshotDigest, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, providers, graph, architecture, run.CreatedAt)
+		workspaceStatus := run.WorkspaceStatus
+		if workspaceStatus == "" {
+			workspaceStatus = "ready"
+			if enqueue {
+				workspaceStatus = "provisioning"
+			}
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO runs (id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,workspace_status,providers,graph,architecture,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)`, run.ID, run.AppID, run.ParentRunID, run.BaseSnapshotDigest, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, workspaceStatus, providers, graph, architecture, run.CreatedAt)
 		if err != nil {
 			return err
 		}
@@ -415,10 +481,13 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`, run.ID, run.Ap
 		if !enqueue {
 			return nil
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,1)`, run.ID, run.Stage); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,state) VALUES ($1,$2,1,'blocked')`, run.ID, run.Stage); err != nil {
 			return err
 		}
-		return s.insertEvent(ctx, tx, run.ID, "stage_queued", string(run.Stage)+" queued", map[string]any{"stage": run.Stage, "attempt": 1})
+		if err := s.insertEvent(ctx, tx, run.ID, "stage_queued", string(run.Stage)+" waiting for workspace", map[string]any{"stage": run.Stage, "attempt": 1, "workspace_status": workspaceStatus}); err != nil {
+			return err
+		}
+		return s.insertOutbox(ctx, tx, run.ID, "workspace.provision", map[string]any{"run_id": run.ID})
 	})
 }
 
@@ -508,78 +577,58 @@ func (s *Store) UpdateGraph(ctx context.Context, runID string, graph domain.Grap
 }
 
 func (s *Store) UpdateArchitecture(ctx context.Context, runID string, architecture domain.Architecture) (domain.Run, error) {
-	encoded, err := json.Marshal(architecture)
-	if err != nil {
-		return domain.Run{}, err
-	}
-	graph, err := json.Marshal(architecture.Workflow)
-	if err != nil {
-		return domain.Run{}, err
-	}
-	err = s.withTx(ctx, func(tx pgx.Tx) error {
-		result, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1 AND stage='planner' AND status='awaiting_approval'`, runID, encoded, graph)
-		if err != nil {
-			return err
-		}
-		if result.RowsAffected() != 1 {
-			return ErrNotFound
-		}
-		return s.insertEvent(ctx, tx, runID, "architecture_updated", "Planner architecture updated by operator", map[string]any{"architecture": architecture})
-	})
+	_, err := s.AppendPlannerRevision(ctx, runID, nextPlannerAttempt(ctx, s, runID), "operator", architecture, domain.StatusAwaiting)
 	if err != nil {
 		return domain.Run{}, err
 	}
 	return s.GetRun(ctx, runID)
 }
 
-func (s *Store) SetPlannerArchitecture(ctx context.Context, runID string, architecture domain.Architecture) error {
-	encoded, err := json.Marshal(architecture)
-	if err != nil {
-		return err
-	}
-	graph, err := json.Marshal(architecture.Workflow)
-	if err != nil {
-		return err
-	}
-	return s.withTx(ctx, func(tx pgx.Tx) error {
-		result, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1 AND stage='planner' AND status='running'`, runID, encoded, graph)
-		if err != nil {
-			return err
-		}
-		if result.RowsAffected() != 1 {
-			return fmt.Errorf("planner architecture update conflict")
-		}
-		return s.insertEvent(ctx, tx, runID, "planner_architecture_generated", "Planner generated architecture", map[string]any{"architecture": architecture})
-	})
+func (s *Store) SetPlannerArchitecture(ctx context.Context, runID string, attempt int, architecture domain.Architecture) error {
+	_, err := s.AppendPlannerRevision(ctx, runID, attempt, "provider", architecture, domain.StatusRunning)
+	return err
 }
 
 func (s *Store) SetPlannerGraph(ctx context.Context, runID string, graph domain.Graph) error {
-	encoded, err := json.Marshal(graph)
+	run, err := s.GetRun(ctx, runID)
 	if err != nil {
 		return err
 	}
-	return s.withTx(ctx, func(tx pgx.Tx) error {
-		result, err := tx.Exec(ctx, `UPDATE runs SET graph=$2,updated_at=now() WHERE id=$1 AND stage='planner' AND status='running'`, runID, encoded)
-		if err != nil {
-			return err
-		}
-		if result.RowsAffected() != 1 {
-			return fmt.Errorf("planner graph update conflict")
-		}
-		return s.insertEvent(ctx, tx, runID, "planner_graph_generated", "Planner generated workflow graph", map[string]any{"graph": graph})
-	})
+	run.Architecture.Workflow = graph
+	_, err = s.AppendPlannerRevision(ctx, runID, nextPlannerAttempt(ctx, s, runID), "provider", run.Architecture, domain.StatusRunning)
+	return err
+}
+
+func nextPlannerAttempt(ctx context.Context, s *Store, runID string) int {
+	var attempt int
+	if err := s.pool.QueryRow(ctx, `SELECT COALESCE(MAX(attempt),0)+1 FROM planner_revisions WHERE run_id=$1`, runID).Scan(&attempt); err != nil || attempt < 1 {
+		return 1
+	}
+	return attempt
 }
 
 func (s *Store) Approve(ctx context.Context, runID string, action domain.ApprovalAction, feedback string) (domain.Run, error) {
-	err := s.withTx(ctx, func(tx pgx.Tx) error {
-		run, err := scanRun(tx.QueryRow(ctx, runQuery+` WHERE id=$1 FOR UPDATE`, runID))
-		if err != nil {
-			return err
-		}
+	err := s.withTx(ctx, func(tx pgx.Tx) error { return s.approveTx(ctx, tx, runID, action, feedback) })
+	if err != nil {
+		return domain.Run{}, err
+	}
+	return s.GetRun(ctx, runID)
+}
+
+func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action domain.ApprovalAction, feedback string) error {
+	run, err := scanRun(tx.QueryRow(ctx, runQuery+` WHERE id=$1 FOR UPDATE`, runID))
+	if err != nil {
+		return err
+	}
 		switch action {
 		case domain.ApprovalApprove:
 			if run.Status != domain.StatusAwaiting {
 				return fmt.Errorf("run is not awaiting approval")
+			}
+			if run.Stage == domain.StagePlanner {
+				if err := s.approvePlannerRevisionTx(ctx, tx, runID); err != nil {
+					return err
+				}
 			}
 			if run.Stage == domain.StageVerifier {
 				var report []byte
@@ -694,11 +743,7 @@ func (s *Store) Approve(ctx context.Context, runID string, action domain.Approva
 		default:
 			return fmt.Errorf("unknown approval action")
 		}
-	})
-	if err != nil {
-		return domain.Run{}, err
-	}
-	return s.GetRun(ctx, runID)
+	return nil
 }
 
 func (s *Store) ClaimJob(ctx context.Context, workerID string, lease time.Duration) (domain.Job, bool, error) {
@@ -1010,18 +1055,20 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO run_events (run_id,event_type,message,metadata) VALUES ($1,$2,$3,$4)`, runID, typ, message, encoded)
-	return err
+	if _, err = tx.Exec(ctx, `INSERT INTO run_events (run_id,event_type,message,metadata) VALUES ($1,$2,$3,$4)`, runID, typ, message, encoded); err != nil {
+		return err
+	}
+	return s.insertOutbox(ctx, tx, runID, "run.event", map[string]any{"event_type": typ, "message": message, "metadata": metadata})
 }
 
-const runQuery = `SELECT id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,feedback,failure_reason,created_at,updated_at FROM runs`
+const runQuery = `SELECT id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,workspace_status,providers,graph,architecture,feedback,failure_reason,created_at,updated_at FROM runs`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanRun(row rowScanner) (domain.Run, error) {
 	var run domain.Run
 	var providers, graph, architecture []byte
-	err := row.Scan(&run.ID, &run.AppID, &run.ParentRunID, &run.BaseSnapshotDigest, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &providers, &graph, &architecture, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
+	err := row.Scan(&run.ID, &run.AppID, &run.ParentRunID, &run.BaseSnapshotDigest, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &run.WorkspaceStatus, &providers, &graph, &architecture, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Run{}, ErrNotFound
 	}
