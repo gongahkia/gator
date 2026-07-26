@@ -12,7 +12,6 @@ local providers = {
 	"cursor",
 	"codex",
 	"claude",
-	"droid",
 	"gemini",
 	"goose",
 	"kimi",

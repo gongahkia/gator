@@ -9,7 +9,6 @@ local providers = {
 	{ name = "cursor", executable = "cursor-agent" },
 	{ name = "codex", executable = "codex" },
 	{ name = "claude", executable = "claude" },
-	{ name = "droid", executable = "droid" },
 	{ name = "gemini", executable = "gemini" },
 	{ name = "goose", executable = "goose" },
 	{ name = "kimi", executable = "kimi" },

@@ -124,7 +124,7 @@ The palette provides the same workflow:
 :GatorPalette action:refresh-providers
 ```
 
-Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Droid, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. Readiness is shown as **detected**, **user-confirmed**, or **indeterminate**; user confirmation is never credential verification. Droid uses a persistent JSON-RPC session, routes each permission request through Gator, and sends `droid.close_session` before terminating a stopped child. Copilot sends ACP `session/load` only when its initialize response advertises `agentCapabilities.loadSession`; otherwise it opens the interactive `copilot --resume <id>` fallback.
+Claude Code, Codex, and OpenCode require a supported executable, provider-native authentication, and a ready session bridge. Pi, Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, and Vibe require both their documented CLI contract and an explicit `providers.<name>.user_confirmed = true` opt-in. Readiness is shown as **detected**, **user-confirmed**, or **indeterminate**; user confirmation is never credential verification. Copilot sends ACP `session/load` only when its initialize response advertises `agentCapabilities.loadSession`; otherwise it opens the interactive `copilot --resume <id>` fallback.
 
 ### Capture context
 
@@ -178,7 +178,7 @@ require("gator").setup({
     pi = { user_confirmed = false },
     aider = { user_confirmed = false }, amp = { user_confirmed = false },
     cline = { user_confirmed = false }, copilot = { user_confirmed = false },
-    cursor = { user_confirmed = false }, droid = { user_confirmed = false },
+		cursor = { user_confirmed = false },
     gemini = { user_confirmed = false }, goose = { user_confirmed = false },
     kimi = { user_confirmed = false }, vibe = { user_confirmed = false },
   },
@@ -221,7 +221,7 @@ The compatibility manifest reports Neovim version and local capability status on
 Providers
 ---------
 
-Gator provides adapters for Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Droid, Gemini CLI, Goose, Kimi Code CLI, Mistral Vibe, Copilot CLI, OpenCode, and Pi.
+Gator provides adapters for Aider, Amp, Cline, Cursor Agent, Codex, Claude Code, Gemini CLI, Goose, Kimi Code CLI, Mistral Vibe, Copilot CLI, OpenCode, and Pi.
 
 Installed capabilities are probed, not assumed. Run `:GatorHealth` from the project you plan to use; an operation is available only when the installed CLI advertises the required capability. See the [provider support matrix](docs/PROVIDERS.md) for fixture-tested versions, auth probes, managed transport, and limitations.
 

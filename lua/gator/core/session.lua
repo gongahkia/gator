@@ -45,7 +45,6 @@ function M.new(attrs)
 		and mode ~= "acp"
 		and mode ~= "stream"
 		and mode ~= "json"
-		and mode ~= "droid"
 		and mode ~= "history"
 	then
 		fail("mode is unsupported")

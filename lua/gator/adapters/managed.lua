@@ -1,10 +1,6 @@
 local redact = require("gator.policy.redact")
-local droid_sessions = require("gator.adapters.droid_sessions")
-local droid_stream = require("gator.adapters.droid_stream")
 local M = { api_version = 1 }
 local Manager = {}
-local droid_request_timeout_ms = 300000
-local managed_stop_timeout_ms = 2000
 
 Manager.__index = Manager
 
@@ -20,7 +16,6 @@ M.profiles = {
 		resume = "dynamic",
 	},
 	cursor = { mode = "stream", executable = "cursor-agent", adapter = "gator.adapters.cursor" },
-	droid = { mode = "droid", executable = "droid", adapter = "gator.adapters.droid" },
 	gemini = { mode = "acp", executable = "gemini", adapter = "gator.adapters.gemini", command = { "gemini", "--acp" } },
 	goose = { mode = "acp", executable = "goose", adapter = "gator.adapters.goose", command = { "goose", "acp" } },
 	kimi = { mode = "acp", executable = "kimi", adapter = "gator.adapters.kimi", command = { "kimi", "acp" } },
@@ -51,9 +46,6 @@ local function profile_supported(value, probe)
 	if value.mode == "stream" and value.executable == "cursor-agent" then
 		return capabilities.structured_output == true and capabilities.session_resume == true
 	end
-	if value.mode == "droid" then
-		return capabilities.stream_jsonrpc == true and capabilities.session_resume == true
-	end
 	return capabilities.message == true and capabilities.history == true
 end
 
@@ -64,13 +56,6 @@ end
 local function text(value, name)
 	if type(value) ~= "string" or value == "" then
 		fail(name .. " must be non-empty text")
-	end
-	return value
-end
-
-local function milliseconds(value, name)
-	if type(value) ~= "number" or value < 1 or value % 1 ~= 0 then
-		fail(name .. " must be a positive integer")
 	end
 	return value
 end
@@ -154,9 +139,6 @@ local function profile_command(provider_name, value, existing, prompt, history, 
 		table.insert(argv, prompt)
 		return argv
 	end
-	if value.mode == "droid" then
-		return droid_sessions.command({ cwd = cwd, executable = value.executable })
-	end
 	if value.mode == "history" then
 		local argv = { "aider", "--chat-history-file", history, "--message", prompt }
 		if existing then
@@ -222,9 +204,7 @@ function M.catalog(opts)
 	local cwd = directory(opts.cwd)
 	local result = {}
 	for name, value in pairs(M.profiles) do
-		local resume_mode = name == "copilot" and "dynamic_acp_then_terminal"
-			or value.mode == "droid" and "managed_jsonrpc"
-			or "managed"
+		local resume_mode = name == "copilot" and "dynamic_acp_then_terminal" or "managed"
 		local record = {
 			provider = name,
 			mode = value.mode,
@@ -274,15 +254,11 @@ function M.new(opts)
 		type(opts) ~= "table"
 		or (opts.spawn ~= nil and type(opts.spawn) ~= "function")
 		or (opts.shutdown ~= nil and type(opts.shutdown) ~= "boolean")
-		or (
-			opts.stop_timeout_ms ~= nil
-			and (type(opts.stop_timeout_ms) ~= "number" or opts.stop_timeout_ms < 1 or opts.stop_timeout_ms % 1 ~= 0)
-		)
 	then
 		fail("new requires optional spawn and shutdown settings")
 	end
 	for key in pairs(opts) do
-		if key ~= "spawn" and key ~= "shutdown" and key ~= "stop_timeout_ms" then
+		if key ~= "spawn" and key ~= "shutdown" then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -290,8 +266,6 @@ function M.new(opts)
 		spawn = opts.spawn or default_spawn,
 		active = {},
 		sequence = 0,
-		stop_timeout_ms = opts.stop_timeout_ms and milliseconds(opts.stop_timeout_ms, "stop_timeout_ms")
-			or managed_stop_timeout_ms,
 	}, Manager)
 	if opts.shutdown then
 		local group = vim.api.nvim_create_augroup("GatorManagedSessions", { clear = true })
@@ -415,106 +389,6 @@ function Manager:_permission(run, raw)
 	end)
 end
 
-function Manager:_droid_permission(run, raw)
-	local params = type(raw.params) == "table" and raw.params or {}
-	local responded = false
-	local function respond(selected)
-		if responded or raw.id == nil then
-			return false
-		end
-		responded = true
-		self:_write(run, { jsonrpc = "2.0", id = raw.id, result = { selectedOption = selected } })
-		return true
-	end
-	run.on_permission({
-		provider = run.provider,
-		session_id = run.session and run.session.id or nil,
-		request_id = tostring(raw.id),
-		action = raw.method,
-		details = vim.deepcopy(params),
-	}, function(decision)
-		local selected = "cancel"
-		if decision == "approved" then
-			for _, option in ipairs(type(params.options) == "table" and params.options or {}) do
-				if type(option) == "table" and option.value == "proceed_once" then
-					selected = "proceed_once"
-					break
-				end
-			end
-		end
-		return respond(selected)
-	end)
-	vim.defer_fn(function()
-		if not responded and run.active then
-			respond("cancel")
-		end
-	end, droid_request_timeout_ms)
-end
-
-function Manager:_droid_question(run, raw)
-	local params = type(raw.params) == "table" and raw.params or {}
-	local questions = type(params.questions) == "table" and params.questions or nil
-	if raw.id == nil or not questions then
-		if raw.id ~= nil then
-			self:_write(run, { jsonrpc = "2.0", id = raw.id, result = { cancelled = true, answers = {} } })
-		end
-		return
-	end
-	local normalized = {}
-	for _, question in ipairs(questions) do
-		if type(question) ~= "table" or type(question.index) ~= "number" or type(question.question) ~= "string" then
-			self:_write(run, { jsonrpc = "2.0", id = raw.id, result = { cancelled = true, answers = {} } })
-			return
-		end
-		if question.options ~= nil and (type(question.options) ~= "table" or not vim.islist(question.options)) then
-			self:_write(run, { jsonrpc = "2.0", id = raw.id, result = { cancelled = true, answers = {} } })
-			return
-		end
-		local options = question.options or {}
-		for _, option in ipairs(options) do
-			if type(option) ~= "string" or option == "" then
-				self:_write(run, { jsonrpc = "2.0", id = raw.id, result = { cancelled = true, answers = {} } })
-				return
-			end
-		end
-		table.insert(normalized, {
-			index = question.index,
-			topic = type(question.topic) == "string" and question.topic or "Droid",
-			question = question.question,
-			options = vim.deepcopy(options),
-		})
-	end
-	if not run.has_question_callback then
-		self:_write(run, { jsonrpc = "2.0", id = raw.id, result = { cancelled = true, answers = {} } })
-		return
-	end
-	local responded = false
-	local function respond(result)
-		if responded or raw.id == nil then
-			return false
-		end
-		responded = true
-		if type(result) ~= "table" or type(result.answers) ~= "table" then
-			result = { cancelled = true, answers = {} }
-		end
-		self:_write(run, { jsonrpc = "2.0", id = raw.id, result = vim.deepcopy(result) })
-		return true
-	end
-	run.on_question({
-		provider = run.provider,
-		session_id = run.session and run.session.id or nil,
-		request_id = tostring(raw.id),
-		questions = normalized,
-	}, function(result)
-		return respond(result)
-	end)
-	vim.defer_fn(function()
-		if not responded and run.active then
-			respond({ cancelled = true, answers = {} })
-		end
-	end, droid_request_timeout_ms)
-end
-
 function Manager:_acp_line(run, raw)
 	if raw.id ~= nil and (raw.result ~= nil or raw.error ~= nil) then
 		local done = run.pending[raw.id]
@@ -562,59 +436,6 @@ function Manager:_stream_line(run, raw)
 	end
 end
 
-function Manager:_droid_line(run, raw)
-	if raw.id ~= nil and (raw.result ~= nil or raw.error ~= nil) then
-		local done = run.pending[raw.id]
-		if not done then
-			run.on_event({ type = "error", text = "Droid returned an unknown response id" })
-			return
-		end
-		run.pending[raw.id] = nil
-		done(raw.result, raw.error)
-		return
-	end
-	if raw.id ~= nil and raw.method == "droid.request_permission" then
-		self:_droid_permission(run, raw)
-		return
-	end
-	if raw.id ~= nil and raw.method == "droid.ask_user" then
-		self:_droid_question(run, raw)
-		return
-	end
-	if raw.method == "droid.session_notification" then
-		local params = type(raw.params) == "table" and raw.params or {}
-		local notification = type(params.notification) == "table" and params.notification or {}
-		local kind = notification.type
-		if kind == "assistant_text_delta" and type(notification.textDelta) == "string" then
-			run.on_event({ type = "text", text = redact.text(notification.textDelta) })
-		elseif kind == "error" then
-			run.on_event({
-				type = "error",
-				text = redact.text(tostring(notification.message or "Droid reported an error")),
-			})
-		elseif kind == "droid_working_state_changed" and notification.newState == "idle" then
-			run.on_event({ type = "complete", text = "Droid turn complete" })
-		elseif type(kind) == "string" then
-			local detail = notification.toolUse and notification.toolUse.name
-				or notification.toolName
-				or notification.title
-				or notification.message
-			run.on_event({
-				type = "update",
-				text = redact.text("Droid " .. kind .. (type(detail) == "string" and ": " .. detail or "")),
-			})
-		end
-		return
-	end
-	if raw.id ~= nil and raw.method then
-		self:_write(run, {
-			jsonrpc = "2.0",
-			id = raw.id,
-			error = { code = -32601, message = "Gator does not implement " .. raw.method },
-		})
-	end
-end
-
 function Manager:_feed(run, chunk)
 	if type(chunk) ~= "string" or chunk == "" then
 		return
@@ -627,15 +448,7 @@ function Manager:_feed(run, chunk)
 		end
 		local line = run.buffer:sub(1, ending - 1):gsub("\r$", "")
 		run.buffer = run.buffer:sub(ending + 1)
-		if line ~= "" then
-			if run.mode == "droid" then
-				local ok, raw = pcall(droid_stream.parse_jsonrpc_line, line)
-				if ok then
-					self:_droid_line(run, raw)
-				else
-					run.on_event({ type = "error", text = "Droid emitted invalid JSON-RPC" })
-				end
-			else
+			if line ~= "" then
 				local ok, raw = pcall(vim.json.decode, line)
 				if ok and type(raw) == "table" then
 					if run.mode == "acp" then
@@ -647,7 +460,6 @@ function Manager:_feed(run, chunk)
 					run.on_event({ type = "error", text = "provider emitted invalid structured output" })
 				end
 			end
-		end
 	end
 end
 
@@ -724,27 +536,6 @@ function Manager:_start_acp(run, prompt)
 	end)
 end
 
-function Manager:_start_droid(run, prompt)
-	local request = run.session and droid_sessions.resume({ id = run.session.id })
-		or droid_sessions.create({ cwd = run.cwd })
-	self:_request(run, request.method, request.params, function(result, err)
-		if err or type(result) ~= "table" then
-			run.on_event({ type = "error", text = "Droid " .. request.method .. " failed" })
-			return
-		end
-		if request.method == "droid.initialize_session" then
-			if type(result.sessionId) ~= "string" or result.sessionId == "" then
-				run.on_event({ type = "error", text = "Droid initialization returned no session id" })
-				return
-			end
-			self:_session(run, result.sessionId)
-		end
-		if prompt and prompt ~= "" then
-			self:send(run.session, prompt)
-		end
-	end)
-end
-
 function Manager:open(opts)
 	if type(opts) ~= "table" then
 		fail("open requires options")
@@ -782,8 +573,6 @@ function Manager:open(opts)
 		on_session = callback(opts.on_session, "on_session"),
 		on_event = callback(opts.on_event, "on_event"),
 		on_permission = callback(opts.on_permission, "on_permission"),
-		on_question = callback(opts.on_question, "on_question"),
-		has_question_callback = type(opts.on_question) == "function",
 		on_resume_fallback = callback(opts.on_resume_fallback, "on_resume_fallback"),
 		has_resume_fallback = type(opts.on_resume_fallback) == "function",
 		on_exit = callback(opts.on_exit, "on_exit"),
@@ -792,9 +581,6 @@ function Manager:open(opts)
 	if mode == "acp" then
 		self:_spawn(run, profile_command(provider_name, value, current, "", history, cwd))
 		self:_start_acp(run, opts.prompt)
-	elseif mode == "droid" then
-		self:_spawn(run, profile_command(provider_name, value, current, "", history, cwd))
-		self:_start_droid(run, opts.prompt)
 	elseif opts.prompt and opts.prompt ~= "" then
 		self:_spawn(run, profile_command(provider_name, value, current, opts.prompt, history, cwd))
 		if mode == "stream" and provider_name == "amp" then
@@ -831,18 +617,6 @@ function Manager:send(reference, prompt)
 		end)
 		return true
 	end
-	if value.mode == "droid" then
-		if not run or not run.active or run.stopping then
-			fail("Droid session is not active; reopen it before prompting")
-		end
-		local request = droid_sessions.prompt({ text = prompt })
-		self:_request(run, request.method, request.params, function(_, err)
-			if err then
-				run.on_event({ type = "error", text = "Droid prompt failed" })
-			end
-		end)
-		return true
-	end
 	if run and run.active then
 		if value.mode == "stream" and provider_name == "amp" then
 			self:_write(
@@ -865,13 +639,6 @@ function Manager:cancel(reference)
 	end
 	if value.mode == "acp" then
 		self:_write(run, { jsonrpc = "2.0", method = "session/cancel", params = { sessionId = current.id } })
-	elseif value.mode == "droid" then
-		local request = droid_sessions.interrupt()
-		self:_request(run, request.method, request.params, function(_, err)
-			if err then
-				run.on_event({ type = "error", text = "Droid interruption failed" })
-			end
-		end)
 	else
 		pcall(run.handle.kill, run.handle, 15)
 	end
@@ -886,38 +653,7 @@ function Manager:stop(reference)
 		return false
 	end
 	run.stopping, run.stopped = true, true
-	if value.mode ~= "droid" then
-		return self:_terminate(run)
-	end
-	local stopped = false
-	local timer = vim.uv.new_timer()
-	local function release_timer()
-		if timer then
-			timer:stop()
-			timer:close()
-			timer = nil
-		end
-	end
-	local function terminate()
-		if stopped then
-			return false
-		end
-		stopped = true
-		release_timer()
-		return self:_terminate(run)
-	end
-	timer:start(self.stop_timeout_ms, 0, function()
-		vim.schedule(function()
-			if timer and run.active and run.stopping then
-				terminate()
-			end
-		end)
-	end)
-	local request = droid_sessions.close_session({ reason = "other" })
-	self:_request(run, request.method, request.params, function(_, _)
-		terminate()
-	end)
-	return true
+	return self:_terminate(run)
 end
 
 function Manager:shutdown()

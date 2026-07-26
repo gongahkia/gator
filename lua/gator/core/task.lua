@@ -82,7 +82,6 @@ local function sessions(value)
 			and mode ~= "acp"
 			and mode ~= "stream"
 			and mode ~= "json"
-			and mode ~= "droid"
 			and mode ~= "history"
 		then
 			fail("session " .. index .. " mode is unsupported")

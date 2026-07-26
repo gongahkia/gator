@@ -71,7 +71,7 @@ local function catalog_contract(record, transport_name)
 	local auth = record.readiness_state == "user_confirmed" and { available = true, modes = { "user_confirmed" } }
 		or ready
 	local permission = transport_name == "managed"
-			and (record.mode == "acp" or record.mode == "droid")
+			and record.mode == "acp"
 			and { available = true, modes = { "user_decision" } }
 		or unavailable
 	return capabilities.new({
@@ -373,33 +373,6 @@ function Workflow:managed_callbacks(value, provider_name)
 				respond("cancelled")
 			end
 		end,
-		on_question = function(request, respond)
-			local answers, index = {}, 1
-			local function next_question()
-				local question = request.questions[index]
-				if not question then
-					respond({ cancelled = false, answers = answers })
-					return
-				end
-				local function accepted(answer)
-					if type(answer) ~= "string" or answer == "" then
-						respond({ cancelled = true, answers = {} })
-						return
-					end
-					table.insert(answers, { index = question.index, question = question.question, answer = answer })
-					index = index + 1
-					next_question()
-				end
-				if #question.options > 0 then
-					vim.ui.select(question.options, {
-						prompt = "Droid " .. question.topic .. ": " .. question.question,
-					}, accepted)
-				else
-					vim.ui.input({ prompt = "Droid " .. question.topic .. ": " .. question.question .. " " }, accepted)
-				end
-			end
-			next_question()
-		end,
 		on_resume_fallback = function(request)
 			if type(request.session) ~= "table" then
 				vim.notify("Gator attach: " .. tostring(request.reason), vim.log.levels.ERROR)
@@ -453,7 +426,6 @@ function Workflow:open_managed(value, provider_name, reference, prompt)
 		on_session = callbacks.on_session,
 		on_event = callbacks.on_event,
 		on_permission = callbacks.on_permission,
-		on_question = callbacks.on_question,
 		on_resume_fallback = callbacks.on_resume_fallback,
 		on_exit = callbacks.on_exit,
 	})

@@ -52,14 +52,6 @@ local results = fixtures.conform({
 			end,
 		},
 		{
-			name = "droid",
-			kind = "jsonrpc",
-			path = root .. "/droid_rpc.jsonl",
-			verify = function(value)
-				return value.count == 3 and value.records[2].result.sessionId == "droid-fixture"
-			end,
-		},
-		{
 			name = "gemini",
 			kind = "jsonl",
 			path = root .. "/gemini_stream.jsonl",
@@ -119,7 +111,7 @@ local results = fixtures.conform({
 })
 
 assert(
-	#results == 14 and results[1].name == "aider" and results[14].name == "vibe",
+	#results == 13 and results[1].name == "aider" and results[13].name == "vibe",
 	"conformance must retain matrix order"
 )
 

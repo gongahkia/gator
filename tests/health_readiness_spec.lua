@@ -58,29 +58,6 @@ assert(
 	codex.level == "warn" and codex.message:find("authentication not verified", 1, true),
 	"health must not report provider readiness from executable and capability presence alone"
 )
-local confirmed = health.readiness({
-	executable = function(name)
-		return name == "droid"
-	end,
-	probe = function()
-		return { available = true, supported = true, version = "1.0.0" }
-	end,
-	auth = function()
-		return { authenticated = false, reason = "Droid exposes no credential-status command" }
-	end,
-	settings = { providers = { droid = { user_confirmed = true } } },
-	consent = consent,
-})
-local droid
-for _, record in ipairs(confirmed) do
-	if record.component == "adapter.droid" then
-		droid = record
-	end
-end
-assert(
-	droid.readiness_state == "user_confirmed" and droid.message:find("credentials not verified", 1, true),
-	"health must distinguish explicit readiness confirmation from credential verification"
-)
 assert(
 	not pcall(health.readiness, { executable = true }) and not pcall(health.readiness, { auth = true }),
 	"invalid readiness probes must fail explicitly"

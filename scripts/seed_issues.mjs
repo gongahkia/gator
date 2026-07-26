@@ -204,11 +204,11 @@ add("performance", "Implement macOS Linux and WSL preflight checks", "Detect pla
 add("performance", "Build a repeatable performance benchmark suite", "Track startup, context, stream, worktree, diff, and indexer regressions in CI artifacts.", "foundation");
 
 // Future agents researched before implementation: 8
-for (const agent of ["Cursor", "Cline", "Kimi CLI", "Mistral Vibe", "Goose", "Aider", "Amp", "Droid"]) {
+for (const agent of ["Cursor", "Cline", "Kimi CLI", "Mistral Vibe", "Goose", "Aider", "Amp"]) {
   add("future", `Implement ${agent} capability probe and recorded transport fixture`, `Research current ${agent} CLI behavior, implement a version/capability probe, and record a conformance fixture for a future first-class adapter.`, "adapters");
 }
 
-if (tasks.length !== 160) throw new Error(`Expected 160 tasks, got ${tasks.length}`);
+if (tasks.length !== 159) throw new Error(`Expected 159 tasks, got ${tasks.length}`);
 
 function body(task) {
   return [
