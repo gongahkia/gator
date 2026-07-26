@@ -30,15 +30,19 @@ import (
 )
 
 type CreateRunInput struct {
-	Prompt           string                  `json:"prompt"`
-	Profile          domain.Profile          `json:"profile"`
-	Providers        map[domain.Stage]string `json:"providers"`
-	DeploymentTarget domain.DeploymentTarget `json:"deployment_target"`
-	PublicIngress    bool                    `json:"public_ingress"`
-	MaxFixes         int                     `json:"max_fixes"`
-	SkillDigests     []string                `json:"skill_digests"`
-	ParentRunID      string                  `json:"-"`
-	Architecture     *domain.Architecture    `json:"-"`
+	Prompt            string                  `json:"prompt"`
+	Profile           domain.Profile          `json:"profile"`
+	Providers         map[domain.Stage]string `json:"providers"`
+	DeploymentTarget  domain.DeploymentTarget `json:"deployment_target"`
+	PublicIngress     bool                    `json:"public_ingress"`
+	MaxFixes          int                     `json:"max_fixes"`
+	SkillDigests      []string                `json:"skill_digests"`
+	ParentRunID       string                  `json:"-"`
+	Architecture      *domain.Architecture    `json:"-"`
+	AppID             string                  `json:"-"`
+	BaseSnapshot      *domain.AppSnapshot     `json:"-"`
+	InitialStage      domain.Stage            `json:"-"`
+	InheritSkillsFrom string                  `json:"-"`
 }
 
 type ApprovalInput struct {
@@ -118,6 +122,25 @@ func (s *Service) backendForRun(ctx context.Context, run domain.Run) (runtime.Wo
 	return s.backendFor(ctx, run.DeploymentTarget)
 }
 
+func applicationID(run domain.Run) string {
+	if run.AppID != "" {
+		return run.AppID
+	}
+	return run.ID
+}
+
+func (s *Service) deployedRun(ctx context.Context, runID string) (domain.Run, domain.Deployment, error) {
+	deployment, err := s.store.GetDeployment(ctx, runID)
+	if err != nil {
+		return domain.Run{}, domain.Deployment{}, err
+	}
+	run, err := s.store.GetRun(ctx, deployment.RunID)
+	if err != nil {
+		return domain.Run{}, domain.Deployment{}, err
+	}
+	return run, deployment, nil
+}
+
 func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.Run, error) {
 	input.Prompt = strings.TrimSpace(input.Prompt)
 	if input.Prompt == "" {
@@ -167,25 +190,39 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	if maxFixes < 0 || maxFixes > 10 {
 		return domain.Run{}, fmt.Errorf("max_fixes must be between 0 and 10")
 	}
+	stage := input.InitialStage
+	if stage == "" {
+		stage = domain.StagePlanner
+	}
+	if stage != domain.StagePlanner && stage != domain.StageBuilder {
+		return domain.Run{}, fmt.Errorf("initial stage must be planner or builder")
+	}
 	graph := domain.DefaultGraph()
 	architecture := domain.DefaultArchitecture(input.Profile, graph)
 	if input.Architecture != nil {
 		architecture = *input.Architecture
 		graph = architecture.Workflow
 	}
-	run := domain.Run{ID: id, ParentRunID: input.ParentRunID, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: providers, Graph: graph, Architecture: architecture, CreatedAt: now, UpdatedAt: now}
-	if err := s.store.CreateRun(ctx, run); err != nil {
-		return domain.Run{}, err
+	appID := input.AppID
+	if appID == "" {
+		appID = id
 	}
-	if len(input.SkillDigests) > 0 {
-		if err := s.store.SelectRunSkills(ctx, id, input.SkillDigests); err != nil {
-			return domain.Run{}, err
-		}
+	baseSnapshotDigest := ""
+	if input.BaseSnapshot != nil {
+		baseSnapshotDigest = input.BaseSnapshot.Digest
 	}
+	run := domain.Run{ID: id, AppID: appID, ParentRunID: input.ParentRunID, BaseSnapshotDigest: baseSnapshotDigest, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: stage, Status: domain.StatusQueued, Providers: providers, Graph: graph, Architecture: architecture, CreatedAt: now, UpdatedAt: now}
 	if err := workspace.Ensure(ctx, id); err != nil {
 		return domain.Run{}, err
 	}
-	if err := s.store.Enqueue(ctx, id, domain.StagePlanner, 1); err != nil {
+	if input.BaseSnapshot != nil {
+		if err := materializeAppSnapshot(ctx, workspace, run, *input.BaseSnapshot); err != nil {
+			_ = workspace.Cleanup(context.Background(), id)
+			return domain.Run{}, err
+		}
+	}
+	if err := s.store.CreateRunWithInitialJob(ctx, run, input.SkillDigests, input.InheritSkillsFrom); err != nil {
+		_ = workspace.Cleanup(context.Background(), id)
 		return domain.Run{}, err
 	}
 	return s.store.GetRun(ctx, id)
@@ -230,7 +267,7 @@ func (s *Service) UpdateArchitecture(ctx context.Context, runID string, architec
 	return s.store.UpdateArchitecture(ctx, runID, architecture)
 }
 
-func (s *Service) CreateChangeRun(ctx context.Context, runID, change string) (domain.Run, error) {
+func (s *Service) CreateChangeRun(ctx context.Context, runID, change string, architectureAffecting bool) (domain.Run, error) {
 	change = strings.TrimSpace(change)
 	if change == "" {
 		return domain.Run{}, fmt.Errorf("change request is required")
@@ -239,10 +276,29 @@ func (s *Service) CreateChangeRun(ctx context.Context, runID, change string) (do
 	if err != nil {
 		return domain.Run{}, err
 	}
+	if parent.Status != domain.StatusCompleted {
+		return domain.Run{}, fmt.Errorf("changes require a completed app version")
+	}
+	workspace, _, err := s.backendForRun(ctx, parent)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	snapshot, err := s.captureAppSnapshot(parent, workspace)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	if err := s.store.UpsertAppSnapshot(ctx, snapshot); err != nil {
+		return domain.Run{}, err
+	}
+	stage := domain.StageBuilder
+	if architectureAffecting {
+		stage = domain.StagePlanner
+	}
 	input := CreateRunInput{
 		Prompt:  "Change request for " + parent.ID + ": " + change + "\n\nOriginal request: " + parent.Prompt,
 		Profile: parent.Profile, Providers: parent.Providers, DeploymentTarget: parent.DeploymentTarget,
 		PublicIngress: parent.PublicIngress, MaxFixes: parent.MaxFixes, ParentRunID: parent.ID, Architecture: &parent.Architecture,
+		AppID: parent.AppID, BaseSnapshot: &snapshot, InitialStage: stage, InheritSkillsFrom: parent.ID,
 	}
 	return s.CreateRun(ctx, input)
 }
@@ -295,7 +351,9 @@ func (s *Service) Cancel(ctx context.Context, runID string) (domain.Run, error) 
 	if backendErr != nil {
 		return domain.Run{}, backendErr
 	}
-	_ = deployment.Delete(ctx, runID, workspace.RunPath(runID))
+	if current, err := s.store.GetDeployment(ctx, runID); err == nil && current.RunID == run.ID {
+		_ = deployment.Delete(ctx, applicationID(run), workspace.RunPath(runID))
+	}
 	if err := workspace.Cleanup(ctx, runID); err != nil {
 		s.log.Warn("workspace cleanup failed after cancel", "run_id", runID, "error", err)
 	}
@@ -315,7 +373,9 @@ func (s *Service) Cleanup(ctx context.Context, runID string) error {
 	if backendErr != nil {
 		return backendErr
 	}
-	_ = deployment.Delete(ctx, runID, workspace.RunPath(runID))
+	if current, err := s.store.GetDeployment(ctx, runID); err == nil && current.RunID == run.ID {
+		_ = deployment.Delete(ctx, applicationID(run), workspace.RunPath(runID))
+	}
 	if err := workspace.Cleanup(ctx, runID); err != nil {
 		return err
 	}
@@ -334,7 +394,9 @@ func (s *Service) DeleteRun(ctx context.Context, runID string) error {
 	if err != nil {
 		return err
 	}
-	_ = deployment.Delete(ctx, runID, workspace.RunPath(runID))
+	if current, err := s.store.GetDeployment(ctx, runID); err == nil && current.RunID == run.ID {
+		_ = deployment.Delete(ctx, applicationID(run), workspace.RunPath(runID))
+	}
 	if err := workspace.Cleanup(ctx, runID); err != nil {
 		return err
 	}
@@ -342,11 +404,7 @@ func (s *Service) DeleteRun(ctx context.Context, runID string) error {
 }
 
 func (s *Service) DeploymentStatus(ctx context.Context, runID string) (DeploymentInfo, error) {
-	run, err := s.store.GetRun(ctx, runID)
-	if err != nil {
-		return DeploymentInfo{}, err
-	}
-	deployment, err := s.store.GetDeployment(ctx, runID)
+	run, deployment, err := s.deployedRun(ctx, runID)
 	if err != nil {
 		return DeploymentInfo{}, err
 	}
@@ -354,7 +412,7 @@ func (s *Service) DeploymentStatus(ctx context.Context, runID string) (Deploymen
 	if err != nil {
 		return DeploymentInfo{}, err
 	}
-	status, err := backend.Status(ctx, runID, workspace.RunPath(runID))
+	status, err := backend.Status(ctx, applicationID(run), workspace.RunPath(run.ID))
 	if err != nil {
 		return DeploymentInfo{}, err
 	}
@@ -362,22 +420,19 @@ func (s *Service) DeploymentStatus(ctx context.Context, runID string) (Deploymen
 }
 
 func (s *Service) DeploymentLogs(ctx context.Context, runID string, lines int) (string, error) {
-	run, err := s.store.GetRun(ctx, runID)
+	run, _, err := s.deployedRun(ctx, runID)
 	if err != nil {
-		return "", err
-	}
-	if _, err := s.store.GetDeployment(ctx, runID); err != nil {
 		return "", err
 	}
 	workspace, backend, err := s.backendForRun(ctx, run)
 	if err != nil {
 		return "", err
 	}
-	return backend.Logs(ctx, runID, workspace.RunPath(runID), lines)
+	return backend.Logs(ctx, applicationID(run), workspace.RunPath(run.ID), lines)
 }
 
 func (s *Service) InvokeAgent(ctx context.Context, runID string, input runtime.AgentInvocation) (runtime.AgentResponse, error) {
-	run, err := s.store.GetRun(ctx, runID)
+	run, _, err := s.deployedRun(ctx, runID)
 	if err != nil {
 		return runtime.AgentResponse{}, err
 	}
@@ -392,9 +447,6 @@ func (s *Service) InvokeAgent(ctx context.Context, runID string, input runtime.A
 	if !ok || (providerConfig.Kind != "openai_responses" && providerConfig.Kind != "openai_compatible" && providerConfig.Kind != "anthropic_messages" && providerConfig.Kind != "gemini_generate_content") {
 		return runtime.AgentResponse{}, fmt.Errorf("agentic application requires an HTTP model provider")
 	}
-	if _, err := s.store.GetDeployment(ctx, runID); err != nil {
-		return runtime.AgentResponse{}, err
-	}
 	return s.invokeCentralAgent(ctx, run, input)
 }
 
@@ -407,11 +459,7 @@ func (s *Service) RunSandbox(ctx context.Context, runID string, request runtime.
 }
 
 func (s *Service) StartDeployment(ctx context.Context, runID string) (DeploymentInfo, error) {
-	deployment, err := s.store.GetDeployment(ctx, runID)
-	if err != nil {
-		return DeploymentInfo{}, err
-	}
-	run, err := s.store.GetRun(ctx, runID)
+	run, deployment, err := s.deployedRun(ctx, runID)
 	if err != nil {
 		return DeploymentInfo{}, err
 	}
@@ -419,13 +467,13 @@ func (s *Service) StartDeployment(ctx context.Context, runID string) (Deployment
 	if err != nil {
 		return DeploymentInfo{}, err
 	}
-	if err := backend.Start(ctx, runID, workspace.RunPath(runID)); err != nil {
+	if err := backend.Start(ctx, applicationID(run), workspace.RunPath(run.ID)); err != nil {
 		return DeploymentInfo{}, err
 	}
-	if err := s.store.UpsertDeployment(ctx, runID, deployment.ProjectName, deployment.PublicURL, "running", ""); err != nil {
+	if err := s.store.UpsertDeployment(ctx, run.ID, applicationID(run), deployment.ProjectName, deployment.PublicURL, "running", ""); err != nil {
 		return DeploymentInfo{}, err
 	}
-	if err := s.store.RecordEvent(ctx, runID, "deployment_started", "Deployment started by operator", nil); err != nil {
+	if err := s.store.RecordEvent(ctx, run.ID, "deployment_started", "Deployment started by operator", nil); err != nil {
 		return DeploymentInfo{}, err
 	}
 	s.metrics.ObserveDeployment("started")
@@ -433,11 +481,7 @@ func (s *Service) StartDeployment(ctx context.Context, runID string) (Deployment
 }
 
 func (s *Service) StopDeployment(ctx context.Context, runID string) (domain.Deployment, error) {
-	deployment, err := s.store.GetDeployment(ctx, runID)
-	if err != nil {
-		return domain.Deployment{}, err
-	}
-	run, err := s.store.GetRun(ctx, runID)
+	run, deployment, err := s.deployedRun(ctx, runID)
 	if err != nil {
 		return domain.Deployment{}, err
 	}
@@ -445,25 +489,21 @@ func (s *Service) StopDeployment(ctx context.Context, runID string) (domain.Depl
 	if err != nil {
 		return domain.Deployment{}, err
 	}
-	if err := backend.Stop(ctx, runID, workspace.RunPath(runID)); err != nil {
+	if err := backend.Stop(ctx, applicationID(run), workspace.RunPath(run.ID)); err != nil {
 		return domain.Deployment{}, err
 	}
-	if err := s.store.UpsertDeployment(ctx, runID, deployment.ProjectName, deployment.PublicURL, "stopped", ""); err != nil {
+	if err := s.store.UpsertDeployment(ctx, run.ID, applicationID(run), deployment.ProjectName, deployment.PublicURL, "stopped", ""); err != nil {
 		return domain.Deployment{}, err
 	}
-	if err := s.store.RecordEvent(ctx, runID, "deployment_stopped", "Deployment stopped by operator", nil); err != nil {
+	if err := s.store.RecordEvent(ctx, run.ID, "deployment_stopped", "Deployment stopped by operator", nil); err != nil {
 		return domain.Deployment{}, err
 	}
 	s.metrics.ObserveDeployment("stopped")
-	return s.store.GetDeployment(ctx, runID)
+	return s.store.GetDeployment(ctx, run.ID)
 }
 
 func (s *Service) DeleteDeployment(ctx context.Context, runID string) (domain.Deployment, error) {
-	deployment, err := s.store.GetDeployment(ctx, runID)
-	if err != nil {
-		return domain.Deployment{}, err
-	}
-	run, err := s.store.GetRun(ctx, runID)
+	run, deployment, err := s.deployedRun(ctx, runID)
 	if err != nil {
 		return domain.Deployment{}, err
 	}
@@ -471,20 +511,20 @@ func (s *Service) DeleteDeployment(ctx context.Context, runID string) (domain.De
 	if err != nil {
 		return domain.Deployment{}, err
 	}
-	if err := backend.Delete(ctx, runID, workspace.RunPath(runID)); err != nil {
+	if err := backend.Delete(ctx, applicationID(run), workspace.RunPath(run.ID)); err != nil {
 		return domain.Deployment{}, err
 	}
-	if err := s.store.UpsertDeployment(ctx, runID, deployment.ProjectName, deployment.PublicURL, "deleted", ""); err != nil {
+	if err := s.store.UpsertDeployment(ctx, run.ID, applicationID(run), deployment.ProjectName, deployment.PublicURL, "deleted", ""); err != nil {
 		return domain.Deployment{}, err
 	}
-	if err := s.store.RecordEvent(ctx, runID, "deployment_deleted", "Deployment deleted by operator", nil); err != nil {
+	if err := s.store.RecordEvent(ctx, run.ID, "deployment_deleted", "Deployment deleted by operator", nil); err != nil {
 		return domain.Deployment{}, err
 	}
 	s.metrics.ObserveDeployment("deleted")
-	if err := workspace.Cleanup(ctx, runID); err != nil {
+	if err := workspace.Cleanup(ctx, run.ID); err != nil {
 		return domain.Deployment{}, err
 	}
-	return s.store.GetDeployment(ctx, runID)
+	return s.store.GetDeployment(ctx, run.ID)
 }
 
 func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
@@ -675,7 +715,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
 	}
 	generatedFiles := []string(nil)
-	if job.Stage == domain.StageBuilder && job.Attempt == 1 {
+	if job.Stage == domain.StageBuilder && job.Attempt == 1 && run.BaseSnapshotDigest == "" {
 		generatedFiles, err = generateApp(workspace, run, s.config.Manifest.ToolPolicy)
 		if err != nil {
 			return err
@@ -810,13 +850,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) error {
 	ctx, span := otel.Tracer("norbot.deployment").Start(ctx, "deployment.create")
 	defer span.End()
-	span.SetAttributes(attribute.String("norbot.run_id", run.ID), attribute.String("norbot.project", runtime.ProjectName(run.ID)))
+	project := runtime.ProjectName(applicationID(run))
+	span.SetAttributes(attribute.String("norbot.run_id", run.ID), attribute.String("norbot.app_id", applicationID(run)), attribute.String("norbot.project", project))
 	workspace, deployment, err := s.backendForRun(ctx, run)
 	if err != nil {
 		return err
 	}
 	root := workspace.RunPath(run.ID)
-	if err := s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), "", "building", ""); err != nil {
+	if err := s.store.UpsertDeployment(ctx, run.ID, applicationID(run), project, "", "building", ""); err != nil {
 		return err
 	}
 	url, err := deployment.Deploy(ctx, run, root)
@@ -824,14 +865,17 @@ func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) er
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		s.metrics.ObserveDeployment("failed")
-		_ = s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), "", "failed", err.Error())
+		_ = s.store.UpsertDeployment(ctx, run.ID, applicationID(run), project, "", "failed", err.Error())
 		return err
 	}
-	if err := s.store.UpsertDeployment(ctx, run.ID, runtime.ProjectName(run.ID), url, "running", ""); err != nil {
+	if err := s.store.UpsertDeployment(ctx, run.ID, applicationID(run), project, url, "running", ""); err != nil {
+		return err
+	}
+	if err := s.store.PromoteDeployment(ctx, run.ID, applicationID(run)); err != nil {
 		return err
 	}
 	s.metrics.ObserveDeployment("created")
-	return s.store.CompleteRun(ctx, job, map[string]any{"project": runtime.ProjectName(run.ID), "public_url": url})
+	return s.store.CompleteRun(ctx, job, map[string]any{"app_id": applicationID(run), "project": project, "public_url": url})
 }
 
 func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run) (map[string]any, error) {
@@ -1082,6 +1126,63 @@ func snapshotGeneratedApp(runPath string) (map[string]string, error) {
 	return files, err
 }
 
+func (s *Service) captureAppSnapshot(run domain.Run, workspace runtime.WorkspaceBackend) (domain.AppSnapshot, error) {
+	files, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
+	if err != nil {
+		return domain.AppSnapshot{}, fmt.Errorf("snapshot approved app: %w", err)
+	}
+	if len(files) == 0 {
+		return domain.AppSnapshot{}, fmt.Errorf("snapshot approved app: generated app is empty")
+	}
+	digest := digestFiles(files)
+	root := filepath.Join(s.config.ArtifactsDir, "app-snapshots")
+	path := filepath.Join(root, strings.TrimPrefix(digest, "sha256:"))
+	if _, err := os.Stat(path); err != nil {
+		if !os.IsNotExist(err) {
+			return domain.AppSnapshot{}, err
+		}
+		if err := os.MkdirAll(root, 0o750); err != nil {
+			return domain.AppSnapshot{}, err
+		}
+		temporary, err := os.MkdirTemp(root, ".snapshot-")
+		if err != nil {
+			return domain.AppSnapshot{}, err
+		}
+		defer os.RemoveAll(temporary)
+		if err := restoreGeneratedApp(temporary, files); err != nil {
+			return domain.AppSnapshot{}, err
+		}
+		if err := os.Rename(temporary, path); err != nil && !os.IsExist(err) {
+			return domain.AppSnapshot{}, err
+		}
+	}
+	bytes := int64(0)
+	for _, value := range files {
+		bytes += int64(len(value))
+	}
+	return domain.AppSnapshot{Digest: digest, SourceRunID: run.ID, AppID: run.AppID, Path: path, FileCount: len(files), ByteCount: bytes, CreatedAt: time.Now().UTC()}, nil
+}
+
+func materializeAppSnapshot(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run, snapshot domain.AppSnapshot) error {
+	if snapshot.Digest == "" || snapshot.Path == "" {
+		return fmt.Errorf("app snapshot is incomplete")
+	}
+	files, err := snapshotGeneratedApp(snapshot.Path)
+	if err != nil {
+		return fmt.Errorf("read app snapshot: %w", err)
+	}
+	if actual := digestFiles(files); actual != snapshot.Digest {
+		return fmt.Errorf("app snapshot digest mismatch")
+	}
+	if err := restoreGeneratedApp(workspace.RunPath(run.ID), files); err != nil {
+		return fmt.Errorf("restore app snapshot: %w", err)
+	}
+	if err := workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
+		return fmt.Errorf("mirror app snapshot: %w", err)
+	}
+	return nil
+}
+
 func changedFiles(baseline, current map[string]string) (map[string]string, error) {
 	result := map[string]string{}
 	for path, content := range current {
@@ -1106,10 +1207,11 @@ func restoreGeneratedApp(runPath string, files map[string]string) error {
 		return err
 	}
 	for path, content := range files {
-		if !strings.HasPrefix(path, "generated-app/") {
+		clean := filepath.Clean(filepath.FromSlash(path))
+		if !strings.HasPrefix(filepath.ToSlash(clean), "generated-app/") || strings.HasPrefix(filepath.ToSlash(clean), "../") {
 			return fmt.Errorf("invalid snapshot path")
 		}
-		full := filepath.Join(runPath, path)
+		full := filepath.Join(runPath, clean)
 		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
 			return err
 		}

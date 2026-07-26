@@ -276,18 +276,21 @@ func (k *KubernetesRuntime) Deploy(ctx context.Context, run domain.Run, root str
 	if err != nil {
 		return "", err
 	}
-	if err := k.applyApplication(ctx, run, images, ""); err != nil {
+	appID := ApplicationID(run)
+	if err := k.applyApplication(ctx, run, images, "", appID); err != nil {
 		return "", err
 	}
-	if err := k.waitDeployment(ctx, k.frontendName(run.ID)); err != nil {
+	if err := k.waitDeployment(ctx, k.frontendName(appID)); err != nil {
 		return "", err
 	}
 	if run.Profile != domain.ProfileFrontend {
-		if err := k.waitDeployment(ctx, k.backendName(run.ID)); err != nil {
+		if err := k.waitDeployment(ctx, k.backendName(appID)); err != nil {
 			return "", err
 		}
 	}
-	return k.publicURL(run), nil
+	appRun := run
+	appRun.ID = appID
+	return k.publicURL(appRun), nil
 }
 
 func (k *KubernetesRuntime) Stop(ctx context.Context, runID, root string) error {
@@ -364,7 +367,7 @@ func (k *KubernetesRuntime) InvokeAgent(ctx context.Context, run domain.Run, roo
 	if run.Profile != domain.ProfileAgentic {
 		return AgentResponse{}, fmt.Errorf("run is not an agentic application")
 	}
-	pods, err := k.client.CoreV1().Pods(k.config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=" + k.backendName(run.ID)})
+	pods, err := k.client.CoreV1().Pods(k.config.Namespace).List(ctx, metav1.ListOptions{LabelSelector: "app.kubernetes.io/name=" + k.backendName(ApplicationID(run))})
 	if err != nil {
 		return AgentResponse{}, err
 	}
@@ -463,7 +466,7 @@ func (k *KubernetesRuntime) Verify(ctx context.Context, run domain.Run) (map[str
 	if err != nil {
 		return map[string]any{"status": "fail", "checks": checks}, err
 	}
-	if err := k.applyApplication(ctx, run, images, "verify"); err != nil {
+	if err := k.applyApplication(ctx, run, images, "verify", run.ID); err != nil {
 		return map[string]any{"status": "fail", "checks": checks}, err
 	}
 	defer k.deleteApplication(context.Background(), run.ID, "verify")
@@ -529,45 +532,47 @@ func (k *KubernetesRuntime) buildImage(ctx context.Context, run domain.Run, comp
 	return destination, nil
 }
 
-func (k *KubernetesRuntime) applyApplication(ctx context.Context, run domain.Run, images map[string]string, suffix string) error {
-	frontend := k.frontendName(run.ID)
+func (k *KubernetesRuntime) applyApplication(ctx context.Context, run domain.Run, images map[string]string, suffix, appID string) error {
+	frontend := k.frontendName(appID)
 	if suffix != "" {
 		frontend += "-" + suffix
 	}
-	backend := k.backendName(run.ID)
+	backend := k.backendName(appID)
 	if suffix != "" {
 		backend += "-" + suffix
 	}
 	if run.Profile != domain.ProfileFrontend {
-		if err := k.applyDeployment(ctx, backend, run.ID, "backend", images["backend"], 8000, k.config.Replicas); err != nil {
+		if err := k.applyDeployment(ctx, backend, appID, run.ID, "backend", images["backend"], 8000, k.config.Replicas); err != nil {
 			return err
 		}
-		if err := k.applyService(ctx, backend, run.ID, "backend", 8000); err != nil {
+		if err := k.applyService(ctx, backend, appID, "backend", 8000); err != nil {
 			return err
 		}
 	}
-	if err := k.applyDeployment(ctx, frontend, run.ID, "frontend", images["frontend"], 80, k.config.Replicas); err != nil {
+	if err := k.applyDeployment(ctx, frontend, appID, run.ID, "frontend", images["frontend"], 80, k.config.Replicas); err != nil {
 		return err
 	}
-	if err := k.applyService(ctx, frontend, run.ID, "frontend", 80); err != nil {
+	if err := k.applyService(ctx, frontend, appID, "frontend", 80); err != nil {
 		return err
 	}
-	if err := k.applyNetworkPolicy(ctx, run.ID, frontend, backend); err != nil {
+	if err := k.applyNetworkPolicy(ctx, appID, frontend, backend); err != nil {
 		return err
 	}
 	if suffix == "" && run.PublicIngress {
-		if err := k.applyIngress(ctx, run, frontend); err != nil {
+		appRun := run
+		appRun.ID = appID
+		if err := k.applyIngress(ctx, appRun, frontend); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, component, image string, port int32, replicas int32) error {
-	labels := k.labels(runID, "application")
+func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, appID, workspaceID, component, image string, port int32, replicas int32) error {
+	labels := k.labels(appID, "application")
 	labels["app.kubernetes.io/name"] = name
 	labels["norbot.component"] = component
-	container := hardenedContainer(component, image, nil, k.PVC(runID), "", k.config)
+	container := hardenedContainer(component, image, nil, k.PVC(workspaceID), "", k.config)
 	container.Ports = []corev1.ContainerPort{{ContainerPort: port}}
 	container.ReadinessProbe = httpProbe(port, "/")
 	container.LivenessProbe = httpProbe(port, "/")
@@ -575,15 +580,15 @@ func (k *KubernetesRuntime) applyDeployment(ctx context.Context, name, runID, co
 		container.ReadinessProbe = httpProbe(port, "/api/health")
 		container.LivenessProbe = httpProbe(port, "/api/health")
 	}
-	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}, Spec: appsv1.DeploymentSpec{Replicas: &replicas, Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app.kubernetes.io/name": name}}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: k.config.ServiceAccount, AutomountServiceAccountToken: ptr(false), SecurityContext: &corev1.PodSecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: k.config.RegistryPullSecret}}, Containers: []corev1.Container{container}, Volumes: workspaceVolume(k.PVC(runID))}}}}
+	deployment := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}, Spec: appsv1.DeploymentSpec{Replicas: &replicas, Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app.kubernetes.io/name": name}}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: corev1.PodSpec{ServiceAccountName: k.config.ServiceAccount, AutomountServiceAccountToken: ptr(false), SecurityContext: &corev1.PodSecurityContext{SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault}}, ImagePullSecrets: []corev1.LocalObjectReference{{Name: k.config.RegistryPullSecret}}, Containers: []corev1.Container{container}, Volumes: workspaceVolume(k.PVC(workspaceID))}}}}
 	return k.upsertDeployment(ctx, deployment)
 }
 
 func httpProbe(port int32, path string) *corev1.Probe {
 	return &corev1.Probe{ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: path, Port: intstr.FromInt32(port)}}, InitialDelaySeconds: 3, PeriodSeconds: 5, TimeoutSeconds: 3, FailureThreshold: 12}
 }
-func (k *KubernetesRuntime) applyService(ctx context.Context, name, runID, component string, port int32) error {
-	labels := k.labels(runID, "application")
+func (k *KubernetesRuntime) applyService(ctx context.Context, name, appID, component string, port int32) error {
+	labels := k.labels(appID, "application")
 	labels["app.kubernetes.io/name"] = name
 	labels["norbot.component"] = component
 	svc := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}, Spec: corev1.ServiceSpec{Selector: map[string]string{"app.kubernetes.io/name": name}, Ports: []corev1.ServicePort{{Port: port, TargetPort: intstr.FromInt32(port)}}}}

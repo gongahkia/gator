@@ -62,7 +62,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY,
+	app_id TEXT NOT NULL DEFAULT '',
 	parent_run_id TEXT NOT NULL DEFAULT '',
+	base_snapshot_digest TEXT NOT NULL DEFAULT '',
   prompt TEXT NOT NULL,
   profile TEXT NOT NULL,
 	deployment_target TEXT NOT NULL DEFAULT 'docker',
@@ -104,11 +106,22 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE INDEX IF NOT EXISTS jobs_claim_idx ON jobs(state, created_at) WHERE state = 'queued';
 CREATE TABLE IF NOT EXISTS deployments (
   run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+	app_id TEXT NOT NULL DEFAULT '',
+	is_current BOOLEAN NOT NULL DEFAULT FALSE,
   project_name TEXT NOT NULL,
   public_url TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL,
   error_message TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS app_snapshots (
+  digest TEXT PRIMARY KEY,
+  source_run_id TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  file_count INT NOT NULL,
+  byte_count BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS capacity_recommendations (
   id BIGSERIAL PRIMARY KEY,
@@ -304,6 +317,11 @@ ALTER TABLE runs ADD COLUMN IF NOT EXISTS deployment_target TEXT NOT NULL DEFAUL
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS public_ingress BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS max_fixes INT NOT NULL DEFAULT 2;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS parent_run_id TEXT NOT NULL DEFAULT '';
+
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS app_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS base_snapshot_digest TEXT NOT NULL DEFAULT '';
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS app_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS is_current BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE runs ADD COLUMN IF NOT EXISTS architecture JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS bundle_path TEXT NOT NULL DEFAULT '';
 ALTER TABLE skill_imports ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'native';
@@ -313,6 +331,22 @@ UPDATE runs SET architecture=jsonb_build_object(
   'core_features',jsonb_build_array(jsonb_build_object('id','core-request','name','Requested application','description','Deliver the approved user request.','role','app_logic','selected',true)),
   'optional_features','[]'::jsonb,'workflow',graph
 ) WHERE architecture='{}'::jsonb;
+WITH RECURSIVE app_roots AS (
+  SELECT id, id AS app_id FROM runs WHERE parent_run_id=''
+  UNION ALL
+  SELECT child.id, app_roots.app_id FROM runs child JOIN app_roots ON child.parent_run_id=app_roots.id
+)
+UPDATE runs SET app_id=app_roots.app_id FROM app_roots WHERE runs.id=app_roots.id AND runs.app_id='';
+UPDATE runs SET app_id=id WHERE app_id='';
+UPDATE deployments SET app_id=runs.app_id FROM runs WHERE deployments.run_id=runs.id AND deployments.app_id='';
+UPDATE deployments SET is_current=FALSE;
+WITH latest_deployments AS (
+  SELECT DISTINCT ON (app_id) run_id FROM deployments ORDER BY app_id,updated_at DESC
+)
+UPDATE deployments SET is_current=TRUE FROM latest_deployments WHERE deployments.run_id=latest_deployments.run_id;
+CREATE INDEX IF NOT EXISTS runs_app_updated_at_idx ON runs(app_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS deployments_app_updated_idx ON deployments(app_id, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS deployments_current_app_idx ON deployments(app_id) WHERE is_current;
 CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state = 'running';`)
 	if err != nil {
 		return fmt.Errorf("migrate: %w", err)
@@ -321,6 +355,17 @@ CREATE INDEX IF NOT EXISTS jobs_lease_idx ON jobs(lease_expires_at) WHERE state 
 }
 
 func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
+	return s.createRun(ctx, run, nil, "", false)
+}
+
+func (s *Store) CreateRunWithInitialJob(ctx context.Context, run domain.Run, skillDigests []string, inheritSkillsFrom string) error {
+	return s.createRun(ctx, run, skillDigests, inheritSkillsFrom, true)
+}
+
+func (s *Store) createRun(ctx context.Context, run domain.Run, skillDigests []string, inheritSkillsFrom string, enqueue bool) error {
+	if run.AppID == "" {
+		run.AppID = run.ID
+	}
 	providers, err := json.Marshal(run.Providers)
 	if err != nil {
 		return err
@@ -334,12 +379,42 @@ func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
 		return err
 	}
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO runs (id,parent_run_id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,created_at,updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)`, run.ID, run.ParentRunID, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, providers, graph, architecture, run.CreatedAt)
+		_, err := tx.Exec(ctx, `INSERT INTO runs (id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,created_at,updated_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`, run.ID, run.AppID, run.ParentRunID, run.BaseSnapshotDigest, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, providers, graph, architecture, run.CreatedAt)
 		if err != nil {
 			return err
 		}
-		return s.insertEvent(ctx, tx, run.ID, "run_created", "Run created and planner queued", map[string]any{"profile": run.Profile, "providers": run.Providers, "deployment_target": run.DeploymentTarget, "public_ingress": run.PublicIngress, "parent_run_id": run.ParentRunID})
+		if inheritSkillsFrom != "" {
+			if _, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,skill_digest FROM run_skills WHERE run_id=$2 ON CONFLICT DO NOTHING`, run.ID, inheritSkillsFrom); err != nil {
+				return err
+			}
+		}
+		for _, digest := range skillDigests {
+			result, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,$2 WHERE EXISTS(SELECT 1 FROM skill_imports WHERE digest=$2 AND state='active') ON CONFLICT DO NOTHING`, run.ID, digest)
+			if err != nil {
+				return err
+			}
+			if result.RowsAffected() != 1 {
+				var exists bool
+				if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM run_skills WHERE run_id=$1 AND skill_digest=$2)`, run.ID, digest).Scan(&exists); err != nil || !exists {
+					return fmt.Errorf("skill %q is not active", digest)
+				}
+			}
+		}
+		message := "Run created"
+		if enqueue {
+			message += " and " + string(run.Stage) + " queued"
+		}
+		if err := s.insertEvent(ctx, tx, run.ID, "run_created", message, map[string]any{"app_id": run.AppID, "profile": run.Profile, "providers": run.Providers, "deployment_target": run.DeploymentTarget, "public_ingress": run.PublicIngress, "parent_run_id": run.ParentRunID, "base_snapshot_digest": run.BaseSnapshotDigest}); err != nil {
+			return err
+		}
+		if !enqueue {
+			return nil
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,1)`, run.ID, run.Stage); err != nil {
+			return err
+		}
+		return s.insertEvent(ctx, tx, run.ID, "stage_queued", string(run.Stage)+" queued", map[string]any{"stage": run.Stage, "attempt": 1})
 	})
 }
 
@@ -767,15 +842,33 @@ func (s *Store) FailJob(ctx context.Context, job domain.Job, failure string) err
 	})
 }
 
-func (s *Store) UpsertDeployment(ctx context.Context, runID, project, publicURL, status, errorMessage string) error {
-	_, err := s.pool.Exec(ctx, `INSERT INTO deployments (run_id,project_name,public_url,status,error_message) VALUES ($1,$2,$3,$4,$5)
-ON CONFLICT (run_id) DO UPDATE SET project_name=EXCLUDED.project_name,public_url=EXCLUDED.public_url,status=EXCLUDED.status,error_message=EXCLUDED.error_message,updated_at=now()`, runID, project, publicURL, status, errorMessage)
+func (s *Store) UpsertDeployment(ctx context.Context, runID, appID, project, publicURL, status, errorMessage string) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO deployments (run_id,app_id,project_name,public_url,status,error_message,is_current) VALUES ($1,$2,$3,$4,$5,$6,FALSE)
+ON CONFLICT (run_id) DO UPDATE SET app_id=EXCLUDED.app_id,project_name=EXCLUDED.project_name,public_url=EXCLUDED.public_url,status=EXCLUDED.status,error_message=EXCLUDED.error_message,updated_at=now()`, runID, appID, project, publicURL, status, errorMessage)
 	return err
+}
+
+func (s *Store) PromoteDeployment(ctx context.Context, runID, appID string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE deployments SET is_current=FALSE WHERE app_id=$1 AND is_current`, appID); err != nil {
+			return err
+		}
+		result, err := tx.Exec(ctx, `UPDATE deployments SET is_current=TRUE,updated_at=now() WHERE run_id=$1 AND app_id=$2`, runID, appID)
+		if err != nil {
+			return err
+		}
+		if result.RowsAffected() != 1 {
+			return ErrNotFound
+		}
+		return nil
+	})
 }
 
 func (s *Store) GetDeployment(ctx context.Context, runID string) (domain.Deployment, error) {
 	var deployment domain.Deployment
-	err := s.pool.QueryRow(ctx, `SELECT run_id,project_name,public_url,status,error_message,updated_at FROM deployments WHERE run_id=$1`, runID).Scan(&deployment.RunID, &deployment.ProjectName, &deployment.PublicURL, &deployment.Status, &deployment.ErrorMessage, &deployment.UpdatedAt)
+	err := s.pool.QueryRow(ctx, `SELECT d.run_id,d.app_id,d.project_name,d.public_url,d.status,d.error_message,d.updated_at
+FROM deployments d JOIN runs requested ON requested.id=$1
+WHERE d.app_id=requested.app_id AND d.is_current ORDER BY d.updated_at DESC LIMIT 1`, runID).Scan(&deployment.RunID, &deployment.AppID, &deployment.ProjectName, &deployment.PublicURL, &deployment.Status, &deployment.ErrorMessage, &deployment.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Deployment{}, ErrNotFound
 	}
@@ -786,8 +879,12 @@ func (s *Store) GetDeployment(ctx context.Context, runID string) (domain.Deploym
 }
 
 func (s *Store) ListApps(ctx context.Context) ([]domain.App, error) {
-	rows, err := s.pool.Query(ctx, `SELECT r.id,r.parent_run_id,r.prompt,r.profile,r.status,r.created_at,d.run_id,d.project_name,d.public_url,d.status,d.error_message,d.updated_at
-FROM runs r JOIN deployments d ON d.run_id=r.id ORDER BY d.updated_at DESC LIMIT 100`)
+	rows, err := s.pool.Query(ctx, `WITH latest_deployments AS (
+  SELECT run_id,app_id,project_name,public_url,status,error_message,updated_at
+  FROM deployments WHERE is_current
+)
+SELECT d.app_id,r.id,r.parent_run_id,r.prompt,r.profile,r.status,r.created_at,d.run_id,d.app_id,d.project_name,d.public_url,d.status,d.error_message,d.updated_at
+FROM latest_deployments d JOIN runs r ON d.run_id=r.id ORDER BY d.updated_at DESC LIMIT 100`)
 	if err != nil {
 		return nil, err
 	}
@@ -795,12 +892,28 @@ FROM runs r JOIN deployments d ON d.run_id=r.id ORDER BY d.updated_at DESC LIMIT
 	apps := []domain.App{}
 	for rows.Next() {
 		var app domain.App
-		if err := rows.Scan(&app.RunID, &app.ParentRunID, &app.Prompt, &app.Profile, &app.RunStatus, &app.CreatedAt, &app.Deployment.RunID, &app.Deployment.ProjectName, &app.Deployment.PublicURL, &app.Deployment.Status, &app.Deployment.ErrorMessage, &app.Deployment.UpdatedAt); err != nil {
+		if err := rows.Scan(&app.AppID, &app.RunID, &app.ParentRunID, &app.Prompt, &app.Profile, &app.RunStatus, &app.CreatedAt, &app.Deployment.RunID, &app.Deployment.AppID, &app.Deployment.ProjectName, &app.Deployment.PublicURL, &app.Deployment.Status, &app.Deployment.ErrorMessage, &app.Deployment.UpdatedAt); err != nil {
 			return nil, err
 		}
 		apps = append(apps, app)
 	}
 	return apps, rows.Err()
+}
+
+func (s *Store) UpsertAppSnapshot(ctx context.Context, snapshot domain.AppSnapshot) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO app_snapshots (digest,source_run_id,app_id,path,file_count,byte_count,created_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
+ON CONFLICT (digest) DO UPDATE SET path=EXCLUDED.path,file_count=EXCLUDED.file_count,byte_count=EXCLUDED.byte_count`, snapshot.Digest, snapshot.SourceRunID, snapshot.AppID, snapshot.Path, snapshot.FileCount, snapshot.ByteCount, snapshot.CreatedAt)
+	return err
+}
+
+func (s *Store) AppSnapshot(ctx context.Context, digest string) (domain.AppSnapshot, error) {
+	var snapshot domain.AppSnapshot
+	err := s.pool.QueryRow(ctx, `SELECT digest,source_run_id,app_id,path,file_count,byte_count,created_at FROM app_snapshots WHERE digest=$1`, digest).Scan(&snapshot.Digest, &snapshot.SourceRunID, &snapshot.AppID, &snapshot.Path, &snapshot.FileCount, &snapshot.ByteCount, &snapshot.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.AppSnapshot{}, ErrNotFound
+	}
+	return snapshot, err
 }
 
 func (s *Store) RecordProviderObservation(ctx context.Context, observation ProviderObservation) error {
@@ -897,14 +1010,14 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 	return err
 }
 
-const runQuery = `SELECT id,parent_run_id,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,feedback,failure_reason,created_at,updated_at FROM runs`
+const runQuery = `SELECT id,app_id,parent_run_id,base_snapshot_digest,prompt,profile,deployment_target,public_ingress,max_fixes,stage,status,providers,graph,architecture,feedback,failure_reason,created_at,updated_at FROM runs`
 
 type rowScanner interface{ Scan(...any) error }
 
 func scanRun(row rowScanner) (domain.Run, error) {
 	var run domain.Run
 	var providers, graph, architecture []byte
-	err := row.Scan(&run.ID, &run.ParentRunID, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &providers, &graph, &architecture, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
+	err := row.Scan(&run.ID, &run.AppID, &run.ParentRunID, &run.BaseSnapshotDigest, &run.Prompt, &run.Profile, &run.DeploymentTarget, &run.PublicIngress, &run.MaxFixes, &run.Stage, &run.Status, &providers, &graph, &architecture, &run.Feedback, &run.FailureReason, &run.CreatedAt, &run.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Run{}, ErrNotFound
 	}
@@ -922,6 +1035,9 @@ func scanRun(row rowScanner) (domain.Run, error) {
 	}
 	if run.Architecture.AppName == "" {
 		run.Architecture = domain.DefaultArchitecture(run.Profile, run.Graph)
+	}
+	if run.AppID == "" {
+		run.AppID = run.ID
 	}
 	return run, nil
 }

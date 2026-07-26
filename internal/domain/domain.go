@@ -253,22 +253,24 @@ func DefaultGraph() Graph {
 }
 
 type Run struct {
-	ID               string           `json:"id"`
-	ParentRunID      string           `json:"parent_run_id,omitempty"`
-	Prompt           string           `json:"prompt"`
-	Profile          Profile          `json:"profile"`
-	DeploymentTarget DeploymentTarget `json:"deployment_target"`
-	PublicIngress    bool             `json:"public_ingress"`
-	MaxFixes         int              `json:"max_fixes"`
-	Stage            Stage            `json:"stage"`
-	Status           Status           `json:"status"`
-	Providers        map[Stage]string `json:"providers"`
-	Graph            Graph            `json:"graph"`
-	Architecture     Architecture     `json:"architecture"`
-	Feedback         string           `json:"feedback,omitempty"`
-	FailureReason    string           `json:"failure_reason,omitempty"`
-	CreatedAt        time.Time        `json:"created_at"`
-	UpdatedAt        time.Time        `json:"updated_at"`
+	ID                 string           `json:"id"`
+	AppID              string           `json:"app_id"`
+	ParentRunID        string           `json:"parent_run_id,omitempty"`
+	BaseSnapshotDigest string           `json:"base_snapshot_digest,omitempty"`
+	Prompt             string           `json:"prompt"`
+	Profile            Profile          `json:"profile"`
+	DeploymentTarget   DeploymentTarget `json:"deployment_target"`
+	PublicIngress      bool             `json:"public_ingress"`
+	MaxFixes           int              `json:"max_fixes"`
+	Stage              Stage            `json:"stage"`
+	Status             Status           `json:"status"`
+	Providers          map[Stage]string `json:"providers"`
+	Graph              Graph            `json:"graph"`
+	Architecture       Architecture     `json:"architecture"`
+	Feedback           string           `json:"feedback,omitempty"`
+	FailureReason      string           `json:"failure_reason,omitempty"`
+	CreatedAt          time.Time        `json:"created_at"`
+	UpdatedAt          time.Time        `json:"updated_at"`
 }
 
 type ReviewKind string
@@ -473,6 +475,7 @@ type Event struct {
 
 type Deployment struct {
 	RunID        string    `json:"run_id"`
+	AppID        string    `json:"app_id"`
 	ProjectName  string    `json:"project_name"`
 	PublicURL    string    `json:"public_url,omitempty"`
 	Status       string    `json:"status"`
@@ -481,6 +484,7 @@ type Deployment struct {
 }
 
 type App struct {
+	AppID       string     `json:"app_id"`
 	RunID       string     `json:"run_id"`
 	ParentRunID string     `json:"parent_run_id,omitempty"`
 	Prompt      string     `json:"prompt"`
@@ -488,6 +492,16 @@ type App struct {
 	RunStatus   Status     `json:"run_status"`
 	Deployment  Deployment `json:"deployment"`
 	CreatedAt   time.Time  `json:"created_at"`
+}
+
+type AppSnapshot struct {
+	Digest      string    `json:"digest"`
+	SourceRunID string    `json:"source_run_id"`
+	AppID       string    `json:"app_id"`
+	Path        string    `json:"path"`
+	FileCount   int       `json:"file_count"`
+	ByteCount   int64     `json:"byte_count"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Job struct {

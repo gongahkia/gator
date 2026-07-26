@@ -518,13 +518,14 @@ func (s *Server) updateArchitecture(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createChangeRun(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Change string `json:"change"`
+		Change                string `json:"change"`
+		ArchitectureAffecting bool   `json:"architecture_affecting"`
 	}
 	if err := decodeJSON(r, &input); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	run, err := s.service.CreateChangeRun(r.Context(), r.PathValue("id"), input.Change)
+	run, err := s.service.CreateChangeRun(r.Context(), r.PathValue("id"), input.Change, input.ArchitectureAffecting)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, err)
 		return

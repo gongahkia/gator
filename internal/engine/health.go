@@ -32,11 +32,21 @@ func (s *Service) Health(ctx context.Context) domain.HealthReport {
 	if err != nil {
 		report.Checks = append(report.Checks, failedCheck("deployments", false, err))
 	} else {
+		checkedApps := map[string]bool{}
 		for _, run := range runs {
+			appID := applicationID(run)
+			if checkedApps[appID] {
+				continue
+			}
 			if _, err := s.store.GetDeployment(ctx, run.ID); err != nil {
 				continue
 			}
-			report.Checks = append(report.Checks, s.checkDeployment(ctx, run))
+			current, _, err := s.deployedRun(ctx, run.ID)
+			if err != nil {
+				continue
+			}
+			checkedApps[appID] = true
+			report.Checks = append(report.Checks, s.checkDeployment(ctx, current))
 		}
 	}
 	report.State = domain.HealthHealthy
@@ -161,18 +171,18 @@ func (s *Service) checkDeployment(ctx context.Context, run domain.Run) domain.He
 	started := time.Now()
 	workspace, backend, err := s.backendForRun(ctx, run)
 	if err == nil {
-		_, err = backend.Status(ctx, run.ID, workspace.RunPath(run.ID))
+		_, err = backend.Status(ctx, applicationID(run), workspace.RunPath(run.ID))
 	}
 	if err != nil {
 		logs := ""
 		if backend != nil && workspace != nil {
-			if tail, logErr := backend.Logs(ctx, run.ID, workspace.RunPath(run.ID), 80); logErr == nil {
+			if tail, logErr := backend.Logs(ctx, applicationID(run), workspace.RunPath(run.ID), 80); logErr == nil {
 				logs = s.redact(tail)
 			}
 		}
-		return domain.HealthCheck{ID: "deployment:" + run.ID, State: domain.HealthDown, Critical: false, LatencyMS: time.Since(started).Milliseconds(), Message: "deployment probe failed", LogTail: logs, Diagnostics: map[string]any{"run_id": run.ID, "error": err.Error()}, CheckedAt: time.Now().UTC()}
+		return domain.HealthCheck{ID: "deployment:" + applicationID(run), State: domain.HealthDown, Critical: false, LatencyMS: time.Since(started).Milliseconds(), Message: "deployment probe failed", LogTail: logs, Diagnostics: map[string]any{"run_id": run.ID, "app_id": applicationID(run), "error": err.Error()}, CheckedAt: time.Now().UTC()}
 	}
-	return okCheck("deployment:"+run.ID, false, "runtime status reachable", started, map[string]any{"run_id": run.ID})
+	return okCheck("deployment:"+applicationID(run), false, "runtime status reachable", started, map[string]any{"run_id": run.ID, "app_id": applicationID(run)})
 }
 
 func (s *Service) redact(value string) string {

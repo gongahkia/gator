@@ -24,7 +24,7 @@ func TestKubernetesApplicationResourcesAreRestricted(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	runtime := testKubernetesRuntime(client)
 	run := domain.Run{ID: "run123", Profile: domain.ProfileAgentic, DeploymentTarget: domain.DeploymentKubernetes}
-	if err := runtime.applyApplication(ctx, run, map[string]string{"frontend": "registry.test/frontend:run123", "backend": "registry.test/backend:run123"}, ""); err != nil {
+	if err := runtime.applyApplication(ctx, run, map[string]string{"frontend": "registry.test/frontend:run123", "backend": "registry.test/backend:run123"}, "", run.ID); err != nil {
 		t.Fatal(err)
 	}
 	frontend, err := client.AppsV1().Deployments("norbot").Get(ctx, runtime.frontendName(run.ID), metav1.GetOptions{})

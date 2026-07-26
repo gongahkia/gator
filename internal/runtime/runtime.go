@@ -365,12 +365,19 @@ func ProjectName(runID string) string {
 	return "norbot-" + strings.ToLower(runID)
 }
 
+func ApplicationID(run domain.Run) string {
+	if run.AppID != "" {
+		return run.AppID
+	}
+	return run.ID
+}
+
 func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (string, error) {
 	port, err := ReservePort()
 	if err != nil {
 		return "", err
 	}
-	project := ProjectName(run.ID)
+	project := ProjectName(ApplicationID(run))
 	args := []string{"compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "up", "--build", "-d", "--wait", "--wait-timeout", "90"}
 	command := exec.CommandContext(ctx, d.DockerBin, args...)
 	command.Dir = filepath.Join(root, "generated-app")
@@ -443,7 +450,7 @@ func (d Deployment) InvokeAgent(ctx context.Context, run domain.Run, root string
 	if err != nil {
 		return AgentResponse{}, err
 	}
-	args := []string{"compose", "-p", ProjectName(run.ID), "--project-directory", filepath.Join(root, "generated-app"), "exec", "-T", "backend", "wget", "-qO-", "--header=Content-Type: application/json", "--post-file=-", "http://127.0.0.1:8000/api/agents/run"}
+	args := []string{"compose", "-p", ProjectName(ApplicationID(run)), "--project-directory", filepath.Join(root, "generated-app"), "exec", "-T", "backend", "wget", "-qO-", "--header=Content-Type: application/json", "--post-file=-", "http://127.0.0.1:8000/api/agents/run"}
 	command := exec.CommandContext(ctx, d.DockerBin, args...)
 	command.Stdin = bytes.NewReader(payload)
 	output, err := command.CombinedOutput()
