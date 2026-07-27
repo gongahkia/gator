@@ -158,6 +158,10 @@ func (w Workspace) MirrorToVolume(ctx context.Context, runID, relative string) e
 	if _, err := os.Stat(source); err != nil {
 		return err
 	}
+	targetDir := filepath.ToSlash(filepath.Dir(relative))
+	if _, err := w.Runner.Run(ctx, w.DockerBin, "exec", w.Name(runID), "mkdir", "-p", "/workspace/"+targetDir); err != nil {
+		return err
+	}
 	_, err := w.Runner.Run(ctx, w.DockerBin, "cp", source, w.Name(runID)+":/workspace/"+relative)
 	return err
 }

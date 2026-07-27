@@ -43,3 +43,21 @@ func TestDeploymentLifecycleAndJSONArrayStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkspaceMirrorToVolumeCreatesTargetDirectory(t *testing.T) {
+	runner := &lifecycleRunner{}
+	workspace := Workspace{DockerBin: "docker", ArtifactsDir: t.TempDir(), Runner: runner}
+	if _, err := workspace.WriteArtifact("run", "stage-output/planner-1.json", []byte(`{}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := workspace.MirrorToVolume(context.Background(), "run", "stage-output/planner-1.json"); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(runner.calls, "\n")
+	if !strings.Contains(joined, "exec norbot-ws-run mkdir -p /workspace/stage-output") {
+		t.Fatalf("target directory was not created: %s", joined)
+	}
+	if !strings.Contains(joined, "cp "+workspace.RunPath("run")+"/stage-output/planner-1.json norbot-ws-run:/workspace/stage-output/planner-1.json") {
+		t.Fatalf("artifact was not copied: %s", joined)
+	}
+}
