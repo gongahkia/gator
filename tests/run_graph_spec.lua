@@ -26,6 +26,23 @@ local window = graph.open({
 	attach_context = function() end,
 	review = function() end,
 	launch_parallel = function() end,
+	runbooks = function()
+		return { { id = "parallel-review" } }
+	end,
+	runbook_status = function()
+		return {
+			id = "parallel-review",
+			active = 1,
+			reported_tokens = 20,
+			max_tokens = 100,
+			usage_state = "partial",
+			steps = {
+				{ id = "research", role = "researcher", state = "completed", ready = false, depends_on = {} },
+				{ id = "write", role = "writer", state = "pending", ready = true, depends_on = { "research" } },
+			},
+		}
+	end,
+	start_ready_runbook_step = function() end,
 	stop = function() end,
 	resume = function() end,
 })
@@ -36,5 +53,11 @@ assert(
 		and content:find("Usage: reported · in 12 · out 8 · total 20", 1, true)
 		and content:find("Budget: tracking · 20/100", 1, true),
 	"run graph must render workspace, context bundle, exact usage, and budget state"
+)
+assert(
+	content:find("Gator runbooks", 1, true)
+		and content:find("parallel-review · active 1 · reported 20/100 · usage partial", 1, true)
+		and content:find("> write · writer · pending · depends research", 1, true),
+	"run graph must show runbook dependencies and ready steps without a scheduler"
 )
 assert(graph.close(), "run graph must close its ephemeral panel")

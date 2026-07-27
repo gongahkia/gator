@@ -84,6 +84,24 @@ function M.review(run_id)
 	return M.dispatch("review", { run_id = run_id })
 end
 
+function M.create_runbook(opts)
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:workflow():create_runbook(opts)
+end
+
+function M.runbook_status(id)
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:workflow():runbook_status(id)
+end
+
+function M.runbook_next()
+	return M.dispatch("runbook_next")
+end
+
 function M.health()
 	return M.dispatch("health")
 end

@@ -16,6 +16,7 @@ local actions = {
 	context = true,
 	review = true,
 	parallel = true,
+	runbook = true,
 	stop = true,
 	resume = true,
 	close = true,

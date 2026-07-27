@@ -10,7 +10,7 @@ It does not replace Codex, Pi, Claude, ACP agents, or their harnesses. Providers
 2. Run `:Gator` and enter a short objective.
 3. Pick a ready provider once. Gator remembers it for that Git project.
 4. Gator opens a structured chat when that provider exposes one; otherwise it opens the provider's native terminal in Neovim.
-5. Use `:GatorRuns` to focus, stop, resume, hand off, or start a parallel writer.
+5. Use `:GatorRuns` to focus, resume/fork, hand off, review, attach new context, or start a ready runbook step.
 
 The launched prompt receives the objective, exact selected/current source, and current Git diff. Gator writes local run metadata and bundles under `.gator/`; it adds that directory to Git's local `info/exclude`, never to tracked `.gitignore`.
 
@@ -43,6 +43,9 @@ Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
 | `:Gator [provider]` | Capture the visual range/current buffer and launch. |
 | `:GatorRuns` | Open the local run graph. |
 | `:GatorHandoff <run-id> [provider]` | Review a bundle and create a new target-provider session. |
+| `:[range]GatorSend [run-id] [selection\|diagnostic\|hunk\|bundle] [bundle-id]` | Send provenance-labelled editor context to an active structured chat. |
+| `:GatorReview [run-id]` | Inspect a worktree diff and run an explicitly configured review command. |
+| `:GatorRunbook` | Select and start one ready manual runbook step. |
 | `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |
 | `:GatorHealth` | Check provider readiness and compatibility. |
 
@@ -72,6 +75,21 @@ require("gator").setup({
   budget = {
     max_tokens = 0, -- 0 is unbounded; enforced only for provider-reported usage
     action = "warn", -- "warn" or "stop"
+    max_concurrent_runs = 0, -- 0 is unbounded
+  },
+  review = {
+    commands = {
+      unit = { argv = { "make", "test" } }, -- only configured argv commands can run from review
+    },
+  },
+  acp = {
+    commands = {
+      -- localagent = { argv = { "local-agent", "--acp" } }, -- explicit opt-in only
+    },
+  },
+  runbooks = {
+    max_concurrent = 0, -- default per-runbook active-run cap
+    max_tokens = 0, -- default per-runbook reported-token cap
   },
   providers = {
     pi = { user_confirmed = true }, -- only after Pi is configured locally
@@ -103,7 +121,28 @@ Handoff creates a new provider session. It never claims to migrate an opaque pro
 
 Every handoff is reviewed before launch. Included text-file snapshots are applied in the isolated target workspace and retained under `.gator/handoffs/<bundle-id>/files/`; binary, oversized, and omitted files are shown explicitly in the review. This is a portable Gator artifact, not a claim of provider-native session migration. Terminal runs are labelled `transcript unavailable`. Usage is `reported` only when a provider emits exact counts; otherwise it is `unknown` with a separate local context estimate. A configured token budget can warn or stop only runs with reported usage.
 
+After Neovim restarts, formerly active runs become `detached`. Gator resumes only when the same provider confirms the persisted native session identity. A native fork is available only for structured providers with a documented fork contract; cross-provider continuation remains a reviewed portable handoff.
+
 The first writer uses the current checkout. A further active writer gets an isolated Git worktree. Chat, review, and terminal panes are ephemeral; terminal panes close when their provider exits. Gator does not run a daemon, scheduler, process scanner, or automatic workflow queue.
+
+## Manual runbooks
+
+Runbooks are an opt-in Lua API for deliberate multi-agent work, not a scheduler:
+
+```lua
+require("gator").create_runbook({
+  id = "fix-and-review",
+  title = "Research, implement, review",
+  steps = {
+    { id = "research", role = "researcher", provider = "pi", objective = "Find the cause", depends_on = {} },
+    { id = "write", role = "writer", provider = "codex", objective = "Implement the fix", depends_on = { "research" } },
+    { id = "review", role = "reviewer", provider = "pi", objective = "Review the diff", depends_on = { "write" } },
+    { id = "integrate", role = "integrator", provider = "codex", objective = "Converge reviewed work", depends_on = { "write", "review" } },
+  },
+})
+```
+
+The run graph renders dependency state and ready steps; press `n` or run `:GatorRunbook` to select one. Gator never starts the next step itself. `researcher` and `reviewer` add a read-only instruction and use an existing workspace; generic CLIs remain provider-owned processes, so this is not a sandbox. `writer` and `integrator` use isolated worktrees; integrator start always requires confirmation. Dependency packets identify every dependency and include bounded Gator-owned transcript/bundle/diff provenance; they do not claim provider-native session migration. See [runbooks](docs/RUNBOOKS.md).
 
 ## Provider boundaries
 

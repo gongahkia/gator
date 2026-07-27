@@ -65,8 +65,40 @@ local function active_state(value)
 		or value.state == "detached"
 end
 
+local roles = {
+	primary = true,
+	researcher = true,
+	writer = true,
+	reviewer = true,
+	integrator = true,
+}
+
+local function role(value)
+	value = value or "primary"
+	if type(value) ~= "string" or not roles[value] then
+		fail("run role is unavailable")
+	end
+	return value
+end
+
 local function writers(value)
-	return active_state(value) and (value.role == "primary" or value.role == "writer")
+	return active_state(value) and (value.role == "primary" or value.role == "writer" or value.role == "integrator")
+end
+
+local function role_instruction(value)
+	if value == "researcher" then
+		return "Gator role: researcher. Inspect and report; do not edit files or run mutating commands."
+	end
+	if value == "reviewer" then
+		return "Gator role: reviewer. Inspect the diff and collect evidence; do not edit source files."
+	end
+	if value == "writer" then
+		return "Gator role: writer. Make changes only in this isolated Gator worktree."
+	end
+	if value == "integrator" then
+		return "Gator role: integrator. The user explicitly approved convergence; reconcile dependency evidence only in this isolated Gator worktree."
+	end
+	return nil
 end
 
 local function context_kind(value)
@@ -176,6 +208,19 @@ function Workflow:report_usage(id, usage)
 		)
 		if budget.action == "stop" then
 			self:cancel(id)
+		end
+	end
+	if run.runbook_id then
+		local status = self:runbook_status(run.runbook_id)
+		local limit = status.max_tokens > 0 and status.max_tokens or self.state.config.runbooks.max_tokens
+		if limit > 0 and status.reported_tokens >= limit then
+			vim.notify(
+				"Gator runbook reported-token budget reached · " .. status.reported_tokens .. "/" .. limit,
+				vim.log.levels.WARN
+			)
+			if budget.action == "stop" then
+				self:cancel(id)
+			end
 		end
 	end
 	return budget
@@ -575,6 +620,7 @@ function Workflow:launch(opts)
 		fail("launch requires options")
 	end
 	local objective = text(opts.objective, "objective")
+	local selected_role = role(opts.role)
 	local chosen = self:provider(opts.provider)
 	local transport = self:resolve_transport(chosen, opts.transport)
 	local id = run_store.id("run")
@@ -611,11 +657,13 @@ function Workflow:launch(opts)
 	local run = self:put({
 		id = id,
 		provider = chosen.provider,
-		role = opts.role or "primary",
+		role = selected_role,
 		transport = transport,
 		state = "starting",
 		workspace = workspace,
 		parent_run_id = opts.parent_run_id,
+		runbook_id = opts.runbook_id,
+		depends_on = opts.depends_on,
 		bundle_id = bundle_id,
 		objective = objective,
 		transcript = transport == "terminal" and "unavailable" or "available",
@@ -629,6 +677,10 @@ function Workflow:launch(opts)
 		updated_at = now(),
 	})
 	local prompt = objective .. "\n\nUse this Gator context bundle:\n\n" .. body
+	local instruction = role_instruction(selected_role)
+	if instruction then
+		prompt = prompt .. "\n\n" .. instruction
+	end
 	if opts.handoff_snapshot then
 		local state = opts.apply_handoff_snapshot == false and "were retained" or "were applied and retained"
 		prompt = prompt
@@ -961,6 +1013,22 @@ function Workflow:record_review_decision(id, decision)
 	if current.base_sha ~= context.base_sha or current.diff_sha256 ~= context.diff_sha256 then
 		fail("review is stale because the target worktree changed")
 	end
+	if decision == "accepted" and next(self.state.config.review.commands) ~= nil then
+		local passed = false
+		for _, evidence in ipairs(self.store:list_reviews(run.id)) do
+			if
+				evidence.state == "passed"
+				and evidence.base_sha == context.base_sha
+				and evidence.diff_sha256 == context.diff_sha256
+			then
+				passed = true
+				break
+			end
+		end
+		if not passed then
+			fail("accepted review requires passed evidence for the reviewed worktree diff")
+		end
+	end
 	local record = self.store:write_review({
 		id = run_store.id("review"),
 		run_id = run.id,
@@ -972,6 +1040,246 @@ function Workflow:record_review_decision(id, decision)
 	}, "Review decision: " .. decision)
 	self:update(run.id, { review = { id = record.review.id, state = record.review.state } })
 	return record
+end
+
+function Workflow:create_runbook(opts)
+	if type(opts) ~= "table" then
+		fail("create runbook requires options")
+	end
+	local record = vim.deepcopy(opts)
+	record.id = record.id or run_store.id("runbook")
+	record.created_at = record.created_at or now()
+	record.max_concurrent = record.max_concurrent or self.state.config.runbooks.max_concurrent
+	record.max_tokens = record.max_tokens or self.state.config.runbooks.max_tokens
+	for _, step in ipairs(record.steps or {}) do
+		if step.provider == nil then
+			fail("runbook steps require an explicit provider")
+		end
+	end
+	return self.store:create_runbook(record)
+end
+
+function Workflow:runbooks()
+	return self.store:list_runbooks()
+end
+
+function Workflow:runbook_status(id)
+	local runbook = self.store:runbook(id)
+	if not runbook then
+		fail("runbook is unavailable: " .. tostring(id))
+	end
+	local runs = {}
+	for _, run in ipairs(self:runs()) do
+		runs[run.id] = run
+	end
+	local steps, by_id, reported_tokens, unknown_usage, tracked_runs, active = {}, {}, 0, false, 0, 0
+	for _, run in pairs(runs) do
+		if run.runbook_id == runbook.id then
+			tracked_runs = tracked_runs + 1
+			if active_state(run) then
+				active = active + 1
+			end
+			if run.usage.state == "reported" and type(run.usage.total_tokens) == "number" then
+				reported_tokens = reported_tokens + run.usage.total_tokens
+			else
+				unknown_usage = true
+			end
+		end
+	end
+	for _, step in ipairs(runbook.steps) do
+		local run = step.run_id and runs[step.run_id] or nil
+		local state = run and run.state or "pending"
+		by_id[step.id] = { step = step, run = run, state = state }
+	end
+	for _, step in ipairs(runbook.steps) do
+		local status = by_id[step.id]
+		local dependencies_complete = true
+		for _, dependency in ipairs(step.depends_on) do
+			local source = by_id[dependency]
+			if not source.run or source.run.state ~= "completed" then
+				dependencies_complete = false
+				break
+			end
+		end
+		status.ready = status.run == nil and dependencies_complete
+		table.insert(steps, {
+			id = step.id,
+			role = step.role,
+			provider = step.provider,
+			objective = step.objective,
+			depends_on = vim.deepcopy(step.depends_on),
+			run_id = step.run_id,
+			state = status.state,
+			ready = status.ready,
+		})
+	end
+	return {
+		id = runbook.id,
+		title = runbook.title,
+		max_concurrent = runbook.max_concurrent,
+		max_tokens = runbook.max_tokens,
+		reported_tokens = reported_tokens,
+		usage_state = tracked_runs == 0 and "unknown" or (unknown_usage and "partial" or "reported"),
+		tracked_runs = tracked_runs,
+		active = active,
+		steps = steps,
+	}
+end
+
+function Workflow:ready_runbook_steps()
+	local result = {}
+	for _, runbook in ipairs(self:runbooks()) do
+		local status = self:runbook_status(runbook.id)
+		for _, step in ipairs(status.steps) do
+			if step.ready then
+				table.insert(result, { runbook_id = status.id, title = status.title, step = step })
+			end
+		end
+	end
+	table.sort(result, function(left, right)
+		return left.runbook_id == right.runbook_id and left.step.id < right.step.id
+			or left.runbook_id < right.runbook_id
+	end)
+	return result
+end
+
+function Workflow:check_runbook_limits(runbook_id)
+	local global_limit = self.state.config.budget.max_concurrent_runs
+	local globally_active = 0
+	for _, run in ipairs(self:runs()) do
+		if active_state(run) then
+			globally_active = globally_active + 1
+		end
+	end
+	if global_limit > 0 and globally_active >= global_limit then
+		fail("global Gator concurrency limit is reached")
+	end
+	local status = self:runbook_status(runbook_id)
+	local configured = self.state.config.runbooks.max_concurrent
+	local limit = status.max_concurrent > 0 and status.max_concurrent or configured
+	if limit > 0 and status.active >= limit then
+		fail("runbook concurrency limit is reached")
+	end
+	local budget = status.max_tokens > 0 and status.max_tokens or self.state.config.runbooks.max_tokens
+	if budget > 0 and status.reported_tokens >= budget then
+		fail("runbook reported-token budget is exhausted")
+	end
+	return status
+end
+
+function Workflow:bind_runbook_step(runbook_id, step_id, run)
+	local record = self.store:runbook(runbook_id)
+	if not record then
+		fail("runbook is unavailable")
+	end
+	for _, step in ipairs(record.steps) do
+		if step.id == step_id then
+			step.run_id = run.id
+			self.store:update_runbook(record)
+			return run
+		end
+	end
+	fail("runbook step is unavailable")
+end
+
+function Workflow:start_runbook_step(runbook_id, step_id, confirmed)
+	local status = self:check_runbook_limits(runbook_id)
+	local step
+	for _, value in ipairs(status.steps) do
+		if value.id == step_id then
+			step = value
+			break
+		end
+	end
+	if not step or not step.ready then
+		fail("runbook step is not ready")
+	end
+	if step.role == "integrator" and confirmed ~= true then
+		fail("integrator runbook steps require explicit user confirmation")
+	end
+	local dependencies = {}
+	for _, dependency in ipairs(step.depends_on) do
+		for _, candidate in ipairs(status.steps) do
+			if candidate.id == dependency and candidate.run_id then
+				table.insert(dependencies, candidate.run_id)
+			end
+		end
+	end
+	local function bound(run)
+		return self:bind_runbook_step(runbook_id, step.id, run)
+	end
+	local dependency_context = self:runbook_dependency_context(dependencies)
+	if step.role == "reviewer" and #dependencies > 0 then
+		local source = self:run(dependencies[#dependencies])
+		return self:handoff(source.id, step.provider, {
+			profile = "full",
+			role = step.role,
+			objective = step.objective,
+			runbook_id = runbook_id,
+			depends_on = dependencies,
+			additional_context = dependency_context,
+			reuse_source_workspace = true,
+			on_launch = bound,
+		})
+	end
+	local workspace = nil
+	if step.role == "researcher" then
+		workspace = { kind = "project", root = self.root }
+	end
+	local run = self:launch({
+		objective = step.objective,
+		provider = step.provider,
+		role = step.role,
+		workspace = workspace,
+		force_worktree = step.role == "writer" or step.role == "integrator",
+		runbook_id = runbook_id,
+		depends_on = dependencies,
+		bundle_body = dependency_context,
+	})
+	return bound(run)
+end
+
+function Workflow:start_ready_runbook_step()
+	local choices = self:ready_runbook_steps()
+	if #choices == 0 then
+		fail("no runbook step is ready")
+	end
+	vim.ui.select(choices, {
+		prompt = "Start ready Gator runbook step",
+		format_item = function(value)
+			return value.runbook_id
+				.. " · "
+				.. value.step.id
+				.. " · "
+				.. value.step.role
+				.. " · "
+				.. value.step.objective
+		end,
+	}, function(choice)
+		if not choice then
+			return
+		end
+		local function start(confirmed)
+			local ok, err = pcall(self.start_runbook_step, self, choice.runbook_id, choice.step.id, confirmed)
+			if not ok then
+				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			end
+		end
+		if choice.step.role == "integrator" then
+			vim.ui.select(
+				{ "Start integrator", "Cancel" },
+				{ prompt = "Gator integrator convergence approval" },
+				function(value)
+					if value == "Start integrator" then
+						start(true)
+					end
+				end
+			)
+		else
+			start(false)
+		end
+	end)
+	return true
 end
 
 function Workflow:cancel(id)
@@ -1066,6 +1374,67 @@ function Workflow:transcript(run)
 	return value and table.concat(value, "\n\n") or self.store:read_transcript(run.id)
 end
 
+function Workflow:runbook_dependency_context(ids)
+	if type(ids) ~= "table" or not vim.islist(ids) then
+		fail("runbook dependency ids must be an array")
+	end
+	local lines, dependencies =
+		{
+			"## Gator runbook dependency context",
+			"This is Gator-owned provenance. Provider-native sessions were not migrated.",
+		}, {}
+	for _, id in ipairs(ids) do
+		local dependency = self:run(id)
+		table.insert(dependencies, dependency)
+		table.insert(
+			lines,
+			"- `"
+				.. dependency.id
+				.. "` · "
+				.. dependency.role
+				.. " · "
+				.. dependency.provider
+				.. " · "
+				.. dependency.state
+		)
+	end
+	local maximum = self.state.config.context.handoff.max_chars
+	local header = table.concat(lines, "\n")
+	if #header > maximum then
+		fail("configured handoff max_chars is too small for runbook dependency provenance")
+	end
+	for _, dependency in ipairs(dependencies) do
+		vim.list_extend(lines, {
+			"",
+			"### " .. dependency.id .. " · " .. dependency.role .. " · " .. dependency.provider,
+			"- State: " .. dependency.state,
+			"- Workspace: `" .. dependency.workspace.root .. "`",
+			"- Objective: " .. dependency.objective,
+		})
+		local bundle = dependency.bundle_id and self.store:read_bundle(dependency.bundle_id) or nil
+		if bundle then
+			vim.list_extend(lines, { "", "#### Original context bundle", bundle })
+		end
+		local transcript = self:transcript(dependency)
+		if transcript then
+			vim.list_extend(lines, { "", "#### Gator-owned transcript", transcript })
+		end
+		local diff = capture.diff(dependency.workspace.root)
+		if diff and diff ~= "" then
+			vim.list_extend(lines, { "", "#### Current dependency diff", "```diff", diff, "```" })
+		end
+	end
+	local body = table.concat(lines, "\n")
+	if #body > maximum then
+		local suffix = "\n\n[Gator dependency detail truncated at configured handoff bound.]"
+		if #header + #suffix > maximum then
+			fail("configured handoff max_chars is too small for runbook dependency provenance")
+		end
+		body = body:sub(1, maximum - #suffix) .. suffix
+	end
+	return body
+end
+
 function Workflow:finish_summary(id)
 	local pending = self.pending_summary[id]
 	if not pending then
@@ -1083,6 +1452,12 @@ end
 
 function Workflow:handoff(source_id, target, opts)
 	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("handoff options must be an object")
+	end
+	if opts.on_launch ~= nil and type(opts.on_launch) ~= "function" then
+		fail("handoff on_launch must be a function")
+	end
 	local source = self:run(source_id)
 	if not target then
 		local choices = {}
@@ -1112,6 +1487,9 @@ function Workflow:handoff(source_id, target, opts)
 		or source.objective
 	if type(opts.summary) == "string" and vim.trim(opts.summary) ~= "" then
 		body = body .. "\n\n## Source-agent summary\n" .. opts.summary
+	end
+	if type(opts.additional_context) == "string" and vim.trim(opts.additional_context) ~= "" then
+		body = body .. "\n\n" .. opts.additional_context
 	end
 	local snapshot = capture.snapshot(source.workspace.root, {
 		max_files = self.state.config.context.handoff.max_files,
@@ -1148,7 +1526,17 @@ function Workflow:handoff(source_id, target, opts)
 		end)
 		return true
 	end
-	local workspace = self:handoff_workspace(source, opts.native_fork == true or writers(source))
+	local owned_workspace = false
+	local workspace
+	if opts.workspace then
+		workspace = vim.deepcopy(opts.workspace)
+	elseif opts.reuse_source_workspace then
+		workspace = vim.deepcopy(source.workspace)
+	else
+		workspace =
+			self:handoff_workspace(source, opts.force_worktree == true or opts.native_fork == true or writers(source))
+		owned_workspace = workspace.kind == "worktree"
+	end
 	local apply_snapshot = workspace.root ~= source.workspace.root
 	local conflicts = apply_snapshot and self.store:handoff_conflicts(snapshot, workspace.root) or {}
 	local preview = apply_snapshot and self.store:preview_handoff(snapshot, workspace.root)
@@ -1161,15 +1549,17 @@ function Workflow:handoff(source_id, target, opts)
 		preview = preview,
 		conflicts = conflicts,
 		on_cancel = function()
-			self:discard_workspace(workspace)
+			if owned_workspace then
+				self:discard_workspace(workspace)
+			end
 		end,
 		on_confirm = function(reviewed, decisions)
-			local ok, err = pcall(self.launch, self, {
-				objective = "Continue the reviewed handoff from " .. source.provider,
+			local launched, run = pcall(self.launch, self, {
+				objective = opts.objective or ("Continue the reviewed handoff from " .. source.provider),
 				provider = target,
 				bundle_body = reviewed,
 				parent_run_id = source.id,
-				role = "writer",
+				role = opts.role or "writer",
 				workspace = workspace,
 				remember = false,
 				handoff_snapshot = snapshot,
@@ -1177,10 +1567,21 @@ function Workflow:handoff(source_id, target, opts)
 				apply_handoff_snapshot = apply_snapshot,
 				native_session_operation = opts.native_fork and "fork" or nil,
 				native_session = opts.native_fork and source.session or nil,
+				runbook_id = opts.runbook_id,
+				depends_on = opts.depends_on,
 			})
-			if not ok then
-				self:discard_workspace(workspace)
-				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			if not launched then
+				if owned_workspace then
+					self:discard_workspace(workspace)
+				end
+				vim.notify(tostring(run), vim.log.levels.ERROR, { title = "Gator" })
+				return
+			end
+			if opts.on_launch then
+				local bound, bind_err = pcall(opts.on_launch, run)
+				if not bound then
+					vim.notify("Gator runbook binding: " .. tostring(bind_err), vim.log.levels.ERROR)
+				end
 			end
 		end,
 	})

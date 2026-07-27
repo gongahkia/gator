@@ -68,6 +68,10 @@ assert(
 		and vim.deep_equal(opened.commands, { "unit" }),
 	"review must show the real worktree diff, base SHA, and explicitly configured test commands"
 )
+assert(
+	not pcall(value.record_review_decision, value, "run-review", "accepted"),
+	"a configured review command must produce matching passed evidence before acceptance"
+)
 local evidence = value:execute_review_test("run-review", "unit", true)
 assert(
 	evidence.review.state == "passed"

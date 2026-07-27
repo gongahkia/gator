@@ -132,7 +132,10 @@ local function normalize_run(value)
 	run.id = identifier(run.id, "run.id")
 	run.provider = identifier(run.provider, "run.provider")
 	run.role = run.role or "primary"
-	if not ({ primary = true, writer = true, reviewer = true, research = true, integrator = true })[run.role] then
+	if run.role == "research" then
+		run.role = "researcher"
+	end
+	if not ({ primary = true, writer = true, reviewer = true, researcher = true, integrator = true })[run.role] then
 		fail("run.role is unavailable")
 	end
 	if run.transport ~= "chat" and run.transport ~= "terminal" then
@@ -586,7 +589,7 @@ local function decisions(value)
 	if value == nil then
 		return {}
 	end
-	if type(value) ~= "table" or vim.islist(value) then
+	if type(value) ~= "table" or (vim.islist(value) and next(value) ~= nil) then
 		fail("handoff decisions must be an object")
 	end
 	local result = {}
@@ -789,6 +792,161 @@ function Store:list_reviews(run_id)
 		end
 		record.output_ref = document.output_ref
 		table.insert(result, record)
+	end
+	table.sort(result, function(left, right)
+		return left.created_at > right.created_at
+	end)
+	return result
+end
+
+local runbook_roles = { researcher = true, writer = true, reviewer = true, integrator = true }
+
+local function runbook_record(value)
+	if type(value) ~= "table" then
+		fail("runbook must be an object")
+	end
+	for key in pairs(value) do
+		if
+			key ~= "id"
+			and key ~= "title"
+			and key ~= "max_concurrent"
+			and key ~= "max_tokens"
+			and key ~= "steps"
+			and key ~= "created_at"
+		then
+			fail("runbook contains unsupported field: " .. tostring(key))
+		end
+	end
+	local record = vim.deepcopy(value)
+	record.id = identifier(record.id, "runbook.id")
+	record.title = text(record.title, "runbook.title")
+	for _, field in ipairs({ "max_concurrent", "max_tokens", "created_at" }) do
+		if type(record[field]) ~= "number" or record[field] < 0 or record[field] % 1 ~= 0 then
+			fail("runbook." .. field .. " must be a non-negative integer")
+		end
+	end
+	if type(record.steps) ~= "table" or not vim.islist(record.steps) or #record.steps == 0 then
+		fail("runbook.steps must be a non-empty array")
+	end
+	local by_id = {}
+	for index, step in ipairs(record.steps) do
+		if type(step) ~= "table" then
+			fail("runbook.steps[" .. index .. "] must be an object")
+		end
+		for key in pairs(step) do
+			if
+				key ~= "id"
+				and key ~= "role"
+				and key ~= "objective"
+				and key ~= "provider"
+				and key ~= "depends_on"
+				and key ~= "run_id"
+			then
+				fail("runbook step contains unsupported field: " .. tostring(key))
+			end
+		end
+		step.id = identifier(step.id, "runbook.steps[" .. index .. "].id")
+		if by_id[step.id] then
+			fail("runbook steps must have unique ids")
+		end
+		by_id[step.id] = step
+		if step.role == "research" then
+			step.role = "researcher"
+		end
+		if not runbook_roles[step.role] then
+			fail("runbook step role is unavailable")
+		end
+		step.objective = text(step.objective, "runbook.steps[" .. index .. "].objective")
+		if step.provider ~= nil then
+			step.provider = identifier(step.provider, "runbook step provider")
+		end
+		if type(step.depends_on) ~= "table" or not vim.islist(step.depends_on) then
+			fail("runbook step dependencies must be an array")
+		end
+		local seen = {}
+		for dependency_index, dependency in ipairs(step.depends_on) do
+			dependency = identifier(dependency, "runbook dependency")
+			if dependency == step.id or seen[dependency] then
+				fail("runbook step dependencies must be unique external step ids")
+			end
+			seen[dependency] = true
+			step.depends_on[dependency_index] = dependency
+		end
+		if step.run_id ~= nil then
+			step.run_id = identifier(step.run_id, "runbook step run_id")
+		end
+	end
+	for _, step in ipairs(record.steps) do
+		for _, dependency in ipairs(step.depends_on) do
+			if not by_id[dependency] then
+				fail("runbook dependency is unavailable: " .. dependency)
+			end
+		end
+	end
+	local visiting, visited = {}, {}
+	local function walk(step)
+		if visiting[step.id] then
+			fail("runbook dependencies must be acyclic")
+		end
+		if visited[step.id] then
+			return
+		end
+		visiting[step.id] = true
+		for _, dependency in ipairs(step.depends_on) do
+			walk(by_id[dependency])
+		end
+		visiting[step.id], visited[step.id] = nil, true
+	end
+	for _, step in ipairs(record.steps) do
+		walk(step)
+	end
+	return record
+end
+
+function Store:create_runbook(value)
+	local record = runbook_record(value)
+	self:ensure()
+	local path = self.runbooks_directory .. "/" .. record.id .. ".json"
+	if vim.uv.fs_stat(path) then
+		fail("runbook already exists")
+	end
+	atomic(path, { schema_version = 1, runbook = record })
+	return vim.deepcopy(record)
+end
+
+function Store:runbook(id)
+	id = identifier(id, "runbook id")
+	self:ensure()
+	local document = json(self.runbooks_directory .. "/" .. id .. ".json")
+	if not document then
+		return nil
+	end
+	if document.schema_version ~= 1 or type(document.runbook) ~= "table" then
+		fail("invalid runbook artifact")
+	end
+	return runbook_record(document.runbook)
+end
+
+function Store:update_runbook(value)
+	local record = runbook_record(value)
+	self:ensure()
+	local path = self.runbooks_directory .. "/" .. record.id .. ".json"
+	if not vim.uv.fs_stat(path) then
+		fail("runbook is unavailable")
+	end
+	atomic(path, { schema_version = 1, runbook = record })
+	return vim.deepcopy(record)
+end
+
+function Store:list_runbooks()
+	self:ensure()
+	local result = {}
+	for _, path in ipairs(vim.fn.glob(self.runbooks_directory .. "/*.json", false, true)) do
+		local document = json(path)
+		if not document or document.schema_version ~= 1 or type(document.runbook) ~= "table" then
+			fail("invalid runbook artifact: " .. path)
+		end
+		table.insert(result, runbook_record(document.runbook))
 	end
 	table.sort(result, function(left, right)
 		return left.created_at > right.created_at

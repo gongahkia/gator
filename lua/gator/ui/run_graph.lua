@@ -62,10 +62,52 @@ local function render(panel)
 			table.insert(lines, "  Budget: " .. budget)
 		end
 	end
+	if type(panel.workflow.runbooks) == "function" and type(panel.workflow.runbook_status) == "function" then
+		local ok, runbooks = pcall(panel.workflow.runbooks, panel.workflow)
+		if ok and #runbooks > 0 then
+			table.insert(lines, "")
+			table.insert(lines, "Gator runbooks")
+			for _, runbook in ipairs(runbooks) do
+				local available, status = pcall(panel.workflow.runbook_status, panel.workflow, runbook.id)
+				if available then
+					local limit = status.max_tokens == 0 and "unbounded" or tostring(status.max_tokens)
+					table.insert(
+						lines,
+						"- "
+							.. status.id
+							.. " · active "
+							.. status.active
+							.. " · reported "
+							.. status.reported_tokens
+							.. "/"
+							.. limit
+							.. " · usage "
+							.. status.usage_state
+					)
+					for _, step in ipairs(status.steps) do
+						local dependencies = #step.depends_on == 0 and "none" or table.concat(step.depends_on, ",")
+						table.insert(
+							lines,
+							"  "
+								.. (step.ready and ">" or "·")
+								.. " "
+								.. step.id
+								.. " · "
+								.. step.role
+								.. " · "
+								.. step.state
+								.. " · depends "
+								.. dependencies
+						)
+					end
+				end
+			end
+		end
+	end
 	table.insert(lines, "")
 	table.insert(
 		lines,
-		"<CR> focus · c context · f native fork · h handoff · p parallel writer · v review · s stop · r resume · q close · ? help"
+		"<CR> focus · c context · f native fork · h handoff · p parallel writer · v review · n next runbook step · s stop · r resume · q close · ? help"
 	)
 	accessibility.render(panel.buffer, lines, "gator-runs")
 end
@@ -84,6 +126,7 @@ local function bind(panel)
 		context = "c",
 		review = "v",
 		parallel = "p",
+		runbook = "n",
 		stop = "s",
 		resume = "r",
 		close = "q",
@@ -137,6 +180,11 @@ local function bind(panel)
 				panel.workflow:launch_parallel(run.id)
 			end
 		end,
+		runbook = function()
+			if type(panel.workflow.start_ready_runbook_step) == "function" then
+				panel.workflow:start_ready_runbook_step()
+			end
+		end,
 		stop = function()
 			local run = selected(panel)
 			if run then
@@ -153,7 +201,7 @@ local function bind(panel)
 		close = M.close,
 		help = function()
 			vim.notify(
-				"Gator runs: <CR> focus, c context, f native fork, h handoff, p parallel writer, v review, s stop, r resume, q close",
+				"Gator runs: <CR> focus, c context, f native fork, h handoff, p parallel writer, v review, n next runbook step, s stop, r resume, q close",
 				vim.log.levels.INFO
 			)
 		end,

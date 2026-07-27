@@ -15,6 +15,7 @@ local actions = {
 		fields = { run_id = true, kind = true, bundle_id = true, buffer = true, first_line = true, last_line = true },
 	},
 	review = { fields = { run_id = true } },
+	runbook_next = { fields = {} },
 	health = { fields = {} },
 	export_diagnostics = { fields = {} },
 	verify_beta_readiness = { fields = {} },
@@ -28,6 +29,7 @@ local action_names = {
 	"handoff",
 	"send_context",
 	"review",
+	"runbook_next",
 	"health",
 	"export_diagnostics",
 	"verify_beta_readiness",
@@ -307,6 +309,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "review" then
 		return self:workflow():review(opts.run_id)
+	end
+	if action == "runbook_next" then
+		return self:workflow():start_ready_runbook_step()
 	end
 	if action == "health" then
 		return self:health()
