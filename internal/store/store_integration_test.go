@@ -1,14 +1,63 @@
 package store
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/observability"
+	"go.opentelemetry.io/otel/trace"
 )
+
+func TestTraceAndForensicsIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	key := bytes.Repeat([]byte{9}, 32)
+	t.Setenv("NORBOT_FORENSICS_TEST_KEY", base64.StdEncoding.EncodeToString(key))
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ConfigureForensics(true, "NORBOT_FORENSICS_TEST_KEY"); err != nil {
+		t.Fatal(err)
+	}
+	id := "trace-" + time.Now().UTC().Format("20060102150405.000000000")
+	run := domain.Run{ID: id, Prompt: "trace", Profile: domain.ProfileFrontend, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "local-deployer"}, Graph: domain.DefaultGraph(), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
+	span := trace.NewSpanContext(trace.SpanContextConfig{TraceID: trace.TraceID{1}, SpanID: trace.SpanID{2}, TraceFlags: trace.FlagsSampled})
+	ctx = trace.ContextWithSpanContext(ctx, span)
+	ctx = observability.With(ctx, observability.Correlation{RunID: id, Stage: "planner", Attempt: 1, TurnID: "turn-1"})
+	event, err := st.RecordTrace(ctx, domain.TraceEvent{RunID: id, Type: "agent_turn_created", Summary: "agent received prompt"}, map[string]any{"prompt": "local secret"}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := st.TracePage(ctx, id, domain.TraceFilter{Query: "agent prompt"}, 10)
+	if err != nil || len(page.Items) != 1 || page.Items[0].TraceID != span.TraceID().String() || !page.Items[0].RawAvailable {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	raw, err := st.TraceRaw(ctx, id, event.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw.(map[string]any)["prompt"] != "local secret" {
+		t.Fatalf("raw=%#v", raw)
+	}
+}
 
 func TestRunApprovalLifecycleIntegration(t *testing.T) {
 	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
