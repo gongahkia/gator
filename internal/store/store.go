@@ -454,6 +454,69 @@ CREATE INDEX IF NOT EXISTS run_events_retention_idx ON run_events(created_at);
 CREATE INDEX IF NOT EXISTS provider_usage_retention_idx ON provider_usage(created_at);
 `
 
+const migration005OutboxReceipts = `
+CREATE TABLE IF NOT EXISTS outbox_delivery_receipts (
+  outbox_event_id BIGINT NOT NULL REFERENCES outbox_events(id) ON DELETE CASCADE,
+  sink TEXT NOT NULL,
+  receipt JSONB NOT NULL DEFAULT '{}'::jsonb,
+  delivered_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY(outbox_event_id,sink)
+);
+`
+
+const migration006PlanningSwarms = `
+CREATE TABLE IF NOT EXISTS planning_swarm_executions (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  attempt INT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'running',
+  provider_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  prompt_digest TEXT NOT NULL,
+  config_digest TEXT NOT NULL,
+  selected_task_id BIGINT,
+  ranker_error TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  UNIQUE(run_id,attempt)
+);
+CREATE TABLE IF NOT EXISTS planning_swarm_tasks (
+  id BIGSERIAL PRIMARY KEY,
+  execution_id BIGINT NOT NULL REFERENCES planning_swarm_executions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL,
+  ordinal INT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'queued',
+  provider_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_digest TEXT NOT NULL,
+  output_digest TEXT NOT NULL DEFAULT '',
+  architecture JSONB NOT NULL DEFAULT '{}'::jsonb,
+  rationale TEXT NOT NULL DEFAULT '',
+  assumptions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  risks JSONB NOT NULL DEFAULT '[]'::jsonb,
+  score INT NOT NULL DEFAULT 0,
+  rank_reason TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(execution_id,role)
+);
+CREATE INDEX IF NOT EXISTS planning_swarm_run_attempt_idx ON planning_swarm_executions(run_id,attempt DESC);
+CREATE INDEX IF NOT EXISTS planning_swarm_task_execution_idx ON planning_swarm_tasks(execution_id,ordinal);
+ALTER TABLE planning_swarm_executions ADD CONSTRAINT planning_swarm_selected_task_fk FOREIGN KEY (selected_task_id) REFERENCES planning_swarm_tasks(id) ON DELETE SET NULL;
+CREATE TABLE IF NOT EXISTS planning_swarm_provider_slots (
+  provider_id TEXT NOT NULL,
+  holder TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY(provider_id,holder)
+);
+CREATE INDEX IF NOT EXISTS planning_swarm_provider_slots_expiry_idx ON planning_swarm_provider_slots(expires_at);
+`
+
 type migration struct {
 	Version int
 	Name    string
@@ -465,6 +528,8 @@ var migrations = []migration{
 	{Version: 2, Name: "operational_hardening", SQL: migration002OperationalHardening},
 	{Version: 3, Name: "cache_ledger_cleanup", SQL: migration003CacheLedgerCleanup},
 	{Version: 4, Name: "lifecycle_indexes", SQL: migration004LifecycleIndexes},
+	{Version: 5, Name: "outbox_receipts", SQL: migration005OutboxReceipts},
+	{Version: 6, Name: "planning_swarms", SQL: migration006PlanningSwarms},
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
@@ -679,8 +744,8 @@ func (s *Store) EventsPage(ctx context.Context, runID, cursor string, limit int)
 	}
 	afterID := int64(0)
 	if cursor != "" {
-		parsed, err := strconv.ParseInt(cursor, 10, 64)
-		if err != nil || parsed < 0 {
+		parsed, err := decodeEventPageCursor(cursor)
+		if err != nil {
 			return domain.EventPage{}, fmt.Errorf("invalid event cursor")
 		}
 		afterID = parsed
@@ -709,7 +774,7 @@ func (s *Store) EventsPage(ctx context.Context, runID, cursor string, limit int)
 	if len(page.Items) > limit {
 		last := page.Items[limit-1]
 		page.Items = page.Items[:limit]
-		page.NextCursor = strconv.FormatInt(last.ID, 10)
+		page.NextCursor = encodeEventPageCursor(last.ID)
 	}
 	return page, nil
 }
@@ -906,7 +971,6 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 	default:
 		return fmt.Errorf("unknown approval action")
 	}
-	return nil
 }
 
 func (s *Store) ClaimJob(ctx context.Context, workerID string, lease time.Duration) (domain.Job, bool, error) {
@@ -1096,18 +1160,47 @@ func (s *Store) ListApps(ctx context.Context) ([]domain.App, error) {
 }
 
 func (s *Store) ListAppsPage(ctx context.Context, cursor string, limit int) (domain.AppPage, error) {
+	return s.ListAppsFilteredPage(ctx, cursor, AppFilter{}, limit)
+}
+
+type AppFilter struct {
+	Status, Search              string
+	UpdatedAfter, UpdatedBefore *time.Time
+}
+
+func (s *Store) ListAppsFilteredPage(ctx context.Context, cursor string, filter AppFilter, limit int) (domain.AppPage, error) {
 	if limit < 1 || limit > 100 {
 		limit = 50
 	}
 	var args []any
-	where := ""
+	clauses := []string{}
+	if status := strings.TrimSpace(filter.Status); status != "" {
+		clauses = append(clauses, "d.status=$"+strconv.Itoa(len(args)+1))
+		args = append(args, status)
+	}
+	if search := strings.TrimSpace(filter.Search); search != "" {
+		clauses = append(clauses, "(d.app_id ILIKE $"+strconv.Itoa(len(args)+1)+" OR d.project_name ILIKE $"+strconv.Itoa(len(args)+1)+" OR r.prompt ILIKE $"+strconv.Itoa(len(args)+1)+")")
+		args = append(args, "%"+search+"%")
+	}
+	if filter.UpdatedAfter != nil {
+		clauses = append(clauses, "d.updated_at>=$"+strconv.Itoa(len(args)+1))
+		args = append(args, *filter.UpdatedAfter)
+	}
+	if filter.UpdatedBefore != nil {
+		clauses = append(clauses, "d.updated_at<$"+strconv.Itoa(len(args)+1))
+		args = append(args, *filter.UpdatedBefore)
+	}
 	if cursor != "" {
 		updatedAt, appID, err := decodePageCursor(cursor)
 		if err != nil {
 			return domain.AppPage{}, err
 		}
 		args = append(args, updatedAt, appID)
-		where = ` WHERE (d.updated_at,d.app_id)<($1,$2)`
+		clauses = append(clauses, "(d.updated_at,d.app_id)<($"+strconv.Itoa(len(args)-1)+",$"+strconv.Itoa(len(args))+")")
+	}
+	where := ""
+	if len(clauses) > 0 {
+		where = " WHERE " + strings.Join(clauses, " AND ")
 	}
 	args = append(args, limit+1)
 	rows, err := s.pool.Query(ctx, `WITH latest_deployments AS (
@@ -1264,6 +1357,10 @@ type pageCursor struct {
 	ID        string    `json:"id"`
 }
 
+type eventPageCursor struct {
+	ID int64 `json:"id"`
+}
+
 func runPageWhere(cursor string, filter RunFilter) (string, []any, error) {
 	clauses := []string{}
 	args := []any{}
@@ -1316,6 +1413,23 @@ func decodePageCursor(value string) (time.Time, string, error) {
 		return time.Time{}, "", fmt.Errorf("invalid page cursor")
 	}
 	return cursor.UpdatedAt, cursor.ID, nil
+}
+
+func encodeEventPageCursor(id int64) string {
+	encoded, _ := json.Marshal(eventPageCursor{ID: id})
+	return base64.RawURLEncoding.EncodeToString(encoded)
+}
+
+func decodeEventPageCursor(value string) (int64, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return 0, err
+	}
+	var cursor eventPageCursor
+	if err := json.Unmarshal(raw, &cursor); err != nil || cursor.ID < 0 {
+		return 0, fmt.Errorf("invalid event cursor")
+	}
+	return cursor.ID, nil
 }
 
 type rowScanner interface{ Scan(...any) error }

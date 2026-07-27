@@ -22,3 +22,9 @@ func (s *Store) insertAuditEvent(ctx context.Context, tx pgx.Tx, actor, action, 
 	_, err = tx.Exec(ctx, `INSERT INTO audit_events(actor,action,target_type,target_id,metadata) VALUES($1,$2,$3,$4,$5)`, actor, action, targetType, targetID, encoded)
 	return err
 }
+
+func (s *Store) RecordAuditEvent(ctx context.Context, actor, action, targetType, targetID string, metadata map[string]any) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		return s.insertAuditEvent(ctx, tx, actor, action, targetType, targetID, metadata)
+	})
+}

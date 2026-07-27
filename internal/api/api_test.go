@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/norbot/internal/config"
 )
@@ -47,5 +48,19 @@ func TestClientLimiterEnforcesBurst(t *testing.T) {
 	limiter := newClientLimiter(config.HTTPPolicy{RatePerMinute: 1, RateBurst: 1})
 	if !limiter.allow("operator:one") || limiter.allow("operator:one") {
 		t.Fatal("limiter did not enforce burst")
+	}
+}
+
+func TestAppFilterValidatesRFC3339Bounds(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/api/apps?status=running&search=calendar&updated_after=2026-07-01T00:00:00Z&updated_before=2026-08-01T00:00:00Z", nil)
+	filter, err := appFilter(request)
+	if err != nil || filter.Status != "running" || filter.Search != "calendar" || filter.UpdatedAfter == nil || filter.UpdatedBefore == nil {
+		t.Fatalf("filter=%#v err=%v", filter, err)
+	}
+	if !filter.UpdatedAfter.Equal(time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("updated_after=%v", filter.UpdatedAfter)
+	}
+	if _, err := appFilter(httptest.NewRequest(http.MethodGet, "/api/apps?updated_after=tomorrow", nil)); err == nil {
+		t.Fatal("invalid app filter accepted")
 	}
 }

@@ -60,7 +60,7 @@ func main() {
 		liveInboundCommand(os.Args[3:])
 		return
 	}
-	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template | norbot serve | norbot egress-proxy | norbot health [--json] | norbot live-e2e inbound")
+	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template|network-policy-check | norbot serve | norbot egress-proxy | norbot health [--json] | norbot live-e2e inbound")
 	os.Exit(2)
 }
 
@@ -224,7 +224,7 @@ func initCommand(args []string) {
 
 func kubeCommand(args []string) {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube local | norbot kube secret-template")
+		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube local | norbot kube secret-template | norbot kube network-policy-check")
 		os.Exit(2)
 	}
 	if args[0] == "local" {
@@ -232,6 +232,7 @@ func kubeCommand(args []string) {
 		return
 	}
 	flags := flag.NewFlagSet("kube "+args[0], flag.ExitOnError)
+	probeTimeout := flags.Duration("timeout", 2*time.Minute, "maximum duration for network policy enforcement probe")
 	_ = flags.Parse(args[1:])
 	cfg, err := config.Load()
 	if err != nil {
@@ -249,13 +250,21 @@ func kubeCommand(args []string) {
 	case "secret-template":
 		fmt.Print(runtime.RegistrySecretTemplate(cfg.Manifest.Runtime.Kubernetes.RegistryPullSecret))
 		return
+	case "network-policy-check":
+		ctx, cancel := context.WithTimeout(context.Background(), *probeTimeout)
+		defer cancel()
+		err = kube.VerifyNetworkPolicyEnforcement(ctx)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube local | norbot kube secret-template")
+		fmt.Fprintln(os.Stderr, "usage: norbot kube bootstrap | norbot kube local | norbot kube secret-template | norbot kube network-policy-check")
 		os.Exit(2)
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+	if args[0] == "network-policy-check" {
+		fmt.Println("network policy enforcement verified")
+		return
 	}
 	fmt.Println("kubernetes bootstrap complete")
 }
@@ -268,12 +277,22 @@ func kubeLocalCommand(args []string) {
 	configPath := flags.String("config", "config.local-kubernetes.json", "local Kubernetes config output")
 	envPath := flags.String("env", ".norbot/local-kubernetes.env", "local secret environment file")
 	cilium := flags.Bool("cilium", false, "create a new Kind cluster with Cilium NetworkPolicy enforcement")
-	confirmPolicy := flags.Bool("confirm-network-policy", false, "confirm the installed CNI enforces NetworkPolicy")
+	verifyPolicy := flags.Bool("verify-network-policy", false, "run a real deny-egress NetworkPolicy enforcement probe")
+	confirmPolicy := flags.Bool("confirm-network-policy", false, "deprecated alias for --verify-network-policy")
 	force := flags.Bool("force", false, "overwrite generated local config and environment files")
 	_ = flags.Parse(args)
 	if !validKubeLocalName(*name) || !validKubeLocalName(*namespace) || *registryPort < 1024 || *registryPort > 65535 {
 		fmt.Fprintln(os.Stderr, "name/namespace must be lowercase DNS labels and registry-port must be 1024..65535")
 		os.Exit(2)
+	}
+	if !*force {
+		if _, err := os.Stat(*configPath); err == nil {
+			fmt.Fprintln(os.Stderr, "config", *configPath, "already exists; use --force")
+			os.Exit(1)
+		} else if !os.IsNotExist(err) {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	}
 	if _, err := os.Stat("Dockerfile"); err != nil {
 		fmt.Fprintln(os.Stderr, "run norbot kube local from the Norbot repository root:", err)
@@ -359,13 +378,7 @@ func kubeLocalCommand(args []string) {
 	if paths := filepath.SplitList(strings.TrimSpace(os.Getenv("KUBECONFIG"))); len(paths) > 0 && paths[0] != "" {
 		hostKubeconfig = paths[0]
 	}
-	kube := config.Kubernetes{Kubeconfig: "/etc/norbot/kubeconfig", Context: contextName, Namespace: *namespace, ServiceAccount: "norbot-runtime", RegistryRepository: "kind-registry:5000/norbot", RegistryPullSecret: "registry-pull", RegistryInsecure: true, EgressProxyImage: "kind-registry:5000/norbot-egress-proxy:local", EgressProxySecret: "norbot-egress-proxy", EgressProxySecretKey: "secret", EgressProxyPort: 8181, NetworkPolicyEnforced: *confirmPolicy || *cilium}
-	manifest := config.InitialManifest(domain.DeploymentKubernetes, kube)
-	manifest.Runtime.Sandbox = config.Sandbox{Image: "alpine:3.21", CPUMilli: 500, MemoryMiB: 512, TimeoutS: 60, EgressProxyURL: "http://norbot-egress-proxy." + *namespace + ".svc.cluster.local:8181", EgressProxySecret: "NORBOT_EGRESS_PROXY_SECRET"}
-	if err := config.WriteManifest(*configPath, manifest, *force); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	kube := config.Kubernetes{Kubeconfig: "/etc/norbot/kubeconfig", Context: contextName, Namespace: *namespace, ServiceAccount: "norbot-runtime", RegistryRepository: "kind-registry:5000/norbot", RegistryPullSecret: "registry-pull", RegistryInsecure: true, EgressProxyImage: "kind-registry:5000/norbot-egress-proxy:local", EgressProxySecret: "norbot-egress-proxy", EgressProxySecretKey: "secret", EgressProxyPort: 8181}
 	bootstrapKube := kube
 	bootstrapKube.Kubeconfig = hostKubeconfig
 	kubeRuntime, err := runtime.NewKubernetesRuntime(bootstrapKube, ".norbot/artifacts")
@@ -377,10 +390,33 @@ func kubeLocalCommand(args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if *verifyPolicy || *confirmPolicy || *cilium {
+		if err := kubeRuntime.VerifyNetworkPolicyEnforcement(ctx); err != nil {
+			fmt.Fprintln(os.Stderr, "network policy enforcement check failed:", err)
+			os.Exit(1)
+		}
+		kube.NetworkPolicyEnforced = true
+	}
+	manifestKube := kube
+	manifest := config.InitialManifest(domain.DeploymentKubernetes, manifestKube)
+	manifest.Runtime.Sandbox = config.Sandbox{Image: "alpine:3.21", CPUMilli: 500, MemoryMiB: 512, TimeoutS: 60}
+	if kube.NetworkPolicyEnforced {
+		manifest.Runtime.Sandbox.EgressProxyURL = "http://norbot-egress-proxy." + *namespace + ".svc.cluster.local:8181"
+		manifest.Runtime.Sandbox.EgressProxySecret = "NORBOT_EGRESS_PROXY_SECRET"
+	} else {
+		manifest.Runtime.Kubernetes.EgressProxyImage = ""
+		manifest.Runtime.Kubernetes.EgressProxySecret = ""
+		manifest.Runtime.Kubernetes.EgressProxySecretKey = ""
+		manifest.Runtime.Kubernetes.EgressProxyPort = 0
+	}
+	if err := config.WriteManifest(*configPath, manifest, *force); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	fmt.Println("local Kubernetes bootstrap complete")
 	fmt.Println("start Norbot with: set -a; source " + *envPath + "; set +a; NORBOT_CONFIG_HOST=" + *configPath + " NORBOT_KUBECONFIG_HOST=" + hostKubeconfig + " docker compose up --build")
-	if !*confirmPolicy && !*cilium {
-		fmt.Println("HTTPS sandbox tools are fail-closed until a NetworkPolicy-enforcing CNI is installed and you rerun with --confirm-network-policy.")
+	if !*verifyPolicy && !*confirmPolicy && !*cilium {
+		fmt.Println("HTTPS sandbox tools are fail-closed until a NetworkPolicy-enforcing CNI is installed and you rerun with --verify-network-policy.")
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -125,9 +126,13 @@ func (s *Store) DeadOutbox(ctx context.Context, limit int) ([]domain.OutboxEvent
 	return items, rows.Err()
 }
 
-func (s *Store) ReplayDeadOutbox(ctx context.Context, id int64, operator string) (domain.OutboxEvent, error) {
+func (s *Store) ReplayDeadOutbox(ctx context.Context, id int64, operator, reason string) (domain.OutboxEvent, error) {
 	if id < 1 {
 		return domain.OutboxEvent{}, fmt.Errorf("outbox id is required")
+	}
+	reason = strings.TrimSpace(reason)
+	if len(reason) < 4 || len(reason) > 512 {
+		return domain.OutboxEvent{}, fmt.Errorf("replay reason must be 4 to 512 characters")
 	}
 	var item domain.OutboxEvent
 	var payload []byte
@@ -139,7 +144,7 @@ func (s *Store) ReplayDeadOutbox(ctx context.Context, id int64, operator string)
 			}
 			return err
 		}
-		return s.insertAuditEvent(ctx, tx, operator, "outbox.replayed", "outbox_event", fmt.Sprint(id), map[string]any{"event_type": item.Type})
+		return s.insertAuditEvent(ctx, tx, operator, "outbox.replayed", "outbox_event", fmt.Sprint(id), map[string]any{"event_type": item.Type, "reason": reason})
 	})
 	if err != nil {
 		return domain.OutboxEvent{}, err
@@ -148,6 +153,22 @@ func (s *Store) ReplayDeadOutbox(ctx context.Context, id int64, operator string)
 		return domain.OutboxEvent{}, err
 	}
 	return item, nil
+}
+
+// RecordOutboxReceipt gives idempotent sinks one durable delivery decision per event.
+func (s *Store) RecordOutboxReceipt(ctx context.Context, eventID int64, sink string, receipt map[string]any) (bool, error) {
+	if eventID < 1 || strings.TrimSpace(sink) == "" {
+		return false, fmt.Errorf("outbox event id and sink are required")
+	}
+	encoded, err := json.Marshal(receipt)
+	if err != nil {
+		return false, err
+	}
+	result, err := s.pool.Exec(ctx, `INSERT INTO outbox_delivery_receipts(outbox_event_id,sink,receipt) VALUES($1,$2,$3) ON CONFLICT(outbox_event_id,sink) DO NOTHING`, eventID, sink, encoded)
+	if err != nil {
+		return false, err
+	}
+	return result.RowsAffected() == 1, nil
 }
 
 func outboxRetryDelay(attempts int) time.Duration {

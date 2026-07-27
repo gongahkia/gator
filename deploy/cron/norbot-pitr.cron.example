@@ -1,0 +1,5 @@
+# Install on the isolated backup host after setting the referenced environment file.
+# The archive directory and backup directory must be independent, encrypted storage.
+15 */6 * * * . /etc/norbot/pitr.env && /opt/norbot/scripts/backup-postgres-pitr.sh >>/var/log/norbot-pitr.log 2>&1
+# Review the latest base backup in the scheduler before this weekly drill; do not use an unbounded glob.
+# 30 4 * * 0 . /etc/norbot/pitr.env && NORBOT_RESTORE_DRILL=1 /opt/norbot/scripts/restore-drill-pitr.sh /srv/norbot-backups/norbot-postgres-YYYYMMDDTHHMMSSZ.base.tar.enc >>/var/log/norbot-pitr.log 2>&1

@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
         env:
           POSTGRES_USER: norbot
           POSTGRES_PASSWORD: norbot
@@ -40,7 +40,17 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: NORBOT_E2E_DOCKER=1 go test ./internal/engine -run TestGeneratedProfileDockerE2E -count=1 -v
-      - run: docker build --tag norbot:ci .
+      - run: sh -n scripts/*.sh deploy/postgres/norbot-archive-wal deploy/postgres/norbot-restore-wal
+      - run: NORBOT_BACKUP_PASSPHRASE=test NORBOT_WAL_ARCHIVE_HOST_DIR=/tmp/norbot-wal NORBOT_METRICS_TOKEN=test docker compose -f docker-compose.yml -f docker-compose.production.yml config >/dev/null
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          load: true
+          tags: norbot:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker build --file deploy/postgres/Dockerfile --tag norbot-postgres-pitr:ci .
       - name: export SPDX SBOM
         env: {GH_TOKEN: ${{ github.token }}}
         run: gh api -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" > norbot.spdx.json

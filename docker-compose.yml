@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
       POSTGRES_USER: norbot
       POSTGRES_PASSWORD: norbot
@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.123.0
+    image: otel/opentelemetry-collector-contrib:0.123.0@sha256:e39311df1f3d941923c00da79ac7ba6269124a870ee87e3c3ad24d60f8aee4d2
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./deploy/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
@@ -23,7 +23,7 @@ services:
       - "127.0.0.1:8889:8889"
 
   jaeger:
-    image: jaegertracing/all-in-one:1.67.0
+    image: jaegertracing/all-in-one:1.67.0@sha256:34e3d18e0f2eeb9abd9bb53d0dc7abaf2a5b1c884fdca575093af3126811a9d3
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     ports:
@@ -61,7 +61,7 @@ services:
         condition: service_started
 
   caddy:
-    image: caddy:2.10-alpine
+    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     profiles: ["public"]
     environment:
       NORBOT_PUBLIC_HTTPS_DOMAIN: ${NORBOT_PUBLIC_HTTPS_DOMAIN:-}

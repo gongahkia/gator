@@ -88,6 +88,24 @@ func TestKubernetesBootstrapIsNamespaced(t *testing.T) {
 	}
 }
 
+func TestNetworkPolicyProbeRequiresRealClusterConfig(t *testing.T) {
+	runtime := testKubernetesRuntime(fake.NewSimpleClientset())
+	if err := runtime.VerifyNetworkPolicyEnforcement(context.Background()); err == nil {
+		t.Fatal("expected real REST config requirement")
+	}
+}
+
+func TestNetworkPolicyProbeDenyPolicyIsEgressOnlyAndEmpty(t *testing.T) {
+	labels := map[string]string{"norbot.network-policy-probe": "test", roleLabel: "network-policy-probe-client"}
+	policy := networkPolicyProbeDenyPolicy("probe", labels)
+	if len(policy.Spec.PolicyTypes) != 1 || policy.Spec.PolicyTypes[0] != "Egress" || policy.Spec.Egress == nil || len(policy.Spec.Egress) != 0 {
+		t.Fatalf("policy must default-deny egress: %#v", policy.Spec)
+	}
+	if policy.Spec.PodSelector.MatchLabels[roleLabel] != "network-policy-probe-client" {
+		t.Fatalf("policy selector=%#v", policy.Spec.PodSelector)
+	}
+}
+
 func TestKubernetesEgressProxyResourcesAreIsolated(t *testing.T) {
 	ctx := context.Background()
 	client := fake.NewSimpleClientset()

@@ -498,6 +498,9 @@ func (s *Service) stageAgentAttachments(ctx context.Context, workspace runtime.W
 			if !record.ExpiresAt.After(time.Now().UTC()) {
 				return nil, fmt.Errorf("managed artifact %q has expired", id)
 			}
+			if err := s.store.RecordAuditEvent(ctx, "system:agent", "attachment.accessed", "managed_artifact", record.ID, map[string]any{"run_id": runID, "owner_type": record.OwnerType, "digest": record.Digest}); err != nil {
+				return nil, fmt.Errorf("audit managed artifact access: %w", err)
+			}
 			reader, _, err := s.artifacts.Open(ctx, record.Key)
 			if err != nil {
 				return nil, err

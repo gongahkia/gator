@@ -545,6 +545,9 @@ func (s *Service) materializeAttachments(ctx context.Context, account domain.Cha
 			value["artifact_id"] = record.ID
 			value["object_key"] = record.Key
 			value["digest"] = record.Digest
+			if err := s.store.RecordAuditEvent(ctx, "system:channel", "attachment.stored", "managed_artifact", record.ID, map[string]any{"run_id": account.RunID, "account_id": account.ID, "digest": record.Digest, "size_bytes": record.Size}); err != nil {
+				return nil, fmt.Errorf("audit managed artifact storage: %w", err)
+			}
 		}
 	}
 	completed = true

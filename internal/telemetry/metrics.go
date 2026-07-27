@@ -15,6 +15,7 @@ type Metrics struct {
 	stages      map[string]stageMetric
 	providers   map[string]providerMetric
 	deployments map[string]int64
+	caches      map[string]cacheMetric
 }
 
 type stageMetric struct {
@@ -25,9 +26,10 @@ type providerMetric struct {
 	Calls, Failed int64
 	Duration      time.Duration
 }
+type cacheMetric struct{ Hits, Misses int64 }
 
 func NewMetrics() *Metrics {
-	return &Metrics{inFlight: map[string]int64{}, stages: map[string]stageMetric{}, providers: map[string]providerMetric{}, deployments: map[string]int64{}}
+	return &Metrics{inFlight: map[string]int64{}, stages: map[string]stageMetric{}, providers: map[string]providerMetric{}, deployments: map[string]int64{}, caches: map[string]cacheMetric{}}
 }
 
 func (m *Metrics) StartStage(stage string) func(error) {
@@ -72,6 +74,18 @@ func (m *Metrics) ObserveDeployment(action string) {
 	m.mu.Unlock()
 }
 
+func (m *Metrics) ObserveCache(ecosystem string, hit bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	item := m.caches[label(ecosystem)]
+	if hit {
+		item.Hits++
+	} else {
+		item.Misses++
+	}
+	m.caches[label(ecosystem)] = item
+}
+
 func (m *Metrics) Handler(w http.ResponseWriter, _ *http.Request) {
 	m.HandlerWithGauges(w, nil, nil)
 }
@@ -102,6 +116,12 @@ func (m *Metrics) HandlerWithGauges(w http.ResponseWriter, _ *http.Request, gaug
 	fmt.Fprintln(w, "# HELP norbot_deployment_actions_total Deployment lifecycle actions\n# TYPE norbot_deployment_actions_total counter")
 	for _, key := range ordered(m.deployments) {
 		fmt.Fprintf(w, "norbot_deployment_actions_total{action=%q} %d\n", key, m.deployments[key])
+	}
+	fmt.Fprintln(w, "# HELP norbot_verification_cache_access_total Dependency cache outcomes\n# TYPE norbot_verification_cache_access_total counter")
+	for _, key := range ordered(m.caches) {
+		item := m.caches[key]
+		fmt.Fprintf(w, "norbot_verification_cache_access_total{ecosystem=%q,outcome=\"hit\"} %d\n", key, item.Hits)
+		fmt.Fprintf(w, "norbot_verification_cache_access_total{ecosystem=%q,outcome=\"miss\"} %d\n", key, item.Misses)
 	}
 	fmt.Fprintln(w, "# HELP norbot_operational_gauge Durable operational state\n# TYPE norbot_operational_gauge gauge")
 	for _, key := range ordered(gauges) {

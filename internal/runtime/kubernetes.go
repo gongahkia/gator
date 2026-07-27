@@ -417,7 +417,7 @@ func (k *KubernetesRuntime) RunSandbox(ctx context.Context, runID string, reques
 	}
 	if len(request.AllowedHosts) > 0 {
 		if !k.config.NetworkPolicyEnforced {
-			return SandboxResult{}, fmt.Errorf("sandbox egress is disabled until network_policy_enforced is explicitly confirmed")
+			return SandboxResult{}, fmt.Errorf("sandbox egress is disabled until network_policy_enforced is set after a passing enforcement check")
 		}
 		if err := k.applySandboxNetworkPolicy(ctx, runID); err != nil {
 			return SandboxResult{}, err

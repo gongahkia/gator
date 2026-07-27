@@ -103,7 +103,24 @@ type Retention struct {
 }
 
 type Workflow struct {
-	MaxFixes int `json:"max_fixes"`
+	MaxFixes      int           `json:"max_fixes"`
+	PlanningSwarm PlanningSwarm `json:"planning_swarm"`
+}
+
+type PlanningSwarm struct {
+	Enabled     bool `json:"enabled"`
+	MaxParallel int  `json:"max_parallel"`
+	TimeoutS    int  `json:"timeout_seconds"`
+}
+
+func (p PlanningSwarm) Parallelism() int {
+	if p.MaxParallel == 0 { return 3 }
+	return p.MaxParallel
+}
+
+func (p PlanningSwarm) Timeout() int {
+	if p.TimeoutS == 0 { return 180 }
+	return p.TimeoutS
 }
 
 type Kubernetes struct {
@@ -204,6 +221,12 @@ func Load() (Config, error) {
 func (m Manifest) Validate() error {
 	if m.Workflow.MaxFixes < 0 || m.Workflow.MaxFixes > 10 {
 		return fmt.Errorf("workflow max_fixes must be between 0 and 10")
+	}
+	if m.Workflow.PlanningSwarm.MaxParallel < 0 || m.Workflow.PlanningSwarm.MaxParallel > 3 {
+		return fmt.Errorf("workflow planning_swarm max_parallel must be between 1 and 3")
+	}
+	if m.Workflow.PlanningSwarm.TimeoutS < 0 || m.Workflow.PlanningSwarm.TimeoutS > 600 || m.Workflow.PlanningSwarm.TimeoutS > 0 && m.Workflow.PlanningSwarm.TimeoutS < 30 {
+		return fmt.Errorf("workflow planning_swarm timeout_seconds must be between 30 and 600")
 	}
 	if len(m.Providers) == 0 {
 		return fmt.Errorf("manifest needs at least one provider")
@@ -356,9 +379,6 @@ func (m Manifest) ValidateRuntime() error {
 	if proxyConfigured {
 		if s.EgressProxyURL == "" || s.EgressProxySecret == "" || k.EgressProxyImage == "" || k.EgressProxySecret == "" || k.EgressProxySecretKey == "" {
 			return fmt.Errorf("kubernetes egress proxy needs sandbox proxy configuration, image, secret, and secret key")
-		}
-		if !k.NetworkPolicyEnforced {
-			return fmt.Errorf("kubernetes egress proxy requires network_policy_enforced=true after an enforcement check")
 		}
 		if k.EgressProxyPort < 0 || k.EgressProxyPort > 65535 {
 			return fmt.Errorf("kubernetes egress proxy port is invalid")

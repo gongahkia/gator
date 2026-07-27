@@ -55,6 +55,15 @@ func TestKubernetesIngressConfigurationIsAllOrNothing(t *testing.T) {
 	}
 }
 
+func TestKubernetesEgressCanRemainConfiguredButFailClosed(t *testing.T) {
+	kube := Kubernetes{Kubeconfig: "/tmp/kubeconfig", Namespace: "norbot", ServiceAccount: "norbot-runtime", RegistryRepository: "registry.example/norbot", RegistryPullSecret: "registry-pull", EgressProxyImage: "registry.example/proxy@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", EgressProxySecret: "proxy", EgressProxySecretKey: "secret", EgressProxyPort: 8181}
+	manifest := InitialManifest(domain.DeploymentKubernetes, kube)
+	manifest.Runtime.Sandbox = Sandbox{EgressProxyURL: "http://proxy:8181", EgressProxySecret: "NORBOT_EGRESS_PROXY_SECRET"}
+	if err := manifest.Validate(); err != nil {
+		t.Fatalf("unverified egress configuration must load fail-closed: %v", err)
+	}
+}
+
 func TestPublicSecurityRequiresCompleteIngressControls(t *testing.T) {
 	manifest := InitialManifest(domain.DeploymentDocker, Kubernetes{})
 	manifest.Security = Security{Public: true, HTTP: HTTPPolicy{RequireHTTPS: true, MetricsTokenEnv: "NORBOT_METRICS_TOKEN", RatePerMinute: 120, RateBurst: 30}}

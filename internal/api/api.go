@@ -487,7 +487,14 @@ func (s *Server) replayOutbox(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid outbox event id"))
 		return
 	}
-	item, err := s.store.ReplayDeadOutbox(r.Context(), id, operatorFromRequest(r))
+	var input struct {
+		Reason string `json:"reason"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	item, err := s.store.ReplayDeadOutbox(r.Context(), id, operatorFromRequest(r), input.Reason)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, err)
 		return
@@ -530,12 +537,33 @@ func runFilter(r *http.Request) (store.RunFilter, error) {
 }
 
 func (s *Server) listApps(w http.ResponseWriter, r *http.Request) {
-	page, err := s.store.ListAppsPage(r.Context(), r.URL.Query().Get("cursor"), queryLimit(r, 50))
+	filter, err := appFilter(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.ListAppsFilteredPage(r.Context(), r.URL.Query().Get("cursor"), filter, queryLimit(r, 50))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, page)
+}
+
+func appFilter(r *http.Request) (store.AppFilter, error) {
+	filter := store.AppFilter{Status: r.URL.Query().Get("status"), Search: r.URL.Query().Get("search")}
+	for key, target := range map[string]**time.Time{"updated_after": &filter.UpdatedAfter, "updated_before": &filter.UpdatedBefore} {
+		value := strings.TrimSpace(r.URL.Query().Get(key))
+		if value == "" {
+			continue
+		}
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			return store.AppFilter{}, fmt.Errorf("%s must be RFC3339", key)
+		}
+		*target = &parsed
+	}
+	return filter, nil
 }
 
 func queryLimit(r *http.Request, fallback int) int {

@@ -697,6 +697,13 @@ func (s *Service) outboxWorker(ctx context.Context) {
 func (s *Service) processOutbox(ctx context.Context, item domain.OutboxEvent) error {
 	switch item.Type {
 	case "run.event":
+		recorded, err := s.store.RecordOutboxReceipt(ctx, item.ID, "internal-log", map[string]any{"event_type": item.Payload["event_type"]})
+		if err != nil {
+			return err
+		}
+		if !recorded {
+			return nil
+		}
 		s.log.Info("outbox event relayed", "id", item.ID, "run_id", item.RunID, "event_type", item.Payload["event_type"])
 		return nil
 	case "workspace.provision":
@@ -931,6 +938,9 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	result, err := invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
 	s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
 	if err != nil {
+		if observeErr := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, Metadata: map[string]any{"outcome": "error", "rate_limited": providerRateLimited(err)}}); observeErr != nil {
+			s.log.Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
+		}
 		providerSpan.RecordError(err)
 		providerSpan.SetStatus(codes.Error, err.Error())
 	}
@@ -1012,6 +1022,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			return err
 		}
 		report, err := verifyApp(ctx, workspace, run, revision.Files)
+		if report != nil {
+			if cache, ok := report["cache"].(map[string]any); ok {
+				for ecosystem, raw := range cache {
+					hit, _ := raw.(bool)
+					s.metrics.ObserveCache(ecosystem, hit)
+				}
+			}
+		}
 		if err != nil {
 			if report == nil {
 				report = map[string]any{}
@@ -1037,6 +1055,10 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	}
 	_ = deployment
 	return s.store.MarkStageAwaitingApproval(ctx, job, artifact)
+}
+
+func providerRateLimited(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "provider status 429")
 }
 
 func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) error {
@@ -1124,6 +1146,7 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 	defer os.Remove(envFile)
 	compose := []string{"compose", "-p", project, "--project-directory", root, "--env-file", envFile}
 	checks := []string{"profile contract", "locked frontend dependencies", "compose config"}
+	cache := map[string]any{}
 	runCommand := func(name string, args ...string) error {
 		if _, err := runner.Run(ctx, name, args...); err != nil {
 			return err
@@ -1138,19 +1161,21 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		return nil, err
 	}
 	frontendCache := verificationCacheVolume("node", frontendKey)
-	if err := ensureNodeCache(ctx, runner, dockerBin, docker.Volume(run.ID), frontendCache, frontendKey); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend dependency cache: %w", err))
+	frontendHit, err := ensureNodeCache(ctx, runner, dockerBin, docker.Volume(run.ID), frontendCache, frontendKey)
+	if err != nil {
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend dependency cache: %w", err), cache)
 	}
+	cache["node"] = frontendHit
 	frontendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", frontendCache + ":/workspace/generated-app/frontend/node_modules:ro", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu"}
 	if fastFrontend(changed) {
 		if err := runCommand(dockerBin, append(frontendMount, "npm test")...); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast frontend test: %w", err))
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast frontend test: %w", err), cache)
 		}
 		checks = append(checks, "fast frontend test")
 	}
 	frontend := append(frontendMount, "npm test && npm run build && npm audit --omit=dev --audit-level=high")
 	if err := runCommand(dockerBin, frontend...); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend test/build/audit: %w", err))
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend test/build/audit: %w", err), cache)
 	}
 	checks = append(checks, "npm cache/test/build/audit")
 	if run.Profile != domain.ProfileFrontend {
@@ -1159,21 +1184,33 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 			return nil, err
 		}
 		backendCache := verificationCacheVolume("go", backendKey)
-		if err := ensureGoCache(ctx, runner, dockerBin, docker.Volume(run.ID), backendCache, backendKey); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go dependency cache: %w", err))
+		backendHit, err := ensureGoCache(ctx, runner, dockerBin, docker.Volume(run.ID), backendCache, backendKey)
+		if err != nil {
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go dependency cache: %w", err), cache)
 		}
+		cache["go"] = backendHit
 		backendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", backendCache + ":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu"}
 		if fastBackend(changed) {
 			if err := runCommand(dockerBin, append(backendMount, "GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./...")...); err != nil {
-				return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast Go test: %w", err))
+				return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast Go test: %w", err), cache)
 			}
 			checks = append(checks, "fast Go test")
 		}
 		backend := append(backendMount, "PATH=/cache/bin:$PATH GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./... && go build ./... && govulncheck ./...")
 		if err := runCommand(dockerBin, backend...); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go test/build/govulncheck: %w", err))
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go test/build/govulncheck: %w", err), cache)
 		}
 		checks = append(checks, "Go cache/test/build/govulncheck")
+		return verifyDockerApp(ctx, runner, dockerBin, compose, checks, run, project, cache)
+	}
+	return verifyDockerApp(ctx, runner, dockerBin, compose, checks, run, project, cache)
+
+}
+
+func verifyDockerApp(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, run domain.Run, project string, cache map[string]any) (map[string]any, error) {
+	runCommand := func(name string, args ...string) error {
+		_, err := runner.Run(ctx, name, args...)
+		return err
 	}
 	deployed := false
 	defer func() {
@@ -1182,25 +1219,29 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		}
 	}()
 	if err := runCommand(dockerBin, append(compose, "up", "--build", "-d", "--wait", "--wait-timeout", "90")...); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("compose smoke startup: %w", err))
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("compose smoke startup: %w", err), cache)
 	}
 	deployed = true
 	network := project + "_default"
 	if err := runCommand(dockerBin, "run", "--rm", "--network", network, "curlimages/curl:8.12.1", "-fsS", "http://frontend/"); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend smoke: %w", err))
+		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend smoke: %w", err), cache)
 	}
 	if run.Profile != domain.ProfileFrontend {
 		if err := runCommand(dockerBin, "run", "--rm", "--network", network, "curlimages/curl:8.12.1", "-fsS", "http://backend:8000/api/health"); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("backend smoke: %w", err))
+			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("backend smoke: %w", err), cache)
 		}
 	}
 	checks = append(checks, "compose build/health/smoke")
-	return map[string]any{"status": "pass", "checks": checks, "summary": "Locked dependency, build, test, vulnerability scan, Compose health, and network smoke checks passed. Operator approval is required before deployment."}, nil
+	return map[string]any{"status": "pass", "checks": checks, "cache": cache, "summary": "Locked dependency, build, test, vulnerability scan, Compose health, and network smoke checks passed. Operator approval is required before deployment."}, nil
 }
 
-func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, cause error) (map[string]any, error) {
+func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, cause error, caches ...map[string]any) (map[string]any, error) {
 	logs, _ := runner.Run(ctx, dockerBin, append(compose, "logs", "--no-color", "--tail", "200")...)
-	return map[string]any{"status": "fail", "checks": checks, "logs": string(logs)}, fmt.Errorf("verification failed: %w", cause)
+	report := map[string]any{"status": "fail", "checks": checks, "logs": string(logs)}
+	if len(caches) > 0 && len(caches[0]) > 0 {
+		report["cache"] = caches[0]
+	}
+	return report, fmt.Errorf("verification failed: %w", cause)
 }
 
 func dependencyCacheKey(root, image string, files ...string) (string, error) {
@@ -1226,22 +1267,22 @@ func verificationCacheVolume(ecosystem, key string) string {
 	return "norbot_verify_" + ecosystem + "_" + key
 }
 
-func ensureNodeCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) error {
-	if _, err := runner.Run(ctx, dockerBin, "volume", "create", cacheVolume); err != nil {
-		return err
+func ensureNodeCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) (bool, error) {
+	if _, err := runner.Run(ctx, dockerBin, "volume", "create", "--label", "norbot.cache=verification", cacheVolume); err != nil {
+		return false, err
 	}
-	script := cacheLockScript("/cache") + "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; npm ci; cp -a node_modules/. /cache/; printf '%s' '" + key + "' >/cache/.norbot-key; rm -rf node_modules; fi"
-	_, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", script)
-	return err
+	script := cacheLockScript("/cache") + "if [ -f /cache/.norbot-key ] && [ \"$(cat /cache/.norbot-key)\" = '" + key + "' ]; then echo norbot_cache_hit=1; else find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; npm ci; cp -a node_modules/. /cache/; printf '%s' '" + key + "' >/cache/.norbot-key; rm -rf node_modules; echo norbot_cache_hit=0; fi; touch /cache/.norbot-last-used"
+	output, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", script)
+	return strings.Contains(string(output), "norbot_cache_hit=1"), err
 }
 
-func ensureGoCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) error {
-	if _, err := runner.Run(ctx, dockerBin, "volume", "create", cacheVolume); err != nil {
-		return err
+func ensureGoCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) (bool, error) {
+	if _, err := runner.Run(ctx, dockerBin, "volume", "create", "--label", "norbot.cache=verification", cacheVolume); err != nil {
+		return false, err
 	}
-	script := cacheLockScript("/cache") + "if [ ! -f /cache/.norbot-key ] || [ \"$(cat /cache/.norbot-key)\" != '" + key + "' ]; then find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go mod download; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >/cache/.norbot-key; fi"
-	_, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", script)
-	return err
+	script := cacheLockScript("/cache") + "if [ -f /cache/.norbot-key ] && [ \"$(cat /cache/.norbot-key)\" = '" + key + "' ]; then echo norbot_cache_hit=1; else find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go mod download; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >/cache/.norbot-key; echo norbot_cache_hit=0; fi; touch /cache/.norbot-last-used"
+	output, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", script)
+	return strings.Contains(string(output), "norbot_cache_hit=1"), err
 }
 
 func cacheLockScript(root string) string {

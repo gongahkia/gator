@@ -137,6 +137,25 @@ func TestCreateRunWithInitialJobIsAtomicIntegration(t *testing.T) {
 	if provisioned != 1 {
 		t.Fatalf("workspace outbox count=%d", provisioned)
 	}
+	var outboxID int64
+	if err := st.pool.QueryRow(ctx, `SELECT id FROM outbox_events WHERE run_id=$1 AND event_type='workspace.provision'`, id).Scan(&outboxID); err != nil {
+		t.Fatal(err)
+	}
+	if recorded, err := st.RecordOutboxReceipt(ctx, outboxID, "integration-sink", map[string]any{"result": "ok"}); err != nil || !recorded {
+		t.Fatalf("first receipt recorded=%t err=%v", recorded, err)
+	}
+	if recorded, err := st.RecordOutboxReceipt(ctx, outboxID, "integration-sink", map[string]any{"result": "duplicate"}); err != nil || recorded {
+		t.Fatalf("duplicate receipt recorded=%t err=%v", recorded, err)
+	}
+	if _, err := st.ReplayDeadOutbox(ctx, outboxID, "operator", "no"); err == nil {
+		t.Fatal("short replay reason accepted")
+	}
+	if _, err := st.pool.Exec(ctx, `UPDATE outbox_events SET state='dead',dead_lettered_at=now() WHERE id=$1`, outboxID); err != nil {
+		t.Fatal(err)
+	}
+	if replayed, err := st.ReplayDeadOutbox(ctx, outboxID, "operator", "fixed downstream configuration"); err != nil || replayed.State != "queued" || replayed.Attempts != 0 {
+		t.Fatalf("replay=%#v err=%v", replayed, err)
+	}
 }
 
 func TestFinalizeApprovalOperationIntegration(t *testing.T) {

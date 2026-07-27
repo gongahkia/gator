@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,6 +72,15 @@ func TestVerifierRunsDeterministicChecks(t *testing.T) {
 	}
 	if !strings.Contains(joined, ".norbot-lock") {
 		t.Fatalf("dependency cache population is not serialized: %s", joined)
+	}
+	if cache, ok := report["cache"].(map[string]any); !ok || cache["node"] != false || cache["go"] != false {
+		t.Fatalf("cache report=%#v", report["cache"])
+	}
+}
+
+func TestProviderRateLimited(t *testing.T) {
+	if !providerRateLimited(errors.New("provider status 429: retry later")) || providerRateLimited(errors.New("provider status 500")) {
+		t.Fatal("provider rate-limit classification is incorrect")
 	}
 }
 
