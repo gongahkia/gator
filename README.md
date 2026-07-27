@@ -103,6 +103,9 @@ require("gator").setup({
       -- localagent = { argv = { "local-agent", "--acp" } }, -- explicit opt-in only
     },
   },
+  extensions = {
+    modules = { "my_gator_extension" }, -- explicitly configured, trusted Lua modules only
+  },
   runbooks = {
     max_concurrent = 0, -- default per-runbook active-run cap
     max_tokens = 0, -- default per-runbook reported-token cap
@@ -121,6 +124,16 @@ require("gator").setup({
       spinner = "whirly.hanoi", -- `:lua =require("gator.ui.loading").presets()`
       interval_ms = 0, -- 0 keeps the upstream cadence; otherwise >= 16 ms
     },
+    renderers = {
+      provider_picker = "native", -- or an extension renderer id
+      run_graph = "native",
+      context_preflight = "native",
+      handoff_review = "native",
+      dashboard = "native",
+    },
+    run_graph = {
+      columns = { "id", "provider", "role", "state", "context", "resources", "budget", "trust" },
+    },
   },
 })
 ```
@@ -130,6 +143,10 @@ Gator vendors 169 selectable loading animations from [Rattles](https://github.co
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 
 `auto` uses a Gator chat only for documented structured transports: Pi RPC, Codex App Server, and supported ACP/managed providers. Claude and unsupported/terminal-only providers retain their native Neovim terminal. Forcing `chat` on an unsupported provider fails explicitly.
+
+## Extensions and integrations
+
+Gator can load explicitly configured trusted Lua modules for lifecycle hooks, custom terminal or ACP adapters, UI slots, run-graph columns, and context processing. It does not scan directories or sandbox modules: an extension has normal Neovim/Lua access. The interface is intentionally unversioned, so plugin upgrades can require extension changes. See [extensions](docs/EXTENSIONS.md).
 
 ## Local journal, context, and retention
 

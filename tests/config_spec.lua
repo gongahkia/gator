@@ -54,6 +54,18 @@ assert(
 	resources.enabled and #resources.fields == 2 and resources.fields[2] == "usage",
 	"resource display must default on and allow an explicit field subset"
 )
+local extensions = config.resolve({ extensions = { modules = { "my_gator_extension" } } }).extensions
+assert(extensions.modules[1] == "my_gator_extension", "extensions must require explicit trusted module names")
+local ui_extensions = config.resolve({
+	ui = {
+		renderers = { provider_picker = "my-picker" },
+		run_graph = { columns = { "id", "my-column" } },
+	},
+}).ui
+assert(
+	ui_extensions.renderers.provider_picker == "my-picker" and ui_extensions.run_graph.columns[2] == "my-column",
+	"UI extension selection and graph columns must be configurable"
+)
 local budget = config.resolve({ budget = { max_tokens = 1000, action = "stop", max_concurrent_runs = 2 } }).budget
 assert(
 	budget.max_tokens == 1000 and budget.action == "stop" and budget.max_concurrent_runs == 2,
@@ -105,6 +117,8 @@ assert(
 		and not pcall(config.resolve, { ui = { resources = { enabled = "yes" } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "tokens" } } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "usage", "usage" } } } })
+		and not pcall(config.resolve, { extensions = { modules = { "invalid module" } } })
+		and not pcall(config.resolve, { ui = { run_graph = { columns = { "id", "id" } } } })
 		and not pcall(config.resolve, { permissions = { codex = { sandbox = "unrestricted" } } })
 		and not pcall(config.resolve, { budget = { max_tokens = -1 } })
 		and not pcall(config.resolve, { retention = { max_age_days = -1 } })
@@ -135,7 +149,7 @@ assert(
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":12}')
+helpers.write(path, '{"schema_version":13}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

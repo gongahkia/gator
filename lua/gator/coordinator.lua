@@ -1,6 +1,8 @@
 local dependencies = require("gator.coordinator.dependencies")
 local cancellation = require("gator.coordinator.cancellation")
 local workflow = require("gator.workflow")
+local extension_runtime = require("gator.extensions.runtime")
+local health = require("gator.health")
 
 local M = { name = "coordinator", api_version = 1, inspection_schema_version = 1 }
 local Coordinator = {}
@@ -113,12 +115,36 @@ function M.new(opts)
 	local report = container:require("compat").require_supported()
 	local settings = container:require("config").resolve(opts)
 	configure(container, settings)
+	local extensions = extension_runtime.new({
+		modules = settings.extensions.modules,
+		renderers = settings.ui.renderers,
+		columns = settings.ui.run_graph.columns,
+	})
+	health.unregister("extensions.runtime")
+	health.register("extensions.runtime", function(reporter)
+		local statuses = extensions:status()
+		if #statuses == 0 then
+			reporter.ok("No configured Gator extensions")
+			return
+		end
+		for _, value in ipairs(statuses) do
+			if value.state == "ready" then
+				reporter.ok("Extension " .. value.name .. " is ready")
+			else
+				reporter.warn(
+					"Extension " .. value.name .. " is disabled: " .. tostring(value.reason),
+					"Fix the extension callback or remove it from extensions.modules."
+				)
+			end
+		end
+	end)
 	local value = setmetatable({
 		_dependencies = container,
 		_operations = {},
 		_operation_keys = {},
 		_startup_recovery = nil,
 		_workflow = nil,
+		extensions = extensions,
 		_state = container:require("state").new(settings, report),
 	}, Coordinator)
 	return value
@@ -170,6 +196,7 @@ function Coordinator:inspect()
 		state_version = state:version(),
 		state = state:snapshot(),
 		operations = operations,
+		extensions = self.extensions:status(),
 	}
 end
 
@@ -183,16 +210,41 @@ function Coordinator:workflow()
 		fail("workflow requires an initialized coordinator")
 	end
 	if not self._workflow then
-		self._workflow = workflow.new({ state = self:state() })
+		self._workflow = workflow.new({ state = self:state(), extensions = self.extensions })
 	end
 	return self._workflow
 end
 
 function Coordinator:dispose()
+	self.extensions:close()
 	if self._workflow and type(self._workflow.close) == "function" then
 		self._workflow:close()
 	end
 	return self:cancel_all("Gator configuration changed")
+end
+
+function Coordinator:extensions_runtime()
+	if not M.is(self) then
+		fail("extensions_runtime requires an initialized coordinator")
+	end
+	return self.extensions
+end
+
+function Coordinator:statusline(opts)
+	if not M.is(self) then
+		fail("statusline requires an initialized coordinator")
+	end
+	if not self._workflow then
+		return "Gator idle"
+	end
+	return self._workflow:statusline(opts)
+end
+
+function Coordinator:load_extensions()
+	if not M.is(self) then
+		fail("load_extensions requires an initialized coordinator")
+	end
+	return self.extensions:load()
 end
 
 function Coordinator:bootstrap_recovery()

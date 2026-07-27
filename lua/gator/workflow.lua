@@ -22,6 +22,7 @@ local state_store = require("gator.state")
 local review_validation = require("gator.review.validation")
 local policy_overlay = require("gator.policy.overlay")
 local trust = require("gator.trust")
+local extension_runtime = require("gator.extensions.runtime")
 
 local M = { name = "workflow", api_version = 2 }
 local Workflow = {}
@@ -142,6 +143,7 @@ function M.new(opts)
 			and key ~= "review_ui"
 			and key ~= "review_validation"
 			and key ~= "retention_ui"
+			and key ~= "extensions"
 			and key ~= "clock"
 		then
 			fail("new contains unsupported field: " .. tostring(key))
@@ -165,6 +167,7 @@ function M.new(opts)
 		review_ui = opts.review_ui or review_ui,
 		review_validation = opts.review_validation or review_validation,
 		retention_ui = opts.retention_ui or retention_ui,
+		extensions = opts.extensions or extension_runtime.new({ modules = {}, renderers = {}, columns = {} }),
 		clock = opts.clock or now,
 		loading_handles = {},
 		providers = {},
@@ -212,7 +215,26 @@ function Workflow:put(value)
 end
 
 function Workflow:journal(id, event_type, payload)
-	return self.store:append_event(id, event_type, payload, self.clock())
+	local value = self.store:append_event(id, event_type, payload, self.clock())
+	local events = {
+		["run.created"] = "run.created",
+		["context.prepared"] = "context.prepared",
+		["context.sent"] = "context.delivered",
+		["handoff.prepared"] = "handoff.prepared",
+		["handoff.reviewed"] = "handoff.reviewed",
+		["handoff.delivered"] = "handoff.delivered",
+		["approval.requested"] = "approval.requested",
+		["approval.decided"] = "approval.resolved",
+	}
+	if events[event_type] then
+		pcall(
+			self.extensions.emit,
+			self.extensions,
+			events[event_type],
+			vim.tbl_extend("force", { run_id = id }, payload or {})
+		)
+	end
+	return value
 end
 
 function Workflow:events(id)
@@ -244,10 +266,24 @@ function Workflow:update(id, patch)
 	local updated = self:put(value)
 	if patch.state ~= nil and patch.state ~= previous_state then
 		self:journal(updated.id, "run.state", { from = previous_state, to = updated.state })
+		pcall(self.extensions.emit, self.extensions, "run.state_changed", {
+			run_id = updated.id,
+			provider = updated.provider,
+			from = previous_state,
+			to = updated.state,
+		})
+		if updated.state == "completed" or updated.state == "failed" or updated.state == "stopped" then
+			pcall(self.extensions.emit, self.extensions, "run.finished", {
+				run_id = updated.id,
+				provider = updated.provider,
+				state = updated.state,
+			})
+		end
 	end
 	if updated.workspace.kind == "worktree" and not active_state(updated) then
 		self:release_worktree_lease(updated)
 	end
+	pcall(self.extensions.emit, self.extensions, "status.changed", { run_id = updated.id, state = updated.state })
 	return updated
 end
 
@@ -255,8 +291,72 @@ function Workflow:resource_display()
 	return vim.deepcopy(self.state.config.ui.resources)
 end
 
+function Workflow:graph_columns()
+	return vim.deepcopy(self.state.config.ui.run_graph.columns)
+end
+
+function Workflow:render_graph_column(id, run, measurements)
+	local builtins = {
+		id = run.id,
+		provider = run.provider,
+		role = run.role,
+		state = run.state,
+		context = run.bundle_id or "unavailable",
+		resources = measurements and (measurements.context_bytes .. " B") or "unknown",
+		budget = run.budget.limit_tokens == 0 and "unbounded"
+			or (run.budget.state .. " " .. (run.usage.total_tokens or "?") .. "/" .. run.budget.limit_tokens),
+		trust = run.trust and run.trust.surface or "unknown",
+	}
+	if builtins[id] ~= nil then
+		return tostring(builtins[id])
+	end
+	return self.extensions:render_column(id, { run = run, resources = measurements, root = self.root })
+end
+
 function Workflow:resource_summary()
 	return resources.summary(self:runs())
+end
+
+function Workflow:statusline(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("statusline options must be a table")
+	end
+	for key in pairs(opts) do
+		if key ~= "fields" then
+			fail("statusline options contain unsupported field: " .. tostring(key))
+		end
+	end
+	local fields = opts.fields or { "active", "provider", "state" }
+	if type(fields) ~= "table" or not vim.islist(fields) then
+		fail("statusline fields must be an array")
+	end
+	local active, current = 0, nil
+	for _, run in ipairs(self:runs()) do
+		if active_state(run) then
+			active = active + 1
+			current = current or run
+		end
+	end
+	if active == 0 then
+		return "Gator idle"
+	end
+	local values = {
+		active = active .. " active",
+		provider = current.provider,
+		state = current.state,
+		role = current.role,
+		budget = current.budget.limit_tokens == 0 and "unbounded"
+			or (current.usage.total_tokens or "?") .. "/" .. current.budget.limit_tokens,
+	}
+	local result = { "Gator" }
+	for _, field in ipairs(fields) do
+		if type(field) ~= "string" or not values[field] then
+			fail("statusline field is unavailable: " .. tostring(field))
+		end
+		table.insert(result, values[field])
+	end
+	return table.concat(result, " · ")
 end
 
 function Workflow:run_resources(run)
@@ -317,6 +417,13 @@ end
 
 function Workflow:refresh()
 	local providers = {}
+	local extension_providers = self.extensions:providers_list()
+	local acp_commands = vim.deepcopy(self.state.config.acp.commands)
+	for _, definition in ipairs(extension_providers) do
+		if definition.kind == "acp" then
+			acp_commands[definition.name] = { argv = vim.deepcopy(definition.argv) }
+		end
+	end
 	local terminal_records = self.readiness({
 		cwd = self.root,
 		pi_user_confirmed = self.state.config.providers.pi.user_confirmed,
@@ -337,15 +444,28 @@ function Workflow:refresh()
 	for name, value in pairs(self.state.config.providers) do
 		confirmations[name] = value.user_confirmed
 	end
-	self.managed:configure({ commands = self.state.config.acp.commands })
+	self.managed:configure({ commands = acp_commands })
 	for _, record in
 		ipairs(managed_adapter.catalog({
 			cwd = self.root,
 			user_confirmed = confirmations,
-			commands = self.state.config.acp.commands,
+			commands = acp_commands,
 		}))
 	do
-		if record.available then
+		local definition = self:custom_provider(record.provider)
+		local extension_ready = true
+		if definition and definition.kind == "acp" then
+			local ok, probe = pcall(definition.probe, { cwd = self.root, provider = record.provider })
+			local valid = ok and type(probe) == "table" and type(probe.available) == "boolean"
+			extension_ready = valid and probe.available
+			if not valid and definition.extension then
+				self.extensions:disable(
+					definition.extension,
+					ok and "ACP provider probe must return { available = boolean }" or probe
+				)
+			end
+		end
+		if record.available and extension_ready then
 			providers[record.provider] = {
 				provider = record.provider,
 				available = true,
@@ -357,9 +477,119 @@ function Workflow:refresh()
 			}
 		end
 	end
+	for _, definition in ipairs(extension_providers) do
+		if definition.kind == "terminal" then
+			local ok, probe = pcall(definition.probe, { cwd = self.root, provider = definition.name })
+			local valid = ok and type(probe) == "table" and type(probe.available) == "boolean"
+			if valid and probe.available then
+				providers[definition.name] = {
+					provider = definition.name,
+					available = true,
+					terminal = true,
+					chat = false,
+					custom = true,
+					readiness_state = "configured",
+					version = type(probe.version) == "string" and probe.version or nil,
+				}
+			elseif not valid and definition.extension then
+				self.extensions:disable(
+					definition.extension,
+					ok and "terminal provider probe must return { available = boolean }" or probe
+				)
+			end
+		end
+	end
 	self.providers = providers
 	self.state:update({ adapters = vim.deepcopy(providers) })
 	return vim.deepcopy(providers)
+end
+
+function Workflow:custom_provider(name)
+	return self.extensions:provider(name)
+end
+
+function Workflow:prepare_terminal(run, prompt, callback, resume)
+	local definition = self:custom_provider(run.provider)
+	if definition and definition.kind == "terminal" then
+		local operation = resume and definition.resume or definition.start
+		if not operation then
+			callback(nil, "custom terminal provider does not expose resume")
+			return
+		end
+		local ok, prepared = pcall(operation, {
+			provider = run.provider,
+			cwd = run.workspace.root,
+			prompt = prompt,
+			session = vim.deepcopy(run.session),
+			run = vim.deepcopy(run),
+		})
+		if not ok or type(prepared) ~= "table" then
+			if definition.extension then
+				self.extensions:disable(
+					definition.extension,
+					ok and "custom terminal provider returned no launch command" or prepared
+				)
+			end
+			callback(nil, ok and "custom terminal provider returned no launch command" or prepared)
+			return
+		end
+		if type(prepared.command) ~= "table" or not vim.islist(prepared.command) or #prepared.command == 0 then
+			if definition.extension then
+				self.extensions:disable(definition.extension, "custom terminal provider returned an invalid command")
+			end
+			callback(nil, "custom terminal provider returned an invalid command")
+			return
+		end
+		if type(prepared.session) ~= "table" or type(prepared.session.id) ~= "string" or prepared.session.id == "" then
+			if definition.extension then
+				self.extensions:disable(definition.extension, "custom terminal provider returned an invalid session")
+			end
+			callback(nil, "custom terminal provider returned an invalid session")
+			return
+		end
+		prepared.session = { provider = run.provider, id = prepared.session.id, owner = "provider" }
+		callback(prepared)
+		return
+	end
+	if resume then
+		self.bridge:resume(
+			{ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } },
+			callback
+		)
+	else
+		self.bridge:start({ provider = run.provider, cwd = run.workspace.root, prompt = prompt }, callback)
+	end
+end
+
+function Workflow:render_ui(slot, model, fallback)
+	local handled, result = self.extensions:render(slot, model)
+	if handled then
+		return result == nil and true or result
+	end
+	return fallback()
+end
+
+function Workflow:pick_provider(providers, on_launch, on_cancel)
+	return self:render_ui("provider_picker", {
+		providers = vim.deepcopy(providers),
+		actions = {
+			select = function(name)
+				return on_launch({ provider = provider(name) })
+			end,
+			cancel = on_cancel,
+		},
+	}, function()
+		return provider_picker.open({ providers = providers, on_launch = on_launch, on_cancel = on_cancel })
+	end)
+end
+
+function Workflow:open_preflight(preflight, on_confirm, on_cancel)
+	return self:render_ui("context_preflight", {
+		preflight = vim.deepcopy(preflight),
+		actions = { confirm = on_confirm, cancel = on_cancel },
+	}, function()
+		return context_preflight.open({ preflight = preflight, on_confirm = on_confirm, on_cancel = on_cancel })
+	end)
 end
 
 function Workflow:provider(name)
@@ -413,35 +643,42 @@ function Workflow:choose(opts)
 		vim.notify("Gator: no ready providers; run :GatorHealth", vim.log.levels.WARN)
 		return false
 	end
-	return provider_picker.open({
-		providers = choices,
-		on_launch = function(choice)
-			opts.provider = choice.provider
-			local ok, err = pcall(self.launch, self, opts)
-			if not ok then
-				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
-			end
-		end,
-	})
+	return self:pick_provider(choices, function(choice)
+		opts.provider = choice.provider
+		local ok, err = pcall(self.launch, self, opts)
+		if not ok then
+			vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+		end
+	end)
 end
 
 function Workflow:prompt(opts)
 	opts = opts or {}
 	local selected = capture.current({ buffer = opts.buffer, first_line = opts.first_line, last_line = opts.last_line })
-	vim.ui.input({ prompt = "Gator: " }, function(objective)
+	local function submit(objective, overrides)
+		overrides = overrides or {}
+		if type(overrides) ~= "table" then
+			fail("dashboard launch overrides must be a table")
+		end
 		if type(objective) == "string" and vim.trim(objective) ~= "" then
 			local ok, err = pcall(self.choose, self, {
 				objective = objective,
 				capture = selected,
-				provider = opts.provider,
-				transport = opts.transport,
+				provider = overrides.provider or opts.provider,
+				transport = overrides.transport or opts.transport,
 			})
 			if not ok then
 				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end
 		end
+	end
+	return self:render_ui("dashboard", {
+		capture = vim.deepcopy(selected),
+		actions = { submit = submit, cancel = function() end },
+	}, function()
+		vim.ui.input({ prompt = "Gator: " }, submit)
+		return true
 	end)
-	return true
 end
 
 local function git_path(root, argv, name)
@@ -800,17 +1037,36 @@ function Workflow:discard_workspace(workspace)
 end
 
 function Workflow:bundle(opts, workspace)
+	local function finalize(body, estimate)
+		local extras = self.extensions:collect({
+			purpose = "launch",
+			objective = opts.objective,
+			workspace = workspace.root,
+			capture = vim.deepcopy(opts.capture),
+		})
+		for _, artifact in ipairs(extras) do
+			body = body .. "\n\n## Gator extension context · " .. artifact.name .. "\n" .. artifact.text
+			estimate.artifacts = estimate.artifacts or {}
+			table.insert(estimate.artifacts, {
+				kind = "extension:" .. artifact.name,
+				bytes = #artifact.text,
+			})
+		end
+		local redacted, matches = self.extensions:redact(body)
+		estimate.input_tokens = capture.estimate(redacted)
+		estimate.redactions = (estimate.redactions or 0) + matches
+		return redacted, estimate
+	end
 	if opts.bundle_body then
 		local body = text(opts.bundle_body, "handoff bundle")
-		return body,
-			{
-				input_tokens = capture.estimate(body),
-				redactions = 0,
-				artifacts = { { kind = "explicit_bundle", bytes = #body } },
-			}
+		return finalize(body, {
+			input_tokens = capture.estimate(body),
+			redactions = 0,
+			artifacts = { { kind = "explicit_bundle", bytes = #body } },
+		})
 	end
 	local diff, diff_redactions = capture.diff(workspace.root)
-	return capture.bundle({
+	local body, estimate = capture.bundle({
 		objective = opts.objective,
 		capture = opts.capture,
 		profile = opts.profile or self.state.config.context.handoff.profile,
@@ -821,6 +1077,7 @@ function Workflow:bundle(opts, workspace)
 		summary = opts.summary,
 		transcript = opts.transcript,
 	})
+	return finalize(body, estimate)
 end
 
 function Workflow:open_conversation(run)
@@ -866,6 +1123,8 @@ function Workflow:close_loading(id)
 end
 
 function Workflow:open_terminal(run, prepared)
+	local definition = self:custom_provider(run.provider)
+	local resume_supported = not definition or type(definition.resume) == "function"
 	local opened = self.terminal:open({
 		id = run.id,
 		cwd = run.workspace.root,
@@ -881,12 +1140,23 @@ function Workflow:open_terminal(run, prepared)
 		end,
 	})
 	self.active[run.id] = { kind = "terminal", terminal_id = run.id }
-	self:journal(run.id, "provider.session", { owner = "provider", resume_supported = true, transport = "terminal" })
-	return self:update(run.id, {
+	self:journal(run.id, "provider.session", {
+		owner = "provider",
+		resume_supported = resume_supported,
+		transport = "terminal",
+	})
+	local updated = self:update(run.id, {
 		state = "running",
-		session = { id = prepared.session.id, resume_supported = true },
+		session = { id = prepared.session.id, resume_supported = resume_supported },
 		process = { job_id = opened.job_id },
 	})
+	pcall(
+		self.extensions.emit,
+		self.extensions,
+		"run.started",
+		{ run_id = run.id, provider = run.provider, transport = "terminal" }
+	)
+	return updated
 end
 
 function Workflow:open_structured(run, prompt, operation, existing_session)
@@ -906,6 +1176,11 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				owner = "provider",
 				resume_supported = session.resume_supported,
 				operation = operation or "start",
+			})
+			pcall(self.extensions.emit, self.extensions, "run.started", {
+				run_id = run.id,
+				provider = run.provider,
+				transport = "chat",
 			})
 			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
 		end,
@@ -1007,6 +1282,11 @@ function Workflow:open_managed(run, prompt, existing_session)
 				owner = session.owner,
 				mode = session.mode,
 				resume_supported = self.managed:can_resume(run.provider, session),
+			})
+			pcall(self.extensions.emit, self.extensions, "run.started", {
+				run_id = run.id,
+				provider = run.provider,
+				transport = "chat",
 			})
 			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
 		end,
@@ -1178,24 +1458,21 @@ function Workflow:launch(opts)
 		self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
 		vim.notify("Gator trust · " .. trust.summary(run.trust), vim.log.levels.INFO)
 		if transport == "terminal" then
-			self.bridge:start(
-				{ provider = run.provider, cwd = workspace.root, prompt = prompt },
-				function(prepared, reason)
-					self:close_loading(run.id)
-					if not prepared then
-						self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "launch" })
-						self:update(run.id, { state = "failed" })
-						vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
-						return
-					end
-					local ok, err = pcall(self.open_terminal, self, run, prepared)
-					if not ok then
-						self:journal(run.id, "provider.error", { code = failure_code(err), phase = "terminal_open" })
-						self:update(run.id, { state = "failed" })
-						vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
-					end
+			self:prepare_terminal(run, prompt, function(prepared, reason)
+				self:close_loading(run.id)
+				if not prepared then
+					self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "launch" })
+					self:update(run.id, { state = "failed" })
+					vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
+					return
 				end
-			)
+				local ok, err = pcall(self.open_terminal, self, run, prepared)
+				if not ok then
+					self:journal(run.id, "provider.error", { code = failure_code(err), phase = "terminal_open" })
+					self:update(run.id, { state = "failed" })
+					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
+			end)
 		elseif structured.supports(run.provider) then
 			local operation = opts.native_session_operation
 			local existing = opts.native_session
@@ -1218,14 +1495,10 @@ function Workflow:launch(opts)
 		end
 	end
 	if self.state.config.context.preflight.confirm then
-		context_preflight.open({
-			preflight = preflight,
-			on_confirm = begin,
-			on_cancel = function()
-				self:journal(run.id, "context.cancelled", { purpose = "launch" })
-				self:update(run.id, { state = "stopped" })
-			end,
-		})
+		self:open_preflight(preflight, begin, function()
+			self:journal(run.id, "context.cancelled", { purpose = "launch" })
+			self:update(run.id, { state = "stopped" })
+		end)
 	else
 		begin()
 	end
@@ -1405,6 +1678,21 @@ function Workflow:send_context(opts)
 			.. bundle
 		artifacts = { { kind = "named_bundle", bundle_id = opts.bundle_id, bytes = #bundle } }
 	end
+	for _, artifact in
+		ipairs(self.extensions:collect({
+			purpose = "send",
+			run_id = run.id,
+			provider = run.provider,
+			kind = kind,
+			workspace = run.workspace.root,
+		}))
+	do
+		message = message .. "\n\n## Gator extension context · " .. artifact.name .. "\n" .. artifact.text
+		table.insert(artifacts, { kind = "extension:" .. artifact.name, bytes = #artifact.text })
+	end
+	local redacted, extension_redactions = self.extensions:redact(message)
+	message = redacted
+	redactions = redactions + extension_redactions
 	local preflight = {
 		purpose = "send",
 		provider = run.provider,
@@ -1421,13 +1709,9 @@ function Workflow:send_context(opts)
 		return self:send(run.id, message)
 	end
 	if self.state.config.context.preflight.confirm then
-		context_preflight.open({
-			preflight = preflight,
-			on_confirm = deliver,
-			on_cancel = function()
-				self:journal(run.id, "context.cancelled", { purpose = "send" })
-			end,
-		})
+		self:open_preflight(preflight, deliver, function()
+			self:journal(run.id, "context.cancelled", { purpose = "send" })
+		end)
 		return true
 	end
 	return deliver()
@@ -1915,17 +2199,14 @@ function Workflow:resume(id)
 	if ok then
 		return true
 	end
-	self.bridge:resume(
-		{ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } },
-		function(prepared, reason)
-			if not prepared then
-				self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "resume" })
-				vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
-				return
-			end
-			self:open_terminal(run, prepared)
+	self:prepare_terminal(run, nil, function(prepared, reason)
+		if not prepared then
+			self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "resume" })
+			vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
+			return
 		end
-	)
+		self:open_terminal(run, prepared)
+	end, true)
 	return true
 end
 
@@ -2037,12 +2318,9 @@ function Workflow:handoff(source_id, target, opts)
 				table.insert(choices, value)
 			end
 		end
-		return provider_picker.open({
-			providers = choices,
-			on_launch = function(choice)
-				self:handoff(source_id, choice.provider, opts)
-			end,
-		})
+		return self:pick_provider(choices, function(choice)
+			self:handoff(source_id, choice.provider, opts)
+		end)
 	end
 	target = self:provider(target).provider
 	local profile = opts.profile or self.state.config.context.handoff.profile
@@ -2062,6 +2340,17 @@ function Workflow:handoff(source_id, target, opts)
 	if type(opts.additional_context) == "string" and vim.trim(opts.additional_context) ~= "" then
 		body = body .. "\n\n" .. opts.additional_context
 	end
+	for _, section in
+		ipairs(self.extensions:format_handoff({
+			source = vim.deepcopy(source),
+			target = target,
+			profile = profile,
+			body = body,
+		}))
+	do
+		body = body .. "\n\n## Gator extension handoff · " .. section.name .. "\n" .. section.text
+	end
+	body = self.extensions:redact(body)
 	local snapshot = capture.snapshot(source.workspace.root, {
 		max_files = self.state.config.context.handoff.max_files,
 		max_file_chars = self.state.config.context.handoff.max_file_chars,
@@ -2097,6 +2386,7 @@ function Workflow:handoff(source_id, target, opts)
 		end)
 		return true
 	end
+	body = self.extensions:redact(body)
 	local owned_workspace = false
 	local workspace
 	if opts.workspace then
@@ -2127,7 +2417,7 @@ function Workflow:handoff(source_id, target, opts)
 		included = included,
 		omitted = omitted,
 	})
-	self.handoff_review.open({
+	local review_options = {
 		source = source,
 		target = target,
 		profile = profile,
@@ -2148,6 +2438,7 @@ function Workflow:handoff(source_id, target, opts)
 			end
 		end,
 		on_confirm = function(reviewed, decisions, approved_snapshot_application)
+			self:journal(source.id, "handoff.reviewed", { target = target, profile = profile })
 			local materialize_snapshot = approved_snapshot_application
 			if materialize_snapshot == nil then
 				materialize_snapshot = apply_snapshot
@@ -2175,6 +2466,7 @@ function Workflow:handoff(source_id, target, opts)
 				vim.notify(tostring(run), vim.log.levels.ERROR, { title = "Gator" })
 				return
 			end
+			self:journal(source.id, "handoff.delivered", { target = target, run_id = run.id })
 			if opts.on_launch then
 				local bound, bind_err = pcall(opts.on_launch, run)
 				if not bound then
@@ -2182,8 +2474,18 @@ function Workflow:handoff(source_id, target, opts)
 				end
 			end
 		end,
-	})
-	return true
+	}
+	return self:render_ui("handoff_review", {
+		source = vim.deepcopy(source),
+		target = target,
+		profile = profile,
+		body = body,
+		preflight = vim.deepcopy(review_options.preflight),
+		conflicts = vim.deepcopy(conflicts),
+		actions = { confirm = review_options.on_confirm, cancel = review_options.on_cancel },
+	}, function()
+		return self.handoff_review.open(review_options)
+	end)
 end
 
 function Workflow:launch_parallel(id)
@@ -2192,7 +2494,26 @@ function Workflow:launch_parallel(id)
 end
 
 function Workflow:open_runs()
-	return run_graph.open(self)
+	return self:render_ui("run_graph", {
+		runs = self:runs(),
+		columns = self:graph_columns(),
+		actions = {
+			focus = function(id)
+				return self:focus(id)
+			end,
+			stop = function(id)
+				return self:stop(id)
+			end,
+			handoff = function(id, target)
+				return self:handoff(id, target)
+			end,
+			context = function(id)
+				return self:attach_context(id)
+			end,
+		},
+	}, function()
+		return run_graph.open(self)
+	end)
 end
 
 function Workflow:close()

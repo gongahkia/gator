@@ -30,7 +30,12 @@ local function render(panel)
 	local lines = {
 		"Gator context confirmation",
 		"Target: " .. preflight.provider .. " · " .. preflight.transport,
-		"Payload: " .. preflight.bytes .. " bytes · ~" .. preflight.tokens .. " tokens · redactions " .. preflight.redactions,
+		"Payload: "
+			.. preflight.bytes
+			.. " bytes · ~"
+			.. preflight.tokens
+			.. " tokens · redactions "
+			.. preflight.redactions,
 		"",
 		"Artifacts:",
 	}
@@ -70,7 +75,8 @@ function M.open(opts)
 	end
 	local panel, tabpage = current()
 	if panel then
-		panel.preflight, panel.on_confirm, panel.on_cancel, panel.confirmed = preflight, opts.on_confirm, opts.on_cancel, false
+		panel.preflight, panel.on_confirm, panel.on_cancel, panel.confirmed =
+			preflight, opts.on_confirm, opts.on_cancel, false
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window

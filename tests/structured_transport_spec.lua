@@ -174,15 +174,12 @@ assert(
 		and sent[3].params.approvalPolicy == "on-request",
 	"Codex structured launches must pass the recorded sandbox and approval policy to App Server"
 )
-assert(
-	not pcall(manager.open, manager, {
-		provider = "pi",
-		cwd = vim.fn.getcwd(),
-		prompt = "review this",
-		codex_policy = { sandbox = "readOnly", approval_policy = "on-request" },
-	}),
-	"Codex launch policy must not be silently applied to a different provider"
-)
+assert(not pcall(manager.open, manager, {
+	provider = "pi",
+	cwd = vim.fn.getcwd(),
+	prompt = "review this",
+	codex_policy = { sandbox = "readOnly", approval_policy = "on-request" },
+}), "Codex launch policy must not be silently applied to a different provider")
 
 manager, sent, process = fake_manager()
 local resumed_codex = nil

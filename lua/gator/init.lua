@@ -24,9 +24,31 @@ function M.setup(opts)
 		M._coordinator:dispose()
 	end
 	M._coordinator = next
+	M._coordinator:load_extensions()
 	M._state = M._coordinator:state()
 	M._coordinator:bootstrap_recovery()
 	return M
+end
+
+function M.on(event, handler)
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:extensions_runtime():subscribe(event, handler)
+end
+
+function M.extensions()
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:extensions_runtime():status()
+end
+
+function M.statusline(opts)
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:statusline(opts)
 end
 
 function M.compatibility()

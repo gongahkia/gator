@@ -139,7 +139,10 @@ function Retention:plan(now, opts)
 			if
 				now - file.mtime >= self.max_age[category] and not (opts.exclude and opts.exclude(file.path, category))
 			then
-				table.insert(result, { category = category, path = file.path, mtime = file.mtime, bytes = file.bytes, reason = "age" })
+				table.insert(
+					result,
+					{ category = category, path = file.path, mtime = file.mtime, bytes = file.bytes, reason = "age" }
+				)
 			end
 		end
 	end

@@ -39,6 +39,19 @@ local function selected_fields(value)
 	return result
 end
 
+local default_columns = { "id", "provider", "role", "state", "context", "resources", "budget", "trust" }
+
+local function graph_columns(workflow)
+	if type(workflow.graph_columns) ~= "function" then
+		return default_columns
+	end
+	local ok, value = pcall(workflow.graph_columns, workflow)
+	if not ok or type(value) ~= "table" or not vim.islist(value) then
+		return default_columns
+	end
+	return value
+end
+
 local function bytes(value)
 	if value < 1024 then
 		return value .. " B"
@@ -86,6 +99,23 @@ local function render(panel)
 		table.insert(lines, "No Gator-managed runs. Use :Gator to launch one.")
 	else
 		for index, run in ipairs(runs) do
+			local measurements
+			if type(panel.workflow.run_resources) == "function" then
+				local ok, value = pcall(panel.workflow.run_resources, panel.workflow, run)
+				measurements = ok and value or nil
+			end
+			local columns = {}
+			for _, id in ipairs(graph_columns(panel.workflow)) do
+				local value
+				if type(panel.workflow.render_graph_column) == "function" then
+					local ok, rendered =
+						pcall(panel.workflow.render_graph_column, panel.workflow, id, run, measurements)
+					value = ok and rendered or nil
+				end
+				if type(value) == "string" and value ~= "" then
+					table.insert(columns, value)
+				end
+			end
 			local parent = run.parent_run_id and (" ← " .. run.parent_run_id) or ""
 			local usage = run.usage.state == "reported"
 					and string.format(
@@ -101,16 +131,7 @@ local function render(panel)
 			local workspace = vim.fn.fnamemodify(run.workspace.root, ":~:.")
 			table.insert(
 				lines,
-				string.format(
-					"%s %s · %s · %s · %s · %s%s",
-					index == panel.selected and ">" or " ",
-					run.id,
-					run.provider,
-					run.role,
-					run.state,
-					usage,
-					parent
-				)
+				(index == panel.selected and ">" or " ") .. " " .. table.concat(columns, " · ") .. parent
 			)
 			table.insert(lines, "  Workspace: " .. run.workspace.kind .. " · " .. workspace)
 			table.insert(
@@ -118,11 +139,6 @@ local function render(panel)
 				"  Context: " .. (run.bundle_id or "unavailable") .. " · transcript " .. run.transcript
 			)
 			if configured_resources.enabled then
-				local measurements
-				if type(panel.workflow.run_resources) == "function" then
-					local ok, value = pcall(panel.workflow.run_resources, panel.workflow, run)
-					measurements = ok and value or nil
-				end
 				local values = {}
 				if resource_fields.wall_time then
 					table.insert(values, "wall " .. (measurements and duration(measurements.wall_seconds) or "unknown"))

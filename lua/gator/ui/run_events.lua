@@ -31,7 +31,9 @@ local function render(panel)
 			local selected = index == panel.selected and "> " or "  "
 			table.insert(lines, selected .. timestamp(event.at) .. " · " .. event.type)
 			if panel.expanded[event.sequence] then
-				for _, line in ipairs(vim.split(vim.json.encode(event.payload), "\n", { plain = true, trimempty = false })) do
+				for _, line in
+					ipairs(vim.split(vim.json.encode(event.payload), "\n", { plain = true, trimempty = false }))
+				do
 					table.insert(lines, "  " .. line)
 				end
 			end
@@ -79,7 +81,13 @@ function M.open(opts)
 	end
 	local events = vim.deepcopy(opts.events)
 	for index, event in ipairs(events) do
-		if type(event) ~= "table" or type(event.sequence) ~= "number" or type(event.type) ~= "string" or type(event.at) ~= "number" or type(event.payload) ~= "table" then
+		if
+			type(event) ~= "table"
+			or type(event.sequence) ~= "number"
+			or type(event.type) ~= "string"
+			or type(event.at) ~= "number"
+			or type(event.payload) ~= "table"
+		then
 			fail("event " .. index .. " is invalid")
 		end
 	end

@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 11
+M.schema_version = 12
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -14,7 +14,16 @@ M.defaults = {
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
 		resources = { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } },
+		renderers = {
+			provider_picker = "native",
+			run_graph = "native",
+			context_preflight = "native",
+			handoff_review = "native",
+			dashboard = "native",
+		},
+		run_graph = { columns = { "id", "provider", "role", "state", "context", "resources", "budget", "trust" } },
 	},
+	extensions = { modules = {} },
 	context = {
 		mode = "manual",
 		trust = "provenance",
@@ -110,6 +119,7 @@ end
 local root_fields = {
 	schema_version = true,
 	ui = true,
+	extensions = true,
 	context = true,
 	launch = true,
 	permissions = true,
@@ -160,7 +170,6 @@ local provider_names = {
 	vibe = true,
 }
 
-local launch_provider_names = vim.tbl_extend("force", { claude = true, codex = true, opencode = true }, provider_names)
 local resource_fields = { wall_time = true, context_bytes = true, worktree = true, usage = true }
 
 local function identifier(value, name)
@@ -200,7 +209,20 @@ local function settings(value)
 		motion = true,
 		loading = true,
 		resources = true,
+		renderers = true,
+		run_graph = true,
 	}, "settings.ui")
+	fields(value.extensions, { modules = true }, "settings.extensions")
+	if type(value.extensions.modules) ~= "table" or not vim.islist(value.extensions.modules) then
+		fail("extensions.modules must be an array")
+	end
+	local extension_modules = {}
+	for index, module in ipairs(value.extensions.modules) do
+		if type(module) ~= "string" or not module:match("^[%a_][%w_.-]*$") or extension_modules[module] then
+			fail("extensions.modules[" .. index .. "] must be a unique Lua module name")
+		end
+		extension_modules[module] = true
+	end
 	fields(value.context, { mode = true, trust = true, preflight = true, handoff = true }, "settings.context")
 	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")
@@ -246,6 +268,29 @@ local function settings(value)
 	value.ui.motion = motion
 	value.ui.loading = require("gator.ui.loading").resolve(value.ui.loading)
 	fields(value.ui.resources, { enabled = true, fields = true }, "settings.ui.resources")
+	fields(value.ui.renderers, {
+		provider_picker = true,
+		run_graph = true,
+		context_preflight = true,
+		handoff_review = true,
+		dashboard = true,
+	}, "settings.ui.renderers")
+	for name, renderer in pairs(value.ui.renderers) do
+		if type(renderer) ~= "string" or renderer == "" then
+			fail("ui.renderers." .. name .. " must identify a renderer")
+		end
+	end
+	fields(value.ui.run_graph, { columns = true }, "settings.ui.run_graph")
+	if type(value.ui.run_graph.columns) ~= "table" or not vim.islist(value.ui.run_graph.columns) then
+		fail("ui.run_graph.columns must be an array")
+	end
+	local graph_columns = {}
+	for index, column in ipairs(value.ui.run_graph.columns) do
+		if type(column) ~= "string" or column == "" or graph_columns[column] then
+			fail("ui.run_graph.columns[" .. index .. "] must be a unique column id")
+		end
+		graph_columns[column] = true
+	end
 	if type(value.ui.resources.enabled) ~= "boolean" then
 		fail("ui.resources.enabled must be boolean")
 	end
@@ -308,12 +353,8 @@ local function settings(value)
 	end
 	command_entries(value.review.commands, "settings.review.commands")
 	command_entries(value.acp.commands, "settings.acp.commands")
-	local allowed_launch_providers = vim.deepcopy(launch_provider_names)
-	for name in pairs(value.acp.commands) do
-		allowed_launch_providers[name] = true
-	end
-	if value.launch.default_provider ~= "ask" and not allowed_launch_providers[value.launch.default_provider] then
-		fail("launch.default_provider must be ask or a supported provider")
+	if value.launch.default_provider ~= "ask" then
+		identifier(value.launch.default_provider, "launch.default_provider")
 	end
 	if not vim.tbl_contains({ "auto", "chat", "terminal" }, value.launch.transport) then
 		fail("launch.transport must be auto, chat, or terminal")
@@ -405,6 +446,7 @@ function M.migrate(value)
 		and from_version ~= 8
 		and from_version ~= 9
 		and from_version ~= 10
+		and from_version ~= 11
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -448,6 +490,17 @@ function M.migrate(value)
 	if document.ui.resources.fields == nil then
 		document.ui.resources.fields = { "wall_time", "context_bytes", "worktree", "usage" }
 	end
+	document.ui.renderers = document.ui.renderers or {}
+	for name, renderer in pairs(M.defaults.ui.renderers) do
+		if document.ui.renderers[name] == nil then
+			document.ui.renderers[name] = renderer
+		end
+	end
+	document.ui.run_graph = document.ui.run_graph or {}
+	if document.ui.run_graph.columns == nil then
+		document.ui.run_graph.columns = vim.deepcopy(M.defaults.ui.run_graph.columns)
+	end
+	document.extensions = document.extensions or { modules = {} }
 	document.budget = document.budget or {}
 	document.budget.max_concurrent_runs = document.budget.max_concurrent_runs or 0
 	document.review = document.review or {}

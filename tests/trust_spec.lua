@@ -45,24 +45,18 @@ assert(
 	"managed agents must expose only approval requests they actually emit"
 )
 
-assert(
-	not pcall(trust.resolve, {
-		provider = "pi",
-		transport = "chat",
-		config = settings,
-		project_policy = { available = true, policy = { rules = { write_allowed = false } } },
-	}),
-	"a read-only project policy must reject structured providers Gator cannot constrain"
-)
-assert(
-	not pcall(trust.resolve, {
-		provider = "claude",
-		transport = "terminal",
-		config = settings,
-		project_policy = { available = true, policy = { rules = { write_allowed = false } } },
-	}),
-	"a read-only project policy must reject terminal providers Gator cannot constrain"
-)
+assert(not pcall(trust.resolve, {
+	provider = "pi",
+	transport = "chat",
+	config = settings,
+	project_policy = { available = true, policy = { rules = { write_allowed = false } } },
+}), "a read-only project policy must reject structured providers Gator cannot constrain")
+assert(not pcall(trust.resolve, {
+	provider = "claude",
+	transport = "terminal",
+	config = settings,
+	project_policy = { available = true, policy = { rules = { write_allowed = false } } },
+}), "a read-only project policy must reject terminal providers Gator cannot constrain")
 
 local legacy = trust.normalize(nil, { provider = "codex", transport = "chat" })
 assert(

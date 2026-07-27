@@ -34,7 +34,10 @@ local function render(panel)
 	table.insert(lines, "Stored: " .. bytes(panel.inventory.bytes) .. " · quota: " .. quota)
 	for _, category in ipairs(panel.inventory.categories) do
 		if category.files > 0 then
-			table.insert(lines, "- " .. category.category .. " · " .. category.files .. " files · " .. bytes(category.bytes))
+			table.insert(
+				lines,
+				"- " .. category.category .. " · " .. category.files .. " files · " .. bytes(category.bytes)
+			)
 		end
 	end
 	table.insert(lines, "")
@@ -42,7 +45,10 @@ local function render(panel)
 		table.insert(lines, "No Gator-owned artifacts are selected for deletion.")
 	else
 		if #panel.artifacts > 0 then
-			table.insert(lines, "Artifacts to delete: " .. #panel.artifacts .. " · reclaim " .. bytes(panel.reclaim_bytes))
+			table.insert(
+				lines,
+				"Artifacts to delete: " .. #panel.artifacts .. " · reclaim " .. bytes(panel.reclaim_bytes)
+			)
 			for _, value in ipairs(panel.artifacts) do
 				table.insert(
 					lines,
@@ -71,13 +77,29 @@ local function render(panel)
 end
 
 function M.open(opts)
-	if type(opts) ~= "table" or type(opts.artifacts) ~= "table" or not vim.islist(opts.artifacts) or type(opts.worktrees) ~= "table" or not vim.islist(opts.worktrees) then
+	if
+		type(opts) ~= "table"
+		or type(opts.artifacts) ~= "table"
+		or not vim.islist(opts.artifacts)
+		or type(opts.worktrees) ~= "table"
+		or not vim.islist(opts.worktrees)
+	then
 		fail("open requires artifact and worktree arrays")
 	end
-	if type(opts.inventory) ~= "table" or type(opts.inventory.bytes) ~= "number" or type(opts.inventory.categories) ~= "table" or not vim.islist(opts.inventory.categories) then
+	if
+		type(opts.inventory) ~= "table"
+		or type(opts.inventory.bytes) ~= "number"
+		or type(opts.inventory.categories) ~= "table"
+		or not vim.islist(opts.inventory.categories)
+	then
 		fail("open requires a storage inventory")
 	end
-	if type(opts.quota_bytes) ~= "number" or opts.quota_bytes < 0 or type(opts.reclaim_bytes) ~= "number" or opts.reclaim_bytes < 0 then
+	if
+		type(opts.quota_bytes) ~= "number"
+		or opts.quota_bytes < 0
+		or type(opts.reclaim_bytes) ~= "number"
+		or opts.reclaim_bytes < 0
+	then
 		fail("open requires non-negative quota and reclaim bytes")
 	end
 	if opts.readonly ~= true and type(opts.on_confirm) ~= "function" then

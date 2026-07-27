@@ -33,7 +33,10 @@ local function terminal(provider, project)
 	return {
 		surface = "terminal",
 		security_owner = "provider",
-		policy = state(project and "not_enforced" or "not_configured", project and "project policy cannot govern a terminal provider" or "no Gator-enforced terminal policy"),
+		policy = state(
+			project and "not_enforced" or "not_configured",
+			project and "project policy cannot govern a terminal provider" or "no Gator-enforced terminal policy"
+		),
 		write = state("provider_owned", detail),
 		network = state("provider_owned", detail),
 		mcp = state("provider_owned", detail),
@@ -46,7 +49,11 @@ local function managed(provider, project)
 	return {
 		surface = "structured",
 		security_owner = "provider",
-		policy = state(project and "not_enforced" or "not_configured", project and "project policy is not enforceable for this provider" or "no Gator-enforced policy for this provider"),
+		policy = state(
+			project and "not_enforced" or "not_configured",
+			project and "project policy is not enforceable for this provider"
+				or "no Gator-enforced policy for this provider"
+		),
 		write = state("unknown", "provider controls filesystem access"),
 		network = state("unknown", "provider controls network access"),
 		mcp = state("unknown", "provider controls MCP access"),
@@ -59,7 +66,10 @@ local function pi(project)
 	return {
 		surface = "structured",
 		security_owner = "provider",
-		policy = state(project and "not_enforced" or "not_configured", project and "project policy is not enforceable for Pi RPC" or "no Gator-enforced Pi policy"),
+		policy = state(
+			project and "not_enforced" or "not_configured",
+			project and "project policy is not enforceable for Pi RPC" or "no Gator-enforced Pi policy"
+		),
 		write = state("unknown", "Pi controls filesystem access"),
 		network = state("unknown", "Pi controls network access"),
 		mcp = state("unknown", "Pi controls MCP access"),
@@ -102,7 +112,13 @@ function M.resolve(opts)
 		fail("resolve requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "provider" and key ~= "transport" and key ~= "root" and key ~= "config" and key ~= "project_policy" then
+		if
+			key ~= "provider"
+			and key ~= "transport"
+			and key ~= "root"
+			and key ~= "config"
+			and key ~= "project_policy"
+		then
 			fail("resolve contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -139,7 +155,11 @@ function M.resolve(opts)
 		return codex(mode, source)
 	end
 	if project_rules and not project_rules.write_allowed then
-		fail("project policy requires read-only; " .. opts.provider .. " exposes no Gator-enforced read-only structured control")
+		fail(
+			"project policy requires read-only; "
+				.. opts.provider
+				.. " exposes no Gator-enforced read-only structured control"
+		)
 	end
 	if opts.provider == "pi" then
 		return pi(project_rules ~= nil)
@@ -173,7 +193,16 @@ function M.normalize(value, legacy)
 	end
 	field(value, "run.trust")
 	for key in pairs(value) do
-		if key ~= "surface" and key ~= "security_owner" and key ~= "policy" and key ~= "write" and key ~= "network" and key ~= "mcp" and key ~= "approval" and key ~= "provider" then
+		if
+			key ~= "surface"
+			and key ~= "security_owner"
+			and key ~= "policy"
+			and key ~= "write"
+			and key ~= "network"
+			and key ~= "mcp"
+			and key ~= "approval"
+			and key ~= "provider"
+		then
 			fail("run.trust contains unsupported field: " .. tostring(key))
 		end
 	end
@@ -209,7 +238,9 @@ function M.codex_policy(value)
 	if value.provider ~= "codex" or value.write.state ~= "codex_enforced" then
 		return nil
 	end
-	local sandbox = value.write.mode == "read_only" and "readOnly" or value.write.mode == "workspace_write" and "workspaceWrite" or nil
+	local sandbox = value.write.mode == "read_only" and "readOnly"
+		or value.write.mode == "workspace_write" and "workspaceWrite"
+		or nil
 	if not sandbox or value.approval.state ~= "on_request" then
 		fail("Codex trust record does not describe an enforceable launch policy")
 	end

@@ -329,11 +329,13 @@ function Manager:open(opts)
 			if requested == "initialize" then
 				current.initialized = true
 				write({ jsonrpc = "2.0", method = "initialized", params = vim.empty_dict() })
-				local params = launch_policy and {
-					cwd = cwd,
-					approvalPolicy = launch_policy.approval_policy,
-					sandbox = launch_policy.sandbox,
-				} or { cwd = cwd }
+				local params = launch_policy
+						and {
+							cwd = cwd,
+							approvalPolicy = launch_policy.approval_policy,
+							sandbox = launch_policy.sandbox,
+						}
+					or { cwd = cwd }
 				if current.operation == "start" then
 					params.ephemeral = false
 					codex_request("thread/start", params)
