@@ -26,6 +26,36 @@ func TestManifestProviderRespectsStage(t *testing.T) {
 	}
 }
 
+func TestManifestValidatesNativeProviderRequirements(t *testing.T) {
+	manifest := Manifest{Providers: []Provider{{ID: "azure", Kind: "azure_openai_responses", Model: "deployment", BaseURL: "https://resource.openai.azure.com/openai/v1", CredentialEnv: "AZURE_OPENAI_KEY", Stages: []domain.Stage{domain.StagePlanner}}, {ID: "ollama", Kind: "ollama_chat", Model: "qwen", BaseURL: "http://host.docker.internal:11434", Stages: []domain.Stage{domain.StageBuilder}}, {ID: "bedrock", Kind: "aws_bedrock_converse", Model: "amazon.nova-lite-v1:0", Region: "us-east-1", Stages: []domain.Stage{domain.StageVerifier}}, {ID: "vertex", Kind: "vertex_ai_generate_content", Model: "gemini", BaseURL: "https://us-central1-aiplatform.googleapis.com", Project: "project", Region: "us-central1", Stages: []domain.Stage{domain.StagePlanner}}}, Profiles: []domain.Profile{domain.ProfileFullStack}}
+	if err := manifest.Validate(); err != nil {
+		t.Fatalf("valid native providers rejected: %v", err)
+	}
+	manifest.Providers[2].Region = ""
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("bedrock region is required")
+	}
+	manifest.Providers[2].Region = "us-east-1"
+	manifest.Providers[3].Project = ""
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("vertex project is required")
+	}
+}
+
+func TestManifestRejectsUnknownProviderKind(t *testing.T) {
+	manifest := Manifest{Providers: []Provider{{ID: "unknown", Kind: "unsupported", Model: "model", BaseURL: "https://example.com", CredentialEnv: "KEY", Stages: []domain.Stage{domain.StagePlanner}}}, Profiles: []domain.Profile{domain.ProfileFullStack}}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("unknown provider kind accepted")
+	}
+}
+
+func TestManifestAllowsUnauthenticatedCompatibleEndpoint(t *testing.T) {
+	manifest := Manifest{Providers: []Provider{{ID: "local", Kind: "openai_compatible", Model: "local-model", BaseURL: "http://host.docker.internal:1234/v1", Stages: []domain.Stage{domain.StagePlanner}}}, Profiles: []domain.Profile{domain.ProfileFullStack}}
+	if err := manifest.Validate(); err != nil {
+		t.Fatalf("unauthenticated compatible endpoint rejected: %v", err)
+	}
+}
+
 func TestManifestRejectsUnknownPluginProvider(t *testing.T) {
 	manifest := Manifest{Providers: []Provider{{ID: "external", Kind: "plugin", PluginID: "missing", Stages: []domain.Stage{domain.StagePlanner}}}, Profiles: []domain.Profile{domain.ProfileFullStack}}
 	if err := manifest.Validate(); err == nil {

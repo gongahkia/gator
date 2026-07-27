@@ -4,9 +4,9 @@ Norbot reads `config.json`; keep the file outside source control. The supplied `
 
 ## Provider adapters
 
-`kind` can be `openai_responses`, `anthropic_messages`, `gemini_generate_content`, `openai_compatible`, `cli`, or `plugin`.
+`kind` can be `openai_responses`, `azure_openai_responses`, `anthropic_messages`, `gemini_generate_content`, `vertex_ai_generate_content`, `cohere_v2_chat`, `ollama_chat`, `aws_bedrock_converse`, `openai_compatible`, `cli`, or `plugin`. See [provider configurations](PROVIDERS.md) for required fields, authentication, documented presets, and live-validation procedure.
 
-- API adapters require `model`, `base_url`, and `credential_env`.
+- Most API adapters require `model`, `base_url`, and `credential_env`; Ollama has no credential field, Bedrock requires `model` and `region` with AWS credentials, and Vertex requires `model`, `base_url`, `project`, and `region` with Application Default Credentials.
 - CLI adapters require `image`, `command`, and optionally `credential_env`/`network`. Docker runs inject credentials from the selected local environment variable. Kubernetes CLI runs require `kubernetes_secret` and `kubernetes_secret_key`, referring to an existing Secret in Norbot's namespace.
 - `stages` is an allowlist. The web console only offers compatible adapters for each stage.
 - `budget.max_concurrent` and `budget.requests_per_minute` constrain capacity recommendations. API rate-limit response headers are persisted when available; a recommendation must be explicitly accepted through the API before it is recorded as operator-approved.

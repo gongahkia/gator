@@ -90,6 +90,8 @@ Then open `http://127.0.0.1:8080` locally.
 
 Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
 
+Native Azure OpenAI, Cohere, Ollama, Amazon Bedrock, and Vertex AI adapters plus documented OpenAI-compatible provider presets are available in [provider configurations](docs/PROVIDERS.md).
+
 ## API
 
 - `POST /api/runs` creates and queues a planner run. It accepts optional `deployment_target: "docker"|"kubernetes"` and `public_ingress` fields.

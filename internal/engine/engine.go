@@ -514,7 +514,7 @@ func (s *Service) InvokeAgent(ctx context.Context, runID string, input runtime.A
 	}
 	providerID := run.Providers[domain.StageBuilder]
 	providerConfig, ok := s.config.Manifest.Provider(providerID, domain.StageBuilder)
-	if !ok || (providerConfig.Kind != "openai_responses" && providerConfig.Kind != "openai_compatible" && providerConfig.Kind != "anthropic_messages" && providerConfig.Kind != "gemini_generate_content") {
+	if !ok || !providerConfig.IsAPI() {
 		return runtime.AgentResponse{}, fmt.Errorf("agentic application requires an HTTP model provider")
 	}
 	return s.invokeCentralAgent(ctx, run, input)

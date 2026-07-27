@@ -16,6 +16,8 @@ type Provider struct {
 	Kind                string         `json:"kind"`
 	Model               string         `json:"model"`
 	BaseURL             string         `json:"base_url"`
+	Region              string         `json:"region"`
+	Project             string         `json:"project"`
 	CredentialEnv       string         `json:"credential_env"`
 	Command             []string       `json:"command"`
 	Image               string         `json:"image"`
@@ -30,6 +32,26 @@ type Provider struct {
 type ProviderBudget struct {
 	MaxConcurrent     int `json:"max_concurrent"`
 	RequestsPerMinute int `json:"requests_per_minute"`
+}
+
+func (p Provider) IsAPI() bool {
+	switch p.Kind {
+	case "openai_responses", "azure_openai_responses", "openai_compatible", "anthropic_messages", "gemini_generate_content", "vertex_ai_generate_content", "cohere_v2_chat", "ollama_chat", "aws_bedrock_converse":
+		return true
+	default:
+		return false
+	}
+}
+
+func (p Provider) RequiresBaseURL() bool { return p.Kind != "aws_bedrock_converse" }
+
+func (p Provider) RequiresCredentialEnv() bool {
+	switch p.Kind {
+	case "ollama_chat", "aws_bedrock_converse", "openai_compatible", "vertex_ai_generate_content":
+		return false
+	default:
+		return p.IsAPI()
+	}
 }
 
 type ToolPolicy struct {
@@ -266,6 +288,9 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("duplicate provider id %q", p.ID)
 		}
 		seen[p.ID] = struct{}{}
+		if !p.IsAPI() && p.Kind != "cli" && p.Kind != "plugin" {
+			return fmt.Errorf("unsupported provider kind %q", p.Kind)
+		}
 		if p.Kind == "plugin" && p.PluginID == "" {
 			return fmt.Errorf("plugin provider %q needs plugin_id", p.ID)
 		}
@@ -275,8 +300,20 @@ func (m Manifest) Validate() error {
 		if p.Kind == "cli" && p.Network != "" && p.Network != "none" && p.Network != "bridge" {
 			return fmt.Errorf("cli provider %q network must be none or bridge", p.ID)
 		}
-		if p.Kind != "cli" && p.Kind != "plugin" && (p.BaseURL == "" || p.Model == "" || p.CredentialEnv == "") {
-			return fmt.Errorf("api provider %q needs base_url, model, and credential_env", p.ID)
+		if p.IsAPI() && p.Model == "" {
+			return fmt.Errorf("api provider %q needs model", p.ID)
+		}
+		if p.IsAPI() && p.RequiresBaseURL() && p.BaseURL == "" {
+			return fmt.Errorf("api provider %q needs base_url", p.ID)
+		}
+		if p.IsAPI() && p.RequiresCredentialEnv() && p.CredentialEnv == "" {
+			return fmt.Errorf("api provider %q needs credential_env", p.ID)
+		}
+		if p.Kind == "aws_bedrock_converse" && p.Region == "" {
+			return fmt.Errorf("aws bedrock provider %q needs region", p.ID)
+		}
+		if p.Kind == "vertex_ai_generate_content" && (p.Region == "" || p.Project == "") {
+			return fmt.Errorf("vertex ai provider %q needs project and region", p.ID)
 		}
 		if p.Budget.MaxConcurrent < 0 || p.Budget.RequestsPerMinute < 0 {
 			return fmt.Errorf("provider %q has negative budget", p.ID)

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/runtime"
 )
@@ -16,7 +18,7 @@ func (s *Service) Health(ctx context.Context) domain.HealthReport {
 	report := domain.HealthReport{CheckedAt: time.Now().UTC()}
 	report.Checks = append(report.Checks, s.checkPostgres(ctx), s.checkQueue(ctx), s.checkRuntime(ctx))
 	for _, provider := range s.config.Manifest.Providers {
-		report.Checks = append(report.Checks, s.checkProvider(ctx, provider.ID, provider.BaseURL, provider.CredentialEnv, provider.Kind))
+		report.Checks = append(report.Checks, s.checkProvider(ctx, provider))
 	}
 	if imports, err := s.store.SkillImports(ctx); err != nil {
 		report.Checks = append(report.Checks, failedCheck("marketplace", true, err))
@@ -125,32 +127,42 @@ func (s *Service) checkRuntime(ctx context.Context) domain.HealthCheck {
 	return okCheck("runtime", true, "Kubernetes API reachable", started, map[string]any{"target": "kubernetes"})
 }
 
-func (s *Service) checkProvider(ctx context.Context, id, baseURL, credentialEnv, kind string) domain.HealthCheck {
+func (s *Service) checkProvider(ctx context.Context, provider config.Provider) domain.HealthCheck {
 	started := time.Now()
-	if kind == "plugin" {
-		return okCheck("provider:"+id, true, "locally configured", started, map[string]any{"kind": kind})
+	if provider.Kind == "plugin" {
+		return okCheck("provider:"+provider.ID, true, "locally configured", started, map[string]any{"kind": provider.Kind})
 	}
-	if credentialEnv != "" && strings.TrimSpace(os.Getenv(credentialEnv)) == "" {
-		return domain.HealthCheck{ID: "provider:" + id, State: domain.HealthDown, Critical: true, LatencyMS: time.Since(started).Milliseconds(), Message: "credential env is unset", Diagnostics: map[string]any{"credential_env": credentialEnv}, CheckedAt: time.Now().UTC()}
+	if provider.RequiresCredentialEnv() && strings.TrimSpace(os.Getenv(provider.CredentialEnv)) == "" {
+		return domain.HealthCheck{ID: "provider:" + provider.ID, State: domain.HealthDown, Critical: true, LatencyMS: time.Since(started).Milliseconds(), Message: "credential env is unset", Diagnostics: map[string]any{"credential_env": provider.CredentialEnv}, CheckedAt: time.Now().UTC()}
 	}
-	if kind == "cli" {
-		return okCheck("provider:"+id, true, "runner and credential configured", started, map[string]any{"kind": kind, "credential_env": credentialEnv})
+	if provider.Kind == "cli" {
+		return okCheck("provider:"+provider.ID, true, "runner and credential configured", started, map[string]any{"kind": provider.Kind, "credential_env": provider.CredentialEnv})
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodHead, baseURL, nil)
+	if provider.Kind == "aws_bedrock_converse" {
+		loaded, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(provider.Region))
+		if err == nil {
+			_, err = loaded.Credentials.Retrieve(ctx)
+		}
+		if err != nil {
+			return failedCheckWithLatency("provider:"+provider.ID, true, err, started)
+		}
+		return okCheck("provider:"+provider.ID, true, "AWS credentials resolved", started, map[string]any{"kind": provider.Kind, "region": provider.Region})
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodHead, provider.BaseURL, nil)
 	if err != nil {
-		return failedCheckWithLatency("provider:"+id, true, err, started)
+		return failedCheckWithLatency("provider:"+provider.ID, true, err, started)
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
 	response, err := client.Do(request)
 	if err != nil {
-		return failedCheckWithLatency("provider:"+id, true, err, started)
+		return failedCheckWithLatency("provider:"+provider.ID, true, err, started)
 	}
 	response.Body.Close()
 	state, message := domain.HealthHealthy, "endpoint reachable"
 	if response.StatusCode >= 500 {
 		state, message = domain.HealthDegraded, fmt.Sprintf("endpoint returned %d", response.StatusCode)
 	}
-	return domain.HealthCheck{ID: "provider:" + id, State: state, Critical: true, LatencyMS: time.Since(started).Milliseconds(), Message: message, Diagnostics: map[string]any{"kind": kind, "status_code": response.StatusCode}, CheckedAt: time.Now().UTC()}
+	return domain.HealthCheck{ID: "provider:" + provider.ID, State: state, Critical: true, LatencyMS: time.Since(started).Milliseconds(), Message: message, Diagnostics: map[string]any{"kind": provider.Kind, "status_code": response.StatusCode}, CheckedAt: time.Now().UTC()}
 }
 
 func marketplaceCheck(imports []domain.SkillImport) domain.HealthCheck {

@@ -27,12 +27,7 @@ type planningCandidate struct {
 }
 
 func planningSwarmAllowed(value config.Provider) bool {
-	switch value.Kind {
-	case "openai_responses", "openai_compatible", "anthropic_messages", "gemini_generate_content":
-		return true
-	default:
-		return false
-	}
+	return value.IsAPI()
 }
 
 func swarmDigest(value any) string {
