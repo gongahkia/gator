@@ -48,6 +48,12 @@ assert(
 	loading.enabled and loading.spinner == "whirly.hanoi" and loading.interval_ms == 80,
 	"loading configuration must select a bundled spinner and optional cadence override"
 )
+local resources =
+	config.resolve({ ui = { resources = { enabled = true, fields = { "wall_time", "usage" } } } }).ui.resources
+assert(
+	resources.enabled and #resources.fields == 2 and resources.fields[2] == "usage",
+	"resource display must default on and allow an explicit field subset"
+)
 local budget = config.resolve({ budget = { max_tokens = 1000, action = "stop", max_concurrent_runs = 2 } }).budget
 assert(
 	budget.max_tokens == 1000 and budget.action == "stop" and budget.max_concurrent_runs == 2,
@@ -60,7 +66,10 @@ assert(
 )
 local retention = config.resolve({ retention = { max_age_days = 90, cleanup_on_start = false } }).retention
 assert(
-	retention.max_age_days == 90 and retention.max_bytes == 0 and not retention.cleanup_on_start and retention.worktrees == "inactive_clean",
+	retention.max_age_days == 90
+		and retention.max_bytes == 0
+		and not retention.cleanup_on_start
+		and retention.worktrees == "inactive_clean",
 	"retention must accept an arbitrary fixed period and preserve safe worktree cleanup"
 )
 local preflight = config.resolve({ context = { preflight = { confirm = true } } }).context.preflight
@@ -93,6 +102,9 @@ assert(
 		and not pcall(config.resolve, { providers = { unknown = { user_confirmed = true } } })
 		and not pcall(config.resolve, { ui = { loading = { spinner = "unknown" } } })
 		and not pcall(config.resolve, { ui = { loading = { interval_ms = 15 } } })
+		and not pcall(config.resolve, { ui = { resources = { enabled = "yes" } } })
+		and not pcall(config.resolve, { ui = { resources = { fields = { "tokens" } } } })
+		and not pcall(config.resolve, { ui = { resources = { fields = { "usage", "usage" } } } })
 		and not pcall(config.resolve, { permissions = { codex = { sandbox = "unrestricted" } } })
 		and not pcall(config.resolve, { budget = { max_tokens = -1 } })
 		and not pcall(config.resolve, { retention = { max_age_days = -1 } })
@@ -123,7 +135,7 @@ assert(
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":11}')
+helpers.write(path, '{"schema_version":12}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

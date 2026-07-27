@@ -14,6 +14,7 @@ local loading_ui = require("gator.ui.loading")
 local worktree = require("gator.workspace.worktree")
 local workspace_cleanup = require("gator.workspace.cleanup")
 local retention = require("gator.core.retention")
+local resources = require("gator.core.resources")
 local retention_ui = require("gator.ui.retention")
 local context_preflight = require("gator.ui.context_preflight")
 local run_events = require("gator.ui.run_events")
@@ -227,8 +228,17 @@ end
 function Workflow:update(id, patch)
 	local value = self:run(id)
 	local previous_state = value.state
+	local was_active = active_state(value)
 	for key, item in pairs(patch) do
 		value[key] = vim.deepcopy(item)
+	end
+	if patch.state ~= nil then
+		local active = active_state(value)
+		if was_active and not active and value.resources.finished_at == nil then
+			value.resources.finished_at = self.clock()
+		elseif not was_active and active then
+			value.resources.finished_at = nil
+		end
 	end
 	value.updated_at = self.clock()
 	local updated = self:put(value)
@@ -239,6 +249,29 @@ function Workflow:update(id, patch)
 		self:release_worktree_lease(updated)
 	end
 	return updated
+end
+
+function Workflow:resource_display()
+	return vim.deepcopy(self.state.config.ui.resources)
+end
+
+function Workflow:resource_summary()
+	return resources.summary(self:runs())
+end
+
+function Workflow:run_resources(run)
+	return resources.run(run, self.clock())
+end
+
+function Workflow:record_context_delivery(id, bytes)
+	if type(bytes) ~= "number" or bytes < 0 or bytes % 1 ~= 0 then
+		fail("context bytes must be a non-negative integer")
+	end
+	local run = self:run(id)
+	local value = vim.deepcopy(run.resources)
+	value.context_bytes = value.context_bytes + bytes
+	value.context_sends = value.context_sends + 1
+	return self:update(id, { resources = value })
 end
 
 function Workflow:report_usage(id, usage)
@@ -1084,6 +1117,7 @@ function Workflow:launch(opts)
 			action = self.state.config.budget.action,
 			state = self.state.config.budget.max_tokens > 0 and "unknown" or "unbounded",
 		},
+		resources = { started_at = self.clock(), context_bytes = 0, context_sends = 0 },
 		trust = run_trust,
 		created_at = self.clock(),
 		updated_at = self.clock(),
@@ -1140,6 +1174,7 @@ function Workflow:launch(opts)
 	end
 	local function begin()
 		self:journal(run.id, "context.sent", preflight)
+		self:record_context_delivery(run.id, #body)
 		self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
 		vim.notify("Gator trust · " .. trust.summary(run.trust), vim.log.levels.INFO)
 		if transport == "terminal" then
@@ -1382,6 +1417,7 @@ function Workflow:send_context(opts)
 	self:journal(run.id, "context.prepared", preflight)
 	local function deliver()
 		self:journal(run.id, "context.sent", preflight)
+		self:record_context_delivery(run.id, #message)
 		return self:send(run.id, message)
 	end
 	if self.state.config.context.preflight.confirm then

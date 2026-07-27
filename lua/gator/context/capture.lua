@@ -233,6 +233,12 @@ local function read(path, maximum)
 	return value
 end
 
+local function lfs_pointer(value)
+	return value:match("^version https://git%-lfs%.github%.com/spec/v1\r?\n") ~= nil
+		and value:match("\r?\noid sha256:[0-9a-fA-F]+\r?\n") ~= nil
+		and value:match("\r?\nsize %d+\r?\n?$") ~= nil
+end
+
 function M.snapshot(root, opts)
 	root = text(root, "project root")
 	opts = opts or {}
@@ -273,7 +279,9 @@ function M.snapshot(root, opts)
 			entry.state, entry.reason = "omitted", "secret-like untracked file"
 		else
 			local value, reason = read(root .. "/" .. entry.path, remaining)
-			if value then
+			if value and lfs_pointer(value) then
+				entry.state, entry.reason = "omitted", "Git LFS pointer"
+			elseif value then
 				entry.state, entry.content, entry.apply_content, entry.bytes, entry.content_sha256 =
 					"included", redact.text(value), value, #value, vim.fn.sha256(value)
 				remaining = remaining - #value

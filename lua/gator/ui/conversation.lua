@@ -12,7 +12,12 @@ end
 local function current()
 	local tabpage = vim.api.nvim_get_current_tabpage()
 	local panel = panels[tabpage]
-	if panel and vim.api.nvim_win_is_valid(panel.window) then
+	if
+		panel
+		and vim.api.nvim_win_is_valid(panel.window)
+		and vim.api.nvim_buf_is_valid(panel.buffer)
+		and vim.api.nvim_win_get_buf(panel.window) == panel.buffer
+	then
 		return panel, tabpage
 	end
 	panels[tabpage] = nil

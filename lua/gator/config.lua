@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 10
+M.schema_version = 11
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -13,6 +13,7 @@ M.defaults = {
 		icons = "unicode",
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
+		resources = { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } },
 	},
 	context = {
 		mode = "manual",
@@ -160,6 +161,7 @@ local provider_names = {
 }
 
 local launch_provider_names = vim.tbl_extend("force", { claude = true, codex = true, opencode = true }, provider_names)
+local resource_fields = { wall_time = true, context_bytes = true, worktree = true, usage = true }
 
 local function identifier(value, name)
 	if type(value) ~= "string" or not value:match("^[a-z][a-z0-9_-]*$") then
@@ -192,7 +194,15 @@ local function settings(value)
 	schema_version(value.schema_version)
 	fields(
 		value.ui,
-		{ layout = true, keymaps = true, screen_reader = true, icons = true, motion = true, loading = true },
+		{
+			layout = true,
+			keymaps = true,
+			screen_reader = true,
+			icons = true,
+			motion = true,
+			loading = true,
+			resources = true,
+		},
 		"settings.ui"
 	)
 	fields(value.context, { mode = true, trust = true, preflight = true, handoff = true }, "settings.context")
@@ -205,7 +215,11 @@ local function settings(value)
 		fields(value.providers[name], { user_confirmed = true }, "settings.providers." .. name)
 	end
 	fields(value.workspaces, { mode = true }, "settings.workspaces")
-	fields(value.retention, { max_age_days = true, max_bytes = true, cleanup_on_start = true, worktrees = true }, "settings.retention")
+	fields(
+		value.retention,
+		{ max_age_days = true, max_bytes = true, cleanup_on_start = true, worktrees = true },
+		"settings.retention"
+	)
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
 	fields(value.budget, { max_tokens = true, action = true, max_concurrent_runs = true }, "settings.budget")
@@ -235,6 +249,20 @@ local function settings(value)
 	local motion = require("gator.ui.motion").resolve(value.ui.motion)
 	value.ui.motion = motion
 	value.ui.loading = require("gator.ui.loading").resolve(value.ui.loading)
+	fields(value.ui.resources, { enabled = true, fields = true }, "settings.ui.resources")
+	if type(value.ui.resources.enabled) ~= "boolean" then
+		fail("ui.resources.enabled must be boolean")
+	end
+	if type(value.ui.resources.fields) ~= "table" or not vim.islist(value.ui.resources.fields) then
+		fail("ui.resources.fields must be an array")
+	end
+	local seen = {}
+	for index, field in ipairs(value.ui.resources.fields) do
+		if type(field) ~= "string" or not resource_fields[field] or seen[field] then
+			fail("ui.resources.fields[" .. index .. "] is unavailable or duplicated")
+		end
+		seen[field] = true
+	end
 	if not vim.tbl_contains({ "manual", "inspect", "automatic" }, value.context.mode) then
 		fail("context.mode must be manual, inspect, or automatic")
 	end
@@ -315,7 +343,11 @@ local function settings(value)
 	then
 		fail("retention.max_age_days must be a non-negative integer")
 	end
-	if type(value.retention.max_bytes) ~= "number" or value.retention.max_bytes < 0 or value.retention.max_bytes % 1 ~= 0 then
+	if
+		type(value.retention.max_bytes) ~= "number"
+		or value.retention.max_bytes < 0
+		or value.retention.max_bytes % 1 ~= 0
+	then
 		fail("retention.max_bytes must be a non-negative integer")
 	end
 	if type(value.retention.cleanup_on_start) ~= "boolean" then
@@ -376,6 +408,7 @@ function M.migrate(value)
 		and from_version ~= 7
 		and from_version ~= 8
 		and from_version ~= 9
+		and from_version ~= 10
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -412,6 +445,13 @@ function M.migrate(value)
 	end
 	document.ui = document.ui or {}
 	document.ui.loading = document.ui.loading or {}
+	document.ui.resources = document.ui.resources or {}
+	if document.ui.resources.enabled == nil then
+		document.ui.resources.enabled = true
+	end
+	if document.ui.resources.fields == nil then
+		document.ui.resources.fields = { "wall_time", "context_bytes", "worktree", "usage" }
+	end
 	document.budget = document.budget or {}
 	document.budget.max_concurrent_runs = document.budget.max_concurrent_runs or 0
 	document.review = document.review or {}

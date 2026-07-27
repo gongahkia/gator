@@ -112,6 +112,10 @@ require("gator").setup({
   },
   ui = {
     icons = "ascii", -- "unicode", "nerd_font", "ascii", or "none"
+    resources = {
+      enabled = true, -- false hides local resource lines in :GatorRuns
+      fields = { "wall_time", "context_bytes", "worktree", "usage" }, -- choose any subset
+    },
     loading = {
       enabled = true,
       spinner = "whirly.hanoi", -- `:lua =require("gator.ui.loading").presets()`
@@ -134,6 +138,8 @@ For every run Gator appends lifecycle, provider/version, trust, approval, usage,
 Launches and `:GatorSend` always record their target, artifacts, byte/token estimate, and redaction-match count before delivery. This is passive by default. Set `context.preflight.confirm = true` to inspect that exact metadata and explicitly send or cancel every launch/context transfer.
 
 `:GatorStorage` inventories only Gator's project-local artifacts. `:GatorPrune` is always a preview with explicit confirmation. `retention.max_bytes` adds oldest-first quota candidates to that preview; it never causes startup deletion. Startup cleanup only removes age-expired Gator-owned artifacts and eligible clean inactive worktrees. `:GatorForget` removes one completed run and its Gator-owned artifacts, including its journal. Gator neither imports nor deletes provider-native history created outside Gator.
+
+`:GatorRuns` shows local resources by default: elapsed wall time, exact bytes/sends Gator delivered as context, Gator worktree count/disk use, and provider-reported usage. These values remain separate: elapsed time is local wall time, context bytes are not provider tokens, worktree size is local filesystem usage, and token/cost values stay `unknown` unless a provider reports them. Set `ui.resources.enabled = false` or choose any subset of `wall_time`, `context_bytes`, `worktree`, and `usage` with `ui.resources.fields`.
 
 ## Handoffs and parallel runs
 

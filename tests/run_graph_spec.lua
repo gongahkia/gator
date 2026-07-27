@@ -17,6 +17,7 @@ local window = graph.open({
 				transcript = "available",
 				usage = { state = "reported", input_tokens = 12, output_tokens = 8, total_tokens = 20 },
 				budget = { limit_tokens = 100, action = "warn", state = "tracking" },
+				resources = { started_at = 100, finished_at = 125, context_bytes = 1024, context_sends = 2 },
 				trust = {
 					surface = "structured",
 					security_owner = "provider",
@@ -27,6 +28,20 @@ local window = graph.open({
 					approval = { state = "on_request" },
 				},
 			},
+		}
+	end,
+	resource_display = function()
+		return { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } }
+	end,
+	resource_summary = function()
+		return { count = 1, state = "measured", bytes = 2048 }
+	end,
+	run_resources = function()
+		return {
+			wall_seconds = 25,
+			context_bytes = 1024,
+			context_sends = 2,
+			worktree = { state = "measured", bytes = 2048 },
 		}
 	end,
 	focus = function() end,
@@ -59,10 +74,19 @@ local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf
 assert(
 	content:find("Workspace: worktree", 1, true)
 		and content:find("Context: bundle-graph · transcript available", 1, true)
-		and content:find("Usage: reported · in 12 · out 8 · total 20", 1, true)
+		and content:find("Local worktrees: 1 · 2.0 KiB", 1, true)
+		and content:find(
+			"Resources: wall 25s · context 1.0 KiB / 2 sends · worktree 2.0 KiB · provider usage reported · in 12 · out 8 · total 20",
+			1,
+			true
+		)
 		and content:find("Budget: tracking · 20/100", 1, true)
-		and content:find("Trust: structured · provider · policy applied (gator.config) · write codex_enforced (workspace_write) · network unknown · MCP unknown · approval on_request", 1, true),
-	"run graph must render workspace, context bundle, exact usage, and budget state"
+		and content:find(
+			"Trust: structured · provider · policy applied (gator.config) · write codex_enforced (workspace_write) · network unknown · MCP unknown · approval on_request",
+			1,
+			true
+		),
+	"run graph must render separately configured local resources, exact usage, and budget state"
 )
 assert(
 	content:find("Gator runbooks", 1, true)

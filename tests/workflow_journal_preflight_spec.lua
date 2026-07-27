@@ -78,17 +78,25 @@ assert(
 	not table.concat(vim.fn.readfile(root .. "/.gator/events/" .. run.id .. ".jsonl"), "\n"):find("private%-value"),
 	"the context journal must not persist selected source or provider error text"
 )
+local initial_resources = value:run(run.id).resources
+assert(
+	initial_resources.context_sends == 1 and initial_resources.context_bytes == types["context.sent"].bytes,
+	"launches must account for exactly the Gator context payload delivered to the provider"
+)
 assert(
 	value:send_context({ run_id = run.id, kind = "selection", buffer = buffer, first_line = 1, last_line = 1 }),
 	"context send must succeed"
 )
 events = value:events(run.id)
 local prepared = events[#events - 1]
+local delivered_resources = value:run(run.id).resources
 assert(
 	#sent == 1
 		and prepared.type == "context.prepared"
 		and prepared.payload.purpose == "send"
-		and prepared.payload.artifacts[1].first_line == 1,
-	"follow-up context must be passively logged with exact range metadata before it is sent"
+		and prepared.payload.artifacts[1].first_line == 1
+		and delivered_resources.context_sends == 2
+		and delivered_resources.context_bytes == initial_resources.context_bytes + events[#events].payload.bytes,
+	"follow-up context must be logged and counted separately before it is sent"
 )
 assert(require("gator.ui.conversation").close(), "test chat panel must remain ephemeral")

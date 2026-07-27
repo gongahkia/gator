@@ -18,11 +18,70 @@ local function current()
 	return nil, tabpage
 end
 
+local default_resources = { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } }
+
+local function resource_config(workflow)
+	if type(workflow.resource_display) ~= "function" then
+		return default_resources
+	end
+	local ok, value = pcall(workflow.resource_display, workflow)
+	if not ok or type(value) ~= "table" or type(value.enabled) ~= "boolean" or type(value.fields) ~= "table" then
+		return default_resources
+	end
+	return value
+end
+
+local function selected_fields(value)
+	local result = {}
+	for _, field in ipairs(value.fields) do
+		result[field] = true
+	end
+	return result
+end
+
+local function bytes(value)
+	if value < 1024 then
+		return value .. " B"
+	end
+	if value < 1024 * 1024 then
+		return string.format("%.1f KiB", value / 1024)
+	end
+	if value < 1024 * 1024 * 1024 then
+		return string.format("%.1f MiB", value / (1024 * 1024))
+	end
+	return string.format("%.1f GiB", value / (1024 * 1024 * 1024))
+end
+
+local function duration(value)
+	if value < 60 then
+		return value .. "s"
+	end
+	if value < 60 * 60 then
+		return math.floor(value / 60) .. "m " .. value % 60 .. "s"
+	end
+	return math.floor(value / 3600) .. "h " .. math.floor(value % 3600 / 60) .. "m"
+end
+
 local function render(panel)
 	local runs = panel.workflow:runs()
 	panel.runs = runs
 	panel.selected = math.min(panel.selected, math.max(#runs, 1))
 	local lines = { "Gator runs", "" }
+	local configured_resources = resource_config(panel.workflow)
+	local resource_fields = selected_fields(configured_resources)
+	if
+		configured_resources.enabled
+		and resource_fields.worktree
+		and type(panel.workflow.resource_summary) == "function"
+	then
+		local ok, summary = pcall(panel.workflow.resource_summary, panel.workflow)
+		if ok and type(summary) == "table" and type(summary.count) == "number" then
+			local size = summary.state == "measured" and bytes(summary.bytes)
+				or (bytes(summary.bytes or 0) .. " + unknown")
+			table.insert(lines, "Local worktrees: " .. summary.count .. " · " .. size)
+			table.insert(lines, "")
+		end
+	end
 	if #runs == 0 then
 		table.insert(lines, "No Gator-managed runs. Use :Gator to launch one.")
 	else
@@ -58,7 +117,45 @@ local function render(panel)
 				lines,
 				"  Context: " .. (run.bundle_id or "unavailable") .. " · transcript " .. run.transcript
 			)
-			table.insert(lines, "  Usage: " .. usage)
+			if configured_resources.enabled then
+				local measurements
+				if type(panel.workflow.run_resources) == "function" then
+					local ok, value = pcall(panel.workflow.run_resources, panel.workflow, run)
+					measurements = ok and value or nil
+				end
+				local values = {}
+				if resource_fields.wall_time then
+					table.insert(values, "wall " .. (measurements and duration(measurements.wall_seconds) or "unknown"))
+				end
+				if resource_fields.context_bytes then
+					if measurements then
+						table.insert(
+							values,
+							"context "
+								.. bytes(measurements.context_bytes)
+								.. " / "
+								.. measurements.context_sends
+								.. " sends"
+						)
+					else
+						table.insert(values, "context unknown")
+					end
+				end
+				if resource_fields.worktree and run.workspace.kind == "worktree" then
+					local worktree = measurements and measurements.worktree
+					table.insert(
+						values,
+						"worktree "
+							.. (worktree and worktree.state == "measured" and bytes(worktree.bytes) or "unknown")
+					)
+				end
+				if resource_fields.usage then
+					table.insert(values, "provider usage " .. usage)
+				end
+				if #values > 0 then
+					table.insert(lines, "  Resources: " .. table.concat(values, " · "))
+				end
+			end
 			table.insert(lines, "  Budget: " .. budget)
 			local trust = run.trust
 			if trust then
@@ -86,7 +183,10 @@ local function render(panel)
 			end
 			if type(panel.workflow.events) == "function" then
 				local ok, events = pcall(panel.workflow.events, panel.workflow, run.id)
-				table.insert(lines, ok and ("  Journal: " .. #events .. " Gator-owned events · l details") or "  Journal: unavailable")
+				table.insert(
+					lines,
+					ok and ("  Journal: " .. #events .. " Gator-owned events · l details") or "  Journal: unavailable"
+				)
 			end
 			if run.workspace.kind == "worktree" and type(panel.workflow.worktree_lease) == "function" then
 				local ok, lease = pcall(panel.workflow.worktree_lease, panel.workflow, run.id)

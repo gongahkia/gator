@@ -164,6 +164,7 @@ local function normalize_run(value)
 				transcript = true,
 				usage = true,
 				budget = true,
+				resources = true,
 				created_at = true,
 				updated_at = true,
 				process = true,
@@ -271,7 +272,10 @@ local function normalize_run(value)
 	if run.trust.provider ~= run.provider then
 		fail("run.trust.provider must match run.provider")
 	end
-	if (run.transport == "terminal" and run.trust.surface ~= "terminal") or (run.transport == "chat" and run.trust.surface ~= "structured") then
+	if
+		(run.transport == "terminal" and run.trust.surface ~= "terminal")
+		or (run.transport == "chat" and run.trust.surface ~= "structured")
+	then
 		fail("run.trust.surface must match run.transport")
 	end
 	run.objective = redact.text(text(run.objective, "run.objective"))
@@ -302,6 +306,29 @@ local function normalize_run(value)
 	for _, field in ipairs({ "created_at", "updated_at" }) do
 		if type(run[field]) ~= "number" or run[field] < 0 or run[field] % 1 ~= 0 then
 			fail("run." .. field .. " must be a non-negative integer")
+		end
+	end
+	run.resources = run.resources or { started_at = run.created_at, context_bytes = 0, context_sends = 0 }
+	if type(run.resources) ~= "table" then
+		fail("run.resources must be an object")
+	end
+	for key in pairs(run.resources) do
+		if key ~= "started_at" and key ~= "finished_at" and key ~= "context_bytes" and key ~= "context_sends" then
+			fail("run.resources contains unsupported field: " .. tostring(key))
+		end
+	end
+	for _, field in ipairs({ "started_at", "context_bytes", "context_sends" }) do
+		if type(run.resources[field]) ~= "number" or run.resources[field] < 0 or run.resources[field] % 1 ~= 0 then
+			fail("run.resources." .. field .. " must be a non-negative integer")
+		end
+	end
+	if run.resources.finished_at ~= nil then
+		if
+			type(run.resources.finished_at) ~= "number"
+			or run.resources.finished_at < run.resources.started_at
+			or run.resources.finished_at % 1 ~= 0
+		then
+			fail("run.resources.finished_at must be an integer after run.resources.started_at")
 		end
 	end
 	return run
