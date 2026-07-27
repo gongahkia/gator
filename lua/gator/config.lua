@@ -192,19 +192,15 @@ end
 local function settings(value)
 	fields(value, root_fields, "settings")
 	schema_version(value.schema_version)
-	fields(
-		value.ui,
-		{
-			layout = true,
-			keymaps = true,
-			screen_reader = true,
-			icons = true,
-			motion = true,
-			loading = true,
-			resources = true,
-		},
-		"settings.ui"
-	)
+	fields(value.ui, {
+		layout = true,
+		keymaps = true,
+		screen_reader = true,
+		icons = true,
+		motion = true,
+		loading = true,
+		resources = true,
+	}, "settings.ui")
 	fields(value.context, { mode = true, trust = true, preflight = true, handoff = true }, "settings.context")
 	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")

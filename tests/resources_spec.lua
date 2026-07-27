@@ -17,13 +17,10 @@ assert(
 	summary.count == 1 and summary.state == "measured" and summary.bytes == 3,
 	"worktree summary must deduplicate shared Gator worktree paths"
 )
-local run = resources.run(
-	{
-		workspace = { kind = "project", root = root },
-		resources = { started_at = 10, finished_at = 75, context_bytes = 1536, context_sends = 3 },
-	},
-	100
-)
+local run = resources.run({
+	workspace = { kind = "project", root = root },
+	resources = { started_at = 10, finished_at = 75, context_bytes = 1536, context_sends = 3 },
+}, 100)
 assert(
 	run.wall_seconds == 65
 		and run.context_bytes == 1536
