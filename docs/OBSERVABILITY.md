@@ -16,6 +16,10 @@ The API equivalents are:
 
 Pagination is opaque. `from` and `to` use RFC3339. Standard trace responses contain only redacted payload projections; trace/span IDs join them to the local OpenTelemetry trace backend.
 
+## Builder-response failures
+
+Norbot writes `stage-output/builder-<attempt>.json` before validating a builder response. If validation fails, it updates that artifact with `builder_validation` and records a `builder_response_rejected` trace event containing the rejection reason, invalid path, file count, response size, and required path prefix. Structured logs include the same metadata but never the response body.
+
 ## Local forensic mode
 
 `forensics.raw_capture` stores raw payloads in encrypted `forensic_payloads` records. It is intentionally rejected unless all of the following are true:

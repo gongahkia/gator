@@ -162,8 +162,37 @@ func TestBuilderResponseIsBoundedToGeneratedApp(t *testing.T) {
 	if err != nil || len(files) != 1 {
 		t.Fatalf("files=%v err=%v", files, err)
 	}
-	if _, err := applyBuilderResponse(workspace, run, `{"files":{"../escape":"bad"}}`); err == nil {
+	_, err = applyBuilderResponse(workspace, run, `{"files":{"../escape":"bad"}}`)
+	if err == nil {
 		t.Fatal("expected unsafe path failure")
+	}
+	validation, ok := err.(builderResponseError)
+	if !ok || validation.reason != "path_outside_generated_app" || validation.invalidPath != "../escape" || validation.fileCount != 1 {
+		t.Fatalf("validation=%#v", validation)
+	}
+	diagnostics := builderResponseDiagnostics(err)
+	if diagnostics["required_path_prefix"] != "generated-app/" || diagnostics["invalid_path"] != "../escape" {
+		t.Fatalf("diagnostics=%#v", diagnostics)
+	}
+}
+
+func TestWriteStageArtifactPersistsBuilderResponse(t *testing.T) {
+	runner := &verifyRunner{}
+	workspace := runtime.Workspace{ArtifactsDir: t.TempDir(), DockerBin: "docker", Runner: runner}
+	artifact := map[string]any{"response": `{"files":{"index.html":"<main />"}}`, "builder_validation": map[string]any{"reason": "path_outside_generated_app"}}
+	if err := writeStageArtifact(context.Background(), workspace, "run-artifact", "stage-output/builder-1.json", artifact); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(workspace.RunPath("run-artifact"), "stage-output", "builder-1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "builder_validation") || !strings.Contains(string(content), "index.html") {
+		t.Fatalf("artifact=%s", content)
+	}
+	joined := strings.Join(runner.commands, "\n")
+	if !strings.Contains(joined, "cp "+workspace.RunPath("run-artifact")+"/stage-output/builder-1.json norbot-ws-run-artifact:/workspace/stage-output/builder-1.json") {
+		t.Fatalf("artifact was not mirrored: %s", joined)
 	}
 }
 

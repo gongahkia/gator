@@ -1000,6 +1000,11 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		artifact["planning_swarm"] = swarmArtifact
 	}
 	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
+	if job.Stage == domain.StageBuilder {
+		if err := writeStageArtifact(ctx, workspace, run.ID, path, artifact); err != nil {
+			return fmt.Errorf("record builder response artifact: %w", err)
+		}
+	}
 	if job.Stage == domain.StagePlanner {
 		if architecture, ok := architectureFromResponse(result.Text, run); ok && !swarmHandled {
 			if err := s.store.SetPlannerArchitecture(ctx, run.ID, job.Attempt, architecture); err != nil {
@@ -1040,6 +1045,18 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		} else {
 			files, err := builderFiles(result.Text)
 			if err != nil {
+				diagnostics := builderResponseDiagnostics(err)
+				artifact["builder_validation"] = diagnostics
+				if artifactErr := writeStageArtifact(ctx, workspace, run.ID, path, artifact); artifactErr != nil {
+					return fmt.Errorf("builder response rejected: %v; record diagnostic artifact: %w", err, artifactErr)
+				}
+				if usageErr := s.recordUsage(ctx, run.ID, job.Stage, nil, providerConfig.ID, result, prompt); usageErr != nil {
+					observability.Logger(s.log, ctx).Warn("record rejected builder usage", "error", usageErr)
+				}
+				observability.Logger(s.log, ctx).Error("builder response rejected", "reason", diagnostics["reason"], "invalid_path", diagnostics["invalid_path"], "file_count", diagnostics["file_count"], "response_bytes", diagnostics["response_bytes"], "artifact_path", path)
+				if _, traceErr := s.store.RecordTrace(ctx, domain.TraceEvent{RunID: run.ID, Type: "builder_response_rejected", Severity: "error", Status: "rejected", Summary: "Builder response rejected before revision creation", Stage: string(job.Stage), Attempt: job.Attempt, ProviderID: providerConfig.ID, Payload: diagnostics}, nil, 0); traceErr != nil {
+					return fmt.Errorf("builder response rejected: %v; record diagnostics: %w", err, traceErr)
+				}
 				return err
 			}
 			baseline, err := snapshotGeneratedApp(workspace.RunPath(run.ID))
@@ -1094,14 +1111,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			return err
 		}
 	}
-	encoded, err := json.MarshalIndent(artifact, "", "  ")
-	if err != nil {
-		return err
-	}
-	if _, err := workspace.WriteArtifact(run.ID, path, encoded); err != nil {
-		return err
-	}
-	if err := workspace.MirrorToVolume(ctx, run.ID, path); err != nil {
+	if err := writeStageArtifact(ctx, workspace, run.ID, path, artifact); err != nil {
 		return err
 	}
 	_ = deployment
@@ -1389,7 +1399,7 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"...\",\"stack\":[],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]}},\"notes\":\"...\"}. Workflow requires input and output nodes."
 	}
 	if stage == domain.StageBuilder {
-		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/path/to/file\":\"complete source\"}}. Include only approved files, use safe relative paths, and preserve required profile files."
+		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/path/to/file\":\"complete source\"}}. Every files key must start with generated-app/; never return bare paths such as index.html. Include only approved files, use safe relative paths, and preserve required profile files."
 	}
 	return base + "Return concise verification notes."
 }
@@ -1438,24 +1448,64 @@ func architectureFromResponse(text string, run domain.Run) (domain.Architecture,
 func builderFiles(text string) (map[string]string, error) {
 	payload, err := responseObject(text)
 	if err != nil {
-		return nil, fmt.Errorf("builder must return one JSON object: %w", err)
+		return nil, builderResponseError{reason: "invalid_json", responseBytes: len(text), cause: err}
 	}
 	rawFiles, ok := payload["files"].(map[string]any)
 	if !ok || len(rawFiles) == 0 || len(rawFiles) > 64 {
-		return nil, fmt.Errorf("builder output requires 1-64 files")
+		return nil, builderResponseError{reason: "invalid_file_count", fileCount: len(rawFiles), responseBytes: len(text)}
 	}
 	files := make(map[string]string, len(rawFiles))
 	for path, rawContent := range rawFiles {
 		content, ok := rawContent.(string)
 		if !ok || len(content) > 512<<10 {
-			return nil, fmt.Errorf("invalid builder content for %q", path)
+			return nil, builderResponseError{reason: "invalid_file_content", invalidPath: path, fileCount: len(rawFiles), responseBytes: len(text)}
 		}
 		if !strings.HasPrefix(path, "generated-app/") || strings.HasPrefix(path, "/") || strings.Contains(path, "..") {
-			return nil, fmt.Errorf("builder path %q is outside generated-app", path)
+			return nil, builderResponseError{reason: "path_outside_generated_app", invalidPath: path, fileCount: len(rawFiles), responseBytes: len(text)}
 		}
 		files[path] = content
 	}
 	return files, nil
+}
+
+type builderResponseError struct {
+	reason, invalidPath      string
+	fileCount, responseBytes int
+	cause                    error
+}
+
+func (e builderResponseError) Error() string {
+	switch e.reason {
+	case "invalid_json":
+		return fmt.Sprintf("builder must return one JSON object: %v", e.cause)
+	case "invalid_file_count":
+		return "builder output requires 1-64 files"
+	case "invalid_file_content":
+		return fmt.Sprintf("invalid builder content for %q", e.invalidPath)
+	case "path_outside_generated_app":
+		return fmt.Sprintf("builder path %q is outside generated-app", e.invalidPath)
+	default:
+		return "invalid builder response"
+	}
+}
+
+func builderResponseDiagnostics(err error) map[string]any {
+	value, ok := err.(builderResponseError)
+	if !ok {
+		return map[string]any{"reason": "unknown"}
+	}
+	return map[string]any{"reason": value.reason, "invalid_path": value.invalidPath, "file_count": value.fileCount, "response_bytes": value.responseBytes, "required_path_prefix": "generated-app/"}
+}
+
+func writeStageArtifact(ctx context.Context, workspace runtime.WorkspaceBackend, runID, path string, artifact map[string]any) error {
+	encoded, err := json.MarshalIndent(artifact, "", "  ")
+	if err != nil {
+		return err
+	}
+	if _, err := workspace.WriteArtifact(runID, path, encoded); err != nil {
+		return err
+	}
+	return workspace.MirrorToVolume(ctx, runID, path)
 }
 
 func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, text string) ([]string, error) {
