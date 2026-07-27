@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 9
+M.schema_version = 10
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -17,6 +17,7 @@ M.defaults = {
 	context = {
 		mode = "manual",
 		trust = "provenance",
+		preflight = { confirm = false },
 		handoff = {
 			author = "user",
 			max_chars = 4096,
@@ -43,7 +44,7 @@ M.defaults = {
 		vibe = { user_confirmed = false },
 	},
 	workspaces = { mode = "project" },
-	retention = { max_age_days = 30, cleanup_on_start = true, worktrees = "inactive_clean" },
+	retention = { max_age_days = 30, max_bytes = 0, cleanup_on_start = true, worktrees = "inactive_clean" },
 	persistence = { sharing = "local" },
 	telemetry = { enabled = false, redaction_patterns = {} },
 	budget = { max_tokens = 0, action = "warn", max_concurrent_runs = 0 },
@@ -194,7 +195,7 @@ local function settings(value)
 		{ layout = true, keymaps = true, screen_reader = true, icons = true, motion = true, loading = true },
 		"settings.ui"
 	)
-	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
+	fields(value.context, { mode = true, trust = true, preflight = true, handoff = true }, "settings.context")
 	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")
 	fields(value.permissions.codex, { sandbox = true }, "settings.permissions.codex")
@@ -204,7 +205,7 @@ local function settings(value)
 		fields(value.providers[name], { user_confirmed = true }, "settings.providers." .. name)
 	end
 	fields(value.workspaces, { mode = true }, "settings.workspaces")
-	fields(value.retention, { max_age_days = true, cleanup_on_start = true, worktrees = true }, "settings.retention")
+	fields(value.retention, { max_age_days = true, max_bytes = true, cleanup_on_start = true, worktrees = true }, "settings.retention")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
 	fields(value.budget, { max_tokens = true, action = true, max_concurrent_runs = true }, "settings.budget")
@@ -239,6 +240,10 @@ local function settings(value)
 	end
 	if not vim.tbl_contains({ "provenance", "repository", "manual" }, value.context.trust) then
 		fail("context.trust must be provenance, repository, or manual")
+	end
+	fields(value.context.preflight, { confirm = true }, "settings.context.preflight")
+	if type(value.context.preflight.confirm) ~= "boolean" then
+		fail("context.preflight.confirm must be boolean")
 	end
 	fields(value.context.handoff, {
 		author = true,
@@ -310,6 +315,9 @@ local function settings(value)
 	then
 		fail("retention.max_age_days must be a non-negative integer")
 	end
+	if type(value.retention.max_bytes) ~= "number" or value.retention.max_bytes < 0 or value.retention.max_bytes % 1 ~= 0 then
+		fail("retention.max_bytes must be a non-negative integer")
+	end
 	if type(value.retention.cleanup_on_start) ~= "boolean" then
 		fail("retention.cleanup_on_start must be boolean")
 	end
@@ -367,6 +375,7 @@ function M.migrate(value)
 		and from_version ~= 6
 		and from_version ~= 7
 		and from_version ~= 8
+		and from_version ~= 9
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -386,7 +395,14 @@ function M.migrate(value)
 	if document.retention.worktrees == nil then
 		document.retention.worktrees = "inactive_clean"
 	end
+	if document.retention.max_bytes == nil then
+		document.retention.max_bytes = 0
+	end
 	document.context = document.context or {}
+	document.context.preflight = document.context.preflight or {}
+	if document.context.preflight.confirm == nil then
+		document.context.preflight.confirm = false
+	end
 	document.context.handoff = document.context.handoff or {}
 	document.context.handoff.profile = document.context.handoff.profile or "full"
 	document.context.handoff.max_files = document.context.handoff.max_files or 24

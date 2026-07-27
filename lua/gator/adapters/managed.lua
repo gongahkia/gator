@@ -304,6 +304,13 @@ function M.catalog(opts)
 				record.readiness_state = "user_confirmed"
 				record.readiness_signals = { "CLI contract detected", "user-confirmed configuration" }
 			end
+			if type(probe) == "table" then
+				if type(probe.version) == "table" and #probe.version == 3 then
+					record.version = table.concat(probe.version, ".")
+				elseif type(probe.version) == "string" then
+					record.version = probe.version
+				end
+			end
 		end
 		table.insert(result, record)
 	end

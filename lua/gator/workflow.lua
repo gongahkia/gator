@@ -15,9 +15,12 @@ local worktree = require("gator.workspace.worktree")
 local workspace_cleanup = require("gator.workspace.cleanup")
 local retention = require("gator.core.retention")
 local retention_ui = require("gator.ui.retention")
+local context_preflight = require("gator.ui.context_preflight")
+local run_events = require("gator.ui.run_events")
 local state_store = require("gator.state")
 local review_validation = require("gator.review.validation")
 local policy_overlay = require("gator.policy.overlay")
+local trust = require("gator.trust")
 
 local M = { name = "workflow", api_version = 2 }
 local Workflow = {}
@@ -178,6 +181,7 @@ function Workflow:recover()
 	for _, run in ipairs(self:runs()) do
 		if active_state(run) and run.state ~= "detached" then
 			self:update(run.id, { state = "detached" })
+			self:journal(run.id, "run.recovered", { previous_state = run.state, state = "detached" })
 			recovered = recovered + 1
 		end
 	end
@@ -198,13 +202,31 @@ function Workflow:put(value)
 	return self.store:put(value)
 end
 
+function Workflow:journal(id, event_type, payload)
+	return self.store:append_event(id, event_type, payload, self.clock())
+end
+
+function Workflow:events(id)
+	self:run(id)
+	return self.store:events(id)
+end
+
+function Workflow:open_events(id)
+	local run = self:run(id)
+	return run_events.open({ run = run, events = self.store:events(run.id) })
+end
+
 function Workflow:update(id, patch)
 	local value = self:run(id)
+	local previous_state = value.state
 	for key, item in pairs(patch) do
 		value[key] = vim.deepcopy(item)
 	end
 	value.updated_at = self.clock()
 	local updated = self:put(value)
+	if patch.state ~= nil and patch.state ~= previous_state then
+		self:journal(updated.id, "run.state", { from = previous_state, to = updated.state })
+	end
 	if updated.workspace.kind == "worktree" and not active_state(updated) then
 		self:release_worktree_lease(updated)
 	end
@@ -221,6 +243,12 @@ function Workflow:report_usage(id, usage)
 		budget.state = usage.total_tokens and usage.total_tokens >= budget.limit_tokens and "exhausted" or "tracking"
 	end
 	self:update(id, { usage = usage, budget = budget })
+	self:journal(id, "provider.usage", {
+		input_tokens = usage.input_tokens,
+		output_tokens = usage.output_tokens,
+		total_tokens = usage.total_tokens,
+		state = usage.state,
+	})
 	if budget.state == "exhausted" then
 		vim.notify(
 			"Gator budget reached for " .. run.provider .. " · " .. budget.limit_tokens .. " tokens",
@@ -260,6 +288,7 @@ function Workflow:refresh()
 				terminal = true,
 				chat = structured.supports(record.provider),
 				readiness_state = record.readiness_state,
+				version = record.version,
 			}
 		end
 	end
@@ -283,6 +312,7 @@ function Workflow:refresh()
 				terminal = native_terminal.supports(record.provider),
 				managed_mode = record.mode,
 				readiness_state = record.readiness_state,
+				version = record.version,
 			}
 		end
 	end
@@ -459,11 +489,12 @@ function Workflow:reconcile_worktree_leases()
 end
 
 function Workflow:retention_exclusion()
-	local protected = { runs = {}, transcripts = {}, bundles = {}, reviews = {}, handoffs = {} }
+	local protected = { runs = {}, transcripts = {}, bundles = {}, reviews = {}, handoffs = {}, events = {} }
 	for _, run in ipairs(self:runs()) do
 		if active_state(run) then
 			protected.runs[run.id] = true
 			protected.transcripts[run.id] = true
+			protected.events[run.id] = true
 			protected.reviews[run.id] = true
 			if run.bundle_id then
 				protected.bundles[run.bundle_id] = true
@@ -473,7 +504,7 @@ function Workflow:retention_exclusion()
 	end
 	return function(value, category)
 		local name = vim.fn.fnamemodify(value, ":t")
-		if category == "runs" or category == "transcripts" then
+		if category == "runs" or category == "transcripts" or category == "events" then
 			return protected[category][name:gsub("%.[^.]+$", "")]
 		end
 		if category == "bundles" then
@@ -530,18 +561,50 @@ function Workflow:worktree_cleanup_plan(opts)
 	return { manager = manager, plan = manager:plan(), by_path = by_path }
 end
 
-function Workflow:retention_plan()
-	local age = self.state.config.retention.max_age_days
-	if age == 0 then
-		return { manager = nil, artifacts = {}, worktrees = self:worktree_cleanup_plan(), by_path = {} }
+function Workflow:retention_inventory()
+	local manager = retention.project(self.store.directory, self.state.config.retention.max_age_days)
+	return manager:inventory()
+end
+
+function Workflow:retention_plan(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" or (opts.quota ~= nil and type(opts.quota) ~= "boolean") then
+		fail("retention plan options must provide an optional quota boolean")
 	end
+	local age = self.state.config.retention.max_age_days
 	local manager = retention.project(self.store.directory, age)
 	local worktrees = self:worktree_cleanup_plan()
+	local exclude = self:retention_exclusion()
+	local artifacts = age > 0 and manager:plan(self.clock(), { exclude = exclude }) or {}
+	local selected, scheduled_bytes = {}, 0
+	for _, artifact in ipairs(artifacts) do
+		selected[artifact.path] = true
+		scheduled_bytes = scheduled_bytes + (artifact.bytes or 0)
+	end
+	local quota, inventory = {}, manager:inventory()
+	if opts.quota ~= false and self.state.config.retention.max_bytes > 0 then
+		quota, inventory = manager:quota_plan(self.state.config.retention.max_bytes, {
+			already_scheduled_bytes = scheduled_bytes,
+			exclude = function(path, category)
+				return selected[path] or exclude(path, category)
+			end,
+		})
+		for _, artifact in ipairs(quota) do
+			table.insert(artifacts, artifact)
+		end
+	end
+	local reclaim_bytes = 0
+	for _, artifact in ipairs(artifacts) do
+		reclaim_bytes = reclaim_bytes + (artifact.bytes or 0)
+	end
 	return {
 		manager = manager,
-		artifacts = manager:plan(self.clock(), { exclude = self:retention_exclusion() }),
+		artifacts = artifacts,
 		worktrees = worktrees,
 		by_path = worktrees.by_path,
+		inventory = inventory,
+		quota_bytes = self.state.config.retention.max_bytes,
+		reclaim_bytes = reclaim_bytes,
 	}
 end
 
@@ -560,7 +623,11 @@ function Workflow:apply_retention_plan(value)
 			end
 		end
 	end
-	return { artifacts = artifacts, worktrees = worktrees }
+	local reclaimed_bytes = 0
+	for _, value in ipairs(value.artifacts or {}) do
+		reclaimed_bytes = reclaimed_bytes + (value.bytes or 0)
+	end
+	return { artifacts = artifacts, worktrees = worktrees, reclaimed_bytes = reclaimed_bytes }
 end
 
 function Workflow:startup_retention()
@@ -568,7 +635,7 @@ function Workflow:startup_retention()
 		return { artifacts = {}, worktrees = {} }
 	end
 	self.retention_started = true
-	local value = self:retention_plan()
+	local value = self:retention_plan({ quota = false })
 	local ok, result = pcall(self.apply_retention_plan, self, value)
 	if not ok then
 		vim.notify("Gator startup cleanup: " .. tostring(result), vim.log.levels.WARN)
@@ -592,16 +659,37 @@ function Workflow:prune()
 	return self.retention_ui.open({
 		artifacts = value.artifacts,
 		worktrees = value.worktrees.plan,
+		inventory = value.inventory,
+		quota_bytes = value.quota_bytes,
+		reclaim_bytes = value.reclaim_bytes,
 		on_confirm = function()
 			local ok, result = pcall(self.apply_retention_plan, self, value)
 			vim.notify(
 				ok
-						and ("Gator cleanup: removed " .. #result.artifacts .. " artifacts and " .. #result.worktrees .. " worktrees")
+					and ("Gator cleanup: removed "
+						.. #result.artifacts
+						.. " artifacts · reclaimed "
+						.. result.reclaimed_bytes
+						.. " bytes · "
+						.. #result.worktrees
+						.. " worktrees")
 					or ("Gator cleanup: " .. tostring(result)),
 				ok and vim.log.levels.INFO or vim.log.levels.ERROR,
 				{ title = "Gator" }
 			)
 		end,
+	})
+end
+
+function Workflow:storage()
+	local value = self:retention_plan()
+	return self.retention_ui.open({
+		artifacts = value.artifacts,
+		worktrees = value.worktrees.plan,
+		inventory = value.inventory,
+		quota_bytes = value.quota_bytes,
+		reclaim_bytes = value.reclaim_bytes,
+		readonly = true,
 	})
 end
 
@@ -679,14 +767,20 @@ end
 function Workflow:bundle(opts, workspace)
 	if opts.bundle_body then
 		local body = text(opts.bundle_body, "handoff bundle")
-		return body, { input_tokens = capture.estimate(body) }
+		return body, {
+			input_tokens = capture.estimate(body),
+			redactions = 0,
+			artifacts = { { kind = "explicit_bundle", bytes = #body } },
+		}
 	end
+	local diff, diff_redactions = capture.diff(workspace.root)
 	return capture.bundle({
 		objective = opts.objective,
 		capture = opts.capture,
 		profile = opts.profile or self.state.config.context.handoff.profile,
 		max_chars = self.state.config.context.handoff.max_chars,
-		diff = capture.diff(workspace.root),
+		diff = diff,
+		diff_redactions = diff_redactions,
 		note = opts.note,
 		summary = opts.summary,
 		transcript = opts.transcript,
@@ -742,6 +836,7 @@ function Workflow:open_terminal(run, prepared)
 		command = prepared.command,
 		on_exit = function(result)
 			self:close_loading(run.id)
+			self:journal(run.id, "provider.exited", { code = result.code, transport = "terminal" })
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
 				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
@@ -750,6 +845,7 @@ function Workflow:open_terminal(run, prepared)
 		end,
 	})
 	self.active[run.id] = { kind = "terminal", terminal_id = run.id }
+	self:journal(run.id, "provider.session", { owner = "provider", resume_supported = true, transport = "terminal" })
 	return self:update(run.id, {
 		state = "running",
 		session = { id = prepared.session.id, resume_supported = true },
@@ -765,21 +861,31 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 		prompt = prompt,
 		operation = operation,
 		session = existing_session,
+		codex_policy = run.provider == "codex" and trust.codex_policy(run.trust) or nil,
 		on_session = function(session)
 			self:close_loading(run.id)
 			local state = prompt and "running" or "waiting_input"
 			self:update(run.id, { session = session, state = state })
+			self:journal(run.id, "provider.session", {
+				owner = "provider",
+				resume_supported = session.resume_supported,
+				operation = operation or "start",
+			})
 			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
 		end,
 		on_event = function(kind, value)
-			if kind == "text" then
+			if kind == "running" then
+				self:journal(run.id, "provider.running", { transport = "structured" })
+			elseif kind == "text" then
 				self:append_transcript(run.id, "assistant", value)
 				pcall(conversation.update, { run_id = run.id, text = value, state = "running" })
 			elseif kind == "settled" then
+				self:journal(run.id, "provider.settled", { transport = "structured" })
 				self:update(run.id, { state = "waiting_input" })
 				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
 				self:finish_summary(run.id)
 			elseif kind == "error" then
+				self:journal(run.id, "provider.error", { reason = tostring(value):sub(1, 2048), phase = "structured" })
 				pcall(conversation.update, { run_id = run.id, text = value, state = "failed" })
 			end
 		end,
@@ -792,16 +898,22 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				conversation.update,
 				{ run_id = run.id, text = "Approval requested: " .. request.action .. detail, state = "waiting_input" }
 			)
+			self:journal(run.id, "approval.requested", {
+				action = request.action,
+				has_command = request.command ~= "",
+			})
 			vim.ui.select({ "Approve once", "Deny", "Cancel" }, {
 				prompt = "Gator approval · " .. run.provider .. " · " .. request.action .. detail,
 			}, function(choice)
 				local decision = choice == "Approve once" and "approved"
 					or (choice == "Deny" and "denied" or "cancelled")
 				decide(decision)
+				self:journal(run.id, "approval.decided", { action = request.action, decision = decision })
 			end)
 		end,
 		on_exit = function(result)
 			self:close_loading(run.id)
+			self:journal(run.id, "provider.exited", { code = result.code, transport = "structured" })
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
 				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
@@ -823,10 +935,13 @@ function Workflow:open_managed(run, prompt, existing_session)
 	end
 	local reference
 	local function permission(request, respond)
+		self:journal(run.id, "approval.requested", { action = request.action, provider = request.provider })
 		vim.ui.select({ "approved", "denied", "cancelled" }, {
 			prompt = "Gator approval · " .. request.provider .. " · " .. request.action,
 		}, function(decision)
-			respond(decision or "cancelled")
+			local resolved = decision or "cancelled"
+			respond(resolved)
+			self:journal(run.id, "approval.decided", { action = request.action, decision = resolved })
 		end)
 	end
 	local opened = self.managed:open({
@@ -852,6 +967,11 @@ function Workflow:open_managed(run, prompt, existing_session)
 					capabilities = session.capabilities,
 				},
 			})
+			self:journal(run.id, "provider.session", {
+				owner = session.owner,
+				mode = session.mode,
+				resume_supported = self.managed:can_resume(run.provider, session),
+			})
 			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
 		end,
 		on_event = function(event)
@@ -863,16 +983,23 @@ function Workflow:open_managed(run, prompt, existing_session)
 					state = event.type == "complete" and "waiting_input" or "running",
 				})
 				if event.type == "complete" then
+					self:journal(run.id, "provider.settled", { transport = "managed" })
 					self:update(run.id, { state = "waiting_input" })
 					self:finish_summary(run.id)
 				end
 			elseif event.type == "error" then
+				self:journal(run.id, "provider.error", { reason = tostring(event.text):sub(1, 2048), phase = "managed" })
 				pcall(conversation.update, { run_id = run.id, text = event.text, state = "failed" })
 			end
 		end,
 		on_permission = permission,
 		on_exit = function(result)
 			self:close_loading(run.id)
+			self:journal(run.id, "provider.exited", {
+				code = result.code,
+				stopped = result.stopped == true,
+				transport = "managed",
+			})
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
 				self:update(
@@ -906,6 +1033,12 @@ function Workflow:launch(opts)
 	if type(workspace.root) ~= "string" or not vim.uv.fs_realpath(workspace.root) then
 		fail("workspace root must resolve")
 	end
+	local run_trust = trust.resolve({
+		provider = chosen.provider,
+		transport = transport,
+		root = self.root,
+		config = self.state.config,
+	})
 	if opts.native_session_operation ~= nil then
 		if
 			opts.native_session_operation ~= "fork"
@@ -948,9 +1081,37 @@ function Workflow:launch(opts)
 			action = self.state.config.budget.action,
 			state = self.state.config.budget.max_tokens > 0 and "unknown" or "unbounded",
 		},
+		trust = run_trust,
 		created_at = self.clock(),
 		updated_at = self.clock(),
 	})
+	local preflight = {
+		purpose = "launch",
+		provider = run.provider,
+		transport = run.transport,
+		bytes = #body,
+		tokens = estimate.input_tokens,
+		redactions = estimate.redactions or 0,
+		artifacts = estimate.artifacts or {},
+	}
+	self:journal(run.id, "run.created", { role = run.role, workspace = run.workspace.kind, parent_run_id = run.parent_run_id })
+	self:journal(run.id, "provider.selected", {
+		provider = run.provider,
+		transport = run.transport,
+		readiness = chosen.readiness_state,
+		version = chosen.version,
+	})
+	self:journal(run.id, "trust.applied", {
+		surface = run.trust.surface,
+		policy = run.trust.policy.state,
+		policy_source = run.trust.policy.mode,
+		write = run.trust.write.state,
+		write_mode = run.trust.write.mode,
+		network = run.trust.network.state,
+		mcp = run.trust.mcp.state,
+		approval = run.trust.approval.state,
+	})
+	self:journal(run.id, "context.prepared", preflight)
 	local leased, lease_error = pcall(self.lease_worktree, self, run)
 	if not leased then
 		self:update(run.id, { state = "failed" })
@@ -970,38 +1131,58 @@ function Workflow:launch(opts)
 			.. bundle_id
 			.. "/files/."
 	end
-	self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
-	if transport == "terminal" then
-		self.bridge:start({ provider = run.provider, cwd = workspace.root, prompt = prompt }, function(prepared, reason)
-			self:close_loading(run.id)
-			if not prepared then
-				self:update(run.id, { state = "failed" })
-				vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
-				return
-			end
-			local ok, err = pcall(self.open_terminal, self, run, prepared)
+	local function begin()
+		self:journal(run.id, "context.sent", preflight)
+		self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
+		vim.notify("Gator trust · " .. trust.summary(run.trust), vim.log.levels.INFO)
+		if transport == "terminal" then
+			self.bridge:start({ provider = run.provider, cwd = workspace.root, prompt = prompt }, function(prepared, reason)
+				self:close_loading(run.id)
+				if not prepared then
+					self:journal(run.id, "provider.error", { reason = tostring(reason):sub(1, 2048), phase = "launch" })
+					self:update(run.id, { state = "failed" })
+					vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
+					return
+				end
+				local ok, err = pcall(self.open_terminal, self, run, prepared)
+				if not ok then
+					self:journal(run.id, "provider.error", { reason = tostring(err):sub(1, 2048), phase = "terminal_open" })
+					self:update(run.id, { state = "failed" })
+					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
+			end)
+		elseif structured.supports(run.provider) then
+			local operation = opts.native_session_operation
+			local existing = opts.native_session
+			local ok, err = pcall(self.open_structured, self, run, prompt, operation, existing)
 			if not ok then
-				self:update(run.id, { state = "failed" })
-				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				self:close_loading(run.id)
+				self:journal(run.id, "provider.error", { reason = tostring(err):sub(1, 2048), phase = "structured_open" })
+				error(err, 0)
 			end
-		end)
-	elseif structured.supports(run.provider) then
-		local operation = opts.native_session_operation
-		local existing = opts.native_session
-		local ok, err = pcall(self.open_structured, self, run, prompt, operation, existing)
-		if not ok then
-			self:close_loading(run.id)
-			error(err, 0)
+		else
+			local ok, err = pcall(self.open_managed, self, run, prompt)
+			if not ok then
+				self:close_loading(run.id)
+				self:journal(run.id, "provider.error", { reason = tostring(err):sub(1, 2048), phase = "managed_open" })
+				error(err, 0)
+			end
 		end
-	else
-		local ok, err = pcall(self.open_managed, self, run, prompt)
-		if not ok then
-			self:close_loading(run.id)
-			error(err, 0)
+		if opts.remember ~= false then
+			self.store:set_default_provider(run.provider)
 		end
 	end
-	if opts.remember ~= false then
-		self.store:set_default_provider(run.provider)
+	if self.state.config.context.preflight.confirm then
+		context_preflight.open({
+			preflight = preflight,
+			on_confirm = begin,
+			on_cancel = function()
+				self:journal(run.id, "context.cancelled", { purpose = "launch" })
+				self:update(run.id, { state = "stopped" })
+			end,
+		})
+	else
+		begin()
 	end
 	return run
 end
@@ -1102,8 +1283,20 @@ function Workflow:send_context(opts)
 		return true
 	end
 	local message
+	local artifacts
+	local redactions = 0
 	if kind == "selection" then
 		local selected = capture.current(opts)
+		artifacts = {
+			{
+				kind = "selection",
+				path = selected.path,
+				first_line = selected.first_line,
+				last_line = selected.last_line,
+				bytes = #selected.text,
+			},
+		}
+		redactions = selected.redactions or 0
 		message = table.concat({
 			"## Gator follow-up editor context",
 			"- Kind: selection",
@@ -1117,6 +1310,17 @@ function Workflow:send_context(opts)
 		}, "\n")
 	elseif kind == "diagnostic" then
 		local diagnostics = capture.diagnostics(opts)
+		artifacts = {
+			{
+				kind = "diagnostics",
+				path = diagnostics.path,
+				first_line = diagnostics.first_line,
+				last_line = diagnostics.last_line,
+				count = #diagnostics.values,
+				bytes = 0,
+			},
+		}
+		redactions = diagnostics.redactions or 0
 		local lines = {
 			"## Gator follow-up editor context",
 			"- Kind: diagnostic",
@@ -1131,8 +1335,11 @@ function Workflow:send_context(opts)
 			)
 		end
 		message = table.concat(lines, "\n")
+		artifacts[1].bytes = #message
 	elseif kind == "hunk" then
 		local hunk = capture.hunk({ root = run.workspace.root, buffer = opts.buffer })
+		artifacts = { { kind = "git_hunk", path = hunk.path, bytes = #hunk.text } }
+		redactions = hunk.redactions or 0
 		message = table.concat({
 			"## Gator follow-up editor context",
 			"- Kind: Git hunk",
@@ -1151,8 +1358,33 @@ function Workflow:send_context(opts)
 			.. opts.bundle_id
 			.. "`\n\n"
 			.. bundle
+		artifacts = { { kind = "named_bundle", bundle_id = opts.bundle_id, bytes = #bundle } }
 	end
-	return self:send(run.id, message)
+	local preflight = {
+		purpose = "send",
+		provider = run.provider,
+		transport = run.transport,
+		bytes = #message,
+		tokens = capture.estimate(message),
+		redactions = redactions,
+		artifacts = artifacts,
+	}
+	self:journal(run.id, "context.prepared", preflight)
+	local function deliver()
+		self:journal(run.id, "context.sent", preflight)
+		return self:send(run.id, message)
+	end
+	if self.state.config.context.preflight.confirm then
+		context_preflight.open({
+			preflight = preflight,
+			on_confirm = deliver,
+			on_cancel = function()
+				self:journal(run.id, "context.cancelled", { purpose = "send" })
+			end,
+		})
+		return true
+	end
+	return deliver()
 end
 
 function Workflow:attach_context(id)
@@ -1271,6 +1503,12 @@ function Workflow:execute_review_test(id, command_id, confirmed)
 		created_at = now(),
 	}, table.concat(output, "\n"))
 	self:update(run.id, { review = { id = record.review.id, state = record.review.state } })
+	self:journal(run.id, "review.recorded", {
+		review_id = record.review.id,
+		state = record.review.state,
+		command_id = record.review.command_id,
+		passed = record.review.passed,
+	})
 	vim.notify(
 		"Gator review test "
 			.. result.command_id
@@ -1319,6 +1557,7 @@ function Workflow:record_review_decision(id, decision)
 		created_at = now(),
 	}, "Review decision: " .. decision)
 	self:update(run.id, { review = { id = record.review.id, state = record.review.state } })
+	self:journal(run.id, "review.recorded", { review_id = record.review.id, state = record.review.state, decision = decision })
 	return record
 end
 
@@ -1589,6 +1828,7 @@ function Workflow:stop(id)
 		end
 		self.active[id] = nil
 	end
+	self:journal(run.id, "provider.exited", { stopped = true, transport = run.transport })
 	self:update(run.id, { state = "stopped" })
 	return true
 end
@@ -1629,6 +1869,7 @@ function Workflow:resume(id)
 		{ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } },
 		function(prepared, reason)
 			if not prepared then
+				self:journal(run.id, "provider.error", { reason = tostring(reason):sub(1, 2048), phase = "resume" })
 				vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
 				return
 			end
@@ -1829,6 +2070,13 @@ function Workflow:handoff(source_id, target, opts)
 			omitted = omitted + 1
 		end
 	end
+	self:journal(source.id, "handoff.prepared", {
+		target = target,
+		profile = profile,
+		bytes = #body,
+		included = included,
+		omitted = omitted,
+	})
 	self.handoff_review.open({
 		source = source,
 		target = target,

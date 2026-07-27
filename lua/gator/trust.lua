@@ -69,7 +69,6 @@ local function pi(project)
 end
 
 local function codex(mode, source)
-	local app_server_mode = mode == "read_only" and "readOnly" or "workspaceWrite"
 	return {
 		surface = "structured",
 		security_owner = "provider",
@@ -79,7 +78,6 @@ local function codex(mode, source)
 		mcp = state("unknown", "not controlled by Gator"),
 		approval = state("on_request", "Gator renders Codex approval requests"),
 		provider = "codex",
-		codex = { sandbox = app_server_mode, approval_policy = "on-request" },
 	}
 end
 
@@ -194,14 +192,28 @@ end
 function M.summary(value)
 	value = M.normalize(value)
 	return string.format(
-		"%s · write %s%s · network %s · MCP %s · approval %s",
+		"%s · policy %s%s · write %s%s · network %s · MCP %s · approval %s",
 		value.surface == "terminal" and "terminal" or "structured chat",
+		value.policy.state,
+		value.policy.mode and (" (" .. value.policy.mode .. ")") or "",
 		value.write.state,
 		value.write.mode and (" (" .. value.write.mode .. ")") or "",
 		value.network.state,
 		value.mcp.state,
 		value.approval.state
 	)
+end
+
+function M.codex_policy(value)
+	value = M.normalize(value)
+	if value.provider ~= "codex" or value.write.state ~= "codex_enforced" then
+		return nil
+	end
+	local sandbox = value.write.mode == "read_only" and "readOnly" or value.write.mode == "workspace_write" and "workspaceWrite" or nil
+	if not sandbox or value.approval.state ~= "on_request" then
+		fail("Codex trust record does not describe an enforceable launch policy")
+	end
+	return { sandbox = sandbox, approval_policy = "on-request" }
 end
 
 return M

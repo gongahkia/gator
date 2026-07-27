@@ -42,14 +42,15 @@ local function source(opts)
 		path = "[unnamed buffer " .. buffer .. "]"
 	end
 	local lines = vim.api.nvim_buf_get_lines(buffer, first_line - 1, last_line, false)
-	local body = table.concat(lines, "\n")
+	local body = redact.inspect(table.concat(lines, "\n"))
 	return {
 		buffer = buffer,
 		path = path,
 		language = vim.bo[buffer].filetype ~= "" and vim.bo[buffer].filetype or "text",
 		first_line = first_line,
 		last_line = last_line,
-		text = redact.text(body),
+		text = body.text,
+		redactions = body.matches,
 		changedtick = vim.api.nvim_buf_get_changedtick(buffer),
 	}
 end
@@ -73,7 +74,11 @@ function M.diff(root)
 		return nil
 	end
 	local value = vim.trim(result.stdout or "")
-	return value ~= "" and redact.text(value) or nil
+	if value == "" then
+		return nil, 0
+	end
+	local inspected = redact.inspect(value)
+	return inspected.text, inspected.matches
 end
 
 local function relative(path)
@@ -335,15 +340,17 @@ function M.diagnostics(opts)
 	then
 		fail("diagnostic line range is outside the buffer")
 	end
-	local values = {}
+	local values, redactions = {}, 0
 	for _, diagnostic in ipairs(vim.diagnostic.get(buffer)) do
 		local line = (diagnostic.lnum or 0) + 1
 		if line >= first_line and line <= last_line then
+			local inspected = redact.inspect(diagnostic.message or "")
+			redactions = redactions + inspected.matches
 			table.insert(values, {
 				line = line,
 				column = (diagnostic.col or 0) + 1,
 				severity = vim.diagnostic.severity[diagnostic.severity] or "UNKNOWN",
-				message = redact.text(diagnostic.message or ""),
+				message = inspected.text,
 			})
 		end
 	end
@@ -360,6 +367,7 @@ function M.diagnostics(opts)
 		first_line = first_line,
 		last_line = last_line,
 		values = values,
+		redactions = redactions,
 	}
 end
 
@@ -385,7 +393,8 @@ function M.hunk(opts)
 	if not value or vim.trim(value) == "" then
 		fail("no Git diff exists for the current buffer")
 	end
-	return { kind = "hunk", path = relative_path, text = redact.text(value) }
+	local inspected = redact.inspect(value)
+	return { kind = "hunk", path = relative_path, text = inspected.text, redactions = inspected.matches }
 end
 
 local function section(lines, heading, value)
@@ -401,6 +410,7 @@ function M.bundle(opts)
 		fail("bundle options must be an object")
 	end
 	local objective = text(opts.objective, "objective")
+	local objective_inspected = redact.inspect(objective)
 	local capture = opts.capture
 	if type(capture) ~= "table" then
 		fail("bundle capture is required")
@@ -417,7 +427,17 @@ function M.bundle(opts)
 	if profile == "compact" or profile == "summary-first" then
 		captured = captured:sub(1, max_chars)
 	end
-	local lines = { "# Gator context bundle", "", "## Objective", redact.text(objective), "" }
+	local diff = opts.diff and redact.inspect(opts.diff) or { text = nil, matches = 0 }
+	local note = opts.note and redact.inspect(opts.note) or { text = nil, matches = 0 }
+	local summary = opts.summary and redact.inspect(opts.summary) or { text = nil, matches = 0 }
+	local transcript = opts.transcript and redact.inspect(opts.transcript) or { text = nil, matches = 0 }
+	local redactions = (capture.redactions or 0)
+		+ (opts.diff_redactions or diff.matches)
+		+ objective_inspected.matches
+		+ note.matches
+		+ summary.matches
+		+ transcript.matches
+	local lines = { "# Gator context bundle", "", "## Objective", objective_inspected.text, "" }
 	section(
 		lines,
 		"Captured source",
@@ -431,18 +451,38 @@ function M.bundle(opts)
 			"```",
 		}, "\n")
 	)
-	section(lines, "Current diff", opts.diff)
-	section(lines, "Handoff note", opts.note)
-	section(lines, "Source-agent summary", opts.summary)
-	if opts.transcript and profile == "full" then
-		section(lines, "Gator-owned transcript", opts.transcript)
+	section(lines, "Current diff", diff.text)
+	section(lines, "Handoff note", note.text)
+	section(lines, "Source-agent summary", summary.text)
+	if transcript.text and profile == "full" then
+		section(lines, "Gator-owned transcript", transcript.text)
+	end
+	local artifacts = {
+		{
+			kind = "selection",
+			path = capture.path,
+			first_line = capture.first_line,
+			last_line = capture.last_line,
+			bytes = #captured,
+		},
+	}
+	if diff.text then
+		table.insert(artifacts, { kind = "git_diff", bytes = #diff.text })
+	end
+	if note.text then
+		table.insert(artifacts, { kind = "handoff_note", bytes = #note.text })
+	end
+	if transcript.text and profile == "full" then
+		table.insert(artifacts, { kind = "gator_transcript", bytes = #transcript.text })
 	end
 	return table.concat(lines, "\n"),
 		{
 			input_tokens = M.estimate(
-				objective .. "\n" .. captured .. "\n" .. (opts.diff or "") .. "\n" .. (opts.note or "")
+				objective_inspected.text .. "\n" .. captured .. "\n" .. (diff.text or "") .. "\n" .. (note.text or "")
 			),
 			state = "estimated",
+			redactions = redactions,
+			artifacts = artifacts,
 		}
 end
 

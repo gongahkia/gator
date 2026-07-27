@@ -97,6 +97,12 @@ assert(
 	"launch must create a run-first terminal record with explicit transcript and usage state"
 )
 assert(
+	persisted.trust.surface == "terminal"
+		and persisted.trust.write.state == "provider_owned"
+		and persisted.trust.approval.state == "provider_owned",
+	"terminal launches must persist a provider-owned permission boundary"
+)
+assert(
 	#opened == 1 and opened[1].command[2]:find("local selected = true", 1, true),
 	"native launch must receive the captured source rather than only the objective"
 )

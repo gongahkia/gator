@@ -12,6 +12,7 @@ local actions = {
 	undo = true,
 	prompt = true,
 	handoff = true,
+	journal = true,
 	fork = true,
 	context = true,
 	review = true,

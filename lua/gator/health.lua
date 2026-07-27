@@ -378,37 +378,44 @@ function M.launch_catalog(opts)
 				end
 				if type(probe) ~= "table" or not probe.available then
 					record.reason = (probe and probe.reason) or "version or capability probe failed"
-				elseif probe.supported == false then
-					record.reason = "installed version is outside Gator's supported range"
-				else
-					for _, capability in ipairs(terminal_capabilities[provider.name]) do
-						if type(probe.capabilities) ~= "table" or probe.capabilities[capability] ~= true then
-							record.reason = "native terminal capability is unavailable: " .. capability
-							break
+				elseif type(probe.version) == "table" and #probe.version == 3 then
+					record.version = table.concat(probe.version, ".")
+				elseif type(probe.version) == "string" then
+					record.version = probe.version
+				end
+				if type(probe) == "table" and probe.available then
+					if probe.supported == false then
+						record.reason = "installed version is outside Gator's supported range"
+					else
+						for _, capability in ipairs(terminal_capabilities[provider.name]) do
+							if type(probe.capabilities) ~= "table" or probe.capabilities[capability] ~= true then
+								record.reason = "native terminal capability is unavailable: " .. capability
+								break
+							end
 						end
-					end
-					if provider.name == "pi" and not pi_user_confirmed then
-						record.readiness_state = "detected"
-						record.reason = "Pi is detected; explicit providers.pi.user_confirmed opt-in is required"
-					elseif not record.reason then
-						if provider.name == "pi" then
-							record.available = true
-							record.authentication = "user_confirmed"
-							record.readiness_state = "user_confirmed"
-							record.readiness_signals = { "CLI contract detected", "user-confirmed configuration" }
-						else
-							local ok, auth = pcall(adapter.auth, {
-								executable = provider.executable,
-								run = function(argv, input)
-									return run(argv, cwd, input)
-								end,
-							})
-							if ok and type(auth) == "table" and auth.authenticated then
+						if provider.name == "pi" and not pi_user_confirmed then
+							record.readiness_state = "detected"
+							record.reason = "Pi is detected; explicit providers.pi.user_confirmed opt-in is required"
+						elseif not record.reason then
+							if provider.name == "pi" then
 								record.available = true
-								record.readiness_state = "detected"
+								record.authentication = "user_confirmed"
+								record.readiness_state = "user_confirmed"
+								record.readiness_signals = { "CLI contract detected", "user-confirmed configuration" }
 							else
-								record.reason = (type(auth) == "table" and auth.reason)
-									or "authentication is not verified"
+								local ok, auth = pcall(adapter.auth, {
+									executable = provider.executable,
+									run = function(argv, input)
+										return run(argv, cwd, input)
+									end,
+								})
+								if ok and type(auth) == "table" and auth.authenticated then
+									record.available = true
+									record.readiness_state = "detected"
+								else
+									record.reason = (type(auth) == "table" and auth.reason)
+										or "authentication is not verified"
+								end
 							end
 						end
 					end

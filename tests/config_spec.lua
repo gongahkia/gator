@@ -53,10 +53,21 @@ assert(
 	budget.max_tokens == 1000 and budget.action == "stop" and budget.max_concurrent_runs == 2,
 	"budget configuration must preserve explicit limits and actions"
 )
+local permissions = config.resolve({ permissions = { codex = { sandbox = "read_only" } } }).permissions
+assert(
+	permissions.codex.sandbox == "read_only",
+	"Codex launch policy must accept an explicit read-only App Server sandbox"
+)
 local retention = config.resolve({ retention = { max_age_days = 90, cleanup_on_start = false } }).retention
 assert(
-	retention.max_age_days == 90 and not retention.cleanup_on_start and retention.worktrees == "inactive_clean",
+	retention.max_age_days == 90 and retention.max_bytes == 0 and not retention.cleanup_on_start and retention.worktrees == "inactive_clean",
 	"retention must accept an arbitrary fixed period and preserve safe worktree cleanup"
+)
+local preflight = config.resolve({ context = { preflight = { confirm = true } } }).context.preflight
+assert(preflight.confirm, "context preflight confirmation must be an explicit opt-in")
+assert(
+	config.resolve({ retention = { max_bytes = 4096 } }).retention.max_bytes == 4096,
+	"retention must accept an explicit local artifact quota"
 )
 local review = config.resolve({ review = { commands = { unit = { argv = { "make", "test" } } } } }).review
 assert(review.commands.unit.argv[2] == "test", "review commands must be explicit argv arrays")
@@ -82,9 +93,12 @@ assert(
 		and not pcall(config.resolve, { providers = { unknown = { user_confirmed = true } } })
 		and not pcall(config.resolve, { ui = { loading = { spinner = "unknown" } } })
 		and not pcall(config.resolve, { ui = { loading = { interval_ms = 15 } } })
+		and not pcall(config.resolve, { permissions = { codex = { sandbox = "unrestricted" } } })
 		and not pcall(config.resolve, { budget = { max_tokens = -1 } })
 		and not pcall(config.resolve, { retention = { max_age_days = -1 } })
+		and not pcall(config.resolve, { retention = { max_bytes = -1 } })
 		and not pcall(config.resolve, { retention = { cleanup_on_start = "yes" } })
+		and not pcall(config.resolve, { context = { preflight = { confirm = "yes" } } })
 		and not pcall(config.resolve, { review = { commands = { invalid = { argv = {} } } } })
 		and not pcall(config.resolve, { acp = { commands = { Invalid = { argv = { "agent" } } } } })
 		and not pcall(config.resolve, { budget = { action = "invalid" } }),
@@ -109,7 +123,7 @@ assert(
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":9}')
+helpers.write(path, '{"schema_version":11}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

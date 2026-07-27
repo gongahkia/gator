@@ -60,6 +60,16 @@ assert(
 	"retention schedules must cancel cleanly"
 )
 
+helpers.write(paths.transcripts .. "/quota-a.log", "1234567890")
+helpers.write(paths.transcripts .. "/quota-b.log", "abcdefghij")
+vim.uv.fs_utime(paths.transcripts .. "/quota-a.log", 2, 2)
+vim.uv.fs_utime(paths.transcripts .. "/quota-b.log", 3, 3)
+local quota, inventory = manager:quota_plan(12)
+assert(
+	inventory.bytes == 25 and #quota == 2 and quota[1].reason == "quota" and quota[1].path:find("quota%-a", 1, false),
+	"retention inventory and quotas must select oldest managed artifacts until the local limit is met"
+)
+
 local project = helpers.tempdir("project-retention") .. "/.gator"
 helpers.write(project .. "/runs/run-old.json", '{"schema_version":1}')
 helpers.write(project .. "/transcripts/run-active.md", "active")

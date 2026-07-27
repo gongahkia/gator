@@ -5,6 +5,7 @@ assert(
 	vim.deep_equal(coordinator.actions(), {
 		"open",
 		"runs",
+		"events",
 		"handoff",
 		"send_context",
 		"review",
@@ -16,6 +17,7 @@ assert(
 		"cancel_operation",
 		"stop_session",
 		"prune",
+		"storage",
 		"forget",
 	}),
 	"coordinator must expose supported action names"

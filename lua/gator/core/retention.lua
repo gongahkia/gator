@@ -6,7 +6,7 @@ local Schedule = {}
 Retention.__index = Retention
 Schedule.__index = Schedule
 M.categories = { "transcripts", "indices", "worktree_records", "telemetry" }
-M.project_categories = { "transcripts", "bundles", "handoffs", "reviews", "runs" }
+M.project_categories = { "transcripts", "bundles", "handoffs", "reviews", "runs", "events" }
 
 local function fail(detail)
 	errors.raise(errors.new("retention.invalid", "Local retention request is invalid", {
@@ -48,7 +48,7 @@ local function collect(root, result)
 		elseif kind == "file" then
 			local stat = vim.uv.fs_lstat(path)
 			if stat and stat.type == "file" then
-				table.insert(result, { path = path, mtime = stat.mtime.sec })
+				table.insert(result, { path = path, mtime = stat.mtime.sec, bytes = stat.size })
 			end
 		end
 	end
@@ -139,7 +139,7 @@ function Retention:plan(now, opts)
 			if
 				now - file.mtime >= self.max_age[category] and not (opts.exclude and opts.exclude(file.path, category))
 			then
-				table.insert(result, { category = category, path = file.path, mtime = file.mtime })
+				table.insert(result, { category = category, path = file.path, mtime = file.mtime, bytes = file.bytes, reason = "age" })
 			end
 		end
 	end
@@ -147,6 +147,86 @@ function Retention:plan(now, opts)
 		return left.path < right.path
 	end)
 	return result
+end
+
+function Retention:inventory()
+	if getmetatable(self) ~= Retention then
+		fail("inventory requires a retention manager")
+	end
+	local items, categories, bytes = {}, {}, 0
+	for _, category in ipairs(self.categories) do
+		local files = {}
+		collect(self.paths[category], files)
+		local category_bytes = 0
+		for _, file in ipairs(files) do
+			local entry = { category = category, path = file.path, mtime = file.mtime, bytes = file.bytes }
+			table.insert(items, entry)
+			category_bytes = category_bytes + file.bytes
+			bytes = bytes + file.bytes
+		end
+		table.insert(categories, { category = category, bytes = category_bytes, files = #files })
+	end
+	table.sort(items, function(left, right)
+		return left.path < right.path
+	end)
+	return { bytes = bytes, categories = categories, items = items }
+end
+
+function Retention:quota_plan(max_bytes, opts)
+	if getmetatable(self) ~= Retention then
+		fail("quota_plan requires a retention manager")
+	end
+	if type(max_bytes) ~= "number" or max_bytes < 0 or max_bytes % 1 ~= 0 then
+		fail("max_bytes must be a non-negative integer")
+	end
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("quota_plan options must be an object")
+	end
+	for key in pairs(opts) do
+		if key ~= "exclude" and key ~= "already_scheduled_bytes" then
+			fail("quota_plan contains unsupported field: " .. tostring(key))
+		end
+	end
+	if opts.exclude ~= nil and type(opts.exclude) ~= "function" then
+		fail("quota_plan exclude must be a function")
+	end
+	local scheduled = opts.already_scheduled_bytes or 0
+	if type(scheduled) ~= "number" or scheduled < 0 or scheduled % 1 ~= 0 then
+		fail("already_scheduled_bytes must be a non-negative integer")
+	end
+	local inventory = self:inventory()
+	if max_bytes == 0 then
+		return {}, inventory
+	end
+	local remaining = math.max(0, inventory.bytes - scheduled)
+	if remaining <= max_bytes then
+		return {}, inventory
+	end
+	local candidates = {}
+	for _, item in ipairs(inventory.items) do
+		if not (opts.exclude and opts.exclude(item.path, item.category)) then
+			table.insert(candidates, item)
+		end
+	end
+	table.sort(candidates, function(left, right)
+		return left.mtime == right.mtime and left.path < right.path or left.mtime < right.mtime
+	end)
+	local result = {}
+	for _, item in ipairs(candidates) do
+		if remaining <= max_bytes then
+			break
+		end
+		remaining = remaining - item.bytes
+		table.insert(result, {
+			category = item.category,
+			path = item.path,
+			mtime = item.mtime,
+			bytes = item.bytes,
+			reason = "quota",
+		})
+	end
+	return result, inventory
 end
 
 function Retention:prune(plan, confirm)

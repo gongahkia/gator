@@ -17,6 +17,15 @@ local window = graph.open({
 				transcript = "available",
 				usage = { state = "reported", input_tokens = 12, output_tokens = 8, total_tokens = 20 },
 				budget = { limit_tokens = 100, action = "warn", state = "tracking" },
+				trust = {
+					surface = "structured",
+					security_owner = "provider",
+					policy = { state = "applied", mode = "gator.config" },
+					write = { state = "codex_enforced", mode = "workspace_write" },
+					network = { state = "unknown" },
+					mcp = { state = "unknown" },
+					approval = { state = "on_request" },
+				},
 			},
 		}
 	end,
@@ -51,7 +60,8 @@ assert(
 	content:find("Workspace: worktree", 1, true)
 		and content:find("Context: bundle-graph · transcript available", 1, true)
 		and content:find("Usage: reported · in 12 · out 8 · total 20", 1, true)
-		and content:find("Budget: tracking · 20/100", 1, true),
+		and content:find("Budget: tracking · 20/100", 1, true)
+		and content:find("Trust: structured · provider · policy applied (gator.config) · write codex_enforced (workspace_write) · network unknown · MCP unknown · approval on_request", 1, true),
 	"run graph must render workspace, context bundle, exact usage, and budget state"
 )
 assert(

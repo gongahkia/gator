@@ -60,6 +60,34 @@ local function render(panel)
 			)
 			table.insert(lines, "  Usage: " .. usage)
 			table.insert(lines, "  Budget: " .. budget)
+			local trust = run.trust
+			if trust then
+				local write = trust.write.state .. (trust.write.mode and (" (" .. trust.write.mode .. ")") or "")
+				local policy = trust.policy.state .. (trust.policy.mode and (" (" .. trust.policy.mode .. ")") or "")
+				table.insert(
+					lines,
+					"  Trust: "
+						.. trust.surface
+						.. " · "
+						.. trust.security_owner
+						.. " · policy "
+						.. policy
+						.. " · write "
+						.. write
+						.. " · network "
+						.. trust.network.state
+						.. " · MCP "
+						.. trust.mcp.state
+						.. " · approval "
+						.. trust.approval.state
+				)
+			else
+				table.insert(lines, "  Trust: legacy run · launch trust unavailable")
+			end
+			if type(panel.workflow.events) == "function" then
+				local ok, events = pcall(panel.workflow.events, panel.workflow, run.id)
+				table.insert(lines, ok and ("  Journal: " .. #events .. " Gator-owned events · l details") or "  Journal: unavailable")
+			end
 			if run.workspace.kind == "worktree" and type(panel.workflow.worktree_lease) == "function" then
 				local ok, lease = pcall(panel.workflow.worktree_lease, panel.workflow, run.id)
 				if ok and lease then
@@ -115,7 +143,7 @@ local function render(panel)
 	table.insert(lines, "")
 	table.insert(
 		lines,
-		"<CR> focus · c context · f native fork · h handoff · p parallel writer · v review · n next runbook step · s stop · r resume · q close · ? help"
+		"<CR> focus · c context · f native fork · h handoff · l journal · p parallel writer · v review · n next runbook step · s stop · r resume · q close · ? help"
 	)
 	accessibility.render(panel.buffer, lines, "gator-runs")
 end
@@ -130,6 +158,7 @@ local function bind(panel)
 		previous = "k",
 		confirm = "<CR>",
 		handoff = "h",
+		journal = "l",
 		fork = "f",
 		context = "c",
 		review = "v",
@@ -162,6 +191,12 @@ local function bind(panel)
 			local run = selected(panel)
 			if run then
 				panel.workflow:handoff(run.id)
+			end
+		end,
+		journal = function()
+			local run = selected(panel)
+			if run and type(panel.workflow.open_events) == "function" then
+				panel.workflow:open_events(run.id)
 			end
 		end,
 		fork = function()
@@ -209,7 +244,7 @@ local function bind(panel)
 		close = M.close,
 		help = function()
 			vim.notify(
-				"Gator runs: <CR> focus, c context, f native fork, h handoff, p parallel writer, v review, n next runbook step, s stop, r resume, q close",
+				"Gator runs: <CR> focus, c context, f native fork, h handoff, l journal, p parallel writer, v review, n next runbook step, s stop, r resume, q close",
 				vim.log.levels.INFO
 			)
 		end,

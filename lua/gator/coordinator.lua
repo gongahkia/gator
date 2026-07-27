@@ -10,6 +10,7 @@ Operation.__index = Operation
 local actions = {
 	open = { fields = { provider = true, buffer = true, first_line = true, last_line = true, transport = true } },
 	runs = { fields = {} },
+	events = { fields = { run_id = true } },
 	handoff = { fields = { run_id = true, provider = true, profile = true } },
 	send_context = {
 		fields = { run_id = true, kind = true, bundle_id = true, buffer = true, first_line = true, last_line = true },
@@ -23,11 +24,13 @@ local actions = {
 	cancel_operation = { fields = { id = true, reason = true } },
 	stop_session = { fields = { run_id = true } },
 	prune = { fields = {} },
+	storage = { fields = {} },
 	forget = { fields = { run_id = true } },
 }
 local action_names = {
 	"open",
 	"runs",
+	"events",
 	"handoff",
 	"send_context",
 	"review",
@@ -39,6 +42,7 @@ local action_names = {
 	"cancel_operation",
 	"stop_session",
 	"prune",
+	"storage",
 	"forget",
 }
 local operation_kinds = { operation = true, launch = true, handoff = true }
@@ -305,6 +309,9 @@ function Coordinator:dispatch(action, opts)
 	if action == "runs" then
 		return self:workflow():open_runs()
 	end
+	if action == "events" then
+		return self:workflow():open_events(identifier(opts.run_id, "run_id"))
+	end
 	if action == "handoff" then
 		return self:workflow():handoff(require_string(opts.run_id, "run_id"), opts.provider, { profile = opts.profile })
 	end
@@ -351,6 +358,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "prune" then
 		return self:workflow():prune()
+	end
+	if action == "storage" then
+		return self:workflow():storage()
 	end
 	if action == "forget" then
 		return self:workflow():forget(identifier(opts.run_id, "run_id"))

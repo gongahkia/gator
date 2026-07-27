@@ -16,6 +16,24 @@ local function text(value, name)
 	return value
 end
 
+local function codex_policy(value)
+	if value == nil then
+		return nil
+	end
+	if type(value) ~= "table" or (vim.islist(value) and next(value) ~= nil) then
+		fail("codex_policy must be an object")
+	end
+	for key in pairs(value) do
+		if key ~= "sandbox" and key ~= "approval_policy" then
+			fail("codex_policy contains unsupported field: " .. tostring(key))
+		end
+	end
+	if (value.sandbox ~= "readOnly" and value.sandbox ~= "workspaceWrite") or value.approval_policy ~= "on-request" then
+		fail("codex_policy must use a supported sandbox and on-request approvals")
+	end
+	return vim.deepcopy(value)
+end
+
 local function event_text(value)
 	if type(value) ~= "table" then
 		return nil
@@ -86,6 +104,10 @@ function Manager:open(opts)
 		fail("open requires a structured provider")
 	end
 	local provider, cwd = opts.provider, text(opts.cwd, "cwd")
+	local launch_policy = codex_policy(opts.codex_policy)
+	if launch_policy and provider ~= "codex" then
+		fail("codex_policy is available only for Codex")
+	end
 	local prompt = opts.prompt
 	if prompt ~= nil then
 		prompt = text(prompt, "prompt")
@@ -307,12 +329,20 @@ function Manager:open(opts)
 			if requested == "initialize" then
 				current.initialized = true
 				write({ jsonrpc = "2.0", method = "initialized", params = vim.empty_dict() })
+				local params = launch_policy and {
+					cwd = cwd,
+					approvalPolicy = launch_policy.approval_policy,
+					sandbox = launch_policy.sandbox,
+				} or { cwd = cwd }
 				if current.operation == "start" then
-					codex_request("thread/start", { cwd = cwd, ephemeral = false })
+					params.ephemeral = false
+					codex_request("thread/start", params)
 				elseif current.operation == "resume" then
-					codex_request("thread/resume", { threadId = current.existing.id, cwd = cwd })
+					params.threadId = current.existing.id
+					codex_request("thread/resume", params)
 				else
-					codex_request("thread/fork", { threadId = current.existing.id, cwd = cwd })
+					params.threadId = current.existing.id
+					codex_request("thread/fork", params)
 				end
 				return
 			end

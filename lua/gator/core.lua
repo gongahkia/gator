@@ -14,6 +14,7 @@ local M = {
 	provider_event = require("gator.core.provider_event"),
 	provider_status = require("gator.core.provider_status"),
 	retention = require("gator.core.retention"),
+	run_event = require("gator.core.run_event"),
 	tool_event = require("gator.core.tool_event"),
 	transport_faults = require("gator.core.transport_faults"),
 	usage_event = require("gator.core.usage_event"),

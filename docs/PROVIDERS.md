@@ -50,4 +50,4 @@ Set that only after configuring Pi's own local provider credentials.
 
 ## Version policy
 
-Fixture-tested version ranges are enforced by each adapter probe. Gator does not treat a newer CLI version as compatible solely because its executable exists. Update an adapter range only with matching protocol fixtures and a local verification run.
+Fixture-tested version ranges are enforced by each adapter probe. Gator never updates a provider or requires an upgrade: keep a known-compatible local version, use terminal fallback where available, and report a regression in [GitHub Issues](https://github.com/gongahkia/gator/issues). A later Gator change may expand a supported range only with matching protocol fixtures and local verification.

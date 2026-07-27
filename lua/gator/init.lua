@@ -69,6 +69,10 @@ function M.runs()
 	return M.dispatch("runs")
 end
 
+function M.events(run_id)
+	return M.dispatch("events", { run_id = run_id })
+end
+
 function M.handoff(run_id, provider, opts)
 	if not M._coordinator then
 		M.setup()
@@ -120,6 +124,10 @@ end
 
 function M.prune()
 	return M.dispatch("prune")
+end
+
+function M.storage()
+	return M.dispatch("storage")
 end
 
 function M.forget(run_id)

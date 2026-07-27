@@ -1,4 +1,6 @@
 local redact = require("gator.policy.redact")
+local trust = require("gator.trust")
+local run_event = require("gator.core.run_event")
 
 local M = { schema_version = 1 }
 local Store = {}
@@ -166,6 +168,7 @@ local function normalize_run(value)
 				updated_at = true,
 				process = true,
 				review = true,
+				trust = true,
 				runbook_id = true,
 				depends_on = true,
 			})[key]
@@ -264,6 +267,13 @@ local function normalize_run(value)
 			fail("run.review.state is unavailable")
 		end
 	end
+	run.trust = trust.normalize(run.trust, run)
+	if run.trust.provider ~= run.provider then
+		fail("run.trust.provider must match run.provider")
+	end
+	if (run.transport == "terminal" and run.trust.surface ~= "terminal") or (run.transport == "chat" and run.trust.surface ~= "structured") then
+		fail("run.trust.surface must match run.transport")
+	end
 	run.objective = redact.text(text(run.objective, "run.objective"))
 	if run.transcript ~= "available" and run.transcript ~= "unavailable" then
 		fail("run.transcript must be available or unavailable")
@@ -311,6 +321,7 @@ function M.new(root)
 		reviews_directory = root .. "/.gator/reviews",
 		runbooks_directory = root .. "/.gator/runbooks",
 		worktree_leases_directory = root .. "/.gator/worktree-leases",
+		events_directory = root .. "/.gator/events",
 	}, Store)
 end
 
@@ -328,6 +339,7 @@ function Store:ensure()
 		self.reviews_directory,
 		self.runbooks_directory,
 		self.worktree_leases_directory,
+		self.events_directory,
 	}) do
 		if vim.fn.mkdir(path, "p") ~= 1 and vim.fn.isdirectory(path) ~= 1 then
 			fail("cannot create local Gator state directory")
@@ -1022,6 +1034,55 @@ function Store:read_transcript(id)
 	return vim.fn.filereadable(path) == 1 and table.concat(vim.fn.readfile(path), "\n") or nil
 end
 
+function Store:events(id)
+	id = identifier(id, "run id")
+	self:ensure()
+	local path = self.events_directory .. "/" .. id .. ".jsonl"
+	if vim.fn.filereadable(path) ~= 1 then
+		return {}
+	end
+	local result, expected = {}, 0
+	for index, line in ipairs(vim.fn.readfile(path)) do
+		local ok, document = pcall(vim.json.decode, line)
+		if not ok or type(document) ~= "table" then
+			fail("invalid run event at " .. path .. ":" .. index)
+		end
+		local event = run_event.from_record(document)
+		if event.run_id ~= id or event.sequence ~= expected then
+			fail("run event sequence is invalid at " .. path .. ":" .. index)
+		end
+		expected = expected + 1
+		table.insert(result, event)
+	end
+	return result
+end
+
+function Store:append_event(id, event_type, payload, at)
+	id = identifier(id, "run id")
+	if type(event_type) ~= "string" or type(at) ~= "number" then
+		fail("run event type and timestamp are required")
+	end
+	self:ensure()
+	if not self:get(id) then
+		fail("cannot append an event for an unavailable run")
+	end
+	local sequence = #self:events(id)
+	local event = run_event.new({
+		schema_version = run_event.schema_version,
+		id = id .. "-event-" .. sequence,
+		run_id = id,
+		sequence = sequence,
+		type = event_type,
+		at = at,
+		payload = payload or {},
+	})
+	local path = self.events_directory .. "/" .. id .. ".jsonl"
+	if vim.fn.writefile({ vim.json.encode(event) }, path, "a") ~= 0 then
+		fail("cannot append run event")
+	end
+	return vim.deepcopy(event)
+end
+
 function Store:put_worktree_lease(value)
 	self:ensure()
 	local lease = worktree_lease(value)
@@ -1090,6 +1151,7 @@ function Store:forget_run(id)
 	self:ensure()
 	remove_managed(self.runs_directory .. "/" .. id .. ".json")
 	remove_managed(self.directory .. "/transcripts/" .. id .. ".md")
+	remove_managed(self.events_directory .. "/" .. id .. ".jsonl")
 	remove_managed(self.reviews_directory .. "/" .. id, true)
 	if run.bundle_id then
 		remove_managed(self.bundles_directory .. "/" .. run.bundle_id .. ".md")

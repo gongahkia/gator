@@ -72,24 +72,34 @@ function M.new(opts)
 	return setmetatable({ patterns = M.validate_patterns(patterns) }, Redactor)
 end
 
-function Redactor:text(value)
+function Redactor:inspect(value)
 	if type(value) ~= "string" then
 		fail("text must be a string")
 	end
-	local result = value
+	local result, matches = value, 0
 	for _, rule in ipairs(known) do
 		if rule.replace then
-			result = result:gsub(rule.pattern, rule.replace)
+			local count
+			result, count = result:gsub(rule.pattern, rule.replace)
+			matches = matches + count
 		else
-			result = result:gsub(rule.pattern, function(prefix)
+			local count
+			result, count = result:gsub(rule.pattern, function(prefix)
 				return prefix .. placeholder
 			end)
+			matches = matches + count
 		end
 	end
 	for _, pattern in ipairs(self.patterns) do
-		result = result:gsub(pattern, placeholder)
+		local count
+		result, count = result:gsub(pattern, placeholder)
+		matches = matches + count
 	end
-	return result
+	return { text = result, matches = matches }
+end
+
+function Redactor:text(value)
+	return self:inspect(value).text
 end
 
 function Redactor:value(value)
@@ -128,6 +138,10 @@ end
 
 function M.text(value)
 	return default:text(value)
+end
+
+function M.inspect(value)
+	return default:inspect(value)
 end
 
 function M.prompt(value)

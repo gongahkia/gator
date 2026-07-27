@@ -66,6 +66,9 @@ require("gator").setup({
     default_provider = "ask", -- "ask" or a provider id
     transport = "auto", -- "auto", "chat", or "terminal"
   },
+  permissions = {
+    codex = { sandbox = "workspace_write" }, -- or "read_only"; sent to Codex App Server
+  },
   context = {
     handoff = {
       profile = "full", -- "full", "compact", or "summary-first"
@@ -154,6 +157,19 @@ The run graph renders dependency state and ready steps; press `n` or run `:Gator
 ## Provider boundaries
 
 Gator does not read, store, or verify provider credentials. `user_confirmed` means the user asserted local readiness where a CLI has no non-interactive auth-status contract; it is not credential verification.
+
+Every new run announces and stores its actual launch boundary in `:GatorRuns`:
+
+- Codex chat sends `workspaceWrite` or `readOnly` plus `on-request` approval to Codex App Server. Codex enforces that policy; Gator does not. Network and MCP access remain `unknown`.
+- Pi chat records filesystem, network, and MCP access as `unknown`; Pi RPC has no Gator approval bridge.
+- ACP chat records those controls as `unknown`; Gator can render an approval only when the provider emits one.
+- Native terminal runs are provider-owned. Gator does not infer or claim sandboxing, authentication, read-only access, or network restrictions from terminal output.
+
+An intentionally tracked `.gator/policy.json` may set `write_allowed`. Since Gator locally ignores `.gator/`, track this file deliberately with `git add -f .gator/policy.json`. `false` overrides Codex to `readOnly` and blocks a provider Gator cannot constrain.
+
+```json
+{ "enabled": true, "rules": { "write_allowed": false } }
+```
 
 See [provider support](docs/PROVIDERS.md) for the transport matrix and version constraints.
 
