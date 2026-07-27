@@ -240,12 +240,24 @@ func (k *KubernetesRuntime) execPod(ctx context.Context, pod, container string, 
 	return executor.StreamWithContext(ctx, remotecommand.StreamOptions{Stdin: stdin, Stdout: stdout, Stderr: stderr})
 }
 
-func (k *KubernetesRuntime) RunCLI(ctx context.Context, runID, image, network string, command []string, prompt, credentialEnv, credentialSecret, credentialSecretKey string) (string, error) {
+func (k *KubernetesRuntime) RunCLI(ctx context.Context, runID string, stage domain.Stage, image, network string, command []string, prompt, credentialEnv, credentialSecret, credentialSecretKey string) (string, error) {
 	if image == "" || len(command) == 0 {
 		return "", fmt.Errorf("cli runner image and command are required")
 	}
 	if len(prompt) > 768<<10 {
 		return "", fmt.Errorf("cli prompt exceeds kubernetes configmap limit")
+	}
+	if network == "" {
+		network = "none"
+	}
+	if network == "none" {
+		if !k.config.NetworkPolicyEnforced {
+			return "", fmt.Errorf("CLI network denial requires network_policy_enforced after a passing enforcement check")
+		}
+		if err := k.applyCLINetworkDenyPolicy(ctx, runID); err != nil {
+			return "", err
+		}
+		defer k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Delete(context.Background(), k.Name(runID)+"-cli-network", metav1.DeleteOptions{})
 	}
 	name := k.Name(runID) + "-cli-" + shortID()
 	input := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: k.labels(runID, "cli-input")}, Data: map[string]string{"prompt": prompt}}
@@ -254,6 +266,13 @@ func (k *KubernetesRuntime) RunCLI(ctx context.Context, runID, image, network st
 	}
 	defer k.client.CoreV1().ConfigMaps(k.config.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 	container := hardenedContainer("agent", image, []string{"sh", "-ceu", "cat /norbot/input/prompt | exec " + shellArgs(command)}, k.PVC(runID), "/workspace", k.config)
+	if stage != domain.StageBuilder {
+		for index := range container.VolumeMounts {
+			if container.VolumeMounts[index].Name == "workspace" {
+				container.VolumeMounts[index].ReadOnly = true
+			}
+		}
+	}
 	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{Name: "input", MountPath: "/norbot/input", ReadOnly: true})
 	if credentialEnv != "" {
 		if credentialSecret == "" || credentialSecretKey == "" {
@@ -263,6 +282,20 @@ func (k *KubernetesRuntime) RunCLI(ctx context.Context, runID, image, network st
 	}
 	job := oneShotJob(name, k.config, runID, "agent", container, []corev1.Volume{{Name: "workspace", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: k.PVC(runID)}}}, {Name: "input", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: name}}}}})
 	return k.runJob(ctx, job, true)
+}
+
+func (k *KubernetesRuntime) applyCLINetworkDenyPolicy(ctx context.Context, runID string) error {
+	policy := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: k.Name(runID) + "-cli-network", Labels: k.labels(runID, "agent")}, Spec: networkingv1.NetworkPolicySpec{PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{runLabel: runID, roleLabel: "agent"}}, PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeEgress}}}
+	_, err := k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Create(ctx, policy, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		current, getErr := k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Get(ctx, policy.Name, metav1.GetOptions{})
+		if getErr != nil {
+			return getErr
+		}
+		policy.ResourceVersion = current.ResourceVersion
+		_, err = k.client.NetworkingV1().NetworkPolicies(k.config.Namespace).Update(ctx, policy, metav1.UpdateOptions{})
+	}
+	return err
 }
 
 func (k *KubernetesRuntime) Cleanup(ctx context.Context, runID string) error {

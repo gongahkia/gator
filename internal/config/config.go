@@ -261,6 +261,9 @@ func (m Manifest) Validate() error {
 		if p.Kind == "cli" && (len(p.Command) == 0 || p.Image == "") {
 			return fmt.Errorf("cli provider %q needs command and image", p.ID)
 		}
+		if p.Kind == "cli" && p.Network != "" && p.Network != "none" && p.Network != "bridge" {
+			return fmt.Errorf("cli provider %q network must be none or bridge", p.ID)
+		}
 		if p.Kind != "cli" && p.Kind != "plugin" && (p.BaseURL == "" || p.Model == "" || p.CredentialEnv == "") {
 			return fmt.Errorf("api provider %q needs base_url, model, and credential_env", p.ID)
 		}

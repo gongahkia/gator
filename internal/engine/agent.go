@@ -44,7 +44,14 @@ func (s *Service) invokeCentralAgent(ctx context.Context, run domain.Run, input 
 	}
 	providerID := run.Providers[domain.StageBuilder]
 	if input.Provider.Kind != "" {
-		providerID = ""
+		return runtime.AgentResponse{}, fmt.Errorf("agent provider overrides are not permitted")
+	}
+	providerConfig, ok := s.config.Manifest.Provider(providerID, domain.StageBuilder)
+	if !ok {
+		return runtime.AgentResponse{}, fmt.Errorf("agent provider %q is unavailable", providerID)
+	}
+	if err := s.enforceInternalAgentPolicy(ctx, run, domain.StageBuilder, providerConfig); err != nil {
+		return runtime.AgentResponse{}, err
 	}
 	if input.IdempotencyKey == "" || input.SessionID == "" || input.ExternalID == "" {
 		return runtime.AgentResponse{}, fmt.Errorf("session_id, external_id, and idempotency_key are required")
@@ -424,7 +431,7 @@ func agentHTTP(ctx context.Context, params map[string]any) (map[string]any, erro
 	if err != nil {
 		return nil, err
 	}
-	response, err := (&http.Client{Timeout: 30 * time.Second}).Do(request)
+	response, err := (&http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}).Do(request)
 	if err != nil {
 		return nil, err
 	}

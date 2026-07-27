@@ -66,7 +66,7 @@ func (i Invoker) Invoke(ctx context.Context, provider config.Provider, request R
 		return Result{Text: response.Text, Provider: provider.ID, Model: "process-plugin", Metadata: response.Metadata}, nil
 	}
 	if provider.Kind == "cli" {
-		output, err := i.Workspace.RunCLI(ctx, request.RunID, provider.Image, provider.Network, provider.Command, request.Prompt, provider.CredentialEnv, provider.KubernetesSecret, provider.KubernetesSecretKey)
+		output, err := i.Workspace.RunCLI(ctx, request.RunID, request.Stage, provider.Image, provider.Network, provider.Command, request.Prompt, provider.CredentialEnv, provider.KubernetesSecret, provider.KubernetesSecretKey)
 		if err != nil {
 			return Result{}, err
 		}

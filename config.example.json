@@ -40,12 +40,12 @@
   ],
   "profiles": ["frontend-only", "full-stack", "agentic"],
   "tool_policy": {
-    "artifact_read": {"enabled": true, "approval_required": false, "roles": ["researcher", "builder"]},
-    "http_get": {"enabled": true, "approval_required": false, "roles": ["researcher"], "allowed_hosts": ["api.example.com"]},
-    "http_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
-    "database_mutate": {"enabled": true, "approval_required": true, "roles": ["operator"]},
-    "file_write": {"enabled": true, "approval_required": true, "roles": ["operator"]},
-    "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": []}
+    "artifact_read": {"enabled": true, "approval_required": false, "roles": ["researcher", "builder"], "allowed_path_prefixes": ["agent-input/", "agent-output/", "generated-app/", "stage-output/"], "max_calls": 8},
+    "http_get": {"enabled": true, "approval_required": false, "roles": ["researcher"], "allowed_hosts": ["api.example.com"], "max_calls": 4},
+    "http_write": {"enabled": true, "approval_required": true, "roles": ["operator"], "max_calls": 2},
+    "database_mutate": {"enabled": true, "approval_required": true, "roles": ["operator"], "max_calls": 2},
+    "file_write": {"enabled": true, "approval_required": true, "roles": ["operator"], "allowed_path_prefixes": ["agent-output/"], "max_calls": 2},
+    "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": [], "max_calls": 1}
   },
   "plugins": [],
   "workflow": {"max_fixes": 2, "planning_swarm": {"enabled": false, "max_parallel": 3, "timeout_seconds": 180}},

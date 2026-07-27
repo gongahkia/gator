@@ -30,7 +30,7 @@ type WorkspaceBackend interface {
 	MirrorToVolume(context.Context, string, string) error
 	MirrorGeneratedApp(context.Context, string) error
 	SyncGeneratedApp(context.Context, string) error
-	RunCLI(context.Context, string, string, string, []string, string, string, string, string) (string, error)
+	RunCLI(context.Context, string, domain.Stage, string, string, []string, string, string, string, string) (string, error)
 	Cleanup(context.Context, string) error
 }
 
@@ -183,7 +183,7 @@ func (w Workspace) SyncGeneratedApp(ctx context.Context, runID string) error {
 	return err
 }
 
-func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, command []string, prompt, credentialEnv, credentialSecret, credentialSecretKey string) (string, error) {
+func (w Workspace) RunCLI(ctx context.Context, runID string, stage domain.Stage, image, network string, command []string, prompt, credentialEnv, credentialSecret, credentialSecretKey string) (string, error) {
 	if len(command) == 0 {
 		return "", fmt.Errorf("empty cli command")
 	}
@@ -191,9 +191,13 @@ func (w Workspace) RunCLI(ctx context.Context, runID, image, network string, com
 		return "", fmt.Errorf("cli runner image is required")
 	}
 	if network == "" {
-		network = "bridge"
+		network = "none"
 	}
-	args := []string{"run", "--rm", "-i", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=256", "--memory=4g", "--cpus=2", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "--label", "norbot.run_id=" + runID, "--label", "norbot.role=agent", "--network", network, "-v", w.Volume(runID) + ":/workspace", "-w", "/workspace"}
+	workspaceMount := w.Volume(runID) + ":/workspace:ro"
+	if stage == domain.StageBuilder {
+		workspaceMount = w.Volume(runID) + ":/workspace"
+	}
+	args := []string{"run", "--rm", "-i", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=256", "--memory=4g", "--cpus=2", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m", "--label", "norbot.run_id=" + runID, "--label", "norbot.role=agent", "--label", "norbot.stage=" + string(stage), "--network", network, "-v", workspaceMount, "-w", "/workspace"}
 	if credentialEnv != "" {
 		if value, ok := os.LookupEnv(credentialEnv); ok {
 			args = append(args, "-e", credentialEnv+"="+value)

@@ -98,6 +98,7 @@ Configure provider API keys in `.env`; add CLI providers with isolated runner im
 - `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the scanned native/adapted skill catalog.
 - `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.
 - `GET /api/agent/actions` and `POST /api/agent/actions/{id}/decision` expose central, durable tool approvals; a decision resumes its exact persisted turn once.
+- `GET/PUT /api/runs/{id}/agent-policy` expose each run's internal-agent and agentic-app capability policy. PUT is monotonic: it can only restrict the run; pending tool actions are revalidated before execution.
 - `GET /api/runtime` returns the default target and Kubernetes/ingress availability for web-console onboarding.
 - `GET /api/runs/{id}/deployment`, `/logs`; `POST .../start`, `POST .../stop`; and `DELETE .../deployment` control deployed apps.
 

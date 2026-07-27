@@ -25,7 +25,11 @@ func (s *Service) defaultRunAgentPolicy(run domain.Run) domain.RunAgentPolicy {
 				switch provider.Kind {
 				case "cli":
 					stagePolicy.AllowCLI = true
-					stagePolicy.AllowNetwork = strings.TrimSpace(provider.Network) != "none"
+					network := strings.TrimSpace(provider.Network)
+					if network == "" {
+						network = "none"
+					}
+					stagePolicy.AllowNetwork = network != "none"
 				case "plugin":
 					stagePolicy.AllowCLI, stagePolicy.AllowNetwork = true, true
 				default:
