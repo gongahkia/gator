@@ -274,6 +274,41 @@ type Run struct {
 	UpdatedAt          time.Time        `json:"updated_at"`
 }
 
+// RunAgentPolicy is an immutable-at-creation capability ceiling with operator-only
+// monotonic restrictions recorded as later versions.
+type RunAgentPolicy struct {
+	RunID     string                        `json:"run_id"`
+	Version   int                           `json:"version"`
+	Stages    map[Stage]InternalAgentPolicy `json:"stages"`
+	Tools     map[string]AgentToolPolicy    `json:"tools"`
+	Digest    string                        `json:"digest"`
+	UpdatedBy string                        `json:"updated_by,omitempty"`
+	CreatedAt time.Time                     `json:"created_at"`
+	UpdatedAt time.Time                     `json:"updated_at"`
+}
+
+// InternalAgentPolicy controls the model/runtime used by a workflow stage.
+// A false value is a denial; operators may only turn capabilities off per run.
+type InternalAgentPolicy struct {
+	Enabled      bool `json:"enabled"`
+	AllowModel   bool `json:"allow_model"`
+	AllowNetwork bool `json:"allow_network"`
+	AllowCLI     bool `json:"allow_cli"`
+}
+
+// AgentToolPolicy controls central-agent functions for an agentic app.
+// Empty allowlists mean no values are permitted, except allowed_path_prefixes
+// where an empty list retains the manifest's safe-relative-path ceiling.
+type AgentToolPolicy struct {
+	Enabled             bool     `json:"enabled"`
+	ApprovalRequired    bool     `json:"approval_required"`
+	Roles               []string `json:"roles"`
+	AllowedHosts        []string `json:"allowed_hosts"`
+	AllowedCommands     []string `json:"allowed_commands"`
+	AllowedPathPrefixes []string `json:"allowed_path_prefixes"`
+	MaxCalls            int      `json:"max_calls"`
+}
+
 type ReviewKind string
 
 const (

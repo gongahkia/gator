@@ -33,11 +33,13 @@ type ProviderBudget struct {
 }
 
 type ToolPolicy struct {
-	Enabled          bool     `json:"enabled"`
-	ApprovalRequired bool     `json:"approval_required"`
-	Roles            []string `json:"roles"`
-	AllowedHosts     []string `json:"allowed_hosts"`
-	AllowedCommands  []string `json:"allowed_commands"`
+	Enabled             bool     `json:"enabled"`
+	ApprovalRequired    bool     `json:"approval_required"`
+	Roles               []string `json:"roles"`
+	AllowedHosts        []string `json:"allowed_hosts"`
+	AllowedCommands     []string `json:"allowed_commands"`
+	AllowedPathPrefixes []string `json:"allowed_path_prefixes"`
+	MaxCalls            int      `json:"max_calls"`
 }
 
 type ProcessPlugin struct {
@@ -291,6 +293,19 @@ func (m Manifest) Validate() error {
 		if provider.Kind == "plugin" {
 			if _, ok := pluginIDs[provider.PluginID]; !ok {
 				return fmt.Errorf("provider %q references unknown plugin %q", provider.ID, provider.PluginID)
+			}
+		}
+	}
+	for name, policy := range m.ToolPolicy {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("tool policy needs a name")
+		}
+		if policy.MaxCalls < 0 || policy.MaxCalls > 100 {
+			return fmt.Errorf("tool policy %q max_calls must be between 0 and 100", name)
+		}
+		for _, prefix := range policy.AllowedPathPrefixes {
+			if prefix == "" || strings.HasPrefix(prefix, "/") || strings.Contains(prefix, "..") {
+				return fmt.Errorf("tool policy %q has unsafe allowed_path_prefixes", name)
 			}
 		}
 	}

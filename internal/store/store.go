@@ -517,6 +517,29 @@ CREATE TABLE IF NOT EXISTS planning_swarm_provider_slots (
 CREATE INDEX IF NOT EXISTS planning_swarm_provider_slots_expiry_idx ON planning_swarm_provider_slots(expires_at);
 `
 
+const migration007RunAgentPolicies = `
+CREATE TABLE IF NOT EXISTS run_agent_policies (
+  run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
+  version INT NOT NULL,
+  policy JSONB NOT NULL,
+  digest TEXT NOT NULL,
+  updated_by TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS run_agent_policy_events (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  version INT NOT NULL,
+  policy JSONB NOT NULL,
+  digest TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(run_id,version)
+);
+CREATE INDEX IF NOT EXISTS run_agent_policy_events_run_idx ON run_agent_policy_events(run_id,version DESC);
+`
+
 type migration struct {
 	Version int
 	Name    string
@@ -530,6 +553,7 @@ var migrations = []migration{
 	{Version: 4, Name: "lifecycle_indexes", SQL: migration004LifecycleIndexes},
 	{Version: 5, Name: "outbox_receipts", SQL: migration005OutboxReceipts},
 	{Version: 6, Name: "planning_swarms", SQL: migration006PlanningSwarms},
+	{Version: 7, Name: "run_agent_policies", SQL: migration007RunAgentPolicies},
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
@@ -583,14 +607,18 @@ func migrationChecksum(sql string) string {
 }
 
 func (s *Store) CreateRun(ctx context.Context, run domain.Run) error {
-	return s.createRun(ctx, run, nil, "", false)
+	return s.createRun(ctx, run, nil, "", false, nil)
 }
 
 func (s *Store) CreateRunWithInitialJob(ctx context.Context, run domain.Run, skillDigests []string, inheritSkillsFrom string) error {
-	return s.createRun(ctx, run, skillDigests, inheritSkillsFrom, true)
+	return s.createRun(ctx, run, skillDigests, inheritSkillsFrom, true, nil)
 }
 
-func (s *Store) createRun(ctx context.Context, run domain.Run, skillDigests []string, inheritSkillsFrom string, enqueue bool) error {
+func (s *Store) CreateRunWithInitialJobAndPolicy(ctx context.Context, run domain.Run, skillDigests []string, inheritSkillsFrom string, policy domain.RunAgentPolicy) error {
+	return s.createRun(ctx, run, skillDigests, inheritSkillsFrom, true, &policy)
+}
+
+func (s *Store) createRun(ctx context.Context, run domain.Run, skillDigests []string, inheritSkillsFrom string, enqueue bool, policy *domain.RunAgentPolicy) error {
 	if run.AppID == "" {
 		run.AppID = run.ID
 	}
@@ -618,6 +646,15 @@ func (s *Store) createRun(ctx context.Context, run domain.Run, skillDigests []st
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)`, run.ID, run.AppID, run.ParentRunID, run.BaseSnapshotDigest, run.Prompt, run.Profile, run.DeploymentTarget, run.PublicIngress, run.MaxFixes, run.Stage, run.Status, workspaceStatus, providers, graph, architecture, run.CreatedAt)
 		if err != nil {
 			return err
+		}
+		if policy != nil {
+			policy.RunID = run.ID
+			if policy.Version == 0 {
+				policy.Version = 1
+			}
+			if err := insertRunAgentPolicy(ctx, tx, *policy, policy.UpdatedBy); err != nil {
+				return err
+			}
 		}
 		if inheritSkillsFrom != "" {
 			if _, err := tx.Exec(ctx, `INSERT INTO run_skills(run_id,skill_digest) SELECT $1,skill_digest FROM run_skills WHERE run_id=$2 ON CONFLICT DO NOTHING`, run.ID, inheritSkillsFrom); err != nil {

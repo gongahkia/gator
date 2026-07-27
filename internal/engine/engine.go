@@ -212,7 +212,7 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 		baseSnapshotDigest = input.BaseSnapshot.Digest
 	}
 	run := domain.Run{ID: id, AppID: appID, ParentRunID: input.ParentRunID, BaseSnapshotDigest: baseSnapshotDigest, Prompt: input.Prompt, Profile: input.Profile, DeploymentTarget: target, PublicIngress: input.PublicIngress, MaxFixes: maxFixes, Stage: stage, Status: domain.StatusQueued, Providers: providers, Graph: graph, Architecture: architecture, CreatedAt: now, UpdatedAt: now}
-	if err := s.store.CreateRunWithInitialJob(ctx, run, input.SkillDigests, input.InheritSkillsFrom); err != nil {
+	if err := s.store.CreateRunWithInitialJobAndPolicy(ctx, run, input.SkillDigests, input.InheritSkillsFrom, s.defaultRunAgentPolicy(run)); err != nil {
 		return domain.Run{}, err
 	}
 	return s.store.GetRun(ctx, id)
@@ -900,9 +900,16 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		return err
 	}
 	providerID := run.Providers[job.Stage]
-	providerConfig, ok := s.config.Manifest.Provider(providerID, job.Stage)
-	if !ok {
-		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
+	providerConfig := config.Provider{ID: providerID, Kind: "runtime", Network: "bridge"}
+	if job.Stage != domain.StageDeployer {
+		var ok bool
+		providerConfig, ok = s.config.Manifest.Provider(providerID, job.Stage)
+		if !ok {
+			return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
+		}
+	}
+	if err := s.enforceInternalAgentPolicy(ctx, run, job.Stage, providerConfig); err != nil {
+		return err
 	}
 	swarmEligible := job.Stage == domain.StagePlanner && s.config.Manifest.Workflow.PlanningSwarm.Enabled && planningSwarmAllowed(providerConfig)
 	if err := s.store.MarkStageRunning(ctx, job, providerID); err != nil {

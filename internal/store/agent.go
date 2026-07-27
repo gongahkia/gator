@@ -71,6 +71,11 @@ func (s *Store) CreateAgentAction(ctx context.Context, value domain.AgentAction)
 func (s *Store) AgentAction(ctx context.Context, id string) (domain.AgentAction, error) {
 	return scanAgentAction(s.pool.QueryRow(ctx, `SELECT `+agentActionColumns+` FROM agent_actions WHERE id=$1`, id))
 }
+func (s *Store) AgentToolCallCount(ctx context.Context, turnID, tool string) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM agent_actions WHERE turn_id=$1 AND tool=$2`, turnID, tool).Scan(&count)
+	return count, err
+}
 func (s *Store) PendingAgentActions(ctx context.Context, limit int) ([]domain.AgentAction, error) {
 	if limit < 1 || limit > 200 {
 		limit = 100

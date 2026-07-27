@@ -98,6 +98,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs", s.createRun)
 	mux.HandleFunc("GET /api/apps", s.listApps)
 	mux.HandleFunc("GET /api/runs/{id}", s.getRun)
+	mux.HandleFunc("GET /api/runs/{id}/agent-policy", s.agentPolicy)
+	mux.HandleFunc("PUT /api/runs/{id}/agent-policy", s.restrictAgentPolicy)
 	mux.HandleFunc("GET /api/runs/{id}/architecture", s.architecture)
 	mux.HandleFunc("PUT /api/runs/{id}/architecture", s.updateArchitecture)
 	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
@@ -601,6 +603,37 @@ func (s *Server) getRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) agentPolicy(w http.ResponseWriter, r *http.Request) {
+	value, err := s.service.AgentPolicy(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
+}
+
+func (s *Server) restrictAgentPolicy(w http.ResponseWriter, r *http.Request) {
+	var input domain.RunAgentPolicy
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	value, err := s.service.RestrictAgentPolicy(r.Context(), r.PathValue("id"), input, operatorFromRequest(r))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, value)
 }
 
 func (s *Server) architecture(w http.ResponseWriter, r *http.Request) {
