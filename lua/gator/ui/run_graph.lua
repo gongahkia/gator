@@ -60,6 +60,14 @@ local function render(panel)
 			)
 			table.insert(lines, "  Usage: " .. usage)
 			table.insert(lines, "  Budget: " .. budget)
+			if run.workspace.kind == "worktree" and type(panel.workflow.worktree_lease) == "function" then
+				local ok, lease = pcall(panel.workflow.worktree_lease, panel.workflow, run.id)
+				if ok and lease then
+					table.insert(lines, "  Worktree lease: " .. lease.state .. " · " .. lease.branch)
+				else
+					table.insert(lines, "  Worktree lease: unavailable")
+				end
+			end
 		end
 	end
 	if type(panel.workflow.runbooks) == "function" and type(panel.workflow.runbook_status) == "function" then

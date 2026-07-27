@@ -47,6 +47,8 @@ Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
 | `:GatorReview [run-id]` | Inspect a worktree diff and run an explicitly configured review command. |
 | `:GatorRunbook` | Select and start one ready manual runbook step. |
 | `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |
+| `:GatorPrune` | Preview then remove expired Gator-owned artifacts and eligible clean worktrees. |
+| `:GatorForget <run-id>` | Remove a completed run's artifacts and eligible clean worktree. |
 | `:GatorHealth` | Check provider readiness and compatibility. |
 
 There is no legacy dashboard, import, file, or ID workflow. A simple optional mapping is:
@@ -76,6 +78,11 @@ require("gator").setup({
     max_tokens = 0, -- 0 is unbounded; enforced only for provider-reported usage
     action = "warn", -- "warn" or "stop"
     max_concurrent_runs = 0, -- 0 is unbounded
+  },
+  retention = {
+    max_age_days = 30, -- any positive integer; 0 retains artifacts forever
+    cleanup_on_start = true, -- automatically delete expired Gator-owned artifacts at startup
+    worktrees = "inactive_clean", -- only clean, unlocked, inactive Gator worktrees
   },
   review = {
     commands = {
@@ -119,11 +126,11 @@ Handoff creates a new provider session. It never claims to migrate an opaque pro
 - `compact` transfers a bounded bundle without the full transcript.
 - `summary-first` requires explicit opt-in and is unavailable for terminal-originated runs because Gator does not scrape terminal output.
 
-Every handoff is reviewed before launch. Included text-file snapshots are applied in the isolated target workspace and retained under `.gator/handoffs/<bundle-id>/files/`; binary, oversized, and omitted files are shown explicitly in the review. This is a portable Gator artifact, not a claim of provider-native session migration. Terminal runs are labelled `transcript unavailable`. Usage is `reported` only when a provider emits exact counts; otherwise it is `unknown` with a separate local context estimate. A configured token budget can warn or stop only runs with reported usage.
+Every handoff is reviewed before launch. The review displays target transport/workspace, context byte size, included/omitted snapshots, redaction/omission reasons, and target diff. You explicitly choose whether snapshots are applied or retained only; binary, oversized, and omitted files remain visible. This is a portable Gator artifact, not a claim of provider-native session migration. Terminal runs are labelled `transcript unavailable`. Usage is `reported` only when a provider emits exact counts; otherwise it is `unknown` with a separate local context estimate. A configured token budget can warn or stop only runs with reported usage.
 
 After Neovim restarts, formerly active runs become `detached`. Gator resumes only when the same provider confirms the persisted native session identity. A native fork is available only for structured providers with a documented fork contract; cross-provider continuation remains a reviewed portable handoff.
 
-The first writer uses the current checkout. A further active writer gets an isolated Git worktree. Chat, review, and terminal panes are ephemeral; terminal panes close when their provider exits. Gator does not run a daemon, scheduler, process scanner, or automatic workflow queue.
+The first writer uses the current checkout. A further active writer gets an isolated Git worktree. Active and detached Gator worktrees are Git-locked and have local lease metadata; terminal states unlock them. Startup cleanup removes only expired Gator-owned artifacts and clean, unlocked, inactive leased worktrees. It never force-removes a worktree or deletes a branch. Chat, review, and terminal panes are ephemeral; terminal panes close when their provider exits. Gator does not run a daemon, scheduler, process scanner, or automatic workflow queue.
 
 ## Manual runbooks
 

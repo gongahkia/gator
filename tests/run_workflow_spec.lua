@@ -79,7 +79,7 @@ local value = workflow.new({
 	handoff_review = {
 		open = function(opts)
 			reviewed = opts
-			opts.on_confirm(opts.body)
+			opts.on_confirm(opts.body, {}, false)
 		end,
 	},
 })
@@ -139,6 +139,13 @@ assert(
 			== 1,
 	"reviewed handoffs must capture and materialize live source-workspace file context"
 )
+assert(
+	reviewed.preflight.transport == "chat"
+		and reviewed.preflight.context_bytes > 0
+		and reviewed.preflight.included >= 1
+		and reviewed.apply_snapshot == false,
+	"handoff review must show target transport, context size, snapshot scope, and application state before launch"
+)
 assert(value:stop(handoff_run.id), "test handoff run must stop before the next isolated launch")
 local handoff = value:launch({
 	provider = "pi",
@@ -169,3 +176,10 @@ value.active[handoff.id] =
 	} }
 value:report_usage(handoff.id, { state = "reported", input_tokens = 2, output_tokens = 3, total_tokens = 5 })
 assert(cancelled, "stop budgets must cancel an active structured run when reported usage reaches the limit")
+assert(
+	value:forget(isolated.id)
+		and vim.fn.isdirectory(isolated.workspace.root) == 0
+		and value.store:worktree_lease(isolated.id) == nil
+		and not pcall(value.run, value, isolated.id),
+	"forget must remove only a completed run's clean, released Gator worktree and owned metadata"
+)

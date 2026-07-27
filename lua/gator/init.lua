@@ -118,6 +118,14 @@ function M.stop_session()
 	return M.dispatch("stop_session")
 end
 
+function M.prune()
+	return M.dispatch("prune")
+end
+
+function M.forget(run_id)
+	return M.dispatch("forget", { run_id = run_id })
+end
+
 function M.dispatch(action, opts)
 	if not coordinator.is_action(action) then
 		error("unknown Gator action: " .. tostring(action))

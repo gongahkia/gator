@@ -59,3 +59,17 @@ assert(
 	#manager:prune(plan, true) == 1 and removed[1] == resolved_clean,
 	"confirmed cleanup must remove only planned worktrees"
 )
+local owned = cleanup.new({
+	root = root,
+	run = run,
+	active = function()
+		return false
+	end,
+	owned = function(path)
+		return path == resolved_clean
+	end,
+})
+assert(
+	#owned:plan() == 1 and owned:plan()[1].path == resolved_clean,
+	"automatic cleanup must ignore clean worktrees without Gator ownership metadata"
+)

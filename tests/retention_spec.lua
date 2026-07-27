@@ -59,3 +59,19 @@ assert(
 	schedule:cancel() and not schedule:cancel() and timer.stopped and timer.closed,
 	"retention schedules must cancel cleanly"
 )
+
+local project = helpers.tempdir("project-retention") .. "/.gator"
+helpers.write(project .. "/runs/run-old.json", '{"schema_version":1}')
+helpers.write(project .. "/transcripts/run-active.md", "active")
+vim.uv.fs_utime(project .. "/runs/run-old.json", 1, 1)
+vim.uv.fs_utime(project .. "/transcripts/run-active.md", 1, 1)
+local project_manager = retention.project(project, 1)
+local project_plan = project_manager:plan(2 * 24 * 60 * 60, {
+	exclude = function(path, category)
+		return category == "transcripts" and path:find("run%-active", 1, false) ~= nil
+	end,
+})
+assert(
+	#project_plan == 1 and project_plan[1].category == "runs",
+	"project retention must delete only named managed categories while preserving active exclusions"
+)

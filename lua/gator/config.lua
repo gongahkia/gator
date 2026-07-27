@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 7
+M.schema_version = 9
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -28,6 +28,7 @@ M.defaults = {
 		},
 	},
 	launch = { default_provider = "ask", transport = "auto" },
+	permissions = { codex = { sandbox = "workspace_write" } },
 	sessions = { transfer = "manual" },
 	providers = {
 		pi = { user_confirmed = false },
@@ -42,6 +43,7 @@ M.defaults = {
 		vibe = { user_confirmed = false },
 	},
 	workspaces = { mode = "project" },
+	retention = { max_age_days = 30, cleanup_on_start = true, worktrees = "inactive_clean" },
 	persistence = { sharing = "local" },
 	telemetry = { enabled = false, redaction_patterns = {} },
 	budget = { max_tokens = 0, action = "warn", max_concurrent_runs = 0 },
@@ -108,9 +110,11 @@ local root_fields = {
 	ui = true,
 	context = true,
 	launch = true,
+	permissions = true,
 	sessions = true,
 	providers = true,
 	workspaces = true,
+	retention = true,
 	persistence = true,
 	telemetry = true,
 	budget = true,
@@ -192,12 +196,15 @@ local function settings(value)
 	)
 	fields(value.context, { mode = true, trust = true, handoff = true }, "settings.context")
 	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
+	fields(value.permissions, { codex = true }, "settings.permissions")
+	fields(value.permissions.codex, { sandbox = true }, "settings.permissions.codex")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
 	fields(value.providers, provider_names, "settings.providers")
 	for name in pairs(provider_names) do
 		fields(value.providers[name], { user_confirmed = true }, "settings.providers." .. name)
 	end
 	fields(value.workspaces, { mode = true }, "settings.workspaces")
+	fields(value.retention, { max_age_days = true, cleanup_on_start = true, worktrees = true }, "settings.retention")
 	fields(value.persistence, { sharing = true }, "settings.persistence")
 	fields(value.telemetry, { enabled = true, redaction_patterns = true }, "settings.telemetry")
 	fields(value.budget, { max_tokens = true, action = true, max_concurrent_runs = true }, "settings.budget")
@@ -282,6 +289,9 @@ local function settings(value)
 	if not vim.tbl_contains({ "auto", "chat", "terminal" }, value.launch.transport) then
 		fail("launch.transport must be auto, chat, or terminal")
 	end
+	if not vim.tbl_contains({ "workspace_write", "read_only" }, value.permissions.codex.sandbox) then
+		fail("permissions.codex.sandbox must be workspace_write or read_only")
+	end
 	if value.sessions.transfer ~= "manual" then
 		fail("sessions.transfer must be manual")
 	end
@@ -292,6 +302,19 @@ local function settings(value)
 	end
 	if not vim.tbl_contains({ "project", "worktree" }, value.workspaces.mode) then
 		fail("workspaces.mode must be project or worktree")
+	end
+	if
+		type(value.retention.max_age_days) ~= "number"
+		or value.retention.max_age_days < 0
+		or value.retention.max_age_days % 1 ~= 0
+	then
+		fail("retention.max_age_days must be a non-negative integer")
+	end
+	if type(value.retention.cleanup_on_start) ~= "boolean" then
+		fail("retention.cleanup_on_start must be boolean")
+	end
+	if value.retention.worktrees ~= "inactive_clean" then
+		fail("retention.worktrees must be inactive_clean")
 	end
 	if value.persistence.sharing ~= "local" then
 		fail("persistence.sharing must be local")
@@ -342,12 +365,27 @@ function M.migrate(value)
 		and from_version ~= 4
 		and from_version ~= 5
 		and from_version ~= 6
+		and from_version ~= 7
+		and from_version ~= 8
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
 	document.launch = document.launch or {}
+	document.permissions = document.permissions or {}
+	document.permissions.codex = document.permissions.codex or {}
+	document.permissions.codex.sandbox = document.permissions.codex.sandbox or "workspace_write"
 	document.workspaces = document.workspaces or {}
 	document.workspaces.max_write_runs = nil
+	document.retention = document.retention or {}
+	if document.retention.max_age_days == nil then
+		document.retention.max_age_days = 30
+	end
+	if document.retention.cleanup_on_start == nil then
+		document.retention.cleanup_on_start = true
+	end
+	if document.retention.worktrees == nil then
+		document.retention.worktrees = "inactive_clean"
+	end
 	document.context = document.context or {}
 	document.context.handoff = document.context.handoff or {}
 	document.context.handoff.profile = document.context.handoff.profile or "full"

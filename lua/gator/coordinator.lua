@@ -22,6 +22,8 @@ local actions = {
 	close = { fields = {} },
 	cancel_operation = { fields = { id = true, reason = true } },
 	stop_session = { fields = { run_id = true } },
+	prune = { fields = {} },
+	forget = { fields = { run_id = true } },
 }
 local action_names = {
 	"open",
@@ -36,6 +38,8 @@ local action_names = {
 	"close",
 	"cancel_operation",
 	"stop_session",
+	"prune",
+	"forget",
 }
 local operation_kinds = { operation = true, launch = true, handoff = true }
 
@@ -344,6 +348,12 @@ function Coordinator:dispatch(action, opts)
 			end
 		end
 		fail("no active Gator-managed run")
+	end
+	if action == "prune" then
+		return self:workflow():prune()
+	end
+	if action == "forget" then
+		return self:workflow():forget(identifier(opts.run_id, "run_id"))
 	end
 end
 

@@ -6,6 +6,7 @@ local Schedule = {}
 Retention.__index = Retention
 Schedule.__index = Schedule
 M.categories = { "transcripts", "indices", "worktree_records", "telemetry" }
+M.project_categories = { "transcripts", "bundles", "handoffs", "reviews", "runs" }
 
 local function fail(detail)
 	errors.raise(errors.new("retention.invalid", "Local retention request is invalid", {
@@ -18,8 +19,8 @@ local function now_seconds()
 	return math.floor(vim.uv.gettimeofday().sec)
 end
 
-local function is_category(name)
-	return vim.tbl_contains(M.categories, name)
+local function is_category(name, categories)
+	return vim.tbl_contains(categories, name)
 end
 
 local function path_within(path, root)
@@ -67,7 +68,14 @@ function M.new(opts)
 	local root = vim.fs.normalize(opts.root)
 	local paths = {}
 	local max_age = {}
-	for _, category in ipairs(M.categories) do
+	local categories = opts.categories or M.categories
+	if type(categories) ~= "table" or not vim.islist(categories) or #categories == 0 then
+		fail("categories must be a non-empty array")
+	end
+	for _, category in ipairs(categories) do
+		if type(category) ~= "string" or category == "" then
+			fail("categories must contain non-empty names")
+		end
 		local path = opts.paths[category]
 		local age = opts.max_age[category]
 		if type(path) ~= "string" or path == "" then
@@ -83,7 +91,10 @@ function M.new(opts)
 		paths[category] = path
 		max_age[category] = age
 	end
-	return setmetatable({ root = root, paths = paths, max_age = max_age }, Retention)
+	return setmetatable(
+		{ root = root, paths = paths, max_age = max_age, categories = vim.deepcopy(categories) },
+		Retention
+	)
 end
 
 function M.default(max_age)
@@ -96,17 +107,38 @@ function M.default(max_age)
 	return M.new({ root = root, paths = paths, max_age = max_age })
 end
 
-function Retention:plan(now)
+function M.project(root, max_age_days)
+	if type(root) ~= "string" or root == "" then
+		fail("project root must be non-empty text")
+	end
+	if type(max_age_days) ~= "number" or max_age_days < 0 or max_age_days % 1 ~= 0 then
+		fail("project max_age_days must be a non-negative integer")
+	end
+	local paths, max_age = {}, {}
+	for _, category in ipairs(M.project_categories) do
+		paths[category] = root .. "/" .. category
+		max_age[category] = max_age_days * 24 * 60 * 60
+	end
+	return M.new({ root = root, paths = paths, max_age = max_age, categories = M.project_categories })
+end
+
+function Retention:plan(now, opts)
 	now = now or now_seconds()
 	if type(now) ~= "number" or now < 0 or now % 1 ~= 0 then
 		fail("now must be a non-negative integer")
 	end
+	opts = opts or {}
+	if type(opts) ~= "table" or (opts.exclude ~= nil and type(opts.exclude) ~= "function") then
+		fail("plan options must provide an optional exclude callback")
+	end
 	local result = {}
-	for _, category in ipairs(M.categories) do
+	for _, category in ipairs(self.categories) do
 		local files = {}
 		collect(self.paths[category], files)
 		for _, file in ipairs(files) do
-			if now - file.mtime >= self.max_age[category] then
+			if
+				now - file.mtime >= self.max_age[category] and not (opts.exclude and opts.exclude(file.path, category))
+			then
 				table.insert(result, { category = category, path = file.path, mtime = file.mtime })
 			end
 		end
@@ -128,7 +160,7 @@ function Retention:prune(plan, confirm)
 	for _, candidate in ipairs(plan) do
 		if
 			type(candidate) ~= "table"
-			or not is_category(candidate.category)
+			or not is_category(candidate.category, self.categories)
 			or type(candidate.path) ~= "string"
 			or type(candidate.mtime) ~= "number"
 		then

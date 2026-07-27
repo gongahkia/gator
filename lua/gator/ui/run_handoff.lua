@@ -24,6 +24,16 @@ local function render(panel)
 		"Gator handoff review",
 		"Source: " .. panel.source.provider .. " · target: " .. panel.target .. " · profile: " .. panel.profile,
 		"Transcript: " .. panel.source.transcript,
+		"Target transport: " .. panel.preflight.transport .. " · workspace: " .. panel.preflight.workspace,
+		"Context: "
+			.. panel.preflight.context_bytes
+			.. " bytes · snapshots "
+			.. panel.preflight.included
+			.. " included / "
+			.. panel.preflight.omitted
+			.. " omitted",
+		"Snapshot application: "
+			.. (panel.apply_snapshot and "choose apply or retain before launch" or "retained only"),
 		"",
 	}
 	if #panel.conflicts > 0 then
@@ -44,12 +54,15 @@ end
 
 local function confirm(panel)
 	local decisions = {}
+	local function complete(apply_snapshot)
+		panel.confirmed = true
+		panel.on_confirm(panel.body, decisions, apply_snapshot)
+		M.close()
+	end
 	local function next_conflict(index)
 		local conflict = panel.conflicts[index]
 		if not conflict then
-			panel.confirmed = true
-			panel.on_confirm(panel.body, decisions)
-			M.close()
+			complete(true)
 			return
 		end
 		vim.ui.select({ "Apply source snapshot", "Skip source snapshot", "Cancel" }, {
@@ -66,7 +79,19 @@ local function confirm(panel)
 			end
 		end)
 	end
-	next_conflict(1)
+	if not panel.apply_snapshot then
+		complete(false)
+		return
+	end
+	vim.ui.select({ "Apply snapshots and launch", "Retain snapshots only", "Cancel" }, {
+		prompt = "Gator handoff snapshot application",
+	}, function(choice)
+		if choice == "Apply snapshots and launch" then
+			next_conflict(1)
+		elseif choice == "Retain snapshots only" then
+			complete(false)
+		end
+	end)
 end
 
 function M.open(opts)
@@ -75,9 +100,16 @@ function M.open(opts)
 		or type(opts.source) ~= "table"
 		or type(opts.target) ~= "string"
 		or type(opts.body) ~= "string"
+		or type(opts.preflight) ~= "table"
+		or type(opts.preflight.transport) ~= "string"
+		or type(opts.preflight.workspace) ~= "string"
+		or type(opts.preflight.context_bytes) ~= "number"
+		or type(opts.preflight.included) ~= "number"
+		or type(opts.preflight.omitted) ~= "number"
+		or type(opts.apply_snapshot) ~= "boolean"
 		or type(opts.on_confirm) ~= "function"
 	then
-		fail("open requires source, target, body, and confirm callback")
+		fail("open requires source, target, body, preflight, and confirm callback")
 	end
 	if opts.preview ~= nil and type(opts.preview) ~= "string" then
 		fail("preview must be text")
@@ -95,8 +127,13 @@ function M.open(opts)
 		end
 		panel.source, panel.target, panel.profile, panel.body, panel.on_confirm =
 			opts.source, opts.target, opts.profile, opts.body, opts.on_confirm
-		panel.preview, panel.conflicts, panel.on_cancel, panel.confirmed =
-			opts.preview, vim.deepcopy(opts.conflicts or {}), opts.on_cancel, false
+		panel.preview, panel.conflicts, panel.on_cancel, panel.confirmed, panel.preflight, panel.apply_snapshot =
+			opts.preview,
+			vim.deepcopy(opts.conflicts or {}),
+			opts.on_cancel,
+			false,
+			vim.deepcopy(opts.preflight),
+			opts.apply_snapshot
 		render(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
@@ -116,6 +153,8 @@ function M.open(opts)
 		on_confirm = opts.on_confirm,
 		preview = redact.text(opts.preview or ""),
 		conflicts = vim.deepcopy(opts.conflicts or {}),
+		preflight = vim.deepcopy(opts.preflight),
+		apply_snapshot = opts.apply_snapshot,
 		on_cancel = opts.on_cancel,
 		confirmed = false,
 	}

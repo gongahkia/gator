@@ -77,3 +77,24 @@ assert(
 	not cancelled and cancelled_error:find("was cancelled", 1, true),
 	"worktree allocation must support cancellation"
 )
+local locked, unlocked = {}, {}
+assert(worktree.lock({
+	root = root,
+	path = occupied,
+	reason = "Gator run run-one",
+	run = function(argv)
+		table.insert(locked, argv)
+		return { code = 0, stdout = "" }
+	end,
+}) and worktree.unlock({
+	root = root,
+	path = occupied,
+	run = function(argv)
+		table.insert(unlocked, argv)
+		return { code = 0, stdout = "" }
+	end,
+}), "active worktrees must support explicit Git lock and terminal-state unlock")
+assert(
+	locked[1][3] == "lock" and locked[1][4] == "--reason" and unlocked[1][3] == "unlock",
+	"worktree locking must use Git worktree lock/unlock without branch mutation"
+)

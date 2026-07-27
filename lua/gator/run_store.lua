@@ -71,6 +71,51 @@ local function resolve_git_path(root, value)
 	return root .. "/" .. value
 end
 
+local function path(value, name)
+	value = text(value, name)
+	if value:find("\0", 1, true) then
+		fail(name .. " must not contain NUL")
+	end
+	return vim.fs.normalize(value)
+end
+
+local function worktree_lease(value)
+	if type(value) ~= "table" then
+		fail("worktree lease must be an object")
+	end
+	for key in pairs(value) do
+		if
+			key ~= "run_id"
+			and key ~= "repository_root"
+			and key ~= "common_git_dir"
+			and key ~= "worktree_root"
+			and key ~= "branch"
+			and key ~= "base"
+			and key ~= "state"
+			and key ~= "created_at"
+			and key ~= "updated_at"
+		then
+			fail("worktree lease contains unsupported field: " .. tostring(key))
+		end
+	end
+	local result = vim.deepcopy(value)
+	result.run_id = identifier(result.run_id, "worktree lease.run_id")
+	result.repository_root = path(result.repository_root, "worktree lease.repository_root")
+	result.common_git_dir = path(result.common_git_dir, "worktree lease.common_git_dir")
+	result.worktree_root = path(result.worktree_root, "worktree lease.worktree_root")
+	result.branch = text(result.branch, "worktree lease.branch")
+	result.base = text(result.base, "worktree lease.base")
+	if result.state ~= "active" and result.state ~= "released" then
+		fail("worktree lease.state must be active or released")
+	end
+	for _, field in ipairs({ "created_at", "updated_at" }) do
+		if type(result[field]) ~= "number" or result[field] < 0 or result[field] % 1 ~= 0 then
+			fail("worktree lease." .. field .. " must be a non-negative integer")
+		end
+	end
+	return result
+end
+
 local function ignore(root)
 	local result = vim.system({ "git", "rev-parse", "--git-path", "info/exclude" }, { cwd = root, text = true }):wait()
 	if result.code ~= 0 then
@@ -265,6 +310,7 @@ function M.new(root)
 		handoffs_directory = root .. "/.gator/handoffs",
 		reviews_directory = root .. "/.gator/reviews",
 		runbooks_directory = root .. "/.gator/runbooks",
+		worktree_leases_directory = root .. "/.gator/worktree-leases",
 	}, Store)
 end
 
@@ -281,6 +327,7 @@ function Store:ensure()
 		self.handoffs_directory,
 		self.reviews_directory,
 		self.runbooks_directory,
+		self.worktree_leases_directory,
 	}) do
 		if vim.fn.mkdir(path, "p") ~= 1 and vim.fn.isdirectory(path) ~= 1 then
 			fail("cannot create local Gator state directory")
@@ -973,6 +1020,82 @@ function Store:read_transcript(id)
 	id = identifier(id, "run id")
 	local path = self.directory .. "/transcripts/" .. id .. ".md"
 	return vim.fn.filereadable(path) == 1 and table.concat(vim.fn.readfile(path), "\n") or nil
+end
+
+function Store:put_worktree_lease(value)
+	self:ensure()
+	local lease = worktree_lease(value)
+	atomic(self.worktree_leases_directory .. "/" .. lease.run_id .. ".json", { schema_version = 1, lease = lease })
+	return vim.deepcopy(lease)
+end
+
+function Store:worktree_lease(id)
+	id = identifier(id, "run id")
+	self:ensure()
+	local document = json(self.worktree_leases_directory .. "/" .. id .. ".json")
+	if not document then
+		return nil
+	end
+	if document.schema_version ~= 1 or type(document.lease) ~= "table" then
+		fail("invalid worktree lease")
+	end
+	return worktree_lease(document.lease)
+end
+
+function Store:list_worktree_leases()
+	self:ensure()
+	local result = {}
+	for _, value in ipairs(vim.fn.glob(self.worktree_leases_directory .. "/*.json", false, true)) do
+		local document = json(value)
+		if not document or document.schema_version ~= 1 or type(document.lease) ~= "table" then
+			fail("invalid worktree lease: " .. value)
+		end
+		table.insert(result, worktree_lease(document.lease))
+	end
+	table.sort(result, function(left, right)
+		return left.run_id < right.run_id
+	end)
+	return result
+end
+
+function Store:remove_worktree_lease(id)
+	id = identifier(id, "run id")
+	self:ensure()
+	local value = self.worktree_leases_directory .. "/" .. id .. ".json"
+	if vim.fn.filereadable(value) ~= 1 then
+		return false
+	end
+	if vim.fn.delete(value) ~= 0 then
+		fail("cannot remove worktree lease")
+	end
+	return true
+end
+
+local function remove_managed(path, recursive)
+	if not vim.uv.fs_lstat(path) then
+		return false
+	end
+	if vim.fn.delete(path, recursive and "rf" or "") ~= 0 then
+		fail("cannot remove managed artifact: " .. path)
+	end
+	return true
+end
+
+function Store:forget_run(id)
+	id = identifier(id, "run id")
+	local run = self:get(id)
+	if not run then
+		return false
+	end
+	self:ensure()
+	remove_managed(self.runs_directory .. "/" .. id .. ".json")
+	remove_managed(self.directory .. "/transcripts/" .. id .. ".md")
+	remove_managed(self.reviews_directory .. "/" .. id, true)
+	if run.bundle_id then
+		remove_managed(self.bundles_directory .. "/" .. run.bundle_id .. ".md")
+		remove_managed(self.handoffs_directory .. "/" .. run.bundle_id, true)
+	end
+	return true
 end
 
 function M.id(prefix)

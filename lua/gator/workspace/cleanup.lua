@@ -69,7 +69,7 @@ function M.new(opts)
 		fail("new requires options")
 	end
 	for key in pairs(opts) do
-		if key ~= "root" and key ~= "run" and key ~= "active" then
+		if key ~= "root" and key ~= "run" and key ~= "active" and key ~= "owned" then
 			fail("options contain unsupported field: " .. tostring(key))
 		end
 	end
@@ -79,6 +79,9 @@ function M.new(opts)
 	if type(opts.active) ~= "function" then
 		fail("active must be a function")
 	end
+	if opts.owned ~= nil and type(opts.owned) ~= "function" then
+		fail("owned must be a function")
+	end
 	local root = directory(opts.root, "root")
 	local run = opts.run
 		or function(argv, cwd)
@@ -86,7 +89,7 @@ function M.new(opts)
 			return { code = result.code, stdout = result.stdout or "" }
 		end
 	return setmetatable(
-		{ root = root, run = run, active = opts.active, plans = setmetatable({}, { __mode = "k" }) },
+		{ root = root, run = run, active = opts.active, owned = opts.owned, plans = setmetatable({}, { __mode = "k" }) },
 		Cleanup
 	)
 end
@@ -97,6 +100,15 @@ function Cleanup:plan()
 	for _, value in ipairs(worktrees(output)) do
 		local path = vim.uv.fs_realpath(value.path)
 		if path and path ~= self.root and not value.locked and not value.prunable then
+			if self.owned then
+				local ok, owned = pcall(self.owned, path)
+				if not ok or type(owned) ~= "boolean" then
+					fail("worktree ownership probe failed")
+				end
+				if not owned then
+					goto continue
+				end
+			end
 			local ok, active = pcall(self.active, path)
 			if not ok or type(active) ~= "boolean" then
 				fail("worktree activity probe failed")
@@ -112,6 +124,7 @@ function Cleanup:plan()
 				table.insert(result, { path = path, branch = value.branch })
 			end
 		end
+		::continue::
 	end
 	table.sort(result, function(left, right)
 		return left.path < right.path

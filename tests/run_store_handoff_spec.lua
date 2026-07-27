@@ -26,3 +26,26 @@ assert(
 assert(not pcall(store.materialize_handoff, store, "bundle-invalid", "body", {
 	files = { { path = "../outside", state = "included", content = "no" } },
 }, root), "handoff materialization must reject traversal paths")
+
+local lease = store:put_worktree_lease({
+	run_id = "run-transfer",
+	repository_root = root,
+	common_git_dir = root .. "/.git",
+	worktree_root = root .. "/linked-worktree",
+	branch = "gator/run-transfer",
+	base = "HEAD",
+	state = "active",
+	created_at = 1,
+	updated_at = 1,
+})
+assert(
+	store:worktree_lease("run-transfer").state == "active"
+		and store:list_worktree_leases()[1].common_git_dir == root .. "/.git",
+	"project-local worktree leases must retain only Git ownership metadata"
+)
+lease.state, lease.updated_at = "released", 2
+store:put_worktree_lease(lease)
+assert(
+	store:worktree_lease("run-transfer").state == "released" and store:remove_worktree_lease("run-transfer"),
+	"terminal worktree leases must remain inspectable until explicit removal"
+)

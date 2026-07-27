@@ -36,6 +36,17 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorRunbook", function()
 		require("gator").dispatch("runbook_next")
 	end, { nargs = 0, desc = "Select and start one ready Gator runbook step" })
+	vim.api.nvim_create_user_command("GatorPrune", function()
+		require("gator").dispatch("prune")
+	end, { nargs = 0, desc = "Preview and remove expired Gator-owned artifacts" })
+	vim.api.nvim_create_user_command("GatorForget", function(opts)
+		local ok, result = pcall(require("gator").dispatch, "forget", { run_id = opts.args })
+		vim.notify(
+			ok and (result and "Gator run forgotten" or "Gator run is unavailable") or tostring(result),
+			ok and vim.log.levels.INFO or vim.log.levels.ERROR,
+			{ title = "Gator" }
+		)
+	end, { nargs = 1, desc = "Forget a completed Gator run and eligible worktree" })
 	vim.api.nvim_create_user_command("GatorHealth", function()
 		require("gator").dispatch("health")
 	end, { desc = "Check Gator health" })

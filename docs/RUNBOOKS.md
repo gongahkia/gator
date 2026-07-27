@@ -30,4 +30,6 @@ Every step has an explicit provider, objective, role, and acyclic dependency lis
 
 Provider CLIs retain their own filesystem and command permissions. `researcher`/`reviewer` are Gator role instructions, not an OS sandbox or a claim that an arbitrary provider cannot write. For structured providers, native approval requests remain interactive.
 
+Writer and integrator worktrees are Git-locked while their Gator run is active or detached. Terminal states unlock the worktree but retain local ownership metadata, so the configured startup cleanup can remove only expired, clean, inactive Gator worktrees. Cleanup never uses force removal or deletes branches.
+
 Runbook usage displays exact aggregate provider-reported tokens only. If any started run has no report, the graph says `partial`; an untouched runbook says `unknown`. No price, token, or context value is inferred for another provider. A reported-token cap blocks future starts once the exact reported lower bound reaches it; it does not estimate unreported usage.

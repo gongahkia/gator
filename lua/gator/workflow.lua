@@ -12,6 +12,9 @@ local handoff_review = require("gator.ui.run_handoff")
 local review_ui = require("gator.ui.run_review")
 local loading_ui = require("gator.ui.loading")
 local worktree = require("gator.workspace.worktree")
+local workspace_cleanup = require("gator.workspace.cleanup")
+local retention = require("gator.core.retention")
+local retention_ui = require("gator.ui.retention")
 local state_store = require("gator.state")
 local review_validation = require("gator.review.validation")
 local policy_overlay = require("gator.policy.overlay")
@@ -126,9 +129,14 @@ function M.new(opts)
 			and key ~= "handoff_review"
 			and key ~= "review_ui"
 			and key ~= "review_validation"
+			and key ~= "retention_ui"
+			and key ~= "clock"
 		then
 			fail("new contains unsupported field: " .. tostring(key))
 		end
+	end
+	if opts.clock ~= nil and type(opts.clock) ~= "function" then
+		fail("clock must be a function")
 	end
 	local root = project_root(opts.root)
 	local value = setmetatable({
@@ -144,6 +152,8 @@ function M.new(opts)
 		handoff_review = opts.handoff_review or handoff_review,
 		review_ui = opts.review_ui or review_ui,
 		review_validation = opts.review_validation or review_validation,
+		retention_ui = opts.retention_ui or retention_ui,
+		clock = opts.clock or now,
 		loading_handles = {},
 		providers = {},
 		active = {},
@@ -159,6 +169,10 @@ function Workflow:runs()
 	return self.store:list()
 end
 
+function Workflow:worktree_lease(id)
+	return self.store:worktree_lease(id)
+end
+
 function Workflow:recover()
 	local recovered = 0
 	for _, run in ipairs(self:runs()) do
@@ -167,6 +181,8 @@ function Workflow:recover()
 			recovered = recovered + 1
 		end
 	end
+	self:reconcile_worktree_leases()
+	self:startup_retention()
 	return recovered
 end
 
@@ -187,8 +203,12 @@ function Workflow:update(id, patch)
 	for key, item in pairs(patch) do
 		value[key] = vim.deepcopy(item)
 	end
-	value.updated_at = now()
-	return self:put(value)
+	value.updated_at = self.clock()
+	local updated = self:put(value)
+	if updated.workspace.kind == "worktree" and not active_state(updated) then
+		self:release_worktree_lease(updated)
+	end
+	return updated
 end
 
 function Workflow:report_usage(id, usage)
@@ -353,6 +373,261 @@ function Workflow:prompt(opts)
 	return true
 end
 
+local function git_path(root, argv, name)
+	local result = vim.system(argv, { cwd = root, text = true }):wait()
+	if result.code ~= 0 or vim.trim(result.stdout or "") == "" then
+		fail(name .. " is unavailable")
+	end
+	local value = vim.trim(result.stdout)
+	return value:sub(1, 1) == "/" and vim.fs.normalize(value) or vim.fs.normalize(root .. "/" .. value)
+end
+
+local function git_branch(root)
+	local result = vim.system({ "git", "branch", "--show-current" }, { cwd = root, text = true }):wait()
+	if result.code ~= 0 or vim.trim(result.stdout or "") == "" then
+		fail("worktree branch is unavailable")
+	end
+	return vim.trim(result.stdout)
+end
+
+function Workflow:lease_worktree(run)
+	if run.workspace.kind ~= "worktree" then
+		return nil
+	end
+	local existing = self.store:worktree_lease(run.id)
+	if existing and existing.state == "active" then
+		return existing
+	end
+	local workspace = run.workspace
+	local lease = {
+		run_id = run.id,
+		repository_root = self.root,
+		common_git_dir = git_path(self.root, { "git", "rev-parse", "--git-common-dir" }, "Git common directory"),
+		worktree_root = workspace.root,
+		branch = workspace.branch or git_branch(workspace.root),
+		base = workspace.base or capture.head(workspace.root) or "HEAD",
+		state = "active",
+		created_at = existing and existing.created_at or self.clock(),
+		updated_at = self.clock(),
+	}
+	if not existing then
+		worktree.lock({ root = self.root, path = workspace.root, reason = "Gator run " .. run.id })
+	elseif existing.state == "released" then
+		worktree.lock({ root = self.root, path = workspace.root, reason = "Gator run " .. run.id })
+	end
+	local ok, value = pcall(self.store.put_worktree_lease, self.store, lease)
+	if not ok then
+		pcall(worktree.unlock, { root = self.root, path = workspace.root })
+		error(value, 0)
+	end
+	return value
+end
+
+function Workflow:release_worktree_lease(run)
+	if run.workspace.kind ~= "worktree" then
+		return false
+	end
+	local lease = self.store:worktree_lease(run.id)
+	if not lease or lease.state == "released" then
+		return false
+	end
+	local unlocked, reason = pcall(worktree.unlock, { root = lease.repository_root, path = lease.worktree_root })
+	if not unlocked then
+		vim.notify("Gator worktree unlock: " .. tostring(reason), vim.log.levels.WARN)
+		return false
+	end
+	lease.state, lease.updated_at = "released", self.clock()
+	self.store:put_worktree_lease(lease)
+	return true
+end
+
+function Workflow:reconcile_worktree_leases()
+	for _, run in ipairs(self:runs()) do
+		if run.workspace.kind == "worktree" then
+			local lease = self.store:worktree_lease(run.id)
+			if active_state(run) and (not lease or lease.state ~= "active") then
+				local ok, reason = pcall(self.lease_worktree, self, run)
+				if not ok then
+					vim.notify("Gator worktree lease: " .. tostring(reason), vim.log.levels.WARN)
+				end
+			elseif not active_state(run) and lease and lease.state == "active" then
+				self:release_worktree_lease(run)
+			end
+		end
+	end
+	return self.store:list_worktree_leases()
+end
+
+function Workflow:retention_exclusion()
+	local protected = { runs = {}, transcripts = {}, bundles = {}, reviews = {}, handoffs = {} }
+	for _, run in ipairs(self:runs()) do
+		if active_state(run) then
+			protected.runs[run.id] = true
+			protected.transcripts[run.id] = true
+			protected.reviews[run.id] = true
+			if run.bundle_id then
+				protected.bundles[run.bundle_id] = true
+				protected.handoffs[run.bundle_id] = true
+			end
+		end
+	end
+	return function(value, category)
+		local name = vim.fn.fnamemodify(value, ":t")
+		if category == "runs" or category == "transcripts" then
+			return protected[category][name:gsub("%.[^.]+$", "")]
+		end
+		if category == "bundles" then
+			return protected.bundles[name:gsub("%.[^.]+$", "")]
+		end
+		if category == "reviews" then
+			return protected.reviews[vim.fn.fnamemodify(vim.fn.fnamemodify(value, ":h"), ":t")]
+		end
+		if category == "handoffs" then
+			local parent = vim.fn.fnamemodify(value, ":h")
+			return protected.handoffs[vim.fn.fnamemodify(parent, ":t")]
+		end
+		return false
+	end
+end
+
+function Workflow:worktree_cleanup_plan(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("worktree cleanup options must be an object")
+	end
+	local age = self.state.config.retention.max_age_days
+	if age == 0 and not opts.ignore_age then
+		return { manager = nil, plan = {}, by_path = {} }
+	end
+	local cutoff = self.clock() - age * 24 * 60 * 60
+	local by_path = {}
+	for _, lease in ipairs(self.store:list_worktree_leases()) do
+		if
+			lease.state == "released"
+			and (not opts.run_id or lease.run_id == opts.run_id)
+			and (opts.ignore_age or lease.updated_at <= cutoff)
+		then
+			by_path[vim.fs.normalize(lease.worktree_root)] = lease
+		end
+	end
+	if next(by_path) == nil then
+		return { manager = nil, plan = {}, by_path = by_path }
+	end
+	local manager = workspace_cleanup.new({
+		root = self.root,
+		active = function(path)
+			for _, run in ipairs(self:runs()) do
+				if active_state(run) and vim.fs.normalize(run.workspace.root) == path then
+					return true
+				end
+			end
+			return false
+		end,
+		owned = function(path)
+			return by_path[path] ~= nil
+		end,
+	})
+	return { manager = manager, plan = manager:plan(), by_path = by_path }
+end
+
+function Workflow:retention_plan()
+	local age = self.state.config.retention.max_age_days
+	if age == 0 then
+		return { manager = nil, artifacts = {}, worktrees = self:worktree_cleanup_plan(), by_path = {} }
+	end
+	local manager = retention.project(self.store.directory, age)
+	local worktrees = self:worktree_cleanup_plan()
+	return {
+		manager = manager,
+		artifacts = manager:plan(self.clock(), { exclude = self:retention_exclusion() }),
+		worktrees = worktrees,
+		by_path = worktrees.by_path,
+	}
+end
+
+function Workflow:apply_retention_plan(value)
+	if type(value) ~= "table" then
+		fail("retention plan must be an object")
+	end
+	local artifacts = value.manager and value.manager:prune(value.artifacts, true) or {}
+	local worktrees = {}
+	if value.worktrees and value.worktrees.manager and #value.worktrees.plan > 0 then
+		worktrees = value.worktrees.manager:prune(value.worktrees.plan, true)
+		for _, path in ipairs(worktrees) do
+			local lease = value.by_path[path]
+			if lease then
+				self.store:remove_worktree_lease(lease.run_id)
+			end
+		end
+	end
+	return { artifacts = artifacts, worktrees = worktrees }
+end
+
+function Workflow:startup_retention()
+	if self.retention_started or not self.state.config.retention.cleanup_on_start then
+		return { artifacts = {}, worktrees = {} }
+	end
+	self.retention_started = true
+	local value = self:retention_plan()
+	local ok, result = pcall(self.apply_retention_plan, self, value)
+	if not ok then
+		vim.notify("Gator startup cleanup: " .. tostring(result), vim.log.levels.WARN)
+		return { artifacts = {}, worktrees = {} }
+	end
+	if #result.artifacts > 0 or #result.worktrees > 0 then
+		vim.notify(
+			"Gator startup cleanup: removed "
+				.. #result.artifacts
+				.. " artifacts and "
+				.. #result.worktrees
+				.. " clean worktrees",
+			vim.log.levels.INFO
+		)
+	end
+	return result
+end
+
+function Workflow:prune()
+	local value = self:retention_plan()
+	return self.retention_ui.open({
+		artifacts = value.artifacts,
+		worktrees = value.worktrees.plan,
+		on_confirm = function()
+			local ok, result = pcall(self.apply_retention_plan, self, value)
+			vim.notify(
+				ok
+						and ("Gator cleanup: removed " .. #result.artifacts .. " artifacts and " .. #result.worktrees .. " worktrees")
+					or ("Gator cleanup: " .. tostring(result)),
+				ok and vim.log.levels.INFO or vim.log.levels.ERROR,
+				{ title = "Gator" }
+			)
+		end,
+	})
+end
+
+function Workflow:forget(id)
+	local run = self:run(id)
+	if active_state(run) then
+		fail("cannot forget an active or detached run")
+	end
+	local lease = self.store:worktree_lease(run.id)
+	if lease then
+		if lease.state ~= "released" then
+			fail("cannot forget a locked worktree lease")
+		end
+		local worktrees = self:worktree_cleanup_plan({ run_id = run.id, ignore_age = true })
+		if #worktrees.plan ~= 1 then
+			fail("cannot forget a worktree that is dirty, locked, missing, or not Gator-owned")
+		end
+		local removed = worktrees.manager:prune(worktrees.plan, true)
+		if #removed ~= 1 then
+			fail("cannot remove eligible worktree")
+		end
+		self.store:remove_worktree_lease(run.id)
+	end
+	return self.store:forget_run(run.id)
+end
+
 function Workflow:workspace(id, force_worktree)
 	if not force_worktree then
 		for _, run in ipairs(self:runs()) do
@@ -375,7 +650,7 @@ function Workflow:workspace(id, force_worktree)
 		branch = "gator/" .. id,
 		base = "HEAD",
 	})
-	return { kind = "worktree", root = created.path, branch = created.branch }
+	return { kind = "worktree", root = created.path, branch = created.branch, base = created.base }
 end
 
 function Workflow:handoff_workspace(source, force_worktree)
@@ -673,9 +948,14 @@ function Workflow:launch(opts)
 			action = self.state.config.budget.action,
 			state = self.state.config.budget.max_tokens > 0 and "unknown" or "unbounded",
 		},
-		created_at = now(),
-		updated_at = now(),
+		created_at = self.clock(),
+		updated_at = self.clock(),
 	})
+	local leased, lease_error = pcall(self.lease_worktree, self, run)
+	if not leased then
+		self:update(run.id, { state = "failed" })
+		error(lease_error, 0)
+	end
 	local prompt = objective .. "\n\nUse this Gator context bundle:\n\n" .. body
 	local instruction = role_instruction(selected_role)
 	if instruction then
@@ -1541,11 +1821,27 @@ function Workflow:handoff(source_id, target, opts)
 	local conflicts = apply_snapshot and self.store:handoff_conflicts(snapshot, workspace.root) or {}
 	local preview = apply_snapshot and self.store:preview_handoff(snapshot, workspace.root)
 		or "Target is the source workspace; snapshots will be retained as an artifact but not applied again."
+	local included, omitted = 0, 0
+	for _, file in ipairs(snapshot.files) do
+		if file.state == "included" or file.state == "deleted" then
+			included = included + 1
+		else
+			omitted = omitted + 1
+		end
+	end
 	self.handoff_review.open({
 		source = source,
 		target = target,
 		profile = profile,
 		body = body,
+		preflight = {
+			transport = self:resolve_transport(self:provider(target)),
+			workspace = vim.fn.fnamemodify(workspace.root, ":~:."),
+			context_bytes = #body,
+			included = included,
+			omitted = omitted,
+		},
+		apply_snapshot = apply_snapshot,
 		preview = preview,
 		conflicts = conflicts,
 		on_cancel = function()
@@ -1553,7 +1849,11 @@ function Workflow:handoff(source_id, target, opts)
 				self:discard_workspace(workspace)
 			end
 		end,
-		on_confirm = function(reviewed, decisions)
+		on_confirm = function(reviewed, decisions, approved_snapshot_application)
+			local materialize_snapshot = approved_snapshot_application
+			if materialize_snapshot == nil then
+				materialize_snapshot = apply_snapshot
+			end
 			local launched, run = pcall(self.launch, self, {
 				objective = opts.objective or ("Continue the reviewed handoff from " .. source.provider),
 				provider = target,
@@ -1564,7 +1864,7 @@ function Workflow:handoff(source_id, target, opts)
 				remember = false,
 				handoff_snapshot = snapshot,
 				handoff_decisions = decisions,
-				apply_handoff_snapshot = apply_snapshot,
+				apply_handoff_snapshot = materialize_snapshot,
 				native_session_operation = opts.native_fork and "fork" or nil,
 				native_session = opts.native_fork and source.session or nil,
 				runbook_id = opts.runbook_id,

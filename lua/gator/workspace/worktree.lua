@@ -110,4 +110,47 @@ function M.remove(opts)
 	invoke(git, { "git", "branch", "--delete", "--force", opts.branch }, root, "worktree branch removal")
 	return true
 end
+
+local function lock_request(opts, action)
+	if
+		type(opts) ~= "table"
+		or type(opts.root) ~= "string"
+		or opts.root == ""
+		or type(opts.path) ~= "string"
+		or opts.path == ""
+		or (opts.reason ~= nil and (type(opts.reason) ~= "string" or opts.reason == ""))
+		or (opts.run ~= nil and type(opts.run) ~= "function")
+		or (opts.git ~= nil and not git_boundary.is(opts.git))
+	then
+		fail(action .. " requires root, path, optional reason, and optional Git boundary")
+	end
+	if opts.run ~= nil and opts.git ~= nil then
+		fail(action .. " accepts either run or git")
+	end
+	local root = vim.uv.fs_realpath(opts.root)
+	local path = vim.uv.fs_realpath(opts.path)
+	if not root or not path or root == path then
+		fail(action .. " requires a linked worktree")
+	end
+	return root, path, opts.git or git_boundary.new({ run = opts.run })
+end
+
+function M.lock(opts)
+	local root, path, git = lock_request(opts, "lock")
+	local argv = { "git", "worktree", "lock" }
+	if opts.reason then
+		table.insert(argv, "--reason")
+		table.insert(argv, opts.reason)
+	end
+	table.insert(argv, path)
+	invoke(git, argv, root, "worktree lock")
+	return true
+end
+
+function M.unlock(opts)
+	local root, path, git = lock_request(opts, "unlock")
+	invoke(git, { "git", "worktree", "unlock", path }, root, "worktree unlock")
+	return true
+end
+
 return M
