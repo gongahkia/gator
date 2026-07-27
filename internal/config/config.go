@@ -114,12 +114,16 @@ type PlanningSwarm struct {
 }
 
 func (p PlanningSwarm) Parallelism() int {
-	if p.MaxParallel == 0 { return 3 }
+	if p.MaxParallel == 0 {
+		return 3
+	}
 	return p.MaxParallel
 }
 
 func (p PlanningSwarm) Timeout() int {
-	if p.TimeoutS == 0 { return 180 }
+	if p.TimeoutS == 0 {
+		return 180
+	}
 	return p.TimeoutS
 }
 

@@ -900,18 +900,21 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		return err
 	}
 	providerID := run.Providers[job.Stage]
-	if err := s.store.MarkStageRunning(ctx, job, providerID); err != nil {
-		return err
+	providerConfig, ok := s.config.Manifest.Provider(providerID, job.Stage)
+	if !ok {
+		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
 	}
-	if err := workspace.Ensure(ctx, run.ID); err != nil {
+	swarmEligible := job.Stage == domain.StagePlanner && s.config.Manifest.Workflow.PlanningSwarm.Enabled && planningSwarmAllowed(providerConfig)
+	if err := s.store.MarkStageRunning(ctx, job, providerID); err != nil {
 		return err
 	}
 	if job.Stage == domain.StageDeployer {
 		return s.deploy(ctx, run, job)
 	}
-	providerConfig, ok := s.config.Manifest.Provider(providerID, job.Stage)
-	if !ok {
-		return fmt.Errorf("provider %q is no longer enabled for %s", providerID, job.Stage)
+	if !swarmEligible {
+		if err := workspace.Ensure(ctx, run.ID); err != nil {
+			return err
+		}
 	}
 	generatedFiles := []string(nil)
 	if job.Stage == domain.StageBuilder && job.Attempt == 1 && run.BaseSnapshotDigest == "" {
@@ -927,26 +930,51 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
-		return err
-	}
-	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli", skills)
-	providerStarted := time.Now()
-	providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
-	providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
-	invoker := provider.Invoker{Workspace: workspace, Extensions: s.extensions}
-	result, err := invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
-	s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
-	if err != nil {
-		if observeErr := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, Metadata: map[string]any{"outcome": "error", "rate_limited": providerRateLimited(err)}}); observeErr != nil {
-			s.log.Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
+	if !swarmEligible {
+		if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
+			return err
 		}
-		providerSpan.RecordError(err)
-		providerSpan.SetStatus(codes.Error, err.Error())
 	}
-	providerSpan.End()
-	if err != nil {
-		return err
+	promptSkills := skills
+	if swarmEligible {
+		promptSkills = nil
+	}
+	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli", promptSkills)
+	var result provider.Result
+	var swarmArtifact map[string]any
+	swarmHandled := false
+	if swarmEligible {
+		result, swarmArtifact, swarmHandled, err = s.invokeSwarm(ctx, run, job, providerConfig, skills, prompt)
+		if err != nil {
+			return err
+		}
+	}
+	if !swarmHandled {
+		if swarmEligible {
+			if err := workspace.Ensure(ctx, run.ID); err != nil {
+				return err
+			}
+			if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
+				return err
+			}
+		}
+		providerStarted := time.Now()
+		providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
+		providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
+		invoker := provider.Invoker{Workspace: workspace, Extensions: s.extensions}
+		result, err = invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
+		s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
+		if err != nil {
+			if observeErr := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, Metadata: map[string]any{"outcome": "error", "rate_limited": providerRateLimited(err)}}); observeErr != nil {
+				s.log.Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
+			}
+			providerSpan.RecordError(err)
+			providerSpan.SetStatus(codes.Error, err.Error())
+		}
+		providerSpan.End()
+		if err != nil {
+			return err
+		}
 	}
 	var revisionID *int64
 	if result.RateLimit.RemainingRequests != nil || result.RateLimit.ResetAt != nil {
@@ -955,9 +983,12 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		}
 	}
 	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
+	if swarmArtifact != nil {
+		artifact["planning_swarm"] = swarmArtifact
+	}
 	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
 	if job.Stage == domain.StagePlanner {
-		if architecture, ok := architectureFromResponse(result.Text, run); ok {
+		if architecture, ok := architectureFromResponse(result.Text, run); ok && !swarmHandled {
 			if err := s.store.SetPlannerArchitecture(ctx, run.ID, job.Attempt, architecture); err != nil {
 				return err
 			}
@@ -1013,8 +1044,10 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		artifact["revision_id"] = *revisionID
 		artifact["review_kind"] = revisionKind(job.Attempt)
 	}
-	if err := s.recordUsage(ctx, run.ID, job.Stage, revisionID, providerConfig.ID, result, prompt); err != nil {
-		s.log.Warn("record provider usage", "run_id", run.ID, "error", err)
+	if !swarmHandled {
+		if err := s.recordUsage(ctx, run.ID, job.Stage, revisionID, providerConfig.ID, result, prompt); err != nil {
+			s.log.Warn("record provider usage", "run_id", run.ID, "error", err)
+		}
 	}
 	if job.Stage == domain.StageVerifier {
 		revision, err := s.store.LatestRevision(ctx, run.ID)
@@ -1040,6 +1073,11 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		artifact["verification"] = report
 		artifact["revision_id"] = revision.ID
 		if err := s.store.RecordRevisionReport(ctx, run.ID, revision.ID, report, "tested"); err != nil {
+			return err
+		}
+	}
+	if swarmHandled {
+		if err := workspace.Ensure(ctx, run.ID); err != nil {
 			return err
 		}
 	}

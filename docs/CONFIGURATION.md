@@ -13,6 +13,14 @@ Norbot reads `config.json`; keep the file outside source control. The supplied `
 
 Build an image for local Pi, OpenCode, Claude Code, or Codex with the CLI on `PATH`, then declare it as a `cli` provider. Credentials are injected only from the selected environment variable into that stage container. Do not put secrets in this file, artifacts, or generated apps.
 
+## Planning swarm
+
+`workflow.planning_swarm` is disabled by default. When enabled, only the Planner stage fans out to up to three remote API candidates (`architecture`, `delivery`, and `security`) using the run's already-selected planner provider and model. Norbot then uses that same provider to rank valid candidates and submits the selected architecture to the existing human approval gate.
+
+CLI and process-plugin providers intentionally use the ordinary single-planner path: Norbot cannot impose the same no-tool, no-network, read-only boundary on those adapters. Candidates receive no Norbot tool permissions, extensions, or writable workspace. A swarm needs at least two schema-valid candidates; otherwise it records a degraded execution and falls back to the normal planner. `max_parallel` is `1..3` (default `3`), and `timeout_seconds` is `30..600` (default `180`).
+
+Each attempt persists prompt/config/output digests, candidate roles, architectures, ranking reasons, provider/model, failures, and automatic or operator candidate selection. The console exposes candidate selection while planner approval is pending; selection replaces the proposed architecture but never approves it.
+
 ## Process plugins
 
 Plugins are local absolute executable paths, pinned by SHA-256. Norbot verifies the digest at startup and before every call, then exchanges one JSON-RPC 2.0 request/response through stdin/stdout. A plugin must allow and implement `norbot.initialize`, returning API version `v1` plus provider, tool, and profile capabilities. Provider capabilities can be selected with `kind: "plugin"` and `plugin_id`.

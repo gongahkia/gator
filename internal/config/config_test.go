@@ -75,3 +75,19 @@ func TestPublicSecurityRequiresCompleteIngressControls(t *testing.T) {
 		t.Fatalf("complete public profile rejected: %v", err)
 	}
 }
+
+func TestPlanningSwarmBounds(t *testing.T) {
+	manifest := InitialManifest(domain.DeploymentDocker, Kubernetes{})
+	manifest.Workflow.PlanningSwarm = PlanningSwarm{Enabled: true, MaxParallel: 4, TimeoutS: 180}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("accepted more than three swarm candidates")
+	}
+	manifest.Workflow.PlanningSwarm = PlanningSwarm{Enabled: true, MaxParallel: 3, TimeoutS: 29}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("accepted an unbounded swarm timeout")
+	}
+	manifest.Workflow.PlanningSwarm = PlanningSwarm{Enabled: true, MaxParallel: 3, TimeoutS: 180}
+	if err := manifest.Validate(); err != nil {
+		t.Fatalf("valid swarm configuration rejected: %v", err)
+	}
+}

@@ -31,31 +31,65 @@ func (s *Store) AppendPlannerRevision(ctx context.Context, runID string, attempt
 
 func (s *Store) appendPlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID string, attempt int, source string, architecture domain.Architecture, expected domain.Status) (domain.PlannerRevision, error) {
 	run, err := scanRun(tx.QueryRow(ctx, runQuery+` WHERE id=$1 FOR UPDATE`, runID))
-	if err != nil { return domain.PlannerRevision{}, err }
-	if run.Stage != domain.StagePlanner || (expected != "" && run.Status != expected) { return domain.PlannerRevision{}, fmt.Errorf("planner revision update conflict") }
+	if err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	if run.Stage != domain.StagePlanner || (expected != "" && run.Status != expected) {
+		return domain.PlannerRevision{}, fmt.Errorf("planner revision update conflict")
+	}
 	value := domain.PlannerRevision{RunID: runID, Attempt: attempt, Source: source}
 	var previous domain.PlannerRevision
 	var rawArchitecture, rawGraph, rawDiff []byte
 	err = tx.QueryRow(ctx, `SELECT id,run_id,attempt,source,parent_id,architecture,graph,digest,diff,state,created_at,approved_at FROM planner_revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&previous.ID, &previous.RunID, &previous.Attempt, &previous.Source, &previous.ParentID, &rawArchitecture, &rawGraph, &previous.Digest, &rawDiff, &previous.State, &previous.CreatedAt, &previous.ApprovedAt)
-	if err != nil && err != pgx.ErrNoRows { return domain.PlannerRevision{}, err }
+	if err != nil && err != pgx.ErrNoRows {
+		return domain.PlannerRevision{}, err
+	}
 	if err == nil {
-		if err := json.Unmarshal(rawArchitecture, &previous.Architecture); err != nil { return domain.PlannerRevision{}, err }
-		if err := json.Unmarshal(rawGraph, &previous.Graph); err != nil { return domain.PlannerRevision{}, err }
+		if err := json.Unmarshal(rawArchitecture, &previous.Architecture); err != nil {
+			return domain.PlannerRevision{}, err
+		}
+		if err := json.Unmarshal(rawGraph, &previous.Graph); err != nil {
+			return domain.PlannerRevision{}, err
+		}
 		value.ParentID = &previous.ID
 	}
-	if attempt == 0 { attempt = previous.Attempt + 1; if attempt < 1 { attempt = 1 } }
+	if attempt == 0 {
+		attempt = previous.Attempt + 1
+		if attempt < 1 {
+			attempt = 1
+		}
+	}
 	value.Attempt, value.Architecture, value.Graph = attempt, architecture, architecture.Workflow
 	value.Digest, err = plannerDigest(value.Architecture, value.Graph)
-	if err != nil { return domain.PlannerRevision{}, err }
+	if err != nil {
+		return domain.PlannerRevision{}, err
+	}
 	before := any(map[string]any{})
-	if previous.ID != 0 { before = map[string]any{"architecture": previous.Architecture, "graph": previous.Graph} }
+	if previous.ID != 0 {
+		before = map[string]any{"architecture": previous.Architecture, "graph": previous.Graph}
+	}
 	value.Diff = jsonDiff(before, map[string]any{"architecture": value.Architecture, "graph": value.Graph}, "")
-	architectureJSON, err := json.Marshal(value.Architecture); if err != nil { return domain.PlannerRevision{}, err }
-	graphJSON, err := json.Marshal(value.Graph); if err != nil { return domain.PlannerRevision{}, err }
-	diffJSON, err := json.Marshal(value.Diff); if err != nil { return domain.PlannerRevision{}, err }
-	if err := tx.QueryRow(ctx, `INSERT INTO planner_revisions(run_id,attempt,source,parent_id,architecture,graph,digest,diff) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,state,created_at,approved_at`, value.RunID, value.Attempt, value.Source, value.ParentID, architectureJSON, graphJSON, value.Digest, diffJSON).Scan(&value.ID, &value.State, &value.CreatedAt, &value.ApprovedAt); err != nil { return domain.PlannerRevision{}, err }
-	if _, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1`, runID, architectureJSON, graphJSON); err != nil { return domain.PlannerRevision{}, err }
-	if err := s.insertEvent(ctx, tx, runID, "planner_revision_created", "Planner revision recorded", map[string]any{"planner_revision_id": value.ID, "attempt": attempt, "source": source, "digest": value.Digest}); err != nil { return domain.PlannerRevision{}, err }
+	architectureJSON, err := json.Marshal(value.Architecture)
+	if err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	graphJSON, err := json.Marshal(value.Graph)
+	if err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	diffJSON, err := json.Marshal(value.Diff)
+	if err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	if err := tx.QueryRow(ctx, `INSERT INTO planner_revisions(run_id,attempt,source,parent_id,architecture,graph,digest,diff) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,state,created_at,approved_at`, value.RunID, value.Attempt, value.Source, value.ParentID, architectureJSON, graphJSON, value.Digest, diffJSON).Scan(&value.ID, &value.State, &value.CreatedAt, &value.ApprovedAt); err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1`, runID, architectureJSON, graphJSON); err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	if err := s.insertEvent(ctx, tx, runID, "planner_revision_created", "Planner revision recorded", map[string]any{"planner_revision_id": value.ID, "attempt": attempt, "source": source, "digest": value.Digest}); err != nil {
+		return domain.PlannerRevision{}, err
+	}
 	return value, nil
 }
 

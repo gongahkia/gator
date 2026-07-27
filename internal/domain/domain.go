@@ -361,26 +361,26 @@ type PlanningSwarmExecution struct {
 }
 
 type PlanningSwarmTask struct {
-	ID              int64        `json:"id"`
-	ExecutionID     int64        `json:"execution_id"`
-	Role            string       `json:"role"`
-	Ordinal         int          `json:"ordinal"`
-	State           string       `json:"state"`
-	ProviderID      string       `json:"provider_id"`
-	Model           string       `json:"model"`
-	InputDigest     string       `json:"input_digest"`
-	OutputDigest    string       `json:"output_digest,omitempty"`
-	Architecture    Architecture `json:"architecture,omitempty"`
-	Rationale       string       `json:"rationale,omitempty"`
-	Assumptions     []string     `json:"assumptions,omitempty"`
-	Risks           []string     `json:"risks,omitempty"`
-	Score           int          `json:"score,omitempty"`
-	RankReason      string       `json:"rank_reason,omitempty"`
-	Error           string       `json:"error,omitempty"`
-	StartedAt       *time.Time   `json:"started_at,omitempty"`
-	CompletedAt     *time.Time   `json:"completed_at,omitempty"`
-	CreatedAt       time.Time    `json:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at"`
+	ID           int64        `json:"id"`
+	ExecutionID  int64        `json:"execution_id"`
+	Role         string       `json:"role"`
+	Ordinal      int          `json:"ordinal"`
+	State        string       `json:"state"`
+	ProviderID   string       `json:"provider_id"`
+	Model        string       `json:"model"`
+	InputDigest  string       `json:"input_digest"`
+	OutputDigest string       `json:"output_digest,omitempty"`
+	Architecture Architecture `json:"architecture,omitempty"`
+	Rationale    string       `json:"rationale,omitempty"`
+	Assumptions  []string     `json:"assumptions,omitempty"`
+	Risks        []string     `json:"risks,omitempty"`
+	Score        int          `json:"score,omitempty"`
+	RankReason   string       `json:"rank_reason,omitempty"`
+	Error        string       `json:"error,omitempty"`
+	StartedAt    *time.Time   `json:"started_at,omitempty"`
+	CompletedAt  *time.Time   `json:"completed_at,omitempty"`
+	CreatedAt    time.Time    `json:"created_at"`
+	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 type UsageRecord struct {

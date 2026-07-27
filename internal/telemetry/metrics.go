@@ -14,6 +14,7 @@ type Metrics struct {
 	inFlight    map[string]int64
 	stages      map[string]stageMetric
 	providers   map[string]providerMetric
+	swarms      map[string]providerMetric
 	deployments map[string]int64
 	caches      map[string]cacheMetric
 }
@@ -29,7 +30,7 @@ type providerMetric struct {
 type cacheMetric struct{ Hits, Misses int64 }
 
 func NewMetrics() *Metrics {
-	return &Metrics{inFlight: map[string]int64{}, stages: map[string]stageMetric{}, providers: map[string]providerMetric{}, deployments: map[string]int64{}, caches: map[string]cacheMetric{}}
+	return &Metrics{inFlight: map[string]int64{}, stages: map[string]stageMetric{}, providers: map[string]providerMetric{}, swarms: map[string]providerMetric{}, deployments: map[string]int64{}, caches: map[string]cacheMetric{}}
 }
 
 func (m *Metrics) StartStage(stage string) func(error) {
@@ -67,6 +68,19 @@ func (m *Metrics) ObserveProvider(provider string, duration time.Duration, err e
 		item.Failed++
 	}
 	m.providers[provider] = item
+}
+
+func (m *Metrics) ObservePlanningSwarm(role string, duration time.Duration, err error) {
+	role = label(role)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	item := m.swarms[role]
+	item.Calls++
+	item.Duration += duration
+	if err != nil {
+		item.Failed++
+	}
+	m.swarms[role] = item
 }
 func (m *Metrics) ObserveDeployment(action string) {
 	m.mu.Lock()
@@ -112,6 +126,14 @@ func (m *Metrics) HandlerWithGauges(w http.ResponseWriter, _ *http.Request, gaug
 		fmt.Fprintf(w, "norbot_provider_calls_total{provider=%q,outcome=\"failed\"} %d\n", key, item.Failed)
 		fmt.Fprintf(w, "norbot_provider_duration_seconds_sum{provider=%q} %.6f\n", key, item.Duration.Seconds())
 		fmt.Fprintf(w, "norbot_provider_duration_seconds_count{provider=%q} %d\n", key, item.Calls)
+	}
+	fmt.Fprintln(w, "# HELP norbot_planning_swarm_calls_total Planning swarm candidate/ranker outcomes\n# TYPE norbot_planning_swarm_calls_total counter")
+	for _, key := range ordered(m.swarms) {
+		item := m.swarms[key]
+		fmt.Fprintf(w, "norbot_planning_swarm_calls_total{role=%q,outcome=\"total\"} %d\n", key, item.Calls)
+		fmt.Fprintf(w, "norbot_planning_swarm_calls_total{role=%q,outcome=\"failed\"} %d\n", key, item.Failed)
+		fmt.Fprintf(w, "norbot_planning_swarm_duration_seconds_sum{role=%q} %.6f\n", key, item.Duration.Seconds())
+		fmt.Fprintf(w, "norbot_planning_swarm_duration_seconds_count{role=%q} %d\n", key, item.Calls)
 	}
 	fmt.Fprintln(w, "# HELP norbot_deployment_actions_total Deployment lifecycle actions\n# TYPE norbot_deployment_actions_total counter")
 	for _, key := range ordered(m.deployments) {
