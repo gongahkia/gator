@@ -1008,8 +1008,8 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		}
 		return s.insertEvent(ctx, tx, runID, "stage_approved", string(run.Stage)+" approved; "+string(next)+" queued", map[string]any{"stage": run.Stage, "next_stage": next})
 	case domain.ApprovalRevise:
-		if run.Status != domain.StatusAwaiting || run.Stage != domain.StagePlanner {
-			return fmt.Errorf("revision is available only while planner approval is pending")
+		if run.Status != domain.StatusAwaiting || (run.Stage != domain.StagePlanner && run.Stage != domain.StageBuilder) {
+			return fmt.Errorf("revision is available only while planner or builder approval is pending")
 		}
 		if feedback == "" {
 			return fmt.Errorf("revision feedback is required")
@@ -1017,10 +1017,14 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) SELECT $1,'planner',COALESCE(MAX(attempt),0)+1,$2 FROM jobs WHERE run_id=$1`, runID, observability.Traceparent(ctx)); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) SELECT $1,$2,COALESCE(MAX(attempt),0)+1,$3 FROM jobs WHERE run_id=$1`, runID, run.Stage, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
-		return s.insertEvent(ctx, tx, runID, "planner_revision_requested", "Planner revision queued", map[string]any{"feedback": feedback})
+		eventType, message := "planner_revision_requested", "Planner revision queued"
+		if run.Stage == domain.StageBuilder {
+			eventType, message = "builder_revision_requested", "Builder revision queued"
+		}
+		return s.insertEvent(ctx, tx, runID, eventType, message, map[string]any{"stage": run.Stage, "feedback": feedback})
 	case domain.ApprovalRetry:
 		if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted {
 			return fmt.Errorf("retry is available only for failed or interrupted runs")
@@ -1137,12 +1141,21 @@ func (s *Store) RecoverExpiredJobs(ctx context.Context) (int, error) {
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+		jobs := []domain.Job{}
 		for rows.Next() {
 			var job domain.Job
 			if err := rows.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt); err != nil {
+				rows.Close()
 				return err
 			}
+			jobs = append(jobs, job)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return err
+		}
+		rows.Close()
+		for _, job := range jobs {
 			if _, err := tx.Exec(ctx, `UPDATE jobs SET state='interrupted',completed_at=now(),last_error='worker lease expired' WHERE id=$1`, job.ID); err != nil {
 				return err
 			}
@@ -1154,7 +1167,7 @@ func (s *Store) RecoverExpiredJobs(ctx context.Context) (int, error) {
 			}
 			recovered++
 		}
-		return rows.Err()
+		return nil
 	})
 	return recovered, err
 }

@@ -99,7 +99,7 @@ Native Azure OpenAI, Cohere, Ollama, Amazon Bedrock, and Vertex AI adapters plus
 - `GET/PUT /api/runs/{id}/architecture` reads or edits the typed planner architecture while approval is pending. `PUT /api/runs/{id}/graph` remains a compatibility projection.
 - `GET /api/runs/{id}/planning-swarm` exposes durable planning candidates; `POST /api/runs/{id}/planning-swarm/select` selects a completed candidate for review without bypassing planner approval.
 - `POST /api/runs/{id}/change-runs` creates a snapshot-backed linked version. Send `{"change":"...","architecture_affecting":true}` only when the architecture must be replanned; otherwise it starts at Build. `GET /api/apps` lists the current deployed version of each app.
-- `POST /api/runs/{id}/approval` approves, revises, explicitly starts a fix, retries, or abandons a run.
+- `POST /api/runs/{id}/approval` approves, revises planner or builder output, explicitly starts a verification fix, retries, or abandons a run.
 - `GET /api/health`, `/api/health/detail`, `/api/health/stream`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
 - `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the scanned native/adapted skill catalog.
 - `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.

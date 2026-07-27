@@ -104,6 +104,93 @@ func TestRunApprovalLifecycleIntegration(t *testing.T) {
 	}
 }
 
+func TestBuilderRevisionRequestIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	id := "builder-revision-" + time.Now().UTC().Format("20060102150405.000000000")
+	run := domain.Run{ID: id, Prompt: "test", Profile: domain.ProfileFrontend, Stage: domain.StageBuilder, Status: domain.StatusAwaiting, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "local-deployer"}, Graph: domain.DefaultGraph(), Architecture: domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph()), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
+	updated, err := st.Approve(ctx, id, domain.ApprovalRevise, "move browser assets into generated-app/frontend")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Stage != domain.StageBuilder || updated.Status != domain.StatusQueued || updated.Feedback == "" {
+		t.Fatalf("run=%#v", updated)
+	}
+	var attempt int
+	if err := st.pool.QueryRow(ctx, `SELECT attempt FROM jobs WHERE run_id=$1 AND stage='builder'`, id).Scan(&attempt); err != nil || attempt != 1 {
+		t.Fatalf("attempt=%d err=%v", attempt, err)
+	}
+	var events int
+	if err := st.pool.QueryRow(ctx, `SELECT count(*) FROM run_events WHERE run_id=$1 AND event_type='builder_revision_requested'`, id).Scan(&events); err != nil || events != 1 {
+		t.Fatalf("events=%d err=%v", events, err)
+	}
+}
+
+func TestRecoverExpiredJobsIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	id := "expired-job-" + time.Now().UTC().Format("20060102150405.000000000")
+	run := domain.Run{ID: id, Prompt: "test", Profile: domain.ProfileFrontend, Stage: domain.StageVerifier, Status: domain.StatusQueued, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "local-deployer"}, Graph: domain.DefaultGraph(), Architecture: domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph()), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
+	if err := st.Enqueue(ctx, id, domain.StageVerifier, 1); err != nil {
+		t.Fatal(err)
+	}
+	job, claimed, err := st.ClaimJob(ctx, "expired-worker", time.Minute)
+	if err != nil || !claimed {
+		t.Fatalf("claimed=%t err=%v", claimed, err)
+	}
+	if err := st.MarkStageRunning(ctx, job, "test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.pool.Exec(ctx, `UPDATE jobs SET lease_expires_at=now()-interval '1 second' WHERE id=$1`, job.ID); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := st.RecoverExpiredJobs(ctx)
+	if err != nil || recovered < 1 {
+		t.Fatalf("recovered=%d err=%v", recovered, err)
+	}
+	updated, err := st.GetRun(ctx, id)
+	if err != nil || updated.Status != domain.StatusInterrupted {
+		t.Fatalf("run=%#v err=%v", updated, err)
+	}
+	var state, eventType string
+	if err := st.pool.QueryRow(ctx, `SELECT state FROM jobs WHERE id=$1`, job.ID).Scan(&state); err != nil || state != "interrupted" {
+		t.Fatalf("state=%q err=%v", state, err)
+	}
+	if err := st.pool.QueryRow(ctx, `SELECT event_type FROM run_events WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, id).Scan(&eventType); err != nil || eventType != "stage_interrupted" {
+		t.Fatalf("event=%q err=%v", eventType, err)
+	}
+}
+
 func TestMigrationsRecordImmutableLedgerIntegration(t *testing.T) {
 	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
 	if databaseURL == "" {
