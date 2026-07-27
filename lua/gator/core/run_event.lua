@@ -31,6 +31,14 @@ local forbidden = {
 	diff = true,
 	transcript = true,
 	output = true,
+	authorization = true,
+	credential = true,
+	credentials = true,
+	password = true,
+	secret = true,
+	api_key = true,
+	access_key = true,
+	token = true,
 }
 
 local function fail(message)
@@ -81,7 +89,7 @@ local function value(input, path)
 		end
 		result[key] = value(item, path .. "." .. key)
 	end
-	return redact.value(result)
+	return result
 end
 
 function M.new(attrs)
@@ -89,7 +97,15 @@ function M.new(attrs)
 		fail("attributes must be an object")
 	end
 	for key in pairs(attrs) do
-		if key ~= "schema_version" and key ~= "id" and key ~= "run_id" and key ~= "sequence" and key ~= "type" and key ~= "at" and key ~= "payload" then
+		if
+			key ~= "schema_version"
+			and key ~= "id"
+			and key ~= "run_id"
+			and key ~= "sequence"
+			and key ~= "type"
+			and key ~= "at"
+			and key ~= "payload"
+		then
 			fail("attributes contain unsupported field: " .. tostring(key))
 		end
 	end

@@ -34,23 +34,29 @@ assert(
 	first.sequence == 0
 		and second.sequence == 1
 		and #store:events("run-event") == 2
+		and store:events("run-event")[2].payload.tokens == 8
 		and store:events("run-event")[2].payload.artifacts[1].path == "src/main.lua",
-	"run events must append in durable sequence order with metadata only"
+	"run events must append in durable sequence order with usable metadata only"
 )
+assert(not pcall(event.new, {
+	schema_version = 1,
+	id = "run-event-event-2",
+	run_id = "run-event",
+	sequence = 2,
+	type = "context.sent",
+	at = 3,
+	payload = { prompt = "do not persist raw context" },
+}), "run events must reject raw prompts, code, diffs, transcripts, and outputs")
+assert(not pcall(event.new, {
+	schema_version = 1,
+	id = "run-event-event-2",
+	run_id = "run-event",
+	sequence = 2,
+	type = "context.sent",
+	at = 3,
+	payload = { token = "do not persist credentials" },
+}), "run events must reject credential-shaped payload fields")
 assert(
-	not pcall(event.new, {
-		schema_version = 1,
-		id = "run-event-event-2",
-		run_id = "run-event",
-		sequence = 2,
-		type = "context.sent",
-		at = 3,
-		payload = { prompt = "do not persist raw context" },
-	}),
-	"run events must reject raw prompts, code, diffs, transcripts, and outputs"
-)
-assert(
-	store:forget_run("run-event")
-		and vim.fn.filereadable(root .. "/.gator/events/run-event.jsonl") == 0,
-	"forget must remove a run's Gator-owned immutable journal with its other local artifacts"
+	store:forget_run("run-event") and vim.fn.filereadable(root .. "/.gator/events/run-event.jsonl") == 0,
+	"forget must remove a run's Gator-owned append-only journal with its other local artifacts"
 )

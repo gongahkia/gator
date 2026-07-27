@@ -14,7 +14,7 @@ function M.register()
 	end, { desc = "Open Gator run graph" })
 	vim.api.nvim_create_user_command("GatorEvents", function(opts)
 		require("gator").dispatch("events", { run_id = opts.args })
-	end, { nargs = 1, desc = "Open the immutable Gator event journal for a run" })
+	end, { nargs = 1, desc = "Open the append-only Gator event journal for a run" })
 	vim.api.nvim_create_user_command("GatorHandoff", function(opts)
 		local run_id = opts.fargs[1]
 		if not run_id then

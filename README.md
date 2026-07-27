@@ -42,12 +42,14 @@ Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
 | --- | --- |
 | `:Gator [provider]` | Capture the visual range/current buffer and launch. |
 | `:GatorRuns` | Open the local run graph. |
+| `:GatorEvents <run-id>` | Inspect Gator's append-only metadata journal for a run. |
 | `:GatorHandoff <run-id> [provider]` | Review a bundle and create a new target-provider session. |
 | `:[range]GatorSend [run-id] [selection\|diagnostic\|hunk\|bundle] [bundle-id]` | Send provenance-labelled editor context to an active structured chat. |
 | `:GatorReview [run-id]` | Inspect a worktree diff and run an explicitly configured review command. |
 | `:GatorRunbook` | Select and start one ready manual runbook step. |
 | `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |
-| `:GatorPrune` | Preview then remove expired Gator-owned artifacts and eligible clean worktrees. |
+| `:GatorStorage` | Inspect project-local Gator artifact storage and quota candidates. |
+| `:GatorPrune` | Preview then remove age- or quota-selected Gator-owned artifacts and eligible clean worktrees. |
 | `:GatorForget <run-id>` | Remove a completed run's artifacts and eligible clean worktree. |
 | `:GatorHealth` | Check provider readiness and compatibility. |
 
@@ -70,6 +72,9 @@ require("gator").setup({
     codex = { sandbox = "workspace_write" }, -- or "read_only"; sent to Codex App Server
   },
   context = {
+    preflight = {
+      confirm = false, -- log metadata by default; true asks before every launch/context send
+    },
     handoff = {
       profile = "full", -- "full", "compact", or "summary-first"
       source_summary = false, -- explicit opt-in for summary-first review
@@ -84,6 +89,7 @@ require("gator").setup({
   },
   retention = {
     max_age_days = 30, -- any positive integer; 0 retains artifacts forever
+    max_bytes = 0, -- 0 disables quota selection; quotas are previewed, never auto-pruned at startup
     cleanup_on_start = true, -- automatically delete expired Gator-owned artifacts at startup
     worktrees = "inactive_clean", -- only clean, unlocked, inactive Gator worktrees
   },
@@ -120,6 +126,14 @@ Gator vendors 169 selectable loading animations from [Rattles](https://github.co
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 
 `auto` uses a Gator chat only for documented structured transports: Pi RPC, Codex App Server, and supported ACP/managed providers. Claude and unsupported/terminal-only providers retain their native Neovim terminal. Forcing `chat` on an unsupported provider fails explicitly.
+
+## Local journal, context, and retention
+
+For every run Gator appends lifecycle, provider/version, trust, approval, usage, context-metadata, handoff, review, recovery, and exit events to `.gator/events/<run-id>.jsonl`. `:GatorRuns` opens it with `l`; `:GatorEvents <run-id>` opens it directly. The journal records Gator-owned metadata, not raw prompts, source, diffs, terminal output, or provider transcripts. It is append-only while Gator writes it, but remains ordinary user-owned local data and is not tamper-proof.
+
+Launches and `:GatorSend` always record their target, artifacts, byte/token estimate, and redaction-match count before delivery. This is passive by default. Set `context.preflight.confirm = true` to inspect that exact metadata and explicitly send or cancel every launch/context transfer.
+
+`:GatorStorage` inventories only Gator's project-local artifacts. `:GatorPrune` is always a preview with explicit confirmation. `retention.max_bytes` adds oldest-first quota candidates to that preview; it never causes startup deletion. Startup cleanup only removes age-expired Gator-owned artifacts and eligible clean inactive worktrees. `:GatorForget` removes one completed run and its Gator-owned artifacts, including its journal. Gator neither imports nor deletes provider-native history created outside Gator.
 
 ## Handoffs and parallel runs
 

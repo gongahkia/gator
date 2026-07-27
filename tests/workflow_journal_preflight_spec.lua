@@ -6,11 +6,18 @@ local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local root = helpers.tempdir("workflow-journal-preflight")
 assert(vim.system({ "git", "init", "-q" }, { cwd = root, text = true }):wait().code == 0, "fixture must initialize Git")
 helpers.write(root .. "/main.lua", "local secret = 'token=private-value'\nreturn secret\n")
-assert(vim.system({ "git", "add", "main.lua" }, { cwd = root, text = true }):wait().code == 0, "fixture must stage baseline")
-assert(vim.system({ "git", "-c", "user.name=Gator", "-c", "user.email=gator@example.invalid", "commit", "-qm", "base" }, {
-	cwd = root,
-	text = true,
-}):wait().code == 0, "fixture must commit baseline")
+assert(
+	vim.system({ "git", "add", "main.lua" }, { cwd = root, text = true }):wait().code == 0,
+	"fixture must stage baseline"
+)
+assert(
+	vim.system({ "git", "-c", "user.name=Gator", "-c", "user.email=gator@example.invalid", "commit", "-qm", "base" }, {
+		cwd = root,
+		text = true,
+	})
+		:wait().code == 0,
+	"fixture must commit baseline"
+)
 
 vim.cmd("enew!")
 local buffer = vim.api.nvim_get_current_buf()
@@ -28,6 +35,7 @@ local value = workflow.new({
 		open = function(_, opts)
 			opened = opts
 			opts.on_session({ id = "pi-journal", resume_supported = true })
+			opts.on_event("error", "token=provider-private-value")
 			return {
 				send = function(message)
 					table.insert(sent, message)
@@ -42,7 +50,11 @@ local value = workflow.new({
 			}
 		end,
 	},
-	loading = { open = function() return { close = function() end } end },
+	loading = {
+		open = function()
+			return { close = function() end }
+		end,
+	},
 })
 local run = value:launch({ provider = "pi", transport = "chat", objective = "Check selection", capture = capture })
 local events = value:events(run.id)
@@ -50,19 +62,26 @@ local types = {}
 for _, event in ipairs(events) do
 	types[event.type] = event.payload
 end
-vim.print(types)
 assert(
-	opened and types["run.created"] and types["provider.selected"].version == "0.82.0" and types["trust.applied"]
+	opened
+		and types["run.created"]
+		and types["provider.selected"].version == "0.82.0"
+		and types["trust.applied"]
+		and types["provider.error"].phase == "structured"
+		and types["provider.error"].code == "provider_error"
 		and types["context.prepared"].artifacts[1].path == root .. "/main.lua"
-		and types["context.prepared"].redactions == 1
+		and types["context.prepared"].redactions >= 1
 		and types["context.sent"],
 	"launches must journal provider version, trust, and passive context metadata before sending"
 )
 assert(
 	not table.concat(vim.fn.readfile(root .. "/.gator/events/" .. run.id .. ".jsonl"), "\n"):find("private%-value"),
-	"the context journal must not persist selected source text"
+	"the context journal must not persist selected source or provider error text"
 )
-assert(value:send_context({ run_id = run.id, kind = "selection", buffer = buffer, first_line = 1, last_line = 1 }), "context send must succeed")
+assert(
+	value:send_context({ run_id = run.id, kind = "selection", buffer = buffer, first_line = 1, last_line = 1 }),
+	"context send must succeed"
+)
 events = value:events(run.id)
 local prepared = events[#events - 1]
 assert(

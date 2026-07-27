@@ -14,6 +14,6 @@ assert(
 	content:find("Gator event journal · run-events-ui", 1, true)
 		and content:find("context.prepared", 1, true)
 		and content:find("approval.decided", 1, true),
-	"journal UI must list immutable Gator-owned lifecycle events"
+	"journal UI must list append-only Gator-owned lifecycle events"
 )
 assert(events.close(), "journal UI must remain ephemeral")

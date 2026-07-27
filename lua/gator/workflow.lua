@@ -64,6 +64,14 @@ local function now()
 	return os.time()
 end
 
+local function failure_code(value)
+	local code = type(value) == "table" and value.code or nil
+	if type(code) == "string" and code:match("^[a-z][a-z0-9_.-]*$") then
+		return code
+	end
+	return "provider_error"
+end
+
 local function active_state(value)
 	return value.state == "starting"
 		or value.state == "running"
@@ -666,13 +674,7 @@ function Workflow:prune()
 			local ok, result = pcall(self.apply_retention_plan, self, value)
 			vim.notify(
 				ok
-					and ("Gator cleanup: removed "
-						.. #result.artifacts
-						.. " artifacts · reclaimed "
-						.. result.reclaimed_bytes
-						.. " bytes · "
-						.. #result.worktrees
-						.. " worktrees")
+						and ("Gator cleanup: removed " .. #result.artifacts .. " artifacts · reclaimed " .. result.reclaimed_bytes .. " bytes · " .. #result.worktrees .. " worktrees")
 					or ("Gator cleanup: " .. tostring(result)),
 				ok and vim.log.levels.INFO or vim.log.levels.ERROR,
 				{ title = "Gator" }
@@ -767,11 +769,12 @@ end
 function Workflow:bundle(opts, workspace)
 	if opts.bundle_body then
 		local body = text(opts.bundle_body, "handoff bundle")
-		return body, {
-			input_tokens = capture.estimate(body),
-			redactions = 0,
-			artifacts = { { kind = "explicit_bundle", bytes = #body } },
-		}
+		return body,
+			{
+				input_tokens = capture.estimate(body),
+				redactions = 0,
+				artifacts = { { kind = "explicit_bundle", bytes = #body } },
+			}
 	end
 	local diff, diff_redactions = capture.diff(workspace.root)
 	return capture.bundle({
@@ -885,7 +888,7 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
 				self:finish_summary(run.id)
 			elseif kind == "error" then
-				self:journal(run.id, "provider.error", { reason = tostring(value):sub(1, 2048), phase = "structured" })
+				self:journal(run.id, "provider.error", { code = failure_code(value), phase = "structured" })
 				pcall(conversation.update, { run_id = run.id, text = value, state = "failed" })
 			end
 		end,
@@ -988,7 +991,7 @@ function Workflow:open_managed(run, prompt, existing_session)
 					self:finish_summary(run.id)
 				end
 			elseif event.type == "error" then
-				self:journal(run.id, "provider.error", { reason = tostring(event.text):sub(1, 2048), phase = "managed" })
+				self:journal(run.id, "provider.error", { code = failure_code(event), phase = "managed" })
 				pcall(conversation.update, { run_id = run.id, text = event.text, state = "failed" })
 			end
 		end,
@@ -1094,7 +1097,11 @@ function Workflow:launch(opts)
 		redactions = estimate.redactions or 0,
 		artifacts = estimate.artifacts or {},
 	}
-	self:journal(run.id, "run.created", { role = run.role, workspace = run.workspace.kind, parent_run_id = run.parent_run_id })
+	self:journal(
+		run.id,
+		"run.created",
+		{ role = run.role, workspace = run.workspace.kind, parent_run_id = run.parent_run_id }
+	)
 	self:journal(run.id, "provider.selected", {
 		provider = run.provider,
 		transport = run.transport,
@@ -1136,35 +1143,38 @@ function Workflow:launch(opts)
 		self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
 		vim.notify("Gator trust · " .. trust.summary(run.trust), vim.log.levels.INFO)
 		if transport == "terminal" then
-			self.bridge:start({ provider = run.provider, cwd = workspace.root, prompt = prompt }, function(prepared, reason)
-				self:close_loading(run.id)
-				if not prepared then
-					self:journal(run.id, "provider.error", { reason = tostring(reason):sub(1, 2048), phase = "launch" })
-					self:update(run.id, { state = "failed" })
-					vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
-					return
+			self.bridge:start(
+				{ provider = run.provider, cwd = workspace.root, prompt = prompt },
+				function(prepared, reason)
+					self:close_loading(run.id)
+					if not prepared then
+						self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "launch" })
+						self:update(run.id, { state = "failed" })
+						vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
+						return
+					end
+					local ok, err = pcall(self.open_terminal, self, run, prepared)
+					if not ok then
+						self:journal(run.id, "provider.error", { code = failure_code(err), phase = "terminal_open" })
+						self:update(run.id, { state = "failed" })
+						vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					end
 				end
-				local ok, err = pcall(self.open_terminal, self, run, prepared)
-				if not ok then
-					self:journal(run.id, "provider.error", { reason = tostring(err):sub(1, 2048), phase = "terminal_open" })
-					self:update(run.id, { state = "failed" })
-					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
-				end
-			end)
+			)
 		elseif structured.supports(run.provider) then
 			local operation = opts.native_session_operation
 			local existing = opts.native_session
 			local ok, err = pcall(self.open_structured, self, run, prompt, operation, existing)
 			if not ok then
 				self:close_loading(run.id)
-				self:journal(run.id, "provider.error", { reason = tostring(err):sub(1, 2048), phase = "structured_open" })
+				self:journal(run.id, "provider.error", { code = failure_code(err), phase = "structured_open" })
 				error(err, 0)
 			end
 		else
 			local ok, err = pcall(self.open_managed, self, run, prompt)
 			if not ok then
 				self:close_loading(run.id)
-				self:journal(run.id, "provider.error", { reason = tostring(err):sub(1, 2048), phase = "managed_open" })
+				self:journal(run.id, "provider.error", { code = failure_code(err), phase = "managed_open" })
 				error(err, 0)
 			end
 		end
@@ -1557,7 +1567,11 @@ function Workflow:record_review_decision(id, decision)
 		created_at = now(),
 	}, "Review decision: " .. decision)
 	self:update(run.id, { review = { id = record.review.id, state = record.review.state } })
-	self:journal(run.id, "review.recorded", { review_id = record.review.id, state = record.review.state, decision = decision })
+	self:journal(
+		run.id,
+		"review.recorded",
+		{ review_id = record.review.id, state = record.review.state, decision = decision }
+	)
 	return record
 end
 
@@ -1869,7 +1883,7 @@ function Workflow:resume(id)
 		{ provider = run.provider, session = { provider = run.provider, id = run.session.id, owner = "provider" } },
 		function(prepared, reason)
 			if not prepared then
-				self:journal(run.id, "provider.error", { reason = tostring(reason):sub(1, 2048), phase = "resume" })
+				self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "resume" })
 				vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
 				return
 			end
