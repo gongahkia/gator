@@ -7,10 +7,11 @@ import (
 
 type RetentionResult struct {
 	AgentTurns, ChannelMessages, RunEvents, ProviderUsage int64
+	TraceEvents, ForensicPayloads                         int64
 }
 
 // PurgeRetainedData removes only explicitly configured aged records. Pending approvals retain their turns.
-func (s *Store) PurgeRetainedData(ctx context.Context, agentTurnsDays, channelMessagesDays, runEventsDays, providerUsageDays int) (RetentionResult, error) {
+func (s *Store) PurgeRetainedData(ctx context.Context, agentTurnsDays, channelMessagesDays, runEventsDays, providerUsageDays, traceEventsDays, forensicPayloadDays int) (RetentionResult, error) {
 	var result RetentionResult
 	if agentTurnsDays > 0 {
 		count, err := s.deleteRetained(ctx, `DELETE FROM agent_turns t WHERE t.created_at < now()-$1::interval AND NOT EXISTS (SELECT 1 FROM agent_actions a WHERE a.turn_id=t.id AND a.state='pending')`, agentTurnsDays)
@@ -40,6 +41,11 @@ func (s *Store) PurgeRetainedData(ctx context.Context, agentTurnsDays, channelMe
 		}
 		result.ProviderUsage = count
 	}
+	traces, payloads, err := s.PurgeTraceData(ctx, traceEventsDays, forensicPayloadDays)
+	if err != nil {
+		return result, err
+	}
+	result.TraceEvents, result.ForensicPayloads = traces, payloads
 	return result, nil
 }
 

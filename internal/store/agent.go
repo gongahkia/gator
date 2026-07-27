@@ -10,18 +10,23 @@ import (
 	"time"
 
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/observability"
 	"github.com/jackc/pgx/v5"
 )
 
-const agentTurnColumns = `id,run_id,session_id,external_id,role,idempotency_key,prompt,history,state,final,provider_id,created_at,updated_at`
-const agentActionColumns = `id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,decided_at,expires_at,approval_context,created_at,updated_at`
+const agentTurnColumns = `id,run_id,session_id,external_id,role,idempotency_key,prompt,history,state,final,provider_id,trace_id,span_id,traceparent,created_at,updated_at`
+const agentActionColumns = `id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,decided_at,expires_at,approval_context,trace_id,span_id,traceparent,created_at,updated_at`
 
 func (s *Store) CreateAgentTurn(ctx context.Context, value domain.AgentTurn) (domain.AgentTurn, bool, error) {
 	history, err := json.Marshal(value.History)
 	if err != nil {
 		return domain.AgentTurn{}, false, err
 	}
-	row := s.pool.QueryRow(ctx, `INSERT INTO agent_turns(`+agentTurnColumns+`) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now()) ON CONFLICT(run_id,idempotency_key) DO NOTHING RETURNING `+agentTurnColumns, value.ID, value.RunID, value.SessionID, value.ExternalID, value.Role, value.IdempotencyKey, value.Prompt, history, value.State, value.Final, value.ProviderID)
+	correlation := observability.From(ctx)
+	if value.TraceID == "" {
+		value.TraceID, value.SpanID, value.Traceparent = correlation.TraceID, correlation.SpanID, correlation.Traceparent
+	}
+	row := s.pool.QueryRow(ctx, `INSERT INTO agent_turns(`+agentTurnColumns+`) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now(),now()) ON CONFLICT(run_id,idempotency_key) DO NOTHING RETURNING `+agentTurnColumns, value.ID, value.RunID, value.SessionID, value.ExternalID, value.Role, value.IdempotencyKey, value.Prompt, history, value.State, value.Final, value.ProviderID, value.TraceID, value.SpanID, value.Traceparent)
 	created, err := scanAgentTurn(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		existing, getErr := s.AgentTurnByKey(ctx, value.RunID, value.IdempotencyKey)
@@ -53,6 +58,78 @@ func (s *Store) AgentTurnForSession(ctx context.Context, sessionID string) (doma
 	return scanAgentTurn(s.pool.QueryRow(ctx, `SELECT `+agentTurnColumns+` FROM agent_turns WHERE session_id=$1 ORDER BY created_at DESC LIMIT 1`, sessionID))
 }
 
+func (s *Store) AgentTurnsPage(ctx context.Context, runID, cursor string, limit int) (domain.AgentTurnPage, error) {
+	if limit < 1 || limit > 100 {
+		limit = 50
+	}
+	where, args := "run_id=$1", []any{runID}
+	if cursor != "" {
+		updatedAt, id, err := decodePageCursor(cursor)
+		if err != nil {
+			return domain.AgentTurnPage{}, fmt.Errorf("invalid agent turn cursor")
+		}
+		args = append(args, updatedAt, id)
+		where += " AND (updated_at,id)<($2,$3)"
+	}
+	args = append(args, limit+1)
+	rows, err := s.pool.Query(ctx, `SELECT `+agentTurnColumns+` FROM agent_turns WHERE `+where+` ORDER BY updated_at DESC,id DESC LIMIT $`+fmt.Sprint(len(args)), args...)
+	if err != nil {
+		return domain.AgentTurnPage{}, err
+	}
+	defer rows.Close()
+	page := domain.AgentTurnPage{}
+	for rows.Next() {
+		value, err := scanAgentTurn(rows)
+		if err != nil {
+			return page, err
+		}
+		page.Items = append(page.Items, value)
+	}
+	if err := rows.Err(); err != nil {
+		return page, err
+	}
+	if len(page.Items) > limit {
+		last := page.Items[limit-1]
+		page.Items = page.Items[:limit]
+		page.NextCursor = encodePageCursor(last.UpdatedAt, last.ID)
+	}
+	return page, nil
+}
+
+func (s *Store) AgentActionsForTurn(ctx context.Context, turnID string) ([]domain.AgentAction, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+agentActionColumns+` FROM agent_actions WHERE turn_id=$1 ORDER BY created_at,id`, turnID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []domain.AgentAction{}
+	for rows.Next() {
+		value, err := scanAgentAction(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, value)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) SandboxExecutions(ctx context.Context, runID string) ([]domain.SandboxExecution, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id,COALESCE(action_id,''),run_id,target,tool,state,exit_code,output,trace_id,span_id,traceparent,started_at,completed_at FROM sandbox_executions WHERE run_id=$1 ORDER BY started_at,id`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []domain.SandboxExecution{}
+	for rows.Next() {
+		var value domain.SandboxExecution
+		if err := rows.Scan(&value.ID, &value.ActionID, &value.RunID, &value.Target, &value.Tool, &value.State, &value.ExitCode, &value.Output, &value.TraceID, &value.SpanID, &value.Traceparent, &value.StartedAt, &value.CompletedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, value)
+	}
+	return items, rows.Err()
+}
+
 func (s *Store) CreateAgentAction(ctx context.Context, value domain.AgentAction) (domain.AgentAction, error) {
 	params, err := json.Marshal(value.Params)
 	if err != nil {
@@ -66,7 +143,11 @@ func (s *Store) CreateAgentAction(ctx context.Context, value domain.AgentAction)
 	if err != nil {
 		return domain.AgentAction{}, err
 	}
-	return scanAgentAction(s.pool.QueryRow(ctx, `INSERT INTO agent_actions(id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,expires_at,approval_context,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),now()) RETURNING `+agentActionColumns, value.ID, value.TurnID, value.RunID, value.Tool, value.Role, params, value.Digest, value.State, result, value.Error, value.ApprovedBy, value.ExpiresAt, contextJSON))
+	correlation := observability.From(ctx)
+	if value.TraceID == "" {
+		value.TraceID, value.SpanID, value.Traceparent = correlation.TraceID, correlation.SpanID, correlation.Traceparent
+	}
+	return scanAgentAction(s.pool.QueryRow(ctx, `INSERT INTO agent_actions(id,turn_id,run_id,tool,role,params,digest,state,result,error,approved_by,expires_at,approval_context,trace_id,span_id,traceparent,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now(),now()) RETURNING `+agentActionColumns, value.ID, value.TurnID, value.RunID, value.Tool, value.Role, params, value.Digest, value.State, result, value.Error, value.ApprovedBy, value.ExpiresAt, contextJSON, value.TraceID, value.SpanID, value.Traceparent))
 }
 func (s *Store) AgentAction(ctx context.Context, id string) (domain.AgentAction, error) {
 	return scanAgentAction(s.pool.QueryRow(ctx, `SELECT `+agentActionColumns+` FROM agent_actions WHERE id=$1`, id))
@@ -126,7 +207,8 @@ func (s *Store) CompleteAgentAction(ctx context.Context, id, state string, resul
 	return scanAgentAction(s.pool.QueryRow(ctx, `UPDATE agent_actions SET state=$2,result=$3,error=$4,updated_at=now() WHERE id=$1 AND state IN ('approved','running') RETURNING `+agentActionColumns, id, state, encoded, errorText))
 }
 func (s *Store) CreateSandboxExecution(ctx context.Context, id, actionID, runID, target, tool string) error {
-	_, err := s.pool.Exec(ctx, `INSERT INTO sandbox_executions(id,action_id,run_id,target,tool,state) VALUES($1,$2,$3,$4,$5,'running')`, id, actionID, runID, target, tool)
+	correlation := observability.From(ctx)
+	_, err := s.pool.Exec(ctx, `INSERT INTO sandbox_executions(id,action_id,run_id,target,tool,state,trace_id,span_id,traceparent) VALUES($1,$2,$3,$4,$5,'running',$6,$7,$8)`, id, actionID, runID, target, tool, correlation.TraceID, correlation.SpanID, correlation.Traceparent)
 	return err
 }
 func (s *Store) CompleteSandboxExecution(ctx context.Context, id, state string, exitCode int, output string) error {
@@ -201,7 +283,7 @@ func (s *Store) ExecuteAppMutation(ctx context.Context, runID, statement string,
 func scanAgentTurn(row interface{ Scan(...any) error }) (domain.AgentTurn, error) {
 	var value domain.AgentTurn
 	var history []byte
-	err := row.Scan(&value.ID, &value.RunID, &value.SessionID, &value.ExternalID, &value.Role, &value.IdempotencyKey, &value.Prompt, &history, &value.State, &value.Final, &value.ProviderID, &value.CreatedAt, &value.UpdatedAt)
+	err := row.Scan(&value.ID, &value.RunID, &value.SessionID, &value.ExternalID, &value.Role, &value.IdempotencyKey, &value.Prompt, &history, &value.State, &value.Final, &value.ProviderID, &value.TraceID, &value.SpanID, &value.Traceparent, &value.CreatedAt, &value.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.AgentTurn{}, ErrNotFound
 	}
@@ -217,7 +299,7 @@ func scanAgentAction(row interface{ Scan(...any) error }) (domain.AgentAction, e
 	var value domain.AgentAction
 	var params, result []byte
 	var approvalContext []byte
-	err := row.Scan(&value.ID, &value.TurnID, &value.RunID, &value.Tool, &value.Role, &params, &value.Digest, &value.State, &result, &value.Error, &value.ApprovedBy, &value.DecidedAt, &value.ExpiresAt, &approvalContext, &value.CreatedAt, &value.UpdatedAt)
+	err := row.Scan(&value.ID, &value.TurnID, &value.RunID, &value.Tool, &value.Role, &params, &value.Digest, &value.State, &result, &value.Error, &value.ApprovedBy, &value.DecidedAt, &value.ExpiresAt, &approvalContext, &value.TraceID, &value.SpanID, &value.Traceparent, &value.CreatedAt, &value.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.AgentAction{}, ErrNotFound
 	}

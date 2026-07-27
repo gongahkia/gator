@@ -23,6 +23,7 @@ import (
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/extension"
+	"github.com/gongahkia/norbot/internal/observability"
 	"github.com/gongahkia/norbot/internal/provider"
 	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/store"
@@ -779,11 +780,11 @@ func (s *Service) expireAgentActions(ctx context.Context) {
 func (s *Service) purgeRetainedData(ctx context.Context) {
 	for {
 		retention := s.config.Manifest.Retention
-		result, err := s.store.PurgeRetainedData(ctx, retention.AgentTurnsDays, retention.ChannelMessagesDays, retention.RunEventsDays, retention.ProviderUsageDays)
+		result, err := s.store.PurgeRetainedData(ctx, retention.AgentTurnsDays, retention.ChannelMessagesDays, retention.RunEventsDays, retention.ProviderUsageDays, retention.TraceEventsDays, retention.ForensicPayloadDays)
 		if err != nil {
 			s.log.Error("purge retained data", "error", err)
-		} else if result.AgentTurns+result.ChannelMessages+result.RunEvents+result.ProviderUsage > 0 {
-			s.log.Info("purged retained data", "agent_turns", result.AgentTurns, "channel_messages", result.ChannelMessages, "run_events", result.RunEvents, "provider_usage", result.ProviderUsage)
+		} else if result.AgentTurns+result.ChannelMessages+result.RunEvents+result.ProviderUsage+result.TraceEvents+result.ForensicPayloads > 0 {
+			s.log.Info("purged retained data", "agent_turns", result.AgentTurns, "channel_messages", result.ChannelMessages, "run_events", result.RunEvents, "provider_usage", result.ProviderUsage, "trace_events", result.TraceEvents, "forensic_payloads", result.ForensicPayloads)
 		}
 		sleep(ctx, time.Hour)
 		if ctx.Err() != nil {
@@ -877,6 +878,8 @@ func workerIdentity() string {
 }
 
 func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
+	ctx = observability.ExtractTraceparent(ctx, job.Traceparent)
+	ctx = observability.With(ctx, observability.Correlation{RunID: job.RunID, Stage: string(job.Stage), Attempt: job.Attempt})
 	ctx, span := otel.Tracer("norbot.engine").Start(ctx, "stage.execute")
 	span.SetAttributes(attribute.String("norbot.run_id", job.RunID), attribute.String("norbot.stage", string(job.Stage)), attribute.Int("norbot.attempt", job.Attempt), attribute.String("norbot.worker_id", job.WorkerID))
 	finishMetric := s.metrics.StartStage(string(job.Stage))
@@ -973,12 +976,15 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
 		if err != nil {
 			if observeErr := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, Metadata: map[string]any{"outcome": "error", "rate_limited": providerRateLimited(err)}}); observeErr != nil {
-				s.log.Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
+				observability.Logger(s.log, ctx).Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
 			}
 			providerSpan.RecordError(err)
 			providerSpan.SetStatus(codes.Error, err.Error())
 		}
 		providerSpan.End()
+		if _, traceErr := s.store.RecordTrace(providerCtx, domain.TraceEvent{RunID: run.ID, Type: "provider_invoked", Summary: "Workflow provider call completed", Stage: string(job.Stage), Attempt: job.Attempt, ProviderID: providerConfig.ID, Status: traceStatus(err), Severity: traceSeverity(err)}, map[string]any{"prompt": prompt, "response": result.Text, "metadata": result.Metadata}, s.config.Manifest.Retention.ForensicPayloadDays); traceErr != nil {
+			return traceErr
+		}
 		if err != nil {
 			return err
 		}
@@ -986,7 +992,7 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	var revisionID *int64
 	if result.RateLimit.RemainingRequests != nil || result.RateLimit.ResetAt != nil {
 		if err := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, RemainingRequests: result.RateLimit.RemainingRequests, ResetAt: result.RateLimit.ResetAt, Metadata: result.Metadata}); err != nil {
-			s.log.Warn("record provider quota observation", "provider", providerConfig.ID, "error", err)
+			observability.Logger(s.log, ctx).Warn("record provider quota observation", "provider", providerConfig.ID, "error", err)
 		}
 	}
 	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
@@ -1100,6 +1106,13 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	}
 	_ = deployment
 	return s.store.MarkStageAwaitingApproval(ctx, job, artifact)
+}
+
+func traceSeverity(err error) string {
+	if err != nil {
+		return "error"
+	}
+	return "info"
 }
 
 func providerRateLimited(err error) bool {

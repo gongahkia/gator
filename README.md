@@ -1,5 +1,9 @@
 # Norbot
 
+## Operator traceback
+
+Expanded runs expose a unified trace across stages, providers, revisions, approvals, policy changes, central-agent turns, tool actions, and sandboxes. See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) for console/API usage and the local-only encrypted forensic mode.
+
 Norbot is a local-first, provider-agnostic agentic app builder. Its embedded web console drives explicit Plan → Build → Verify/Fix → Deploy approvals; Go API and workers own durable state, generated artifacts, Docker or Kubernetes workspaces, deployments, and OpenTelemetry visibility.
 
 ## Install

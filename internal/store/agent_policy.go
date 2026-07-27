@@ -19,6 +19,32 @@ func (s *Store) RunAgentPolicy(ctx context.Context, runID string) (domain.RunAge
 	return scanRunAgentPolicy(s.pool.QueryRow(ctx, `SELECT `+runAgentPolicyColumns+` FROM run_agent_policies WHERE run_id=$1`, runID))
 }
 
+func (s *Store) RunAgentPolicyHistory(ctx context.Context, runID string) ([]domain.RunAgentPolicyEvent, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id,run_id,version,policy,digest,actor,created_at FROM run_agent_policy_events WHERE run_id=$1 ORDER BY version ASC`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []domain.RunAgentPolicyEvent{}
+	for rows.Next() {
+		var value domain.RunAgentPolicyEvent
+		var raw []byte
+		if err := rows.Scan(&value.ID, &value.RunID, &value.Version, &raw, &value.Digest, &value.Actor, &value.CreatedAt); err != nil {
+			return nil, err
+		}
+		var body struct {
+			Stages map[domain.Stage]domain.InternalAgentPolicy `json:"stages"`
+			Tools  map[string]domain.AgentToolPolicy           `json:"tools"`
+		}
+		if err := json.Unmarshal(raw, &body); err != nil {
+			return nil, err
+		}
+		value.Policy = domain.RunAgentPolicy{RunID: value.RunID, Version: value.Version, Stages: body.Stages, Tools: body.Tools, Digest: value.Digest, UpdatedBy: value.Actor, CreatedAt: value.CreatedAt, UpdatedAt: value.CreatedAt}
+		items = append(items, value)
+	}
+	return items, rows.Err()
+}
+
 func (s *Store) EnsureRunAgentPolicy(ctx context.Context, policy domain.RunAgentPolicy) (domain.RunAgentPolicy, error) {
 	if policy.RunID == "" {
 		return domain.RunAgentPolicy{}, fmt.Errorf("run_id is required")
@@ -81,6 +107,9 @@ func (s *Store) RestrictRunAgentPolicy(ctx context.Context, runID string, reques
 			return err
 		}
 		if err := s.insertEvent(ctx, tx, runID, "agent_policy_restricted", "Agent capabilities restricted by operator", map[string]any{"version": result.Version, "digest": result.Digest, "actor": actor}); err != nil {
+			return err
+		}
+		if _, err := s.insertTrace(ctx, tx, domain.TraceEvent{RunID: runID, Type: "agent_policy_restricted", Summary: "Agent capabilities restricted by operator", Actor: actor, Status: "restricted", EntityRefs: map[string]string{"policy_version": fmt.Sprint(result.Version)}, Payload: map[string]any{"version": result.Version, "digest": result.Digest}}, map[string]any{"policy": policyBody(result)}, 30); err != nil {
 			return err
 		}
 		return s.insertAuditEvent(ctx, tx, actor, "run_agent_policy.restricted", "run", runID, map[string]any{"version": result.Version, "digest": result.Digest})

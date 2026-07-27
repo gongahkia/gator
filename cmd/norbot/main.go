@@ -555,6 +555,13 @@ func serveCommand(args []string) {
 		fmt.Fprintln(os.Stderr, "public norbot API requires security.oidc configuration")
 		os.Exit(1)
 	}
+	if cfg.Manifest.Forensics.RawCapture {
+		host, _, splitErr := net.SplitHostPort(cfg.HTTPAddr)
+		if splitErr != nil || (host != "127.0.0.1" && host != "::1" && host != "localhost") {
+			fmt.Fprintln(os.Stderr, "forensics raw_capture requires a loopback NORBOT_HTTP_ADDR")
+			os.Exit(1)
+		}
+	}
 	plugins, err := extension.LoadProcessPlugins(cfg.Manifest.Plugins)
 	if err != nil {
 		logger.Error("load process plugins", "error", err)
@@ -581,6 +588,10 @@ func serveCommand(args []string) {
 	defer st.Close()
 	if err := st.Migrate(ctx); err != nil {
 		logger.Error("migrate database", "error", err)
+		os.Exit(1)
+	}
+	if err := st.ConfigureForensics(cfg.Manifest.Forensics.RawCapture, cfg.Manifest.Forensics.MasterKeyEnv); err != nil {
+		logger.Error("configure local forensics", "error", err)
 		os.Exit(1)
 	}
 	objects, err := artifact.New(cfg.Manifest.Artifacts)

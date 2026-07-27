@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/norbot/internal/config"
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/engine"
+	"github.com/gongahkia/norbot/internal/observability"
 	"github.com/gongahkia/norbot/internal/skill"
 	"github.com/gongahkia/norbot/internal/store"
 	"github.com/gongahkia/norbot/internal/web"
@@ -99,11 +100,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/apps", s.listApps)
 	mux.HandleFunc("GET /api/runs/{id}", s.getRun)
 	mux.HandleFunc("GET /api/runs/{id}/agent-policy", s.agentPolicy)
+	mux.HandleFunc("GET /api/runs/{id}/agent-policy-history", s.agentPolicyHistory)
 	mux.HandleFunc("PUT /api/runs/{id}/agent-policy", s.restrictAgentPolicy)
 	mux.HandleFunc("GET /api/runs/{id}/architecture", s.architecture)
 	mux.HandleFunc("PUT /api/runs/{id}/architecture", s.updateArchitecture)
 	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
+	mux.HandleFunc("GET /api/runs/{id}/trace", s.trace)
+	mux.HandleFunc("GET /api/runs/{id}/trace/export", s.traceExport)
+	mux.HandleFunc("GET /api/runs/{id}/trace/{event_id}/raw", s.traceRaw)
+	mux.HandleFunc("GET /api/runs/{id}/agent-turns", s.agentTurns)
+	mux.HandleFunc("GET /api/runs/{id}/sandboxes", s.sandboxExecutions)
 	mux.HandleFunc("GET /api/runs/{id}/event-history", s.eventHistory)
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/planner-revisions", s.plannerRevisions)
@@ -112,6 +119,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
 	mux.HandleFunc("GET /api/runs/{id}/skills", s.runSkills)
 	mux.HandleFunc("GET /api/agent/actions", s.agentActions)
+	mux.HandleFunc("GET /api/agent/turns/{id}", s.agentTurn)
 	mux.HandleFunc("GET /api/agent/actions/{id}", s.agentAction)
 	mux.HandleFunc("POST /api/agent/actions/{id}/decision", s.agentActionDecision)
 	mux.HandleFunc("PUT /api/runs/{id}/graph", s.updateGraph)
@@ -618,6 +626,15 @@ func (s *Server) agentPolicy(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, value)
 }
 
+func (s *Server) agentPolicyHistory(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.RunAgentPolicyHistory(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
 func (s *Server) restrictAgentPolicy(w http.ResponseWriter, r *http.Request) {
 	var input domain.RunAgentPolicy
 	if err := decodeJSON(r, &input); err != nil {
@@ -991,6 +1008,148 @@ func (s *Server) eventHistory(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, page)
 }
 
+func (s *Server) trace(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.store.GetRun(r.Context(), r.PathValue("id")); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	} else if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	filter, err := traceFilter(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	page, err := s.store.TracePage(r.Context(), r.PathValue("id"), filter, queryLimit(r, 100))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) traceRaw(w http.ResponseWriter, r *http.Request) {
+	if !s.store.ForensicsEnabled() {
+		writeError(w, http.StatusForbidden, fmt.Errorf("local forensic mode is disabled"))
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("event_id"), 10, 64)
+	if err != nil || id < 1 {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid trace event id"))
+		return
+	}
+	value, err := s.store.TraceRaw(r.Context(), r.PathValue("id"), id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = s.store.RecordAuditEvent(r.Context(), operatorFromRequest(r), "forensics.raw_revealed", "trace_event", strconv.FormatInt(id, 10), map[string]any{"run_id": r.PathValue("id")})
+	writeJSON(w, http.StatusOK, map[string]any{"event_id": id, "raw": value})
+}
+
+func (s *Server) traceExport(w http.ResponseWriter, r *http.Request) {
+	filter, err := traceFilter(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	includeRaw := r.URL.Query().Get("include") == "raw"
+	if includeRaw && !s.store.ForensicsEnabled() {
+		writeError(w, http.StatusForbidden, fmt.Errorf("local forensic mode is disabled"))
+		return
+	}
+	items := []map[string]any{}
+	for {
+		page, err := s.store.TracePage(r.Context(), r.PathValue("id"), filter, 200)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		for _, event := range page.Items {
+			item := map[string]any{"event": event}
+			if includeRaw && event.RawAvailable {
+				raw, err := s.store.TraceRaw(r.Context(), event.RunID, event.ID)
+				if err != nil {
+					writeError(w, http.StatusInternalServerError, err)
+					return
+				}
+				item["raw"] = raw
+			}
+			items = append(items, item)
+		}
+		if page.NextCursor == "" {
+			break
+		}
+		filter.Cursor = page.NextCursor
+	}
+	_ = s.store.RecordAuditEvent(r.Context(), operatorFromRequest(r), "forensics.trace_exported", "run", r.PathValue("id"), map[string]any{"include": r.URL.Query().Get("include"), "records": len(items)})
+	if r.URL.Query().Get("format") == "ndjson" {
+		w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+		encoder := json.NewEncoder(w)
+		for _, item := range items {
+			_ = encoder.Encode(item)
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"run_id": r.PathValue("id"), "exported_at": time.Now().UTC(), "items": items})
+}
+
+func (s *Server) agentTurns(w http.ResponseWriter, r *http.Request) {
+	page, err := s.store.AgentTurnsPage(r.Context(), r.PathValue("id"), r.URL.Query().Get("cursor"), queryLimit(r, 50))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, page)
+}
+
+func (s *Server) agentTurn(w http.ResponseWriter, r *http.Request) {
+	turn, err := s.store.AgentTurn(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	actions, err := s.store.AgentActionsForTurn(r.Context(), turn.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"turn": turn, "actions": actions})
+}
+
+func (s *Server) sandboxExecutions(w http.ResponseWriter, r *http.Request) {
+	values, err := s.store.SandboxExecutions(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, values)
+}
+
+func traceFilter(r *http.Request) (domain.TraceFilter, error) {
+	query := r.URL.Query()
+	value := domain.TraceFilter{Cursor: query.Get("cursor"), Stage: query.Get("stage"), Type: query.Get("type"), Severity: query.Get("severity"), ProviderID: query.Get("provider_id"), Tool: query.Get("tool"), Actor: query.Get("actor"), EntityID: query.Get("entity_id"), Query: query.Get("q")}
+	for raw, target := range map[string]**time.Time{"from": &value.From, "to": &value.To} {
+		if text := query.Get(raw); text != "" {
+			parsed, err := time.Parse(time.RFC3339, text)
+			if err != nil {
+				return value, fmt.Errorf("%s must be RFC3339", raw)
+			}
+			*target = &parsed
+		}
+	}
+	return value, nil
+}
+
 func decodeJSON(r *http.Request, destination any) error {
 	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
 	decoder.DisallowUnknownFields()
@@ -1017,7 +1176,7 @@ func requestLog(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		next.ServeHTTP(w, r)
-		logger.Info("http request", "method", r.Method, "path", r.URL.Path, "duration_ms", time.Since(started).Milliseconds(), "remote", strings.Split(r.RemoteAddr, ":")[0])
+		observability.Logger(logger, r.Context()).Info("http request", "method", r.Method, "path", r.URL.Path, "duration_ms", time.Since(started).Milliseconds(), "remote", strings.Split(r.RemoteAddr, ":")[0])
 	})
 }
 

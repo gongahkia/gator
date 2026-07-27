@@ -16,12 +16,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/observability"
 )
 
 var ErrNotFound = errors.New("not found")
 
 type Store struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	forensics *forensicCipher
 }
 
 type ProviderObservation struct {
@@ -54,6 +56,21 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 }
 
 func (s *Store) Close() { s.pool.Close() }
+
+func (s *Store) ConfigureForensics(enabled bool, keyEnv string) error {
+	if !enabled {
+		s.forensics = nil
+		return nil
+	}
+	value, err := newForensicCipher(keyEnv)
+	if err != nil {
+		return err
+	}
+	s.forensics = value
+	return nil
+}
+
+func (s *Store) ForensicsEnabled() bool { return s.forensics != nil }
 
 func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
@@ -540,6 +557,72 @@ CREATE TABLE IF NOT EXISTS run_agent_policy_events (
 CREATE INDEX IF NOT EXISTS run_agent_policy_events_run_idx ON run_agent_policy_events(run_id,version DESC);
 `
 
+const migration008OperatorTrace = `
+ALTER TABLE run_events ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE run_events ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE run_events ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE provider_usage ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE provider_usage ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE provider_usage ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE revisions ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE revisions ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE revisions ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE planner_revisions ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE planner_revisions ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE planner_revisions ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE approval_operations ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE approval_operations ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE approval_operations ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_turns ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_turns ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_turns ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_actions ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_actions ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_actions ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+ALTER TABLE sandbox_executions ADD COLUMN IF NOT EXISTS trace_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE sandbox_executions ADD COLUMN IF NOT EXISTS span_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE sandbox_executions ADD COLUMN IF NOT EXISTS traceparent TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS trace_events (
+  id BIGSERIAL PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'info',
+  status TEXT NOT NULL DEFAULT '',
+  summary TEXT NOT NULL,
+  stage TEXT NOT NULL DEFAULT '',
+  attempt INT NOT NULL DEFAULT 0,
+  provider_id TEXT NOT NULL DEFAULT '',
+  revision_id BIGINT NOT NULL DEFAULT 0,
+  approval_id BIGINT NOT NULL DEFAULT 0,
+  turn_id TEXT NOT NULL DEFAULT '',
+  action_id TEXT NOT NULL DEFAULT '',
+  sandbox_id TEXT NOT NULL DEFAULT '',
+  actor TEXT NOT NULL DEFAULT '',
+  trace_id TEXT NOT NULL DEFAULT '',
+  span_id TEXT NOT NULL DEFAULT '',
+  traceparent TEXT NOT NULL DEFAULT '',
+  entity_refs JSONB NOT NULL DEFAULT '{}'::jsonb,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  search_vector TSVECTOR NOT NULL DEFAULT ''::tsvector,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS trace_events_run_id_id_idx ON trace_events(run_id,id);
+CREATE INDEX IF NOT EXISTS trace_events_trace_id_idx ON trace_events(trace_id) WHERE trace_id<>'';
+CREATE INDEX IF NOT EXISTS trace_events_filter_idx ON trace_events(run_id,stage,severity,provider_id,id);
+CREATE INDEX IF NOT EXISTS trace_events_search_idx ON trace_events USING GIN(search_vector);
+CREATE TABLE IF NOT EXISTS forensic_payloads (
+  trace_event_id BIGINT PRIMARY KEY REFERENCES trace_events(id) ON DELETE CASCADE,
+  key_version TEXT NOT NULL,
+  nonce BYTEA NOT NULL,
+  ciphertext BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS forensic_payloads_expiry_idx ON forensic_payloads(expires_at);
+`
+
 type migration struct {
 	Version int
 	Name    string
@@ -554,6 +637,7 @@ var migrations = []migration{
 	{Version: 5, Name: "outbox_receipts", SQL: migration005OutboxReceipts},
 	{Version: 6, Name: "planning_swarms", SQL: migration006PlanningSwarms},
 	{Version: 7, Name: "run_agent_policies", SQL: migration007RunAgentPolicies},
+	{Version: 8, Name: "operator_trace", SQL: migration008OperatorTrace},
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
@@ -683,7 +767,7 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)`, run.ID, ru
 		if !enqueue {
 			return nil
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,state) VALUES ($1,$2,1,'blocked')`, run.ID, run.Stage); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,state,traceparent) VALUES ($1,$2,1,'blocked',$3)`, run.ID, run.Stage, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
 		if err := s.insertEvent(ctx, tx, run.ID, "stage_queued", string(run.Stage)+" waiting for workspace", map[string]any{"stage": run.Stage, "attempt": 1, "workspace_status": workspaceStatus}); err != nil {
@@ -695,7 +779,7 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)`, run.ID, ru
 
 func (s *Store) Enqueue(ctx context.Context, runID string, stage domain.Stage, attempt int) error {
 	return s.withTx(ctx, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,$3)`, runID, stage, attempt)
+		_, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) VALUES ($1,$2,$3,$4)`, runID, stage, attempt, observability.Traceparent(ctx))
 		if err != nil {
 			return err
 		}
@@ -901,7 +985,7 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback='',updated_at=now() WHERE id=$1`, runID); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'deployer',1)`, runID); err != nil {
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) VALUES ($1,'deployer',1,$2)`, runID, observability.Traceparent(ctx)); err != nil {
 				return err
 			}
 			return s.insertEvent(ctx, tx, runID, "deployment_approved", "Deployment approved and queued", map[string]any{"stage": run.Stage})
@@ -919,7 +1003,7 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if _, err := tx.Exec(ctx, `UPDATE runs SET stage=$2,status='queued',feedback='',updated_at=now() WHERE id=$1`, runID, next); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,$2,1)`, runID, next); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) VALUES ($1,$2,1,$3)`, runID, next, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, runID, "stage_approved", string(run.Stage)+" approved; "+string(next)+" queued", map[string]any{"stage": run.Stage, "next_stage": next})
@@ -933,7 +1017,7 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,'planner',COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) SELECT $1,'planner',COALESCE(MAX(attempt),0)+1,$2 FROM jobs WHERE run_id=$1`, runID, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, runID, "planner_revision_requested", "Planner revision queued", map[string]any{"feedback": feedback})
@@ -945,7 +1029,7 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',workspace_status='provisioning',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO jobs(run_id,stage,attempt,state) SELECT $1,$2,COALESCE(MAX(attempt),0)+1,'blocked' FROM jobs WHERE run_id=$1`, runID, run.Stage); err != nil {
+			if _, err := tx.Exec(ctx, `INSERT INTO jobs(run_id,stage,attempt,state,traceparent) SELECT $1,$2,COALESCE(MAX(attempt),0)+1,'blocked',$3 FROM jobs WHERE run_id=$1`, runID, run.Stage, observability.Traceparent(ctx)); err != nil {
 				return err
 			}
 			if err := s.insertEvent(ctx, tx, runID, "workspace_provision_retry_requested", "Workspace provisioning retry queued", map[string]any{"stage": run.Stage}); err != nil {
@@ -956,7 +1040,7 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) SELECT $1,$2,COALESCE(MAX(attempt),0)+1 FROM jobs WHERE run_id=$1`, runID, run.Stage); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) SELECT $1,$2,COALESCE(MAX(attempt),0)+1,$3 FROM jobs WHERE run_id=$1`, runID, run.Stage, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, runID, "stage_retry_requested", string(run.Stage)+" retry queued", map[string]any{"stage": run.Stage})
@@ -1001,7 +1085,7 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if _, err := tx.Exec(ctx, `UPDATE runs SET stage='builder',status='queued',feedback=$2,updated_at=now() WHERE id=$1`, runID, feedback); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt) VALUES ($1,'builder',$2)`, runID, attempt); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) VALUES ($1,'builder',$2,$3)`, runID, attempt, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, runID, "fix_approved", "Operator approved bounded fix attempt", map[string]any{"attempt": attempt, "feedback": feedback})
@@ -1019,8 +1103,8 @@ func (s *Store) ClaimJob(ctx context.Context, workerID string, lease time.Durati
 		row := tx.QueryRow(ctx, `WITH next AS (
   SELECT id FROM jobs WHERE state='queued' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1
 ) UPDATE jobs SET state='running',worker_id=$1,claimed_at=now(),lease_expires_at=now()+$2::interval WHERE id=(SELECT id FROM next)
-RETURNING id,run_id,stage,attempt,worker_id,lease_expires_at`, workerID, lease.String())
-		err := row.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt, &job.WorkerID, &job.LeaseExpiresAt)
+RETURNING id,run_id,stage,attempt,worker_id,lease_expires_at,traceparent`, workerID, lease.String())
+		err := row.Scan(&job.ID, &job.RunID, &job.Stage, &job.Attempt, &job.WorkerID, &job.LeaseExpiresAt, &job.Traceparent)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -1381,7 +1465,11 @@ func (s *Store) insertEvent(ctx context.Context, tx pgx.Tx, runID, typ, message 
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO run_events (run_id,event_type,message,metadata) VALUES ($1,$2,$3,$4)`, runID, typ, message, encoded); err != nil {
+	correlation := observability.From(ctx)
+	if _, err = tx.Exec(ctx, `INSERT INTO run_events (run_id,event_type,message,metadata,trace_id,span_id,traceparent) VALUES ($1,$2,$3,$4,$5,$6,$7)`, runID, typ, message, encoded, correlation.TraceID, correlation.SpanID, correlation.Traceparent); err != nil {
+		return err
+	}
+	if _, err := s.insertTrace(ctx, tx, domain.TraceEvent{RunID: runID, Type: typ, Summary: message, Payload: metadata}, nil, 0); err != nil {
 		return err
 	}
 	return s.insertOutbox(ctx, tx, runID, "run.event", map[string]any{"event_type": typ, "message": message, "metadata": metadata})

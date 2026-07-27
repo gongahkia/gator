@@ -76,6 +76,20 @@ func TestPublicSecurityRequiresCompleteIngressControls(t *testing.T) {
 	}
 }
 
+func TestManifestRejectsPublicOrOIDCForensics(t *testing.T) {
+	manifest := InitialManifest(domain.DeploymentDocker, Kubernetes{})
+	manifest.Forensics = Forensics{RawCapture: true, MasterKeyEnv: "NORBOT_FORENSICS_KEY"}
+	manifest.Security.Public = true
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("expected public forensic rejection")
+	}
+	manifest.Security.Public = false
+	manifest.Security.OIDC = OIDC{Issuer: "https://issuer.example", Audience: "norbot", GroupsClaim: "groups", OperatorGroups: []string{"operators"}, ClientID: "norbot"}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("expected oidc forensic rejection")
+	}
+}
+
 func TestPlanningSwarmBounds(t *testing.T) {
 	manifest := InitialManifest(domain.DeploymentDocker, Kubernetes{})
 	manifest.Workflow.PlanningSwarm = PlanningSwarm{Enabled: true, MaxParallel: 4, TimeoutS: 180}

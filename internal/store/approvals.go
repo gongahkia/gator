@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/observability"
 )
 
 func (s *Store) CreateApprovalOperation(ctx context.Context, value domain.ApprovalOperation) (domain.ApprovalOperation, error) {
@@ -45,7 +46,12 @@ func (s *Store) CreateApprovalOperation(ctx context.Context, value domain.Approv
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		if err := tx.QueryRow(ctx, `INSERT INTO approval_operations(run_id,revision_id,baseline_digest,post_digest,baseline_files,state) VALUES($1,$2,$3,$4,$5,'prepared') RETURNING id,state,error,created_at,updated_at,completed_at`, value.RunID, value.RevisionID, value.BaselineDigest, value.PostDigest, encoded).Scan(&value.ID, &value.State, &value.Error, &value.CreatedAt, &value.UpdatedAt, &value.CompletedAt); err != nil {
+		correlation := observability.From(ctx)
+		value.TraceID, value.SpanID, value.Traceparent = correlation.TraceID, correlation.SpanID, correlation.Traceparent
+		if err := tx.QueryRow(ctx, `INSERT INTO approval_operations(run_id,revision_id,baseline_digest,post_digest,baseline_files,state,trace_id,span_id,traceparent) VALUES($1,$2,$3,$4,$5,'prepared',$6,$7,$8) RETURNING id,state,error,created_at,updated_at,completed_at`, value.RunID, value.RevisionID, value.BaselineDigest, value.PostDigest, encoded, value.TraceID, value.SpanID, value.Traceparent).Scan(&value.ID, &value.State, &value.Error, &value.CreatedAt, &value.UpdatedAt, &value.CompletedAt); err != nil {
+			return err
+		}
+		if _, err := s.insertTrace(ctx, tx, domain.TraceEvent{RunID: value.RunID, Type: "code_approval_journaled", Summary: "Code approval journaled before workspace mutation", ApprovalID: value.ID, RevisionID: value.RevisionID, Status: value.State, Payload: map[string]any{"post_digest": value.PostDigest}}, map[string]any{"baseline_files": value.BaselineFiles}, 30); err != nil {
 			return err
 		}
 		return s.insertEvent(ctx, tx, value.RunID, "code_approval_journaled", "Code approval journaled before workspace mutation", map[string]any{"approval_operation_id": value.ID, "revision_id": value.RevisionID, "post_digest": value.PostDigest})
@@ -128,6 +134,9 @@ func (s *Store) FinalizeApprovalOperation(ctx context.Context, id int64) (domain
 		if _, err := tx.Exec(ctx, `UPDATE approval_operations SET state='finalized',updated_at=now(),completed_at=now(),error='' WHERE id=$1`, id); err != nil {
 			return err
 		}
+		if _, err := s.insertTrace(ctx, tx, domain.TraceEvent{RunID: runID, Type: "code_approval_finalized", Summary: "Code approval finalized after workspace mutation", ApprovalID: id, RevisionID: revisionID, Status: "finalized"}, nil, 0); err != nil {
+			return err
+		}
 		return s.insertEvent(ctx, tx, runID, "code_approval_finalized", "Code approval finalized after workspace mutation", map[string]any{"approval_operation_id": id, "revision_id": revisionID})
 	})
 	if err != nil {
@@ -136,7 +145,7 @@ func (s *Store) FinalizeApprovalOperation(ctx context.Context, id int64) (domain
 	return s.GetRun(ctx, runID)
 }
 
-const approvalOperationQuery = `SELECT id,run_id,revision_id,baseline_digest,post_digest,baseline_files,state,error,created_at,updated_at,completed_at FROM approval_operations`
+const approvalOperationQuery = `SELECT id,run_id,revision_id,baseline_digest,post_digest,baseline_files,state,error,trace_id,span_id,traceparent,created_at,updated_at,completed_at FROM approval_operations`
 
 func scanApprovalOperation(row interface{ Scan(...any) error }, target *domain.ApprovalOperation) (domain.ApprovalOperation, error) {
 	value := domain.ApprovalOperation{}
@@ -144,7 +153,7 @@ func scanApprovalOperation(row interface{ Scan(...any) error }, target *domain.A
 		value = *target
 	}
 	var files []byte
-	err := row.Scan(&value.ID, &value.RunID, &value.RevisionID, &value.BaselineDigest, &value.PostDigest, &files, &value.State, &value.Error, &value.CreatedAt, &value.UpdatedAt, &value.CompletedAt)
+	err := row.Scan(&value.ID, &value.RunID, &value.RevisionID, &value.BaselineDigest, &value.PostDigest, &files, &value.State, &value.Error, &value.TraceID, &value.SpanID, &value.Traceparent, &value.CreatedAt, &value.UpdatedAt, &value.CompletedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ApprovalOperation{}, ErrNotFound
 	}

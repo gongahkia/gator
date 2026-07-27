@@ -102,6 +102,13 @@ type Retention struct {
 	ChannelMessagesDays int `json:"channel_messages_days"`
 	RunEventsDays       int `json:"run_events_days"`
 	ProviderUsageDays   int `json:"provider_usage_days"`
+	TraceEventsDays     int `json:"trace_events_days"`
+	ForensicPayloadDays int `json:"forensic_payload_days"`
+}
+
+type Forensics struct {
+	RawCapture   bool   `json:"raw_capture"`
+	MasterKeyEnv string `json:"master_key_env"`
 }
 
 type Workflow struct {
@@ -169,6 +176,7 @@ type Manifest struct {
 	Security   Security              `json:"security"`
 	Artifacts  ArtifactStore         `json:"artifacts"`
 	Retention  Retention             `json:"retention"`
+	Forensics  Forensics             `json:"forensics"`
 }
 
 type Config struct {
@@ -246,6 +254,9 @@ func (m Manifest) Validate() error {
 	if err := m.ValidateRetention(); err != nil {
 		return err
 	}
+	if err := m.ValidateForensics(); err != nil {
+		return err
+	}
 	seen := map[string]struct{}{}
 	for _, p := range m.Providers {
 		if p.ID == "" || p.Kind == "" {
@@ -319,10 +330,24 @@ func (m Manifest) ValidateRetention() error {
 	for name, days := range map[string]int{
 		"agent_turns_days": m.Retention.AgentTurnsDays, "channel_messages_days": m.Retention.ChannelMessagesDays,
 		"run_events_days": m.Retention.RunEventsDays, "provider_usage_days": m.Retention.ProviderUsageDays,
+		"trace_events_days": m.Retention.TraceEventsDays, "forensic_payload_days": m.Retention.ForensicPayloadDays,
 	} {
 		if days < 0 || days > 3650 {
 			return fmt.Errorf("retention %s must be between 0 and 3650", name)
 		}
+	}
+	return nil
+}
+
+func (m Manifest) ValidateForensics() error {
+	if !m.Forensics.RawCapture {
+		return nil
+	}
+	if m.Forensics.MasterKeyEnv == "" {
+		return fmt.Errorf("forensics raw_capture requires master_key_env")
+	}
+	if m.Security.Public || m.Security.OIDC.Issuer != "" {
+		return fmt.Errorf("forensics raw_capture requires local mode with public and oidc disabled")
 	}
 	return nil
 }
@@ -479,7 +504,7 @@ func InitialManifest(target domain.DeploymentTarget, kube Kubernetes) Manifest {
 	if target == "" {
 		target = domain.DeploymentDocker
 	}
-	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}, Retention: Retention{AgentTurnsDays: 90, ChannelMessagesDays: 90, RunEventsDays: 365, ProviderUsageDays: 365}}
+	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}, Retention: Retention{AgentTurnsDays: 90, ChannelMessagesDays: 90, RunEventsDays: 365, ProviderUsageDays: 365, TraceEventsDays: 365, ForensicPayloadDays: 30}}
 }
 
 func WriteManifest(path string, manifest Manifest, force bool) error {

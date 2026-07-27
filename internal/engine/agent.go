@@ -17,8 +17,13 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+
 	"github.com/gongahkia/norbot/internal/artifact"
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/observability"
 	"github.com/gongahkia/norbot/internal/provider"
 	"github.com/gongahkia/norbot/internal/runtime"
 )
@@ -60,6 +65,11 @@ func (s *Service) invokeCentralAgent(ctx context.Context, run domain.Run, input 
 	if err != nil {
 		return runtime.AgentResponse{}, err
 	}
+	rawPrompt := input.Prompt
+	ctx = observability.With(ctx, observability.Correlation{RunID: run.ID, Stage: string(domain.StageBuilder), ProviderID: providerID})
+	ctx, span := otel.Tracer("norbot.agent").Start(ctx, "agent.turn")
+	span.SetAttributes(attribute.String("norbot.run_id", run.ID), attribute.String("gen_ai.provider.name", providerID), attribute.String("norbot.agent.role", input.Role))
+	defer span.End()
 	input.Prompt = redactSensitivePrompt(input.Prompt)
 	attachments, err := s.stageAgentAttachments(ctx, workspace, run.ID, input.Attachments)
 	if err != nil {
@@ -71,10 +81,16 @@ func (s *Service) invokeCentralAgent(ctx context.Context, run domain.Run, input 
 	}
 	turn, created, err := s.store.CreateAgentTurn(ctx, domain.AgentTurn{ID: mustID(), RunID: run.ID, SessionID: input.SessionID, ExternalID: input.ExternalID, Role: input.Role, IdempotencyKey: input.IdempotencyKey, Prompt: input.Prompt, History: []map[string]any{{"kind": "user", "content": input.Prompt}}, State: "running", ProviderID: providerID})
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return runtime.AgentResponse{}, err
 	}
 	if !created {
 		return turnResponse(turn), nil
+	}
+	ctx = observability.With(ctx, observability.Correlation{TurnID: turn.ID})
+	if _, err := s.store.RecordTrace(ctx, domain.TraceEvent{RunID: run.ID, Type: "agent_turn_created", Summary: "Central agent turn created", EntityRefs: map[string]string{"role": turn.Role}}, map[string]any{"prompt": rawPrompt, "attachments": input.Attachments}, s.config.Manifest.Retention.ForensicPayloadDays); err != nil {
+		return runtime.AgentResponse{}, err
 	}
 	return s.advanceAgentTurn(ctx, run, turn)
 }
@@ -93,6 +109,11 @@ func (s *Service) AgentAction(ctx context.Context, id string) (domain.AgentActio
 func (s *Service) DecideAgentAction(ctx context.Context, id, decision, operator string) (runtime.AgentResponse, domain.AgentAction, error) {
 	action, err := s.store.DecideAgentAction(ctx, id, decision, operator)
 	if err != nil {
+		return runtime.AgentResponse{}, domain.AgentAction{}, err
+	}
+	ctx = observability.ExtractTraceparent(ctx, action.Traceparent)
+	ctx = observability.With(ctx, observability.Correlation{RunID: action.RunID, TurnID: action.TurnID, ActionID: action.ID, Actor: operator, Stage: string(domain.StageBuilder)})
+	if _, err := s.store.RecordTrace(ctx, domain.TraceEvent{RunID: action.RunID, Type: "agent_action_" + action.State, Summary: "Operator " + action.State + " agent action", TurnID: action.TurnID, ActionID: action.ID, Actor: operator, Status: action.State, EntityRefs: map[string]string{"tool": action.Tool, "role": action.Role}}, map[string]any{"params": action.Params, "approval_context": action.ApprovalContext}, s.config.Manifest.Retention.ForensicPayloadDays); err != nil {
 		return runtime.AgentResponse{}, domain.AgentAction{}, err
 	}
 	turn, err := s.store.AgentTurn(ctx, action.TurnID)
@@ -130,6 +151,7 @@ func (s *Service) DecideAgentAction(ctx context.Context, id, decision, operator 
 }
 
 func (s *Service) advanceAgentTurn(ctx context.Context, run domain.Run, turn domain.AgentTurn) (runtime.AgentResponse, error) {
+	ctx = observability.With(ctx, observability.Correlation{RunID: run.ID, Stage: string(domain.StageBuilder), TurnID: turn.ID, ProviderID: turn.ProviderID})
 	providerConfig, ok := s.config.Manifest.Provider(turn.ProviderID, domain.StageBuilder)
 	if !ok {
 		return runtime.AgentResponse{}, fmt.Errorf("agent provider %q is unavailable", turn.ProviderID)
@@ -148,7 +170,17 @@ func (s *Service) advanceAgentTurn(ctx context.Context, run domain.Run, turn dom
 	invoker := provider.Invoker{Workspace: workspace, Extensions: s.extensions}
 	for count := 0; count < agentMaxTurns; count++ {
 		prompt := agentPrompt(turn.History, turn.Role, runPolicy)
-		result, err := invoker.Invoke(ctx, providerConfig, provider.Request{RunID: run.ID, Stage: domain.StageBuilder, Prompt: prompt})
+		providerCtx, span := otel.Tracer("norbot.agent").Start(ctx, "agent.provider.invoke")
+		span.SetAttributes(attribute.String("gen_ai.provider.name", providerConfig.ID), attribute.String("norbot.turn_id", turn.ID))
+		result, err := invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: domain.StageBuilder, Prompt: prompt})
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+		if _, traceErr := s.store.RecordTrace(providerCtx, domain.TraceEvent{RunID: run.ID, Type: "agent_provider_invoked", Summary: "Central agent provider call completed", ProviderID: providerConfig.ID, TurnID: turn.ID, Status: traceStatus(err)}, map[string]any{"prompt": prompt, "response": result.Text, "metadata": result.Metadata}, s.config.Manifest.Retention.ForensicPayloadDays); traceErr != nil {
+			return runtime.AgentResponse{}, traceErr
+		}
 		if err != nil {
 			turn.State = "failed"
 			_ = s.store.UpdateAgentTurn(ctx, turn)
@@ -202,6 +234,9 @@ func (s *Service) advanceAgentTurn(ctx context.Context, run domain.Run, turn dom
 				return runtime.AgentResponse{}, err
 			}
 			if action.State == "pending" {
+				if _, err := s.store.RecordTrace(ctx, domain.TraceEvent{RunID: run.ID, Type: "agent_action_approval_requested", Summary: "Agent action requires operator approval", TurnID: turn.ID, ActionID: action.ID, Status: "pending", EntityRefs: map[string]string{"tool": action.Tool, "role": action.Role}}, map[string]any{"params": call.Params, "approval_context": action.ApprovalContext}, s.config.Manifest.Retention.ForensicPayloadDays); err != nil {
+					return runtime.AgentResponse{}, err
+				}
 				turn.State = "awaiting_approval"
 				turn.History = append(turn.History, map[string]any{"kind": "tool_request", "tool": action.Tool, "action_id": action.ID, "digest": action.Digest})
 				if err := s.store.UpdateAgentTurn(ctx, turn); err != nil {
@@ -269,6 +304,10 @@ func (s *Service) validateAgentTool(runPolicy domain.RunAgentPolicy, role string
 }
 
 func (s *Service) executeAgentAction(ctx context.Context, run domain.Run, action domain.AgentAction) (domain.AgentAction, error) {
+	ctx = observability.With(ctx, observability.Correlation{RunID: run.ID, TurnID: action.TurnID, ActionID: action.ID, Stage: string(domain.StageBuilder), Actor: action.ApprovedBy})
+	ctx, span := otel.Tracer("norbot.agent").Start(ctx, "agent.tool.execute")
+	span.SetAttributes(attribute.String("gen_ai.tool.name", action.Tool), attribute.String("norbot.action_id", action.ID))
+	defer span.End()
 	policy, err := s.AgentPolicy(ctx, run.ID)
 	if err == nil {
 		var toolPolicy domain.AgentToolPolicy
@@ -278,6 +317,8 @@ func (s *Service) executeAgentAction(ctx context.Context, run domain.Run, action
 		}
 	}
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		completed, completeErr := s.store.CompleteAgentAction(ctx, action.ID, "failed", map[string]any{"error": err.Error()}, err.Error())
 		if completeErr != nil {
 			return action, completeErr
@@ -285,6 +326,7 @@ func (s *Service) executeAgentAction(ctx context.Context, run domain.Run, action
 		return completed, err
 	}
 	executionID := mustID()
+	ctx = observability.With(ctx, observability.Correlation{SandboxID: executionID})
 	if err := s.store.CreateSandboxExecution(ctx, executionID, action.ID, run.ID, string(run.DeploymentTarget), action.Tool); err != nil {
 		return action, err
 	}
@@ -293,6 +335,8 @@ func (s *Service) executeAgentAction(ctx context.Context, run domain.Run, action
 	errorText := ""
 	exit := 0
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		state = "failed"
 		errorText = err.Error()
 		exit = 1
@@ -304,9 +348,20 @@ func (s *Service) executeAgentAction(ctx context.Context, run domain.Run, action
 		return action, completeErr
 	}
 	if err != nil {
+		_, _ = s.store.RecordTrace(ctx, domain.TraceEvent{RunID: run.ID, Type: "agent_sandbox_completed", Summary: "Agent sandbox action failed", TurnID: action.TurnID, ActionID: action.ID, SandboxID: executionID, Status: state, Severity: "error", EntityRefs: map[string]string{"tool": action.Tool}}, map[string]any{"params": action.Params, "result": result}, s.config.Manifest.Retention.ForensicPayloadDays)
 		return completed, err
 	}
+	if _, traceErr := s.store.RecordTrace(ctx, domain.TraceEvent{RunID: run.ID, Type: "agent_sandbox_completed", Summary: "Agent sandbox action completed", TurnID: action.TurnID, ActionID: action.ID, SandboxID: executionID, Status: state, EntityRefs: map[string]string{"tool": action.Tool}}, map[string]any{"params": action.Params, "result": result}, s.config.Manifest.Retention.ForensicPayloadDays); traceErr != nil {
+		return completed, traceErr
+	}
 	return completed, nil
+}
+
+func traceStatus(err error) string {
+	if err != nil {
+		return "failed"
+	}
+	return "completed"
 }
 
 func (s *Service) executeTool(ctx context.Context, run domain.Run, action domain.AgentAction) (map[string]any, error) {

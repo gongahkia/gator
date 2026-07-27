@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/observability"
 )
 
 func (s *Store) AppendPlannerRevision(ctx context.Context, runID string, attempt int, source string, architecture domain.Architecture, expected domain.Status) (domain.PlannerRevision, error) {
@@ -40,7 +41,7 @@ func (s *Store) appendPlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID st
 	value := domain.PlannerRevision{RunID: runID, Attempt: attempt, Source: source}
 	var previous domain.PlannerRevision
 	var rawArchitecture, rawGraph, rawDiff []byte
-	err = tx.QueryRow(ctx, `SELECT id,run_id,attempt,source,parent_id,architecture,graph,digest,diff,state,created_at,approved_at FROM planner_revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&previous.ID, &previous.RunID, &previous.Attempt, &previous.Source, &previous.ParentID, &rawArchitecture, &rawGraph, &previous.Digest, &rawDiff, &previous.State, &previous.CreatedAt, &previous.ApprovedAt)
+	err = tx.QueryRow(ctx, `SELECT id,run_id,attempt,source,parent_id,architecture,graph,digest,diff,state,trace_id,span_id,traceparent,created_at,approved_at FROM planner_revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&previous.ID, &previous.RunID, &previous.Attempt, &previous.Source, &previous.ParentID, &rawArchitecture, &rawGraph, &previous.Digest, &rawDiff, &previous.State, &previous.TraceID, &previous.SpanID, &previous.Traceparent, &previous.CreatedAt, &previous.ApprovedAt)
 	if err != nil && err != pgx.ErrNoRows {
 		return domain.PlannerRevision{}, err
 	}
@@ -81,10 +82,15 @@ func (s *Store) appendPlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID st
 	if err != nil {
 		return domain.PlannerRevision{}, err
 	}
-	if err := tx.QueryRow(ctx, `INSERT INTO planner_revisions(run_id,attempt,source,parent_id,architecture,graph,digest,diff) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,state,created_at,approved_at`, value.RunID, value.Attempt, value.Source, value.ParentID, architectureJSON, graphJSON, value.Digest, diffJSON).Scan(&value.ID, &value.State, &value.CreatedAt, &value.ApprovedAt); err != nil {
+	correlation := observability.From(ctx)
+	value.TraceID, value.SpanID, value.Traceparent = correlation.TraceID, correlation.SpanID, correlation.Traceparent
+	if err := tx.QueryRow(ctx, `INSERT INTO planner_revisions(run_id,attempt,source,parent_id,architecture,graph,digest,diff,trace_id,span_id,traceparent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id,state,created_at,approved_at`, value.RunID, value.Attempt, value.Source, value.ParentID, architectureJSON, graphJSON, value.Digest, diffJSON, value.TraceID, value.SpanID, value.Traceparent).Scan(&value.ID, &value.State, &value.CreatedAt, &value.ApprovedAt); err != nil {
 		return domain.PlannerRevision{}, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE runs SET architecture=$2,graph=$3,updated_at=now() WHERE id=$1`, runID, architectureJSON, graphJSON); err != nil {
+		return domain.PlannerRevision{}, err
+	}
+	if _, err := s.insertTrace(ctx, tx, domain.TraceEvent{RunID: runID, Type: "planner_revision_created", Summary: "Planner revision recorded", Stage: string(domain.StagePlanner), Attempt: attempt, RevisionID: value.ID, Status: value.State, Payload: map[string]any{"source": source, "digest": value.Digest, "diff": value.Diff}}, map[string]any{"architecture": value.Architecture, "graph": value.Graph, "diff": value.Diff}, 30); err != nil {
 		return domain.PlannerRevision{}, err
 	}
 	if err := s.insertEvent(ctx, tx, runID, "planner_revision_created", "Planner revision recorded", map[string]any{"planner_revision_id": value.ID, "attempt": attempt, "source": source, "digest": value.Digest}); err != nil {
@@ -94,7 +100,7 @@ func (s *Store) appendPlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID st
 }
 
 func (s *Store) ListPlannerRevisions(ctx context.Context, runID string) ([]domain.PlannerRevision, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id,run_id,attempt,source,parent_id,architecture,graph,digest,diff,state,created_at,approved_at FROM planner_revisions WHERE run_id=$1 ORDER BY id ASC`, runID)
+	rows, err := s.pool.Query(ctx, `SELECT id,run_id,attempt,source,parent_id,architecture,graph,digest,diff,state,trace_id,span_id,traceparent,created_at,approved_at FROM planner_revisions WHERE run_id=$1 ORDER BY id ASC`, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +128,7 @@ func (s *Store) approvePlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID s
 func scanPlannerRevision(row interface{ Scan(...any) error }) (domain.PlannerRevision, error) {
 	var value domain.PlannerRevision
 	var architecture, graph, diff []byte
-	if err := row.Scan(&value.ID, &value.RunID, &value.Attempt, &value.Source, &value.ParentID, &architecture, &graph, &value.Digest, &diff, &value.State, &value.CreatedAt, &value.ApprovedAt); err != nil {
+	if err := row.Scan(&value.ID, &value.RunID, &value.Attempt, &value.Source, &value.ParentID, &architecture, &graph, &value.Digest, &diff, &value.State, &value.TraceID, &value.SpanID, &value.Traceparent, &value.CreatedAt, &value.ApprovedAt); err != nil {
 		return domain.PlannerRevision{}, err
 	}
 	if err := json.Unmarshal(architecture, &value.Architecture); err != nil {

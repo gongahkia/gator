@@ -329,6 +329,9 @@ type Revision struct {
 	Files          map[string]string `json:"files,omitempty"`
 	Report         map[string]any    `json:"report,omitempty"`
 	State          string            `json:"state"`
+	TraceID        string            `json:"trace_id,omitempty"`
+	SpanID         string            `json:"span_id,omitempty"`
+	Traceparent    string            `json:"traceparent,omitempty"`
 	CreatedAt      time.Time         `json:"created_at"`
 	ApprovedAt     *time.Time        `json:"approved_at,omitempty"`
 }
@@ -361,6 +364,9 @@ type ApprovalOperation struct {
 	CreatedAt      time.Time         `json:"created_at"`
 	UpdatedAt      time.Time         `json:"updated_at"`
 	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
+	TraceID        string            `json:"trace_id,omitempty"`
+	SpanID         string            `json:"span_id,omitempty"`
+	Traceparent    string            `json:"traceparent,omitempty"`
 }
 
 type PlannerRevision struct {
@@ -376,6 +382,9 @@ type PlannerRevision struct {
 	State        string       `json:"state"`
 	CreatedAt    time.Time    `json:"created_at"`
 	ApprovedAt   *time.Time   `json:"approved_at,omitempty"`
+	TraceID      string       `json:"trace_id,omitempty"`
+	SpanID       string       `json:"span_id,omitempty"`
+	Traceparent  string       `json:"traceparent,omitempty"`
 }
 
 type PlanningSwarmExecution struct {
@@ -431,6 +440,9 @@ type UsageRecord struct {
 	Source       string         `json:"source"`
 	Estimator    string         `json:"estimator,omitempty"`
 	Metadata     map[string]any `json:"metadata,omitempty"`
+	TraceID      string         `json:"trace_id,omitempty"`
+	SpanID       string         `json:"span_id,omitempty"`
+	Traceparent  string         `json:"traceparent,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
 }
 
@@ -555,6 +567,9 @@ type AgentTurn struct {
 	State          string           `json:"state"`
 	Final          string           `json:"final,omitempty"`
 	ProviderID     string           `json:"provider_id"`
+	TraceID        string           `json:"trace_id,omitempty"`
+	SpanID         string           `json:"span_id,omitempty"`
+	Traceparent    string           `json:"traceparent,omitempty"`
 	CreatedAt      time.Time        `json:"created_at"`
 	UpdatedAt      time.Time        `json:"updated_at"`
 }
@@ -574,6 +589,9 @@ type AgentAction struct {
 	DecidedAt       *time.Time     `json:"decided_at,omitempty"`
 	ExpiresAt       *time.Time     `json:"expires_at,omitempty"`
 	ApprovalContext map[string]any `json:"approval_context,omitempty"`
+	TraceID         string         `json:"trace_id,omitempty"`
+	SpanID          string         `json:"span_id,omitempty"`
+	Traceparent     string         `json:"traceparent,omitempty"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 }
@@ -590,6 +608,70 @@ type ManagedArtifact struct {
 	Digest      string    `json:"digest"`
 	ExpiresAt   time.Time `json:"expires_at"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type SandboxExecution struct {
+	ID          string     `json:"id"`
+	ActionID    string     `json:"action_id,omitempty"`
+	RunID       string     `json:"run_id"`
+	Target      string     `json:"target"`
+	Tool        string     `json:"tool"`
+	State       string     `json:"state"`
+	ExitCode    int        `json:"exit_code"`
+	Output      string     `json:"output,omitempty"`
+	TraceID     string     `json:"trace_id,omitempty"`
+	SpanID      string     `json:"span_id,omitempty"`
+	Traceparent string     `json:"traceparent,omitempty"`
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+type TraceEvent struct {
+	ID           int64             `json:"id"`
+	RunID        string            `json:"run_id"`
+	Type         string            `json:"type"`
+	Severity     string            `json:"severity"`
+	Status       string            `json:"status,omitempty"`
+	Summary      string            `json:"summary"`
+	Stage        string            `json:"stage,omitempty"`
+	Attempt      int               `json:"attempt,omitempty"`
+	ProviderID   string            `json:"provider_id,omitempty"`
+	RevisionID   int64             `json:"revision_id,omitempty"`
+	ApprovalID   int64             `json:"approval_id,omitempty"`
+	TurnID       string            `json:"turn_id,omitempty"`
+	ActionID     string            `json:"action_id,omitempty"`
+	SandboxID    string            `json:"sandbox_id,omitempty"`
+	Actor        string            `json:"actor,omitempty"`
+	TraceID      string            `json:"trace_id,omitempty"`
+	SpanID       string            `json:"span_id,omitempty"`
+	Traceparent  string            `json:"traceparent,omitempty"`
+	EntityRefs   map[string]string `json:"entity_refs,omitempty"`
+	Payload      map[string]any    `json:"payload,omitempty"`
+	RawAvailable bool              `json:"raw_available,omitempty"`
+	OccurredAt   time.Time         `json:"occurred_at"`
+	RecordedAt   time.Time         `json:"recorded_at"`
+}
+
+type TracePage struct {
+	Items      []TraceEvent `json:"items"`
+	NextCursor string       `json:"next_cursor,omitempty"`
+}
+type TraceFilter struct {
+	Cursor, Stage, Type, Severity, ProviderID, Tool, Actor, EntityID, Query string
+	From, To                                                                *time.Time
+}
+type AgentTurnPage struct {
+	Items      []AgentTurn `json:"items"`
+	NextCursor string      `json:"next_cursor,omitempty"`
+}
+type RunAgentPolicyEvent struct {
+	ID        int64          `json:"id"`
+	RunID     string         `json:"run_id"`
+	Version   int            `json:"version"`
+	Policy    RunAgentPolicy `json:"policy"`
+	Digest    string         `json:"digest"`
+	Actor     string         `json:"actor"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type Event struct {
@@ -654,6 +736,7 @@ type Job struct {
 	Attempt        int        `json:"attempt"`
 	WorkerID       string     `json:"worker_id,omitempty"`
 	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
+	Traceparent    string     `json:"traceparent,omitempty"`
 }
 
 type ApprovalAction string
