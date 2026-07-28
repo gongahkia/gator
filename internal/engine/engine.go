@@ -971,6 +971,9 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		providerStarted := time.Now()
 		providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
 		providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
+		if eventErr := s.store.RecordEvent(providerCtx, run.ID, "provider_started", "Workflow provider call started", map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": providerConfig.ID, "model": providerConfig.Model}); eventErr != nil {
+			observability.Logger(s.log, ctx).Warn("record provider start event", "error", eventErr)
+		}
 		invoker := provider.Invoker{Workspace: workspace, Extensions: s.extensions}
 		result, err = invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
 		s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
@@ -987,6 +990,13 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		}
 		if err != nil {
 			return err
+		}
+		metadata := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model}
+		if summary, ok := result.Metadata["reasoning_summary"]; ok {
+			metadata["reasoning_summary"] = summary
+		}
+		if eventErr := s.store.RecordEvent(providerCtx, run.ID, "provider_completed", "Workflow provider response received", metadata); eventErr != nil {
+			observability.Logger(s.log, ctx).Warn("record provider completion event", "error", eventErr)
 		}
 	}
 	var revisionID *int64

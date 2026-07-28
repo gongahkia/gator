@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -31,14 +32,21 @@ func TestOpenAIResponsesAdapter(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			t.Fatal("missing auth")
 		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if reasoning := body["reasoning"].(map[string]any); reasoning["summary"] != "auto" {
+			t.Fatalf("reasoning=%#v", body["reasoning"])
+		}
 		w.Header().Set("x-ratelimit-remaining-requests", "7")
 		w.Header().Set("x-ratelimit-reset-requests", "1s")
-		_, _ = io.WriteString(w, `{"id":"resp_1","output_text":"planned"}`)
+		_, _ = io.WriteString(w, `{"id":"resp_1","output_text":"planned","output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"Selected a small architecture."}]}]}`)
 	}))
 	defer server.Close()
 	t.Setenv("TEST_OPENAI", "test-key")
 	invoker := Invoker{HTTPClient: server.Client()}
-	result, err := invoker.Invoke(context.Background(), config.Provider{ID: "openai", Kind: "openai_responses", Model: "model", BaseURL: server.URL, CredentialEnv: "TEST_OPENAI"}, Request{RunID: "run", Stage: domain.StagePlanner, Prompt: "plan"})
+	result, err := invoker.Invoke(context.Background(), config.Provider{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: server.URL, CredentialEnv: "TEST_OPENAI"}, Request{RunID: "run", Stage: domain.StagePlanner, Prompt: "plan"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +55,9 @@ func TestOpenAIResponsesAdapter(t *testing.T) {
 	}
 	if result.RateLimit.RemainingRequests == nil || *result.RateLimit.RemainingRequests != 7 || result.RateLimit.ResetAt == nil {
 		t.Fatalf("rate limit=%#v", result.RateLimit)
+	}
+	if summary, ok := result.Metadata["reasoning_summary"].([]string); !ok || len(summary) != 1 || summary[0] != "Selected a small architecture." {
+		t.Fatalf("reasoning summary=%#v", result.Metadata["reasoning_summary"])
 	}
 	_ = os.Unsetenv("TEST_OPENAI")
 }

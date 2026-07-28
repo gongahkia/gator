@@ -2,12 +2,15 @@
 
 Every run records an append-only `trace_events` timeline. Each row can link the run, workflow stage and attempt, provider, planner/code revision, approval operation, central-agent turn, tool action, sandbox execution, policy version, actor, and OpenTelemetry trace/span context.
 
+Norbot does not capture or expose private model reasoning. For `openai_responses` calls to GPT-5 models, it requests the provider-supported reasoning summary and records that summary with the provider-completed event and trace. It is an operator-facing rationale, not raw chain-of-thought; other providers continue to expose their returned output and normal trace metadata only.
+
 ## Console
 
 Open **Runs**, expand one run, then use **Unified trace**. It is the primary traceback view: search the redacted timeline, inspect entity references and trace IDs, and expand the summary for agent turns, sandbox executions, and policy history. The JSON export uses the exact trace filter and records the export in `audit_events`.
 
 The API equivalents are:
 
+- `GET /api/events/stream` for replayable global run lifecycle events. Connect with `Last-Event-ID` or `?after=<event-id>` to resume; a new connection starts at the current cursor.
 - `GET /api/runs/{id}/trace?cursor=&q=&stage=&type=&severity=&provider_id=&tool=&actor=&entity_id=&from=&to=`
 - `GET /api/runs/{id}/trace/export?format=json|ndjson&include=redacted|raw`
 - `GET /api/runs/{id}/trace/{event_id}/raw`

@@ -95,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /metrics", s.metrics)
 	mux.HandleFunc("GET /api/operations/outbox/dead", s.deadOutbox)
 	mux.HandleFunc("POST /api/operations/outbox/{id}/replay", s.replayOutbox)
+	mux.HandleFunc("GET /api/events/stream", s.runEventsStream)
 	mux.HandleFunc("GET /api/runs", s.listRuns)
 	mux.HandleFunc("POST /api/runs", s.createRun)
 	mux.HandleFunc("GET /api/apps", s.listApps)
@@ -988,6 +989,53 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		for _, event := range events {
 			encoded, _ := json.Marshal(event)
 			_, _ = fmt.Fprintf(w, "id: %d\ndata: %s\n\n", event.ID, encoded)
+			after = event.ID
+		}
+		flusher.Flush()
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Server) runEventsStream(w http.ResponseWriter, r *http.Request) {
+	rawAfter := strings.TrimSpace(r.URL.Query().Get("after"))
+	if rawAfter == "" {
+		rawAfter = strings.TrimSpace(r.Header.Get("Last-Event-ID"))
+	}
+	after, _ := strconv.ParseInt(rawAfter, 10, 64)
+	if rawAfter == "" {
+		var err error
+		after, err = s.store.LatestEventID(r.Context())
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, err)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("streaming unsupported"))
+		return
+	}
+	_, _ = fmt.Fprintf(w, "id: %d\nevent: ready\ndata: {}\n\n", after)
+	flusher.Flush()
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		events, err := s.store.EventsAfter(r.Context(), after, 500)
+		if err != nil {
+			observability.Logger(s.log, r.Context()).Warn("stream global run events", "error", err)
+			return
+		}
+		for _, event := range events {
+			encoded, _ := json.Marshal(event)
+			_, _ = fmt.Fprintf(w, "id: %d\nevent: run\ndata: %s\n\n", event.ID, encoded)
 			after = event.ID
 		}
 		flusher.Flush()

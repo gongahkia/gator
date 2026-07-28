@@ -859,6 +859,41 @@ func (s *Store) Events(ctx context.Context, runID string, afterID int64) ([]doma
 	return page.Items, nil
 }
 
+func (s *Store) EventsAfter(ctx context.Context, afterID int64, limit int) ([]domain.Event, error) {
+	if limit < 1 || limit > 500 {
+		limit = 100
+	}
+	rows, err := s.pool.Query(ctx, `SELECT id,run_id,event_type,message,metadata,created_at FROM run_events WHERE id>$1 ORDER BY id ASC LIMIT $2`, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	events := []domain.Event{}
+	for rows.Next() {
+		var event domain.Event
+		var metadata []byte
+		if err := rows.Scan(&event.ID, &event.RunID, &event.Type, &event.Message, &metadata, &event.CreatedAt); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(metadata, &event.Metadata); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func (s *Store) LatestEventID(ctx context.Context) (int64, error) {
+	var id int64
+	if err := s.pool.QueryRow(ctx, `SELECT COALESCE(MAX(id),0) FROM run_events`).Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
 func (s *Store) EventsPage(ctx context.Context, runID, cursor string, limit int) (domain.EventPage, error) {
 	if limit < 1 || limit > 500 {
 		limit = 100

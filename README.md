@@ -95,7 +95,7 @@ Native Azure OpenAI, Cohere, Ollama, Amazon Bedrock, and Vertex AI adapters plus
 ## API
 
 - `POST /api/runs` creates and queues a planner run. It accepts optional `deployment_target: "docker"|"kubernetes"` and `public_ingress` fields.
-- `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events` inspect state and stream replayable events.
+- `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events`, and `GET /api/events/stream` inspect state and stream replayable events. The console uses the global stream to update run cards, review artifacts, and details without manual refresh.
 - `GET/PUT /api/runs/{id}/architecture` reads or edits the typed planner architecture while approval is pending. `PUT /api/runs/{id}/graph` remains a compatibility projection.
 - `GET /api/runs/{id}/planning-swarm` exposes durable planning candidates; `POST /api/runs/{id}/planning-swarm/select` selects a completed candidate for review without bypassing planner approval.
 - `POST /api/runs/{id}/change-runs` creates a snapshot-backed linked version. Send `{"change":"...","architecture_affecting":true}` only when the architecture must be replanned; otherwise it starts at Build. `GET /api/apps` lists the current deployed version of each app.

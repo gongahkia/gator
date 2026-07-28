@@ -121,6 +121,7 @@ function App() {
   const [details, setDetails] = useState({ events: [], revisions: [], usage: [], skills: [], deployment: null, swarm: null, agentPolicy: null, policyHistory: [], trace: [], agentTurns: [], sandboxes: [] });
   const [toasts, setToasts] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [liveUpdates, setLiveUpdates] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem(ONBOARDING_KEY) !== "seen");
   const notify = useCallback((message, tone = "notice") => {
     const text = String(message || "").trim();
@@ -157,6 +158,16 @@ function App() {
   useEffect(() => { loadDetails(selected); }, [selected, loadDetails]);
   const setEvents = useCallback((events) => setDetails((current) => ({ ...current, events })), []);
   useRunEvents(selected?.id, auth.token, setEvents, notify);
+  const refreshLiveRuns = useCallback(async (events) => {
+    await Promise.all([loadRuns(), loadApps()]);
+    if (!selectedID || !events.some((event) => event.run_id === selectedID)) return;
+    try {
+      const run = await api(`/api/runs/${selectedID}`);
+      setRuns((current) => current.map((item) => item.id === run.id ? run : item));
+      await loadDetails(run);
+    } catch (cause) { notify(cause.message, "warning"); }
+  }, [api, loadApps, loadDetails, loadRuns, notify, selectedID]);
+  useLiveRunUpdates(Boolean(auth.config && (!auth.config.enabled || auth.token)), auth.token, refreshLiveRuns, setLiveUpdates);
   const act = async (action, success) => {
     setBusy(true);
     try { const value = await action(); await loadRuns(); await loadApps(); if (success) notify(success); return value; }
@@ -176,7 +187,7 @@ function App() {
   const changeRun = (runID, change, architectureAffecting = false) => act(async () => { const run = await api(`/api/runs/${runID}/change-runs`, { method: "POST", body: JSON.stringify({ change, architecture_affecting: architectureAffecting }) }); setSelectedID(""); setPage("runs"); return run; }, architectureAffecting ? "Architecture change run created." : "Change run created from approved snapshot.");
   const restrictAgentPolicy = (runID, policy) => act(async () => { const value = await api(`/api/runs/${runID}/agent-policy`, { method: "PUT", body: JSON.stringify(policy) }); await loadDetails({ id: runID, stage: selected?.stage, status: selected?.status }); return value; }, "Agent capabilities restricted.");
   const dismissOnboarding = () => { localStorage.setItem(ONBOARDING_KEY, "seen"); setShowOnboarding(false); };
-  return <AuthGate auth={auth}><div className="app-shell"><aside><div className="brand">Norbot<span>operator console</span></div><nav>{NAV.map(([id, label]) => <button key={id} className={page === id ? "active" : ""} onClick={() => setPage(id)}>{label}</button>)}</nav><div className="aside-footer">{auth.config?.enabled && <button className="quiet" onClick={auth.logout}>Sign out</button>}<p>{plural(runs.length, "loaded run")}</p></div></aside><main className="main"><header><div><p className="eyebrow">{page === "create" ? "New run" : NAV.find(([id]) => id === page)?.[1]}</p><h1>{page === "create" ? "Build an application" : page === "runs" ? "Runs" : page}</h1></div><button className="quiet" onClick={() => { loadRuns(); loadApps(); }}>Refresh</button></header>{page === "create" && <CreatePage api={api} busy={busy} notify={notify} onCreate={createRun} onBack={() => setPage("runs")} />}{page === "runs" && <RunsPage api={api} runs={runs} filter={runsFilter} onFilter={setRunsFilter} selected={selected} details={details} busy={busy} onCreate={() => setPage("create")} onLoadMore={runsCursor ? () => loadRuns(runsCursor, true) : null} onSelect={(id) => setSelectedID((current) => current === id ? "" : id)} onExpand={setSelectedID} onApprove={approve} onUpdateArchitecture={updateArchitecture} onSelectSwarmCandidate={selectSwarmCandidate} onChange={changeRun} onSaveAgentPolicy={restrictAgentPolicy} onCancel={(runID) => act(() => api(`/api/runs/${runID}/cancel`, { method: "POST" }), "Run cancelled.")} onRemove={removeRun} />}{page === "apps" && <AppsPage apps={apps} filter={appsFilter} onFilter={setAppsFilter} busy={busy} onLoadMore={appsCursor ? () => loadApps(appsCursor, true) : null} onStart={start} onStop={stop} onDelete={destroy} onChange={changeRun} onManage={(runID) => api(`/api/runs/${runID}`).then((run) => { setRuns((current) => current.some((item) => item.id === run.id) ? current : [run, ...current]); setSelectedID(run.id); setPage("runs"); }).catch((cause) => notify(cause.message, "error"))} />}{page === "skills" && <SkillsPage api={api} act={act} notify={notify} />}{page === "channels" && <ChannelsPage api={api} act={act} runs={runs} notify={notify} />}{page === "actions" && <ActionsPage api={api} act={act} notify={notify} />}{page === "operations" && <OperationsPage api={api} act={act} notify={notify} />}{page === "capacity" && <CapacityPage api={api} act={act} notify={notify} />}{page === "health" && <HealthPage api={api} notify={notify} />}</main><GnomeToasts toasts={toasts} onboarding={showOnboarding} onDismiss={dismissToast} onDismissOnboarding={dismissOnboarding}/></div></AuthGate>;
+  return <AuthGate auth={auth}><div className="app-shell"><aside><div className="brand">Norbot<span>operator console</span></div><nav>{NAV.map(([id, label]) => <button key={id} className={page === id ? "active" : ""} onClick={() => setPage(id)}>{label}</button>)}</nav><div className="aside-footer">{auth.config?.enabled && <button className="quiet" onClick={auth.logout}>Sign out</button>}<p>{plural(runs.length, "loaded run")}</p></div></aside><main className="main"><header><div><p className="eyebrow">{page === "create" ? "New run" : NAV.find(([id]) => id === page)?.[1]}</p><h1>{page === "create" ? "Build an application" : page === "runs" ? "Runs" : page}</h1></div><span className="badge">{liveUpdates ? "Live updates" : "Reconnecting…"}</span></header>{page === "create" && <CreatePage api={api} busy={busy} notify={notify} onCreate={createRun} onBack={() => setPage("runs")} />}{page === "runs" && <RunsPage api={api} runs={runs} filter={runsFilter} onFilter={setRunsFilter} selected={selected} details={details} busy={busy} onCreate={() => setPage("create")} onLoadMore={runsCursor ? () => loadRuns(runsCursor, true) : null} onSelect={(id) => setSelectedID((current) => current === id ? "" : id)} onExpand={setSelectedID} onApprove={approve} onUpdateArchitecture={updateArchitecture} onSelectSwarmCandidate={selectSwarmCandidate} onChange={changeRun} onSaveAgentPolicy={restrictAgentPolicy} onCancel={(runID) => act(() => api(`/api/runs/${runID}/cancel`, { method: "POST" }), "Run cancelled.")} onRemove={removeRun} />}{page === "apps" && <AppsPage apps={apps} filter={appsFilter} onFilter={setAppsFilter} busy={busy} onLoadMore={appsCursor ? () => loadApps(appsCursor, true) : null} onStart={start} onStop={stop} onDelete={destroy} onChange={changeRun} onManage={(runID) => api(`/api/runs/${runID}`).then((run) => { setRuns((current) => current.some((item) => item.id === run.id) ? current : [run, ...current]); setSelectedID(run.id); setPage("runs"); }).catch((cause) => notify(cause.message, "error"))} />}{page === "skills" && <SkillsPage api={api} act={act} notify={notify} />}{page === "channels" && <ChannelsPage api={api} act={act} runs={runs} notify={notify} />}{page === "actions" && <ActionsPage api={api} act={act} notify={notify} />}{page === "operations" && <OperationsPage api={api} act={act} notify={notify} />}{page === "capacity" && <CapacityPage api={api} act={act} notify={notify} />}{page === "health" && <HealthPage api={api} notify={notify} />}</main><GnomeToasts toasts={toasts} onboarding={showOnboarding} onDismiss={dismissToast} onDismissOnboarding={dismissOnboarding}/></div></AuthGate>;
 }
 
 function useRunEvents(runID, token, setEvents, notify) {
@@ -199,6 +210,35 @@ function useRunEvents(runID, token, setEvents, notify) {
     };
     connect(); return () => controller.abort();
   }, [runID, token, setEvents, notify]);
+}
+
+function useLiveRunUpdates(enabled, token, onUpdate, setConnected) {
+  useEffect(() => {
+    if (!enabled) { setConnected(false); return undefined; }
+    const controller = new AbortController(); let reconnect; let pending; let lastID = 0; let queued = [];
+    const schedule = (event) => {
+      if (!event?.run_id) return;
+      queued.push(event);
+      window.clearTimeout(pending);
+      pending = window.setTimeout(() => { const events = queued; queued = []; onUpdate(events); }, 100);
+    };
+    const connect = async () => {
+      try {
+        const response = await fetch(`/api/events/stream${lastID ? `?after=${lastID}` : ""}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: controller.signal });
+        if (!response.ok || !response.body) throw new Error("Could not stream workflow updates");
+        setConnected(true);
+        const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
+        while (!controller.signal.aborted) {
+          const { value, done } = await reader.read(); if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split("\n\n"); buffer = blocks.pop() || "";
+          blocks.forEach((block) => { const id = Number(block.split("\n").find((line) => line.startsWith("id: "))?.slice(4)); if (Number.isFinite(id) && id > lastID) lastID = id; const raw = block.split("\n").find((line) => line.startsWith("data: "))?.slice(6); if (raw) { try { schedule(JSON.parse(raw)); } catch {} } });
+        }
+      } catch { setConnected(false); } finally { if (!controller.signal.aborted) reconnect = window.setTimeout(connect, 1000); }
+    };
+    connect();
+    return () => { controller.abort(); window.clearTimeout(reconnect); window.clearTimeout(pending); setConnected(false); };
+  }, [enabled, token, onUpdate, setConnected]);
 }
 
 function CreatePage({ api, busy, notify, onCreate, onBack }) {

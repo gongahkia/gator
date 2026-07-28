@@ -118,6 +118,9 @@ func (i Invoker) Invoke(ctx context.Context, provider config.Provider, request R
 
 func (i Invoker) openAIResponses(ctx context.Context, p config.Provider, key string, request Request) (Result, error) {
 	body := map[string]any{"model": p.Model, "input": request.Prompt}
+	if supportsReasoningSummary(p.Model) {
+		body["reasoning"] = map[string]string{"summary": "auto"}
+	}
 	payload, rateLimit, err := i.postJSON(ctx, joinURL(p.BaseURL, "/responses"), body, map[string]string{"Authorization": "Bearer " + key})
 	if err != nil {
 		return Result{}, err
@@ -322,6 +325,9 @@ func (i Invoker) postJSON(ctx context.Context, url string, body any, headers map
 
 func result(p config.Provider, text string, payload map[string]any, rateLimit RateLimit) Result {
 	metadata := map[string]any{"kind": p.Kind, "response_id": stringField(payload, "id")}
+	if summary := reasoningSummary(payload); len(summary) > 0 {
+		metadata["reasoning_summary"] = summary
+	}
 	if rateLimit.RemainingRequests != nil {
 		metadata["rate_limit_remaining_requests"] = *rateLimit.RemainingRequests
 	}
@@ -330,6 +336,25 @@ func result(p config.Provider, text string, payload map[string]any, rateLimit Ra
 	}
 	usage := usageFromPayload(payload)
 	return Result{Text: text, Provider: p.ID, Model: p.Model, Metadata: metadata, RateLimit: rateLimit, Usage: usage}
+}
+
+func supportsReasoningSummary(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-5")
+}
+
+func reasoningSummary(payload map[string]any) []string {
+	summary := []string{}
+	for _, output := range objectSlice(payload["output"]) {
+		if stringField(output, "type") != "reasoning" {
+			continue
+		}
+		for _, item := range objectSlice(output["summary"]) {
+			if text := strings.TrimSpace(stringField(item, "text")); text != "" {
+				summary = append(summary, text)
+			}
+		}
+	}
+	return summary
 }
 
 func usageFromPayload(payload map[string]any) TokenUsage {

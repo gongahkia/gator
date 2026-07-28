@@ -104,6 +104,51 @@ func TestRunApprovalLifecycleIntegration(t *testing.T) {
 	}
 }
 
+func TestEventsAfterIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	before, err := st.LatestEventID(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := domain.Run{ID: "events-" + time.Now().UTC().Format("20060102150405.000000000"), Prompt: "events", Profile: domain.ProfileFrontend, Stage: domain.StagePlanner, Status: domain.StatusQueued, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "local-deployer"}, Graph: domain.DefaultGraph(), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), run.ID) })
+	if err := st.RecordEvent(ctx, run.ID, "first", "first event", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RecordEvent(ctx, run.ID, "second", "second event", nil); err != nil {
+		t.Fatal(err)
+	}
+	events, err := st.EventsAfter(ctx, before, 500)
+	owned := []domain.Event{}
+	for _, event := range events {
+		if event.RunID == run.ID {
+			owned = append(owned, event)
+		}
+	}
+	if err != nil || len(owned) != 2 || owned[0].Type != "first" || owned[1].Type != "second" {
+		t.Fatalf("events=%#v err=%v", events, err)
+	}
+	latest, err := st.LatestEventID(ctx)
+	if err != nil || latest < owned[1].ID {
+		t.Fatalf("latest=%d event=%#v err=%v", latest, owned[1], err)
+	}
+}
+
 func TestBuilderRevisionRequestIntegration(t *testing.T) {
 	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
 	if databaseURL == "" {
