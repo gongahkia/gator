@@ -35,7 +35,7 @@ local function codex_policy(value)
 	return vim.deepcopy(value)
 end
 
-local function event_text(value)
+local function pi_event_text(value)
 	if type(value) ~= "table" then
 		return nil
 	end
@@ -50,6 +50,13 @@ local function event_text(value)
 		return value.text
 	end
 	return nil
+end
+
+local function codex_event_text(method, value)
+	if method ~= "item/agentMessage/delta" or type(value) ~= "table" then
+		return nil
+	end
+	return type(value.delta) == "string" and value.delta or nil
 end
 
 local function pi_usage(value)
@@ -356,7 +363,7 @@ function Manager:open(opts)
 			elseif message.type == "response" and message.command == "get_session_stats" and message.success then
 				usage(message.data)
 			end
-			local delta = event_text(message)
+			local delta = pi_event_text(message)
 			if delta then
 				notify("text", delta)
 			end
@@ -446,7 +453,7 @@ function Manager:open(opts)
 			notify("settled")
 		end
 		usage(message.params or message.result)
-		local delta = event_text(message.params or message)
+		local delta = codex_event_text(method, message.params)
 		if delta then
 			notify("text", delta)
 		end
