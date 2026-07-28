@@ -7,7 +7,10 @@ local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local root = helpers.tempdir("workflow-transcript")
 assert(vim.system({ "git", "init", "-q" }, { cwd = root, text = true }):wait().code == 0, "fixture must initialize Git")
 helpers.write(root .. "/main.lua", "return true\n")
-assert(vim.system({ "git", "add", "main.lua" }, { cwd = root, text = true }):wait().code == 0, "fixture must stage baseline")
+assert(
+	vim.system({ "git", "add", "main.lua" }, { cwd = root, text = true }):wait().code == 0,
+	"fixture must stage baseline"
+)
 assert(
 	vim.system({ "git", "-c", "user.name=Gator", "-c", "user.email=gator@example.invalid", "commit", "-qm", "base" }, {
 		cwd = root,
@@ -28,10 +31,21 @@ local value = workflow.new({
 	end,
 	structured = {
 		open = function()
-			return { send = function() return true end, cancel = function() return true end }
+			return {
+				send = function()
+					return true
+				end,
+				cancel = function()
+					return true
+				end,
+			}
 		end,
 	},
-	loading = { open = function() return { close = function() end } end },
+	loading = {
+		open = function()
+			return { close = function() end }
+		end,
+	},
 })
 local run = value:launch({
 	provider = "pi",

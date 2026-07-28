@@ -58,7 +58,10 @@ vim.cmd = function(command)
 	end
 	return original_cmd(command)
 end
-loading.configure({ enabled = true, spinner = "rattles.braille.dots", interval_ms = 16 }, { enabled = true, reduced = false })
+loading.configure(
+	{ enabled = true, spinner = "rattles.braille.dots", interval_ms = 16 },
+	{ enabled = true, reduced = false }
+)
 local handle = loading.open({ message = "timer test" })
 local buffer = vim.tbl_filter(function(id)
 	return vim.bo[id].filetype == "gator-loading"

@@ -29,7 +29,10 @@ local function codex_policy(value)
 			fail("codex_policy contains unsupported field: " .. tostring(key))
 		end
 	end
-	if (value.sandbox ~= "read-only" and value.sandbox ~= "workspace-write") or value.approval_policy ~= "on-request" then
+	if
+		(value.sandbox ~= "read-only" and value.sandbox ~= "workspace-write")
+		or value.approval_policy ~= "on-request"
+	then
 		fail("codex_policy must use a supported sandbox and on-request approvals")
 	end
 	return vim.deepcopy(value)

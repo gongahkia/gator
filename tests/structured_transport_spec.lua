@@ -159,14 +159,11 @@ process.stdout(
 	nil,
 	vim.json.encode({ jsonrpc = "2.0", method = "item/agentMessage/delta", params = { delta = "done" } }) .. "\n"
 )
-process.stdout(
-	nil,
-	vim.json.encode({
-		jsonrpc = "2.0",
-		method = "item/commandExecution/outputDelta",
-		params = { delta = "README.md" },
-	}) .. "\n"
-)
+process.stdout(nil, vim.json.encode({
+	jsonrpc = "2.0",
+	method = "item/commandExecution/outputDelta",
+	params = { delta = "README.md" },
+}) .. "\n")
 assert(#codex_events == 1 and codex_events[1].value == "done", "Codex command output must not enter assistant chat")
 process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", method = "turn/completed", params = {} }) .. "\n")
 assert(
