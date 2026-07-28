@@ -1,12 +1,16 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"image/png"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -47,9 +51,10 @@ type CreateRunInput struct {
 }
 
 type ApprovalInput struct {
-	Action     domain.ApprovalAction `json:"action"`
-	Feedback   string                `json:"feedback"`
-	RevisionID int64                 `json:"revision_id"`
+	Action         domain.ApprovalAction `json:"action"`
+	Feedback       string                `json:"feedback"`
+	RevisionID     int64                 `json:"revision_id"`
+	ProposalDigest string                `json:"proposal_digest"`
 }
 
 type DeploymentInfo struct {
@@ -214,6 +219,9 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	if architecture.Acceptance.Empty() {
 		architecture.Acceptance = domain.CompileAcceptance(architecture)
 	}
+	if err := domain.ValidateAcceptanceForProfile(input.Profile, architecture.Acceptance); err != nil {
+		return domain.Run{}, err
+	}
 	appID := input.AppID
 	if appID == "" {
 		appID = id
@@ -265,16 +273,27 @@ func (s *Service) UpdateArchitecture(ctx context.Context, runID string, architec
 	if err := architecture.Validate(); err != nil {
 		return domain.Run{}, err
 	}
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil {
+		return domain.Run{}, err
+	}
+	if err := domain.ValidateAcceptanceForProfile(run.Profile, architecture.Acceptance); err != nil {
+		return domain.Run{}, err
+	}
 	return s.store.UpdateArchitecture(ctx, runID, architecture)
 }
 
 func (s *Service) UpdateAcceptance(ctx context.Context, runID string, acceptance domain.AcceptanceContract) (domain.Run, error) {
 	if err := acceptance.Validate(); err != nil || acceptance.Empty() {
-		if err != nil { return domain.Run{}, err }
+		if err != nil {
+			return domain.Run{}, err
+		}
 		return domain.Run{}, fmt.Errorf("acceptance contract is required")
 	}
 	run, err := s.store.GetRun(ctx, runID)
-	if err != nil { return domain.Run{}, err }
+	if err != nil {
+		return domain.Run{}, err
+	}
 	run.Architecture.Acceptance = acceptance
 	return s.UpdateArchitecture(ctx, runID, run.Architecture)
 }
@@ -352,7 +371,52 @@ func (s *Service) Approve(ctx context.Context, runID string, input ApprovalInput
 		}
 		return s.applyApprovalOperation(ctx, operation)
 	}
+	if input.Action == domain.ApprovalFix {
+		if strings.TrimSpace(input.Feedback) != "" {
+			return domain.Run{}, fmt.Errorf("bounded fix does not accept free-text instructions")
+		}
+		revision, err := s.store.LatestRevision(ctx, runID)
+		if err != nil {
+			return domain.Run{}, err
+		}
+		proposal, err := repairProposal(revision.Report)
+		if err != nil {
+			return domain.Run{}, err
+		}
+		if input.ProposalDigest == "" || input.ProposalDigest != proposal["digest"] {
+			return domain.Run{}, fmt.Errorf("repair proposal is no longer current")
+		}
+		encoded, err := json.Marshal(proposal)
+		if err != nil {
+			return domain.Run{}, err
+		}
+		input.Feedback = "bounded remediation: " + string(encoded)
+	}
+	if input.Action == domain.ApprovalApprove && run.Stage == domain.StageVerifier && run.Status == domain.StatusAwaiting {
+		revision, err := s.store.LatestRevision(ctx, run.ID)
+		if err != nil {
+			return domain.Run{}, err
+		}
+		if revision.Report["status"] != "pass" {
+			return domain.Run{}, fmt.Errorf("failed verification requires a bounded repair or retry")
+		}
+		if err := s.store.ApproveAcceptanceBaselines(ctx, run.ID); err != nil {
+			return domain.Run{}, err
+		}
+	}
 	return s.store.Approve(ctx, runID, input.Action, strings.TrimSpace(input.Feedback))
+}
+
+func repairProposal(report map[string]any) (map[string]any, error) {
+	proposal, ok := report["repair_proposal"].(map[string]any)
+	if !ok || proposal == nil {
+		return nil, fmt.Errorf("failed verification has no bounded repair proposal")
+	}
+	digest, ok := proposal["digest"].(string)
+	if !ok || !strings.HasPrefix(digest, "sha256:") {
+		return nil, fmt.Errorf("repair proposal is invalid")
+	}
+	return proposal, nil
 }
 
 func (s *Service) applyApprovalOperation(ctx context.Context, operation domain.ApprovalOperation) (domain.Run, error) {
@@ -1121,7 +1185,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		if err != nil {
 			return err
 		}
-		report, err := verifyApp(ctx, workspace, run, revision.Files)
+		report, err := s.verifyApp(ctx, workspace, run, revision.Files)
+		if err == nil && report != nil {
+			if baselineErr := s.processAcceptanceBaselines(ctx, run, report); baselineErr != nil {
+				report["status"] = "fail"
+				report["repair_proposal"] = proposeRepair(baselineErr, nil)
+				err = fmt.Errorf("acceptance screenshot baseline: %w", baselineErr)
+			}
+		}
 		if report != nil {
 			if cache, ok := report["cache"].(map[string]any); ok {
 				for ecosystem, raw := range cache {
@@ -1136,6 +1207,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			}
 			report["status"] = "fail"
 			report["error"] = err.Error()
+		}
+		if commands, ok := report["_full_commands"]; ok {
+			commandPath := filepath.ToSlash(filepath.Join("stage-output", fmt.Sprintf("verification-commands-%d.json", job.Attempt)))
+			if writeErr := writeStageArtifact(ctx, workspace, run.ID, commandPath, map[string]any{"commands": commands}); writeErr != nil {
+				return fmt.Errorf("record verification command artifact: %w", writeErr)
+			}
+			report["command_log_artifact"] = commandPath
+			delete(report, "_full_commands")
 		}
 		artifact["verification"] = report
 		artifact["revision_id"] = revision.ID
@@ -1202,21 +1281,29 @@ func (s *Service) deploy(ctx context.Context, run domain.Run, job domain.Job) er
 	return s.store.CompleteRun(ctx, job, map[string]any{"app_id": applicationID(run), "project": project, "public_url": url})
 }
 
+func (s *Service) verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run, changedSets ...map[string]string) (map[string]any, error) {
+	return verifyAppWithBrowser(ctx, workspace, run, s.config.Manifest.Runtime.Verification.Normalized().BrowserImage, changedSets...)
+}
+
 func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run, changedSets ...map[string]string) (map[string]any, error) {
+	return verifyAppWithBrowser(ctx, workspace, run, "norbot-verifier-browser:local", changedSets...)
+}
+
+func verifyAppWithBrowser(ctx context.Context, workspace runtime.WorkspaceBackend, run domain.Run, browserImage string, changedSets ...map[string]string) (map[string]any, error) {
 	changed := map[string]string{}
 	if len(changedSets) > 0 && changedSets[0] != nil {
 		changed = changedSets[0]
 	}
 	if len(changed) > 0 {
 		if err := validateBuilderFiles(run, changed); err != nil {
-			report := map[string]any{"status": "fail", "checks": []string{"deployable source contract"}, "builder_validation": builderResponseDiagnostics(err), "summary": "Builder revision does not modify deployable application source."}
+			report := map[string]any{"status": "fail", "checks": []string{"deployable source contract"}, "builder_validation": builderResponseDiagnostics(err), "repair_proposal": proposeRepair(err, nil), "summary": "Builder revision does not modify deployable application source."}
 			return report, fmt.Errorf("verification failed: %w", err)
 		}
 	}
 	root := workspace.RunPath(run.ID)
 	source, err := runtime.PrepareDeploymentSource(root, run)
 	if err != nil {
-		return map[string]any{"status": "fail", "checks": []string{"server-owned deployment source contract"}, "summary": "Generated source violates the deployment contract."}, fmt.Errorf("verification failed: %w", err)
+		return map[string]any{"status": "fail", "checks": []string{"server-owned deployment source contract"}, "repair_proposal": proposeRepair(err, nil), "summary": "Generated source violates the deployment contract."}, fmt.Errorf("verification failed: %w", err)
 	}
 	if err := workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
 		return nil, fmt.Errorf("mirror protected deployment source: %w", err)
@@ -1227,6 +1314,9 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		report, err := verifier.VerifyChanged(ctx, run, changed)
 		if report != nil {
 			report["deployment_source"] = source
+			if err != nil && report["repair_proposal"] == nil {
+				report["repair_proposal"] = proposeRepair(err, nil)
+			}
 		}
 		return report, err
 	}
@@ -1236,6 +1326,9 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		report, err := verifier.Verify(ctx, run)
 		if report != nil {
 			report["deployment_source"] = source
+			if err != nil && report["repair_proposal"] == nil {
+				report["repair_proposal"] = proposeRepair(err, nil)
+			}
 		}
 		return report, err
 	}
@@ -1246,7 +1339,8 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 	root = filepath.Join(root, "generated-app")
-	client := docker.Client()
+	recorder := &runtime.CommandRecorder{}
+	client := docker.Client().WithRecorder(recorder)
 	checks := []string{"profile contract", "locked frontend dependencies", "server-owned Docker deployment contract"}
 	cache := map[string]any{}
 	runCommand := func(args ...string) error {
@@ -1262,19 +1356,19 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 	frontendCache := verificationCacheVolume("node", frontendKey)
 	frontendHit, err := ensureNodeCache(ctx, client, docker.Volume(run.ID), frontendCache, frontendKey)
 	if err != nil {
-		return verificationFailure(ctx, client, run, checks, fmt.Errorf("frontend dependency cache: %w", err), cache)
+		return verificationFailure(ctx, client, run, checks, fmt.Errorf("frontend dependency cache: %w", err), recorder, cache)
 	}
 	cache["node"] = frontendHit
 	frontendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", frontendCache + ":/workspace/generated-app/frontend/node_modules:ro", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu"}
 	if fastFrontend(changed) {
 		if err := runCommand(append(frontendMount, "npm test")...); err != nil {
-			return verificationFailure(ctx, client, run, checks, fmt.Errorf("fast frontend test: %w", err), cache)
+			return verificationFailure(ctx, client, run, checks, fmt.Errorf("fast frontend test: %w", err), recorder, cache)
 		}
 		checks = append(checks, "fast frontend test")
 	}
 	frontend := append(frontendMount, "npm test && npm run build && npm audit --omit=dev --audit-level=high")
 	if err := runCommand(frontend...); err != nil {
-		return verificationFailure(ctx, client, run, checks, fmt.Errorf("frontend test/build/audit: %w", err), cache)
+		return verificationFailure(ctx, client, run, checks, fmt.Errorf("frontend test/build/audit: %w", err), recorder, cache)
 	}
 	checks = append(checks, "npm cache/test/build/audit")
 	if run.Profile != domain.ProfileFrontend {
@@ -1285,45 +1379,176 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 		backendCache := verificationCacheVolume("go", backendKey)
 		backendHit, err := ensureGoCache(ctx, client, docker.Volume(run.ID), backendCache, backendKey)
 		if err != nil {
-			return verificationFailure(ctx, client, run, checks, fmt.Errorf("Go dependency cache: %w", err), cache)
+			return verificationFailure(ctx, client, run, checks, fmt.Errorf("Go dependency cache: %w", err), recorder, cache)
 		}
 		cache["go"] = backendHit
 		backendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", backendCache + ":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu"}
 		if fastBackend(changed) {
 			if err := runCommand(append(backendMount, "GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./...")...); err != nil {
-				return verificationFailure(ctx, client, run, checks, fmt.Errorf("fast Go test: %w", err), cache)
+				return verificationFailure(ctx, client, run, checks, fmt.Errorf("fast Go test: %w", err), recorder, cache)
 			}
 			checks = append(checks, "fast Go test")
 		}
 		backend := append(backendMount, "PATH=/cache/bin:$PATH; GOMODCACHE=/cache/mod; GOCACHE=/cache/build; export PATH GOMODCACHE GOCACHE; go test ./... && go build ./... && govulncheck ./...")
 		if err := runCommand(backend...); err != nil {
-			return verificationFailure(ctx, client, run, checks, fmt.Errorf("Go test/build/govulncheck: %w", err), cache)
+			return verificationFailure(ctx, client, run, checks, fmt.Errorf("Go test/build/govulncheck: %w", err), recorder, cache)
 		}
 		checks = append(checks, "Go cache/test/build/govulncheck")
-		return verifyDockerApp(ctx, runtime.Deployment{Docker: client}, checks, run, docker.RunPath(run.ID), cache, source)
+		return verifyDockerApp(ctx, runtime.Deployment{Docker: client, BrowserImage: browserImage}, checks, run, docker.RunPath(run.ID), cache, source, recorder)
 	}
-	return verifyDockerApp(ctx, runtime.Deployment{Docker: client}, checks, run, docker.RunPath(run.ID), cache, source)
+	return verifyDockerApp(ctx, runtime.Deployment{Docker: client, BrowserImage: browserImage}, checks, run, docker.RunPath(run.ID), cache, source, recorder)
 
 }
 
-func verifyDockerApp(ctx context.Context, deployment runtime.Deployment, checks []string, run domain.Run, root string, cache map[string]any, source runtime.DeploymentSourceReport) (map[string]any, error) {
+func verifyDockerApp(ctx context.Context, deployment runtime.Deployment, checks []string, run domain.Run, root string, cache map[string]any, source runtime.DeploymentSourceReport, recorder *runtime.CommandRecorder) (map[string]any, error) {
 	acceptance, err := deployment.VerifyAcceptance(ctx, run, root, run.Architecture.Acceptance)
 	if err != nil {
-		report, verificationErr := verificationFailure(ctx, deployment.Client(), run, checks, fmt.Errorf("Docker build/health/smoke/semantic: %w", err), cache)
-		if acceptance != nil { report["acceptance"] = acceptance }
+		report, verificationErr := verificationFailure(ctx, deployment.Client(), run, checks, fmt.Errorf("Docker build/health/smoke/semantic: %w", err), recorder, cache)
+		if acceptance != nil {
+			report["acceptance"] = acceptance
+		}
 		return report, verificationErr
 	}
 	checks = append(checks, "server-owned Docker build/health/smoke", "browser acceptance contract")
-	return map[string]any{"status": "pass", "checks": checks, "cache": cache, "deployment_source": source, "acceptance": acceptance, "acceptance_digest": run.Architecture.Acceptance.Digest(), "summary": "Locked dependency, build, test, vulnerability scan, server-owned Docker health, network smoke, and browser acceptance checks passed. Operator approval is required before deployment."}, nil
+	return map[string]any{"status": "pass", "checks": checks, "cache": cache, "deployment_source": source, "acceptance": acceptance, "acceptance_digest": run.Architecture.Acceptance.Digest(), "commands": recorder.Records(), "_full_commands": recorder.FullRecords(), "summary": "Locked dependency, build, test, vulnerability scan, server-owned Docker health, network smoke, and browser acceptance checks passed. Operator approval is required before deployment."}, nil
 }
 
-func verificationFailure(ctx context.Context, client runtime.DockerClient, run domain.Run, checks []string, cause error, caches ...map[string]any) (map[string]any, error) {
+func verificationFailure(ctx context.Context, client runtime.DockerClient, run domain.Run, checks []string, cause error, recorder *runtime.CommandRecorder, cache map[string]any) (map[string]any, error) {
 	status, _ := client.Run(ctx, "ps", "-a", "--filter", "label=norbot.managed=true", "--filter", "label=norbot.app_id=verify-"+run.ID, "--format", "{{json .}}")
-	report := map[string]any{"status": "fail", "checks": checks, "runtime_status": string(status)}
-	if len(caches) > 0 && len(caches[0]) > 0 {
-		report["cache"] = caches[0]
+	report := map[string]any{"status": "fail", "checks": checks, "runtime_status": string(status), "commands": recorder.Records(), "_full_commands": recorder.FullRecords()}
+	if len(cache) > 0 {
+		report["cache"] = cache
 	}
+	repair := proposeRepair(cause, recorder.Records())
+	report["repair_proposal"] = repair
 	return report, fmt.Errorf("verification failed: %w", cause)
+}
+
+func (s *Service) processAcceptanceBaselines(ctx context.Context, run domain.Run, report map[string]any) error {
+	acceptance, ok := report["acceptance"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	shots, ok := acceptance["screenshots"].([]any)
+	if !ok {
+		return nil
+	}
+	contractDigest := run.Architecture.Acceptance.Digest()
+	summaries := make([]map[string]any, 0, len(shots))
+	defer func() { acceptance["screenshots"] = summaries }()
+	for _, raw := range shots {
+		shot, ok := raw.(map[string]any)
+		if !ok {
+			return fmt.Errorf("invalid acceptance screenshot")
+		}
+		id, _ := shot["id"].(string)
+		encoded, _ := shot["png_base64"].(string)
+		if id == "" || encoded == "" {
+			return fmt.Errorf("invalid acceptance screenshot")
+		}
+		image, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return fmt.Errorf("decode acceptance screenshot %q: %w", id, err)
+		}
+		baseline, err := s.store.AcceptanceBaseline(ctx, run.AppID, contractDigest, id)
+		if errors.Is(err, store.ErrNotFound) {
+			baseline, err = s.store.CreateAcceptanceBaseline(ctx, domain.AcceptanceBaseline{AppID: run.AppID, ContractDigest: contractDigest, ScreenshotID: id, RunID: run.ID, PNG: image})
+			if err != nil {
+				return err
+			}
+			summaries = append(summaries, map[string]any{"id": id, "state": "baseline_pending", "digest": baseline.Digest})
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		difference, err := screenshotDifference(baseline.PNG, image)
+		if err != nil {
+			return fmt.Errorf("compare acceptance screenshot %q: %w", id, err)
+		}
+		summaries = append(summaries, map[string]any{"id": id, "state": baseline.State, "baseline_digest": baseline.Digest, "difference": difference})
+		if baseline.State == "approved" && difference > 0.005 {
+			return fmt.Errorf("screenshot %q differs from approved baseline by %.4f", id, difference)
+		}
+	}
+	return nil
+}
+
+func screenshotDifference(before, after []byte) (float64, error) {
+	first, err := png.Decode(bytes.NewReader(before))
+	if err != nil {
+		return 0, err
+	}
+	second, err := png.Decode(bytes.NewReader(after))
+	if err != nil {
+		return 0, err
+	}
+	if !first.Bounds().Eq(second.Bounds()) {
+		return 1, nil
+	}
+	bounds := first.Bounds()
+	total, changed := 0, 0
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			ar, ag, ab, aa := first.At(x, y).RGBA()
+			br, bg, bb, ba := second.At(x, y).RGBA()
+			total++
+			if channelDifference(ar, br) > 4096 || channelDifference(ag, bg) > 4096 || channelDifference(ab, bb) > 4096 || channelDifference(aa, ba) > 4096 {
+				changed++
+			}
+		}
+	}
+	if total == 0 {
+		return 0, nil
+	}
+	return float64(changed) / float64(total), nil
+}
+
+func channelDifference(first, second uint32) uint32 {
+	if first > second {
+		return first - second
+	}
+	return second - first
+}
+
+func proposeRepair(cause error, commands []runtime.CommandRecord) map[string]any {
+	message := strings.ToLower(cause.Error())
+	proposal := map[string]any{"classification": "verification_infrastructure", "title": "Retry verification", "instructions": "Verification infrastructure did not complete. Retry without changing generated source.", "allowed_paths": []string{}, "required_checks": []string{"repeat failed verification"}, "retry_only": true}
+	var validation builderResponseError
+	if errors.As(cause, &validation) {
+		proposal = map[string]any{"classification": "source_contract", "title": "Move code into deployable source", "instructions": "Move the intended application code into generated-app/frontend/ or generated-app/backend/; do not modify deployment descriptors.", "allowed_paths": []string{"generated-app/frontend/", "generated-app/backend/"}, "required_checks": []string{"deployable source contract", "npm test/build/audit"}}
+		proposal["failed_command"] = failedCommand(commands)
+		encoded, _ := json.Marshal(proposal)
+		digest := sha256.Sum256(encoded)
+		proposal["digest"] = "sha256:" + hex.EncodeToString(digest[:])
+		return proposal
+	}
+	switch {
+	case strings.Contains(message, "path_outside_deployable_source"), strings.Contains(message, "deployable source contract"):
+		proposal = map[string]any{"classification": "source_contract", "title": "Move code into deployable source", "instructions": "Move the intended application code into generated-app/frontend/ or generated-app/backend/; do not modify deployment descriptors.", "allowed_paths": []string{"generated-app/frontend/", "generated-app/backend/"}, "required_checks": []string{"deployable source contract", "npm test/build/audit"}}
+	case strings.Contains(message, "frontend"), strings.Contains(message, "npm "):
+		proposal = map[string]any{"classification": "frontend_verification", "title": "Repair frontend verification", "instructions": "Repair the failing frontend source or locked dependency metadata only.", "allowed_paths": []string{"generated-app/frontend/"}, "required_checks": []string{"npm test", "npm run build", "npm audit"}}
+	case strings.Contains(message, "go test"), strings.Contains(message, "govulncheck"), strings.Contains(message, "backend"):
+		proposal = map[string]any{"classification": "backend_verification", "title": "Repair backend verification", "instructions": "Repair the failing backend source or locked Go dependency metadata only.", "allowed_paths": []string{"generated-app/backend/"}, "required_checks": []string{"go test ./...", "go build ./...", "govulncheck ./..."}}
+	case strings.Contains(message, "acceptance"), strings.Contains(message, "accessibility"), strings.Contains(message, "browser"):
+		proposal = map[string]any{"classification": "semantic_verification", "title": "Repair approved acceptance behavior", "instructions": "Implement the failed locked acceptance behavior without changing the acceptance contract or deployment descriptors.", "allowed_paths": []string{"generated-app/frontend/", "generated-app/backend/"}, "required_checks": []string{"browser flows", "API contracts", "accessibility", "screenshots"}}
+	case strings.Contains(message, "docker"), strings.Contains(message, "health"), strings.Contains(message, "smoke"):
+		proposal = map[string]any{"classification": "deployment_verification", "title": "Repair deployable application behavior", "instructions": "Repair application source that prevents the server-owned image from starting or passing health checks.", "allowed_paths": []string{"generated-app/frontend/", "generated-app/backend/"}, "required_checks": []string{"server-owned Docker build", "health", "network smoke"}}
+	}
+	proposal["failed_command"] = failedCommand(commands)
+	encoded, _ := json.Marshal(proposal)
+	digest := sha256.Sum256(encoded)
+	proposal["digest"] = "sha256:" + hex.EncodeToString(digest[:])
+	return proposal
+}
+
+func failedCommand(commands []runtime.CommandRecord) map[string]any {
+	for index := len(commands) - 1; index >= 0; index-- {
+		if commands[index].ExitCode != 0 {
+			return map[string]any{"command": commands[index].Command, "args": commands[index].Args, "exit_code": commands[index].ExitCode, "output": commands[index].Output}
+		}
+	}
+	return map[string]any{}
 }
 
 func dependencyCacheKey(root, image string, files ...string) (string, error) {
@@ -1484,6 +1709,7 @@ func builderFiles(text string) (map[string]string, error) {
 
 func validateBuilderFiles(run domain.Run, files map[string]string) error {
 	frontend := false
+	allowedPaths := boundedRepairPaths(run.Feedback)
 	for _, path := range mapKeys(files) {
 		if isReservedDeploymentPath(path) {
 			return builderResponseError{reason: "server_owned_deployment_descriptor", invalidPath: path, fileCount: len(files)}
@@ -1495,11 +1721,37 @@ func validateBuilderFiles(run domain.Run, files map[string]string) error {
 		default:
 			return builderResponseError{reason: "path_outside_deployable_source", invalidPath: path, fileCount: len(files)}
 		}
+		if len(allowedPaths) > 0 && !pathAllowedByRepair(path, allowedPaths) {
+			return builderResponseError{reason: "path_outside_repair_scope", invalidPath: path, fileCount: len(files)}
+		}
 	}
 	if !frontend {
 		return builderResponseError{reason: "missing_frontend_files", fileCount: len(files)}
 	}
 	return nil
+}
+
+func boundedRepairPaths(feedback string) []string {
+	const prefix = "bounded remediation: "
+	if !strings.HasPrefix(feedback, prefix) {
+		return nil
+	}
+	var proposal struct {
+		AllowedPaths []string `json:"allowed_paths"`
+	}
+	if json.Unmarshal([]byte(strings.TrimPrefix(feedback, prefix)), &proposal) != nil {
+		return nil
+	}
+	return proposal.AllowedPaths
+}
+
+func pathAllowedByRepair(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func isReservedDeploymentPath(path string) bool {
@@ -1532,6 +1784,8 @@ func (e builderResponseError) Error() string {
 		return fmt.Sprintf("builder path %q is outside generated-app", e.invalidPath)
 	case "path_outside_deployable_source":
 		return fmt.Sprintf("builder path %q is outside deployable source directories", e.invalidPath)
+	case "path_outside_repair_scope":
+		return fmt.Sprintf("builder path %q is outside the approved repair scope", e.invalidPath)
 	case "server_owned_deployment_descriptor":
 		return fmt.Sprintf("builder path %q is a server-owned deployment descriptor", e.invalidPath)
 	case "missing_frontend_files":

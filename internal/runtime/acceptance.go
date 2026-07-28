@@ -9,7 +9,7 @@ import (
 	"github.com/gongahkia/norbot/internal/domain"
 )
 
-// AcceptanceError preserves browser output for the operator-visible verifier report.
+// acceptance error preserves browser output for the operator-visible verifier report.
 type AcceptanceError struct {
 	Output string
 	Err    error
@@ -23,7 +23,9 @@ func (d Deployment) runAcceptance(ctx context.Context, docker DockerClient, run 
 		return nil, err
 	}
 	image := strings.TrimSpace(d.BrowserImage)
-	if image == "" { image = "norbot-verifier-browser:local" }
+	if image == "" {
+		image = "norbot-verifier-browser:local"
+	}
 	if _, ok := docker.Runner.(InputCommandRunner); !ok {
 		return map[string]any{"status": "skipped", "reason": "command runner does not support stdin"}, nil
 	}

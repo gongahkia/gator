@@ -1,8 +1,12 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +18,40 @@ import (
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/runtime"
 )
+
+func TestAcceptanceContractAndScreenshotDifference(t *testing.T) {
+	architecture := domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph())
+	architecture.Acceptance = domain.CompileAcceptance(architecture)
+	if err := architecture.Acceptance.Validate(); err != nil || architecture.Acceptance.Digest() == "" {
+		t.Fatalf("acceptance=%#v err=%v", architecture.Acceptance, err)
+	}
+	imageBytes := func(value color.Color) []byte {
+		image := image.NewRGBA(image.Rect(0, 0, 2, 2))
+		image.Set(0, 0, value)
+		var output bytes.Buffer
+		if err := png.Encode(&output, image); err != nil {
+			t.Fatal(err)
+		}
+		return output.Bytes()
+	}
+	if difference, err := screenshotDifference(imageBytes(color.Black), imageBytes(color.Black)); err != nil || difference != 0 {
+		t.Fatalf("difference=%v err=%v", difference, err)
+	}
+	if difference, err := screenshotDifference(imageBytes(color.Black), imageBytes(color.White)); err != nil || difference <= 0 {
+		t.Fatalf("difference=%v err=%v", difference, err)
+	}
+}
+
+func TestRepairProposalIsBounded(t *testing.T) {
+	proposal := proposeRepair(errors.New("frontend test/build/audit: npm test failed"), nil)
+	if proposal["classification"] != "frontend_verification" || proposal["digest"] == "" {
+		t.Fatalf("proposal=%#v", proposal)
+	}
+	run := domain.Run{Profile: domain.ProfileFrontend, Feedback: "bounded remediation: {\"allowed_paths\":[\"generated-app/frontend/\"]}"}
+	if err := validateBuilderFiles(run, map[string]string{"generated-app/backend/main.go": "bad", "generated-app/frontend/src/main.jsx": "ok"}); err == nil {
+		t.Fatal("repair scope accepted backend change")
+	}
+}
 
 type verifyRunner struct{ commands []string }
 
@@ -140,7 +178,7 @@ func TestGeneratedProfileDockerE2E(t *testing.T) {
 	}
 	root := t.TempDir()
 	workspace := runtime.Workspace{ArtifactsDir: root, DockerBin: "docker", Runner: runtime.OSRunner{}}
-	run := domain.Run{ID: "e2e" + time.Now().UTC().Format("150405"), Profile: domain.ProfileAgentic}
+	run := domain.Run{ID: "e2e" + time.Now().UTC().Format("150405"), Profile: domain.ProfileAgentic, Architecture: domain.Architecture{Acceptance: domain.AcceptanceContract{Version: 1, Flows: []domain.AcceptanceFlow{{ID: "home", Name: "generated home", Steps: []domain.AcceptanceStep{{Kind: "goto", URL: "/"}, {Kind: "expect_text", Text: "Norbot generated app"}}}}, Accessibility: []domain.AccessibilityCheck{{ID: "home", FlowID: "home"}}, Screenshots: []domain.ScreenshotExpectation{{ID: "home", FlowID: "home", Path: "/"}}}}}
 	if err := workspace.Ensure(context.Background(), run.ID); err != nil {
 		t.Fatal(err)
 	}

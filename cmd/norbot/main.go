@@ -29,6 +29,7 @@ import (
 	"github.com/gongahkia/norbot/internal/domain"
 	"github.com/gongahkia/norbot/internal/egress"
 	"github.com/gongahkia/norbot/internal/engine"
+	"github.com/gongahkia/norbot/internal/eval"
 	"github.com/gongahkia/norbot/internal/extension"
 	"github.com/gongahkia/norbot/internal/runtime"
 	"github.com/gongahkia/norbot/internal/skill"
@@ -56,12 +57,96 @@ func main() {
 		egressProxyCommand(os.Args[2:])
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "eval" {
+		evalCommand(os.Args[2:])
+		return
+	}
 	if len(os.Args) > 2 && os.Args[1] == "live-e2e" && os.Args[2] == "inbound" {
 		liveInboundCommand(os.Args[3:])
 		return
 	}
-	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template|network-policy-check | norbot serve | norbot egress-proxy | norbot health [--json] | norbot live-e2e inbound")
+	fmt.Fprintln(os.Stderr, "usage: norbot init | norbot kube bootstrap|local|secret-template|network-policy-check | norbot serve | norbot egress-proxy | norbot health [--json] | norbot eval validate|run|score | norbot live-e2e inbound")
 	os.Exit(2)
+}
+
+func evalCommand(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: norbot eval validate|run|score")
+		os.Exit(2)
+	}
+	switch args[0] {
+	case "validate":
+		flags := flag.NewFlagSet("eval validate", flag.ExitOnError)
+		dir := flags.String("dir", "evals/v1", "corpus directory")
+		_ = flags.Parse(args[1:])
+		corpus, err := eval.Load(*dir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("%s: %d cases valid\n", corpus.Version, len(corpus.Cases))
+	case "run":
+		flags := flag.NewFlagSet("eval run", flag.ExitOnError)
+		dir := flags.String("dir", "evals/v1", "corpus directory")
+		providerID := flags.String("provider", "", "provider label")
+		model := flags.String("model", "", "model label")
+		caseID := flags.String("case", "", "single case")
+		maxCost := flags.Float64("max-cost", 0, "declared cost ceiling")
+		_ = flags.Parse(args[1:])
+		if *providerID == "" || *model == "" || *maxCost <= 0 {
+			fmt.Fprintln(os.Stderr, "eval run requires --provider, --model, and positive --max-cost")
+			os.Exit(2)
+		}
+		corpus, err := eval.Load(*dir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		results := eval.OfflineResults(corpus, *providerID, *model, *caseID)
+		if *caseID != "" && len(results) == 0 {
+			fmt.Fprintln(os.Stderr, "unknown eval case")
+			os.Exit(2)
+		}
+		score, err := eval.ScoreResults(corpus, results)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"mode": "fixture_validation", "provider": *providerID, "model": *model, "max_cost": *maxCost, "results": results, "score": score})
+	case "score":
+		flags := flag.NewFlagSet("eval score", flag.ExitOnError)
+		dir := flags.String("dir", "evals/v1", "corpus directory")
+		input := flags.String("input", "", "results JSON path")
+		_ = flags.Parse(args[1:])
+		if *input == "" {
+			fmt.Fprintln(os.Stderr, "eval score requires --input")
+			os.Exit(2)
+		}
+		corpus, err := eval.Load(*dir)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		data, err := os.ReadFile(*input)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		var results []eval.Result
+		if err := json.Unmarshal(data, &results); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		score, err := eval.ScoreResults(corpus, results)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(score)
+	default:
+		fmt.Fprintln(os.Stderr, "usage: norbot eval validate|run|score")
+		os.Exit(2)
+	}
 }
 
 func egressProxyCommand(args []string) {

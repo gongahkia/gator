@@ -90,7 +90,9 @@ Then open `http://127.0.0.1:8080` locally.
 - Per-stage providers and deployment target are chosen at run creation and recorded with each event; later config changes do not alter an existing run.
 - Provider credentials are environment references only; Norbot never stores raw secrets.
 - Norbot owns agent sessions, provider credentials, typed tools, approval audit, sandbox execution, and idempotency. Generated apps receive neither model credentials nor a local tool executor. OpenClaw is not used.
-- Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, server-owned Docker or Kubernetes rollout, or smoke failure.
+- Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, server-owned Docker or Kubernetes rollout, and smoke failure. Docker runs additionally execute the approved browser acceptance contract. The planner drafts a typed contract for flows, API assertions, seeded data, axe accessibility checks, and screenshots; edit it before architecture approval. Norbot owns the Playwright verifier image and runs it only on the temporary internal verification network. First screenshots become pending baselines and are approved with the verification gate; later runs compare against the approved baseline.
+- Failed verification reports retain command argv, exit status, redacted output, a command-log artifact, a deterministic failure class, and one bounded repair proposal. A repair approval accepts only that proposal digest, restricts changed paths, and reruns its required verification checks; free-text repair scope is rejected.
+- `norbot eval validate` validates the versioned 24-case offline corpus in `evals/v1`; `norbot eval run --provider ID --model MODEL --max-cost N` records an explicit fixture-validation score, and `norbot eval score --input results.json` scores externally collected provider results by provider/model. Provider invocation remains opt-in and must be run through an explicitly credentialed CI job.
 
 Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
 
@@ -101,6 +103,7 @@ Native Azure OpenAI, Cohere, Ollama, Amazon Bedrock, and Vertex AI adapters plus
 - `POST /api/runs` creates and queues a planner run. It accepts optional `deployment_target: "docker"|"kubernetes"` and `public_ingress` fields.
 - `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events`, and `GET /api/events/stream` inspect state and stream replayable events. The console uses the global stream to update run cards, review artifacts, and details without manual refresh.
 - `GET/PUT /api/runs/{id}/architecture` reads or edits the typed planner architecture while approval is pending. `PUT /api/runs/{id}/graph` remains a compatibility projection.
+- `GET/PUT /api/runs/{id}/acceptance` reads or edits the typed browser/API/a11y/screenshot acceptance contract while planner approval is pending.
 - `GET /api/runs/{id}/planning-swarm` exposes durable planning candidates; `POST /api/runs/{id}/planning-swarm/select` selects a completed candidate for review without bypassing planner approval.
 - `POST /api/runs/{id}/change-runs` creates a snapshot-backed linked version. Send `{"change":"...","architecture_affecting":true}` only when the architecture must be replanned; otherwise it starts at Build. `GET /api/apps` lists the current deployed version of each app.
 - `POST /api/runs/{id}/approval` approves, revises planner or builder output, explicitly starts a verification fix, retries, or abandons a run.

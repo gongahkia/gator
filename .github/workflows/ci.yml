@@ -39,6 +39,7 @@ jobs:
       - run: npm --prefix web audit --omit=dev --audit-level=high
       - run: go vet ./...
       - run: go test -race ./...
+      - run: docker build --tag norbot-verifier-browser:local verifier
       - run: NORBOT_E2E_DOCKER=1 go test ./internal/engine -run TestGeneratedProfileDockerE2E -count=1 -v
       - run: sh -n scripts/*.sh deploy/postgres/norbot-archive-wal deploy/postgres/norbot-restore-wal
       - run: NORBOT_BACKUP_PASSPHRASE=test NORBOT_WAL_ARCHIVE_HOST_DIR=/tmp/norbot-wal NORBOT_METRICS_TOKEN=test docker compose -f docker-compose.yml -f docker-compose.production.yml config >/dev/null

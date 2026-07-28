@@ -689,17 +689,32 @@ func (s *Server) updateArchitecture(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) acceptance(w http.ResponseWriter, r *http.Request) {
 	run, err := s.store.GetRun(r.Context(), r.PathValue("id"))
-	if errors.Is(err, store.ErrNotFound) { writeError(w, http.StatusNotFound, err); return }
-	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, run.Architecture.Acceptance)
 }
 
 func (s *Server) updateAcceptance(w http.ResponseWriter, r *http.Request) {
 	var acceptance domain.AcceptanceContract
-	if err := decodeJSON(r, &acceptance); err != nil { writeError(w, http.StatusBadRequest, err); return }
+	if err := decodeJSON(r, &acceptance); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	run, err := s.service.UpdateAcceptance(r.Context(), r.PathValue("id"), acceptance)
-	if errors.Is(err, store.ErrNotFound) { writeError(w, http.StatusConflict, fmt.Errorf("acceptance can only be edited while planner approval is pending")); return }
-	if err != nil { writeError(w, http.StatusUnprocessableEntity, err); return }
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusConflict, fmt.Errorf("acceptance can only be edited while planner approval is pending"))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, run)
 }
 

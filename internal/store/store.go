@@ -343,6 +343,19 @@ CREATE TABLE IF NOT EXISTS managed_artifacts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS managed_artifacts_expiry_idx ON managed_artifacts(expires_at);
+CREATE TABLE IF NOT EXISTS acceptance_baselines (
+  app_id TEXT NOT NULL,
+  contract_digest TEXT NOT NULL,
+  screenshot_id TEXT NOT NULL,
+  run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  state TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  png BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  approved_at TIMESTAMPTZ,
+  PRIMARY KEY(app_id,contract_digest,screenshot_id)
+);
+CREATE INDEX IF NOT EXISTS acceptance_baselines_run_idx ON acceptance_baselines(run_id);
 CREATE TABLE IF NOT EXISTS agent_turns (
   id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -1124,12 +1137,8 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if decoded["status"] != "fail" {
 			return fmt.Errorf("fix requires a failed test report")
 		}
-		if feedback == "" {
-			encoded, err := json.Marshal(decoded)
-			if err != nil {
-				return err
-			}
-			feedback = "failed verification diagnostics: " + string(encoded)
+		if !strings.HasPrefix(feedback, "bounded remediation: ") {
+			return fmt.Errorf("fix requires the current bounded remediation")
 		}
 		var attempts int
 		if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM revisions WHERE run_id=$1 AND kind='fix'`, runID).Scan(&attempts); err != nil {

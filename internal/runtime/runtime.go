@@ -368,9 +368,9 @@ func memoryBytes(ctx context.Context, runner CommandRunner) int64 {
 }
 
 type Deployment struct {
-	Docker    DockerClient
-	DockerBin string
-	Runner    CommandRunner
+	Docker       DockerClient
+	DockerBin    string
+	Runner       CommandRunner
 	BrowserImage string
 }
 

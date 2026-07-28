@@ -66,6 +66,7 @@
       "tls_verify_env": "DOCKER_TLS_VERIFY",
       "cert_path_env": "DOCKER_CERT_PATH"
     },
+    "verification": {"browser_image": "norbot-verifier-browser:local"},
     "sandbox": {"image": "alpine:3.21", "cpu_milli": 500, "memory_mib": 512, "timeout_seconds": 60, "egress_proxy_url": "", "egress_proxy_secret_env": ""},
     "kubernetes": {
       "kubeconfig": "/absolute/path/to/kubeconfig",

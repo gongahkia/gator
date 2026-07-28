@@ -117,3 +117,40 @@ func TestRootlessDockerClientPropagatesTLSSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestDockerClientRecordsCommands(t *testing.T) {
+	runner := &dockerSecurityRunner{}
+	recorder := &CommandRecorder{}
+	client := LegacyDockerClient("docker", runner).WithRecorder(recorder)
+	if _, err := client.Run(context.Background(), "ps", "-a"); err != nil {
+		t.Fatal(err)
+	}
+	records := recorder.Records()
+	if len(records) != 1 || records[0].Command != "docker" || records[0].Args[0] != "ps" || records[0].ExitCode != 0 {
+		t.Fatalf("records=%#v", records)
+	}
+}
+
+func TestCommandRecorderArchivesFullRedactedOutput(t *testing.T) {
+	const output = "token=super-secret " + "x"
+	runner := commandOutputRunner{output: []byte(output + strings.Repeat("z", 70<<10))}
+	recorder := &CommandRecorder{}
+	client := LegacyDockerClient("docker", runner).WithRecorder(recorder)
+	if _, err := client.Run(context.Background(), "logs", "app"); err != nil {
+		t.Fatal(err)
+	}
+	compact := recorder.Records()[0]
+	if !compact.OutputTruncated || strings.Contains(compact.Output, "super-secret") {
+		t.Fatalf("compact=%#v", compact)
+	}
+	full := recorder.FullRecords()[0]
+	if full.OutputTruncated || len(full.Output) <= 70<<10 || strings.Contains(full.Output, "super-secret") || !strings.Contains(full.Output, "token=[REDACTED]") {
+		t.Fatalf("full=%#v", full)
+	}
+}
+
+type commandOutputRunner struct{ output []byte }
+
+func (r commandOutputRunner) Run(context.Context, string, ...string) ([]byte, error) {
+	return r.output, nil
+}

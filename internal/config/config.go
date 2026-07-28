@@ -76,7 +76,7 @@ type Runtime struct {
 	Docker        Docker                  `json:"docker"`
 	Kubernetes    Kubernetes              `json:"kubernetes"`
 	Sandbox       Sandbox                 `json:"sandbox"`
-	Verification  Verification             `json:"verification"`
+	Verification  Verification            `json:"verification"`
 }
 
 type Verification struct {
@@ -84,7 +84,9 @@ type Verification struct {
 }
 
 func (v Verification) Normalized() Verification {
-	if v.BrowserImage == "" { v.BrowserImage = "norbot-verifier-browser:local" }
+	if v.BrowserImage == "" {
+		v.BrowserImage = "norbot-verifier-browser:local"
+	}
 	return v
 }
 
