@@ -12,7 +12,7 @@ func TestAcceptanceRunnerSupportsPageLevelPressKey(t *testing.T) {
 }
 
 func TestAcceptanceRunnerSupportsLocalStorageOperations(t *testing.T) {
-	if !strings.Contains(acceptanceRunner, "s.op==='clear'") || !strings.Contains(acceptanceRunner, "localStorage.clear()") || !strings.Contains(acceptanceRunner, "localStorage.setItem(k,v)") {
+	if !strings.Contains(acceptanceRunner, "if(p.url()==='about:blank')await p.goto(base+'/')") || !strings.Contains(acceptanceRunner, "s.op==='clear'") || !strings.Contains(acceptanceRunner, "localStorage.clear()") || !strings.Contains(acceptanceRunner, "localStorage.setItem(k,v)") {
 		t.Fatal("local_storage operations are not implemented")
 	}
 }
