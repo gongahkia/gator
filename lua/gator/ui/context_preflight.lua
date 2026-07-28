@@ -104,7 +104,10 @@ function M.open(opts)
 		end,
 		close = M.close,
 		help = function()
-			require("gator.ui.notice").show("Gator context: <CR> send exactly this context, q cancel", vim.log.levels.INFO)
+			require("gator.ui.notice").show(
+				"Gator context: <CR> send exactly this context, q cancel",
+				vim.log.levels.INFO
+			)
 		end,
 	})
 	return panel.window

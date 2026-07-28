@@ -67,7 +67,10 @@ local function bind(panel)
 		end,
 		close = M.close,
 		help = function()
-			require("gator.ui.notice").show("Gator journal: j/k navigate, <CR> show metadata, q close", vim.log.levels.INFO)
+			require("gator.ui.notice").show(
+				"Gator journal: j/k navigate, <CR> show metadata, q close",
+				vim.log.levels.INFO
+			)
 		end,
 	})
 end

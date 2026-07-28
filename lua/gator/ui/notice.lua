@@ -64,7 +64,10 @@ function M.show(message, level, opts)
 	if opts.title ~= nil and (type(opts.title) ~= "string" or opts.title == "") then
 		fail("title must be non-empty text")
 	end
-	if opts.timeout_ms ~= nil and (type(opts.timeout_ms) ~= "number" or opts.timeout_ms < 0 or opts.timeout_ms % 1 ~= 0) then
+	if
+		opts.timeout_ms ~= nil
+		and (type(opts.timeout_ms) ~= "number" or opts.timeout_ms < 0 or opts.timeout_ms % 1 ~= 0)
+	then
 		fail("timeout_ms must be a non-negative integer")
 	end
 	local text = compact(message)
@@ -101,11 +104,19 @@ function M.show(message, level, opts)
 	local timeout = opts.timeout_ms or (level == vim.log.levels.ERROR and 7000 or 4000)
 	if timeout > 0 then
 		panel.timer = vim.uv.new_timer()
-		panel.timer:start(timeout, 0, vim.schedule_wrap(function()
-			close(panel)
-		end))
+		panel.timer:start(
+			timeout,
+			0,
+			vim.schedule_wrap(function()
+				close(panel)
+			end)
+		)
 	end
-	return { close = function() return close(panel) end }
+	return {
+		close = function()
+			return close(panel)
+		end,
+	}
 end
 
 function M.close()
