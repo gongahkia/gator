@@ -116,8 +116,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/runs/{id}/event-history", s.eventHistory)
 	mux.HandleFunc("GET /api/runs/{id}/revisions", s.revisions)
 	mux.HandleFunc("GET /api/runs/{id}/planner-revisions", s.plannerRevisions)
-	mux.HandleFunc("GET /api/runs/{id}/planning-swarm", s.planningSwarm)
-	mux.HandleFunc("POST /api/runs/{id}/planning-swarm/select", s.selectPlanningSwarmCandidate)
 	mux.HandleFunc("GET /api/runs/{id}/usage", s.usage)
 	mux.HandleFunc("GET /api/runs/{id}/skills", s.runSkills)
 	mux.HandleFunc("GET /api/agent/actions", s.agentActions)
@@ -738,43 +736,6 @@ func (s *Server) plannerRevisions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, values)
-}
-
-func (s *Server) planningSwarm(w http.ResponseWriter, r *http.Request) {
-	value, err := s.store.PlanningSwarm(r.Context(), r.PathValue("id"))
-	if errors.Is(err, store.ErrNotFound) {
-		writeJSON(w, http.StatusOK, nil)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, value)
-}
-
-func (s *Server) selectPlanningSwarmCandidate(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		TaskID int64 `json:"task_id"`
-	}
-	if err := decodeJSON(r, &input); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	if input.TaskID < 1 {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("task_id is required"))
-		return
-	}
-	value, err := s.store.SelectPlanningSwarmCandidate(r.Context(), r.PathValue("id"), input.TaskID, operatorFromRequest(r))
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, err)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, value)
 }
 
 func (s *Server) usage(w http.ResponseWriter, r *http.Request) {

@@ -38,7 +38,7 @@ func (s *Store) appendPlannerRevisionTx(ctx context.Context, tx pgx.Tx, runID st
 	if err != nil {
 		return domain.PlannerRevision{}, err
 	}
-	if err := domain.ValidateAcceptanceForProfile(run.Profile, architecture.Acceptance); err != nil {
+	if err := domain.ValidateArchitectureForProfile(run.Profile, architecture); err != nil {
 		return domain.PlannerRevision{}, err
 	}
 	if run.Stage != domain.StagePlanner || (expected != "" && run.Status != expected) {

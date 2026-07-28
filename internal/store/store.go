@@ -649,6 +649,15 @@ ALTER TABLE channel_accounts ADD COLUMN IF NOT EXISTS owner_external_id TEXT NOT
 DROP TABLE IF EXISTS channel_pairings;
 `
 
+const migration010RemovePlanningSwarms = `
+DROP TABLE IF EXISTS planning_swarm_provider_slots;
+DROP TABLE IF EXISTS planning_swarm_executions CASCADE;
+`
+
+const migration011DropPlanningSwarmTasks = `
+DROP TABLE IF EXISTS planning_swarm_tasks;
+`
+
 type migration struct {
 	Version int
 	Name    string
@@ -665,6 +674,8 @@ var migrations = []migration{
 	{Version: 7, Name: "run_agent_policies", SQL: migration007RunAgentPolicies},
 	{Version: 8, Name: "operator_trace", SQL: migration008OperatorTrace},
 	{Version: 9, Name: "local_single_operator", SQL: migration009LocalSingleOperator},
+	{Version: 10, Name: "remove_planning_swarms", SQL: migration010RemovePlanningSwarms},
+	{Version: 11, Name: "drop_planning_swarm_tasks", SQL: migration011DropPlanningSwarmTasks},
 }
 
 func (s *Store) Migrate(ctx context.Context) error {

@@ -48,7 +48,7 @@
     "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": [], "max_calls": 1}
   },
   "plugins": [],
-  "workflow": {"max_fixes": 2, "planning_swarm": {"enabled": false, "max_parallel": 3, "timeout_seconds": 180}},
+  "workflow": {"max_fixes": 2},
   "security": {
     "public": false,
     "http": {"require_https": false, "rate_per_minute": 240, "rate_burst": 60, "metrics_token_env": "NORBOT_METRICS_TOKEN"}

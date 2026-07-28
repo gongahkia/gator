@@ -252,14 +252,11 @@ func (s *Service) UpdateGraph(ctx context.Context, runID string, graph domain.Gr
 }
 
 func (s *Service) UpdateArchitecture(ctx context.Context, runID string, architecture domain.Architecture) (domain.Run, error) {
-	if err := architecture.Validate(); err != nil {
-		return domain.Run{}, err
-	}
 	run, err := s.store.GetRun(ctx, runID)
 	if err != nil {
 		return domain.Run{}, err
 	}
-	if err := domain.ValidateAcceptanceForProfile(run.Profile, architecture.Acceptance); err != nil {
+	if err := domain.ValidateArchitectureForProfile(run.Profile, architecture); err != nil {
 		return domain.Run{}, err
 	}
 	return s.store.UpdateArchitecture(ctx, runID, architecture)
@@ -1009,17 +1006,14 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	if err := s.enforceInternalAgentPolicy(ctx, run, job.Stage, providerConfig); err != nil {
 		return err
 	}
-	swarmEligible := job.Stage == domain.StagePlanner && s.config.Manifest.Workflow.PlanningSwarm.Enabled && planningSwarmAllowed(providerConfig)
 	if err := s.store.MarkStageRunning(ctx, job, providerID); err != nil {
 		return err
 	}
 	if job.Stage == domain.StageDeployer {
 		return s.deploy(ctx, run, job)
 	}
-	if !swarmEligible {
-		if err := workspace.Ensure(ctx, run.ID); err != nil {
-			return err
-		}
+	if err := workspace.Ensure(ctx, run.ID); err != nil {
+		return err
 	}
 	generatedFiles := []string(nil)
 	if job.Stage == domain.StageBuilder && job.Attempt == 1 && run.BaseSnapshotDigest == "" {
@@ -1035,64 +1029,36 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 	if err != nil {
 		return err
 	}
-	if !swarmEligible {
-		if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
-			return err
-		}
+	if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
+		return err
 	}
-	promptSkills := skills
-	if swarmEligible {
-		promptSkills = nil
+	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli", skills)
+	providerStarted := time.Now()
+	providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
+	providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
+	if eventErr := s.store.RecordEvent(providerCtx, run.ID, "provider_started", "Workflow provider call started", map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": providerConfig.ID, "model": providerConfig.Model}); eventErr != nil {
+		observability.Logger(s.log, ctx).Warn("record provider start event", "error", eventErr)
 	}
-	prompt := stagePrompt(run, job.Stage, providerConfig.Kind == "cli", promptSkills)
-	var result provider.Result
-	var swarmArtifact map[string]any
-	swarmHandled := false
-	if swarmEligible {
-		result, swarmArtifact, swarmHandled, err = s.invokeSwarm(ctx, run, job, providerConfig, skills, prompt)
-		if err != nil {
-			return err
+	invoker := provider.Invoker{Workspace: workspace, Extensions: s.extensions}
+	result, err := invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
+	s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
+	if err != nil {
+		if observeErr := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, Metadata: map[string]any{"outcome": "error", "rate_limited": providerRateLimited(err)}}); observeErr != nil {
+			observability.Logger(s.log, ctx).Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
 		}
+		providerSpan.RecordError(err)
+		providerSpan.SetStatus(codes.Error, err.Error())
 	}
-	if !swarmHandled {
-		if swarmEligible {
-			if err := workspace.Ensure(ctx, run.ID); err != nil {
-				return err
-			}
-			if err := materializeRunSkills(workspace, run.ID, skills); err != nil {
-				return err
-			}
-		}
-		providerStarted := time.Now()
-		providerCtx, providerSpan := otel.Tracer("norbot.provider").Start(ctx, "provider.invoke")
-		providerSpan.SetAttributes(attribute.String("norbot.provider_id", providerConfig.ID), attribute.String("norbot.provider_kind", providerConfig.Kind), attribute.String("norbot.stage", string(job.Stage)))
-		if eventErr := s.store.RecordEvent(providerCtx, run.ID, "provider_started", "Workflow provider call started", map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": providerConfig.ID, "model": providerConfig.Model}); eventErr != nil {
-			observability.Logger(s.log, ctx).Warn("record provider start event", "error", eventErr)
-		}
-		invoker := provider.Invoker{Workspace: workspace, Extensions: s.extensions}
-		result, err = invoker.Invoke(providerCtx, providerConfig, provider.Request{RunID: run.ID, Stage: job.Stage, Prompt: prompt})
-		s.metrics.ObserveProvider(providerConfig.ID, time.Since(providerStarted), err)
-		if err != nil {
-			if observeErr := s.store.RecordProviderObservation(ctx, store.ProviderObservation{ProviderID: providerConfig.ID, Metadata: map[string]any{"outcome": "error", "rate_limited": providerRateLimited(err)}}); observeErr != nil {
-				observability.Logger(s.log, ctx).Warn("record provider failure observation", "provider", providerConfig.ID, "error", observeErr)
-			}
-			providerSpan.RecordError(err)
-			providerSpan.SetStatus(codes.Error, err.Error())
-		}
-		providerSpan.End()
-		if _, traceErr := s.store.RecordTrace(providerCtx, domain.TraceEvent{RunID: run.ID, Type: "provider_invoked", Summary: "Workflow provider call completed", Stage: string(job.Stage), Attempt: job.Attempt, ProviderID: providerConfig.ID, Status: traceStatus(err), Severity: traceSeverity(err)}, map[string]any{"prompt": prompt, "response": result.Text, "metadata": result.Metadata}, s.config.Manifest.Retention.ForensicPayloadDays); traceErr != nil {
-			return traceErr
-		}
-		if err != nil {
-			return err
-		}
-		metadata := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model}
-		if summary, ok := result.Metadata["reasoning_summary"]; ok {
-			metadata["reasoning_summary"] = summary
-		}
-		if eventErr := s.store.RecordEvent(providerCtx, run.ID, "provider_completed", "Workflow provider response received", metadata); eventErr != nil {
-			observability.Logger(s.log, ctx).Warn("record provider completion event", "error", eventErr)
-		}
+	providerSpan.End()
+	if _, traceErr := s.store.RecordTrace(providerCtx, domain.TraceEvent{RunID: run.ID, Type: "provider_invoked", Summary: "Workflow provider call completed", Stage: string(job.Stage), Attempt: job.Attempt, ProviderID: providerConfig.ID, Status: traceStatus(err), Severity: traceSeverity(err)}, map[string]any{"prompt": prompt, "response": result.Text, "metadata": result.Metadata}, s.config.Manifest.Retention.ForensicPayloadDays); traceErr != nil {
+		return traceErr
+	}
+	if err != nil {
+		return err
+	}
+	metadata := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model}
+	if eventErr := s.store.RecordEvent(providerCtx, run.ID, "provider_completed", "Workflow provider response received", metadata); eventErr != nil {
+		observability.Logger(s.log, ctx).Warn("record provider completion event", "error", eventErr)
 	}
 	var revisionID *int64
 	if result.RateLimit.RemainingRequests != nil || result.RateLimit.ResetAt != nil {
@@ -1101,9 +1067,6 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		}
 	}
 	artifact := map[string]any{"stage": job.Stage, "attempt": job.Attempt, "provider": result.Provider, "model": result.Model, "response": result.Text, "metadata": result.Metadata, "created_at": time.Now().UTC()}
-	if swarmArtifact != nil {
-		artifact["planning_swarm"] = swarmArtifact
-	}
 	path := filepath.ToSlash(filepath.Join("stage-output", string(job.Stage)+fmt.Sprintf("-%d.json", job.Attempt)))
 	if job.Stage == domain.StageBuilder {
 		if err := writeStageArtifact(ctx, workspace, run.ID, path, artifact); err != nil {
@@ -1111,12 +1074,25 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		}
 	}
 	if job.Stage == domain.StagePlanner {
-		if architecture, ok := architectureFromResponse(result.Text, run); ok && !swarmHandled {
-			if err := s.store.SetPlannerArchitecture(ctx, run.ID, job.Attempt, architecture); err != nil {
-				return err
+		architecture, parseErr := architectureFromResponse(result.Text, run)
+		if parseErr != nil {
+			diagnostics := plannerResponseDiagnostics(parseErr)
+			artifact["planner_validation"] = diagnostics
+			if artifactErr := writeStageArtifact(ctx, workspace, run.ID, path, artifact); artifactErr != nil {
+				return fmt.Errorf("planner response rejected: %v; record diagnostic artifact: %w", parseErr, artifactErr)
 			}
-			run.Graph, run.Architecture = architecture.Workflow, architecture
+			if usageErr := s.recordUsage(ctx, run.ID, job.Stage, nil, providerConfig.ID, result, prompt); usageErr != nil {
+				observability.Logger(s.log, ctx).Warn("record rejected planner usage", "error", usageErr)
+			}
+			if _, traceErr := s.store.RecordTrace(ctx, domain.TraceEvent{RunID: run.ID, Type: "planner_response_rejected", Severity: "error", Status: "rejected", Summary: "Planner response rejected before architecture revision", Stage: string(job.Stage), Attempt: job.Attempt, ProviderID: providerConfig.ID, Payload: diagnostics}, nil, 0); traceErr != nil {
+				return fmt.Errorf("planner response rejected: %v; record diagnostics: %w", parseErr, traceErr)
+			}
+			return parseErr
 		}
+		if err := s.store.SetPlannerArchitecture(ctx, run.ID, job.Attempt, architecture); err != nil {
+			return err
+		}
+		run.Graph, run.Architecture = architecture.Workflow, architecture
 	}
 	if job.Stage == domain.StageBuilder {
 		if providerConfig.Kind == "cli" {
@@ -1185,10 +1161,8 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		artifact["revision_id"] = *revisionID
 		artifact["review_kind"] = revisionKind(job.Attempt)
 	}
-	if !swarmHandled {
-		if err := s.recordUsage(ctx, run.ID, job.Stage, revisionID, providerConfig.ID, result, prompt); err != nil {
-			s.log.Warn("record provider usage", "run_id", run.ID, "error", err)
-		}
+	if err := s.recordUsage(ctx, run.ID, job.Stage, revisionID, providerConfig.ID, result, prompt); err != nil {
+		s.log.Warn("record provider usage", "run_id", run.ID, "error", err)
 	}
 	if job.Stage == domain.StageVerifier {
 		revision, err := s.store.LatestRevision(ctx, run.ID)
@@ -1234,11 +1208,6 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			}
 		}
 		if err := s.store.RecordRevisionReport(ctx, run.ID, revision.ID, report, "tested"); err != nil {
-			return err
-		}
-	}
-	if swarmHandled {
-		if err := workspace.Ensure(ctx, run.ID); err != nil {
 			return err
 		}
 	}
@@ -1638,7 +1607,20 @@ func fastBackend(changed map[string]string) bool {
 func reserveVerificationPort() (int, error) { return runtime.ReservePort() }
 
 func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain.SkillPackage) string {
-	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\nApproved architecture: %+v\nPlanner feedback: %s\nDo not reveal credentials or execute unapproved external actions.\n", stage, run.ID, run.Profile, run.Prompt, run.Architecture, run.Feedback)
+	base := fmt.Sprintf("You are Norbot's %s stage. Work only on the operator-approved scope.\nRun: %s\nProfile: %s\nRequest: %s\n", stage, run.ID, run.Profile, run.Prompt)
+	if stage == domain.StagePlanner {
+		switch {
+		case run.ParentRunID != "":
+			base += fmt.Sprintf("Approved baseline architecture: %+v\n", run.Architecture)
+		case strings.TrimSpace(run.Feedback) != "":
+			base += fmt.Sprintf("Previous planner draft: %+v\nPlanner feedback: %s\n", run.Architecture, run.Feedback)
+		default:
+			base += "This is the first planner pass. Derive the full architecture from the request and profile. The initial draft template is not approved scope and must not be copied as a placeholder.\n"
+		}
+	} else {
+		base += fmt.Sprintf("Approved architecture: %+v\n", run.Architecture)
+	}
+	base += "Do not reveal credentials or execute unapproved external actions.\n"
 	if len(skills) > 0 {
 		entries := make([]string, 0, len(skills))
 		for _, skill := range skills {
@@ -1650,7 +1632,7 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		return base + "The approved baseline is in /workspace/generated-app. Put browser application code only under generated-app/frontend/; never put browser assets directly under generated-app/. For non-frontend profiles, backend code may be under generated-app/backend/. Do not create Dockerfiles, .dockerignore files, Compose files, or generated-app/.norbot/: Norbot owns deployment descriptors. Modify only deployable source directories, then return a concise summary."
 	}
 	if stage == domain.StagePlanner {
-		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"...\",\"stack\":[],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]},\"acceptance\":{\"version\":1,\"flows\":[{\"id\":\"...\",\"name\":\"...\",\"steps\":[{\"kind\":\"goto\",\"url\":\"/\"},{\"kind\":\"expect_text\",\"text\":\"...\"}]}],\"api_contracts\":[],\"seed_data\":[],\"accessibility\":[{\"id\":\"home\"}],\"screenshots\":[{\"id\":\"home\",\"path\":\"/\"}]}},\"notes\":\"...\"}. Acceptance selectors must be stable, local, and executable. Workflow requires input and output nodes."
+		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"" + string(run.Profile) + "\",\"stack\":[\"...\"],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"},{\"id\":\"output-deployment\",\"label\":\"...\",\"kind\":\"output\"}],\"edges\":[]},\"acceptance\":{\"version\":1,\"flows\":[{\"id\":\"...\",\"name\":\"...\",\"steps\":[{\"kind\":\"goto\",\"url\":\"/\"},{\"kind\":\"fill\",\"selector\":\"[data-testid=\\\"...\\\"]\",\"value\":\"...\"},{\"kind\":\"expect_text\",\"selector\":\"[data-testid=\\\"...\\\"]\",\"text\":\"...\"}]}],\"api_contracts\":[],\"seed_data\":[],\"accessibility\":[{\"id\":\"home\",\"selector\":\"[data-testid=\\\"app-root\\\"]\"}],\"screenshots\":[{\"id\":\"home\",\"path\":\"/\"}]}},\"notes\":\"...\"}. app_type must exactly match Profile. Derive a non-empty stack, concrete selected core features, and executable acceptance flows from the request. Acceptance step kinds: goto, click, fill, set_value, expect_text, expect_value, expect_visible, expect_count, expect_attribute, expect_url, reload, focus, press_key, local_storage. Interaction targets use selector or role plus name; use stable local data-testid selectors when possible. expect_count requires count. expect_attribute requires attribute and value. Workflow requires input and output nodes."
 	}
 	if stage == domain.StageBuilder {
 		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/frontend/src/main.jsx\":\"complete source\"}}. Implement every locked acceptance flow, API contract, seeded-data expectation, accessibility requirement, and screenshot state. Browser application files must be under generated-app/frontend/; never create browser assets directly under generated-app/. For non-frontend profiles, backend files may be under generated-app/backend/. Never create Dockerfiles, .dockerignore files, Compose files, or generated-app/.norbot/ because Norbot owns deployment descriptors. Include at least one generated-app/frontend/ file, use safe relative paths, and preserve required profile files."
@@ -1658,45 +1640,27 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 	return base + "Return concise verification notes."
 }
 
-func graphFromResponse(text string) (domain.Graph, bool) {
+func architectureFromResponse(text string, run domain.Run) (domain.Architecture, error) {
 	payload, err := responseObject(text)
 	if err != nil {
-		return domain.Graph{}, false
+		return domain.Architecture{}, plannerResponseError{reason: "invalid_json", responseBytes: len(text), cause: err}
 	}
-	raw, ok := payload["graph"]
+	raw, ok := payload["architecture"]
 	if !ok {
-		return domain.Graph{}, false
+		return domain.Architecture{}, plannerResponseError{reason: "missing_architecture", responseBytes: len(text)}
 	}
 	encoded, err := json.Marshal(raw)
 	if err != nil {
-		return domain.Graph{}, false
+		return domain.Architecture{}, plannerResponseError{reason: "invalid_architecture", responseBytes: len(text), cause: err}
 	}
-	var graph domain.Graph
-	if err := json.Unmarshal(encoded, &graph); err != nil || graph.Validate() != nil {
-		return domain.Graph{}, false
+	var architecture domain.Architecture
+	if err := json.Unmarshal(encoded, &architecture); err != nil {
+		return domain.Architecture{}, plannerResponseError{reason: "invalid_architecture", responseBytes: len(text), cause: err}
 	}
-	return graph, true
-}
-
-func architectureFromResponse(text string, run domain.Run) (domain.Architecture, bool) {
-	payload, err := responseObject(text)
-	if err != nil {
-		return domain.Architecture{}, false
+	if err := domain.ValidateArchitectureForProfile(run.Profile, architecture); err != nil {
+		return domain.Architecture{}, plannerResponseError{reason: "invalid_contract", responseBytes: len(text), cause: err}
 	}
-	if raw, ok := payload["architecture"]; ok {
-		encoded, err := json.Marshal(raw)
-		if err == nil {
-			var architecture domain.Architecture
-			if json.Unmarshal(encoded, &architecture) == nil && architecture.Validate() == nil {
-				return architecture, true
-			}
-		}
-	}
-	if graph, ok := graphFromResponse(text); ok {
-		architecture := domain.DefaultArchitecture(run.Profile, graph)
-		return architecture, true
-	}
-	return domain.Architecture{}, false
+	return architecture, nil
 }
 
 func builderFiles(text string) (map[string]string, error) {
@@ -1789,6 +1753,42 @@ type builderResponseError struct {
 	reason, invalidPath      string
 	fileCount, responseBytes int
 	cause                    error
+}
+
+type plannerResponseError struct {
+	reason, field string
+	responseBytes int
+	cause         error
+}
+
+func (e plannerResponseError) Error() string {
+	switch e.reason {
+	case "invalid_json":
+		return fmt.Sprintf("planner must return one JSON object: %v", e.cause)
+	case "missing_architecture":
+		return "planner response requires an architecture object"
+	case "invalid_architecture":
+		return fmt.Sprintf("planner architecture could not be decoded: %v", e.cause)
+	case "invalid_contract":
+		return fmt.Sprintf("planner architecture contract is invalid: %v", e.cause)
+	default:
+		return "invalid planner response"
+	}
+}
+
+func plannerResponseDiagnostics(err error) map[string]any {
+	value, ok := err.(plannerResponseError)
+	if !ok {
+		return map[string]any{"reason": "unknown"}
+	}
+	diagnostics := map[string]any{"reason": value.reason, "response_bytes": value.responseBytes}
+	if value.field != "" {
+		diagnostics["field"] = value.field
+	}
+	if value.cause != nil {
+		diagnostics["detail"] = value.cause.Error()
+	}
+	return diagnostics
 }
 
 func (e builderResponseError) Error() string {

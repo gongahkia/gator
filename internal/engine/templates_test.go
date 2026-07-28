@@ -269,9 +269,39 @@ func TestWriteStageArtifactPersistsBuilderResponse(t *testing.T) {
 	}
 }
 
-func TestPlannerGraphResponse(t *testing.T) {
-	graph, ok := graphFromResponse(`{"graph":{"nodes":[{"id":"input","label":"Input","kind":"input"},{"id":"output","label":"Output","kind":"output"}],"edges":[{"id":"input-to-output","source":"input","target":"output"}]}}`)
-	if !ok || len(graph.Nodes) != 2 {
-		t.Fatalf("graph=%#v ok=%t", graph, ok)
+func TestFirstPlannerPromptDoesNotTreatTemplateAsApproved(t *testing.T) {
+	run := domain.Run{ID: "fresh", Profile: domain.ProfileFrontend, Prompt: "Build a task tracker", Architecture: domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph())}
+	prompt := stagePrompt(run, domain.StagePlanner, false, nil)
+	if !strings.Contains(prompt, "first planner pass") || strings.Contains(prompt, "Approved architecture:") {
+		t.Fatalf("prompt=%s", prompt)
+	}
+	revision := run
+	revision.Feedback = "Add local persistence"
+	prompt = stagePrompt(revision, domain.StagePlanner, false, nil)
+	if !strings.Contains(prompt, "Previous planner draft") || !strings.Contains(prompt, revision.Feedback) {
+		t.Fatalf("revision prompt=%s", prompt)
+	}
+}
+
+func TestPlannerResponseAcceptsSelectorContract(t *testing.T) {
+	run := domain.Run{Profile: domain.ProfileFrontend}
+	response := `{"architecture":{"app_name":"Task Tracker","app_type":"frontend-only","stack":["HTML5","Vanilla JavaScript"],"integrations":[],"core_features":[{"id":"tasks","name":"Task CRUD","description":"Add and complete tasks","role":"app_logic","selected":true}],"optional_features":[],"workflow":{"nodes":[{"id":"input","label":"Input","kind":"input"},{"id":"logic","label":"Logic","kind":"logic"},{"id":"output","label":"Output","kind":"output"}],"edges":[{"id":"input-to-logic","source":"input","target":"logic"},{"id":"logic-to-output","source":"logic","target":"output"}]},"acceptance":{"version":1,"flows":[{"id":"tasks","name":"Task CRUD","steps":[{"kind":"goto","url":"/"},{"kind":"set_value","selector":"[data-testid=\"new-task\"]","value":"Buy milk"},{"kind":"press_key","selector":"[data-testid=\"new-task\"]","key":"Enter"},{"kind":"expect_text","selector":"[data-testid=\"task-title\"]","text":"Buy milk"},{"kind":"expect_count","selector":"[data-testid=\"task\"]","count":1},{"kind":"reload"}]}],"api_contracts":[],"seed_data":[],"accessibility":[{"id":"home","selector":"[data-testid=\"app-root\"]"}],"screenshots":[{"id":"home","path":"/"}]}}}`
+	architecture, err := architectureFromResponse(response, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(architecture.Stack) != 2 || len(architecture.Acceptance.Flows) != 1 {
+		t.Fatalf("architecture=%#v", architecture)
+	}
+}
+
+func TestPlannerResponseReportsInvalidContract(t *testing.T) {
+	_, err := architectureFromResponse(`{"architecture":{"app_name":"Task Tracker"}}`, domain.Run{Profile: domain.ProfileFrontend})
+	if err == nil {
+		t.Fatal("invalid planner contract accepted")
+	}
+	diagnostics := plannerResponseDiagnostics(err)
+	if diagnostics["reason"] != "invalid_contract" {
+		t.Fatalf("diagnostics=%#v", diagnostics)
 	}
 }

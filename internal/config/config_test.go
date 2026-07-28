@@ -24,7 +24,6 @@ func TestLocalManifestRejectsRemoteAndPublicFeatures(t *testing.T) {
 		"oidc":       func(m *Manifest) { m.Security.OIDC.Issuer = "https://issuer.example" },
 		"artifacts":  func(m *Manifest) { m.Artifacts.Enabled = true },
 		"forensics":  func(m *Manifest) { m.Forensics.RawCapture = true },
-		"swarm":      func(m *Manifest) { m.Workflow.PlanningSwarm.Enabled = true },
 		"egress":     func(m *Manifest) { m.Runtime.Sandbox.EgressProxyURL = "http://proxy" },
 		"http_tool":  func(m *Manifest) { m.ToolPolicy["http_get"] = ToolPolicy{Enabled: true} },
 	} {

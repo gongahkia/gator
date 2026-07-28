@@ -122,16 +122,21 @@ type AcceptanceFlow struct {
 	Steps []AcceptanceStep `json:"steps"`
 }
 
-// supported step kinds are goto, click, fill, expect_text, expect_visible,
-// expect_url, and local_storage. Selectors are role/name based where possible.
+// supported step kinds are goto, click, fill, set_value, expect_text,
+// expect_value,
+// expect_visible, expect_count, expect_attribute, expect_url, reload, focus,
+// press_key, and local_storage. A target uses selector or role/name.
 type AcceptanceStep struct {
-	Kind  string `json:"kind"`
-	Role  string `json:"role,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Text  string `json:"text,omitempty"`
-	URL   string `json:"url,omitempty"`
-	Value string `json:"value,omitempty"`
-	Key   string `json:"key,omitempty"`
+	Kind      string `json:"kind"`
+	Role      string `json:"role,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Selector  string `json:"selector,omitempty"`
+	Text      string `json:"text,omitempty"`
+	URL       string `json:"url,omitempty"`
+	Value     string `json:"value,omitempty"`
+	Key       string `json:"key,omitempty"`
+	Attribute string `json:"attribute,omitempty"`
+	Count     *int   `json:"count,omitempty"`
 }
 
 type APIContract struct {
@@ -196,6 +201,34 @@ func (a Architecture) Validate() error {
 		return fmt.Errorf("architecture acceptance: %w", err)
 	}
 	return nil
+}
+
+// ValidateArchitectureForProfile rejects incomplete planner contracts while
+// retaining Architecture.Validate for pre-planner draft state.
+func ValidateArchitectureForProfile(profile Profile, architecture Architecture) error {
+	if err := architecture.Validate(); err != nil {
+		return err
+	}
+	if architecture.AppType != string(profile) {
+		return fmt.Errorf("architecture app_type %q does not match profile %q", architecture.AppType, profile)
+	}
+	if len(architecture.Stack) == 0 {
+		return fmt.Errorf("architecture requires a non-empty stack")
+	}
+	selected := 0
+	placeholderOnly := len(architecture.CoreFeatures) == 1 && architecture.CoreFeatures[0].ID == "core-request"
+	for _, feature := range architecture.CoreFeatures {
+		if feature.Selected {
+			selected++
+		}
+	}
+	if selected == 0 || placeholderOnly {
+		return fmt.Errorf("architecture requires concrete selected core features")
+	}
+	if architecture.Acceptance.Empty() || len(architecture.Acceptance.Flows) == 0 {
+		return fmt.Errorf("architecture requires executable acceptance flows")
+	}
+	return ValidateAcceptanceForProfile(profile, architecture.Acceptance)
 }
 
 func CompileAcceptance(architecture Architecture) AcceptanceContract {
@@ -296,28 +329,53 @@ func (c AcceptanceContract) Validate() error {
 }
 
 func (s AcceptanceStep) Validate() error {
-	if len(s.Role) > 512 || len(s.Name) > 4096 || len(s.Text) > 8192 || len(s.URL) > 4096 || len(s.Value) > 64<<10 || len(s.Key) > 512 {
+	if len(s.Role) > 512 || len(s.Name) > 4096 || len(s.Selector) > 4096 || len(s.Text) > 8192 || len(s.URL) > 4096 || len(s.Value) > 64<<10 || len(s.Key) > 512 || len(s.Attribute) > 512 {
 		return fmt.Errorf("acceptance step exceeds execution limits")
+	}
+	hasTarget := s.Selector != "" || s.Role != "" && s.Name != ""
+	if s.Selector == "" && (s.Role == "") != (s.Name == "") {
+		return fmt.Errorf("acceptance role and name must be supplied together")
 	}
 	switch s.Kind {
 	case "goto":
 		if !validLocalPath(s.URL) {
 			return fmt.Errorf("goto requires a local absolute URL")
 		}
-	case "click", "fill", "expect_visible":
-		if s.Role == "" || s.Name == "" {
-			return fmt.Errorf("%s requires role and name", s.Kind)
+	case "click", "fill", "set_value", "expect_visible", "focus":
+		if !hasTarget {
+			return fmt.Errorf("%s requires selector or role and name", s.Kind)
 		}
-		if s.Kind == "fill" && s.Value == "" {
-			return fmt.Errorf("fill requires value")
+		if (s.Kind == "fill" || s.Kind == "set_value") && s.Value == "" {
+			return fmt.Errorf("%s requires value", s.Kind)
 		}
 	case "expect_text":
 		if s.Text == "" {
 			return fmt.Errorf("expect_text requires text")
 		}
+	case "expect_value":
+		if !hasTarget {
+			return fmt.Errorf("expect_value requires selector or role and name")
+		}
+	case "expect_count":
+		if !hasTarget || s.Count == nil || *s.Count < 0 {
+			return fmt.Errorf("expect_count requires target and non-negative count")
+		}
+	case "expect_attribute":
+		attribute := s.Attribute
+		if attribute == "" && s.Selector != "" {
+			attribute = s.Name // support pre-schema planner responses
+		}
+		if !hasTarget || attribute == "" {
+			return fmt.Errorf("expect_attribute requires target and attribute")
+		}
 	case "expect_url":
 		if !validLocalPath(s.URL) {
 			return fmt.Errorf("expect_url requires a local absolute URL")
+		}
+	case "reload":
+	case "press_key":
+		if !hasTarget || s.Key == "" {
+			return fmt.Errorf("press_key requires target and key")
 		}
 	case "local_storage":
 		if s.Key == "" {
@@ -631,46 +689,6 @@ type PlannerRevision struct {
 	TraceID      string       `json:"trace_id,omitempty"`
 	SpanID       string       `json:"span_id,omitempty"`
 	Traceparent  string       `json:"traceparent,omitempty"`
-}
-
-type PlanningSwarmExecution struct {
-	ID             int64               `json:"id"`
-	RunID          string              `json:"run_id"`
-	Attempt        int                 `json:"attempt"`
-	State          string              `json:"state"`
-	ProviderID     string              `json:"provider_id"`
-	Model          string              `json:"model"`
-	PromptDigest   string              `json:"prompt_digest"`
-	ConfigDigest   string              `json:"config_digest"`
-	SelectedTaskID *int64              `json:"selected_task_id,omitempty"`
-	RankerError    string              `json:"ranker_error,omitempty"`
-	CreatedAt      time.Time           `json:"created_at"`
-	UpdatedAt      time.Time           `json:"updated_at"`
-	CompletedAt    *time.Time          `json:"completed_at,omitempty"`
-	Tasks          []PlanningSwarmTask `json:"tasks"`
-}
-
-type PlanningSwarmTask struct {
-	ID           int64        `json:"id"`
-	ExecutionID  int64        `json:"execution_id"`
-	Role         string       `json:"role"`
-	Ordinal      int          `json:"ordinal"`
-	State        string       `json:"state"`
-	ProviderID   string       `json:"provider_id"`
-	Model        string       `json:"model"`
-	InputDigest  string       `json:"input_digest"`
-	OutputDigest string       `json:"output_digest,omitempty"`
-	Architecture Architecture `json:"architecture,omitempty"`
-	Rationale    string       `json:"rationale,omitempty"`
-	Assumptions  []string     `json:"assumptions,omitempty"`
-	Risks        []string     `json:"risks,omitempty"`
-	Score        int          `json:"score,omitempty"`
-	RankReason   string       `json:"rank_reason,omitempty"`
-	Error        string       `json:"error,omitempty"`
-	StartedAt    *time.Time   `json:"started_at,omitempty"`
-	CompletedAt  *time.Time   `json:"completed_at,omitempty"`
-	CreatedAt    time.Time    `json:"created_at"`
-	UpdatedAt    time.Time    `json:"updated_at"`
 }
 
 type UsageRecord struct {

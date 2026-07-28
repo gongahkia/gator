@@ -61,3 +61,40 @@ func TestAcceptanceContractBoundsAndProfile(t *testing.T) {
 		t.Fatal("frontend API contract accepted")
 	}
 }
+
+func TestAcceptanceSupportsSelectorWorkflow(t *testing.T) {
+	count := 0
+	contract := AcceptanceContract{Version: 1, Flows: []AcceptanceFlow{{ID: "crud", Name: "CRUD", Steps: []AcceptanceStep{
+		{Kind: "goto", URL: "/"},
+		{Kind: "set_value", Selector: "[data-testid=\"new-task\"]", Value: "Buy milk"},
+		{Kind: "press_key", Selector: "[data-testid=\"new-task\"]", Key: "Enter"},
+		{Kind: "expect_value", Selector: "[data-testid=\"new-task\"]", Value: ""},
+		{Kind: "expect_text", Selector: "[data-testid=\"task-title\"]", Text: "Buy milk"},
+		{Kind: "expect_attribute", Selector: "[data-testid=\"task\"]", Attribute: "data-completed", Value: "true"},
+		{Kind: "expect_attribute", Selector: "[data-testid=\"task\"]", Name: "data-selected", Value: "true"},
+		{Kind: "expect_count", Selector: "[data-testid=\"task\"]", Count: &count},
+		{Kind: "reload"},
+	}}}}
+	if err := contract.Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPlannerArchitectureRequiresConcreteProfileContract(t *testing.T) {
+	architecture := DefaultArchitecture(ProfileFrontend, DefaultGraph())
+	architecture.Acceptance = CompileAcceptance(architecture)
+	if err := ValidateArchitectureForProfile(ProfileFrontend, architecture); err == nil {
+		t.Fatal("placeholder planner contract accepted")
+	}
+	architecture.AppName = "Task Tracker"
+	architecture.Stack = []string{"HTML", "JavaScript"}
+	architecture.CoreFeatures = []Feature{{ID: "tasks", Name: "Task CRUD", Description: "Create tasks", Role: "app_logic", Selected: true}}
+	architecture.Acceptance = AcceptanceContract{Version: 1, Flows: []AcceptanceFlow{{ID: "tasks", Name: "Task CRUD", Steps: []AcceptanceStep{{Kind: "goto", URL: "/"}, {Kind: "expect_text", Text: "Task Tracker"}}}}}
+	if err := ValidateArchitectureForProfile(ProfileFrontend, architecture); err != nil {
+		t.Fatal(err)
+	}
+	architecture.AppType = string(ProfileFullStack)
+	if err := ValidateArchitectureForProfile(ProfileFrontend, architecture); err == nil {
+		t.Fatal("profile mismatch accepted")
+	}
+}

@@ -9,4 +9,6 @@ test("review UI preserves bounded repair and acceptance controls", async () => {
   assert.match(source, /Acceptance contract — editable before approval/);
   assert.match(source, /recorded command/);
 	assert.match(source, /Full command log artifact/);
+	assert.match(source, /Norbot rejected this stage output/);
+	assert.doesNotMatch(source, /planning-swarm/);
 });

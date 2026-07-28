@@ -197,28 +197,7 @@ type Forensics struct {
 }
 
 type Workflow struct {
-	MaxFixes      int           `json:"max_fixes"`
-	PlanningSwarm PlanningSwarm `json:"planning_swarm"`
-}
-
-type PlanningSwarm struct {
-	Enabled     bool `json:"enabled"`
-	MaxParallel int  `json:"max_parallel"`
-	TimeoutS    int  `json:"timeout_seconds"`
-}
-
-func (p PlanningSwarm) Parallelism() int {
-	if p.MaxParallel == 0 {
-		return 3
-	}
-	return p.MaxParallel
-}
-
-func (p PlanningSwarm) Timeout() int {
-	if p.TimeoutS == 0 {
-		return 180
-	}
-	return p.TimeoutS
+	MaxFixes int `json:"max_fixes"`
 }
 
 type Kubernetes struct {
@@ -323,9 +302,6 @@ func Load() (Config, error) {
 func (m Manifest) Validate() error {
 	if m.Workflow.MaxFixes < 0 || m.Workflow.MaxFixes > 10 {
 		return fmt.Errorf("workflow max_fixes must be between 0 and 10")
-	}
-	if m.Workflow.PlanningSwarm.Enabled || m.Workflow.PlanningSwarm.MaxParallel != 0 || m.Workflow.PlanningSwarm.TimeoutS != 0 {
-		return fmt.Errorf("planning_swarm is not available in single-operator local mode")
 	}
 	if len(m.Providers) == 0 {
 		return fmt.Errorf("manifest needs at least one provider")
