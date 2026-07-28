@@ -10,8 +10,12 @@ type lifecycleRunner struct{ calls []string }
 
 func (r *lifecycleRunner) Run(_ context.Context, name string, args ...string) ([]byte, error) {
 	r.calls = append(r.calls, name+" "+strings.Join(args, " "))
-	if strings.Contains(strings.Join(args, " "), " ps ") {
-		return []byte(`[{"Name":"norbot-run-frontend-1","State":"running"}]`), nil
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, "--format {{json .}}") {
+		return []byte(`{"Names":"norbot-run-frontend-1","State":"running"}`), nil
+	}
+	if len(args) > 0 && args[0] == "ps" && strings.Contains(joined, " -q") {
+		return []byte("container-1\n"), nil
 	}
 	return nil, nil
 }
@@ -37,7 +41,7 @@ func TestDeploymentLifecycleAndJSONArrayStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	joined := strings.Join(runner.calls, "\n")
-	for _, expected := range []string{"start --wait", " stop", "down --remove-orphans --volumes"} {
+	for _, expected := range []string{"start container-1", "stop container-1", "rm -f container-1", "network rm norbot-run-network"} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("missing %q: %s", expected, joined)
 		}

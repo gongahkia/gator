@@ -1,4 +1,10 @@
 services:
+  verifier-browser:
+    image: norbot-verifier-browser:local
+    build:
+      context: ./verifier
+    command: ["true"]
+
   postgres:
     image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     environment:
@@ -45,7 +51,6 @@ services:
       NORBOT_S3_ACCESS_KEY: ${NORBOT_S3_ACCESS_KEY:-}
       NORBOT_S3_SECRET_KEY: ${NORBOT_S3_SECRET_KEY:-}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ${NORBOT_CONFIG_HOST:-./config.json}:/etc/norbot/config.json:ro
       - ${NORBOT_KUBECONFIG_HOST:-./deploy/empty-kubeconfig}:/etc/norbot/kubeconfig:ro
       - norbot_artifacts:/var/lib/norbot/artifacts

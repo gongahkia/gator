@@ -61,6 +61,8 @@ type RuntimeOptions struct {
 	DefaultTarget        domain.DeploymentTarget `json:"default_target"`
 	KubernetesConfigured bool                    `json:"kubernetes_configured"`
 	IngressConfigured    bool                    `json:"ingress_configured"`
+	DockerMode           string                  `json:"docker_mode"`
+	UnsafeDocker         bool                    `json:"unsafe_docker"`
 }
 
 type Service struct {
@@ -83,13 +85,14 @@ func NewWithExtensions(st *store.Store, cfg config.Config, logger *slog.Logger, 
 }
 
 func NewWithExtensionsAndArtifacts(st *store.Store, cfg config.Config, logger *slog.Logger, extensions *extension.Registry, artifacts artifact.Store) *Service {
-	workspace := runtime.Workspace{DockerBin: cfg.DockerBin, ArtifactsDir: cfg.ArtifactsDir, Runner: runtime.OSRunner{}}
+	docker := runtime.NewDockerClient(cfg.DockerBin, cfg.Manifest.Runtime.Docker, runtime.OSRunner{})
+	workspace := runtime.Workspace{Docker: docker, ArtifactsDir: cfg.ArtifactsDir}
 	if extensions == nil {
 		extensions = extension.NewRegistry()
 	}
 	return &Service{
 		store: st, config: cfg, dockerWorkspace: workspace,
-		dockerDeployment: runtime.Deployment{DockerBin: cfg.DockerBin, Runner: runtime.OSRunner{}},
+		dockerDeployment: runtime.Deployment{Docker: docker, BrowserImage: cfg.Manifest.Runtime.Verification.Normalized().BrowserImage},
 		extensions:       extensions, log: logger, metrics: telemetry.NewMetrics(), artifacts: artifacts,
 	}
 }
@@ -99,11 +102,15 @@ func (s *Service) Metrics() *telemetry.Metrics { return s.metrics }
 func (s *Service) RuntimeOptions() RuntimeOptions {
 	k := s.config.Manifest.Runtime.Kubernetes
 	configured := k.Kubeconfig != "" && k.Namespace != "" && k.ServiceAccount != "" && k.RegistryRepository != "" && k.RegistryPullSecret != ""
-	return RuntimeOptions{DefaultTarget: s.config.Manifest.DefaultTarget(), KubernetesConfigured: configured, IngressConfigured: configured && k.IngressClass != "" && k.IngressBaseDomain != ""}
+	docker := s.config.Manifest.Runtime.Docker.Normalized()
+	return RuntimeOptions{DefaultTarget: s.config.Manifest.DefaultTarget(), KubernetesConfigured: configured, IngressConfigured: configured && k.IngressClass != "" && k.IngressBaseDomain != "", DockerMode: docker.Mode, UnsafeDocker: docker.Mode == config.DockerModeUnsafeLocalSocket}
 }
 
 func (s *Service) backendFor(ctx context.Context, target domain.DeploymentTarget) (runtime.WorkspaceBackend, runtime.DeploymentBackend, error) {
 	if target == domain.DeploymentDocker {
+		if err := s.dockerWorkspace.Validate(ctx); err != nil {
+			return nil, nil, err
+		}
 		return s.dockerWorkspace, s.dockerDeployment, nil
 	}
 	if target != domain.DeploymentKubernetes {
@@ -204,6 +211,9 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 		architecture = *input.Architecture
 		graph = architecture.Workflow
 	}
+	if architecture.Acceptance.Empty() {
+		architecture.Acceptance = domain.CompileAcceptance(architecture)
+	}
 	appID := input.AppID
 	if appID == "" {
 		appID = id
@@ -256,6 +266,17 @@ func (s *Service) UpdateArchitecture(ctx context.Context, runID string, architec
 		return domain.Run{}, err
 	}
 	return s.store.UpdateArchitecture(ctx, runID, architecture)
+}
+
+func (s *Service) UpdateAcceptance(ctx context.Context, runID string, acceptance domain.AcceptanceContract) (domain.Run, error) {
+	if err := acceptance.Validate(); err != nil || acceptance.Empty() {
+		if err != nil { return domain.Run{}, err }
+		return domain.Run{}, fmt.Errorf("acceptance contract is required")
+	}
+	run, err := s.store.GetRun(ctx, runID)
+	if err != nil { return domain.Run{}, err }
+	run.Architecture.Acceptance = acceptance
+	return s.UpdateArchitecture(ctx, runID, run.Architecture)
 }
 
 func (s *Service) CreateChangeRun(ctx context.Context, runID, change string, architectureAffecting bool) (domain.Run, error) {
@@ -598,7 +619,7 @@ func (s *Service) DeleteDeployment(ctx context.Context, runID string) (domain.De
 }
 
 func (s *Service) Capacity(ctx context.Context) runtime.Capacity {
-	capacity := runtime.DetectCapacity(ctx, s.config.DockerBin, s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
+	capacity := runtime.DetectCapacity(ctx, s.dockerWorkspace.Client(), s.config.Workers, s.config.MaxWorkers, runtime.OSRunner{})
 	if s.config.Manifest.DefaultTarget() == domain.DeploymentKubernetes {
 		if kube, err := runtime.NewKubernetesRuntime(s.config.Manifest.Runtime.Kubernetes, s.config.ArtifactsDir); err != nil {
 			capacity.Target = domain.DeploymentKubernetes
@@ -1118,6 +1139,11 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 		}
 		artifact["verification"] = report
 		artifact["revision_id"] = revision.ID
+		if source, ok := report["deployment_source"].(runtime.DeploymentSourceReport); ok && len(source.Archived) > 0 {
+			if err := s.store.RecordEvent(ctx, run.ID, "deployment_descriptors_archived", "Model-authored deployment descriptors archived and replaced by Norbot", map[string]any{"archived": source.Archived, "protected": source.Protected}); err != nil {
+				return err
+			}
+		}
 		if err := s.store.RecordRevisionReport(ctx, run.ID, revision.ID, report, "tested"); err != nil {
 			return err
 		}
@@ -1187,15 +1213,31 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 			return report, fmt.Errorf("verification failed: %w", err)
 		}
 	}
+	root := workspace.RunPath(run.ID)
+	source, err := runtime.PrepareDeploymentSource(root, run)
+	if err != nil {
+		return map[string]any{"status": "fail", "checks": []string{"server-owned deployment source contract"}, "summary": "Generated source violates the deployment contract."}, fmt.Errorf("verification failed: %w", err)
+	}
+	if err := workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
+		return nil, fmt.Errorf("mirror protected deployment source: %w", err)
+	}
 	if verifier, ok := workspace.(interface {
 		VerifyChanged(context.Context, domain.Run, map[string]string) (map[string]any, error)
 	}); ok && run.DeploymentTarget == domain.DeploymentKubernetes {
-		return verifier.VerifyChanged(ctx, run, changed)
+		report, err := verifier.VerifyChanged(ctx, run, changed)
+		if report != nil {
+			report["deployment_source"] = source
+		}
+		return report, err
 	}
 	if verifier, ok := workspace.(interface {
 		Verify(context.Context, domain.Run) (map[string]any, error)
 	}); ok && run.DeploymentTarget == domain.DeploymentKubernetes {
-		return verifier.Verify(ctx, run)
+		report, err := verifier.Verify(ctx, run)
+		if report != nil {
+			report["deployment_source"] = source
+		}
+		return report, err
 	}
 	docker, ok := workspace.(runtime.Workspace)
 	if !ok {
@@ -1203,69 +1245,36 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
-	root := filepath.Join(docker.RunPath(run.ID), "generated-app")
-	required := []string{"docker-compose.yml", "frontend/package.json", "frontend/package-lock.json", "frontend/src/main.jsx"}
-	if run.Profile != domain.ProfileFrontend {
-		required = append(required, "backend/main.go", "backend/go.mod", "backend/go.sum")
-	}
-	if run.Profile == domain.ProfileAgentic {
-		required = append(required, "backend/AGENT_RUNTIME.md")
-	}
-	for _, relative := range required {
-		if _, err := os.Stat(filepath.Join(root, relative)); err != nil {
-			return nil, fmt.Errorf("generated app missing %s", relative)
-		}
-	}
-	runner := docker.Runner
-	if runner == nil {
-		runner = runtime.OSRunner{}
-	}
-	dockerBin := docker.DockerBin
-	if dockerBin == "" {
-		dockerBin = "docker"
-	}
-	project := runtime.ProjectName("verify-" + run.ID)
-	port, err := reserveVerificationPort()
-	if err != nil {
-		return nil, err
-	}
-	envFile := filepath.Join(root, ".norbot.verify.env")
-	if err := os.WriteFile(envFile, []byte("NORBOT_PUBLIC_PORT="+fmt.Sprint(port)+"\n"), 0o600); err != nil {
-		return nil, err
-	}
-	defer os.Remove(envFile)
-	compose := []string{"compose", "-p", project, "--project-directory", root, "--env-file", envFile}
-	checks := []string{"profile contract", "locked frontend dependencies", "compose config"}
+	root = filepath.Join(root, "generated-app")
+	client := docker.Client()
+	checks := []string{"profile contract", "locked frontend dependencies", "server-owned Docker deployment contract"}
 	cache := map[string]any{}
-	runCommand := func(name string, args ...string) error {
-		if _, err := runner.Run(ctx, name, args...); err != nil {
+	runCommand := func(args ...string) error {
+		if _, err := client.Run(ctx, args...); err != nil {
 			return err
 		}
 		return nil
-	}
-	if err := runCommand(dockerBin, append(compose, "config", "--quiet")...); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, err)
 	}
 	frontendKey, err := dependencyCacheKey(root, "node:22-alpine", "frontend/package.json", "frontend/package-lock.json")
 	if err != nil {
 		return nil, err
 	}
 	frontendCache := verificationCacheVolume("node", frontendKey)
-	frontendHit, err := ensureNodeCache(ctx, runner, dockerBin, docker.Volume(run.ID), frontendCache, frontendKey)
+	frontendHit, err := ensureNodeCache(ctx, client, docker.Volume(run.ID), frontendCache, frontendKey)
 	if err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend dependency cache: %w", err), cache)
+		return verificationFailure(ctx, client, run, checks, fmt.Errorf("frontend dependency cache: %w", err), cache)
 	}
 	cache["node"] = frontendHit
 	frontendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", frontendCache + ":/workspace/generated-app/frontend/node_modules:ro", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu"}
 	if fastFrontend(changed) {
-		if err := runCommand(dockerBin, append(frontendMount, "npm test")...); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast frontend test: %w", err), cache)
+		if err := runCommand(append(frontendMount, "npm test")...); err != nil {
+			return verificationFailure(ctx, client, run, checks, fmt.Errorf("fast frontend test: %w", err), cache)
 		}
 		checks = append(checks, "fast frontend test")
 	}
 	frontend := append(frontendMount, "npm test && npm run build && npm audit --omit=dev --audit-level=high")
-	if err := runCommand(dockerBin, frontend...); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend test/build/audit: %w", err), cache)
+	if err := runCommand(frontend...); err != nil {
+		return verificationFailure(ctx, client, run, checks, fmt.Errorf("frontend test/build/audit: %w", err), cache)
 	}
 	checks = append(checks, "npm cache/test/build/audit")
 	if run.Profile != domain.ProfileFrontend {
@@ -1274,60 +1283,43 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 			return nil, err
 		}
 		backendCache := verificationCacheVolume("go", backendKey)
-		backendHit, err := ensureGoCache(ctx, runner, dockerBin, docker.Volume(run.ID), backendCache, backendKey)
+		backendHit, err := ensureGoCache(ctx, client, docker.Volume(run.ID), backendCache, backendKey)
 		if err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go dependency cache: %w", err), cache)
+			return verificationFailure(ctx, client, run, checks, fmt.Errorf("Go dependency cache: %w", err), cache)
 		}
 		cache["go"] = backendHit
 		backendMount := []string{"run", "--rm", "-v", docker.Volume(run.ID) + ":/workspace", "-v", backendCache + ":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu"}
 		if fastBackend(changed) {
-			if err := runCommand(dockerBin, append(backendMount, "GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./...")...); err != nil {
-				return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("fast Go test: %w", err), cache)
+			if err := runCommand(append(backendMount, "GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./...")...); err != nil {
+				return verificationFailure(ctx, client, run, checks, fmt.Errorf("fast Go test: %w", err), cache)
 			}
 			checks = append(checks, "fast Go test")
 		}
 		backend := append(backendMount, "PATH=/cache/bin:$PATH; GOMODCACHE=/cache/mod; GOCACHE=/cache/build; export PATH GOMODCACHE GOCACHE; go test ./... && go build ./... && govulncheck ./...")
-		if err := runCommand(dockerBin, backend...); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go test/build/govulncheck: %w", err), cache)
+		if err := runCommand(backend...); err != nil {
+			return verificationFailure(ctx, client, run, checks, fmt.Errorf("Go test/build/govulncheck: %w", err), cache)
 		}
 		checks = append(checks, "Go cache/test/build/govulncheck")
-		return verifyDockerApp(ctx, runner, dockerBin, compose, checks, run, project, cache)
+		return verifyDockerApp(ctx, runtime.Deployment{Docker: client}, checks, run, docker.RunPath(run.ID), cache, source)
 	}
-	return verifyDockerApp(ctx, runner, dockerBin, compose, checks, run, project, cache)
+	return verifyDockerApp(ctx, runtime.Deployment{Docker: client}, checks, run, docker.RunPath(run.ID), cache, source)
 
 }
 
-func verifyDockerApp(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, run domain.Run, project string, cache map[string]any) (map[string]any, error) {
-	runCommand := func(name string, args ...string) error {
-		_, err := runner.Run(ctx, name, args...)
-		return err
+func verifyDockerApp(ctx context.Context, deployment runtime.Deployment, checks []string, run domain.Run, root string, cache map[string]any, source runtime.DeploymentSourceReport) (map[string]any, error) {
+	acceptance, err := deployment.VerifyAcceptance(ctx, run, root, run.Architecture.Acceptance)
+	if err != nil {
+		report, verificationErr := verificationFailure(ctx, deployment.Client(), run, checks, fmt.Errorf("Docker build/health/smoke/semantic: %w", err), cache)
+		if acceptance != nil { report["acceptance"] = acceptance }
+		return report, verificationErr
 	}
-	deployed := false
-	defer func() {
-		if deployed {
-			_, _ = runner.Run(context.Background(), dockerBin, append(compose, "down", "--remove-orphans", "--volumes")...)
-		}
-	}()
-	if err := runCommand(dockerBin, append(compose, "up", "--build", "-d", "--wait", "--wait-timeout", "90")...); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("compose smoke startup: %w", err), cache)
-	}
-	deployed = true
-	network := project + "_default"
-	if err := runCommand(dockerBin, "run", "--rm", "--network", network, "curlimages/curl:8.12.1", "-fsS", "http://frontend/"); err != nil {
-		return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("frontend smoke: %w", err), cache)
-	}
-	if run.Profile != domain.ProfileFrontend {
-		if err := runCommand(dockerBin, "run", "--rm", "--network", network, "curlimages/curl:8.12.1", "-fsS", "http://backend:8000/api/health"); err != nil {
-			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("backend smoke: %w", err), cache)
-		}
-	}
-	checks = append(checks, "compose build/health/smoke")
-	return map[string]any{"status": "pass", "checks": checks, "cache": cache, "summary": "Locked dependency, build, test, vulnerability scan, Compose health, and network smoke checks passed. Operator approval is required before deployment."}, nil
+	checks = append(checks, "server-owned Docker build/health/smoke", "browser acceptance contract")
+	return map[string]any{"status": "pass", "checks": checks, "cache": cache, "deployment_source": source, "acceptance": acceptance, "acceptance_digest": run.Architecture.Acceptance.Digest(), "summary": "Locked dependency, build, test, vulnerability scan, server-owned Docker health, network smoke, and browser acceptance checks passed. Operator approval is required before deployment."}, nil
 }
 
-func verificationFailure(ctx context.Context, runner runtime.CommandRunner, dockerBin string, compose, checks []string, cause error, caches ...map[string]any) (map[string]any, error) {
-	logs, _ := runner.Run(ctx, dockerBin, append(compose, "logs", "--no-color", "--tail", "200")...)
-	report := map[string]any{"status": "fail", "checks": checks, "logs": string(logs)}
+func verificationFailure(ctx context.Context, client runtime.DockerClient, run domain.Run, checks []string, cause error, caches ...map[string]any) (map[string]any, error) {
+	status, _ := client.Run(ctx, "ps", "-a", "--filter", "label=norbot.managed=true", "--filter", "label=norbot.app_id=verify-"+run.ID, "--format", "{{json .}}")
+	report := map[string]any{"status": "fail", "checks": checks, "runtime_status": string(status)}
 	if len(caches) > 0 && len(caches[0]) > 0 {
 		report["cache"] = caches[0]
 	}
@@ -1357,21 +1349,21 @@ func verificationCacheVolume(ecosystem, key string) string {
 	return "norbot_verify_" + ecosystem + "_" + key
 }
 
-func ensureNodeCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) (bool, error) {
-	if _, err := runner.Run(ctx, dockerBin, "volume", "create", "--label", "norbot.cache=verification", cacheVolume); err != nil {
+func ensureNodeCache(ctx context.Context, docker runtime.DockerClient, workspaceVolume, cacheVolume, key string) (bool, error) {
+	if _, err := docker.Run(ctx, "volume", "create", "--label", "norbot.cache=verification", cacheVolume); err != nil {
 		return false, err
 	}
 	script := cacheLockScript("/cache") + "if [ -f /cache/.norbot-key ] && [ \"$(cat /cache/.norbot-key)\" = '" + key + "' ]; then echo norbot_cache_hit=1; else find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; npm ci; cp -a node_modules/. /cache/; printf '%s' '" + key + "' >/cache/.norbot-key; rm -rf node_modules; echo norbot_cache_hit=0; fi; touch /cache/.norbot-last-used"
-	output, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", script)
+	output, err := docker.Run(ctx, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/frontend", "node:22-alpine", "sh", "-ceu", script)
 	return strings.Contains(string(output), "norbot_cache_hit=1"), err
 }
 
-func ensureGoCache(ctx context.Context, runner runtime.CommandRunner, dockerBin, workspaceVolume, cacheVolume, key string) (bool, error) {
-	if _, err := runner.Run(ctx, dockerBin, "volume", "create", "--label", "norbot.cache=verification", cacheVolume); err != nil {
+func ensureGoCache(ctx context.Context, docker runtime.DockerClient, workspaceVolume, cacheVolume, key string) (bool, error) {
+	if _, err := docker.Run(ctx, "volume", "create", "--label", "norbot.cache=verification", cacheVolume); err != nil {
 		return false, err
 	}
 	script := cacheLockScript("/cache") + "if [ -f /cache/.norbot-key ] && [ \"$(cat /cache/.norbot-key)\" = '" + key + "' ]; then echo norbot_cache_hit=1; else find /cache -mindepth 1 -maxdepth 1 ! -name .norbot-lock -exec rm -rf {} +; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go mod download; GOMODCACHE=/cache/mod GOCACHE=/cache/build GOBIN=/cache/bin go install golang.org/x/vuln/cmd/govulncheck@v1.6.0; printf '%s' '" + key + "' >/cache/.norbot-key; echo norbot_cache_hit=0; fi; touch /cache/.norbot-last-used"
-	output, err := runner.Run(ctx, dockerBin, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", script)
+	output, err := docker.Run(ctx, "run", "--rm", "-v", workspaceVolume+":/workspace", "-v", cacheVolume+":/cache", "-w", "/workspace/generated-app/backend", "golang:1.26-alpine", "sh", "-ceu", script)
 	return strings.Contains(string(output), "norbot_cache_hit=1"), err
 }
 
@@ -1384,7 +1376,7 @@ func fastFrontend(changed map[string]string) bool {
 		return true
 	}
 	for path := range changed {
-		if strings.HasPrefix(path, "generated-app/frontend/") || path == "generated-app/docker-compose.yml" {
+		if strings.HasPrefix(path, "generated-app/frontend/") {
 			return true
 		}
 	}
@@ -1396,7 +1388,7 @@ func fastBackend(changed map[string]string) bool {
 		return true
 	}
 	for path := range changed {
-		if strings.HasPrefix(path, "generated-app/backend/") || path == "generated-app/docker-compose.yml" {
+		if strings.HasPrefix(path, "generated-app/backend/") {
 			return true
 		}
 	}
@@ -1415,13 +1407,13 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		base += "Approved skills: " + strings.Join(entries, ", ") + ". Their materialized instructions and manifest are under /workspace/selected-skills.\n"
 	}
 	if isCLI && stage == domain.StageBuilder {
-		return base + "The approved baseline is in /workspace/generated-app. Put browser application code only under generated-app/frontend/; never put browser assets directly under generated-app/. For non-frontend profiles, backend code may be under generated-app/backend/. Modify only deployable source directories, then return a concise summary."
+		return base + "The approved baseline is in /workspace/generated-app. Put browser application code only under generated-app/frontend/; never put browser assets directly under generated-app/. For non-frontend profiles, backend code may be under generated-app/backend/. Do not create Dockerfiles, .dockerignore files, Compose files, or generated-app/.norbot/: Norbot owns deployment descriptors. Modify only deployable source directories, then return a concise summary."
 	}
 	if stage == domain.StagePlanner {
-		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"...\",\"stack\":[],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]}},\"notes\":\"...\"}. Workflow requires input and output nodes."
+		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"...\",\"stack\":[],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]},\"acceptance\":{\"version\":1,\"flows\":[{\"id\":\"...\",\"name\":\"...\",\"steps\":[{\"kind\":\"goto\",\"url\":\"/\"},{\"kind\":\"expect_text\",\"text\":\"...\"}]}],\"api_contracts\":[],\"seed_data\":[],\"accessibility\":[{\"id\":\"home\"}],\"screenshots\":[{\"id\":\"home\",\"path\":\"/\"}]}},\"notes\":\"...\"}. Acceptance selectors must be stable, local, and executable. Workflow requires input and output nodes."
 	}
 	if stage == domain.StageBuilder {
-		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/frontend/src/main.jsx\":\"complete source\"}}. Browser application files must be under generated-app/frontend/; never create browser assets directly under generated-app/. For non-frontend profiles, backend files may be under generated-app/backend/. Include at least one generated-app/frontend/ file, use safe relative paths, and preserve required profile files."
+		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/frontend/src/main.jsx\":\"complete source\"}}. Implement every locked acceptance flow, API contract, seeded-data expectation, accessibility requirement, and screenshot state. Browser application files must be under generated-app/frontend/; never create browser assets directly under generated-app/. For non-frontend profiles, backend files may be under generated-app/backend/. Never create Dockerfiles, .dockerignore files, Compose files, or generated-app/.norbot/ because Norbot owns deployment descriptors. Include at least one generated-app/frontend/ file, use safe relative paths, and preserve required profile files."
 	}
 	return base + "Return concise verification notes."
 }
@@ -1493,11 +1485,13 @@ func builderFiles(text string) (map[string]string, error) {
 func validateBuilderFiles(run domain.Run, files map[string]string) error {
 	frontend := false
 	for _, path := range mapKeys(files) {
+		if isReservedDeploymentPath(path) {
+			return builderResponseError{reason: "server_owned_deployment_descriptor", invalidPath: path, fileCount: len(files)}
+		}
 		switch {
 		case strings.HasPrefix(path, "generated-app/frontend/"):
 			frontend = true
 		case run.Profile != domain.ProfileFrontend && strings.HasPrefix(path, "generated-app/backend/"):
-		case path == "generated-app/docker-compose.yml":
 		default:
 			return builderResponseError{reason: "path_outside_deployable_source", invalidPath: path, fileCount: len(files)}
 		}
@@ -1506,6 +1500,18 @@ func validateBuilderFiles(run domain.Run, files map[string]string) error {
 		return builderResponseError{reason: "missing_frontend_files", fileCount: len(files)}
 	}
 	return nil
+}
+
+func isReservedDeploymentPath(path string) bool {
+	if strings.HasPrefix(path, "generated-app/.norbot/") {
+		return true
+	}
+	base := filepath.Base(path)
+	lower := strings.ToLower(base)
+	if base == "Dockerfile" || base == ".dockerignore" {
+		return true
+	}
+	return strings.HasPrefix(lower, "docker-compose") && (strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml"))
 }
 
 type builderResponseError struct {
@@ -1526,6 +1532,8 @@ func (e builderResponseError) Error() string {
 		return fmt.Sprintf("builder path %q is outside generated-app", e.invalidPath)
 	case "path_outside_deployable_source":
 		return fmt.Sprintf("builder path %q is outside deployable source directories", e.invalidPath)
+	case "server_owned_deployment_descriptor":
+		return fmt.Sprintf("builder path %q is a server-owned deployment descriptor", e.invalidPath)
 	case "missing_frontend_files":
 		return "builder response must include a generated-app/frontend/ file"
 	default:
@@ -1539,7 +1547,7 @@ func builderResponseDiagnostics(err error) map[string]any {
 		return map[string]any{"reason": "unknown"}
 	}
 	required := "generated-app/"
-	if value.reason == "path_outside_deployable_source" || value.reason == "missing_frontend_files" {
+	if value.reason == "path_outside_deployable_source" || value.reason == "missing_frontend_files" || value.reason == "server_owned_deployment_descriptor" {
 		required = "generated-app/frontend/"
 	}
 	return map[string]any{"reason": value.reason, "invalid_path": value.invalidPath, "file_count": value.fileCount, "response_bytes": value.responseBytes, "required_path_prefix": required}

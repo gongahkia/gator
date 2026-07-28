@@ -310,7 +310,13 @@ func (k *KubernetesRuntime) Cleanup(ctx context.Context, runID string) error {
 }
 
 func (k *KubernetesRuntime) Deploy(ctx context.Context, run domain.Run, root string) (string, error) {
+	if _, err := PrepareDeploymentSource(root, run); err != nil {
+		return "", err
+	}
 	if err := k.Ensure(ctx, run.ID); err != nil {
+		return "", err
+	}
+	if err := k.MirrorGeneratedApp(ctx, run.ID); err != nil {
 		return "", err
 	}
 	images, err := k.buildImages(ctx, run, "")
@@ -579,7 +585,7 @@ func needsFastFrontend(changed map[string]string) bool {
 		return true
 	}
 	for path := range changed {
-		if strings.HasPrefix(path, "generated-app/frontend/") || path == "generated-app/docker-compose.yml" {
+		if strings.HasPrefix(path, "generated-app/frontend/") {
 			return true
 		}
 	}
@@ -591,7 +597,7 @@ func needsFastBackend(changed map[string]string) bool {
 		return true
 	}
 	for path := range changed {
-		if strings.HasPrefix(path, "generated-app/backend/") || path == "generated-app/docker-compose.yml" {
+		if strings.HasPrefix(path, "generated-app/backend/") {
 			return true
 		}
 	}
@@ -645,7 +651,7 @@ func (k *KubernetesRuntime) buildImage(ctx context.Context, run domain.Run, comp
 	if suffix != "" {
 		destination += "-" + suffix
 	}
-	command := []string{"/kaniko/executor", "--context=dir:///workspace/generated-app/" + component, "--dockerfile=/workspace/generated-app/" + component + "/Dockerfile", "--destination=" + destination, "--digest-file=/dev/termination-log", "--snapshotMode=redo"}
+	command := []string{"/kaniko/executor", "--context=dir:///workspace/generated-app", "--dockerfile=/workspace/generated-app/" + deploymentDirectory + "/" + component + ".Dockerfile", "--destination=" + destination, "--digest-file=/dev/termination-log", "--snapshotMode=redo"}
 	if k.config.RegistryInsecure {
 		command = append(command, "--insecure", "--skip-tls-verify")
 	}

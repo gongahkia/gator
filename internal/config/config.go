@@ -73,8 +73,90 @@ type ProcessPlugin struct {
 
 type Runtime struct {
 	DefaultTarget domain.DeploymentTarget `json:"default_target"`
+	Docker        Docker                  `json:"docker"`
 	Kubernetes    Kubernetes              `json:"kubernetes"`
 	Sandbox       Sandbox                 `json:"sandbox"`
+	Verification  Verification             `json:"verification"`
+}
+
+type Verification struct {
+	BrowserImage string `json:"browser_image"`
+}
+
+func (v Verification) Normalized() Verification {
+	if v.BrowserImage == "" { v.BrowserImage = "norbot-verifier-browser:local" }
+	return v
+}
+
+const (
+	DockerModeRootlessRemoteTLS = "rootless_remote_tls"
+	DockerModeUnsafeLocalSocket = "unsafe_local_socket"
+)
+
+type Docker struct {
+	Mode         string `json:"mode"`
+	HostEnv      string `json:"host_env"`
+	TLSVerifyEnv string `json:"tls_verify_env"`
+	CertPathEnv  string `json:"cert_path_env"`
+}
+
+func (d Docker) Normalized() Docker {
+	if d.Mode == "" {
+		d.Mode = DockerModeRootlessRemoteTLS
+	}
+	if d.HostEnv == "" {
+		d.HostEnv = "DOCKER_HOST"
+	}
+	if d.TLSVerifyEnv == "" {
+		d.TLSVerifyEnv = "DOCKER_TLS_VERIFY"
+	}
+	if d.CertPathEnv == "" {
+		d.CertPathEnv = "DOCKER_CERT_PATH"
+	}
+	return d
+}
+
+func (d Docker) Validate(public bool) error {
+	d = d.Normalized()
+	switch d.Mode {
+	case DockerModeRootlessRemoteTLS:
+		for _, name := range []string{d.HostEnv, d.TLSVerifyEnv, d.CertPathEnv} {
+			if !validEnvName(name) {
+				return fmt.Errorf("runtime docker environment reference is invalid")
+			}
+		}
+		if d.HostEnv == d.TLSVerifyEnv || d.HostEnv == d.CertPathEnv || d.TLSVerifyEnv == d.CertPathEnv {
+			return fmt.Errorf("runtime docker environment references must be distinct")
+		}
+	case DockerModeUnsafeLocalSocket:
+		if public {
+			return fmt.Errorf("unsafe_local_socket docker mode cannot be used with public security")
+		}
+	default:
+		return fmt.Errorf("runtime docker mode must be %q or %q", DockerModeRootlessRemoteTLS, DockerModeUnsafeLocalSocket)
+	}
+	return nil
+}
+
+func (d Docker) ValidateEnvironment(lookup func(string) string) error {
+	d = d.Normalized()
+	if d.Mode == DockerModeUnsafeLocalSocket {
+		if lookup("NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET") != "true" {
+			return fmt.Errorf("unsafe_local_socket requires NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET=true")
+		}
+		return nil
+	}
+	host := strings.TrimSpace(lookup(d.HostEnv))
+	if !strings.HasPrefix(host, "tcp://") {
+		return fmt.Errorf("rootless_remote_tls requires %s to be a tcp:// endpoint", d.HostEnv)
+	}
+	if strings.TrimSpace(lookup(d.TLSVerifyEnv)) != "1" {
+		return fmt.Errorf("rootless_remote_tls requires %s=1", d.TLSVerifyEnv)
+	}
+	if !filepath.IsAbs(strings.TrimSpace(lookup(d.CertPathEnv))) {
+		return fmt.Errorf("rootless_remote_tls requires %s to be an absolute certificate path", d.CertPathEnv)
+	}
+	return nil
 }
 
 type Sandbox struct {
@@ -248,6 +330,11 @@ func Load() (Config, error) {
 	if target := strings.TrimSpace(os.Getenv("NORBOT_DEPLOYMENT_TARGET")); target != "" {
 		cfg.Manifest.Runtime.DefaultTarget = domain.DeploymentTarget(target)
 		if err := cfg.Manifest.ValidateRuntime(); err != nil {
+			return Config{}, err
+		}
+	}
+	if cfg.Manifest.DefaultTarget() == domain.DeploymentDocker {
+		if err := cfg.Manifest.Runtime.Docker.ValidateEnvironment(os.Getenv); err != nil {
 			return Config{}, err
 		}
 	}
@@ -445,6 +532,9 @@ func (m Manifest) ValidateRuntime() error {
 	if !target.Valid() {
 		return fmt.Errorf("unsupported runtime default_target %q", target)
 	}
+	if err := m.Runtime.Docker.Validate(m.Security.Public); err != nil {
+		return err
+	}
 	if target != domain.DeploymentKubernetes {
 		return nil
 	}
@@ -541,7 +631,7 @@ func InitialManifest(target domain.DeploymentTarget, kube Kubernetes) Manifest {
 	if target == "" {
 		target = domain.DeploymentDocker
 	}
-	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}, Retention: Retention{AgentTurnsDays: 90, ChannelMessagesDays: 90, RunEventsDays: 365, ProviderUsageDays: 365, TraceEventsDays: 365, ForensicPayloadDays: 30}}
+	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Docker: Docker{}.Normalized(), Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}, Retention: Retention{AgentTurnsDays: 90, ChannelMessagesDays: 90, RunEventsDays: 365, ProviderUsageDays: 365, TraceEventsDays: 365, ForensicPayloadDays: 30}}
 }
 
 func WriteManifest(path string, manifest Manifest, force bool) error {

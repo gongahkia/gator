@@ -18,6 +18,9 @@ func (s *Store) AppendPlannerRevision(ctx context.Context, runID string, attempt
 	if attempt < 0 || source == "" {
 		return domain.PlannerRevision{}, fmt.Errorf("invalid planner revision")
 	}
+	if architecture.Acceptance.Empty() {
+		architecture.Acceptance = domain.CompileAcceptance(architecture)
+	}
 	if err := architecture.Validate(); err != nil {
 		return domain.PlannerRevision{}, err
 	}

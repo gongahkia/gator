@@ -1,7 +1,11 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -98,6 +102,65 @@ type Architecture struct {
 	CoreFeatures     []Feature `json:"core_features"`
 	OptionalFeatures []Feature `json:"optional_features"`
 	Workflow         Graph     `json:"workflow"`
+	Acceptance       AcceptanceContract `json:"acceptance"`
+}
+
+// AcceptanceContract is the operator-editable semantic contract compiled from
+// the approved architecture. It is immutable once planner approval completes.
+type AcceptanceContract struct {
+	Version       int                    `json:"version"`
+	Flows         []AcceptanceFlow       `json:"flows"`
+	APIContracts  []APIContract          `json:"api_contracts"`
+	SeedData      []SeedData             `json:"seed_data"`
+	Accessibility []AccessibilityCheck   `json:"accessibility"`
+	Screenshots   []ScreenshotExpectation `json:"screenshots"`
+}
+
+type AcceptanceFlow struct {
+	ID    string           `json:"id"`
+	Name  string           `json:"name"`
+	Steps []AcceptanceStep `json:"steps"`
+}
+
+// Supported step kinds are goto, click, fill, expect_text, expect_visible,
+// expect_url, and local_storage. Selectors are role/name based where possible.
+type AcceptanceStep struct {
+	Kind  string `json:"kind"`
+	Role  string `json:"role,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Text  string `json:"text,omitempty"`
+	URL   string `json:"url,omitempty"`
+	Value string `json:"value,omitempty"`
+	Key   string `json:"key,omitempty"`
+}
+
+type APIContract struct {
+	ID          string `json:"id"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	Status      int    `json:"status"`
+	BodyIncludes string `json:"body_includes,omitempty"`
+}
+
+type SeedData struct {
+	Kind   string `json:"kind"`
+	Key    string `json:"key,omitempty"`
+	Value  string `json:"value,omitempty"`
+	Method string `json:"method,omitempty"`
+	Path   string `json:"path,omitempty"`
+	Body   string `json:"body,omitempty"`
+}
+
+type AccessibilityCheck struct {
+	ID       string `json:"id"`
+	FlowID   string `json:"flow_id,omitempty"`
+	Selector string `json:"selector,omitempty"`
+}
+
+type ScreenshotExpectation struct {
+	ID     string `json:"id"`
+	FlowID string `json:"flow_id,omitempty"`
+	Path   string `json:"path,omitempty"`
 }
 
 type Feature struct {
@@ -129,7 +192,112 @@ func (a Architecture) Validate() error {
 			return fmt.Errorf("architecture features require id, name, and role")
 		}
 	}
+	if err := a.Acceptance.Validate(); err != nil {
+		return fmt.Errorf("architecture acceptance: %w", err)
+	}
 	return nil
+}
+
+func CompileAcceptance(architecture Architecture) AcceptanceContract {
+	flows := make([]AcceptanceFlow, 0, len(architecture.CoreFeatures))
+	for _, feature := range architecture.CoreFeatures {
+		if !feature.Selected {
+			continue
+		}
+		flows = append(flows, AcceptanceFlow{ID: feature.ID, Name: feature.Name, Steps: []AcceptanceStep{{Kind: "goto", URL: "/"}, {Kind: "expect_text", Text: feature.Name}}})
+	}
+	return AcceptanceContract{Version: 1, Flows: flows, APIContracts: []APIContract{}, SeedData: []SeedData{}, Accessibility: []AccessibilityCheck{{ID: "home"}}, Screenshots: []ScreenshotExpectation{{ID: "home", Path: "/"}}}
+}
+
+func (c AcceptanceContract) Empty() bool {
+	return c.Version == 0 && len(c.Flows) == 0 && len(c.APIContracts) == 0 && len(c.SeedData) == 0 && len(c.Accessibility) == 0 && len(c.Screenshots) == 0
+}
+
+func (c AcceptanceContract) Validate() error {
+	if c.Empty() {
+		return nil
+	}
+	if c.Version != 1 {
+		return fmt.Errorf("acceptance version must be 1")
+	}
+	seen := map[string]struct{}{}
+	for _, flow := range c.Flows {
+		if flow.ID == "" || flow.Name == "" || len(flow.Steps) == 0 {
+			return fmt.Errorf("acceptance flows require id, name, and steps")
+		}
+		if _, ok := seen[flow.ID]; ok {
+			return fmt.Errorf("duplicate acceptance flow %q", flow.ID)
+		}
+		seen[flow.ID] = struct{}{}
+		for _, step := range flow.Steps {
+			if err := step.Validate(); err != nil {
+				return fmt.Errorf("flow %q: %w", flow.ID, err)
+			}
+		}
+	}
+	for _, api := range c.APIContracts {
+		if api.ID == "" || api.Method == "" || !strings.HasPrefix(api.Path, "/") || api.Status < 100 || api.Status > 599 {
+			return fmt.Errorf("invalid API contract")
+		}
+	}
+	for _, seed := range c.SeedData {
+		if seed.Kind == "local_storage" && (seed.Key == "" || seed.Value == "") {
+			return fmt.Errorf("local_storage seed requires key and value")
+		}
+		if seed.Kind == "http" && (seed.Method == "" || !strings.HasPrefix(seed.Path, "/")) {
+			return fmt.Errorf("http seed requires method and absolute path")
+		}
+		if seed.Kind != "local_storage" && seed.Kind != "http" {
+			return fmt.Errorf("unsupported seed kind %q", seed.Kind)
+		}
+	}
+	for _, item := range append(append([]AccessibilityCheck{}, c.Accessibility...), screenshotChecks(c.Screenshots)...) {
+		if item.ID == "" {
+			return fmt.Errorf("acceptance artifact ids are required")
+		}
+		if item.FlowID != "" {
+			if _, ok := seen[item.FlowID]; !ok {
+				return fmt.Errorf("acceptance flow %q does not exist", item.FlowID)
+			}
+		}
+	}
+	return nil
+}
+
+func screenshotChecks(items []ScreenshotExpectation) []AccessibilityCheck {
+	result := make([]AccessibilityCheck, 0, len(items))
+	for _, item := range items {
+		if item.ID == "" || (item.Path != "" && !strings.HasPrefix(item.Path, "/")) {
+			return []AccessibilityCheck{{}}
+		}
+		result = append(result, AccessibilityCheck{ID: item.ID, FlowID: item.FlowID})
+	}
+	return result
+}
+
+func (s AcceptanceStep) Validate() error {
+	switch s.Kind {
+	case "goto":
+		if !strings.HasPrefix(s.URL, "/") { return fmt.Errorf("goto requires a local absolute URL") }
+	case "click", "fill", "expect_visible":
+		if s.Role == "" || s.Name == "" { return fmt.Errorf("%s requires role and name", s.Kind) }
+		if s.Kind == "fill" && s.Value == "" { return fmt.Errorf("fill requires value") }
+	case "expect_text":
+		if s.Text == "" { return fmt.Errorf("expect_text requires text") }
+	case "expect_url":
+		if !strings.HasPrefix(s.URL, "/") { return fmt.Errorf("expect_url requires a local absolute URL") }
+	case "local_storage":
+		if s.Key == "" { return fmt.Errorf("local_storage requires key") }
+	default:
+		return fmt.Errorf("unsupported step kind %q", s.Kind)
+	}
+	return nil
+}
+
+func (c AcceptanceContract) Digest() string {
+	encoded, _ := json.Marshal(c)
+	digest := sha256.Sum256(encoded)
+	return "sha256:" + hex.EncodeToString(digest[:])
 }
 
 func (g Graph) Validate() error {

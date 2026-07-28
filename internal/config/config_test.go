@@ -1,9 +1,11 @@
 package config
 
 import (
-	"github.com/gongahkia/norbot/internal/domain"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/gongahkia/norbot/internal/domain"
 )
 
 func TestManifestRejectsDuplicateProvider(t *testing.T) {
@@ -53,6 +55,24 @@ func TestManifestAllowsUnauthenticatedCompatibleEndpoint(t *testing.T) {
 	manifest := Manifest{Providers: []Provider{{ID: "local", Kind: "openai_compatible", Model: "local-model", BaseURL: "http://host.docker.internal:1234/v1", Stages: []domain.Stage{domain.StagePlanner}}}, Profiles: []domain.Profile{domain.ProfileFullStack}}
 	if err := manifest.Validate(); err != nil {
 		t.Fatalf("unauthenticated compatible endpoint rejected: %v", err)
+	}
+}
+
+func TestDockerRuntimeRejectsUnsafeSocketForPublicControlPlane(t *testing.T) {
+	manifest := InitialManifest(domain.DeploymentDocker, Kubernetes{})
+	manifest.Security.Public = true
+	manifest.Security.HTTP = HTTPPolicy{RequireHTTPS: true, MetricsTokenEnv: "NORBOT_METRICS_TOKEN", RatePerMinute: 1, RateBurst: 1}
+	manifest.Security.OIDC = OIDC{Issuer: "https://issuer.example", Audience: "norbot", GroupsClaim: "groups", OperatorGroups: []string{"operators"}, ClientID: "console"}
+	manifest.Runtime.Docker.Mode = DockerModeUnsafeLocalSocket
+	if err := manifest.Validate(); err == nil || !strings.Contains(err.Error(), "unsafe_local_socket") {
+		t.Fatalf("unsafe public Docker mode accepted: %v", err)
+	}
+}
+
+func TestDockerRuntimeRequiresRemoteTLSSettings(t *testing.T) {
+	docker := Docker{}
+	if err := docker.ValidateEnvironment(func(string) string { return "" }); err == nil || !strings.Contains(err.Error(), "DOCKER_HOST") {
+		t.Fatalf("missing remote TLS settings accepted: %v", err)
 	}
 }
 

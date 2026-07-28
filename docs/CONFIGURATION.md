@@ -47,6 +47,16 @@ The proxy accepts only signed HTTPS CONNECT requests on port 443. It resolves ap
 
 `runtime.default_target` is `docker` or `kubernetes`. A run may override it through `POST /api/runs`; its `deployment_target` is durable and existing runs are migrated as Docker.
 
+`runtime.docker` is server-owned execution transport, never generated-app configuration. Its default is:
+
+```json
+{"mode":"rootless_remote_tls","host_env":"DOCKER_HOST","tls_verify_env":"DOCKER_TLS_VERIFY","cert_path_env":"DOCKER_CERT_PATH"}
+```
+
+The referenced environment values must be `tcp://...`, `1`, and an absolute certificate path respectively; Norbot then checks Docker `SecurityOptions` for rootless mode before it creates a workspace or deployment. Mount client certificates read-only with `docker-compose.remote-tls.yml`; the base Compose file deliberately does not mount `/var/run/docker.sock`.
+
+`unsafe_local_socket` is a local-development compatibility mode only: `"docker":{"mode":"unsafe_local_socket"}`. It requires `NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET=true`, `docker-compose.unsafe-local.yml`, and local `security.public: false`; Norbot rejects the configuration for public deployments and displays a persistent console warning. It is not a security boundary for generated code.
+
 Kubernetes configuration requires `kubeconfig`, `namespace`, `service_account`, `registry_repository`, and `registry_pull_secret`. Norbot reads the kubeconfig through client-go; it does not require a `kubectl` binary or Docker socket. `norbot kube bootstrap` creates the dedicated namespace, ServiceAccount, Role, RoleBinding, and configured egress-proxy resources. Apply an OCI `kubernetes.io/dockerconfigjson` Secret separately; `norbot kube secret-template` emits a credential-free template. Set `registry_insecure` only for a local HTTP registry; it enables Kaniko’s insecure-registry flags and must not be used for a remote registry.
 
 `norbot kube local` is the supported local bootstrap. It needs Docker, `kind`, and `kubectl`, builds/pushes the local proxy image to `kind-registry`, and writes `config.local-kubernetes.json` plus `.norbot/local-kubernetes.env`. Add `--cilium` on a new cluster to install Cilium and wait for an enforcing CNI before enabling sandbox HTTP tools; this also needs `cilium` in `PATH`. Run Compose with `NORBOT_CONFIG_HOST` and `NORBOT_KUBECONFIG_HOST` as printed by the command.
@@ -55,7 +65,7 @@ Each Kubernetes run receives a PVC. Provider CLI, verifier, Kaniko, and smoke Jo
 
 ## Verification and lifecycle
 
-Verifier gates fail closed: locked frontend dependencies, npm test/build/audit, Go test/build/govulncheck, and backend-specific isolated smoke checks must pass before deployment approval. Docker uses Compose; Kubernetes uses temporary Jobs, Kaniko image builds, rollout, and in-cluster smoke before cleanup. Deployment API and web console controls support status, logs, start, stop, and delete. Worker leases expire to `interrupted`; recovery never auto-replays work.
+Verifier gates fail closed: locked frontend dependencies, npm test/build/audit, Go test/build/govulncheck, and backend-specific isolated smoke checks must pass before deployment approval. Docker and Kubernetes generate their Dockerfiles from Norbot-owned templates after every builder stage; model-authored Compose, Dockerfile, `.dockerignore`, and `.norbot/` deployment descriptors are rejected or archived outside `generated-app` before execution. Docker uses fixed `docker build`, internal labeled networks, loopback-only frontend publishing, and hardened `docker run` flags; Kubernetes uses temporary Jobs, Kaniko image builds, rollout, and in-cluster smoke before cleanup. Deployment API and web console controls support status, logs, start, stop, and delete. Worker leases expire to `interrupted`; recovery never auto-replays work.
 
 ## Remote operation
 

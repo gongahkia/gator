@@ -11,8 +11,12 @@ Norbot is a local-first, provider-agnostic agentic app builder. Its embedded web
 ```sh
 cp .env.example .env
 cp config.example.json config.json
-docker compose up --build
+docker compose -f docker-compose.yml -f docker-compose.remote-tls.yml up --build
 ```
+
+Docker execution defaults to a separately operated rootless daemon over mutually authenticated TLS. Set `NORBOT_DOCKER_HOST` and `NORBOT_DOCKER_CERTS_HOST`; Norbot validates that the daemon reports rootless mode before accepting Docker runs. The base Compose file intentionally has no Docker socket mount.
+
+For an isolated local development machine only, set `runtime.docker` to `{"mode":"unsafe_local_socket"}` in `config.json` and run `docker compose -f docker-compose.yml -f docker-compose.unsafe-local.yml up --build`. This requires `NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET=true`, is rejected with `security.public: true`, and exposes host-Docker authority to Norbot; do not use it for normal operation.
 
 Open `http://127.0.0.1:8080`. The default Compose setup is loopback-only and allows local unauthenticated access. For a shared deployment, configure `security.oidc` with an issuer, audience, groups claim, operator group, SPA `client_id`, and optional `scopes`, then set `NORBOT_ALLOW_UNAUTHENTICATED_LOCAL=false`.
 
@@ -44,7 +48,7 @@ Norbot is the central HTTPS gateway for Telegram, Slack HTTP Events, Discord sig
 
 Create an account through `POST /api/channels/accounts`, then pair an external platform identity through `POST /api/channels/accounts/{id}/pairings`. Configure each provider webhook to `https://<public-host>/api/channels/<account-id>/webhook`; Telegram needs `webhook_secret` and `bot_token`, Slack `signing_secret` and `bot_token`, Discord `public_key` plus `bot_token`, and WhatsApp `verify_token`, `app_secret`, and `access_token`. The account `settings` needs `public_key` for Discord and `phone_number_id` for WhatsApp.
 
-For Docker, set `NORBOT_PUBLIC_HTTPS_DOMAIN` and run `docker compose --profile public up --build`; the included Caddy reverse proxy obtains TLS for a publicly resolvable DNS name. Kubernetes-generated apps retain their existing ingress path; the Norbot gateway itself must be deployed behind a public TLS reverse proxy reachable by the platform webhooks.
+For Docker, set `NORBOT_PUBLIC_HTTPS_DOMAIN` and run `docker compose -f docker-compose.yml -f docker-compose.remote-tls.yml --profile public up --build`; the included Caddy reverse proxy obtains TLS for a publicly resolvable DNS name. Kubernetes-generated apps retain their existing ingress path; the Norbot gateway itself must be deployed behind a public TLS reverse proxy reachable by the platform webhooks.
 
 ## Kubernetes
 
@@ -86,7 +90,7 @@ Then open `http://127.0.0.1:8080` locally.
 - Per-stage providers and deployment target are chosen at run creation and recorded with each event; later config changes do not alter an existing run.
 - Provider credentials are environment references only; Norbot never stores raw secrets.
 - Norbot owns agent sessions, provider credentials, typed tools, approval audit, sandbox execution, and idempotency. Generated apps receive neither model credentials nor a local tool executor. OpenClaw is not used.
-- Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, Docker Compose or Kubernetes rollout, or smoke failure.
+- Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, server-owned Docker or Kubernetes rollout, or smoke failure.
 
 Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
 
@@ -110,6 +114,6 @@ Native Azure OpenAI, Cohere, Ollama, Amazon Bedrock, and Vertex AI adapters plus
 
 `/metrics` is a Prometheus scrape endpoint; traces export through the OpenTelemetry Collector to Jaeger.
 
-`docker compose` remains the supported Norbot installation path. Docker runs require Docker; Kubernetes runs require only kubeconfig access from the Norbot control plane.
+Docker Compose remains the supported Norbot control-plane installation path. Docker runs require a rootless remote TLS daemon by default; Kubernetes runs require only kubeconfig access from the Norbot control plane.
 
 For the required human inbound proof on dedicated Telegram, Slack, Discord, and WhatsApp identities, send a unique marker and run `norbot live-e2e inbound --account <account-id> --external <identity-id> --marker <marker>`. It succeeds only after Norbot records that inbound message and a delivered outbound reply.

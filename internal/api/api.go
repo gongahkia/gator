@@ -105,6 +105,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/runs/{id}/agent-policy", s.restrictAgentPolicy)
 	mux.HandleFunc("GET /api/runs/{id}/architecture", s.architecture)
 	mux.HandleFunc("PUT /api/runs/{id}/architecture", s.updateArchitecture)
+	mux.HandleFunc("GET /api/runs/{id}/acceptance", s.acceptance)
+	mux.HandleFunc("PUT /api/runs/{id}/acceptance", s.updateAcceptance)
 	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
 	mux.HandleFunc("GET /api/runs/{id}/trace", s.trace)
@@ -682,6 +684,22 @@ func (s *Server) updateArchitecture(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) acceptance(w http.ResponseWriter, r *http.Request) {
+	run, err := s.store.GetRun(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) { writeError(w, http.StatusNotFound, err); return }
+	if err != nil { writeError(w, http.StatusInternalServerError, err); return }
+	writeJSON(w, http.StatusOK, run.Architecture.Acceptance)
+}
+
+func (s *Server) updateAcceptance(w http.ResponseWriter, r *http.Request) {
+	var acceptance domain.AcceptanceContract
+	if err := decodeJSON(r, &acceptance); err != nil { writeError(w, http.StatusBadRequest, err); return }
+	run, err := s.service.UpdateAcceptance(r.Context(), r.PathValue("id"), acceptance)
+	if errors.Is(err, store.ErrNotFound) { writeError(w, http.StatusConflict, fmt.Errorf("acceptance can only be edited while planner approval is pending")); return }
+	if err != nil { writeError(w, http.StatusUnprocessableEntity, err); return }
 	writeJSON(w, http.StatusOK, run)
 }
 

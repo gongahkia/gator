@@ -41,11 +41,10 @@ func TestGenerateAgenticProfile(t *testing.T) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("generated backend must compile: %v\n%s", err, output)
 	}
-	compose := exec.Command("docker", "compose", "config", "--quiet")
-	compose.Dir = filepath.Join(root, "run-1", "generated-app")
-	compose.Env = append(os.Environ(), "NORBOT_PUBLIC_PORT=31000")
-	if output, err := compose.CombinedOutput(); err != nil {
-		t.Fatalf("generated compose must validate: %v\n%s", err, output)
+	for _, path := range []string{"docker-compose.yml", "frontend/Dockerfile", "backend/Dockerfile"} {
+		if _, err := os.Stat(filepath.Join(root, "run-1", "generated-app", path)); !os.IsNotExist(err) {
+			t.Fatalf("model-owned deployment descriptor %s must not be generated: %v", path, err)
+		}
 	}
 }
 
@@ -62,7 +61,7 @@ func TestVerifierRunsDeterministicChecks(t *testing.T) {
 		t.Fatalf("report=%v err=%v", report, err)
 	}
 	joined := strings.Join(runner.commands, "\n")
-	for _, required := range []string{"npm audit --omit=dev --audit-level=high", "govulncheck", "compose", "curlimages/curl"} {
+	for _, required := range []string{"npm audit --omit=dev --audit-level=high", "govulncheck", ".norbot/deployment/frontend.Dockerfile", "curlimages/curl"} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("missing verifier command %q: %s", required, joined)
 		}
@@ -191,6 +190,17 @@ func TestBuilderResponseTargetsDeployableSource(t *testing.T) {
 	}
 	if diagnostics := builderResponseDiagnostics(err); diagnostics["required_path_prefix"] != "generated-app/frontend/" {
 		t.Fatalf("diagnostics=%#v", diagnostics)
+	}
+}
+
+func TestBuilderResponseRejectsDeploymentDescriptors(t *testing.T) {
+	run := domain.Run{Profile: domain.ProfileFullStack}
+	for _, path := range []string{"generated-app/docker-compose.yml", "generated-app/frontend/Dockerfile", "generated-app/backend/.dockerignore", "generated-app/.norbot/deployment/frontend.Dockerfile"} {
+		err := validateBuilderFiles(run, map[string]string{path: "attacker", "generated-app/frontend/src/main.jsx": "export default null"})
+		validation, ok := err.(builderResponseError)
+		if !ok || validation.reason != "server_owned_deployment_descriptor" || validation.invalidPath != path {
+			t.Fatalf("path=%s validation=%#v", path, validation)
+		}
 	}
 }
 

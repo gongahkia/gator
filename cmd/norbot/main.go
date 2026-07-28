@@ -562,6 +562,13 @@ func serveCommand(args []string) {
 			os.Exit(1)
 		}
 	}
+	if cfg.Manifest.DefaultTarget() == domain.DeploymentDocker {
+		docker := runtime.NewDockerClient(cfg.DockerBin, cfg.Manifest.Runtime.Docker, runtime.OSRunner{})
+		if err := docker.Validate(context.Background()); err != nil {
+			logger.Error("validate Docker runtime", "error", err)
+			os.Exit(1)
+		}
+	}
 	plugins, err := extension.LoadProcessPlugins(cfg.Manifest.Plugins)
 	if err != nil {
 		logger.Error("load process plugins", "error", err)

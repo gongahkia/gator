@@ -111,11 +111,11 @@ func (s *Service) checkQueue(ctx context.Context) domain.HealthCheck {
 func (s *Service) checkRuntime(ctx context.Context) domain.HealthCheck {
 	started := time.Now()
 	if s.config.Manifest.DefaultTarget() == domain.DeploymentDocker {
-		_, err := runtime.OSRunner{}.Run(ctx, s.config.DockerBin, "info", "--format", "{{.ServerVersion}}")
+		err := s.dockerWorkspace.Validate(ctx)
 		if err != nil {
 			return failedCheckWithLatency("runtime", true, err, started)
 		}
-		return okCheck("runtime", true, "Docker reachable", started, map[string]any{"target": "docker"})
+		return okCheck("runtime", true, "rootless Docker reachable", started, map[string]any{"target": "docker", "mode": s.config.Manifest.Runtime.Docker.Normalized().Mode})
 	}
 	kube, err := runtime.NewKubernetesRuntime(s.config.Manifest.Runtime.Kubernetes, s.config.ArtifactsDir)
 	if err == nil {

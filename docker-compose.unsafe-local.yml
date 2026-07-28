@@ -1,0 +1,6 @@
+services:
+  norbot:
+    environment:
+      NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

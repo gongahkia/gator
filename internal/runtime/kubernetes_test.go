@@ -161,10 +161,6 @@ func TestVerificationChangedPathSelection(t *testing.T) {
 	if needsFastFrontend(backend) || !needsFastBackend(backend) {
 		t.Fatalf("backend selection is wrong: %#v", backend)
 	}
-	compose := map[string]string{"generated-app/docker-compose.yml": "changed"}
-	if !needsFastFrontend(compose) || !needsFastBackend(compose) {
-		t.Fatalf("compose selection is wrong: %#v", compose)
-	}
 	if !needsFastFrontend(nil) || !needsFastBackend(nil) {
 		t.Fatal("initial verification must run both fast checks")
 	}

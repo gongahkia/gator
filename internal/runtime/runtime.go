@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -108,26 +107,40 @@ func (OSRunner) Run(ctx context.Context, name string, args ...string) ([]byte, e
 }
 
 type Workspace struct {
+	Docker       DockerClient
 	DockerBin    string
 	ArtifactsDir string
 	Runner       CommandRunner
 }
 
+func (w Workspace) Client() DockerClient {
+	if w.Docker.Bin != "" || w.Docker.Runner != nil || w.Docker.err != nil {
+		return w.Docker
+	}
+	return LegacyDockerClient(w.DockerBin, w.Runner)
+}
+
+func (w Workspace) Validate(ctx context.Context) error { return w.Client().Validate(ctx) }
+
 func (w Workspace) Name(runID string) string   { return "norbot-ws-" + runID }
 func (w Workspace) Volume(runID string) string { return "norbot_workspace_" + runID }
 
 func (w Workspace) Ensure(ctx context.Context, runID string) error {
+	if err := w.Validate(ctx); err != nil {
+		return err
+	}
+	docker := w.Client()
 	if err := os.MkdirAll(w.RunPath(runID), 0o750); err != nil {
 		return fmt.Errorf("create artifact directory: %w", err)
 	}
-	if _, err := w.Runner.Run(ctx, w.DockerBin, "volume", "create", w.Volume(runID)); err != nil {
+	if _, err := docker.Run(ctx, "volume", "create", w.Volume(runID)); err != nil {
 		return fmt.Errorf("create run volume: %w", err)
 	}
-	_, err := w.Runner.Run(ctx, w.DockerBin, "container", "inspect", w.Name(runID))
+	_, err := docker.Run(ctx, "container", "inspect", w.Name(runID))
 	if err == nil {
 		return nil
 	}
-	_, err = w.Runner.Run(ctx, w.DockerBin, "run", "-d", "--name", w.Name(runID), "--label", "norbot.run_id="+runID, "--label", "norbot.role=workspace", "-v", w.Volume(runID)+":/workspace", "alpine:3.21", "sleep", "infinity")
+	_, err = docker.Run(ctx, "run", "-d", "--name", w.Name(runID), "--label", "norbot.run_id="+runID, "--label", "norbot.role=workspace", "-v", w.Volume(runID)+":/workspace", "alpine:3.21", "sleep", "infinity")
 	if err != nil {
 		return fmt.Errorf("start workspace: %w", err)
 	}
@@ -159,10 +172,11 @@ func (w Workspace) MirrorToVolume(ctx context.Context, runID, relative string) e
 		return err
 	}
 	targetDir := filepath.ToSlash(filepath.Dir(relative))
-	if _, err := w.Runner.Run(ctx, w.DockerBin, "exec", w.Name(runID), "mkdir", "-p", "/workspace/"+targetDir); err != nil {
+	docker := w.Client()
+	if _, err := docker.Run(ctx, "exec", w.Name(runID), "mkdir", "-p", "/workspace/"+targetDir); err != nil {
 		return err
 	}
-	_, err := w.Runner.Run(ctx, w.DockerBin, "cp", source, w.Name(runID)+":/workspace/"+relative)
+	_, err := docker.Run(ctx, "cp", source, w.Name(runID)+":/workspace/"+relative)
 	return err
 }
 
@@ -171,10 +185,11 @@ func (w Workspace) MirrorGeneratedApp(ctx context.Context, runID string) error {
 	if _, err := os.Stat(source); err != nil {
 		return err
 	}
-	if _, err := w.Runner.Run(ctx, w.DockerBin, "exec", w.Name(runID), "mkdir", "-p", "/workspace/generated-app"); err != nil {
+	docker := w.Client()
+	if _, err := docker.Run(ctx, "exec", w.Name(runID), "mkdir", "-p", "/workspace/generated-app"); err != nil {
 		return err
 	}
-	_, err := w.Runner.Run(ctx, w.DockerBin, "cp", source+"/.", w.Name(runID)+":/workspace/generated-app")
+	_, err := docker.Run(ctx, "cp", source+"/.", w.Name(runID)+":/workspace/generated-app")
 	return err
 }
 
@@ -183,7 +198,7 @@ func (w Workspace) SyncGeneratedApp(ctx context.Context, runID string) error {
 	if err := os.MkdirAll(target, 0o750); err != nil {
 		return err
 	}
-	_, err := w.Runner.Run(ctx, w.DockerBin, "cp", w.Name(runID)+":/workspace/generated-app/.", target)
+	_, err := w.Client().Run(ctx, "cp", w.Name(runID)+":/workspace/generated-app/.", target)
 	return err
 }
 
@@ -209,9 +224,7 @@ func (w Workspace) RunCLI(ctx context.Context, runID string, stage domain.Stage,
 	}
 	args = append(args, image)
 	args = append(args, command...)
-	execCommand := exec.CommandContext(ctx, w.DockerBin, args...)
-	execCommand.Stdin = strings.NewReader(prompt)
-	output, err := execCommand.CombinedOutput()
+	output, err := w.Client().RunInput(ctx, prompt, args...)
 	if err != nil {
 		return string(output), fmt.Errorf("workspace cli: %w", err)
 	}
@@ -243,7 +256,7 @@ func (w Workspace) RunSandbox(ctx context.Context, runID string, request Sandbox
 	}
 	args = append(args, image)
 	args = append(args, request.Command...)
-	out, err := w.Runner.Run(ctx, w.DockerBin, args...)
+	out, err := w.Client().Run(ctx, args...)
 	result := SandboxResult{Output: string(out), DurationMS: time.Since(started).Milliseconds(), Network: network}
 	if err != nil {
 		return result, err
@@ -252,11 +265,12 @@ func (w Workspace) RunSandbox(ctx context.Context, runID string, request Sandbox
 }
 
 func (w Workspace) Cleanup(ctx context.Context, runID string) error {
-	_, _ = w.Runner.Run(ctx, w.DockerBin, "rm", "-f", w.Name(runID))
-	if _, err := w.Runner.Run(ctx, w.DockerBin, "volume", "inspect", w.Volume(runID)); err != nil {
+	docker := w.Client()
+	_, _ = docker.Run(ctx, "rm", "-f", w.Name(runID))
+	if _, err := docker.Run(ctx, "volume", "inspect", w.Volume(runID)); err != nil {
 		return nil
 	}
-	_, err := w.Runner.Run(ctx, w.DockerBin, "volume", "rm", w.Volume(runID))
+	_, err := docker.Run(ctx, "volume", "rm", w.Volume(runID))
 	return err
 }
 
@@ -280,10 +294,10 @@ type QuotaFactor struct {
 	ObservedRemaining           *int   `json:"observed_remaining,omitempty"`
 }
 
-func DetectCapacity(ctx context.Context, dockerBin string, configuredWorkers, maxWorkers int, runner CommandRunner) Capacity {
+func DetectCapacity(ctx context.Context, docker DockerClient, configuredWorkers, maxWorkers int, runner CommandRunner) Capacity {
 	capacity := Capacity{CPUs: runtime.NumCPU(), ConfiguredWorkers: configuredWorkers, Target: domain.DeploymentDocker}
 	capacity.MemoryBytes = memoryBytes(ctx, runner)
-	if _, err := runner.Run(ctx, dockerBin, "info", "--format", "{{.ServerVersion}}"); err == nil {
+	if err := docker.Validate(ctx); err == nil {
 		capacity.DockerAvailable = true
 	}
 	byCPU := max(1, capacity.CPUs/2)
@@ -354,9 +368,20 @@ func memoryBytes(ctx context.Context, runner CommandRunner) int64 {
 }
 
 type Deployment struct {
+	Docker    DockerClient
 	DockerBin string
 	Runner    CommandRunner
+	BrowserImage string
 }
+
+func (d Deployment) Client() DockerClient {
+	if d.Docker.Bin != "" || d.Docker.Runner != nil || d.Docker.err != nil {
+		return d.Docker
+	}
+	return LegacyDockerClient(d.DockerBin, d.Runner)
+}
+
+func (d Deployment) Validate(ctx context.Context) error { return d.Client().Validate(ctx) }
 
 func (d Deployment) Target() domain.DeploymentTarget { return domain.DeploymentDocker }
 
@@ -370,7 +395,22 @@ type DeploymentStatus struct {
 }
 
 func ProjectName(runID string) string {
-	return "norbot-" + strings.ToLower(runID)
+	var value strings.Builder
+	for _, character := range strings.ToLower(runID) {
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+			value.WriteRune(character)
+		} else {
+			value.WriteByte('-')
+		}
+	}
+	name := strings.Trim(value.String(), "-")
+	if name == "" {
+		name = "app"
+	}
+	if len(name) > 48 {
+		name = name[:48]
+	}
+	return "norbot-" + name
 }
 
 func ApplicationID(run domain.Run) string {
@@ -381,73 +421,172 @@ func ApplicationID(run domain.Run) string {
 }
 
 func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (string, error) {
+	if err := d.Validate(ctx); err != nil {
+		return "", err
+	}
+	if _, err := PrepareDeploymentSource(root, run); err != nil {
+		return "", err
+	}
 	port, err := ReservePort()
 	if err != nil {
 		return "", err
 	}
-	project := ProjectName(ApplicationID(run))
-	args := []string{"compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "up", "--build", "-d", "--wait", "--wait-timeout", "90"}
-	command := exec.CommandContext(ctx, d.DockerBin, args...)
-	command.Dir = filepath.Join(root, "generated-app")
-	command.Env = append(os.Environ(), "NORBOT_PUBLIC_PORT="+strconv.Itoa(port), "NORBOT_RUN_ID="+run.ID)
-	output, err := command.CombinedOutput()
+	docker := d.Client()
+	appID := ApplicationID(run)
+	project := ProjectName(appID)
+	appRoot := filepath.Join(root, "generated-app")
+	images, err := d.buildImages(ctx, docker, run, appRoot)
 	if err != nil {
-		return "", fmt.Errorf("deploy %s: %w: %s", project, err, tail(string(output), 1000))
+		return "", err
+	}
+	if err := d.deleteApplication(ctx, docker, appID, true); err != nil {
+		return "", err
+	}
+	network := project + "-network"
+	if _, err := docker.Run(ctx, "network", "create", "--internal", "--label", "norbot.managed=true", "--label", "norbot.app_id="+appID, network); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
+		return "", fmt.Errorf("create deployment network: %w", err)
+	}
+	started := []string{}
+	fail := func(cause error) (string, error) {
+		for _, container := range started {
+			_, _ = docker.Run(context.Background(), "rm", "-f", container)
+		}
+		return "", cause
+	}
+	if run.Profile != domain.ProfileFrontend {
+		name, err := d.runContainer(ctx, docker, run, network, "backend", images["backend"], 0)
+		if err != nil {
+			return fail(err)
+		}
+		started = append(started, name)
+		if err := d.waitHTTP(ctx, docker, network, "http://backend:8000/api/health"); err != nil {
+			return fail(err)
+		}
+	}
+	name, err := d.runContainer(ctx, docker, run, network, "frontend", images["frontend"], port)
+	if err != nil {
+		return fail(err)
+	}
+	started = append(started, name)
+	if err := d.waitHTTP(ctx, docker, network, "http://frontend:8080/"); err != nil {
+		return fail(err)
 	}
 	return "http://127.0.0.1:" + strconv.Itoa(port), nil
 }
 
-func (d Deployment) Stop(ctx context.Context, runID, root string) error {
-	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "stop")
+func (d Deployment) Verify(ctx context.Context, run domain.Run, root string) error {
+	_, err := d.VerifyAcceptance(ctx, run, root, domain.AcceptanceContract{})
 	return err
 }
 
-func (d Deployment) Start(ctx context.Context, runID, root string) error {
-	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "start", "--wait", "--wait-timeout", "90")
+func (d Deployment) VerifyAcceptance(ctx context.Context, run domain.Run, root string, acceptance domain.AcceptanceContract) (map[string]any, error) {
+	if err := d.Validate(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := PrepareDeploymentSource(root, run); err != nil {
+		return nil, err
+	}
+	verificationRun := run
+	verificationRun.AppID = "verify-" + run.ID
+	docker := d.Client()
+	appRoot := filepath.Join(root, "generated-app")
+	images, err := d.buildImages(ctx, docker, verificationRun, appRoot)
+	if err != nil {
+		return nil, err
+	}
+	appID := ApplicationID(verificationRun)
+	project := ProjectName(appID)
+	if err := d.deleteApplication(ctx, docker, appID, false); err != nil {
+		return nil, err
+	}
+	network := project + "-network"
+	if _, err := docker.Run(ctx, "network", "create", "--internal", "--label", "norbot.managed=true", "--label", "norbot.app_id="+appID, network); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
+		return nil, fmt.Errorf("create verification network: %w", err)
+	}
+	defer d.deleteApplication(context.Background(), docker, appID, false)
+	if verificationRun.Profile != domain.ProfileFrontend {
+		if _, err := d.runContainer(ctx, docker, verificationRun, network, "backend", images["backend"], 0); err != nil {
+			return nil, err
+		}
+		if err := d.waitHTTP(ctx, docker, network, "http://backend:8000/api/health"); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := d.runContainer(ctx, docker, verificationRun, network, "frontend", images["frontend"], 0); err != nil {
+		return nil, err
+	}
+	if err := d.waitHTTP(ctx, docker, network, "http://frontend:8080/"); err != nil {
+		return nil, err
+	}
+	if acceptance.Empty() {
+		return map[string]any{"status": "skipped", "reason": "no acceptance contract"}, nil
+	}
+	return d.runAcceptance(ctx, docker, verificationRun, network, acceptance)
+}
+
+func (d Deployment) Stop(ctx context.Context, appID, _ string) error {
+	docker := d.Client()
+	ids, err := d.applicationContainers(ctx, docker, appID, false, "")
+	if err != nil || len(ids) == 0 {
+		return err
+	}
+	_, err = docker.Run(ctx, append([]string{"stop"}, ids...)...)
 	return err
 }
 
-func (d Deployment) Delete(ctx context.Context, runID, root string) error {
-	_, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "down", "--remove-orphans", "--volumes")
+func (d Deployment) Start(ctx context.Context, appID, _ string) error {
+	docker := d.Client()
+	ids, err := d.applicationContainers(ctx, docker, appID, true, "")
+	if err != nil || len(ids) == 0 {
+		return err
+	}
+	_, err = docker.Run(ctx, append([]string{"start"}, ids...)...)
 	return err
 }
 
-func (d Deployment) Status(ctx context.Context, runID, root string) (DeploymentStatus, error) {
-	project := ProjectName(runID)
-	output, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", project, "--project-directory", filepath.Join(root, "generated-app"), "ps", "--format", "json")
+func (d Deployment) Delete(ctx context.Context, appID, _ string) error {
+	return d.deleteApplication(ctx, d.Client(), appID, true)
+}
+
+func (d Deployment) Status(ctx context.Context, appID, _ string) (DeploymentStatus, error) {
+	project := ProjectName(appID)
+	output, err := d.Client().Run(ctx, "ps", "-a", "--filter", "label=norbot.managed=true", "--filter", "label=norbot.app_id="+appID, "--format", "{{json .}}")
 	if err != nil {
 		return DeploymentStatus{}, err
 	}
 	services := []map[string]any{}
 	trimmed := strings.TrimSpace(string(output))
-	if strings.HasPrefix(trimmed, "[") {
-		if err := json.Unmarshal([]byte(trimmed), &services); err != nil {
-			return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err)
-		}
-		return DeploymentStatus{Target: d.Target(), Project: project, Services: services}, nil
-	}
 	for _, line := range strings.Split(trimmed, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
 		var service map[string]any
 		if err := json.Unmarshal([]byte(line), &service); err != nil {
-			return DeploymentStatus{}, fmt.Errorf("decode compose status: %w", err)
+			return DeploymentStatus{}, fmt.Errorf("decode Docker status: %w", err)
 		}
 		services = append(services, service)
 	}
 	return DeploymentStatus{Target: d.Target(), Project: project, Services: services}, nil
 }
 
-func (d Deployment) Logs(ctx context.Context, runID, root string, lines int) (string, error) {
+func (d Deployment) Logs(ctx context.Context, appID, _ string, lines int) (string, error) {
 	if lines < 1 || lines > 10000 {
 		return "", fmt.Errorf("log line limit must be 1-10000")
 	}
-	output, err := d.Runner.Run(ctx, d.DockerBin, "compose", "-p", ProjectName(runID), "--project-directory", filepath.Join(root, "generated-app"), "logs", "--no-color", "--tail", strconv.Itoa(lines))
+	docker := d.Client()
+	ids, err := d.applicationContainers(ctx, docker, appID, true, "")
 	if err != nil {
 		return "", err
 	}
-	return string(output), nil
+	var output strings.Builder
+	for _, id := range ids {
+		logs, err := docker.Run(ctx, "logs", "--tail", strconv.Itoa(lines), id)
+		if err != nil {
+			return "", err
+		}
+		output.Write(logs)
+	}
+	return output.String(), nil
 }
 
 func (d Deployment) InvokeAgent(ctx context.Context, run domain.Run, root string, input AgentInvocation) (AgentResponse, error) {
@@ -458,10 +597,15 @@ func (d Deployment) InvokeAgent(ctx context.Context, run domain.Run, root string
 	if err != nil {
 		return AgentResponse{}, err
 	}
-	args := []string{"compose", "-p", ProjectName(ApplicationID(run)), "--project-directory", filepath.Join(root, "generated-app"), "exec", "-T", "backend", "wget", "-qO-", "--header=Content-Type: application/json", "--post-file=-", "http://127.0.0.1:8000/api/agents/run"}
-	command := exec.CommandContext(ctx, d.DockerBin, args...)
-	command.Stdin = bytes.NewReader(payload)
-	output, err := command.CombinedOutput()
+	docker := d.Client()
+	ids, err := d.applicationContainers(ctx, docker, ApplicationID(run), false, "backend")
+	if err != nil {
+		return AgentResponse{}, err
+	}
+	if len(ids) != 1 {
+		return AgentResponse{}, fmt.Errorf("expected one managed backend container, found %d", len(ids))
+	}
+	output, err := docker.RunInput(ctx, string(payload), "exec", "-i", ids[0], "wget", "-qO-", "--header=Content-Type: application/json", "--post-file=-", "http://127.0.0.1:8000/api/agents/run")
 	if err != nil {
 		return AgentResponse{}, fmt.Errorf("invoke agent: %w: %s", err, tail(string(output), 1000))
 	}
@@ -477,6 +621,130 @@ func (d Deployment) InvokeAgent(ctx context.Context, run domain.Run, root string
 		}
 	}
 	return response, nil
+}
+
+func (d Deployment) buildImages(ctx context.Context, docker DockerClient, run domain.Run, appRoot string) (map[string]string, error) {
+	images := map[string]string{}
+	project := ProjectName(ApplicationID(run))
+	for _, component := range []string{"frontend"} {
+		image := project + "-" + component + ":" + shortImageID(run.ID)
+		dockerfile := filepath.Join(appRoot, filepath.FromSlash(deploymentDirectory), component+".Dockerfile")
+		if _, err := docker.Run(ctx, "build", "--label", "norbot.managed=true", "--label", "norbot.app_id="+ApplicationID(run), "--label", "norbot.run_id="+run.ID, "--file", dockerfile, "--tag", image, appRoot); err != nil {
+			return nil, fmt.Errorf("build %s image: %w", component, err)
+		}
+		images[component] = image
+	}
+	if run.Profile != domain.ProfileFrontend {
+		component := "backend"
+		image := project + "-" + component + ":" + shortImageID(run.ID)
+		dockerfile := filepath.Join(appRoot, filepath.FromSlash(deploymentDirectory), component+".Dockerfile")
+		if _, err := docker.Run(ctx, "build", "--label", "norbot.managed=true", "--label", "norbot.app_id="+ApplicationID(run), "--label", "norbot.run_id="+run.ID, "--file", dockerfile, "--tag", image, appRoot); err != nil {
+			return nil, fmt.Errorf("build %s image: %w", component, err)
+		}
+		images[component] = image
+	}
+	return images, nil
+}
+
+func (d Deployment) runContainer(ctx context.Context, docker DockerClient, run domain.Run, network, component, image string, publicPort int) (string, error) {
+	name := ProjectName(ApplicationID(run)) + "-" + component + "-" + shortImageID(run.ID)
+	args := []string{"run", "-d", "--name", name, "--network", network, "--network-alias", component, "--label", "norbot.managed=true", "--label", "norbot.app_id=" + ApplicationID(run), "--label", "norbot.run_id=" + run.ID, "--label", "norbot.role=application", "--label", "norbot.component=" + component, "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=128", "--memory=512m", "--cpus=0.5", "--tmpfs=/tmp:rw,noexec,nosuid,size=64m", "--tmpfs=/var/run:rw,noexec,nosuid,size=16m"}
+	if component == "frontend" && publicPort > 0 {
+		args = append(args, "--publish", "127.0.0.1:"+strconv.Itoa(publicPort)+":8080")
+	} else if component == "backend" {
+		args = append(args, "--env", "PORT=8000")
+	}
+	args = append(args, image)
+	if _, err := docker.Run(ctx, args...); err != nil {
+		return "", fmt.Errorf("start %s container: %w", component, err)
+	}
+	return name, nil
+}
+
+func (d Deployment) waitHTTP(ctx context.Context, docker DockerClient, network, endpoint string) error {
+	deadline := time.NewTimer(90 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var last error
+	for {
+		if _, err := docker.Run(ctx, "run", "--rm", "--network", network, "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=64", "--memory=64m", "--cpus=0.25", "--tmpfs=/tmp:rw,noexec,nosuid,size=16m", "curlimages/curl:8.12.1", "--connect-timeout", "2", "--max-time", "5", "-fsS", endpoint); err == nil {
+			return nil
+		} else {
+			last = err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("timed out waiting for %s: %w", endpoint, last)
+		case <-ticker.C:
+		}
+	}
+}
+
+func (d Deployment) applicationContainers(ctx context.Context, docker DockerClient, appID string, all bool, component string) ([]string, error) {
+	args := []string{"ps"}
+	if all {
+		args = append(args, "-a")
+	}
+	args = append(args, "-q", "--filter", "label=norbot.managed=true", "--filter", "label=norbot.app_id="+appID)
+	if component != "" {
+		args = append(args, "--filter", "label=norbot.component="+component)
+	}
+	output, err := docker.Run(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(string(output)), nil
+}
+
+func (d Deployment) deleteApplication(ctx context.Context, docker DockerClient, appID string, legacy bool) error {
+	ids, err := d.applicationContainers(ctx, docker, appID, true, "")
+	if err != nil {
+		return err
+	}
+	if len(ids) > 0 {
+		if _, err := docker.Run(ctx, append([]string{"rm", "-f"}, ids...)...); err != nil {
+			return err
+		}
+	}
+	project := ProjectName(appID)
+	_, _ = docker.Run(ctx, "network", "rm", project+"-network")
+	if !legacy {
+		return nil
+	}
+	legacyIDs, err := docker.Run(ctx, "ps", "-aq", "--filter", "label=com.docker.compose.project="+project)
+	if err == nil && len(strings.Fields(string(legacyIDs))) > 0 {
+		if _, err := docker.Run(ctx, append([]string{"rm", "-f"}, strings.Fields(string(legacyIDs))...)...); err != nil {
+			return err
+		}
+	}
+	for _, resource := range []string{"network", "volume"} {
+		output, err := docker.Run(ctx, resource, "ls", "-q", "--filter", "label=com.docker.compose.project="+project)
+		if err != nil || len(strings.Fields(string(output))) == 0 {
+			continue
+		}
+		_, _ = docker.Run(ctx, append([]string{resource, "rm"}, strings.Fields(string(output))...)...)
+	}
+	return nil
+}
+
+func shortImageID(value string) string {
+	value = strings.ToLower(value)
+	var out strings.Builder
+	for _, character := range value {
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+			out.WriteRune(character)
+		}
+	}
+	if out.Len() == 0 {
+		return "run"
+	}
+	if out.Len() > 12 {
+		return out.String()[:12]
+	}
+	return out.String()
 }
 
 func ReservePort() (int, error) {

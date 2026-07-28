@@ -60,6 +60,12 @@
   "retention": {"agent_turns_days": 90, "channel_messages_days": 90, "run_events_days": 365, "provider_usage_days": 365},
   "runtime": {
     "default_target": "docker",
+    "docker": {
+      "mode": "rootless_remote_tls",
+      "host_env": "DOCKER_HOST",
+      "tls_verify_env": "DOCKER_TLS_VERIFY",
+      "cert_path_env": "DOCKER_CERT_PATH"
+    },
     "sandbox": {"image": "alpine:3.21", "cpu_milli": 500, "memory_mib": 512, "timeout_seconds": 60, "egress_proxy_url": "", "egress_proxy_secret_env": ""},
     "kubernetes": {
       "kubeconfig": "/absolute/path/to/kubeconfig",
