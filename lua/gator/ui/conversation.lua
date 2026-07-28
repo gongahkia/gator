@@ -68,6 +68,29 @@ local function sync_timer(panel)
 	)
 end
 
+local function markdown_line(line)
+	if line == "## user" then
+		return "You"
+	end
+	if line == "## assistant" then
+		return "Gator agent"
+	end
+	if line:match("^```[^`]*$") then
+		return "— code —"
+	end
+	line = line:gsub("%[([^%]]+)%]%b()", "%1")
+	line = line:gsub("`([^`]+)`", "%1")
+	return line:gsub("^(%s*)#+%s+", "%1")
+end
+
+local function display_lines(values)
+	local result = {}
+	for index, line in ipairs(values) do
+		result[index] = markdown_line(line)
+	end
+	return result
+end
+
 function M.render(panel)
 	local label = panel.run_id and ("run " .. panel.run_id) or panel.session_id
 	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. panel.state
@@ -91,7 +114,7 @@ function M.render(panel)
 			table.insert(lines, "No provider output")
 		end
 	else
-		vim.list_extend(lines, panel.lines)
+		vim.list_extend(lines, display_lines(panel.lines))
 	end
 	table.insert(lines, "")
 	if panel.notice then

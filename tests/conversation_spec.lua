@@ -13,8 +13,10 @@ local window = conversation.open({
 })
 local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
 assert(
-	content:find("## user\nInspect this", 1, true) and content:find("## assistant\nThe prior result", 1, true),
-	"reopened structured chats must rehydrate their persisted Gator transcript"
+	content:find("You\nInspect this", 1, true)
+		and content:find("Gator agent\nThe prior result", 1, true)
+		and not content:find("## user", 1, true),
+	"reopened structured chats must display persisted transcripts without raw Markdown headings"
 )
 conversation.update({ text = "I", state = "running", phase = "thinking", turn_started_at = os.time() })
 conversation.update({ text = "'ll inspect", append = true, state = "running", phase = "responding" })
@@ -34,5 +36,13 @@ content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(windo
 assert(
 	content:find("i prompt", 1, true) and not content:find("c cancel", 1, true),
 	"settled chats must restore the prompt action and remove cancellation"
+)
+conversation.update({ text = "See [health.lua](/private/path/health.lua) and `check()`.", state = "waiting_input" })
+content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
+assert(
+	content:find("See health.lua and check().", 1, true)
+		and not content:find("/private/path/health.lua", 1, true)
+		and not content:find("`check()`", 1, true),
+	"chat display must render Markdown links and inline code without exposing raw markup targets"
 )
 assert(conversation.close(), "rehydrated conversations must remain ephemeral")
