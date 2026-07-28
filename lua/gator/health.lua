@@ -1,6 +1,7 @@
 local compat = require("gator.compat")
 local config = require("gator.config")
 local consent = require("gator.telemetry.consent")
+local loading = require("gator.ui.loading")
 local M = { checks = {}, graph = require("gator.health.graph") }
 local providers = {
 	{ name = "aider", executable = "aider" },
@@ -52,6 +53,26 @@ local function validate_reporter(reporter)
 	end
 end
 
+local function run_command(argv, cwd, input, timeout_ms)
+	local completed, result = false, nil
+	local timeout = timeout_ms or 3000
+	local process = vim.system(argv, {
+		cwd = cwd,
+		stdin = input,
+		text = true,
+		timeout = timeout,
+	}, function(value)
+		result, completed = value, true
+	end)
+	if not vim.wait(timeout + 100, function()
+		return completed
+	end, 10) then
+		pcall(process.kill, process, 15)
+		return { code = 124, stdout = "" }
+	end
+	return { code = result.code, stdout = result.stdout or "" }
+end
+
 function M.register(name, check)
 	validate_name(name)
 	if type(check) ~= "function" then
@@ -101,7 +122,14 @@ function M.check()
 				.. " or newer"
 		)
 	end
-	M.run(vim.health)
+	local handle = loading.open({ message = "Checking Gator health" })
+	local ok, err = xpcall(function()
+		M.run(vim.health)
+	end, debug.traceback)
+	handle.close()
+	if not ok then
+		error(err, 0)
+	end
 end
 
 function M.readiness(opts)
@@ -145,16 +173,7 @@ function M.readiness(opts)
 	local executable = opts.executable or function(name)
 		return vim.fn.executable(name) == 1
 	end
-	local run = opts.run
-		or function(argv, directory, input, timeout_ms)
-			local value = vim.system(argv, {
-				cwd = directory,
-				stdin = input,
-				text = true,
-				timeout = timeout_ms or 3000,
-			}):wait()
-			return { code = value.code, stdout = value.stdout or "" }
-		end
+	local run = opts.run or run_command
 	local cwd = opts.cwd or vim.fn.getcwd()
 	local records = {}
 	local function add(component, level, message, repair, readiness_state)
@@ -337,16 +356,7 @@ function M.launch_catalog(opts)
 	local executable = opts.executable or function(name)
 		return vim.fn.executable(name) == 1
 	end
-	local run = opts.run
-		or function(argv, directory, input, timeout_ms)
-			local result = vim.system(argv, {
-				cwd = directory,
-				stdin = input,
-				text = true,
-				timeout = timeout_ms or 3000,
-			}):wait()
-			return { code = result.code, stdout = result.stdout or "" }
-		end
+	local run = opts.run or run_command
 	if type(executable) ~= "function" or type(run) ~= "function" then
 		fail("launch catalog executable and run must be functions")
 	end
