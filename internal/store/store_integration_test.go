@@ -191,6 +191,49 @@ func TestRecoverExpiredJobsIntegration(t *testing.T) {
 	}
 }
 
+func TestFailedVerificationRetryIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	id := "verification-retry-" + time.Now().UTC().Format("20060102150405.000000000")
+	run := domain.Run{ID: id, Prompt: "test", Profile: domain.ProfileFrontend, Stage: domain.StageVerifier, Status: domain.StatusAwaiting, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "local-deployer"}, Graph: domain.DefaultGraph(), Architecture: domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph()), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
+	revision, err := st.CreateRevision(ctx, domain.Revision{RunID: id, Kind: domain.ReviewCode, Attempt: 1, BaselineDigest: "sha256:baseline", PatchDigest: "sha256:patch", Files: map[string]string{"generated-app/frontend/index.html": "after"}, Report: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RecordRevisionReport(ctx, id, revision.ID, map[string]any{"status": "fail", "error": "verification infrastructure unavailable"}, "tested"); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := st.Approve(ctx, id, domain.ApprovalRetry, "")
+	if err != nil || updated.Stage != domain.StageVerifier || updated.Status != domain.StatusQueued {
+		t.Fatalf("run=%#v err=%v", updated, err)
+	}
+	var jobs, events int
+	if err := st.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jobs WHERE run_id=$1 AND stage='verifier' AND state='queued'`, id).Scan(&jobs); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.pool.QueryRow(ctx, `SELECT COUNT(*) FROM run_events WHERE run_id=$1 AND event_type='verification_retry_requested'`, id).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	if jobs != 1 || events != 1 {
+		t.Fatalf("jobs=%d events=%d", jobs, events)
+	}
+}
+
 func TestMigrationsRecordImmutableLedgerIntegration(t *testing.T) {
 	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
 	if databaseURL == "" {

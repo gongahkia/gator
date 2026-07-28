@@ -1026,8 +1026,22 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		}
 		return s.insertEvent(ctx, tx, runID, eventType, message, map[string]any{"stage": run.Stage, "feedback": feedback})
 	case domain.ApprovalRetry:
-		if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted {
-			return fmt.Errorf("retry is available only for failed or interrupted runs")
+		failedVerification := run.Status == domain.StatusAwaiting && run.Stage == domain.StageVerifier
+		if run.Status != domain.StatusFailed && run.Status != domain.StatusInterrupted && !failedVerification {
+			return fmt.Errorf("retry is available only for failed, interrupted, or failed verification runs")
+		}
+		if failedVerification {
+			var report []byte
+			if err := tx.QueryRow(ctx, `SELECT report FROM revisions WHERE run_id=$1 ORDER BY id DESC LIMIT 1`, runID).Scan(&report); err != nil {
+				return fmt.Errorf("test report unavailable: %w", err)
+			}
+			var decoded map[string]any
+			if err := json.Unmarshal(report, &decoded); err != nil {
+				return err
+			}
+			if decoded["status"] != "fail" {
+				return fmt.Errorf("retry requires a failed verification report")
+			}
 		}
 		if run.WorkspaceStatus == "failed" {
 			if _, err := tx.Exec(ctx, `UPDATE runs SET status='queued',workspace_status='provisioning',failure_reason='',updated_at=now() WHERE id=$1`, runID); err != nil {
@@ -1047,7 +1061,11 @@ func (s *Store) approveTx(ctx context.Context, tx pgx.Tx, runID string, action d
 		if _, err := tx.Exec(ctx, `INSERT INTO jobs (run_id,stage,attempt,traceparent) SELECT $1,$2,COALESCE(MAX(attempt),0)+1,$3 FROM jobs WHERE run_id=$1`, runID, run.Stage, observability.Traceparent(ctx)); err != nil {
 			return err
 		}
-		return s.insertEvent(ctx, tx, runID, "stage_retry_requested", string(run.Stage)+" retry queued", map[string]any{"stage": run.Stage})
+		eventType, message := "stage_retry_requested", string(run.Stage)+" retry queued"
+		if failedVerification {
+			eventType, message = "verification_retry_requested", "Failed verification retry queued"
+		}
+		return s.insertEvent(ctx, tx, runID, eventType, message, map[string]any{"stage": run.Stage})
 	case domain.ApprovalAbandon:
 		if run.Status == domain.StatusAbandoned || run.Status == domain.StatusCompleted {
 			return fmt.Errorf("completed or abandoned run cannot be abandoned")

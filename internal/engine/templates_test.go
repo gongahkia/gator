@@ -67,6 +67,9 @@ func TestVerifierRunsDeterministicChecks(t *testing.T) {
 			t.Fatalf("missing verifier command %q: %s", required, joined)
 		}
 	}
+	if !strings.Contains(joined, "export PATH GOMODCACHE GOCACHE") {
+		t.Fatalf("Go verifier environment is not preserved across commands: %s", joined)
+	}
 	if !strings.Contains(joined, "norbot_verify_node_") || !strings.Contains(joined, "norbot_verify_go_") {
 		t.Fatalf("dependency cache volumes were not used: %s", joined)
 	}
@@ -173,6 +176,28 @@ func TestBuilderResponseIsBoundedToGeneratedApp(t *testing.T) {
 	diagnostics := builderResponseDiagnostics(err)
 	if diagnostics["required_path_prefix"] != "generated-app/" || diagnostics["invalid_path"] != "../escape" {
 		t.Fatalf("diagnostics=%#v", diagnostics)
+	}
+}
+
+func TestBuilderResponseTargetsDeployableSource(t *testing.T) {
+	run := domain.Run{Profile: domain.ProfileFullStack}
+	if err := validateBuilderFiles(run, map[string]string{"generated-app/frontend/src/main.jsx": "export default null"}); err != nil {
+		t.Fatal(err)
+	}
+	err := validateBuilderFiles(run, map[string]string{"generated-app/index.html": "<main />"})
+	validation, ok := err.(builderResponseError)
+	if !ok || validation.reason != "path_outside_deployable_source" || validation.invalidPath != "generated-app/index.html" {
+		t.Fatalf("validation=%#v", validation)
+	}
+	if diagnostics := builderResponseDiagnostics(err); diagnostics["required_path_prefix"] != "generated-app/frontend/" {
+		t.Fatalf("diagnostics=%#v", diagnostics)
+	}
+}
+
+func TestVerifyRejectsRevisionWithoutDeployableSource(t *testing.T) {
+	report, err := verifyApp(context.Background(), nil, domain.Run{Profile: domain.ProfileFullStack}, map[string]string{"generated-app/index.html": "<main />"})
+	if err == nil || report["status"] != "fail" || report["summary"] != "Builder revision does not modify deployable application source." {
+		t.Fatalf("report=%#v err=%v", report, err)
 	}
 }
 

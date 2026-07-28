@@ -1036,6 +1036,9 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			if err := workspace.MirrorGeneratedApp(ctx, run.ID); err != nil {
 				return err
 			}
+			if err := validateBuilderFiles(run, files); err != nil {
+				return err
+			}
 			revision, err := s.store.CreateRevision(ctx, domain.Revision{RunID: run.ID, Kind: revisionKind(job.Attempt), Attempt: job.Attempt, BaselineDigest: digestFiles(baseline), PatchDigest: digestStringMap(files), Files: files, Report: map[string]any{"provider": result.Provider, "model": result.Model}})
 			if err != nil {
 				return err
@@ -1044,6 +1047,9 @@ func (s *Service) execute(ctx context.Context, job domain.Job) (err error) {
 			generatedFiles = mapKeys(files)
 		} else {
 			files, err := builderFiles(result.Text)
+			if err == nil {
+				err = validateBuilderFiles(run, files)
+			}
 			if err != nil {
 				diagnostics := builderResponseDiagnostics(err)
 				artifact["builder_validation"] = diagnostics
@@ -1165,6 +1171,12 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 	if len(changedSets) > 0 && changedSets[0] != nil {
 		changed = changedSets[0]
 	}
+	if len(changed) > 0 {
+		if err := validateBuilderFiles(run, changed); err != nil {
+			report := map[string]any{"status": "fail", "checks": []string{"deployable source contract"}, "builder_validation": builderResponseDiagnostics(err), "summary": "Builder revision does not modify deployable application source."}
+			return report, fmt.Errorf("verification failed: %w", err)
+		}
+	}
 	if verifier, ok := workspace.(interface {
 		VerifyChanged(context.Context, domain.Run, map[string]string) (map[string]any, error)
 	}); ok && run.DeploymentTarget == domain.DeploymentKubernetes {
@@ -1264,7 +1276,7 @@ func verifyApp(ctx context.Context, workspace runtime.WorkspaceBackend, run doma
 			}
 			checks = append(checks, "fast Go test")
 		}
-		backend := append(backendMount, "PATH=/cache/bin:$PATH GOMODCACHE=/cache/mod GOCACHE=/cache/build go test ./... && go build ./... && govulncheck ./...")
+		backend := append(backendMount, "PATH=/cache/bin:$PATH; GOMODCACHE=/cache/mod; GOCACHE=/cache/build; export PATH GOMODCACHE GOCACHE; go test ./... && go build ./... && govulncheck ./...")
 		if err := runCommand(dockerBin, backend...); err != nil {
 			return verificationFailure(ctx, runner, dockerBin, compose, checks, fmt.Errorf("Go test/build/govulncheck: %w", err), cache)
 		}
@@ -1393,13 +1405,13 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		base += "Approved skills: " + strings.Join(entries, ", ") + ". Their materialized instructions and manifest are under /workspace/selected-skills.\n"
 	}
 	if isCLI && stage == domain.StageBuilder {
-		return base + "The approved baseline is in /workspace/generated-app. Modify only that directory, then return a concise summary."
+		return base + "The approved baseline is in /workspace/generated-app. Put browser application code only under generated-app/frontend/; never put browser assets directly under generated-app/. For non-frontend profiles, backend code may be under generated-app/backend/. Modify only deployable source directories, then return a concise summary."
 	}
 	if stage == domain.StagePlanner {
 		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"...\",\"stack\":[],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"}],\"edges\":[]}},\"notes\":\"...\"}. Workflow requires input and output nodes."
 	}
 	if stage == domain.StageBuilder {
-		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/path/to/file\":\"complete source\"}}. Every files key must start with generated-app/; never return bare paths such as index.html. Include only approved files, use safe relative paths, and preserve required profile files."
+		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/frontend/src/main.jsx\":\"complete source\"}}. Browser application files must be under generated-app/frontend/; never create browser assets directly under generated-app/. For non-frontend profiles, backend files may be under generated-app/backend/. Include at least one generated-app/frontend/ file, use safe relative paths, and preserve required profile files."
 	}
 	return base + "Return concise verification notes."
 }
@@ -1468,6 +1480,24 @@ func builderFiles(text string) (map[string]string, error) {
 	return files, nil
 }
 
+func validateBuilderFiles(run domain.Run, files map[string]string) error {
+	frontend := false
+	for _, path := range mapKeys(files) {
+		switch {
+		case strings.HasPrefix(path, "generated-app/frontend/"):
+			frontend = true
+		case run.Profile != domain.ProfileFrontend && strings.HasPrefix(path, "generated-app/backend/"):
+		case path == "generated-app/docker-compose.yml":
+		default:
+			return builderResponseError{reason: "path_outside_deployable_source", invalidPath: path, fileCount: len(files)}
+		}
+	}
+	if !frontend {
+		return builderResponseError{reason: "missing_frontend_files", fileCount: len(files)}
+	}
+	return nil
+}
+
 type builderResponseError struct {
 	reason, invalidPath      string
 	fileCount, responseBytes int
@@ -1484,6 +1514,10 @@ func (e builderResponseError) Error() string {
 		return fmt.Sprintf("invalid builder content for %q", e.invalidPath)
 	case "path_outside_generated_app":
 		return fmt.Sprintf("builder path %q is outside generated-app", e.invalidPath)
+	case "path_outside_deployable_source":
+		return fmt.Sprintf("builder path %q is outside deployable source directories", e.invalidPath)
+	case "missing_frontend_files":
+		return "builder response must include a generated-app/frontend/ file"
 	default:
 		return "invalid builder response"
 	}
@@ -1494,7 +1528,11 @@ func builderResponseDiagnostics(err error) map[string]any {
 	if !ok {
 		return map[string]any{"reason": "unknown"}
 	}
-	return map[string]any{"reason": value.reason, "invalid_path": value.invalidPath, "file_count": value.fileCount, "response_bytes": value.responseBytes, "required_path_prefix": "generated-app/"}
+	required := "generated-app/"
+	if value.reason == "path_outside_deployable_source" || value.reason == "missing_frontend_files" {
+		required = "generated-app/frontend/"
+	}
+	return map[string]any{"reason": value.reason, "invalid_path": value.invalidPath, "file_count": value.fileCount, "response_bytes": value.responseBytes, "required_path_prefix": required}
 }
 
 func writeStageArtifact(ctx context.Context, workspace runtime.WorkspaceBackend, runID, path string, artifact map[string]any) error {
@@ -1511,6 +1549,9 @@ func writeStageArtifact(ctx context.Context, workspace runtime.WorkspaceBackend,
 func applyBuilderResponse(workspace runtime.ArtifactWorkspace, run domain.Run, text string) ([]string, error) {
 	files, err := builderFiles(text)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateBuilderFiles(run, files); err != nil {
 		return nil, err
 	}
 	for path, content := range files {
