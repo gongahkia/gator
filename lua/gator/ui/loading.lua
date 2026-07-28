@@ -219,20 +219,33 @@ local function render(panel)
 	return true
 end
 
+local function stop_timer(panel)
+	local timer = panel.timer
+	panel.timer = nil
+	if timer and not timer:is_closing() then
+		timer:stop()
+		timer:close()
+	end
+end
+
 local function schedule(panel)
 	if panel.closed or not panel.animate then
 		return
 	end
-	local generation = panel.generation
-	vim.defer_fn(function()
-		if panel.closed or panel.generation ~= generation then
-			return
-		end
-		M.advance(panel.animation)
-		if render(panel) then
-			schedule(panel)
-		end
-	end, panel.animation.interval_ms)
+	local timer = vim.uv.new_timer()
+	panel.timer = timer
+	timer:start(
+		panel.animation.interval_ms,
+		panel.animation.interval_ms,
+		vim.schedule_wrap(function()
+			if panel.closed or panel.timer ~= timer or not panel_valid(panel) then
+				stop_timer(panel)
+				return
+			end
+			M.advance(panel.animation)
+			render(panel)
+		end)
+	)
 end
 
 function M.open(opts)
@@ -302,6 +315,7 @@ function M.open(opts)
 			return false
 		end
 		panel.closed, panel.generation, panels[panel.id] = true, panel.generation + 1, nil
+		stop_timer(panel)
 		if vim.api.nvim_win_is_valid(panel.window) then
 			vim.api.nvim_win_close(panel.window, true)
 		end
@@ -313,6 +327,7 @@ end
 function M.close()
 	for _, panel in pairs(panels) do
 		panel.closed, panel.generation = true, panel.generation + 1
+		stop_timer(panel)
 		if vim.api.nvim_win_is_valid(panel.window) then
 			vim.api.nvim_win_close(panel.window, true)
 		end

@@ -45,3 +45,22 @@ local generated = loading.animation({
 })
 assert(loading.frame(generated) == "🀀", "Whirly procedural spinners must remain selectable")
 assert(not pcall(loading.configure, { spinner = "missing" }), "unknown loading spinners must fail configuration")
+
+local original_list_uis = vim.api.nvim_list_uis
+vim.api.nvim_list_uis = function()
+	return { {} }
+end
+loading.configure({ enabled = true, spinner = "rattles.braille.dots", interval_ms = 16 }, { enabled = true, reduced = false })
+local handle = loading.open({ message = "timer test" })
+local buffer = vim.tbl_filter(function(id)
+	return vim.bo[id].filetype == "gator-loading"
+end, vim.api.nvim_list_bufs())[1]
+local first_frame = vim.api.nvim_buf_get_lines(buffer, 0, 1, false)[1]
+assert(
+	vim.wait(200, function()
+		return vim.api.nvim_buf_get_lines(buffer, 0, 1, false)[1] ~= first_frame
+	end, 10),
+	"floating loading panels must advance their spinner frame"
+)
+handle.close()
+vim.api.nvim_list_uis = original_list_uis
