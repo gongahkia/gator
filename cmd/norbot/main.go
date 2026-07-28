@@ -102,7 +102,7 @@ func evalCommand(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		results := eval.OfflineResults(corpus, *providerID, *model, *caseID)
+		results := eval.DeterministicResults(corpus, *providerID, *model, *caseID)
 		if *caseID != "" && len(results) == 0 {
 			fmt.Fprintln(os.Stderr, "unknown eval case")
 			os.Exit(2)
@@ -112,7 +112,7 @@ func evalCommand(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"mode": "fixture_validation", "provider": *providerID, "model": *model, "max_cost": *maxCost, "results": results, "score": score})
+		_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"mode": "deterministic_contract_evaluation", "provider": *providerID, "model": *model, "max_cost": *maxCost, "results": results, "score": score})
 	case "score":
 		flags := flag.NewFlagSet("eval score", flag.ExitOnError)
 		dir := flags.String("dir", "evals/v1", "corpus directory")
@@ -134,8 +134,14 @@ func evalCommand(args []string) {
 		}
 		var results []eval.Result
 		if err := json.Unmarshal(data, &results); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			var envelope struct {
+				Results []eval.Result `json:"results"`
+			}
+			if envelopeErr := json.Unmarshal(data, &envelope); envelopeErr != nil || envelope.Results == nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			results = envelope.Results
 		}
 		score, err := eval.ScoreResults(corpus, results)
 		if err != nil {

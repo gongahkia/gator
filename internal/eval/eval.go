@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/norbot/internal/domain"
+	"github.com/gongahkia/norbot/internal/engine"
 )
 
 const Version = "v1"
@@ -92,15 +93,55 @@ func (c Corpus) Validate() error {
 	}
 	return nil
 }
-func OfflineResults(c Corpus, provider, model, only string) []Result {
+func DeterministicResults(c Corpus, provider, model, only string) []Result {
 	values := []Result{}
 	for _, item := range c.Cases {
 		if only != "" && item.ID != only {
 			continue
 		}
-		values = append(values, Result{CaseID: item.ID, Provider: provider, Model: model, Outcome: item.Expected.Outcome, Classification: item.Expected.Classification, Passed: true})
+		result := Result{CaseID: item.ID, Provider: provider, Model: model, Passed: true}
+		switch item.Kind {
+		case "app_spec":
+			architecture := item.Architecture
+			if architecture.Acceptance.Empty() {
+				architecture.Acceptance = domain.CompileAcceptance(architecture)
+			}
+			if err := architecture.Validate(); err != nil {
+				result.Outcome = "rejected"
+			} else {
+				result.Outcome = "accepted"
+			}
+		case "builder_failure":
+			err := engine.ValidateGeneratedFiles(domain.Run{Profile: domain.ProfileFullStack}, map[string]string{builderFixturePath(item.Prompt): "fixture"})
+			if err == nil {
+				result.Outcome = "accepted"
+			} else {
+				result.Outcome = "rejected"
+				result.Classification = engine.ClassifyVerificationFailure(err)
+			}
+		case "verification_failure":
+			result.Outcome = "failed"
+			result.Classification = engine.ClassifyVerificationFailure(fmt.Errorf("%s", item.Prompt))
+		case "prompt_injection":
+			if InjectionPrompt(item.Prompt) {
+				result.Outcome = "rejected"
+			} else {
+				result.Outcome = "accepted"
+			}
+		default:
+			result.Outcome = "invalid"
+			result.Passed = false
+		}
+		values = append(values, result)
 	}
 	return values
+}
+
+func builderFixturePath(prompt string) string {
+	if strings.HasSuffix(prompt, " only") {
+		return strings.TrimSuffix(prompt, " only")
+	}
+	return prompt
 }
 func ScoreResults(c Corpus, results []Result) (Score, error) {
 	expected := map[string]Expected{}
@@ -154,5 +195,5 @@ func CaseIDs(c Corpus) []string {
 }
 func InjectionPrompt(value string) bool {
 	value = strings.ToLower(value)
-	return strings.Contains(value, "ignore previous") || strings.Contains(value, "system prompt") || strings.Contains(value, "exfiltrate")
+	return strings.Contains(value, "ignore previous") || strings.Contains(value, "ignore policy") || strings.Contains(value, "system prompt") || strings.Contains(value, "exfiltrate") || strings.Contains(value, "docker socket")
 }

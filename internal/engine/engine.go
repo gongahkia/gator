@@ -298,6 +298,34 @@ func (s *Service) UpdateAcceptance(ctx context.Context, runID string, acceptance
 	return s.UpdateArchitecture(ctx, runID, run.Architecture)
 }
 
+func (s *Service) VerificationCommands(ctx context.Context, runID string) ([]runtime.CommandRecord, error) {
+	if _, err := s.store.GetRun(ctx, runID); err != nil {
+		return nil, err
+	}
+	revision, err := s.store.LatestRevision(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+	path, _ := revision.Report["command_log_artifact"].(string)
+	if path == "" {
+		return []runtime.CommandRecord{}, nil
+	}
+	if !strings.HasPrefix(path, "stage-output/verification-commands-") || !strings.HasSuffix(path, ".json") || strings.Contains(path, "..") {
+		return nil, fmt.Errorf("invalid verification command artifact path")
+	}
+	encoded, err := os.ReadFile(filepath.Join(s.config.ArtifactsDir, runID, filepath.FromSlash(path)))
+	if err != nil {
+		return nil, fmt.Errorf("read verification command artifact: %w", err)
+	}
+	var artifact struct {
+		Commands []runtime.CommandRecord `json:"commands"`
+	}
+	if err := json.Unmarshal(encoded, &artifact); err != nil {
+		return nil, fmt.Errorf("decode verification command artifact: %w", err)
+	}
+	return artifact.Commands, nil
+}
+
 func (s *Service) CreateChangeRun(ctx context.Context, runID, change string, architectureAffecting bool) (domain.Run, error) {
 	change = strings.TrimSpace(change)
 	if change == "" {
@@ -1542,6 +1570,11 @@ func proposeRepair(cause error, commands []runtime.CommandRecord) map[string]any
 	return proposal
 }
 
+func ClassifyVerificationFailure(cause error) string {
+	classification, _ := proposeRepair(cause, nil)["classification"].(string)
+	return classification
+}
+
 func failedCommand(commands []runtime.CommandRecord) map[string]any {
 	for index := len(commands) - 1; index >= 0; index-- {
 		if commands[index].ExitCode != 0 {
@@ -1729,6 +1762,10 @@ func validateBuilderFiles(run domain.Run, files map[string]string) error {
 		return builderResponseError{reason: "missing_frontend_files", fileCount: len(files)}
 	}
 	return nil
+}
+
+func ValidateGeneratedFiles(run domain.Run, files map[string]string) error {
+	return validateBuilderFiles(run, files)
 }
 
 func boundedRepairPaths(feedback string) []string {

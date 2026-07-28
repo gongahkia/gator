@@ -8,4 +8,5 @@ test("review UI preserves bounded repair and acceptance controls", async () => {
   assert.match(source, /Approve bounded fix/);
   assert.match(source, /Acceptance contract — editable before approval/);
   assert.match(source, /recorded command/);
+	assert.match(source, /Full command log artifact/);
 });

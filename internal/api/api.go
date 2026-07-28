@@ -107,6 +107,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/runs/{id}/architecture", s.updateArchitecture)
 	mux.HandleFunc("GET /api/runs/{id}/acceptance", s.acceptance)
 	mux.HandleFunc("PUT /api/runs/{id}/acceptance", s.updateAcceptance)
+	mux.HandleFunc("GET /api/runs/{id}/verification-commands", s.verificationCommands)
 	mux.HandleFunc("POST /api/runs/{id}/change-runs", s.createChangeRun)
 	mux.HandleFunc("GET /api/runs/{id}/events", s.events)
 	mux.HandleFunc("GET /api/runs/{id}/trace", s.trace)
@@ -716,6 +717,19 @@ func (s *Server) updateAcceptance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) verificationCommands(w http.ResponseWriter, r *http.Request) {
+	commands, err := s.service.VerificationCommands(r.Context(), r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, commands)
 }
 
 func (s *Server) createChangeRun(w http.ResponseWriter, r *http.Request) {
