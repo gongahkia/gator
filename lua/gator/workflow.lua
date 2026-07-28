@@ -1102,14 +1102,23 @@ function Workflow:open_conversation(run)
 	})
 end
 
-function Workflow:append_transcript(id, role, message)
+function Workflow:append_transcript(id, role, message, append)
 	local run = self:run(id)
 	if run.transcript ~= "available" or type(message) ~= "string" or message == "" then
 		return false
 	end
-	self.transcripts[id] = self.transcripts[id] or {}
-	table.insert(self.transcripts[id], "## " .. role .. "\n" .. message)
-	self.store:transcript(id, table.concat(self.transcripts[id], "\n\n"))
+	if not self.transcripts[id] then
+		local transcript = self.store:read_transcript(id)
+		self.transcripts[id] = transcript and vim.split(transcript, "\n\n", { plain = true, trimempty = false }) or {}
+	end
+	local parts = self.transcripts[id]
+	local header = "## " .. role .. "\n"
+	if append and role == "assistant" and type(parts[#parts]) == "string" and vim.startswith(parts[#parts], header) then
+		parts[#parts] = parts[#parts] .. message
+	else
+		table.insert(parts, header .. message)
+	end
+	self.store:transcript(id, table.concat(parts, "\n\n"))
 	return true
 end
 
@@ -1188,8 +1197,8 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 			if kind == "running" then
 				self:journal(run.id, "provider.running", { transport = "structured" })
 			elseif kind == "text" then
-				self:append_transcript(run.id, "assistant", value)
-				pcall(conversation.update, { run_id = run.id, text = value, state = "running" })
+				self:append_transcript(run.id, "assistant", value, true)
+				pcall(conversation.update, { run_id = run.id, text = value, append = true, state = "running" })
 			elseif kind == "settled" then
 				self:journal(run.id, "provider.settled", { transport = "structured" })
 				self:update(run.id, { state = "waiting_input" })

@@ -43,6 +43,18 @@ local function append_lines(target, value)
 	end
 end
 
+local function append_fragment(target, value)
+	local lines = vim.split(redact.text(value), "\n", { plain = true, trimempty = false })
+	if #target == 0 then
+		vim.list_extend(target, lines)
+		return
+	end
+	target[#target] = target[#target] .. lines[1]
+	for index = 2, #lines do
+		table.insert(target, lines[index])
+	end
+end
+
 local function input(panel)
 	vim.ui.input({ prompt = "Gator prompt: " }, function(value)
 		if type(value) == "string" and vim.trim(value) ~= "" then
@@ -148,7 +160,11 @@ function M.update(opts)
 	end
 	if opts.text ~= nil and opts.text ~= "" then
 		local value = redact.text(opts.text)
-		append_lines(panel.lines, value)
+		if opts.append then
+			append_fragment(panel.lines, value)
+		else
+			append_lines(panel.lines, value)
+		end
 		panel.on_message("assistant", value)
 	end
 	render(panel)
