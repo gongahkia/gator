@@ -1,6 +1,11 @@
 local M = {}
+local registered = false
 
 function M.register()
+	if registered then
+		return false
+	end
+	registered = true
 	vim.api.nvim_create_user_command("Gator", function(opts)
 		require("gator").dispatch("open", {
 			provider = opts.args ~= "" and opts.args or nil,
@@ -90,6 +95,7 @@ function M.register()
 			{ title = "Gator" }
 		)
 	end, { nargs = "?", desc = "Stop an active Gator-managed run" })
+	return true
 end
 
 return M

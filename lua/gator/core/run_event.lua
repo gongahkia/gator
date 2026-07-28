@@ -20,6 +20,8 @@ M.types = {
 	["context.sent"] = true,
 	["context.cancelled"] = true,
 	["handoff.prepared"] = true,
+	["handoff.reviewed"] = true,
+	["handoff.delivered"] = true,
 	["review.recorded"] = true,
 }
 

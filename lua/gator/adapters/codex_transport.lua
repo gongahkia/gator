@@ -174,9 +174,11 @@ local function response(message, request, index)
 			"initialize result"
 		)
 		string(message.result.userAgent, "initialize result.userAgent")
-		local home = string(message.result.codexHome, "initialize result.codexHome")
-		if home:sub(1, 1) ~= "/" then
-			fail("initialize result.codexHome must be an absolute path")
+		if message.result.codexHome ~= nil then
+			local home = string(message.result.codexHome, "initialize result.codexHome")
+			if home:sub(1, 1) ~= "/" then
+				fail("initialize result.codexHome must be an absolute path")
+			end
 		end
 		string(message.result.platformFamily, "initialize result.platformFamily")
 		string(message.result.platformOs, "initialize result.platformOs")

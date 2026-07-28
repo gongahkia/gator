@@ -59,6 +59,13 @@ end
 
 local function rpc_client(opts, initialized, callback)
 	local process, buffer, sequence, pending, closed = nil, "", 0, {}, false
+	local function dispatch(fn)
+		if vim.in_fast_event() then
+			vim.schedule(fn)
+		else
+			fn()
+		end
+	end
 	local function finish(result, reason)
 		if closed then
 			return
@@ -82,6 +89,14 @@ local function rpc_client(opts, initialized, callback)
 			pending[id] = nil
 			finish(nil, "provider RPC write failed")
 		end
+	end
+	local function notify(method, params)
+		local ok, detail = pcall(process.write, process, vim.json.encode({ method = method, params = params }) .. "\n")
+		if not ok or detail == false then
+			finish(nil, "provider RPC notification could not be written")
+			return false
+		end
+		return true
 	end
 	local function feed(chunk)
 		if closed or type(chunk) ~= "string" or chunk == "" then
@@ -111,22 +126,30 @@ local function rpc_client(opts, initialized, callback)
 		cwd = opts.cwd,
 		text = true,
 		stdout = function(_, data)
-			feed(data)
+			if data and data ~= "" then
+				dispatch(function()
+					feed(data)
+				end)
+			end
 		end,
 		stderr = function() end,
 	}, function(result)
-		if not closed then
-			finish(nil, "provider RPC exited " .. tostring(result and result.code or "before initialization"))
-		end
+		dispatch(function()
+			if not closed then
+				finish(nil, "provider RPC exited " .. tostring(result and result.code or "before initialization"))
+			end
+		end)
 	end)
 	if not ok or (type(value) ~= "table" and type(value) ~= "userdata") or type(value.write) ~= "function" then
 		finish(nil, "provider RPC could not start")
 		return
 	end
 	process = value
-	initialized(request, finish)
+	initialized(request, notify, finish)
 	vim.defer_fn(function()
-		finish(nil, "provider RPC initialization timed out")
+		dispatch(function()
+			finish(nil, "provider RPC initialization timed out")
+		end)
 	end, 10000)
 end
 
@@ -185,25 +208,32 @@ function Bridge:start(opts, callback)
 	end
 	if provider_name == "codex" then
 		rpc_client(
-			{ spawn = self.spawn, command = { executable, "app-server", "--stdio" }, cwd = cwd },
-			function(request, finish)
-				request("initialize", { clientInfo = { name = "gator", version = "1" } }, function(_, err)
-					if err then
-						finish(nil, "Codex app-server initialization failed")
-						return
-					end
-					request("thread/start", { cwd = cwd, ephemeral = false }, function(result, start_err)
-						local id = result and result.thread and result.thread.id
-						if start_err or type(id) ~= "string" or id == "" then
-							finish(nil, "Codex thread creation failed")
+			{ spawn = self.spawn, command = { executable, "app-server" }, cwd = cwd },
+			function(request, notify, finish)
+				request(
+					"initialize",
+					{ clientInfo = { name = "gator", title = "Gator", version = "1" } },
+					function(_, err)
+						if err then
+							finish(nil, "Codex app-server initialization failed")
 							return
 						end
-						finish({
-							session = { provider = "codex", id = id, owner = "provider" },
-							command = { executable, "resume", id, prompt },
-						})
-					end)
-				end)
+						if not notify("initialized", vim.empty_dict()) then
+							return
+						end
+						request("thread/start", { cwd = cwd, ephemeral = false }, function(result, start_err)
+							local id = result and result.thread and result.thread.id
+							if start_err or type(id) ~= "string" or id == "" then
+								finish(nil, "Codex thread creation failed")
+								return
+							end
+							finish({
+								session = { provider = "codex", id = id, owner = "provider" },
+								command = { executable, "resume", id, prompt },
+							})
+						end)
+					end
+				)
 			end,
 			callback
 		)
@@ -211,7 +241,7 @@ function Bridge:start(opts, callback)
 	end
 	rpc_client(
 		{ spawn = self.spawn, command = { executable, "acp", "--cwd", cwd }, cwd = cwd, jsonrpc = true },
-		function(request, finish)
+		function(request, _, finish)
 			request("initialize", {
 				protocolVersion = 1,
 				clientCapabilities = vim.empty_dict(),

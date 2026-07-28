@@ -59,6 +59,9 @@ local function spawn(command, opts)
 	function process:write(frame)
 		local request = vim.json.decode(frame)
 		table.insert(requests, request)
+		if request.id == nil then
+			return true
+		end
 		local result
 		if request.method == "thread/start" then
 			result = { thread = { id = "codex-thread" } }
@@ -67,7 +70,9 @@ local function spawn(command, opts)
 		else
 			result = {}
 		end
-		opts.stdout(nil, vim.json.encode({ id = request.id, result = result }) .. "\n")
+		vim.schedule(function()
+			opts.stdout(nil, vim.json.encode({ id = request.id, result = result }) .. "\n")
+		end)
 		return true
 	end
 	function process:kill()
@@ -82,9 +87,13 @@ rpc_bridge:start({ provider = "codex", cwd = vim.g.gator_test.root, prompt = "Re
 	codex = value
 end)
 assert(
-	vim.deep_equal(spawned[1].command, { "codex", "app-server", "--stdio" })
-		and requests[2].method == "thread/start"
-		and requests[2].params.ephemeral == false
+	vim.wait(1000, function()
+		return codex ~= nil
+	end)
+		and vim.deep_equal(spawned[1].command, { "codex", "app-server" })
+		and requests[2].method == "initialized"
+		and requests[3].method == "thread/start"
+		and requests[3].params.ephemeral == false
 		and vim.deep_equal(codex.command, { "codex", "resume", "codex-thread", "Review Codex" }),
 	"Codex launch must create a persistent app-server thread before opening its native terminal"
 )
@@ -97,13 +106,55 @@ rpc_bridge:start(
 	end
 )
 assert(
-	vim.deep_equal(spawned[2].command, { "opencode", "acp", "--cwd", vim.g.gator_test.root })
-		and requests[3].jsonrpc == "2.0"
+	vim.wait(1000, function()
+		return opencode ~= nil
+	end)
+		and vim.deep_equal(spawned[2].command, { "opencode", "acp", "--cwd", vim.g.gator_test.root })
 		and requests[4].jsonrpc == "2.0"
-		and requests[4].method == "session/new"
+		and requests[5].jsonrpc == "2.0"
+		and requests[5].method == "session/new"
 		and vim.deep_equal(
 			opencode.command,
 			{ "opencode", "--session", "opencode-session", "--prompt", "Review OpenCode" }
 		),
 	"OpenCode launch must negotiate ACP and preserve the provider-owned session id in its terminal command"
+)
+
+local terminal_safe = false
+local terminal_timer
+local callback_bridge = require("gator.adapters.native_terminal").new({
+	spawn = function(_, opts)
+		return {
+			write = function(_, frame)
+				local request = vim.json.decode(frame)
+				if request.id == nil then
+					return true
+				end
+				local result = request.method == "thread/start" and { thread = { id = "fast-thread" } } or {}
+				terminal_timer = vim.uv.new_timer()
+				terminal_timer:start(0, 0, function()
+					terminal_timer:stop()
+					terminal_timer:close()
+					opts.stdout(nil, vim.json.encode({ id = request.id, result = result }) .. "\n")
+				end)
+				return true
+			end,
+			kill = function()
+				return true
+			end,
+		}
+	end,
+})
+callback_bridge:start(
+	{ provider = "codex", cwd = vim.g.gator_test.root, prompt = "Check callback context" },
+	function(value)
+		local checked = vim.system({ "git", "rev-parse", "--is-inside-work-tree" }, { text = true }):wait()
+		terminal_safe = value.session.id == "fast-thread" and checked.code == 0
+	end
+)
+assert(
+	vim.wait(1000, function()
+		return terminal_safe
+	end),
+	"terminal bridge callbacks must schedule lifecycle work outside fast-event context"
 )

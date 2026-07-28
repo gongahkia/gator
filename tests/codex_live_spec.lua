@@ -17,7 +17,7 @@ end
 local redact = require("gator.policy.redact")
 local uv = vim.uv
 local stdin, stdout, stderr = uv.new_pipe(false), uv.new_pipe(false), uv.new_pipe(false)
-local responses, turns, completed, buffer = {}, {}, {}, ""
+local responses, turns, completed, buffer, stderr_buffer = {}, {}, {}, "", ""
 local handle
 local function close()
 	if handle and not handle:is_closing() then
@@ -73,7 +73,10 @@ local function request(id, method, params)
 		vim.wait(10000, function()
 			return response() ~= nil
 		end),
-		"authenticated Codex verification timed out waiting for " .. method
+		"authenticated Codex verification timed out waiting for "
+			.. method
+			.. ": "
+			.. redact.text(vim.trim(stderr_buffer))
 	)
 	local value = response()
 	if type(value.result) ~= "table" then
@@ -87,16 +90,20 @@ local workspace = vim.fn.tempname()
 assert(vim.fn.mkdir(workspace, "p") == 1, "authenticated Codex verification requires a temporary workspace")
 local thread_id
 local ok, failure = xpcall(function()
-	handle = assert(
-		uv.spawn("codex", { args = { "app-server", "--stdio" }, stdio = { stdin, stdout, stderr } }, function() end)
-	)
+	handle = assert(uv.spawn("codex", { args = { "app-server" }, stdio = { stdin, stdout, stderr } }, function() end))
 	stdout:read_start(function(error, data)
 		assert(not error, "authenticated Codex verification received app-server stdout failure")
 		if data then
 			record(data)
 		end
 	end)
-	request("gator-live-initialize", "initialize", { clientInfo = { name = "gator", version = "1" } })
+	stderr:read_start(function(_, data)
+		if data then
+			stderr_buffer = stderr_buffer .. data
+		end
+	end)
+	request("gator-live-initialize", "initialize", { clientInfo = { name = "gator", title = "Gator", version = "1" } })
+	stdin:write(vim.json.encode({ method = "initialized", params = {} }) .. "\n")
 	local started = request("gator-live-thread-start", "thread/start", { cwd = workspace, ephemeral = false })
 	assert(
 		type(started.thread) == "table" and type(started.thread.id) == "string" and started.thread.id ~= "",

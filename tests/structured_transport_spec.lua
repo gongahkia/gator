@@ -3,8 +3,9 @@ local structured = require("gator.adapters.structured")
 local function fake_manager()
 	local sent, process = {}, {}
 	local manager = structured.new({
+		startup_timeout_ms = 0,
 		spawn = function(argv, opts, done)
-			process.argv, process.stdout, process.done = argv, opts.stdout, done
+			process.argv, process.stdout, process.stderr, process.done = argv, opts.stdout, opts.stderr, done
 			return {
 				write = function(_, value)
 					table.insert(sent, vim.json.decode(vim.trim(value)))
@@ -137,13 +138,17 @@ manager:open({
 	end,
 })
 assert(
-	process.argv[1] == "codex" and process.argv[2] == "app-server" and sent[1].method == "initialize",
-	"Codex chat must start App Server"
+	process.argv[1] == "codex"
+		and process.argv[2] == "app-server"
+		and sent[1].method == "initialize"
+		and sent[1].jsonrpc == nil
+		and #sent == 1,
+	"Codex chat must wait for the initialization result before sending initialized"
 )
 process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 1, result = {} }) .. "\n")
 assert(
 	sent[2].method == "initialized" and sent[3].method == "thread/start",
-	"Codex initialization must complete before thread creation"
+	"Codex initialization result must be acknowledged before thread creation"
 )
 process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 2, result = { thread = { id = "thread-1" } } }) .. "\n")
 assert(
@@ -266,6 +271,150 @@ assert(
 	approval.action == "execute command"
 		and approval.command == "git status"
 		and sent[#sent].id == "approval-1"
+		and sent[#sent].jsonrpc == nil
 		and sent[#sent].result.decision == "accept",
 	"Codex approval requests must be surfaced and receive an explicit user decision"
+)
+
+manager, sent, process = fake_manager()
+local safe_session = false
+manager:open({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	prompt = "review this",
+	on_session = function()
+		local result = vim.system({ "git", "rev-parse", "--is-inside-work-tree" }, { text = true }):wait()
+		safe_session = result.code == 0
+	end,
+})
+local first, second = vim.uv.new_timer(), vim.uv.new_timer()
+first:start(0, 0, function()
+	first:stop()
+	first:close()
+	process.stdout(nil, vim.json.encode({ id = 1, result = {} }) .. "\n")
+	second:start(10, 0, function()
+		second:stop()
+		second:close()
+		process.stdout(nil, vim.json.encode({ id = 2, result = { thread = { id = "thread-fast" } } }) .. "\n")
+	end)
+end)
+assert(
+	vim.wait(1000, function()
+		return safe_session
+	end),
+	"structured stdout callbacks must schedule provider lifecycle work outside fast-event context"
+)
+
+manager, sent, process = fake_manager()
+local exit_code = nil
+manager:open({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	prompt = "review this",
+	on_exit = function(result)
+		local checked = vim.system({ "git", "rev-parse", "--is-inside-work-tree" }, { text = true }):wait()
+		assert(checked.code == 0, "scheduled exit callback must permit normal Neovim work")
+		exit_code = result.code
+	end,
+})
+local exit_timer = vim.uv.new_timer()
+exit_timer:start(0, 0, function()
+	exit_timer:stop()
+	exit_timer:close()
+	process.done({ code = 17 })
+end)
+assert(
+	vim.wait(1000, function()
+		return exit_code == 17
+	end),
+	"structured exit callbacks must schedule cleanup outside fast-event context"
+)
+
+manager, sent, process = fake_manager()
+local stderr_safe = false
+manager:open({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	prompt = "review this",
+	on_event = function(kind)
+		if kind == "error" then
+			local checked = vim.system({ "git", "rev-parse", "--is-inside-work-tree" }, { text = true }):wait()
+			stderr_safe = checked.code == 0
+		end
+	end,
+})
+local stderr_timer = vim.uv.new_timer()
+stderr_timer:start(0, 0, function()
+	stderr_timer:stop()
+	stderr_timer:close()
+	process.stderr(nil, "provider startup diagnostic")
+end)
+assert(
+	vim.wait(1000, function()
+		return stderr_safe
+	end),
+	"structured stderr callbacks must schedule provider lifecycle work outside fast-event context"
+)
+
+local rejected, rejected_killed = nil, false
+local rejected_manager = structured.new({
+	startup_timeout_ms = 0,
+	spawn = function(_, opts)
+		return {
+			write = function(_, value)
+				return vim.json.decode(vim.trim(value)).method == "initialize"
+			end,
+			kill = function()
+				rejected_killed = true
+				return true
+			end,
+			stdout = opts.stdout,
+		}
+	end,
+})
+local rejected_handle = rejected_manager:open({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	prompt = "review this",
+	on_event = function(kind, value)
+		rejected = kind == "error" and value or rejected
+	end,
+})
+local rejected_current = rejected_manager.active[rejected_handle.id]
+rejected_current.handle.stdout(nil, vim.json.encode({ id = 1, error = { message = "initialize rejected" } }) .. "\n")
+assert(
+	rejected == "initialize rejected" and rejected_killed,
+	"rejected structured startup must fail visibly and stop the provider immediately"
+)
+
+local timed_out, killed = nil, false
+local timeout_manager = structured.new({
+	startup_timeout_ms = 1,
+	spawn = function(_, opts)
+		return {
+			write = function()
+				return true
+			end,
+			kill = function()
+				killed = true
+				return true
+			end,
+		}
+	end,
+})
+timeout_manager:open({
+	provider = "codex",
+	cwd = vim.fn.getcwd(),
+	prompt = "review this",
+	on_event = function(kind, value)
+		timed_out = kind == "error" and value or timed_out
+	end,
+})
+assert(
+	vim.wait(1000, function()
+		return timed_out ~= nil
+	end)
+		and timed_out:find("startup timed out", 1, true)
+		and killed,
+	"structured startup must fail visibly and stop the provider instead of spinning indefinitely"
 )

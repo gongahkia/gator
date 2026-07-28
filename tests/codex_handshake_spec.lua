@@ -33,6 +33,19 @@ assert(
 	"Codex handshakes must use the native initialize request"
 )
 
+local current = handshake.new({
+	request = function()
+		return {
+			id = "gator-handshake",
+			result = { userAgent = "gator-fixture/0.145", platformFamily = "unix", platformOs = "macos" },
+		}
+	end,
+})
+assert(
+	current:connect().state == "ready",
+	"Codex handshakes must accept the current initialize response without codexHome"
+)
+
 local failed = handshake.new({
 	request = function()
 		return { id = "gator-handshake", error = { code = -32000, message = "token=fixture-secret" } }

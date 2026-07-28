@@ -77,9 +77,11 @@ local function response(value, id)
 		"initialize result"
 	)
 	string(value.result.userAgent, "initialize result.userAgent")
-	local home = string(value.result.codexHome, "initialize result.codexHome")
-	if not absolute_path(home) then
-		fail("initialize result.codexHome must be an absolute path")
+	if value.result.codexHome ~= nil then
+		local home = string(value.result.codexHome, "initialize result.codexHome")
+		if not absolute_path(home) then
+			fail("initialize result.codexHome must be an absolute path")
+		end
 	end
 	return {
 		platform_family = string(value.result.platformFamily, "initialize result.platformFamily"),

@@ -34,7 +34,15 @@ nvim --cmd 'set rtp+=/absolute/path/to/gator' \
   --cmd 'lua require("gator").setup()' .
 ```
 
-Then run `:GatorHealth` from the target Git project, followed by `:Gator`.
+Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `require("gator").setup()` registers every Gator command; no extra `:runtime plugin/gator.lua` step is needed.
+
+## First run
+
+1. In the target Git checkout, open the relevant source file or visually select code.
+2. Run `:GatorHealth`. A green `codex` readiness line means the structured Codex path is ready; warnings for other providers are informational unless you plan to use them.
+3. Run `:Gator codex`, enter a concise objective, and wait for the chat pane. A startup error closes the spinner and marks the run failed instead of leaving it pending.
+4. In the chat, `i` sends a follow-up prompt, `c` cancels the current turn, and `q` detaches without stopping the provider.
+5. Run `:GatorRuns` to find detached runs. Press `<CR>` to focus one or run `:GatorStopSession [run-id]` to terminate Gator's local process.
 
 ## Commands
 

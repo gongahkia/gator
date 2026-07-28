@@ -19,6 +19,7 @@ function M.module(name)
 end
 
 function M.setup(opts)
+	require("gator.commands").register()
 	local next = coordinator.new(opts)
 	if M._coordinator then
 		M._coordinator:dispose()

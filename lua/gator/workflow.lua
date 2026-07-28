@@ -1196,7 +1196,9 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
 				self:finish_summary(run.id)
 			elseif kind == "error" then
+				self:close_loading(run.id)
 				self:journal(run.id, "provider.error", { code = failure_code(value), phase = "structured" })
+				self:update(run.id, { state = "failed" })
 				pcall(conversation.update, { run_id = run.id, text = value, state = "failed" })
 			end
 		end,

@@ -4,6 +4,7 @@ local codex_permission = require("gator.adapters.codex_permission")
 local M = {}
 local Manager = {}
 Manager.__index = Manager
+M.startup_timeout_ms = 15000
 
 local function fail(message)
 	error("Gator structured transport: " .. redact.text(tostring(message)), 3)
@@ -93,10 +94,26 @@ end
 
 function M.new(opts)
 	opts = opts or {}
-	if type(opts) ~= "table" or (opts.spawn ~= nil and type(opts.spawn) ~= "function") then
-		fail("new requires an optional spawn function")
+	if
+		type(opts) ~= "table"
+		or (opts.spawn ~= nil and type(opts.spawn) ~= "function")
+		or (
+			opts.startup_timeout_ms ~= nil
+			and (
+				type(opts.startup_timeout_ms) ~= "number"
+				or opts.startup_timeout_ms < 0
+				or opts.startup_timeout_ms % 1 ~= 0
+			)
+		)
+	then
+		fail("new requires optional spawn and startup_timeout_ms settings")
 	end
-	return setmetatable({ spawn = opts.spawn or vim.system, active = {}, sequence = 0 }, Manager)
+	return setmetatable({
+		spawn = opts.spawn or vim.system,
+		startup_timeout_ms = opts.startup_timeout_ms or M.startup_timeout_ms,
+		active = {},
+		sequence = 0,
+	}, Manager)
 end
 
 function Manager:open(opts)
@@ -149,10 +166,39 @@ function Manager:open(opts)
 		existing = existing and vim.deepcopy(existing) or nil,
 	}
 	self.active[id] = current
+	local function dispatch(callback)
+		if vim.in_fast_event() then
+			vim.schedule(callback)
+		else
+			callback()
+		end
+	end
 	local function notify(kind, value)
 		if opts.on_event then
 			opts.on_event(kind, value)
 		end
+	end
+	local function stop_startup_timer()
+		local timer = current.startup_timer
+		current.startup_timer = nil
+		if timer and not timer:is_closing() then
+			timer:stop()
+			timer:close()
+		end
+	end
+	local function fail_startup(reason)
+		if current.closed or current.startup_failed then
+			return false
+		end
+		current.startup_failed = true
+		stop_startup_timer()
+		if reason then
+			notify("error", reason)
+		end
+		if current.handle then
+			pcall(current.handle.kill, current.handle, 15)
+		end
+		return false
 	end
 	local function usage(value)
 		local result = provider == "pi" and pi_usage(value) or codex_usage(value)
@@ -178,6 +224,7 @@ function Manager:open(opts)
 			end
 			return false
 		end
+		stop_startup_timer()
 		current.session_id = value.id
 		if opts.on_session then
 			opts.on_session(value)
@@ -188,12 +235,23 @@ function Manager:open(opts)
 		return true
 	end
 	local function pi_command(command, message)
-		return write({ id = tostring(vim.uv.hrtime()), type = command, message = message })
+		if write({ id = tostring(vim.uv.hrtime()), type = command, message = message }) then
+			return true
+		end
+		if not current.session_id then
+			return fail_startup("Pi startup request could not be written")
+		end
+		notify("error", "Pi request could not be written")
+		return false
 	end
 	local function codex_request(method, params)
 		current.request_id = (current.request_id or 0) + 1
 		local request_id = current.request_id
-		if not write({ jsonrpc = "2.0", id = request_id, method = method, params = params }) then
+		if not write({ id = request_id, method = method, params = params }) then
+			if not current.session_id then
+				return fail_startup("Codex startup request could not be written: " .. method)
+			end
+			notify("error", "Codex request could not be written: " .. method)
 			return false
 		end
 		current.pending[request_id] = method
@@ -226,7 +284,7 @@ function Manager:open(opts)
 		end
 		current.permission = codex_permission.new({
 			respond = function(response)
-				if not write({ jsonrpc = "2.0", id = response.id, result = response.result }) then
+				if not write({ id = response.id, result = response.result }) then
 					error("Codex approval response could not be written")
 				end
 			end,
@@ -309,7 +367,6 @@ function Manager:open(opts)
 				return
 			end
 			write({
-				jsonrpc = "2.0",
 				id = message.id,
 				error = { code = -32601, message = "Gator does not implement " .. tostring(message.method) },
 			})
@@ -320,15 +377,22 @@ function Manager:open(opts)
 			local requested = current.pending[message.id]
 			current.pending[message.id] = nil
 			if message.error then
-				notify(
-					"error",
+				local reason =
 					redact.text(type(message.error) == "table" and message.error.message or "Codex request failed")
-				)
+				if not current.session_id then
+					fail_startup(reason)
+				else
+					notify("error", reason)
+				end
 				return
 			end
 			if requested == "initialize" then
 				current.initialized = true
-				write({ jsonrpc = "2.0", method = "initialized", params = vim.empty_dict() })
+				current.initialized_notification_sent = write({ method = "initialized", params = vim.empty_dict() })
+				if not current.initialized_notification_sent then
+					fail_startup("Codex initialized notification could not be written")
+					return
+				end
 				local params = launch_policy
 						and {
 							cwd = cwd,
@@ -418,36 +482,65 @@ function Manager:open(opts)
 			vim.list_extend(argv, { "--fork", existing.path or existing.id })
 		end
 	else
-		argv = { "codex", "app-server", "--stdio" }
+		argv = { "codex", "app-server" }
 	end
 	local handle = self.spawn(argv, {
 		cwd = cwd,
 		text = true,
 		stdin = true,
 		stdout = function(_, data)
-			feed(data)
+			if data and data ~= "" then
+				dispatch(function()
+					feed(data)
+				end)
+			end
 		end,
 		stderr = function(_, data)
 			if data and data ~= "" then
-				notify("error", redact.text(data))
+				dispatch(function()
+					notify("error", redact.text(data))
+				end)
 			end
 		end,
 	}, function(result)
-		current.closed = true
-		self.active[id] = nil
-		if opts.on_exit then
-			opts.on_exit({ code = result and result.code or 1 })
-		end
+		dispatch(function()
+			local stopped = current.stopped
+			current.closed = true
+			stop_startup_timer()
+			self.active[id] = nil
+			if opts.on_exit and not stopped then
+				opts.on_exit({ code = result and result.code or 1 })
+			end
+		end)
 	end)
 	if type(handle) ~= "table" and type(handle) ~= "userdata" then
 		self.active[id] = nil
 		fail("provider process could not start")
 	end
 	current.handle = handle
+	if self.startup_timeout_ms > 0 then
+		local timer = vim.uv.new_timer()
+		current.startup_timer = timer
+		timer:start(
+			self.startup_timeout_ms,
+			0,
+			vim.schedule_wrap(function()
+				if current.startup_timer == timer then
+					current.startup_timer = nil
+					if not timer:is_closing() then
+						timer:close()
+					end
+				end
+				if not current.closed and not current.session_id then
+					fail_startup(provider .. " startup timed out waiting for a provider session")
+				end
+			end)
+		)
+	end
 	if provider == "pi" then
 		pi_command("get_state")
 	else
-		codex_request("initialize", { clientInfo = { name = "gator", version = "1" }, capabilities = vim.empty_dict() })
+		codex_request("initialize", { clientInfo = { name = "gator", title = "Gator", version = "1" } })
 	end
 	return {
 		id = id,
@@ -462,7 +555,9 @@ function Manager:open(opts)
 			return codex_request("turn/interrupt", { threadId = current.session_id, turnId = current.turn_id })
 		end,
 		stop = function()
+			current.stopped = true
 			current.closed = true
+			stop_startup_timer()
 			self.active[id] = nil
 			return pcall(handle.kill, handle, 15)
 		end,

@@ -24,7 +24,7 @@ local buffer = vim.api.nvim_get_current_buf()
 vim.api.nvim_buf_set_name(buffer, root .. "/main.lua")
 vim.api.nvim_buf_set_lines(buffer, 0, -1, false, { "local secret = 'token=private-value'", "return secret" })
 local capture = require("gator.context.capture").current({ buffer = buffer, first_line = 1, last_line = 2 })
-local opened, sent = nil, {}
+local opened, sent, closed = nil, {}, 0
 local value = workflow.new({
 	state = state.new(config.resolve({ providers = { pi = { user_confirmed = true } } }), { supported = true }),
 	root = root,
@@ -52,7 +52,11 @@ local value = workflow.new({
 	},
 	loading = {
 		open = function()
-			return { close = function() end }
+			return {
+				close = function()
+					closed = closed + 1
+				end,
+			}
 		end,
 	},
 })
@@ -80,8 +84,11 @@ assert(
 )
 local initial_resources = value:run(run.id).resources
 assert(
-	initial_resources.context_sends == 1 and initial_resources.context_bytes == types["context.sent"].bytes,
-	"launches must account for exactly the Gator context payload delivered to the provider"
+	value:run(run.id).state == "failed"
+		and closed == 1
+		and initial_resources.context_sends == 1
+		and initial_resources.context_bytes == types["context.sent"].bytes,
+	"structured provider errors must close loading and mark the run failed"
 )
 assert(
 	value:send_context({ run_id = run.id, kind = "selection", buffer = buffer, first_line = 1, last_line = 1 }),
