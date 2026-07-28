@@ -7,19 +7,19 @@ local M = {
 	error = require("gator.error"),
 	modules = coordinator.modules,
 }
+local source = debug.getinfo(1, "S").source
+local runtime_root = source:sub(1, 1) == "@" and vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(source:sub(2)))) or nil
 
 local function restore_runtimepath()
-	local source = package.searchpath("gator", package.path)
-	if not source then
+	if not runtime_root then
 		return
 	end
-	local root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(source)))
 	for _, entry in ipairs(vim.opt.runtimepath:get()) do
-		if vim.fs.normalize(entry) == root then
+		if vim.fs.normalize(entry) == runtime_root then
 			return
 		end
 	end
-	vim.opt.runtimepath:append(root)
+	vim.opt.runtimepath:append(runtime_root)
 end
 
 local function retain_runtimepath()

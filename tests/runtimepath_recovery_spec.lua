@@ -1,6 +1,7 @@
 local root = vim.fs.normalize(vim.g.gator_test.root)
+local gator = require("gator")
 vim.opt.runtimepath:remove(root)
-require("gator").setup()
+gator.setup()
 vim.api.nvim_exec_autocmds("VimEnter", {})
 local found = false
 for _, entry in ipairs(vim.opt.runtimepath:get()) do
