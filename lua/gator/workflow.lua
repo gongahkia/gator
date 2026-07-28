@@ -1103,6 +1103,9 @@ function Workflow:open_conversation(run)
 		on_detach = function()
 			self:update(run.id, { state = "detached" })
 		end,
+		on_runs = function()
+			self:open_runs()
+		end,
 		on_message = function() end,
 	})
 end

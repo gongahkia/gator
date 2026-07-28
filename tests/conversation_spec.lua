@@ -2,6 +2,7 @@ local accessibility = require("gator.ui.accessibility")
 local conversation = require("gator.ui.conversation")
 
 accessibility.configure({ keymaps = {}, screen_reader = false, icons = "none" })
+local opened_runs = 0
 local window = conversation.open({
 	provider = "codex",
 	session_id = "thread-existing",
@@ -21,6 +22,9 @@ local window = conversation.open({
 	history = { "## user\nInspect this", "## assistant\nThe prior result" },
 	on_input = function() end,
 	on_cancel = function() end,
+	on_runs = function()
+		opened_runs = opened_runs + 1
+	end,
 })
 local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
 assert(
@@ -41,6 +45,12 @@ assert(
 	content:find("Ready for input (waiting_input)", 1, true)
 		and content:find("Status: the provider turn is complete; i sends a follow-up", 1, true),
 	"chat headers must explain run states in place"
+)
+assert(
+	content:find("active chat", 1, true)
+		and not content:find("run-existing", 1, true)
+		and vim.fn.maparg("r", "n", false, true).desc == "Gator runs",
+	"chat headers must hide opaque run ids and expose the run list"
 )
 conversation.update({ text = "I", state = "running", phase = "thinking", turn_started_at = os.time() })
 conversation.update({ text = "'ll inspect", append = true, state = "running", phase = "responding" })

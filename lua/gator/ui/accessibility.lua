@@ -20,6 +20,7 @@ local actions = {
 	runbook = true,
 	stop = true,
 	resume = true,
+	runs = true,
 	close = true,
 	help = true,
 	grow = true,

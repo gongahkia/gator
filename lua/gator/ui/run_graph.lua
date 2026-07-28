@@ -99,6 +99,8 @@ local function render(panel)
 	if #runs == 0 then
 		table.insert(lines, "No Gator-managed runs. Use :Gator to launch one.")
 	else
+		table.insert(lines, "Flow: <CR> reopen · r resume detached · v review · h handoff · c context")
+		table.insert(lines, "")
 		for index, run in ipairs(runs) do
 			local measurements
 			if type(panel.workflow.run_resources) == "function" then
@@ -263,7 +265,7 @@ local function render(panel)
 	table.insert(lines, "")
 	table.insert(
 		lines,
-		"<CR> focus · c context · f native fork · h handoff · l journal · p parallel writer · v review · n next runbook step · s stop · r resume · q close · ? help"
+		"<CR> reopen · c context · f native fork · h handoff · l journal · p parallel writer · v review · n next runbook step · s stop · r resume detached · q close · ? help"
 	)
 	accessibility.render(panel.buffer, lines, "gator-runs")
 end

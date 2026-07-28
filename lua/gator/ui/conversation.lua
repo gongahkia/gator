@@ -192,7 +192,7 @@ local function trust_label(value, workspace)
 end
 
 function M.render(panel)
-	local label = panel.run_id and ("run " .. panel.run_id) or panel.session_id
+	local label = panel.run_id and "active chat" or "chat"
 	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. run_state.summary(panel.state)
 	if panel.state == "running" then
 		header = header
@@ -221,13 +221,13 @@ function M.render(panel)
 		table.insert(lines, panel.notice)
 	end
 	if panel.cancelling then
-		table.insert(lines, "cancelling · q detach · + / - resize · f fullscreen · o layout · ? help")
+		table.insert(lines, "cancelling · q detach · r runs · + / - resize · f fullscreen · o layout · ? help")
 	elseif panel.state == "running" then
-		table.insert(lines, "c cancel · q detach · + / - resize · f fullscreen · o layout · ? help")
+		table.insert(lines, "c cancel · q detach · r runs · + / - resize · f fullscreen · o layout · ? help")
 	elseif panel.state == "waiting_input" then
-		table.insert(lines, "i prompt · q detach · + / - resize · f fullscreen · o layout · ? help")
+		table.insert(lines, "i prompt · q detach · r runs · + / - resize · f fullscreen · o layout · ? help")
 	else
-		table.insert(lines, "q close · + / - resize · f fullscreen · o layout · ? help")
+		table.insert(lines, "q close · r runs · + / - resize · f fullscreen · o layout · ? help")
 	end
 	accessibility.render(panel.buffer, lines, "gator-conversation")
 end
@@ -278,6 +278,7 @@ local function bind(panel)
 		shrink = "-",
 		fullscreen = "f",
 		layout = "o",
+		runs = "r",
 	}, {
 		prompt = function()
 			input(panel)
@@ -299,8 +300,11 @@ local function bind(panel)
 		end,
 		close = M.detach,
 		help = function()
-			panel.notice = panel.state == "waiting_input" and "i prompts · q detaches" or "c cancels · q detaches"
+			panel.notice = "r runs · Visual select then :GatorAsk · runs: r resume, v review, h handoff"
 			M.render(panel)
+		end,
+		runs = function()
+			return panel.on_runs()
 		end,
 		grow = function()
 			M.resize(4)
@@ -326,6 +330,9 @@ function M.open(opts)
 	end
 	if opts.on_message ~= nil and type(opts.on_message) ~= "function" then
 		fail("on_message must be a function")
+	end
+	if opts.on_runs ~= nil and type(opts.on_runs) ~= "function" then
+		fail("on_runs must be a function")
 	end
 	if opts.run_id ~= nil and (type(opts.run_id) ~= "string" or opts.run_id == "") then
 		fail("run_id must be non-empty text")
@@ -366,8 +373,12 @@ function M.open(opts)
 		panel.turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil)
 		panel.cancelling, panel.notice = false, nil
 		panel.lines = history
-		panel.on_input, panel.on_cancel, panel.on_detach, panel.on_message =
-			opts.on_input, opts.on_cancel, opts.on_detach or function() end, opts.on_message or function() end
+		panel.on_input, panel.on_cancel, panel.on_detach, panel.on_message, panel.on_runs =
+			opts.on_input,
+			opts.on_cancel,
+			opts.on_detach or function() end,
+			opts.on_message or function() end,
+			opts.on_runs or function() end
 		M.render(panel)
 		sync_timer(panel)
 		vim.api.nvim_set_current_win(panel.window)
@@ -398,6 +409,7 @@ function M.open(opts)
 		on_cancel = opts.on_cancel,
 		on_detach = opts.on_detach or function() end,
 		on_message = opts.on_message or function() end,
+		on_runs = opts.on_runs or function() end,
 		previous = previous,
 	}
 	panels[tabpage] = panel

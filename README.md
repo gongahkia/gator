@@ -154,7 +154,7 @@ require("gator").setup({
 
 Gator vendors 169 selectable loading animations from [Rattles](https://github.com/vyfor/rattles) and [Whirly](https://github.com/janlelis/whirly); see [loading dialogs](docs/LOADING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). `ui.motion.enabled = false` or `ui.motion.reduced = true` leaves the dialog visible but static.
 
-Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, and `o` to cycle split, float, and fullscreen layouts. These mappings can be overridden through `ui.keymaps`.
+Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle split, float, and fullscreen layouts, and `r` to open the run list. `?` explains the selection (`:GatorAsk`) and run flows (resume, review, handoff). These mappings can be overridden through `ui.keymaps`.
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 
