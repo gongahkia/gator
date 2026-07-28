@@ -59,6 +59,7 @@ local function configure(container, settings)
 	container:require("motion").configure(settings.ui.motion)
 	container:require("loading").configure(settings.ui.loading, settings.ui.motion)
 	container:require("accessibility").configure(settings.ui)
+	container:require("ui").conversation.configure(settings.ui.chat)
 	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
 	container:require("consent").configure({ enabled = settings.telemetry.enabled })
 end

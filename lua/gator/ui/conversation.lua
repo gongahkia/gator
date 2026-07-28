@@ -4,9 +4,78 @@ local redact = require("gator.policy.redact")
 
 local M = {}
 local panels = {}
+local defaults = { layout = "split", height = 18, width = 0 }
+local settings = vim.deepcopy(defaults)
 
 local function fail(message)
 	error("Gator conversation: " .. redact.text(tostring(message)), 3)
+end
+
+local function layout(value)
+	if value ~= "split" and value ~= "float" and value ~= "fullscreen" then
+		fail("layout must be split, float, or fullscreen")
+	end
+	return value
+end
+
+function M.configure(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" or (vim.islist(opts) and next(opts) ~= nil) then
+		fail("settings must be an object")
+	end
+	for key in pairs(opts) do
+		if key ~= "layout" and key ~= "height" and key ~= "width" then
+			fail("settings contain unsupported field: " .. tostring(key))
+		end
+	end
+	local value = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts)
+	layout(value.layout)
+	if type(value.height) ~= "number" or value.height % 1 ~= 0 or value.height < 6 then
+		fail("height must be an integer of at least 6")
+	end
+	if
+		type(value.width) ~= "number"
+		or value.width % 1 ~= 0
+		or value.width < 0
+		or (value.width > 0 and value.width < 20)
+	then
+		fail("width must be 0 or an integer of at least 20")
+	end
+	settings = value
+	return vim.deepcopy(settings)
+end
+
+local function float_dimensions(height)
+	local maximum_width = math.max(vim.o.columns - 4, 1)
+	local maximum_height = math.max(vim.o.lines - 4, 1)
+	local width = settings.width == 0 and math.floor(vim.o.columns * 0.75) or settings.width
+	return math.min(width, maximum_width), math.min(height or settings.height, maximum_height)
+end
+
+local function open_window(buffer, mode, previous)
+	if mode == "float" then
+		local width, height = float_dimensions()
+		return vim.api.nvim_open_win(buffer, true, {
+			relative = "editor",
+			row = math.max(math.floor((vim.o.lines - height) / 2), 0),
+			col = math.max(math.floor((vim.o.columns - width) / 2), 0),
+			width = width,
+			height = height,
+			style = "minimal",
+			border = "rounded",
+		})
+	end
+	if previous and vim.api.nvim_win_is_valid(previous) then
+		vim.api.nvim_set_current_win(previous)
+	end
+	vim.cmd(mode == "split" and "botright " .. settings.height .. "new" or "botright new")
+	local window = vim.api.nvim_get_current_win()
+	vim.api.nvim_win_set_buf(window, buffer)
+	if mode == "fullscreen" then
+		vim.cmd("wincmd _")
+		vim.cmd("wincmd |")
+	end
+	return window
 end
 
 local function current()
@@ -121,13 +190,13 @@ function M.render(panel)
 		table.insert(lines, panel.notice)
 	end
 	if panel.cancelling then
-		table.insert(lines, "cancelling · q detach · ? help")
+		table.insert(lines, "cancelling · q detach · + / - resize · f fullscreen · o layout · ? help")
 	elseif panel.state == "running" then
-		table.insert(lines, "c cancel · q detach · ? help")
+		table.insert(lines, "c cancel · q detach · + / - resize · f fullscreen · o layout · ? help")
 	elseif panel.state == "waiting_input" then
-		table.insert(lines, "i prompt · q detach · ? help")
+		table.insert(lines, "i prompt · q detach · + / - resize · f fullscreen · o layout · ? help")
 	else
-		table.insert(lines, "q close · ? help")
+		table.insert(lines, "q close · + / - resize · f fullscreen · o layout · ? help")
 	end
 	accessibility.render(panel.buffer, lines, "gator-conversation")
 end
@@ -169,7 +238,16 @@ local function input(panel)
 end
 
 local function bind(panel)
-	accessibility.panel(panel.buffer, { prompt = "i", cancel = "c", close = "q", help = "?" }, {
+	accessibility.panel(panel.buffer, {
+		prompt = "i",
+		cancel = "c",
+		close = "q",
+		help = "?",
+		grow = "+",
+		shrink = "-",
+		fullscreen = "f",
+		layout = "o",
+	}, {
 		prompt = function()
 			input(panel)
 		end,
@@ -192,6 +270,18 @@ local function bind(panel)
 		help = function()
 			panel.notice = panel.state == "waiting_input" and "i prompts · q detaches" or "c cancels · q detaches"
 			M.render(panel)
+		end,
+		grow = function()
+			M.resize(4)
+		end,
+		shrink = function()
+			M.resize(-4)
+		end,
+		fullscreen = function()
+			M.toggle_fullscreen()
+		end,
+		layout = function()
+			M.cycle_layout()
 		end,
 	})
 end
@@ -245,13 +335,16 @@ function M.open(opts)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
-	local opened = panel_window.open("botright 18new")
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].filetype, vim.bo[buffer].bufhidden = "gator-conversation", "wipe"
-	vim.api.nvim_win_set_buf(opened.window, buffer)
+	local previous = vim.api.nvim_get_current_win()
+	local mode = settings.layout
+	local window = open_window(buffer, mode, previous)
 	panel = {
-		window = opened.window,
+		window = window,
 		buffer = buffer,
+		layout = mode,
+		previous_layout = mode,
 		provider = opts.provider,
 		session_id = opts.session_id,
 		run_id = opts.run_id,
@@ -265,13 +358,70 @@ function M.open(opts)
 		on_cancel = opts.on_cancel,
 		on_detach = opts.on_detach or function() end,
 		on_message = opts.on_message or function() end,
-		previous = opened.previous,
+		previous = previous,
 	}
 	panels[tabpage] = panel
 	M.render(panel)
 	sync_timer(panel)
 	bind(panel)
 	return panel.window
+end
+
+local function replace_layout(panel, mode)
+	mode = layout(mode)
+	if panel.layout == mode then
+		return false
+	end
+	local old = panel.window
+	vim.bo[panel.buffer].bufhidden = "hide"
+	if vim.api.nvim_win_is_valid(old) then
+		vim.api.nvim_win_close(old, true)
+	end
+	panel.window = open_window(panel.buffer, mode, panel.previous)
+	vim.bo[panel.buffer].bufhidden = "wipe"
+	if mode ~= "fullscreen" then
+		panel.previous_layout = mode
+	end
+	panel.layout, panel.notice = mode, nil
+	M.render(panel)
+	return true
+end
+
+function M.resize(delta)
+	local panel = current()
+	if not panel or type(delta) ~= "number" or delta % 1 ~= 0 or delta == 0 then
+		return false
+	end
+	if panel.layout == "fullscreen" then
+		panel.notice = "Fullscreen uses the available editor space"
+		M.render(panel)
+		return false
+	end
+	if panel.layout == "float" then
+		local config = vim.api.nvim_win_get_config(panel.window)
+		local _, maximum = float_dimensions()
+		vim.api.nvim_win_set_config(panel.window, { height = math.max(6, math.min(config.height + delta, maximum)) })
+	else
+		vim.api.nvim_win_set_height(panel.window, math.max(6, vim.api.nvim_win_get_height(panel.window) + delta))
+	end
+	return true
+end
+
+function M.toggle_fullscreen()
+	local panel = current()
+	if not panel then
+		return false
+	end
+	return replace_layout(panel, panel.layout == "fullscreen" and panel.previous_layout or "fullscreen")
+end
+
+function M.cycle_layout()
+	local panel = current()
+	if not panel then
+		return false
+	end
+	local next_layout = panel.layout == "split" and "float" or (panel.layout == "float" and "fullscreen" or "split")
+	return replace_layout(panel, next_layout)
 end
 
 function M.update(opts)

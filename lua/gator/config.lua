@@ -13,6 +13,7 @@ M.defaults = {
 		icons = "unicode",
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
+		chat = { layout = "split", height = 18, width = 0 },
 		resources = { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } },
 		renderers = {
 			provider_picker = "native",
@@ -208,6 +209,7 @@ local function settings(value)
 		icons = true,
 		motion = true,
 		loading = true,
+		chat = true,
 		resources = true,
 		renderers = true,
 		run_graph = true,
@@ -267,6 +269,21 @@ local function settings(value)
 	local motion = require("gator.ui.motion").resolve(value.ui.motion)
 	value.ui.motion = motion
 	value.ui.loading = require("gator.ui.loading").resolve(value.ui.loading)
+	fields(value.ui.chat, { layout = true, height = true, width = true }, "settings.ui.chat")
+	if not vim.tbl_contains({ "split", "float", "fullscreen" }, value.ui.chat.layout) then
+		fail("ui.chat.layout must be split, float, or fullscreen")
+	end
+	if type(value.ui.chat.height) ~= "number" or value.ui.chat.height % 1 ~= 0 or value.ui.chat.height < 6 then
+		fail("ui.chat.height must be an integer of at least 6")
+	end
+	if
+		type(value.ui.chat.width) ~= "number"
+		or value.ui.chat.width % 1 ~= 0
+		or value.ui.chat.width < 0
+		or (value.ui.chat.width > 0 and value.ui.chat.width < 20)
+	then
+		fail("ui.chat.width must be 0 or an integer of at least 20")
+	end
 	fields(value.ui.resources, { enabled = true, fields = true }, "settings.ui.resources")
 	fields(value.ui.renderers, {
 		provider_picker = true,
@@ -483,6 +500,7 @@ function M.migrate(value)
 	end
 	document.ui = document.ui or {}
 	document.ui.loading = document.ui.loading or {}
+	document.ui.chat = document.ui.chat or vim.deepcopy(M.defaults.ui.chat)
 	document.ui.resources = document.ui.resources or {}
 	if document.ui.resources.enabled == nil then
 		document.ui.resources.enabled = true

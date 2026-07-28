@@ -133,6 +133,11 @@ require("gator").setup({
       spinner = "whirly.hanoi", -- `:lua =require("gator.ui.loading").presets()`
       interval_ms = 0, -- 0 keeps the upstream cadence; otherwise >= 16 ms
     },
+    chat = {
+      layout = "split", -- "split", "float", or "fullscreen"
+      height = 18, -- split/float height; + and - resize a focused chat
+      width = 0, -- float width; 0 uses 75% of the editor width
+    },
     renderers = {
       provider_picker = "native", -- or an extension renderer id
       run_graph = "native",
@@ -148,6 +153,8 @@ require("gator").setup({
 ```
 
 Gator vendors 169 selectable loading animations from [Rattles](https://github.com/vyfor/rattles) and [Whirly](https://github.com/janlelis/whirly); see [loading dialogs](docs/LOADING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). `ui.motion.enabled = false` or `ui.motion.reduced = true` leaves the dialog visible but static.
+
+Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, and `o` to cycle split, float, and fullscreen layouts. These mappings can be overridden through `ui.keymaps`.
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 

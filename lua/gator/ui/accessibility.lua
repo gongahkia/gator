@@ -22,6 +22,10 @@ local actions = {
 	resume = true,
 	close = true,
 	help = true,
+	grow = true,
+	shrink = true,
+	fullscreen = true,
+	layout = true,
 }
 local settings = { keymaps = {}, screen_reader = true, icons = "unicode" }
 

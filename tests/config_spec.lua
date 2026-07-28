@@ -54,6 +54,11 @@ assert(
 	resources.enabled and #resources.fields == 2 and resources.fields[2] == "usage",
 	"resource display must default on and allow an explicit field subset"
 )
+local chat = config.resolve({ ui = { chat = { layout = "float", height = 20, width = 90 } } }).ui.chat
+assert(
+	chat.layout == "float" and chat.height == 20 and chat.width == 90,
+	"chat layout settings must support float, height, and width"
+)
 local extensions = config.resolve({ extensions = { modules = { "my_gator_extension" } } }).extensions
 assert(extensions.modules[1] == "my_gator_extension", "extensions must require explicit trusted module names")
 local ui_extensions = config.resolve({
@@ -114,6 +119,9 @@ assert(
 		and not pcall(config.resolve, { providers = { unknown = { user_confirmed = true } } })
 		and not pcall(config.resolve, { ui = { loading = { spinner = "unknown" } } })
 		and not pcall(config.resolve, { ui = { loading = { interval_ms = 15 } } })
+		and not pcall(config.resolve, { ui = { chat = { layout = "side" } } })
+		and not pcall(config.resolve, { ui = { chat = { height = 5 } } })
+		and not pcall(config.resolve, { ui = { chat = { width = 19 } } })
 		and not pcall(config.resolve, { ui = { resources = { enabled = "yes" } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "tokens" } } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "usage", "usage" } } } })

@@ -46,3 +46,19 @@ assert(
 	"chat display must render Markdown links and inline code without exposing raw markup targets"
 )
 assert(conversation.close(), "rehydrated conversations must remain ephemeral")
+
+conversation.configure({ layout = "float", height = 10, width = 40 })
+window = conversation.open({
+	provider = "codex",
+	session_id = "thread-float",
+	run_id = "run-float",
+	state = "waiting_input",
+	on_input = function() end,
+	on_cancel = function() end,
+})
+assert(vim.api.nvim_win_get_config(window).relative == "editor", "configured chats must open in a floating window")
+assert(conversation.resize(2), "floating chats must resize in place")
+assert(conversation.toggle_fullscreen(), "chat controls must maximize the current conversation")
+assert(conversation.cycle_layout(), "chat controls must cycle from fullscreen back to a split")
+assert(conversation.close(), "resized chats must close cleanly")
+conversation.configure({ layout = "split", height = 18, width = 0 })
