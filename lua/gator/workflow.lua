@@ -1581,6 +1581,9 @@ function Workflow:send_context(opts)
 	if run.transport ~= "chat" or not active or (active.kind ~= "structured" and active.kind ~= "managed") then
 		fail("editor context can be sent only to an active structured Gator chat")
 	end
+	if opts.require_waiting and run.state ~= "waiting_input" then
+		fail("wait for the current Gator response before asking about a selection")
+	end
 	if opts.kind == nil then
 		vim.ui.select(
 			{ "selection", "diagnostic", "hunk", "bundle" },
@@ -1636,6 +1639,9 @@ function Workflow:send_context(opts)
 			selected.text,
 			"```",
 		}, "\n")
+		if opts.question then
+			message = message .. "\n\n## User question\n" .. text(opts.question, "selection question")
+		end
 	elseif kind == "diagnostic" then
 		local diagnostics = capture.diagnostics(opts)
 		artifacts = {
@@ -1725,6 +1731,91 @@ function Workflow:send_context(opts)
 		return true
 	end
 	return deliver()
+end
+
+function Workflow:ask_selection(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then
+		fail("ask selection requires options")
+	end
+	if opts.run_id == nil then
+		local choices = {}
+		for _, candidate in ipairs(self:runs()) do
+			local active = self.active[candidate.id]
+			if
+				candidate.transport == "chat"
+				and candidate.state == "waiting_input"
+				and active
+				and (active.kind == "structured" or active.kind == "managed")
+			then
+				table.insert(choices, candidate)
+			end
+		end
+		if #choices == 0 then
+			fail("no active Gator chat is ready for a selected-text question")
+		end
+		vim.ui.select(choices, {
+			prompt = "Ask Gator about selected lines",
+			format_item = function(value)
+				return value.provider .. " · " .. value.objective
+			end,
+		}, function(choice)
+			if choice then
+				opts.run_id = choice.id
+				local ok, err = pcall(self.ask_selection, self, opts)
+				if not ok then
+					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
+			end
+		end)
+		return true
+	end
+	local run = self:run(opts.run_id)
+	if run.state ~= "waiting_input" then
+		fail("wait for the current Gator response before asking about a selection")
+	end
+	local function submit(question)
+		if type(question) ~= "string" or vim.trim(question) == "" then
+			return false
+		end
+		local ok, err = pcall(self.send_context, self, {
+			run_id = run.id,
+			kind = "selection",
+			question = question,
+			require_waiting = true,
+			buffer = opts.buffer,
+			first_line = opts.first_line,
+			last_line = opts.last_line,
+		})
+		if not ok then
+			fail(err)
+		end
+		local selected = capture.current(opts)
+		pcall(conversation.update, {
+			run_id = run.id,
+			text = "> ["
+				.. selected.path
+				.. ":"
+				.. selected.first_line
+				.. "-"
+				.. selected.last_line
+				.. "] "
+				.. question,
+			role = "user",
+			state = "running",
+		})
+		return true
+	end
+	if opts.question ~= nil then
+		return submit(opts.question)
+	end
+	vim.ui.input({ prompt = "Ask Gator about selected lines: " }, function(question)
+		local ok, err = pcall(submit, question)
+		if not ok then
+			vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+		end
+	end)
+	return true
 end
 
 function Workflow:attach_context(id)

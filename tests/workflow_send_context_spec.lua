@@ -55,6 +55,30 @@ assert(
 		and (value:transcript(value:run("run-context")) or ""):find("Gator follow-up editor context", 1, true),
 	"editor context must become a persisted Gator-owned follow-up turn"
 )
+value:update("run-context", { state = "waiting_input" })
+
+assert(
+	value:ask_selection({
+		run_id = "run-context",
+		question = "What does this return?",
+		buffer = buffer,
+		first_line = 1,
+		last_line = 1,
+	}),
+	"a selected-text question must send one contextual prompt"
+)
+assert(
+	#sent == 2 and sent[2]:find("## User question\nWhat does this return?", 1, true),
+	"selected-text questions must combine selection and question in one provider turn"
+)
+assert(value:run("run-context").state == "running", "selected-text questions must mark the turn running")
+assert(not pcall(value.ask_selection, value, {
+	run_id = "run-context",
+	question = "Can I steer this?",
+	buffer = buffer,
+	first_line = 1,
+	last_line = 1,
+}), "selected-text questions must reject a chat with an active turn")
 
 value.store:bundle("bundle-context", "# Named context\n\nUse this exact artifact.")
 assert(

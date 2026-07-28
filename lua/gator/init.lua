@@ -128,6 +128,10 @@ function M.send_context(opts)
 	return M.dispatch("send_context", opts)
 end
 
+function M.ask_selection(opts)
+	return M.dispatch("ask_selection", opts)
+end
+
 function M.review(run_id)
 	return M.dispatch("review", { run_id = run_id })
 end

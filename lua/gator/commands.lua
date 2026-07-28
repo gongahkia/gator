@@ -38,6 +38,17 @@ function M.register()
 			last_line = opts.range > 0 and opts.line2 or nil,
 		})
 	end, { nargs = "*", range = true, desc = "Send selected editor context to an active Gator chat" })
+	vim.api.nvim_create_user_command("GatorAsk", function(opts)
+		if opts.range == 0 then
+			error("GatorAsk requires a Visual line selection", 0)
+		end
+		require("gator").dispatch("ask_selection", {
+			run_id = opts.args ~= "" and opts.args or nil,
+			buffer = vim.api.nvim_get_current_buf(),
+			first_line = opts.line1,
+			last_line = opts.line2,
+		})
+	end, { nargs = "?", range = true, desc = "Ask an active Gator chat about selected lines" })
 	vim.api.nvim_create_user_command("GatorReview", function(opts)
 		require("gator").dispatch("review", { run_id = opts.args ~= "" and opts.args or nil })
 	end, { nargs = "?", desc = "Review a Gator run diff and approved test evidence" })

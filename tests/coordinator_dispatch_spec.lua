@@ -8,6 +8,7 @@ assert(
 		"events",
 		"handoff",
 		"send_context",
+		"ask_selection",
 		"review",
 		"runbook_next",
 		"health",

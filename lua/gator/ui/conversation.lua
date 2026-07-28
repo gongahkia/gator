@@ -165,7 +165,7 @@ function M.update(opts)
 		else
 			append_lines(panel.lines, value)
 		end
-		panel.on_message("assistant", value)
+		panel.on_message(opts.role == "user" and "user" or "assistant", value)
 	end
 	render(panel)
 	return true

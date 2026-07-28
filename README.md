@@ -41,7 +41,8 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 2. Run `:GatorHealth`. A green `codex` readiness line means the structured Codex path is ready; warnings for other providers are informational unless you plan to use them.
 3. Run `:Gator codex`, enter a concise objective, and wait for the chat pane. A startup error closes the spinner and marks the run failed instead of leaving it pending.
 4. In the chat, `i` sends a follow-up prompt, `c` cancels the current turn, and `q` detaches without stopping the provider.
-5. Run `:GatorRuns` to find detached runs. Press `<CR>` to focus one or run `:GatorStopSession [run-id]` to terminate Gator's local process.
+5. In Visual-line mode, run `:'<,'>GatorAsk` to choose a ready chat, ask one question, and send the selected lines and question as one turn. It will not steer a response already in progress.
+6. Run `:GatorRuns` to find detached runs. Press `<CR>` to focus one or run `:GatorStopSession [run-id]` to terminate Gator's local process.
 
 ## Commands
 
@@ -52,6 +53,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 | `:GatorEvents <run-id>` | Inspect Gator's append-only metadata journal for a run. |
 | `:GatorHandoff <run-id> [provider]` | Review a bundle and create a new target-provider session. |
 | `:[range]GatorSend [run-id] [selection\|diagnostic\|hunk\|bundle] [bundle-id]` | Send provenance-labelled editor context to an active structured chat. |
+| `:[range]GatorAsk [run-id]` | Ask a ready structured chat one question about the selected lines. |
 | `:GatorReview [run-id]` | Inspect a worktree diff and run an explicitly configured review command. |
 | `:GatorRunbook` | Select and start one ready manual runbook step. |
 | `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |

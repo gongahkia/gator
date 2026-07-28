@@ -17,6 +17,7 @@ local actions = {
 	send_context = {
 		fields = { run_id = true, kind = true, bundle_id = true, buffer = true, first_line = true, last_line = true },
 	},
+	ask_selection = { fields = { run_id = true, question = true, buffer = true, first_line = true, last_line = true } },
 	review = { fields = { run_id = true } },
 	runbook_next = { fields = {} },
 	health = { fields = {} },
@@ -35,6 +36,7 @@ local action_names = {
 	"events",
 	"handoff",
 	"send_context",
+	"ask_selection",
 	"review",
 	"runbook_next",
 	"health",
@@ -369,6 +371,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "send_context" then
 		return self:workflow():send_context(opts)
+	end
+	if action == "ask_selection" then
+		return self:workflow():ask_selection(opts)
 	end
 	if action == "review" then
 		return self:workflow():review(opts.run_id)
