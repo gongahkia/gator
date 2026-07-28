@@ -30,8 +30,9 @@ Requirements: Neovim 0.11+, Git, and any provider CLIs you intend to use.
 For a temporary development checkout:
 
 ```sh
-nvim --cmd 'set rtp+=/absolute/path/to/gator' \
-  --cmd 'lua require("gator").setup()' .
+nvim . \
+  -c 'set rtp+=/absolute/path/to/gator' \
+  -c 'lua require("gator").setup()'
 ```
 
 Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `require("gator").setup()` registers every Gator command; no extra `:runtime plugin/gator.lua` step is needed.

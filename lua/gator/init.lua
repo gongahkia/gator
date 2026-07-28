@@ -8,6 +8,26 @@ local M = {
 	modules = coordinator.modules,
 }
 
+local function restore_runtimepath()
+	local source = package.searchpath("gator", package.path)
+	if not source then
+		return
+	end
+	local root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(source)))
+	for _, entry in ipairs(vim.opt.runtimepath:get()) do
+		if vim.fs.normalize(entry) == root then
+			return
+		end
+	end
+	vim.opt.runtimepath:append(root)
+end
+
+local function retain_runtimepath()
+	restore_runtimepath()
+	local group = vim.api.nvim_create_augroup("GatorRuntimePath", { clear = true })
+	vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = restore_runtimepath })
+end
+
 function M.module(name)
 	if name == "coordinator" then
 		return coordinator
@@ -19,6 +39,7 @@ function M.module(name)
 end
 
 function M.setup(opts)
+	retain_runtimepath()
 	require("gator.commands").register()
 	local next = coordinator.new(opts)
 	if M._coordinator then
