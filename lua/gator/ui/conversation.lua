@@ -1,6 +1,7 @@
 local accessibility = require("gator.ui.accessibility")
 local panel_window = require("gator.ui.window")
 local redact = require("gator.policy.redact")
+local trust = require("gator.trust")
 
 local M = {}
 local panels = {}
@@ -160,6 +161,35 @@ local function display_lines(values)
 	return result
 end
 
+local function workspace_label(value)
+	if
+		type(value) ~= "table"
+		or (value.kind ~= "project" and value.kind ~= "worktree")
+		or type(value.root) ~= "string"
+	then
+		return "workspace unavailable"
+	end
+	return value.kind .. " " .. vim.fn.fnamemodify(value.root, ":t")
+end
+
+local function trust_label(value, workspace)
+	if value == nil then
+		return "Trust: unavailable · " .. workspace_label(workspace)
+	end
+	local normalized = trust.normalize(value)
+	local policy = normalized.policy.mode or normalized.policy.state
+	local write = normalized.write.mode or normalized.write.state
+	local approval = normalized.approval.state:gsub("_", "-")
+	return "Trust: policy "
+		.. policy
+		.. " · write "
+		.. write:gsub("_", "-")
+		.. " · approval "
+		.. approval
+		.. " · "
+		.. workspace_label(workspace)
+end
+
 function M.render(panel)
 	local label = panel.run_id and ("run " .. panel.run_id) or panel.session_id
 	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. panel.state
@@ -170,7 +200,7 @@ function M.render(panel)
 			.. " · "
 			.. elapsed(panel)
 	end
-	local lines = { header, "" }
+	local lines = { header, trust_label(panel.trust, panel.workspace), "" }
 	if #panel.lines == 0 then
 		if panel.state == "running" then
 			table.insert(
@@ -313,6 +343,12 @@ function M.open(opts)
 	if opts.turn_started_at ~= nil and type(opts.turn_started_at) ~= "number" then
 		fail("turn_started_at must be a number")
 	end
+	if opts.trust ~= nil then
+		trust.normalize(opts.trust)
+	end
+	if opts.workspace ~= nil and type(opts.workspace) ~= "table" then
+		fail("workspace must be an object")
+	end
 	local history = {}
 	for _, value in ipairs(opts.history or {}) do
 		if type(value) ~= "string" then
@@ -324,6 +360,7 @@ function M.open(opts)
 	if panel then
 		panel.provider, panel.session_id, panel.run_id, panel.state =
 			opts.provider, opts.session_id, opts.run_id, opts.state
+		panel.trust, panel.workspace = opts.trust, opts.workspace
 		panel.phase = opts.phase or (opts.state == "running" and "working" or nil)
 		panel.turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil)
 		panel.cancelling, panel.notice = false, nil
@@ -348,6 +385,8 @@ function M.open(opts)
 		provider = opts.provider,
 		session_id = opts.session_id,
 		run_id = opts.run_id,
+		trust = opts.trust,
+		workspace = opts.workspace,
 		state = opts.state,
 		phase = opts.phase or (opts.state == "running" and "working" or nil),
 		turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil),

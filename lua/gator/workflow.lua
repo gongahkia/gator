@@ -1088,6 +1088,8 @@ function Workflow:open_conversation(run)
 		session_id = run.session and run.session.id or run.id,
 		run_id = run.id,
 		state = run.state,
+		trust = run.trust,
+		workspace = run.workspace,
 		phase = run.state == "running" and "working" or nil,
 		turn_started_at = run.state == "running" and run.updated_at or nil,
 		history = history,

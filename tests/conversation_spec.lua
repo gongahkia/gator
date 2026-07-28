@@ -7,6 +7,17 @@ local window = conversation.open({
 	session_id = "thread-existing",
 	run_id = "run-existing",
 	state = "waiting_input",
+	trust = {
+		surface = "structured",
+		security_owner = "provider",
+		provider = "codex",
+		policy = { state = "applied", detail = "test", mode = "gator.config" },
+		write = { state = "codex_enforced", detail = "test", mode = "workspace_write" },
+		network = { state = "unknown", detail = "test" },
+		mcp = { state = "unknown", detail = "test" },
+		approval = { state = "on_request", detail = "test" },
+	},
+	workspace = { kind = "worktree", root = "/tmp/gator-worktree" },
 	history = { "## user\nInspect this", "## assistant\nThe prior result" },
 	on_input = function() end,
 	on_cancel = function() end,
@@ -17,6 +28,14 @@ assert(
 		and content:find("Gator agent\nThe prior result", 1, true)
 		and not content:find("## user", 1, true),
 	"reopened structured chats must display persisted transcripts without raw Markdown headings"
+)
+assert(
+	content:find(
+		"Trust: policy gator.config · write workspace-write · approval on-request · worktree gator-worktree",
+		1,
+		true
+	),
+	"chat headers must expose the recorded policy, write mode, approval mode, and workspace"
 )
 conversation.update({ text = "I", state = "running", phase = "thinking", turn_started_at = os.time() })
 conversation.update({ text = "'ll inspect", append = true, state = "running", phase = "responding" })
