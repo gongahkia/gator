@@ -241,14 +241,17 @@ function M.open(opts)
 		fail("open options must be an object")
 	end
 	for key in pairs(opts) do
-		if key ~= "message" and key ~= "spinner" and key ~= "interval_ms" then
+		if key ~= "message" and key ~= "spinner" and key ~= "interval_ms" and key ~= "force" then
 			fail("open options contain unsupported field: " .. tostring(key))
 		end
 	end
 	if type(opts.message) ~= "string" or vim.trim(opts.message) == "" then
 		fail("message must be non-empty text")
 	end
-	if not settings.enabled or #vim.api.nvim_list_uis() == 0 then
+	if opts.force ~= nil and type(opts.force) ~= "boolean" then
+		fail("force must be boolean")
+	end
+	if (not settings.enabled and not opts.force) or #vim.api.nvim_list_uis() == 0 then
 		return { close = function() end, update = function() end }
 	end
 	sequence = sequence + 1

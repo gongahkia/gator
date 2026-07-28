@@ -122,7 +122,8 @@ function M.check()
 				.. " or newer"
 		)
 	end
-	local handle = loading.open({ message = "Checking Gator health" })
+	local handle = loading.open({ message = "Checking Gator health", force = true })
+	vim.cmd("redraw")
 	local ok, err = xpcall(function()
 		M.run(vim.health)
 	end, debug.traceback)
