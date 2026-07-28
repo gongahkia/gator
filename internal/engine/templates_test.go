@@ -233,7 +233,7 @@ func TestBuilderResponseTargetsDeployableSource(t *testing.T) {
 
 func TestBuilderResponseRejectsDeploymentDescriptors(t *testing.T) {
 	run := domain.Run{Profile: domain.ProfileFullStack}
-	for _, path := range []string{"generated-app/docker-compose.yml", "generated-app/frontend/Dockerfile", "generated-app/backend/.dockerignore", "generated-app/.norbot/deployment/frontend.Dockerfile"} {
+	for _, path := range []string{"generated-app/docker-compose.yml", "generated-app/frontend/Dockerfile", "generated-app/backend/.dockerignore", "generated-app/.norbot/deployment/frontend.Dockerfile", "generated-app/.norbot/deployment/ingress.Dockerfile"} {
 		err := validateBuilderFiles(run, map[string]string{path: "attacker", "generated-app/frontend/src/main.jsx": "export default null"})
 		validation, ok := err.(builderResponseError)
 		if !ok || validation.reason != "server_owned_deployment_descriptor" || validation.invalidPath != path {

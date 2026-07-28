@@ -80,6 +80,16 @@ func validateApplicationSource(appRoot string, run domain.Run) error {
 func serverOwnedFiles(run domain.Run) map[string]string {
 	root := filepath.FromSlash(deploymentDirectory)
 	files := map[string]string{
+		filepath.Join(root, "ingress.Dockerfile"): `FROM caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d AS caddy
+RUN setcap -r /usr/bin/caddy
+
+FROM alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+COPY --from=caddy /usr/bin/caddy /usr/bin/caddy
+ENV XDG_CONFIG_HOME=/tmp XDG_DATA_HOME=/tmp
+USER 10001:10001
+EXPOSE 8080
+ENTRYPOINT ["/usr/bin/caddy"]
+`,
 		filepath.Join(root, "frontend.Dockerfile"): `FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS build
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./

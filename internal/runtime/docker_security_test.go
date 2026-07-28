@@ -88,9 +88,14 @@ func TestDeploymentNeverInvokesComposeAndHardensContainers(t *testing.T) {
 	if strings.Contains(joined, " compose ") {
 		t.Fatalf("deployment executed Compose:\n%s", joined)
 	}
-	for _, required := range []string{"--file " + filepath.Join(root, "generated-app", ".norbot", "deployment", "frontend.Dockerfile"), "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--publish 127.0.0.1:"} {
+	for _, required := range []string{"--file " + filepath.Join(root, "generated-app", ".norbot", "deployment", "frontend.Dockerfile"), "--file " + filepath.Join(root, "generated-app", ".norbot", "deployment", "ingress.Dockerfile"), "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--publish 127.0.0.1:", "network create --internal", "network connect --alias ingress"} {
 		if !strings.Contains(joined, required) {
 			t.Fatalf("missing %q:\n%s", required, joined)
+		}
+	}
+	for _, call := range runner.calls {
+		if strings.Contains(call, "--label norbot.component=frontend") && strings.Contains(call, "--publish") {
+			t.Fatalf("frontend must remain on the internal network:\n%s", call)
 		}
 	}
 	if strings.Contains(joined, "--publish 0.0.0.0") || strings.Contains(joined, "--publish 127.0.0.1:0:8000") {

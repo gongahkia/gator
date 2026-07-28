@@ -443,14 +443,21 @@ func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (st
 		return "", err
 	}
 	network := project + "-network"
+	ingressNetwork := project + "-ingress"
 	if _, err := docker.Run(ctx, "network", "create", "--internal", "--label", "norbot.managed=true", "--label", "norbot.app_id="+appID, network); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
 		return "", fmt.Errorf("create deployment network: %w", err)
+	}
+	if _, err := docker.Run(ctx, "network", "create", "--label", "norbot.managed=true", "--label", "norbot.app_id="+appID, ingressNetwork); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
+		_, _ = docker.Run(context.Background(), "network", "rm", network)
+		return "", fmt.Errorf("create deployment ingress network: %w", err)
 	}
 	started := []string{}
 	fail := func(cause error) (string, error) {
 		for _, container := range started {
 			_, _ = docker.Run(context.Background(), "rm", "-f", container)
 		}
+		_, _ = docker.Run(context.Background(), "network", "rm", ingressNetwork)
+		_, _ = docker.Run(context.Background(), "network", "rm", network)
 		return "", cause
 	}
 	if run.Profile != domain.ProfileFrontend {
@@ -463,12 +470,23 @@ func (d Deployment) Deploy(ctx context.Context, run domain.Run, root string) (st
 			return fail(err)
 		}
 	}
-	name, err := d.runContainer(ctx, docker, run, network, "frontend", images["frontend"], port)
+	name, err := d.runContainer(ctx, docker, run, network, "frontend", images["frontend"], 0)
 	if err != nil {
 		return fail(err)
 	}
 	started = append(started, name)
 	if err := d.waitHTTP(ctx, docker, network, "http://frontend:8080/"); err != nil {
+		return fail(err)
+	}
+	ingress, err := d.runIngress(ctx, docker, run, ingressNetwork, images["ingress"], port)
+	if err != nil {
+		return fail(err)
+	}
+	started = append(started, ingress)
+	if _, err := docker.Run(ctx, "network", "connect", "--alias", "ingress", network, ingress); err != nil {
+		return fail(fmt.Errorf("connect deployment ingress: %w", err))
+	}
+	if err := d.waitHTTP(ctx, docker, network, "http://ingress:8080/"); err != nil {
 		return fail(err)
 	}
 	return "http://127.0.0.1:" + strconv.Itoa(port), nil
@@ -626,7 +644,7 @@ func (d Deployment) InvokeAgent(ctx context.Context, run domain.Run, root string
 func (d Deployment) buildImages(ctx context.Context, docker DockerClient, run domain.Run, appRoot string) (map[string]string, error) {
 	images := map[string]string{}
 	project := ProjectName(ApplicationID(run))
-	for _, component := range []string{"frontend"} {
+	for _, component := range []string{"frontend", "ingress"} {
 		image := project + "-" + component + ":" + shortImageID(run.ID)
 		dockerfile := filepath.Join(appRoot, filepath.FromSlash(deploymentDirectory), component+".Dockerfile")
 		if _, err := docker.Run(ctx, "build", "--label", "norbot.managed=true", "--label", "norbot.app_id="+ApplicationID(run), "--label", "norbot.run_id="+run.ID, "--file", dockerfile, "--tag", image, appRoot); err != nil {
@@ -657,6 +675,15 @@ func (d Deployment) runContainer(ctx context.Context, docker DockerClient, run d
 	args = append(args, image)
 	if _, err := docker.Run(ctx, args...); err != nil {
 		return "", fmt.Errorf("start %s container: %w", component, err)
+	}
+	return name, nil
+}
+
+func (d Deployment) runIngress(ctx context.Context, docker DockerClient, run domain.Run, network, image string, publicPort int) (string, error) {
+	name := ProjectName(ApplicationID(run)) + "-ingress-" + shortImageID(run.ID)
+	args := []string{"run", "-d", "--name", name, "--network", network, "--network-alias", "ingress", "--label", "norbot.managed=true", "--label", "norbot.app_id=" + ApplicationID(run), "--label", "norbot.run_id=" + run.ID, "--label", "norbot.role=ingress", "--label", "norbot.component=ingress", "--read-only", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--pids-limit=128", "--memory=128m", "--cpus=0.25", "--tmpfs=/tmp:rw,noexec,nosuid,size=64m", "--publish", "127.0.0.1:" + strconv.Itoa(publicPort) + ":8080", image, "reverse-proxy", "--from", ":8080", "--to", "frontend:8080"}
+	if _, err := docker.Run(ctx, args...); err != nil {
+		return "", fmt.Errorf("start deployment ingress: %w", err)
 	}
 	return name, nil
 }
@@ -711,6 +738,7 @@ func (d Deployment) deleteApplication(ctx context.Context, docker DockerClient, 
 	}
 	project := ProjectName(appID)
 	_, _ = docker.Run(ctx, "network", "rm", project+"-network")
+	_, _ = docker.Run(ctx, "network", "rm", project+"-ingress")
 	if !legacy {
 		return nil
 	}
