@@ -270,9 +270,23 @@ function Coordinator:bootstrap_recovery()
 	return vim.deepcopy(self._startup_recovery)
 end
 
-function Coordinator:health()
+function Coordinator:health(opts)
 	self:state()
-	vim.cmd("checkhealth gator")
+	opts = opts or {}
+	if type(opts) ~= "table" or (vim.islist(opts) and next(opts) ~= nil) then
+		fail("health options must be an object")
+	end
+	if opts.verbose ~= nil and type(opts.verbose) ~= "boolean" then
+		fail("health verbose must be boolean")
+	end
+	local previous = health.set_verbose(opts.verbose == true)
+	local ok, err = xpcall(function()
+		vim.cmd("checkhealth gator")
+	end, debug.traceback)
+	health.set_verbose(previous)
+	if not ok then
+		error(err, 0)
+	end
 end
 
 function Coordinator:export_diagnostics()
@@ -383,7 +397,7 @@ function Coordinator:dispatch(action, opts)
 		return self:workflow():start_ready_runbook_step()
 	end
 	if action == "health" then
-		return self:health()
+		return self:health(opts)
 	end
 	if action == "export_diagnostics" then
 		return self:export_diagnostics()

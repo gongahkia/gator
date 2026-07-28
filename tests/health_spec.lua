@@ -32,6 +32,46 @@ for _, event in ipairs(events) do
 end
 assert(failure_reported, "failing checks must report explicit health errors")
 
+local original_readiness = health.readiness
+health.readiness = function()
+	return {
+		{ component = "adapter.codex", level = "ok", message = "Codex is ready" },
+		{ component = "adapter.claude", level = "warn", message = "Claude needs login", repair = "log in" },
+		{ component = "git", level = "ok", message = "Git is ready" },
+	}
+end
+local compact = {}
+for _, method in ipairs({ "start", "ok", "warn", "error" }) do
+	reporter[method] = function(message)
+		table.insert(compact, { method = method, message = message })
+	end
+end
+health.run(reporter)
+local compact_output = {}
+for _, event in ipairs(compact) do
+	table.insert(compact_output, event.message)
+end
+local compact_text = table.concat(compact_output, "\n")
+assert(
+	compact_text:find("Ready now: codex", 1, true)
+		and compact_text:find("1 adapter(s) need setup or verification: claude", 1, true)
+		and not compact_text:find("Claude needs login", 1, true),
+	"compact health must lead with ready agents and collapse optional adapter warnings"
+)
+
+local verbose = {}
+for _, method in ipairs({ "start", "ok", "warn", "error" }) do
+	reporter[method] = function(message)
+		table.insert(verbose, message)
+	end
+end
+health.run(reporter, { verbose = true })
+assert(
+	table.concat(verbose, "\n"):find("Claude needs login", 1, true),
+	"verbose health must retain individual provider diagnostics"
+)
+health.readiness = original_readiness
+
 local original_health = vim.health
 local before = #events
 vim.health = reporter

@@ -2,7 +2,7 @@ local compat = require("gator.compat")
 local config = require("gator.config")
 local consent = require("gator.telemetry.consent")
 local loading = require("gator.ui.loading")
-local M = { checks = {}, graph = require("gator.health.graph") }
+local M = { checks = {}, graph = require("gator.health.graph"), verbose = false }
 local providers = {
 	{ name = "aider", executable = "aider" },
 	{ name = "amp", executable = "amp" },
@@ -93,26 +93,53 @@ function M.unregister(name)
 	return true
 end
 
-function M.run(reporter)
+function M.run(reporter, opts)
 	validate_reporter(reporter)
-	local names = vim.tbl_keys(M.checks)
-	table.sort(names)
-
-	for _, name in ipairs(names) do
-		reporter.start("Gator " .. name)
-		local ok, err = xpcall(function()
-			M.checks[name](reporter)
-		end, debug.traceback)
-		if not ok then
-			reporter.error(
-				"Health check failed: " .. name .. "\n" .. err,
-				"Correct the reported configuration and rerun :checkhealth gator."
-			)
+	opts = opts or {}
+	if type(opts) ~= "table" or (vim.islist(opts) and next(opts) ~= nil) then
+		fail("run options must be an object")
+	end
+	for key in pairs(opts) do
+		if key ~= "verbose" then
+			fail("run options contain unsupported field: " .. tostring(key))
 		end
+	end
+	if opts.verbose ~= nil and type(opts.verbose) ~= "boolean" then
+		fail("run options verbose must be boolean")
+	end
+	local names = vim.tbl_keys(M.checks)
+	table.sort(names, function(left, right)
+		if left == "readiness" then
+			return right ~= "readiness"
+		end
+		if right == "readiness" then
+			return false
+		end
+		return left < right
+	end)
+	local previous = M.verbose
+	M.verbose = opts.verbose == nil and previous or opts.verbose
+	local ok, err = xpcall(function()
+		for _, name in ipairs(names) do
+			reporter.start("Gator " .. name)
+			local check_ok, check_err = xpcall(function()
+				M.checks[name](reporter)
+			end, debug.traceback)
+			if not check_ok then
+				reporter.error(
+					"Health check failed: " .. name .. "\n" .. check_err,
+					"Correct the reported configuration and rerun :checkhealth gator."
+				)
+			end
+		end
+	end, debug.traceback)
+	M.verbose = previous
+	if not ok then
+		error(err, 0)
 	end
 end
 
-function M.check()
+function M.check(opts)
 	if type(vim.health) ~= "table" then
 		fail(
 			"vim.health is unavailable; upgrade Neovim to 0."
@@ -125,12 +152,21 @@ function M.check()
 	local handle = loading.open({ message = "Checking Gator health", force = true })
 	vim.cmd("redraw")
 	local ok, err = xpcall(function()
-		M.run(vim.health)
+		M.run(vim.health, opts)
 	end, debug.traceback)
 	handle.close()
 	if not ok then
 		error(err, 0)
 	end
+end
+
+function M.set_verbose(value)
+	if type(value) ~= "boolean" then
+		fail("verbose mode must be boolean")
+	end
+	local previous = M.verbose
+	M.verbose = value
+	return previous
 end
 
 function M.readiness(opts)
@@ -485,15 +521,52 @@ M.register("dependencies", function(report)
 	end
 end)
 
+local function report_record(report, record)
+	if record.level == "ok" then
+		report.ok(record.message)
+	elseif record.level == "warn" then
+		report.warn(record.message, record.repair)
+	else
+		report.error(record.message, record.repair)
+	end
+end
+
 M.register("readiness", function(report)
+	local adapters, core, ready, optional = {}, {}, {}, {}
 	for _, record in ipairs(M.readiness()) do
-		if record.level == "ok" then
-			report.ok(record.message)
-		elseif record.level == "warn" then
-			report.warn(record.message, record.repair)
+		if vim.startswith(record.component, "adapter.") then
+			table.insert(adapters, record)
+			local name = record.component:sub(#"adapter." + 1)
+			if record.level == "ok" then
+				table.insert(ready, name)
+			else
+				table.insert(optional, name)
+			end
 		else
-			report.error(record.message, record.repair)
+			table.insert(core, record)
 		end
+	end
+	report.start("Ready now")
+	if #ready > 0 then
+		report.ok("Ready now: " .. table.concat(ready, ", "))
+	else
+		report.warn("No coding agent is ready", "Authenticate a supported provider, then rerun :GatorHealth.")
+	end
+	if M.verbose then
+		report.start("Provider details")
+		for _, record in ipairs(adapters) do
+			report_record(report, record)
+		end
+	elseif #optional > 0 then
+		report.start("Optional providers")
+		report.warn(
+			#optional .. " adapter(s) need setup or verification: " .. table.concat(optional, ", "),
+			"Run :GatorHealth! for individual diagnostics; install only providers you plan to use."
+		)
+	end
+	report.start("Project readiness")
+	for _, record in ipairs(core) do
+		report_record(report, record)
 	end
 end)
 

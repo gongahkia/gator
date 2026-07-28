@@ -38,7 +38,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 ## First run
 
 1. In the target Git checkout, open the relevant source file or visually select code.
-2. Run `:GatorHealth`. A green `codex` readiness line means the structured Codex path is ready; warnings for other providers are informational unless you plan to use them.
+2. Run `:GatorHealth`. Its first section lists agents ready now; warnings for other providers are collapsed because they are informational unless you plan to use them. Use `:GatorHealth!` for individual provider diagnostics.
 3. Run `:Gator codex`, enter a concise objective, and wait for the chat pane. A startup error closes the spinner and marks the run failed instead of leaving it pending.
 4. In the chat, `i` sends a follow-up prompt once the agent is ready, `c` cancels the current turn, and `q` detaches without stopping the provider. Markdown is display-formatted; the local transcript retains the provider text for handoff.
 5. In Visual-line mode, run `:'<,'>GatorAsk` to choose a ready chat, ask one question, and send the selected lines and question as one turn. It will not steer a response already in progress.
@@ -60,7 +60,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 | `:GatorStorage` | Inspect project-local Gator artifact storage and quota candidates. |
 | `:GatorPrune` | Preview then remove age- or quota-selected Gator-owned artifacts and eligible clean worktrees. |
 | `:GatorForget <run-id>` | Remove a completed run's artifacts and eligible clean worktree. |
-| `:GatorHealth` | Check provider readiness and compatibility. |
+| `:GatorHealth[!]` | Check readiness and compatibility; `!` expands individual provider diagnostics. |
 
 There is no legacy dashboard, import, file, or ID workflow. A simple optional mapping is:
 
