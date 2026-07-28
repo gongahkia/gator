@@ -62,7 +62,11 @@ process.stdout(nil, vim.json.encode({
 }) .. "\n")
 process.stdout(nil, vim.json.encode({ type = "agent_settled" }) .. "\n")
 assert(
-	events[1].kind == "running" and events[2].value == "hello" and usage.total_tokens == 7,
+	events[1].kind == "running"
+		and events[2].kind == "phase"
+		and events[2].value == "responding"
+		and events[3].value == "hello"
+		and usage.total_tokens == 7,
 	"Pi events and reported usage must flow to the Gator chat"
 )
 assert(pi.cancel() and sent[#sent].type == "abort", "Pi chat cancellation must use the RPC abort command")
@@ -155,6 +159,15 @@ assert(
 	codex_session.id == "thread-1" and sent[4].method == "turn/start",
 	"Codex thread creation must precede the first turn"
 )
+process.stdout(nil, vim.json.encode({
+	jsonrpc = "2.0",
+	method = "item/started",
+	params = { item = { id = "command-one", type = "commandExecution", command = "git status" } },
+}) .. "\n")
+assert(
+	codex_events[1].kind == "phase" and codex_events[1].value == "running a command",
+	"Codex command lifecycle must expose a safe phase without command contents"
+)
 process.stdout(
 	nil,
 	vim.json.encode({ jsonrpc = "2.0", method = "item/agentMessage/delta", params = { delta = "done" } }) .. "\n"
@@ -164,10 +177,13 @@ process.stdout(nil, vim.json.encode({
 	method = "item/commandExecution/outputDelta",
 	params = { delta = "README.md" },
 }) .. "\n")
-assert(#codex_events == 1 and codex_events[1].value == "done", "Codex command output must not enter assistant chat")
+assert(
+	#codex_events == 3 and codex_events[2].kind == "phase" and codex_events[3].value == "done",
+	"Codex command output must not enter assistant chat"
+)
 process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", method = "turn/completed", params = {} }) .. "\n")
 assert(
-	codex_events[1].value == "done" and codex_events[2].kind == "settled",
+	codex_events[3].value == "done" and codex_events[4].kind == "settled",
 	"Codex deltas and turn completion must update chat state"
 )
 

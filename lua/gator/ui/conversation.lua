@@ -24,16 +24,88 @@ local function current()
 	return nil, tabpage
 end
 
-local function render(panel)
+local function elapsed(panel)
+	if panel.state ~= "running" or type(panel.turn_started_at) ~= "number" then
+		return nil
+	end
+	local seconds = math.max(0, os.time() - panel.turn_started_at)
+	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
+end
+
+local function stop_timer(panel)
+	local timer = panel.timer
+	panel.timer = nil
+	if timer and not timer:is_closing() then
+		timer:stop()
+		timer:close()
+	end
+end
+
+local function sync_timer(panel)
+	if panel.state ~= "running" then
+		stop_timer(panel)
+		return
+	end
+	if panel.timer and not panel.timer:is_closing() then
+		return
+	end
+	local timer = vim.uv.new_timer()
+	panel.timer = timer
+	timer:start(
+		1000,
+		1000,
+		vim.schedule_wrap(function()
+			if
+				panel.timer ~= timer
+				or not vim.api.nvim_win_is_valid(panel.window)
+				or not vim.api.nvim_buf_is_valid(panel.buffer)
+			then
+				stop_timer(panel)
+				return
+			end
+			M.render(panel)
+		end)
+	)
+end
+
+function M.render(panel)
 	local label = panel.run_id and ("run " .. panel.run_id) or panel.session_id
-	local lines = { "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. panel.state, "" }
+	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. panel.state
+	if panel.state == "running" then
+		header = header
+			.. " · "
+			.. (panel.cancelling and "cancelling" or panel.phase or "working")
+			.. " · "
+			.. elapsed(panel)
+	end
+	local lines = { header, "" }
 	if #panel.lines == 0 then
-		table.insert(lines, "Waiting for provider output")
+		if panel.state == "running" then
+			table.insert(
+				lines,
+				panel.cancelling and "Cancelling current turn" or "Working · " .. (panel.phase or "working")
+			)
+		elseif panel.state == "waiting_input" then
+			table.insert(lines, "Ready for a prompt")
+		else
+			table.insert(lines, "No provider output")
+		end
 	else
 		vim.list_extend(lines, panel.lines)
 	end
 	table.insert(lines, "")
-	table.insert(lines, "i prompt · c cancel · q detach · ? help")
+	if panel.notice then
+		table.insert(lines, panel.notice)
+	end
+	if panel.cancelling then
+		table.insert(lines, "cancelling · q detach · ? help")
+	elseif panel.state == "running" then
+		table.insert(lines, "c cancel · q detach · ? help")
+	elseif panel.state == "waiting_input" then
+		table.insert(lines, "i prompt · q detach · ? help")
+	else
+		table.insert(lines, "q close · ? help")
+	end
 	accessibility.render(panel.buffer, lines, "gator-conversation")
 end
 
@@ -56,14 +128,21 @@ local function append_fragment(target, value)
 end
 
 local function input(panel)
+	if panel.state ~= "waiting_input" then
+		panel.notice = "Wait for the current response before sending another prompt"
+		M.render(panel)
+		return false
+	end
 	vim.ui.input({ prompt = "Gator prompt: " }, function(value)
 		if type(value) == "string" and vim.trim(value) ~= "" then
+			panel.notice = nil
 			append_lines(panel.lines, "> " .. value)
 			panel.on_message("user", value)
-			render(panel)
+			M.render(panel)
 			panel.on_input(value)
 		end
 	end)
+	return true
 end
 
 local function bind(panel)
@@ -72,11 +151,24 @@ local function bind(panel)
 			input(panel)
 		end,
 		cancel = function()
-			panel.on_cancel()
+			if panel.state ~= "running" or panel.cancelling then
+				panel.notice = "No active turn to cancel"
+				M.render(panel)
+				return false
+			end
+			panel.cancelling, panel.notice = true, nil
+			M.render(panel)
+			if panel.on_cancel() == false then
+				panel.cancelling, panel.notice = false, "Provider did not accept cancellation"
+				M.render(panel)
+				return false
+			end
+			return true
 		end,
 		close = M.detach,
 		help = function()
-			vim.notify("Gator agent: i prompt, c cancel, q detach", vim.log.levels.INFO)
+			panel.notice = panel.state == "waiting_input" and "i prompts · q detaches" or "c cancels · q detaches"
+			M.render(panel)
 		end,
 	})
 end
@@ -102,6 +194,12 @@ function M.open(opts)
 			fail(name .. " must be non-empty text")
 		end
 	end
+	if opts.phase ~= nil and (type(opts.phase) ~= "string" or opts.phase == "") then
+		fail("phase must be non-empty text")
+	end
+	if opts.turn_started_at ~= nil and type(opts.turn_started_at) ~= "number" then
+		fail("turn_started_at must be a number")
+	end
 	local history = {}
 	for _, value in ipairs(opts.history or {}) do
 		if type(value) ~= "string" then
@@ -113,10 +211,14 @@ function M.open(opts)
 	if panel then
 		panel.provider, panel.session_id, panel.run_id, panel.state =
 			opts.provider, opts.session_id, opts.run_id, opts.state
+		panel.phase = opts.phase or (opts.state == "running" and "working" or nil)
+		panel.turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil)
+		panel.cancelling, panel.notice = false, nil
 		panel.lines = history
 		panel.on_input, panel.on_cancel, panel.on_detach, panel.on_message =
 			opts.on_input, opts.on_cancel, opts.on_detach or function() end, opts.on_message or function() end
-		render(panel)
+		M.render(panel)
+		sync_timer(panel)
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
@@ -131,6 +233,10 @@ function M.open(opts)
 		session_id = opts.session_id,
 		run_id = opts.run_id,
 		state = opts.state,
+		phase = opts.phase or (opts.state == "running" and "working" or nil),
+		turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil),
+		cancelling = false,
+		notice = nil,
 		lines = history,
 		on_input = opts.on_input,
 		on_cancel = opts.on_cancel,
@@ -139,7 +245,8 @@ function M.open(opts)
 		previous = opened.previous,
 	}
 	panels[tabpage] = panel
-	render(panel)
+	M.render(panel)
+	sync_timer(panel)
 	bind(panel)
 	return panel.window
 end
@@ -149,6 +256,9 @@ function M.update(opts)
 	if not panel or type(opts) ~= "table" then
 		fail("update requires an open panel and options")
 	end
+	if opts.run_id ~= nil and opts.run_id ~= panel.run_id then
+		return false
+	end
 	if opts.session_id ~= nil then
 		panel.session_id = redact.text(opts.session_id)
 	end
@@ -156,7 +266,19 @@ function M.update(opts)
 		panel.run_id = redact.text(opts.run_id)
 	end
 	if opts.state ~= nil then
+		local was_running = panel.state == "running"
 		panel.state = redact.text(opts.state)
+		if panel.state == "running" and not was_running then
+			panel.turn_started_at = opts.turn_started_at or os.time()
+		elseif panel.state ~= "running" then
+			panel.cancelling, panel.phase = false, nil
+		end
+	end
+	if opts.phase ~= nil then
+		panel.phase = redact.text(opts.phase)
+	end
+	if opts.cancelling ~= nil then
+		panel.cancelling = opts.cancelling == true
 	end
 	if opts.text ~= nil and opts.text ~= "" then
 		local value = redact.text(opts.text)
@@ -167,7 +289,8 @@ function M.update(opts)
 		end
 		panel.on_message(opts.role == "user" and "user" or "assistant", value)
 	end
-	render(panel)
+	M.render(panel)
+	sync_timer(panel)
 	return true
 end
 
@@ -176,6 +299,7 @@ function M.close()
 	if not panel then
 		return false
 	end
+	stop_timer(panel)
 	panel_window.close(panel.window, panel.previous)
 	panels[tabpage] = nil
 	return true

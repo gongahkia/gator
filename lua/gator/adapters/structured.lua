@@ -62,6 +62,27 @@ local function codex_event_text(method, value)
 	return type(value.delta) == "string" and value.delta or nil
 end
 
+local function codex_phase(method, value)
+	if method == "turn/started" then
+		return "thinking"
+	end
+	if method == "item/agentMessage/delta" then
+		return "responding"
+	end
+	if method ~= "item/started" and method ~= "item/completed" then
+		return nil
+	end
+	local item = type(value) == "table" and value.item or nil
+	local phases = {
+		agentMessage = "responding",
+		commandExecution = "running a command",
+		fileChange = "preparing file changes",
+		mcpToolCall = "using an MCP tool",
+		webSearch = "searching the web",
+	}
+	return type(item) == "table" and phases[item.type] or "working"
+end
+
 local function pi_usage(value)
 	local tokens = type(value) == "table" and value.tokens
 	if type(tokens) ~= "table" then
@@ -358,7 +379,7 @@ function Manager:open(opts)
 			end
 			if message.type == "agent_start" then
 				current.busy = true
-				notify("running")
+				notify("running", "thinking")
 			elseif message.type == "agent_settled" then
 				current.busy = false
 				notify("settled")
@@ -368,6 +389,7 @@ function Manager:open(opts)
 			end
 			local delta = pi_event_text(message)
 			if delta then
+				notify("phase", "responding")
 				notify("text", delta)
 			end
 			return
@@ -449,13 +471,17 @@ function Manager:open(opts)
 			if type(turn) == "table" and type(turn.id) == "string" then
 				current.turn_id = turn.id
 			end
-			notify("running")
+			notify("running", "thinking")
 		elseif method == "turn/completed" or method == "turn/finished" then
 			current.busy = false
 			current.turn_id = nil
 			notify("settled")
 		end
 		usage(message.params or message.result)
+		local phase = codex_phase(method, message.params)
+		if phase then
+			notify("phase", phase)
+		end
 		local delta = codex_event_text(method, message.params)
 		if delta then
 			notify("text", delta)

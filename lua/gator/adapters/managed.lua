@@ -182,6 +182,19 @@ local function acp_text(params)
 	return nil
 end
 
+local function acp_phase(params)
+	local update = type(params) == "table" and params.update
+	if type(update) ~= "table" then
+		return nil
+	end
+	local phases = {
+		agent_thought_chunk = "thinking",
+		tool_call = "using a tool",
+		tool_call_update = "using a tool",
+	}
+	return phases[update.sessionUpdate]
+end
+
 local function acp_capabilities(value)
 	local source = type(value) == "table" and value.agentCapabilities or nil
 	if type(source) ~= "table" then
@@ -541,7 +554,12 @@ function Manager:_acp_line(run, raw)
 		if value then
 			run.on_event({ type = "text", text = redact.text(value) })
 		else
-			run.on_event({ type = "update", update = redact.value(vim.deepcopy(params.update or {})) })
+			local phase = acp_phase(params)
+			if phase then
+				run.on_event({ type = "phase", phase = phase })
+			else
+				run.on_event({ type = "update", update = redact.value(vim.deepcopy(params.update or {})) })
+			end
 		end
 		return
 	end

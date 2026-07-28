@@ -22,6 +22,14 @@ function handle:write(frame)
 			method = "session/update",
 			params = {
 				sessionId = "managed-session",
+				update = { sessionUpdate = "tool_call", title = "unsafe command", rawInput = { token = "secret" } },
+			},
+		}) .. "\n")
+		stdout(nil, vim.json.encode({
+			jsonrpc = "2.0",
+			method = "session/update",
+			params = {
+				sessionId = "managed-session",
 				update = { sessionUpdate = "agent_message_chunk", content = { type = "text", text = "managed reply" } },
 			},
 		}) .. "\n")
@@ -77,8 +85,12 @@ assert(
 	writes[1].method == "initialize"
 		and writes[2].method == "session/new"
 		and writes[3].method == "session/prompt"
-		and events[1].text == "managed reply",
+		and events[2].text == "managed reply",
 	"ACP managed runs must initialize, create, prompt, and render provider text"
+)
+assert(
+	events[1].type == "phase" and events[1].phase == "using a tool" and events[2].type == "text",
+	"ACP tool updates must expose only a generic safe progress phase"
 )
 assert(
 	decisions[1] and writes[#writes].id == 91 and writes[#writes].result.outcome.optionId == "allow",

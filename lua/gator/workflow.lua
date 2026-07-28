@@ -1088,6 +1088,8 @@ function Workflow:open_conversation(run)
 		session_id = run.session and run.session.id or run.id,
 		run_id = run.id,
 		state = run.state,
+		phase = run.state == "running" and "working" or nil,
+		turn_started_at = run.state == "running" and run.updated_at or nil,
 		history = history,
 		on_input = function(message)
 			self:send(run.id, message)
@@ -1191,14 +1193,34 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				provider = run.provider,
 				transport = "chat",
 			})
-			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
+			pcall(conversation.update, {
+				run_id = run.id,
+				session_id = session.id,
+				state = state,
+				phase = state == "running" and "starting" or nil,
+				turn_started_at = state == "running" and self.clock() or nil,
+			})
 		end,
 		on_event = function(kind, value)
 			if kind == "running" then
 				self:journal(run.id, "provider.running", { transport = "structured" })
+				pcall(conversation.update, {
+					run_id = run.id,
+					state = "running",
+					phase = value or "thinking",
+					turn_started_at = self.clock(),
+				})
+			elseif kind == "phase" then
+				pcall(conversation.update, { run_id = run.id, state = "running", phase = value or "working" })
 			elseif kind == "text" then
 				self:append_transcript(run.id, "assistant", value, true)
-				pcall(conversation.update, { run_id = run.id, text = value, append = true, state = "running" })
+				pcall(conversation.update, {
+					run_id = run.id,
+					text = value,
+					append = true,
+					state = "running",
+					phase = "responding",
+				})
 			elseif kind == "settled" then
 				self:journal(run.id, "provider.settled", { transport = "structured" })
 				self:update(run.id, { state = "waiting_input" })
@@ -1299,7 +1321,13 @@ function Workflow:open_managed(run, prompt, existing_session)
 				provider = run.provider,
 				transport = "chat",
 			})
-			pcall(conversation.update, { run_id = run.id, session_id = session.id, state = state })
+			pcall(conversation.update, {
+				run_id = run.id,
+				session_id = session.id,
+				state = state,
+				phase = state == "running" and "starting" or nil,
+				turn_started_at = state == "running" and self.clock() or nil,
+			})
 		end,
 		on_event = function(event)
 			if event.type == "text" or event.type == "complete" then
@@ -1314,6 +1342,8 @@ function Workflow:open_managed(run, prompt, existing_session)
 					self:update(run.id, { state = "waiting_input" })
 					self:finish_summary(run.id)
 				end
+			elseif event.type == "phase" then
+				pcall(conversation.update, { run_id = run.id, state = "running", phase = event.phase or "working" })
 			elseif event.type == "error" then
 				self:journal(run.id, "provider.error", { code = failure_code(event), phase = "managed" })
 				pcall(conversation.update, { run_id = run.id, text = event.text, state = "failed" })
@@ -1536,6 +1566,12 @@ function Workflow:send(id, message)
 	end
 	self:append_transcript(id, "user", message)
 	self:update(run.id, { state = "running" })
+	pcall(conversation.update, {
+		run_id = run.id,
+		state = "running",
+		phase = "thinking",
+		turn_started_at = self.clock(),
+	})
 	return true
 end
 
@@ -1803,6 +1839,8 @@ function Workflow:ask_selection(opts)
 				.. question,
 			role = "user",
 			state = "running",
+			phase = "thinking",
+			turn_started_at = self.clock(),
 		})
 		return true
 	end
