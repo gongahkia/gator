@@ -74,6 +74,14 @@ func (s *Store) ForensicsEnabled() bool { return s.forensics != nil }
 
 func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
+// ResetLocal drops only Norbot's database schema then recreates the current schema.
+func (s *Store) ResetLocal(ctx context.Context) error {
+	if _, err := s.pool.Exec(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public`); err != nil {
+		return fmt.Errorf("reset local schema: %w", err)
+	}
+	return s.Migrate(ctx)
+}
+
 func (s *Store) QueueDepth(ctx context.Context) (int, error) {
 	var value int
 	err := s.pool.QueryRow(ctx, `SELECT COUNT(*) FROM jobs WHERE state IN ('queued','running')`).Scan(&value)
@@ -636,6 +644,11 @@ CREATE TABLE IF NOT EXISTS forensic_payloads (
 CREATE INDEX IF NOT EXISTS forensic_payloads_expiry_idx ON forensic_payloads(expires_at);
 `
 
+const migration009LocalSingleOperator = `
+ALTER TABLE channel_accounts ADD COLUMN IF NOT EXISTS owner_external_id TEXT NOT NULL DEFAULT '';
+DROP TABLE IF EXISTS channel_pairings;
+`
+
 type migration struct {
 	Version int
 	Name    string
@@ -651,6 +664,7 @@ var migrations = []migration{
 	{Version: 6, Name: "planning_swarms", SQL: migration006PlanningSwarms},
 	{Version: 7, Name: "run_agent_policies", SQL: migration007RunAgentPolicies},
 	{Version: 8, Name: "operator_trace", SQL: migration008OperatorTrace},
+	{Version: 9, Name: "local_single_operator", SQL: migration009LocalSingleOperator},
 }
 
 func (s *Store) Migrate(ctx context.Context) error {

@@ -2,15 +2,12 @@ package engine
 
 import (
 	"context"
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -272,30 +269,10 @@ func (s *Service) validateAgentTool(runPolicy domain.RunAgentPolicy, role string
 		if path, ok := call.Params["path"].(string); !ok || !safeAgentPath(path) || !pathAllowed(policy.AllowedPathPrefixes, path) {
 			return domain.AgentToolPolicy{}, fmt.Errorf("%s path is outside the operator allowlist", call.Tool)
 		}
-	case "http_get", "http_write":
-		raw, ok := call.Params["url"].(string)
-		if !ok {
-			return domain.AgentToolPolicy{}, fmt.Errorf("http tool requires url")
-		}
-		parsed, err := url.Parse(raw)
-		if err != nil || parsed.Scheme != "https" || !stringIn(policy.AllowedHosts, parsed.Hostname()) {
-			return domain.AgentToolPolicy{}, fmt.Errorf("url must be an allowlisted https host")
-		}
-		if call.Tool == "http_write" {
-			method, _ := call.Params["method"].(string)
-			if method != "POST" && method != "PUT" && method != "PATCH" {
-				return domain.AgentToolPolicy{}, fmt.Errorf("http_write method must be POST, PUT, or PATCH")
-			}
-		}
 	case "shell":
 		command, ok := call.Params["command"].(string)
 		if !ok || !stringIn(policy.AllowedCommands, command) {
 			return domain.AgentToolPolicy{}, fmt.Errorf("shell command is not allowlisted")
-		}
-	case "database_mutate":
-		statement, ok := call.Params["statement"].(string)
-		if !ok || !singleMutation(statement) {
-			return domain.AgentToolPolicy{}, fmt.Errorf("database_mutate requires one parameterized INSERT, UPDATE, or DELETE")
 		}
 	default:
 		return domain.AgentToolPolicy{}, fmt.Errorf("unsupported tool %q", call.Tool)
@@ -413,19 +390,8 @@ func (s *Service) executeTool(ctx context.Context, run domain.Run, action domain
 		result["object_key"] = record.Key
 		result["digest"] = record.Digest
 		return result, nil
-	case "http_get":
-		return agentHTTP(ctx, action.Params)
-	case "http_write":
-		return s.sandboxHTTP(ctx, run, action)
 	case "shell":
 		return s.sandboxShell(ctx, run, action)
-	case "database_mutate":
-		args := list(action.Params["args"])
-		rows, err := s.store.ExecuteAppMutation(ctx, run.ID, action.Params["statement"].(string), args)
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"rows_affected": rows, "schema": "app_" + strings.ReplaceAll(run.ID, "-", "")}, nil
 	}
 	return nil, fmt.Errorf("unsupported tool")
 }
@@ -443,33 +409,6 @@ func (s *Service) sandboxShell(ctx context.Context, run domain.Run, action domai
 	result, err := s.runSandbox(ctx, run, request)
 	return map[string]any{"output": result.Output, "exit_code": result.ExitCode, "duration_ms": result.DurationMS}, err
 }
-func (s *Service) sandboxHTTP(ctx context.Context, run domain.Run, action domain.AgentAction) (map[string]any, error) {
-	method := action.Params["method"].(string)
-	rawURL := action.Params["url"].(string)
-	body, _ := action.Params["body"].(string)
-	host := mustHost(rawURL)
-	signature, err := s.egressSignature(host)
-	if err != nil {
-		return nil, err
-	}
-	command := []string{"--fail-with-body", "--silent", "--show-error", "--proxy-header", "X-Norbot-Egress-Hosts: " + host, "--proxy-header", "X-Norbot-Egress-Signature: " + signature, "--request", method, "--data-raw", body, rawURL}
-	request := runtime.SandboxRequest{Image: "curlimages/curl:8.12.1", Command: command, AllowedHosts: []string{host}}
-	result, err := s.runSandbox(ctx, run, request)
-	return map[string]any{"output": result.Output, "exit_code": result.ExitCode, "duration_ms": result.DurationMS}, err
-}
-func (s *Service) egressSignature(hosts string) (string, error) {
-	ref := s.config.Manifest.Runtime.Sandbox.EgressProxySecret
-	if ref == "" {
-		return "", fmt.Errorf("sandbox egress proxy is not configured")
-	}
-	secret := os.Getenv(ref)
-	if secret == "" {
-		return "", fmt.Errorf("sandbox egress proxy secret is unavailable")
-	}
-	mac := hmac.New(sha256.New, []byte(secret))
-	_, _ = mac.Write([]byte(hosts))
-	return hex.EncodeToString(mac.Sum(nil)), nil
-}
 func (s *Service) runSandbox(ctx context.Context, run domain.Run, request runtime.SandboxRequest) (runtime.SandboxResult, error) {
 	workspace, _, err := s.backendForRun(ctx, run)
 	if err != nil {
@@ -481,22 +420,6 @@ func (s *Service) runSandbox(ctx context.Context, run domain.Run, request runtim
 	}
 	return executor.RunSandbox(ctx, run.ID, request, s.config.Manifest.Runtime.Sandbox)
 }
-func agentHTTP(ctx context.Context, params map[string]any) (map[string]any, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, params["url"].(string), nil)
-	if err != nil {
-		return nil, err
-	}
-	response, err := (&http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}).Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{"status": response.StatusCode, "body": string(raw)}, nil
-}
 func agentPrompt(history []map[string]any, role string, policy domain.RunAgentPolicy) string {
 	encoded, _ := json.Marshal(history)
 	tools := agentToolSummary(policy, role)
@@ -505,12 +428,6 @@ func agentPrompt(history []map[string]any, role string, policy domain.RunAgentPo
 
 func approvalContext(call agentToolCall, run domain.Run) map[string]any {
 	context := map[string]any{"run_id": run.ID, "deployment_target": run.DeploymentTarget, "tool": call.Tool, "params": call.Params}
-	if raw, ok := call.Params["url"].(string); ok {
-		if parsed, err := url.Parse(raw); err == nil {
-			context["target_host"] = parsed.Hostname()
-			context["target_path"] = parsed.EscapedPath()
-		}
-	}
 	if raw, ok := call.Params["path"].(string); ok {
 		context["target_path"] = raw
 	}
@@ -674,8 +591,7 @@ func singleMutation(value string) bool {
 	normalized := strings.TrimSpace(strings.ToUpper(value))
 	return (strings.HasPrefix(normalized, "INSERT ") || strings.HasPrefix(normalized, "UPDATE ") || strings.HasPrefix(normalized, "DELETE ")) && !strings.Contains(strings.TrimSuffix(normalized, ";"), ";")
 }
-func list(value any) []any       { items, _ := value.([]any); return items }
-func mustHost(raw string) string { parsed, _ := url.Parse(raw); return parsed.Hostname() }
+func list(value any) []any { items, _ := value.([]any); return items }
 func stringValue(value map[string]any, key string) string {
 	text, _ := value[key].(string)
 	return text

@@ -1,8 +1,0 @@
-services:
-  norbot:
-    environment:
-      DOCKER_HOST: ${NORBOT_DOCKER_HOST:?set NORBOT_DOCKER_HOST to the rootless remote tcp endpoint}
-      DOCKER_TLS_VERIFY: "1"
-      DOCKER_CERT_PATH: /run/norbot/docker-certs
-    volumes:
-      - ${NORBOT_DOCKER_CERTS_HOST:?set NORBOT_DOCKER_CERTS_HOST to the client certificate directory}:/run/norbot/docker-certs:ro

@@ -223,6 +223,40 @@ func (c DockerClient) Validate(ctx context.Context) error {
 	return nil
 }
 
+// ResetLocal removes only resources created by Norbot's local executor.
+func ResetLocal(ctx context.Context, docker DockerClient) error {
+	if err := docker.Validate(ctx); err != nil {
+		return err
+	}
+	for _, args := range [][]string{
+		{"ps", "-aq", "--filter", "label=norbot.run_id"},
+		{"network", "ls", "-q", "--filter", "label=app.kubernetes.io/managed-by=norbot"},
+		{"volume", "ls", "-q", "--filter", "name=norbot_workspace_"},
+	} {
+		out, err := docker.Run(ctx, args...)
+		if err != nil {
+			return fmt.Errorf("list Norbot Docker resources: %w", err)
+		}
+		ids := strings.Fields(string(out))
+		if len(ids) == 0 {
+			continue
+		}
+		var remove []string
+		switch args[0] {
+		case "ps":
+			remove = append([]string{"rm", "-f"}, ids...)
+		case "network":
+			remove = append([]string{"network", "rm"}, ids...)
+		case "volume":
+			remove = append([]string{"volume", "rm"}, ids...)
+		}
+		if _, err := docker.Run(ctx, remove...); err != nil {
+			return fmt.Errorf("remove Norbot Docker resources: %w", err)
+		}
+	}
+	return nil
+}
+
 func (OSRunner) RunWithEnv(ctx context.Context, env []string, name string, args ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Env = append(os.Environ(), env...)

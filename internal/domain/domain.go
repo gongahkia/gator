@@ -755,22 +755,16 @@ type HealthReport struct {
 }
 
 type ChannelAccount struct {
-	ID         string            `json:"id"`
-	RunID      string            `json:"run_id"`
-	Adapter    string            `json:"adapter"`
-	Name       string            `json:"name"`
-	SecretRefs map[string]string `json:"secret_refs"`
-	Settings   map[string]any    `json:"settings"`
-	Enabled    bool              `json:"enabled"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
-}
-
-type ChannelPairing struct {
-	AccountID  string     `json:"account_id"`
-	ExternalID string     `json:"external_id"`
-	PairedAt   time.Time  `json:"paired_at"`
-	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	ID              string            `json:"id"`
+	RunID           string            `json:"run_id"`
+	Adapter         string            `json:"adapter"`
+	Name            string            `json:"name"`
+	OwnerExternalID string            `json:"owner_external_id"`
+	SecretRefs      map[string]string `json:"secret_refs"`
+	Settings        map[string]any    `json:"settings"`
+	Enabled         bool              `json:"enabled"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 type ChannelSession struct {

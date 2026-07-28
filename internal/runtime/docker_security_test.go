@@ -98,23 +98,18 @@ func TestDeploymentNeverInvokesComposeAndHardensContainers(t *testing.T) {
 	}
 }
 
-func TestRootlessDockerClientPropagatesTLSSettings(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "tcp://rootless.example:2376")
-	t.Setenv("DOCKER_TLS_VERIFY", "1")
-	t.Setenv("DOCKER_CERT_PATH", "/run/certs")
+func TestLocalDockerClientRequiresExplicitAcknowledgement(t *testing.T) {
+	t.Setenv("NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET", "true")
 	runner := &dockerSecurityRunner{}
-	client := NewDockerClient("docker", config.Docker{}, runner)
+	client := NewDockerClient("docker", config.Docker{Mode: config.DockerModeUnsafeLocalSocket}, runner)
 	if err := client.Validate(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := client.Run(context.Background(), "ps"); err != nil {
 		t.Fatal(err)
 	}
-	joined := strings.Join(runner.envs[len(runner.envs)-1], "\n")
-	for _, required := range []string{"DOCKER_HOST=tcp://rootless.example:2376", "DOCKER_TLS_VERIFY=1", "DOCKER_CERT_PATH=/run/certs"} {
-		if !strings.Contains(joined, required) {
-			t.Fatalf("missing %q in %s", required, joined)
-		}
+	if len(runner.envs) != 1 || len(runner.envs[0]) != 0 {
+		t.Fatalf("local Docker client should not inject remote TLS env: %#v", runner.envs)
 	}
 }
 

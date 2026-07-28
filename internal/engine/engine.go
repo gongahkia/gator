@@ -105,30 +105,18 @@ func NewWithExtensionsAndArtifacts(st *store.Store, cfg config.Config, logger *s
 func (s *Service) Metrics() *telemetry.Metrics { return s.metrics }
 
 func (s *Service) RuntimeOptions() RuntimeOptions {
-	k := s.config.Manifest.Runtime.Kubernetes
-	configured := k.Kubeconfig != "" && k.Namespace != "" && k.ServiceAccount != "" && k.RegistryRepository != "" && k.RegistryPullSecret != ""
 	docker := s.config.Manifest.Runtime.Docker.Normalized()
-	return RuntimeOptions{DefaultTarget: s.config.Manifest.DefaultTarget(), KubernetesConfigured: configured, IngressConfigured: configured && k.IngressClass != "" && k.IngressBaseDomain != "", DockerMode: docker.Mode, UnsafeDocker: docker.Mode == config.DockerModeUnsafeLocalSocket}
+	return RuntimeOptions{DefaultTarget: domain.DeploymentDocker, DockerMode: docker.Mode, UnsafeDocker: docker.Mode == config.DockerModeUnsafeLocalSocket}
 }
 
 func (s *Service) backendFor(ctx context.Context, target domain.DeploymentTarget) (runtime.WorkspaceBackend, runtime.DeploymentBackend, error) {
-	if target == domain.DeploymentDocker {
-		if err := s.dockerWorkspace.Validate(ctx); err != nil {
-			return nil, nil, err
-		}
-		return s.dockerWorkspace, s.dockerDeployment, nil
+	if target != domain.DeploymentDocker {
+		return nil, nil, fmt.Errorf("single-operator local mode supports only Docker deployment")
 	}
-	if target != domain.DeploymentKubernetes {
-		return nil, nil, fmt.Errorf("unsupported deployment target %q", target)
-	}
-	kube, err := runtime.NewKubernetesRuntime(s.config.Manifest.Runtime.Kubernetes, s.config.ArtifactsDir)
-	if err != nil {
+	if err := s.dockerWorkspace.Validate(ctx); err != nil {
 		return nil, nil, err
 	}
-	if err := kube.Validate(ctx); err != nil {
-		return nil, nil, err
-	}
-	return kube, kube, nil
+	return s.dockerWorkspace, s.dockerDeployment, nil
 }
 
 func (s *Service) backendForRun(ctx context.Context, run domain.Run) (runtime.WorkspaceBackend, runtime.DeploymentBackend, error) {
@@ -166,14 +154,8 @@ func (s *Service) CreateRun(ctx context.Context, input CreateRunInput) (domain.R
 	if target == "" {
 		target = s.config.Manifest.DefaultTarget()
 	}
-	if !target.Valid() {
-		return domain.Run{}, fmt.Errorf("unsupported deployment_target %q", target)
-	}
-	if input.PublicIngress && target != domain.DeploymentKubernetes {
-		return domain.Run{}, fmt.Errorf("public_ingress requires deployment_target kubernetes")
-	}
-	if input.PublicIngress && (s.config.Manifest.Runtime.Kubernetes.IngressClass == "" || s.config.Manifest.Runtime.Kubernetes.IngressBaseDomain == "") {
-		return domain.Run{}, fmt.Errorf("public_ingress requires configured kubernetes ingress")
+	if target != domain.DeploymentDocker || input.PublicIngress {
+		return domain.Run{}, fmt.Errorf("single-operator local mode supports only private Docker deployment")
 	}
 	_, _, err := s.backendFor(ctx, target)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 )
 
 func (s *Store) CreateChannelAccount(ctx context.Context, value domain.ChannelAccount) (domain.ChannelAccount, error) {
-	if value.ID == "" || value.RunID == "" || !validChannelAdapter(value.Adapter) || value.Name == "" {
+	if value.ID == "" || value.RunID == "" || !validChannelAdapter(value.Adapter) || value.Name == "" || value.OwnerExternalID == "" {
 		return domain.ChannelAccount{}, fmt.Errorf("invalid channel account")
 	}
 	secrets, err := json.Marshal(value.SecretRefs)
@@ -25,7 +25,7 @@ func (s *Store) CreateChannelAccount(ctx context.Context, value domain.ChannelAc
 		return domain.ChannelAccount{}, err
 	}
 	var rawSecrets, rawSettings []byte
-	err = s.pool.QueryRow(ctx, `INSERT INTO channel_accounts(id,run_id,adapter,name,secret_refs,settings,enabled) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING secret_refs,settings,created_at,updated_at`, value.ID, value.RunID, value.Adapter, value.Name, secrets, settings, value.Enabled).Scan(&rawSecrets, &rawSettings, &value.CreatedAt, &value.UpdatedAt)
+	err = s.pool.QueryRow(ctx, `INSERT INTO channel_accounts(id,run_id,adapter,name,owner_external_id,secret_refs,settings,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING secret_refs,settings,created_at,updated_at`, value.ID, value.RunID, value.Adapter, value.Name, value.OwnerExternalID, secrets, settings, value.Enabled).Scan(&rawSecrets, &rawSettings, &value.CreatedAt, &value.UpdatedAt)
 	if err != nil {
 		return domain.ChannelAccount{}, err
 	}
@@ -82,29 +82,6 @@ func (s *Store) ChannelAccountsForRun(ctx context.Context, runID string) ([]doma
 		items = append(items, value)
 	}
 	return items, rows.Err()
-}
-
-func (s *Store) PairChannelIdentity(ctx context.Context, value domain.ChannelPairing) (domain.ChannelPairing, error) {
-	if value.AccountID == "" || value.ExternalID == "" {
-		return domain.ChannelPairing{}, fmt.Errorf("account and external identity are required")
-	}
-	err := s.pool.QueryRow(ctx, `INSERT INTO channel_pairings(account_id,external_id,expires_at) VALUES($1,$2,$3) ON CONFLICT(account_id,external_id) DO UPDATE SET paired_at=now(),expires_at=EXCLUDED.expires_at RETURNING paired_at`, value.AccountID, value.ExternalID, value.ExpiresAt).Scan(&value.PairedAt)
-	return value, err
-}
-func (s *Store) UnpairChannelIdentity(ctx context.Context, accountID, externalID string) error {
-	result, err := s.pool.Exec(ctx, `DELETE FROM channel_pairings WHERE account_id=$1 AND external_id=$2`, accountID, externalID)
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected() != 1 {
-		return ErrNotFound
-	}
-	return nil
-}
-func (s *Store) IsPaired(ctx context.Context, accountID, externalID string) (bool, error) {
-	var value bool
-	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM channel_pairings WHERE account_id=$1 AND external_id=$2 AND (expires_at IS NULL OR expires_at>now()))`, accountID, externalID).Scan(&value)
-	return value, err
 }
 
 func (s *Store) Session(ctx context.Context, accountID, externalID, replyID, id string, expiresAt time.Time) (domain.ChannelSession, error) {
@@ -219,12 +196,12 @@ func (s *Store) ChannelMessages(ctx context.Context, accountID, externalID strin
 	return items, rows.Err()
 }
 
-const channelAccountQuery = `SELECT id,run_id,adapter,name,secret_refs,settings,enabled,created_at,updated_at FROM channel_accounts`
+const channelAccountQuery = `SELECT id,run_id,adapter,name,owner_external_id,secret_refs,settings,enabled,created_at,updated_at FROM channel_accounts`
 
 func scanChannelAccount(row interface{ Scan(...any) error }) (domain.ChannelAccount, error) {
 	var value domain.ChannelAccount
 	var secrets, settings []byte
-	err := row.Scan(&value.ID, &value.RunID, &value.Adapter, &value.Name, &secrets, &settings, &value.Enabled, &value.CreatedAt, &value.UpdatedAt)
+	err := row.Scan(&value.ID, &value.RunID, &value.Adapter, &value.Name, &value.OwnerExternalID, &secrets, &settings, &value.Enabled, &value.CreatedAt, &value.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ChannelAccount{}, ErrNotFound
 	}

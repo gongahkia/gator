@@ -19,70 +19,29 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.123.0@sha256:e39311df1f3d941923c00da79ac7ba6269124a870ee87e3c3ad24d60f8aee4d2
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    volumes:
-      - ./deploy/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
-    ports:
-      - "127.0.0.1:4318:4318"
-      - "127.0.0.1:8889:8889"
-
-  jaeger:
-    image: jaegertracing/all-in-one:1.67.0@sha256:34e3d18e0f2eeb9abd9bb53d0dc7abaf2a5b1c884fdca575093af3126811a9d3
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "127.0.0.1:16686:16686"
-
   norbot:
     build: .
     env_file: .env
     environment:
       NORBOT_DATABASE_URL: ${NORBOT_DATABASE_URL:-postgres://norbot:norbot@postgres:5432/norbot?sslmode=disable}
       NORBOT_HTTP_ADDR: ${NORBOT_HTTP_ADDR:-0.0.0.0:8080}
-      NORBOT_ALLOW_UNAUTHENTICATED_LOCAL: ${NORBOT_ALLOW_UNAUTHENTICATED_LOCAL:-true}
       NORBOT_ARTIFACTS_DIR: ${NORBOT_ARTIFACTS_DIR:-/var/lib/norbot/artifacts}
       NORBOT_CONFIG: /etc/norbot/config.json
-      NORBOT_OTEL_ENDPOINT: ${NORBOT_OTEL_ENDPOINT:-otel-collector:4318}
+      NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET: ${NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET:-true}
+      NORBOT_CONTAINER_LOCAL: "true"
+      NORBOT_WEBHOOK_ADDR: ${NORBOT_WEBHOOK_ADDR:-0.0.0.0:8081}
       NORBOT_WORKERS: ${NORBOT_WORKERS:-2}
-      NORBOT_MAX_WORKERS: ${NORBOT_MAX_WORKERS:-4}
-      NORBOT_EGRESS_PROXY_SECRET: ${NORBOT_EGRESS_PROXY_SECRET:-}
-      NORBOT_S3_ACCESS_KEY: ${NORBOT_S3_ACCESS_KEY:-}
-      NORBOT_S3_SECRET_KEY: ${NORBOT_S3_SECRET_KEY:-}
     volumes:
       - ${NORBOT_CONFIG_HOST:-./config.json}:/etc/norbot/config.json:ro
-      - ${NORBOT_KUBECONFIG_HOST:-./deploy/empty-kubeconfig}:/etc/norbot/kubeconfig:ro
       - norbot_artifacts:/var/lib/norbot/artifacts
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "127.0.0.1:8080:8080"
-      - "127.0.0.1:8181:8181"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "127.0.0.1:8081:8081"
     depends_on:
       postgres:
         condition: service_healthy
-      otel-collector:
-        condition: service_started
-
-  caddy:
-    image: caddy:2.10-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
-    profiles: ["public"]
-    environment:
-      NORBOT_PUBLIC_HTTPS_DOMAIN: ${NORBOT_PUBLIC_HTTPS_DOMAIN:-}
-    volumes:
-      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      norbot:
-        condition: service_started
 
 volumes:
   postgres_data:
   norbot_artifacts:
-  caddy_data:
-  caddy_config:

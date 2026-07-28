@@ -1,123 +1,42 @@
 # Norbot
 
-## Operator traceback
+Norbot is a local, single-operator agentic app builder. It creates frontend, full-stack, and agentic applications through explicit Plan, Build, Verify/Fix, and Deploy approvals.
 
-Expanded runs expose a unified trace across stages, providers, revisions, approvals, policy changes, central-agent turns, tool actions, and sandboxes. See [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) for console/API usage and the local-only encrypted forensic mode.
+## Local setup
 
-Norbot is a local-first, provider-agnostic agentic app builder. Its embedded web console drives explicit Plan → Build → Verify/Fix → Deploy approvals; Go API and workers own durable state, generated artifacts, Docker or Kubernetes workspaces, deployments, and OpenTelemetry visibility.
-
-## Install
+Requirements: Docker Desktop, Docker socket access, and an API key for one configured provider.
 
 ```sh
-cp .env.example .env
-cp config.example.json config.json
-docker compose -f docker-compose.yml -f docker-compose.remote-tls.yml up --build
+cp .env.example .env # add OPENAI_API_KEY
+docker compose up --build
+open http://127.0.0.1:8080
 ```
 
-Docker execution defaults to a separately operated rootless daemon over mutually authenticated TLS. Set `NORBOT_DOCKER_HOST` and `NORBOT_DOCKER_CERTS_HOST`; Norbot validates that the daemon reports rootless mode before accepting Docker runs. The base Compose file intentionally has no Docker socket mount.
-
-For an isolated local development machine only, set `runtime.docker` to `{"mode":"unsafe_local_socket"}` in `config.json` and run `docker compose -f docker-compose.yml -f docker-compose.unsafe-local.yml up --build`. This requires `NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET=true`, is rejected with `security.public: true`, and exposes host-Docker authority to Norbot; do not use it for normal operation.
-
-Open `http://127.0.0.1:8080`. The default Compose setup is loopback-only and allows local unauthenticated access. For a shared deployment, configure `security.oidc` with an issuer, audience, groups claim, operator group, SPA `client_id`, and optional `scopes`, then set `NORBOT_ALLOW_UNAUTHENTICATED_LOCAL=false`.
-
-Existing local installs with the former placeholder `security.oidc` block must replace it with `"security": {}` before starting; configure a complete OIDC block instead for shared access.
-
-`norbot init` creates a config interactively. It records a Docker or Kubernetes default; every run can override that default and permanently pins its selected backend.
-
-The example config disables remote artifact storage and managed sandbox HTTP writes by default, so the first Docker Compose boot needs only a provider key. Enable either deliberately after bootstrap.
-
-## Reviews, skills, and health
-
-Builder responses are stored as immutable, digest-checked code/fix proposals. Code approval applies a proposal, deterministic test output becomes a second approval gate, and failed tests require an explicit `fix` action; `workflow.max_fixes` defaults to `2`. `GET /api/runs/{id}/revisions`, `/usage`, and `/skills` expose patch/report, reported-or-estimated token usage, and selected-skill provenance.
-
-`workflow.planning_swarm` is an opt-in planning-only experiment. It runs bounded remote architecture/delivery/security candidates without Norbot tools or writable workspaces, ranks valid candidates with the configured planner provider, and still requires the ordinary human architecture approval. CLI and plugin planners stay single-agent because that isolation boundary cannot be enforced for them. See [configuration](docs/CONFIGURATION.md#planning-swarm).
-
-Each completed app version can create a change run. Norbot snapshots the approved `generated-app` tree under its SHA-256 digest, records that immutable snapshot, copies the parent run’s exact selected skill digests, and restores the snapshot into the child workspace. A normal change starts directly at Build; only `architecture_affecting: true` permits the Planner stage. The child has a new version run ID but inherits the stable `app_id`, so a successful deployment updates the same Docker Compose project or Kubernetes application identity. Failed candidate deployments do not replace the recorded current app version.
-
-Skill imports accept HTTPS Git and OCI sources. Norbot recursively discovers every `SKILL.md` (up to 64 per source) and creates one independently scanned import for each directory. In `auto` mode, a directory with `skill.json` is imported as a native declarative bundle; any other `SKILL.md` is imported as an adapted read-only instruction bundle, with its identity and metadata derived from frontmatter and source path. `native` mode requires `skill.json`; `adapted` mode deliberately ignores manifests and derives metadata for every discovered skill.
-
-Each candidate is independently limited to 128 regular non-executable files, 1 MiB per file, and 10 MiB total. Imports are copied into Norbot-managed storage by SHA-256 digest, stay `scanned` until explicitly activated, and only activated digests can be selected when creating a run. Adapted imports declare no executable tools or capabilities: their source files are available as read-only instructions only. Private source credentials are environment-variable references only.
-
-For catalogue repositories, `follow_readme_links: true` reads the root `README.md`, extracts up to 32 canonical public GitHub repository links, and scans each linked repository independently. Credentials are never sent to linked repositories; invalid, unsafe, or non-skill links are reported as skipped.
-
-`norbot health` prints detailed health and returns nonzero only for a critical down dependency; `norbot health --json`, `GET /api/health/detail`, `/api/health/stream`, and the web console provide the same redacted diagnostics.
-
-## Channels
-
-Norbot is the central HTTPS gateway for Telegram, Slack HTTP Events, Discord signed interactions plus Gateway messages, and official WhatsApp Cloud API. Channel accounts bind to one deployed agentic app, persist only environment-variable secret references, and require explicit pairing before an identity can invoke the app. Sessions retain summaries for 30 days and can be exported or reset through the API.
-
-Create an account through `POST /api/channels/accounts`, then pair an external platform identity through `POST /api/channels/accounts/{id}/pairings`. Configure each provider webhook to `https://<public-host>/api/channels/<account-id>/webhook`; Telegram needs `webhook_secret` and `bot_token`, Slack `signing_secret` and `bot_token`, Discord `public_key` plus `bot_token`, and WhatsApp `verify_token`, `app_secret`, and `access_token`. The account `settings` needs `public_key` for Discord and `phone_number_id` for WhatsApp.
-
-For Docker, set `NORBOT_PUBLIC_HTTPS_DOMAIN` and run `docker compose -f docker-compose.yml -f docker-compose.remote-tls.yml --profile public up --build`; the included Caddy reverse proxy obtains TLS for a publicly resolvable DNS name. Kubernetes-generated apps retain their existing ingress path; the Norbot gateway itself must be deployed behind a public TLS reverse proxy reachable by the platform webhooks.
-
-## Kubernetes
-
-Kubernetes is additive; Docker Compose remains fully supported. Kubernetes runs use kubeconfig/client-go, a per-run PVC, isolated Jobs, Kaniko builds to an existing OCI registry Secret, temporary live verification, and retained application/PVC resources until deletion.
-
-For a local Kubernetes option, `kind` runs the cluster nodes as Docker containers on this Mac. It is not a replacement for Docker Compose: Docker Compose still runs the Norbot control plane, while `kind` runs the generated apps, verifier, sandbox Jobs, and egress proxy. The bootstrap creates an in-cluster OCI registry, namespace, ServiceAccount/RBAC, registry Secret, signed egress-proxy Deployment/Service, NetworkPolicies, a Compose-ready Kubernetes config, and a local 0600 proxy-secret file.
+The console and webhook listener bind to loopback only. Docker Desktop socket mode is intentionally local-only: the Norbot container can control Docker on this Mac. Generated deployment descriptors remain server-owned and generated app containers are constrained, but this is not a shared or production deployment mode.
 
 ```sh
-brew install kind kubectl
-brew install cilium-cli # enables safe Kubernetes HTTP sandbox tools
-norbot kube local --cilium
-set -a; source .norbot/local-kubernetes.env; set +a
-NORBOT_CONFIG_HOST=config.local-kubernetes.json \
-NORBOT_KUBECONFIG_HOST="$HOME/.kube/config" docker compose up --build
+docker compose exec norbot norbot local doctor
+docker compose exec norbot norbot local reset --yes
 ```
 
-`kind`’s default networking does not by itself prove NetworkPolicy enforcement. `--cilium` creates a new Kind cluster with the default CNI disabled, installs Cilium, then runs a direct pod-to-pod deny-egress probe before enabling HTTPS sandbox tools. For another CNI, use `norbot kube local --verify-network-policy`; the legacy `--confirm-network-policy` alias now runs the same probe. Without a passing probe, local bootstrap leaves those tools fail-closed. Recheck after every CNI upgrade or policy-engine change. Docker deployment and non-network sandbox tools remain available.
+`local reset --yes` removes only Norbot-labelled Docker resources and resets the Norbot database. It does not remove unrelated Docker resources.
 
-For a remote cluster, use `norbot init --target kubernetes`, create the registry Secret, then `norbot kube bootstrap`. The operator needs namespace-creation access for bootstrap, then namespaced access only to Norbot resources. Set `runtime.kubernetes.registry_repository` and `registry_pull_secret`; optional ingress is disabled unless its class, base domain, and controller namespace are all configured.
+## Channels and agent tools
 
-## Artifact storage and managed egress
+Each channel account has one required `owner_external_id`. Only that identity can invoke the agent or receive operator-queued output; rejected messages are retained in channel logs. Pairing is not used.
 
-Set `artifacts.enabled` to `true` with an HTTPS S3 or S3-compatible endpoint, bucket, and environment-variable credential references to enable durable channel input/output and agent file artifacts. Norbot transfers objects with the AWS Go v2 S3 client, retains a digest and 30-day expiry record in Postgres, verifies downloads before upload, and removes the remote object before its metadata during expiry cleanup. The default remains local files only.
+Telegram webhook traffic is served only on `127.0.0.1:8081`. Tunnel that port over HTTPS and configure the account’s webhook as:
 
-For Docker HTTP-write tools, set `runtime.sandbox.egress_proxy_url` to `http://host.docker.internal:8181` and `egress_proxy_secret_env` to `NORBOT_EGRESS_PROXY_SECRET`; Compose publishes that loopback-only listener. Kubernetes uses a separate namespace-local proxy Deployment and Service. Sandboxes can connect only to DNS and that Service; the proxy checks the signed host allowlist, permits HTTPS/443 only, resolves and dials public IPs only, and is the sole workload with public HTTPS egress.
-
-For remote access, tunnel the embedded web console:
-
-```sh
-ssh -L 8080:127.0.0.1:8080 host
+```text
+https://YOUR-TUNNEL/api/channels/ACCOUNT_ID/webhook
 ```
 
-Then open `http://127.0.0.1:8080` locally.
+The console on port 8080 must not be tunneled. Telegram E2E requires a bot token, owner chat ID, and HTTPS tunnel supplied through environment-variable references.
 
-## Operating model
+Agent tools are offline by design: `artifact_read`, approval-required `file_write`, and approval-required allowlisted `shell`. Shell actions run in a read-only, capability-dropped sandbox with `--network none`; HTTP and database-mutation tools are unavailable.
 
-- One local/self-hosted operator. No cloud control plane, tenancy, or Azure dependency.
-- Every stage pauses for explicit approval. Failures and expired worker leases pause for retry, revision, or abandonment; Norbot never auto-replays a recovered job.
-- Per-stage providers and deployment target are chosen at run creation and recorded with each event; later config changes do not alter an existing run.
-- Provider credentials are environment references only; Norbot never stores raw secrets.
-- Norbot owns agent sessions, provider credentials, typed tools, approval audit, sandbox execution, and idempotency. Generated apps receive neither model credentials nor a local tool executor. OpenClaw is not used.
-- Verification blocks deployment on locked dependency checks, tests, builds, npm audit, govulncheck, server-owned Docker or Kubernetes rollout, and smoke failure. Docker runs additionally execute the approved browser acceptance contract. The planner drafts a typed contract for flows, API assertions, seeded data, axe accessibility checks, and screenshots; edit it before architecture approval. Norbot owns the Playwright verifier image and runs it only on the temporary internal verification network. First screenshots become pending baselines and are approved with the verification gate; later runs compare against the approved baseline.
-- Failed verification reports retain command argv, exit status, redacted output, a command-log artifact, a deterministic failure class, and one bounded repair proposal. A repair approval accepts only that proposal digest, restricts changed paths, and reruns its required verification checks; free-text repair scope is rejected.
-- `norbot eval validate` validates the versioned 24-case corpus in `evals/v1`; `norbot eval run --provider ID --model MODEL --max-cost N` executes its deterministic architecture, source-contract, failure-classification, and injection fixtures, and `norbot eval score --input results.json` scores externally collected provider results by provider/model. Provider invocation remains opt-in and must be run through an explicitly credentialed CI job.
+## Local proof suite
 
-Configure provider API keys in `.env`; add CLI providers with isolated runner images in `config.json`. See [configuration](docs/CONFIGURATION.md).
+[`proofs/local-v1.json`](proofs/local-v1.json) defines nine real-provider runs: three frontend, three full-stack, and three agentic. Run the first six from the console, approving each stage after review. For each agentic case, attach the Telegram account sequentially, send the specified owner message, approve the pending action, and record the run ID and result in the proof report.
 
-Native Azure OpenAI, Cohere, Ollama, Amazon Bedrock, and Vertex AI adapters plus documented OpenAI-compatible provider presets are available in [provider configurations](docs/PROVIDERS.md).
-
-## API
-
-- `POST /api/runs` creates and queues a planner run. It accepts optional `deployment_target: "docker"|"kubernetes"` and `public_ingress` fields.
-- `GET /api/runs`, `GET /api/runs/{id}`, `GET /api/runs/{id}/events`, and `GET /api/events/stream` inspect state and stream replayable events. The console uses the global stream to update run cards, review artifacts, and details without manual refresh.
-- `GET/PUT /api/runs/{id}/architecture` reads or edits the typed planner architecture while approval is pending. `PUT /api/runs/{id}/graph` remains a compatibility projection.
-- `GET/PUT /api/runs/{id}/acceptance` reads or edits the typed browser/API/a11y/screenshot acceptance contract while planner approval is pending.
-- `GET /api/runs/{id}/verification-commands` returns the complete redacted command artifact for the latest verification revision; the revision report remains a concise tail summary.
-- `GET /api/runs/{id}/planning-swarm` exposes durable planning candidates; `POST /api/runs/{id}/planning-swarm/select` selects a completed candidate for review without bypassing planner approval.
-- `POST /api/runs/{id}/change-runs` creates a snapshot-backed linked version. Send `{"change":"...","architecture_affecting":true}` only when the architecture must be replanned; otherwise it starts at Build. `GET /api/apps` lists the current deployed version of each app.
-- `POST /api/runs/{id}/approval` approves, revises planner or builder output, explicitly starts a verification fix, retries, or abandons a run.
-- `GET /api/health`, `/api/health/detail`, `/api/health/stream`, `/metrics`, and `/api/capacity` expose operations and quota-aware worker recommendations. `POST /api/capacity/recommendations` persists a recommendation; `POST /api/capacity/recommendations/{id}/accept` records explicit confirmation.
-- `POST /api/skills/imports`, `GET /api/skills/imports`, and `POST /api/skills/imports/{id}/activate` operate the scanned native/adapted skill catalog.
-- `POST/GET /api/channels/accounts`, pairing/session routes, and `/api/channels/{account}/webhook` operate the central native channel gateway.
-- `GET /api/agent/actions` and `POST /api/agent/actions/{id}/decision` expose central, durable tool approvals; a decision resumes its exact persisted turn once.
-- `GET/PUT /api/runs/{id}/agent-policy` expose each run's internal-agent and agentic-app capability policy. PUT is monotonic: it can only restrict the run; pending tool actions are revalidated before execution.
-- `GET /api/runtime` returns the default target and Kubernetes/ingress availability for web-console onboarding.
-- `GET /api/runs/{id}/deployment`, `/logs`; `POST .../start`, `POST .../stop`; and `DELETE .../deployment` control deployed apps.
-
-`/metrics` is a Prometheus scrape endpoint; traces export through the OpenTelemetry Collector to Jaeger.
-
-Docker Compose remains the supported Norbot control-plane installation path. Docker runs require a rootless remote TLS daemon by default; Kubernetes runs require only kubeconfig access from the Norbot control plane.
-
-For the required human inbound proof on dedicated Telegram, Slack, Discord, and WhatsApp identities, send a unique marker and run `norbot live-e2e inbound --account <account-id> --external <identity-id> --marker <marker>`. It succeeds only after Norbot records that inbound message and a delivered outbound reply.
+The suite is a pass only when each run reaches deployed/completed status and its declared browser/API/tool evidence is present. Provider or Telegram setup failures are reported as failures, never converted to a pass.

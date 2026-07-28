@@ -104,7 +104,7 @@ type Docker struct {
 
 func (d Docker) Normalized() Docker {
 	if d.Mode == "" {
-		d.Mode = DockerModeRootlessRemoteTLS
+		d.Mode = DockerModeUnsafeLocalSocket
 	}
 	if d.HostEnv == "" {
 		d.HostEnv = "DOCKER_HOST"
@@ -120,22 +120,11 @@ func (d Docker) Normalized() Docker {
 
 func (d Docker) Validate(public bool) error {
 	d = d.Normalized()
-	switch d.Mode {
-	case DockerModeRootlessRemoteTLS:
-		for _, name := range []string{d.HostEnv, d.TLSVerifyEnv, d.CertPathEnv} {
-			if !validEnvName(name) {
-				return fmt.Errorf("runtime docker environment reference is invalid")
-			}
-		}
-		if d.HostEnv == d.TLSVerifyEnv || d.HostEnv == d.CertPathEnv || d.TLSVerifyEnv == d.CertPathEnv {
-			return fmt.Errorf("runtime docker environment references must be distinct")
-		}
-	case DockerModeUnsafeLocalSocket:
-		if public {
-			return fmt.Errorf("unsafe_local_socket docker mode cannot be used with public security")
-		}
-	default:
-		return fmt.Errorf("runtime docker mode must be %q or %q", DockerModeRootlessRemoteTLS, DockerModeUnsafeLocalSocket)
+	if d.Mode != DockerModeUnsafeLocalSocket {
+		return fmt.Errorf("single-operator local mode requires runtime.docker.mode %q", DockerModeUnsafeLocalSocket)
+	}
+	if public {
+		return fmt.Errorf("single-operator local mode cannot enable public security")
 	}
 	return nil
 }
@@ -148,17 +137,7 @@ func (d Docker) ValidateEnvironment(lookup func(string) string) error {
 		}
 		return nil
 	}
-	host := strings.TrimSpace(lookup(d.HostEnv))
-	if !strings.HasPrefix(host, "tcp://") {
-		return fmt.Errorf("rootless_remote_tls requires %s to be a tcp:// endpoint", d.HostEnv)
-	}
-	if strings.TrimSpace(lookup(d.TLSVerifyEnv)) != "1" {
-		return fmt.Errorf("rootless_remote_tls requires %s=1", d.TLSVerifyEnv)
-	}
-	if !filepath.IsAbs(strings.TrimSpace(lookup(d.CertPathEnv))) {
-		return fmt.Errorf("rootless_remote_tls requires %s to be an absolute certificate path", d.CertPathEnv)
-	}
-	return nil
+	return fmt.Errorf("single-operator local mode requires runtime.docker.mode %q", DockerModeUnsafeLocalSocket)
 }
 
 type Sandbox struct {
@@ -286,15 +265,14 @@ type Manifest struct {
 }
 
 type Config struct {
-	DatabaseURL               string
-	HTTPAddr                  string
-	ArtifactsDir              string
-	OTelEndpoint              string
-	Workers                   int
-	MaxWorkers                int
-	DockerBin                 string
-	AllowUnauthenticatedLocal bool
-	Manifest                  Manifest
+	DatabaseURL  string
+	HTTPAddr     string
+	WebhookAddr  string
+	ArtifactsDir string
+	Workers      int
+	MaxWorkers   int
+	DockerBin    string
+	Manifest     Manifest
 }
 
 func Load() (Config, error) {
@@ -304,14 +282,13 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("NORBOT_WORKERS must be >=1 and <= NORBOT_MAX_WORKERS")
 	}
 	cfg := Config{
-		DatabaseURL:               env("NORBOT_DATABASE_URL", "postgres://norbot:norbot@127.0.0.1:5432/norbot?sslmode=disable"),
-		HTTPAddr:                  env("NORBOT_HTTP_ADDR", "127.0.0.1:8080"),
-		ArtifactsDir:              env("NORBOT_ARTIFACTS_DIR", ".norbot/artifacts"),
-		OTelEndpoint:              strings.TrimSpace(os.Getenv("NORBOT_OTEL_ENDPOINT")),
-		Workers:                   workers,
-		MaxWorkers:                maxWorkers,
-		DockerBin:                 env("NORBOT_DOCKER_BIN", "docker"),
-		AllowUnauthenticatedLocal: envBool("NORBOT_ALLOW_UNAUTHENTICATED_LOCAL", false),
+		DatabaseURL:  env("NORBOT_DATABASE_URL", "postgres://norbot:norbot@127.0.0.1:5432/norbot?sslmode=disable"),
+		HTTPAddr:     env("NORBOT_HTTP_ADDR", "127.0.0.1:8080"),
+		WebhookAddr:  env("NORBOT_WEBHOOK_ADDR", "127.0.0.1:8081"),
+		ArtifactsDir: env("NORBOT_ARTIFACTS_DIR", ".norbot/artifacts"),
+		Workers:      workers,
+		MaxWorkers:   maxWorkers,
+		DockerBin:    env("NORBOT_DOCKER_BIN", "docker"),
 	}
 	path := env("NORBOT_CONFIG", "config.json")
 	data, err := os.ReadFile(path)
@@ -347,11 +324,8 @@ func (m Manifest) Validate() error {
 	if m.Workflow.MaxFixes < 0 || m.Workflow.MaxFixes > 10 {
 		return fmt.Errorf("workflow max_fixes must be between 0 and 10")
 	}
-	if m.Workflow.PlanningSwarm.MaxParallel < 0 || m.Workflow.PlanningSwarm.MaxParallel > 3 {
-		return fmt.Errorf("workflow planning_swarm max_parallel must be between 1 and 3")
-	}
-	if m.Workflow.PlanningSwarm.TimeoutS < 0 || m.Workflow.PlanningSwarm.TimeoutS > 600 || m.Workflow.PlanningSwarm.TimeoutS > 0 && m.Workflow.PlanningSwarm.TimeoutS < 30 {
-		return fmt.Errorf("workflow planning_swarm timeout_seconds must be between 30 and 600")
+	if m.Workflow.PlanningSwarm.Enabled || m.Workflow.PlanningSwarm.MaxParallel != 0 || m.Workflow.PlanningSwarm.TimeoutS != 0 {
+		return fmt.Errorf("planning_swarm is not available in single-operator local mode")
 	}
 	if len(m.Providers) == 0 {
 		return fmt.Errorf("manifest needs at least one provider")
@@ -440,8 +414,14 @@ func (m Manifest) Validate() error {
 		if strings.TrimSpace(name) == "" {
 			return fmt.Errorf("tool policy needs a name")
 		}
+		if name != "artifact_read" && name != "file_write" && name != "shell" {
+			return fmt.Errorf("tool policy %q is not available in single-operator local mode", name)
+		}
 		if policy.MaxCalls < 0 || policy.MaxCalls > 100 {
 			return fmt.Errorf("tool policy %q max_calls must be between 0 and 100", name)
+		}
+		if len(policy.AllowedHosts) != 0 {
+			return fmt.Errorf("tool policy %q cannot enable network access", name)
 		}
 		for _, prefix := range policy.AllowedPathPrefixes {
 			if prefix == "" || strings.HasPrefix(prefix, "/") || strings.Contains(prefix, "..") {
@@ -466,56 +446,27 @@ func (m Manifest) ValidateRetention() error {
 }
 
 func (m Manifest) ValidateForensics() error {
-	if !m.Forensics.RawCapture {
-		return nil
-	}
-	if m.Forensics.MasterKeyEnv == "" {
-		return fmt.Errorf("forensics raw_capture requires master_key_env")
-	}
-	if m.Security.Public || m.Security.OIDC.Issuer != "" {
-		return fmt.Errorf("forensics raw_capture requires local mode with public and oidc disabled")
+	if m.Forensics.RawCapture || m.Forensics.MasterKeyEnv != "" {
+		return fmt.Errorf("forensics is not available in single-operator local mode")
 	}
 	return nil
 }
 
 func (m Manifest) ValidateSecurity() error {
 	o := m.Security.OIDC
-	h := m.Security.HTTP
-	if o.Issuer == "" && o.Audience == "" && len(o.OperatorGroups) == 0 && o.GroupsClaim == "" && o.ClientID == "" && len(o.Scopes) == 0 {
-		if !m.Security.Public {
-			return nil
-		}
+	if m.Security.Public || o.Issuer != "" || o.Audience != "" || len(o.OperatorGroups) != 0 || o.GroupsClaim != "" || o.ClientID != "" || len(o.Scopes) != 0 {
+		return fmt.Errorf("oidc and public security are not available in single-operator local mode")
 	}
-	if o.Issuer == "" || o.Audience == "" || len(o.OperatorGroups) == 0 {
-		return fmt.Errorf("oidc issuer, audience, and operator_groups must be configured together")
-	}
-	if o.GroupsClaim == "" {
-		return fmt.Errorf("oidc groups_claim is required when oidc is configured")
-	}
-	if o.ClientID == "" {
-		return fmt.Errorf("oidc client_id is required when oidc is configured")
-	}
-	if m.Security.Public {
-		if !h.RequireHTTPS || h.MetricsTokenEnv == "" || h.RatePerMinute < 1 || h.RateBurst < 1 {
-			return fmt.Errorf("public security requires https, metrics_token_env, positive rate_per_minute, and positive rate_burst")
-		}
-		if !validEnvName(h.MetricsTokenEnv) {
-			return fmt.Errorf("metrics_token_env is invalid")
-		}
+	if h := m.Security.HTTP; h.RequireHTTPS || h.RatePerMinute != 0 || h.RateBurst != 0 || h.MetricsTokenEnv != "" {
+		return fmt.Errorf("http security policy is not available in single-operator local mode")
 	}
 	return nil
 }
 
 func (m Manifest) ValidateArtifacts() error {
 	a := m.Artifacts
-	if !a.Enabled {
-		return nil
-	}
-	if a.Endpoint == "" || a.Bucket == "" || a.AccessKeyEnv == "" || a.SecretKeyEnv == "" {
-		return fmt.Errorf("artifact endpoint, bucket, access_key_env, and secret_key_env must be configured together")
-	}
-	if !strings.HasPrefix(a.Endpoint, "https://") && !strings.HasPrefix(a.Endpoint, "http://127.0.0.1") && !strings.HasPrefix(a.Endpoint, "http://localhost") {
-		return fmt.Errorf("artifact endpoint must use https outside localhost")
+	if a.Enabled || a.Endpoint != "" || a.Region != "" || a.Bucket != "" || a.AccessKeyEnv != "" || a.SecretKeyEnv != "" || a.ForcePathStyle {
+		return fmt.Errorf("remote artifact storage is not available in single-operator local mode")
 	}
 	return nil
 }
@@ -524,41 +475,18 @@ func (m Manifest) ValidateRuntime() error {
 	if s := m.Runtime.Sandbox; s.CPUMilli < 0 || s.MemoryMiB < 0 || s.TimeoutS < 0 {
 		return fmt.Errorf("sandbox resources cannot be negative")
 	}
-	if s := m.Runtime.Sandbox; (s.EgressProxyURL == "") != (s.EgressProxySecret == "") {
-		return fmt.Errorf("sandbox egress_proxy_url and egress_proxy_secret_env must be configured together")
+	if s := m.Runtime.Sandbox; s.EgressProxyURL != "" || s.EgressProxySecret != "" {
+		return fmt.Errorf("sandbox network access is not available in single-operator local mode")
 	}
 	target := m.Runtime.DefaultTarget
 	if target == "" {
 		target = domain.DeploymentDocker
 	}
-	if !target.Valid() {
-		return fmt.Errorf("unsupported runtime default_target %q", target)
+	if target != domain.DeploymentDocker {
+		return fmt.Errorf("single-operator local mode supports only docker deployment")
 	}
 	if err := m.Runtime.Docker.Validate(m.Security.Public); err != nil {
 		return err
-	}
-	if target != domain.DeploymentKubernetes {
-		return nil
-	}
-	k := m.Runtime.Kubernetes
-	s := m.Runtime.Sandbox
-	if k.Kubeconfig == "" || k.Namespace == "" || k.ServiceAccount == "" || k.RegistryRepository == "" || k.RegistryPullSecret == "" {
-		return fmt.Errorf("kubernetes runtime needs kubeconfig, namespace, service_account, registry_repository, and registry_pull_secret")
-	}
-	if (k.IngressClass == "") != (k.IngressBaseDomain == "") || (k.IngressClass != "" && k.IngressControllerNamespace == "") {
-		return fmt.Errorf("kubernetes ingress_class, ingress_base_domain, and ingress_controller_namespace must be configured together")
-	}
-	if k.CPUMilli < 0 || k.MemoryMiB < 0 || k.Replicas < 0 || k.QuotaCPUMilli < 0 || k.QuotaMemoryMiB < 0 || k.QuotaStorageGiB < 0 || k.QuotaPods < 0 || k.QuotaJobs < 0 || k.QuotaPVCs < 0 {
-		return fmt.Errorf("kubernetes resources cannot be negative")
-	}
-	proxyConfigured := k.EgressProxyImage != "" || k.EgressProxySecret != "" || k.EgressProxySecretKey != "" || k.EgressProxyPort != 0
-	if proxyConfigured {
-		if s.EgressProxyURL == "" || s.EgressProxySecret == "" || k.EgressProxyImage == "" || k.EgressProxySecret == "" || k.EgressProxySecretKey == "" {
-			return fmt.Errorf("kubernetes egress proxy needs sandbox proxy configuration, image, secret, and secret key")
-		}
-		if k.EgressProxyPort < 0 || k.EgressProxyPort > 65535 {
-			return fmt.Errorf("kubernetes egress proxy port is invalid")
-		}
 	}
 	return nil
 }
@@ -629,11 +557,8 @@ func (k Kubernetes) Normalized() Kubernetes {
 	return k
 }
 
-func InitialManifest(target domain.DeploymentTarget, kube Kubernetes) Manifest {
-	if target == "" {
-		target = domain.DeploymentDocker
-	}
-	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: target, Docker: Docker{}.Normalized(), Kubernetes: kube}, Workflow: Workflow{MaxFixes: 2}, Retention: Retention{AgentTurnsDays: 90, ChannelMessagesDays: 90, RunEventsDays: 365, ProviderUsageDays: 365, TraceEventsDays: 365, ForensicPayloadDays: 30}}
+func InitialManifest(_ domain.DeploymentTarget, _ Kubernetes) Manifest {
+	return Manifest{Providers: []Provider{{ID: "openai", Kind: "openai_responses", Model: "gpt-5", BaseURL: "https://api.openai.com/v1", CredentialEnv: "OPENAI_API_KEY", Stages: []domain.Stage{domain.StagePlanner, domain.StageBuilder, domain.StageVerifier}, Budget: ProviderBudget{MaxConcurrent: 2, RequestsPerMinute: 60}}}, Profiles: []domain.Profile{domain.ProfileFrontend, domain.ProfileFullStack, domain.ProfileAgentic}, ToolPolicy: map[string]ToolPolicy{"artifact_read": {Enabled: true, Roles: []string{"researcher", "builder"}}, "file_write": {Enabled: true, ApprovalRequired: true, Roles: []string{"operator"}}, "shell": {Enabled: true, ApprovalRequired: true, Roles: []string{"operator"}, AllowedCommands: []string{"cat", "grep", "ls", "wc"}}}, Plugins: []ProcessPlugin{}, Runtime: Runtime{DefaultTarget: domain.DeploymentDocker, Docker: Docker{Mode: DockerModeUnsafeLocalSocket}, Sandbox: Sandbox{}.Normalized()}, Workflow: Workflow{MaxFixes: 2}}
 }
 
 func WriteManifest(path string, manifest Manifest, force bool) error {

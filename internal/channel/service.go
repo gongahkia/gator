@@ -63,6 +63,10 @@ func (s *Service) CreateAccount(ctx context.Context, value domain.ChannelAccount
 	if value.ID == "" {
 		value.ID = randomID()
 	}
+	value.OwnerExternalID = strings.TrimSpace(value.OwnerExternalID)
+	if value.OwnerExternalID == "" {
+		return domain.ChannelAccount{}, fmt.Errorf("channel owner_external_id is required")
+	}
 	if !value.Enabled {
 		value.Enabled = true
 	}
@@ -91,12 +95,6 @@ func (s *Service) CreateAccount(ctx context.Context, value domain.ChannelAccount
 	return created, err
 }
 
-func (s *Service) Pair(ctx context.Context, accountID, externalID string, expiresAt *time.Time) (domain.ChannelPairing, error) {
-	return s.store.PairChannelIdentity(ctx, domain.ChannelPairing{AccountID: accountID, ExternalID: externalID, ExpiresAt: expiresAt})
-}
-func (s *Service) Unpair(ctx context.Context, accountID, externalID string) error {
-	return s.store.UnpairChannelIdentity(ctx, accountID, externalID)
-}
 func (s *Service) Accounts(ctx context.Context) ([]domain.ChannelAccount, error) {
 	return s.store.ChannelAccounts(ctx)
 }
@@ -121,12 +119,8 @@ func (s *Service) QueueOutbound(ctx context.Context, accountID, externalID, text
 	if !account.Enabled {
 		return domain.ChannelMessage{}, fmt.Errorf("channel account is disabled")
 	}
-	paired, err := s.store.IsPaired(ctx, accountID, externalID)
-	if err != nil {
-		return domain.ChannelMessage{}, err
-	}
-	if !paired {
-		return domain.ChannelMessage{}, fmt.Errorf("channel identity is not paired")
+	if strings.TrimSpace(externalID) != account.OwnerExternalID {
+		return domain.ChannelMessage{}, fmt.Errorf("channel identity is not the configured owner")
 	}
 	value, created, err := s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: accountID, ExternalID: externalID, Direction: "outbound", IdempotencyKey: "operator:" + randomID(), Text: strings.TrimSpace(text), State: "pending"})
 	if err != nil {
@@ -382,12 +376,8 @@ func (s *Service) acceptAsync(account domain.ChannelAccount, value inbound) {
 	}()
 }
 func (s *Service) ingest(ctx context.Context, account domain.ChannelAccount, value inbound) error {
-	paired, err := s.store.IsPaired(ctx, account.ID, value.ExternalID)
-	if err != nil {
-		return err
-	}
-	if !paired {
-		_, _, _ = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ExternalID, Direction: "inbound", PlatformID: value.PlatformID, IdempotencyKey: "in:" + value.PlatformID, Text: value.Text, Attachments: value.Attachments, State: "rejected", Error: "identity is not paired"})
+	if strings.TrimSpace(value.ExternalID) != account.OwnerExternalID {
+		_, _, _ = s.store.CreateChannelMessage(ctx, domain.ChannelMessage{AccountID: account.ID, ExternalID: value.ExternalID, Direction: "inbound", PlatformID: value.PlatformID, IdempotencyKey: "in:" + value.PlatformID, Text: value.Text, Attachments: value.Attachments, State: "rejected", Error: "identity is not the configured owner"})
 		return nil
 	}
 	attachments, err := s.materializeAttachments(ctx, account, value.PlatformID, value.Attachments)

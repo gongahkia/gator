@@ -84,8 +84,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/channels/accounts", s.channelAccounts)
 	mux.HandleFunc("POST /api/channels/accounts", s.createChannelAccount)
 	mux.HandleFunc("DELETE /api/channels/accounts/{id}", s.deleteChannelAccount)
-	mux.HandleFunc("POST /api/channels/accounts/{id}/pairings", s.pairChannel)
-	mux.HandleFunc("DELETE /api/channels/accounts/{id}/pairings/{external}", s.unpairChannel)
 	mux.HandleFunc("POST /api/channels/accounts/{id}/messages", s.queueChannelMessage)
 	mux.HandleFunc("GET /api/channels/accounts/{id}/messages/{external}", s.channelMessages)
 	mux.HandleFunc("GET /api/channels/accounts/{id}/sessions/{external}", s.exportChannelSession)
@@ -145,6 +143,14 @@ func (s *Server) Handler() http.Handler {
 	handler = s.requireOperator(handler)
 	handler = s.securityHeaders(handler)
 	return requestLog(s.log, otelhttp.NewHandler(handler, "norbot.http"))
+}
+
+// WebhookHandler intentionally exposes only signed channel webhook routes.
+func (s *Server) WebhookHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/channels/{account}/webhook", s.channelWebhook)
+	mux.HandleFunc("POST /api/channels/{account}/webhook", s.channelWebhook)
+	return requestLog(s.log, mux)
 }
 
 func (s *Server) requireOperator(next http.Handler) http.Handler {
@@ -284,43 +290,6 @@ func (s *Server) deleteChannelAccount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) pairChannel(w http.ResponseWriter, r *http.Request) {
-	if s.channels == nil {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
-		return
-	}
-	var input struct {
-		ExternalID string     `json:"external_id"`
-		ExpiresAt  *time.Time `json:"expires_at"`
-	}
-	if err := decodeJSON(r, &input); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	value, err := s.channels.Pair(r.Context(), r.PathValue("id"), strings.TrimSpace(input.ExternalID), input.ExpiresAt)
-	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, value)
-}
-
-func (s *Server) unpairChannel(w http.ResponseWriter, r *http.Request) {
-	if s.channels == nil {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
-		return
-	}
-	err := s.channels.Unpair(r.Context(), r.PathValue("id"), r.PathValue("external"))
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, err)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "unpaired"})
-}
 func (s *Server) queueChannelMessage(w http.ResponseWriter, r *http.Request) {
 	if s.channels == nil {
 		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("channel gateway is unavailable"))
