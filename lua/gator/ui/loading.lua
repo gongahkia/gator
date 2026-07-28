@@ -216,6 +216,7 @@ local function render(panel)
 		width = width,
 		height = #lines,
 	})
+	vim.cmd("redraw")
 	return true
 end
 
