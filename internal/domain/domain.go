@@ -125,7 +125,8 @@ type AcceptanceFlow struct {
 // supported step kinds are goto, click, fill, set_value, expect_text,
 // expect_value,
 // expect_visible, expect_count, expect_attribute, expect_url, reload, focus,
-// press_key, and local_storage. A target uses selector or role/name.
+// press_key, and local_storage. Targets use selector or role/name; press_key
+// may omit a target to use the active page element.
 type AcceptanceStep struct {
 	Kind      string `json:"kind"`
 	Role      string `json:"role,omitempty"`
@@ -374,8 +375,8 @@ func (s AcceptanceStep) Validate() error {
 		}
 	case "reload":
 	case "press_key":
-		if !hasTarget || s.Key == "" {
-			return fmt.Errorf("press_key requires target and key")
+		if s.Key == "" {
+			return fmt.Errorf("press_key requires key")
 		}
 	case "local_storage":
 		if s.Key == "" {

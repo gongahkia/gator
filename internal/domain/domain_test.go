@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDefaultGraphIsValid(t *testing.T) {
 	if err := DefaultGraph().Validate(); err != nil {
@@ -68,6 +71,7 @@ func TestAcceptanceSupportsSelectorWorkflow(t *testing.T) {
 		{Kind: "goto", URL: "/"},
 		{Kind: "set_value", Selector: "[data-testid=\"new-task\"]", Value: "Buy milk"},
 		{Kind: "press_key", Selector: "[data-testid=\"new-task\"]", Key: "Enter"},
+		{Kind: "press_key", Key: "Escape"},
 		{Kind: "expect_value", Selector: "[data-testid=\"new-task\"]", Value: ""},
 		{Kind: "expect_text", Selector: "[data-testid=\"task-title\"]", Text: "Buy milk"},
 		{Kind: "expect_attribute", Selector: "[data-testid=\"task\"]", Attribute: "data-completed", Value: "true"},
@@ -77,6 +81,10 @@ func TestAcceptanceSupportsSelectorWorkflow(t *testing.T) {
 	}}}}
 	if err := contract.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	contract.Flows[0].Steps[3].Key = ""
+	if err := contract.Validate(); err == nil || !strings.Contains(err.Error(), "press_key requires key") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

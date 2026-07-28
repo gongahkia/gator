@@ -272,7 +272,7 @@ func TestWriteStageArtifactPersistsBuilderResponse(t *testing.T) {
 func TestFirstPlannerPromptDoesNotTreatTemplateAsApproved(t *testing.T) {
 	run := domain.Run{ID: "fresh", Profile: domain.ProfileFrontend, Prompt: "Build a task tracker", Architecture: domain.DefaultArchitecture(domain.ProfileFrontend, domain.DefaultGraph())}
 	prompt := stagePrompt(run, domain.StagePlanner, false, nil)
-	if !strings.Contains(prompt, "first planner pass") || strings.Contains(prompt, "Approved architecture:") {
+	if !strings.Contains(prompt, "first planner pass") || !strings.Contains(prompt, "press_key requires key and may omit a target") || !strings.Contains(prompt, "Every workflow edge requires id, source, and target; do not use from or to.") || strings.Contains(prompt, "Approved architecture:") {
 		t.Fatalf("prompt=%s", prompt)
 	}
 	revision := run
@@ -292,6 +292,27 @@ func TestPlannerResponseAcceptsSelectorContract(t *testing.T) {
 	}
 	if len(architecture.Stack) != 2 || len(architecture.Acceptance.Flows) != 1 {
 		t.Fatalf("architecture=%#v", architecture)
+	}
+}
+
+func TestPlannerResponseNormalizesLegacyWorkflowEdges(t *testing.T) {
+	run := domain.Run{Profile: domain.ProfileFrontend}
+	response := `{"architecture":{"app_name":"Task Tracker","app_type":"frontend-only","stack":["HTML5","Vanilla JavaScript"],"integrations":[],"core_features":[{"id":"tasks","name":"Task CRUD","description":"Add and complete tasks","role":"app_logic","selected":true}],"optional_features":[],"workflow":{"nodes":[{"id":"input","label":"Input","kind":"input"},{"id":"logic","label":"Logic","kind":"logic"},{"id":"output","label":"Output","kind":"output"}],"edges":[{"from":"input","to":"logic"},{"from":"logic","to":"output"}]},"acceptance":{"version":1,"flows":[{"id":"tasks","name":"Task CRUD","steps":[{"kind":"goto","url":"/"},{"kind":"expect_visible","selector":"[data-testid=\"app-root\"]"}]}],"api_contracts":[],"seed_data":[],"accessibility":[{"id":"home","selector":"[data-testid=\"app-root\"]"}],"screenshots":[{"id":"home","path":"/"}]}}}`
+	architecture, err := architectureFromResponse(response, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edges := architecture.Workflow.Edges
+	if len(edges) != 2 || edges[0] != (domain.GraphEdge{ID: "planner-edge-1", Source: "input", Target: "logic"}) || edges[1] != (domain.GraphEdge{ID: "planner-edge-2", Source: "logic", Target: "output"}) {
+		t.Fatalf("edges=%#v", edges)
+	}
+}
+
+func TestPlannerResponseRejectsIncompleteLegacyWorkflowEdge(t *testing.T) {
+	response := `{"architecture":{"app_name":"Task Tracker","app_type":"frontend-only","stack":["HTML5"],"integrations":[],"core_features":[{"id":"tasks","name":"Task CRUD","description":"Add tasks","role":"app_logic","selected":true}],"optional_features":[],"workflow":{"nodes":[{"id":"input","label":"Input","kind":"input"},{"id":"output","label":"Output","kind":"output"}],"edges":[{"from":"input"}]},"acceptance":{"version":1,"flows":[{"id":"tasks","name":"Task CRUD","steps":[{"kind":"goto","url":"/"},{"kind":"expect_visible","selector":"[data-testid=\"app-root\"]"}]}],"api_contracts":[],"seed_data":[],"accessibility":[{"id":"home","selector":"[data-testid=\"app-root\"]"}],"screenshots":[{"id":"home","path":"/"}]}}}`
+	_, err := architectureFromResponse(response, domain.Run{Profile: domain.ProfileFrontend})
+	if err == nil || !strings.Contains(err.Error(), "every edge requires id, source, and target") {
+		t.Fatalf("err=%v", err)
 	}
 }
 

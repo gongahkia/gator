@@ -1632,7 +1632,7 @@ func stagePrompt(run domain.Run, stage domain.Stage, isCLI bool, skills []domain
 		return base + "The approved baseline is in /workspace/generated-app. Put browser application code only under generated-app/frontend/; never put browser assets directly under generated-app/. For non-frontend profiles, backend code may be under generated-app/backend/. Do not create Dockerfiles, .dockerignore files, Compose files, or generated-app/.norbot/: Norbot owns deployment descriptors. Modify only deployable source directories, then return a concise summary."
 	}
 	if stage == domain.StagePlanner {
-		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"" + string(run.Profile) + "\",\"stack\":[\"...\"],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"},{\"id\":\"output-deployment\",\"label\":\"...\",\"kind\":\"output\"}],\"edges\":[]},\"acceptance\":{\"version\":1,\"flows\":[{\"id\":\"...\",\"name\":\"...\",\"steps\":[{\"kind\":\"goto\",\"url\":\"/\"},{\"kind\":\"fill\",\"selector\":\"[data-testid=\\\"...\\\"]\",\"value\":\"...\"},{\"kind\":\"expect_text\",\"selector\":\"[data-testid=\\\"...\\\"]\",\"text\":\"...\"}]}],\"api_contracts\":[],\"seed_data\":[],\"accessibility\":[{\"id\":\"home\",\"selector\":\"[data-testid=\\\"app-root\\\"]\"}],\"screenshots\":[{\"id\":\"home\",\"path\":\"/\"}]}},\"notes\":\"...\"}. app_type must exactly match Profile. Derive a non-empty stack, concrete selected core features, and executable acceptance flows from the request. Acceptance step kinds: goto, click, fill, set_value, expect_text, expect_value, expect_visible, expect_count, expect_attribute, expect_url, reload, focus, press_key, local_storage. Interaction targets use selector or role plus name; use stable local data-testid selectors when possible. expect_count requires count. expect_attribute requires attribute and value. Workflow requires input and output nodes."
+		return base + "Return strict JSON without markdown: {\"architecture\":{\"app_name\":\"...\",\"app_type\":\"" + string(run.Profile) + "\",\"stack\":[\"...\"],\"integrations\":[],\"core_features\":[{\"id\":\"...\",\"name\":\"...\",\"description\":\"...\",\"role\":\"app_logic\",\"selected\":true}],\"optional_features\":[],\"workflow\":{\"nodes\":[{\"id\":\"input-request\",\"label\":\"...\",\"kind\":\"input\"},{\"id\":\"output-deployment\",\"label\":\"...\",\"kind\":\"output\"}],\"edges\":[{\"id\":\"input-to-output\",\"source\":\"input-request\",\"target\":\"output-deployment\"}]},\"acceptance\":{\"version\":1,\"flows\":[{\"id\":\"...\",\"name\":\"...\",\"steps\":[{\"kind\":\"goto\",\"url\":\"/\"},{\"kind\":\"fill\",\"selector\":\"[data-testid=\\\"...\\\"]\",\"value\":\"...\"},{\"kind\":\"expect_text\",\"selector\":\"[data-testid=\\\"...\\\"]\",\"text\":\"...\"}]}],\"api_contracts\":[],\"seed_data\":[],\"accessibility\":[{\"id\":\"home\",\"selector\":\"[data-testid=\\\"app-root\\\"]\"}],\"screenshots\":[{\"id\":\"home\",\"path\":\"/\"}]}},\"notes\":\"...\"}. app_type must exactly match Profile. Derive a non-empty stack, concrete selected core features, and executable acceptance flows from the request. Acceptance step kinds: goto, click, fill, set_value, expect_text, expect_value, expect_visible, expect_count, expect_attribute, expect_url, reload, focus, press_key, local_storage. Interaction targets use selector or role plus name; use stable local data-testid selectors when possible. press_key requires key and may omit a target to press on the active page element. expect_count requires count. expect_attribute requires attribute and value. Workflow requires input and output nodes. Every workflow edge requires id, source, and target; do not use from or to."
 	}
 	if stage == domain.StageBuilder {
 		return base + "Return strict JSON without markdown: {\"files\":{\"generated-app/frontend/src/main.jsx\":\"complete source\"}}. Implement every locked acceptance flow, API contract, seeded-data expectation, accessibility requirement, and screenshot state. Browser application files must be under generated-app/frontend/; never create browser assets directly under generated-app/. For non-frontend profiles, backend files may be under generated-app/backend/. Never create Dockerfiles, .dockerignore files, Compose files, or generated-app/.norbot/ because Norbot owns deployment descriptors. Include at least one generated-app/frontend/ file, use safe relative paths, and preserve required profile files."
@@ -1649,6 +1649,9 @@ func architectureFromResponse(text string, run domain.Run) (domain.Architecture,
 	if !ok {
 		return domain.Architecture{}, plannerResponseError{reason: "missing_architecture", responseBytes: len(text)}
 	}
+	if err := normalizePlannerWorkflowEdges(raw); err != nil {
+		return domain.Architecture{}, plannerResponseError{reason: "invalid_architecture", responseBytes: len(text), cause: err}
+	}
 	encoded, err := json.Marshal(raw)
 	if err != nil {
 		return domain.Architecture{}, plannerResponseError{reason: "invalid_architecture", responseBytes: len(text), cause: err}
@@ -1661,6 +1664,70 @@ func architectureFromResponse(text string, run domain.Run) (domain.Architecture,
 		return domain.Architecture{}, plannerResponseError{reason: "invalid_contract", responseBytes: len(text), cause: err}
 	}
 	return architecture, nil
+}
+
+func normalizePlannerWorkflowEdges(raw any) error {
+	architecture, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("architecture must be an object")
+	}
+	workflowRaw, ok := architecture["workflow"]
+	if !ok {
+		return nil
+	}
+	workflow, ok := workflowRaw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("workflow must be an object")
+	}
+	edgesRaw, ok := workflow["edges"]
+	if !ok {
+		return nil
+	}
+	edges, ok := edgesRaw.([]any)
+	if !ok {
+		return fmt.Errorf("workflow edges must be an array")
+	}
+	usedIDs := map[string]struct{}{}
+	for _, rawEdge := range edges {
+		edge, ok := rawEdge.(map[string]any)
+		if !ok {
+			return fmt.Errorf("workflow edge must be an object")
+		}
+		if id, ok := edge["id"].(string); ok && strings.TrimSpace(id) != "" {
+			usedIDs[id] = struct{}{}
+		}
+	}
+	for index, rawEdge := range edges {
+		edge := rawEdge.(map[string]any)
+		if _, exists := edge["source"]; !exists {
+			if legacy, ok := edge["from"].(string); ok && strings.TrimSpace(legacy) != "" {
+				edge["source"] = legacy
+			}
+		}
+		if _, exists := edge["target"]; !exists {
+			if legacy, ok := edge["to"].(string); ok && strings.TrimSpace(legacy) != "" {
+				edge["target"] = legacy
+			}
+		}
+		if _, exists := edge["id"]; exists {
+			continue
+		}
+		source, _ := edge["source"].(string)
+		target, _ := edge["target"].(string)
+		if strings.TrimSpace(source) == "" || strings.TrimSpace(target) == "" {
+			continue
+		}
+		candidate := fmt.Sprintf("planner-edge-%d", index+1)
+		for suffix := 2; ; suffix++ {
+			if _, exists := usedIDs[candidate]; !exists {
+				break
+			}
+			candidate = fmt.Sprintf("planner-edge-%d-%d", index+1, suffix)
+		}
+		edge["id"] = candidate
+		usedIDs[candidate] = struct{}{}
+	}
+	return nil
 }
 
 func builderFiles(text string) (map[string]string, error) {
