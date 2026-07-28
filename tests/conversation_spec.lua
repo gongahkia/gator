@@ -37,6 +37,11 @@ assert(
 	),
 	"chat headers must expose the recorded policy, write mode, approval mode, and workspace"
 )
+assert(
+	content:find("Ready for input (waiting_input)", 1, true)
+		and content:find("Status: the provider turn is complete; i sends a follow-up", 1, true),
+	"chat headers must explain run states in place"
+)
 conversation.update({ text = "I", state = "running", phase = "thinking", turn_started_at = os.time() })
 conversation.update({ text = "'ll inspect", append = true, state = "running", phase = "responding" })
 content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")

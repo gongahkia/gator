@@ -2,6 +2,7 @@ local accessibility = require("gator.ui.accessibility")
 local panel_window = require("gator.ui.window")
 local redact = require("gator.policy.redact")
 local trust = require("gator.trust")
+local run_state = require("gator.ui.run_state")
 
 local M = {}
 local panels = {}
@@ -192,7 +193,7 @@ end
 
 function M.render(panel)
 	local label = panel.run_id and ("run " .. panel.run_id) or panel.session_id
-	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. panel.state
+	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. run_state.summary(panel.state)
 	if panel.state == "running" then
 		header = header
 			.. " · "
@@ -200,7 +201,7 @@ function M.render(panel)
 			.. " · "
 			.. elapsed(panel)
 	end
-	local lines = { header, trust_label(panel.trust, panel.workspace), "" }
+	local lines = { header, trust_label(panel.trust, panel.workspace), "Status: " .. run_state.detail(panel.state), "" }
 	if #panel.lines == 0 then
 		if panel.state == "running" then
 			table.insert(

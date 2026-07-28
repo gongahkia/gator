@@ -1,5 +1,6 @@
 local accessibility = require("gator.ui.accessibility")
 local panel_window = require("gator.ui.window")
+local run_state = require("gator.ui.run_state")
 
 local M = {}
 local panels = {}
@@ -107,7 +108,9 @@ local function render(panel)
 			local columns = {}
 			for _, id in ipairs(graph_columns(panel.workflow)) do
 				local value
-				if type(panel.workflow.render_graph_column) == "function" then
+				if id == "state" then
+					value = run_state.summary(run.state)
+				elseif type(panel.workflow.render_graph_column) == "function" then
 					local ok, rendered =
 						pcall(panel.workflow.render_graph_column, panel.workflow, id, run, measurements)
 					value = ok and rendered or nil
@@ -133,6 +136,7 @@ local function render(panel)
 				lines,
 				(index == panel.selected and ">" or " ") .. " " .. table.concat(columns, " · ") .. parent
 			)
+			table.insert(lines, "  Status: " .. run_state.detail(run.state))
 			table.insert(lines, "  Workspace: " .. run.workspace.kind .. " · " .. workspace)
 			table.insert(
 				lines,

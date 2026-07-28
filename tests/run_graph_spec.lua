@@ -73,6 +73,8 @@ local window = graph.open({
 local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
 assert(
 	content:find("Workspace: worktree", 1, true)
+		and content:find("Working (running)", 1, true)
+		and content:find("Status: the current turn is active; c cancels and q detaches", 1, true)
 		and content:find("Context: bundle-graph · transcript available", 1, true)
 		and content:find("Local worktrees: 1 · 2.0 KiB", 1, true)
 		and content:find(
