@@ -126,9 +126,11 @@ type AcceptanceFlow struct {
 // expect_value,
 // expect_visible, expect_count, expect_attribute, expect_url, reload, focus,
 // press_key, and local_storage. Targets use selector or role/name; press_key
-// may omit a target to use the active page element.
+// may omit a target to use the active page element. local_storage supports
+// clear or keyed set operations.
 type AcceptanceStep struct {
 	Kind      string `json:"kind"`
+	Op        string `json:"op,omitempty"`
 	Role      string `json:"role,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Selector  string `json:"selector,omitempty"`
@@ -330,7 +332,7 @@ func (c AcceptanceContract) Validate() error {
 }
 
 func (s AcceptanceStep) Validate() error {
-	if len(s.Role) > 512 || len(s.Name) > 4096 || len(s.Selector) > 4096 || len(s.Text) > 8192 || len(s.URL) > 4096 || len(s.Value) > 64<<10 || len(s.Key) > 512 || len(s.Attribute) > 512 {
+	if len(s.Op) > 32 || len(s.Role) > 512 || len(s.Name) > 4096 || len(s.Selector) > 4096 || len(s.Text) > 8192 || len(s.URL) > 4096 || len(s.Value) > 64<<10 || len(s.Key) > 512 || len(s.Attribute) > 512 {
 		return fmt.Errorf("acceptance step exceeds execution limits")
 	}
 	hasTarget := s.Selector != "" || s.Role != "" && s.Name != ""
@@ -379,8 +381,17 @@ func (s AcceptanceStep) Validate() error {
 			return fmt.Errorf("press_key requires key")
 		}
 	case "local_storage":
-		if s.Key == "" {
-			return fmt.Errorf("local_storage requires key")
+		switch s.Op {
+		case "", "set":
+			if s.Key == "" || s.Value == "" {
+				return fmt.Errorf("local_storage set requires key and value")
+			}
+		case "clear":
+			if s.Key != "" || s.Value != "" {
+				return fmt.Errorf("local_storage clear does not accept key or value")
+			}
+		default:
+			return fmt.Errorf("unsupported local_storage operation %q", s.Op)
 		}
 	default:
 		return fmt.Errorf("unsupported step kind %q", s.Kind)

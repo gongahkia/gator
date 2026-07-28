@@ -88,6 +88,27 @@ func TestAcceptanceSupportsSelectorWorkflow(t *testing.T) {
 	}
 }
 
+func TestAcceptanceSupportsLocalStorageOperations(t *testing.T) {
+	for _, step := range []AcceptanceStep{
+		{Kind: "local_storage", Op: "clear"},
+		{Kind: "local_storage", Op: "set", Key: "task-tracker:tasks", Value: "[]"},
+		{Kind: "local_storage", Key: "task-tracker:tasks", Value: "[]"},
+	} {
+		if err := step.Validate(); err != nil {
+			t.Fatalf("step=%#v err=%v", step, err)
+		}
+	}
+	for _, step := range []AcceptanceStep{
+		{Kind: "local_storage", Op: "clear", Key: "unexpected"},
+		{Kind: "local_storage", Op: "set", Key: "task-tracker:tasks"},
+		{Kind: "local_storage", Op: "delete", Key: "task-tracker:tasks"},
+	} {
+		if err := step.Validate(); err == nil {
+			t.Fatalf("invalid step accepted: %#v", step)
+		}
+	}
+}
+
 func TestPlannerArchitectureRequiresConcreteProfileContract(t *testing.T) {
 	architecture := DefaultArchitecture(ProfileFrontend, DefaultGraph())
 	architecture.Acceptance = CompileAcceptance(architecture)
