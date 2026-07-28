@@ -238,8 +238,8 @@ function M.codex_policy(value)
 	if value.provider ~= "codex" or value.write.state ~= "codex_enforced" then
 		return nil
 	end
-	local sandbox = value.write.mode == "read_only" and "readOnly"
-		or value.write.mode == "workspace_write" and "workspaceWrite"
+	local sandbox = value.write.mode == "read_only" and "read-only"
+		or value.write.mode == "workspace_write" and "workspace-write"
 		or nil
 	if not sandbox or value.approval.state ~= "on_request" then
 		fail("Codex trust record does not describe an enforceable launch policy")

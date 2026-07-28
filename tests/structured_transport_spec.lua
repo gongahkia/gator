@@ -170,12 +170,12 @@ manager:open({
 	provider = "codex",
 	cwd = vim.fn.getcwd(),
 	prompt = "review this",
-	codex_policy = { sandbox = "readOnly", approval_policy = "on-request" },
+	codex_policy = { sandbox = "read-only", approval_policy = "on-request" },
 })
 process.stdout(nil, vim.json.encode({ jsonrpc = "2.0", id = 1, result = {} }) .. "\n")
 assert(
 	sent[3].method == "thread/start"
-		and sent[3].params.sandbox == "readOnly"
+		and sent[3].params.sandbox == "read-only"
 		and sent[3].params.approvalPolicy == "on-request",
 	"Codex structured launches must pass the recorded sandbox and approval policy to App Server"
 )
@@ -183,7 +183,7 @@ assert(not pcall(manager.open, manager, {
 	provider = "pi",
 	cwd = vim.fn.getcwd(),
 	prompt = "review this",
-	codex_policy = { sandbox = "readOnly", approval_policy = "on-request" },
+	codex_policy = { sandbox = "read-only", approval_policy = "on-request" },
 }), "Codex launch policy must not be silently applied to a different provider")
 
 manager, sent, process = fake_manager()

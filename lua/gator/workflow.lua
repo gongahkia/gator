@@ -1458,7 +1458,6 @@ function Workflow:launch(opts)
 		self:journal(run.id, "context.sent", preflight)
 		self:record_context_delivery(run.id, #body)
 		self.loading_handles[run.id] = self.loading.open({ message = "Starting " .. run.provider })
-		vim.notify("Gator trust · " .. trust.summary(run.trust), vim.log.levels.INFO)
 		if transport == "terminal" then
 			self:prepare_terminal(run, prompt, function(prepared, reason)
 				self:close_loading(run.id)
