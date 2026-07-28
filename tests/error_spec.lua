@@ -11,17 +11,12 @@ assert(
 	"formatted errors must include details and recovery"
 )
 
-local notification
 local original_notify = vim.notify
-vim.notify = function(message, level, options)
-	notification = { message = message, level = level, options = options }
+vim.notify = function()
+	error("typed errors must not use vim.notify")
 end
 errors.notify(value)
 vim.notify = original_notify
-
-assert(notification.message == errors.format(value), "notifications must preserve formatted errors")
-assert(notification.level == vim.log.levels.ERROR, "notifications must default to error level")
-assert(notification.options.title == "Gator", "notifications must identify Gator")
 
 local ok = pcall(errors.new, "Capability Missing", "message", { remedy = "retry" })
 assert(not ok, "invalid error codes must fail explicitly")

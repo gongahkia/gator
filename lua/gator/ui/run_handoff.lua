@@ -174,7 +174,7 @@ function M.open(opts)
 		end,
 		cancel = M.close,
 		help = function()
-			vim.notify(
+			require("gator.ui.notice").show(
 				"Gator handoff: <CR> launch, e edit, q cancel; conflicts require per-file apply/skip",
 				vim.log.levels.INFO
 			)

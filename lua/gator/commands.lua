@@ -1,5 +1,6 @@
 local M = {}
 local registered = false
+local notice = require("gator.ui.notice")
 
 function M.register()
 	if registered then
@@ -63,7 +64,7 @@ function M.register()
 	end, { nargs = 0, desc = "Inspect Gator-owned local artifact storage" })
 	vim.api.nvim_create_user_command("GatorForget", function(opts)
 		local ok, result = pcall(require("gator").dispatch, "forget", { run_id = opts.args })
-		vim.notify(
+		notice.show(
 			ok and (result and "Gator run forgotten" or "Gator run is unavailable") or tostring(result),
 			ok and vim.log.levels.INFO or vim.log.levels.ERROR,
 			{ title = "Gator" }
@@ -77,7 +78,7 @@ function M.register()
 			local ok, result = pcall(require("gator").export_diagnostics)
 			local message = ok and (result.state == "ready" and "Diagnostic export: " .. result.path or result.reason)
 				or require("gator.policy.redact").text(tostring(result))
-			vim.notify(
+			notice.show(
 				message,
 				ok and result.state == "ready" and vim.log.levels.INFO or vim.log.levels.WARN,
 				{ title = "Gator" }
@@ -89,7 +90,7 @@ function M.register()
 			local ok, result = pcall(require("gator").verify_beta_readiness)
 			local message = ok and ("Public-beta readiness: " .. result.state .. " · " .. result.path)
 				or require("gator.policy.redact").text(tostring(result))
-			vim.notify(
+			notice.show(
 				message,
 				ok and result.state == "ready" and vim.log.levels.INFO or vim.log.levels.WARN,
 				{ title = "Gator" }
@@ -99,7 +100,7 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorStopSession", function(opts)
 		local ok, result =
 			pcall(require("gator").dispatch, "stop_session", { run_id = opts.args ~= "" and opts.args or nil })
-		vim.notify(
+		notice.show(
 			ok and "Gator session stopped; provider session remains resumable"
 				or require("gator.policy.redact").text(tostring(result)),
 			ok and vim.log.levels.INFO or vim.log.levels.ERROR,

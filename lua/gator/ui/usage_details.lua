@@ -196,7 +196,7 @@ local function bind(panel)
 		end,
 		cancel = M.cancel,
 		help = function()
-			vim.notify("Gator usage: j/k navigate, q close", vim.log.levels.INFO)
+			require("gator.ui.notice").show("Gator usage: j/k navigate, q close", vim.log.levels.INFO)
 		end,
 	})
 end

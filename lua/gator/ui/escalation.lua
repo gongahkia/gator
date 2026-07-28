@@ -126,7 +126,7 @@ function M.request(opts)
 		confirm = M.acknowledge,
 		cancel = M.cancel,
 		help = function()
-			vim.notify("Gator escalation: <CR> acknowledge, q cancel", vim.log.levels.INFO)
+			require("gator.ui.notice").show("Gator escalation: <CR> acknowledge, q cancel", vim.log.levels.INFO)
 		end,
 	})
 	return { required = true, changes = vim.deepcopy(value), window = window }

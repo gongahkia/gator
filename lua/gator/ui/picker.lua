@@ -82,7 +82,7 @@ local function bind(picker)
 		end,
 		cancel = M.cancel,
 		help = function()
-			vim.notify("Gator picker: j/k navigate, <CR> confirm, q cancel", vim.log.levels.INFO)
+			require("gator.ui.notice").show("Gator picker: j/k navigate, <CR> confirm, q cancel", vim.log.levels.INFO)
 		end,
 	})
 end

@@ -119,7 +119,7 @@ function M.open(opts)
 		end,
 		cancel = M.close,
 		help = function()
-			vim.notify(
+			require("gator.ui.notice").show(
 				"Gator review: <CR> choose test, accept, request changes, or handoff; q closes",
 				vim.log.levels.INFO
 			)

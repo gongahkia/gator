@@ -128,7 +128,7 @@ local function bind(panel)
 		reject = M.deny,
 		cancel = M.cancel,
 		help = function()
-			vim.notify("Gator approval: <CR> approve, d deny, q cancel", vim.log.levels.INFO)
+			require("gator.ui.notice").show("Gator approval: <CR> approve, d deny, q cancel", vim.log.levels.INFO)
 		end,
 	})
 end

@@ -1,6 +1,7 @@
 local actions = require("gator.ui.actions")
 local health = require("gator.health")
 local redact = require("gator.policy.redact")
+local notice = require("gator.ui.notice")
 
 local M = { api_version = 1 }
 local Runtime = {}
@@ -201,7 +202,7 @@ function Runtime:disable(name, reason, quiet)
 	record.reason = vim.trim((redact.text(tostring(reason)):match("^[^\n]+") or "extension callback failed"))
 	if not quiet and not record.notified then
 		record.notified = true
-		vim.notify("Gator extension " .. name .. " disabled: " .. record.reason, vim.log.levels.ERROR)
+		notice.show("Gator extension " .. name .. " disabled: " .. record.reason, vim.log.levels.ERROR)
 	end
 	return true
 end
@@ -401,7 +402,7 @@ function Runtime:emit(event, payload)
 					failures[live.extension] = reason
 				else
 					self.listeners[id] = nil
-					vim.notify("Gator lifecycle hook removed: " .. redact.text(tostring(reason)), vim.log.levels.ERROR)
+					notice.show("Gator lifecycle hook removed: " .. redact.text(tostring(reason)), vim.log.levels.ERROR)
 				end
 			end
 		end

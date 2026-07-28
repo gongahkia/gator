@@ -146,7 +146,7 @@ function M.open(opts)
 		end,
 		close = M.close,
 		help = function()
-			vim.notify(
+			require("gator.ui.notice").show(
 				panel.readonly and "Gator storage: q closes this local inventory"
 					or "Gator cleanup: <CR> deletes only listed Gator-owned artifacts and clean inactive worktrees",
 				vim.log.levels.INFO

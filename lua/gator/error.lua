@@ -48,6 +48,7 @@ local M = {
 }
 local Error = {}
 local redact = require("gator.policy.redact")
+local notice = require("gator.ui.notice")
 
 Error.__index = Error
 
@@ -150,7 +151,7 @@ function M.notify(value)
 	if not M.is(value) then
 		fail("value must be created by gator.error.new")
 	end
-	vim.notify(M.format(value), value.level, { title = "Gator" })
+	notice.show(M.format(value), value.level, { title = "Gator" })
 	return value
 end
 

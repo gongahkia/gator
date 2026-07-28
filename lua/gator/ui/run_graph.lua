@@ -363,7 +363,7 @@ local function bind(panel)
 		end,
 		close = M.close,
 		help = function()
-			vim.notify(
+			require("gator.ui.notice").show(
 				"Gator runs: <CR> focus, c context, f native fork, h handoff, l journal, p parallel writer, v review, n next runbook step, s stop, r resume, q close",
 				vim.log.levels.INFO
 			)

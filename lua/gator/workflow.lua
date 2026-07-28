@@ -11,6 +11,7 @@ local run_graph = require("gator.ui.run_graph")
 local handoff_review = require("gator.ui.run_handoff")
 local review_ui = require("gator.ui.run_review")
 local loading_ui = require("gator.ui.loading")
+local notice = require("gator.ui.notice")
 local worktree = require("gator.workspace.worktree")
 local workspace_cleanup = require("gator.workspace.cleanup")
 local retention = require("gator.core.retention")
@@ -391,7 +392,7 @@ function Workflow:report_usage(id, usage)
 		state = usage.state,
 	})
 	if budget.state == "exhausted" then
-		vim.notify(
+		notice.show(
 			"Gator budget reached for " .. run.provider .. " · " .. budget.limit_tokens .. " tokens",
 			vim.log.levels.WARN
 		)
@@ -403,7 +404,7 @@ function Workflow:report_usage(id, usage)
 		local status = self:runbook_status(run.runbook_id)
 		local limit = status.max_tokens > 0 and status.max_tokens or self.state.config.runbooks.max_tokens
 		if limit > 0 and status.reported_tokens >= limit then
-			vim.notify(
+			notice.show(
 				"Gator runbook reported-token budget reached · " .. status.reported_tokens .. "/" .. limit,
 				vim.log.levels.WARN
 			)
@@ -640,14 +641,14 @@ function Workflow:choose(opts)
 		table.insert(choices, value)
 	end
 	if #choices == 0 then
-		vim.notify("Gator: no ready providers; run :GatorHealth", vim.log.levels.WARN)
+		notice.show("Gator: no ready providers; run :GatorHealth", vim.log.levels.WARN)
 		return false
 	end
 	return self:pick_provider(choices, function(choice)
 		opts.provider = choice.provider
 		local ok, err = pcall(self.launch, self, opts)
 		if not ok then
-			vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 		end
 	end)
 end
@@ -668,7 +669,7 @@ function Workflow:prompt(opts)
 				transport = overrides.transport or opts.transport,
 			})
 			if not ok then
-				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end
 		end
 	end
@@ -741,7 +742,7 @@ function Workflow:release_worktree_lease(run)
 	end
 	local unlocked, reason = pcall(worktree.unlock, { root = lease.repository_root, path = lease.worktree_root })
 	if not unlocked then
-		vim.notify("Gator worktree unlock: " .. tostring(reason), vim.log.levels.WARN)
+		notice.show("Gator worktree unlock: " .. tostring(reason), vim.log.levels.WARN)
 		return false
 	end
 	lease.state, lease.updated_at = "released", self.clock()
@@ -756,7 +757,7 @@ function Workflow:reconcile_worktree_leases()
 			if active_state(run) and (not lease or lease.state ~= "active") then
 				local ok, reason = pcall(self.lease_worktree, self, run)
 				if not ok then
-					vim.notify("Gator worktree lease: " .. tostring(reason), vim.log.levels.WARN)
+					notice.show("Gator worktree lease: " .. tostring(reason), vim.log.levels.WARN)
 				end
 			elseif not active_state(run) and lease and lease.state == "active" then
 				self:release_worktree_lease(run)
@@ -916,11 +917,11 @@ function Workflow:startup_retention()
 	local value = self:retention_plan({ quota = false })
 	local ok, result = pcall(self.apply_retention_plan, self, value)
 	if not ok then
-		vim.notify("Gator startup cleanup: " .. tostring(result), vim.log.levels.WARN)
+		notice.show("Gator startup cleanup: " .. tostring(result), vim.log.levels.WARN)
 		return { artifacts = {}, worktrees = {} }
 	end
 	if #result.artifacts > 0 or #result.worktrees > 0 then
-		vim.notify(
+		notice.show(
 			"Gator startup cleanup: removed "
 				.. #result.artifacts
 				.. " artifacts and "
@@ -942,7 +943,7 @@ function Workflow:prune()
 		reclaim_bytes = value.reclaim_bytes,
 		on_confirm = function()
 			local ok, result = pcall(self.apply_retention_plan, self, value)
-			vim.notify(
+			notice.show(
 				ok
 						and ("Gator cleanup: removed " .. #result.artifacts .. " artifacts · reclaimed " .. result.reclaimed_bytes .. " bytes · " .. #result.worktrees .. " worktrees")
 					or ("Gator cleanup: " .. tostring(result)),
@@ -1030,7 +1031,7 @@ function Workflow:discard_workspace(workspace)
 		branch = workspace.branch,
 	})
 	if not ok then
-		vim.notify("Gator: retained unlaunched handoff worktree at " .. workspace.root, vim.log.levels.WARN)
+		notice.show("Gator: retained unlaunched handoff worktree at " .. workspace.root, vim.log.levels.WARN)
 		return false
 	end
 	return true
@@ -1505,14 +1506,14 @@ function Workflow:launch(opts)
 				if not prepared then
 					self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "launch" })
 					self:update(run.id, { state = "failed" })
-					vim.notify("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
+					notice.show("Gator launch: " .. tostring(reason), vim.log.levels.ERROR)
 					return
 				end
 				local ok, err = pcall(self.open_terminal, self, run, prepared)
 				if not ok then
 					self:journal(run.id, "provider.error", { code = failure_code(err), phase = "terminal_open" })
 					self:update(run.id, { state = "failed" })
-					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 				end
 			end)
 		elseif structured.supports(run.provider) then
@@ -1608,7 +1609,7 @@ function Workflow:send_context(opts)
 				opts.run_id = choice.id
 				local ok, err = pcall(self.send_context, self, opts)
 				if not ok then
-					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 				end
 			end
 		end)
@@ -1631,7 +1632,7 @@ function Workflow:send_context(opts)
 					opts.kind = choice
 					local ok, err = pcall(self.send_context, self, opts)
 					if not ok then
-						vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+						notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 					end
 				end
 			end
@@ -1645,7 +1646,7 @@ function Workflow:send_context(opts)
 				opts.bundle_id = value
 				local ok, err = pcall(self.send_context, self, opts)
 				if not ok then
-					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 				end
 			end
 		end)
@@ -1802,7 +1803,7 @@ function Workflow:ask_selection(opts)
 				opts.run_id = choice.id
 				local ok, err = pcall(self.ask_selection, self, opts)
 				if not ok then
-					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 				end
 			end
 		end)
@@ -1852,7 +1853,7 @@ function Workflow:ask_selection(opts)
 	vim.ui.input({ prompt = "Ask Gator about selected lines: " }, function(question)
 		local ok, err = pcall(submit, question)
 		if not ok then
-			vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 		end
 	end)
 	return true
@@ -1886,7 +1887,7 @@ function Workflow:review(id)
 			if choice then
 				local ok, err = pcall(self.review, self, choice.id)
 				if not ok then
-					vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+					notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 				end
 			end
 		end)
@@ -1911,7 +1912,7 @@ function Workflow:review(id)
 				if choice == "Run approved test" then
 					local ok, err = pcall(self.execute_review_test, self, run.id, command_id, true)
 					if not ok then
-						vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+						notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 					end
 				end
 			end)
@@ -1919,7 +1920,7 @@ function Workflow:review(id)
 		on_decision = function(decision)
 			local ok, err = pcall(self.record_review_decision, self, run.id, decision)
 			if not ok then
-				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 				return
 			end
 			self.review_ui.close()
@@ -1980,7 +1981,7 @@ function Workflow:execute_review_test(id, command_id, confirmed)
 		command_id = record.review.command_id,
 		passed = record.review.passed,
 	})
-	vim.notify(
+	notice.show(
 		"Gator review test "
 			.. result.command_id
 			.. " "
@@ -2256,7 +2257,7 @@ function Workflow:start_ready_runbook_step()
 		local function start(confirmed)
 			local ok, err = pcall(self.start_runbook_step, self, choice.runbook_id, choice.step.id, confirmed)
 			if not ok then
-				vim.notify(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
 			end
 		end
 		if choice.step.role == "integrator" then
@@ -2343,7 +2344,7 @@ function Workflow:resume(id)
 	self:prepare_terminal(run, nil, function(prepared, reason)
 		if not prepared then
 			self:journal(run.id, "provider.error", { code = failure_code(reason), phase = "resume" })
-			vim.notify("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
+			notice.show("Gator resume: " .. tostring(reason), vim.log.levels.ERROR)
 			return
 		end
 		self:open_terminal(run, prepared)
@@ -2437,7 +2438,7 @@ function Workflow:finish_summary(id)
 	local parts = self.transcripts[id] or {}
 	local summary = table.concat(vim.list_slice(parts, pending.start_index + 1), "\n\n")
 	if vim.trim(summary) == "" then
-		vim.notify("Gator handoff: source agent returned no summary", vim.log.levels.WARN)
+		notice.show("Gator handoff: source agent returned no summary", vim.log.levels.WARN)
 		return false
 	end
 	return self:handoff(id, pending.target, { profile = "compact", summary = summary })
@@ -2522,7 +2523,7 @@ function Workflow:handoff(source_id, target, opts)
 			)
 			if not ok then
 				self.pending_summary[source.id] = nil
-				vim.notify("Gator handoff: " .. tostring(err), vim.log.levels.ERROR)
+				notice.show("Gator handoff: " .. tostring(err), vim.log.levels.ERROR)
 			end
 		end)
 		return true
@@ -2604,14 +2605,14 @@ function Workflow:handoff(source_id, target, opts)
 				if owned_workspace then
 					self:discard_workspace(workspace)
 				end
-				vim.notify(tostring(run), vim.log.levels.ERROR, { title = "Gator" })
+				notice.show(tostring(run), vim.log.levels.ERROR, { title = "Gator" })
 				return
 			end
 			self:journal(source.id, "handoff.delivered", { target = target, run_id = run.id })
 			if opts.on_launch then
 				local bound, bind_err = pcall(opts.on_launch, run)
 				if not bound then
-					vim.notify("Gator runbook binding: " .. tostring(bind_err), vim.log.levels.ERROR)
+					notice.show("Gator runbook binding: " .. tostring(bind_err), vim.log.levels.ERROR)
 				end
 			end
 		end,

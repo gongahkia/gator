@@ -248,7 +248,7 @@ local function bind(timeline)
 		end,
 		cancel = M.close,
 		help = function()
-			vim.notify("Gator timeline: j/k navigate, <Space> collapse or expand, q close", vim.log.levels.INFO)
+			require("gator.ui.notice").show("Gator timeline: j/k navigate, <Space> collapse or expand, q close", vim.log.levels.INFO)
 		end,
 	})
 end

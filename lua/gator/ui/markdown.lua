@@ -78,7 +78,7 @@ local function bind(renderer)
 	accessibility.panel(renderer.buffer, { cancel = "q", help = "?" }, {
 		cancel = M.close,
 		help = function()
-			vim.notify("Gator markdown: use native movement keys; q closes the panel", vim.log.levels.INFO)
+			require("gator.ui.notice").show("Gator markdown: use native movement keys; q closes the panel", vim.log.levels.INFO)
 		end,
 	})
 end
