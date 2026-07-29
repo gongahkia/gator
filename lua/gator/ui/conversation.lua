@@ -194,16 +194,19 @@ end
 function M.render(panel)
 	local label = panel.run_id and "active chat" or "chat"
 	local header = "Gator agent · " .. panel.provider .. " · " .. label .. " · " .. run_state.summary(panel.state)
-	if panel.state == "running" then
+	if panel.state == "running" or panel.stalled then
 		header = header
 			.. " · "
-			.. (panel.cancelling and "cancelling" or panel.phase or "working")
-			.. " · "
-			.. elapsed(panel)
+			.. (panel.cancelling and "cancelling" or (panel.stalled and "stalled" or panel.phase or "working"))
+		if panel.state == "running" then
+			header = header .. " · " .. elapsed(panel)
+		end
 	end
 	local lines = { header, trust_label(panel.trust, panel.workspace), "Status: " .. run_state.detail(panel.state), "" }
 	if #panel.lines == 0 then
-		if panel.state == "running" then
+		if panel.stalled then
+			table.insert(lines, "No provider event for " .. math.floor(panel.stall_after_ms / 1000) .. "s")
+		elseif panel.state == "running" then
 			table.insert(
 				lines,
 				panel.cancelling and "Cancelling current turn" or "Working · " .. (panel.phase or "working")
@@ -217,12 +220,15 @@ function M.render(panel)
 		vim.list_extend(lines, display_lines(panel.lines))
 	end
 	table.insert(lines, "")
+	if panel.stalled then
+		table.insert(lines, "Provider appears stalled · c cancel · q detach · r runs")
+	end
 	if panel.notice then
 		table.insert(lines, panel.notice)
 	end
 	if panel.cancelling then
 		table.insert(lines, "cancelling · q detach · r runs · + / - resize · f fullscreen · o layout · ? help")
-	elseif panel.state == "running" then
+	elseif panel.state == "running" or panel.stalled then
 		table.insert(lines, "c cancel · q detach · r runs · + / - resize · f fullscreen · o layout · ? help")
 	elseif panel.state == "waiting_input" then
 		table.insert(lines, "i prompt · q detach · r runs · + / - resize · f fullscreen · o layout · ? help")
@@ -284,7 +290,7 @@ local function bind(panel)
 			input(panel)
 		end,
 		cancel = function()
-			if panel.state ~= "running" or panel.cancelling then
+			if (panel.state ~= "running" and not panel.stalled) or panel.cancelling then
 				panel.notice = "No active turn to cancel"
 				M.render(panel)
 				return false
@@ -351,6 +357,12 @@ function M.open(opts)
 	if opts.turn_started_at ~= nil and type(opts.turn_started_at) ~= "number" then
 		fail("turn_started_at must be a number")
 	end
+	if opts.stalled ~= nil and type(opts.stalled) ~= "boolean" then
+		fail("stalled must be boolean")
+	end
+	if opts.stall_after_ms ~= nil and (type(opts.stall_after_ms) ~= "number" or opts.stall_after_ms < 0) then
+		fail("stall_after_ms must be a non-negative number")
+	end
 	if opts.trust ~= nil then
 		trust.normalize(opts.trust)
 	end
@@ -371,6 +383,8 @@ function M.open(opts)
 		panel.trust, panel.workspace = opts.trust, opts.workspace
 		panel.phase = opts.phase or (opts.state == "running" and "working" or nil)
 		panel.turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil)
+		panel.stalled = opts.stalled == true
+		panel.stall_after_ms = opts.stall_after_ms or 0
 		panel.cancelling, panel.notice = false, nil
 		panel.lines = history
 		panel.on_input, panel.on_cancel, panel.on_detach, panel.on_message, panel.on_runs =
@@ -402,6 +416,8 @@ function M.open(opts)
 		state = opts.state,
 		phase = opts.phase or (opts.state == "running" and "working" or nil),
 		turn_started_at = opts.turn_started_at or (opts.state == "running" and os.time() or nil),
+		stalled = opts.stalled == true,
+		stall_after_ms = opts.stall_after_ms or 0,
 		cancelling = false,
 		notice = nil,
 		lines = history,
@@ -504,6 +520,12 @@ function M.update(opts)
 	end
 	if opts.cancelling ~= nil then
 		panel.cancelling = opts.cancelling == true
+	end
+	if opts.stalled ~= nil then
+		panel.stalled = opts.stalled == true
+	end
+	if opts.stall_after_ms ~= nil then
+		panel.stall_after_ms = opts.stall_after_ms
 	end
 	if opts.text ~= nil and opts.text ~= "" then
 		local value = redact.text(opts.text)

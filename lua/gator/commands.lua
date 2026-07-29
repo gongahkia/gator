@@ -1,6 +1,43 @@
 local M = {}
 local registered = false
+local installed_ask_mapping = nil
 local notice = require("gator.ui.notice")
+
+local function mapping(lhs)
+	local value = vim.fn.maparg(lhs, "x", false, true)
+	return type(value) == "table" and next(value) and value or nil
+end
+
+local function remove_default_mapping()
+	if not installed_ask_mapping then
+		return
+	end
+	local current = mapping(installed_ask_mapping)
+	if current and current.rhs == "<Plug>(gator-ask-selection)" then
+		vim.keymap.del("x", installed_ask_mapping)
+	end
+	installed_ask_mapping = nil
+end
+
+function M.configure(opts)
+	if type(opts) ~= "table" or (opts.keymap ~= false and (type(opts.keymap) ~= "string" or opts.keymap == "")) then
+		error("Gator commands: ask_selection.keymap must be false or non-empty text", 3)
+	end
+	vim.keymap.set("x", "<Plug>(gator-ask-selection)", ":<C-U>'<,'>GatorAsk<CR>", {
+		desc = "Gator ask about selected text",
+		silent = true,
+	})
+	remove_default_mapping()
+	if opts.keymap == false or mapping(opts.keymap) then
+		return false
+	end
+	vim.keymap.set("x", opts.keymap, "<Plug>(gator-ask-selection)", {
+		desc = "Gator ask about selected text",
+		silent = true,
+	})
+	installed_ask_mapping = opts.keymap
+	return true
+end
 
 function M.register()
 	if registered then

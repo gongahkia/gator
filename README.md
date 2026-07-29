@@ -9,7 +9,7 @@ It does not replace Codex, Pi, Claude, ACP agents, or their harnesses. Providers
 1. Select code, or place the cursor in the relevant buffer.
 2. Run `:Gator` and enter a short objective.
 3. Pick a ready provider once. Gator remembers it for that Git project.
-4. Gator opens a structured chat when that provider exposes one; otherwise it opens the provider's native terminal in Neovim.
+4. Gator opens a structured chat when that provider exposes one; otherwise it opens the provider's native terminal and a Gator control companion in Neovim.
 5. Use `:GatorRuns` to focus, resume/fork, hand off, review, attach new context, or start a ready runbook step.
 
 The launched prompt receives the objective, exact selected/current source, and current Git diff. Gator writes local run metadata and bundles under `.gator/`; it adds that directory to Git's local `info/exclude`, never to tracked `.gitignore`.
@@ -41,7 +41,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 2. Run `:GatorHealth`. Its first section lists agents ready now; warnings for other providers are collapsed because they are informational unless you plan to use them. Use `:GatorHealth!` for individual provider diagnostics.
 3. Run `:Gator codex`, enter a concise objective, and wait for the chat pane. A startup error closes the spinner and marks the run failed instead of leaving it pending.
 4. In the chat, `i` sends a follow-up prompt once the agent is ready, `c` cancels the current turn, and `q` detaches without stopping the provider. Markdown is display-formatted; the local transcript retains the provider text for handoff.
-5. In Visual-line mode, run `:'<,'>GatorAsk` to choose a ready chat, ask one question, and send the selected lines and question as one turn. It will not steer a response already in progress.
+5. In Visual mode, press `<leader>gA` to choose a ready chat, ask one question, and send the selected lines and question as one turn. It will not steer a response already in progress; `:'<,'>GatorAsk` remains available without the mapping.
 6. Run `:GatorRuns` to find detached runs. Press `<CR>` to focus one or run `:GatorStopSession [run-id]` to terminate Gator's local process.
 
 ## Commands
@@ -62,7 +62,16 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 | `:GatorForget <run-id>` | Remove a completed run's artifacts and eligible clean worktree. |
 | `:GatorHealth[!]` | Check readiness and compatibility; `!` expands individual provider diagnostics. |
 
-There is no legacy dashboard, import, file, or ID workflow. A simple optional mapping is:
+`<leader>gA` is installed in Visual mode only when that mapping is unclaimed. It invokes `<Plug>(gator-ask-selection)`, so a config can remap it or disable only the default:
+
+```lua
+require("gator").setup({
+  ui = { ask_selection = { keymap = false } },
+})
+vim.keymap.set("x", "<leader>ga", "<Plug>(gator-ask-selection)", { desc = "Gator ask selected text" })
+```
+
+There is no legacy dashboard, import, file, or ID workflow. A simple optional launch mapping is:
 
 ```lua
 vim.keymap.set("n", "<leader>ag", "<cmd>Gator<CR>", { desc = "Gator launch" })
@@ -76,6 +85,7 @@ require("gator").setup({
   launch = {
     default_provider = "ask", -- "ask" or a provider id
     transport = "auto", -- "auto", "chat", or "terminal"
+    stall_after_ms = 120000, -- warn after 120s without a structured provider event; 0 disables
   },
   permissions = {
     codex = { sandbox = "workspace_write" }, -- or "read_only"; sent to Codex App Server
@@ -138,6 +148,9 @@ require("gator").setup({
       height = 18, -- split/float height; + and - resize a focused chat
       width = 0, -- float width; 0 uses 75% of the editor width
     },
+    ask_selection = {
+      keymap = "<leader>gA", -- false disables only Gator's unclaimed default mapping
+    },
     renderers = {
       provider_picker = "native", -- or an extension renderer id
       run_graph = "native",
@@ -154,7 +167,7 @@ require("gator").setup({
 
 Gator vendors 169 selectable loading animations from [Rattles](https://github.com/vyfor/rattles) and [Whirly](https://github.com/janlelis/whirly); see [loading dialogs](docs/LOADING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). `ui.motion.enabled = false` or `ui.motion.reduced = true` leaves the dialog visible but static.
 
-Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle split, float, and fullscreen layouts, and `r` to open the run list. `?` explains the selection (`:GatorAsk`) and run flows (resume, review, handoff). These mappings can be overridden through `ui.keymaps`.
+Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle split, float, and fullscreen layouts, and `r` to open the run list. After 120 seconds without a structured provider event, the chat says it is stalled and leaves `c` cancel, `q` detach, and `r` runs available; it never retries or kills the provider automatically. Terminal companions expose focus, stop, detach, runs, journal, and handoff without reading terminal output. `?` explains the selection (`:GatorAsk`) and run flows (resume, review, handoff). These mappings can be overridden through `ui.keymaps`.
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 

@@ -8,6 +8,7 @@ local capture = require("gator.context.capture")
 local provider_picker = require("gator.ui.provider_picker")
 local conversation = require("gator.ui.conversation")
 local run_graph = require("gator.ui.run_graph")
+local terminal_companion = require("gator.ui.terminal_companion")
 local handoff_review = require("gator.ui.run_handoff")
 local review_ui = require("gator.ui.run_review")
 local loading_ui = require("gator.ui.loading")
@@ -135,6 +136,7 @@ function M.new(opts)
 			key ~= "state"
 			and key ~= "root"
 			and key ~= "terminal"
+			and key ~= "terminal_companion"
 			and key ~= "bridge"
 			and key ~= "readiness"
 			and key ~= "managed"
@@ -159,6 +161,7 @@ function M.new(opts)
 		root = root,
 		store = run_store.new(root),
 		terminal = opts.terminal or terminal.new(),
+		terminal_companion = opts.terminal_companion or terminal_companion,
 		bridge = opts.bridge or native_terminal.new(),
 		readiness = opts.readiness or health.launch_catalog,
 		managed = opts.managed or managed_adapter.new({ shutdown = true }),
@@ -171,6 +174,7 @@ function M.new(opts)
 		extensions = opts.extensions or extension_runtime.new({ modules = {}, renderers = {}, columns = {} }),
 		clock = opts.clock or now,
 		loading_handles = {},
+		stall_watches = {},
 		providers = {},
 		active = {},
 		transcripts = {},
@@ -1091,6 +1095,8 @@ function Workflow:open_conversation(run)
 		state = run.state,
 		trust = run.trust,
 		workspace = run.workspace,
+		stalled = run.activity and run.activity.state == "stalled",
+		stall_after_ms = self.state.config.launch.stall_after_ms,
 		phase = run.state == "running" and "working" or nil,
 		turn_started_at = run.state == "running" and run.updated_at or nil,
 		history = history,
@@ -1139,6 +1145,144 @@ function Workflow:close_loading(id)
 	return handle ~= nil
 end
 
+function Workflow:stop_stall_watch(id, inactive)
+	local watch = self.stall_watches[id]
+	local was_stalled = watch and watch.stalled
+	self.stall_watches[id] = nil
+	if watch and watch.timer and not watch.timer:is_closing() then
+		watch.timer:stop()
+		watch.timer:close()
+	end
+	if inactive then
+		local run = self.store:get(id)
+		if run and run.activity and run.activity.state ~= "inactive" then
+			self:update(id, { activity = { state = "inactive", last_event_at = self.clock() } })
+		end
+	end
+	if was_stalled then
+		self:render_stall(id, false)
+	end
+	return watch ~= nil
+end
+
+function Workflow:render_stall(id, stalled)
+	pcall(conversation.update, {
+		run_id = id,
+		stalled = stalled,
+		stall_after_ms = self.state.config.launch.stall_after_ms,
+	})
+end
+
+function Workflow:arm_stall_watch(id, watch)
+	if watch.timer and not watch.timer:is_closing() then
+		watch.timer:stop()
+		watch.timer:close()
+	end
+	local timer = vim.uv.new_timer()
+	watch.timer = timer
+	local generation = watch.generation
+	timer:start(
+		watch.after_ms,
+		0,
+		vim.schedule_wrap(function()
+			if watch.timer == timer then
+				watch.timer = nil
+			end
+			if not timer:is_closing() then
+				timer:close()
+			end
+			if self.stall_watches[id] ~= watch or watch.generation ~= generation or watch.stalled then
+				return
+			end
+			local run = self.store:get(id)
+			if not run or not active_state(run) then
+				return
+			end
+			watch.stalled = true
+			local at = self.clock()
+			self:update(id, { activity = { state = "stalled", last_event_at = watch.last_event_at, stalled_at = at } })
+			self:journal(id, "provider.stalled", { transport = run.transport, idle_ms = watch.after_ms })
+			self:render_stall(id, true)
+		end)
+	)
+end
+
+function Workflow:start_stall_watch(id)
+	local after_ms = self.state.config.launch.stall_after_ms
+	local run = self.store:get(id)
+	if not run or not active_state(run) then
+		self:stop_stall_watch(id, true)
+		return false
+	end
+	if after_ms == 0 then
+		self:stop_stall_watch(id, true)
+		return false
+	end
+	local previous = self.stall_watches[id]
+	local recovered = previous and previous.stalled
+	self:stop_stall_watch(id)
+	local at = self.clock()
+	local watch = { after_ms = after_ms, generation = 1, last_event_at = at, stalled = false }
+	self.stall_watches[id] = watch
+	self:update(id, { activity = { state = "active", last_event_at = at } })
+	if recovered then
+		self:journal(id, "provider.recovered", { idle_ms = after_ms })
+	end
+	self:arm_stall_watch(id, watch)
+	return true
+end
+
+function Workflow:touch_stall_watch(id)
+	local watch = self.stall_watches[id]
+	if not watch then
+		return false
+	end
+	watch.generation = watch.generation + 1
+	watch.last_event_at = self.clock()
+	if watch.stalled then
+		watch.stalled = false
+		self:update(id, { activity = { state = "active", last_event_at = watch.last_event_at } })
+		self:journal(id, "provider.recovered", { idle_ms = watch.after_ms })
+		self:render_stall(id, false)
+	end
+	self:arm_stall_watch(id, watch)
+	return true
+end
+
+function Workflow:open_terminal_companion(run, terminal_window)
+	if type(terminal_window) ~= "number" or not vim.api.nvim_win_is_valid(terminal_window) then
+		return false
+	end
+	return self.terminal_companion.open({
+		run_id = run.id,
+		provider = run.provider,
+		state = run.state,
+		trust = run.trust,
+		workspace = run.workspace,
+		session = run.session,
+		started_at = run.resources and run.resources.started_at or run.created_at,
+		terminal_window = terminal_window,
+		on_focus = function()
+			return self:focus(run.id)
+		end,
+		on_stop = function()
+			return self:stop(run.id)
+		end,
+		on_detach = function()
+			self:update(run.id, { state = "detached" })
+		end,
+		on_runs = function()
+			return self:open_runs()
+		end,
+		on_journal = function()
+			return self:open_events(run.id)
+		end,
+		on_handoff = function()
+			return self:handoff(run.id)
+		end,
+	})
+end
+
 function Workflow:open_terminal(run, prepared)
 	local definition = self:custom_provider(run.provider)
 	local resume_supported = not definition or type(definition.resume) == "function"
@@ -1148,6 +1292,8 @@ function Workflow:open_terminal(run, prepared)
 		command = prepared.command,
 		on_exit = function(result)
 			self:close_loading(run.id)
+			self:stop_stall_watch(run.id, true)
+			self.terminal_companion.close(run.id)
 			self:journal(run.id, "provider.exited", { code = result.code, transport = "terminal" })
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
@@ -1167,6 +1313,7 @@ function Workflow:open_terminal(run, prepared)
 		session = { id = prepared.session.id, resume_supported = resume_supported },
 		process = { job_id = opened.job_id },
 	})
+	self:open_terminal_companion(updated, opened.window)
 	pcall(
 		self.extensions.emit,
 		self.extensions,
@@ -1206,8 +1353,14 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				phase = state == "running" and "starting" or nil,
 				turn_started_at = state == "running" and self.clock() or nil,
 			})
+			if prompt then
+				self:start_stall_watch(run.id)
+			else
+				self:stop_stall_watch(run.id, true)
+			end
 		end,
 		on_event = function(kind, value)
+			self:touch_stall_watch(run.id)
 			if kind == "running" then
 				self:journal(run.id, "provider.running", { transport = "structured" })
 				pcall(conversation.update, {
@@ -1228,11 +1381,13 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 					phase = "responding",
 				})
 			elseif kind == "settled" then
+				self:stop_stall_watch(run.id, true)
 				self:journal(run.id, "provider.settled", { transport = "structured" })
 				self:update(run.id, { state = "waiting_input" })
 				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
 				self:finish_summary(run.id)
 			elseif kind == "error" then
+				self:stop_stall_watch(run.id, true)
 				self:close_loading(run.id)
 				self:journal(run.id, "provider.error", { code = failure_code(value), phase = "structured" })
 				self:update(run.id, { state = "failed" })
@@ -1263,15 +1418,19 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 		end,
 		on_exit = function(result)
 			self:close_loading(run.id)
+			self:stop_stall_watch(run.id, true)
 			self:journal(run.id, "provider.exited", { code = result.code, transport = "structured" })
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
-				self:update(run.id, { state = result.code == 0 and "completed" or "failed" })
+				local state = result.code == 0 and "completed" or "failed"
+				self:update(run.id, { state = state })
+				pcall(conversation.update, { run_id = run.id, state = state })
 			end
 			self.active[run.id] = nil
 		end,
 	})
 	self.active[run.id] = { kind = "structured", handle = opened }
+	self:start_stall_watch(run.id)
 	self:open_conversation(self:run(run.id))
 	return run
 end
@@ -1334,8 +1493,14 @@ function Workflow:open_managed(run, prompt, existing_session)
 				phase = state == "running" and "starting" or nil,
 				turn_started_at = state == "running" and self.clock() or nil,
 			})
+			if prompt then
+				self:start_stall_watch(run.id)
+			else
+				self:stop_stall_watch(run.id, true)
+			end
 		end,
 		on_event = function(event)
+			self:touch_stall_watch(run.id)
 			if event.type == "text" or event.type == "complete" then
 				self:append_transcript(run.id, "assistant", event.text or "")
 				pcall(conversation.update, {
@@ -1344,6 +1509,7 @@ function Workflow:open_managed(run, prompt, existing_session)
 					state = event.type == "complete" and "waiting_input" or "running",
 				})
 				if event.type == "complete" then
+					self:stop_stall_watch(run.id, true)
 					self:journal(run.id, "provider.settled", { transport = "managed" })
 					self:update(run.id, { state = "waiting_input" })
 					self:finish_summary(run.id)
@@ -1351,13 +1517,16 @@ function Workflow:open_managed(run, prompt, existing_session)
 			elseif event.type == "phase" then
 				pcall(conversation.update, { run_id = run.id, state = "running", phase = event.phase or "working" })
 			elseif event.type == "error" then
+				self:stop_stall_watch(run.id, true)
 				self:journal(run.id, "provider.error", { code = failure_code(event), phase = "managed" })
+				self:update(run.id, { state = "failed" })
 				pcall(conversation.update, { run_id = run.id, text = event.text, state = "failed" })
 			end
 		end,
 		on_permission = permission,
 		on_exit = function(result)
 			self:close_loading(run.id)
+			self:stop_stall_watch(run.id, true)
 			self:journal(run.id, "provider.exited", {
 				code = result.code,
 				stopped = result.stopped == true,
@@ -1365,10 +1534,9 @@ function Workflow:open_managed(run, prompt, existing_session)
 			})
 			local latest = self.store:get(run.id)
 			if latest and active_state(latest) then
-				self:update(
-					run.id,
-					{ state = result.stopped and "stopped" or (result.code == 0 and "completed" or "failed") }
-				)
+				local state = result.stopped and "stopped" or (result.code == 0 and "completed" or "failed")
+				self:update(run.id, { state = state })
+				pcall(conversation.update, { run_id = run.id, state = state })
 			end
 			self.active[run.id] = nil
 		end,
@@ -1376,6 +1544,7 @@ function Workflow:open_managed(run, prompt, existing_session)
 	if reference then
 		self.active[run.id] = { kind = "managed", reference = reference }
 	end
+	self:start_stall_watch(run.id)
 	self:open_conversation(self:run(run.id))
 	return opened
 end
@@ -1572,6 +1741,7 @@ function Workflow:send(id, message)
 	end
 	self:append_transcript(id, "user", message)
 	self:update(run.id, { state = "running" })
+	self:start_stall_watch(run.id)
 	pcall(conversation.update, {
 		run_id = run.id,
 		state = "running",
@@ -2296,6 +2466,8 @@ end
 function Workflow:stop(id)
 	local run = self:run(id)
 	self:close_loading(id)
+	self:stop_stall_watch(id, true)
+	self.terminal_companion.close(id)
 	local active = self.active[id]
 	if active then
 		if active.kind == "terminal" then
@@ -2309,6 +2481,7 @@ function Workflow:stop(id)
 	end
 	self:journal(run.id, "provider.exited", { stopped = true, transport = run.transport })
 	self:update(run.id, { state = "stopped" })
+	pcall(conversation.update, { run_id = run.id, state = "stopped" })
 	return true
 end
 
@@ -2316,7 +2489,13 @@ function Workflow:focus(id)
 	local run = self:run(id)
 	local active = self.active[id]
 	if active and active.kind == "terminal" then
-		return self.terminal:attach(active.terminal_id)
+		local window = self.terminal:attach(active.terminal_id)
+		local latest = self:run(id)
+		if latest.state == "detached" then
+			latest = self:update(id, { state = "running" })
+		end
+		self:open_terminal_companion(latest, window)
+		return window
 	end
 	if run.transport == "chat" then
 		if self.active[id] then
@@ -2340,9 +2519,9 @@ function Workflow:resume(id)
 		end
 		return self:open_managed(run, nil, run.session)
 	end
-	local ok = pcall(self.terminal.attach, self.terminal, id)
+	local ok, value = pcall(self.focus, self, id)
 	if ok then
-		return true
+		return value
 	end
 	self:prepare_terminal(run, nil, function(prepared, reason)
 		if not prepared then
@@ -2664,6 +2843,12 @@ end
 function Workflow:close()
 	for id in pairs(vim.deepcopy(self.loading_handles)) do
 		self:close_loading(id)
+	end
+	for id in pairs(vim.deepcopy(self.stall_watches)) do
+		self:stop_stall_watch(id, true)
+	end
+	for _, run in ipairs(self:runs()) do
+		self.terminal_companion.close(run.id)
 	end
 	for id in pairs(vim.deepcopy(self.active)) do
 		pcall(self.stop, self, id)

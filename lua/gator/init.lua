@@ -46,6 +46,7 @@ function M.setup(opts)
 		M._coordinator:dispose()
 	end
 	M._coordinator = next
+	require("gator.commands").configure(next:state().config.ui.ask_selection)
 	M._coordinator:load_extensions()
 	M._state = M._coordinator:state()
 	M._coordinator:bootstrap_recovery()

@@ -3,6 +3,10 @@ local config = require("gator.config")
 
 assert(config.resolve().schema_version == config.schema_version, "default settings must resolve to the current schema")
 assert(config.resolve().ui.icons == "unicode", "Unicode alligator glyphs must be the default UI style")
+assert(
+	config.resolve().ui.ask_selection.keymap == "<leader>gA" and config.resolve().launch.stall_after_ms == 120000,
+	"selection asks and non-destructive provider-stall warnings must have safe defaults"
+)
 
 local path = helpers.tempdir("config") .. "/gator.json"
 helpers.write(path, '{"schema_version":2,"ui":{"layout":"modal"},"workspaces":{"mode":"worktree","max_write_runs":2}}')
@@ -58,6 +62,12 @@ local chat = config.resolve({ ui = { chat = { layout = "float", height = 20, wid
 assert(
 	chat.layout == "float" and chat.height == 20 and chat.width == 90,
 	"chat layout settings must support float, height, and width"
+)
+local ask_selection = config.resolve({ ui = { ask_selection = { keymap = false } } }).ui.ask_selection
+assert(ask_selection.keymap == false, "selection ask mapping must allow an explicit opt-out")
+assert(
+	config.resolve({ launch = { stall_after_ms = 120 } }).launch.stall_after_ms == 120,
+	"provider stall threshold must be configurable in milliseconds"
 )
 local extensions = config.resolve({ extensions = { modules = { "my_gator_extension" } } }).extensions
 assert(extensions.modules[1] == "my_gator_extension", "extensions must require explicit trusted module names")
@@ -122,6 +132,8 @@ assert(
 		and not pcall(config.resolve, { ui = { chat = { layout = "side" } } })
 		and not pcall(config.resolve, { ui = { chat = { height = 5 } } })
 		and not pcall(config.resolve, { ui = { chat = { width = 19 } } })
+		and not pcall(config.resolve, { ui = { ask_selection = { keymap = true } } })
+		and not pcall(config.resolve, { ui = { ask_selection = { keymap = "" } } })
 		and not pcall(config.resolve, { ui = { resources = { enabled = "yes" } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "tokens" } } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "usage", "usage" } } } })
@@ -129,6 +141,7 @@ assert(
 		and not pcall(config.resolve, { ui = { run_graph = { columns = { "id", "id" } } } })
 		and not pcall(config.resolve, { permissions = { codex = { sandbox = "unrestricted" } } })
 		and not pcall(config.resolve, { budget = { max_tokens = -1 } })
+		and not pcall(config.resolve, { launch = { stall_after_ms = -1 } })
 		and not pcall(config.resolve, { retention = { max_age_days = -1 } })
 		and not pcall(config.resolve, { retention = { max_bytes = -1 } })
 		and not pcall(config.resolve, { retention = { cleanup_on_start = "yes" } })
@@ -157,7 +170,7 @@ assert(
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":13}')
+helpers.write(path, '{"schema_version":14}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

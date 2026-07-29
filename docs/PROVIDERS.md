@@ -10,7 +10,9 @@ Gator selects only adapters that pass their local executable/version/capability 
 | OpenCode | Native Neovim terminal | Gator records the provider session created by its bridge. |
 | Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, Vibe | Managed/ACP chat only when each installed adapter advertises the required contract | Capability and resume behavior remain adapter-specific; Gator presents provider approval requests interactively where ACP emits them. |
 
-Gator never scrapes a terminal to fabricate chat history. A terminal-originated run can still hand off its objective, captured source, current diff, bounded changed-text-file snapshots, and an editable note, but is explicitly marked `transcript unavailable`. Cross-provider handoff creates a new provider session and materializes Gator-owned files under `.gator/handoffs/<bundle-id>/files/`; it does not claim to migrate opaque provider state.
+Gator never scrapes a terminal to fabricate chat history. A terminal-originated run opens a separate Gator companion split with focus, stop, detach, run-list, journal, and handoff controls; prompts and output remain in the provider terminal. A terminal run can still hand off its objective, captured source, current diff, bounded changed-text-file snapshots, and an editable note, but is explicitly marked `transcript unavailable`. Cross-provider handoff creates a new provider session and materializes Gator-owned files under `.gator/handoffs/<bundle-id>/files/`; it does not claim to migrate opaque provider state.
+
+For structured and managed chats, Gator marks a turn stalled after the configured `launch.stall_after_ms` (120 seconds by default) without an adapter event, records only that metadata, and exposes cancel, detach, and journal controls. It does not retry, inject a prompt, terminate, or infer the provider's underlying state.
 
 Gator marks previously active local records `detached` on startup. It does not reconnect by PID or recreate an empty chat as if it were a provider session. Resume is offered only when the stored session declares support and the selected provider confirms the same session identity.
 

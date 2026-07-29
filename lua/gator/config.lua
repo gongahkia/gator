@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 12
+M.schema_version = 13
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -14,6 +14,7 @@ M.defaults = {
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
 		chat = { layout = "split", height = 18, width = 0 },
+		ask_selection = { keymap = "<leader>gA" },
 		resources = { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } },
 		renderers = {
 			provider_picker = "native",
@@ -39,7 +40,7 @@ M.defaults = {
 			source_summary = false,
 		},
 	},
-	launch = { default_provider = "ask", transport = "auto" },
+	launch = { default_provider = "ask", transport = "auto", stall_after_ms = 120000 },
 	permissions = { codex = { sandbox = "workspace_write" } },
 	sessions = { transfer = "manual" },
 	providers = {
@@ -210,6 +211,7 @@ local function settings(value)
 		motion = true,
 		loading = true,
 		chat = true,
+		ask_selection = true,
 		resources = true,
 		renderers = true,
 		run_graph = true,
@@ -226,7 +228,7 @@ local function settings(value)
 		extension_modules[module] = true
 	end
 	fields(value.context, { mode = true, trust = true, preflight = true, handoff = true }, "settings.context")
-	fields(value.launch, { default_provider = true, transport = true }, "settings.launch")
+	fields(value.launch, { default_provider = true, transport = true, stall_after_ms = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")
 	fields(value.permissions.codex, { sandbox = true }, "settings.permissions.codex")
 	fields(value.sessions, { transfer = true }, "settings.sessions")
@@ -283,6 +285,12 @@ local function settings(value)
 		or (value.ui.chat.width > 0 and value.ui.chat.width < 20)
 	then
 		fail("ui.chat.width must be 0 or an integer of at least 20")
+	end
+	fields(value.ui.ask_selection, { keymap = true }, "settings.ui.ask_selection")
+	if value.ui.ask_selection.keymap ~= false then
+		if type(value.ui.ask_selection.keymap) ~= "string" or value.ui.ask_selection.keymap == "" then
+			fail("ui.ask_selection.keymap must be false or a non-empty mapping")
+		end
 	end
 	fields(value.ui.resources, { enabled = true, fields = true }, "settings.ui.resources")
 	fields(value.ui.renderers, {
@@ -376,6 +384,13 @@ local function settings(value)
 	if not vim.tbl_contains({ "auto", "chat", "terminal" }, value.launch.transport) then
 		fail("launch.transport must be auto, chat, or terminal")
 	end
+	if
+		type(value.launch.stall_after_ms) ~= "number"
+		or value.launch.stall_after_ms < 0
+		or value.launch.stall_after_ms % 1 ~= 0
+	then
+		fail("launch.stall_after_ms must be a non-negative integer")
+	end
 	if not vim.tbl_contains({ "workspace_write", "read_only" }, value.permissions.codex.sandbox) then
 		fail("permissions.codex.sandbox must be workspace_write or read_only")
 	end
@@ -464,6 +479,7 @@ function M.migrate(value)
 		and from_version ~= 9
 		and from_version ~= 10
 		and from_version ~= 11
+		and from_version ~= 12
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -501,6 +517,7 @@ function M.migrate(value)
 	document.ui = document.ui or {}
 	document.ui.loading = document.ui.loading or {}
 	document.ui.chat = document.ui.chat or vim.deepcopy(M.defaults.ui.chat)
+	document.ui.ask_selection = document.ui.ask_selection or vim.deepcopy(M.defaults.ui.ask_selection)
 	document.ui.resources = document.ui.resources or {}
 	if document.ui.resources.enabled == nil then
 		document.ui.resources.enabled = true
@@ -524,6 +541,9 @@ function M.migrate(value)
 	document.review = document.review or {}
 	document.acp = document.acp or {}
 	document.runbooks = document.runbooks or {}
+	if document.launch.stall_after_ms == nil then
+		document.launch.stall_after_ms = M.defaults.launch.stall_after_ms
+	end
 	document.schema_version = M.schema_version
 	return document, { migrated = true, from_version = from_version, to_version = M.schema_version }
 end

@@ -172,6 +172,7 @@ local function normalize_run(value)
 				trust = true,
 				runbook_id = true,
 				depends_on = true,
+				activity = true,
 			})[key]
 		then
 			fail("run contains unsupported field: " .. tostring(key))
@@ -329,6 +330,30 @@ local function normalize_run(value)
 			or run.resources.finished_at % 1 ~= 0
 		then
 			fail("run.resources.finished_at must be an integer after run.resources.started_at")
+		end
+	end
+	if run.activity ~= nil then
+		if type(run.activity) ~= "table" then
+			fail("run.activity must be an object")
+		end
+		for key in pairs(run.activity) do
+			if key ~= "state" and key ~= "last_event_at" and key ~= "stalled_at" then
+				fail("run.activity contains unsupported field: " .. tostring(key))
+			end
+		end
+		if run.activity.state ~= "active" and run.activity.state ~= "stalled" and run.activity.state ~= "inactive" then
+			fail("run.activity.state is unavailable")
+		end
+		for _, field in ipairs({ "last_event_at", "stalled_at" }) do
+			if
+				run.activity[field] ~= nil
+				and (type(run.activity[field]) ~= "number" or run.activity[field] < 0 or run.activity[field] % 1 ~= 0)
+			then
+				fail("run.activity." .. field .. " must be a non-negative integer")
+			end
+		end
+		if run.activity.state == "stalled" and run.activity.stalled_at == nil then
+			fail("run.activity.stalled_at is required when stalled")
 		end
 	end
 	return run
