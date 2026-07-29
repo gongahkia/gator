@@ -245,6 +245,8 @@ local function settings(value)
 		motion = true,
 		loading = true,
 		chat = true,
+		workspace = true,
+		approvals = true,
 		composer = true,
 		ask_selection = true,
 		edit_selection = true,

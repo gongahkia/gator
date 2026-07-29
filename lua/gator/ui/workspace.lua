@@ -40,7 +40,8 @@ local function markdown_line(line)
 	line = line:gsub("^## user%s*$", "You")
 	line = line:gsub("^## assistant%s*$", "Gator agent")
 	line = line:gsub("%[([^%]]+)%]%b()", "%1")
-	return line:gsub("`([^`]+)`", "%1")
+	line = line:gsub("`([^`]+)`", "%1")
+	return line
 end
 
 local function transcript(history)
@@ -145,9 +146,9 @@ local function render(panel)
 	return true
 end
 
-local function move(panel, target)
+local function move(panel, target, force)
 	target = tabpage(target)
-	if panel.tabpage == target and panel.window and vim.api.nvim_win_is_valid(panel.window) then
+	if not force and panel.tabpage == target and panel.window and vim.api.nvim_win_is_valid(panel.window) then
 		vim.api.nvim_set_current_win(panel.window)
 		return panel.window
 	end
@@ -309,6 +310,22 @@ function M.request_approval(run_id, value)
 	return true
 end
 
+function M.add_context(run_id, kind, artifacts)
+	local panel = panels_by_run[run_id]
+	if not panel or type(kind) ~= "string" or type(artifacts) ~= "table" then
+		return false
+	end
+	local target = kind == "selection" and "selections" or (kind == "diagnostic" and "diagnostics" or "files")
+	for _, artifact in ipairs(artifacts) do
+		local label = artifact.path or artifact.bundle_id or artifact.kind
+		if type(label) == "string" and label ~= "" then
+			table.insert(panel.context[target], redact.text(label))
+		end
+	end
+	render(panel)
+	return true
+end
+
 function M.detach(run_id)
 	local panel = panels_by_run[run_id]
 	if not panel then
@@ -336,7 +353,7 @@ function M.rotate(run_id)
 		end
 	end
 	panel.position = settings.rotation[index]
-	move(panel, panel.tabpage)
+	move(panel, panel.tabpage, true)
 	render(panel)
 	return true
 end

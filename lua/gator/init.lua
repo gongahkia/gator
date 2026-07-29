@@ -155,6 +155,16 @@ function M.runs()
 	return M.dispatch("runs")
 end
 
+function M.workspace(run_id)
+	if type(run_id) ~= "string" or run_id == "" then
+		error("Gator workspace: run id must be non-empty text", 2)
+	end
+	if not M._coordinator then
+		M.setup()
+	end
+	return M._coordinator:workflow():focus(run_id)
+end
+
 function M.events(run_id)
 	return M.dispatch("events", { run_id = run_id })
 end

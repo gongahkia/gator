@@ -1015,7 +1015,9 @@ function Workflow:forget(id)
 		end
 		self.store:remove_worktree_lease(run.id)
 	end
-	return self.store:forget_run(run.id)
+	local removed = self.store:forget_run(run.id)
+	require("gator.context.images").remove_run(run.id)
+	return removed
 end
 
 function Workflow:workspace(id, force_worktree)
@@ -1383,6 +1385,48 @@ function Workflow:open_terminal(run, prepared)
 	return updated
 end
 
+local function approval_kind(request)
+	local value = ((request and request.action) or ""):lower()
+	if value:find("file", 1, true) or value:find("write", 1, true) or value:find("edit", 1, true) then
+		return "edit"
+	end
+	if value:find("command", 1, true) or value:find("exec", 1, true) then
+		return "command"
+	end
+	return "escalation"
+end
+
+function Workflow:request_approval(run, request, decide)
+	if type(request) ~= "table" or type(decide) ~= "function" then
+		fail("approval requires a request and decision callback")
+	end
+	local kind = approval_kind(request)
+	local scope = self.state.config.ui.approvals.scope
+	local queued = scope == "all" or (scope == "writes" and kind == "edit") or (scope == "edits" and kind == "edit")
+	local action = request.action or "provider action"
+	local function resolved(decision)
+		local value = decision == "approved" and "approved" or (decision == "denied" and "denied" or "cancelled")
+		decide(value)
+		self:journal(run.id, "approval.decided", { action = action, decision = value, kind = kind })
+	end
+	self:journal(run.id, "approval.requested", { action = action, kind = kind, provider = run.provider })
+	if queued and conversation.request_approval(run.id, {
+		action = action,
+		kind = kind,
+		details = request.details or request.command or "no additional detail",
+		diff = request.diff,
+		on_decide = resolved,
+	}) then
+		return true
+	end
+	vim.ui.select({ "Approve once", "Deny", "Cancel" }, {
+		prompt = "Gator approval · " .. run.provider .. " · " .. action,
+	}, function(choice)
+		resolved(choice == "Approve once" and "approved" or (choice == "Deny" and "denied" or "cancelled"))
+	end)
+	return true
+end
+
 function Workflow:open_structured(run, prompt, operation, existing_session)
 	local opened = self.structured:open({
 		provider = run.provider,
@@ -1459,23 +1503,7 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 			self:report_usage(run.id, usage)
 		end,
 		on_approval = function(request, decide)
-			local detail = request.command ~= "" and (" · " .. request.command) or ""
-			pcall(
-				conversation.update,
-				{ run_id = run.id, text = "Approval requested: " .. request.action .. detail, state = "waiting_input" }
-			)
-			self:journal(run.id, "approval.requested", {
-				action = request.action,
-				has_command = request.command ~= "",
-			})
-			vim.ui.select({ "Approve once", "Deny", "Cancel" }, {
-				prompt = "Gator approval · " .. run.provider .. " · " .. request.action .. detail,
-			}, function(choice)
-				local decision = choice == "Approve once" and "approved"
-					or (choice == "Deny" and "denied" or "cancelled")
-				decide(decision)
-				self:journal(run.id, "approval.decided", { action = request.action, decision = decision })
-			end)
+			self:request_approval(run, request, decide)
 		end,
 		on_exit = function(result)
 			self:close_loading(run.id)
@@ -1505,14 +1533,7 @@ function Workflow:open_managed(run, prompt, existing_session)
 	end
 	local reference
 	local function permission(request, respond)
-		self:journal(run.id, "approval.requested", { action = request.action, provider = request.provider })
-		vim.ui.select({ "approved", "denied", "cancelled" }, {
-			prompt = "Gator approval · " .. request.provider .. " · " .. request.action,
-		}, function(decision)
-			local resolved = decision or "cancelled"
-			respond(resolved)
-			self:journal(run.id, "approval.decided", { action = request.action, decision = resolved })
-		end)
+		self:request_approval(run, request, respond)
 	end
 	local opened = self.managed:open({
 		provider = run.provider,
@@ -2005,6 +2026,7 @@ function Workflow:send_context(opts)
 	local function deliver()
 		self:journal(run.id, "context.sent", preflight)
 		self:record_context_delivery(run.id, #message)
+		conversation.add_context(run.id, kind, artifacts)
 		return self:send(run.id, message, false)
 	end
 	if self.state.config.context.preflight.confirm then
