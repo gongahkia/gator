@@ -1,5 +1,5 @@
 local command =
-	"lua local g=require('gator').setup(); assert(vim.fn.exists(':Gator') == 2); assert(vim.fn.exists(':GatorHealth') == 2); assert(vim.fn.exists(':GatorRuns') == 2); g.setup()"
+	"lua local g=require('gator').setup(); assert(vim.fn.exists(':Gator') == 2); assert(vim.fn.exists(':GatorHealth') == 2); assert(vim.fn.exists(':GatorRuns') == 2); assert(vim.fn.exists(':GatorCompletion') == 2); g.setup()"
 local result = vim.system({
 	vim.v.progpath,
 	"--headless",

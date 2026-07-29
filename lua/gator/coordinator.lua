@@ -3,6 +3,7 @@ local cancellation = require("gator.coordinator.cancellation")
 local workflow = require("gator.workflow")
 local extension_runtime = require("gator.extensions.runtime")
 local health = require("gator.health")
+local completion_context = require("gator.completion.context")
 
 local M = { name = "coordinator", api_version = 1, inspection_schema_version = 1 }
 local Coordinator = {}
@@ -221,6 +222,80 @@ function Coordinator:workflow()
 	return self._workflow
 end
 
+local function active_runs(value)
+	for _, run in ipairs(value:runs()) do
+		if run.state == "starting" or run.state == "running" or run.state == "waiting_input" or run.state == "detached" then
+			return true
+		end
+	end
+	return false
+end
+
+function Coordinator:completion_root(buffer)
+	local settings = self:state().config.completion
+	if settings.root.apply_to == "completion" then
+		return nil
+	end
+	local candidate = completion_context.root({ buffer = buffer or vim.api.nvim_get_current_buf(), settings = settings })
+	if not candidate then
+		return nil
+	end
+	local result = vim.system({ "git", "rev-parse", "--show-toplevel" }, { cwd = candidate, text = true }):wait()
+	if result.code ~= 0 then
+		return nil
+	end
+	local root = vim.uv.fs_realpath(vim.trim(result.stdout or ""))
+	return root and vim.fn.isdirectory(root) == 1 and vim.fs.normalize(root) or nil
+end
+
+function Coordinator:rebind_workflow(root)
+	local current = self:workflow()
+	if current.root == root then
+		return current
+	end
+	if active_runs(current) then
+		fail("cannot change Gator workspace while a run is active")
+	end
+	current:close()
+	self._workflow = workflow.new({ state = self:state(), extensions = self.extensions, root = root })
+	return self._workflow
+end
+
+function Coordinator:completion_workspace(opts, callback)
+	local settings = self:state().config.completion
+	local current = self:workflow()
+	local root = self:completion_root(opts.buffer)
+	if not root or root == current.root then
+		return callback(current)
+	end
+	if settings.root.apply_to == "workspace" then
+		return callback(self:rebind_workflow(root))
+	end
+	vim.ui.select({ current.root, root }, {
+		prompt = "Gator workspace",
+		format_item = function(value)
+			return value == root and value .. " · completion root" or value .. " · current Git root"
+		end,
+	}, function(choice)
+		if choice then
+			callback(choice == root and self:rebind_workflow(root) or current)
+		end
+	end)
+	return nil
+end
+
+function Coordinator:launch(opts)
+	if not M.is(self) then
+		fail("launch requires an initialized coordinator")
+	end
+	if type(opts) ~= "table" then
+		fail("launch options must be a table")
+	end
+	return self:completion_workspace(opts, function(value)
+		value:choose(opts)
+	end)
+end
+
 function Coordinator:dispose()
 	self.extensions:close()
 	if self._workflow and type(self._workflow.close) == "function" then
@@ -376,7 +451,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	opts = options(action, opts)
 	if action == "open" then
-		return self:workflow():prompt(opts)
+		return self:completion_workspace(opts, function(value)
+			value:prompt(opts)
+		end)
 	end
 	if action == "runs" then
 		return self:workflow():open_runs()

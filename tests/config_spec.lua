@@ -2,6 +2,12 @@ local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local config = require("gator.config")
 
 assert(config.resolve().schema_version == config.schema_version, "default settings must resolve to the current schema")
+assert(
+	config.resolve().completion.enabled
+		and #config.resolve().completion.sidecar.argv == 0
+		and config.resolve().completion.context.mode == "bounded",
+	"inline completion must default on without a bundled provider or broad context delivery"
+)
 assert(config.resolve().ui.icons == "unicode", "Unicode alligator glyphs must be the default UI style")
 assert(
 	config.resolve().ui.ask_selection.keymap == "<leader>gA" and config.resolve().launch.stall_after_ms == 120000,
@@ -166,6 +172,12 @@ assert(
 		and not pcall(config.resolve, { acp = { commands = { Invalid = { argv = { "agent" } } } } })
 		and not pcall(config.resolve, { budget = { action = "invalid" } }),
 	"handoff authoring settings must reject unsupported authors, bounds, and review modes"
+)
+assert(
+	not pcall(config.resolve, { completion = { sidecar = { argv = "agent" } } })
+		and not pcall(config.resolve, { completion = { context = { mode = "all" } } })
+		and not pcall(config.resolve, { completion = { root = { strategy = "custom" } } }),
+	"completion settings must reject unframed commands and unsupported privacy or root policies"
 )
 
 helpers.write(path, '{"schema_version":1,"ui":{"layout":"modal"}}')

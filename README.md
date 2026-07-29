@@ -110,6 +110,31 @@ require("gator").setup({
       max_file_chars = 65536, -- total copied-file character limit; 0 disables copies
     },
   },
+  completion = {
+    enabled = true, -- no provider runs until sidecar.argv is configured
+    sidecar = {
+      argv = { "my-completion-sidecar", "--stdio" }, -- JSON-RPC 2.0 over stdin/stdout; never a shell command
+      timeout_ms = 30000,
+      restart_backoff_ms = 1000,
+    },
+    context = {
+      mode = "bounded", -- "bounded", "buffer", or explicit opt-in "workspace"
+      before_lines = 120,
+      after_lines = 60,
+      max_bytes = 32768,
+    },
+    root = {
+      strategy = "git", -- "git", "lsp", or "markers"
+      markers = { ".git", "package.json" },
+      apply_to = "completion", -- "completion", "workspace", or "prompt"
+    },
+    ui = {
+      virtual_text = { enabled = true, priority = 65535 },
+      cmp = { enabled = false }, -- registers nvim-cmp source "gator" when nvim-cmp is present
+      blink = { enabled = false }, -- configure module = "gator.completion.blink" in blink.cmp
+      keymaps = { accept = "<Tab>", accept_word = false, accept_line = false, clear = false, next = false, prev = false },
+    },
+  },
   budget = {
     max_tokens = 0, -- 0 is unbounded; enforced only for provider-reported usage
     action = "warn", -- "warn" or "stop"
@@ -180,6 +205,14 @@ require("gator").setup({
 ```
 
 Gator vendors 169 selectable loading animations from [Rattles](https://github.com/vyfor/rattles) and [Whirly](https://github.com/janlelis/whirly); see [loading dialogs](docs/LOADING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). `ui.motion.enabled = false` or `ui.motion.reduced = true` leaves the dialog visible but static.
+
+## Inline completion
+
+`completion` is enabled by default but inactive until `completion.sidecar.argv` names a local sidecar. Gator starts one JSON-RPC 2.0 process per resolved root, sends `gator/completion` requests over JSONL, and cancels superseded requests with `$/cancelRequest`. A request contains redacted current-buffer text, UTF-8 byte cursor coordinates, a changedtick, bounded window metadata, language, and root metadata; the response must be `{"items":[{"text":"...","range":{"start":{"line":0,"byte_column":0},"end":{"line":0,"byte_column":0}}}]}`. Omit `range` to insert at the request cursor.
+
+Ghost text is the default presentation. `<Tab>` is installed only when unclaimed; every action also has an insert-mode `<Plug>` mapping: `gator-completion-accept`, `accept_word`, `accept_line`, `clear`, `next`, and `prev`. Use `:GatorCompletion enable|disable|toggle|status|restart`, `require("gator").complete()`, or `require("gator").completion_status()`. Add `completion` to `require("gator").statusline({ fields = { "active", "completion" } })` for `*`, `current/total`, or `0`.
+
+Gator never downloads a model/server, stores a token, indexes a workspace, or journals raw completion requests, responses, or sidecar stderr. `buffer` and `workspace` modes are explicit context-policy opt-ins; completion root inference does not affect Gator agent/worktree roots unless `root.apply_to` is changed.
 
 Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle split, float, and fullscreen layouts, and `r` to open the run list. After 120 seconds without a structured provider event, the chat says it is stalled and leaves `c` cancel, `q` detach, and `r` runs available; it never retries or kills the provider automatically. Terminal companions expose focus, stop, detach, runs, journal, and handoff without reading terminal output. `?` explains the selection (`:GatorAsk`) and run flows (resume, review, handoff). These mappings can be overridden through `ui.keymaps`.
 

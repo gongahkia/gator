@@ -146,7 +146,7 @@ function M.launch(opts)
 		M.setup()
 	end
 	if type(opts.objective) == "string" and vim.trim(opts.objective) ~= "" then
-		return M._coordinator:workflow():choose(opts)
+		return M._coordinator:launch(opts)
 	end
 	return M.dispatch("open", opts)
 end
