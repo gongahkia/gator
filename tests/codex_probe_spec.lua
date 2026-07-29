@@ -15,11 +15,20 @@ assert(
 )
 assert(#calls == 2 and calls[2][2] == "app-server", "Codex probe must inspect the structured app-server surface")
 local unsupported = codex.probe({
-	run = function()
-		return { code = 0, stdout = "codex-cli 1.0.0" }
+	run = function(argv)
+		if argv[2] == "--version" then
+			return { code = 0, stdout = "codex-cli 1.0.0" }
+		end
+		return { code = 0, stdout = "--listen stdio://" }
 	end,
 })
-assert(unsupported.available and not unsupported.supported, "out-of-range Codex versions must remain explicit")
+assert(
+	unsupported.available
+		and unsupported.supported
+		and not unsupported.version_verified
+		and unsupported.capabilities.rpc,
+	"newer Codex versions must launch when App Server stdio is available"
+)
 local missing = codex.probe({
 	run = function()
 		return { code = 127, stdout = "" }

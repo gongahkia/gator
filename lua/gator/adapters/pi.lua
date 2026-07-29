@@ -117,7 +117,8 @@ function M.probe(opts)
 		provider = "pi",
 		available = true,
 		version = found,
-		supported = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		version_verified = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		supported = valid,
 		capabilities = {
 			rpc = valid,
 			stdio = valid,
@@ -128,7 +129,7 @@ function M.probe(opts)
 			session_close = false,
 			tool_filters = output:find("--tools", 1, true) ~= nil and output:find("--exclude-tools", 1, true) ~= nil,
 		},
-		capability_error = valid and nil or "Pi RPC get_state is unavailable",
+		capability_error = not valid and "Pi RPC get_state is unavailable" or nil,
 	}
 end
 

@@ -292,8 +292,12 @@ function M.readiness(opts)
 					and type(auth_result.authenticated) == "boolean"
 				local auth_reason = auth_ok and auth_result.reason or "authentication-status probe failed"
 				local detected = version(result.version)
-				local capability = result.supported == false and "outside Gator's supported capability range"
+				local capability = result.supported == false
+						and (result.capability_error or "required provider capability is unavailable")
 					or "capability probe passed"
+				local verification = result.version_verified == false
+						and "; version is outside the fixture-tested range"
+					or ""
 				local user_confirmed = type(confirmations[provider.name]) == "table"
 					and confirmations[provider.name].user_confirmed == true
 				local readiness_state = auth_ok and auth_result.authenticated and "detected"
@@ -311,6 +315,7 @@ function M.readiness(opts)
 						.. " "
 						.. capability
 						.. (detected and " " .. detected or "")
+						.. verification
 						.. "; "
 						.. authentication,
 					"Use only advertised capabilities, verify provider-native login, then rerun :GatorHealth.",
@@ -428,7 +433,7 @@ function M.launch_catalog(opts)
 				end
 				if type(probe) == "table" and probe.available then
 					if probe.supported == false then
-						record.reason = "installed version is outside Gator's supported range"
+						record.reason = probe.capability_error or "native terminal protocol is unavailable"
 					else
 						for _, capability in ipairs(terminal_capabilities[provider.name]) do
 							if type(probe.capabilities) ~= "table" or probe.capabilities[capability] ~= true then

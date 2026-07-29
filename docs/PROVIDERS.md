@@ -54,4 +54,4 @@ Claude Code and OpenCode are not supported by Gator. Use their own CLIs outside 
 
 ## Version policy
 
-Fixture-tested version ranges are enforced by each adapter probe. Gator never updates a provider or requires an upgrade: keep a known-compatible local version, use terminal fallback where available, and report a regression in [GitHub Issues](https://github.com/gongahkia/gator/issues). A later Gator change may expand a supported range only with matching protocol fixtures and local verification.
+Fixture-tested version ranges are informational, not launch gates. Gator accepts any parseable provider version when its required local protocol/capability probe passes; versions outside the fixture-tested range remain visible in `:GatorHealth!` as unverified. Gator never updates a provider or requires an upgrade: if the required protocol probe fails, use the provider's own CLI and report the incompatibility in [GitHub Issues](https://github.com/gongahkia/gator/issues).

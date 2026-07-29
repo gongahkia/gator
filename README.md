@@ -175,6 +175,8 @@ Provider selection precedence is explicit command/API provider, project-local re
 
 `auto` uses a Gator chat only for documented structured transports: Pi RPC, Codex App Server, and supported ACP/managed providers. Claude Code and OpenCode are not supported by Gator; use their own CLIs outside Gator. Forcing `chat` on an unsupported provider fails explicitly.
 
+Gator does not pin users to an exact provider version: a parseable version can launch when its required local protocol probe succeeds. `:GatorHealth!` marks versions outside Gator's fixture-tested range as unverified; it does not reject them solely for that reason.
+
 ## Extensions and integrations
 
 Gator can load explicitly configured trusted Lua modules for lifecycle hooks, custom terminal or ACP adapters, UI slots, run-graph columns, and context processing. It does not scan directories or sandbox modules: an extension has normal Neovim/Lua access. The interface is intentionally unversioned, so plugin upgrades can require extension changes. See [extensions](docs/EXTENSIONS.md).

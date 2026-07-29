@@ -30,8 +30,11 @@ local unsupported = copilot.probe({
 	end,
 })
 assert(
-	unsupported.available and not unsupported.supported,
-	"unverified Copilot versions must not be treated as supported"
+	unsupported.available
+		and unsupported.supported
+		and not unsupported.version_verified
+		and unsupported.capabilities.acp,
+	"newer Copilot versions must launch when ACP is available"
 )
 local launched
 local manager = {

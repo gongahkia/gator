@@ -16,7 +16,7 @@ local catalog = health.launch_catalog({
 			return { code = 0, stdout = "Logged in" }
 		end
 		if argv[1] == "pi" and argv[2] == "--version" then
-			return { code = 0, stdout = "0.82.0" }
+			return { code = 0, stdout = "0.82.1" }
 		end
 		if argv[1] == "pi" and argv[2] == "--help" then
 			return { code = 0, stdout = "--mode rpc --session --session-id --tools --exclude-tools" }

@@ -21,6 +21,18 @@ local missing = gemini.probe({
 	end,
 })
 assert(not missing.available, "missing Gemini CLI must fail explicitly")
+local unverified = gemini.probe({
+	run = function(argv)
+		if argv[2] == "--version" then
+			return { code = 0, stdout = "0.52.0" }
+		end
+		return { code = 0, stdout = "--acp" }
+	end,
+})
+assert(
+	unverified.available and unverified.supported and not unverified.version_verified and unverified.capabilities.acp,
+	"newer Gemini versions must launch when ACP is available"
+)
 local launched
 local manager = {
 	launch = function(_, opts)

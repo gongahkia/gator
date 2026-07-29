@@ -40,6 +40,25 @@ local unavailable = pi.probe({
 	end,
 })
 assert(not unavailable.available, "missing Pi CLI must fail explicitly")
+local unverified = pi.probe({
+	cwd = vim.g.gator_test.root,
+	run = function(argv)
+		if argv[2] == "--version" then
+			return { code = 0, stdout = "0.82.1" }
+		end
+		if argv[2] == "--help" then
+			return { code = 0, stdout = "--session --session-id" }
+		end
+		return {
+			code = 0,
+			stdout = [[{"id":"gator-probe","type":"response","command":"get_state","success":true,"data":{}}]],
+		}
+	end,
+})
+assert(
+	unverified.available and unverified.supported and not unverified.version_verified and unverified.capabilities.rpc,
+	"newer Pi versions must launch when their RPC contract passes"
+)
 local unsupported = pi.probe({
 	cwd = vim.g.gator_test.root,
 	run = function(argv)
@@ -54,7 +73,7 @@ assert(
 		and not unsupported.supported
 		and not unsupported.capabilities.rpc
 		and unsupported.capability_error,
-	"unverified Pi versions and unavailable RPC profiles must remain explicit"
+	"Pi RPC contract failures must remain explicit"
 )
 local auth = pi.auth()
 assert(

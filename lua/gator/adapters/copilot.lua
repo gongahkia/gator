@@ -75,12 +75,14 @@ function M.probe(opts)
 		provider = "copilot",
 		available = true,
 		version = found,
-		supported = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		version_verified = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		supported = acp,
 		capabilities = {
 			acp = acp,
 			stdio = acp,
 			resume = output:find("--resume", 1, true) ~= nil,
 		},
+		capability_error = not acp and "Copilot ACP mode is unavailable" or nil,
 	}
 end
 

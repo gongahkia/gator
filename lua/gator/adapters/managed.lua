@@ -308,7 +308,8 @@ function M.catalog(opts)
 			if type(probe) ~= "table" or not probe.available then
 				record.reason = (type(probe) == "table" and probe.reason) or "provider probe failed"
 			elseif probe.supported == false then
-				record.reason = "installed version is outside Gator's supported range"
+				record.reason = probe.capability_error
+					or "installed CLI does not expose the required managed-session contract"
 			elseif not profile_supported(value, probe) then
 				record.reason = "installed CLI does not expose the required managed-session contract"
 			else

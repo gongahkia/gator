@@ -74,8 +74,10 @@ function M.probe(opts)
 		provider = "codex",
 		available = true,
 		version = found,
-		supported = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		version_verified = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		supported = rpc,
 		capabilities = { cli = true, rpc = rpc },
+		capability_error = not rpc and "Codex App Server stdio is unavailable" or nil,
 	}
 end
 

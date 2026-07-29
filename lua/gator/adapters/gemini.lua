@@ -56,16 +56,19 @@ function M.probe(opts)
 			and type(help.stdout) == "string"
 			and help.stdout
 		or ""
+	local acp = output:find("--acp", 1, true) ~= nil
 	return {
 		provider = "gemini",
 		available = true,
 		version = found,
-		supported = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		version_verified = compare(found, minimum) >= 0 and compare(found, maximum) <= 0,
+		supported = acp,
 		capabilities = {
-			acp = output:find("--acp", 1, true) ~= nil,
+			acp = acp,
 			structured_output = output:find("stream-json", 1, true) ~= nil,
 			sessions = output:find("--list-sessions", 1, true) ~= nil and output:find("--resume", 1, true) ~= nil,
 		},
+		capability_error = not acp and "Gemini ACP mode is unavailable" or nil,
 	}
 end
 
