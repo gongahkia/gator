@@ -165,7 +165,8 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorExportDiagnostics", function()
 		vim.schedule(function()
 			local ok, result = pcall(require("gator").export_diagnostics)
-			local message = ok and (result.state == "ready" and "Diagnostic export: " .. result.path or result.reason)
+			local message = ok
+					and (result.state == "ready" and "Diagnostics saved locally" or "Diagnostics " .. result.state .. ": " .. result.reason)
 				or require("gator.policy.redact").text(tostring(result))
 			notice.show(
 				message,
@@ -177,7 +178,8 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorBetaReadiness", function()
 		vim.schedule(function()
 			local ok, result = pcall(require("gator").verify_beta_readiness)
-			local message = ok and ("Public-beta readiness: " .. result.state .. " · " .. result.path)
+			local message = ok
+					and (result.state == "ready" and "Readiness check passed; report saved locally" or "Readiness check " .. result.state .. ": " .. result.reason)
 				or require("gator.policy.redact").text(tostring(result))
 			notice.show(
 				message,

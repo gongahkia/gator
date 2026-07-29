@@ -20,4 +20,12 @@ assert(
 	buffer and #vim.api.nvim_buf_get_lines(buffer, 0, -1, false) == 1,
 	"notices must constrain multi-line errors to one non-blocking floating line"
 )
+local window = vim.fn.win_findbuf(buffer)[1]
+local config = vim.api.nvim_win_get_config(window)
+assert(
+	vim.api.nvim_buf_get_lines(buffer, 0, -1, false)[1] == "first line second line"
+		and config.anchor == "NE"
+		and config.row[false] == 0,
+	"notices must use a titled top-right float without obscuring command entry"
+)
 assert(handle.close(), "notices must close cleanly")

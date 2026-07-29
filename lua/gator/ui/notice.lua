@@ -80,8 +80,8 @@ function M.show(message, level, opts)
 	close(current)
 	local title = opts.title or "Gator"
 	local maximum = math.max(math.min(vim.o.columns - 6, 100), 24)
-	local line = truncate(title .. ": " .. text, maximum)
-	local width = math.max(vim.fn.strdisplaywidth(line), 1)
+	local line = truncate(text, maximum)
+	local width = math.max(vim.fn.strdisplaywidth(line), vim.fn.strdisplaywidth(title), 1)
 	local buffer = vim.api.nvim_create_buf(false, true)
 	vim.bo[buffer].bufhidden, vim.bo[buffer].filetype = "wipe", "gator-notice"
 	vim.bo[buffer].modifiable = true
@@ -89,13 +89,16 @@ function M.show(message, level, opts)
 	vim.bo[buffer].modifiable = false
 	local window = vim.api.nvim_open_win(buffer, false, {
 		relative = "editor",
-		row = math.max(vim.o.lines - 3, 0),
-		col = math.max(vim.o.columns - width - 4, 0),
+		anchor = "NE",
+		row = 0,
+		col = vim.o.columns - 1,
 		width = width,
 		height = 1,
 		style = "minimal",
 		focusable = false,
 		border = "rounded",
+		title = title,
+		title_pos = "left",
 		zindex = 220,
 		noautocmd = true,
 	})
