@@ -8,7 +8,7 @@ local function fail(message)
 end
 
 local function compact(value)
-	local text = redact.text(tostring(value)):gsub("[%r\n]+", " "):gsub("%s+", " ")
+	local text = redact.text(tostring(value)):gsub("[\r\n]+", " "):gsub("%s+", " ")
 	return vim.trim(text)
 end
 

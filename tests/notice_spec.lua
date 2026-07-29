@@ -24,7 +24,7 @@ local window = vim.fn.win_findbuf(buffer)[1]
 local config = vim.api.nvim_win_get_config(window)
 local line = vim.api.nvim_buf_get_lines(buffer, 0, -1, false)[1]
 assert(
-	line:find("\n", 1, true) == nil
+	line == "first line second line"
 		and config.anchor == "NE"
 		and (config.row == 0 or config.row[false] == 0)
 		and config.title[1][1] == "Gator",
