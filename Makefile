@@ -1,4 +1,4 @@
-.PHONY: temp test fixture-test conformance-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-codex-e2e live-claude-test live-claude-e2e live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-kimi-e2e live-vibe-test live-vibe-e2e live-copilot-test live-copilot-e2e live-opencode-test live-opencode-e2e live-pi-test live-pi-e2e live-handoff-e2e indexer-test sidecar benchmark fmt format-check lint check issues
+.PHONY: temp test fixture-test conformance-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-codex-e2e live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-kimi-e2e live-vibe-test live-vibe-e2e live-copilot-test live-copilot-e2e live-pi-test live-pi-e2e live-handoff-e2e indexer-test sidecar benchmark fmt format-check lint check issues
 
 NVIM ?= nvim
 NVIM_TEST = tests/gator-test.sh
@@ -47,12 +47,6 @@ live-codex-test:
 live-codex-e2e:
 	GATOR_LIVE_CODEX=1 GATOR_LIVE_CODEX_AUTH=1 GATOR_TEST_GLOB='codex_live_spec.lua' $(NVIM_TEST)
 
-live-claude-test:
-	GATOR_LIVE_CLAUDE=1 GATOR_TEST_GLOB='claude_live_spec.lua' $(NVIM_TEST)
-
-live-claude-e2e:
-	GATOR_LIVE_CLAUDE=1 GATOR_LIVE_CLAUDE_AUTH=1 GATOR_TEST_GLOB='claude_live_spec.lua' $(NVIM_TEST)
-
 live-gemini-test:
 	GATOR_LIVE_GEMINI=1 GATOR_TEST_GLOB='gemini_live_spec.lua' $(NVIM_TEST)
 
@@ -83,12 +77,6 @@ live-copilot-test:
 live-copilot-e2e:
 	GATOR_LIVE_COPILOT=1 GATOR_LIVE_COPILOT_AUTH=1 GATOR_TEST_GLOB='copilot_live_spec.lua' $(NVIM_TEST)
 
-live-opencode-test:
-	GATOR_LIVE_OPENCODE=1 GATOR_TEST_GLOB='opencode_live_spec.lua' $(NVIM_TEST)
-
-live-opencode-e2e:
-	GATOR_LIVE_OPENCODE=1 GATOR_LIVE_OPENCODE_AUTH=1 GATOR_TEST_GLOB='opencode_live_spec.lua' $(NVIM_TEST)
-
 live-pi-test:
 	GATOR_LIVE_PI=1 GATOR_TEST_GLOB='pi_live_spec.lua' $(NVIM_TEST)
 
@@ -101,13 +89,11 @@ live-handoff-e2e:
 	$(MAKE) live-cline-e2e
 	$(MAKE) live-cursor-e2e
 	$(MAKE) live-codex-e2e
-	$(MAKE) live-claude-e2e
 	$(MAKE) live-gemini-e2e
 	$(MAKE) live-goose-e2e
 	$(MAKE) live-kimi-e2e
 	$(MAKE) live-vibe-e2e
 	$(MAKE) live-copilot-e2e
-	$(MAKE) live-opencode-e2e
 	$(MAKE) live-pi-e2e
 	GATOR_TEST_GLOB='handoff_cross_provider_spec.lua' $(NVIM_TEST)
 

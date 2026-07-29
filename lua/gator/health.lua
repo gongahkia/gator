@@ -9,12 +9,10 @@ local providers = {
 	{ name = "cline", executable = "cline", cwd = true },
 	{ name = "cursor", executable = "cursor-agent" },
 	{ name = "codex", executable = "codex" },
-	{ name = "claude", executable = "claude" },
 	{ name = "gemini", executable = "gemini" },
 	{ name = "goose", executable = "goose" },
 	{ name = "kimi", executable = "kimi" },
 	{ name = "copilot", executable = "copilot" },
-	{ name = "opencode", executable = "opencode", cwd = true },
 	{ name = "pi", executable = "pi", cwd = true },
 	{ name = "vibe", executable = "vibe" },
 }
@@ -23,11 +21,9 @@ for _, provider in ipairs(providers) do
 	provider_modules[provider.name] = "gator.adapters." .. provider.name
 end
 
-local terminal_providers = { claude = true, codex = true, opencode = true, pi = true }
+local terminal_providers = { codex = true, pi = true }
 local terminal_capabilities = {
-	claude = { "cli", "resume" },
 	codex = { "rpc" },
-	opencode = { "acp", "session_resume" },
 	pi = { "stdio", "session_create", "session_resume" },
 }
 local pi_probe_timeout_ms = 10000
@@ -260,7 +256,7 @@ function M.readiness(opts)
 				reason = "This provider does not expose a non-interactive authentication-status probe",
 			}
 		end
-		if provider.name == "codex" or provider.name == "claude" or provider.name == "opencode" then
+		if provider.name == "codex" then
 			return adapter.auth({ executable = provider.executable, run = probe_run })
 		end
 		return adapter.auth()

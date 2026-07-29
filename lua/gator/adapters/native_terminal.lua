@@ -5,7 +5,7 @@ local Bridge = {}
 
 Bridge.__index = Bridge
 
-local supported = { claude = true, codex = true, opencode = true, pi = true }
+local supported = { codex = true, pi = true }
 
 local function fail(message)
 	error("Gator native terminal bridge: " .. redact.text(tostring(message)), 3)
@@ -80,11 +80,8 @@ local function rpc_client(opts, initialized, callback)
 		sequence = sequence + 1
 		local id = sequence
 		pending[id] = done
-		local message = { id = id, method = method, params = params }
-		if opts.jsonrpc then
-			message.jsonrpc = "2.0"
-		end
-		local ok, detail = pcall(process.write, process, vim.json.encode(message) .. "\n")
+		local ok, detail =
+			pcall(process.write, process, vim.json.encode({ id = id, method = method, params = params }) .. "\n")
 		if not ok or detail == false then
 			pending[id] = nil
 			finish(nil, "provider RPC write failed")
@@ -190,14 +187,6 @@ function Bridge:start(opts, callback)
 	local provider_name = provider(opts.provider)
 	local cwd, prompt = workspace(opts.cwd), text(opts.prompt, "prompt")
 	local executable = command(self.executables, provider_name)
-	if provider_name == "claude" then
-		local id = text(self.uuid(), "generated session id")
-		callback({
-			session = { provider = "claude", id = id, owner = "provider" },
-			command = { executable, "--session-id", id, prompt },
-		})
-		return
-	end
 	if provider_name == "pi" then
 		local id = text(self.uuid(), "generated session id")
 		callback({
@@ -239,33 +228,7 @@ function Bridge:start(opts, callback)
 		)
 		return
 	end
-	rpc_client(
-		{ spawn = self.spawn, command = { executable, "acp", "--cwd", cwd }, cwd = cwd, jsonrpc = true },
-		function(request, _, finish)
-			request("initialize", {
-				protocolVersion = 1,
-				clientCapabilities = vim.empty_dict(),
-				clientInfo = { name = "gator", version = "1" },
-			}, function(_, err)
-				if err then
-					finish(nil, "OpenCode ACP initialization failed")
-					return
-				end
-				request("session/new", { cwd = cwd, mcpServers = {} }, function(result, start_err)
-					local id = result and result.sessionId
-					if start_err or type(id) ~= "string" or id == "" then
-						finish(nil, "OpenCode session creation failed")
-						return
-					end
-					finish({
-						session = { provider = "opencode", id = id, owner = "provider" },
-						command = { executable, "--session", id, "--prompt", prompt },
-					})
-				end)
-			end)
-		end,
-		callback
-	)
+	fail("provider is unavailable: " .. provider_name)
 end
 
 function Bridge:resume(opts, callback)
@@ -276,14 +239,10 @@ function Bridge:resume(opts, callback)
 	local value = session(opts.session, provider_name)
 	local executable = command(self.executables, provider_name)
 	local argv
-	if provider_name == "claude" then
-		argv = { executable, "--resume", value.id }
-	elseif provider_name == "pi" then
+	if provider_name == "pi" then
 		argv = { executable, "--session", value.id }
-	elseif provider_name == "codex" then
-		argv = { executable, "resume", value.id }
 	else
-		argv = { executable, "--session", value.id }
+		argv = { executable, "resume", value.id }
 	end
 	callback({ session = value, command = argv })
 end

@@ -19,7 +19,7 @@ local selected
 picker.open({
 	providers = {
 		contract("codex"),
-		contract("claude", { available = false, reason = "transport unavailable" }),
+		contract("aider", { available = false, reason = "transport unavailable" }),
 	},
 	on_launch = function(value)
 		selected = value

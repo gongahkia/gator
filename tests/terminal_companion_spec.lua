@@ -7,12 +7,12 @@ local terminal_window = vim.api.nvim_get_current_win()
 vim.api.nvim_buf_set_lines(0, 0, -1, false, { "provider secret transcript" })
 local window = companion.open({
 	run_id = "run-terminal-companion",
-	provider = "claude",
+	provider = "codex",
 	state = "running",
 	trust = {
 		surface = "terminal",
 		security_owner = "provider",
-		provider = "claude",
+		provider = "codex",
 		policy = { state = "provider_owned", detail = "test", mode = "provider" },
 		write = { state = "provider_owned", detail = "test", mode = "provider" },
 		network = { state = "unknown", detail = "test" },

@@ -12,7 +12,7 @@ local calls = {
 	},
 	{
 		id = "call-two",
-		provider = "claude",
+		provider = "pi",
 		session_id = "native-two",
 		name = "apply_patch",
 		arguments = '{"path":"lua/gator/init.lua"}',

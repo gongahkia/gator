@@ -3,18 +3,9 @@ local health = require("gator.health")
 local catalog = health.launch_catalog({
 	cwd = vim.g.gator_test.root,
 	executable = function(name)
-		return name == "claude" or name == "codex" or name == "opencode" or name == "pi"
+		return name == "codex" or name == "pi"
 	end,
 	run = function(argv, _, input)
-		if argv[1] == "claude" and argv[2] == "--version" then
-			return { code = 0, stdout = "2.1.119 (Claude Code)" }
-		end
-		if argv[1] == "claude" and argv[2] == "--help" then
-			return { code = 0, stdout = "--resume" }
-		end
-		if argv[1] == "claude" and argv[2] == "auth" then
-			return { code = 0, stdout = [[{"loggedIn":true}]] }
-		end
 		if argv[1] == "codex" and argv[2] == "--version" then
 			return { code = 0, stdout = "codex-cli 0.145.0" }
 		end
@@ -23,19 +14,6 @@ local catalog = health.launch_catalog({
 		end
 		if argv[1] == "codex" and argv[2] == "login" then
 			return { code = 0, stdout = "Logged in" }
-		end
-		if argv[1] == "opencode" and argv[2] == "--version" then
-			return { code = 0, stdout = "1.18.0" }
-		end
-		if argv[1] == "opencode" and argv[2] == "acp" then
-			assert(input:find('"jsonrpc":"2.0"', 1, true), "OpenCode catalog must use JSON-RPC ACP initialization")
-			return {
-				code = 0,
-				stdout = [[{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{"sessionCapabilities":{"resume":{}}}}}]],
-			}
-		end
-		if argv[1] == "opencode" and argv[2] == "providers" then
-			return { code = 0, stdout = "1 credential" }
 		end
 		if argv[1] == "pi" and argv[2] == "--version" then
 			return { code = 0, stdout = "0.82.0" }
@@ -59,8 +37,8 @@ for _, record in ipairs(catalog) do
 	ready[record.provider] = record.available
 end
 assert(
-	ready.claude and ready.codex and ready.opencode and ready.pi,
-	"native launch catalog must expose verified providers and explicitly user-confirmed Pi"
+	ready.codex and ready.pi and ready.claude == nil and ready.opencode == nil,
+	"native launch catalog must expose only supported native terminal providers"
 )
 local unconfirmed = health.launch_catalog({
 	cwd = vim.g.gator_test.root,

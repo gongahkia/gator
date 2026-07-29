@@ -1,6 +1,0 @@
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"opencode-fixture","update":{"sessionUpdate":"agent_message_chunk","messageId":"message-fixture","content":{"type":"text","text":"gator-fixture"}}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"opencode-fixture","update":{"sessionUpdate":"agent_thought_chunk","messageId":"message-fixture","content":{"type":"text","text":"reasoning"}}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"opencode-fixture","update":{"sessionUpdate":"tool_call","toolCallId":"tool-fixture","title":"write","kind":"edit","status":"pending","rawInput":{"filePath":"lua/gator/init.lua","content":"fixture","token":"fixture-secret"}}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"opencode-fixture","update":{"sessionUpdate":"tool_call_update","toolCallId":"tool-fixture","status":"completed","rawOutput":{"output":"done","token":"fixture-secret"}}}}
-{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"opencode-fixture","update":{"sessionUpdate":"usage_update","used":3,"size":10,"cost":{"amount":0.01,"currency":"USD"}}}}
-{"jsonrpc":"2.0","id":4,"error":{"code":-32603,"message":"token=fixture-secret"}}

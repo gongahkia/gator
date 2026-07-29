@@ -6,7 +6,7 @@ local function message(id, sequence, event_type, payload)
 		schema_version = event.schema_version,
 		id = id,
 		run_id = "run-event-details",
-		provider = { name = "opencode", session_id = "native-event-details" },
+		provider = { name = "codex", session_id = "native-event-details" },
 		sequence = sequence,
 		type = event_type,
 		at = sequence,
@@ -28,8 +28,8 @@ local window = details.open({
 assert(vim.api.nvim_win_is_valid(window), "event detail opening must create a window")
 local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
 assert(
-	content:find("Message delta · opencode · session: native-event-details", 1, true)
-		and content:find("Reasoning summary · opencode · session: native-event-details", 1, true)
+	content:find("Message delta · codex · session: native-event-details", 1, true)
+		and content:find("Reasoning summary · codex · session: native-event-details", 1, true)
 		and not content:find("fixture-secret", 1, true),
 	"event details must render redacted message and reasoning summaries with provider-owned session references"
 )

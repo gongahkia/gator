@@ -2,7 +2,7 @@
 
 Gator is a Neovim plugin for launching local coding-agent CLIs with editor context, then retaining a local run graph for focus, handoff, review, and parallel worktrees.
 
-It does not replace Codex, Pi, Claude, ACP agents, or their harnesses. Providers retain authentication, model choice, tools, permissions, compaction, and sessions. Gator records only runs it starts.
+It does not replace Codex, Pi, ACP agents, or their harnesses. Providers retain authentication, model choice, tools, permissions, compaction, and sessions. Gator records only runs it starts.
 
 ## The normal flow
 
@@ -171,7 +171,7 @@ Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle spli
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 
-`auto` uses a Gator chat only for documented structured transports: Pi RPC, Codex App Server, and supported ACP/managed providers. Claude and unsupported/terminal-only providers retain their native Neovim terminal. Forcing `chat` on an unsupported provider fails explicitly.
+`auto` uses a Gator chat only for documented structured transports: Pi RPC, Codex App Server, and supported ACP/managed providers. Claude Code and OpenCode are not supported by Gator; use their own CLIs outside Gator. Forcing `chat` on an unsupported provider fails explicitly.
 
 ## Extensions and integrations
 

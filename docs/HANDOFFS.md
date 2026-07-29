@@ -1,6 +1,6 @@
 # Handoffs
 
-Gator creates a new target-provider session for every handoff. It transfers a reviewed, local Gator artifact rather than claiming an opaque Claude, Codex, Pi, or ACP session can be migrated across providers.
+Gator creates a new target-provider session for every handoff. It transfers a reviewed, local Gator artifact rather than claiming an opaque Codex, Pi, or ACP session can be migrated across providers.
 
 The review includes the target transport/workspace, context byte count, original context bundle, Gator-owned chat transcript when available, a live source-workspace diff, and an immutable file-snapshot manifest. The manifest records the source base SHA, staged/unstaged state, add/modify/delete/rename/mode metadata, content hashes, exclusions, target conflicts, and per-conflict decisions. Included changed text files are copied to the target workspace at:
 

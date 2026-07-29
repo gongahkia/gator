@@ -17,7 +17,7 @@ local value = monitor.inspect({
 	end,
 	agents = {
 		{ id = "agent-live", provider = "codex", session_id = "native-one", pid = 10, state = "running" },
-		{ id = "agent-detached", provider = "claude", session_id = "native-two", pid = 20, state = "running" },
+		{ id = "agent-detached", provider = "pi", session_id = "native-two", pid = 20, state = "running" },
 		{ id = "agent-finished", provider = "gemini", session_id = "native-three", pid = 30, state = "completed" },
 	},
 })

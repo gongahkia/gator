@@ -71,26 +71,6 @@ assert(
 	"Codex signal fixture must preserve usage, patch, and compaction notifications"
 )
 
-local claude = {}
-assert(fixtures.replay_jsonl(root .. "/claude_stream.jsonl", function(record)
-	table.insert(claude, record)
-end) == 3, "Claude stream fixture must replay every record")
-assert(
-	claude[1].session_id == "claude-fixture" and claude[3].subtype == "success",
-	"Claude fixture must preserve structured session and completion data"
-)
-
-local claude_signals = {}
-assert(fixtures.replay_jsonl(root .. "/claude_signals.jsonl", function(record)
-	table.insert(claude_signals, record)
-end) == 3, "Claude signal fixture must replay every record")
-assert(
-	claude_signals[1].usage.input_tokens == 2
-		and claude_signals[2].files[1].filename == "lua/gator/init.lua"
-		and claude_signals[3].compact_metadata.pre_tokens == 5,
-	"Claude signal fixture must preserve usage, persisted-file, and compaction records"
-)
-
 local gemini = {}
 assert(fixtures.replay_jsonl(root .. "/gemini_stream.jsonl", function(record)
 	table.insert(gemini, record)
@@ -142,34 +122,6 @@ assert(
 		and cursor[5].tool_call.readToolCall.result.success.totalLines == 1
 		and cursor[6].subtype == "success",
 	"Cursor fixture must preserve documented stream session, tool, and completion records"
-)
-
-local opencode = {}
-assert(fixtures.replay_jsonrpc(root .. "/opencode_acp.jsonl", function(message)
-	table.insert(opencode, message)
-end) == 8, "OpenCode ACP fixture must replay every record")
-assert(
-	opencode[2].result.agentCapabilities.loadSession
-		and opencode[2].result.agentCapabilities.sessionCapabilities.resume ~= nil
-		and opencode[4].result.sessionId == "opencode-fixture"
-		and opencode[5].params.update.availableCommands[1].name == "help"
-		and opencode[6].method == "session/cancel"
-		and opencode[6].params.sessionId == "opencode-fixture"
-		and opencode[8].error.code == -32602
-		and opencode[8].error.data.sessionId == "opencode-missing",
-	"OpenCode fixture must preserve ACP capabilities, sessions, cancellation, and safe failures"
-)
-
-local opencode_stream = {}
-assert(fixtures.replay_jsonrpc(root .. "/opencode_stream.jsonl", function(message)
-	table.insert(opencode_stream, message)
-end) == 6, "OpenCode stream fixture must replay every record")
-assert(
-	opencode_stream[1].params.update.sessionUpdate == "agent_message_chunk"
-		and opencode_stream[3].params.update.toolCallId == "tool-fixture"
-		and opencode_stream[5].params.update.used == 3
-		and opencode_stream[6].error.code == -32603,
-	"OpenCode stream fixture must preserve message, tool, usage, and failure updates"
 )
 
 local pi = {}

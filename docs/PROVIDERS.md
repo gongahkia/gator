@@ -6,8 +6,6 @@ Gator selects only adapters that pass their local executable/version/capability 
 | --- | --- | --- |
 | Pi | Gator chat through `pi --mode rpc` | Gator records Pi's session ID/path and exact session usage. Same-provider resume/fork requires Pi confirmation; cross-provider handoff starts a new session. |
 | Codex | Gator chat through App Server when the tested protocol contract is available | Gator records the App Server thread. Same-provider `thread/resume`/`thread/fork` requires the returned thread identity to match; terminal fallback uses Codex's provider-owned resume flow. |
-| Claude Code | Native Neovim terminal | Gator does not treat headless streaming as a durable interactive chat contract. |
-| OpenCode | Native Neovim terminal | Gator records the provider session created by its bridge. |
 | Aider, Amp, Cline, Copilot, Cursor, Gemini, Goose, Kimi, Vibe | Managed/ACP chat only when each installed adapter advertises the required contract | Capability and resume behavior remain adapter-specific; Gator presents provider approval requests interactively where ACP emits them. |
 
 Gator never scrapes a terminal to fabricate chat history. A terminal-originated run opens a separate Gator companion split with focus, stop, detach, run-list, journal, and handoff controls; prompts and output remain in the provider terminal. A terminal run can still hand off its objective, captured source, current diff, bounded changed-text-file snapshots, and an editable note, but is explicitly marked `transcript unavailable`. Cross-provider handoff creates a new provider session and materializes Gator-owned files under `.gator/handoffs/<bundle-id>/files/`; it does not claim to migrate opaque provider state.
@@ -49,6 +47,10 @@ require("gator").setup({
 ```
 
 Set that only after configuring Pi's own local provider credentials.
+
+## Unsupported providers
+
+Claude Code and OpenCode are not supported by Gator. Use their own CLIs outside Gator.
 
 ## Version policy
 

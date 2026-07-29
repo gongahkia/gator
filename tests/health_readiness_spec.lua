@@ -25,7 +25,7 @@ for _, record in ipairs(records) do
 	seen[record.component] = record
 end
 assert(
-	seen["adapter.codex"].level == "ok" and seen["adapter.claude"].level == "warn",
+	seen["adapter.codex"].level == "ok" and seen["adapter.aider"].level == "warn",
 	"health readiness must report every adapter with bounded capability probes"
 )
 assert(

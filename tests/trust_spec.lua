@@ -25,7 +25,7 @@ assert(
 	"a tracked read-only project policy must override the configured Codex default"
 )
 
-local terminal = trust.resolve({ provider = "claude", transport = "terminal", config = settings })
+local terminal = trust.resolve({ provider = "codex", transport = "terminal", config = settings })
 assert(
 	terminal.write.state == "provider_owned"
 		and terminal.network.state == "provider_owned"
@@ -52,7 +52,7 @@ assert(not pcall(trust.resolve, {
 	project_policy = { available = true, policy = { rules = { write_allowed = false } } },
 }), "a read-only project policy must reject structured providers Gator cannot constrain")
 assert(not pcall(trust.resolve, {
-	provider = "claude",
+	provider = "codex",
 	transport = "terminal",
 	config = settings,
 	project_policy = { available = true, policy = { rules = { write_allowed = false } } },

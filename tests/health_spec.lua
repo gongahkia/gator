@@ -36,7 +36,7 @@ local original_readiness = health.readiness
 health.readiness = function()
 	return {
 		{ component = "adapter.codex", level = "ok", message = "Codex is ready" },
-		{ component = "adapter.claude", level = "warn", message = "Claude needs login", repair = "log in" },
+		{ component = "adapter.aider", level = "warn", message = "Aider needs setup", repair = "set up Aider" },
 		{ component = "git", level = "ok", message = "Git is ready" },
 	}
 end
@@ -54,8 +54,8 @@ end
 local compact_text = table.concat(compact_output, "\n")
 assert(
 	compact_text:find("Ready now: codex", 1, true)
-		and compact_text:find("1 adapter(s) need setup or verification: claude", 1, true)
-		and not compact_text:find("Claude needs login", 1, true),
+		and compact_text:find("1 adapter(s) need setup or verification: aider", 1, true)
+		and not compact_text:find("Aider needs setup", 1, true),
 	"compact health must lead with ready agents and collapse optional adapter warnings"
 )
 
@@ -67,7 +67,7 @@ for _, method in ipairs({ "start", "ok", "warn", "error" }) do
 end
 health.run(reporter, { verbose = true })
 assert(
-	table.concat(verbose, "\n"):find("Claude needs login", 1, true),
+	table.concat(verbose, "\n"):find("Aider needs setup", 1, true),
 	"verbose health must retain individual provider diagnostics"
 )
 health.readiness = original_readiness

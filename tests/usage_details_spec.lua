@@ -4,7 +4,7 @@ local usage = require("gator").module("core").usage_event
 local usage_event = usage.usage({
 	id = "event-usage-detail",
 	run_id = "run-usage-detail",
-	provider = { name = "claude", session_id = "native-usage-detail" },
+	provider = { name = "codex", session_id = "native-usage-detail" },
 	sequence = 1,
 	at = 1,
 	input_tokens = 12,
@@ -14,7 +14,7 @@ local usage_event = usage.usage({
 local compaction = usage.compaction({
 	id = "event-compaction-detail",
 	run_id = "run-usage-detail",
-	provider = { name = "claude", session_id = "native-usage-detail" },
+	provider = { name = "codex", session_id = "native-usage-detail" },
 	sequence = 2,
 	at = 2,
 	before_tokens = 100,
@@ -31,8 +31,8 @@ local window = details.open({
 assert(vim.api.nvim_win_is_valid(window), "usage detail opening must create a window")
 local content = table.concat(vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(window), 0, -1, false), "\n")
 assert(
-	content:find("Usage · claude · session: native-usage-detail · input: 12 · output: 5 · total: 17", 1, true)
-		and content:find("Context compacted · claude · session: native-usage-detail · 100 → 60", 1, true)
+	content:find("Usage · codex · session: native-usage-detail · input: 12 · output: 5 · total: 17", 1, true)
+		and content:find("Context compacted · codex · session: native-usage-detail · 100 → 60", 1, true)
 		and not content:find("fixture-secret", 1, true),
 	"usage details must render redacted usage and compaction state with provider-native session references"
 )
