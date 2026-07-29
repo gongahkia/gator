@@ -11,6 +11,7 @@ local M = {
 	event_details = require("gator.ui.event_details"),
 	glyphs = require("gator.ui.glyphs"),
 	markdown = require("gator.ui.markdown"),
+	motion = require("gator.ui.motion"),
 	loading = require("gator.ui.loading"),
 	picker = require("gator.ui.picker"),
 	provider_picker = require("gator.ui.provider_picker"),

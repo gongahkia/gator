@@ -99,11 +99,33 @@ local function render(panel)
 		return false
 	end
 	local label = panel.run_id and "active run" or "workspace"
-	local header = "Gator workspace · " .. panel.provider .. " · " .. label .. " · " .. run_state.summary(panel.state)
+	local header = "Gator workspace · "
+		.. panel.provider
+		.. " · "
+		.. label
+		.. " · "
+		.. run_state.summary(panel.state)
 	if panel.state == "running" then
 		header = header .. " · " .. (panel.phase or "working") .. " · " .. (elapsed(panel) or "0:00")
 	end
 	local lines = { header, "Status: " .. run_state.detail(panel.state), "" }
+	if type(panel.controls) == "table" then
+		local controls = {}
+		for name, enabled in pairs(panel.controls) do
+			if enabled == true then
+				table.insert(controls, name)
+			end
+		end
+		table.sort(controls)
+		if #controls > 0 then
+			table.insert(lines, "Provider capabilities: " .. table.concat(controls, ", "))
+			table.insert(lines, "")
+		end
+	end
+	if panel.stalled then
+		table.insert(lines, "Provider appears stalled · c cancel · q detach · r runs")
+		table.insert(lines, "")
+	end
 	if settings.panels.context then
 		table.insert(lines, "## Context")
 		local context = panel.context or {}
@@ -134,14 +156,18 @@ local function render(panel)
 			table.insert(lines, "- none")
 		else
 			for index, value in ipairs(panel.approvals) do
-				local suffix = value.diff and " · diff ready" or (value.kind == "edit" and " · diff unavailable" or "")
+				local suffix = value.diff and " · diff ready"
+					or (value.kind == "edit" and " · diff unavailable" or "")
 				table.insert(lines, string.format("%d. %s%s", index, value.action, suffix))
 				table.insert(lines, "   " .. details(value.details))
 			end
 		end
 		table.insert(lines, "")
 	end
-	table.insert(lines, "i prompt · p image · 1-9 decide approval · d remove context · o rotate · c cancel · q detach · r runs")
+	table.insert(
+		lines,
+		"i prompt · p image · 1-9 decide approval · d remove context · o rotate · c cancel · q detach · r runs"
+	)
 	accessibility.render(panel.buffer, lines, "gator-workspace")
 	return true
 end
@@ -212,12 +238,17 @@ local function bind(panel)
 		render(panel)
 	end, { buffer = buffer, silent = true, desc = "Gator workspace remove context" })
 	vim.keymap.set("n", "p", function()
-		local image, reason = attachments.capture({ run_id = panel.run_id, enabled = settings.images.enabled })
-		if image then
+		if not settings.images.enabled then
+			panel.notice = "image attachments are disabled"
+			render(panel)
+			return
+		end
+		local ok, image, reason = pcall(attachments.capture, { run_id = panel.run_id, enabled = true })
+		if ok and image then
 			table.insert(panel.context.images, vim.fn.fnamemodify(image.path, ":t"))
 			panel.attachments[#panel.attachments + 1] = image
 		else
-			panel.notice = reason
+			panel.notice = reason or redact.text(tostring(image))
 		end
 		render(panel)
 	end, { buffer = buffer, silent = true, desc = "Gator workspace paste image" })
@@ -266,7 +297,8 @@ function M.open(opts)
 		end
 	end
 	panel.history = vim.deepcopy(opts.history or panel.history or {})
-	panel.context = vim.deepcopy(opts.context or panel.context or { files = {}, selections = {}, diagnostics = {}, images = {} })
+	panel.context =
+		vim.deepcopy(opts.context or panel.context or { files = {}, selections = {}, diagnostics = {}, images = {} })
 	for _, name in ipairs({ "files", "selections", "diagnostics", "images" }) do
 		panel.context[name] = panel.context[name] or {}
 	end

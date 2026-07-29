@@ -46,7 +46,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 1. In the target Git checkout, open the relevant source file or visually select code.
 2. Run `:GatorHealth`. Its first section lists agents ready now; warnings for other providers are collapsed because they are informational unless you plan to use them. Use `:GatorHealth!` for individual provider diagnostics.
 3. Run `:Gator codex`, enter a concise objective, and wait for the chat pane. A startup error closes the spinner and marks the run failed instead of leaving it pending.
-4. In the chat, `i` sends a follow-up prompt once the agent is ready, `c` cancels the current turn, and `q` detaches without stopping the provider. Markdown is display-formatted; the local transcript retains the provider text for handoff.
+4. In the run workspace, `i` opens a follow-up composer, `c` cancels the current turn, `q` detaches without stopping the provider, and `o` rotates right/bottom/left. It shows removable file/selection/diagnostic context, activity, and queued governed approvals; the local transcript remains available for handoff.
 5. In Visual mode, press `<leader>gA` to choose a ready chat, ask one question, and send the selected lines and question as one turn. It will not steer a response already in progress; `:'<,'>GatorAsk` remains available without the mapping.
 6. Run `:GatorRuns` to find detached runs. Press `<CR>` to focus one or run `:GatorStopSession [run-id]` to terminate Gator's local process.
 
@@ -56,6 +56,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 | --- | --- |
 | `:Gator [provider]` | Capture the visual range/current buffer and launch. |
 | `:GatorRuns` | Open the local run graph. |
+| `:GatorWorkspace <run-id>` | Attach that run's workspace to the current tab; moving it does not stop the run. |
 | `:GatorEvents <run-id>` | Inspect Gator's append-only metadata journal for a run. |
 | `:GatorHandoff <run-id> [provider]` | Review a bundle and create a new target-provider session. |
 | `:[range]GatorSend [run-id] [selection\|diagnostic\|hunk\|bundle] [bundle-id]` | Send provenance-labelled editor context to an active structured chat. |
@@ -98,6 +99,7 @@ require("gator").setup({
     codex = { sandbox = "workspace_write" }, -- or "read_only"; sent to Codex App Server
   },
   context = {
+	images = { enabled = true }, -- stores clipboard images in private per-run state on supported platforms
     references = {
       roots = { "/path/to/skills" }, -- global <root>/<name>/SKILL.md directories
       max_files = 12,
@@ -172,6 +174,14 @@ require("gator").setup({
     pi = { user_confirmed = true }, -- only after Pi is configured locally
   },
   ui = {
+	workspace = {
+	  position = "right", -- "right", "bottom", or "left"
+	  width = 40,
+	  height = 18,
+	  rotation = { "right", "bottom", "left" },
+	  panels = { context = true, activity = true, approvals = true },
+	},
+	approvals = { scope = "all" }, -- "all", "writes", or "edits"
     composer = { enabled = true }, -- false uses vim.ui.input without #/@ completion
     icons = "ascii", -- "unicode", "nerd_font", "ascii", or "none"
     resources = {
@@ -219,11 +229,11 @@ Ghost text is the default presentation. `<Tab>` is installed only when unclaimed
 
 Gator never downloads a model/server, stores a token, indexes a workspace, or journals raw completion requests, responses, or sidecar stderr. `buffer` and `workspace` modes are explicit context-policy opt-ins; completion root inference does not affect Gator agent/worktree roots unless `root.apply_to` is changed.
 
-Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle split, float, and fullscreen layouts, and `r` to open the run list. After 120 seconds without a structured provider event, the chat says it is stalled and leaves `c` cancel, `q` detach, and `r` runs available; it never retries or kills the provider automatically. Terminal companions expose focus, stop, detach, runs, journal, and handoff without reading terminal output. `?` explains the selection (`:GatorAsk`) and run flows (resume, review, handoff). These mappings can be overridden through `ui.keymaps`.
+Run workspaces are run-owned rather than tab-owned: opening `:GatorWorkspace <run-id>` elsewhere moves the editable workspace without interrupting provider work. `o` rotates its right/bottom/left layout; `i` opens the existing `#`/`@` composer; `d` removes the most recent context item; `1`–`9` approve queued governed actions. A provider action with no deterministic patch is labelled `diff unavailable` rather than presented as a pre-write diff. After 120 seconds without a structured provider event, the workspace says it is stalled and leaves `c` cancel, `q` detach, and `r` runs available; it never retries or kills the provider automatically.
 
 Interactive Gator prompts use a native composer: type `#name` to attach a configured `<root>/<name>/SKILL.md`, or `@path` to attach a Git-tracked workspace file. Gator snapshots and redacts selected reference content before delivery; `:Gator` and chat follow-ups retain the existing context preflight behavior. A project may add roots inside its Git workspace through `.gator/references.json`, for example `{"roots":[".agents/skills"]}`. Global roots may be external user-owned directories.
 
-In Visual mode, `<leader>gE` opens a selection-edit composer. Gator reuses the sole ready same-workspace structured chat when possible; otherwise choose an eligible chat or create a dedicated edit run. The provider must return exactly one `<gator-replacement>` payload. Gator previews the diff, rejects a stale selection, applies one undoable buffer edit only after confirmation, then follows `edits.save`. Existing provider permissions remain unchanged.
+In Visual mode, `<leader>gE` opens a selection-edit composer. Gator reuses the sole ready same-workspace structured chat when possible; otherwise choose an eligible chat or create a dedicated edit run. The provider must return exactly one `<gator-replacement>` payload. Gator previews the diff, rejects a stale selection, applies one undoable buffer edit only after confirmation, then follows `edits.save`. Provider approvals enter the workspace queue by default; `ui.approvals.scope` may narrow that queue without bypassing provider or Gator policy.
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 

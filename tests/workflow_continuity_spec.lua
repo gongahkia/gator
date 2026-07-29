@@ -1,5 +1,5 @@
 local config = require("gator.config")
-local conversation = require("gator.ui.conversation")
+local conversation = require("gator.ui.workspace")
 local state = require("gator.state")
 local workflow = require("gator.workflow")
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
@@ -70,4 +70,4 @@ assert(
 	content:find("Original question", 1, true) and content:find("Original answer", 1, true),
 	"resumed chats must show their persisted Gator transcript"
 )
-assert(conversation.close(), "continuity chat must remain ephemeral")
+assert(conversation.close(), "continuity workspace must close cleanly")

@@ -95,7 +95,14 @@ assert(
 	"context send must succeed"
 )
 events = value:events(run.id)
-local prepared = events[#events - 1]
+local prepared, delivered
+for index = #events, 1, -1 do
+	if events[index].type == "context.sent" and not delivered then
+		delivered = events[index]
+	elseif events[index].type == "context.prepared" and not prepared then
+		prepared = events[index]
+	end
+end
 local delivered_resources = value:run(run.id).resources
 assert(
 	#sent == 1
@@ -103,7 +110,7 @@ assert(
 		and prepared.payload.purpose == "send"
 		and prepared.payload.artifacts[1].first_line == 1
 		and delivered_resources.context_sends == 2
-		and delivered_resources.context_bytes == initial_resources.context_bytes + events[#events].payload.bytes,
+		and delivered_resources.context_bytes == initial_resources.context_bytes + delivered.payload.bytes,
 	"follow-up context must be logged and counted separately before it is sent"
 )
-assert(require("gator.ui.conversation").close(), "test chat panel must remain ephemeral")
+assert(require("gator.ui.workspace").close(), "test workspace must close cleanly")

@@ -940,22 +940,25 @@ end
 
 function Workflow:startup_retention()
 	if self.retention_started or not self.state.config.retention.cleanup_on_start then
-		return { artifacts = {}, worktrees = {} }
+		return { artifacts = {}, worktrees = {}, attachments = 0 }
 	end
 	self.retention_started = true
 	local value = self:retention_plan({ quota = false })
 	local ok, result = pcall(self.apply_retention_plan, self, value)
 	if not ok then
 		notice.show("Gator startup cleanup: " .. tostring(result), vim.log.levels.WARN)
-		return { artifacts = {}, worktrees = {} }
+		return { artifacts = {}, worktrees = {}, attachments = 0 }
 	end
-	if #result.artifacts > 0 or #result.worktrees > 0 then
+	result.attachments = require("gator.context.images").prune(self.state.config.retention.max_age_days, self.clock())
+	if #result.artifacts > 0 or #result.worktrees > 0 or result.attachments > 0 then
 		notice.show(
 			"Gator startup cleanup: removed "
 				.. #result.artifacts
 				.. " artifacts and "
 				.. #result.worktrees
-				.. " clean worktrees",
+				.. " clean worktrees and "
+				.. result.attachments
+				.. " image attachments",
 			vim.log.levels.INFO
 		)
 	end
@@ -1410,13 +1413,16 @@ function Workflow:request_approval(run, request, decide)
 		self:journal(run.id, "approval.decided", { action = action, decision = value, kind = kind })
 	end
 	self:journal(run.id, "approval.requested", { action = action, kind = kind, provider = run.provider })
-	if queued and conversation.request_approval(run.id, {
-		action = action,
-		kind = kind,
-		details = request.details or request.command or "no additional detail",
-		diff = request.diff,
-		on_decide = resolved,
-	}) then
+	if
+		queued
+		and conversation.request_approval(run.id, {
+			action = action,
+			kind = kind,
+			details = request.details or request.command or "no additional detail",
+			diff = request.diff,
+			on_decide = resolved,
+		})
+	then
 		return true
 	end
 	vim.ui.select({ "Approve once", "Deny", "Cancel" }, {

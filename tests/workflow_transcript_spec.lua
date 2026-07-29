@@ -66,4 +66,4 @@ assert(
 	value:transcript(value:run(run.id)) == "## assistant\nI'll inspect this",
 	"rehydrated transcript appends must preserve prior output"
 )
-assert(require("gator.ui.conversation").close(), "test chat panel must remain ephemeral")
+assert(require("gator.ui.workspace").close(), "test workspace must close cleanly")

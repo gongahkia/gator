@@ -1,7 +1,7 @@
 local accessibility = require("gator.ui.accessibility")
 local capture = require("gator.context.capture")
 local config = require("gator.config")
-local conversation = require("gator.ui.conversation")
+local conversation = require("gator.ui.workspace")
 local helpers = dofile(vim.g.gator_test.root .. "/tests/helpers.lua")
 local state = require("gator.state")
 local workflow = require("gator.workflow")
@@ -100,4 +100,4 @@ assert(
 	seen["provider.stalled"] and seen["provider.recovered"],
 	"stall transitions must be journalled without provider output"
 )
-assert(conversation.close(), "stall test chat must remain ephemeral")
+assert(conversation.close(), "stall workspace must close cleanly")

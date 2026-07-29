@@ -28,7 +28,7 @@ assert(
 )
 local buffer = vim.api.nvim_win_get_buf(value.window)
 assert(
-	vim.bo[buffer].filetype == "gator-text"
+	(vim.bo[buffer].filetype == "gator-text" or vim.bo[buffer].filetype == "gator-escalation")
 		and not vim.bo[buffer].modifiable
 		and vim.api.nvim_buf_call(buffer, function()
 			return vim.fn.maparg("?", "n", false, true).buffer == 1

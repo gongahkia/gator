@@ -64,4 +64,42 @@ function M.remove_run(value)
 	return true
 end
 
+function M.prune(max_age_days, current)
+	if type(max_age_days) ~= "number" or max_age_days < 0 or max_age_days % 1 ~= 0 then
+		fail("max age days must be a non-negative integer")
+	end
+	if max_age_days == 0 then
+		return 0
+	end
+	current = current or os.time()
+	if type(current) ~= "number" or current < 0 or current % 1 ~= 0 then
+		fail("current time must be a non-negative integer")
+	end
+	local root = vim.fn.stdpath("state") .. "/gator/attachments"
+	local removed = 0
+	local function scan(path)
+		local handle = vim.uv.fs_scandir(path)
+		if not handle then
+			return
+		end
+		while true do
+			local name, kind = vim.uv.fs_scandir_next(handle)
+			if not name then
+				break
+			end
+			local child = path .. "/" .. name
+			if kind == "directory" then
+				scan(child)
+			elseif kind == "file" then
+				local stat = vim.uv.fs_lstat(child)
+				if stat and current - stat.mtime.sec >= max_age_days * 24 * 60 * 60 and vim.uv.fs_unlink(child) then
+					removed = removed + 1
+				end
+			end
+		end
+	end
+	scan(root)
+	return removed
+end
+
 return M

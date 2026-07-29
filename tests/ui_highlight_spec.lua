@@ -1,5 +1,6 @@
 local accessibility = require("gator.ui.accessibility")
 
+accessibility.configure({ keymaps = {}, screen_reader = true, icons = "unicode" })
 local buffer = vim.api.nvim_create_buf(false, true)
 accessibility.render(buffer, {
 	"Gator workspace",

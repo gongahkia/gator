@@ -447,11 +447,19 @@ local function settings(value)
 		fail("ui.workspace.position must be right, left, or bottom")
 	end
 	for _, field in ipairs({ "width", "height" }) do
-		if type(value.ui.workspace[field]) ~= "number" or value.ui.workspace[field] % 1 ~= 0 or value.ui.workspace[field] < 6 then
+		if
+			type(value.ui.workspace[field]) ~= "number"
+			or value.ui.workspace[field] % 1 ~= 0
+			or value.ui.workspace[field] < 6
+		then
 			fail("ui.workspace." .. field .. " must be an integer of at least 6")
 		end
 	end
-	if type(value.ui.workspace.rotation) ~= "table" or not vim.islist(value.ui.workspace.rotation) or #value.ui.workspace.rotation == 0 then
+	if
+		type(value.ui.workspace.rotation) ~= "table"
+		or not vim.islist(value.ui.workspace.rotation)
+		or #value.ui.workspace.rotation == 0
+	then
 		fail("ui.workspace.rotation must be a non-empty array")
 	end
 	local workspace_positions = {}
@@ -461,7 +469,11 @@ local function settings(value)
 		end
 		workspace_positions[position] = true
 	end
-	fields(value.ui.workspace.panels, { context = true, activity = true, approvals = true }, "settings.ui.workspace.panels")
+	fields(
+		value.ui.workspace.panels,
+		{ context = true, activity = true, approvals = true },
+		"settings.ui.workspace.panels"
+	)
 	for _, name in ipairs({ "context", "activity", "approvals" }) do
 		if type(value.ui.workspace.panels[name]) ~= "boolean" then
 			fail("ui.workspace.panels." .. name .. " must be boolean")
