@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 16
+M.schema_version = 17
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -14,6 +14,14 @@ M.defaults = {
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
 		chat = { layout = "split", height = 18, width = 0 },
+		workspace = {
+			position = "right",
+			width = 40,
+			height = 18,
+			rotation = { "right", "bottom", "left" },
+			panels = { context = true, activity = true, approvals = true },
+		},
+		approvals = { scope = "all" },
 		composer = { enabled = true },
 		ask_selection = { keymap = "<leader>gA" },
 		edit_selection = { keymap = "<leader>gE" },
@@ -32,6 +40,7 @@ M.defaults = {
 		mode = "manual",
 		trust = "provenance",
 		preflight = { confirm = false },
+		images = { enabled = true },
 		references = { roots = {}, max_files = 12, max_file_bytes = 32768, max_total_bytes = 131072 },
 		handoff = {
 			author = "user",
@@ -256,7 +265,7 @@ local function settings(value)
 	end
 	fields(
 		value.context,
-		{ mode = true, trust = true, preflight = true, references = true, handoff = true },
+		{ mode = true, trust = true, preflight = true, images = true, references = true, handoff = true },
 		"settings.context"
 	)
 	fields(
@@ -427,6 +436,39 @@ local function settings(value)
 	then
 		fail("ui.chat.width must be 0 or an integer of at least 20")
 	end
+	fields(
+		value.ui.workspace,
+		{ position = true, width = true, height = true, rotation = true, panels = true },
+		"settings.ui.workspace"
+	)
+	if not vim.tbl_contains({ "right", "left", "bottom" }, value.ui.workspace.position) then
+		fail("ui.workspace.position must be right, left, or bottom")
+	end
+	for _, field in ipairs({ "width", "height" }) do
+		if type(value.ui.workspace[field]) ~= "number" or value.ui.workspace[field] % 1 ~= 0 or value.ui.workspace[field] < 6 then
+			fail("ui.workspace." .. field .. " must be an integer of at least 6")
+		end
+	end
+	if type(value.ui.workspace.rotation) ~= "table" or not vim.islist(value.ui.workspace.rotation) or #value.ui.workspace.rotation == 0 then
+		fail("ui.workspace.rotation must be a non-empty array")
+	end
+	local workspace_positions = {}
+	for index, position in ipairs(value.ui.workspace.rotation) do
+		if not vim.tbl_contains({ "right", "left", "bottom" }, position) or workspace_positions[position] then
+			fail("ui.workspace.rotation[" .. index .. "] is unavailable or duplicated")
+		end
+		workspace_positions[position] = true
+	end
+	fields(value.ui.workspace.panels, { context = true, activity = true, approvals = true }, "settings.ui.workspace.panels")
+	for _, name in ipairs({ "context", "activity", "approvals" }) do
+		if type(value.ui.workspace.panels[name]) ~= "boolean" then
+			fail("ui.workspace.panels." .. name .. " must be boolean")
+		end
+	end
+	fields(value.ui.approvals, { scope = true }, "settings.ui.approvals")
+	if not vim.tbl_contains({ "all", "writes", "edits" }, value.ui.approvals.scope) then
+		fail("ui.approvals.scope must be all, writes, or edits")
+	end
 	fields(value.ui.composer, { enabled = true }, "settings.ui.composer")
 	if type(value.ui.composer.enabled) ~= "boolean" then
 		fail("ui.composer.enabled must be boolean")
@@ -490,6 +532,10 @@ local function settings(value)
 	fields(value.context.preflight, { confirm = true }, "settings.context.preflight")
 	if type(value.context.preflight.confirm) ~= "boolean" then
 		fail("context.preflight.confirm must be boolean")
+	end
+	fields(value.context.images, { enabled = true }, "settings.context.images")
+	if type(value.context.images.enabled) ~= "boolean" then
+		fail("context.images.enabled must be boolean")
 	end
 	fields(
 		value.context.references,
@@ -660,6 +706,7 @@ function M.migrate(value)
 		and from_version ~= 13
 		and from_version ~= 14
 		and from_version ~= 15
+		and from_version ~= 16
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -683,6 +730,7 @@ function M.migrate(value)
 		document.retention.max_bytes = 0
 	end
 	document.context = document.context or {}
+	document.context.images = document.context.images or vim.deepcopy(M.defaults.context.images)
 	document.context.preflight = document.context.preflight or {}
 	if document.context.preflight.confirm == nil then
 		document.context.preflight.confirm = false
@@ -700,6 +748,8 @@ function M.migrate(value)
 	document.ui = document.ui or {}
 	document.ui.loading = document.ui.loading or {}
 	document.ui.chat = document.ui.chat or vim.deepcopy(M.defaults.ui.chat)
+	document.ui.workspace = document.ui.workspace or vim.deepcopy(M.defaults.ui.workspace)
+	document.ui.approvals = document.ui.approvals or vim.deepcopy(M.defaults.ui.approvals)
 	document.ui.composer = document.ui.composer or vim.deepcopy(M.defaults.ui.composer)
 	document.ui.ask_selection = document.ui.ask_selection or vim.deepcopy(M.defaults.ui.ask_selection)
 	document.ui.edit_selection = document.ui.edit_selection or vim.deepcopy(M.defaults.ui.edit_selection)

@@ -63,6 +63,10 @@ local function configure(container, settings)
 	container:require("loading").configure(settings.ui.loading, settings.ui.motion)
 	container:require("accessibility").configure(settings.ui)
 	container:require("ui").conversation.configure(settings.ui.chat)
+	container:require("ui").workspace.configure(vim.tbl_deep_extend("force", settings.ui.workspace, {
+		approval_scope = settings.ui.approvals.scope,
+		images = settings.context.images,
+	}))
 	container:require("ui").composer.configure(settings.ui.composer)
 	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
 	container:require("consent").configure({ enabled = settings.telemetry.enabled })

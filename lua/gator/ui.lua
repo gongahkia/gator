@@ -4,6 +4,7 @@ local M = {
 	accessibility = require("gator.ui.accessibility"),
 	approval_details = require("gator.ui.approval_details"),
 	conversation = require("gator.ui.conversation"),
+	workspace = require("gator.ui.workspace"),
 	composer = require("gator.ui.composer"),
 	context_preflight = require("gator.ui.context_preflight"),
 	escalation = require("gator.ui.escalation"),
@@ -23,6 +24,7 @@ local M = {
 function M.close()
 	local closed = false
 	closed = M.conversation.close() or closed
+	closed = M.workspace.close() or closed
 	closed = M.context_preflight.close() or closed
 	closed = M.run_graph.close() or closed
 	closed = M.run_events.close() or closed

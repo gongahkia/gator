@@ -7,7 +7,7 @@ local run_store = require("gator.run_store")
 local capture = require("gator.context.capture")
 local references = require("gator.context.references")
 local provider_picker = require("gator.ui.provider_picker")
-local conversation = require("gator.ui.conversation")
+local conversation = require("gator.ui.workspace")
 local composer = require("gator.ui.composer")
 local edit_preview = require("gator.ui.edit_preview")
 local run_graph = require("gator.ui.run_graph")
@@ -1124,6 +1124,23 @@ end
 function Workflow:open_conversation(run)
 	local transcript = self:transcript(run)
 	local history = transcript and vim.split(transcript, "\n", { plain = true, trimempty = false }) or {}
+	local context = { files = {}, selections = {}, diagnostics = {}, images = {} }
+	local buffer = vim.api.nvim_get_current_buf()
+	if vim.api.nvim_buf_is_valid(buffer) and vim.bo[buffer].filetype ~= "gator-workspace" then
+		local path = vim.api.nvim_buf_get_name(buffer)
+		if path ~= "" then
+			table.insert(context.files, vim.fn.fnamemodify(path, ":."))
+		end
+		for _, diagnostic in ipairs(vim.diagnostic.get(buffer)) do
+			if #context.diagnostics >= 12 then
+				break
+			end
+			table.insert(
+				context.diagnostics,
+				string.format("L%d %s", diagnostic.lnum + 1, require("gator.policy.redact").text(diagnostic.message))
+			)
+		end
+	end
 	conversation.open({
 		provider = run.provider,
 		session_id = run.session and run.session.id or run.id,
@@ -1136,6 +1153,8 @@ function Workflow:open_conversation(run)
 		phase = run.state == "running" and "working" or nil,
 		turn_started_at = run.state == "running" and run.updated_at or nil,
 		history = history,
+		context = context,
+		controls = run.session and run.session.capabilities or nil,
 		on_input = function(message)
 			self:compose({
 				prompt = "Gator prompt: ",
