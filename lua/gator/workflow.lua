@@ -1065,14 +1065,14 @@ function Workflow:bundle(opts, workspace)
 	local function finalize(body, estimate)
 		if opts.reference_context then
 			body = body .. "\n\n" .. opts.reference_context
-			for _, artifact in ipairs(opts.reference_artifacts or {}) do
-				table.insert(estimate.artifacts, {
-					kind = "reference:" .. artifact.kind,
-					ref = artifact.ref,
-					bytes = artifact.bytes,
-				})
-				estimate.redactions = (estimate.redactions or 0) + (artifact.redactions or 0)
-			end
+		end
+		for _, artifact in ipairs(opts.reference_artifacts or {}) do
+			table.insert(estimate.artifacts, {
+				kind = "reference:" .. artifact.kind,
+				ref = artifact.ref,
+				bytes = artifact.bytes,
+			})
+			estimate.redactions = (estimate.redactions or 0) + (artifact.redactions or 0)
 		end
 		local extras = self.extensions:collect({
 			purpose = "launch",
