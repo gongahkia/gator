@@ -1394,7 +1394,7 @@ func (s *Store) ListAppsFilteredPage(ctx context.Context, cursor string, filter 
 		limit = 50
 	}
 	var args []any
-	clauses := []string{}
+	clauses := []string{"d.status <> 'deleted'"}
 	if status := strings.TrimSpace(filter.Status); status != "" {
 		clauses = append(clauses, "d.status=$"+strconv.Itoa(len(args)+1))
 		args = append(args, status)

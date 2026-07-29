@@ -104,6 +104,44 @@ func TestRunApprovalLifecycleIntegration(t *testing.T) {
 	}
 }
 
+func TestDeletedDeploymentIsHiddenFromAppsButRetainedForAuditIntegration(t *testing.T) {
+	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set NORBOT_TEST_DATABASE_URL to run Postgres integration coverage")
+	}
+	ctx := context.Background()
+	st, err := Open(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(st.Close)
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	id := "deleted-app-" + time.Now().UTC().Format("20060102150405.000000000")
+	run := domain.Run{ID: id, AppID: id, Prompt: "test", Profile: domain.ProfileFrontend, Stage: domain.StageDeployer, Status: domain.StatusCompleted, Providers: map[domain.Stage]string{domain.StagePlanner: "test", domain.StageBuilder: "test", domain.StageVerifier: "test", domain.StageDeployer: "test"}, Graph: domain.DefaultGraph(), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
+	if err := st.CreateRun(ctx, run); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.DeleteRun(context.Background(), id) })
+	if err := st.UpsertDeployment(ctx, id, id, "norbot-"+id, "http://127.0.0.1:12345", "deleted", ""); err != nil {
+		t.Fatal(err)
+	}
+	page, err := st.ListAppsPage(ctx, "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, app := range page.Items {
+		if app.RunID == id {
+			t.Fatalf("deleted deployment remained in apps: %#v", app)
+		}
+	}
+	deployment, err := st.GetDeployment(ctx, id)
+	if err != nil || deployment.Status != "deleted" {
+		t.Fatalf("deployment audit record=%#v err=%v", deployment, err)
+	}
+}
+
 func TestEventsAfterIntegration(t *testing.T) {
 	databaseURL := os.Getenv("NORBOT_TEST_DATABASE_URL")
 	if databaseURL == "" {
