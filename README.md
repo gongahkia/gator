@@ -33,6 +33,8 @@ For a temporary development checkout:
 make temp
 ```
 
+`make temp` is a local development launcher: it enables the explicit readiness confirmations for every supported non-Codex provider for that Neovim session only. A provider still appears only when its executable and required capability probe pass; Codex still requires provider-native login.
+
 Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `require("gator").setup()` registers every Gator command; no extra `:runtime plugin/gator.lua` step is needed.
 
 ## First run

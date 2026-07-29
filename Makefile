@@ -4,9 +4,10 @@ NVIM ?= nvim
 NVIM_TEST = tests/gator-test.sh
 NVIM_LINT = tests/gator-test.sh lint
 INDEXER_TEST = tests/gator-test.sh indexer
+TEMP_GATOR_SETTINGS = { providers = { aider = { user_confirmed = true }, amp = { user_confirmed = true }, cline = { user_confirmed = true }, copilot = { user_confirmed = true }, cursor = { user_confirmed = true }, gemini = { user_confirmed = true }, goose = { user_confirmed = true }, kimi = { user_confirmed = true }, pi = { user_confirmed = true }, vibe = { user_confirmed = true } } }
 
 temp:
-	$(NVIM) . --cmd 'set rtp+=$(CURDIR)' --cmd 'lua require("gator").setup()'
+	$(NVIM) . --cmd 'set rtp+=$(CURDIR)' --cmd 'lua require("gator").setup($(TEMP_GATOR_SETTINGS))'
 
 test:
 	$(NVIM_TEST)
