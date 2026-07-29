@@ -175,19 +175,6 @@ function M.register()
 			)
 		end)
 	end, { desc = "Write a local redacted diagnostic export" })
-	vim.api.nvim_create_user_command("GatorBetaReadiness", function()
-		vim.schedule(function()
-			local ok, result = pcall(require("gator").verify_beta_readiness)
-			local message = ok
-					and (result.state == "ready" and "Readiness check passed; report saved locally" or "Readiness check " .. result.state .. ": " .. result.reason)
-				or require("gator.policy.redact").text(tostring(result))
-			notice.show(
-				message,
-				ok and result.state == "ready" and vim.log.levels.INFO or vim.log.levels.WARN,
-				{ title = "Gator" }
-			)
-		end)
-	end, { desc = "Verify public-beta readiness and write a local failure report" })
 	vim.api.nvim_create_user_command("GatorStopSession", function(opts)
 		local ok, result =
 			pcall(require("gator").dispatch, "stop_session", { run_id = opts.args ~= "" and opts.args or nil })
