@@ -80,19 +80,20 @@ function M.document(opts)
 	if type(opts) ~= "table" or type(opts.buffer) ~= "number" or type(opts.settings) ~= "table" then
 		fail("document requires buffer and settings")
 	end
-	if not vim.api.nvim_buf_is_valid(opts.buffer) or not vim.bo[opts.buffer].modifiable then
+	local buffer = opts.buffer == 0 and vim.api.nvim_get_current_buf() or opts.buffer
+	if not vim.api.nvim_buf_is_valid(buffer) or not vim.bo[buffer].modifiable then
 		return nil, "buffer is unavailable"
 	end
-	local path = vim.api.nvim_buf_get_name(opts.buffer)
+	local path = vim.api.nvim_buf_get_name(buffer)
 	if path == "" or path:match("^%w+://") then
 		return nil, "buffer must be a file"
 	end
 	local cursor = vim.api.nvim_win_get_cursor(0)
-	if vim.api.nvim_get_current_buf() ~= opts.buffer then
+	if vim.api.nvim_get_current_buf() ~= buffer then
 		return nil, "buffer is not current"
 	end
 	local row, column = cursor[1] - 1, cursor[2]
-	local lines = vim.api.nvim_buf_get_lines(opts.buffer, 0, -1, false)
+	local lines = vim.api.nvim_buf_get_lines(buffer, 0, -1, false)
 	local settings = opts.settings.context
 	local first, last = 0, #lines
 	if settings.mode == "bounded" then
@@ -106,13 +107,13 @@ function M.document(opts)
 		raw = raw:sub(1, settings.max_bytes)
 	end
 	local inspected = redact.inspect(raw)
-	local root = M.root({ buffer = opts.buffer, settings = opts.settings })
+	local root = M.root({ buffer = buffer, settings = opts.settings })
 	return {
 		document = {
 			uri = vim.uri_from_fname(vim.fs.normalize(path)),
 			language = vim.bo[opts.buffer].filetype == "" and "text" or vim.bo[opts.buffer].filetype,
 			text = inspected.text,
-			version = vim.api.nvim_buf_get_changedtick(opts.buffer),
+			version = vim.api.nvim_buf_get_changedtick(buffer),
 			window = { first_line = first, last_line = last - 1, truncated = #raw < #table.concat(selected, "\n") },
 			cursor = { line = row, byte_column = column },
 		},
