@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 13
+M.schema_version = 14
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -14,7 +14,9 @@ M.defaults = {
 		motion = { enabled = true, interval_ms = 120, reduced = false },
 		loading = { enabled = true, spinner = "rattles.braille.dots", interval_ms = 0 },
 		chat = { layout = "split", height = 18, width = 0 },
+		composer = { enabled = true },
 		ask_selection = { keymap = "<leader>gA" },
+		edit_selection = { keymap = "<leader>gE" },
 		resources = { enabled = true, fields = { "wall_time", "context_bytes", "worktree", "usage" } },
 		renderers = {
 			provider_picker = "native",
@@ -30,6 +32,7 @@ M.defaults = {
 		mode = "manual",
 		trust = "provenance",
 		preflight = { confirm = false },
+		references = { roots = {}, max_files = 12, max_file_bytes = 32768, max_total_bytes = 131072 },
 		handoff = {
 			author = "user",
 			max_chars = 4096,
@@ -40,6 +43,7 @@ M.defaults = {
 			source_summary = false,
 		},
 	},
+	edits = { save = "always" },
 	launch = { default_provider = "ask", transport = "auto", stall_after_ms = 120000 },
 	permissions = { codex = { sandbox = "workspace_write" } },
 	sessions = { transfer = "manual" },
@@ -123,6 +127,7 @@ local root_fields = {
 	ui = true,
 	extensions = true,
 	context = true,
+	edits = true,
 	launch = true,
 	permissions = true,
 	sessions = true,
@@ -211,7 +216,9 @@ local function settings(value)
 		motion = true,
 		loading = true,
 		chat = true,
+		composer = true,
 		ask_selection = true,
+		edit_selection = true,
 		resources = true,
 		renderers = true,
 		run_graph = true,
@@ -227,7 +234,8 @@ local function settings(value)
 		end
 		extension_modules[module] = true
 	end
-	fields(value.context, { mode = true, trust = true, preflight = true, handoff = true }, "settings.context")
+	fields(value.context, { mode = true, trust = true, preflight = true, references = true, handoff = true }, "settings.context")
+	fields(value.edits, { save = true }, "settings.edits")
 	fields(value.launch, { default_provider = true, transport = true, stall_after_ms = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")
 	fields(value.permissions.codex, { sandbox = true }, "settings.permissions.codex")
@@ -286,11 +294,19 @@ local function settings(value)
 	then
 		fail("ui.chat.width must be 0 or an integer of at least 20")
 	end
+	fields(value.ui.composer, { enabled = true }, "settings.ui.composer")
+	if type(value.ui.composer.enabled) ~= "boolean" then
+		fail("ui.composer.enabled must be boolean")
+	end
 	fields(value.ui.ask_selection, { keymap = true }, "settings.ui.ask_selection")
 	if value.ui.ask_selection.keymap ~= false then
 		if type(value.ui.ask_selection.keymap) ~= "string" or value.ui.ask_selection.keymap == "" then
 			fail("ui.ask_selection.keymap must be false or a non-empty mapping")
 		end
+	end
+	fields(value.ui.edit_selection, { keymap = true }, "settings.ui.edit_selection")
+	if value.ui.edit_selection.keymap ~= false and (type(value.ui.edit_selection.keymap) ~= "string" or value.ui.edit_selection.keymap == "") then
+		fail("ui.edit_selection.keymap must be false or a non-empty mapping")
 	end
 	fields(value.ui.resources, { enabled = true, fields = true }, "settings.ui.resources")
 	fields(value.ui.renderers, {
@@ -338,6 +354,23 @@ local function settings(value)
 	fields(value.context.preflight, { confirm = true }, "settings.context.preflight")
 	if type(value.context.preflight.confirm) ~= "boolean" then
 		fail("context.preflight.confirm must be boolean")
+	end
+	fields(value.context.references, { roots = true, max_files = true, max_file_bytes = true, max_total_bytes = true }, "settings.context.references")
+	if type(value.context.references.roots) ~= "table" or not vim.islist(value.context.references.roots) then
+		fail("context.references.roots must be an array")
+	end
+	for index, root in ipairs(value.context.references.roots) do
+		if type(root) ~= "string" or root == "" then
+			fail("context.references.roots[" .. index .. "] must be non-empty text")
+		end
+	end
+	for _, field in ipairs({ "max_files", "max_file_bytes", "max_total_bytes" }) do
+		if type(value.context.references[field]) ~= "number" or value.context.references[field] < 1 or value.context.references[field] % 1 ~= 0 then
+			fail("context.references." .. field .. " must be a positive integer")
+		end
+	end
+	if value.edits.save ~= "always" and value.edits.save ~= "never" and value.edits.save ~= "ask" then
+		fail("edits.save must be always, never, or ask")
 	end
 	fields(value.context.handoff, {
 		author = true,
@@ -480,6 +513,7 @@ function M.migrate(value)
 		and from_version ~= 10
 		and from_version ~= 11
 		and from_version ~= 12
+		and from_version ~= 13
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -507,6 +541,8 @@ function M.migrate(value)
 	if document.context.preflight.confirm == nil then
 		document.context.preflight.confirm = false
 	end
+	document.context.references = document.context.references or vim.deepcopy(M.defaults.context.references)
+	document.edits = document.edits or vim.deepcopy(M.defaults.edits)
 	document.context.handoff = document.context.handoff or {}
 	document.context.handoff.profile = document.context.handoff.profile or "full"
 	document.context.handoff.max_files = document.context.handoff.max_files or 24
@@ -517,7 +553,9 @@ function M.migrate(value)
 	document.ui = document.ui or {}
 	document.ui.loading = document.ui.loading or {}
 	document.ui.chat = document.ui.chat or vim.deepcopy(M.defaults.ui.chat)
+	document.ui.composer = document.ui.composer or vim.deepcopy(M.defaults.ui.composer)
 	document.ui.ask_selection = document.ui.ask_selection or vim.deepcopy(M.defaults.ui.ask_selection)
+	document.ui.edit_selection = document.ui.edit_selection or vim.deepcopy(M.defaults.ui.edit_selection)
 	document.ui.resources = document.ui.resources or {}
 	if document.ui.resources.enabled == nil then
 		document.ui.resources.enabled = true

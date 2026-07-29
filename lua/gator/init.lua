@@ -46,7 +46,10 @@ function M.setup(opts)
 		M._coordinator:dispose()
 	end
 	M._coordinator = next
-	require("gator.commands").configure(next:state().config.ui.ask_selection)
+	require("gator.commands").configure({
+		ask_selection = next:state().config.ui.ask_selection,
+		edit_selection = next:state().config.ui.edit_selection,
+	})
 	M._coordinator:load_extensions()
 	M._state = M._coordinator:state()
 	M._coordinator:bootstrap_recovery()
@@ -131,6 +134,10 @@ end
 
 function M.ask_selection(opts)
 	return M.dispatch("ask_selection", opts)
+end
+
+function M.edit(opts)
+	return M.dispatch("edit", opts)
 end
 
 function M.review(run_id)

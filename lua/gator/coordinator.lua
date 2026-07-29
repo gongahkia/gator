@@ -18,6 +18,7 @@ local actions = {
 		fields = { run_id = true, kind = true, bundle_id = true, buffer = true, first_line = true, last_line = true },
 	},
 	ask_selection = { fields = { run_id = true, question = true, buffer = true, first_line = true, last_line = true } },
+	edit = { fields = { run_id = true, buffer = true, first_line = true, last_line = true } },
 	review = { fields = { run_id = true } },
 	runbook_next = { fields = {} },
 	health = { fields = { verbose = true } },
@@ -37,6 +38,7 @@ local action_names = {
 	"handoff",
 	"send_context",
 	"ask_selection",
+	"edit",
 	"review",
 	"runbook_next",
 	"health",
@@ -60,6 +62,7 @@ local function configure(container, settings)
 	container:require("loading").configure(settings.ui.loading, settings.ui.motion)
 	container:require("accessibility").configure(settings.ui)
 	container:require("ui").conversation.configure(settings.ui.chat)
+	container:require("ui").composer.configure(settings.ui.composer)
 	container:require("redact").configure({ patterns = settings.telemetry.redaction_patterns })
 	container:require("consent").configure({ enabled = settings.telemetry.enabled })
 end
@@ -389,6 +392,9 @@ function Coordinator:dispatch(action, opts)
 	end
 	if action == "ask_selection" then
 		return self:workflow():ask_selection(opts)
+	end
+	if action == "edit" then
+		return self:workflow():edit(opts)
 	end
 	if action == "review" then
 		return self:workflow():review(opts.run_id)

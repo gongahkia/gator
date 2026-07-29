@@ -1,6 +1,7 @@
 local M = {}
 local registered = false
 local installed_ask_mapping = nil
+local installed_edit_mapping = nil
 local notice = require("gator.ui.notice")
 
 local function mapping(lhs)
@@ -8,35 +9,54 @@ local function mapping(lhs)
 	return type(value) == "table" and next(value) and value or nil
 end
 
-local function remove_default_mapping()
-	if not installed_ask_mapping then
+local function remove_default_mapping(kind)
+	local installed = kind == "edit" and installed_edit_mapping or installed_ask_mapping
+	if not installed then
 		return
 	end
-	local current = mapping(installed_ask_mapping)
-	if current and current.rhs == "<Plug>(gator-ask-selection)" then
-		vim.keymap.del("x", installed_ask_mapping)
+	local rhs = kind == "edit" and "<Plug>(gator-edit-selection)" or "<Plug>(gator-ask-selection)"
+	local current = mapping(installed)
+	if current and current.rhs == rhs then
+		vim.keymap.del("x", installed)
 	end
-	installed_ask_mapping = nil
+	if kind == "edit" then installed_edit_mapping = nil else installed_ask_mapping = nil end
 end
 
 function M.configure(opts)
-	if type(opts) ~= "table" or (opts.keymap ~= false and (type(opts.keymap) ~= "string" or opts.keymap == "")) then
-		error("Gator commands: ask_selection.keymap must be false or non-empty text", 3)
+	if type(opts) ~= "table" or type(opts.ask_selection) ~= "table" or type(opts.edit_selection) ~= "table" then
+		error("Gator commands: settings require ask_selection and edit_selection", 3)
+	end
+	for _, value in ipairs({ opts.ask_selection.keymap, opts.edit_selection.keymap }) do
+		if value ~= false and (type(value) ~= "string" or value == "") then
+			error("Gator commands: keymap must be false or non-empty text", 3)
+		end
 	end
 	vim.keymap.set("x", "<Plug>(gator-ask-selection)", ":<C-U>'<,'>GatorAsk<CR>", {
 		desc = "Gator ask about selected text",
 		silent = true,
 	})
-	remove_default_mapping()
-	if opts.keymap == false or mapping(opts.keymap) then
-		return false
-	end
-	vim.keymap.set("x", opts.keymap, "<Plug>(gator-ask-selection)", {
-		desc = "Gator ask about selected text",
+	vim.keymap.set("x", "<Plug>(gator-edit-selection)", ":<C-U>'<,'>GatorEdit<CR>", {
+		desc = "Gator edit selected text",
 		silent = true,
 	})
-	installed_ask_mapping = opts.keymap
-	return true
+	remove_default_mapping("ask")
+	remove_default_mapping("edit")
+	local installed = { ask = false, edit = false }
+	if opts.ask_selection.keymap ~= false and not mapping(opts.ask_selection.keymap) then
+		vim.keymap.set("x", opts.ask_selection.keymap, "<Plug>(gator-ask-selection)", {
+			desc = "Gator ask about selected text",
+			silent = true,
+		})
+		installed_ask_mapping, installed.ask = opts.ask_selection.keymap, true
+	end
+	if opts.edit_selection.keymap ~= false and not mapping(opts.edit_selection.keymap) then
+		vim.keymap.set("x", opts.edit_selection.keymap, "<Plug>(gator-edit-selection)", {
+			desc = "Gator edit selected text",
+			silent = true,
+		})
+		installed_edit_mapping, installed.edit = opts.edit_selection.keymap, true
+	end
+	return installed
 end
 
 function M.register()
@@ -87,6 +107,17 @@ function M.register()
 			last_line = opts.line2,
 		})
 	end, { nargs = "?", range = true, desc = "Ask an active Gator chat about selected lines" })
+	vim.api.nvim_create_user_command("GatorEdit", function(opts)
+		if opts.range == 0 then
+			error("GatorEdit requires a Visual line selection", 0)
+		end
+		require("gator").dispatch("edit", {
+			run_id = opts.args ~= "" and opts.args or nil,
+			buffer = vim.api.nvim_get_current_buf(),
+			first_line = opts.line1,
+			last_line = opts.line2,
+		})
+	end, { nargs = "?", range = true, desc = "Request a reviewed replacement for selected text" })
 	vim.api.nvim_create_user_command("GatorReview", function(opts)
 		require("gator").dispatch("review", { run_id = opts.args ~= "" and opts.args or nil })
 	end, { nargs = "?", desc = "Review a Gator run diff and approved test evidence" })

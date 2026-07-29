@@ -5,8 +5,11 @@ local structured = require("gator.adapters.structured")
 local terminal = require("gator.adapters.terminal")
 local run_store = require("gator.run_store")
 local capture = require("gator.context.capture")
+local references = require("gator.context.references")
 local provider_picker = require("gator.ui.provider_picker")
 local conversation = require("gator.ui.conversation")
+local composer = require("gator.ui.composer")
+local edit_preview = require("gator.ui.edit_preview")
 local run_graph = require("gator.ui.run_graph")
 local terminal_companion = require("gator.ui.terminal_companion")
 local handoff_review = require("gator.ui.run_handoff")
@@ -179,6 +182,7 @@ function M.new(opts)
 		active = {},
 		transcripts = {},
 		pending_summary = {},
+		pending_edits = {},
 		review_sessions = {},
 	}, Workflow)
 	value:refresh()
@@ -681,9 +685,25 @@ function Workflow:prompt(opts)
 		capture = vim.deepcopy(selected),
 		actions = { submit = submit, cancel = function() end },
 	}, function()
-		vim.ui.input({ prompt = "Gator: " }, submit)
-		return true
+		return self:compose({ prompt = "Gator: ", on_submit = submit })
 	end)
+end
+
+function Workflow:compose(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" or type(opts.on_submit) ~= "function" then
+		fail("compose requires submit callback")
+	end
+	return composer.open({
+		prompt = opts.prompt,
+		candidates = references.candidates({ root = self.root, settings = self.state.config.context.references }),
+		on_submit = opts.on_submit,
+		on_cancel = opts.on_cancel,
+	})
+end
+
+function Workflow:resolve_references(prompt)
+	return references.resolve({ prompt = prompt, root = self.root, settings = self.state.config.context.references })
 end
 
 local function git_path(root, argv, name)
@@ -1043,6 +1063,17 @@ end
 
 function Workflow:bundle(opts, workspace)
 	local function finalize(body, estimate)
+		if opts.reference_context then
+			body = body .. "\n\n" .. opts.reference_context
+			for _, artifact in ipairs(opts.reference_artifacts or {}) do
+				table.insert(estimate.artifacts, {
+					kind = "reference:" .. artifact.kind,
+					ref = artifact.ref,
+					bytes = artifact.bytes,
+				})
+				estimate.redactions = (estimate.redactions or 0) + (artifact.redactions or 0)
+			end
+		end
 		local extras = self.extensions:collect({
 			purpose = "launch",
 			objective = opts.objective,
@@ -1101,7 +1132,7 @@ function Workflow:open_conversation(run)
 		turn_started_at = run.state == "running" and run.updated_at or nil,
 		history = history,
 		on_input = function(message)
-			self:send(run.id, message)
+			self:compose({ prompt = "Gator prompt: ", on_submit = function(message) self:send(run.id, message) end })
 		end,
 		on_cancel = function()
 			self:cancel(run.id)
@@ -1385,6 +1416,7 @@ function Workflow:open_structured(run, prompt, operation, existing_session)
 				self:journal(run.id, "provider.settled", { transport = "structured" })
 				self:update(run.id, { state = "waiting_input" })
 				pcall(conversation.update, { run_id = run.id, state = "waiting_input" })
+				self:complete_edit(run.id)
 				self:finish_summary(run.id)
 			elseif kind == "error" then
 				self:stop_stall_watch(run.id, true)
@@ -1554,6 +1586,10 @@ function Workflow:launch(opts)
 		fail("launch requires options")
 	end
 	local objective = text(opts.objective, "objective")
+	if opts.reference_context == nil then
+		local resolved = self:resolve_references(objective)
+		opts.reference_context, opts.reference_artifacts = resolved.context, resolved.artifacts
+	end
 	local selected_role = role(opts.role)
 	local chosen = self:provider(opts.provider)
 	local transport = self:resolve_transport(chosen, opts.transport)
@@ -1720,8 +1756,14 @@ function Workflow:launch(opts)
 	return run
 end
 
-function Workflow:send(id, message)
+function Workflow:send(id, message, resolve_references)
 	message = text(message, "prompt")
+	if resolve_references ~= false then
+		local resolved = self:resolve_references(message)
+		if resolved.context then
+			message = message .. "\n\n" .. resolved.context
+		end
+	end
 	local run = self:run(id)
 	local active = self.active[id]
 	if not active then
@@ -1934,7 +1976,7 @@ function Workflow:send_context(opts)
 	local function deliver()
 		self:journal(run.id, "context.sent", preflight)
 		self:record_context_delivery(run.id, #message)
-		return self:send(run.id, message)
+		return self:send(run.id, message, false)
 	end
 	if self.state.config.context.preflight.confirm then
 		self:open_preflight(preflight, deliver, function()
@@ -1990,6 +2032,8 @@ function Workflow:ask_selection(opts)
 		if type(question) ~= "string" or vim.trim(question) == "" then
 			return false
 		end
+		local resolved = self:resolve_references(question)
+		if resolved.context then question = question .. "\n\n" .. resolved.context end
 		local ok, err = pcall(self.send_context, self, {
 			run_id = run.id,
 			kind = "selection",
@@ -2023,17 +2067,224 @@ function Workflow:ask_selection(opts)
 	if opts.question ~= nil then
 		return submit(opts.question)
 	end
-	vim.ui.input({ prompt = "Ask Gator about selected lines: " }, function(question)
-		local ok, err = pcall(submit, question)
-		if not ok then
-			notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+	return self:compose({
+		prompt = "Ask Gator about selected lines: ",
+		on_submit = function(question)
+			local ok, err = pcall(submit, question)
+			if not ok then notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" }) end
+		end,
+	})
+end
+
+function Workflow:attach_context(id)
+	return self:send_context({ run_id = id })
+end
+
+local edit_namespace = vim.api.nvim_create_namespace("gator-selection-edit")
+
+local function edit_selection(workspace, opts)
+	local selected = capture.current(opts)
+	local path = vim.uv.fs_realpath(selected.path)
+	if not path or not vim.startswith(path, workspace .. "/") then
+		fail("selection edits require a file inside the current Git workspace")
+	end
+	local start = vim.api.nvim_buf_set_extmark(selected.buffer, edit_namespace, selected.first_line - 1, 0, { right_gravity = false })
+	local finish = vim.api.nvim_buf_set_extmark(selected.buffer, edit_namespace, selected.last_line, 0, { right_gravity = true })
+	return {
+		buffer = selected.buffer,
+		path = selected.path,
+		language = selected.language,
+		first_line = selected.first_line,
+		last_line = selected.last_line,
+		text = selected.text,
+		changedtick = selected.changedtick,
+		start = start,
+		finish = finish,
+	}
+end
+
+local function edit_prompt(selection, objective, reference_context)
+	local message = table.concat({
+		"## Gator selection edit",
+		"- Path: `" .. selection.path .. "`",
+		"- Lines: " .. selection.first_line .. "-" .. selection.last_line,
+		"",
+		"Replace only the selected text. Do not edit files or run mutating commands.",
+		"Respond with exactly one `<gator-replacement>` payload containing only the replacement text; do not add Markdown fences or explanation.",
+		"",
+		"## Objective",
+		objective,
+		"",
+		"## Selected source",
+		"```" .. selection.language,
+		selection.text,
+		"```",
+	}, "\n")
+	return reference_context and (message .. "\n\n" .. reference_context) or message
+end
+
+function Workflow:eligible_edit_runs()
+	local values = {}
+	for _, run in ipairs(self:runs()) do
+		local active = self.active[run.id]
+		if run.state == "waiting_input" and active and active.kind == "structured" and vim.fs.normalize(run.workspace.root) == self.root then
+			table.insert(values, run)
+		end
+	end
+	table.sort(values, function(left, right) return left.id < right.id end)
+	return values
+end
+
+function Workflow:deliver_edit(run, value, message, artifacts)
+	local preflight = {
+		purpose = "edit",
+		provider = run.provider,
+		transport = run.transport,
+		bytes = #message,
+		tokens = capture.estimate(message),
+		redactions = 0,
+		artifacts = artifacts,
+	}
+	self:journal(run.id, "edit.requested", { path = value.path, first_line = value.first_line, last_line = value.last_line, references = #artifacts - 1 })
+	self:journal(run.id, "context.prepared", preflight)
+	local function deliver()
+		self:journal(run.id, "context.sent", preflight)
+		self:record_context_delivery(run.id, #message)
+		self.pending_edits[run.id] = value
+		return self:send(run.id, message, false)
+	end
+	if self.state.config.context.preflight.confirm then
+		self:open_preflight(preflight, deliver, function()
+			self:journal(run.id, "context.cancelled", { purpose = "edit" })
+			self:journal(run.id, "edit.cancelled", { reason = "context_cancelled" })
+		end)
+		return true
+	end
+	return deliver()
+end
+
+function Workflow:create_edit_run(value, objective, resolved)
+	self:refresh()
+	local choices = {}
+	for _, candidate in pairs(self.providers) do
+		if candidate.available and candidate.chat and structured.supports(candidate.provider) then
+			table.insert(choices, candidate)
+		end
+	end
+	table.sort(choices, function(left, right) return left.provider < right.provider end)
+	if #choices == 0 then
+		fail("no ready structured Gator provider can create a selection edit")
+	end
+	local function launch(choice)
+		local message = edit_prompt(value, objective, resolved.context)
+		local run = self:launch({
+			provider = choice.provider,
+			transport = "chat",
+			objective = message,
+			capture = capture.current({ buffer = value.buffer, first_line = value.first_line, last_line = value.last_line }),
+			remember = false,
+			reference_context = nil,
+			reference_artifacts = resolved.artifacts,
+		})
+		self.pending_edits[run.id] = value
+		self:journal(run.id, "edit.requested", { path = value.path, first_line = value.first_line, last_line = value.last_line, references = #resolved.artifacts })
+		return run
+	end
+	if #choices == 1 then return launch(choices[1]) end
+	vim.ui.select(choices, {
+		prompt = "New Gator selection edit provider",
+		format_item = function(choice) return choice.provider end,
+	}, function(choice)
+		if choice then
+			local ok, err = pcall(launch, choice)
+			if not ok then notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" }) end
 		end
 	end)
 	return true
 end
 
-function Workflow:attach_context(id)
-	return self:send_context({ run_id = id })
+function Workflow:edit(opts)
+	opts = opts or {}
+	if type(opts) ~= "table" then fail("edit requires options") end
+	local value = edit_selection(self.root, opts)
+	return self:compose({
+		prompt = "Gator selection edit: ",
+		on_submit = function(objective)
+			local resolved = self:resolve_references(objective)
+			local function existing(run)
+				if run.state ~= "waiting_input" or not self.active[run.id] or self.active[run.id].kind ~= "structured" then
+					fail("selection edits require a ready structured Gator chat")
+				end
+				if vim.fs.normalize(run.workspace.root) ~= self.root then
+					fail("selection edit chat must use the selected buffer's Git workspace")
+				end
+				local message = edit_prompt(value, objective, resolved.context)
+				local artifacts = { { kind = "selection", path = value.path, first_line = value.first_line, last_line = value.last_line, bytes = #value.text } }
+				for _, artifact in ipairs(resolved.artifacts) do table.insert(artifacts, { kind = "reference:" .. artifact.kind, ref = artifact.ref, bytes = artifact.bytes }) end
+				return self:deliver_edit(run, value, message, artifacts)
+			end
+			if opts.run_id then return existing(self:run(opts.run_id)) end
+			local runs = self:eligible_edit_runs()
+			if #runs == 1 then return existing(runs[1]) end
+			local choices = { { kind = "new", label = "New dedicated edit run" } }
+			for _, run in ipairs(runs) do table.insert(choices, { kind = "run", run = run, label = run.provider .. " · " .. run.objective }) end
+			vim.ui.select(choices, { prompt = "Gator selection edit", format_item = function(choice) return choice.label end }, function(choice)
+				if not choice then return end
+				local ok, err = pcall(choice.kind == "new" and self.create_edit_run or existing, self, choice.kind == "new" and value or choice.run, choice.kind == "new" and objective or nil, choice.kind == "new" and resolved or nil)
+				if not ok then notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" }) end
+			end)
+			return true
+		end,
+	})
+end
+
+function Workflow:complete_edit(id)
+	local value = self.pending_edits[id]
+	if not value then return false end
+	self.pending_edits[id] = nil
+	local transcript = self:transcript(self:run(id)) or ""
+	local response = transcript:match("## assistant\n(.*)$") or ""
+	local replacements = {}
+	for replacement in response:gmatch("<gator%-replacement>(.-)</gator%-replacement>") do
+		table.insert(replacements, replacement)
+	end
+	if #replacements ~= 1 or vim.trim(replacements[1]) == "" then
+		self:journal(id, "edit.rejected", { reason = "invalid_replacement_payload" })
+		notice.show("Gator edit: provider returned no valid replacement payload", vim.log.levels.WARN)
+		return false
+	end
+	local replacement = replacements[1]
+	self:journal(id, "edit.previewed", { path = value.path, bytes = #replacement })
+	return edit_preview.open({
+		before = value.text,
+		after = replacement,
+		on_cancel = function() self:journal(id, "edit.cancelled", { reason = "preview_cancelled" }) end,
+		on_apply = function()
+			if not vim.api.nvim_buf_is_valid(value.buffer) or vim.api.nvim_buf_get_changedtick(value.buffer) ~= value.changedtick then
+				self:journal(id, "edit.rejected", { reason = "stale_selection" })
+				notice.show("Gator edit: buffer changed since selection; preview was not applied", vim.log.levels.WARN)
+				return
+			end
+			local start = vim.api.nvim_buf_get_extmark_by_id(value.buffer, edit_namespace, value.start, {})
+			local finish = vim.api.nvim_buf_get_extmark_by_id(value.buffer, edit_namespace, value.finish, {})
+			if #start == 0 or #finish == 0 then
+				self:journal(id, "edit.rejected", { reason = "selection_unavailable" })
+				return
+			end
+			vim.api.nvim_buf_set_lines(value.buffer, start[1], finish[1], false, vim.split(replacement, "\n", { plain = true, trimempty = false }))
+			vim.api.nvim_buf_del_extmark(value.buffer, edit_namespace, value.start)
+			vim.api.nvim_buf_del_extmark(value.buffer, edit_namespace, value.finish)
+			self:journal(id, "edit.applied", { path = value.path, save = self.state.config.edits.save })
+			if self.state.config.edits.save == "always" then
+				local ok, err = pcall(vim.api.nvim_buf_call, value.buffer, function() vim.cmd("silent write") end)
+				if not ok then notice.show("Gator edit save: " .. tostring(err), vim.log.levels.ERROR) end
+			elseif self.state.config.edits.save == "ask" then
+				vim.ui.select({ "Save buffer", "Leave modified" }, { prompt = "Gator edit applied" }, function(choice)
+					if choice == "Save buffer" then pcall(vim.api.nvim_buf_call, value.buffer, function() vim.cmd("silent write") end) end
+				end)
+			end
+		end,
+	})
 end
 
 function Workflow:review_context(run)

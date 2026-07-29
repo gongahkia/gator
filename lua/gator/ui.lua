@@ -4,6 +4,7 @@ local M = {
 	accessibility = require("gator.ui.accessibility"),
 	approval_details = require("gator.ui.approval_details"),
 	conversation = require("gator.ui.conversation"),
+	composer = require("gator.ui.composer"),
 	context_preflight = require("gator.ui.context_preflight"),
 	escalation = require("gator.ui.escalation"),
 	event_details = require("gator.ui.event_details"),

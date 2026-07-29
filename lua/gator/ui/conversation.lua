@@ -262,16 +262,9 @@ local function input(panel)
 		M.render(panel)
 		return false
 	end
-	vim.ui.input({ prompt = "Gator prompt: " }, function(value)
-		if type(value) == "string" and vim.trim(value) ~= "" then
-			panel.notice = nil
-			append_lines(panel.lines, "> " .. value)
-			panel.on_message("user", value)
-			M.render(panel)
-			panel.on_input(value)
-		end
-	end)
-	return true
+	panel.notice = nil
+	M.render(panel)
+	return panel.on_input() ~= false
 end
 
 local function bind(panel)
