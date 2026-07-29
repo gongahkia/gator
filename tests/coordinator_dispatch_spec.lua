@@ -41,6 +41,15 @@ assert(
 local window = gator.dispatch("runs")
 assert(vim.api.nvim_win_is_valid(window), "dispatcher must route the run graph")
 assert(gator.dispatch("close"), "dispatcher must expose explicit workspace cancellation")
+local original_health = gator._coordinator.health
+local health_options
+gator._coordinator.health = function(_, opts)
+	health_options = opts
+	return true
+end
+assert(gator.dispatch("health", { verbose = true }), "dispatcher must accept verbose health options")
+assert(health_options.verbose, "dispatcher must preserve verbose health options")
+gator._coordinator.health = original_health
 assert(not pcall(gator.dispatch, "missing"), "dispatcher must reject unavailable actions")
 assert(not pcall(gator.dispatch, "palette"), "dispatcher must reject removed palette actions")
 assert(not coordinator.is_action("capture_selection"), "removed capture actions must not remain public")

@@ -20,7 +20,7 @@ local actions = {
 	ask_selection = { fields = { run_id = true, question = true, buffer = true, first_line = true, last_line = true } },
 	review = { fields = { run_id = true } },
 	runbook_next = { fields = {} },
-	health = { fields = {} },
+	health = { fields = { verbose = true } },
 	export_diagnostics = { fields = {} },
 	verify_beta_readiness = { fields = {} },
 	close = { fields = {} },
