@@ -1,5 +1,9 @@
 # Gator
 
+<div align="center">
+    <img src="./asset/logo/gator-logo.png" width="50%">
+</div>
+
 Gator is a Neovim plugin for launching local coding-agent CLIs with editor context, then retaining a local run graph for focus, handoff, review, and parallel worktrees.
 
 It does not replace Codex, Pi, ACP agents, or their harnesses. Providers retain authentication, model choice, tools, permissions, compaction, and sessions. Gator records only runs it starts.

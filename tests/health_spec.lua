@@ -73,11 +73,11 @@ assert(
 health.readiness = original_readiness
 
 local original_health = vim.health
-local before = #events
+local before = #verbose
 vim.health = reporter
 health.check()
 vim.health = original_health
-assert(#events > before, "checkhealth entry point must use the shared health framework")
+assert(#verbose > before, "checkhealth entry point must use the shared health framework")
 
 local ok = pcall(health.register, "provider.fixture", function() end)
 assert(not ok, "duplicate health checks must fail explicitly")
