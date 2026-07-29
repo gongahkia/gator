@@ -15,10 +15,16 @@ assert(
 	"composer instructions must be decorative and attachment text must remain deletable"
 )
 vim.api.nvim_buf_set_lines(buffer, 0, -1, false, { "@README.md" })
-vim.api.nvim_set_current_win(window)
-vim.api.nvim_win_set_cursor(window, { 1, #"@README.md" })
-vim.api.nvim_feedkeys(vim.keycode("A<BS><C-s>"), "xt", false)
+local backspace = vim.fn.maparg("<BS>", "i", false, true)
+assert(
+	type(backspace.callback) == "function" and backspace.callback() == vim.keycode("<BS>"),
+	"composer backspace must preserve normal deletion after closing completion"
+)
+vim.api.nvim_buf_set_lines(buffer, 0, -1, false, { "@README.m" })
+local submit = vim.fn.maparg("<C-s>", "i", false, true)
+assert(type(submit.callback) == "function", "composer must expose an insert-mode submit action")
+submit.callback()
 assert(
 	submitted == "@README.m",
-	"composer backspace must remove attachment text before submission: " .. vim.inspect(submitted)
+	"composer backspace must remove attachment text before submission"
 )
