@@ -5,6 +5,7 @@ local health = require("gator.health")
 
 local M = {}
 local active
+local cmp_hooked = false
 
 local function unavailable(callback, code)
 	callback(nil, { code = code })
@@ -25,11 +26,24 @@ function M.setup(settings)
 		cancel = function(ticket)
 			return active and active:cancel(ticket)
 		end,
+		accept = function(root, id)
+			return active and active:accept(root, id)
+		end,
 	})
 	if settings.completion.ui.cmp.enabled then
 		local ok, cmp = pcall(require, "cmp")
 		if ok then
 			cmp.register_source("gator", require("gator.completion.source"):new())
+			if not cmp_hooked then
+				cmp_hooked = true
+				cmp.event:on("confirm_done", function(event)
+					local item = event.entry and event.entry.completion_item
+					local data = item and item.data
+					if data and data.gator_completion_root and data.gator_completion_id then
+						M.accept_candidate(data.gator_completion_root, data.gator_completion_id)
+					end
+				end)
+			end
 		end
 	end
 	health.unregister("completion.sidecar")
@@ -38,12 +52,19 @@ function M.setup(settings)
 		if not status.enabled then
 			reporter.ok("Inline completion is disabled")
 		elseif not status.configured then
-			reporter.warn("Inline completion needs completion.sidecar.argv", "Configure a local JSON-RPC completion sidecar or disable completion.")
+			reporter.warn(
+				"Inline completion needs completion.sidecar.argv",
+				"Configure a local JSON-RPC completion sidecar or disable completion."
+			)
 		else
 			reporter.ok("Inline completion sidecar is configured")
 		end
 	end)
 	return M
+end
+
+function M.accept_candidate(root, id)
+	return active and active:accept(root, id) or false
 end
 
 function M.request(buffer, callback)

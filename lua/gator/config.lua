@@ -52,7 +52,14 @@ M.defaults = {
 			virtual_text = { enabled = true, priority = 65535 },
 			cmp = { enabled = false },
 			blink = { enabled = false },
-			keymaps = { accept = "<Tab>", accept_word = false, accept_line = false, clear = false, next = false, prev = false },
+			keymaps = {
+				accept = "<Tab>",
+				accept_word = false,
+				accept_line = false,
+				clear = false,
+				next = false,
+				prev = false,
+			},
 		},
 	},
 	edits = { save = "always" },
@@ -252,11 +259,19 @@ local function settings(value)
 		{ mode = true, trust = true, preflight = true, references = true, handoff = true },
 		"settings.context"
 	)
-	fields(value.completion, { enabled = true, sidecar = true, context = true, root = true, ui = true }, "settings.completion")
+	fields(
+		value.completion,
+		{ enabled = true, sidecar = true, context = true, root = true, ui = true },
+		"settings.completion"
+	)
 	if type(value.completion.enabled) ~= "boolean" then
 		fail("completion.enabled must be boolean")
 	end
-	fields(value.completion.sidecar, { argv = true, timeout_ms = true, restart_backoff_ms = true }, "settings.completion.sidecar")
+	fields(
+		value.completion.sidecar,
+		{ argv = true, timeout_ms = true, restart_backoff_ms = true },
+		"settings.completion.sidecar"
+	)
 	if type(value.completion.sidecar.argv) ~= "table" or not vim.islist(value.completion.sidecar.argv) then
 		fail("completion.sidecar.argv must be an argv array")
 	end
@@ -266,16 +281,28 @@ local function settings(value)
 		end
 	end
 	for _, field in ipairs({ "timeout_ms", "restart_backoff_ms" }) do
-		if type(value.completion.sidecar[field]) ~= "number" or value.completion.sidecar[field] < 1 or value.completion.sidecar[field] % 1 ~= 0 then
+		if
+			type(value.completion.sidecar[field]) ~= "number"
+			or value.completion.sidecar[field] < 1
+			or value.completion.sidecar[field] % 1 ~= 0
+		then
 			fail("completion.sidecar." .. field .. " must be a positive integer")
 		end
 	end
-	fields(value.completion.context, { mode = true, before_lines = true, after_lines = true, max_bytes = true }, "settings.completion.context")
+	fields(
+		value.completion.context,
+		{ mode = true, before_lines = true, after_lines = true, max_bytes = true },
+		"settings.completion.context"
+	)
 	if not vim.tbl_contains({ "bounded", "buffer", "workspace" }, value.completion.context.mode) then
 		fail("completion.context.mode must be bounded, buffer, or workspace")
 	end
 	for _, field in ipairs({ "before_lines", "after_lines", "max_bytes" }) do
-		if type(value.completion.context[field]) ~= "number" or value.completion.context[field] < 1 or value.completion.context[field] % 1 ~= 0 then
+		if
+			type(value.completion.context[field]) ~= "number"
+			or value.completion.context[field] < 1
+			or value.completion.context[field] % 1 ~= 0
+		then
 			fail("completion.context." .. field .. " must be a positive integer")
 		end
 	end
@@ -294,12 +321,20 @@ local function settings(value)
 	if not vim.tbl_contains({ "completion", "workspace", "prompt" }, value.completion.root.apply_to) then
 		fail("completion.root.apply_to must be completion, workspace, or prompt")
 	end
-	fields(value.completion.ui, { virtual_text = true, cmp = true, blink = true, keymaps = true }, "settings.completion.ui")
+	fields(
+		value.completion.ui,
+		{ virtual_text = true, cmp = true, blink = true, keymaps = true },
+		"settings.completion.ui"
+	)
 	fields(value.completion.ui.virtual_text, { enabled = true, priority = true }, "settings.completion.ui.virtual_text")
 	if type(value.completion.ui.virtual_text.enabled) ~= "boolean" then
 		fail("completion.ui.virtual_text.enabled must be boolean")
 	end
-	if type(value.completion.ui.virtual_text.priority) ~= "number" or value.completion.ui.virtual_text.priority < 1 or value.completion.ui.virtual_text.priority % 1 ~= 0 then
+	if
+		type(value.completion.ui.virtual_text.priority) ~= "number"
+		or value.completion.ui.virtual_text.priority < 1
+		or value.completion.ui.virtual_text.priority % 1 ~= 0
+	then
 		fail("completion.ui.virtual_text.priority must be a positive integer")
 	end
 	for _, surface in ipairs({ "cmp", "blink" }) do
@@ -312,7 +347,10 @@ local function settings(value)
 		fail("completion.ui.keymaps must be an object")
 	end
 	for name, mapping in pairs(value.completion.ui.keymaps) do
-		if not ({ accept = true, accept_word = true, accept_line = true, clear = true, next = true, prev = true })[name] or (mapping ~= false and (type(mapping) ~= "string" or mapping == "")) then
+		if
+			not ({ accept = true, accept_word = true, accept_line = true, clear = true, next = true, prev = true })[name]
+			or (mapping ~= false and (type(mapping) ~= "string" or mapping == ""))
+		then
 			fail("completion.ui.keymaps must use supported mappings or false")
 		end
 	end

@@ -148,7 +148,8 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorCompletion", function(opts)
 		local ok, value = pcall(require("gator").completion_command, opts.args)
 		local status = ok and value or nil
-		local message = ok and ("Completion " .. (status.enabled and (status.configured and "ready" or "needs sidecar.argv") or "disabled"))
+		local message = ok
+				and ("Completion " .. (status.enabled and (status.configured and "ready" or "needs sidecar.argv") or "disabled"))
 			or require("gator.policy.redact").text(tostring(value))
 		notice.show(message, ok and vim.log.levels.INFO or vim.log.levels.ERROR, { title = "Gator" })
 	end, {

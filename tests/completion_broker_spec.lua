@@ -27,6 +27,11 @@ end)
 assert(ticket and writes[1]:find('"method":"gator/completion"', 1, true), "completion requests must use JSON-RPC")
 callbacks.stdout(nil, '{"jsonrpc":"2.0","id":1,"result":{"items":[{"text":"value"}]}}\n')
 assert(received.items[1].text == "value" and not received.error, "valid sidecar responses must reach callers")
+assert(value:accept(ticket.root, "candidate-one"), "accepted candidates must be reported to the sidecar")
+assert(
+	writes[#writes]:find("gator/completionAccepted", 1, true),
+	"acceptance notifications must not contain suggestion text"
+)
 
 local cancelled
 local second = value:request({ workspace = { root = vim.fn.getcwd() } }, function(_, error)

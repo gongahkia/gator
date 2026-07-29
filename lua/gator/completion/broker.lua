@@ -39,7 +39,10 @@ function M.new(opts)
 	if opts.spawn ~= nil and type(opts.spawn) ~= "function" then
 		fail("spawn must be a function")
 	end
-	return setmetatable({ settings = opts.settings, spawn = opts.spawn or default_spawn, sidecars = {}, enabled = nil }, Broker)
+	return setmetatable(
+		{ settings = opts.settings, spawn = opts.spawn or default_spawn, sidecars = {}, enabled = nil },
+		Broker
+	)
 end
 
 function Broker:is_enabled()
@@ -158,6 +161,18 @@ function Broker:cancel(ticket)
 		return false
 	end
 	local ok = pcall(sidecar.transport.cancel, sidecar.transport, ticket.id)
+	return ok
+end
+
+function Broker:accept(root, id)
+	if type(root) ~= "string" or type(id) ~= "string" then
+		return false
+	end
+	local sidecar = self.sidecars[root]
+	if not sidecar or sidecar.state ~= "ready" then
+		return false
+	end
+	local ok = pcall(sidecar.transport.notify, sidecar.transport, "gator/completionAccepted", { id = id })
 	return ok
 end
 

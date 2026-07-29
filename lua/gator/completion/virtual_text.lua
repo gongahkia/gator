@@ -55,7 +55,11 @@ local function candidate(item, document)
 	then
 		return nil
 	end
-	return { id = type(item.id) == "string" and item.id or nil, text = text, range = { start = start, ["end"] = finish } }
+	return {
+		id = type(item.id) == "string" and item.id or nil,
+		text = text,
+		range = { start = start, ["end"] = finish },
+	}
 end
 
 local function render()
@@ -76,7 +80,13 @@ local function render()
 			return { { line, "GatorCompletionSuggestion" } }
 		end, lines)
 	end
-	vim.api.nvim_buf_set_extmark(current.buffer, namespace, item.range.start.line, item.range.start.byte_column, options)
+	vim.api.nvim_buf_set_extmark(
+		current.buffer,
+		namespace,
+		item.range.start.line,
+		item.range.start.byte_column,
+		options
+	)
 end
 
 local function reset(cancel)
@@ -102,7 +112,11 @@ local function apply(text)
 		return ""
 	end
 	local cursor = vim.api.nvim_win_get_cursor(0)
-	if vim.api.nvim_get_current_buf() ~= current.buffer or cursor[1] - 1 ~= current.document.cursor.line or cursor[2] ~= current.document.cursor.byte_column then
+	if
+		vim.api.nvim_get_current_buf() ~= current.buffer
+		or cursor[1] - 1 ~= current.document.cursor.line
+		or cursor[2] ~= current.document.cursor.byte_column
+	then
 		reset(true)
 		return ""
 	end
@@ -114,6 +128,9 @@ local function apply(text)
 		item.range["end"].byte_column,
 		vim.split(text, "\n", { plain = true, trimempty = false })
 	)
+	if item.id and current.ticket then
+		state.accept(current.ticket.root, item.id)
+	end
 	reset(false)
 	return ""
 end
@@ -136,7 +153,10 @@ local function remove_mapping(name)
 end
 
 function M.setup(opts)
-	state.settings, state.request, state.cancel = opts.settings, opts.request, opts.cancel
+	state.settings, state.request, state.cancel, state.accept =
+		opts.settings, opts.request, opts.cancel, opts.accept or function()
+			return false
+		end
 	reset(true)
 	for _, name in ipairs({ "accept", "accept_word", "accept_line", "clear", "next", "prev" }) do
 		vim.keymap.set("i", "<Plug>(gator-completion-" .. name .. ")", function()
@@ -165,9 +185,12 @@ function M.setup(opts)
 		end,
 	})
 	vim.api.nvim_create_autocmd({ "InsertLeave", "BufLeave" }, { group = group, callback = M.clear })
-	vim.api.nvim_create_autocmd("ColorScheme", { group = group, callback = function()
-		vim.api.nvim_set_hl(0, "GatorCompletionSuggestion", { link = "Comment", default = true })
-	end })
+	vim.api.nvim_create_autocmd("ColorScheme", {
+		group = group,
+		callback = function()
+			vim.api.nvim_set_hl(0, "GatorCompletionSuggestion", { link = "Comment", default = true })
+		end,
+	})
 end
 
 function M.complete()
@@ -217,16 +240,20 @@ function M.debounced_complete()
 		state.timer:close()
 	end
 	state.timer = vim.uv.new_timer()
-	state.timer:start(75, 0, vim.schedule_wrap(function()
-		if state.timer then
-			state.timer:stop()
-			state.timer:close()
-			state.timer = nil
-		end
-		if vim.fn.mode() == "i" then
-			M.complete()
-		end
-	end))
+	state.timer:start(
+		75,
+		0,
+		vim.schedule_wrap(function()
+			if state.timer then
+				state.timer:stop()
+				state.timer:close()
+				state.timer = nil
+			end
+			if vim.fn.mode() == "i" then
+				M.complete()
+			end
+		end)
+	)
 end
 
 function M.accept()
@@ -237,7 +264,11 @@ end
 function M.accept_word()
 	local current = state.current
 	local item = current and current.items and current.items[current.index] or nil
-	if not item or item.range.start.line ~= item.range["end"].line or item.range.start.byte_column ~= item.range["end"].byte_column then
+	if
+		not item
+		or item.range.start.line ~= item.range["end"].line
+		or item.range.start.byte_column ~= item.range["end"].byte_column
+	then
 		return ""
 	end
 	return apply(item.text:match("^%W*%w*") or item.text)
@@ -246,7 +277,11 @@ end
 function M.accept_line()
 	local current = state.current
 	local item = current and current.items and current.items[current.index] or nil
-	if not item or item.range.start.line ~= item.range["end"].line or item.range.start.byte_column ~= item.range["end"].byte_column then
+	if
+		not item
+		or item.range.start.line ~= item.range["end"].line
+		or item.range.start.byte_column ~= item.range["end"].byte_column
+	then
 		return ""
 	end
 	return apply((item.text:match("^[^\n]*") or item.text))

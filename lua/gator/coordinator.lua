@@ -224,7 +224,12 @@ end
 
 local function active_runs(value)
 	for _, run in ipairs(value:runs()) do
-		if run.state == "starting" or run.state == "running" or run.state == "waiting_input" or run.state == "detached" then
+		if
+			run.state == "starting"
+			or run.state == "running"
+			or run.state == "waiting_input"
+			or run.state == "detached"
+		then
 			return true
 		end
 	end
@@ -236,7 +241,8 @@ function Coordinator:completion_root(buffer)
 	if settings.root.apply_to == "completion" then
 		return nil
 	end
-	local candidate = completion_context.root({ buffer = buffer or vim.api.nvim_get_current_buf(), settings = settings })
+	local candidate =
+		completion_context.root({ buffer = buffer or vim.api.nvim_get_current_buf(), settings = settings })
 	if not candidate then
 		return nil
 	end
