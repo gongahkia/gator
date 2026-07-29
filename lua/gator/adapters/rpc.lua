@@ -117,6 +117,17 @@ function Transport:expire()
 	return #expired
 end
 
+function Transport:fail_all(error)
+	if type(error) ~= "table" or type(error.code) ~= "number" or type(error.message) ~= "string" then
+		fail("fail_all requires a JSON-RPC error")
+	end
+	local pending = self.pending
+	self.pending = {}
+	for _, value in pairs(pending) do
+		value.callback(nil, vim.deepcopy(error))
+	end
+end
+
 function Transport:feed(chunk)
 	if type(chunk) ~= "string" or chunk == "" then
 		fail("frame chunk must be a non-empty string")

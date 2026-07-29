@@ -145,6 +145,19 @@ function M.register()
 	vim.api.nvim_create_user_command("GatorHealth", function(opts)
 		require("gator").dispatch("health", { verbose = opts.bang })
 	end, { bang = true, desc = "Check Gator health (! shows individual provider diagnostics)" })
+	vim.api.nvim_create_user_command("GatorCompletion", function(opts)
+		local ok, value = pcall(require("gator").completion_command, opts.args)
+		local status = ok and value or nil
+		local message = ok and ("Completion " .. (status.enabled and (status.configured and "ready" or "needs sidecar.argv") or "disabled"))
+			or require("gator.policy.redact").text(tostring(value))
+		notice.show(message, ok and vim.log.levels.INFO or vim.log.levels.ERROR, { title = "Gator" })
+	end, {
+		nargs = "?",
+		complete = function()
+			return { "enable", "disable", "toggle", "status", "restart" }
+		end,
+		desc = "Control Gator inline completion",
+	})
 	vim.api.nvim_create_user_command("GatorExportDiagnostics", function()
 		vim.schedule(function()
 			local ok, result = pcall(require("gator").export_diagnostics)

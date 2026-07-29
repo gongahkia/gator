@@ -347,7 +347,11 @@ function Workflow:statusline(opts)
 			current = current or run
 		end
 	end
+	local completion = require("gator.completion").status_string()
 	if active == 0 then
+		if vim.tbl_contains(fields, "completion") then
+			return "Gator idle · " .. completion
+		end
 		return "Gator idle"
 	end
 	local values = {
@@ -357,6 +361,7 @@ function Workflow:statusline(opts)
 		role = current.role,
 		budget = current.budget.limit_tokens == 0 and "unbounded"
 			or (current.usage.total_tokens or "?") .. "/" .. current.budget.limit_tokens,
+		completion = completion,
 	}
 	local result = { "Gator" }
 	for _, field in ipairs(fields) do

@@ -46,6 +46,7 @@ function M.setup(opts)
 		M._coordinator:dispose()
 	end
 	M._coordinator = next
+	require("gator.completion").setup(next:state().config)
 	require("gator.commands").configure({
 		ask_selection = next:state().config.ui.ask_selection,
 		edit_selection = next:state().config.ui.edit_selection,
@@ -75,6 +76,43 @@ function M.statusline(opts)
 		M.setup()
 	end
 	return M._coordinator:statusline(opts)
+end
+
+function M.completion_status()
+	if not M._coordinator then
+		M.setup()
+	end
+	return require("gator.completion").status()
+end
+
+function M.complete()
+	if not M._coordinator then
+		M.setup()
+	end
+	return require("gator.completion").complete()
+end
+
+function M.completion_command(action)
+	if not M._coordinator then
+		M.setup()
+	end
+	local completion = require("gator.completion")
+	if action == "" or action == "status" then
+		return completion.status()
+	end
+	if action == "enable" then
+		return completion.enable()
+	end
+	if action == "disable" then
+		return completion.disable()
+	end
+	if action == "toggle" then
+		return completion.toggle()
+	end
+	if action == "restart" then
+		return completion.restart()
+	end
+	error("Gator completion: action must be enable, disable, toggle, status, or restart", 2)
 end
 
 function M.compatibility()
