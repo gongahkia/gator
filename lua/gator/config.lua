@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 14
+M.schema_version = 15
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -41,6 +41,18 @@ M.defaults = {
 			review = "required",
 			profile = "full",
 			source_summary = false,
+		},
+	},
+	completion = {
+		enabled = true,
+		sidecar = { argv = {}, timeout_ms = 30000, restart_backoff_ms = 1000 },
+		context = { mode = "bounded", before_lines = 120, after_lines = 60, max_bytes = 32768 },
+		root = { strategy = "git", markers = { ".git", "package.json" }, apply_to = "completion" },
+		ui = {
+			virtual_text = { enabled = true, priority = 65535 },
+			cmp = { enabled = false },
+			blink = { enabled = false },
+			keymaps = { accept = "<Tab>", accept_word = false, accept_line = false, clear = false, next = false, prev = false },
 		},
 	},
 	edits = { save = "always" },
@@ -127,6 +139,7 @@ local root_fields = {
 	ui = true,
 	extensions = true,
 	context = true,
+	completion = true,
 	edits = true,
 	launch = true,
 	permissions = true,
@@ -239,6 +252,70 @@ local function settings(value)
 		{ mode = true, trust = true, preflight = true, references = true, handoff = true },
 		"settings.context"
 	)
+	fields(value.completion, { enabled = true, sidecar = true, context = true, root = true, ui = true }, "settings.completion")
+	if type(value.completion.enabled) ~= "boolean" then
+		fail("completion.enabled must be boolean")
+	end
+	fields(value.completion.sidecar, { argv = true, timeout_ms = true, restart_backoff_ms = true }, "settings.completion.sidecar")
+	if type(value.completion.sidecar.argv) ~= "table" or not vim.islist(value.completion.sidecar.argv) then
+		fail("completion.sidecar.argv must be an argv array")
+	end
+	for index, item in ipairs(value.completion.sidecar.argv) do
+		if type(item) ~= "string" or item == "" then
+			fail("completion.sidecar.argv[" .. index .. "] must be non-empty text")
+		end
+	end
+	for _, field in ipairs({ "timeout_ms", "restart_backoff_ms" }) do
+		if type(value.completion.sidecar[field]) ~= "number" or value.completion.sidecar[field] < 1 or value.completion.sidecar[field] % 1 ~= 0 then
+			fail("completion.sidecar." .. field .. " must be a positive integer")
+		end
+	end
+	fields(value.completion.context, { mode = true, before_lines = true, after_lines = true, max_bytes = true }, "settings.completion.context")
+	if not vim.tbl_contains({ "bounded", "buffer", "workspace" }, value.completion.context.mode) then
+		fail("completion.context.mode must be bounded, buffer, or workspace")
+	end
+	for _, field in ipairs({ "before_lines", "after_lines", "max_bytes" }) do
+		if type(value.completion.context[field]) ~= "number" or value.completion.context[field] < 1 or value.completion.context[field] % 1 ~= 0 then
+			fail("completion.context." .. field .. " must be a positive integer")
+		end
+	end
+	fields(value.completion.root, { strategy = true, markers = true, apply_to = true }, "settings.completion.root")
+	if not vim.tbl_contains({ "git", "lsp", "markers" }, value.completion.root.strategy) then
+		fail("completion.root.strategy must be git, lsp, or markers")
+	end
+	if type(value.completion.root.markers) ~= "table" or not vim.islist(value.completion.root.markers) then
+		fail("completion.root.markers must be an array")
+	end
+	for index, marker in ipairs(value.completion.root.markers) do
+		if type(marker) ~= "string" or marker == "" or marker:find("/", 1, true) then
+			fail("completion.root.markers[" .. index .. "] must be a filename")
+		end
+	end
+	if not vim.tbl_contains({ "completion", "workspace", "prompt" }, value.completion.root.apply_to) then
+		fail("completion.root.apply_to must be completion, workspace, or prompt")
+	end
+	fields(value.completion.ui, { virtual_text = true, cmp = true, blink = true, keymaps = true }, "settings.completion.ui")
+	fields(value.completion.ui.virtual_text, { enabled = true, priority = true }, "settings.completion.ui.virtual_text")
+	if type(value.completion.ui.virtual_text.enabled) ~= "boolean" then
+		fail("completion.ui.virtual_text.enabled must be boolean")
+	end
+	if type(value.completion.ui.virtual_text.priority) ~= "number" or value.completion.ui.virtual_text.priority < 1 or value.completion.ui.virtual_text.priority % 1 ~= 0 then
+		fail("completion.ui.virtual_text.priority must be a positive integer")
+	end
+	for _, surface in ipairs({ "cmp", "blink" }) do
+		fields(value.completion.ui[surface], { enabled = true }, "settings.completion.ui." .. surface)
+		if type(value.completion.ui[surface].enabled) ~= "boolean" then
+			fail("completion.ui." .. surface .. ".enabled must be boolean")
+		end
+	end
+	if type(value.completion.ui.keymaps) ~= "table" or vim.islist(value.completion.ui.keymaps) then
+		fail("completion.ui.keymaps must be an object")
+	end
+	for name, mapping in pairs(value.completion.ui.keymaps) do
+		if not ({ accept = true, accept_word = true, accept_line = true, clear = true, next = true, prev = true })[name] or (mapping ~= false and (type(mapping) ~= "string" or mapping == "")) then
+			fail("completion.ui.keymaps must use supported mappings or false")
+		end
+	end
 	fields(value.edits, { save = true }, "settings.edits")
 	fields(value.launch, { default_provider = true, transport = true, stall_after_ms = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")
@@ -529,6 +606,7 @@ function M.migrate(value)
 		and from_version ~= 11
 		and from_version ~= 12
 		and from_version ~= 13
+		and from_version ~= 14
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end
@@ -557,6 +635,7 @@ function M.migrate(value)
 		document.context.preflight.confirm = false
 	end
 	document.context.references = document.context.references or vim.deepcopy(M.defaults.context.references)
+	document.completion = document.completion or vim.deepcopy(M.defaults.completion)
 	document.edits = document.edits or vim.deepcopy(M.defaults.edits)
 	document.context.handoff = document.context.handoff or {}
 	document.context.handoff.profile = document.context.handoff.profile or "full"
