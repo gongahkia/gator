@@ -126,6 +126,7 @@ require("gator").setup({
       before_lines = 120,
       after_lines = 60,
       max_bytes = 32768,
+      references = { "README.md" }, -- only in "workspace" mode; Git-tracked paths only
     },
     root = {
       strategy = "git", -- "git", "lsp", or "markers"

@@ -3167,7 +3167,7 @@ function Workflow:handoff(source_id, target, opts)
 			end
 		end,
 	}
-	return self:render_ui("handoff_review", {
+	local rendered = self:render_ui("handoff_review", {
 		source = vim.deepcopy(source),
 		target = target,
 		profile = profile,
@@ -3178,6 +3178,7 @@ function Workflow:handoff(source_id, target, opts)
 	}, function()
 		return self.handoff_review.open(review_options)
 	end)
+	return rendered == nil and true or rendered
 end
 
 function Workflow:launch_parallel(id)

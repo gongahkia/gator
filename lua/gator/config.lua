@@ -1,7 +1,7 @@
 local M = {}
 local redact = require("gator.policy.redact")
 
-M.schema_version = 15
+M.schema_version = 16
 M.source_precedence = { defaults = 1, file = 2, setup = 3 }
 
 M.defaults = {
@@ -46,7 +46,7 @@ M.defaults = {
 	completion = {
 		enabled = true,
 		sidecar = { argv = {}, timeout_ms = 30000, restart_backoff_ms = 1000 },
-		context = { mode = "bounded", before_lines = 120, after_lines = 60, max_bytes = 32768 },
+		context = { mode = "bounded", before_lines = 120, after_lines = 60, max_bytes = 32768, references = {} },
 		root = { strategy = "git", markers = { ".git", "package.json" }, apply_to = "completion" },
 		ui = {
 			virtual_text = { enabled = true, priority = 65535 },
@@ -291,7 +291,7 @@ local function settings(value)
 	end
 	fields(
 		value.completion.context,
-		{ mode = true, before_lines = true, after_lines = true, max_bytes = true },
+		{ mode = true, before_lines = true, after_lines = true, max_bytes = true, references = true },
 		"settings.completion.context"
 	)
 	if not vim.tbl_contains({ "bounded", "buffer", "workspace" }, value.completion.context.mode) then
@@ -304,6 +304,20 @@ local function settings(value)
 			or value.completion.context[field] % 1 ~= 0
 		then
 			fail("completion.context." .. field .. " must be a positive integer")
+		end
+	end
+	if type(value.completion.context.references) ~= "table" or not vim.islist(value.completion.context.references) then
+		fail("completion.context.references must be an array")
+	end
+	for index, path in ipairs(value.completion.context.references) do
+		if
+			type(path) ~= "string"
+			or path == ""
+			or path:sub(1, 1) == "/"
+			or path:find("\\", 1, true)
+			or path:find("..", 1, true)
+		then
+			fail("completion.context.references[" .. index .. "] must be a normalized relative path")
 		end
 	end
 	fields(value.completion.root, { strategy = true, markers = true, apply_to = true }, "settings.completion.root")
@@ -645,6 +659,7 @@ function M.migrate(value)
 		and from_version ~= 12
 		and from_version ~= 13
 		and from_version ~= 14
+		and from_version ~= 15
 	then
 		fail("settings.schema_version is unsupported: " .. from_version)
 	end

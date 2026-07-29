@@ -19,3 +19,14 @@ assert(
 	payload.context.mode == "bounded" and payload.context.redactions == 1,
 	"completion context must report its delivery policy"
 )
+
+local workspace_settings = config.resolve({
+	completion = {
+		context = { mode = "workspace", max_bytes = 256, references = { "tests/fixtures/sample.txt" } },
+	},
+}).completion
+local workspace_payload = assert(context.document({ buffer = 0, settings = workspace_settings }))
+assert(
+	workspace_payload.workspace.references[1].path == "tests/fixtures/sample.txt",
+	"workspace completion mode must include only explicit Git-tracked references"
+)

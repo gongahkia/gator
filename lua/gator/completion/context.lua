@@ -76,6 +76,35 @@ local function range(first, last, maximum, lines)
 	return first, last, value
 end
 
+local function references(root, paths, remaining)
+	if not root or #paths == 0 or remaining < 1 then
+		return {}, 0
+	end
+	local values, redactions = {}, 0
+	for _, path in ipairs(paths) do
+		local tracked = vim.system({ "git", "ls-files", "--error-unmatch", "--", path }, { cwd = root, text = true })
+			:wait()
+		local absolute = vim.uv.fs_realpath(root .. "/" .. path)
+		local stat = absolute and vim.uv.fs_stat(absolute) or nil
+		if tracked.code == 0 and stat and stat.type == "file" and stat.size <= remaining then
+			local handle = vim.uv.fs_open(absolute, "r", 420)
+			local raw = handle and vim.uv.fs_read(handle, stat.size, 0) or nil
+			if handle then
+				vim.uv.fs_close(handle)
+			end
+			if type(raw) == "string" and not raw:find("%z") then
+				local inspected = redact.inspect(raw)
+				if #inspected.text <= remaining then
+					table.insert(values, { path = path, text = inspected.text })
+					remaining = remaining - #inspected.text
+					redactions = redactions + inspected.matches
+				end
+			end
+		end
+	end
+	return values, redactions
+end
+
 function M.document(opts)
 	if type(opts) ~= "table" or type(opts.buffer) ~= "number" or type(opts.settings) ~= "table" then
 		fail("document requires buffer and settings")
@@ -95,19 +124,26 @@ function M.document(opts)
 	local row, column = cursor[1] - 1, cursor[2]
 	local lines = vim.api.nvim_buf_get_lines(buffer, 0, -1, false)
 	local settings = opts.settings.context
+	local document_maximum = settings.mode == "workspace" and math.max(1, math.floor(settings.max_bytes / 2))
+		or settings.max_bytes
 	local first, last = 0, #lines
 	if settings.mode == "bounded" then
 		first = math.max(0, row - settings.before_lines)
 		last = math.min(#lines, row + settings.after_lines + 1)
 	end
-	first, last, _ = range(first, last, settings.max_bytes, lines)
+	first, last, _ = range(first, last, document_maximum, lines)
 	local selected = vim.list_slice(lines, first + 1, last)
 	local raw = table.concat(selected, "\n")
-	if #raw > settings.max_bytes then
-		raw = raw:sub(1, settings.max_bytes)
+	if #raw > document_maximum then
+		raw = raw:sub(1, document_maximum)
 	end
 	local inspected = redact.inspect(raw)
 	local root = M.root({ buffer = buffer, settings = opts.settings })
+	local workspace_references, reference_redactions = {}, 0
+	if settings.mode == "workspace" then
+		workspace_references, reference_redactions =
+			references(root, settings.references, settings.max_bytes - #inspected.text)
+	end
 	return {
 		document = {
 			uri = vim.uri_from_fname(vim.fs.normalize(path)),
@@ -117,8 +153,8 @@ function M.document(opts)
 			window = { first_line = first, last_line = last - 1, truncated = #raw < #table.concat(selected, "\n") },
 			cursor = { line = row, byte_column = column },
 		},
-		workspace = { root = root, apply_to = opts.settings.root.apply_to },
-		context = { mode = settings.mode, redactions = inspected.matches },
+		workspace = { root = root, apply_to = opts.settings.root.apply_to, references = workspace_references },
+		context = { mode = settings.mode, redactions = inspected.matches + reference_redactions },
 	}
 end
 
