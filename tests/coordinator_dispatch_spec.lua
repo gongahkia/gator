@@ -9,6 +9,7 @@ assert(
 		"handoff",
 		"send_context",
 		"ask_selection",
+		"edit",
 		"review",
 		"runbook_next",
 		"health",

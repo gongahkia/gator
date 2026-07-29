@@ -1132,7 +1132,12 @@ function Workflow:open_conversation(run)
 		turn_started_at = run.state == "running" and run.updated_at or nil,
 		history = history,
 		on_input = function(message)
-			self:compose({ prompt = "Gator prompt: ", on_submit = function(message) self:send(run.id, message) end })
+			self:compose({
+				prompt = "Gator prompt: ",
+				on_submit = function(message)
+					self:send(run.id, message)
+				end,
+			})
 		end,
 		on_cancel = function()
 			self:cancel(run.id)
@@ -1586,7 +1591,7 @@ function Workflow:launch(opts)
 		fail("launch requires options")
 	end
 	local objective = text(opts.objective, "objective")
-	if opts.reference_context == nil then
+	if not opts.references_resolved then
 		local resolved = self:resolve_references(objective)
 		opts.reference_context, opts.reference_artifacts = resolved.context, resolved.artifacts
 	end
@@ -2033,7 +2038,9 @@ function Workflow:ask_selection(opts)
 			return false
 		end
 		local resolved = self:resolve_references(question)
-		if resolved.context then question = question .. "\n\n" .. resolved.context end
+		if resolved.context then
+			question = question .. "\n\n" .. resolved.context
+		end
 		local ok, err = pcall(self.send_context, self, {
 			run_id = run.id,
 			kind = "selection",
@@ -2071,7 +2078,9 @@ function Workflow:ask_selection(opts)
 		prompt = "Ask Gator about selected lines: ",
 		on_submit = function(question)
 			local ok, err = pcall(submit, question)
-			if not ok then notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" }) end
+			if not ok then
+				notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			end
 		end,
 	})
 end
@@ -2088,8 +2097,15 @@ local function edit_selection(workspace, opts)
 	if not path or not vim.startswith(path, workspace .. "/") then
 		fail("selection edits require a file inside the current Git workspace")
 	end
-	local start = vim.api.nvim_buf_set_extmark(selected.buffer, edit_namespace, selected.first_line - 1, 0, { right_gravity = false })
-	local finish = vim.api.nvim_buf_set_extmark(selected.buffer, edit_namespace, selected.last_line, 0, { right_gravity = true })
+	local start = vim.api.nvim_buf_set_extmark(
+		selected.buffer,
+		edit_namespace,
+		selected.first_line - 1,
+		0,
+		{ right_gravity = false }
+	)
+	local finish =
+		vim.api.nvim_buf_set_extmark(selected.buffer, edit_namespace, selected.last_line, 0, { right_gravity = true })
 	return {
 		buffer = selected.buffer,
 		path = selected.path,
@@ -2127,11 +2143,18 @@ function Workflow:eligible_edit_runs()
 	local values = {}
 	for _, run in ipairs(self:runs()) do
 		local active = self.active[run.id]
-		if run.state == "waiting_input" and active and active.kind == "structured" and vim.fs.normalize(run.workspace.root) == self.root then
+		if
+			run.state == "waiting_input"
+			and active
+			and active.kind == "structured"
+			and vim.fs.normalize(run.workspace.root) == self.root
+		then
 			table.insert(values, run)
 		end
 	end
-	table.sort(values, function(left, right) return left.id < right.id end)
+	table.sort(values, function(left, right)
+		return left.id < right.id
+	end)
 	return values
 end
 
@@ -2145,7 +2168,11 @@ function Workflow:deliver_edit(run, value, message, artifacts)
 		redactions = 0,
 		artifacts = artifacts,
 	}
-	self:journal(run.id, "edit.requested", { path = value.path, first_line = value.first_line, last_line = value.last_line, references = #artifacts - 1 })
+	self:journal(
+		run.id,
+		"edit.requested",
+		{ path = value.path, first_line = value.first_line, last_line = value.last_line, references = #artifacts - 1 }
+	)
 	self:journal(run.id, "context.prepared", preflight)
 	local function deliver()
 		self:journal(run.id, "context.sent", preflight)
@@ -2171,7 +2198,9 @@ function Workflow:create_edit_run(value, objective, resolved)
 			table.insert(choices, candidate)
 		end
 	end
-	table.sort(choices, function(left, right) return left.provider < right.provider end)
+	table.sort(choices, function(left, right)
+		return left.provider < right.provider
+	end)
 	if #choices == 0 then
 		fail("no ready structured Gator provider can create a selection edit")
 	end
@@ -2181,23 +2210,39 @@ function Workflow:create_edit_run(value, objective, resolved)
 			provider = choice.provider,
 			transport = "chat",
 			objective = message,
-			capture = capture.current({ buffer = value.buffer, first_line = value.first_line, last_line = value.last_line }),
+			capture = capture.current({
+				buffer = value.buffer,
+				first_line = value.first_line,
+				last_line = value.last_line,
+			}),
 			remember = false,
+			references_resolved = true,
 			reference_context = nil,
 			reference_artifacts = resolved.artifacts,
 		})
 		self.pending_edits[run.id] = value
-		self:journal(run.id, "edit.requested", { path = value.path, first_line = value.first_line, last_line = value.last_line, references = #resolved.artifacts })
+		self:journal(run.id, "edit.requested", {
+			path = value.path,
+			first_line = value.first_line,
+			last_line = value.last_line,
+			references = #resolved.artifacts,
+		})
 		return run
 	end
-	if #choices == 1 then return launch(choices[1]) end
+	if #choices == 1 then
+		return launch(choices[1])
+	end
 	vim.ui.select(choices, {
 		prompt = "New Gator selection edit provider",
-		format_item = function(choice) return choice.provider end,
+		format_item = function(choice)
+			return choice.provider
+		end,
 	}, function(choice)
 		if choice then
 			local ok, err = pcall(launch, choice)
-			if not ok then notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" }) end
+			if not ok then
+				notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+			end
 		end
 	end)
 	return true
@@ -2205,33 +2250,72 @@ end
 
 function Workflow:edit(opts)
 	opts = opts or {}
-	if type(opts) ~= "table" then fail("edit requires options") end
+	if type(opts) ~= "table" then
+		fail("edit requires options")
+	end
 	local value = edit_selection(self.root, opts)
 	return self:compose({
 		prompt = "Gator selection edit: ",
 		on_submit = function(objective)
 			local resolved = self:resolve_references(objective)
 			local function existing(run)
-				if run.state ~= "waiting_input" or not self.active[run.id] or self.active[run.id].kind ~= "structured" then
+				if
+					run.state ~= "waiting_input"
+					or not self.active[run.id]
+					or self.active[run.id].kind ~= "structured"
+				then
 					fail("selection edits require a ready structured Gator chat")
 				end
 				if vim.fs.normalize(run.workspace.root) ~= self.root then
 					fail("selection edit chat must use the selected buffer's Git workspace")
 				end
 				local message = edit_prompt(value, objective, resolved.context)
-				local artifacts = { { kind = "selection", path = value.path, first_line = value.first_line, last_line = value.last_line, bytes = #value.text } }
-				for _, artifact in ipairs(resolved.artifacts) do table.insert(artifacts, { kind = "reference:" .. artifact.kind, ref = artifact.ref, bytes = artifact.bytes }) end
+				local artifacts = {
+					{
+						kind = "selection",
+						path = value.path,
+						first_line = value.first_line,
+						last_line = value.last_line,
+						bytes = #value.text,
+					},
+				}
+				for _, artifact in ipairs(resolved.artifacts) do
+					table.insert(
+						artifacts,
+						{ kind = "reference:" .. artifact.kind, ref = artifact.ref, bytes = artifact.bytes }
+					)
+				end
 				return self:deliver_edit(run, value, message, artifacts)
 			end
-			if opts.run_id then return existing(self:run(opts.run_id)) end
+			if opts.run_id then
+				return existing(self:run(opts.run_id))
+			end
 			local runs = self:eligible_edit_runs()
-			if #runs == 1 then return existing(runs[1]) end
+			if #runs == 1 then
+				return existing(runs[1])
+			end
 			local choices = { { kind = "new", label = "New dedicated edit run" } }
-			for _, run in ipairs(runs) do table.insert(choices, { kind = "run", run = run, label = run.provider .. " · " .. run.objective }) end
-			vim.ui.select(choices, { prompt = "Gator selection edit", format_item = function(choice) return choice.label end }, function(choice)
-				if not choice then return end
-				local ok, err = pcall(choice.kind == "new" and self.create_edit_run or existing, self, choice.kind == "new" and value or choice.run, choice.kind == "new" and objective or nil, choice.kind == "new" and resolved or nil)
-				if not ok then notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" }) end
+			for _, run in ipairs(runs) do
+				table.insert(choices, { kind = "run", run = run, label = run.provider .. " · " .. run.objective })
+			end
+			vim.ui.select(choices, {
+				prompt = "Gator selection edit",
+				format_item = function(choice)
+					return choice.label
+				end,
+			}, function(choice)
+				if not choice then
+					return
+				end
+				local ok, err
+				if choice.kind == "new" then
+					ok, err = pcall(self.create_edit_run, self, value, objective, resolved)
+				else
+					ok, err = pcall(existing, choice.run)
+				end
+				if not ok then
+					notice.show(tostring(err), vim.log.levels.ERROR, { title = "Gator" })
+				end
 			end)
 			return true
 		end,
@@ -2240,10 +2324,19 @@ end
 
 function Workflow:complete_edit(id)
 	local value = self.pending_edits[id]
-	if not value then return false end
+	if not value then
+		return false
+	end
 	self.pending_edits[id] = nil
 	local transcript = self:transcript(self:run(id)) or ""
-	local response = transcript:match("## assistant\n(.*)$") or ""
+	local response = ""
+	local parts = vim.split(transcript, "\n\n", { plain = true, trimempty = false })
+	for index = #parts, 1, -1 do
+		if vim.startswith(parts[index], "## assistant\n") then
+			response = parts[index]:sub(#"## assistant\n" + 1)
+			break
+		end
+	end
 	local replacements = {}
 	for replacement in response:gmatch("<gator%-replacement>(.-)</gator%-replacement>") do
 		table.insert(replacements, replacement)
@@ -2258,9 +2351,14 @@ function Workflow:complete_edit(id)
 	return edit_preview.open({
 		before = value.text,
 		after = replacement,
-		on_cancel = function() self:journal(id, "edit.cancelled", { reason = "preview_cancelled" }) end,
+		on_cancel = function()
+			self:journal(id, "edit.cancelled", { reason = "preview_cancelled" })
+		end,
 		on_apply = function()
-			if not vim.api.nvim_buf_is_valid(value.buffer) or vim.api.nvim_buf_get_changedtick(value.buffer) ~= value.changedtick then
+			if
+				not vim.api.nvim_buf_is_valid(value.buffer)
+				or vim.api.nvim_buf_get_changedtick(value.buffer) ~= value.changedtick
+			then
 				self:journal(id, "edit.rejected", { reason = "stale_selection" })
 				notice.show("Gator edit: buffer changed since selection; preview was not applied", vim.log.levels.WARN)
 				return
@@ -2271,16 +2369,30 @@ function Workflow:complete_edit(id)
 				self:journal(id, "edit.rejected", { reason = "selection_unavailable" })
 				return
 			end
-			vim.api.nvim_buf_set_lines(value.buffer, start[1], finish[1], false, vim.split(replacement, "\n", { plain = true, trimempty = false }))
+			vim.api.nvim_buf_set_lines(
+				value.buffer,
+				start[1],
+				finish[1],
+				false,
+				vim.split(replacement, "\n", { plain = true, trimempty = false })
+			)
 			vim.api.nvim_buf_del_extmark(value.buffer, edit_namespace, value.start)
 			vim.api.nvim_buf_del_extmark(value.buffer, edit_namespace, value.finish)
 			self:journal(id, "edit.applied", { path = value.path, save = self.state.config.edits.save })
 			if self.state.config.edits.save == "always" then
-				local ok, err = pcall(vim.api.nvim_buf_call, value.buffer, function() vim.cmd("silent write") end)
-				if not ok then notice.show("Gator edit save: " .. tostring(err), vim.log.levels.ERROR) end
+				local ok, err = pcall(vim.api.nvim_buf_call, value.buffer, function()
+					vim.cmd("silent write")
+				end)
+				if not ok then
+					notice.show("Gator edit save: " .. tostring(err), vim.log.levels.ERROR)
+				end
 			elseif self.state.config.edits.save == "ask" then
 				vim.ui.select({ "Save buffer", "Leave modified" }, { prompt = "Gator edit applied" }, function(choice)
-					if choice == "Save buffer" then pcall(vim.api.nvim_buf_call, value.buffer, function() vim.cmd("silent write") end) end
+					if choice == "Save buffer" then
+						pcall(vim.api.nvim_buf_call, value.buffer, function()
+							vim.cmd("silent write")
+						end)
+					end
 				end)
 			end
 		end,

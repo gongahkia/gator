@@ -234,7 +234,11 @@ local function settings(value)
 		end
 		extension_modules[module] = true
 	end
-	fields(value.context, { mode = true, trust = true, preflight = true, references = true, handoff = true }, "settings.context")
+	fields(
+		value.context,
+		{ mode = true, trust = true, preflight = true, references = true, handoff = true },
+		"settings.context"
+	)
 	fields(value.edits, { save = true }, "settings.edits")
 	fields(value.launch, { default_provider = true, transport = true, stall_after_ms = true }, "settings.launch")
 	fields(value.permissions, { codex = true }, "settings.permissions")
@@ -305,7 +309,10 @@ local function settings(value)
 		end
 	end
 	fields(value.ui.edit_selection, { keymap = true }, "settings.ui.edit_selection")
-	if value.ui.edit_selection.keymap ~= false and (type(value.ui.edit_selection.keymap) ~= "string" or value.ui.edit_selection.keymap == "") then
+	if
+		value.ui.edit_selection.keymap ~= false
+		and (type(value.ui.edit_selection.keymap) ~= "string" or value.ui.edit_selection.keymap == "")
+	then
 		fail("ui.edit_selection.keymap must be false or a non-empty mapping")
 	end
 	fields(value.ui.resources, { enabled = true, fields = true }, "settings.ui.resources")
@@ -355,7 +362,11 @@ local function settings(value)
 	if type(value.context.preflight.confirm) ~= "boolean" then
 		fail("context.preflight.confirm must be boolean")
 	end
-	fields(value.context.references, { roots = true, max_files = true, max_file_bytes = true, max_total_bytes = true }, "settings.context.references")
+	fields(
+		value.context.references,
+		{ roots = true, max_files = true, max_file_bytes = true, max_total_bytes = true },
+		"settings.context.references"
+	)
 	if type(value.context.references.roots) ~= "table" or not vim.islist(value.context.references.roots) then
 		fail("context.references.roots must be an array")
 	end
@@ -365,7 +376,11 @@ local function settings(value)
 		end
 	end
 	for _, field in ipairs({ "max_files", "max_file_bytes", "max_total_bytes" }) do
-		if type(value.context.references[field]) ~= "number" or value.context.references[field] < 1 or value.context.references[field] % 1 ~= 0 then
+		if
+			type(value.context.references[field]) ~= "number"
+			or value.context.references[field] < 1
+			or value.context.references[field] % 1 ~= 0
+		then
 			fail("context.references." .. field .. " must be a positive integer")
 		end
 	end

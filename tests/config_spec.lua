@@ -65,6 +65,18 @@ assert(
 )
 local ask_selection = config.resolve({ ui = { ask_selection = { keymap = false } } }).ui.ask_selection
 assert(ask_selection.keymap == false, "selection ask mapping must allow an explicit opt-out")
+local edit_settings = config.resolve({
+	ui = { composer = { enabled = false }, edit_selection = { keymap = false } },
+	context = { references = { roots = {}, max_files = 2, max_file_bytes = 1024, max_total_bytes = 2048 } },
+	edits = { save = "ask" },
+})
+assert(
+	not edit_settings.ui.composer.enabled
+		and edit_settings.ui.edit_selection.keymap == false
+		and edit_settings.context.references.max_files == 2
+		and edit_settings.edits.save == "ask",
+	"composer, references, selection-edit mapping, and save policy must be configurable"
+)
 assert(
 	config.resolve({ launch = { stall_after_ms = 120 } }).launch.stall_after_ms == 120,
 	"provider stall threshold must be configurable in milliseconds"
@@ -133,6 +145,10 @@ assert(
 		and not pcall(config.resolve, { ui = { chat = { height = 5 } } })
 		and not pcall(config.resolve, { ui = { chat = { width = 19 } } })
 		and not pcall(config.resolve, { ui = { ask_selection = { keymap = true } } })
+		and not pcall(config.resolve, { ui = { edit_selection = { keymap = true } } })
+		and not pcall(config.resolve, { ui = { composer = { enabled = "yes" } } })
+		and not pcall(config.resolve, { edits = { save = "now" } })
+		and not pcall(config.resolve, { context = { references = { max_files = 0 } } })
 		and not pcall(config.resolve, { ui = { ask_selection = { keymap = "" } } })
 		and not pcall(config.resolve, { ui = { resources = { enabled = "yes" } } })
 		and not pcall(config.resolve, { ui = { resources = { fields = { "tokens" } } } })
@@ -170,7 +186,7 @@ assert(
 		and table.concat(vim.fn.readfile(path), "\n") == legacy,
 	"unversioned legacy configuration files must migrate without a durable rewrite"
 )
-helpers.write(path, '{"schema_version":14}')
+helpers.write(path, '{"schema_version":15}')
 assert(not pcall(config.load, path), "unknown file schemas must fail before migration")
 
 local layered = config.resolve_sources({

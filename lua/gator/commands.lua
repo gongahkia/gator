@@ -19,7 +19,11 @@ local function remove_default_mapping(kind)
 	if current and current.rhs == rhs then
 		vim.keymap.del("x", installed)
 	end
-	if kind == "edit" then installed_edit_mapping = nil else installed_ask_mapping = nil end
+	if kind == "edit" then
+		installed_edit_mapping = nil
+	else
+		installed_ask_mapping = nil
+	end
 end
 
 function M.configure(opts)

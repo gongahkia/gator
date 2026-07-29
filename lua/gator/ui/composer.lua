@@ -88,7 +88,13 @@ function M.open(opts)
 		on_cancel = opts.on_cancel or function() end,
 	}
 	panels[tabpage] = panel
-	vim.api.nvim_buf_set_lines(buffer, 0, -1, false, { "# Gator composer", "# #directive · @tracked-file · <C-s> send · q cancel", "" })
+	vim.api.nvim_buf_set_lines(
+		buffer,
+		0,
+		-1,
+		false,
+		{ "# Gator composer", "# #directive · @tracked-file · <C-s> send · q cancel", "" }
+	)
 	vim.bo[buffer].modifiable = true
 	vim.api.nvim_win_set_cursor(panel.window, { 3, 0 })
 	local function close(submit)

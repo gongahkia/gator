@@ -56,6 +56,7 @@ Then open a source file and run `:GatorHealth`, followed by `:Gator codex`. `req
 | `:GatorHandoff <run-id> [provider]` | Review a bundle and create a new target-provider session. |
 | `:[range]GatorSend [run-id] [selection\|diagnostic\|hunk\|bundle] [bundle-id]` | Send provenance-labelled editor context to an active structured chat. |
 | `:[range]GatorAsk [run-id]` | Ask a ready structured chat one question about the selected lines. |
+| `:[range]GatorEdit [run-id]` | Request, preview, and apply one structured-chat replacement for selected lines. |
 | `:GatorReview [run-id]` | Inspect a worktree diff and run an explicitly configured review command. |
 | `:GatorRunbook` | Select and start one ready manual runbook step. |
 | `:GatorStopSession [run-id]` | Stop a Gator-managed local process. |
@@ -93,6 +94,12 @@ require("gator").setup({
     codex = { sandbox = "workspace_write" }, -- or "read_only"; sent to Codex App Server
   },
   context = {
+    references = {
+      roots = { "/path/to/skills" }, -- global <root>/<name>/SKILL.md directories
+      max_files = 12,
+      max_file_bytes = 32768,
+      max_total_bytes = 131072,
+    },
     preflight = {
       confirm = false, -- log metadata by default; true asks before every launch/context send
     },
@@ -135,6 +142,7 @@ require("gator").setup({
     pi = { user_confirmed = true }, -- only after Pi is configured locally
   },
   ui = {
+    composer = { enabled = true }, -- false uses vim.ui.input without #/@ completion
     icons = "ascii", -- "unicode", "nerd_font", "ascii", or "none"
     resources = {
       enabled = true, -- false hides local resource lines in :GatorRuns
@@ -153,6 +161,9 @@ require("gator").setup({
     ask_selection = {
       keymap = "<leader>gA", -- false disables only Gator's unclaimed default mapping
     },
+    edit_selection = {
+      keymap = "<leader>gE", -- false disables only Gator's unclaimed default
+    },
     renderers = {
       provider_picker = "native", -- or an extension renderer id
       run_graph = "native",
@@ -164,12 +175,17 @@ require("gator").setup({
       columns = { "id", "provider", "role", "state", "context", "resources", "budget", "trust" },
     },
   },
+  edits = { save = "always" }, -- "always", "never", or "ask"
 })
 ```
 
 Gator vendors 169 selectable loading animations from [Rattles](https://github.com/vyfor/rattles) and [Whirly](https://github.com/janlelis/whirly); see [loading dialogs](docs/LOADING.md) and [third-party notices](THIRD_PARTY_NOTICES.md). `ui.motion.enabled = false` or `ui.motion.reduced = true` leaves the dialog visible but static.
 
 Focused chats use `+`/`-` to resize, `f` to toggle fullscreen, `o` to cycle split, float, and fullscreen layouts, and `r` to open the run list. After 120 seconds without a structured provider event, the chat says it is stalled and leaves `c` cancel, `q` detach, and `r` runs available; it never retries or kills the provider automatically. Terminal companions expose focus, stop, detach, runs, journal, and handoff without reading terminal output. `?` explains the selection (`:GatorAsk`) and run flows (resume, review, handoff). These mappings can be overridden through `ui.keymaps`.
+
+Interactive Gator prompts use a native composer: type `#name` to attach a configured `<root>/<name>/SKILL.md`, or `@path` to attach a Git-tracked workspace file. Gator snapshots and redacts selected reference content before delivery; `:Gator` and chat follow-ups retain the existing context preflight behavior. A project may add roots inside its Git workspace through `.gator/references.json`, for example `{"roots":[".agents/skills"]}`. Global roots may be external user-owned directories.
+
+In Visual mode, `<leader>gE` opens a selection-edit composer. Gator reuses the sole ready same-workspace structured chat when possible; otherwise choose an eligible chat or create a dedicated edit run. The provider must return exactly one `<gator-replacement>` payload. Gator previews the diff, rejects a stale selection, applies one undoable buffer edit only after confirmation, then follows `edits.save`. Existing provider permissions remain unchanged.
 
 Provider selection precedence is explicit command/API provider, project-local remembered provider, global `launch.default_provider`, then the picker. An unavailable configured provider opens the picker; Gator does not silently substitute another agent.
 

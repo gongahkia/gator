@@ -14,7 +14,7 @@ local function root(value, name)
 	if type(value) ~= "string" or value == "" then
 		fail(name .. " must be non-empty text")
 	end
-	local resolved = vim.uv.fs_realpath(value)
+	local resolved = vim.uv.fs_realpath(vim.fn.expand(value))
 	if not resolved or vim.fn.isdirectory(resolved) ~= 1 then
 		fail(name .. " must resolve to a directory")
 	end
@@ -72,7 +72,10 @@ local function project_roots(workspace)
 	end
 	local values = {}
 	for index, value in ipairs(document.roots) do
-		local candidate = root(workspace .. "/" .. relative(value, "project references roots[" .. index .. "]"), "project references root")
+		local candidate = root(
+			workspace .. "/" .. relative(value, "project references roots[" .. index .. "]"),
+			"project references root"
+		)
 		if not inside(candidate, workspace) then
 			fail("project references roots must remain inside the Git workspace")
 		end
@@ -193,7 +196,10 @@ function M.resolve(opts)
 		end
 		remaining = remaining - #inspected.text
 		selected[key] = true
-		table.insert(artifacts, { kind = kind, ref = name, source = source, bytes = #inspected.text, redactions = inspected.matches })
+		table.insert(
+			artifacts,
+			{ kind = kind, ref = name, source = source, bytes = #inspected.text, redactions = inspected.matches }
+		)
 		table.insert(sections, "## Gator reference · " .. kind .. " `" .. name .. "`\n\n" .. inspected.text)
 	end
 	for token in opts.prompt:gmatch("#([%w_.-]+)") do
