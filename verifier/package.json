@@ -1,0 +1,1 @@
+{"name":"norbot-verifier-browser","private":true,"version":"1.0.0","dependencies":{"axe-core":"4.11.1","playwright":"1.62.0"}}

@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    environment:
+      POSTGRES_USER: norbot
+      POSTGRES_PASSWORD: norbot
+      POSTGRES_DB: norbot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U norbot -d norbot"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    ports: ["127.0.0.1:55432:5432"]

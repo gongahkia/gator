@@ -1,0 +1,93 @@
+{
+  "providers": [
+    {
+      "id": "openai",
+      "kind": "openai_responses",
+      "model": "gpt-5",
+      "base_url": "https://api.openai.com/v1",
+      "credential_env": "OPENAI_API_KEY",
+      "budget": {"max_concurrent": 2, "requests_per_minute": 60},
+      "stages": ["planner", "builder", "verifier"]
+    },
+    {
+      "id": "anthropic",
+      "kind": "anthropic_messages",
+      "model": "claude-sonnet-4-6",
+      "base_url": "https://api.anthropic.com",
+      "credential_env": "ANTHROPIC_API_KEY",
+      "budget": {"max_concurrent": 2, "requests_per_minute": 50},
+      "stages": ["planner", "builder", "verifier"]
+    },
+    {
+      "id": "gemini",
+      "kind": "gemini_generate_content",
+      "model": "gemini-3.6-flash",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "credential_env": "GEMINI_API_KEY",
+      "budget": {"max_concurrent": 2, "requests_per_minute": 60},
+      "stages": ["planner", "builder", "verifier"]
+    },
+    {
+      "id": "codex",
+      "kind": "cli",
+      "image": "ghcr.io/openai/codex:latest",
+      "network": "bridge",
+      "credential_env": "OPENAI_API_KEY",
+      "budget": {"max_concurrent": 1, "requests_per_minute": 20},
+      "command": ["codex", "exec", "--json"],
+      "stages": ["planner", "builder", "verifier"]
+    }
+  ],
+  "profiles": ["frontend-only", "full-stack", "agentic"],
+  "tool_policy": {
+    "artifact_read": {"enabled": true, "approval_required": false, "roles": ["researcher", "builder"], "allowed_path_prefixes": ["agent-input/", "agent-output/", "generated-app/", "stage-output/"], "max_calls": 8},
+    "http_get": {"enabled": true, "approval_required": false, "roles": ["researcher"], "allowed_hosts": ["api.example.com"], "max_calls": 4},
+    "http_write": {"enabled": true, "approval_required": true, "roles": ["operator"], "max_calls": 2},
+    "database_mutate": {"enabled": true, "approval_required": true, "roles": ["operator"], "max_calls": 2},
+    "file_write": {"enabled": true, "approval_required": true, "roles": ["operator"], "allowed_path_prefixes": ["agent-output/"], "max_calls": 2},
+    "shell": {"enabled": false, "approval_required": true, "roles": ["operator"], "allowed_commands": [], "max_calls": 1}
+  },
+  "plugins": [],
+  "workflow": {"max_fixes": 2},
+  "security": {
+    "public": false,
+    "http": {"require_https": false, "rate_per_minute": 240, "rate_burst": 60, "metrics_token_env": "NORBOT_METRICS_TOKEN"}
+  },
+  "artifacts": {
+    "enabled": false,
+    "endpoint": "https://s3.example.com", "region": "us-east-1", "bucket": "norbot-artifacts", "access_key_env": "NORBOT_S3_ACCESS_KEY", "secret_key_env": "NORBOT_S3_SECRET_KEY", "force_path_style": true
+  },
+  "retention": {"agent_turns_days": 90, "channel_messages_days": 90, "run_events_days": 365, "provider_usage_days": 365},
+  "runtime": {
+    "default_target": "docker",
+    "docker": {
+      "mode": "rootless_remote_tls",
+      "host_env": "DOCKER_HOST",
+      "tls_verify_env": "DOCKER_TLS_VERIFY",
+      "cert_path_env": "DOCKER_CERT_PATH"
+    },
+    "verification": {"browser_image": "norbot-verifier-browser:local"},
+    "sandbox": {"image": "alpine:3.21", "cpu_milli": 500, "memory_mib": 512, "timeout_seconds": 60, "egress_proxy_url": "", "egress_proxy_secret_env": ""},
+    "kubernetes": {
+      "kubeconfig": "/absolute/path/to/kubeconfig",
+      "context": "",
+      "namespace": "norbot",
+      "service_account": "norbot-runtime",
+      "registry_repository": "registry.example.com/norbot",
+      "registry_pull_secret": "registry-pull",
+      "ingress_class": "",
+      "ingress_base_domain": "",
+      "ingress_controller_namespace": "",
+      "cpu_milli": 500,
+      "memory_mib": 512,
+      "replicas": 1,
+      "quota_cpu_milli": 10000,
+      "quota_memory_mib": 10240,
+      "quota_storage_gib": 40,
+      "quota_pods": 50,
+      "quota_jobs": 30,
+      "quota_pvcs": 30,
+      "network_policy_enforced": false
+    }
+  }
+}

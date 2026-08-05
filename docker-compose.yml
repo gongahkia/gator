@@ -1,0 +1,47 @@
+services:
+  verifier-browser:
+    image: norbot-verifier-browser:local
+    build:
+      context: ./verifier
+    command: ["true"]
+
+  postgres:
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    environment:
+      POSTGRES_USER: norbot
+      POSTGRES_PASSWORD: norbot
+      POSTGRES_DB: norbot
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U norbot -d norbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  norbot:
+    build: .
+    env_file: .env
+    environment:
+      NORBOT_DATABASE_URL: ${NORBOT_DATABASE_URL:-postgres://norbot:norbot@postgres:5432/norbot?sslmode=disable}
+      NORBOT_HTTP_ADDR: ${NORBOT_HTTP_ADDR:-0.0.0.0:8080}
+      NORBOT_ARTIFACTS_DIR: ${NORBOT_ARTIFACTS_DIR:-/var/lib/norbot/artifacts}
+      NORBOT_CONFIG: /etc/norbot/config.json
+      NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET: ${NORBOT_ALLOW_UNSAFE_LOCAL_DOCKER_SOCKET:-true}
+      NORBOT_CONTAINER_LOCAL: "true"
+      NORBOT_WEBHOOK_ADDR: ${NORBOT_WEBHOOK_ADDR:-0.0.0.0:8081}
+      NORBOT_WORKERS: ${NORBOT_WORKERS:-2}
+    volumes:
+      - ${NORBOT_CONFIG_HOST:-./config.json}:/etc/norbot/config.json:ro
+      - norbot_artifacts:/var/lib/norbot/artifacts
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  norbot_artifacts:
