@@ -1,7 +1,0 @@
-.git
-.env
-config.json
-.norbot
-artifacts
-web/node_modules
-web/dist
