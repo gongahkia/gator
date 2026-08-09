@@ -7,10 +7,12 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Provider interface {
+	ID() string
 	Status(context.Context) ProviderStatus
 	Start(context.Context, Workspace, string, io.Reader, io.Writer, io.Writer) (*exec.Cmd, error)
 }
@@ -22,8 +24,7 @@ type Registry struct {
 func NewRegistry(providers ...Provider) *Registry {
 	registry := &Registry{providers: map[string]Provider{}}
 	for _, provider := range providers {
-		status := provider.Status(context.Background())
-		registry.providers[status.ID] = provider
+		registry.providers[provider.ID()] = provider
 	}
 	return registry
 }
@@ -46,8 +47,19 @@ func DefaultRegistry() *Registry {
 
 func (r *Registry) Statuses(ctx context.Context) []ProviderStatus {
 	statuses := make([]ProviderStatus, 0, len(r.providers))
+	values := make(chan ProviderStatus, len(r.providers))
+	var group sync.WaitGroup
 	for _, provider := range r.providers {
-		statuses = append(statuses, provider.Status(ctx))
+		group.Add(1)
+		go func(value Provider) {
+			defer group.Done()
+			values <- value.Status(ctx)
+		}(provider)
+	}
+	group.Wait()
+	close(values)
+	for value := range values {
+		statuses = append(statuses, value)
 	}
 	sort.Slice(statuses, func(i, j int) bool { return statuses[i].ID < statuses[j].ID })
 	return statuses
@@ -63,6 +75,8 @@ type probeOnlyProvider struct {
 	executable   string
 	capabilities ProviderCapabilities
 }
+
+func (p probeOnlyProvider) ID() string { return p.id }
 
 func (p probeOnlyProvider) Status(ctx context.Context) ProviderStatus {
 	path, err := exec.LookPath(p.executable)
@@ -82,6 +96,8 @@ type commandProvider struct {
 	argv         func(string) []string
 	capabilities ProviderCapabilities
 }
+
+func (p commandProvider) ID() string { return p.id }
 
 func (p commandProvider) Status(ctx context.Context) ProviderStatus {
 	path, err := exec.LookPath(p.executable)

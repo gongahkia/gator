@@ -1,5 +1,7 @@
 # Provider support
 
+This document describes the retained Lua/Neovim provider implementation. Standalone Go support is intentionally narrower during migration: it discovers every provider listed here but currently executes only Codex through `codex exec`; all other execution adapters are explicitly reported as unimplemented. See the [standalone provider boundary](STANDALONE.md#provider-boundary) before treating this matrix as standalone capability parity.
+
 Gator selects only adapters that pass their local executable/version/capability checks. Provider authentication remains provider-owned. `user_confirmed` is an explicit user readiness assertion for CLIs without a machine-readable auth-status command; it is not credential verification.
 
 | Provider | Auto transport | Resume/handoff truth |

@@ -75,35 +75,35 @@ type Activity struct {
 }
 
 type Verification struct {
-	State       string `json:"state"` // unknown, passed, failed
+	State       string   `json:"state"` // unknown, passed, failed
 	EvidenceIDs []string `json:"evidence_ids,omitempty"`
-	DiffSHA256  string `json:"diff_sha256,omitempty"`
-	BaseSHA     string `json:"base_sha,omitempty"`
+	DiffSHA256  string   `json:"diff_sha256,omitempty"`
+	BaseSHA     string   `json:"base_sha,omitempty"`
 }
 
 type Run struct {
-	SchemaVersion  int             `json:"schema_version"`
-	ID             string          `json:"id"`
-	TaskID         string          `json:"task_id"`
-	Objective      string          `json:"objective"`
-	Provider       string          `json:"provider"`
-	Role           string          `json:"role"`
-	Transport      string          `json:"transport"`
-	State          string          `json:"state"`
-	Workspace      Workspace       `json:"workspace"`
-	SessionID      string          `json:"session_id,omitempty"`
-	ParentRunID    string          `json:"parent_run_id,omitempty"`
-	Dependencies   []string        `json:"dependencies,omitempty"`
-	Context        ContextManifest `json:"context"`
-	Policy         PolicyRef       `json:"policy"`
-	Usage          Usage           `json:"usage"`
-	Activity       Activity        `json:"activity"`
-	Verification   Verification    `json:"verification"`
-	StartedAt      time.Time       `json:"started_at,omitempty"`
-	FinishedAt     time.Time       `json:"finished_at,omitempty"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
-	ProviderError  string          `json:"provider_error,omitempty"`
+	SchemaVersion int             `json:"schema_version"`
+	ID            string          `json:"id"`
+	TaskID        string          `json:"task_id"`
+	Objective     string          `json:"objective"`
+	Provider      string          `json:"provider"`
+	Role          string          `json:"role"`
+	Transport     string          `json:"transport"`
+	State         string          `json:"state"`
+	Workspace     Workspace       `json:"workspace"`
+	SessionID     string          `json:"session_id,omitempty"`
+	ParentRunID   string          `json:"parent_run_id,omitempty"`
+	Dependencies  []string        `json:"dependencies,omitempty"`
+	Context       ContextManifest `json:"context"`
+	Policy        PolicyRef       `json:"policy"`
+	Usage         Usage           `json:"usage"`
+	Activity      Activity        `json:"activity"`
+	Verification  Verification    `json:"verification"`
+	StartedAt     time.Time       `json:"started_at,omitempty"`
+	FinishedAt    time.Time       `json:"finished_at,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	ProviderError string          `json:"provider_error,omitempty"`
 }
 
 type Event struct {
@@ -136,33 +136,33 @@ type Evidence struct {
 }
 
 type Episode struct {
-	SchemaVersion      int       `json:"schema_version"`
-	ID                 string    `json:"id"`
-	RunID              string    `json:"run_id"`
-	TaskFingerprint    string    `json:"task_fingerprint"`
-	Provider           string    `json:"provider"`
-	PolicyVersion      string    `json:"policy_version"`
-	WorkflowTopology   string    `json:"workflow_topology"`
-	StartingSHA        string    `json:"starting_sha"`
-	EndingSHA          string    `json:"ending_sha,omitempty"`
-	EndingDiffSHA256   string    `json:"ending_diff_sha256,omitempty"`
-	DurationMillis     int64     `json:"duration_millis"`
-	RunState           string    `json:"run_state"`
-	VerificationState  string    `json:"verification_state"`
-	Usage              Usage     `json:"usage"`
-	ObservedAt         time.Time `json:"observed_at"`
+	SchemaVersion     int       `json:"schema_version"`
+	ID                string    `json:"id"`
+	RunID             string    `json:"run_id"`
+	TaskFingerprint   string    `json:"task_fingerprint"`
+	Provider          string    `json:"provider"`
+	PolicyVersion     string    `json:"policy_version"`
+	WorkflowTopology  string    `json:"workflow_topology"`
+	StartingSHA       string    `json:"starting_sha"`
+	EndingSHA         string    `json:"ending_sha,omitempty"`
+	EndingDiffSHA256  string    `json:"ending_diff_sha256,omitempty"`
+	DurationMillis    int64     `json:"duration_millis"`
+	RunState          string    `json:"run_state"`
+	VerificationState string    `json:"verification_state"`
+	Usage             Usage     `json:"usage"`
+	ObservedAt        time.Time `json:"observed_at"`
 }
 
 type ExperimentResult struct {
-	SchemaVersion int       `json:"schema_version"`
-	ID            string    `json:"id"`
-	Objective     string    `json:"objective"`
-	Provider      string    `json:"provider"`
-	BaselineRunID string    `json:"baseline_run_id"`
-	CandidateRunID string   `json:"candidate_run_id"`
-	BaselinePolicy string    `json:"baseline_policy"`
-	CandidatePolicy string   `json:"candidate_policy"`
-	Verdict       string    `json:"verdict"` // candidate_better, baseline_better, tie, inconclusive
-	Reason        string    `json:"reason"`
-	CreatedAt     time.Time `json:"created_at"`
+	SchemaVersion   int       `json:"schema_version"`
+	ID              string    `json:"id"`
+	Objective       string    `json:"objective"`
+	Provider        string    `json:"provider"`
+	BaselineRunID   string    `json:"baseline_run_id"`
+	CandidateRunID  string    `json:"candidate_run_id"`
+	BaselinePolicy  string    `json:"baseline_policy"`
+	CandidatePolicy string    `json:"candidate_policy"`
+	Verdict         string    `json:"verdict"` // candidate_better, baseline_better, tie, inconclusive
+	Reason          string    `json:"reason"`
+	CreatedAt       time.Time `json:"created_at"`
 }

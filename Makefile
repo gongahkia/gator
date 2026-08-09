@@ -1,9 +1,11 @@
-.PHONY: temp test fixture-test conformance-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-codex-e2e live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-kimi-e2e live-vibe-test live-vibe-e2e live-copilot-test live-copilot-e2e live-pi-test live-pi-e2e live-handoff-e2e indexer-test sidecar benchmark fmt format-check lint check issues
+.PHONY: temp test fixture-test conformance-test live-aider-test live-aider-e2e live-amp-test live-amp-e2e live-cline-test live-cline-e2e live-cursor-test live-cursor-e2e live-codex-test live-codex-e2e live-gemini-test live-gemini-e2e live-goose-test live-goose-e2e live-kimi-test live-kimi-e2e live-vibe-test live-vibe-e2e live-copilot-test live-copilot-e2e live-pi-test live-pi-e2e live-handoff-e2e indexer-test sidecar benchmark fmt format-check lint gofmt gofmt-check go-test go-vet gator-build standalone-check check issues
 
 NVIM ?= nvim
 NVIM_TEST = tests/gator-test.sh
 NVIM_LINT = tests/gator-test.sh lint
 INDEXER_TEST = tests/gator-test.sh indexer
+GO ?= go
+GATOR_BIN = bin/gator
 TEMP_GATOR_SETTINGS = { providers = { aider = { user_confirmed = true }, amp = { user_confirmed = true }, cline = { user_confirmed = true }, copilot = { user_confirmed = true }, cursor = { user_confirmed = true }, gemini = { user_confirmed = true }, goose = { user_confirmed = true }, kimi = { user_confirmed = true }, pi = { user_confirmed = true }, vibe = { user_confirmed = true } } }
 
 temp:
@@ -110,15 +112,35 @@ sidecar:
 fmt:
 	stylua lua plugin tests
 	cargo fmt --manifest-path crates/gator-index/Cargo.toml
+	$(GO)fmt -w cmd internal
 
 format-check:
 	stylua --check lua plugin tests
 	cargo fmt --manifest-path crates/gator-index/Cargo.toml --check
+	@test -z "$$($(GO)fmt -l cmd internal)"
 
 lint:
 	$(NVIM_LINT)
 
-check: test indexer-test format-check lint
+gofmt:
+	$(GO)fmt -w cmd internal
+
+gofmt-check:
+	@test -z "$$($(GO)fmt -l cmd internal)"
+
+go-test:
+	$(GO) test ./...
+
+go-vet:
+	$(GO) vet ./...
+
+gator-build:
+	mkdir -p bin
+	$(GO) build -o $(GATOR_BIN) ./cmd/gator
+
+standalone-check: gofmt-check go-test go-vet gator-build
+
+check: test indexer-test format-check lint standalone-check
 
 issues:
 	node scripts/seed_issues.mjs

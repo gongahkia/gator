@@ -21,9 +21,9 @@ type RoutingPolicy struct {
 }
 
 type ContextPolicy struct {
-	MaxFiles     int  `json:"max_files"`
-	MaxBytes     int  `json:"max_bytes"`
-	IncludeDiff  bool `json:"include_diff"`
+	MaxFiles    int  `json:"max_files"`
+	MaxBytes    int  `json:"max_bytes"`
+	IncludeDiff bool `json:"include_diff"`
 }
 
 type WorkflowPolicy struct {
@@ -116,7 +116,10 @@ func identifier(value string) bool {
 		return false
 	}
 	for index, character := range value {
-		if !((character >= 'a' && character <= 'z') || (character >= '0' && character <= '9' && index > 0) || character == '_' || character == '-') {
+		if index == 0 && !(character >= 'a' && character <= 'z') {
+			return false
+		}
+		if index > 0 && !((character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || character == '_' || character == '-') {
 			return false
 		}
 	}

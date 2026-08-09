@@ -58,9 +58,13 @@ func DiscoverWorkspace(ctx context.Context, cwd string) (Workspace, error) {
 	if filepath.Clean(common) != filepath.Join(root, ".git") {
 		kind = "worktree"
 	}
+	changes := 0
+	if status != "" {
+		changes = len(strings.Split(strings.TrimSuffix(status, "\x00"), "\x00"))
+	}
 	return Workspace{
 		Root: root, Branch: strings.TrimSpace(branchValue), Head: strings.TrimSpace(headValue),
-		Dirty: status != "", ChangeCount: len(strings.Split(strings.TrimSuffix(status, "\x00"), "\x00")), Kind: kind,
+		Dirty: status != "", ChangeCount: changes, Kind: kind,
 	}, nil
 }
 

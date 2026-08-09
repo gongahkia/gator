@@ -52,9 +52,10 @@ func (e *Engine) VerifyAll(ctx context.Context, runID string, output, errors io.
 		return evidence, err
 	}
 	if run.Verification.State == "failed" {
+		_ = e.recordEpisode(ctx, run)
 		return evidence, fmt.Errorf("verification failed")
 	}
-	return evidence, nil
+	return evidence, e.recordEpisode(ctx, run)
 }
 
 func (e *Engine) verify(ctx context.Context, run Run, spec CommandSpec, output, errors io.Writer) (Evidence, error) {

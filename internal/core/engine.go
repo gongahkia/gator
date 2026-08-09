@@ -36,10 +36,10 @@ func NewForTest(workspace Workspace, store *Store, providers *Registry) *Engine 
 	return &Engine{workspace: workspace, store: store, providers: providers}
 }
 
-func (e *Engine) Workspace() Workspace      { return e.workspace }
-func (e *Engine) Store() *Store              { return e.store }
+func (e *Engine) Workspace() Workspace                           { return e.workspace }
+func (e *Engine) Store() *Store                                  { return e.store }
 func (e *Engine) Providers(ctx context.Context) []ProviderStatus { return e.providers.Statuses(ctx) }
-func (e *Engine) Policy() (Policy, PolicyRef, error) { return LoadPolicy(e.workspace.Root) }
+func (e *Engine) Policy() (Policy, PolicyRef, error)             { return LoadPolicy(e.workspace.Root) }
 
 type RunRequest struct {
 	Objective    string
@@ -89,6 +89,7 @@ func (e *Engine) runWithPolicy(ctx context.Context, request RunRequest, policy P
 	}
 	workspace := e.workspace
 	id := e.id("run")
+	var err error
 	if request.Worktree {
 		workspace, err = CreateWorktree(ctx, e.workspace, id)
 		if err != nil {
@@ -208,7 +209,7 @@ func (e *Engine) recordEpisode(ctx context.Context, run Run) error {
 	}
 	fingerprint := sha256.Sum256([]byte(run.Objective))
 	episode := Episode{
-		SchemaVersion: SchemaVersion, ID: e.id("episode"), RunID: run.ID,
+		SchemaVersion: SchemaVersion, ID: "episode-" + run.ID, RunID: run.ID,
 		TaskFingerprint: hex.EncodeToString(fingerprint[:12]), Provider: run.Provider, PolicyVersion: run.Policy.Version,
 		WorkflowTopology: "direct_writer", StartingSHA: run.Workspace.Head, EndingSHA: ending.Head,
 		EndingDiffSHA256: diff, DurationMillis: duration, RunState: run.State,
