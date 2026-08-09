@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPolicyRoundTripAndValidation(t *testing.T) {
@@ -30,6 +31,40 @@ func TestPolicyRoundTripAndValidation(t *testing.T) {
 	loaded.Verification.Commands = []CommandSpec{{ID: "bad", Argv: nil}}
 	if err := loaded.Validate(); err == nil {
 		t.Fatal("policy accepted an argv-free verification command")
+	}
+	if err := os.WriteFile(PolicyPath(root), []byte(`{"schema_version":1,"routing":{"default_provider":"codex"},"context":{"max_files":1,"max_bytes":1,"include_diff":false},"workflow":{"topology":"direct_writer"},"verification":{"commands":[]},"security":{"disable_approvals":true}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LoadPolicy(root); err == nil {
+		t.Fatal("policy accepted an unknown security field")
+	}
+}
+
+func TestProviderCancellationMarksTheRunFailedAndReapsItsProcess(t *testing.T) {
+	root := gitRepository(t)
+	workspace, err := DiscoverWorkspace(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(root)
+	if err := store.Ensure(); err != nil {
+		t.Fatal(err)
+	}
+	engine := NewForTest(workspace, store, NewRegistry(slowProvider{}))
+	includeDiff := false
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { time.Sleep(50 * time.Millisecond); cancel() }()
+	started := time.Now()
+	run, err := engine.Run(ctx, RunRequest{Objective: "cancel process", Provider: "slow", IncludeDiff: &includeDiff, Execute: true}, nil, io.Discard, io.Discard)
+	if err == nil || run.State != "failed" {
+		t.Fatalf("cancellation did not fail the run: %#v / %v", run, err)
+	}
+	if time.Since(started) > 2*time.Second {
+		t.Fatal("provider cancellation did not terminate promptly")
+	}
+	if _, statErr := os.Stat(filepath.Join(engine.Store().Dir(), "episodes", "episode-"+run.ID+".json")); statErr != nil {
+		t.Fatalf("cancelled provider run did not retain outcome metadata: %v", statErr)
 	}
 }
 
@@ -63,14 +98,14 @@ func TestContextIsRedactedBoundedAndMetadataOnly(t *testing.T) {
 	}
 }
 
-func TestDryRunPersistsRunEventsAndEpisode(t *testing.T) {
+func TestDryRunPersistsRunPlanAndEventsWithoutOutcome(t *testing.T) {
 	engine := testEngine(t)
 	includeDiff := false
 	run, err := engine.Run(context.Background(), RunRequest{Objective: "catalog source", Provider: "fake", IncludeDiff: &includeDiff}, nil, io.Discard, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.State != "completed" || run.Transport != "terminal" || run.Policy.Version == "" {
+	if run.State != "planned" || run.Transport != "terminal" || run.Policy.Version == "" {
 		t.Fatalf("unexpected dry run: %#v", run)
 	}
 	persisted, err := engine.Store().GetRun(run.ID)
@@ -84,11 +119,11 @@ func TestDryRunPersistsRunEventsAndEpisode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 3 || events[0].Type != "run.created" || events[2].Type != "run.dry_run" {
+	if len(events) != 3 || events[0].Type != "run.created" || events[2].Type != "run.planned" {
 		t.Fatalf("event journal is incomplete: %#v", events)
 	}
-	if _, err := os.Stat(filepath.Join(engine.Store().Dir(), "episodes", "episode-"+run.ID+".json")); err != nil {
-		t.Fatalf("episode was not written: %v", err)
+	if _, err := os.Stat(filepath.Join(engine.Store().Dir(), "episodes", "episode-"+run.ID+".json")); !os.IsNotExist(err) {
+		t.Fatalf("planned run incorrectly wrote an outcome episode: %v", err)
 	}
 }
 
@@ -152,6 +187,49 @@ func TestWorktreeAndExperimentPlansAreIsolated(t *testing.T) {
 	}
 }
 
+func TestSecondActiveWriterIsMovedToAnIsolatedWorktree(t *testing.T) {
+	engine := testEngine(t)
+	now := time.Now().UTC()
+	active := Run{SchemaVersion: SchemaVersion, ID: "run-existing", TaskID: "task-existing", Objective: "active writer", Provider: "fake", Role: "writer", Transport: "terminal", State: "running", Workspace: engine.Workspace(), Context: ContextManifest{Entries: []ContextEntry{}, PreparedAt: now}, Policy: PolicyRef{SchemaVersion: 1, Version: "fixture", Source: "test"}, Usage: Usage{State: "unknown"}, Activity: Activity{State: "active", LastEventAt: now}, Verification: Verification{State: "unknown"}, CreatedAt: now, UpdatedAt: now, StartedAt: now}
+	if err := engine.Store().PutRun(active); err != nil {
+		t.Fatal(err)
+	}
+	includeDiff := false
+	run, err := engine.Run(context.Background(), RunRequest{Objective: "second writer", Provider: "fake", IncludeDiff: &includeDiff}, nil, io.Discard, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Workspace.Kind != "worktree" || run.Workspace.Root == engine.Workspace().Root {
+		t.Fatalf("second writer was not isolated: %#v", run.Workspace)
+	}
+}
+
+func TestHandoffRecordsParentAndMetadataProvenance(t *testing.T) {
+	engine := testEngine(t)
+	includeDiff := false
+	source, err := engine.Run(context.Background(), RunRequest{Objective: "source objective", Provider: "fake", IncludeDiff: &includeDiff}, nil, io.Discard, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := engine.Handoff(context.Background(), source.ID, "fake", false, nil, io.Discard, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if target.ParentRunID != source.ID || len(target.Dependencies) != 1 || target.Dependencies[0] != source.ID {
+		t.Fatalf("handoff dependency was incomplete: %#v", target)
+	}
+	if target.Context.Entries[len(target.Context.Entries)-1].Kind != "handoff" {
+		t.Fatalf("handoff context provenance missing: %#v", target.Context)
+	}
+	events, err := engine.Store().Events(source.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if events[len(events)-1].Type != "handoff.prepared" {
+		t.Fatalf("source handoff event missing: %#v", events)
+	}
+}
+
 func testEngine(t *testing.T) *Engine {
 	t.Helper()
 	root := gitRepository(t)
@@ -175,6 +253,18 @@ func (fakeProvider) Status(context.Context) ProviderStatus {
 }
 func (fakeProvider) Start(ctx context.Context, workspace Workspace, _ string, input io.Reader, output, errors io.Writer) (*exec.Cmd, error) {
 	command := exec.CommandContext(ctx, "sh", "-c", "exit 0")
+	command.Dir, command.Stdin, command.Stdout, command.Stderr = workspace.Root, input, output, errors
+	return command, nil
+}
+
+type slowProvider struct{}
+
+func (slowProvider) ID() string { return "slow" }
+func (slowProvider) Status(context.Context) ProviderStatus {
+	return ProviderStatus{ID: "slow", Available: true, Capabilities: ProviderCapabilities{Terminal: true}}
+}
+func (slowProvider) Start(ctx context.Context, workspace Workspace, _ string, input io.Reader, output, errors io.Writer) (*exec.Cmd, error) {
+	command := exec.CommandContext(ctx, "sh", "-c", "sleep 10")
 	command.Dir, command.Stdin, command.Stdout, command.Stderr = workspace.Root, input, output, errors
 	return command, nil
 }

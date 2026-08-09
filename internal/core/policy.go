@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -140,14 +141,27 @@ func LoadPolicy(root string) (Policy, PolicyRef, error) {
 	if err != nil {
 		return Policy{}, PolicyRef{}, fmt.Errorf("read policy: %w", err)
 	}
-	var policy Policy
-	if err := json.Unmarshal(data, &policy); err != nil {
+	policy, err := decodePolicy(data)
+	if err != nil {
 		return Policy{}, PolicyRef{}, fmt.Errorf("decode policy: %w", err)
 	}
 	if err := policy.Validate(); err != nil {
 		return Policy{}, PolicyRef{}, err
 	}
 	return policy, PolicyRef{SchemaVersion: policy.SchemaVersion, Version: policy.Version, Source: path}, nil
+}
+
+func decodePolicy(data []byte) (Policy, error) {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	var policy Policy
+	if err := decoder.Decode(&policy); err != nil {
+		return Policy{}, err
+	}
+	if decoder.More() {
+		return Policy{}, fmt.Errorf("policy contains trailing JSON values")
+	}
+	return policy, nil
 }
 
 func SavePolicy(root string, policy Policy) (PolicyRef, error) {

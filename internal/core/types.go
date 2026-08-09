@@ -29,7 +29,8 @@ type ProviderCapabilities struct {
 
 type ProviderStatus struct {
 	ID           string               `json:"id"`
-	Available    bool                 `json:"available"`
+	Available    bool                 `json:"available"`  // executable standalone adapter is runnable
+	Discovered   bool                 `json:"discovered"` // provider CLI exists but may lack an adapter
 	Version      string               `json:"version,omitempty"`
 	Executable   string               `json:"executable"`
 	Capabilities ProviderCapabilities `json:"capabilities"`

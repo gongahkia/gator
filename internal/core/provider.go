@@ -31,17 +31,17 @@ func NewRegistry(providers ...Provider) *Registry {
 
 func DefaultRegistry() *Registry {
 	return NewRegistry(
-		commandProvider{id: "codex", executable: "codex", argv: func(prompt string) []string { return []string{"exec", prompt} }, capabilities: ProviderCapabilities{Terminal: true, Resume: true, Fork: true, Approvals: true, UsageReporting: true}},
-		probeOnlyProvider{id: "pi", executable: "pi", capabilities: ProviderCapabilities{Terminal: true, Resume: true, UsageReporting: true}},
+		commandProvider{id: "codex", executable: "codex", argv: func(prompt string) []string { return []string{"exec", prompt} }, capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "pi", executable: "pi", capabilities: ProviderCapabilities{Terminal: true}},
 		probeOnlyProvider{id: "aider", executable: "aider", capabilities: ProviderCapabilities{Terminal: true}},
 		probeOnlyProvider{id: "amp", executable: "amp", capabilities: ProviderCapabilities{Terminal: true}},
-		probeOnlyProvider{id: "cline", executable: "cline", capabilities: ProviderCapabilities{Terminal: true, Structured: true, Approvals: true}},
-		probeOnlyProvider{id: "copilot", executable: "copilot", capabilities: ProviderCapabilities{Terminal: true, Structured: true, Resume: true, Approvals: true}},
-		probeOnlyProvider{id: "cursor", executable: "cursor-agent", capabilities: ProviderCapabilities{Terminal: true, Structured: true, Resume: true}},
-		probeOnlyProvider{id: "gemini", executable: "gemini", capabilities: ProviderCapabilities{Terminal: true, Structured: true, Approvals: true}},
-		probeOnlyProvider{id: "goose", executable: "goose", capabilities: ProviderCapabilities{Terminal: true, Structured: true, Approvals: true}},
-		probeOnlyProvider{id: "kimi", executable: "kimi", capabilities: ProviderCapabilities{Terminal: true, Structured: true}},
-		probeOnlyProvider{id: "vibe", executable: "vibe", capabilities: ProviderCapabilities{Terminal: true, Structured: true}},
+		probeOnlyProvider{id: "cline", executable: "cline", capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "copilot", executable: "copilot", capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "cursor", executable: "cursor-agent", capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "gemini", executable: "gemini", capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "goose", executable: "goose", capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "kimi", executable: "kimi", capabilities: ProviderCapabilities{Terminal: true}},
+		probeOnlyProvider{id: "vibe", executable: "vibe", capabilities: ProviderCapabilities{Terminal: true}},
 	)
 }
 
@@ -83,7 +83,7 @@ func (p probeOnlyProvider) Status(ctx context.Context) ProviderStatus {
 	if err != nil {
 		return ProviderStatus{ID: p.id, Executable: p.executable, Capabilities: p.capabilities, Reason: "executable is unavailable"}
 	}
-	return ProviderStatus{ID: p.id, Available: true, Executable: path, Version: probeVersion(ctx, path), Capabilities: p.capabilities, Reason: "discovered; standalone execution adapter is not implemented"}
+	return ProviderStatus{ID: p.id, Discovered: true, Executable: path, Version: probeVersion(ctx, path), Capabilities: p.capabilities, Reason: "discovered; standalone execution adapter is not implemented"}
 }
 
 func (p probeOnlyProvider) Start(context.Context, Workspace, string, io.Reader, io.Writer, io.Writer) (*exec.Cmd, error) {
@@ -104,7 +104,7 @@ func (p commandProvider) Status(ctx context.Context) ProviderStatus {
 	if err != nil {
 		return ProviderStatus{ID: p.id, Executable: p.executable, Capabilities: p.capabilities, Reason: "executable is unavailable"}
 	}
-	return ProviderStatus{ID: p.id, Available: true, Executable: path, Version: probeVersion(ctx, path), Capabilities: p.capabilities}
+	return ProviderStatus{ID: p.id, Available: true, Discovered: true, Executable: path, Version: probeVersion(ctx, path), Capabilities: p.capabilities}
 }
 
 func (p commandProvider) Start(ctx context.Context, workspace Workspace, prompt string, input io.Reader, output, errors io.Writer) (*exec.Cmd, error) {

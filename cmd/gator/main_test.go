@@ -38,7 +38,7 @@ func TestHeadlessCLISurface(t *testing.T) {
 		t.Fatal(err)
 	}
 	fields := strings.Split(strings.TrimSpace(output.String()), "\t")
-	if len(fields) < 2 || !strings.HasPrefix(fields[0], "run-") || fields[1] != "completed" {
+	if len(fields) < 2 || !strings.HasPrefix(fields[0], "run-") || fields[1] != "planned" {
 		t.Fatalf("unexpected run output: %q", output.String())
 	}
 	runID := fields[0]
@@ -46,7 +46,7 @@ func TestHeadlessCLISurface(t *testing.T) {
 	if err := run(context.Background(), []string{"events", runID}, nil, &output, &stderr); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "run.dry_run") {
+	if !strings.Contains(output.String(), "run.planned") {
 		t.Fatalf("events did not expose dry run: %q", output.String())
 	}
 	output.Reset()

@@ -162,7 +162,7 @@ func showRuns(engine *core.Engine, output io.Writer) error {
 
 func showProviders(ctx context.Context, engine *core.Engine, output io.Writer) {
 	for _, provider := range engine.Providers(ctx) {
-		fmt.Fprintf(output, "%-10s available=%-5t transport=%-10s executable=%s %s\n", provider.ID, provider.Available, providerTransport(provider.Capabilities), provider.Executable, provider.Reason)
+		fmt.Fprintf(output, "%-10s available=%-5t discovered=%-5t transport=%-10s executable=%s %s\n", provider.ID, provider.Available, provider.Discovered, providerTransport(provider.Capabilities), provider.Executable, provider.Reason)
 	}
 }
 

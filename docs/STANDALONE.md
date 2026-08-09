@@ -46,7 +46,26 @@ This distinction is deliberate: Gator does not convert terminal output into a fa
 
 `Policy` version 1 has bounded routing, context limits, one of two workflow topologies, and an allowlist of verification argv commands. Schema validation rejects unsupported values, empty argv, and unbounded context. Security/privacy controls are not mutable policy parameters.
 
-An experiment runs baseline and candidate policies in separate Git worktrees. Dry runs record plans and are `inconclusive`. An executing comparison is only scored when both runs pass deterministic configured verification; it reports a transparent latency comparison and never promotes a policy automatically. This is an evidence-first continuation path, not an autonomous evolver.
+`gator policy init` creates the effective policy. The `version` field is recomputed from the validated document when Gator loads it. To add an explicit verification command, edit the created file with an argv list—never a shell string:
+
+```json
+{
+  "schema_version": 1,
+  "version": "policy-recomputed-on-load",
+  "routing": { "default_provider": "codex", "role_providers": {} },
+  "context": { "max_files": 12, "max_bytes": 131072, "include_diff": true },
+  "workflow": { "topology": "direct_writer" },
+  "verification": {
+    "commands": [
+      { "id": "unit", "argv": ["make", "test"] }
+    ]
+  }
+}
+```
+
+The policy file is local by default. Review it before deliberately tracking it; it must not contain credentials or permission-broadening settings.
+
+An experiment runs baseline and candidate policies in separate Git worktrees. Dry runs record `planned` runs and are `inconclusive`; they are not normalized as outcome episodes. An executing comparison is only scored when both runs pass deterministic configured verification; it reports a transparent latency comparison and never promotes a policy automatically. This is an evidence-first continuation path, not an autonomous evolver.
 
 ## Legacy Neovim migration
 

@@ -47,7 +47,7 @@ func run(ctx context.Context, args []string, input io.Reader, output, stderr io.
 			return err
 		}
 		for _, status := range engine.Providers(ctx) {
-			fmt.Fprintf(output, "%s\tavailable=%t\ttransport=%s\t%s\n", status.ID, status.Available, transport(status.Capabilities), status.Reason)
+			fmt.Fprintf(output, "%s\tavailable=%t\tdiscovered=%t\ttransport=%s\t%s\n", status.ID, status.Available, status.Discovered, transport(status.Capabilities), status.Reason)
 		}
 		return nil
 	case "health":
@@ -126,8 +126,12 @@ func runCommand(ctx context.Context, args []string, input io.Reader, output, std
 	if err != nil {
 		return err
 	}
-	includeDiff := !*noDiff
-	run, err := engine.Run(ctx, core.RunRequest{Objective: flags.Arg(0), Provider: *provider, Role: *role, Files: files, IncludeDiff: &includeDiff, Worktree: *worktree, Execute: *execute}, input, output, stderr)
+	var includeDiff *bool
+	if *noDiff {
+		value := false
+		includeDiff = &value
+	}
+	run, err := engine.Run(ctx, core.RunRequest{Objective: flags.Arg(0), Provider: *provider, Role: *role, Files: files, IncludeDiff: includeDiff, Worktree: *worktree, Execute: *execute}, input, output, stderr)
 	fmt.Fprintf(output, "%s\t%s\tprovider=%s\tverify=%s\n", run.ID, run.State, run.Provider, run.Verification.State)
 	return err
 }

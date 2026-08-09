@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -22,8 +21,8 @@ func LoadPolicyFile(path string) (Policy, error) {
 	if err != nil {
 		return Policy{}, err
 	}
-	var policy Policy
-	if err := json.Unmarshal(data, &policy); err != nil {
+	policy, err := decodePolicy(data)
+	if err != nil {
 		return Policy{}, err
 	}
 	if err := policy.Validate(); err != nil {

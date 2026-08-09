@@ -90,6 +90,16 @@ func (e *Engine) runWithPolicy(ctx context.Context, request RunRequest, policy P
 	workspace := e.workspace
 	id := e.id("run")
 	var err error
+	// A second active writer never shares the project checkout. The first writer
+	// may use it, but any concurrently persisted writer is isolated in a fresh
+	// worktree before it is allowed to start.
+	if !request.Worktree && (role == "writer" || role == "integrator") {
+		active, activeErr := e.activeWriterInProject()
+		if activeErr != nil {
+			return Run{}, activeErr
+		}
+		request.Worktree = active
+	}
 	if request.Worktree {
 		workspace, err = CreateWorktree(ctx, e.workspace, id)
 		if err != nil {
@@ -122,14 +132,10 @@ func (e *Engine) runWithPolicy(ctx context.Context, request RunRequest, policy P
 		return Run{}, err
 	}
 	if !request.Execute {
-		run.State, run.FinishedAt, run.UpdatedAt = "completed", time.Now().UTC(), time.Now().UTC()
-		if err := e.store.PutRun(run); err != nil {
+		if err := e.event(run, "run.planned", run.State, "execution was not requested", nil, ""); err != nil {
 			return Run{}, err
 		}
-		if err := e.event(run, "run.dry_run", run.State, "provider was not executed", nil, ""); err != nil {
-			return Run{}, err
-		}
-		return run, e.recordEpisode(ctx, run)
+		return run, nil
 	}
 
 	run.State, run.StartedAt, run.UpdatedAt = "running", time.Now().UTC(), time.Now().UTC()
@@ -175,16 +181,45 @@ func (e *Engine) runWithPolicy(ctx context.Context, request RunRequest, policy P
 	return run, e.recordEpisode(ctx, run)
 }
 
+func (e *Engine) activeWriterInProject() (bool, error) {
+	runs, err := e.store.ListRuns()
+	if err != nil {
+		return false, err
+	}
+	for _, existing := range runs {
+		if existing.State == "running" && existing.Workspace.Root == e.workspace.Root && (existing.Role == "writer" || existing.Role == "integrator") {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (e *Engine) Handoff(ctx context.Context, sourceID, provider string, execute bool, input io.Reader, output, errors io.Writer) (Run, error) {
 	source, err := e.store.GetRun(sourceID)
 	if err != nil {
 		return Run{}, err
 	}
 	objective := "Continue the reviewed handoff from " + source.Provider + ": " + source.Objective
-	return e.Run(ctx, RunRequest{
+	target, err := e.Run(ctx, RunRequest{
 		Objective: objective, Provider: provider, Role: "writer", ParentRunID: source.ID,
 		Dependencies: []string{source.ID}, Execute: execute,
 	}, input, output, errors)
+	if target.ID == "" {
+		return target, err
+	}
+	target.Context.Entries = append(target.Context.Entries, ContextEntry{Kind: "handoff", Path: source.ID})
+	target.Context.Description = target.Context.Description + "; handoff from " + source.ID
+	target.UpdatedAt = time.Now().UTC()
+	if storeErr := e.store.PutRun(target); storeErr != nil {
+		return target, storeErr
+	}
+	if eventErr := e.event(source, "handoff.prepared", source.State, "target run "+target.ID, nil, ""); eventErr != nil {
+		return target, eventErr
+	}
+	if eventErr := e.event(target, "handoff.received", target.State, "source run "+source.ID, nil, ""); eventErr != nil {
+		return target, eventErr
+	}
+	return target, err
 }
 
 func (e *Engine) event(run Run, kind, state, message string, exit *int, evidenceID string) error {
@@ -195,11 +230,16 @@ func (e *Engine) event(run Run, kind, state, message string, exit *int, evidence
 }
 
 func (e *Engine) recordEpisode(ctx context.Context, run Run) error {
-	_, diff, err := WorkspaceDiff(ctx, run.Workspace)
+	// Process cancellation must not discard the locally observable failure
+	// outcome. Observation gets a short independent deadline after the run has
+	// settled, but never reuses the provider process context.
+	observation, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_, diff, err := WorkspaceDiff(observation, run.Workspace)
 	if err != nil {
 		return err
 	}
-	ending, err := DiscoverWorkspace(ctx, run.Workspace.Root)
+	ending, err := DiscoverWorkspace(observation, run.Workspace.Root)
 	if err != nil {
 		return err
 	}
