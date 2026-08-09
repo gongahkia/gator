@@ -7,3 +7,4 @@ target/
 .gator/
 .gator-test/
 test-results/
+AGENTS.md
