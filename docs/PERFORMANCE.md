@@ -1,6 +1,6 @@
 # Performance budgets
 
-`make benchmark` measures startup, context assembly, a fixture-backed long JSONL stream, coalesced timeline updates under a sustained stream, worktree creation planning, native diff rendering, and indexer/retrieval work. It writes the complete duration and memory sample report to `.gator-test/benchmark-report.json`; CI uploads one report for every OS/Neovim matrix entry.
+`make benchmark` runs deterministic Lua performance-suite specifications for startup, context assembly, a fixture-backed long JSONL stream, coalesced timeline updates under a sustained stream, worktree creation planning, native diff rendering, and indexer/retrieval work. Each specification writes a temporary report to verify report serialization and regression handling. It does not currently emit `.gator-test/benchmark-report.json`; the CI upload step therefore warns when that optional artifact is absent.
 
 Each workload has three samples. A limit includes a 100% documented platform-variance allowance, and CI fails only when all three samples exceed the effective duration or memory limit. This avoids failing on a single noisy sample while preserving an artifact for actionable regressions.
 

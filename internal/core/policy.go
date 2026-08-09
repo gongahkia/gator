@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -158,8 +159,12 @@ func decodePolicy(data []byte) (Policy, error) {
 	if err := decoder.Decode(&policy); err != nil {
 		return Policy{}, err
 	}
-	if decoder.More() {
-		return Policy{}, fmt.Errorf("policy contains trailing JSON values")
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return Policy{}, fmt.Errorf("policy contains trailing JSON values")
+		}
+		return Policy{}, err
 	}
 	return policy, nil
 }

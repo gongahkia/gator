@@ -19,6 +19,9 @@ jobs:
         neovim: [v0.11.0, stable]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
       - uses: MunifTanjim/setup-neovim-action@5595675b7a0187e70489af966a26c43179d8ea5d # v1
         with:
           tag: ${{ matrix.neovim }}

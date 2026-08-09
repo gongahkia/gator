@@ -38,6 +38,13 @@ func TestPolicyRoundTripAndValidation(t *testing.T) {
 	if _, _, err := LoadPolicy(root); err == nil {
 		t.Fatal("policy accepted an unknown security field")
 	}
+	valid := `{"schema_version":1,"routing":{"default_provider":"codex"},"context":{"max_files":1,"max_bytes":1,"include_diff":false},"workflow":{"topology":"direct_writer"},"verification":{"commands":[]}}`
+	if err := os.WriteFile(PolicyPath(root), []byte(valid+" "+valid), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LoadPolicy(root); err == nil {
+		t.Fatal("policy accepted trailing JSON values")
+	}
 }
 
 func TestProviderCancellationMarksTheRunFailedAndReapsItsProcess(t *testing.T) {

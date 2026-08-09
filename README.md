@@ -8,7 +8,7 @@ The standalone `gator` binary is the primary interface. It works from a Git repo
 Gator TUI / CLI
        │
        ▼
-UI-independent Go core ── provider subprocesses (Codex, Pi, ACP-capable CLIs, ...)
+UI-independent Go core ── provider subprocess adapters (Codex today)
        │
        ├── .gator/standalone/v1/ runs, append-only events, evidence, episodes
        ├── Git repositories and isolated worktrees
