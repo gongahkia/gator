@@ -13,15 +13,17 @@ tests, and propose the resulting patch.
 
 The project is being rebuilt from a previous agent meta-harness. The first
 runnable milestone includes the native loop, OpenAI Responses adapter,
-worktree-local tools, command policy, and a streaming line-oriented terminal
-experience. Durable run storage, replay, context compaction, a full-screen TUI,
-and real-model usability evidence are still in progress.
+worktree-local tools, command policy, durable local run storage, and a
+full-screen terminal application. Real-model usability evidence, context
+compaction, broader replay coverage, and an explicit patch-application flow are
+still in progress.
 
 ## Development
 
 ```sh
 make check
 make build
+./bin/gator
 ./bin/gator help
 ./bin/gator doctor
 OPENAI_API_KEY=... ./bin/gator run --verify 'go test ./...' \
@@ -31,6 +33,18 @@ OPENAI_API_KEY=... ./bin/gator run --verify 'go test ./...' \
 OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
   'Address the failing verification and finish the patch'
 ```
+
+`gator` opens the interactive application when run from a Git checkout and a
+real terminal. Describe the task, keep or edit the suggested verification
+commands, and press `Ctrl+R` to start. `Tab` moves between task, verifier, and
+model fields. During a run, `Ctrl+C` requests cancellation while retaining the
+isolated worktree. The review screen shows the final report, worktree, run
+record, and a diff preview; press `c` to continue a retained run, `n` for a new
+task, or `d` to refresh the diff.
+
+The review screen deliberately does not modify the active checkout. Inspect the
+printed worktree before bringing a patch into your branch. The existing `run`
+and `resume` commands remain available for scripts and CI-like usage.
 
 ## Design principles
 

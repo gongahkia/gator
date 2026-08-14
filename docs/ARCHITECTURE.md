@@ -16,7 +16,7 @@ refactors are not a v1 acceptance claim.
 ## Runtime
 
 ```text
-task -> session -> native agent loop -> model adapter
+terminal UI -> task/session -> native agent loop -> model adapter
                      |       |
                      |       +-> local event journal / private resume session
                      v
@@ -33,6 +33,12 @@ The core owns the loop, context selection, tool schemas, tool execution,
 policies, event stream, worktree lifecycle, and run outcome. A model adapter
 only converts between the provider protocol and the core's typed turn contract.
 This keeps provider-specific details out of safety and test-critical code.
+
+The interactive terminal UI is a thin event consumer, not another agent loop.
+It collects a task, model, and explicit verifier allowlist; streams lifecycle
+events from the executor; and renders the retained worktree and current diff
+for review. Resume keeps the original run's model and verification policy so a
+continuation cannot silently broaden its command authority.
 
 The current OpenAI adapter uses Responses API streaming for incremental text,
 then converts the completed typed response into the core turn contract. The
