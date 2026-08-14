@@ -82,6 +82,20 @@ func interactive() error {
 	if inputInfo.Mode()&os.ModeCharDevice == 0 {
 		return errors.New("interactive mode requires a terminal; use 'gator run' for scripts")
 	}
+	outputInfo, err := os.Stdout.Stat()
+	if err != nil {
+		return fmt.Errorf("inspect terminal output: %w", err)
+	}
+	if outputInfo.Mode()&os.ModeCharDevice == 0 {
+		return errors.New("interactive mode requires a terminal; use 'gator run' for scripts")
+	}
+	terminal, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return errors.New("interactive mode requires a controlling terminal; use 'gator run' for scripts")
+	}
+	if err := terminal.Close(); err != nil {
+		return fmt.Errorf("close terminal check: %w", err)
+	}
 	application := tui.New(tui.Config{
 		RepositoryPath: repository,
 		Model:          modelFromEnvironment(),
