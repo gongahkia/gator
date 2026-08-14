@@ -106,6 +106,9 @@ func TestInteractiveRunStreamsToReview(t *testing.T) {
 			return gatorrun.Executor{Model: agentModel, Now: func() time.Time { return time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC) }}
 		},
 	})
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
 	model.task.SetValue("Inspect this repository and verify it")
 
 	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
