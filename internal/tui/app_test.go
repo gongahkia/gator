@@ -116,8 +116,17 @@ func TestQuestionMarkOpensCommandPalette(t *testing.T) {
 	}
 }
 
+func TestComposerAllowsQInTaskText(t *testing.T) {
+	model := New(Config{})
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	updated := next.(Model)
+	if updated.task.Value() != "q" {
+		t.Fatalf("task = %q, want q", updated.task.Value())
+	}
+}
+
 func TestContextReferencesIgnoreEmailAndSupportQuotedPaths(t *testing.T) {
-	got := extractContextReferences("Contact dev@example.test; inspect @cmd/gator/main.go and @\"notes with spaces.md\".")
+	got := extractContextReferences("Contact dev@example.test; inspect @cmd/gator/main.go, and @\"notes with spaces.md\".")
 	if want := []string{"cmd/gator/main.go", "notes with spaces.md"}; strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("references = %#v, want %#v", got, want)
 	}
@@ -128,9 +137,9 @@ func TestContextReferencesAreValidatedAndAddedWithoutSourceContents(t *testing.T
 	if err := os.WriteFile(filepath.Join(repository, "secret.txt"), []byte("private source content"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	references, err := resolveContextReferences("Inspect @hello.go and @.", repository)
-	if err == nil || !strings.Contains(err.Error(), "@.") {
-		t.Fatalf("invalid root reference error = %v", err)
+	references, err := resolveContextReferences("Inspect @hello.go and @missing.go", repository)
+	if err == nil || !strings.Contains(err.Error(), "@missing.go") {
+		t.Fatalf("missing context reference error = %v", err)
 	}
 	references, err = resolveContextReferences("Inspect @hello.go", repository)
 	if err != nil {
@@ -184,7 +193,7 @@ func TestInteractiveRunStreamsToReview(t *testing.T) {
 	model.width = 100
 	model.height = 40
 	model.resizeInputs()
-	model.task.SetValue("Inspect this repository and verify it")
+	model.task.SetValue("Inspect @hello.go and verify this repository")
 
 	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
 	if updated.screen != reviewScreen {
@@ -198,6 +207,9 @@ func TestInteractiveRunStreamsToReview(t *testing.T) {
 	}
 	if len(updated.events) < 5 {
 		t.Fatalf("timeline events = %#v", updated.events)
+	}
+	if len(agentModel.requests) == 0 || !strings.Contains(agentModel.requests[0].Messages[0].Content, "hello.go (file)") {
+		t.Fatalf("agent did not receive validated context references: %#v", agentModel.requests)
 	}
 	if !strings.Contains(updated.View(), "The repository is verified") {
 		t.Fatalf("review omitted final result: %s", updated.View())
