@@ -98,17 +98,19 @@ type diffLoadedMsg struct {
 type Model struct {
 	config Config
 
-	screen       screen
-	focus        field
-	width        int
-	height       int
-	task         textarea.Model
-	verification textarea.Model
-	model        textinput.Model
-	notice       notice
-	events       []timelineEntry
-	execution    *executionStream
-	cancelling   bool
+	screen        screen
+	focus         field
+	width         int
+	height        int
+	task          textarea.Model
+	verification  textarea.Model
+	model         textinput.Model
+	notice        notice
+	commandOutput string
+	commandIndex  int
+	events        []timelineEntry
+	execution     *executionStream
+	cancelling    bool
 
 	outcome         *gatorrun.Outcome
 	runErr          error
@@ -234,9 +236,32 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.focus == taskField && m.commandPaletteVisible() {
+		switch message.String() {
+		case "up", "ctrl+p":
+			m.moveCommandSelection(-1)
+			return m, nil
+		case "down", "ctrl+n":
+			m.moveCommandSelection(1)
+			return m, nil
+		case "enter", "tab":
+			return m.executeSelectedCommand()
+		case "esc":
+			m.task.Reset()
+			m.commandIndex = 0
+			m.notice = notice{text: "Command palette dismissed.", kind: noticeInfo}
+			return m, nil
+		}
+	}
 	switch message.String() {
 	case "ctrl+c", "q":
 		return m, tea.Quit
+	case "?":
+		if m.focus == taskField && strings.TrimSpace(m.task.Value()) == "" {
+			m.task.SetValue("/")
+			m.commandIndex = 0
+			return m, nil
+		}
 	case "ctrl+r":
 		return m.startRun()
 	case "tab", "shift+tab":
@@ -252,6 +277,7 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.focus {
 	case taskField:
 		m.task, command = m.task.Update(message)
+		m.normalizeCommandSelection()
 	case verificationField:
 		m.verification, command = m.verification.Update(message)
 	case modelField:
@@ -306,6 +332,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "No model provider is configured for this Gator build.", kind: noticeError}
 		return m, nil
 	}
+	references, err := resolveContextReferences(task, m.config.RepositoryPath)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
 	verification, err := parseVerification(m.verification.Value())
 	if err != nil {
 		m.notice = notice{text: err.Error(), kind: noticeError}
@@ -335,7 +366,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 
 	request := gatorrun.Request{
 		RepositoryPath: m.config.RepositoryPath,
-		Task:           task,
+		Task:           taskWithContextReferences(task, references),
 		Model:          modelName,
 		MaxSteps:       m.config.MaxSteps,
 		Verification:   verification,
@@ -433,6 +464,7 @@ func (m *Model) returnToComposer() {
 	m.task.Reset()
 	m.task.Placeholder = "Describe the bug fix or feature you want to build..."
 	m.focus = taskField
+	m.commandOutput = ""
 	m.notice = notice{text: "Ready for a new isolated task.", kind: noticeInfo}
 }
 
@@ -492,11 +524,24 @@ func (m Model) composeView() string {
 	sections := []string{
 		m.header(mode),
 		m.fieldView("Task", "Explain the desired behavior and any constraints.", m.task.View()),
+	}
+	if palette := m.commandPaletteView(); palette != "" {
+		sections = append(sections, palette)
+	}
+	if references := m.contextReferencesView(); references != "" {
+		sections = append(sections, references)
+	}
+	sections = append(sections,
 		m.fieldView("Verification", verificationHint, m.verification.View()),
 		m.fieldView("Model", modelHint, m.model.View()),
-		m.noticeView(),
-		m.footer("tab switch field", "ctrl+r start run", "q quit"),
+	)
+	if m.commandOutput != "" {
+		sections = append(sections, labelStyle.Render("Command result"), panelStyle.Width(max(28, m.width-4)).Render(m.commandOutput))
 	}
+	sections = append(sections,
+		m.noticeView(),
+		m.footer("? commands", "tab switch field", "ctrl+r start run", "q quit"),
+	)
 	return strings.Join(sections, "\n\n")
 }
 
@@ -610,6 +655,141 @@ func (m Model) footer(keys ...string) string {
 		rendered = append(rendered, keyStyle.Render(parts[0])+" "+dimStyle.Render(parts[1]))
 	}
 	return strings.Join(rendered, "  ")
+}
+
+func (m Model) commandPaletteVisible() bool {
+	return len(m.matchingCommands()) > 0
+}
+
+func (m Model) matchingCommands() []slashCommand {
+	if m.focus != taskField {
+		return nil
+	}
+	return matchingSlashCommands(m.task.Value())
+}
+
+func (m *Model) normalizeCommandSelection() {
+	matches := m.matchingCommands()
+	if len(matches) == 0 {
+		m.commandIndex = 0
+		return
+	}
+	if m.commandIndex >= len(matches) {
+		m.commandIndex = len(matches) - 1
+	}
+}
+
+func (m *Model) moveCommandSelection(delta int) {
+	matches := m.matchingCommands()
+	if len(matches) == 0 {
+		m.commandIndex = 0
+		return
+	}
+	m.commandIndex = (m.commandIndex + delta + len(matches)) % len(matches)
+}
+
+func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
+	matches := m.matchingCommands()
+	if len(matches) == 0 {
+		return m, nil
+	}
+	command := matches[m.commandIndex]
+	m.task.Reset()
+	m.commandIndex = 0
+	switch command.name {
+	case "/clear":
+		m.commandOutput = ""
+		m.notice = notice{text: "Task cleared.", kind: noticeInfo}
+	case "/help":
+		m.commandOutput = commandHelp()
+		m.notice = notice{text: "Commands operate locally and never start a run by themselves.", kind: noticeInfo}
+	case "/model":
+		m.commandOutput = ""
+		m.focus = modelField
+		m.notice = notice{text: "Edit the model, then Tab back to the task.", kind: noticeInfo}
+		return m, m.focusField()
+	case "/permissions":
+		m.commandOutput = m.permissionsStatus()
+		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
+	case "/quit":
+		return m, tea.Quit
+	case "/review":
+		if m.outcome == nil || m.outcome.Worktree.Path == "" {
+			m.notice = notice{text: "No completed or retained run is available to review yet.", kind: noticeError}
+			return m, nil
+		}
+		m.screen = reviewScreen
+		return m, nil
+	case "/status":
+		m.commandOutput = m.sessionStatus()
+		m.notice = notice{text: "Current configuration shown below.", kind: noticeInfo}
+	case "/verify":
+		m.commandOutput = ""
+		m.focus = verificationField
+		m.notice = notice{text: "Edit the allowed verification commands, one argv per line.", kind: noticeInfo}
+		return m, m.focusField()
+	case "/worktree":
+		m.commandOutput = "Every new Gator run creates a detached worktree beside this repository. The agent can edit only that worktree; your active checkout stays unchanged."
+		m.notice = notice{text: "Worktree isolation is always on for new runs.", kind: noticeInfo}
+	}
+	return m, nil
+}
+
+func (m Model) commandPaletteView() string {
+	matches := m.matchingCommands()
+	if len(matches) == 0 {
+		if strings.HasPrefix(strings.TrimSpace(m.task.Value()), "/") {
+			return errorStyle.Render("No Gator command matches this input.")
+		}
+		return ""
+	}
+	lines := make([]string, 0, len(matches))
+	for index, command := range matches {
+		prefix := "  "
+		if index == m.commandIndex {
+			prefix = "> "
+		}
+		lines = append(lines, prefix+keyStyle.Render(command.name)+"  "+dimStyle.Render(command.description))
+	}
+	return labelStyle.Render("Commands") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("up/down choose · enter run command · esc dismiss")
+}
+
+func (m Model) contextReferencesView() string {
+	references := extractContextReferences(m.task.Value())
+	if len(references) == 0 {
+		return ""
+	}
+	values := make([]string, 0, len(references))
+	for _, reference := range references {
+		values = append(values, keyStyle.Render("@"+reference))
+	}
+	return labelStyle.Render("Context references") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(values, "  ")) + "\n" + dimStyle.Render("Gator validates these paths inside the repository before a run and asks the agent to inspect them first.")
+}
+
+func (m Model) sessionStatus() string {
+	verification, err := parseVerification(m.verification.Value())
+	verificationText := "invalid: " + err.Error()
+	if err == nil {
+		verificationText = formatVerification(verification)
+	}
+	return "repository: " + m.config.RepositoryPath + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\nverification:\n" + verificationText
+}
+
+func (m Model) permissionsStatus() string {
+	verification, err := parseVerification(m.verification.Value())
+	commands := "invalid verifier configuration: " + err.Error()
+	if err == nil {
+		commands = formatVerification(verification)
+	}
+	return "writes: isolated run worktree only\nreads: repository paths only\ncommands allowed:\n" + commands + "\nactive checkout: never edited by a normal run"
+}
+
+func commandHelp() string {
+	lines := make([]string, 0, len(slashCommands))
+	for _, command := range slashCommands {
+		lines = append(lines, command.name+" — "+command.description)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func renderEvent(event agent.Event) timelineEntry {
