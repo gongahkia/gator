@@ -11,21 +11,26 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model/openai"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/tui"
 )
 
 const usage = `Gator — native, inspectable coding agent
 
 Usage:
+  gator
+  gator tui
   gator help
   gator doctor
   gator run [--model MODEL] [--max-steps N] --verify 'argv ...' TASK
   gator resume [--max-steps N] RUN_RECORD_PATH TASK
 
 Commands:
+  tui       open the interactive terminal application (the default command)
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    continue a retained worktree from its local run record
@@ -41,7 +46,10 @@ func main() {
 }
 
 func run(args []string, out io.Writer) error {
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+	if len(args) == 0 || args[0] == "tui" {
+		return interactive()
+	}
+	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
 		_, err := fmt.Fprintln(out, usage)
 		return err
 	}
@@ -56,6 +64,46 @@ func run(args []string, out io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q; run 'gator help'", args[0])
 	}
+}
+
+func interactive() error {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	repository, err := gitRepositoryRoot(workingDirectory)
+	if err != nil {
+		return errors.New("interactive mode must start inside a Git checkout; run 'gator doctor' for setup")
+	}
+	inputInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return fmt.Errorf("inspect terminal input: %w", err)
+	}
+	if inputInfo.Mode()&os.ModeCharDevice == 0 {
+		return errors.New("interactive mode requires a terminal; use 'gator run' for scripts")
+	}
+	application := tui.New(tui.Config{
+		RepositoryPath: repository,
+		Model:          modelFromEnvironment(),
+		Verification:   parseSuggestedVerification(suggestedVerificationCommands(repository)),
+		APIKey:         os.Getenv("OPENAI_API_KEY"),
+		NewExecutor: func(model string) gatorrun.Executor {
+			return gatorrun.Executor{Model: openai.Responses{APIKey: os.Getenv("OPENAI_API_KEY"), Model: model}}
+		},
+	})
+	program := tea.NewProgram(application, tea.WithAltScreen())
+	_, err = program.Run()
+	return err
+}
+
+func parseSuggestedVerification(commands []string) [][]string {
+	result := make([][]string, 0, len(commands))
+	for _, command := range commands {
+		if argv := strings.Fields(command); len(argv) > 0 {
+			result = append(result, argv)
+		}
+	}
+	return result
 }
 
 func resumeTask(arguments []string, out io.Writer) error {
