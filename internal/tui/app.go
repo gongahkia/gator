@@ -240,6 +240,10 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+r":
 		return m.startRun()
 	case "tab", "shift+tab":
+		if m.resumeStatePath != "" {
+			m.notice = notice{text: "A continuation inherits the model and verification policy from its original run.", kind: noticeInfo}
+			return m, nil
+		}
 		m.focus = nextField(m.focus, message.String() == "shift+tab")
 		return m, m.focusField()
 	}
@@ -353,6 +357,16 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Load retained run: " + loadErr.Error(), kind: noticeError}
 			return m, nil
 		}
+		if strings.TrimSpace(previous.Model) == "" {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "The retained run does not record a model and cannot be continued safely.", kind: noticeError}
+			return m, nil
+		}
+		modelName = previous.Model
+		request.Model = previous.Model
+		request.Verification = previous.Verification
 		go executeResume(ctx, stream, m.config.NewExecutor(modelName), previous, m.resumeStatePath, task, request)
 	} else {
 		go executeNew(ctx, stream, m.config.NewExecutor(modelName), request)
@@ -469,11 +483,17 @@ func (m Model) composeView() string {
 	if m.resumeStatePath != "" {
 		mode = "continue retained run"
 	}
+	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
+	modelHint := "Set GATOR_MODEL before launch or edit it here."
+	if m.resumeStatePath != "" {
+		verificationHint = "Inherited from the retained run to preserve its command policy."
+		modelHint = "Inherited from the retained run to preserve conversation continuity."
+	}
 	sections := []string{
 		m.header(mode),
 		m.fieldView("Task", "Explain the desired behavior and any constraints.", m.task.View()),
-		m.fieldView("Verification", "One allowed argv command per line. Each must pass before Gator accepts completion.", m.verification.View()),
-		m.fieldView("Model", "Set GATOR_MODEL before launch or edit it here.", m.model.View()),
+		m.fieldView("Verification", verificationHint, m.verification.View()),
+		m.fieldView("Model", modelHint, m.model.View()),
 		m.noticeView(),
 		m.footer("tab switch field", "ctrl+r start run", "q quit"),
 	}
