@@ -114,6 +114,39 @@ func TestRunnerStopsAtStepLimit(t *testing.T) {
 	}
 }
 
+func TestRunnerRequiresCompletionEvidence(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{
+		{Text: "The feature is done."},
+		{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The feature is done and reviewed."},
+	}}
+	var events []Event
+	runner := Runner{Model: model, Tools: []Tool{&recordingTool{}}, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{
+		Task:     "implement a feature",
+		MaxSteps: 3,
+		OnEvent:  func(event Event) { events = append(events, event) },
+		CompletionCheck: func(messages []Message) error {
+			for _, message := range messages {
+				if message.Role == RoleTool && message.ToolName == "read_file" {
+					return nil
+				}
+			}
+			return errors.New("inspect the changed files")
+		},
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.Steps != 3 || result.FinalText != "The feature is done and reviewed." {
+		t.Fatalf("result = %#v", result)
+	}
+	if events[2].Kind != EventCompletionBlocked || !strings.Contains(events[2].Text, "inspect the changed files") {
+		t.Fatalf("completion-block event = %#v", events[2])
+	}
+}
+
 type scriptedModel struct {
 	turns    []Turn
 	requests []TurnRequest

@@ -59,13 +59,23 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 			return Result{Messages: messages, Steps: step}, fmt.Errorf("model turn %d: %w", step, err)
 		}
 
+		if turn.Text != "" || len(turn.ToolCalls) > 0 {
+			messages = append(messages, Message{Role: RoleAgent, Content: turn.Text, ToolCalls: cloneCalls(turn.ToolCalls)})
+		}
 		if turn.Text != "" {
-			messages = append(messages, Message{Role: RoleAgent, Content: turn.Text})
 			r.emit(options.OnEvent, Event{Kind: EventText, At: now(), Step: step, Text: turn.Text})
 		}
 		if len(turn.ToolCalls) == 0 {
 			if strings.TrimSpace(turn.Text) == "" {
 				return Result{Messages: messages, Steps: step}, fmt.Errorf("model turn %d returned neither text nor tool calls", step)
+			}
+			if options.CompletionCheck != nil {
+				if err := options.CompletionCheck(append([]Message(nil), messages...)); err != nil {
+					message := "You cannot complete the task yet: " + err.Error()
+					messages = append(messages, Message{Role: RoleUser, Content: message})
+					r.emit(options.OnEvent, Event{Kind: EventCompletionBlocked, At: now(), Step: step, Text: message})
+					continue
+				}
 			}
 			r.emit(options.OnEvent, Event{Kind: EventRunFinished, At: now(), Step: step, Text: turn.Text})
 			return Result{FinalText: turn.Text, Messages: messages, Steps: step}, nil
@@ -148,6 +158,14 @@ func cloneCall(call ToolCall) *ToolCall {
 	clone := call
 	clone.Arguments = append(json.RawMessage(nil), call.Arguments...)
 	return &clone
+}
+
+func cloneCalls(calls []ToolCall) []ToolCall {
+	clones := make([]ToolCall, len(calls))
+	for index, call := range calls {
+		clones[index] = *cloneCall(call)
+	}
+	return clones
 }
 
 func (r Runner) emit(sink EventSink, event Event) {

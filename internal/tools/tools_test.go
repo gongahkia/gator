@@ -96,6 +96,17 @@ func TestRunCommandRequiresExactPolicyMatch(t *testing.T) {
 	}
 }
 
+func TestGitDiffIncludesUntrackedFiles(t *testing.T) {
+	root := testWorkspace(t)
+	initializeGitRepository(t, root.Path())
+	writeTestFile(t, root.Path(), "new_feature.go", "package feature\n")
+
+	result := executeTool(t, GitDiff{Root: root}, `{}`)
+	if !strings.Contains(result, "new_feature.go") || !strings.Contains(result, "new file mode") {
+		t.Fatalf("diff result = %s", result)
+	}
+}
+
 func TestDecodeArgumentsRejectsTrailingJSON(t *testing.T) {
 	var destination struct{}
 	err := decodeArguments(json.RawMessage(`{} {}`), &destination)
