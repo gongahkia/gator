@@ -1,0 +1,4 @@
+.gator/
+bin/
+coverage.out
+

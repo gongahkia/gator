@@ -1,0 +1,1 @@
+/home/gongahkia/.codex/AGENTS.md

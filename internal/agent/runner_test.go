@@ -1,0 +1,158 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestRunnerCompletesToolUseLoop(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{
+		{Text: "I will inspect the project.", ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{"path":"README.md"}`)}}},
+		{Text: "The feature is ready for review."},
+	}}
+	tool := &recordingTool{result: ToolResult{Content: `{"ok":true,"content":"# Demo"}`}}
+	var events []Event
+	runner := Runner{
+		Model: model,
+		Tools: []Tool{tool},
+		Now:   fixedClock(),
+	}
+
+	result, err := runner.Run(context.Background(), RunOptions{
+		Task:     "Add the demo feature",
+		MaxSteps: 4,
+		OnEvent:  func(event Event) { events = append(events, event) },
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText != "The feature is ready for review." {
+		t.Fatalf("final text = %q", result.FinalText)
+	}
+	if result.Steps != 2 {
+		t.Fatalf("steps = %d, want 2", result.Steps)
+	}
+	if got := tool.arguments; string(got) != `{"path":"README.md"}` {
+		t.Fatalf("tool arguments = %s", got)
+	}
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{
+		EventTurnStarted, EventText, EventToolCalled, EventToolFinished,
+		EventTurnStarted, EventText, EventRunFinished,
+	}) {
+		t.Fatalf("event kinds = %v", got)
+	}
+	if got := model.requests[1].Messages[len(model.requests[1].Messages)-1]; got.Role != RoleTool || got.ToolCallID != "call-1" {
+		t.Fatalf("second turn did not include correlated tool result: %#v", got)
+	}
+}
+
+func TestRunnerLetsModelRecoverFromToolFailure(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{
+		{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "That path was invalid; I need developer input."},
+	}}
+	tool := &recordingTool{err: errors.New("path must be inside the worktree")}
+	var events []Event
+	runner := Runner{Model: model, Tools: []Tool{tool}, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{
+		Task:     "Read the secret file",
+		MaxSteps: 2,
+		OnEvent:  func(event Event) { events = append(events, event) },
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText == "" {
+		t.Fatal("run returned no final text")
+	}
+	if got := model.requests[1].Messages[len(model.requests[1].Messages)-1].Content; got != `{"ok":false,"error":"tool \"read_file\": path must be inside the worktree"}` {
+		t.Fatalf("tool failure message = %q", got)
+	}
+	if events[2].ToolError != "tool \"read_file\": path must be inside the worktree" {
+		t.Fatalf("tool error event = %q", events[2].ToolError)
+	}
+}
+
+func TestRunnerRejectsInvalidRunConfiguration(t *testing.T) {
+	tests := []struct {
+		name    string
+		runner  Runner
+		options RunOptions
+		want    string
+	}{
+		{name: "missing model", options: RunOptions{Task: "feature"}, want: "model is required"},
+		{name: "missing task", runner: Runner{Model: &scriptedModel{}}, want: "task is required"},
+		{name: "invalid step limit", runner: Runner{Model: &scriptedModel{}}, options: RunOptions{Task: "feature", MaxSteps: -1}, want: "max steps"},
+		{name: "duplicate tool", runner: Runner{Model: &scriptedModel{}, Tools: []Tool{&recordingTool{}, &recordingTool{}}}, options: RunOptions{Task: "feature"}, want: "duplicate"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := test.runner.Run(context.Background(), test.options)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("run error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestRunnerStopsAtStepLimit(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}}}}
+	runner := Runner{Model: model, Tools: []Tool{&recordingTool{}}, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{Task: "feature", MaxSteps: 1})
+	if err == nil || !strings.Contains(err.Error(), "step limit") {
+		t.Fatalf("run error = %v, want step-limit error", err)
+	}
+	if result.Steps != 1 {
+		t.Fatalf("steps = %d, want 1", result.Steps)
+	}
+}
+
+type scriptedModel struct {
+	turns    []Turn
+	requests []TurnRequest
+}
+
+func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, error) {
+	m.requests = append(m.requests, request)
+	if len(m.turns) == 0 {
+		return Turn{}, errors.New("unexpected model call")
+	}
+	turn := m.turns[0]
+	m.turns = m.turns[1:]
+	return turn, nil
+}
+
+type recordingTool struct {
+	arguments json.RawMessage
+	result    ToolResult
+	err       error
+}
+
+func (t *recordingTool) Definition() ToolDefinition {
+	return ToolDefinition{Name: "read_file", Description: "read a file", Parameters: json.RawMessage(`{"type":"object"}`)}
+}
+
+func (t *recordingTool) Execute(_ context.Context, arguments json.RawMessage) (ToolResult, error) {
+	t.arguments = append(t.arguments[:0], arguments...)
+	return t.result, t.err
+}
+
+func fixedClock() func() time.Time {
+	now := time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC)
+	return func() time.Time { return now }
+}
+
+func eventKinds(events []Event) []EventKind {
+	kinds := make([]EventKind, 0, len(events))
+	for _, event := range events {
+		kinds = append(kinds, event.Kind)
+	}
+	return kinds
+}
