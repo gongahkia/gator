@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/agent"
 )
 
 func TestRunHelp(t *testing.T) {
@@ -42,5 +44,16 @@ func TestSuggestedVerificationCommands(t *testing.T) {
 	}
 	if got := suggestedVerificationCommands(directory); len(got) != 1 || got[0] != "go test ./..." {
 		t.Fatalf("suggestions = %#v", got)
+	}
+}
+
+func TestEventPrinterGroupsStreamingText(t *testing.T) {
+	var output bytes.Buffer
+	printer := eventPrinter{out: &output}
+	printer.Print(agent.Event{Kind: agent.EventTextDelta, Step: 1, Text: "hello "})
+	printer.Print(agent.Event{Kind: agent.EventTextDelta, Step: 1, Text: "world"})
+	printer.Print(agent.Event{Kind: agent.EventToolCalled, Step: 1, ToolCall: &agent.ToolCall{Name: "git_status"}})
+	if got, want := output.String(), "[01] agent: hello world\n[01] tool → git_status\n"; got != want {
+		t.Fatalf("terminal output = %q, want %q", got, want)
 	}
 }

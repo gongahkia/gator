@@ -62,6 +62,12 @@ type Model interface {
 	Complete(context.Context, TurnRequest) (Turn, error)
 }
 
+// StreamingModel is an optional extension for adapters that can surface
+// incremental text while preserving the same completed-turn contract.
+type StreamingModel interface {
+	CompleteStream(context.Context, TurnRequest, func(string)) (Turn, error)
+}
+
 // Tool executes one typed model request. Tools are responsible for parsing and
 // validating their own arguments at their boundary.
 type Tool interface {
@@ -79,6 +85,7 @@ type EventKind string
 
 const (
 	EventTurnStarted       EventKind = "turn_started"
+	EventTextDelta         EventKind = "text_delta"
 	EventText              EventKind = "text"
 	EventToolCalled        EventKind = "tool_called"
 	EventToolFinished      EventKind = "tool_finished"
@@ -102,10 +109,11 @@ type EventSink func(Event)
 
 // RunOptions defines one bounded autonomous run.
 type RunOptions struct {
-	Task     string
-	System   string
-	MaxSteps int
-	OnEvent  EventSink
+	Task            string
+	System          string
+	InitialMessages []Message
+	MaxSteps        int
+	OnEvent         EventSink
 	// CompletionCheck may require concrete evidence, such as a diff inspection
 	// or a named verifier, before a final response is accepted.
 	CompletionCheck func([]Message) error

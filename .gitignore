@@ -1,4 +1,4 @@
 .gator/
 bin/
+/gator
 coverage.out
-

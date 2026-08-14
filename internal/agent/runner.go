@@ -46,15 +46,32 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	messages := []Message{{Role: RoleUser, Content: options.Task}}
+	messages := cloneMessages(options.InitialMessages)
+	if len(messages) == 0 {
+		messages = []Message{{Role: RoleUser, Content: options.Task}}
+	}
 
 	for step := 1; step <= maxSteps; step++ {
 		r.emit(options.OnEvent, Event{Kind: EventTurnStarted, At: now(), Step: step})
-		turn, err := r.Model.Complete(ctx, TurnRequest{
+		request := TurnRequest{
 			System:   options.System,
 			Messages: append([]Message(nil), messages...),
 			Tools:    definitions,
-		})
+		}
+		var streamedText bool
+		var turn Turn
+		var err error
+		if model, ok := r.Model.(StreamingModel); ok {
+			turn, err = model.CompleteStream(ctx, request, func(delta string) {
+				if delta == "" {
+					return
+				}
+				streamedText = true
+				r.emit(options.OnEvent, Event{Kind: EventTextDelta, At: now(), Step: step, Text: delta})
+			})
+		} else {
+			turn, err = r.Model.Complete(ctx, request)
+		}
 		if err != nil {
 			return Result{Messages: messages, Steps: step}, fmt.Errorf("model turn %d: %w", step, err)
 		}
@@ -63,7 +80,9 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 			messages = append(messages, Message{Role: RoleAgent, Content: turn.Text, ToolCalls: cloneCalls(turn.ToolCalls)})
 		}
 		if turn.Text != "" {
-			r.emit(options.OnEvent, Event{Kind: EventText, At: now(), Step: step, Text: turn.Text})
+			if !streamedText {
+				r.emit(options.OnEvent, Event{Kind: EventText, At: now(), Step: step, Text: turn.Text})
+			}
 		}
 		if len(turn.ToolCalls) == 0 {
 			if strings.TrimSpace(turn.Text) == "" {
@@ -161,9 +180,21 @@ func cloneCall(call ToolCall) *ToolCall {
 }
 
 func cloneCalls(calls []ToolCall) []ToolCall {
+	if calls == nil {
+		return nil
+	}
 	clones := make([]ToolCall, len(calls))
 	for index, call := range calls {
 		clones[index] = *cloneCall(call)
+	}
+	return clones
+}
+
+func cloneMessages(messages []Message) []Message {
+	clones := make([]Message, len(messages))
+	for index, message := range messages {
+		clones[index] = message
+		clones[index].ToolCalls = cloneCalls(message.ToolCalls)
 	}
 	return clones
 }

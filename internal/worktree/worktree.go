@@ -59,6 +59,29 @@ func Create(ctx context.Context, repositoryPath, runID string) (Worktree, error)
 	return Worktree{ID: runID, Repository: repository, Path: root.Path(), Root: root}, nil
 }
 
+// OpenExisting validates a retained worktree before a resumed agent run uses
+// it. The caller supplies its original repository identity from local session
+// state; Git confirms that the target is still a worktree.
+func OpenExisting(ctx context.Context, repository, path, runID string) (Worktree, error) {
+	if !runIDPattern.MatchString(runID) {
+		return Worktree{}, fmt.Errorf("invalid run id %q", runID)
+	}
+	root, err := workspace.Open(path)
+	if err != nil {
+		return Worktree{}, fmt.Errorf("open retained worktree: %w", err)
+	}
+	command := exec.CommandContext(ctx, "git", "rev-parse", "--is-inside-work-tree")
+	command.Dir = root.Path()
+	output, err := command.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(output)) != "true" {
+		if err != nil {
+			return Worktree{}, commandError("validate retained Git worktree", err, output)
+		}
+		return Worktree{}, errors.New("retained path is not a Git worktree")
+	}
+	return Worktree{ID: runID, Repository: repository, Path: root.Path(), Root: root}, nil
+}
+
 func repositoryRoot(ctx context.Context, path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("repository path is required")

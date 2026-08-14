@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/worktree"
 )
 
 func TestExecutorCompletesReviewableFeatureRun(t *testing.T) {
@@ -57,9 +59,11 @@ func TestExecutorCompletesReviewableFeatureRun(t *testing.T) {
 	outcome, err := executor.Execute(context.Background(), Request{
 		RepositoryPath: repository,
 		Task:           "Add a Greeting feature with a focused test",
+		Model:          "test-model",
 		RunID:          "run_feature_001",
 		MaxSteps:       8,
 		Verification:   [][]string{{"go", "test", "./..."}},
+		StateDir:       t.TempDir(),
 	})
 	if err != nil {
 		t.Fatalf("execute feature run: %v", err)
@@ -67,8 +71,14 @@ func TestExecutorCompletesReviewableFeatureRun(t *testing.T) {
 	if outcome.Result.FinalText == "" || outcome.Result.Steps != 5 {
 		t.Fatalf("outcome = %#v", outcome)
 	}
+	if !strings.Contains(model.requests[0].System, "Gator, a careful coding agent") {
+		t.Fatalf("system prompt was not sent: %q", model.requests[0].System)
+	}
 	if _, err := os.Stat(filepath.Join(outcome.Worktree.Path, "greeting.go")); err != nil {
 		t.Fatalf("feature file missing from worktree: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outcome.StatePath, "events.jsonl")); err != nil {
+		t.Fatalf("run journal missing: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(outcome.Worktree.Path, "greeting_test.go")); err != nil {
 		t.Fatalf("feature test missing from worktree: %v", err)
@@ -89,8 +99,10 @@ func TestExecutorRetainsWorktreeWhenEvidenceIsMissing(t *testing.T) {
 	outcome, err := executor.Execute(context.Background(), Request{
 		RepositoryPath: repository,
 		Task:           "Add a feature",
+		Model:          "test-model",
 		RunID:          "run_missing_evidence",
 		MaxSteps:       2,
+		StateDir:       t.TempDir(),
 	})
 	if err == nil || !strings.Contains(err.Error(), "unexpected model call") {
 		t.Fatalf("execute error = %v", err)
@@ -112,11 +124,84 @@ func TestValidateVerification(t *testing.T) {
 	}
 }
 
-type scriptedModel struct {
-	turns []agent.Turn
+func TestExecutorLoadsRootAgentInstructions(t *testing.T) {
+	repository := featureRepository(t)
+	writeFile(t, repository, "AGENTS.md", "Always name the feature tests clearly.\n")
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "No changes were needed."},
+	}}
+
+	_, err := (Executor{Model: model}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Inspect the fixture",
+		Model:          "test-model",
+		RunID:          "run_instructions_001",
+		MaxSteps:       4,
+		StateDir:       t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !strings.Contains(model.requests[0].System, "Always name the feature tests clearly.") {
+		t.Fatalf("system prompt did not include AGENTS.md: %q", model.requests[0].System)
+	}
 }
 
-func (m *scriptedModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+func TestExecutorResumesWithFreshEvidence(t *testing.T) {
+	repository := featureRepository(t)
+	retained, err := worktree.Create(context.Background(), repository, "run_original_001")
+	if err != nil {
+		t.Fatalf("create retained worktree: %v", err)
+	}
+	previous := journal.Session{
+		Version:      1,
+		Repository:   repository,
+		WorktreePath: retained.Path,
+		Model:        "test-model",
+		Task:         "Add a feature",
+		MaxSteps:     4,
+		Messages: []agent.Message{
+			{Role: agent.RoleUser, Content: "Add a feature"},
+			{Role: agent.RoleTool, ToolName: "git_status", ToolCallID: "old-status", Content: `{"ok":true}`},
+			{Role: agent.RoleTool, ToolName: "git_diff", ToolCallID: "old-diff", Content: `{"ok":true}`},
+		},
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The retained patch is ready for review."},
+	}}
+	stateDirectory := t.TempDir()
+	executor := Executor{Model: model}
+
+	outcome, err := executor.Resume(context.Background(), previous, "/state/original", "Review the existing patch and finish.", Request{StateDir: stateDirectory})
+	if err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	if outcome.Worktree.Path != retained.Path || outcome.Result.FinalText == "" {
+		t.Fatalf("resume outcome = %#v", outcome)
+	}
+	if got := model.requests[0].Messages[len(model.requests[0].Messages)-1]; got.Role != agent.RoleUser || !strings.Contains(got.Content, "Review the existing patch") {
+		t.Fatalf("resume history = %#v", model.requests[0].Messages)
+	}
+	current, err := journal.LoadSession(outcome.StatePath)
+	if err != nil {
+		t.Fatalf("load resumed session: %v", err)
+	}
+	if current.ParentStatePath != "/state/original" {
+		t.Fatalf("resumed session parent = %q", current.ParentStatePath)
+	}
+}
+
+type scriptedModel struct {
+	turns    []agent.Turn
+	requests []agent.TurnRequest
+}
+
+func (m *scriptedModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	m.requests = append(m.requests, request)
 	if len(m.turns) == 0 {
 		return agent.Turn{}, errors.New("unexpected model call")
 	}

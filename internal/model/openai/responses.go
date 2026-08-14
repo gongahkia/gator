@@ -3,6 +3,7 @@
 package openai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -73,6 +74,44 @@ func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.
 	return decodeResponse(contents)
 }
 
+// CompleteStream implements agent.StreamingModel. It forwards output-text
+// deltas as they arrive, then returns the completed typed response used by the
+// core tool loop.
+func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, onDelta func(string)) (agent.Turn, error) {
+	if strings.TrimSpace(r.APIKey) == "" {
+		return agent.Turn{}, errors.New("OPENAI_API_KEY is required")
+	}
+	body, err := r.requestBody(turn)
+	if err != nil {
+		return agent.Turn{}, err
+	}
+	body.Stream = true
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return agent.Turn{}, fmt.Errorf("encode OpenAI stream request: %w", err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL(), bytes.NewReader(payload))
+	if err != nil {
+		return agent.Turn{}, fmt.Errorf("create OpenAI stream request: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+r.APIKey)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "text/event-stream")
+	response, err := r.client().Do(request)
+	if err != nil {
+		return agent.Turn{}, fmt.Errorf("request OpenAI stream: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		contents, readErr := io.ReadAll(io.LimitReader(response.Body, 2*1024*1024))
+		if readErr != nil {
+			return agent.Turn{}, fmt.Errorf("read OpenAI stream error: %w", readErr)
+		}
+		return agent.Turn{}, describeAPIError(response.StatusCode, contents)
+	}
+	return decodeSSE(response.Body, onDelta)
+}
+
 func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) {
 	input, err := encodeInput(turn.Messages)
 	if err != nil {
@@ -127,6 +166,7 @@ type responseRequest struct {
 	Input        []inputItem    `json:"input"`
 	Tools        []functionTool `json:"tools,omitempty"`
 	Store        bool           `json:"store"`
+	Stream       bool           `json:"stream,omitempty"`
 }
 
 type functionTool struct {
@@ -229,6 +269,88 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 		return agent.Turn{}, errors.New("OpenAI response contained no output text or function calls")
 	}
 	return agent.Turn{Text: text.String(), ToolCalls: calls}, nil
+}
+
+func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 64*1024), 2*1024*1024)
+	var eventType string
+	var dataLines []string
+	var completed *agent.Turn
+	flush := func() error {
+		if len(dataLines) == 0 {
+			eventType = ""
+			return nil
+		}
+		data := strings.Join(dataLines, "\n")
+		dataLines = nil
+		if data == "[DONE]" {
+			eventType = ""
+			return nil
+		}
+		var event struct {
+			Type     string          `json:"type"`
+			Delta    string          `json:"delta"`
+			Response json.RawMessage `json:"response"`
+			Error    struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal([]byte(data), &event); err != nil {
+			return fmt.Errorf("decode OpenAI stream event: %w", err)
+		}
+		if event.Type == "" {
+			event.Type = eventType
+		}
+		switch event.Type {
+		case "response.output_text.delta":
+			if onDelta != nil && event.Delta != "" {
+				onDelta(event.Delta)
+			}
+		case "response.completed":
+			if len(event.Response) == 0 {
+				return errors.New("OpenAI completed stream event omitted the response")
+			}
+			turn, err := decodeResponse(event.Response)
+			if err != nil {
+				return err
+			}
+			completed = &turn
+		case "response.failed":
+			if event.Error.Message != "" {
+				return fmt.Errorf("OpenAI response failed: %s", event.Error.Message)
+			}
+			return errors.New("OpenAI response failed")
+		}
+		eventType = ""
+		return nil
+	}
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			if err := flush(); err != nil {
+				return agent.Turn{}, err
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "event:") {
+			eventType = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return agent.Turn{}, fmt.Errorf("read OpenAI event stream: %w", err)
+	}
+	if err := flush(); err != nil {
+		return agent.Turn{}, err
+	}
+	if completed == nil {
+		return agent.Turn{}, errors.New("OpenAI event stream ended without a completed response")
+	}
+	return *completed, nil
 }
 
 func describeAPIError(status int, contents []byte) error {

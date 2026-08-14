@@ -147,6 +147,40 @@ func TestRunnerRequiresCompletionEvidence(t *testing.T) {
 	}
 }
 
+func TestRunnerUsesProvidedHistory(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{{Text: "Resumed and complete."}}}
+	runner := Runner{Model: model, Now: fixedClock()}
+	history := []Message{{Role: RoleUser, Content: "Original task"}, {Role: RoleTool, ToolCallID: "call-1", ToolName: "read_file", Content: `{"ok":true}`}, {Role: RoleUser, Content: "Continue"}}
+
+	result, err := runner.Run(context.Background(), RunOptions{Task: "Continue", InitialMessages: history, MaxSteps: 1})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if got := model.requests[0].Messages; !reflect.DeepEqual(got, history) {
+		t.Fatalf("history = %#v, want %#v", got, history)
+	}
+	if result.Messages[0].Content != "Original task" {
+		t.Fatalf("result messages = %#v", result.Messages)
+	}
+}
+
+func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
+	model := streamingModel{turn: Turn{Text: "hello world"}, deltas: []string{"hello ", "world"}}
+	var events []Event
+	runner := Runner{Model: model, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{Task: "say hello", MaxSteps: 1, OnEvent: func(event Event) { events = append(events, event) }})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText != "hello world" {
+		t.Fatalf("result = %#v", result)
+	}
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventTextDelta, EventTextDelta, EventRunFinished}) {
+		t.Fatalf("event kinds = %v", got)
+	}
+}
+
 type scriptedModel struct {
 	turns    []Turn
 	requests []TurnRequest
@@ -166,6 +200,22 @@ type recordingTool struct {
 	arguments json.RawMessage
 	result    ToolResult
 	err       error
+}
+
+type streamingModel struct {
+	turn   Turn
+	deltas []string
+}
+
+func (m streamingModel) Complete(_ context.Context, _ TurnRequest) (Turn, error) {
+	return Turn{}, errors.New("non-streaming completion should not be called")
+}
+
+func (m streamingModel) CompleteStream(_ context.Context, _ TurnRequest, onDelta func(string)) (Turn, error) {
+	for _, delta := range m.deltas {
+		onDelta(delta)
+	}
+	return m.turn, nil
 }
 
 func (t *recordingTool) Definition() ToolDefinition {

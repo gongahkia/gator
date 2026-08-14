@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model/openai"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -20,10 +23,12 @@ Usage:
   gator help
   gator doctor
   gator run [--model MODEL] [--max-steps N] --verify 'argv ...' TASK
+  gator resume [--max-steps N] RUN_RECORD_PATH TASK
 
 Commands:
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
+  resume    continue a retained worktree from its local run record
 
 Run requires OPENAI_API_KEY. --verify is repeatable; each listed command is
 allowed for the run and must pass before Gator accepts completion.`
@@ -46,9 +51,64 @@ func run(args []string, out io.Writer) error {
 		return doctor(out)
 	case "run":
 		return runTask(args[1:], out)
+	case "resume":
+		return resumeTask(args[1:], out)
 	default:
 		return fmt.Errorf("unknown command %q; run 'gator help'", args[0])
 	}
+}
+
+func resumeTask(arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("resume", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	maxSteps := flags.Int("max-steps", 0, "maximum model turns for this continuation")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if len(flags.Args()) < 2 {
+		return errors.New("resume requires a run record path and a continuation task")
+	}
+	statePath := flags.Arg(0)
+	continuation := strings.TrimSpace(strings.Join(flags.Args()[1:], " "))
+	if continuation == "" {
+		return errors.New("resume task is required")
+	}
+	session, err := journal.LoadSession(statePath)
+	if err != nil {
+		return err
+	}
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return errors.New("OPENAI_API_KEY is required; run 'gator doctor' to check setup")
+	}
+	modelName := session.Model
+	if modelName == "" {
+		modelName = modelFromEnvironment()
+	}
+	if _, err := fmt.Fprintf(out, "Gator resume\n  model: %s\n  task: %s\n", modelName, continuation); err != nil {
+		return err
+	}
+	printer := eventPrinter{out: out}
+	executor := gatorrun.Executor{Model: openai.Responses{APIKey: apiKey, Model: modelName}}
+	outcome, err := executor.Resume(context.Background(), session, statePath, continuation, gatorrun.Request{
+		MaxSteps: *maxSteps,
+		OnEvent:  printer.Print,
+	})
+	if outcome.Worktree.Path != "" {
+		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {
+			err = writeErr
+		}
+	}
+	if outcome.StatePath != "" {
+		if _, writeErr := fmt.Fprintf(out, "Run record: %s\n", outcome.StatePath); writeErr != nil && err == nil {
+			err = writeErr
+		}
+	}
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(out, "\n%s\n", outcome.Result.FinalText)
+	return err
 }
 
 func doctor(out io.Writer) error {
@@ -56,7 +116,7 @@ func doctor(out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	_, err = os.Stat(".git")
+	repository, err := gitRepositoryRoot(workingDirectory)
 	gitStatus := "not detected"
 	if err == nil {
 		gitStatus = "detected"
@@ -68,7 +128,11 @@ func doctor(out io.Writer) error {
 	if _, err := fmt.Fprintf(out, "Repository: %s\nOpenAI API key: %s\n", gitStatus, apiKeyStatus); err != nil {
 		return err
 	}
-	for _, suggestion := range suggestedVerificationCommands(workingDirectory) {
+	suggestionDirectory := workingDirectory
+	if gitStatus == "detected" {
+		suggestionDirectory = repository
+	}
+	for _, suggestion := range suggestedVerificationCommands(suggestionDirectory) {
 		if _, err := fmt.Fprintf(out, "Suggested verification: %s\n", suggestion); err != nil {
 			return err
 		}
@@ -108,18 +172,23 @@ func runTask(arguments []string, out io.Writer) error {
 	if _, err := fmt.Fprintf(out, "Gator\n  model: %s\n  task: %s\n", *modelName, task); err != nil {
 		return err
 	}
+	printer := eventPrinter{out: out}
 	executor := gatorrun.Executor{Model: openai.Responses{APIKey: apiKey, Model: *modelName}}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
 		RepositoryPath: workingDirectory,
 		Task:           task,
+		Model:          *modelName,
 		MaxSteps:       *maxSteps,
 		Verification:   verification,
-		OnEvent: func(event agent.Event) {
-			printEvent(out, event)
-		},
+		OnEvent:        printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {
+			err = writeErr
+		}
+	}
+	if outcome.StatePath != "" {
+		if _, writeErr := fmt.Fprintf(out, "Run record: %s\n", outcome.StatePath); writeErr != nil && err == nil {
 			err = writeErr
 		}
 	}
@@ -130,22 +199,37 @@ func runTask(arguments []string, out io.Writer) error {
 	return err
 }
 
-func printEvent(out io.Writer, event agent.Event) {
+type eventPrinter struct {
+	out           io.Writer
+	streamingText bool
+}
+
+func (p *eventPrinter) Print(event agent.Event) {
+	if event.Kind != agent.EventTextDelta && p.streamingText {
+		_, _ = fmt.Fprintln(p.out)
+		p.streamingText = false
+	}
 	switch event.Kind {
 	case agent.EventTurnStarted:
-		_, _ = fmt.Fprintf(out, "\n[%02d] thinking\n", event.Step)
+		_, _ = fmt.Fprintf(p.out, "\n[%02d] thinking\n", event.Step)
+	case agent.EventTextDelta:
+		if !p.streamingText {
+			_, _ = fmt.Fprintf(p.out, "[%02d] agent: ", event.Step)
+			p.streamingText = true
+		}
+		_, _ = fmt.Fprint(p.out, event.Text)
 	case agent.EventText:
-		_, _ = fmt.Fprintf(out, "[%02d] agent: %s\n", event.Step, event.Text)
+		_, _ = fmt.Fprintf(p.out, "[%02d] agent: %s\n", event.Step, event.Text)
 	case agent.EventToolCalled:
-		_, _ = fmt.Fprintf(out, "[%02d] tool → %s\n", event.Step, event.ToolCall.Name)
+		_, _ = fmt.Fprintf(p.out, "[%02d] tool → %s\n", event.Step, event.ToolCall.Name)
 	case agent.EventToolFinished:
 		if event.ToolError == "" {
-			_, _ = fmt.Fprintf(out, "[%02d] tool ✓ %s\n", event.Step, event.ToolCall.Name)
+			_, _ = fmt.Fprintf(p.out, "[%02d] tool ✓ %s\n", event.Step, event.ToolCall.Name)
 		} else {
-			_, _ = fmt.Fprintf(out, "[%02d] tool ! %s: %s\n", event.Step, event.ToolCall.Name, event.ToolError)
+			_, _ = fmt.Fprintf(p.out, "[%02d] tool ! %s: %s\n", event.Step, event.ToolCall.Name, event.ToolError)
 		}
 	case agent.EventCompletionBlocked:
-		_, _ = fmt.Fprintf(out, "[%02d] evidence required: %s\n", event.Step, event.Text)
+		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
 	}
 }
 
@@ -193,6 +277,15 @@ func suggestedVerificationCommands(directory string) []string {
 }
 
 func fileExists(directory, name string) bool {
-	info, err := os.Stat(directory + string(os.PathSeparator) + name)
+	info, err := os.Stat(filepath.Join(directory, name))
 	return err == nil && !info.IsDir()
+}
+
+func gitRepositoryRoot(directory string) (string, error) {
+	command := exec.Command("git", "-C", directory, "rev-parse", "--show-toplevel")
+	output, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }

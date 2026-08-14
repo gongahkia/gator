@@ -1,7 +1,8 @@
 .PHONY: build check fmt test vet
 
 build:
-	go build ./cmd/gator
+	mkdir -p bin
+	go build -o bin/gator ./cmd/gator
 
 check: fmt test vet build
 
@@ -13,4 +14,3 @@ test:
 
 vet:
 	go vet ./...
-

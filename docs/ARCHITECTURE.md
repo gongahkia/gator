@@ -18,7 +18,7 @@ refactors are not a v1 acceptance claim.
 ```text
 task -> session -> native agent loop -> model adapter
                      |       |
-                     |       +-> durable event journal / transcript replay
+                     |       +-> local event journal / private resume session
                      v
               policy-checked tools
                      |
@@ -33,6 +33,11 @@ The core owns the loop, context selection, tool schemas, tool execution,
 policies, event stream, worktree lifecycle, and run outcome. A model adapter
 only converts between the provider protocol and the core's typed turn contract.
 This keeps provider-specific details out of safety and test-critical code.
+
+The current OpenAI adapter uses Responses API streaming for incremental text,
+then converts the completed typed response into the core turn contract. The
+core does not rely on provider-side conversation persistence: requests use
+`store: false` and a private local session file provides resume context.
 
 ## Initial tool surface
 
@@ -66,3 +71,12 @@ Before calling a release useful for daily work, Gator must have:
 Benchmark results can demonstrate a bounded configuration only. They cannot by
 themselves establish general parity with Pi, Codex CLI, or any particular model.
 
+## Local state and privacy
+
+Code changes remain in a sibling worktree. State is written outside the active
+checkout at `$XDG_STATE_HOME/gator/` by default (or
+`~/.local/state/gator/`). `events.jsonl` stores only event type, time, step,
+tool name/call ID, and tool errors. It does not persist source text, prompts,
+tool arguments, or tool output. `session.json` is deliberately different: it
+contains the conversation required to resume a run, is written atomically with
+mode `0600`, and should be treated as private local data.
