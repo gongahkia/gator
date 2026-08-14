@@ -1,11 +1,19 @@
 package tui
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
+	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
 func TestNewUsesConfiguredRunDefaults(t *testing.T) {
@@ -80,6 +88,97 @@ func TestRenderEventDoesNotLeakMultilineOutputIntoTimeline(t *testing.T) {
 	}
 }
 
+func TestInteractiveRunStreamsToReview(t *testing.T) {
+	repository := testRepository(t)
+	agentModel := &testAgentModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "test", Name: "run_command", Arguments: json.RawMessage(`{"argv":["go","test","./..."]}`)}}},
+		{Text: "The repository is verified and ready for review."},
+	}}
+	model := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		Verification:   [][]string{{"go", "test", "./..."}},
+		APIKey:         "test-key",
+		StateDir:       t.TempDir(),
+		NewExecutor: func(string) gatorrun.Executor {
+			return gatorrun.Executor{Model: agentModel, Now: func() time.Time { return time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC) }}
+		},
+	})
+	model.task.SetValue("Inspect this repository and verify it")
+
+	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if updated.screen != reviewScreen {
+		t.Fatalf("screen = %v, want review", updated.screen)
+	}
+	if updated.runErr != nil {
+		t.Fatalf("run error = %v", updated.runErr)
+	}
+	if updated.outcome == nil || updated.outcome.Worktree.Path == "" {
+		t.Fatalf("outcome = %#v", updated.outcome)
+	}
+	if len(updated.events) < 5 {
+		t.Fatalf("timeline events = %#v", updated.events)
+	}
+	if !strings.Contains(updated.View(), "The repository is verified") {
+		t.Fatalf("review omitted final result: %s", updated.View())
+	}
+}
+
 func agentEvent(step int, text string) agent.Event {
 	return agent.Event{Kind: agent.EventText, Step: step, Text: text}
+}
+
+func drive(t *testing.T, model Model, message tea.Msg) Model {
+	t.Helper()
+	current, command := model.Update(message)
+	updated := current.(Model)
+	for command != nil {
+		current, command = updated.Update(command())
+		updated = current.(Model)
+	}
+	return updated
+}
+
+type testAgentModel struct {
+	turns []agent.Turn
+}
+
+func (m *testAgentModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	if len(m.turns) == 0 {
+		return agent.Turn{}, errors.New("unexpected model call")
+	}
+	turn := m.turns[0]
+	m.turns = m.turns[1:]
+	return turn, nil
+}
+
+func testRepository(t *testing.T) string {
+	t.Helper()
+	repository := filepath.Join(t.TempDir(), "repository")
+	if err := os.MkdirAll(repository, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, contents string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(repository, name), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module example.com/tui-test\n\ngo 1.25.0\n")
+	write("hello.go", "package tuitest\n\nfunc Hello() string { return \"hello\" }\n")
+	runGit(t, repository, "init", "--quiet")
+	runGit(t, repository, "add", ".")
+	runGit(t, repository, "-c", "user.name=Gator Test", "-c", "user.email=gator@example.invalid", "commit", "--quiet", "-m", "fixture")
+	return repository
+}
+
+func runGit(t *testing.T, directory string, arguments ...string) {
+	t.Helper()
+	command := exec.Command("git", arguments...)
+	command.Dir = directory
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), err, output)
+	}
 }
