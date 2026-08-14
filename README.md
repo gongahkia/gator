@@ -12,15 +12,19 @@ tests, and propose the resulting patch.
 ## Status
 
 The project is being rebuilt from a previous agent meta-harness. The first
-milestone provides the tested native agent-loop contract. Model transport,
-workspace tools, the terminal UI, and real end-to-end runs are not implemented
-yet.
+runnable milestone includes the native loop, OpenAI Responses adapter,
+worktree-local tools, command policy, and a streaming line-oriented terminal
+experience. Durable run storage, replay, context compaction, a full-screen TUI,
+and real-model usability evidence are still in progress.
 
 ## Development
 
 ```sh
 make check
 go run ./cmd/gator help
+go run ./cmd/gator doctor
+OPENAI_API_KEY=... go run ./cmd/gator run --verify 'go test ./...' \
+  'Add a focused feature with tests'
 ```
 
 ## Design principles
@@ -34,4 +38,3 @@ go run ./cmd/gator help
 
 See [the architecture](docs/ARCHITECTURE.md) for the intended runtime and
 acceptance criteria.
-

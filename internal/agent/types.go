@@ -20,10 +20,11 @@ const (
 // Message is the normalized conversation history passed to a model adapter.
 // Tool messages carry a call ID so adapters can preserve provider correlation.
 type Message struct {
-	Role       Role   `json:"role"`
-	Content    string `json:"content"`
-	ToolCallID string `json:"tool_call_id,omitempty"`
-	ToolName   string `json:"tool_name,omitempty"`
+	Role       Role       `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	ToolName   string     `json:"tool_name,omitempty"`
 }
 
 // ToolDefinition describes one tool available to the model. Parameters is a
@@ -36,9 +37,10 @@ type ToolDefinition struct {
 
 // ToolCall is a model request to invoke one tool.
 type ToolCall struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
+	ID         string          `json:"id"`
+	ProviderID string          `json:"provider_id,omitempty"`
+	Name       string          `json:"name"`
+	Arguments  json.RawMessage `json:"arguments"`
 }
 
 // TurnRequest is one model turn. Implementations must not mutate Messages.
@@ -76,11 +78,12 @@ type ToolResult struct {
 type EventKind string
 
 const (
-	EventTurnStarted  EventKind = "turn_started"
-	EventText         EventKind = "text"
-	EventToolCalled   EventKind = "tool_called"
-	EventToolFinished EventKind = "tool_finished"
-	EventRunFinished  EventKind = "run_finished"
+	EventTurnStarted       EventKind = "turn_started"
+	EventText              EventKind = "text"
+	EventToolCalled        EventKind = "tool_called"
+	EventToolFinished      EventKind = "tool_finished"
+	EventCompletionBlocked EventKind = "completion_blocked"
+	EventRunFinished       EventKind = "run_finished"
 )
 
 // Event is intentionally structured so the UI, journal, and tests observe the
@@ -103,6 +106,9 @@ type RunOptions struct {
 	System   string
 	MaxSteps int
 	OnEvent  EventSink
+	// CompletionCheck may require concrete evidence, such as a diff inspection
+	// or a named verifier, before a final response is accepted.
+	CompletionCheck func([]Message) error
 }
 
 // Result is the terminal state of a completed agent loop.

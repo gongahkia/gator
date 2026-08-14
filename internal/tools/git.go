@@ -3,8 +3,11 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -64,7 +67,7 @@ func (t GitDiff) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolRe
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	output, truncated, err := runGit(ctx, t.Root.Path(), "diff", "--no-ext-diff", "--binary")
+	output, truncated, err := worktreeDiff(ctx, t.Root)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -79,6 +82,76 @@ func (t GitDiff) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolRe
 }
 
 func runGit(ctx context.Context, directory string, arguments ...string) (string, bool, error) {
+	output, truncated, _, err := runGitCommand(ctx, directory, arguments...)
+	if err == nil {
+		return output, truncated, nil
+	}
+	if output == "" {
+		return "", truncated, fmt.Errorf("run git %q: %w", arguments, err)
+	}
+	return "", truncated, fmt.Errorf("run git %q: %w: %s", arguments, err, strings.TrimSpace(output))
+}
+
+func worktreeDiff(ctx context.Context, root workspace.Root) (string, bool, error) {
+	tracked, truncated, err := runGit(ctx, root.Path(), "diff", "--no-ext-diff", "--binary")
+	if err != nil || truncated {
+		return tracked, truncated, err
+	}
+	untracked, err := untrackedFiles(ctx, root)
+	if err != nil {
+		return "", false, err
+	}
+	var diff strings.Builder
+	diff.WriteString(tracked)
+	for _, relative := range untracked {
+		if diff.Len() >= maxGitOutputBytes {
+			return diff.String()[:maxGitOutputBytes], true, nil
+		}
+		path, err := root.ResolveFile(relative)
+		if err != nil {
+			return "", false, err
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		output, wasTruncated, exitCode, commandErr := runGitCommand(ctx, root.Path(), "diff", "--no-index", "--binary", "--", "/dev/null", path)
+		if commandErr != nil && exitCode != 1 {
+			return "", false, fmt.Errorf("diff untracked file %q: %w", relative, commandErr)
+		}
+		remaining := maxGitOutputBytes - diff.Len()
+		if len(output) > remaining {
+			diff.WriteString(output[:remaining])
+			return diff.String(), true, nil
+		}
+		diff.WriteString(output)
+		if wasTruncated {
+			return diff.String(), true, nil
+		}
+	}
+	return diff.String(), false, nil
+}
+
+func untrackedFiles(ctx context.Context, root workspace.Root) ([]string, error) {
+	output, _, err := runGit(ctx, root.Path(), "status", "--porcelain=v1", "--untracked-files=all", "-z")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, entry := range strings.Split(output, "\x00") {
+		if !strings.HasPrefix(entry, "?? ") {
+			continue
+		}
+		path := strings.TrimPrefix(entry, "?? ")
+		if filepath.Clean(path) == ".gator" || strings.HasPrefix(filepath.ToSlash(filepath.Clean(path)), ".gator/") {
+			continue
+		}
+		files = append(files, path)
+	}
+	return files, nil
+}
+
+func runGitCommand(ctx context.Context, directory string, arguments ...string) (string, bool, int, error) {
 	command := exec.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
 	output := &limitedBuffer{limit: maxGitOutputBytes}
@@ -86,11 +159,11 @@ func runGit(ctx context.Context, directory string, arguments ...string) (string,
 	command.Stderr = output
 	err := command.Run()
 	if err != nil {
-		message := strings.TrimSpace(output.String())
-		if message == "" {
-			return "", output.truncated, fmt.Errorf("run git %q: %w", arguments, err)
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			return output.String(), output.truncated, exitError.ExitCode(), err
 		}
-		return "", output.truncated, fmt.Errorf("run git %q: %w: %s", arguments, err, message)
+		return output.String(), output.truncated, -1, err
 	}
-	return output.String(), output.truncated, nil
+	return output.String(), output.truncated, 0, nil
 }

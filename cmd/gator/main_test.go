@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -21,5 +22,25 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	err := run([]string{"ship"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("run error = %v, want unknown-command error", err)
+	}
+}
+
+func TestVerificationFlagsParseArgv(t *testing.T) {
+	var flags verificationFlags
+	if err := flags.Set("go test ./..."); err != nil {
+		t.Fatalf("set verification: %v", err)
+	}
+	if got := strings.Join(flags[0], " "); got != "go test ./..." {
+		t.Fatalf("verification argv = %q", got)
+	}
+}
+
+func TestSuggestedVerificationCommands(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(directory+string(os.PathSeparator)+"go.mod", []byte("module example.com/test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := suggestedVerificationCommands(directory); len(got) != 1 || got[0] != "go test ./..." {
+		t.Fatalf("suggestions = %#v", got)
 	}
 }
