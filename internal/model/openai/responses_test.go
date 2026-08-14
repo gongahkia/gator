@@ -103,3 +103,33 @@ func TestResponsesRequiresAPIKey(t *testing.T) {
 		t.Fatalf("missing-key error = %v", err)
 	}
 }
+
+func TestResponsesCompleteStreamForwardsDeltasAndReturnsCompletedTurn(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body responseRequest
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode stream request: %v", err)
+		}
+		if !body.Stream || request.Header.Get("Accept") != "text/event-stream" {
+			t.Fatalf("stream request = %#v, accept = %q", body, request.Header.Get("Accept"))
+		}
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(writer, "event: response.output_text.delta\n")
+		_, _ = io.WriteString(writer, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello \"}\n\n")
+		_, _ = io.WriteString(writer, "event: response.output_text.delta\n")
+		_, _ = io.WriteString(writer, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"world\"}\n\n")
+		_, _ = io.WriteString(writer, "event: response.completed\n")
+		_, _ = io.WriteString(writer, "data: {\"type\":\"response.completed\",\"response\":{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"hello world\"}]}]}}\n\n")
+	}))
+	defer server.Close()
+
+	model := Responses{APIKey: "test-key", BaseURL: server.URL, Client: server.Client()}
+	var deltas []string
+	turn, err := model.CompleteStream(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}}, func(delta string) { deltas = append(deltas, delta) })
+	if err != nil {
+		t.Fatalf("complete stream: %v", err)
+	}
+	if strings.Join(deltas, "") != "hello world" || turn.Text != "hello world" {
+		t.Fatalf("deltas = %#v, turn = %#v", deltas, turn)
+	}
+}

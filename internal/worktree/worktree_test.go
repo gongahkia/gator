@@ -36,6 +36,21 @@ func TestCreateRejectsInvalidRunID(t *testing.T) {
 	}
 }
 
+func TestOpenExistingWorktree(t *testing.T) {
+	repository := initializedRepository(t)
+	created, err := Create(context.Background(), repository, "run_resume_001")
+	if err != nil {
+		t.Fatalf("create worktree: %v", err)
+	}
+	opened, err := OpenExisting(context.Background(), repository, created.Path, "run_resume_002")
+	if err != nil {
+		t.Fatalf("open existing worktree: %v", err)
+	}
+	if opened.Path != created.Path || opened.Repository != repository {
+		t.Fatalf("opened worktree = %#v", opened)
+	}
+}
+
 func initializedRepository(t *testing.T) string {
 	t.Helper()
 	repository := filepath.Join(t.TempDir(), "repository")

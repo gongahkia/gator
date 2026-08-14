@@ -8,10 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -21,37 +24,35 @@ import (
 type Request struct {
 	RepositoryPath string
 	Task           string
+	Model          string
 	RunID          string
 	MaxSteps       int
 	Verification   [][]string
 	System         string
+	StateDir       string
 	OnEvent        agent.EventSink
 }
 
 // Outcome preserves the reviewable artifacts of a completed or failed run.
 type Outcome struct {
-	Worktree worktree.Worktree
-	Result   agent.Result
-	Events   []agent.Event
+	Worktree  worktree.Worktree
+	StatePath string
+	Result    agent.Result
+	Events    []agent.Event
 }
 
 // Executor combines the provider-independent loop with an isolated worktree.
 type Executor struct {
-	Model agent.Model
-	Now   func() time.Time
+	Model    agent.Model
+	Now      func() time.Time
+	StateDir string
 }
 
 // Execute creates a new detached worktree and runs the native agent inside it.
 // A worktree is retained even on failure so a developer can inspect recovery
 // state rather than losing a partially completed patch.
 func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error) {
-	if e.Model == nil {
-		return Outcome{}, errors.New("agent model is required")
-	}
-	if strings.TrimSpace(request.Task) == "" {
-		return Outcome{}, errors.New("run task is required")
-	}
-	if err := validateVerification(request.Verification); err != nil {
+	if err := e.validateRequest(request); err != nil {
 		return Outcome{}, err
 	}
 	runID := request.RunID
@@ -62,14 +63,84 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 		runID = generated
 	}
+	request.RunID = runID
 	isolated, err := worktree.Create(ctx, request.RepositoryPath, runID)
 	if err != nil {
 		return Outcome{}, err
 	}
+	return e.execute(ctx, isolated, request, nil, "")
+}
+
+// Resume continues a retained worktree from a private local session. It starts
+// a new run record and re-requires final status, diff, and verification evidence.
+func (e Executor) Resume(ctx context.Context, previous journal.Session, statePath, continuation string, request Request) (Outcome, error) {
+	if strings.TrimSpace(continuation) == "" {
+		return Outcome{}, errors.New("resume task is required")
+	}
+	request.RepositoryPath = previous.Repository
+	request.Task = previous.Task
+	request.Model = previous.Model
+	request.Verification = previous.Verification
+	if request.MaxSteps == 0 {
+		request.MaxSteps = previous.MaxSteps
+	}
+	if request.MaxSteps == 0 {
+		request.MaxSteps = defaultResumeMaxSteps
+	}
+	if err := e.validateRequest(request); err != nil {
+		return Outcome{}, err
+	}
+	generated, err := newID(e.now())
+	if err != nil {
+		return Outcome{}, err
+	}
+	request.RunID = generated
+	isolated, err := worktree.OpenExisting(ctx, previous.Repository, previous.WorktreePath, generated)
+	if err != nil {
+		return Outcome{}, err
+	}
+	history := append([]agent.Message(nil), previous.Messages...)
+	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation})
+	return e.execute(ctx, isolated, request, history, statePath)
+}
+
+const defaultResumeMaxSteps = 24
+
+func (e Executor) validateRequest(request Request) error {
+	if e.Model == nil {
+		return errors.New("agent model is required")
+	}
+	if strings.TrimSpace(request.Task) == "" {
+		return errors.New("run task is required")
+	}
+	if err := validateVerification(request.Verification); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string) (Outcome, error) {
+	projectInstructions, err := loadProjectInstructions(isolated.Repository)
+	if err != nil {
+		return Outcome{Worktree: isolated}, err
+	}
+	stateDir := request.StateDir
+	if stateDir == "" {
+		stateDir = e.StateDir
+	}
+	runJournal, record, err := journal.Open(isolated.Repository, request.RunID, isolated.Path, stateDir, e.now())
+	if err != nil {
+		return Outcome{Worktree: isolated}, err
+	}
+	defer runJournal.Close()
 
 	var events []agent.Event
+	var journalErr error
 	emit := func(event agent.Event) {
 		events = append(events, event)
+		if journalErr == nil {
+			journalErr = runJournal.Append(event)
+		}
 		if request.OnEvent != nil {
 			request.OnEvent(event)
 		}
@@ -83,16 +154,79 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	result, err := runner.Run(ctx, agent.RunOptions{
 		Task:            request.Task,
-		System:          systemPrompt(request.System, request.Verification),
+		System:          systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification),
+		InitialMessages: initialMessages,
 		MaxSteps:        request.MaxSteps,
 		OnEvent:         emit,
 		CompletionCheck: completionCheck(request.Verification),
 	})
-	outcome := Outcome{Worktree: isolated, Result: result, Events: events}
+	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, Result: result, Events: events}
+	if sessionErr := runJournal.SaveSession(journal.Session{
+		Version:         1,
+		Repository:      isolated.Repository,
+		WorktreePath:    isolated.Path,
+		Model:           request.Model,
+		Task:            request.Task,
+		MaxSteps:        request.MaxSteps,
+		Verification:    request.Verification,
+		Messages:        result.Messages,
+		ParentStatePath: parentStatePath,
+	}); sessionErr != nil && journalErr == nil {
+		journalErr = sessionErr
+	}
+	status := "completed"
+	if err != nil {
+		status = "failed"
+	}
+	if finishErr := runJournal.Finish(status, result.FinalText, e.now()); finishErr != nil && journalErr == nil {
+		journalErr = finishErr
+	}
+	if journalErr != nil {
+		if err != nil {
+			return outcome, fmt.Errorf("agent run failed: %v; write run journal: %w", err, journalErr)
+		}
+		return outcome, fmt.Errorf("write run journal: %w", journalErr)
+	}
 	if err != nil {
 		return outcome, err
 	}
 	return outcome, nil
+}
+
+const maxProjectInstructionsBytes = 64 * 1024
+
+func loadProjectInstructions(repository string) (string, error) {
+	path := filepath.Join(repository, "AGENTS.md")
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("stat AGENTS.md: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", errors.New("AGENTS.md must be a regular file")
+	}
+	if info.Size() > maxProjectInstructionsBytes {
+		return "", fmt.Errorf("AGENTS.md exceeds the %d-byte limit", maxProjectInstructionsBytes)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read AGENTS.md: %w", err)
+	}
+	return string(contents), nil
+}
+
+func joinInstructions(project, request string) string {
+	project = strings.TrimSpace(project)
+	request = strings.TrimSpace(request)
+	if project == "" {
+		return request
+	}
+	if request == "" {
+		return project
+	}
+	return project + "\n\nAdditional run instructions:\n" + request
 }
 
 func systemPrompt(additional string, verification [][]string) string {
@@ -113,9 +247,15 @@ Treat the user task as an implementation request, not a request for advice. Expl
 
 func completionCheck(verification [][]string) func([]agent.Message) error {
 	return func(messages []agent.Message) error {
+		start := 0
+		for index, message := range messages {
+			if message.Role == agent.RoleUser {
+				start = index
+			}
+		}
 		seen := make(map[string]bool)
 		passed := make(map[string]bool)
-		for _, message := range messages {
+		for _, message := range messages[start:] {
 			if message.Role != agent.RoleTool {
 				continue
 			}

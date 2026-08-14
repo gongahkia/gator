@@ -21,10 +21,15 @@ and real-model usability evidence are still in progress.
 
 ```sh
 make check
-go run ./cmd/gator help
-go run ./cmd/gator doctor
-OPENAI_API_KEY=... go run ./cmd/gator run --verify 'go test ./...' \
+make build
+./bin/gator help
+./bin/gator doctor
+OPENAI_API_KEY=... ./bin/gator run --verify 'go test ./...' \
   'Add a focused feature with tests'
+
+# Continue an interrupted run using the printed run-record path.
+OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
+  'Address the failing verification and finish the patch'
 ```
 
 ## Design principles
@@ -35,6 +40,16 @@ OPENAI_API_KEY=... go run ./cmd/gator run --verify 'go test ./...' \
 - deterministic tests and replayable model transcripts around all harness
   behavior;
 - no claim of model or benchmark competitiveness without published evidence.
+
+## Local run data
+
+Runs leave code changes in a sibling `*-gator-runs/` worktree, never in the
+active checkout. The printed run-record path defaults to
+`$XDG_STATE_HOME/gator/` (or `~/.local/state/gator/`) and contains a
+metadata-only event journal, final result, and a private `0600` session file
+for `gator resume`. The event log intentionally omits prompts, source text,
+tool arguments, and tool output; the worktree is the reviewable source of
+truth. Set `GATOR_STATE_DIR` to use another local state root.
 
 See [the architecture](docs/ARCHITECTURE.md) for the intended runtime and
 acceptance criteria.
