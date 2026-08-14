@@ -254,7 +254,7 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch message.String() {
-	case "ctrl+c", "q":
+	case "ctrl+c":
 		return m, tea.Quit
 	case "?":
 		if m.focus == taskField && strings.TrimSpace(m.task.Value()) == "" {
@@ -526,7 +526,8 @@ func (m Model) composeView() string {
 		m.fieldView("Task", "Explain the desired behavior and any constraints.", m.task.View()),
 	}
 	if palette := m.commandPaletteView(); palette != "" {
-		sections = append(sections, palette)
+		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "ctrl+c quit"))
+		return strings.Join(sections, "\n\n")
 	}
 	if references := m.contextReferencesView(); references != "" {
 		sections = append(sections, references)
@@ -540,7 +541,7 @@ func (m Model) composeView() string {
 	}
 	sections = append(sections,
 		m.noticeView(),
-		m.footer("? commands", "tab switch field", "ctrl+r start run", "q quit"),
+		m.footer("? commands", "tab switch field", "ctrl+r start run", "ctrl+c quit"),
 	)
 	return strings.Join(sections, "\n\n")
 }
@@ -763,7 +764,7 @@ func (m Model) contextReferencesView() string {
 	for _, reference := range references {
 		values = append(values, keyStyle.Render("@"+reference))
 	}
-	return labelStyle.Render("Context references") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(values, "  ")) + "\n" + dimStyle.Render("Gator validates these paths inside the repository before a run and asks the agent to inspect them first.")
+	return labelStyle.Render("Context references") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(values, "  ")) + "\n" + dimStyle.Render("Gator validates these paths before a run; the agent inspects them first.")
 }
 
 func (m Model) sessionStatus() string {

@@ -42,6 +42,13 @@ isolated worktree. The review screen shows the final report, worktree, run
 record, and a diff preview; press `c` to continue a retained run, `n` for a new
 task, or `d` to refresh the diff.
 
+Type `/` (or `?` in an empty task) to filter and select local composer commands:
+`/status`, `/model`, `/verify`, `/permissions`, `/worktree`, `/review`,
+`/clear`, `/help`, and `/quit`. Use `@path/to/file` or `@"path with spaces"`
+in a task to mark repository files or directories that the agent should inspect
+first. Gator validates every reference against the repository boundary before
+starting; it does not copy the referenced source into the task or journal.
+
 The review screen deliberately does not modify the active checkout. Inspect the
 printed worktree before bringing a patch into your branch. The existing `run`
 and `resume` commands remain available for scripts and CI-like usage.

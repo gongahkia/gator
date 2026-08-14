@@ -78,7 +78,7 @@ func extractContextReferences(value string) []string {
 			reference = value[start:end]
 			index = end - 1
 		}
-		reference = strings.TrimSpace(reference)
+		reference = strings.TrimRight(strings.TrimSpace(reference), ".,;:!?)]}")
 		if reference == "" || seen[reference] {
 			continue
 		}
