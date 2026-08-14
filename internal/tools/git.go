@@ -67,7 +67,7 @@ func (t GitDiff) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolRe
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	output, truncated, err := worktreeDiff(ctx, t.Root)
+	output, truncated, err := ReviewDiff(ctx, t.Root)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -79,6 +79,13 @@ func (t GitDiff) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolRe
 		return agent.ToolResult{}, err
 	}
 	return agent.ToolResult{Content: result}, nil
+}
+
+// ReviewDiff returns the current complete review diff for a worktree,
+// including ordinary untracked files. It is shared by the agent tool and the
+// interactive review screen so they show the same patch source.
+func ReviewDiff(ctx context.Context, root workspace.Root) (string, bool, error) {
+	return worktreeDiff(ctx, root)
 }
 
 func runGit(ctx context.Context, directory string, arguments ...string) (string, bool, error) {
