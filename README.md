@@ -49,14 +49,18 @@ OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
 
 `gator` opens the interactive application when run from a Git checkout and a
 real terminal. Describe the task, keep or edit the suggested verification
-commands, choose a provider and model, and press `Ctrl+R` to start. `Tab` moves
-between task, verifier, provider, and model fields. During a run, `Ctrl+C`
+commands, choose a provider and model, and press `Ctrl+R` to start. Provider
+and model fields show keyboard-selectable dropdowns; type to filter, use the
+arrow keys to choose, then press `Enter` or `Tab`. `Tab` moves between task,
+verifier, provider, and model fields. During a run, `Ctrl+C`
 requests cancellation while retaining the isolated worktree. The review screen
 shows the final report, worktree, run record, and a diff preview; press `c` to
 continue a retained run, `n` for a new task, or `d` to refresh the diff.
 
-Type `/` (or `?` in an empty task) to filter and select local composer commands:
-`/status`, `/model`, `/verify`, `/permissions`, `/worktree`, `/review`,
+Type `/` (or `?` in an empty task) to filter and select local composer commands;
+type `@` in a task to select a repository file or directory from matching path
+suggestions. Both menus accept arrow keys and `Enter` or `Tab`. Composer
+commands are `/status`, `/model`, `/verify`, `/permissions`, `/worktree`, `/review`,
 `/clear`, `/help`, and `/quit`. Use `@path/to/file` or `@"path with spaces"`
 in a task to mark repository files or directories that the agent should inspect
 first. Gator validates every reference against the repository boundary before

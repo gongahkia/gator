@@ -93,3 +93,78 @@ func TestJournalSavesAndLoadsPrivateSession(t *testing.T) {
 		t.Fatalf("session permissions = %o, want 600", info.Mode().Perm())
 	}
 }
+
+func TestDraftRoundTripUsesPrivateStateAndClearsAfterRunStart(t *testing.T) {
+	stateDirectory := t.TempDir()
+	draft := Draft{
+		Repository:   "/workspace/project",
+		Task:         "Add a focused feature",
+		Verification: [][]string{{"go", "test", "./..."}},
+		Provider:     "anthropic",
+		Model:        "claude-sonnet-5",
+		BaseURL:      "https://example.test",
+		UpdatedAt:    time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC),
+	}
+	if err := SaveDraft(stateDirectory, draft); err != nil {
+		t.Fatalf("save draft: %v", err)
+	}
+	loaded, found, err := LoadDraft(stateDirectory, draft.Repository)
+	if err != nil {
+		t.Fatalf("load draft: %v", err)
+	}
+	if !found || loaded.Task != draft.Task || loaded.Provider != draft.Provider || loaded.Verification[0][0] != "go" {
+		t.Fatalf("loaded draft = %#v, found = %t", loaded, found)
+	}
+	path := filepath.Join(stateDirectory, "gator", "drafts", repositoryFingerprint(draft.Repository)+".json")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("draft permissions = %o, want 600", info.Mode().Perm())
+	}
+	if err := DeleteDraft(stateDirectory, draft.Repository); err != nil {
+		t.Fatalf("delete draft: %v", err)
+	}
+	if _, found, err := LoadDraft(stateDirectory, draft.Repository); err != nil || found {
+		t.Fatalf("draft after delete = found %t, error %v", found, err)
+	}
+}
+
+func TestListRecentRunsSortsSessionsAndMarksMissingWorktrees(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/project"
+	create := func(runID, worktree string) Record {
+		t.Helper()
+		journal, record, err := Open(repository, runID, worktree, stateDirectory, time.Now())
+		if err != nil {
+			t.Fatalf("open %s: %v", runID, err)
+		}
+		if err := journal.SaveSession(Session{Version: 2, Repository: repository, WorktreePath: worktree, Provider: "openai", Task: "Task " + runID}); err != nil {
+			t.Fatalf("save %s: %v", runID, err)
+		}
+		if err := journal.Close(); err != nil {
+			t.Fatalf("close %s: %v", runID, err)
+		}
+		return record
+	}
+	availableWorktree := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(availableWorktree, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	first := create("run-001", availableWorktree)
+	second := create("run-002", filepath.Join(t.TempDir(), "missing"))
+	if err := os.Chtimes(filepath.Join(first.StatePath, "session.json"), time.Now().Add(-time.Minute), time.Now().Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	runs, err := ListRecentRuns(stateDirectory, repository, 10)
+	if err != nil {
+		t.Fatalf("list recent runs: %v", err)
+	}
+	if len(runs) != 2 || runs[0].StatePath != second.StatePath || runs[1].StatePath != first.StatePath {
+		t.Fatalf("recent runs = %#v", runs)
+	}
+	if !runs[1].Available || runs[0].Available {
+		t.Fatalf("availability = %#v", runs)
+	}
+}

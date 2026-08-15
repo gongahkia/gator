@@ -121,6 +121,88 @@ func TestQuestionMarkOpensCommandPalette(t *testing.T) {
 	}
 }
 
+func TestTabAcceptsSlashCommandRecommendation(t *testing.T) {
+	model := New(Config{})
+	model.task.SetValue("/prov")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if command == nil {
+		t.Fatal("provider command did not focus the provider field")
+	}
+	updated := next.(Model)
+	if updated.focus != providerField || updated.task.Value() != "" {
+		t.Fatalf("composer = %#v", updated)
+	}
+}
+
+func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
+	model := New(Config{Provider: "openai", Model: "gpt-5.6"})
+	model.focus = providerField
+	model.normalizeDropdownSelection()
+	for index, option := range model.dropdownOptions() {
+		if option.value == "anthropic" {
+			model.dropdownIndex = index
+			break
+		}
+	}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if command == nil {
+		t.Fatal("provider dropdown did not focus the model field")
+	}
+	updated := next.(Model)
+	if updated.focus != modelField || updated.provider.Value() != "anthropic" || updated.model.Value() != "claude-sonnet-5" {
+		t.Fatalf("composer = provider %q, model %q, focus %v", updated.provider.Value(), updated.model.Value(), updated.focus)
+	}
+	updated.width = 100
+	updated.height = 40
+	updated.resizeInputs()
+	if !strings.Contains(updated.View(), "Recommended models") {
+		t.Fatalf("model dropdown missing from view: %s", updated.View())
+	}
+}
+
+func TestModelDropdownKeepsCustomModelEntryForEndpointSpecificProviders(t *testing.T) {
+	model := New(Config{Provider: "azure-openai"})
+	model.focus = modelField
+	options := model.dropdownOptions()
+	if len(options) != 1 || !options[0].custom || options[0].label != "custom model ID" {
+		t.Fatalf("Azure model options = %#v", options)
+	}
+}
+
+func TestCustomModelDropdownDoesNotClearTypedModel(t *testing.T) {
+	model := New(Config{Provider: "azure-openai", Model: "my-deployment"})
+	model.focus = modelField
+	model.normalizeDropdownSelection()
+	model.applySelectedDropdown()
+	if got := model.model.Value(); got != "my-deployment" {
+		t.Fatalf("custom model = %q", got)
+	}
+}
+
+func TestTaskPathAutocompleteInsertsSelectedReferenceWithTab(t *testing.T) {
+	repository := testRepository(t)
+	model := New(Config{RepositoryPath: repository})
+	model.task.SetValue("Inspect @hel")
+	model.normalizeContextSelection()
+	if matches := model.contextCompletions(); len(matches) != 1 || matches[0] != "hello.go" {
+		t.Fatalf("path matches = %#v", matches)
+	}
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
+	if !strings.Contains(model.View(), "Path suggestions") {
+		t.Fatalf("path dropdown missing from view: %s", model.View())
+	}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if command != nil {
+		t.Fatal("path completion returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.task.Value() != "Inspect @hello.go " {
+		t.Fatalf("task = %q", updated.task.Value())
+	}
+}
+
 func TestComposerAllowsQInTaskText(t *testing.T) {
 	model := New(Config{})
 	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
