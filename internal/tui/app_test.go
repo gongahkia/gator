@@ -12,6 +12,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -62,6 +63,99 @@ func TestComposerReportsProviderConfigurationFailureBeforeRun(t *testing.T) {
 	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, "ANTHROPIC_API_KEY") {
 		t.Fatalf("notice = %#v", updated.notice)
 	}
+}
+
+func TestWindowSizeResizesInputsAndKeepsComposerWithinTerminal(t *testing.T) {
+	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
+	model.task.SetValue("Implement responsive terminal layout")
+
+	next, _ := model.Update(tea.WindowSizeMsg{Width: 44, Height: 18})
+	small := next.(Model)
+	if got, want := small.task.Height(), 2; got != want {
+		t.Fatalf("small task height = %d, want %d", got, want)
+	}
+	if got, want := small.verification.Height(), 1; got != want {
+		t.Fatalf("small verification height = %d, want %d", got, want)
+	}
+	if got, want := small.provider.Width, 36; got != want {
+		t.Fatalf("small provider width = %d, want %d", got, want)
+	}
+	assertViewFits(t, small, 44, 18)
+
+	next, _ = small.Update(tea.WindowSizeMsg{Width: 120, Height: 52})
+	large := next.(Model)
+	if got, want := large.task.Height(), 7; got != want {
+		t.Fatalf("large task height = %d, want %d", got, want)
+	}
+	if got, want := large.verification.Height(), 3; got != want {
+		t.Fatalf("large verification height = %d, want %d", got, want)
+	}
+	if got, want := large.provider.Width, 112; got != want {
+		t.Fatalf("large provider width = %d, want %d", got, want)
+	}
+	assertViewFits(t, large, 120, 52)
+}
+
+func TestResponsiveViewsFitConstrainedTerminal(t *testing.T) {
+	base := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
+	base.task.SetValue("Implement a responsive layout that remains useful when the terminal is narrow or short.")
+
+	running := base
+	running.screen = runningScreen
+	running.events = []timelineEntry{
+		{step: 1, text: "[01] agent: inspecting the repository"},
+		{step: 2, text: "[02] tool git_status ok"},
+		{step: 3, text: "[03] agent: updating the layout"},
+	}
+
+	review := base
+	review.screen = reviewScreen
+	review.diff = "diff --git a/internal/tui/app.go b/internal/tui/app.go\n+responsive terminal layout\n+bounded output"
+
+	help := base
+	help.screen = helpScreen
+
+	recent := base
+	recent.screen = recentScreen
+	recent.recentIndex = 3
+	recent.recentRuns = []journal.RecentRun{
+		{Provider: "openai", Model: "gpt-5.6", Task: "First retained task", UpdatedAt: time.Now(), Available: true},
+		{Provider: "anthropic", Model: "claude-sonnet-5", Task: "Second retained task", UpdatedAt: time.Now(), Available: true},
+		{Provider: "gemini", Model: "gemini-3-pro", Task: "Third retained task", UpdatedAt: time.Now(), Available: true},
+		{Provider: "codex", Model: "", Task: "Selected retained task", UpdatedAt: time.Now(), Available: true},
+		{Provider: "mistral", Model: "mistral-large", Task: "Fifth retained task", UpdatedAt: time.Now(), Available: false},
+	}
+
+	for name, model := range map[string]Model{
+		"compose": base,
+		"running": running,
+		"review":  review,
+		"help":    help,
+		"recent":  recent,
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, size := range []struct{ width, height int }{{44, 18}, {18, 10}} {
+				next, _ := model.Update(tea.WindowSizeMsg{Width: size.width, Height: size.height})
+				assertViewFits(t, next.(Model), size.width, size.height)
+			}
+		})
+	}
+}
+
+func TestConstrainedProviderDropdownWindowsAroundSelection(t *testing.T) {
+	model := New(Config{Provider: "openai"})
+	model.focus = providerField
+	options := model.dropdownOptions()
+	model.dropdownIndex = len(options) - 1
+
+	next, _ := model.Update(tea.WindowSizeMsg{Width: 44, Height: 18})
+	updated := next.(Model)
+	view := updated.View()
+	selected := options[len(options)-1]
+	if !strings.Contains(view, selected.label) {
+		t.Fatalf("selected provider %q is not visible: %s", selected.label, view)
+	}
+	assertViewFits(t, updated, 44, 18)
 }
 
 func TestParseVerificationSplitsOneCommandPerLine(t *testing.T) {
@@ -435,6 +529,14 @@ func drive(t *testing.T, model Model, message tea.Msg) Model {
 		updated = current.(Model)
 	}
 	return updated
+}
+
+func assertViewFits(t *testing.T, model Model, width, height int) {
+	t.Helper()
+	gotWidth, gotHeight := lipgloss.Size(model.View())
+	if gotWidth > width || gotHeight > height {
+		t.Fatalf("view is %dx%d, terminal is %dx%d:\n%s", gotWidth, gotHeight, width, height, model.View())
+	}
 }
 
 type testAgentModel struct {
