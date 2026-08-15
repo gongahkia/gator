@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/workspace"
@@ -47,6 +48,97 @@ func matchingSlashCommands(value string) []slashCommand {
 type contextReference struct {
 	path  string
 	isDir bool
+}
+
+type contextCompletion struct {
+	start int
+	query string
+}
+
+// activeContextCompletion identifies an unfinished @ reference at the end of
+// the task. Restricting completion to the active suffix avoids altering a
+// reference that is already part of the developer's prose.
+func activeContextCompletion(value string) (contextCompletion, bool) {
+	start := strings.LastIndex(value, "@")
+	if start < 0 || (start > 0 && !referenceBoundary(value[start-1])) {
+		return contextCompletion{}, false
+	}
+	suffix := value[start+1:]
+	if strings.HasPrefix(suffix, `"`) {
+		suffix = suffix[1:]
+		if strings.Contains(suffix, `"`) {
+			return contextCompletion{}, false
+		}
+	} else if strings.ContainsAny(suffix, " \t\n\r") {
+		return contextCompletion{}, false
+	}
+	return contextCompletion{start: start, query: suffix}, true
+}
+
+// contextCompletionCandidates returns repository-relative files and
+// directories suitable for insertion after @. The list is bounded so an
+// exceptionally large checkout cannot make composer completion unresponsive.
+func contextCompletionCandidates(repository string) ([]string, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, fmt.Errorf("open repository for @ completion: %w", err)
+	}
+	const maxCandidates = 2_000
+	var candidates []string
+	err = filepath.WalkDir(root.Path(), func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root.Path() {
+			return nil
+		}
+		if entry.IsDir() && entry.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if !entry.IsDir() && !entry.Type().IsRegular() {
+			return nil
+		}
+		relative, err := filepath.Rel(root.Path(), path)
+		if err != nil {
+			return err
+		}
+		candidate := filepath.ToSlash(relative)
+		if entry.IsDir() {
+			candidate += "/"
+		}
+		candidates = append(candidates, candidate)
+		if len(candidates) >= maxCandidates {
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list repository paths for @ completion: %w", err)
+	}
+	sort.Strings(candidates)
+	return candidates, nil
+}
+
+func matchingContextCompletions(candidates []string, query string) []string {
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return candidates
+	}
+	var matches []string
+	for _, candidate := range candidates {
+		if strings.HasPrefix(strings.ToLower(candidate), query) {
+			matches = append(matches, candidate)
+		}
+	}
+	return matches
+}
+
+func contextToken(candidate string) string {
+	candidate = strings.TrimSuffix(candidate, "/")
+	if strings.ContainsAny(candidate, " \t") {
+		return `@"` + candidate + `"`
+	}
+	return "@" + candidate
 }
 
 // extractContextReferences recognizes @path and @"path with spaces" tokens.
