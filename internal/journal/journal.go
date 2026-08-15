@@ -39,6 +39,7 @@ type Session struct {
 	Version         int             `json:"version"`
 	Repository      string          `json:"repository"`
 	WorktreePath    string          `json:"worktree_path"`
+	Provider        string          `json:"provider"`
 	Model           string          `json:"model"`
 	Task            string          `json:"task"`
 	MaxSteps        int             `json:"max_steps"`
@@ -128,7 +129,7 @@ func (j *Journal) SaveSession(session Session) error {
 	if j == nil || j.directory == "" {
 		return errors.New("journal is not initialized")
 	}
-	if session.Version != 1 {
+	if session.Version != 2 {
 		return fmt.Errorf("unsupported session version %d", session.Version)
 	}
 	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Task) == "" {
@@ -161,7 +162,7 @@ func LoadSession(statePath string) (Session, error) {
 	if err := json.Unmarshal(contents, &session); err != nil {
 		return Session{}, fmt.Errorf("decode run session: %w", err)
 	}
-	if session.Version != 1 {
+	if session.Version != 2 {
 		return Session{}, fmt.Errorf("unsupported session version %d", session.Version)
 	}
 	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Task) == "" {

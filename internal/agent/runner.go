@@ -77,7 +77,12 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 		}
 
 		if turn.Text != "" || len(turn.ToolCalls) > 0 {
-			messages = append(messages, Message{Role: RoleAgent, Content: turn.Text, ToolCalls: cloneCalls(turn.ToolCalls)})
+			messages = append(messages, Message{
+				Role:         RoleAgent,
+				Content:      turn.Text,
+				ToolCalls:    cloneCalls(turn.ToolCalls),
+				ProviderData: append(json.RawMessage(nil), turn.ProviderData...),
+			})
 		}
 		if turn.Text != "" {
 			if !streamedText {
@@ -195,6 +200,7 @@ func cloneMessages(messages []Message) []Message {
 	for index, message := range messages {
 		clones[index] = message
 		clones[index].ToolCalls = cloneCalls(message.ToolCalls)
+		clones[index].ProviderData = append(json.RawMessage(nil), message.ProviderData...)
 	}
 	return clones
 }
