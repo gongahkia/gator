@@ -764,7 +764,7 @@ func (m Model) preflightView() string {
 	for _, issue := range m.preflight {
 		lines = append(lines, "• "+issue)
 	}
-	return labelStyle.Render(label) + "\n" + panelStyle.Width(max(28, m.width-4)).Render(errorStyle.Render(strings.Join(lines, "\n")))
+	return labelStyle.Render(label) + "\n" + m.panel(errorStyle.Render(strings.Join(lines, "\n")))
 }
 
 func (m Model) draftWarningView() string {
@@ -795,40 +795,57 @@ func (m *Model) focusField() tea.Cmd {
 }
 
 func (m *Model) resizeInputs() {
-	width := m.width - 8
-	if width < 28 {
-		width = 28
-	}
+	width := max(1, m.width-8)
 	m.task.SetWidth(width)
 	m.verification.SetWidth(width)
 	m.provider.Width = width
 	m.model.Width = width
+
+	switch {
+	case m.height < 20:
+		m.task.SetHeight(2)
+		m.verification.SetHeight(1)
+	case m.height < 34:
+		m.task.SetHeight(3)
+		m.verification.SetHeight(1)
+	case m.height < 48:
+		m.task.SetHeight(5)
+		m.verification.SetHeight(2)
+	default:
+		m.task.SetHeight(7)
+		m.verification.SetHeight(3)
+	}
 }
 
 func (m Model) View() string {
 	if m.width == 0 {
 		return "Starting Gator..."
 	}
+	var view string
 	switch m.screen {
 	case composeScreen:
-		return m.composeView()
+		view = m.composeView()
 	case runningScreen:
-		return m.runningView()
+		view = m.runningView()
 	case reviewScreen:
-		return m.reviewView()
+		view = m.reviewView()
 	case helpScreen:
-		return m.helpView()
+		view = m.helpView()
 	case recentScreen:
-		return m.recentRunsView()
+		view = m.recentRunsView()
 	default:
 		return ""
 	}
+	return m.fitToTerminal(view)
 }
 
 func (m Model) composeView() string {
 	mode := "new isolated run"
 	if m.resumeStatePath != "" {
 		mode = "continue retained run"
+	}
+	if m.compactComposer() {
+		return m.compactComposeView(mode)
 	}
 	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
 	providerHint := "Choose from the dropdown or type to filter providers."
@@ -844,7 +861,7 @@ func (m Model) composeView() string {
 	}
 	if palette := m.commandPaletteView(); palette != "" {
 		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
-		return strings.Join(sections, "\n\n")
+		return strings.Join(sections, "\n")
 	}
 	if references := m.contextReferencesView(); references != "" {
 		sections = append(sections, references)
@@ -856,9 +873,9 @@ func (m Model) composeView() string {
 	modelSection := m.fieldView("Model", modelHint, m.model.View())
 	if dropdown := m.dropdownView(); dropdown != "" {
 		if m.focus == providerField {
-			providerSection += "\n\n" + dropdown
+			providerSection += "\n" + dropdown
 		} else {
-			modelSection += "\n\n" + dropdown
+			modelSection += "\n" + dropdown
 		}
 	}
 	sections = append(sections,
@@ -873,19 +890,116 @@ func (m Model) composeView() string {
 		sections = append(sections, warning)
 	}
 	if m.commandOutput != "" {
-		sections = append(sections, labelStyle.Render("Command result"), panelStyle.Width(max(28, m.width-4)).Render(m.commandOutput))
+		sections = append(sections, labelStyle.Render("Command result"), m.panel(m.commandOutput))
 	}
 	sections = append(sections,
 		m.noticeView(),
 		m.footer("? commands", "ctrl+o recent", "tab switch field", "ctrl+r start run", "f1 shortcuts", "ctrl+c quit"),
 	)
-	return strings.Join(sections, "\n\n")
+	return strings.Join(sections, "\n")
+}
+
+func (m Model) compactComposeView(mode string) string {
+	sections := []string{
+		m.header(mode),
+		m.fieldView("Task", "", m.task.View()),
+	}
+	if palette := m.commandPaletteView(); palette != "" {
+		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
+		return strings.Join(sections, "\n")
+	}
+	if completions := m.contextCompletionView(); completions != "" {
+		sections = append(sections, completions, m.noticeView(), m.footer("up/down choose", "enter insert", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
+		return strings.Join(sections, "\n")
+	}
+
+	if m.focus != taskField {
+		label, value := "", ""
+		switch m.focus {
+		case verificationField:
+			label, value = "Verification", m.verification.View()
+		case providerField:
+			label, value = "Provider", m.provider.View()
+		case modelField:
+			label, value = "Model", m.model.View()
+		}
+		sections = append(sections, m.fieldView(label, "", value))
+		if dropdown := m.dropdownView(); dropdown != "" {
+			sections = append(sections, dropdown)
+		}
+	}
+
+	sections = append(sections, m.composerSummary(), m.compactPreflightView())
+	if m.commandOutput != "" {
+		sections = append(sections, labelStyle.Render("Command result"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
+	}
+	if warning := m.draftWarningView(); warning != "" {
+		sections = append(sections, warning)
+	}
+	sections = append(sections,
+		m.noticeView(),
+		m.footer("? commands", "ctrl+o recent", "tab switch field", "ctrl+r start run", "f1 shortcuts", "ctrl+c quit"),
+	)
+	return strings.Join(sections, "\n")
+}
+
+func (m Model) composerSummary() string {
+	verification := "no commands"
+	if commands, err := parseVerification(m.verification.Value()); err == nil && len(commands) > 0 {
+		verification = fmt.Sprintf("%d command(s)", len(commands))
+	} else if strings.TrimSpace(m.verification.Value()) != "" {
+		verification = "needs attention"
+	}
+	provider := strings.TrimSpace(m.provider.Value())
+	if provider == "" {
+		provider = "not selected"
+	}
+	model := strings.TrimSpace(m.model.Value())
+	if model == "" {
+		model = "provider default"
+	}
+	text := "verify: " + verification + " · provider: " + provider + " · model: " + model
+	return m.inline(dimStyle.Render(compact(text, m.inlineWidth())))
+}
+
+func (m Model) compactPreflightView() string {
+	if len(m.preflight) == 0 {
+		return m.inline(okStyle.Render("Ready to create an isolated worktree."))
+	}
+	label := "Before starting: "
+	if m.resumeStatePath != "" {
+		label = "Before continuing: "
+	}
+	return m.inline(errorStyle.Render(compact(label+m.preflight[0], m.inlineWidth())))
 }
 
 func (m Model) helpView() string {
+	if m.compactLayout() {
+		lines := []string{
+			"F1  close this help",
+			"Ctrl+R  start the configured run",
+			"Ctrl+O  choose a retained run",
+			"Tab / Shift+Tab  move between fields",
+			"?  open commands; @  reference a path",
+			"Ctrl+C  quit",
+		}
+		if m.constrainedLayout() {
+			lines = []string{
+				"F1  close this help",
+				"Ctrl+R  start a run",
+				"Tab  move between fields",
+				"Ctrl+C  quit",
+			}
+		}
+		return strings.Join([]string{
+			m.header("keyboard shortcuts"),
+			m.panel(strings.Join(lines, "\n")),
+			m.footer("esc close help"),
+		}, "\n")
+	}
 	sections := []string{
 		m.header("keyboard shortcuts"),
-		labelStyle.Render("Composer") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join([]string{
+		labelStyle.Render("Composer") + "\n" + m.panel(strings.Join([]string{
 			"F1  show or close this help",
 			"Ctrl+R  start the configured run",
 			"Ctrl+O  choose a retained run",
@@ -896,16 +1010,18 @@ func (m Model) helpView() string {
 			"Arrows + Enter or Tab  choose an open suggestion",
 			"Ctrl+C  quit",
 		}, "\n")),
-		labelStyle.Render("Running") + "\n" + panelStyle.Width(max(28, m.width-4)).Render("F1  show this help\nCtrl+C  request cancellation and retain the worktree"),
-		labelStyle.Render("Review") + "\n" + panelStyle.Width(max(28, m.width-4)).Render("F1  show this help\nc  continue the retained worktree\nn or Esc  start a new task\nd  refresh the diff\nq or Ctrl+C  quit"),
+		labelStyle.Render("Running") + "\n" + m.panel("F1  show this help\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc  continue the retained worktree\nn or Esc  start a new task\nd  refresh the diff\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}
-	return strings.Join(sections, "\n\n")
+	return strings.Join(sections, "\n")
 }
 
 func (m Model) recentRunsView() string {
-	lines := make([]string, 0, len(m.recentRuns))
-	for index, run := range m.recentRuns {
+	start, end := m.visibleRange(len(m.recentRuns), m.recentIndex, m.recentRunLimit())
+	lines := make([]string, 0, end-start)
+	for index := start; index < end; index++ {
+		run := m.recentRuns[index]
 		prefix := "  "
 		if index == m.recentIndex {
 			prefix = "> "
@@ -918,15 +1034,24 @@ func (m Model) recentRunsView() string {
 		if !run.Available {
 			availability = errorStyle.Render("worktree missing")
 		}
-		lines = append(lines, prefix+keyStyle.Render(run.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(run.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+compact(run.Task, 96))
+		limit := 96
+		if m.compactLayout() {
+			limit = max(12, m.panelTextWidth()-22)
+		}
+		lines = append(lines, prefix+keyStyle.Render(run.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(run.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+compact(run.Task, limit))
 	}
-	return strings.Join([]string{
+	sections := []string{
 		m.header("recent retained runs"),
-		panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n\n")),
-		dimStyle.Render("Run-record paths stay private; Gator validates a selected worktree before continuation."),
-		m.noticeView(),
+		m.panel(strings.Join(lines, "\n\n")),
 		m.footer("up/down choose", "enter continue", "r refresh", "esc back", "f1 shortcuts"),
-	}, "\n\n")
+	}
+	if !m.compactLayout() {
+		sections = append(sections[:2], append([]string{
+			dimStyle.Render("Run-record paths stay private; Gator validates a selected worktree before continuation."),
+			m.noticeView(),
+		}, sections[2:]...)...)
+	}
+	return strings.Join(sections, "\n")
 }
 
 func (m Model) runningView() string {
@@ -935,10 +1060,7 @@ func (m Model) runningView() string {
 		status = "Gator is stopping; the retained worktree will remain reviewable."
 	}
 	entries := m.events
-	maxEntries := m.height - 11
-	if maxEntries < 5 {
-		maxEntries = 5
-	}
+	maxEntries := max(1, m.height-7)
 	if len(entries) > maxEntries {
 		entries = entries[len(entries)-maxEntries:]
 	}
@@ -951,24 +1073,32 @@ func (m Model) runningView() string {
 	}
 	sections := []string{
 		m.header("live run"),
-		status,
-		panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")),
+		m.inline(dimStyle.Render(compact(status, m.inlineWidth()))),
+		m.panel(strings.Join(lines, "\n")),
 		m.noticeView(),
 		m.footer("ctrl+c stop after current operation", "f1 shortcuts"),
 	}
-	return strings.Join(sections, "\n\n")
+	return strings.Join(sections, "\n")
 }
 
 func (m Model) reviewView() string {
 	sections := []string{m.header("review")}
 	if m.outcome != nil {
-		sections = append(sections, labelStyle.Render("Retained worktree"), m.outcome.Worktree.Path)
-		sections = append(sections, labelStyle.Render("Run record"), m.outcome.StatePath)
+		if m.compactLayout() {
+			sections = append(sections, m.inline(dimStyle.Render(compact("worktree: "+m.outcome.Worktree.Path, m.inlineWidth()))))
+		} else {
+			sections = append(sections, labelStyle.Render("Retained worktree"), m.inline(m.outcome.Worktree.Path))
+			sections = append(sections, labelStyle.Render("Run record"), m.inline(m.outcome.StatePath))
+		}
 	}
 	if m.runErr != nil {
-		sections = append(sections, errorStyle.Render("Run result: "+m.runErr.Error()))
+		sections = append(sections, m.inline(errorStyle.Render(compact("Run result: "+m.runErr.Error(), m.inlineWidth()))))
 	} else if m.outcome != nil && strings.TrimSpace(m.outcome.Result.FinalText) != "" {
-		sections = append(sections, panelStyle.Width(max(28, m.width-4)).Render(m.outcome.Result.FinalText))
+		result := m.outcome.Result.FinalText
+		if m.compactLayout() {
+			result = compact(result, max(16, m.panelTextWidth()*2))
+		}
+		sections = append(sections, m.panel(result))
 	}
 	sections = append(sections, labelStyle.Render("Current diff"), m.diffView(), m.noticeView())
 	continueLabel := "c continue retained run"
@@ -976,16 +1106,21 @@ func (m Model) reviewView() string {
 		continueLabel = ""
 	}
 	sections = append(sections, m.footer("d refresh diff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
-	return strings.Join(sections, "\n\n")
+	return strings.Join(sections, "\n")
 }
 
 func (m Model) header(mode string) string {
 	repository := filepath.Base(filepath.Clean(m.config.RepositoryPath))
-	return headerStyle.Render("Gator") + "  " + dimStyle.Render(mode+" · "+repository)
+	return m.inline(headerStyle.Render("Gator") + "  " + dimStyle.Render(mode+" · "+repository))
 }
 
 func (m Model) fieldView(label, hint, value string) string {
-	return labelStyle.Render(label) + "\n" + dimStyle.Render(hint) + "\n" + panelStyle.Width(max(28, m.width-4)).Render(value)
+	sections := []string{m.inline(labelStyle.Render(label))}
+	if hint != "" {
+		sections = append(sections, m.inline(dimStyle.Render(compact(hint, m.inlineWidth()))))
+	}
+	sections = append(sections, m.panel(value))
+	return strings.Join(sections, "\n")
 }
 
 func (m Model) diffView() string {
@@ -996,10 +1131,7 @@ func (m Model) diffView() string {
 		return dimStyle.Render("No changed files are currently visible in the retained worktree.")
 	}
 	lines := strings.Split(m.diff, "\n")
-	maxLines := m.height - 19
-	if maxLines < 5 {
-		maxLines = 5
-	}
+	maxLines := max(1, m.height-10)
 	truncatedByView := len(lines) > maxLines
 	if truncatedByView {
 		lines = lines[:maxLines]
@@ -1008,7 +1140,7 @@ func (m Model) diffView() string {
 	if m.diffTruncated || truncatedByView {
 		content += "\n" + dimStyle.Render("… diff preview truncated; inspect the retained worktree for the full patch.")
 	}
-	return panelStyle.Width(max(28, m.width-4)).Render(content)
+	return m.panel(content)
 }
 
 func (m Model) noticeView() string {
@@ -1017,11 +1149,11 @@ func (m Model) noticeView() string {
 	}
 	switch m.notice.kind {
 	case noticeError:
-		return errorStyle.Render(m.notice.text)
+		return m.inline(errorStyle.Render(compact(m.notice.text, m.inlineWidth())))
 	case noticeSuccess:
-		return okStyle.Render(m.notice.text)
+		return m.inline(okStyle.Render(compact(m.notice.text, m.inlineWidth())))
 	default:
-		return dimStyle.Render(m.notice.text)
+		return m.inline(dimStyle.Render(compact(m.notice.text, m.inlineWidth())))
 	}
 }
 
@@ -1038,7 +1170,7 @@ func (m Model) footer(keys ...string) string {
 		}
 		rendered = append(rendered, keyStyle.Render(parts[0])+" "+dimStyle.Render(parts[1]))
 	}
-	return strings.Join(rendered, "  ")
+	return m.inline(strings.Join(rendered, "  "))
 }
 
 func (m Model) commandPaletteVisible() bool {
@@ -1140,15 +1272,21 @@ func (m Model) commandPaletteView() string {
 		}
 		return ""
 	}
-	lines := make([]string, 0, len(matches))
-	for index, command := range matches {
+	start, end := m.visibleRange(len(matches), m.commandIndex, m.popupLimit())
+	lines := make([]string, 0, end-start)
+	for index := start; index < end; index++ {
+		command := matches[index]
 		prefix := "  "
 		if index == m.commandIndex {
 			prefix = "> "
 		}
-		lines = append(lines, prefix+keyStyle.Render(command.name)+"  "+dimStyle.Render(command.description))
+		line := prefix + keyStyle.Render(command.name)
+		if !m.compactLayout() {
+			line += "  " + dimStyle.Render(command.description)
+		}
+		lines = append(lines, line)
 	}
-	return labelStyle.Render("Commands") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("up/down choose · enter run command · esc dismiss")
+	return labelStyle.Render("Commands") + "\n" + m.panel(strings.Join(lines, "\n")) + "\n" + m.inline(dimStyle.Render("up/down choose · enter run command · esc dismiss"))
 }
 
 type dropdownOption struct {
@@ -1334,8 +1472,10 @@ func (m Model) dropdownView() string {
 		return ""
 	}
 	options := m.dropdownOptions()
-	lines := make([]string, 0, len(options))
-	for index, option := range options {
+	start, end := m.visibleRange(len(options), m.dropdownIndex, m.popupLimit())
+	lines := make([]string, 0, end-start)
+	for index := start; index < end; index++ {
+		option := options[index]
 		prefix := "  "
 		if index == m.dropdownIndex {
 			prefix = "> "
@@ -1347,13 +1487,17 @@ func (m Model) dropdownView() string {
 		if label == "" {
 			label = "provider default"
 		}
-		lines = append(lines, prefix+keyStyle.Render(label)+"  "+dimStyle.Render(option.description))
+		line := prefix + keyStyle.Render(label)
+		if !m.compactLayout() {
+			line += "  " + dimStyle.Render(option.description)
+		}
+		lines = append(lines, line)
 	}
 	title := "Provider choices"
 	if m.focus == modelField {
 		title = "Recommended models"
 	}
-	return labelStyle.Render(title) + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("type to filter · up/down choose · enter apply · tab apply and continue")
+	return labelStyle.Render(title) + "\n" + m.panel(strings.Join(lines, "\n")) + "\n" + m.inline(dimStyle.Render("type to filter · up/down choose · enter apply · tab apply and continue"))
 }
 
 func (m *Model) normalizeContextSelection() {
@@ -1415,19 +1559,17 @@ func (m Model) contextCompletionView() string {
 	if len(matches) == 0 {
 		return ""
 	}
-	const maxVisible = 8
-	if len(matches) > maxVisible {
-		matches = matches[:maxVisible]
-	}
-	lines := make([]string, 0, len(matches))
-	for index, candidate := range matches {
+	start, end := m.visibleRange(len(matches), m.contextIndex, m.popupLimit())
+	lines := make([]string, 0, end-start)
+	for index := start; index < end; index++ {
+		candidate := matches[index]
 		prefix := "  "
 		if index == m.contextIndex {
 			prefix = "> "
 		}
-		lines = append(lines, prefix+keyStyle.Render("["+contextBadge(candidate)+"]")+"  "+"@"+candidate)
+		lines = append(lines, prefix+keyStyle.Render("["+contextBadge(candidate)+"]")+"  "+"@"+compact(candidate, max(8, m.panelTextWidth()-8)))
 	}
-	return labelStyle.Render("Path suggestions") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("type to filter · up/down choose · enter or tab insert · esc dismiss")
+	return labelStyle.Render("Path suggestions") + "\n" + m.panel(strings.Join(lines, "\n")) + "\n" + m.inline(dimStyle.Render("type to filter · up/down choose · enter or tab insert · esc dismiss"))
 }
 
 func (m Model) contextReferencesView() string {
@@ -1439,7 +1581,7 @@ func (m Model) contextReferencesView() string {
 	for _, reference := range references {
 		values = append(values, keyStyle.Render("@"+reference))
 	}
-	return labelStyle.Render("Context references") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(values, "  ")) + "\n" + dimStyle.Render("Gator validates these paths before a run; the agent inspects them first.")
+	return labelStyle.Render("Context references") + "\n" + m.panel(strings.Join(values, "  ")) + "\n" + m.inline(dimStyle.Render("Gator validates these paths before a run; the agent inspects them first."))
 }
 
 func (m Model) sessionStatus() string {
