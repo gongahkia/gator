@@ -771,7 +771,7 @@ func (m Model) draftWarningView() string {
 	if m.draftErr == nil {
 		return ""
 	}
-	return labelStyle.Render("Draft recovery") + "\n" + errorStyle.Render("The current draft could not be saved: "+m.draftErr.Error())
+	return labelStyle.Render("Draft recovery") + "\n" + m.inline(errorStyle.Render(compact("The current draft could not be saved: "+m.draftErr.Error(), m.inlineWidth())))
 }
 
 func (m *Model) focusField() tea.Cmd {
@@ -844,7 +844,7 @@ func (m Model) composeView() string {
 	if m.resumeStatePath != "" {
 		mode = "continue retained run"
 	}
-	if m.compactComposer() {
+	if m.compactComposer() || (m.height < 52 && (m.commandPaletteVisible() || m.contextCompletionVisible() || m.dropdownVisible())) {
 		return m.compactComposeView(mode)
 	}
 	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
@@ -1043,14 +1043,11 @@ func (m Model) recentRunsView() string {
 	sections := []string{
 		m.header("recent retained runs"),
 		m.panel(strings.Join(lines, "\n\n")),
-		m.footer("up/down choose", "enter continue", "r refresh", "esc back", "f1 shortcuts"),
 	}
 	if !m.compactLayout() {
-		sections = append(sections[:2], append([]string{
-			dimStyle.Render("Run-record paths stay private; Gator validates a selected worktree before continuation."),
-			m.noticeView(),
-		}, sections[2:]...)...)
+		sections = append(sections, dimStyle.Render("Run-record paths stay private; Gator validates a selected worktree before continuation."))
 	}
+	sections = append(sections, m.noticeView(), m.footer("up/down choose", "enter continue", "r refresh", "esc back", "f1 shortcuts"))
 	return strings.Join(sections, "\n")
 }
 
@@ -1171,6 +1168,95 @@ func (m Model) footer(keys ...string) string {
 		rendered = append(rendered, keyStyle.Render(parts[0])+" "+dimStyle.Render(parts[1]))
 	}
 	return m.inline(strings.Join(rendered, "  "))
+}
+
+func (m Model) compactLayout() bool {
+	if m.width == 0 || m.height == 0 {
+		return false
+	}
+	return m.width < 72 || m.height < 40
+}
+
+func (m Model) compactComposer() bool {
+	if m.width == 0 || m.height == 0 {
+		return false
+	}
+	return m.width < 72 || m.height < 40
+}
+
+func (m Model) constrainedLayout() bool {
+	if m.width == 0 || m.height == 0 {
+		return false
+	}
+	return m.width < 48 || m.height < 18
+}
+
+func (m Model) panelTextWidth() int {
+	return max(1, m.width-8)
+}
+
+func (m Model) inlineWidth() int {
+	return max(1, m.width)
+}
+
+func (m Model) panel(value string) string {
+	if m.width < 8 {
+		return m.inline(value)
+	}
+	return panelStyle.Width(m.width - 4).Render(value)
+}
+
+func (m Model) inline(value string) string {
+	if m.width <= 0 {
+		return value
+	}
+	return lipgloss.NewStyle().MaxWidth(m.width).Render(value)
+}
+
+func (m Model) fitToTerminal(view string) string {
+	if m.height <= 0 {
+		return view
+	}
+	lines := strings.Split(view, "\n")
+	if len(lines) <= m.height {
+		return view
+	}
+	more := m.inline(dimStyle.Render("… resize terminal for more"))
+	if m.height == 1 {
+		return more
+	}
+	return strings.Join(append(lines[:m.height-1], more), "\n")
+}
+
+func (m Model) popupLimit() int {
+	limit := 8
+	switch {
+	case m.height < 16:
+		limit = 1
+	case m.height < 22:
+		limit = 3
+	case m.height < 32:
+		limit = 5
+	}
+	if m.width < 48 {
+		limit = min(limit, 3)
+	}
+	return max(1, limit)
+}
+
+func (m Model) recentRunLimit() int {
+	return max(1, min(6, max(1, m.height-6)/3))
+}
+
+func (m Model) visibleRange(total, selected, limit int) (int, int) {
+	if total == 0 || limit <= 0 {
+		return 0, 0
+	}
+	limit = min(limit, total)
+	selected = min(max(0, selected), total-1)
+	start := selected - limit/2
+	start = max(0, min(start, total-limit))
+	return start, start + limit
 }
 
 func (m Model) commandPaletteVisible() bool {
@@ -1651,8 +1737,14 @@ func renderEvent(event agent.Event) timelineEntry {
 
 func compact(value string, limit int) string {
 	value = strings.Join(strings.Fields(value), " ")
+	if limit <= 0 {
+		return ""
+	}
 	if len(value) <= limit {
 		return value
+	}
+	if limit == 1 {
+		return "…"
 	}
 	return value[:limit-1] + "…"
 }
