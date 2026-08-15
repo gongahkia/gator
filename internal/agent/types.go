@@ -20,11 +20,12 @@ const (
 // Message is the normalized conversation history passed to a model adapter.
 // Tool messages carry a call ID so adapters can preserve provider correlation.
 type Message struct {
-	Role       Role       `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	ToolName   string     `json:"tool_name,omitempty"`
+	Role         Role            `json:"role"`
+	Content      string          `json:"content"`
+	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
+	ToolCallID   string          `json:"tool_call_id,omitempty"`
+	ToolName     string          `json:"tool_name,omitempty"`
+	ProviderData json.RawMessage `json:"provider_data,omitempty"`
 }
 
 // ToolDefinition describes one tool available to the model. Parameters is a
@@ -53,8 +54,9 @@ type TurnRequest struct {
 // Turn is a completed model response. Text may accompany tool calls; the loop
 // records it, invokes calls, then requests another turn.
 type Turn struct {
-	Text      string     `json:"text"`
-	ToolCalls []ToolCall `json:"tool_calls"`
+	Text         string          `json:"text"`
+	ToolCalls    []ToolCall      `json:"tool_calls"`
+	ProviderData json.RawMessage `json:"provider_data,omitempty"`
 }
 
 // Model is the sole provider-facing interface used by the runtime.
@@ -90,6 +92,8 @@ const (
 	EventToolCalled        EventKind = "tool_called"
 	EventToolFinished      EventKind = "tool_finished"
 	EventCompletionBlocked EventKind = "completion_blocked"
+	EventHarnessStarted    EventKind = "harness_started"
+	EventHarnessFinished   EventKind = "harness_finished"
 	EventRunFinished       EventKind = "run_finished"
 )
 
