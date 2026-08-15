@@ -14,7 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
-	"github.com/gongahkia/gator/internal/model/openai"
+	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tui"
 )
@@ -25,9 +25,9 @@ Usage:
   gator
   gator tui
   gator help
-  gator doctor
-  gator run [--model MODEL] [--max-steps N] --verify 'argv ...' TASK
-  gator resume [--max-steps N] RUN_RECORD_PATH TASK
+  gator doctor [--provider PROVIDER]
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--allow-external-cli] --verify 'argv ...' TASK
+  gator resume [--allow-external-cli] [--max-steps N] RUN_RECORD_PATH TASK
 
 Commands:
   tui       open the interactive terminal application (the default command)
@@ -35,8 +35,12 @@ Commands:
   run       propose a tested patch in an isolated Git worktree
   resume    continue a retained worktree from its local run record
 
-Run requires OPENAI_API_KEY. --verify is repeatable; each listed command is
-allowed for the run and must pass before Gator accepts completion.`
+Cloud providers use their own API-key environment variable. Supported native
+providers are openai, azure-openai, anthropic, gemini, mistral, xai, groq,
+openrouter, together, fireworks, deepseek, and openai-compatible. Codex, Claude Code,
+GitHub Copilot, and Cursor use their already-authenticated local CLIs; select
+one explicitly and pass --allow-external-cli in script mode. --verify is
+repeatable and every listed command must pass before Gator accepts completion.`
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
@@ -56,7 +60,7 @@ func run(args []string, out io.Writer) error {
 
 	switch args[0] {
 	case "doctor":
-		return doctor(out)
+		return doctor(args[1:], out)
 	case "run":
 		return runTask(args[1:], out)
 	case "resume":
@@ -96,13 +100,18 @@ func interactive() error {
 	if err := terminal.Close(); err != nil {
 		return fmt.Errorf("close terminal check: %w", err)
 	}
+	provider, err := providerFromEnvironment()
+	if err != nil {
+		return err
+	}
 	application := tui.New(tui.Config{
 		RepositoryPath: repository,
-		Model:          modelFromEnvironment(),
+		Provider:       string(provider),
+		Model:          modelFromEnvironment(provider),
+		BaseURL:        os.Getenv("GATOR_BASE_URL"),
 		Verification:   parseSuggestedVerification(suggestedVerificationCommands(repository)),
-		APIKey:         os.Getenv("OPENAI_API_KEY"),
-		NewExecutor: func(model string) gatorrun.Executor {
-			return gatorrun.Executor{Model: openai.Responses{APIKey: os.Getenv("OPENAI_API_KEY"), Model: model}}
+		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
+			return newExecutor(provider, modelName, baseURL)
 		},
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
@@ -124,6 +133,7 @@ func resumeTask(arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("resume", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	maxSteps := flags.Int("max-steps", 0, "maximum model turns for this continuation")
+	allowExternalCLI := flags.Bool("allow-external-cli", false, "allow a retained vendor CLI harness to run with its own permission model")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -139,22 +149,26 @@ func resumeTask(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return errors.New("OPENAI_API_KEY is required; run 'gator doctor' to check setup")
+	provider, err := model.ParseProvider(session.Provider)
+	if err != nil {
+		return fmt.Errorf("load retained provider: %w", err)
 	}
-	modelName := session.Model
-	if modelName == "" {
-		modelName = modelFromEnvironment()
+	modelName := model.EffectiveModel(provider, session.Model)
+	if model.IsHarness(provider) && !*allowExternalCLI {
+		return errors.New("resume of an external CLI harness requires --allow-external-cli")
 	}
-	if _, err := fmt.Fprintf(out, "Gator resume\n  model: %s\n  task: %s\n", modelName, continuation); err != nil {
+	executor, err := newExecutor(string(provider), modelName, session.BaseURL)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(out, "Gator resume\n  provider: %s\n  model: %s\n  task: %s\n", provider, displayModel(modelName), continuation); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}
-	executor := gatorrun.Executor{Model: openai.Responses{APIKey: apiKey, Model: modelName}}
 	outcome, err := executor.Resume(context.Background(), session, statePath, continuation, gatorrun.Request{
-		MaxSteps: *maxSteps,
-		OnEvent:  printer.Print,
+		MaxSteps:         *maxSteps,
+		OnEvent:          printer.Print,
+		AllowExternalCLI: *allowExternalCLI,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {
@@ -173,7 +187,24 @@ func resumeTask(arguments []string, out io.Writer) error {
 	return err
 }
 
-func doctor(out io.Writer) error {
+func doctor(arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("doctor", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	defaultProvider := os.Getenv("GATOR_PROVIDER")
+	if defaultProvider == "" {
+		defaultProvider = string(model.OpenAI)
+	}
+	providerName := flags.String("provider", defaultProvider, "provider to inspect")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if len(flags.Args()) != 0 {
+		return errors.New("doctor does not accept positional arguments")
+	}
+	provider, err := model.ParseProvider(*providerName)
+	if err != nil {
+		return err
+	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
@@ -183,11 +214,15 @@ func doctor(out io.Writer) error {
 	if err == nil {
 		gitStatus = "detected"
 	}
-	apiKeyStatus := "missing"
-	if os.Getenv("OPENAI_API_KEY") != "" {
-		apiKeyStatus = "set"
+	authentication := model.CredentialHint(provider)
+	authenticationStatus := "check with provider CLI"
+	if !model.IsHarness(provider) {
+		authenticationStatus = "missing"
+		if os.Getenv(authentication) != "" {
+			authenticationStatus = "set"
+		}
 	}
-	if _, err := fmt.Fprintf(out, "Repository: %s\nOpenAI API key: %s\n", gitStatus, apiKeyStatus); err != nil {
+	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\n", gitStatus, provider, authentication, authenticationStatus); err != nil {
 		return err
 	}
 	suggestionDirectory := workingDirectory
@@ -209,8 +244,15 @@ func doctor(out io.Writer) error {
 func runTask(arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	modelName := flags.String("model", modelFromEnvironment(), "OpenAI Responses model")
+	defaultProvider := os.Getenv("GATOR_PROVIDER")
+	if defaultProvider == "" {
+		defaultProvider = string(model.OpenAI)
+	}
+	providerName := flags.String("provider", defaultProvider, "model provider")
+	modelName := flags.String("model", os.Getenv("GATOR_MODEL"), "model name; optional for vendor CLI harnesses")
+	baseURL := flags.String("base-url", os.Getenv("GATOR_BASE_URL"), "provider API base URL override")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
+	allowExternalCLI := flags.Bool("allow-external-cli", false, "allow a vendor CLI harness to run with its own permission model")
 	var verification verificationFlags
 	flags.Var(&verification, "verify", "required verification command as a whitespace-separated argv")
 	if err := flags.Parse(arguments); err != nil {
@@ -223,26 +265,38 @@ func runTask(arguments []string, out io.Writer) error {
 	if len(verification) == 0 {
 		return errors.New("at least one --verify command is required; run 'gator doctor' for suggestions")
 	}
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		return errors.New("OPENAI_API_KEY is required; run 'gator doctor' to check setup")
+	provider, err := model.ParseProvider(*providerName)
+	if err != nil {
+		return err
+	}
+	if *modelName == "" {
+		*modelName = model.DefaultModel(provider)
+	}
+	if model.IsHarness(provider) && !*allowExternalCLI {
+		return errors.New("external CLI harnesses require --allow-external-cli")
+	}
+	executor, err := newExecutor(string(provider), *modelName, *baseURL)
+	if err != nil {
+		return err
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	if _, err := fmt.Fprintf(out, "Gator\n  model: %s\n  task: %s\n", *modelName, task); err != nil {
+	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  task: %s\n", provider, displayModel(*modelName), task); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}
-	executor := gatorrun.Executor{Model: openai.Responses{APIKey: apiKey, Model: *modelName}}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
-		RepositoryPath: workingDirectory,
-		Task:           task,
-		Model:          *modelName,
-		MaxSteps:       *maxSteps,
-		Verification:   verification,
-		OnEvent:        printer.Print,
+		RepositoryPath:   workingDirectory,
+		Task:             task,
+		Provider:         string(provider),
+		Model:            *modelName,
+		BaseURL:          *baseURL,
+		MaxSteps:         *maxSteps,
+		Verification:     verification,
+		OnEvent:          printer.Print,
+		AllowExternalCLI: *allowExternalCLI,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {
@@ -292,6 +346,14 @@ func (p *eventPrinter) Print(event agent.Event) {
 		}
 	case agent.EventCompletionBlocked:
 		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
+	case agent.EventHarnessStarted:
+		_, _ = fmt.Fprintf(p.out, "[%02d] delegated CLI → %s\n", event.Step, event.Text)
+	case agent.EventHarnessFinished:
+		if event.ToolError == "" {
+			_, _ = fmt.Fprintf(p.out, "[%02d] delegated CLI ✓ %s\n", event.Step, event.Text)
+		} else {
+			_, _ = fmt.Fprintf(p.out, "[%02d] delegated CLI ! %s\n", event.Step, event.ToolError)
+		}
 	}
 }
 
@@ -314,11 +376,38 @@ func (v *verificationFlags) Set(value string) error {
 	return nil
 }
 
-func modelFromEnvironment() string {
+func providerFromEnvironment() (model.Provider, error) {
+	provider := os.Getenv("GATOR_PROVIDER")
+	if provider == "" {
+		provider = string(model.OpenAI)
+	}
+	parsed, err := model.ParseProvider(provider)
+	if err != nil {
+		return "", fmt.Errorf("GATOR_PROVIDER: %w", err)
+	}
+	return parsed, nil
+}
+
+func modelFromEnvironment(provider model.Provider) string {
 	if model := os.Getenv("GATOR_MODEL"); model != "" {
 		return model
 	}
-	return openai.DefaultModel()
+	return model.DefaultModel(provider)
+}
+
+func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, error) {
+	backend, err := model.New(model.Config{Provider: model.Provider(providerName), Model: modelName, BaseURL: baseURL})
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	return gatorrun.Executor{Model: backend.Model, Harness: backend.Harness}, nil
+}
+
+func displayModel(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "provider default"
+	}
+	return value
 }
 
 func suggestedVerificationCommands(directory string) []string {

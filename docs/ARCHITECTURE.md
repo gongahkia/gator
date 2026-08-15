@@ -16,23 +16,34 @@ refactors are not a v1 acceptance claim.
 ## Runtime
 
 ```text
-terminal UI -> task/session -> native agent loop -> model adapter
-                     |       |
-                     |       +-> local event journal / private resume session
-                     v
-              policy-checked tools
-                     |
-                     v
-             isolated Git worktree
+terminal UI -> task/session -> selected backend -> model adapter or vendor CLI
+                     |       |                         |
+                     |       +-> local event journal   +-> isolated Git worktree
+                     v                                      |
+              policy-checked native tools                     v
+                     |                               Gator-owned verification
+                     v                                      |
+             isolated Git worktree <-------------------------+
                      |
                      v
                diff + verification
 ```
 
-The core owns the loop, context selection, tool schemas, tool execution,
-policies, event stream, worktree lifecycle, and run outcome. A model adapter
-only converts between the provider protocol and the core's typed turn contract.
-This keeps provider-specific details out of safety and test-critical code.
+For native cloud providers, the core owns the loop, context selection, tool
+schemas, tool execution, policies, event stream, worktree lifecycle, and run
+outcome. An adapter only converts between the provider protocol and the core's
+typed turn contract. This keeps provider-specific details out of safety and
+test-critical code. OpenAI uses Responses; Anthropic uses Messages; Gemini uses
+stateless GenerateContent; and the compatible adapter supports Chat
+Completions-compatible providers.
+
+Delegated CLI providers are deliberately different. Codex, Claude Code,
+GitHub Copilot CLI, and Cursor Agent run their own supported agent loop using
+their existing local login. Gator does not parse, copy, or exchange their OAuth
+state. It supplies the isolated worktree and task, records bounded lifecycle
+events, then performs the required verifier argv calls and Git inspection
+itself. The vendor CLI's tool policy remains its own security boundary, so a
+noninteractive delegated run requires explicit caller acknowledgement.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, and explicit verifier allowlist; streams lifecycle
@@ -40,10 +51,13 @@ events from the executor; and renders the retained worktree and current diff
 for review. Resume keeps the original run's model and verification policy so a
 continuation cannot silently broaden its command authority.
 
-The current OpenAI adapter uses Responses API streaming for incremental text,
-then converts the completed typed response into the core turn contract. The
-core does not rely on provider-side conversation persistence: requests use
-`store: false` and a private local session file provides resume context.
+The OpenAI and Anthropic adapters stream incremental text before converting the
+completed response into the core turn contract. The core does not rely on
+provider-side conversation persistence: OpenAI requests use `store: false` and
+the private local session file provides resume context. Gemini's stateless
+replay stores only opaque provider content necessary to carry thought
+signatures through a function-call round trip; that content stays in the same
+private `0600` session file as the rest of the conversation.
 
 ## Initial tool surface
 

@@ -85,7 +85,7 @@ func (g GenerateContent) client() *http.Client {
 }
 
 type request struct {
-	SystemInstruction *content `json:"systemInstruction,omitempty"`
+	SystemInstruction *content  `json:"systemInstruction,omitempty"`
 	Contents          []content `json:"contents"`
 	Tools             []tool    `json:"tools,omitempty"`
 }
@@ -191,13 +191,6 @@ func partText(text string) json.RawMessage {
 }
 
 func partFunctionCall(id, name string, args json.RawMessage) json.RawMessage {
-	payload, _ := json.Marshal(struct {
-		FunctionCall struct {
-			ID   string          `json:"id,omitempty"`
-			Name string          `json:"name"`
-			Args json.RawMessage `json:"args"`
-		} `json:"functionCall"`
-	}{})
 	var encoded struct {
 		FunctionCall struct {
 			ID   string          `json:"id,omitempty"`
@@ -208,18 +201,11 @@ func partFunctionCall(id, name string, args json.RawMessage) json.RawMessage {
 	encoded.FunctionCall.ID = id
 	encoded.FunctionCall.Name = name
 	encoded.FunctionCall.Args = args
-	payload, _ = json.Marshal(encoded)
+	payload, _ := json.Marshal(encoded)
 	return payload
 }
 
 func partFunctionResponse(id, name, result string) json.RawMessage {
-	payload, _ := json.Marshal(struct {
-		FunctionResponse struct {
-			ID       string         `json:"id,omitempty"`
-			Name     string         `json:"name"`
-			Response map[string]any `json:"response"`
-		} `json:"functionResponse"`
-	}{})
 	var encoded struct {
 		FunctionResponse struct {
 			ID       string         `json:"id,omitempty"`
@@ -230,7 +216,7 @@ func partFunctionResponse(id, name, result string) json.RawMessage {
 	encoded.FunctionResponse.ID = id
 	encoded.FunctionResponse.Name = name
 	encoded.FunctionResponse.Response = map[string]any{"result": result}
-	payload, _ = json.Marshal(encoded)
+	payload, _ := json.Marshal(encoded)
 	return payload
 }
 

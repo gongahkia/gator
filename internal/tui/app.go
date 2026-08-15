@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
+	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -26,12 +27,13 @@ const defaultMaxSteps = 24
 // any particular model provider and can be tested without a network request.
 type Config struct {
 	RepositoryPath string
+	Provider       string
 	Model          string
+	BaseURL        string
 	Verification   [][]string
-	APIKey         string
 	MaxSteps       int
 	StateDir       string
-	NewExecutor    func(model string) gatorrun.Executor
+	NewExecutor    func(provider, model, baseURL string) (gatorrun.Executor, error)
 }
 
 type screen uint8
@@ -47,6 +49,7 @@ type field uint8
 const (
 	taskField field = iota
 	verificationField
+	providerField
 	modelField
 )
 
@@ -104,6 +107,7 @@ type Model struct {
 	height        int
 	task          textarea.Model
 	verification  textarea.Model
+	provider      textinput.Model
 	model         textinput.Model
 	notice        notice
 	commandOutput string
@@ -135,8 +139,8 @@ func New(config Config) Model {
 	if strings.TrimSpace(config.RepositoryPath) == "" {
 		config.RepositoryPath = "."
 	}
-	if strings.TrimSpace(config.Model) == "" {
-		config.Model = "gpt-5.6"
+	if strings.TrimSpace(config.Provider) == "" {
+		config.Provider = "openai"
 	}
 	if config.MaxSteps == 0 {
 		config.MaxSteps = defaultMaxSteps
@@ -169,11 +173,20 @@ func New(config Config) Model {
 	model.SetValue(config.Model)
 	model.Blur()
 
+	provider := textinput.New()
+	provider.Prompt = ""
+	provider.Placeholder = "provider"
+	provider.CharLimit = 64
+	provider.Width = 60
+	provider.SetValue(config.Provider)
+	provider.Blur()
+
 	return Model{
 		config:       config,
 		screen:       composeScreen,
 		task:         task,
 		verification: verification,
+		provider:     provider,
 		model:        model,
 		notice: notice{
 			text: "Gator works in an isolated Git worktree. Review remains explicit.",
@@ -282,6 +295,8 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.verification, command = m.verification.Update(message)
 	case modelField:
 		m.model, command = m.model.Update(message)
+	case providerField:
+		m.provider, command = m.provider.Update(message)
 	}
 	return m, command
 }
@@ -324,10 +339,6 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Describe a task before starting a run.", kind: noticeError}
 		return m, nil
 	}
-	if strings.TrimSpace(m.config.APIKey) == "" {
-		m.notice = notice{text: "OPENAI_API_KEY is required to start a run. Use gator doctor to check setup.", kind: noticeError}
-		return m, nil
-	}
 	if m.config.NewExecutor == nil {
 		m.notice = notice{text: "No model provider is configured for this Gator build.", kind: noticeError}
 		return m, nil
@@ -343,9 +354,25 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	modelName := strings.TrimSpace(m.model.Value())
-	if modelName == "" {
-		m.notice = notice{text: "Choose a model before starting a run.", kind: noticeError}
+	providerName := strings.TrimSpace(m.provider.Value())
+	if providerName == "" {
+		m.notice = notice{text: "Choose a provider before starting a run.", kind: noticeError}
 		return m, nil
+	}
+	provider, providerErr := modelprovider.ParseProvider(providerName)
+	if providerErr != nil {
+		m.notice = notice{text: providerErr.Error(), kind: noticeError}
+		return m, nil
+	}
+	modelName = modelprovider.EffectiveModel(provider, modelName)
+	var executor gatorrun.Executor
+	if m.resumeStatePath == "" {
+		var executorErr error
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.config.BaseURL)
+		if executorErr != nil {
+			m.notice = notice{text: executorErr.Error(), kind: noticeError}
+			return m, nil
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -367,7 +394,9 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	request := gatorrun.Request{
 		RepositoryPath: m.config.RepositoryPath,
 		Task:           taskWithContextReferences(task, references),
+		Provider:       providerName,
 		Model:          modelName,
+		BaseURL:        m.config.BaseURL,
 		MaxSteps:       m.config.MaxSteps,
 		Verification:   verification,
 		StateDir:       m.config.StateDir,
@@ -377,6 +406,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			case <-ctx.Done():
 			}
 		},
+		AllowExternalCLI: true,
 	}
 
 	if m.resumeStatePath != "" {
@@ -388,19 +418,39 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Load retained run: " + loadErr.Error(), kind: noticeError}
 			return m, nil
 		}
-		if strings.TrimSpace(previous.Model) == "" {
+		if strings.TrimSpace(previous.Provider) == "" {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "The retained run does not record a model and cannot be continued safely.", kind: noticeError}
+			m.notice = notice{text: "The retained run does not record a provider and cannot be continued safely.", kind: noticeError}
 			return m, nil
 		}
-		modelName = previous.Model
-		request.Model = previous.Model
+		retainedProvider, providerErr := modelprovider.ParseProvider(previous.Provider)
+		if providerErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: providerErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		providerName = previous.Provider
+		modelName = modelprovider.EffectiveModel(retainedProvider, previous.Model)
+		request.Model = modelName
+		request.Provider = providerName
+		request.BaseURL = previous.BaseURL
 		request.Verification = previous.Verification
-		go executeResume(ctx, stream, m.config.NewExecutor(modelName), previous, m.resumeStatePath, task, request)
+		var executorErr error
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, previous.BaseURL)
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: executorErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
 	} else {
-		go executeNew(ctx, stream, m.config.NewExecutor(modelName), request)
+		go executeNew(ctx, stream, executor, request)
 	}
 	return m, waitForExecution(stream)
 }
@@ -451,6 +501,7 @@ func (m *Model) prepareContinuation() (tea.Model, tea.Cmd) {
 	m.task.Reset()
 	m.task.Placeholder = "Describe the next instruction for this retained worktree..."
 	m.verification.SetValue(formatVerification(session.Verification))
+	m.provider.SetValue(session.Provider)
 	m.model.SetValue(session.Model)
 	m.screen = composeScreen
 	m.focus = taskField
@@ -471,12 +522,15 @@ func (m *Model) returnToComposer() {
 func (m *Model) focusField() tea.Cmd {
 	m.task.Blur()
 	m.verification.Blur()
+	m.provider.Blur()
 	m.model.Blur()
 	switch m.focus {
 	case taskField:
 		return m.task.Focus()
 	case verificationField:
 		return m.verification.Focus()
+	case providerField:
+		return m.provider.Focus()
 	case modelField:
 		return m.model.Focus()
 	default:
@@ -491,6 +545,7 @@ func (m *Model) resizeInputs() {
 	}
 	m.task.SetWidth(width)
 	m.verification.SetWidth(width)
+	m.provider.Width = width
 	m.model.Width = width
 }
 
@@ -516,9 +571,11 @@ func (m Model) composeView() string {
 		mode = "continue retained run"
 	}
 	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
+	providerHint := "Set GATOR_PROVIDER before launch or edit it here."
 	modelHint := "Set GATOR_MODEL before launch or edit it here."
 	if m.resumeStatePath != "" {
 		verificationHint = "Inherited from the retained run to preserve its command policy."
+		providerHint = "Inherited from the retained run to preserve provider continuity."
 		modelHint = "Inherited from the retained run to preserve conversation continuity."
 	}
 	sections := []string{
@@ -534,6 +591,7 @@ func (m Model) composeView() string {
 	}
 	sections = append(sections,
 		m.fieldView("Verification", verificationHint, m.verification.View()),
+		m.fieldView("Provider", providerHint, m.provider.View()),
 		m.fieldView("Model", modelHint, m.model.View()),
 	)
 	if m.commandOutput != "" {
@@ -709,9 +767,18 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.focus = modelField
 		m.notice = notice{text: "Edit the model, then Tab back to the task.", kind: noticeInfo}
 		return m, m.focusField()
+	case "/provider":
+		m.commandOutput = ""
+		m.focus = providerField
+		m.notice = notice{text: "Edit the provider, then Tab back to the task.", kind: noticeInfo}
+		return m, m.focusField()
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
-		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
+		if isExternalProvider(m.provider.Value()) {
+			m.notice = notice{text: "This provider delegates tool permissions to its vendor CLI; Gator verifies the final worktree.", kind: noticeInfo}
+		} else {
+			m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
+		}
 	case "/quit":
 		return m, tea.Quit
 	case "/review":
@@ -773,7 +840,7 @@ func (m Model) sessionStatus() string {
 	if err == nil {
 		verificationText = formatVerification(verification)
 	}
-	return "repository: " + m.config.RepositoryPath + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\nverification:\n" + verificationText
+	return "repository: " + m.config.RepositoryPath + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {
@@ -781,6 +848,9 @@ func (m Model) permissionsStatus() string {
 	commands := "invalid verifier configuration: " + err.Error()
 	if err == nil {
 		commands = formatVerification(verification)
+	}
+	if isExternalProvider(m.provider.Value()) {
+		return "writes: isolated run worktree only\nprovider: delegated CLI with its own permission policy\nGator runs required verification after the CLI exits:\n" + commands + "\nactive checkout: never edited by a normal run"
 	}
 	return "writes: isolated run worktree only\nreads: repository paths only\ncommands allowed:\n" + commands + "\nactive checkout: never edited by a normal run"
 }
@@ -813,6 +883,14 @@ func renderEvent(event agent.Event) timelineEntry {
 		}
 	case agent.EventCompletionBlocked:
 		text = prefix + " evidence required: " + compact(event.Text, 120)
+	case agent.EventHarnessStarted:
+		text = prefix + " delegated CLI -> " + compact(event.Text, 80)
+	case agent.EventHarnessFinished:
+		if event.ToolError == "" {
+			text = prefix + " delegated CLI ok " + compact(event.Text, 80)
+		} else {
+			text = prefix + " delegated CLI failed: " + compact(event.ToolError, 100)
+		}
 	case agent.EventRunFinished:
 		text = prefix + " completion proposed"
 	default:
@@ -827,6 +905,15 @@ func compact(value string, limit int) string {
 		return value
 	}
 	return value[:limit-1] + "…"
+}
+
+func isExternalProvider(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "codex", "claude", "copilot", "cursor":
+		return true
+	default:
+		return false
+	}
 }
 
 func nextField(current field, reverse bool) field {

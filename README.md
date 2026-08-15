@@ -11,10 +11,10 @@ tests, and propose the resulting patch.
 
 ## Status
 
-The project is being rebuilt from a previous agent meta-harness. The first
-runnable milestone includes the native loop, OpenAI Responses adapter,
-worktree-local tools, command policy, durable local run storage, and a
-full-screen terminal application. Real-model usability evidence, context
+The project is being rebuilt from a previous agent meta-harness. The runnable
+milestone includes the native loop, cloud-provider adapters, delegated vendor
+CLI support, worktree-local tools, command policy, durable local run storage,
+and a full-screen terminal application. Real-model usability evidence, context
 compaction, broader replay coverage, and an explicit patch-application flow are
 still in progress.
 
@@ -26,7 +26,20 @@ make build
 ./bin/gator
 ./bin/gator help
 ./bin/gator doctor
-OPENAI_API_KEY=... ./bin/gator run --verify 'go test ./...' \
+OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \
+  'Add a focused feature with tests'
+
+ANTHROPIC_API_KEY=... ./bin/gator run --provider anthropic \
+  --model claude-sonnet-4-6 --verify 'go test ./...' \
+  'Add a focused feature with tests'
+
+GEMINI_API_KEY=... ./bin/gator run --provider gemini \
+  --model gemini-3.5-flash --verify 'go test ./...' \
+  'Add a focused feature with tests'
+
+# Reuses an existing vendor CLI login. This has a separate tool-permission
+# boundary, so the script command requires an explicit acknowledgement.
+./bin/gator run --provider codex --allow-external-cli --verify 'go test ./...' \
   'Add a focused feature with tests'
 
 # Continue an interrupted run using the printed run-record path.
@@ -36,11 +49,11 @@ OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
 
 `gator` opens the interactive application when run from a Git checkout and a
 real terminal. Describe the task, keep or edit the suggested verification
-commands, and press `Ctrl+R` to start. `Tab` moves between task, verifier, and
-model fields. During a run, `Ctrl+C` requests cancellation while retaining the
-isolated worktree. The review screen shows the final report, worktree, run
-record, and a diff preview; press `c` to continue a retained run, `n` for a new
-task, or `d` to refresh the diff.
+commands, choose a provider and model, and press `Ctrl+R` to start. `Tab` moves
+between task, verifier, provider, and model fields. During a run, `Ctrl+C`
+requests cancellation while retaining the isolated worktree. The review screen
+shows the final report, worktree, run record, and a diff preview; press `c` to
+continue a retained run, `n` for a new task, or `d` to refresh the diff.
 
 Type `/` (or `?` in an empty task) to filter and select local composer commands:
 `/status`, `/model`, `/verify`, `/permissions`, `/worktree`, `/review`,
@@ -52,6 +65,50 @@ starting; it does not copy the referenced source into the task or journal.
 The review screen deliberately does not modify the active checkout. Inspect the
 printed worktree before bringing a patch into your branch. The existing `run`
 and `resume` commands remain available for scripts and CI-like usage.
+
+## Providers
+
+Set `--provider`, or set `GATOR_PROVIDER` before starting the TUI. `GATOR_MODEL`
+and `GATOR_BASE_URL` supply the corresponding defaults. `--base-url` overrides
+an endpoint for one scripted run.
+
+| Provider | Authentication | Protocol |
+| --- | --- | --- |
+| `openai` | `OPENAI_API_KEY` | OpenAI Responses API |
+| `anthropic` | `ANTHROPIC_API_KEY` | Anthropic Messages API |
+| `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
+| `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
+| `mistral`, `xai`, `groq`, `openrouter`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
+| `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
+
+The predefined compatible providers use these key variables respectively:
+`MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
+`TOGETHER_API_KEY`, `FIREWORKS_API_KEY`, and `DEEPSEEK_API_KEY`. Set `--model`
+for compatible providers without a Gator default. `gator doctor --provider NAME`
+reports the selected provider's prerequisite without printing a secret.
+
+The native adapters preserve Gator's strict tool surface: repository reads and
+writes stay inside the isolated worktree and commands are limited to the
+explicit `--verify` argv entries. They replay normalized history locally; the
+Gemini adapter also retains the provider content needed for thought-signature
+tool-call replay in the private session file.
+
+### Existing CLI subscriptions
+
+`codex`, `claude`, `copilot`, and `cursor` use the installed Codex CLI, Claude
+Code, GitHub Copilot CLI, or Cursor Agent CLI. Sign in with the vendor's own
+supported command first, then choose the matching Gator provider. Gator neither
+reads nor copies those tools' OAuth files, tokens, or API keys.
+
+These providers run their own agent/tool loop inside Gator's isolated worktree.
+That is intentionally a separate permission boundary from Gator's native tool
+allowlist: Codex is started with its workspace-write sandbox; Claude Code uses
+its CLI auto permission mode; Copilot and Cursor apply their own CLI policies.
+Gator therefore requires `--allow-external-cli` in scripted mode and always
+runs the required verifier argv entries itself after the delegated CLI exits.
+Review the retained worktree before applying any patch. A resumed delegated run
+starts a fresh vendor CLI task in the same retained worktree; it does not import
+or emulate a vendor conversation token.
 
 ## Design principles
 

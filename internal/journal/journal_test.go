@@ -64,9 +64,10 @@ func TestJournalSavesAndLoadsPrivateSession(t *testing.T) {
 		t.Fatalf("open journal: %v", err)
 	}
 	session := Session{
-		Version:      1,
+		Version:      2,
 		Repository:   "/workspace/project",
 		WorktreePath: "/runs/run-002",
+		Provider:     "openai",
 		Model:        "test-model",
 		Task:         "Add a feature",
 		Messages:     []agent.Message{{Role: agent.RoleUser, Content: "Add a feature"}},

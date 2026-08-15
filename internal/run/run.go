@@ -14,8 +14,10 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/harness"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -24,13 +26,18 @@ import (
 type Request struct {
 	RepositoryPath string
 	Task           string
+	Provider       string
 	Model          string
+	BaseURL        string
 	RunID          string
 	MaxSteps       int
 	Verification   [][]string
 	System         string
 	StateDir       string
 	OnEvent        agent.EventSink
+	// AllowExternalCLI is required for delegated vendor CLIs because their
+	// tool permission model is separate from Gator's native allowlist.
+	AllowExternalCLI bool
 }
 
 // Outcome preserves the reviewable artifacts of a completed or failed run.
@@ -44,6 +51,7 @@ type Outcome struct {
 // Executor combines the provider-independent loop with an isolated worktree.
 type Executor struct {
 	Model    agent.Model
+	Harness  harness.Runner
 	Now      func() time.Time
 	StateDir string
 }
@@ -79,7 +87,9 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 	}
 	request.RepositoryPath = previous.Repository
 	request.Task = previous.Task
+	request.Provider = previous.Provider
 	request.Model = previous.Model
+	request.BaseURL = previous.BaseURL
 	request.Verification = previous.Verification
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
@@ -107,14 +117,20 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 const defaultResumeMaxSteps = 24
 
 func (e Executor) validateRequest(request Request) error {
-	if e.Model == nil {
-		return errors.New("agent model is required")
+	if (e.Model == nil && e.Harness == nil) || (e.Model != nil && e.Harness != nil) {
+		return errors.New("exactly one agent model or CLI harness is required")
 	}
 	if strings.TrimSpace(request.Task) == "" {
 		return errors.New("run task is required")
 	}
 	if err := validateVerification(request.Verification); err != nil {
 		return err
+	}
+	if strings.TrimSpace(request.Provider) == "" {
+		return errors.New("run provider is required")
+	}
+	if e.Harness != nil && !request.AllowExternalCLI {
+		return errors.New("external CLI harness requires explicit approval")
 	}
 	return nil
 }
@@ -145,27 +161,34 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			request.OnEvent(event)
 		}
 	}
-	runner := agent.Runner{
-		Model: e.Model,
-		Tools: tools.Default(isolated.Root, tools.CommandPolicy{
-			Allowed: request.Verification,
-		}),
-		Now: e.Now,
+	var result agent.Result
+	if e.Harness != nil {
+		result, err = e.runHarness(ctx, isolated, request, projectInstructions, initialMessages, emit)
+	} else {
+		runner := agent.Runner{
+			Model: e.Model,
+			Tools: tools.Default(isolated.Root, tools.CommandPolicy{
+				Allowed: request.Verification,
+			}),
+			Now: e.Now,
+		}
+		result, err = runner.Run(ctx, agent.RunOptions{
+			Task:            request.Task,
+			System:          systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification),
+			InitialMessages: initialMessages,
+			MaxSteps:        request.MaxSteps,
+			OnEvent:         emit,
+			CompletionCheck: completionCheck(request.Verification),
+		})
 	}
-	result, err := runner.Run(ctx, agent.RunOptions{
-		Task:            request.Task,
-		System:          systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification),
-		InitialMessages: initialMessages,
-		MaxSteps:        request.MaxSteps,
-		OnEvent:         emit,
-		CompletionCheck: completionCheck(request.Verification),
-	})
 	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, Result: result, Events: events}
 	if sessionErr := runJournal.SaveSession(journal.Session{
-		Version:         1,
+		Version:         2,
 		Repository:      isolated.Repository,
 		WorktreePath:    isolated.Path,
+		Provider:        request.Provider,
 		Model:           request.Model,
+		BaseURL:         request.BaseURL,
 		Task:            request.Task,
 		MaxSteps:        request.MaxSteps,
 		Verification:    request.Verification,
@@ -191,6 +214,102 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return outcome, err
 	}
 	return outcome, nil
+}
+
+func (e Executor) runHarness(ctx context.Context, isolated worktree.Worktree, request Request, projectInstructions string, history []agent.Message, emit agent.EventSink) (agent.Result, error) {
+	task := request.Task
+	if continuation := continuationTask(history); continuation != "" {
+		task += "\n\nDeveloper continuation:\n" + continuation
+	}
+	delegated, err := e.Harness.Run(ctx, harness.Request{
+		Root:     isolated.Root.Path(),
+		Task:     task,
+		System:   joinInstructions(projectInstructions, request.System),
+		Model:    request.Model,
+		MaxSteps: request.MaxSteps,
+		OnEvent:  emit,
+	})
+	result := agent.Result{FinalText: delegated.FinalText, Steps: 1}
+	if err != nil {
+		return result, err
+	}
+	if err := verifyHarnessOutcome(ctx, isolated.Root, request.Verification, emit, e.now); err != nil {
+		return result, err
+	}
+	emit(agent.Event{Kind: agent.EventRunFinished, At: e.now(), Step: 1, Text: result.FinalText})
+	return result, nil
+}
+
+func continuationTask(history []agent.Message) string {
+	for index := len(history) - 1; index >= 0; index-- {
+		message := history[index]
+		if message.Role != agent.RoleUser {
+			continue
+		}
+		const prefix = "Continue the original task with this developer instruction:\n"
+		if strings.HasPrefix(message.Content, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(message.Content, prefix))
+		}
+	}
+	return ""
+}
+
+func verifyHarnessOutcome(ctx context.Context, root workspace.Root, verification [][]string, emit agent.EventSink, now func() time.Time) error {
+	if now == nil {
+		now = time.Now
+	}
+	for index, argv := range verification {
+		call := agent.ToolCall{ID: fmt.Sprintf("harness-verify-%d", index+1), Name: "run_command"}
+		emit(agent.Event{Kind: agent.EventToolCalled, At: now(), Step: 1, ToolCall: &call})
+		result, err := tools.RunAllowedCommand(ctx, root, tools.CommandPolicy{Allowed: verification}, argv)
+		finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call}
+		if err != nil {
+			finished.ToolError = err.Error()
+			emit(finished)
+			return err
+		}
+		if result.ExitCode != 0 {
+			finished.ToolError = fmt.Sprintf("verification exited %d", result.ExitCode)
+			emit(finished)
+			return fmt.Errorf("required verification failed: %s (exit %d): %s", strings.Join(argv, " "), result.ExitCode, compactCommandOutput(result.Output))
+		}
+		emit(finished)
+	}
+	if err := inspectHarnessWorktree(ctx, root, "git_status", now, emit); err != nil {
+		return err
+	}
+	return inspectHarnessWorktree(ctx, root, "git_diff", now, emit)
+}
+
+func inspectHarnessWorktree(ctx context.Context, root workspace.Root, name string, now func() time.Time, emit agent.EventSink) error {
+	call := agent.ToolCall{ID: "harness-" + name, Name: name}
+	emit(agent.Event{Kind: agent.EventToolCalled, At: now(), Step: 1, ToolCall: &call})
+	var err error
+	switch name {
+	case "git_status":
+		_, err = (tools.GitStatus{Root: root}).Execute(ctx, json.RawMessage(`{}`))
+	case "git_diff":
+		_, err = (tools.GitDiff{Root: root}).Execute(ctx, json.RawMessage(`{}`))
+	default:
+		err = fmt.Errorf("unknown harness inspection %q", name)
+	}
+	finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call}
+	if err != nil {
+		finished.ToolError = err.Error()
+	}
+	emit(finished)
+	return err
+}
+
+func compactCommandOutput(output string) string {
+	output = strings.Join(strings.Fields(output), " ")
+	if output == "" {
+		return "no output"
+	}
+	if len(output) > 500 {
+		return output[:499] + "…"
+	}
+	return output
 }
 
 const maxProjectInstructionsBytes = 64 * 1024

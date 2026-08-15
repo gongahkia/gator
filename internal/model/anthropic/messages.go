@@ -114,12 +114,12 @@ func (m Messages) client() *http.Client {
 }
 
 type request struct {
-	Model     string          `json:"model"`
-	MaxTokens int             `json:"max_tokens"`
-	System    string          `json:"system,omitempty"`
-	Messages  []message       `json:"messages"`
-	Tools     []functionTool  `json:"tools,omitempty"`
-	Stream    bool            `json:"stream,omitempty"`
+	Model      string          `json:"model"`
+	MaxTokens  int             `json:"max_tokens"`
+	System     string          `json:"system,omitempty"`
+	Messages   []message       `json:"messages"`
+	Tools      []functionTool  `json:"tools,omitempty"`
+	Stream     bool            `json:"stream,omitempty"`
 	ToolChoice json.RawMessage `json:"tool_choice,omitempty"`
 }
 
@@ -259,10 +259,10 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 		data := strings.Join(dataLines, "\n")
 		dataLines = nil
 		var event struct {
-			Type         string `json:"type"`
-			Index        int    `json:"index"`
+			Type         string       `json:"type"`
+			Index        int          `json:"index"`
 			ContentBlock contentBlock `json:"content_block"`
-			Delta struct {
+			Delta        struct {
 				Type        string `json:"type"`
 				Text        string `json:"text"`
 				PartialJSON string `json:"partial_json"`
@@ -279,7 +279,13 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 		}
 		switch event.Type {
 		case "content_block_start":
-			blocks[event.Index] = event.ContentBlock
+			block := event.ContentBlock
+			// Anthropic starts streamed tool-use blocks with an empty object and
+			// sends the actual input through input_json_delta events.
+			if block.Type == "tool_use" {
+				block.Input = nil
+			}
+			blocks[event.Index] = block
 			order = append(order, event.Index)
 		case "content_block_delta":
 			block := blocks[event.Index]
