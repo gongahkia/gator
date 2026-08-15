@@ -262,6 +262,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "f1" {
+		if m.screen == helpScreen {
+			m.screen = m.helpReturn
+		} else {
+			m.helpReturn = m.screen
+			m.screen = helpScreen
+		}
+		return m, nil
+	}
 	switch m.screen {
 	case composeScreen:
 		return m.updateComposer(message)
@@ -269,12 +278,24 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateRunning(message)
 	case reviewScreen:
 		return m.updateReview(message)
+	case helpScreen:
+		return m.updateHelp(message)
+	case recentScreen:
+		return m.updateRecentRuns(message)
 	default:
 		return m, nil
 	}
 }
 
 func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.focus == taskField && message.Type == tea.KeyCtrlAt {
+		m.contextClosed = false
+		m.normalizeContextSelection()
+		if !m.contextCompletionVisible() {
+			m.notice = notice{text: "Type @ followed by a repository path to open path suggestions.", kind: noticeInfo}
+		}
+		return m, nil
+	}
 	if m.focus == taskField && m.commandPaletteVisible() {
 		switch message.String() {
 		case "up", "ctrl+p":
@@ -329,6 +350,8 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch message.String() {
 	case "ctrl+c":
 		return m, tea.Quit
+	case "ctrl+o":
+		return m.openRecentRuns()
 	case "?":
 		if m.focus == taskField && strings.TrimSpace(m.task.Value()) == "" {
 			m.task.SetValue("/")
@@ -353,14 +376,22 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.normalizeCommandSelection()
 		m.contextClosed = false
 		m.normalizeContextSelection()
+		m.persistDraft()
+		m.refreshPreflight()
 	case verificationField:
 		m.verification, command = m.verification.Update(message)
+		m.persistDraft()
+		m.refreshPreflight()
 	case modelField:
 		m.model, command = m.model.Update(message)
 		m.normalizeDropdownSelection()
+		m.persistDraft()
+		m.refreshPreflight()
 	case providerField:
 		m.provider, command = m.provider.Update(message)
 		m.normalizeDropdownSelection()
+		m.persistDraft()
+		m.refreshPreflight()
 	}
 	return m, command
 }
