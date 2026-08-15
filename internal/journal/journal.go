@@ -41,6 +41,7 @@ type Session struct {
 	WorktreePath    string          `json:"worktree_path"`
 	Provider        string          `json:"provider"`
 	Model           string          `json:"model"`
+	BaseURL         string          `json:"base_url,omitempty"`
 	Task            string          `json:"task"`
 	MaxSteps        int             `json:"max_steps"`
 	Verification    [][]string      `json:"verification"`
@@ -132,8 +133,8 @@ func (j *Journal) SaveSession(session Session) error {
 	if session.Version != 2 {
 		return fmt.Errorf("unsupported session version %d", session.Version)
 	}
-	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Task) == "" {
-		return errors.New("session repository, worktree path, and task are required")
+	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Provider) == "" || strings.TrimSpace(session.Task) == "" {
+		return errors.New("session repository, worktree path, provider, and task are required")
 	}
 	return writeJSON(filepath.Join(j.directory, "session.json"), session)
 }
@@ -165,7 +166,7 @@ func LoadSession(statePath string) (Session, error) {
 	if session.Version != 2 {
 		return Session{}, fmt.Errorf("unsupported session version %d", session.Version)
 	}
-	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Task) == "" {
+	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Provider) == "" || strings.TrimSpace(session.Task) == "" {
 		return Session{}, errors.New("run session is incomplete")
 	}
 	return session, nil

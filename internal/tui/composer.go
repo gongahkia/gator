@@ -18,6 +18,7 @@ var slashCommands = []slashCommand{
 	{name: "/clear", description: "clear the current task"},
 	{name: "/help", description: "show Gator composer commands"},
 	{name: "/model", description: "edit the model for the next run"},
+	{name: "/provider", description: "edit the model provider for the next run"},
 	{name: "/permissions", description: "show the isolated-run policy"},
 	{name: "/quit", description: "exit Gator"},
 	{name: "/review", description: "return to the latest review"},

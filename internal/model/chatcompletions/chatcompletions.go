@@ -21,13 +21,15 @@ const maxResponseBytes = 2 * 1024 * 1024
 // Config describes one OpenAI-compatible Chat Completions endpoint.
 // ProviderName and APIKeyEnv are only used in clear, non-secret errors.
 type Config struct {
-	APIKey       string
-	APIKeyEnv    string
-	BaseURL      string
-	Model        string
-	ProviderName string
-	Headers      http.Header
-	Client       *http.Client
+	APIKey              string
+	APIKeyEnv           string
+	BaseURL             string
+	Model               string
+	ProviderName        string
+	AuthorizationHeader string
+	AuthorizationPrefix string
+	Headers             http.Header
+	Client              *http.Client
 }
 
 // Model is a stateless adapter for OpenAI-compatible Chat Completions APIs.
@@ -64,7 +66,15 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("create Chat Completions request: %w", err)
 	}
-	request.Header.Set("Authorization", "Bearer "+m.Config.APIKey)
+	authHeader := m.Config.AuthorizationHeader
+	if authHeader == "" {
+		authHeader = "Authorization"
+	}
+	authPrefix := m.Config.AuthorizationPrefix
+	if authHeader == "Authorization" && authPrefix == "" {
+		authPrefix = "Bearer "
+	}
+	request.Header.Set(authHeader, authPrefix+m.Config.APIKey)
 	request.Header.Set("Content-Type", "application/json")
 	for name, values := range m.Config.Headers {
 		for _, value := range values {
@@ -107,11 +117,11 @@ type request struct {
 }
 
 type message struct {
-	Role       string          `json:"role"`
-	Content    *string         `json:"content,omitempty"`
-	ToolCalls  []toolCall      `json:"tool_calls,omitempty"`
-	ToolCallID string          `json:"tool_call_id,omitempty"`
-	Name       string          `json:"name,omitempty"`
+	Role       string     `json:"role"`
+	Content    *string    `json:"content,omitempty"`
+	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string     `json:"name,omitempty"`
 }
 
 type toolCall struct {

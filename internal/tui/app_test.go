@@ -34,7 +34,7 @@ func TestNewUsesConfiguredRunDefaults(t *testing.T) {
 }
 
 func TestComposerRejectsEmptyTaskBeforeRun(t *testing.T) {
-	model := New(Config{APIKey: "test-key"})
+	model := New(Config{})
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if command != nil {
 		t.Fatal("empty task started an execution")
@@ -45,15 +45,20 @@ func TestComposerRejectsEmptyTaskBeforeRun(t *testing.T) {
 	}
 }
 
-func TestComposerReportsMissingAPIKeyBeforeRun(t *testing.T) {
-	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
+func TestComposerReportsProviderConfigurationFailureBeforeRun(t *testing.T) {
+	model := New(Config{
+		Verification: [][]string{{"go", "test", "./..."}},
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{}, errors.New("ANTHROPIC_API_KEY is required")
+		},
+	})
 	model.task.SetValue("Add a greeting")
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if command != nil {
 		t.Fatal("missing API key started an execution")
 	}
 	updated := next.(Model)
-	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, "OPENAI_API_KEY") {
+	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, "ANTHROPIC_API_KEY") {
 		t.Fatalf("notice = %#v", updated.notice)
 	}
 }
@@ -156,9 +161,8 @@ func TestStartRunRejectsEscapingContextReference(t *testing.T) {
 	model := New(Config{
 		RepositoryPath: repository,
 		Verification:   [][]string{{"go", "test", "./..."}},
-		APIKey:         "test-key",
-		NewExecutor: func(string) gatorrun.Executor {
-			return gatorrun.Executor{Model: &testAgentModel{}}
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: &testAgentModel{}}, nil
 		},
 	})
 	model.task.SetValue("Inspect @../outside.go")
@@ -184,10 +188,9 @@ func TestInteractiveRunStreamsToReview(t *testing.T) {
 		RepositoryPath: repository,
 		Model:          "test-model",
 		Verification:   [][]string{{"go", "test", "./..."}},
-		APIKey:         "test-key",
 		StateDir:       t.TempDir(),
-		NewExecutor: func(string) gatorrun.Executor {
-			return gatorrun.Executor{Model: agentModel, Now: func() time.Time { return time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC) }}
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel, Now: func() time.Time { return time.Date(2026, 8, 15, 12, 0, 0, 0, time.UTC) }}, nil
 		},
 	})
 	model.width = 100

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 )
@@ -63,7 +64,7 @@ type CLI struct {
 }
 
 // ExecuteFunc runs one process and forwards complete stdout/stderr lines while
-// retaining at most maxOutputBytes of combined output.
+// retaining at most maxOutputBytes from each stream.
 type ExecuteFunc func(context.Context, string, []string, string, func(string, bool)) (processResult, error)
 
 type processResult struct {
@@ -167,7 +168,7 @@ func (c CLI) arguments(request Request) ([]string, func(), error) {
 		arguments = append(arguments, prompt)
 		return arguments, func() {}, nil
 	case Copilot:
-		arguments := []string{"--prompt", prompt, "--stream", "off", "--silent", "--allow-all-tools", "--disable-builtin-mcps", "--disallow-temp-dir", "--no-custom-instructions"}
+		arguments := []string{"--prompt", prompt, "--stream", "off", "--silent", "--allow-all-tools", "--deny-tool=shell(git push)", "--disable-builtin-mcps", "--disallow-temp-dir", "--no-custom-instructions"}
 		if model != "" {
 			arguments = append(arguments, "--model", model)
 		}
@@ -236,14 +237,23 @@ func execute(ctx context.Context, command string, arguments []string, directory 
 	}
 	var stdoutBuffer, stderrBuffer boundedBuffer
 	var group sync.WaitGroup
+	var scanErr error
+	var scanErrMu sync.Mutex
 	read := func(reader io.Reader, destination *boundedBuffer, isStderr bool) {
 		defer group.Done()
 		scanner := bufio.NewScanner(reader)
-		scanner.Buffer(make([]byte, 64*1024), 256*1024)
+		scanner.Buffer(make([]byte, 64*1024), maxOutputBytes)
 		for scanner.Scan() {
 			line := scanner.Text()
 			destination.WriteString(line + "\n")
 			onLine(line, isStderr)
+		}
+		if err := scanner.Err(); err != nil {
+			scanErrMu.Lock()
+			if scanErr == nil {
+				scanErr = err
+			}
+			scanErrMu.Unlock()
 		}
 	}
 	group.Add(2)
@@ -252,6 +262,9 @@ func execute(ctx context.Context, command string, arguments []string, directory 
 	err = process.Wait()
 	group.Wait()
 	result := processResult{Stdout: stdoutBuffer.String(), Stderr: stderrBuffer.String()}
+	if scanErr != nil {
+		return result, fmt.Errorf("read CLI output: %w", scanErr)
+	}
 	if err == nil {
 		return result, nil
 	}
@@ -320,6 +333,26 @@ func streamedText(provider Provider, line string, stderr bool) string {
 			return envelope.Event.Delta.Text
 		}
 	}
+	if provider == Cursor {
+		var envelope struct {
+			Type    string `json:"type"`
+			Message struct {
+				Content []struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"message"`
+		}
+		if json.Unmarshal([]byte(line), &envelope) == nil && envelope.Type == "assistant" {
+			var text strings.Builder
+			for _, content := range envelope.Message.Content {
+				if content.Type == "text" {
+					text.WriteString(content.Text)
+				}
+			}
+			return text.String()
+		}
+	}
 	return ""
 }
 
@@ -376,6 +409,16 @@ func compactOutput(output string) string {
 		return output
 	}
 	return output[:499] + "…"
+}
+
+func emit(sink agent.EventSink, event agent.Event) {
+	if sink == nil {
+		return
+	}
+	if event.At.IsZero() {
+		event.At = time.Now()
+	}
+	sink(event)
 }
 
 // RelativePath returns a path in the worktree for diagnostics without leaking

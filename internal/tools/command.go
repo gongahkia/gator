@@ -34,6 +34,16 @@ type RunCommand struct {
 	Policy CommandPolicy
 }
 
+// CommandResult is a bounded execution record shared by the model tool and
+// Gator's post-harness verification path.
+type CommandResult struct {
+	Argv      []string `json:"argv"`
+	ExitCode  int      `json:"exit_code"`
+	Output    string   `json:"output"`
+	Truncated bool     `json:"truncated"`
+	TimedOut  bool     `json:"timed_out"`
+}
+
 func (t RunCommand) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "run_command",
@@ -55,15 +65,39 @@ func (t RunCommand) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if !t.allowed(arguments.Argv) {
 		return agent.ToolResult{}, fmt.Errorf("command %q is not allowed by policy", arguments.Argv)
 	}
-	timeout := t.Policy.Timeout
+	result, err := RunAllowedCommand(ctx, t.Root, t.Policy, arguments.Argv)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	encoded, encodeErr := success(result)
+	if encodeErr != nil {
+		return agent.ToolResult{}, encodeErr
+	}
+	return agent.ToolResult{Content: encoded}, nil
+}
+
+func (t RunCommand) allowed(argv []string) bool {
+	return allowed(t.Policy.Allowed, argv)
+}
+
+// RunAllowedCommand executes an exact argv that appears in policy. It never
+// uses a shell and retains a bounded combined stdout/stderr transcript.
+func RunAllowedCommand(ctx context.Context, root workspace.Root, policy CommandPolicy, argv []string) (CommandResult, error) {
+	if len(argv) == 0 || argv[0] == "" {
+		return CommandResult{}, errors.New("command argv is required")
+	}
+	if !allowed(policy.Allowed, argv) {
+		return CommandResult{}, fmt.Errorf("command %q is not allowed by policy", argv)
+	}
+	timeout := policy.Timeout
 	if timeout <= 0 {
 		timeout = defaultCommandTimeout
 	}
 	commandContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	output := &limitedBuffer{limit: positiveOr(t.Policy.MaxOutputBytes, defaultCommandOutput)}
-	command := exec.CommandContext(commandContext, arguments.Argv[0], arguments.Argv[1:]...)
-	command.Dir = t.Root.Path()
+	output := &limitedBuffer{limit: positiveOr(policy.MaxOutputBytes, defaultCommandOutput)}
+	command := exec.CommandContext(commandContext, argv[0], argv[1:]...)
+	command.Dir = root.Path()
 	command.Stdout = output
 	command.Stderr = output
 	err := command.Run()
@@ -75,36 +109,20 @@ func (t RunCommand) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 		} else if errors.Is(commandContext.Err(), context.DeadlineExceeded) {
 			exitCode = -1
 		} else {
-			return agent.ToolResult{}, fmt.Errorf("start command: %w", err)
+			return CommandResult{}, fmt.Errorf("start command: %w", err)
 		}
 	}
-	result, encodeErr := success(struct {
-		Argv      []string `json:"argv"`
-		ExitCode  int      `json:"exit_code"`
-		Output    string   `json:"output"`
-		Truncated bool     `json:"truncated"`
-		TimedOut  bool     `json:"timed_out"`
-	}{
-		Argv:      arguments.Argv,
-		ExitCode:  exitCode,
-		Output:    output.String(),
-		Truncated: output.truncated,
-		TimedOut:  errors.Is(commandContext.Err(), context.DeadlineExceeded),
-	})
-	if encodeErr != nil {
-		return agent.ToolResult{}, encodeErr
-	}
-	return agent.ToolResult{Content: result}, nil
+	return CommandResult{Argv: append([]string(nil), argv...), ExitCode: exitCode, Output: output.String(), Truncated: output.truncated, TimedOut: errors.Is(commandContext.Err(), context.DeadlineExceeded)}, nil
 }
 
-func (t RunCommand) allowed(argv []string) bool {
-	for _, allowed := range t.Policy.Allowed {
-		if len(allowed) != len(argv) {
+func allowed(allowlist [][]string, argv []string) bool {
+	for _, permitted := range allowlist {
+		if len(permitted) != len(argv) {
 			continue
 		}
 		matches := true
 		for index := range argv {
-			if argv[index] != allowed[index] {
+			if permitted[index] != argv[index] {
 				matches = false
 				break
 			}

@@ -22,6 +22,7 @@ type Provider string
 
 const (
 	OpenAI           Provider = "openai"
+	AzureOpenAI      Provider = "azure-openai"
 	Anthropic        Provider = "anthropic"
 	Gemini           Provider = "gemini"
 	Mistral          Provider = "mistral"
@@ -87,7 +88,7 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
-	case Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, OpenAICompatible:
+	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, OpenAICompatible:
 		compatible, err := compatibleConfig(provider, config)
 		if err != nil {
 			return Backend{}, err
@@ -121,25 +122,30 @@ func compatibleConfig(provider Provider, config Config) (chatcompletions.Config,
 		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", provider)
 	}
 	if strings.TrimSpace(baseURL) == "" {
-		return chatcompletions.Config{}, fmt.Errorf("--base-url or GATOR_COMPATIBLE_BASE_URL is required for provider %q", provider)
+		return chatcompletions.Config{}, fmt.Errorf("--base-url or GATOR_BASE_URL is required for provider %q", provider)
 	}
 	return chatcompletions.Config{
-		APIKey:       apiKey,
-		APIKeyEnv:    definition.apiKeyEnv,
-		BaseURL:      baseURL,
-		Model:        config.Model,
-		ProviderName: definition.name,
-		Client:       config.Client,
+		APIKey:              apiKey,
+		APIKeyEnv:           definition.apiKeyEnv,
+		BaseURL:             baseURL,
+		Model:               config.Model,
+		ProviderName:        definition.name,
+		AuthorizationHeader: definition.authorizationHeader,
+		AuthorizationPrefix: definition.authorizationPrefix,
+		Client:              config.Client,
 	}, nil
 }
 
 type compatibleProvider struct {
-	name      string
-	apiKeyEnv string
-	baseURL   string
+	name                string
+	apiKeyEnv           string
+	baseURL             string
+	authorizationHeader string
+	authorizationPrefix string
 }
 
 var compatibleProviders = map[Provider]compatibleProvider{
+	AzureOpenAI:      {name: "Azure OpenAI API", apiKeyEnv: "AZURE_OPENAI_API_KEY", baseURL: "", authorizationHeader: "api-key"},
 	Mistral:          {name: "Mistral API", apiKeyEnv: "MISTRAL_API_KEY", baseURL: "https://api.mistral.ai/v1/chat/completions"},
 	XAI:              {name: "xAI API", apiKeyEnv: "XAI_API_KEY", baseURL: "https://api.x.ai/v1/chat/completions"},
 	Groq:             {name: "Groq API", apiKeyEnv: "GROQ_API_KEY", baseURL: "https://api.groq.com/openai/v1/chat/completions"},
@@ -187,7 +193,7 @@ func DefaultModel(provider Provider) string {
 	case OpenAI:
 		return openai.DefaultModel()
 	case Anthropic:
-		return "claude-sonnet-4-6"
+		return "claude-sonnet-5"
 	case Gemini:
 		return "gemini-3.5-flash"
 	case Mistral:
@@ -195,6 +201,16 @@ func DefaultModel(provider Provider) string {
 	default:
 		return ""
 	}
+}
+
+// EffectiveModel returns an explicit model unchanged or the provider's stable
+// default when one is available. An empty result means the selected vendor CLI
+// is responsible for choosing its own configured default.
+func EffectiveModel(provider Provider, requested string) string {
+	if strings.TrimSpace(requested) != "" {
+		return strings.TrimSpace(requested)
+	}
+	return DefaultModel(provider)
 }
 
 // CredentialHint describes the prerequisite without exposing secrets.
@@ -231,5 +247,5 @@ func requireKey(value, environment string) error {
 }
 
 var allProviders = map[Provider]struct{}{
-	OpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, Cursor: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, Cursor: {},
 }
