@@ -17,10 +17,9 @@ type Draft struct {
 	Version      int       `json:"version"`
 	Repository   string    `json:"repository"`
 	Task         string    `json:"task"`
-	Verification [][]string `json:"verification"`
+	Verification string    `json:"verification"`
 	Provider     string    `json:"provider"`
 	Model        string    `json:"model"`
-	BaseURL      string    `json:"base_url,omitempty"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
@@ -32,9 +31,6 @@ const draftVersion = 1
 func SaveDraft(stateDir string, draft Draft) error {
 	if strings.TrimSpace(draft.Repository) == "" {
 		return errors.New("draft repository is required")
-	}
-	if strings.TrimSpace(draft.Provider) == "" {
-		return errors.New("draft provider is required")
 	}
 	base, err := resolveStateDir(stateDir)
 	if err != nil {
@@ -86,14 +82,14 @@ func LoadDraft(stateDir, repository string) (Draft, bool, error) {
 	if draft.Version != draftVersion {
 		return Draft{}, false, fmt.Errorf("unsupported draft version %d", draft.Version)
 	}
-	if draft.Repository != repository || strings.TrimSpace(draft.Provider) == "" {
+	if draft.Repository != repository {
 		return Draft{}, false, errors.New("draft is incomplete or belongs to another repository")
 	}
 	return draft, true, nil
 }
 
-// DeleteDraft removes the private draft after a run has successfully started.
-// A missing draft is already the desired state.
+// DeleteDraft removes the private draft after a run has a durable record. A
+// missing draft is already the desired state.
 func DeleteDraft(stateDir, repository string) error {
 	if strings.TrimSpace(repository) == "" {
 		return errors.New("draft repository is required")

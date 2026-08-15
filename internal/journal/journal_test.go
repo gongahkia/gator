@@ -94,15 +94,14 @@ func TestJournalSavesAndLoadsPrivateSession(t *testing.T) {
 	}
 }
 
-func TestDraftRoundTripUsesPrivateStateAndClearsAfterRunStart(t *testing.T) {
+func TestDraftRoundTripUsesPrivateStateAndDeletes(t *testing.T) {
 	stateDirectory := t.TempDir()
 	draft := Draft{
 		Repository:   "/workspace/project",
 		Task:         "Add a focused feature",
-		Verification: [][]string{{"go", "test", "./..."}},
+		Verification: "go test ./...",
 		Provider:     "anthropic",
 		Model:        "claude-sonnet-5",
-		BaseURL:      "https://example.test",
 		UpdatedAt:    time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC),
 	}
 	if err := SaveDraft(stateDirectory, draft); err != nil {
@@ -112,7 +111,7 @@ func TestDraftRoundTripUsesPrivateStateAndClearsAfterRunStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load draft: %v", err)
 	}
-	if !found || loaded.Task != draft.Task || loaded.Provider != draft.Provider || loaded.Verification[0][0] != "go" {
+	if !found || loaded.Task != draft.Task || loaded.Provider != draft.Provider || loaded.Verification != "go test ./..." {
 		t.Fatalf("loaded draft = %#v, found = %t", loaded, found)
 	}
 	path := filepath.Join(stateDirectory, "gator", "drafts", repositoryFingerprint(draft.Repository)+".json")

@@ -21,6 +21,7 @@ var slashCommands = []slashCommand{
 	{name: "/help", description: "show Gator composer commands"},
 	{name: "/model", description: "edit the model for the next run"},
 	{name: "/provider", description: "edit the model provider for the next run"},
+	{name: "/recent", description: "choose a retained run to continue"},
 	{name: "/permissions", description: "show the isolated-run policy"},
 	{name: "/quit", description: "exit Gator"},
 	{name: "/review", description: "return to the latest review"},
@@ -139,6 +140,23 @@ func contextToken(candidate string) string {
 		return `@"` + candidate + `"`
 	}
 	return "@" + candidate
+}
+
+// contextBadge gives path suggestions enough type information to distinguish a
+// directory from a likely source or configuration file without reading any
+// repository content into the composer.
+func contextBadge(candidate string) string {
+	if strings.HasSuffix(candidate, "/") {
+		return "dir"
+	}
+	extension := strings.TrimPrefix(filepath.Ext(candidate), ".")
+	if extension == "" {
+		return "file"
+	}
+	if len(extension) > 10 {
+		return "file"
+	}
+	return extension
 }
 
 // extractContextReferences recognizes @path and @"path with spaces" tokens.

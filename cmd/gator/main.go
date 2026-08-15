@@ -104,11 +104,16 @@ func interactive() error {
 	if err != nil {
 		return err
 	}
+	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	if err != nil {
+		return err
+	}
 	application := tui.New(tui.Config{
 		RepositoryPath: repository,
 		Provider:       string(provider),
 		Model:          modelFromEnvironment(provider),
 		BaseURL:        os.Getenv("GATOR_BASE_URL"),
+		StateDir:       stateDir,
 		Verification:   parseSuggestedVerification(suggestedVerificationCommands(repository)),
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)

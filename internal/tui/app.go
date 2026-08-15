@@ -206,16 +206,17 @@ func New(config Config) Model {
 			kind: noticeInfo,
 		},
 	}
-	if draft, found, err := journal.LoadDraft(config.StateDir, config.RepositoryPath); err != nil {
-		application.draftErr = err
-		application.notice = notice{text: "Draft recovery unavailable: " + err.Error(), kind: noticeError}
-	} else if found {
-		application.task.SetValue(draft.Task)
-		application.verification.SetValue(formatVerification(draft.Verification))
-		application.provider.SetValue(draft.Provider)
-		application.model.SetValue(draft.Model)
-		application.config.BaseURL = draft.BaseURL
-		application.notice = notice{text: "Restored the unfinished draft saved " + draft.UpdatedAt.Local().Format("Jan 2 15:04") + ".", kind: noticeInfo}
+	if strings.TrimSpace(config.StateDir) != "" {
+		if draft, found, err := journal.LoadDraft(config.StateDir, config.RepositoryPath); err != nil {
+			application.draftErr = err
+			application.notice = notice{text: "Draft recovery unavailable: " + err.Error(), kind: noticeError}
+		} else if found {
+			application.task.SetValue(draft.Task)
+			application.verification.SetValue(draft.Verification)
+			application.provider.SetValue(draft.Provider)
+			application.model.SetValue(draft.Model)
+			application.notice = notice{text: "Restored the unfinished draft saved " + draft.UpdatedAt.Local().Format("Jan 2 15:04") + ".", kind: noticeInfo}
+		}
 	}
 	application.refreshPreflight()
 	return application
@@ -232,7 +233,6 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.resizeInputs()
-		return m, nil
 	case agentEventMsg:
 		m.events = append(m.events, renderEvent(msg.event))
 		return m, waitForExecution(m.execution)
@@ -246,6 +246,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Run stopped: " + msg.done.err.Error(), kind: noticeError}
 		} else {
 			m.notice = notice{text: "Run complete. Inspect the diff and evidence before applying anything.", kind: noticeSuccess}
+		}
+		if msg.done.outcome.StatePath != "" && m.resumeStatePath == "" && strings.TrimSpace(m.config.StateDir) != "" {
+			if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
+				m.draftErr = err
+			}
 		}
 		if msg.done.outcome.Worktree.Path == "" {
 			return m, nil
@@ -428,6 +433,60 @@ func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateHelp(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "esc", "f1", "?", "q":
+		m.screen = m.helpReturn
+	}
+	return m, nil
+}
+
+func (m Model) openRecentRuns() (tea.Model, tea.Cmd) {
+	runs, err := journal.ListRecentRuns(m.config.StateDir, m.config.RepositoryPath, 20)
+	if err != nil {
+		m.notice = notice{text: "Load recent runs: " + err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if len(runs) == 0 {
+		m.notice = notice{text: "No retained runs are available for this repository.", kind: noticeInfo}
+		return m, nil
+	}
+	m.recentRuns = runs
+	m.recentIndex = 0
+	m.screen = recentScreen
+	return m, nil
+}
+
+func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "esc", "q":
+		m.screen = composeScreen
+		return m, m.focusField()
+	case "r", "ctrl+r":
+		m.screen = composeScreen
+		return m.openRecentRuns()
+	case "up", "ctrl+p":
+		if len(m.recentRuns) > 0 {
+			m.recentIndex = (m.recentIndex - 1 + len(m.recentRuns)) % len(m.recentRuns)
+		}
+	case "down", "ctrl+n":
+		if len(m.recentRuns) > 0 {
+			m.recentIndex = (m.recentIndex + 1) % len(m.recentRuns)
+		}
+	case "enter":
+		if len(m.recentRuns) == 0 {
+			return m, nil
+		}
+		selected := m.recentRuns[m.recentIndex]
+		if !selected.Available {
+			m.notice = notice{text: "The selected retained worktree no longer exists.", kind: noticeError}
+			return m, nil
+		}
+		return m.beginContinuation(selected.StatePath)
+	}
+	return m, nil
+}
+
 func (m Model) startRun() (tea.Model, tea.Cmd) {
 	task := strings.TrimSpace(m.task.Value())
 	if task == "" {
@@ -460,6 +519,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	modelName = modelprovider.EffectiveModel(provider, modelName)
+	m.refreshPreflight()
+	if len(m.preflight) > 0 {
+		m.notice = notice{text: "Resolve configuration before starting: " + m.preflight[0], kind: noticeError}
+		return m, nil
+	}
 	var executor gatorrun.Executor
 	if m.resumeStatePath == "" {
 		var executorErr error
@@ -587,12 +651,16 @@ func (m *Model) prepareContinuation() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "This run has no resume record.", kind: noticeError}
 		return *m, nil
 	}
-	session, err := journal.LoadSession(m.outcome.StatePath)
+	return m.beginContinuation(m.outcome.StatePath)
+}
+
+func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
+	session, err := journal.LoadSession(statePath)
 	if err != nil {
 		m.notice = notice{text: "Load retained run: " + err.Error(), kind: noticeError}
 		return *m, nil
 	}
-	m.resumeStatePath = m.outcome.StatePath
+	m.resumeStatePath = statePath
 	m.task.Reset()
 	m.task.Placeholder = "Describe the next instruction for this retained worktree..."
 	m.verification.SetValue(formatVerification(session.Verification))
@@ -601,6 +669,7 @@ func (m *Model) prepareContinuation() (tea.Model, tea.Cmd) {
 	m.screen = composeScreen
 	m.focus = taskField
 	m.notice = notice{text: "Continuing " + filepath.Base(m.resumeStatePath) + " in its retained worktree.", kind: noticeInfo}
+	m.refreshPreflight()
 	return *m, m.focusField()
 }
 
@@ -612,6 +681,97 @@ func (m *Model) returnToComposer() {
 	m.focus = taskField
 	m.commandOutput = ""
 	m.notice = notice{text: "Ready for a new isolated task.", kind: noticeInfo}
+	m.refreshPreflight()
+}
+
+// persistDraft keeps the editable new-run form recoverable without storing it
+// in the repository or exposing it in the event journal. Continuations use a
+// private run session instead, so they do not overwrite the new-run draft.
+func (m *Model) persistDraft() {
+	if m.resumeStatePath != "" || strings.TrimSpace(m.config.StateDir) == "" {
+		return
+	}
+	err := journal.SaveDraft(m.config.StateDir, journal.Draft{
+		Repository:   m.config.RepositoryPath,
+		Task:         m.task.Value(),
+		Verification: m.verification.Value(),
+		Provider:     strings.TrimSpace(m.provider.Value()),
+		Model:        strings.TrimSpace(m.model.Value()),
+	})
+	m.draftErr = err
+}
+
+// refreshPreflight validates the same provider factory used by Ctrl+R. It
+// deliberately performs no model request: construction only checks local
+// configuration, credential presence, base URL requirements, and CLI paths.
+func (m *Model) refreshPreflight() {
+	if m.config.NewExecutor == nil {
+		m.preflight = nil
+		return
+	}
+	issues := make([]string, 0, 3)
+	if m.resumeStatePath != "" {
+		session, err := journal.LoadSession(m.resumeStatePath)
+		if err != nil {
+			m.preflight = []string{"load retained run: " + err.Error()}
+			return
+		}
+		provider, err := modelprovider.ParseProvider(session.Provider)
+		if err != nil {
+			m.preflight = []string{err.Error()}
+			return
+		}
+		if strings.TrimSpace(m.task.Value()) == "" {
+			issues = append(issues, "describe a continuation instruction")
+		}
+		if _, err := m.config.NewExecutor(session.Provider, modelprovider.EffectiveModel(provider, session.Model), session.BaseURL); err != nil {
+			issues = append(issues, err.Error())
+		}
+		m.preflight = issues
+		return
+	}
+	if strings.TrimSpace(m.task.Value()) == "" {
+		issues = append(issues, "describe a task")
+	}
+	if _, err := parseVerification(m.verification.Value()); err != nil {
+		issues = append(issues, err.Error())
+	}
+	providerName := strings.TrimSpace(m.provider.Value())
+	provider, err := modelprovider.ParseProvider(providerName)
+	if err != nil {
+		issues = append(issues, err.Error())
+		m.preflight = issues
+		return
+	}
+	modelName := modelprovider.EffectiveModel(provider, m.model.Value())
+	if _, err := m.config.NewExecutor(providerName, modelName, m.config.BaseURL); err != nil {
+		issues = append(issues, err.Error())
+	}
+	m.preflight = issues
+}
+
+func (m Model) preflightView() string {
+	label := "Before starting"
+	ready := "Ready to create an isolated worktree."
+	if m.resumeStatePath != "" {
+		label = "Before continuing"
+		ready = "Ready to continue the retained worktree."
+	}
+	if len(m.preflight) == 0 {
+		return labelStyle.Render("Run readiness") + "\n" + okStyle.Render(ready)
+	}
+	lines := make([]string, 0, len(m.preflight))
+	for _, issue := range m.preflight {
+		lines = append(lines, "• "+issue)
+	}
+	return labelStyle.Render(label) + "\n" + panelStyle.Width(max(28, m.width-4)).Render(errorStyle.Render(strings.Join(lines, "\n")))
+}
+
+func (m Model) draftWarningView() string {
+	if m.draftErr == nil {
+		return ""
+	}
+	return labelStyle.Render("Draft recovery") + "\n" + errorStyle.Render("The current draft could not be saved: "+m.draftErr.Error())
 }
 
 func (m *Model) focusField() tea.Cmd {
@@ -656,6 +816,10 @@ func (m Model) View() string {
 		return m.runningView()
 	case reviewScreen:
 		return m.reviewView()
+	case helpScreen:
+		return m.helpView()
+	case recentScreen:
+		return m.recentRunsView()
 	default:
 		return ""
 	}
@@ -679,7 +843,7 @@ func (m Model) composeView() string {
 		m.fieldView("Task", "Explain the desired behavior and any constraints.", m.task.View()),
 	}
 	if palette := m.commandPaletteView(); palette != "" {
-		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "ctrl+c quit"))
+		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
 		return strings.Join(sections, "\n\n")
 	}
 	if references := m.contextReferencesView(); references != "" {
@@ -702,14 +866,67 @@ func (m Model) composeView() string {
 		providerSection,
 		modelSection,
 	)
+	if readiness := m.preflightView(); readiness != "" {
+		sections = append(sections, readiness)
+	}
+	if warning := m.draftWarningView(); warning != "" {
+		sections = append(sections, warning)
+	}
 	if m.commandOutput != "" {
 		sections = append(sections, labelStyle.Render("Command result"), panelStyle.Width(max(28, m.width-4)).Render(m.commandOutput))
 	}
 	sections = append(sections,
 		m.noticeView(),
-		m.footer("? commands", "tab switch field", "ctrl+r start run", "ctrl+c quit"),
+		m.footer("? commands", "ctrl+o recent", "tab switch field", "ctrl+r start run", "f1 shortcuts", "ctrl+c quit"),
 	)
 	return strings.Join(sections, "\n\n")
+}
+
+func (m Model) helpView() string {
+	sections := []string{
+		m.header("keyboard shortcuts"),
+		labelStyle.Render("Composer") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join([]string{
+			"F1  show or close this help",
+			"Ctrl+R  start the configured run",
+			"Ctrl+O  choose a retained run",
+			"Tab / Shift+Tab  move between fields",
+			"?  open the / command menu from an empty task",
+			"@  begin a repository-path reference",
+			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
+			"Arrows + Enter or Tab  choose an open suggestion",
+			"Ctrl+C  quit",
+		}, "\n")),
+		labelStyle.Render("Running") + "\n" + panelStyle.Width(max(28, m.width-4)).Render("F1  show this help\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Review") + "\n" + panelStyle.Width(max(28, m.width-4)).Render("F1  show this help\nc  continue the retained worktree\nn or Esc  start a new task\nd  refresh the diff\nq or Ctrl+C  quit"),
+		m.footer("esc close help"),
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+func (m Model) recentRunsView() string {
+	lines := make([]string, 0, len(m.recentRuns))
+	for index, run := range m.recentRuns {
+		prefix := "  "
+		if index == m.recentIndex {
+			prefix = "> "
+		}
+		modelName := run.Model
+		if modelName == "" {
+			modelName = "provider default"
+		}
+		availability := okStyle.Render("path found")
+		if !run.Available {
+			availability = errorStyle.Render("worktree missing")
+		}
+		lines = append(lines, prefix+keyStyle.Render(run.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(run.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+compact(run.Task, 96))
+	}
+	return strings.Join([]string{
+		m.header("recent retained runs"),
+		panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n\n")),
+		dimStyle.Render("Run-record paths stay private; Gator validates a selected worktree before continuation."),
+		m.noticeView(),
+		m.footer("up/down choose", "enter continue", "r refresh", "esc back", "f1 shortcuts"),
+	}, "\n\n")
 }
 
 func (m Model) runningView() string {
@@ -737,7 +954,7 @@ func (m Model) runningView() string {
 		status,
 		panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")),
 		m.noticeView(),
-		m.footer("ctrl+c stop after current operation"),
+		m.footer("ctrl+c stop after current operation", "f1 shortcuts"),
 	}
 	return strings.Join(sections, "\n\n")
 }
@@ -758,7 +975,7 @@ func (m Model) reviewView() string {
 	if m.outcome == nil || m.outcome.StatePath == "" {
 		continueLabel = ""
 	}
-	sections = append(sections, m.footer("d refresh diff", continueLabel, "n new task", "q quit"))
+	sections = append(sections, m.footer("d refresh diff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
 	return strings.Join(sections, "\n\n")
 }
 
@@ -860,6 +1077,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	if len(matches) == 0 {
 		return m, nil
 	}
+	defer m.persistDraft()
+	defer m.refreshPreflight()
 	command := matches[m.commandIndex]
 	m.task.Reset()
 	m.commandIndex = 0
@@ -896,6 +1115,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		}
 		m.screen = reviewScreen
 		return m, nil
+	case "/recent":
+		return m.openRecentRuns()
 	case "/status":
 		m.commandOutput = m.sessionStatus()
 		m.notice = notice{text: "Current configuration shown below.", kind: noticeInfo}
@@ -1092,6 +1313,8 @@ func (m *Model) applySelectedDropdown() {
 				m.notice = notice{text: "Custom model retained: " + strings.TrimSpace(m.model.Value()), kind: noticeInfo}
 			}
 			m.normalizeDropdownSelection()
+			m.persistDraft()
+			m.refreshPreflight()
 			return
 		}
 		m.model.SetValue(selected.value)
@@ -1102,6 +1325,8 @@ func (m *Model) applySelectedDropdown() {
 		}
 	}
 	m.normalizeDropdownSelection()
+	m.persistDraft()
+	m.refreshPreflight()
 }
 
 func (m Model) dropdownView() string {
@@ -1181,6 +1406,8 @@ func (m *Model) applySelectedContextCompletion() {
 	m.task.SetValue(m.task.Value()[:active.start] + contextToken(selected) + " ")
 	m.contextIndex = 0
 	m.contextClosed = false
+	m.persistDraft()
+	m.refreshPreflight()
 }
 
 func (m Model) contextCompletionView() string {
@@ -1198,7 +1425,7 @@ func (m Model) contextCompletionView() string {
 		if index == m.contextIndex {
 			prefix = "> "
 		}
-		lines = append(lines, prefix+keyStyle.Render("@"+candidate))
+		lines = append(lines, prefix+keyStyle.Render("["+contextBadge(candidate)+"]")+"  "+"@"+candidate)
 	}
 	return labelStyle.Render("Path suggestions") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("type to filter · up/down choose · enter or tab insert · esc dismiss")
 }
