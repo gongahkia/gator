@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -92,6 +93,9 @@ func contextCompletionCandidates(repository string) ([]string, error) {
 		if path == root.Path() {
 			return nil
 		}
+		if len(candidates) >= maxCandidates {
+			return fs.SkipAll
+		}
 		if entry.IsDir() && entry.Name() == ".git" {
 			return filepath.SkipDir
 		}
@@ -107,9 +111,6 @@ func contextCompletionCandidates(repository string) ([]string, error) {
 			candidate += "/"
 		}
 		candidates = append(candidates, candidate)
-		if len(candidates) >= maxCandidates {
-			return filepath.SkipDir
-		}
 		return nil
 	})
 	if err != nil {
@@ -134,7 +135,6 @@ func matchingContextCompletions(candidates []string, query string) []string {
 }
 
 func contextToken(candidate string) string {
-	candidate = strings.TrimSuffix(candidate, "/")
 	if strings.ContainsAny(candidate, " \t") {
 		return `@"` + candidate + `"`
 	}

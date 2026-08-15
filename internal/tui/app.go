@@ -42,6 +42,8 @@ const (
 	composeScreen screen = iota
 	runningScreen
 	reviewScreen
+	helpScreen
+	recentScreen
 )
 
 type field uint8
@@ -112,6 +114,17 @@ type Model struct {
 	notice        notice
 	commandOutput string
 	commandIndex  int
+	dropdownIndex int
+	contextIndex  int
+	contextPaths  []string
+	contextLoaded bool
+	contextErr    error
+	contextClosed bool
+	preflight     []string
+	draftErr      error
+	helpReturn    screen
+	recentRuns    []journal.RecentRun
+	recentIndex   int
 	events        []timelineEntry
 	execution     *executionStream
 	cancelling    bool
@@ -181,7 +194,7 @@ func New(config Config) Model {
 	provider.SetValue(config.Provider)
 	provider.Blur()
 
-	return Model{
+	application := Model{
 		config:       config,
 		screen:       composeScreen,
 		task:         task,
@@ -193,6 +206,19 @@ func New(config Config) Model {
 			kind: noticeInfo,
 		},
 	}
+	if draft, found, err := journal.LoadDraft(config.StateDir, config.RepositoryPath); err != nil {
+		application.draftErr = err
+		application.notice = notice{text: "Draft recovery unavailable: " + err.Error(), kind: noticeError}
+	} else if found {
+		application.task.SetValue(draft.Task)
+		application.verification.SetValue(formatVerification(draft.Verification))
+		application.provider.SetValue(draft.Provider)
+		application.model.SetValue(draft.Model)
+		application.config.BaseURL = draft.BaseURL
+		application.notice = notice{text: "Restored the unfinished draft saved " + draft.UpdatedAt.Local().Format("Jan 2 15:04") + ".", kind: noticeInfo}
+	}
+	application.refreshPreflight()
+	return application
 }
 
 // Init starts no external work until the developer explicitly starts a run.
@@ -266,6 +292,40 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	if m.focus == taskField && m.contextCompletionVisible() {
+		switch message.String() {
+		case "up", "ctrl+p":
+			m.moveContextSelection(-1)
+			return m, nil
+		case "down", "ctrl+n":
+			m.moveContextSelection(1)
+			return m, nil
+		case "enter", "tab":
+			m.applySelectedContextCompletion()
+			return m, nil
+		case "esc":
+			m.contextClosed = true
+			m.notice = notice{text: "Path suggestions dismissed.", kind: noticeInfo}
+			return m, nil
+		}
+	}
+	if m.dropdownVisible() {
+		switch message.String() {
+		case "up", "ctrl+p":
+			m.moveDropdownSelection(-1)
+			return m, nil
+		case "down", "ctrl+n":
+			m.moveDropdownSelection(1)
+			return m, nil
+		case "enter":
+			m.applySelectedDropdown()
+			return m, nil
+		case "tab":
+			m.applySelectedDropdown()
+			m.focus = nextField(m.focus, false)
+			return m, m.focusField()
+		}
+	}
 	switch message.String() {
 	case "ctrl+c":
 		return m, tea.Quit
@@ -291,12 +351,16 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case taskField:
 		m.task, command = m.task.Update(message)
 		m.normalizeCommandSelection()
+		m.contextClosed = false
+		m.normalizeContextSelection()
 	case verificationField:
 		m.verification, command = m.verification.Update(message)
 	case modelField:
 		m.model, command = m.model.Update(message)
+		m.normalizeDropdownSelection()
 	case providerField:
 		m.provider, command = m.provider.Update(message)
+		m.normalizeDropdownSelection()
 	}
 	return m, command
 }
@@ -524,6 +588,7 @@ func (m *Model) focusField() tea.Cmd {
 	m.verification.Blur()
 	m.provider.Blur()
 	m.model.Blur()
+	m.normalizeDropdownSelection()
 	switch m.focus {
 	case taskField:
 		return m.task.Focus()
@@ -571,8 +636,8 @@ func (m Model) composeView() string {
 		mode = "continue retained run"
 	}
 	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
-	providerHint := "Set GATOR_PROVIDER before launch or edit it here."
-	modelHint := "Set GATOR_MODEL before launch or edit it here."
+	providerHint := "Choose from the dropdown or type to filter providers."
+	modelHint := "Choose a recommendation or type any model ID supported by the provider."
 	if m.resumeStatePath != "" {
 		verificationHint = "Inherited from the retained run to preserve its command policy."
 		providerHint = "Inherited from the retained run to preserve provider continuity."
@@ -589,10 +654,22 @@ func (m Model) composeView() string {
 	if references := m.contextReferencesView(); references != "" {
 		sections = append(sections, references)
 	}
+	if completions := m.contextCompletionView(); completions != "" {
+		sections = append(sections, completions)
+	}
+	providerSection := m.fieldView("Provider", providerHint, m.provider.View())
+	modelSection := m.fieldView("Model", modelHint, m.model.View())
+	if dropdown := m.dropdownView(); dropdown != "" {
+		if m.focus == providerField {
+			providerSection += "\n\n" + dropdown
+		} else {
+			modelSection += "\n\n" + dropdown
+		}
+	}
 	sections = append(sections,
 		m.fieldView("Verification", verificationHint, m.verification.View()),
-		m.fieldView("Provider", providerHint, m.provider.View()),
-		m.fieldView("Model", modelHint, m.model.View()),
+		providerSection,
+		modelSection,
 	)
 	if m.commandOutput != "" {
 		sections = append(sections, labelStyle.Render("Command result"), panelStyle.Width(max(28, m.width-4)).Render(m.commandOutput))
@@ -765,12 +842,12 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/model":
 		m.commandOutput = ""
 		m.focus = modelField
-		m.notice = notice{text: "Edit the model, then Tab back to the task.", kind: noticeInfo}
+		m.notice = notice{text: "Choose a recommended model or type a model ID, then Tab back to the task.", kind: noticeInfo}
 		return m, m.focusField()
 	case "/provider":
 		m.commandOutput = ""
 		m.focus = providerField
-		m.notice = notice{text: "Edit the provider, then Tab back to the task.", kind: noticeInfo}
+		m.notice = notice{text: "Choose a provider or type to filter it, then Tab back to the task.", kind: noticeInfo}
 		return m, m.focusField()
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
@@ -820,6 +897,279 @@ func (m Model) commandPaletteView() string {
 		lines = append(lines, prefix+keyStyle.Render(command.name)+"  "+dimStyle.Render(command.description))
 	}
 	return labelStyle.Render("Commands") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("up/down choose · enter run command · esc dismiss")
+}
+
+type dropdownOption struct {
+	value       string
+	label       string
+	description string
+	custom      bool
+}
+
+func providerDropdownOptions() []dropdownOption {
+	descriptions := map[modelprovider.Provider]string{
+		modelprovider.OpenAI:           "OpenAI Responses API",
+		modelprovider.AzureOpenAI:      "Azure OpenAI Chat Completions",
+		modelprovider.Anthropic:        "Anthropic Messages API",
+		modelprovider.Gemini:           "Gemini GenerateContent API",
+		modelprovider.Mistral:          "Mistral Chat Completions",
+		modelprovider.XAI:              "xAI Chat Completions",
+		modelprovider.Groq:             "Groq Chat Completions",
+		modelprovider.OpenRouter:       "OpenRouter Chat Completions",
+		modelprovider.Together:         "Together AI Chat Completions",
+		modelprovider.Fireworks:        "Fireworks Chat Completions",
+		modelprovider.DeepSeek:         "DeepSeek Chat Completions",
+		modelprovider.OpenAICompatible: "custom Chat Completions endpoint",
+		modelprovider.Codex:            "local Codex CLI subscription",
+		modelprovider.Claude:           "local Claude Code subscription",
+		modelprovider.Copilot:          "local GitHub Copilot CLI subscription",
+		modelprovider.Cursor:           "local Cursor Agent CLI subscription",
+	}
+	options := make([]dropdownOption, 0, len(descriptions))
+	for _, name := range modelprovider.Names() {
+		provider, err := modelprovider.ParseProvider(name)
+		if err != nil {
+			continue
+		}
+		options = append(options, dropdownOption{value: name, description: descriptions[provider]})
+	}
+	return options
+}
+
+// modelDropdownOptions deliberately offers only model IDs Gator can recommend
+// without guessing an arbitrary provider catalog. The text field remains
+// editable for deployments, aliases, previews, and account-specific models.
+func modelDropdownOptions(providerName string) []dropdownOption {
+	provider, err := modelprovider.ParseProvider(providerName)
+	if err != nil {
+		return nil
+	}
+	customDescription := "type a model ID supported by this provider"
+	if provider == modelprovider.AzureOpenAI {
+		customDescription = "type the Azure deployment name"
+	}
+	if modelprovider.IsHarness(provider) {
+		return []dropdownOption{
+			{value: "", label: "provider default", description: "use the default configured in the vendor CLI"},
+			{label: "custom model ID", description: "type a model selector supported by the vendor CLI", custom: true},
+		}
+	}
+	options := []dropdownOption{{label: "custom model ID", description: customDescription, custom: true}}
+	if defaultModel := modelprovider.DefaultModel(provider); defaultModel != "" {
+		options = append([]dropdownOption{{value: defaultModel, label: defaultModel, description: "Gator recommended default"}}, options...)
+	}
+	return options
+}
+
+func matchingDropdownOptions(options []dropdownOption, query string) []dropdownOption {
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return options
+	}
+	for _, option := range options {
+		if option.custom {
+			continue
+		}
+		if strings.EqualFold(option.value, query) {
+			return options
+		}
+	}
+	var matches []dropdownOption
+	for _, option := range options {
+		if option.custom {
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(option.value), query) {
+			matches = append(matches, option)
+		}
+	}
+	for _, option := range options {
+		if option.custom {
+			matches = append(matches, option)
+		}
+	}
+	return matches
+}
+
+func (m Model) dropdownOptions() []dropdownOption {
+	switch m.focus {
+	case providerField:
+		return matchingDropdownOptions(providerDropdownOptions(), m.provider.Value())
+	case modelField:
+		return matchingDropdownOptions(modelDropdownOptions(m.provider.Value()), m.model.Value())
+	default:
+		return nil
+	}
+}
+
+func (m Model) dropdownVisible() bool {
+	return m.resumeStatePath == "" && (m.focus == providerField || m.focus == modelField) && len(m.dropdownOptions()) > 0
+}
+
+func (m *Model) normalizeDropdownSelection() {
+	options := m.dropdownOptions()
+	if len(options) == 0 {
+		m.dropdownIndex = 0
+		return
+	}
+	value := ""
+	switch m.focus {
+	case providerField:
+		value = m.provider.Value()
+	case modelField:
+		value = m.model.Value()
+	}
+	for index, option := range options {
+		if strings.EqualFold(option.value, strings.TrimSpace(value)) {
+			m.dropdownIndex = index
+			return
+		}
+	}
+	if m.dropdownIndex >= len(options) {
+		m.dropdownIndex = len(options) - 1
+	}
+}
+
+func (m *Model) moveDropdownSelection(delta int) {
+	options := m.dropdownOptions()
+	if len(options) == 0 {
+		m.dropdownIndex = 0
+		return
+	}
+	m.dropdownIndex = (m.dropdownIndex + delta + len(options)) % len(options)
+}
+
+func (m *Model) applySelectedDropdown() {
+	options := m.dropdownOptions()
+	if len(options) == 0 {
+		return
+	}
+	selected := options[m.dropdownIndex]
+	switch m.focus {
+	case providerField:
+		m.provider.SetValue(selected.value)
+		provider, err := modelprovider.ParseProvider(selected.value)
+		if err == nil {
+			m.model.SetValue(modelprovider.DefaultModel(provider))
+		}
+		m.notice = notice{text: "Provider selected: " + selected.value, kind: noticeInfo}
+	case modelField:
+		if selected.custom {
+			if strings.TrimSpace(m.model.Value()) == "" {
+				m.notice = notice{text: "Enter a model ID supported by the selected provider.", kind: noticeInfo}
+			} else {
+				m.notice = notice{text: "Custom model retained: " + strings.TrimSpace(m.model.Value()), kind: noticeInfo}
+			}
+			m.normalizeDropdownSelection()
+			return
+		}
+		m.model.SetValue(selected.value)
+		if selected.value == "" {
+			m.notice = notice{text: "The provider CLI will choose its configured model.", kind: noticeInfo}
+		} else {
+			m.notice = notice{text: "Model selected: " + selected.value, kind: noticeInfo}
+		}
+	}
+	m.normalizeDropdownSelection()
+}
+
+func (m Model) dropdownView() string {
+	if !m.dropdownVisible() {
+		return ""
+	}
+	options := m.dropdownOptions()
+	lines := make([]string, 0, len(options))
+	for index, option := range options {
+		prefix := "  "
+		if index == m.dropdownIndex {
+			prefix = "> "
+		}
+		label := option.label
+		if label == "" {
+			label = option.value
+		}
+		if label == "" {
+			label = "provider default"
+		}
+		lines = append(lines, prefix+keyStyle.Render(label)+"  "+dimStyle.Render(option.description))
+	}
+	title := "Provider choices"
+	if m.focus == modelField {
+		title = "Recommended models"
+	}
+	return labelStyle.Render(title) + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("type to filter · up/down choose · enter apply · tab apply and continue")
+}
+
+func (m *Model) normalizeContextSelection() {
+	if _, active := activeContextCompletion(m.task.Value()); !active {
+		m.contextIndex = 0
+		return
+	}
+	if !m.contextLoaded {
+		m.contextPaths, m.contextErr = contextCompletionCandidates(m.config.RepositoryPath)
+		m.contextLoaded = true
+	}
+	matches := m.contextCompletions()
+	if len(matches) == 0 {
+		m.contextIndex = 0
+		return
+	}
+	if m.contextIndex >= len(matches) {
+		m.contextIndex = len(matches) - 1
+	}
+}
+
+func (m Model) contextCompletions() []string {
+	active, ok := activeContextCompletion(m.task.Value())
+	if !ok || m.contextClosed || m.contextErr != nil {
+		return nil
+	}
+	return matchingContextCompletions(m.contextPaths, active.query)
+}
+
+func (m Model) contextCompletionVisible() bool {
+	return m.focus == taskField && len(m.contextCompletions()) > 0
+}
+
+func (m *Model) moveContextSelection(delta int) {
+	matches := m.contextCompletions()
+	if len(matches) == 0 {
+		m.contextIndex = 0
+		return
+	}
+	m.contextIndex = (m.contextIndex + delta + len(matches)) % len(matches)
+}
+
+func (m *Model) applySelectedContextCompletion() {
+	active, ok := activeContextCompletion(m.task.Value())
+	matches := m.contextCompletions()
+	if !ok || len(matches) == 0 {
+		return
+	}
+	selected := matches[m.contextIndex]
+	m.task.SetValue(m.task.Value()[:active.start] + contextToken(selected) + " ")
+	m.contextIndex = 0
+	m.contextClosed = false
+}
+
+func (m Model) contextCompletionView() string {
+	matches := m.contextCompletions()
+	if len(matches) == 0 {
+		return ""
+	}
+	const maxVisible = 8
+	if len(matches) > maxVisible {
+		matches = matches[:maxVisible]
+	}
+	lines := make([]string, 0, len(matches))
+	for index, candidate := range matches {
+		prefix := "  "
+		if index == m.contextIndex {
+			prefix = "> "
+		}
+		lines = append(lines, prefix+keyStyle.Render("@"+candidate))
+	}
+	return labelStyle.Render("Path suggestions") + "\n" + panelStyle.Width(max(28, m.width-4)).Render(strings.Join(lines, "\n")) + "\n" + dimStyle.Render("type to filter · up/down choose · enter or tab insert · esc dismiss")
 }
 
 func (m Model) contextReferencesView() string {
