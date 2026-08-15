@@ -13,6 +13,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
@@ -193,6 +194,9 @@ func TestTaskPathAutocompleteInsertsSelectedReferenceWithTab(t *testing.T) {
 	if !strings.Contains(model.View(), "Path suggestions") {
 		t.Fatalf("path dropdown missing from view: %s", model.View())
 	}
+	if !strings.Contains(model.View(), "[go]") {
+		t.Fatalf("path type badge missing from view: %s", model.View())
+	}
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if command != nil {
 		t.Fatal("path completion returned an unexpected command")
@@ -200,6 +204,123 @@ func TestTaskPathAutocompleteInsertsSelectedReferenceWithTab(t *testing.T) {
 	updated := next.(Model)
 	if updated.task.Value() != "Inspect @hello.go " {
 		t.Fatalf("task = %q", updated.task.Value())
+	}
+}
+
+func TestCtrlSpaceReopensDismissedPathSuggestions(t *testing.T) {
+	repository := testRepository(t)
+	model := New(Config{RepositoryPath: repository, StateDir: t.TempDir()})
+	model.task.SetValue("Inspect @hel")
+	model.normalizeContextSelection()
+	model.contextClosed = true
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlAt})
+	if command != nil {
+		t.Fatal("Ctrl+Space returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.contextClosed || !updated.contextCompletionVisible() {
+		t.Fatalf("path completion was not reopened: %#v", updated)
+	}
+}
+
+func TestDraftRestoresComposerState(t *testing.T) {
+	repository := testRepository(t)
+	stateDirectory := t.TempDir()
+	first := New(Config{RepositoryPath: repository, StateDir: stateDirectory, Provider: "anthropic", Model: "claude-sonnet-5"})
+	first.task.SetValue("Add draft recovery")
+	first.verification.SetValue("go test ./...\ngo vet ./...")
+	first.persistDraft()
+	if first.draftErr != nil {
+		t.Fatalf("persist draft: %v", first.draftErr)
+	}
+	restored := New(Config{RepositoryPath: repository, StateDir: stateDirectory})
+	if restored.task.Value() != "Add draft recovery" || restored.verification.Value() != "go test ./...\ngo vet ./..." || restored.provider.Value() != "anthropic" || restored.model.Value() != "claude-sonnet-5" {
+		t.Fatalf("restored composer = %#v", restored)
+	}
+}
+
+func TestPreflightShowsFactoryConfigurationErrorBeforeRun(t *testing.T) {
+	model := New(Config{
+		RepositoryPath: "/tmp/example-repository",
+		StateDir:       t.TempDir(),
+		Verification:   [][]string{{"go", "test", "./..."}},
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{}, errors.New("codex CLI is not installed or not on PATH")
+		},
+	})
+	model.task.SetValue("Add a focused feature")
+	model.refreshPreflight()
+	if len(model.preflight) != 1 || !strings.Contains(model.preflight[0], "CLI is not installed") {
+		t.Fatalf("preflight = %#v", model.preflight)
+	}
+	model.width = 100
+	model.height = 40
+	if !strings.Contains(model.preflightView(), "CLI is not installed") {
+		t.Fatalf("preflight view = %s", model.preflightView())
+	}
+}
+
+func TestF1HelpReturnsToPreviousScreen(t *testing.T) {
+	model := New(Config{StateDir: t.TempDir()})
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyF1})
+	if command != nil {
+		t.Fatal("F1 returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.screen != helpScreen || !strings.Contains(updated.helpView(), "Ctrl+O") {
+		t.Fatalf("help screen was not rendered")
+	}
+	next, _ = updated.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	if next.(Model).screen != composeScreen {
+		t.Fatalf("F1 help did not return to composer: %#v", next)
+	}
+}
+
+func TestRecentRunsPickerLoadsASelectedContinuation(t *testing.T) {
+	repository := testRepository(t)
+	stateDirectory := t.TempDir()
+	worktreePath := t.TempDir()
+	runJournal, record, err := journal.Open(repository, "run-recent-001", worktreePath, stateDirectory, time.Now())
+	if err != nil {
+		t.Fatalf("open run journal: %v", err)
+	}
+	if err := runJournal.SaveSession(journal.Session{Version: 2, Repository: repository, WorktreePath: worktreePath, Provider: "openai", Model: "gpt-5.6", Task: "Retained task", Verification: [][]string{{"go", "test", "./..."}}}); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+	if err := runJournal.Close(); err != nil {
+		t.Fatalf("close journal: %v", err)
+	}
+	if record.StatePath == "" {
+		t.Fatal("run record path is empty")
+	}
+	model := New(Config{
+		RepositoryPath: repository,
+		StateDir:       stateDirectory,
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{}, errors.New("OPENAI_API_KEY is required")
+		},
+	})
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	if command != nil {
+		t.Fatal("recent-run picker returned an unexpected command")
+	}
+	picker := next.(Model)
+	pickerView := picker.recentRunsView()
+	if picker.screen != recentScreen || !strings.Contains(pickerView, "Retained") || strings.Contains(pickerView, record.StatePath) {
+		t.Fatalf("recent picker = %s", pickerView)
+	}
+	next, command = picker.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("recent run did not focus the continuation task")
+	}
+	continued := next.(Model)
+	if continued.screen != composeScreen || continued.resumeStatePath != record.StatePath || continued.provider.Value() != "openai" || continued.model.Value() != "gpt-5.6" {
+		t.Fatalf("continuation = %#v", continued)
+	}
+	continued.task.SetValue("Continue the retained patch")
+	continued.refreshPreflight()
+	if len(continued.preflight) != 1 || !strings.Contains(continued.preflight[0], "OPENAI_API_KEY") || !strings.Contains(continued.preflightView(), "Before continuing") {
+		t.Fatalf("continuation preflight = %#v", continued.preflight)
 	}
 }
 

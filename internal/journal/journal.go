@@ -209,6 +209,13 @@ func resolveStateDir(override string) (string, error) {
 	return filepath.Join(home, ".local", "state"), nil
 }
 
+// ResolveStateDir returns the state root used by Gator when an explicit
+// override is absent. Interactive callers pass this resolved value to the TUI
+// so private drafts, recent runs, and execution journals share one location.
+func ResolveStateDir(override string) (string, error) {
+	return resolveStateDir(override)
+}
+
 func absoluteDirectory(path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
