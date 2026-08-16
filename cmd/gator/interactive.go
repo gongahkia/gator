@@ -13,13 +13,31 @@ import (
 )
 
 func interactive() error {
+	return interactiveWithOptions(interactiveOptions{})
+}
+
+type interactiveOptions struct {
+	RepositoryPath  string
+	ResumeStatePath string
+	StartInRecent   bool
+	RecentAll       bool
+	AllowNoRepository bool
+}
+
+func interactiveWithOptions(options interactiveOptions) error {
+	repository := options.RepositoryPath
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	repository, err := gitRepositoryRoot(workingDirectory)
-	if err != nil {
-		return errors.New("interactive mode must start inside a Git checkout; run 'gator doctor' for setup")
+	if repository == "" {
+		repository, err = gitRepositoryRoot(workingDirectory)
+		if err != nil {
+			if !options.AllowNoRepository {
+				return errors.New("interactive mode must start inside a Git checkout; run 'gator doctor' for setup")
+			}
+			repository = workingDirectory
+		}
 	}
 	inputInfo, err := os.Stdin.Stat()
 	if err != nil {
@@ -51,12 +69,15 @@ func interactive() error {
 		return err
 	}
 	application := tui.New(tui.Config{
-		RepositoryPath: repository,
-		Provider:       string(provider),
-		Model:          modelFromEnvironment(provider),
-		BaseURL:        os.Getenv("GATOR_BASE_URL"),
-		StateDir:       stateDir,
-		Verification:   parseSuggestedVerification(suggestedVerificationCommands(repository)),
+		RepositoryPath:  repository,
+		Provider:        string(provider),
+		Model:           modelFromEnvironment(provider),
+		BaseURL:         os.Getenv("GATOR_BASE_URL"),
+		StateDir:        stateDir,
+		Verification:    parseSuggestedVerification(suggestedVerificationCommands(repository)),
+		ResumeStatePath: options.ResumeStatePath,
+		StartInRecent:   options.StartInRecent,
+		RecentAll:       options.RecentAll,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)
 		},

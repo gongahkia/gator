@@ -36,6 +36,35 @@ func TestNewUsesConfiguredRunDefaults(t *testing.T) {
 	}
 }
 
+func TestNewCanStartAtTheProjectOrAllThreadPicker(t *testing.T) {
+	stateDirectory := t.TempDir()
+	project := "/workspace/current-project"
+	firstWorktree := filepath.Join(t.TempDir(), "first")
+	secondWorktree := filepath.Join(t.TempDir(), "second")
+	for _, worktree := range []string{firstWorktree, secondWorktree} {
+		if err := os.Mkdir(worktree, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, thread := range []journal.Thread{
+		{Version: 1, ID: "thread-current", Repository: project, WorktreePath: firstWorktree, Provider: "openai", Task: "Current project", HeadStatePath: "/state/current", TurnCount: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{Version: 1, ID: "thread-other", Repository: "/workspace/other-project", WorktreePath: secondWorktree, Provider: "openai", Task: "Other project", HeadStatePath: "/state/other", TurnCount: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	} {
+		if err := journal.SaveThread(stateDirectory, thread); err != nil {
+			t.Fatalf("save thread: %v", err)
+		}
+	}
+
+	projectPicker := New(Config{RepositoryPath: project, StateDir: stateDirectory, StartInRecent: true})
+	if projectPicker.screen != recentScreen || len(projectPicker.recentThreads) != 1 || projectPicker.recentThreads[0].ID != "thread-current" {
+		t.Fatalf("project picker = %#v", projectPicker)
+	}
+	allPicker := New(Config{RepositoryPath: project, StateDir: stateDirectory, StartInRecent: true, RecentAll: true})
+	if allPicker.screen != recentScreen || !allPicker.recentAll || len(allPicker.recentThreads) != 2 {
+		t.Fatalf("all picker = %#v", allPicker)
+	}
+}
+
 func TestComposerRejectsEmptyTaskBeforeRun(t *testing.T) {
 	model := New(Config{})
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})

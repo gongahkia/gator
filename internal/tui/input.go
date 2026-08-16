@@ -465,13 +465,25 @@ func (m Model) updateHelp(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) openRecentRuns() (tea.Model, tea.Cmd) {
-	threads, err := journal.ListRecentThreads(m.config.StateDir, m.config.RepositoryPath, 20)
+	var (
+		threads []journal.RecentThread
+		err     error
+	)
+	if m.recentAll {
+		threads, err = journal.ListAllRecentThreads(m.config.StateDir, 20)
+	} else {
+		threads, err = journal.ListRecentThreads(m.config.StateDir, m.config.RepositoryPath, 20)
+	}
 	if err != nil {
 		m.notice = notice{text: "Load recent threads: " + err.Error(), kind: noticeError}
 		return m, nil
 	}
 	if len(threads) == 0 {
-		m.notice = notice{text: "No retained threads are available for this repository.", kind: noticeInfo}
+		message := "No retained threads are available for this repository."
+		if m.recentAll {
+			message = "No retained threads are available in this state directory."
+		}
+		m.notice = notice{text: message, kind: noticeInfo}
 		return m, nil
 	}
 	m.recentThreads = threads
@@ -486,6 +498,10 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = composeScreen
 		return m, m.focusField()
 	case "r", "ctrl+r":
+		m.screen = composeScreen
+		return m.openRecentRuns()
+	case "a":
+		m.recentAll = !m.recentAll
 		m.screen = composeScreen
 		return m.openRecentRuns()
 	case "up", "ctrl+p":

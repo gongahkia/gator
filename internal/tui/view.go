@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -554,16 +555,24 @@ func (m Model) recentRunsView() string {
 		if thread.TurnCount != 1 {
 			turns += "s"
 		}
-		lines = append(lines, prefix+keyStyle.Render(thread.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(thread.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+dimStyle.Render(turns)+"  "+compact(thread.Task, limit))
+		repository := ""
+		if m.recentAll {
+			repository = filepath.Base(thread.Repository) + " · "
+		}
+		lines = append(lines, prefix+keyStyle.Render(repository+thread.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(thread.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+dimStyle.Render(turns)+"  "+compact(thread.Task, limit))
+	}
+	title := "recent conversation threads"
+	if m.recentAll {
+		title = "recent conversation threads · all repositories"
 	}
 	sections := []string{
-		m.header("recent conversation threads"),
+		m.header(title),
 		m.panel(strings.Join(lines, "\n\n")),
 	}
 	if !m.compactLayout() {
 		sections = append(sections, dimStyle.Render("Thread state stays private; Gator validates a selected worktree before continuation."))
 	}
-	sections = append(sections, m.noticeView(), m.footer("up/down choose", "enter continue", "r refresh", "esc back", "f1 shortcuts"))
+	sections = append(sections, m.noticeView(), m.footer("up/down choose", "enter continue", "a scope", "r refresh", "esc back", "f1 shortcuts"))
 	return strings.Join(sections, "\n")
 }
 

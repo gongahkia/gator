@@ -37,6 +37,7 @@ type Thread struct {
 // remains local-only metadata and must not be displayed as task content.
 type RecentThread struct {
 	ID            string
+	Repository    string
 	HeadStatePath string
 	WorktreePath  string
 	Provider      string
@@ -76,25 +77,8 @@ func LoadThread(stateDir, repository, id string) (Thread, error) {
 		return Thread{}, err
 	}
 	path := filepath.Join(base, "gator", "threads", repositoryFingerprint(repository), id+".json")
-	info, err := os.Stat(path)
+	thread, err := loadThreadPath(path)
 	if err != nil {
-		return Thread{}, fmt.Errorf("stat thread: %w", err)
-	}
-	if !info.Mode().IsRegular() {
-		return Thread{}, errors.New("thread record is not a regular file")
-	}
-	if info.Size() > 1*1024*1024 {
-		return Thread{}, errors.New("thread record exceeds the 1 MiB limit")
-	}
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return Thread{}, fmt.Errorf("read thread: %w", err)
-	}
-	var thread Thread
-	if err := json.Unmarshal(contents, &thread); err != nil {
-		return Thread{}, fmt.Errorf("decode thread: %w", err)
-	}
-	if err := validateThread(thread); err != nil {
 		return Thread{}, err
 	}
 	if filepath.Clean(thread.Repository) != filepath.Clean(repository) {
@@ -136,6 +120,7 @@ func ListRecentThreads(stateDir, repository string, limit int) ([]RecentThread, 
 			info, statErr := os.Stat(thread.WorktreePath)
 			threads = append(threads, RecentThread{
 				ID:            thread.ID,
+				Repository:    thread.Repository,
 				HeadStatePath: thread.HeadStatePath,
 				WorktreePath:  thread.WorktreePath,
 				Provider:      thread.Provider,
@@ -158,6 +143,7 @@ func ListRecentThreads(stateDir, repository string, limit int) ([]RecentThread, 
 		}
 		threads = append(threads, RecentThread{
 			ID:            filepath.Base(run.StatePath),
+			Repository:    repository,
 			HeadStatePath: run.StatePath,
 			WorktreePath:  run.WorktreePath,
 			Provider:      run.Provider,
@@ -173,6 +159,151 @@ func ListRecentThreads(stateDir, repository string, limit int) ([]RecentThread, 
 	})
 	if len(threads) > limit {
 		threads = threads[:limit]
+	}
+	return threads, nil
+}
+
+// ListAllRecentThreads returns the newest retained threads across local
+// repositories. It is intentionally opt-in: callers normally use the
+// project-scoped ListRecentThreads picker instead.
+func ListAllRecentThreads(stateDir string, limit int) ([]RecentThread, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	base, err := resolveStateDir(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	threadRoot := filepath.Join(base, "gator", "threads")
+	repositories, err := os.ReadDir(threadRoot)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("list thread repositories: %w", err)
+	}
+	threads := make([]RecentThread, 0, limit)
+	seen := make(map[string]bool)
+	if err == nil {
+		for _, repository := range repositories {
+			if !repository.IsDir() {
+				continue
+			}
+			entries, readErr := os.ReadDir(filepath.Join(threadRoot, repository.Name()))
+			if readErr != nil {
+				continue
+			}
+			for _, entry := range entries {
+				if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+					continue
+				}
+				thread, loadErr := loadThreadPath(filepath.Join(threadRoot, repository.Name(), entry.Name()))
+				if loadErr != nil {
+					continue
+				}
+				info, statErr := os.Stat(thread.WorktreePath)
+				threads = append(threads, RecentThread{
+					ID:            thread.ID,
+					Repository:    thread.Repository,
+					HeadStatePath: thread.HeadStatePath,
+					WorktreePath:  thread.WorktreePath,
+					Provider:      thread.Provider,
+					Model:         thread.Model,
+					Task:          thread.Task,
+					TurnCount:     thread.TurnCount,
+					UpdatedAt:     thread.UpdatedAt,
+					Available:     statErr == nil && info.IsDir(),
+				})
+				seen[thread.HeadStatePath] = true
+			}
+		}
+	}
+
+	legacy, err := listAllLegacyThreads(base)
+	if err != nil {
+		return nil, err
+	}
+	for _, thread := range legacy {
+		if !seen[thread.HeadStatePath] {
+			threads = append(threads, thread)
+		}
+	}
+	sort.Slice(threads, func(left, right int) bool {
+		return threads[left].UpdatedAt.After(threads[right].UpdatedAt)
+	})
+	if len(threads) > limit {
+		threads = threads[:limit]
+	}
+	return threads, nil
+}
+
+func loadThreadPath(path string) (Thread, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return Thread{}, fmt.Errorf("stat thread: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return Thread{}, errors.New("thread record is not a regular file")
+	}
+	if info.Size() > 1*1024*1024 {
+		return Thread{}, errors.New("thread record exceeds the 1 MiB limit")
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return Thread{}, fmt.Errorf("read thread: %w", err)
+	}
+	var thread Thread
+	if err := json.Unmarshal(contents, &thread); err != nil {
+		return Thread{}, fmt.Errorf("decode thread: %w", err)
+	}
+	if err := validateThread(thread); err != nil {
+		return Thread{}, err
+	}
+	return thread, nil
+}
+
+func listAllLegacyThreads(base string) ([]RecentThread, error) {
+	runRoot := filepath.Join(base, "gator", "runs")
+	repositories, err := os.ReadDir(runRoot)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list run repositories: %w", err)
+	}
+	threads := make([]RecentThread, 0)
+	for _, repository := range repositories {
+		if !repository.IsDir() {
+			continue
+		}
+		entries, readErr := os.ReadDir(filepath.Join(runRoot, repository.Name()))
+		if readErr != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() || !validRunID(entry.Name()) {
+				continue
+			}
+			statePath := filepath.Join(runRoot, repository.Name(), entry.Name())
+			session, loadErr := LoadSession(statePath)
+			if loadErr != nil {
+				continue
+			}
+			info, statErr := os.Stat(session.WorktreePath)
+			sessionInfo, sessionStatErr := os.Stat(filepath.Join(statePath, "session.json"))
+			if sessionStatErr != nil {
+				continue
+			}
+			threads = append(threads, RecentThread{
+				ID:            entry.Name(),
+				Repository:    session.Repository,
+				HeadStatePath: statePath,
+				WorktreePath:  session.WorktreePath,
+				Provider:      session.Provider,
+				Model:         session.Model,
+				Task:          session.Task,
+				TurnCount:     1,
+				UpdatedAt:     sessionInfo.ModTime(),
+				Available:     statErr == nil && info.IsDir(),
+			})
+		}
 	}
 	return threads, nil
 }
