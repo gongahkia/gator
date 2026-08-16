@@ -12,7 +12,7 @@ import (
 func oauthFlow(provider model.Provider) (auth.BrowserFlow, error) {
 	switch provider {
 	case model.Codex:
-		return configuredOAuthFlow(
+		flow, err := configuredOAuthFlow(
 			"GATOR_CODEX_OAUTH_CLIENT_ID",
 			"GATOR_CODEX_OAUTH_REDIRECT_URL",
 			"http://127.0.0.1:1455/auth/callback",
@@ -20,8 +20,17 @@ func oauthFlow(provider model.Provider) (auth.BrowserFlow, error) {
 			"https://auth.openai.com/oauth/token",
 			[]string{"openid", "profile", "email", "offline_access"},
 		)
+		if err != nil {
+			return auth.BrowserFlow{}, err
+		}
+		flow.AuthorizeParams = map[string]string{
+			"id_token_add_organizations": "true",
+			"codex_cli_simplified_flow":  "true",
+			"originator":                 "gator",
+		}
+		return flow, nil
 	case model.Claude:
-		return configuredOAuthFlow(
+		flow, err := configuredOAuthFlow(
 			"GATOR_CLAUDE_OAUTH_CLIENT_ID",
 			"GATOR_CLAUDE_OAUTH_REDIRECT_URL",
 			"http://127.0.0.1:53692/callback",
@@ -29,6 +38,16 @@ func oauthFlow(provider model.Provider) (auth.BrowserFlow, error) {
 			"https://platform.claude.com/v1/oauth/token",
 			[]string{"org:create_api_key", "user:profile", "user:inference", "user:sessions:claude_code", "user:mcp_servers", "user:file_upload"},
 		)
+		if err != nil {
+			return auth.BrowserFlow{}, err
+		}
+		flow.TokenRequestJSON = true
+		flow.TokenIncludesState = true
+		return flow, nil
+	case model.XAI:
+		return xaiOAuthRefreshFlow()
+	case model.KimiCoding:
+		return kimiOAuthRefreshFlow()
 	default:
 		return auth.BrowserFlow{}, fmt.Errorf("provider %q has no browser OAuth flow", provider)
 	}

@@ -52,12 +52,24 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 }
 
 func refreshProviderCredential(ctx context.Context, provider model.Provider, credentials auth.Store, flowFor func(model.Provider) (auth.BrowserFlow, error), now time.Time) error {
-	if !model.RequiresOAuthLogin(provider) {
+	if !model.SupportsOAuthLogin(provider) {
 		return nil
 	}
 	credential, found, err := credentials.Read(string(provider))
 	if err != nil || !found || !credential.IsOAuth() || credential.Expires == 0 || credential.Expires > now.Add(5*time.Minute).UnixMilli() {
 		return err
+	}
+	if provider == model.Copilot {
+		refreshContext, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		refreshed, err := refreshCopilotCredential(refreshContext, credential)
+		if err != nil {
+			return fmt.Errorf("refresh %s OAuth credential: %w", provider, err)
+		}
+		if err := credentials.Put(string(provider), refreshed); err != nil {
+			return fmt.Errorf("store refreshed %s OAuth credential: %w", provider, err)
+		}
+		return nil
 	}
 	flow, err := flowFor(provider)
 	if err != nil {

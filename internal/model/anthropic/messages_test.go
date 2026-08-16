@@ -113,6 +113,20 @@ func TestMessagesEncodesPDFAttachment(t *testing.T) {
 	}
 }
 
+func TestMessagesUsesBearerAuthenticationWhenConfigured(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("authorization") != "Bearer subscription-token" || request.Header.Get("x-api-key") != "" || request.Header.Get("anthropic-beta") != "oauth-2025-04-20" {
+			t.Fatalf("headers = %#v", request.Header)
+		}
+		_, _ = io.WriteString(writer, `{"content":[{"type":"text","text":"done"}]}`)
+	}))
+	defer server.Close()
+	model := Messages{APIKey: "subscription-token", Model: "claude-test", BaseURL: server.URL, BearerAuth: true, Headers: http.Header{"Anthropic-Beta": []string{"oauth-2025-04-20"}}, Client: server.Client()}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}}); err != nil {
+		t.Fatalf("complete with bearer authentication: %v", err)
+	}
+}
+
 type requestBodyView struct {
 	Model    string         `json:"model"`
 	System   string         `json:"system"`

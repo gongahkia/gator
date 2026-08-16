@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -23,13 +24,17 @@ const oauthResponseLimit = 64 * 1024
 // caller supplies its own client ID: this package never reuses a vendor CLI or
 // another agent's application identity.
 type BrowserFlow struct {
-	ClientID         string
-	AuthorizationURL string
-	TokenURL         string
-	RedirectURL      string
-	Scopes           []string
-	AuthorizeParams  map[string]string
-	HTTPClient       *http.Client
+	ClientID           string
+	AuthorizationURL   string
+	TokenURL           string
+	RedirectURL        string
+	Scopes             []string
+	AuthorizeParams    map[string]string
+	TokenParams        map[string]string
+	TokenRequestJSON   bool
+	TokenIncludesState bool
+	AllowMissingState  bool
+	HTTPClient         *http.Client
 }
 
 // BrowserAttempt carries the one-time state and verifier for a browser login.
@@ -38,6 +43,22 @@ type BrowserAttempt struct {
 	flow     BrowserFlow
 	state    string
 	verifier string
+}
+
+// State returns the one-time OAuth state for custom authorization endpoints.
+func (a BrowserAttempt) State() string {
+	return a.state
+}
+
+// CodeVerifier returns the short-lived PKCE verifier for a custom token
+// exchange. Callers must never persist or log it.
+func (a BrowserAttempt) CodeVerifier() string {
+	return a.verifier
+}
+
+// RedirectURL returns the validated loopback callback URL for this attempt.
+func (a BrowserAttempt) RedirectURL() string {
+	return a.flow.RedirectURL
 }
 
 // BeginBrowserFlow validates a public loopback callback and creates the PKCE
@@ -120,7 +141,7 @@ func (a BrowserAttempt) StartCallback() (*Callback, error) {
 			writeCallbackPage(writer, http.StatusBadRequest, "Authentication did not complete. Return to Gator.")
 			return
 		}
-		if request.URL.Query().Get("state") != a.state {
+		if !a.flow.AllowMissingState && request.URL.Query().Get("state") != a.state {
 			callback.finish(callbackResult{err: errors.New("OAuth callback state mismatch")})
 			writeCallbackPage(writer, http.StatusBadRequest, "Authentication state did not match. Return to Gator.")
 			return
@@ -184,6 +205,9 @@ func (a BrowserAttempt) Exchange(ctx context.Context, code string) (Credential, 
 		"code_verifier": {a.verifier},
 		"redirect_uri":  {a.flow.RedirectURL},
 	}
+	if a.flow.TokenIncludesState {
+		form.Set("state", a.state)
+	}
 	return a.flow.exchangeToken(ctx, form, "authorization code")
 }
 
@@ -202,6 +226,9 @@ func (f BrowserFlow) Refresh(ctx context.Context, credential Credential) (Creden
 		"client_id":     {f.ClientID},
 		"refresh_token": {credential.Refresh},
 	}
+	for key, value := range f.TokenParams {
+		form.Set(key, value)
+	}
 	refreshed, err := f.exchangeToken(ctx, form, "refresh token")
 	if err != nil {
 		return Credential{}, err
@@ -214,12 +241,31 @@ func (f BrowserFlow) Refresh(ctx context.Context, credential Credential) (Creden
 }
 
 func (f BrowserFlow) exchangeToken(ctx context.Context, form url.Values, action string) (Credential, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, f.TokenURL, strings.NewReader(form.Encode()))
+	for key, value := range f.TokenParams {
+		form.Set(key, value)
+	}
+	var body io.Reader = strings.NewReader(form.Encode())
+	contentType := "application/x-www-form-urlencoded"
+	if f.TokenRequestJSON {
+		payload := make(map[string]string, len(form))
+		for key, values := range form {
+			if len(values) > 0 {
+				payload[key] = values[len(values)-1]
+			}
+		}
+		contents, err := json.Marshal(payload)
+		if err != nil {
+			return Credential{}, fmt.Errorf("encode OAuth %s request: %w", action, err)
+		}
+		body = bytes.NewReader(contents)
+		contentType = "application/json"
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, f.TokenURL, body)
 	if err != nil {
 		return Credential{}, fmt.Errorf("create OAuth %s request: %w", action, err)
 	}
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Content-Type", contentType)
 	response, err := f.client().Do(request)
 	if err != nil {
 		return Credential{}, fmt.Errorf("exchange OAuth %s: %w", action, err)
@@ -264,6 +310,13 @@ func randomURLValue(bytes int) (string, error) {
 func pkceChallenge(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// PKCEChallenge derives an S256 challenge for a short-lived verifier. It is
+// exported for OAuth providers whose authorization endpoint has a nonstandard
+// request shape but still uses standard PKCE.
+func PKCEChallenge(verifier string) string {
+	return pkceChallenge(verifier)
 }
 
 func validateLoopbackURL(value string) error {

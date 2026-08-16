@@ -19,6 +19,7 @@ func login(arguments []string, out io.Writer) error {
 	flags.SetOutput(io.Discard)
 	apiKey := flags.String("api-key", "", "API key to store (visible to the current process)")
 	fromEnvironment := flags.String("from-env", "", "environment variable containing the API key")
+	subscription := flags.Bool("subscription", false, "use the provider subscription OAuth flow")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -35,9 +36,12 @@ func login(arguments []string, out io.Writer) error {
 	if !model.SupportsDirect(provider) {
 		return fmt.Errorf("provider %q has no direct Gator API integration", provider)
 	}
-	if model.RequiresOAuthLogin(provider) {
+	if model.RequiresOAuthLogin(provider) || *subscription {
 		if strings.TrimSpace(*apiKey) != "" || strings.TrimSpace(*fromEnvironment) != "" {
 			return fmt.Errorf("provider %q uses subscription OAuth; do not pass an API key", provider)
+		}
+		if !model.SupportsOAuthLogin(provider) {
+			return fmt.Errorf("provider %q has no supported Gator OAuth flow", provider)
 		}
 		return loginOAuth(provider, out)
 	}
@@ -50,12 +54,12 @@ func login(arguments []string, out io.Writer) error {
 		key = strings.TrimSpace(os.Getenv(environment))
 		source = environment
 	} else if key == "" {
-		environment := model.CredentialHint(provider)
+		environment := model.APIKeyEnvironment(provider)
 		key = strings.TrimSpace(os.Getenv(environment))
 		source = environment
 	}
 	if key == "" {
-		return fmt.Errorf("no API key found; set %s or pass --from-env NAME", model.CredentialHint(provider))
+		return fmt.Errorf("no API key found; set %s or pass --from-env NAME", model.APIKeyEnvironment(provider))
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
@@ -69,6 +73,18 @@ func login(arguments []string, out io.Writer) error {
 }
 
 func loginOAuth(provider model.Provider, out io.Writer) error {
+	if provider == model.Copilot {
+		return loginCopilot(out)
+	}
+	if provider == model.XAI {
+		return loginXAI(out)
+	}
+	if provider == model.OpenRouter {
+		return loginOpenRouter(out)
+	}
+	if provider == model.KimiCoding {
+		return loginKimiCoding(out)
+	}
 	flow, err := oauthFlow(provider)
 	if err != nil {
 		return err
@@ -103,6 +119,74 @@ func loginOAuth(provider model.Provider, out io.Writer) error {
 		return fmt.Errorf("store %s OAuth credential: %w", provider, err)
 	}
 	_, err = fmt.Fprintf(out, "Stored a Gator OAuth credential for %s.\n", provider)
+	return err
+}
+
+func loginOpenRouter(out io.Writer) error {
+	login, err := beginOpenRouterLogin()
+	if err != nil {
+		return fmt.Errorf("start OpenRouter OAuth login: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "Open this URL to authenticate Gator with OpenRouter:\n%s\n\nWaiting for the local callback...\n", login.URL()); err != nil {
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	if err := login.Complete(context); err != nil {
+		return fmt.Errorf("complete OpenRouter OAuth login: %w", err)
+	}
+	_, err = fmt.Fprintln(out, "Stored a user-controlled Gator API key for openrouter.")
+	return err
+}
+
+func loginXAI(out io.Writer) error {
+	login, err := beginXAIDeviceLogin()
+	if err != nil {
+		return fmt.Errorf("start xAI device login: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "Open this URL and enter the displayed code to authenticate Gator with xAI:\n%s\n\nWaiting for device authorization...\n", login.URL()); err != nil {
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	if err := login.Complete(context); err != nil {
+		return fmt.Errorf("complete xAI device login: %w", err)
+	}
+	_, err = fmt.Fprintln(out, "Stored a Gator OAuth credential for xai.")
+	return err
+}
+
+func loginKimiCoding(out io.Writer) error {
+	login, err := beginKimiCodingDeviceLogin()
+	if err != nil {
+		return fmt.Errorf("start Kimi Code device login: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "Open this URL and enter the displayed code to authenticate Gator with Kimi Code:\n%s\n\nWaiting for device authorization...\n", login.URL()); err != nil {
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	if err := login.Complete(context); err != nil {
+		return fmt.Errorf("complete Kimi Code device login: %w", err)
+	}
+	_, err = fmt.Fprintln(out, "Stored a Gator OAuth credential for kimi-coding.")
+	return err
+}
+
+func loginCopilot(out io.Writer) error {
+	login, err := beginCopilotDeviceLogin()
+	if err != nil {
+		return fmt.Errorf("start Copilot device login: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "Open this URL and enter the displayed code to authenticate Gator with Copilot:\n%s\n\nWaiting for device authorization...\n", login.URL()); err != nil {
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	if err := login.Complete(context); err != nil {
+		return fmt.Errorf("complete Copilot device login: %w", err)
+	}
+	_, err = fmt.Fprintln(out, "Stored a Gator OAuth credential for copilot.")
 	return err
 }
 

@@ -41,6 +41,7 @@ const (
 	Codex            Provider = "codex"
 	Claude           Provider = "claude"
 	Copilot          Provider = "copilot"
+	KimiCoding       Provider = "kimi-coding"
 	Cursor           Provider = "cursor"
 )
 
@@ -117,7 +118,52 @@ func New(config Config) (Backend, error) {
 		if err != nil {
 			return Backend{}, err
 		}
-		return Backend{Provider: provider, Model: anthropic.Messages{APIKey: credential.Access, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+		return Backend{Provider: provider, Model: anthropic.Messages{
+			APIKey:     credential.Access,
+			Model:      config.Model,
+			BaseURL:    config.BaseURL,
+			BearerAuth: true,
+			Headers: http.Header{
+				"Anthropic-Dangerous-Direct-Browser-Access": []string{"true"},
+				"Anthropic-Beta": []string{"oauth-2025-04-20"},
+			},
+			Client: config.Client,
+		}}, nil
+	case Copilot:
+		credential, err := oauthCredential(config, provider)
+		if err != nil {
+			return Backend{}, err
+		}
+		if strings.TrimSpace(config.Model) == "" {
+			return Backend{}, errors.New("--model is required for provider \"copilot\"; choose an enabled account model")
+		}
+		return Backend{Provider: provider, Model: chatcompletions.Model{Config: chatcompletions.Config{
+			APIKey:       credential.Access,
+			APIKeyEnv:    "Gator Copilot OAuth credential",
+			BaseURL:      copilotChatURL(config.BaseURL, credential.Extra["base_url"]),
+			Model:        config.Model,
+			ProviderName: "GitHub Copilot",
+			Headers: http.Header{
+				"User-Agent":             []string{"GitHubCopilotChat/0.35.0"},
+				"Editor-Version":         []string{"vscode/1.107.0"},
+				"Editor-Plugin-Version":  []string{"copilot-chat/0.35.0"},
+				"Copilot-Integration-Id": []string{"vscode-chat"},
+			},
+			RequestHeaders: copilotRequestHeaders,
+			Client:         config.Client,
+		}}}, nil
+	case KimiCoding:
+		apiKey, bearer, err := kimiCredential(config)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: anthropic.Messages{
+			APIKey:     apiKey,
+			Model:      config.Model,
+			BaseURL:    kimiMessagesURL(config.BaseURL),
+			BearerAuth: bearer,
+			Client:     config.Client,
+		}}, nil
 	case Gemini:
 		apiKey, err := key(config, provider, "GEMINI_API_KEY")
 		if err != nil {
@@ -133,7 +179,7 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
-	case Copilot, Cursor:
+	case Cursor:
 		return Backend{}, fmt.Errorf("provider %q has no supported direct model API integration; Gator will not launch the %s CLI", provider, provider)
 	default:
 		return Backend{}, fmt.Errorf("unsupported provider %q", provider)
@@ -224,7 +270,18 @@ func SupportsDirect(provider Provider) bool {
 // subscription OAuth credential rather than a normal provider API key.
 func RequiresOAuthLogin(provider Provider) bool {
 	switch provider {
-	case Codex, Claude:
+	case Codex, Claude, Copilot:
+		return true
+	default:
+		return false
+	}
+}
+
+// SupportsOAuthLogin reports providers that can use a Gator-managed OAuth
+// credential in addition to, or instead of, their normal API-key path.
+func SupportsOAuthLogin(provider Provider) bool {
+	switch provider {
+	case Codex, Claude, Copilot, KimiCoding, XAI, OpenRouter:
 		return true
 	default:
 		return false
@@ -257,6 +314,8 @@ func DefaultModel(provider Provider) string {
 		return openai.DefaultModel()
 	case Anthropic, Claude:
 		return "claude-sonnet-5"
+	case KimiCoding:
+		return "kimi-for-coding"
 	case Gemini:
 		return "gemini-3.5-flash"
 	case Mistral:
@@ -288,13 +347,37 @@ func CredentialHint(provider Provider) string {
 		return "Gator Claude OAuth credential"
 	case Gemini:
 		return "GEMINI_API_KEY"
-	case Copilot, Cursor:
+	case Copilot:
+		return "Gator GitHub Copilot OAuth credential"
+	case KimiCoding:
+		return "KIMI_API_KEY or Gator Kimi Code OAuth credential"
+	case Cursor:
 		return "no supported direct credential"
 	default:
 		if definition, ok := compatibleProviders[provider]; ok {
 			return definition.apiKeyEnv
 		}
 		return "provider credentials"
+	}
+}
+
+// APIKeyEnvironment returns the ambient API-key variable for providers that
+// support one. OAuth-only providers return an empty string.
+func APIKeyEnvironment(provider Provider) string {
+	switch provider {
+	case OpenAI:
+		return "OPENAI_API_KEY"
+	case Anthropic:
+		return "ANTHROPIC_API_KEY"
+	case Gemini:
+		return "GEMINI_API_KEY"
+	case KimiCoding:
+		return "KIMI_API_KEY"
+	default:
+		if definition, ok := compatibleProviders[provider]; ok {
+			return definition.apiKeyEnv
+		}
+		return ""
 	}
 }
 
@@ -313,8 +396,40 @@ func key(config Config, provider Provider, environment string) (string, error) {
 		if found && credential.IsAPIKey() {
 			return credential.Key, nil
 		}
+		if found && credential.IsOAuth() && provider == XAI {
+			if credential.Expired(time.Now()) {
+				return "", fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s --subscription'", provider, provider)
+			}
+			return credential.Access, nil
+		}
 	}
 	return os.Getenv(environment), nil
+}
+
+func kimiCredential(config Config) (string, bool, error) {
+	if config.APIKey != "" {
+		return config.APIKey, true, nil
+	}
+	if config.Credentials != nil {
+		credential, found, err := config.Credentials.Read(string(KimiCoding))
+		if err != nil {
+			return "", false, fmt.Errorf("read Gator credential for %q: %w", KimiCoding, err)
+		}
+		if found && credential.IsOAuth() {
+			if credential.Expired(time.Now()) {
+				return "", false, fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s --subscription'", KimiCoding, KimiCoding)
+			}
+			return credential.Access, true, nil
+		}
+		if found && credential.IsAPIKey() {
+			return credential.Key, true, nil
+		}
+	}
+	key := os.Getenv("KIMI_API_KEY")
+	if strings.TrimSpace(key) == "" {
+		return "", false, errors.New("KIMI_API_KEY or a Gator Kimi Code OAuth credential is required")
+	}
+	return key, true, nil
 }
 
 func oauthCredential(config Config, provider Provider) (auth.Credential, error) {
@@ -348,6 +463,17 @@ func codexResponsesURL(baseURL string) string {
 	return baseURL + "/codex/responses"
 }
 
+func kimiMessagesURL(baseURL string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		return "https://api.kimi.com/coding/v1/messages"
+	}
+	if strings.HasSuffix(baseURL, "/messages") {
+		return baseURL
+	}
+	return baseURL + "/v1/messages"
+}
+
 func codexAccountID(credential auth.Credential) (string, error) {
 	if accountID := strings.TrimSpace(credential.Extra["chatgpt_account_id"]); accountID != "" {
 		return accountID, nil
@@ -371,6 +497,31 @@ func codexAccountID(credential auth.Credential) (string, error) {
 	return claims.Auth.AccountID, nil
 }
 
+func copilotChatURL(override, credentialURL string) string {
+	baseURL := strings.TrimRight(strings.TrimSpace(override), "/")
+	if baseURL == "" {
+		baseURL = strings.TrimRight(strings.TrimSpace(credentialURL), "/")
+	}
+	if baseURL == "" {
+		baseURL = "https://api.individual.githubcopilot.com"
+	}
+	if strings.HasSuffix(baseURL, "/chat/completions") {
+		return baseURL
+	}
+	return baseURL + "/chat/completions"
+}
+
+func copilotRequestHeaders(turn agent.TurnRequest) http.Header {
+	initiator := "user"
+	if len(turn.Messages) > 0 && turn.Messages[len(turn.Messages)-1].Role != agent.RoleUser {
+		initiator = "agent"
+	}
+	return http.Header{
+		"X-Initiator":   []string{initiator},
+		"Openai-Intent": []string{"conversation-edits"},
+	}
+}
+
 func requireKey(value, environment string) error {
 	if strings.TrimSpace(value) == "" {
 		return fmt.Errorf("%s is required", environment)
@@ -382,9 +533,9 @@ func requireKey(value, environment string) error {
 // session produces a clear no-fallback error instead of treating its metadata
 // as malformed. Names exposes only providers that can currently execute.
 var allProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, Cursor: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Cursor: {},
 }
 
 var directProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {},
 }

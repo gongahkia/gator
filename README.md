@@ -41,6 +41,10 @@ GEMINI_API_KEY=... ./bin/gator run --provider gemini \
 # Gator does not impersonate Codex, Claude Code, or Pi.
 GATOR_CODEX_OAUTH_CLIENT_ID=... ./bin/gator login codex
 GATOR_CLAUDE_OAUTH_CLIENT_ID=... ./bin/gator login claude
+GATOR_COPILOT_OAUTH_CLIENT_ID=... ./bin/gator login copilot
+GATOR_XAI_OAUTH_CLIENT_ID=... ./bin/gator login xai --subscription
+GATOR_KIMI_CODE_OAUTH_CLIENT_ID=... ./bin/gator login kimi-coding --subscription
+./bin/gator login openrouter --subscription
 ./bin/gator run --provider codex --verify 'go test ./...' \
   'Add a focused feature with tests'
 
@@ -171,23 +175,30 @@ an endpoint for one scripted run.
 | Provider | Authentication | Protocol |
 | --- | --- | --- |
 | `openai` | `OPENAI_API_KEY` | OpenAI Responses API |
-| `codex` | Gator-owned ChatGPT/Codex OAuth credential | ChatGPT Codex Responses endpoint |
+| `codex` | ChatGPT/Codex account OAuth using a Gator-registered client | ChatGPT Codex Responses endpoint |
 | `anthropic` | `ANTHROPIC_API_KEY` | Anthropic Messages API |
-| `claude` | Gator-owned Claude Pro/Max OAuth credential | Anthropic Messages endpoint |
+| `claude` | Claude account OAuth using a Gator-registered client | Anthropic Messages endpoint |
+| `copilot` | GitHub Copilot account OAuth using a Gator-registered GitHub client | Copilot Chat Completions endpoint and account model catalog |
+| `kimi-coding` | `KIMI_API_KEY` or Kimi Code account OAuth using a Gator-registered client | Kimi's Anthropic-compatible coding Messages endpoint |
 | `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
 | `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
-| `mistral`, `xai`, `groq`, `openrouter`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
+| `mistral`, `groq`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
+| `xai` | `XAI_API_KEY`, or Grok/X account OAuth using a Gator-registered client | OpenAI-compatible Chat Completions |
+| `openrouter` | `OPENROUTER_API_KEY`, or a browser-minted user-controlled API key | OpenAI-compatible Chat Completions |
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
 
-`gator login PROVIDER` stores an API-key credential in
+`gator login PROVIDER` stores an API-key credential, while `gator login
+PROVIDER --subscription` runs a supported account OAuth flow. Both write only
+Gator's own credential material to
 `$XDG_STATE_HOME/gator/auth.json` (or `~/.local/state/gator/auth.json`) with
 `0600` permissions. Explicit `--api-key` wins over the stored credential,
-which wins over the provider environment variable. `/login codex` and
-`/login claude` in the TUI display the browser URL and wait for its loopback
-callback; `Ctrl+C` cancels the pending login. Those subscription logins require
-`GATOR_CODEX_OAUTH_CLIENT_ID` or `GATOR_CLAUDE_OAUTH_CLIENT_ID`, respectively,
-and their registered redirect URL (override the documented loopback defaults
-with `GATOR_CODEX_OAUTH_REDIRECT_URL` or `GATOR_CLAUDE_OAUTH_REDIRECT_URL`).
+which wins over the provider environment variable. `/login PROVIDER` in the
+TUI displays a browser or device-code URL and waits for completion; `Ctrl+C`
+cancels the pending login. Codex, Claude, Copilot, xAI, and Kimi Code require
+their corresponding `GATOR_*_OAUTH_CLIENT_ID` registration. OpenRouter's flow
+does not use a client ID: it exchanges a PKCE authorization code for a
+user-controlled API key. Gator does not claim that Claude account OAuth uses
+Claude plan limits; provider billing and eligibility remain provider-defined.
 
 The predefined compatible providers use these key variables respectively:
 `MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
@@ -204,14 +215,12 @@ tool-call replay in the private session file.
 ### Provider ownership
 
 Gator never starts Codex, Claude Code, GitHub Copilot, or Cursor Agent. Its
-`codex` and `claude` adapters make direct model requests with credentials that
-Gator created and stores itself; they do not reuse a vendor CLI session or read
-another application's OAuth files, tokens, or API keys. Gator refreshes a
-near-expiry credential before starting a run. `copilot` and `cursor` remain
-unavailable rather than falling back to their vendor CLIs: Pi has a direct
-Copilot protocol, but it needs an application-controlled GitHub OAuth client
-and per-model protocol routing; Cursor is not a Pi built-in provider and no
-public direct inference contract was verified.
+`codex`, `claude`, `copilot`, `kimi-coding`, `xai`, and `openrouter` paths make
+direct model requests with credentials Gator creates and stores itself; they
+do not reuse a vendor CLI session or read another application's OAuth files,
+tokens, or API keys. Gator refreshes a near-expiry credential before starting
+a run. Cursor remains unavailable rather than falling back to its vendor CLI:
+no public direct Cursor inference contract was verified.
 
 ## Design principles
 

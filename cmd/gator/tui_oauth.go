@@ -6,6 +6,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/tui"
 )
 
 type tuiOAuthLogin struct {
@@ -15,13 +16,25 @@ type tuiOAuthLogin struct {
 	credentials auth.Store
 }
 
-func beginTUIOAuthLogin(providerName string) (*tuiOAuthLogin, error) {
+func beginTUIOAuthLogin(providerName string) (tui.OAuthLogin, error) {
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
 		return nil, err
 	}
-	if !model.RequiresOAuthLogin(provider) {
+	if !model.SupportsOAuthLogin(provider) {
 		return nil, fmt.Errorf("provider %q does not use subscription OAuth", provider)
+	}
+	if provider == model.Copilot {
+		return beginCopilotDeviceLogin()
+	}
+	if provider == model.XAI {
+		return beginXAIDeviceLogin()
+	}
+	if provider == model.OpenRouter {
+		return beginOpenRouterLogin()
+	}
+	if provider == model.KimiCoding {
+		return beginKimiCodingDeviceLogin()
 	}
 	flow, err := oauthFlow(provider)
 	if err != nil {

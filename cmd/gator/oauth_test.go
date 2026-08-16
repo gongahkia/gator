@@ -67,3 +67,22 @@ func TestRefreshProviderCredentialLeavesCurrentCredentialUnchanged(t *testing.T)
 		t.Fatal("refresh flow was invoked for a current credential")
 	}
 }
+
+func TestOAuthFlowUsesProviderSpecificAuthorizationAndTokenShapes(t *testing.T) {
+	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "codex-client")
+	codex, err := oauthFlow(model.Codex)
+	if err != nil {
+		t.Fatalf("configure Codex OAuth: %v", err)
+	}
+	if codex.AuthorizeParams["originator"] != "gator" || codex.AuthorizeParams["codex_cli_simplified_flow"] != "true" || codex.TokenRequestJSON {
+		t.Fatalf("Codex OAuth flow = %#v", codex)
+	}
+	t.Setenv("GATOR_CLAUDE_OAUTH_CLIENT_ID", "claude-client")
+	claude, err := oauthFlow(model.Claude)
+	if err != nil {
+		t.Fatalf("configure Claude OAuth: %v", err)
+	}
+	if !claude.TokenRequestJSON || !claude.TokenIncludesState {
+		t.Fatalf("Claude OAuth flow = %#v", claude)
+	}
+}

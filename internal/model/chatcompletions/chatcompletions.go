@@ -30,6 +30,7 @@ type Config struct {
 	AuthorizationHeader string
 	AuthorizationPrefix string
 	Headers             http.Header
+	RequestHeaders      func(agent.TurnRequest) http.Header
 	Client              *http.Client
 }
 
@@ -80,6 +81,13 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	for name, values := range m.Config.Headers {
 		for _, value := range values {
 			request.Header.Add(name, value)
+		}
+	}
+	if m.Config.RequestHeaders != nil {
+		for name, values := range m.Config.RequestHeaders(turn) {
+			for _, value := range values {
+				request.Header.Add(name, value)
+			}
 		}
 	}
 	response, err := m.client().Do(request)
