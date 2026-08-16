@@ -181,6 +181,11 @@ func TestNewRequiresConfiguredKeyAndCompatibleEndpoint(t *testing.T) {
 			t.Fatalf("provider %q error = %v", provider, err)
 		}
 	}
+	for _, provider := range []Provider{AzureOpenAIResponses, MiniMax, MiniMaxCN} {
+		if _, err := New(Config{Provider: provider, APIKey: "test-key"}); err == nil || !strings.Contains(err.Error(), "--model") {
+			t.Fatalf("provider %q missing-model error = %v", provider, err)
+		}
+	}
 }
 
 func TestAzureUsesRawAPIKeyHeader(t *testing.T) {
