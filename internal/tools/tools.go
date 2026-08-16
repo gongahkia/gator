@@ -18,3 +18,15 @@ func Default(root workspace.Root, policy CommandPolicy) []agent.Tool {
 		GitDiff{Root: root},
 	}
 }
+
+// ReadOnly returns the native tool surface available in an enforced planning
+// turn. It intentionally excludes patching and command execution.
+func ReadOnly(root workspace.Root) []agent.Tool {
+	return []agent.Tool{
+		ReadFile{Root: root},
+		ListFiles{Root: root},
+		SearchFiles{Root: root},
+		GitStatus{Root: root},
+		GitDiff{Root: root},
+	}
+}
