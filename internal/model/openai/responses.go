@@ -33,17 +33,20 @@ func DefaultModel() string {
 // full normalized history on each call, allowing Gator to own persistence and
 // avoid provider-side conversation storage.
 type Responses struct {
-	APIKey  string
-	Model   string
-	BaseURL string
-	Headers http.Header
-	Client  *http.Client
+	APIKey              string
+	APIKeyEnv           string
+	Model               string
+	BaseURL             string
+	AuthorizationHeader string
+	AuthorizationPrefix string
+	Headers             http.Header
+	Client              *http.Client
 }
 
 // Complete implements agent.Model.
 func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn, error) {
 	if strings.TrimSpace(r.APIKey) == "" {
-		return agent.Turn{}, errors.New("OPENAI_API_KEY is required")
+		return agent.Turn{}, errors.New(r.apiKeyEnv() + " is required")
 	}
 	body, err := r.requestBody(turn)
 	if err != nil {
@@ -80,7 +83,7 @@ func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.
 // core tool loop.
 func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, onDelta func(string)) (agent.Turn, error) {
 	if strings.TrimSpace(r.APIKey) == "" {
-		return agent.Turn{}, errors.New("OPENAI_API_KEY is required")
+		return agent.Turn{}, errors.New(r.apiKeyEnv() + " is required")
 	}
 	body, err := r.requestBody(turn)
 	if err != nil {
@@ -112,7 +115,15 @@ func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, o
 }
 
 func (r Responses) setHeaders(request *http.Request, stream bool) {
-	request.Header.Set("Authorization", "Bearer "+r.APIKey)
+	authorizationHeader := r.AuthorizationHeader
+	if authorizationHeader == "" {
+		authorizationHeader = "Authorization"
+	}
+	authorizationPrefix := r.AuthorizationPrefix
+	if authorizationHeader == "Authorization" && authorizationPrefix == "" {
+		authorizationPrefix = "Bearer "
+	}
+	request.Header.Set(authorizationHeader, authorizationPrefix+r.APIKey)
 	request.Header.Set("Content-Type", "application/json")
 	if stream {
 		request.Header.Set("Accept", "text/event-stream")
@@ -122,6 +133,13 @@ func (r Responses) setHeaders(request *http.Request, stream bool) {
 			request.Header.Add(name, value)
 		}
 	}
+}
+
+func (r Responses) apiKeyEnv() string {
+	if strings.TrimSpace(r.APIKeyEnv) != "" {
+		return r.APIKeyEnv
+	}
+	return "OPENAI_API_KEY"
 }
 
 func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) {

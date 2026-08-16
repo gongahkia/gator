@@ -45,6 +45,16 @@ func FromEnvironment() Source {
 	}
 }
 
+// Available reports whether an explicit access token or readable ADC file is
+// configured. It does not exchange a token or expose credential contents.
+func (s Source) Available() bool {
+	if strings.TrimSpace(s.AccessToken) != "" {
+		return true
+	}
+	_, err := s.credentials()
+	return err == nil
+}
+
 // Token obtains an OAuth access token suitable for Authorization: Bearer.
 func (s Source) Token(ctx context.Context) (string, error) {
 	if token := strings.TrimSpace(s.AccessToken); token != "" {

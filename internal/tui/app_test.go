@@ -772,6 +772,43 @@ func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
 	}
 }
 
+func TestProviderDropdownShowsSubscriptionSignInState(t *testing.T) {
+	stateDir := t.TempDir()
+	credentials, err := auth.New(stateDir)
+	if err != nil {
+		t.Fatalf("new credentials: %v", err)
+	}
+	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "token", Expires: time.Now().Add(time.Hour).UnixMilli()}); err != nil {
+		t.Fatalf("store credential: %v", err)
+	}
+	model := New(Config{StateDir: stateDir})
+	model.focus = providerField
+	for _, option := range model.dropdownOptions() {
+		if option.value == "codex" {
+			if !strings.Contains(option.description, "signed in") {
+				t.Fatalf("Codex provider description = %q", option.description)
+			}
+			return
+		}
+	}
+	t.Fatal("Codex provider option was missing")
+}
+
+func TestProviderDropdownNamesMissingSubscriptionClientRegistration(t *testing.T) {
+	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "")
+	model := New(Config{StateDir: t.TempDir()})
+	model.focus = providerField
+	for _, option := range model.dropdownOptions() {
+		if option.value == "codex" {
+			if !strings.Contains(option.description, "GATOR_CODEX_OAUTH_CLIENT_ID") {
+				t.Fatalf("Codex provider description = %q", option.description)
+			}
+			return
+		}
+	}
+	t.Fatal("Codex provider option was missing")
+}
+
 func TestModelDropdownKeepsCustomModelEntryForEndpointSpecificProviders(t *testing.T) {
 	model := New(Config{Provider: "azure-openai"})
 	model.focus = modelField

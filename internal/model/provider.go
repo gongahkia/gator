@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -28,44 +29,50 @@ import (
 type Provider string
 
 const (
-	OpenAI             Provider = "openai"
-	AzureOpenAI        Provider = "azure-openai"
-	Anthropic          Provider = "anthropic"
-	Gemini             Provider = "gemini"
-	Mistral            Provider = "mistral"
-	XAI                Provider = "xai"
-	Groq               Provider = "groq"
-	OpenRouter         Provider = "openrouter"
-	Together           Provider = "together"
-	Fireworks          Provider = "fireworks"
-	DeepSeek           Provider = "deepseek"
-	Cerebras           Provider = "cerebras"
-	NVIDIA             Provider = "nvidia"
-	HuggingFace        Provider = "huggingface"
-	MoonshotAI         Provider = "moonshotai"
-	ZAI                Provider = "zai"
-	MiniMax            Provider = "minimax"
-	Baseten            Provider = "baseten"
-	VercelAIGateway    Provider = "vercel-ai-gateway"
-	AntLing            Provider = "ant-ling"
-	Xiaomi             Provider = "xiaomi"
-	MoonshotAICN       Provider = "moonshotai-cn"
-	CloudflareWorkers  Provider = "cloudflare-workers-ai"
-	CloudflareGateway  Provider = "cloudflare-ai-gateway"
-	AmazonBedrock      Provider = "amazon-bedrock"
-	GoogleVertex       Provider = "google-vertex"
-	QwenTokenPlan      Provider = "qwen-token-plan"
-	QwenTokenPlanCN    Provider = "qwen-token-plan-cn"
-	XiaomiTokenPlanCN  Provider = "xiaomi-token-plan-cn"
-	XiaomiTokenPlanAMS Provider = "xiaomi-token-plan-ams"
-	XiaomiTokenPlanSGP Provider = "xiaomi-token-plan-sgp"
-	OpenAICompatible   Provider = "openai-compatible"
-	Codex              Provider = "codex"
-	Claude             Provider = "claude"
-	Copilot            Provider = "copilot"
-	KimiCoding         Provider = "kimi-coding"
-	Radius             Provider = "radius"
-	Cursor             Provider = "cursor"
+	OpenAI                  Provider = "openai"
+	AzureOpenAI             Provider = "azure-openai"
+	AzureOpenAIResponses    Provider = "azure-openai-responses"
+	Anthropic               Provider = "anthropic"
+	Gemini                  Provider = "gemini"
+	Mistral                 Provider = "mistral"
+	XAI                     Provider = "xai"
+	Groq                    Provider = "groq"
+	OpenRouter              Provider = "openrouter"
+	Together                Provider = "together"
+	Fireworks               Provider = "fireworks"
+	DeepSeek                Provider = "deepseek"
+	Cerebras                Provider = "cerebras"
+	NVIDIA                  Provider = "nvidia"
+	HuggingFace             Provider = "huggingface"
+	MoonshotAI              Provider = "moonshotai"
+	ZAI                     Provider = "zai"
+	ZAICodingCN             Provider = "zai-coding-cn"
+	MiniMax                 Provider = "minimax"
+	MiniMaxCN               Provider = "minimax-cn"
+	Baseten                 Provider = "baseten"
+	VercelAIGateway         Provider = "vercel-ai-gateway"
+	AntLing                 Provider = "ant-ling"
+	Xiaomi                  Provider = "xiaomi"
+	MoonshotAICN            Provider = "moonshotai-cn"
+	CloudflareWorkers       Provider = "cloudflare-workers-ai"
+	CloudflareGateway       Provider = "cloudflare-ai-gateway"
+	AmazonBedrock           Provider = "amazon-bedrock"
+	GoogleVertex            Provider = "google-vertex"
+	QwenTokenPlan           Provider = "qwen-token-plan"
+	QwenTokenPlanCN         Provider = "qwen-token-plan-cn"
+	QwenTokenPlanIndividual Provider = "qwen-token-plan-individual"
+	XiaomiTokenPlanCN       Provider = "xiaomi-token-plan-cn"
+	XiaomiTokenPlanAMS      Provider = "xiaomi-token-plan-ams"
+	XiaomiTokenPlanSGP      Provider = "xiaomi-token-plan-sgp"
+	OpenAICompatible        Provider = "openai-compatible"
+	Codex                   Provider = "codex"
+	Claude                  Provider = "claude"
+	Copilot                 Provider = "copilot"
+	KimiCoding              Provider = "kimi-coding"
+	Radius                  Provider = "radius"
+	OpenCode                Provider = "opencode"
+	OpenCodeGo              Provider = "opencode-go"
+	Cursor                  Provider = "cursor"
 )
 
 // Config selects one provider. APIKey is optional only because the factory can
@@ -107,6 +114,26 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: openai.Responses{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+	case AzureOpenAIResponses:
+		apiKey, err := key(config, provider, "AZURE_OPENAI_API_KEY")
+		if err != nil {
+			return Backend{}, err
+		}
+		if err := requireKey(apiKey, "AZURE_OPENAI_API_KEY"); err != nil {
+			return Backend{}, err
+		}
+		baseURL, err := azureResponsesURL(config.BaseURL)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: openai.Responses{
+			APIKey:              apiKey,
+			APIKeyEnv:           "AZURE_OPENAI_API_KEY",
+			Model:               config.Model,
+			BaseURL:             baseURL,
+			AuthorizationHeader: "api-key",
+			Client:              config.Client,
+		}}, nil
 	case Codex:
 		credential, err := oauthCredential(config, provider)
 		if err != nil {
@@ -211,6 +238,26 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+	case MiniMax, MiniMaxCN:
+		apiKeyEnv := "MINIMAX_API_KEY"
+		if provider == MiniMaxCN {
+			apiKeyEnv = "MINIMAX_CN_API_KEY"
+		}
+		apiKey, err := key(config, provider, apiKeyEnv)
+		if err != nil {
+			return Backend{}, err
+		}
+		if err := requireKey(apiKey, apiKeyEnv); err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: anthropic.Messages{
+			APIKey:  apiKey,
+			Model:   config.Model,
+			BaseURL: miniMaxMessagesURL(config.BaseURL, provider == MiniMaxCN),
+			Client:  config.Client,
+		}}, nil
+	case OpenCode, OpenCodeGo:
+		return openCodeBackend(provider, config)
 	case CloudflareWorkers, CloudflareGateway:
 		compatible, err := cloudflareConfig(provider, config)
 		if err != nil {
@@ -229,7 +276,7 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
-	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, Cerebras, NVIDIA, HuggingFace, MoonshotAI, ZAI, MiniMax, Baseten, VercelAIGateway, AntLing, Xiaomi, MoonshotAICN, QwenTokenPlan, QwenTokenPlanCN, XiaomiTokenPlanCN, XiaomiTokenPlanAMS, XiaomiTokenPlanSGP, OpenAICompatible:
+	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, Cerebras, NVIDIA, HuggingFace, MoonshotAI, ZAI, ZAICodingCN, Baseten, VercelAIGateway, AntLing, Xiaomi, MoonshotAICN, QwenTokenPlan, QwenTokenPlanCN, QwenTokenPlanIndividual, XiaomiTokenPlanCN, XiaomiTokenPlanAMS, XiaomiTokenPlanSGP, OpenAICompatible:
 		compatible, err := compatibleConfig(provider, config)
 		if err != nil {
 			return Backend{}, err
@@ -269,6 +316,156 @@ func bedrockConfig(config Config) (chatcompletions.Config, error) {
 		ProviderName: "Amazon Bedrock",
 		Client:       config.Client,
 	}, nil
+}
+
+func azureResponsesURL(configured string) (string, error) {
+	baseURL := strings.TrimSpace(configured)
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(os.Getenv("AZURE_OPENAI_BASE_URL"))
+	}
+	if baseURL == "" {
+		resource := strings.TrimSpace(os.Getenv("AZURE_OPENAI_RESOURCE_NAME"))
+		if resource == "" {
+			return "", errors.New("--base-url, AZURE_OPENAI_BASE_URL, or AZURE_OPENAI_RESOURCE_NAME is required for provider \"azure-openai-responses\"")
+		}
+		baseURL = "https://" + resource + ".openai.azure.com"
+	}
+	endpoint, err := url.Parse(baseURL)
+	if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
+		return "", fmt.Errorf("invalid Azure OpenAI Responses base URL %q", baseURL)
+	}
+	path := strings.TrimRight(endpoint.Path, "/")
+	switch {
+	case strings.HasSuffix(path, "/responses"):
+	case strings.HasSuffix(path, "/openai/v1"):
+		path += "/responses"
+	default:
+		path += "/openai/v1/responses"
+	}
+	endpoint.Path = path
+	query := endpoint.Query()
+	if query.Get("api-version") == "" {
+		apiVersion := strings.TrimSpace(os.Getenv("AZURE_OPENAI_API_VERSION"))
+		if apiVersion == "" {
+			apiVersion = "v1"
+		}
+		query.Set("api-version", apiVersion)
+	}
+	endpoint.RawQuery = query.Encode()
+	return endpoint.String(), nil
+}
+
+func miniMaxMessagesURL(configured string, china bool) string {
+	baseURL := strings.TrimRight(strings.TrimSpace(configured), "/")
+	if baseURL == "" {
+		if china {
+			baseURL = "https://api.minimaxi.com/anthropic"
+		} else {
+			baseURL = "https://api.minimax.io/anthropic"
+		}
+	}
+	if strings.HasSuffix(baseURL, "/v1/messages") {
+		return baseURL
+	}
+	return baseURL + "/v1/messages"
+}
+
+type openCodeProtocol uint8
+
+const (
+	openCodeChatCompletions openCodeProtocol = iota
+	openCodeResponses
+	openCodeAnthropic
+	openCodeGemini
+)
+
+// openCodeBackend reproduces Pi's published model-family routing without
+// launching OpenCode. OpenCode Zen's catalog uses the underlying SDK contract:
+// GPT models use Responses, Claude models use Messages, Gemini models use
+// GenerateContent, and the remaining gateway models use Chat Completions.
+func openCodeBackend(provider Provider, config Config) (Backend, error) {
+	apiKey, err := key(config, provider, "OPENCODE_API_KEY")
+	if err != nil {
+		return Backend{}, err
+	}
+	if err := requireKey(apiKey, "OPENCODE_API_KEY"); err != nil {
+		return Backend{}, err
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(config.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = "https://opencode.ai/zen"
+		if provider == OpenCodeGo {
+			baseURL += "/go"
+		}
+	}
+	switch openCodeModelProtocol(provider, config.Model) {
+	case openCodeResponses:
+		return Backend{Provider: provider, Model: openai.Responses{
+			APIKey:    apiKey,
+			APIKeyEnv: "OPENCODE_API_KEY",
+			Model:     config.Model,
+			BaseURL:   openCodeEndpoint(baseURL, "/responses"),
+			Client:    config.Client,
+		}}, nil
+	case openCodeAnthropic:
+		return Backend{Provider: provider, Model: anthropic.Messages{
+			APIKey:  apiKey,
+			Model:   config.Model,
+			BaseURL: openCodeEndpoint(baseURL, "/messages"),
+			Client:  config.Client,
+		}}, nil
+	case openCodeGemini:
+		return Backend{Provider: provider, Model: gemini.GenerateContent{
+			APIKey:  apiKey,
+			Model:   config.Model,
+			BaseURL: openCodeAPIVersionBase(baseURL),
+			Client:  config.Client,
+		}}, nil
+	default:
+		return Backend{Provider: provider, Model: chatcompletions.Model{Config: chatcompletions.Config{
+			APIKey:       apiKey,
+			APIKeyEnv:    "OPENCODE_API_KEY",
+			BaseURL:      openCodeEndpoint(baseURL, "/chat/completions"),
+			Model:        config.Model,
+			ProviderName: "OpenCode " + map[bool]string{true: "Go", false: "Zen"}[provider == OpenCodeGo],
+			Client:       config.Client,
+		}}}, nil
+	}
+}
+
+func openCodeModelProtocol(provider Provider, model string) openCodeProtocol {
+	model = strings.ToLower(strings.TrimSpace(model))
+	switch {
+	case strings.HasPrefix(model, "gpt-"):
+		return openCodeResponses
+	case strings.HasPrefix(model, "claude-"):
+		return openCodeAnthropic
+	case strings.HasPrefix(model, "gemini-"):
+		return openCodeGemini
+	case provider == OpenCodeGo && model == "minimax-m3":
+		return openCodeAnthropic
+	default:
+		return openCodeChatCompletions
+	}
+}
+
+func openCodeEndpoint(baseURL, suffix string) string {
+	baseURL = strings.TrimRight(baseURL, "/")
+	if strings.HasSuffix(baseURL, suffix) {
+		return baseURL
+	}
+	if strings.HasSuffix(baseURL, "/v1") {
+		return baseURL + suffix
+	}
+	return baseURL + "/v1" + suffix
+}
+
+func openCodeAPIVersionBase(baseURL string) string {
+	baseURL = strings.TrimRight(baseURL, "/")
+	if strings.HasSuffix(baseURL, "/v1") {
+		return baseURL
+	}
+	return baseURL + "/v1"
 }
 
 func vertexConfig(config Config) (chatcompletions.Config, error) {
@@ -377,31 +574,32 @@ type compatibleProvider struct {
 }
 
 var compatibleProviders = map[Provider]compatibleProvider{
-	AzureOpenAI:        {name: "Azure OpenAI API", apiKeyEnv: "AZURE_OPENAI_API_KEY", baseURL: "", authorizationHeader: "api-key"},
-	Mistral:            {name: "Mistral API", apiKeyEnv: "MISTRAL_API_KEY", baseURL: "https://api.mistral.ai/v1/chat/completions"},
-	XAI:                {name: "xAI API", apiKeyEnv: "XAI_API_KEY", baseURL: "https://api.x.ai/v1/chat/completions"},
-	Groq:               {name: "Groq API", apiKeyEnv: "GROQ_API_KEY", baseURL: "https://api.groq.com/openai/v1/chat/completions"},
-	OpenRouter:         {name: "OpenRouter API", apiKeyEnv: "OPENROUTER_API_KEY", baseURL: "https://openrouter.ai/api/v1/chat/completions"},
-	Together:           {name: "Together AI API", apiKeyEnv: "TOGETHER_API_KEY", baseURL: "https://api.together.xyz/v1/chat/completions"},
-	Fireworks:          {name: "Fireworks AI API", apiKeyEnv: "FIREWORKS_API_KEY", baseURL: "https://api.fireworks.ai/inference/v1/chat/completions"},
-	DeepSeek:           {name: "DeepSeek API", apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/chat/completions"},
-	Cerebras:           {name: "Cerebras Inference", apiKeyEnv: "CEREBRAS_API_KEY", baseURL: "https://api.cerebras.ai/v1/chat/completions"},
-	NVIDIA:             {name: "NVIDIA NIM", apiKeyEnv: "NVIDIA_API_KEY", baseURL: "https://integrate.api.nvidia.com/v1/chat/completions"},
-	HuggingFace:        {name: "Hugging Face Inference Providers", apiKeyEnv: "HF_TOKEN", baseURL: "https://router.huggingface.co/v1/chat/completions"},
-	MoonshotAI:         {name: "Moonshot AI Kimi API", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.ai/v1/chat/completions"},
-	ZAI:                {name: "Z.AI GLM Coding Plan", apiKeyEnv: "ZAI_API_KEY", baseURL: "https://api.z.ai/api/coding/paas/v4/chat/completions"},
-	MiniMax:            {name: "MiniMax API", apiKeyEnv: "MINIMAX_API_KEY", baseURL: "https://api.minimax.io/v1/chat/completions"},
-	Baseten:            {name: "Baseten Inference", apiKeyEnv: "BASETEN_API_KEY", baseURL: "https://inference.baseten.co/v1/chat/completions", authorizationPrefix: "Api-Key "},
-	VercelAIGateway:    {name: "Vercel AI Gateway", apiKeyEnv: "AI_GATEWAY_API_KEY", baseURL: "https://ai-gateway.vercel.sh/v1/chat/completions"},
-	AntLing:            {name: "Ant Ling API", apiKeyEnv: "ANT_LING_API_KEY", baseURL: "https://api.ant-ling.com/v1/chat/completions"},
-	Xiaomi:             {name: "Xiaomi MiMo API", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://api.xiaomimimo.com/v1/chat/completions"},
-	MoonshotAICN:       {name: "Moonshot AI Kimi API (China)", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.cn/v1/chat/completions"},
-	QwenTokenPlan:      {name: "Qwen Token Plan", apiKeyEnv: "QWEN_TOKEN_PLAN_API_KEY", baseURL: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
-	QwenTokenPlanCN:    {name: "Qwen Token Plan (China)", apiKeyEnv: "QWEN_TOKEN_PLAN_CN_API_KEY", baseURL: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
-	XiaomiTokenPlanCN:  {name: "Xiaomi MiMo Token Plan (China)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"},
-	XiaomiTokenPlanAMS: {name: "Xiaomi MiMo Token Plan (Amsterdam)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-ams.xiaomimimo.com/v1/chat/completions"},
-	XiaomiTokenPlanSGP: {name: "Xiaomi MiMo Token Plan (Singapore)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"},
-	OpenAICompatible:   {name: "OpenAI-compatible API", apiKeyEnv: "GATOR_COMPATIBLE_API_KEY", baseURL: ""},
+	AzureOpenAI:             {name: "Azure OpenAI API", apiKeyEnv: "AZURE_OPENAI_API_KEY", baseURL: "", authorizationHeader: "api-key"},
+	Mistral:                 {name: "Mistral API", apiKeyEnv: "MISTRAL_API_KEY", baseURL: "https://api.mistral.ai/v1/chat/completions"},
+	XAI:                     {name: "xAI API", apiKeyEnv: "XAI_API_KEY", baseURL: "https://api.x.ai/v1/chat/completions"},
+	Groq:                    {name: "Groq API", apiKeyEnv: "GROQ_API_KEY", baseURL: "https://api.groq.com/openai/v1/chat/completions"},
+	OpenRouter:              {name: "OpenRouter API", apiKeyEnv: "OPENROUTER_API_KEY", baseURL: "https://openrouter.ai/api/v1/chat/completions"},
+	Together:                {name: "Together AI API", apiKeyEnv: "TOGETHER_API_KEY", baseURL: "https://api.together.xyz/v1/chat/completions"},
+	Fireworks:               {name: "Fireworks AI API", apiKeyEnv: "FIREWORKS_API_KEY", baseURL: "https://api.fireworks.ai/inference/v1/chat/completions"},
+	DeepSeek:                {name: "DeepSeek API", apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/chat/completions"},
+	Cerebras:                {name: "Cerebras Inference", apiKeyEnv: "CEREBRAS_API_KEY", baseURL: "https://api.cerebras.ai/v1/chat/completions"},
+	NVIDIA:                  {name: "NVIDIA NIM", apiKeyEnv: "NVIDIA_API_KEY", baseURL: "https://integrate.api.nvidia.com/v1/chat/completions"},
+	HuggingFace:             {name: "Hugging Face Inference Providers", apiKeyEnv: "HF_TOKEN", baseURL: "https://router.huggingface.co/v1/chat/completions"},
+	MoonshotAI:              {name: "Moonshot AI Kimi API", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.ai/v1/chat/completions"},
+	ZAI:                     {name: "Z.AI GLM Coding Plan", apiKeyEnv: "ZAI_API_KEY", baseURL: "https://api.z.ai/api/coding/paas/v4/chat/completions"},
+	ZAICodingCN:             {name: "Z.AI GLM Coding Plan (China)", apiKeyEnv: "ZAI_CODING_CN_API_KEY", baseURL: "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"},
+	Baseten:                 {name: "Baseten Inference", apiKeyEnv: "BASETEN_API_KEY", baseURL: "https://inference.baseten.co/v1/chat/completions", authorizationPrefix: "Api-Key "},
+	VercelAIGateway:         {name: "Vercel AI Gateway", apiKeyEnv: "AI_GATEWAY_API_KEY", baseURL: "https://ai-gateway.vercel.sh/v1/chat/completions"},
+	AntLing:                 {name: "Ant Ling API", apiKeyEnv: "ANT_LING_API_KEY", baseURL: "https://api.ant-ling.com/v1/chat/completions"},
+	Xiaomi:                  {name: "Xiaomi MiMo API", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://api.xiaomimimo.com/v1/chat/completions"},
+	MoonshotAICN:            {name: "Moonshot AI Kimi API (China)", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.cn/v1/chat/completions"},
+	QwenTokenPlan:           {name: "Qwen Token Plan", apiKeyEnv: "QWEN_TOKEN_PLAN_API_KEY", baseURL: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
+	QwenTokenPlanCN:         {name: "Qwen Token Plan (China)", apiKeyEnv: "QWEN_TOKEN_PLAN_CN_API_KEY", baseURL: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
+	QwenTokenPlanIndividual: {name: "Qwen Token Plan (Individual)", apiKeyEnv: "QWEN_TOKEN_PLAN_API_KEY", baseURL: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
+	XiaomiTokenPlanCN:       {name: "Xiaomi MiMo Token Plan (China)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"},
+	XiaomiTokenPlanAMS:      {name: "Xiaomi MiMo Token Plan (Amsterdam)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-ams.xiaomimimo.com/v1/chat/completions"},
+	XiaomiTokenPlanSGP:      {name: "Xiaomi MiMo Token Plan (Singapore)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"},
+	OpenAICompatible:        {name: "OpenAI-compatible API", apiKeyEnv: "GATOR_COMPATIBLE_API_KEY", baseURL: ""},
 }
 
 // ParseProvider validates a user-visible provider name.
@@ -476,6 +674,10 @@ func DefaultModel(provider Provider) string {
 	switch provider {
 	case OpenAI, Codex:
 		return openai.DefaultModel()
+	case OpenCode:
+		return "gpt-5.6-terra"
+	case OpenCodeGo:
+		return "kimi-k2.6"
 	case Anthropic, Claude:
 		return "claude-sonnet-5"
 	case KimiCoding:
@@ -505,6 +707,8 @@ func CredentialHint(provider Provider) string {
 	switch provider {
 	case OpenAI:
 		return "OPENAI_API_KEY"
+	case AzureOpenAIResponses:
+		return "AZURE_OPENAI_API_KEY"
 	case Codex:
 		return "Gator Codex OAuth credential"
 	case Anthropic:
@@ -519,6 +723,12 @@ func CredentialHint(provider Provider) string {
 		return "KIMI_API_KEY or Gator Kimi Code OAuth credential"
 	case Radius:
 		return "RADIUS_API_KEY or Gator Radius OAuth credential"
+	case MiniMax:
+		return "MINIMAX_API_KEY"
+	case MiniMaxCN:
+		return "MINIMAX_CN_API_KEY"
+	case OpenCode, OpenCodeGo:
+		return "OPENCODE_API_KEY"
 	case Cursor:
 		return "no supported direct credential"
 	case GoogleVertex:
@@ -531,12 +741,25 @@ func CredentialHint(provider Provider) string {
 	}
 }
 
+// AmbientCredentialAvailable reports whether a provider with externally
+// managed credentials has a configured, readable credential source.
+func AmbientCredentialAvailable(provider Provider) bool {
+	switch provider {
+	case GoogleVertex:
+		return vertex.FromEnvironment().Available()
+	default:
+		return false
+	}
+}
+
 // APIKeyEnvironment returns the ambient API-key variable for providers that
 // support one. OAuth-only providers return an empty string.
 func APIKeyEnvironment(provider Provider) string {
 	switch provider {
 	case OpenAI:
 		return "OPENAI_API_KEY"
+	case AzureOpenAIResponses:
+		return "AZURE_OPENAI_API_KEY"
 	case Anthropic:
 		return "ANTHROPIC_API_KEY"
 	case Gemini:
@@ -545,6 +768,12 @@ func APIKeyEnvironment(provider Provider) string {
 		return "KIMI_API_KEY"
 	case Radius:
 		return "RADIUS_API_KEY"
+	case MiniMax:
+		return "MINIMAX_API_KEY"
+	case MiniMaxCN:
+		return "MINIMAX_CN_API_KEY"
+	case OpenCode, OpenCodeGo:
+		return "OPENCODE_API_KEY"
 	default:
 		if definition, ok := compatibleProviders[provider]; ok {
 			return definition.apiKeyEnv
@@ -705,9 +934,9 @@ func requireKey(value, environment string) error {
 // session produces a clear no-fallback error instead of treating its metadata
 // as malformed. Names exposes only providers that can currently execute.
 var allProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, ZAI: {}, MiniMax: {}, Baseten: {}, VercelAIGateway: {}, AntLing: {}, Xiaomi: {}, MoonshotAICN: {}, CloudflareWorkers: {}, CloudflareGateway: {}, AmazonBedrock: {}, GoogleVertex: {}, QwenTokenPlan: {}, QwenTokenPlanCN: {}, XiaomiTokenPlanCN: {}, XiaomiTokenPlanAMS: {}, XiaomiTokenPlanSGP: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {}, Cursor: {},
+	OpenAI: {}, AzureOpenAI: {}, AzureOpenAIResponses: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, ZAI: {}, ZAICodingCN: {}, MiniMax: {}, MiniMaxCN: {}, Baseten: {}, VercelAIGateway: {}, AntLing: {}, Xiaomi: {}, MoonshotAICN: {}, CloudflareWorkers: {}, CloudflareGateway: {}, AmazonBedrock: {}, GoogleVertex: {}, QwenTokenPlan: {}, QwenTokenPlanCN: {}, QwenTokenPlanIndividual: {}, XiaomiTokenPlanCN: {}, XiaomiTokenPlanAMS: {}, XiaomiTokenPlanSGP: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {}, OpenCode: {}, OpenCodeGo: {}, Cursor: {},
 }
 
 var directProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, ZAI: {}, MiniMax: {}, Baseten: {}, VercelAIGateway: {}, AntLing: {}, Xiaomi: {}, MoonshotAICN: {}, CloudflareWorkers: {}, CloudflareGateway: {}, AmazonBedrock: {}, GoogleVertex: {}, QwenTokenPlan: {}, QwenTokenPlanCN: {}, XiaomiTokenPlanCN: {}, XiaomiTokenPlanAMS: {}, XiaomiTokenPlanSGP: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {},
+	OpenAI: {}, AzureOpenAI: {}, AzureOpenAIResponses: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, ZAI: {}, ZAICodingCN: {}, MiniMax: {}, MiniMaxCN: {}, Baseten: {}, VercelAIGateway: {}, AntLing: {}, Xiaomi: {}, MoonshotAICN: {}, CloudflareWorkers: {}, CloudflareGateway: {}, AmazonBedrock: {}, GoogleVertex: {}, QwenTokenPlan: {}, QwenTokenPlanCN: {}, QwenTokenPlanIndividual: {}, XiaomiTokenPlanCN: {}, XiaomiTokenPlanAMS: {}, XiaomiTokenPlanSGP: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {}, OpenCode: {}, OpenCodeGo: {},
 }
