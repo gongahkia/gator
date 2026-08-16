@@ -82,9 +82,9 @@ enter enforced Plan mode. `Ctrl+Space` (reported as `Ctrl+@`
 by many terminals) reopens an active `@` path menu. Use `@path/to/file` or `@"path with spaces"`
 in a task to mark repository files or directories that the agent should inspect
 first. Gator validates every reference against the repository boundary before
-starting. Ordinary references remain paths only; supported attachments are
-explicitly copied to the private continuation session and sent to the selected
-native provider.
+starting. Ordinary references remain paths only. Before supported attachments
+are sent, Gator shows the exact files, sizes, and selected provider and requires
+an explicit confirmation.
 
 Use `@mock.png`, `@screenshot.jpg`, or `@design.webp` to attach images, and
 `@report.pdf` to attach a PDF, to a native-provider task. Gator also accepts
@@ -98,14 +98,20 @@ Chat Completions endpoints do not share a stable document-input protocol.
 
 Gator permits at most four attachments per task, each up to 4 MiB, with an
 8 MiB combined image/document budget. Attachments must be regular files inside
-the repository. Their bytes stay only in the private `0600` continuation
-session so stateless native providers receive them across turns. A delegated
-CLI is rejected for attachments because Gator cannot verify its file-input
-contract. Unsupported binary `@` paths remain ordinary references that the
-agent can inspect if its tools can read them. In the running view, file reads,
-commands, tool results, and patch line changes are visible as they occur. Press
-`t` from review to browse the current run transcript; it shows model-emitted
-text and tool activity, not hidden chain-of-thought.
+the repository and are read through a descriptor-rooted workspace boundary.
+Raw attachment bytes are never written to the private `0600` continuation
+session; Gator retains only a name, media type, size, and SHA-256 manifest, so
+you must explicitly re-add `@` files in a later turn. The selected provider
+receives confirmed bytes under its own data-handling and retention policy.
+The byte budget limits local input size but does not cap a PDF's provider-side
+page or token cost. Attachment text is framed as untrusted data, but no LLM
+prompt can make a model fully immune to prompt injection. A delegated CLI is
+rejected for attachments because Gator cannot verify its file-input contract.
+Unsupported binary `@` paths remain ordinary references that the agent can
+inspect if its tools can read them. In the running view, file reads, commands,
+tool results, and patch line changes are visible as they occur. Press `t` from
+review to browse the current run transcript; it shows model-emitted text and
+tool activity, not hidden chain-of-thought.
 
 The review screen deliberately does not modify the active checkout. To hand off
 reviewed work, `gator export RUN_RECORD_PATH` emits a binary-safe patch to
@@ -174,8 +180,8 @@ active checkout. The printed run-record path defaults to
 `$XDG_STATE_HOME/gator/` (or `~/.local/state/gator/`) and contains a
 metadata-only event journal, final result, and a private `0600` session file
 for `gator resume`. The event log intentionally omits prompts, source text,
-tool arguments, and tool output; the worktree is the reviewable source of
-truth. The TUI also keeps one private `0600` unfinished draft per repository
+tool arguments, tool output, and raw attachment bytes; the worktree is the
+reviewable source of truth. The TUI also keeps one private `0600` unfinished draft per repository
 and lists resumable conversation threads from the same state root. Threads
 retain one worktree across turns and record whether the last turn was Plan or
 Execute. Drafts contain only the composer task, verifier text, provider, and

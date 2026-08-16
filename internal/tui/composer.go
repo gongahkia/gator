@@ -275,8 +275,8 @@ func taskWithContextReferences(task string, references []contextReference) strin
 }
 
 // imageAttachments loads image @ references from inside the repository. The
-// bounded bytes are retained in the private session so native providers can
-// replay them across tool turns and continuations.
+// bytes are sent only after an explicit per-send confirmation and are not
+// persisted in a continuation session.
 func imageAttachments(repository string, references []contextReference) ([]agent.Image, error) {
 	root, err := workspace.Open(repository)
 	if err != nil {
@@ -309,7 +309,7 @@ func imageAttachments(repository string, references []contextReference) ([]agent
 }
 
 // documentAttachments loads PDFs and bounded textual document context from @
-// references. It shares the private-session byte budget with image inputs.
+// references. It shares the per-send byte budget with image inputs.
 func documentAttachments(repository string, references []contextReference, imageBytes, imageCount int) ([]agent.Attachment, error) {
 	root, err := workspace.Open(repository)
 	if err != nil {

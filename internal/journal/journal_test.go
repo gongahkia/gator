@@ -94,6 +94,92 @@ func TestJournalSavesAndLoadsPrivateSession(t *testing.T) {
 	}
 }
 
+func TestSessionOmitsRawAttachmentBytesAndKeepsManifest(t *testing.T) {
+	journal, record, err := Open("/workspace/project", "run-attachments", "/runs/run-attachments", t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatalf("open journal: %v", err)
+	}
+	const contents = "attachment bytes must not be persisted"
+	session := Session{
+		Version:      2,
+		Repository:   "/workspace/project",
+		WorktreePath: "/runs/run-attachments",
+		Provider:     "openai",
+		Task:         "Review the attachment",
+		Messages: []agent.Message{{
+			Role:        agent.RoleUser,
+			Content:     "Review the attachment",
+			Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte(contents)}},
+			Images:      []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte(contents)}},
+		}},
+	}
+	if err := journal.SaveSession(session); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatalf("close journal: %v", err)
+	}
+	raw, err := os.ReadFile(filepath.Join(record.StatePath, "session.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), contents) {
+		t.Fatalf("session persisted raw attachment bytes: %s", raw)
+	}
+	loaded, err := LoadSession(record.StatePath)
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if len(loaded.Messages) != 1 || len(loaded.Messages[0].Images) != 0 || len(loaded.Messages[0].Attachments) != 0 || len(loaded.AttachmentManifest) != 2 {
+		t.Fatalf("loaded sanitized session = %#v", loaded)
+	}
+	for _, attachment := range loaded.AttachmentManifest {
+		if attachment.SHA256 == "" || attachment.Bytes != len(contents) {
+			t.Fatalf("attachment manifest = %#v", loaded.AttachmentManifest)
+		}
+	}
+}
+
+func TestLoadSessionScrubsLegacyRawAttachmentBytes(t *testing.T) {
+	journal, record, err := Open("/workspace/project", "run-legacy-attachments", "/runs/run-legacy-attachments", t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatalf("open journal: %v", err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatalf("close journal: %v", err)
+	}
+	const contents = "legacy raw attachment bytes"
+	legacy := Session{
+		Version:      2,
+		Repository:   "/workspace/project",
+		WorktreePath: "/runs/run-legacy-attachments",
+		Provider:     "openai",
+		Task:         "Review the attachment",
+		Messages: []agent.Message{{
+			Role:        agent.RoleUser,
+			Content:     "Review the attachment",
+			Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte(contents)}},
+		}},
+	}
+	if err := writeJSON(filepath.Join(record.StatePath, "session.json"), legacy); err != nil {
+		t.Fatalf("write legacy session: %v", err)
+	}
+	loaded, err := LoadSession(record.StatePath)
+	if err != nil {
+		t.Fatalf("load legacy session: %v", err)
+	}
+	if len(loaded.Messages) != 1 || len(loaded.Messages[0].Attachments) != 0 || len(loaded.AttachmentManifest) != 1 {
+		t.Fatalf("loaded legacy session = %#v", loaded)
+	}
+	raw, err := os.ReadFile(filepath.Join(record.StatePath, "session.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), contents) {
+		t.Fatalf("legacy raw attachment bytes remained on disk: %s", raw)
+	}
+}
+
 func TestDraftRoundTripUsesPrivateStateAndDeletes(t *testing.T) {
 	stateDirectory := t.TempDir()
 	draft := Draft{

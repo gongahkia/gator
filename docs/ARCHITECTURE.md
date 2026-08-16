@@ -63,18 +63,25 @@ Responses, Anthropic Messages, and Gemini GenerateContent); text attachments
 are framed as untrusted reference material for every native adapter. Generic
 Chat Completions endpoints therefore fail clearly for PDF inputs rather than
 silently dropping them. At most four attachments may total 8 MiB (4 MiB per
-file), and their bytes exist only in the private session needed for stateless
-replay. The live transcript displays model-emitted text, tool calls, summaries
-of reads and commands, and patch line previews. It does not attempt to expose
-hidden model reasoning.
+file). Gator reads them through descriptor-rooted workspace paths and rejects
+unsafe or pathological Office archives before extraction. The TUI shows an
+explicit per-send confirmation with each file, size, and provider. Raw bytes
+are not retained in sessions: only a name, media type, size, and SHA-256
+manifest survive for continuation, so a user must re-add an `@` file to send
+it again. The limits bound local input but cannot cap provider-side PDF pages,
+tokens, retention, or the residual prompt-injection risk of an LLM. The live
+transcript displays model-emitted text, tool calls, summaries of reads and
+commands, and patch line previews. It does not attempt to expose hidden model
+reasoning.
 
 The OpenAI and Anthropic adapters stream incremental text before converting the
 completed response into the core turn contract. The core does not rely on
 provider-side conversation persistence: OpenAI requests use `store: false` and
-the private local session file provides resume context. Gemini's stateless
-replay stores only opaque provider content necessary to carry thought
-signatures through a function-call round trip; that content stays in the same
-private `0600` session file as the rest of the conversation.
+the private local session file provides resume context. That request setting is
+not a general provider-retention guarantee. Gemini's stateless replay stores
+only opaque provider content necessary to carry thought signatures through a
+function-call round trip; that content stays in the same private `0600` session
+file as the rest of the conversation.
 
 ## Initial tool surface
 
@@ -118,9 +125,10 @@ Code changes remain in a sibling worktree. State is written outside the active
 checkout at `$XDG_STATE_HOME/gator/` by default (or
 `~/.local/state/gator/`). `events.jsonl` stores only event type, time, step,
 tool name/call ID, and tool errors. It does not persist source text, prompts,
-tool arguments, or tool output. `session.json` is deliberately different: it
-contains the conversation required to resume a run, is written atomically with
-mode `0600`, and should be treated as private local data.
+tool arguments, tool output, or raw attachment bytes. `session.json` is
+deliberately different: it contains the conversation required to resume a run,
+is written atomically with mode `0600`, and should be treated as private local
+data. It records attachment metadata only, never attachment contents.
 
 Each new run also writes a private `0600` thread record indexed by repository.
 It advances to the latest session after every completed turn, allowing the TUI

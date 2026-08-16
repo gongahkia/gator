@@ -186,10 +186,25 @@ func LoadSession(statePath string) (Session, error) {
 	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Provider) == "" || strings.TrimSpace(session.Task) == "" {
 		return Session{}, errors.New("run session is incomplete")
 	}
+	hadRawAttachments := sessionHasRawAttachments(session.Messages)
 	cleanMessages, attachments := sanitizeSessionMessages(session.Messages)
 	session.Messages = cleanMessages
 	session.AttachmentManifest = mergeAttachmentManifest(session.AttachmentManifest, attachments)
+	if hadRawAttachments {
+		if err := writeJSON(path, session); err != nil {
+			return Session{}, fmt.Errorf("remove raw attachment bytes from run session: %w", err)
+		}
+	}
 	return session, nil
+}
+
+func sessionHasRawAttachments(messages []agent.Message) bool {
+	for _, message := range messages {
+		if len(message.Images) > 0 || len(message.Attachments) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func sanitizeSessionMessages(messages []agent.Message) ([]agent.Message, []AttachmentReference) {

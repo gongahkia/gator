@@ -58,3 +58,28 @@ func TestRootRejectsSymlinkOutsideWorkspace(t *testing.T) {
 		t.Fatalf("resolve outside symlink error = %v", err)
 	}
 }
+
+func TestRootReadRegularFileStaysInsideWorkspace(t *testing.T) {
+	directory := t.TempDir()
+	external := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "inside.txt"), []byte("inside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(external, "secret.txt"), []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(external, "secret.txt"), filepath.Join(directory, "escape.txt")); err != nil {
+		t.Fatal(err)
+	}
+	root, err := Open(directory)
+	if err != nil {
+		t.Fatalf("open root: %v", err)
+	}
+	contents, err := root.ReadRegularFile("inside.txt", 64)
+	if err != nil || string(contents) != "inside" {
+		t.Fatalf("read regular file = %q, %v", contents, err)
+	}
+	if _, err := root.ReadRegularFile("escape.txt", 64); err == nil {
+		t.Fatal("read through outside symlink succeeded")
+	}
+}

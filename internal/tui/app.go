@@ -3,6 +3,7 @@ package tui
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,6 +43,7 @@ type screen uint8
 
 const (
 	composeScreen screen = iota
+	attachmentConfirmScreen
 	runningScreen
 	reviewScreen
 	transcriptScreen
@@ -78,6 +80,13 @@ type timelineEntry struct {
 	kind   agent.EventKind
 }
 
+type attachmentPreview struct {
+	name      string
+	mediaType string
+	bytes     int
+	digest    [sha256.Size]byte
+}
+
 type executionStream struct {
 	events chan agent.Event
 	done   chan executionDone
@@ -107,33 +116,35 @@ type diffLoadedMsg struct {
 type Model struct {
 	config Config
 
-	screen           screen
-	focus            field
-	width            int
-	height           int
-	task             textarea.Model
-	verification     textarea.Model
-	provider         textinput.Model
-	model            textinput.Model
-	notice           notice
-	commandOutput    string
-	commandIndex     int
-	dropdownIndex    int
-	contextIndex     int
-	contextPaths     []string
-	contextLoaded    bool
-	contextErr       error
-	contextClosed    bool
-	preflight        []string
-	draftErr         error
-	helpReturn       screen
-	transcriptReturn screen
-	transcriptIndex  int
-	recentThreads    []journal.RecentThread
-	recentIndex      int
-	events           []timelineEntry
-	execution        *executionStream
-	cancelling       bool
+	screen              screen
+	focus               field
+	width               int
+	height              int
+	task                textarea.Model
+	verification        textarea.Model
+	provider            textinput.Model
+	model               textinput.Model
+	notice              notice
+	commandOutput       string
+	commandIndex        int
+	dropdownIndex       int
+	contextIndex        int
+	contextPaths        []string
+	contextLoaded       bool
+	contextErr          error
+	contextClosed       bool
+	attachmentPreview   []attachmentPreview
+	attachmentConfirmed bool
+	preflight           []string
+	draftErr            error
+	helpReturn          screen
+	transcriptReturn    screen
+	transcriptIndex     int
+	recentThreads       []journal.RecentThread
+	recentIndex         int
+	events              []timelineEntry
+	execution           *executionStream
+	cancelling          bool
 
 	outcome         *gatorrun.Outcome
 	runErr          error
@@ -296,6 +307,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case composeScreen:
 		return m.updateComposer(message)
+	case attachmentConfirmScreen:
+		return m.updateAttachmentConfirmation(message)
 	case runningScreen:
 		return m.updateRunning(message)
 	case reviewScreen:
@@ -306,6 +319,23 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateHelp(message)
 	case recentScreen:
 		return m.updateRecentRuns(message)
+	default:
+		return m, nil
+	}
+}
+
+func (m Model) updateAttachmentConfirmation(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "enter", "y":
+		m.attachmentConfirmed = true
+		m.screen = composeScreen
+		return m.startRun()
+	case "esc", "n", "ctrl+c":
+		m.attachmentConfirmed = false
+		m.attachmentPreview = nil
+		m.screen = composeScreen
+		m.notice = notice{text: "Attachment send cancelled. No file bytes were sent.", kind: noticeInfo}
+		return m, m.focusField()
 	default:
 		return m, nil
 	}
@@ -564,6 +594,13 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: err.Error(), kind: noticeError}
 		return m, nil
 	}
+	if m.attachmentConfirmed && !sameAttachmentPreviews(m.attachmentPreview, attachmentPreviews(images, attachments)) {
+		m.attachmentConfirmed = false
+		m.attachmentPreview = attachmentPreviews(images, attachments)
+		m.screen = attachmentConfirmScreen
+		m.notice = notice{text: "Attachment contents changed after preview. Review and confirm the current bytes before sending.", kind: noticeInfo}
+		return m, nil
+	}
 	var verification [][]string
 	if m.runMode == gatorrun.ExecuteMode {
 		var err error
@@ -610,6 +647,17 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "File attachments require a native provider; delegated CLI providers cannot receive attachment bytes from Gator.", kind: noticeError}
 			return m, nil
 		}
+	}
+
+	if len(images) > 0 || len(attachments) > 0 {
+		if !m.attachmentConfirmed {
+			m.attachmentPreview = attachmentPreviews(images, attachments)
+			m.screen = attachmentConfirmScreen
+			m.notice = notice{text: "Review attachment transmission before starting.", kind: noticeInfo}
+			return m, nil
+		}
+		m.attachmentConfirmed = false
+		m.attachmentPreview = nil
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -721,6 +769,29 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	return m, waitForExecution(stream)
 }
 
+func attachmentPreviews(images []agent.Image, attachments []agent.Attachment) []attachmentPreview {
+	previews := make([]attachmentPreview, 0, len(images)+len(attachments))
+	for _, image := range images {
+		previews = append(previews, attachmentPreview{name: image.Name, mediaType: image.MediaType, bytes: len(image.Data), digest: sha256.Sum256(image.Data)})
+	}
+	for _, attachment := range attachments {
+		previews = append(previews, attachmentPreview{name: attachment.Name, mediaType: attachment.MediaType, bytes: len(attachment.Data), digest: sha256.Sum256(attachment.Data)})
+	}
+	return previews
+}
+
+func sameAttachmentPreviews(first, second []attachmentPreview) bool {
+	if len(first) != len(second) {
+		return false
+	}
+	for index := range first {
+		if first[index] != second[index] {
+			return false
+		}
+	}
+	return true
+}
+
 func hasPDFAttachment(attachments []agent.Attachment) bool {
 	for _, attachment := range attachments {
 		if attachment.MediaType == "application/pdf" {
@@ -792,7 +863,11 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 	m.model.SetValue(session.Model)
 	m.screen = composeScreen
 	m.focus = taskField
-	m.notice = notice{text: "Continuing thread " + m.threadID + " in its retained worktree.", kind: noticeInfo}
+	if len(session.AttachmentManifest) > 0 {
+		m.notice = notice{text: "Continuing thread " + m.threadID + ". Prior attachment bytes were not retained; re-add @ files to send them again.", kind: noticeInfo}
+	} else {
+		m.notice = notice{text: "Continuing thread " + m.threadID + " in its retained worktree.", kind: noticeInfo}
+	}
 	m.refreshPreflight()
 	return *m, m.focusField()
 }
@@ -963,6 +1038,8 @@ func (m Model) View() string {
 	switch m.screen {
 	case composeScreen:
 		view = m.composeView()
+	case attachmentConfirmScreen:
+		view = m.attachmentConfirmView()
 	case runningScreen:
 		view = m.runningView()
 	case reviewScreen:
@@ -977,6 +1054,36 @@ func (m Model) View() string {
 		return ""
 	}
 	return m.fitToTerminal(view)
+}
+
+func (m Model) attachmentConfirmView() string {
+	provider := strings.TrimSpace(m.provider.Value())
+	if provider == "" {
+		provider = "the selected provider"
+	}
+	lines := make([]string, 0, len(m.attachmentPreview))
+	for _, attachment := range m.attachmentPreview {
+		lines = append(lines, "• "+attachment.name+" · "+attachment.mediaType+" · "+formatAttachmentSize(attachment.bytes))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, "No attachment bytes are pending.")
+	}
+	sections := []string{
+		m.header("confirm attachment transmission"),
+		m.fieldView("Files to send", "These exact bytes will be sent with this task.", strings.Join(lines, "\n")),
+		m.fieldView("Provider boundary", "The selected provider receives the files under its own data-handling and retention policy. Review that policy before sending.", provider),
+		m.fieldView("Safety and continuation", "Attachment contents are untrusted data: instruction-like text inside them can influence a model despite Gator's safeguards. Gator does not retain raw attachment bytes in the continuation session; re-add @ files to send them in a later turn.", "PDF byte limits do not cap provider page or token cost."),
+		m.noticeView(),
+		m.footer("enter/y send", "esc/n cancel", "f1 shortcuts"),
+	}
+	return strings.Join(sections, "\n")
+}
+
+func formatAttachmentSize(bytes int) string {
+	if bytes < 1024 {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	return fmt.Sprintf("%.1f KiB", float64(bytes)/1024)
 }
 
 func (m Model) composeView() string {
