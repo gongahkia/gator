@@ -238,7 +238,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case agentEventMsg:
 		m.events = append(m.events, renderEvent(msg.event))
 		return m, waitForExecution(m.execution)
-		case executionDoneMsg:
+	case executionDoneMsg:
+		wasNewThread := m.resumeStatePath == ""
 		m.execution = nil
 		m.cancelling = false
 		m.outcome = &msg.done.outcome
@@ -257,7 +258,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				m.notice = notice{text: "Run complete. Inspect the diff and evidence before applying anything.", kind: noticeSuccess}
 			}
 		}
-		if msg.done.outcome.StatePath != "" && m.resumeStatePath == "" && strings.TrimSpace(m.config.StateDir) != "" {
+		if msg.done.outcome.StatePath != "" && wasNewThread && strings.TrimSpace(m.config.StateDir) != "" {
 			if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
 				m.draftErr = err
 			}
@@ -512,10 +513,14 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: err.Error(), kind: noticeError}
 		return m, nil
 	}
-	verification, err := parseVerification(m.verification.Value())
-	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+	var verification [][]string
+	if m.runMode == gatorrun.ExecuteMode {
+		var err error
+		verification, err = parseVerification(m.verification.Value())
+		if err != nil {
+			m.notice = notice{text: err.Error(), kind: noticeError}
+			return m, nil
+		}
 	}
 	modelName := strings.TrimSpace(m.model.Value())
 	providerName := strings.TrimSpace(m.provider.Value())
@@ -542,6 +547,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: executorErr.Error(), kind: noticeError}
 			return m, nil
 		}
+		if m.runMode == gatorrun.PlanMode && executor.Harness != nil {
+			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
+			return m, nil
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -558,7 +567,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	m.diffErr = nil
 	m.diffTruncated = false
 	m.screen = runningScreen
-	m.notice = notice{text: "Creating an isolated worktree...", kind: noticeInfo}
+	if m.runMode == gatorrun.PlanMode {
+		m.notice = notice{text: "Creating an isolated worktree for read-only planning...", kind: noticeInfo}
+	} else {
+		m.notice = notice{text: "Creating an isolated worktree...", kind: noticeInfo}
+	}
 
 	request := gatorrun.Request{
 		RepositoryPath: m.config.RepositoryPath,
@@ -569,6 +582,8 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		MaxSteps:       m.config.MaxSteps,
 		Verification:   verification,
 		StateDir:       m.config.StateDir,
+		ThreadID:       m.threadID,
+		Mode:           m.runMode,
 		OnEvent: func(event agent.Event) {
 			select {
 			case stream.events <- event:
@@ -615,6 +630,13 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.execution = nil
 			m.screen = composeScreen
 			m.notice = notice{text: executorErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		if m.runMode == gatorrun.PlanMode && executor.Harness != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
 			return m, nil
 		}
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
@@ -671,6 +693,14 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 		return *m, nil
 	}
 	m.resumeStatePath = statePath
+	m.threadID = session.ThreadID
+	if m.threadID == "" {
+		m.threadID = filepath.Base(statePath)
+	}
+	m.runMode = gatorrun.ExecuteMode
+	if session.Mode == gatorrun.PlanMode.String() {
+		m.runMode = gatorrun.PlanMode
+	}
 	m.task.Reset()
 	m.task.Placeholder = "Describe the next instruction for this retained worktree..."
 	m.verification.SetValue(formatVerification(session.Verification))
@@ -678,7 +708,7 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 	m.model.SetValue(session.Model)
 	m.screen = composeScreen
 	m.focus = taskField
-	m.notice = notice{text: "Continuing " + filepath.Base(m.resumeStatePath) + " in its retained worktree.", kind: noticeInfo}
+	m.notice = notice{text: "Continuing thread " + m.threadID + " in its retained worktree.", kind: noticeInfo}
 	m.refreshPreflight()
 	return *m, m.focusField()
 }
@@ -686,6 +716,8 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 func (m *Model) returnToComposer() {
 	m.screen = composeScreen
 	m.resumeStatePath = ""
+	m.threadID = ""
+	m.runMode = gatorrun.ExecuteMode
 	m.task.Reset()
 	m.task.Placeholder = "Describe the bug fix or feature you want to build..."
 	m.focus = taskField
@@ -743,8 +775,10 @@ func (m *Model) refreshPreflight() {
 	if strings.TrimSpace(m.task.Value()) == "" {
 		issues = append(issues, "describe a task")
 	}
-	if _, err := parseVerification(m.verification.Value()); err != nil {
-		issues = append(issues, err.Error())
+	if m.runMode == gatorrun.ExecuteMode {
+		if _, err := parseVerification(m.verification.Value()); err != nil {
+			issues = append(issues, err.Error())
+		}
 	}
 	providerName := strings.TrimSpace(m.provider.Value())
 	provider, err := modelprovider.ParseProvider(providerName)
@@ -763,12 +797,22 @@ func (m *Model) refreshPreflight() {
 func (m Model) preflightView() string {
 	label := "Before starting"
 	ready := "Ready to create an isolated worktree."
+	readiness := "Run readiness"
+	if m.runMode == gatorrun.PlanMode {
+		label = "Before planning"
+		ready = "Ready to inspect an isolated worktree without edits."
+		readiness = "Plan readiness"
+	}
 	if m.resumeStatePath != "" {
 		label = "Before continuing"
 		ready = "Ready to continue the retained worktree."
+		if m.runMode == gatorrun.PlanMode {
+			label = "Before planning"
+			ready = "Ready to inspect the retained worktree without edits."
+		}
 	}
 	if len(m.preflight) == 0 {
-		return labelStyle.Render("Run readiness") + "\n" + okStyle.Render(ready)
+		return labelStyle.Render(readiness) + "\n" + okStyle.Render(ready)
 	}
 	lines := make([]string, 0, len(m.preflight))
 	for _, issue := range m.preflight {
@@ -850,9 +894,9 @@ func (m Model) View() string {
 }
 
 func (m Model) composeView() string {
-	mode := "new isolated run"
+	mode := "new isolated thread · " + m.runMode.String()
 	if m.resumeStatePath != "" {
-		mode = "continue retained run"
+		mode = "thread " + compact(m.threadID, 12) + " · " + m.runMode.String()
 	}
 	if m.compactComposer() || (m.height < 52 && (m.commandPaletteVisible() || m.contextCompletionVisible() || m.dropdownVisible())) {
 		return m.compactComposeView(mode)
@@ -904,7 +948,7 @@ func (m Model) composeView() string {
 	}
 	sections = append(sections,
 		m.noticeView(),
-		m.footer("? commands", "ctrl+o recent", "tab switch field", "ctrl+r start run", "f1 shortcuts", "ctrl+c quit"),
+		m.footer("? commands", "ctrl+o threads", "tab switch field", "ctrl+r start "+m.runMode.String(), "f1 shortcuts", "ctrl+c quit"),
 	)
 	return strings.Join(sections, "\n")
 }
@@ -948,7 +992,7 @@ func (m Model) compactComposeView(mode string) string {
 	}
 	sections = append(sections,
 		m.noticeView(),
-		m.footer("? commands", "ctrl+o recent", "tab switch field", "ctrl+r start run", "f1 shortcuts", "ctrl+c quit"),
+		m.footer("? commands", "ctrl+o threads", "tab switch field", "ctrl+r start "+m.runMode.String(), "f1 shortcuts", "ctrl+c quit"),
 	)
 	return strings.Join(sections, "\n")
 }
@@ -974,11 +1018,18 @@ func (m Model) composerSummary() string {
 
 func (m Model) compactPreflightView() string {
 	if len(m.preflight) == 0 {
-		return m.inline(okStyle.Render("Ready to create an isolated worktree."))
+		ready := "Ready to create an isolated worktree."
+		if m.runMode == gatorrun.PlanMode {
+			ready = "Ready to inspect an isolated worktree without edits."
+		}
+		return m.inline(okStyle.Render(ready))
 	}
 	label := "Before starting: "
 	if m.resumeStatePath != "" {
 		label = "Before continuing: "
+	}
+	if m.runMode == gatorrun.PlanMode {
+		label = "Before planning: "
 	}
 	return m.inline(errorStyle.Render(compact(label+m.preflight[0], m.inlineWidth())))
 }
@@ -1028,34 +1079,38 @@ func (m Model) helpView() string {
 }
 
 func (m Model) recentRunsView() string {
-	start, end := m.visibleRange(len(m.recentRuns), m.recentIndex, m.recentRunLimit())
+	start, end := m.visibleRange(len(m.recentThreads), m.recentIndex, m.recentRunLimit())
 	lines := make([]string, 0, end-start)
 	for index := start; index < end; index++ {
-		run := m.recentRuns[index]
+		thread := m.recentThreads[index]
 		prefix := "  "
 		if index == m.recentIndex {
 			prefix = "> "
 		}
-		modelName := run.Model
+		modelName := thread.Model
 		if modelName == "" {
 			modelName = "provider default"
 		}
 		availability := okStyle.Render("path found")
-		if !run.Available {
+		if !thread.Available {
 			availability = errorStyle.Render("worktree missing")
 		}
 		limit := 96
 		if m.compactLayout() {
 			limit = max(12, m.panelTextWidth()-22)
 		}
-		lines = append(lines, prefix+keyStyle.Render(run.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(run.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+compact(run.Task, limit))
+		turns := fmt.Sprintf("%d turn", thread.TurnCount)
+		if thread.TurnCount != 1 {
+			turns += "s"
+		}
+		lines = append(lines, prefix+keyStyle.Render(thread.Provider+" · "+modelName)+"  "+availability+"\n    "+dimStyle.Render(thread.UpdatedAt.Local().Format("Jan 2 15:04"))+"  "+dimStyle.Render(turns)+"  "+compact(thread.Task, limit))
 	}
 	sections := []string{
-		m.header("recent retained runs"),
+		m.header("recent conversation threads"),
 		m.panel(strings.Join(lines, "\n\n")),
 	}
 	if !m.compactLayout() {
-		sections = append(sections, dimStyle.Render("Run-record paths stay private; Gator validates a selected worktree before continuation."))
+		sections = append(sections, dimStyle.Render("Thread state stays private; Gator validates a selected worktree before continuation."))
 	}
 	sections = append(sections, m.noticeView(), m.footer("up/down choose", "enter continue", "r refresh", "esc back", "f1 shortcuts"))
 	return strings.Join(sections, "\n")
@@ -1063,6 +1118,9 @@ func (m Model) recentRunsView() string {
 
 func (m Model) runningView() string {
 	status := "Gator is working in an isolated worktree."
+	if m.runMode == gatorrun.PlanMode {
+		status = "Gator is inspecting the isolated worktree in enforced read-only Plan mode."
+	}
 	if m.cancelling {
 		status = "Gator is stopping; the retained worktree will remain reviewable."
 	}
@@ -1079,7 +1137,7 @@ func (m Model) runningView() string {
 		lines = append(lines, entry.text)
 	}
 	sections := []string{
-		m.header("live run"),
+		m.header("live " + m.runMode.String()),
 		m.inline(dimStyle.Render(compact(status, m.inlineWidth()))),
 		m.panel(strings.Join(lines, "\n")),
 		m.noticeView(),
@@ -1089,7 +1147,11 @@ func (m Model) runningView() string {
 }
 
 func (m Model) reviewView() string {
-	sections := []string{m.header("review")}
+	title := "review"
+	if m.runMode == gatorrun.PlanMode {
+		title = "plan review"
+	}
+	sections := []string{m.header(title)}
 	if m.outcome != nil {
 		if m.compactLayout() {
 			sections = append(sections, m.inline(dimStyle.Render(compact("worktree: "+m.outcome.Worktree.Path, m.inlineWidth()))))
@@ -1108,7 +1170,10 @@ func (m Model) reviewView() string {
 		sections = append(sections, m.panel(result))
 	}
 	sections = append(sections, labelStyle.Render("Current diff"), m.diffView(), m.noticeView())
-	continueLabel := "c continue retained run"
+	continueLabel := "c continue thread"
+	if m.runMode == gatorrun.PlanMode {
+		continueLabel = "c continue plan"
+	}
 	if m.outcome == nil || m.outcome.StatePath == "" {
 		continueLabel = ""
 	}
@@ -1317,6 +1382,15 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/help":
 		m.commandOutput = commandHelp()
 		m.notice = notice{text: "Commands operate locally and never start a run by themselves.", kind: noticeInfo}
+	case "/plan":
+		m.runMode = gatorrun.PlanMode
+		m.notice = notice{text: "Plan mode is read-only: it can inspect the worktree but cannot edit files or run commands.", kind: noticeInfo}
+	case "/execute":
+		m.runMode = gatorrun.ExecuteMode
+		m.notice = notice{text: "Execute mode will use the configured verifier policy after making changes.", kind: noticeInfo}
+	case "/new":
+		m.returnToComposer()
+		return m, m.focusField()
 	case "/model":
 		m.commandOutput = ""
 		m.focus = modelField
@@ -1343,7 +1417,7 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		}
 		m.screen = reviewScreen
 		return m, nil
-	case "/recent":
+	case "/recent", "/threads":
 		return m.openRecentRuns()
 	case "/status":
 		m.commandOutput = m.sessionStatus()

@@ -167,3 +167,77 @@ func TestListRecentRunsSortsSessionsAndMarksMissingWorktrees(t *testing.T) {
 		t.Fatalf("availability = %#v", runs)
 	}
 }
+
+func TestThreadRoundTripAndRecentList(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/project"
+	worktreePath := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(worktreePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	thread := Thread{
+		Version:       1,
+		ID:            "thread-001",
+		Repository:    repository,
+		WorktreePath:  worktreePath,
+		Provider:      "openai",
+		Model:         "test-model",
+		Task:          "Plan a focused change",
+		HeadStatePath: "/state/thread-001",
+		TurnCount:     2,
+		CreatedAt:     now.Add(-time.Minute),
+		UpdatedAt:     now,
+	}
+	if err := SaveThread(stateDirectory, thread); err != nil {
+		t.Fatalf("save thread: %v", err)
+	}
+	loaded, err := LoadThread(stateDirectory, repository, thread.ID)
+	if err != nil {
+		t.Fatalf("load thread: %v", err)
+	}
+	if loaded.ID != thread.ID || loaded.TurnCount != 2 || loaded.WorktreePath != worktreePath {
+		t.Fatalf("loaded thread = %#v", loaded)
+	}
+	path := filepath.Join(stateDirectory, "gator", "threads", repositoryFingerprint(repository), thread.ID+".json")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("thread permissions = %o, want 600", info.Mode().Perm())
+	}
+	recent, err := ListRecentThreads(stateDirectory, repository, 10)
+	if err != nil {
+		t.Fatalf("list recent threads: %v", err)
+	}
+	if len(recent) != 1 || recent[0].ID != thread.ID || !recent[0].Available || recent[0].TurnCount != 2 {
+		t.Fatalf("recent threads = %#v", recent)
+	}
+}
+
+func TestListRecentThreadsFallsBackToLegacyRuns(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/project"
+	worktreePath := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(worktreePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	entry, record, err := Open(repository, "run-legacy-001", worktreePath, stateDirectory, time.Now())
+	if err != nil {
+		t.Fatalf("open legacy run: %v", err)
+	}
+	if err := entry.SaveSession(Session{Version: 2, Repository: repository, WorktreePath: worktreePath, Provider: "openai", Task: "Legacy task"}); err != nil {
+		t.Fatalf("save legacy session: %v", err)
+	}
+	if err := entry.Close(); err != nil {
+		t.Fatalf("close legacy run: %v", err)
+	}
+	recent, err := ListRecentThreads(stateDirectory, repository, 10)
+	if err != nil {
+		t.Fatalf("list recent threads: %v", err)
+	}
+	if len(recent) != 1 || recent[0].ID != "run-legacy-001" || recent[0].HeadStatePath != record.StatePath || !recent[0].Available {
+		t.Fatalf("legacy recent threads = %#v", recent)
+	}
+}

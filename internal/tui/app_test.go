@@ -118,12 +118,12 @@ func TestResponsiveViewsFitConstrainedTerminal(t *testing.T) {
 	recent := base
 	recent.screen = recentScreen
 	recent.recentIndex = 3
-	recent.recentRuns = []journal.RecentRun{
-		{Provider: "openai", Model: "gpt-5.6", Task: "First retained task", UpdatedAt: time.Now(), Available: true},
-		{Provider: "anthropic", Model: "claude-sonnet-5", Task: "Second retained task", UpdatedAt: time.Now(), Available: true},
-		{Provider: "gemini", Model: "gemini-3-pro", Task: "Third retained task", UpdatedAt: time.Now(), Available: true},
-		{Provider: "codex", Model: "", Task: "Selected retained task", UpdatedAt: time.Now(), Available: true},
-		{Provider: "mistral", Model: "mistral-large", Task: "Fifth retained task", UpdatedAt: time.Now(), Available: false},
+	recent.recentThreads = []journal.RecentThread{
+		{Provider: "openai", Model: "gpt-5.6", Task: "First retained task", TurnCount: 1, UpdatedAt: time.Now(), Available: true},
+		{Provider: "anthropic", Model: "claude-sonnet-5", Task: "Second retained task", TurnCount: 1, UpdatedAt: time.Now(), Available: true},
+		{Provider: "gemini", Model: "gemini-3-pro", Task: "Third retained task", TurnCount: 1, UpdatedAt: time.Now(), Available: true},
+		{Provider: "codex", Model: "", Task: "Selected retained task", TurnCount: 2, UpdatedAt: time.Now(), Available: true},
+		{Provider: "mistral", Model: "mistral-large", Task: "Fifth retained task", TurnCount: 1, UpdatedAt: time.Now(), Available: false},
 	}
 
 	for name, model := range map[string]Model{
