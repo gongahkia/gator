@@ -89,8 +89,8 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 const defaultResumeMaxSteps = 24
 
 func (e Executor) validateRequest(request Request) error {
-	if (e.Model == nil && e.Harness == nil) || (e.Model != nil && e.Harness != nil) {
-		return errors.New("exactly one agent model or CLI harness is required")
+	if e.Model == nil {
+		return errors.New("agent model is required")
 	}
 	if strings.TrimSpace(request.Task) == "" {
 		return errors.New("run task is required")
@@ -101,17 +101,8 @@ func (e Executor) validateRequest(request Request) error {
 	if strings.TrimSpace(request.Provider) == "" {
 		return errors.New("run provider is required")
 	}
-	if e.Harness != nil && !request.AllowExternalCLI {
-		return errors.New("external CLI harness requires explicit approval")
-	}
 	if request.Mode != ExecuteMode && request.Mode != PlanMode {
 		return fmt.Errorf("unsupported run mode %d", request.Mode)
-	}
-	if request.Mode == PlanMode && e.Harness != nil {
-		return errors.New("enforced Plan mode is unavailable for delegated CLI providers; choose a native provider or switch to Execute")
-	}
-	if (len(request.Images) > 0 || len(request.Attachments) > 0) && e.Harness != nil {
-		return errors.New("file attachments are available only to native providers")
 	}
 	return nil
 }

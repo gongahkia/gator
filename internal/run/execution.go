@@ -39,35 +39,31 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		}
 	}
 	var result agent.Result
-	if e.Harness != nil {
-		result, err = e.runHarness(ctx, isolated, request, projectInstructions, initialMessages, emit)
+	runTools := tools.Default(isolated.Root, tools.CommandPolicy{Allowed: request.Verification})
+	system := systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification)
+	var check func([]agent.Message) error
+	if request.Mode == PlanMode {
+		runTools = tools.ReadOnly(isolated.Root)
+		system = planSystemPrompt(joinInstructions(projectInstructions, request.System))
 	} else {
-		runTools := tools.Default(isolated.Root, tools.CommandPolicy{Allowed: request.Verification})
-		system := systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification)
-		var check func([]agent.Message) error
-		if request.Mode == PlanMode {
-			runTools = tools.ReadOnly(isolated.Root)
-			system = planSystemPrompt(joinInstructions(projectInstructions, request.System))
-		} else {
-			check = completionCheck(request.Verification)
-		}
-		runner := agent.Runner{
-			Model: e.Model,
-			Tools: runTools,
-			Now:   e.Now,
-		}
-		result, err = runner.Run(ctx, agent.RunOptions{
-			Task:            request.Task,
-			Images:          request.Images,
-			Attachments:     request.Attachments,
-			System:          system,
-			InitialMessages: initialMessages,
-			MaxSteps:        request.MaxSteps,
-			OnEvent:         emit,
-			Steering:        request.Steering,
-			CompletionCheck: check,
-		})
+		check = completionCheck(request.Verification)
 	}
+	runner := agent.Runner{
+		Model: e.Model,
+		Tools: runTools,
+		Now:   e.Now,
+	}
+	result, err = runner.Run(ctx, agent.RunOptions{
+		Task:            request.Task,
+		Images:          request.Images,
+		Attachments:     request.Attachments,
+		System:          system,
+		InitialMessages: initialMessages,
+		MaxSteps:        request.MaxSteps,
+		OnEvent:         emit,
+		Steering:        request.Steering,
+		CompletionCheck: check,
+	})
 	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: events}
 	session := journal.Session{
 		Version:         2,

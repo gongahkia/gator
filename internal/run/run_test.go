@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/harness"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -243,20 +242,6 @@ func TestExecutorResumeAdvancesThread(t *testing.T) {
 	}
 }
 
-func TestExecutorRejectsPlanModeForDelegatedHarness(t *testing.T) {
-	_, err := (Executor{Harness: &recordingHarness{}}).Execute(context.Background(), Request{
-		RepositoryPath:   featureRepository(t),
-		Task:             "Plan a feature",
-		Provider:         "codex",
-		RunID:            "delegated-plan-001",
-		Mode:             PlanMode,
-		AllowExternalCLI: true,
-	})
-	if err == nil || !strings.Contains(err.Error(), "enforced Plan mode") {
-		t.Fatalf("execute error = %v", err)
-	}
-}
-
 func TestValidateVerification(t *testing.T) {
 	if err := validateVerification([][]string{{}}); err == nil {
 		t.Fatal("empty verification command was accepted")
@@ -339,94 +324,9 @@ func TestExecutorResumesWithFreshEvidence(t *testing.T) {
 	}
 }
 
-func TestExecutorVerifiesDelegatedCLIHarnessOutcome(t *testing.T) {
-	repository := featureRepository(t)
-	delegated := &recordingHarness{run: func(_ context.Context, request harness.Request) (harness.Result, error) {
-		if err := os.WriteFile(filepath.Join(request.Root, "delegated.go"), []byte("package feature\n"), 0o644); err != nil {
-			return harness.Result{}, err
-		}
-		return harness.Result{FinalText: "Delegated implementation complete."}, nil
-	}}
-	executor := Executor{Harness: delegated}
-	outcome, err := executor.Execute(context.Background(), Request{
-		RepositoryPath:   repository,
-		Task:             "Add a delegated feature",
-		Provider:         "codex",
-		RunID:            "run_harness_001",
-		Verification:     [][]string{{"go", "test", "./..."}},
-		StateDir:         t.TempDir(),
-		AllowExternalCLI: true,
-	})
-	if err != nil {
-		t.Fatalf("execute harness: %v", err)
-	}
-	if delegated.request.Root != outcome.Worktree.Root.Path() || !containsEvent(outcome.Events, agent.EventHarnessStarted) || !containsEvent(outcome.Events, agent.EventRunFinished) {
-		t.Fatalf("outcome = %#v, request = %#v", outcome, delegated.request)
-	}
-	var verifierArguments struct {
-		Argv []string `json:"argv"`
-	}
-	for _, event := range outcome.Events {
-		if event.Kind == agent.EventToolCalled && event.ToolCall != nil && event.ToolCall.ID == "harness-verify-1" {
-			if err := json.Unmarshal(event.ToolCall.Arguments, &verifierArguments); err != nil {
-				t.Fatalf("decode delegated verifier arguments: %v", err)
-			}
-		}
-	}
-	if got := strings.Join(verifierArguments.Argv, " "); got != "go test ./..." {
-		t.Fatalf("delegated verifier arguments = %q", got)
-	}
-	if _, err := os.Stat(filepath.Join(outcome.Worktree.Path, "delegated.go")); err != nil {
-		t.Fatalf("delegated patch missing: %v", err)
-	}
-	current, err := journal.LoadSession(outcome.StatePath)
-	if err != nil {
-		t.Fatalf("load session: %v", err)
-	}
-	if current.Version != 2 || current.Provider != "codex" {
-		t.Fatalf("session = %#v", current)
-	}
-}
-
-func TestExecutorRequiresExplicitExternalCLIApproval(t *testing.T) {
-	_, err := (Executor{Harness: &recordingHarness{}}).Execute(context.Background(), Request{
-		RepositoryPath: featureRepository(t),
-		Task:           "Add a feature",
-		Provider:       "codex",
-		Verification:   [][]string{{"go", "test", "./..."}},
-	})
-	if err == nil || !strings.Contains(err.Error(), "explicit approval") {
-		t.Fatalf("execute error = %v", err)
-	}
-}
-
 type scriptedModel struct {
 	turns    []agent.Turn
 	requests []agent.TurnRequest
-}
-
-type recordingHarness struct {
-	run     func(context.Context, harness.Request) (harness.Result, error)
-	request harness.Request
-}
-
-func (h *recordingHarness) Run(ctx context.Context, request harness.Request) (harness.Result, error) {
-	h.request = request
-	if request.OnEvent != nil {
-		request.OnEvent(agent.Event{Kind: agent.EventHarnessStarted, Step: 1, Text: "test"})
-	}
-	if h.run == nil {
-		return harness.Result{}, errors.New("unexpected harness call")
-	}
-	result, err := h.run(ctx, request)
-	if request.OnEvent != nil {
-		event := agent.Event{Kind: agent.EventHarnessFinished, Step: 1, Text: "test"}
-		if err != nil {
-			event.ToolError = err.Error()
-		}
-		request.OnEvent(event)
-	}
-	return result, err
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {

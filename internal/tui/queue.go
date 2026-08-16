@@ -71,10 +71,6 @@ func (m Model) steerCurrentInput() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "No active run is available to steer.", kind: noticeError}
 		return m, nil
 	}
-	if !m.execution.steeringSupported {
-		m.notice = notice{text: "Active steering is unavailable for delegated CLI providers. Press Tab to queue this instruction for after it finishes.", kind: noticeInfo}
-		return m, nil
-	}
 	select {
 	case m.execution.steering <- text:
 		m.appendChat(chatEntry{author: chatUser, text: "Steer: " + text})

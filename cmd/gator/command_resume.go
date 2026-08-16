@@ -19,7 +19,6 @@ func resumeTask(arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("resume", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	maxSteps := flags.Int("max-steps", 0, "maximum model turns for this continuation")
-	allowExternalCLI := flags.Bool("allow-external-cli", false, "allow a retained vendor CLI harness to run with its own permission model")
 	last := flags.Bool("last", false, "resume the most recent retained thread for this repository")
 	all := flags.Bool("all", false, "include retained threads from other repositories")
 	if err := flags.Parse(arguments); err != nil {
@@ -41,7 +40,7 @@ func resumeTask(arguments []string, out io.Writer) error {
 		if *all {
 			return errors.New("--all cannot be combined with a run record path")
 		}
-		return resumeState(target, continuation, *maxSteps, *allowExternalCLI, out)
+		return resumeState(target, continuation, *maxSteps, out)
 	}
 
 	workingDirectory, err := os.Getwd()
@@ -66,7 +65,7 @@ func resumeTask(arguments []string, out io.Writer) error {
 	if continuation == "" {
 		return interactiveWithOptions(interactiveOptions{RepositoryPath: selected.Repository, ResumeStatePath: selected.HeadStatePath})
 	}
-	return resumeState(selected.HeadStatePath, continuation, *maxSteps, *allowExternalCLI, out)
+	return resumeState(selected.HeadStatePath, continuation, *maxSteps, out)
 }
 
 const resumeCandidateLimit = 1_000
@@ -124,7 +123,7 @@ func looksLikeRunRecordPath(target string) bool {
 	return err == nil && info.IsDir()
 }
 
-func resumeState(statePath, continuation string, maxSteps int, allowExternalCLI bool, out io.Writer) error {
+func resumeState(statePath, continuation string, maxSteps int, out io.Writer) error {
 	if continuation == "" {
 		session, err := journal.LoadSession(statePath)
 		if err != nil {
@@ -141,9 +140,6 @@ func resumeState(statePath, continuation string, maxSteps int, allowExternalCLI 
 		return fmt.Errorf("load retained provider: %w", err)
 	}
 	modelName := model.EffectiveModel(provider, session.Model)
-	if model.IsHarness(provider) && !allowExternalCLI {
-		return errors.New("resume of an external CLI harness requires --allow-external-cli")
-	}
 	executor, err := newExecutor(string(provider), modelName, session.BaseURL)
 	if err != nil {
 		return err
@@ -153,9 +149,8 @@ func resumeState(statePath, continuation string, maxSteps int, allowExternalCLI 
 	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Resume(context.Background(), session, statePath, continuation, gatorrun.Request{
-		MaxSteps:         maxSteps,
-		OnEvent:          printer.Print,
-		AllowExternalCLI: allowExternalCLI,
+		MaxSteps: maxSteps,
+		OnEvent:  printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {

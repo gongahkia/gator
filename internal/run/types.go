@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/harness"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -31,9 +30,6 @@ type Request struct {
 	Images      []agent.Image
 	Attachments []agent.Attachment
 	Mode        Mode
-	// AllowExternalCLI is required for delegated vendor CLIs because their
-	// tool permission model is separate from Gator's native allowlist.
-	AllowExternalCLI bool
 }
 
 // Mode controls the native agent tool surface for a turn. Plan mode is
@@ -68,7 +64,6 @@ type Outcome struct {
 // Executor combines the provider-independent loop with an isolated worktree.
 type Executor struct {
 	Model    agent.Model
-	Harness  harness.Runner
 	Now      func() time.Time
 	StateDir string
 }

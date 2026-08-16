@@ -40,7 +40,7 @@ func (m *Model) appendChatEvent(event agent.Event) {
 		m.closeStreamingChatEntry()
 		entry := renderEvent(event)
 		m.appendChat(chatEntry{author: chatSystem, text: entry.text})
-	case agent.EventToolCalled, agent.EventToolFinished, agent.EventCompletionBlocked, agent.EventHarnessStarted, agent.EventHarnessFinished:
+	case agent.EventToolCalled, agent.EventToolFinished, agent.EventCompletionBlocked:
 		m.closeStreamingChatEntry()
 		entry := renderEvent(event)
 		m.appendChat(chatEntry{author: chatTool, text: entry.text, detail: entry.detail})
@@ -110,14 +110,6 @@ func renderEvent(event agent.Event) timelineEntry {
 		text = prefix + " evidence required: " + compact(event.Text, 120)
 	case agent.EventSteeringApplied:
 		text = prefix + " steering accepted: " + compact(event.Text, 120)
-	case agent.EventHarnessStarted:
-		text = prefix + " delegated CLI -> " + compact(event.Text, 80)
-	case agent.EventHarnessFinished:
-		if event.ToolError == "" {
-			text = prefix + " delegated CLI ok " + compact(event.Text, 80)
-		} else {
-			text = prefix + " delegated CLI failed: " + compact(event.ToolError, 100)
-		}
 	case agent.EventRunFinished:
 		text = prefix + " completion proposed"
 	default:
@@ -207,15 +199,6 @@ func compact(value string, limit int) string {
 		return "…"
 	}
 	return value[:limit-1] + "…"
-}
-
-func isExternalProvider(provider string) bool {
-	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "codex", "claude", "copilot", "cursor":
-		return true
-	default:
-		return false
-	}
 }
 
 func nextField(current field, reverse bool) field {

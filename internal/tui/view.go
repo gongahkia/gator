@@ -281,12 +281,7 @@ func (m Model) activityView() string {
 	if duration := m.activityDuration(time.Now()); duration != "" {
 		activity += " · " + duration
 	}
-	providerMode := "native"
 	steering := "Enter steers at a model or tool boundary"
-	if m.execution != nil && !m.execution.steeringSupported {
-		providerMode = "delegated CLI"
-		steering = "Tab queues follow-up work; active steering is unavailable"
-	}
 	mode := m.runMode.String()
 	if m.runMode == gatorrun.PlanMode {
 		mode += " read-only"
@@ -295,7 +290,7 @@ func (m Model) activityView() string {
 	if turn < 1 {
 		turn = 1
 	}
-	facts := fmt.Sprintf("%s · %s · isolated worktree · turn %d/%d", mode, providerMode, turn, m.config.MaxSteps)
+	facts := fmt.Sprintf("%s · Gator-owned loop · isolated worktree · turn %d/%d", mode, turn, m.config.MaxSteps)
 	if age := m.lastActivityAge(time.Now()); age != "" {
 		facts += " · last activity " + age
 	}
@@ -393,8 +388,6 @@ func (m Model) failureGuidance() string {
 	switch {
 	case strings.Contains(message, "verification"):
 		return "Verification did not complete successfully. Inspect its transcript and output, then send a focused follow-up."
-	case strings.Contains(message, "harness"), strings.Contains(message, "cli"):
-		return "The delegated CLI stopped. Inspect the transcript, check that provider CLI setup is usable, then retry with a focused follow-up."
 	case strings.Contains(message, "api"), strings.Contains(message, "credential"), strings.Contains(message, "authentication"):
 		return "The model provider stopped before completion. Check provider configuration or credentials, then retry the task."
 	default:

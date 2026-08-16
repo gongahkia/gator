@@ -1,5 +1,5 @@
-// Package model resolves Gator's supported cloud APIs and locally installed
-// subscription CLI harnesses into provider-independent execution backends.
+// Package model resolves supported direct cloud APIs into provider-independent
+// execution backends. Gator always retains the model and tool loop.
 package model
 
 import (
@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/harness"
 	"github.com/gongahkia/gator/internal/model/anthropic"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/model/gemini"
@@ -49,17 +48,15 @@ type Config struct {
 	Client   *http.Client
 }
 
-// Backend has exactly one execution mode. Native models retain Gator's tool
-// loop; Harness uses a vendor CLI's own supported agent loop in the Gator
-// worktree and returns to Gator for verification and review.
+// Backend contains a direct model adapter. The agent and tool loop remain in
+// Gator for every supported provider.
 type Backend struct {
 	Provider Provider
 	Model    agent.Model
-	Harness  harness.Runner
 }
 
-// New resolves one configured provider. It never loads another program's
-// OAuth files: subscription credentials remain owned by the vendor CLI.
+// New resolves one configured direct provider. It never launches a vendor CLI
+// or reads another application's credential store.
 func New(config Config) (Backend, error) {
 	provider, err := ParseProvider(string(config.Provider))
 	if err != nil {
@@ -70,13 +67,13 @@ func New(config Config) (Backend, error) {
 		config.Model = DefaultModel(provider)
 	}
 	switch provider {
-	case OpenAI:
+	case OpenAI, Codex:
 		apiKey := key(config, "OPENAI_API_KEY")
 		if err := requireKey(apiKey, "OPENAI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: openai.Responses{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
-	case Anthropic:
+	case Anthropic, Claude:
 		apiKey := key(config, "ANTHROPIC_API_KEY")
 		if err := requireKey(apiKey, "ANTHROPIC_API_KEY"); err != nil {
 			return Backend{}, err
@@ -94,12 +91,8 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
-	case Codex, Claude, Copilot, Cursor:
-		cli, err := harness.New(harness.Provider(provider))
-		if err != nil {
-			return Backend{}, err
-		}
-		return Backend{Provider: provider, Harness: cli}, nil
+	case Copilot, Cursor:
+		return Backend{}, fmt.Errorf("provider %q has no supported direct model API integration; Gator will not launch the %s CLI", provider, provider)
 	default:
 		return Backend{}, fmt.Errorf("unsupported provider %q", provider)
 	}
@@ -165,25 +158,14 @@ func ParseProvider(value string) (Provider, error) {
 	return provider, nil
 }
 
-// Names returns supported provider names in stable display order.
+// Names returns direct provider names in stable display order.
 func Names() []string {
-	names := make([]string, 0, len(allProviders))
-	for provider := range allProviders {
+	names := make([]string, 0, len(directProviders))
+	for provider := range directProviders {
 		names = append(names, string(provider))
 	}
 	sort.Strings(names)
 	return names
-}
-
-// IsHarness reports whether the provider invokes an already-authenticated CLI
-// rather than Gator's native model/tool loop.
-func IsHarness(provider Provider) bool {
-	switch provider {
-	case Codex, Claude, Copilot, Cursor:
-		return true
-	default:
-		return false
-	}
 }
 
 // SupportsPDFAttachments reports whether Gator's adapter can encode a PDF
@@ -191,7 +173,7 @@ func IsHarness(provider Provider) bool {
 // Completions endpoints do not share a stable file-input contract.
 func SupportsPDFAttachments(provider Provider) bool {
 	switch provider {
-	case OpenAI, Anthropic, Gemini:
+	case OpenAI, Codex, Anthropic, Claude, Gemini:
 		return true
 	default:
 		return false
@@ -202,9 +184,9 @@ func SupportsPDFAttachments(provider Provider) bool {
 // guessing a catalog-specific model. Empty means the user or CLI chooses it.
 func DefaultModel(provider Provider) string {
 	switch provider {
-	case OpenAI:
+	case OpenAI, Codex:
 		return openai.DefaultModel()
-	case Anthropic:
+	case Anthropic, Claude:
 		return "claude-sonnet-5"
 	case Gemini:
 		return "gemini-3.5-flash"
@@ -216,8 +198,7 @@ func DefaultModel(provider Provider) string {
 }
 
 // EffectiveModel returns an explicit model unchanged or the provider's stable
-// default when one is available. An empty result means the selected vendor CLI
-// is responsible for choosing its own configured default.
+// direct-API default when one is available.
 func EffectiveModel(provider Provider, requested string) string {
 	if strings.TrimSpace(requested) != "" {
 		return strings.TrimSpace(requested)
@@ -228,14 +209,14 @@ func EffectiveModel(provider Provider, requested string) string {
 // CredentialHint describes the prerequisite without exposing secrets.
 func CredentialHint(provider Provider) string {
 	switch provider {
-	case OpenAI:
+	case OpenAI, Codex:
 		return "OPENAI_API_KEY"
-	case Anthropic:
+	case Anthropic, Claude:
 		return "ANTHROPIC_API_KEY"
 	case Gemini:
 		return "GEMINI_API_KEY"
-	case Codex, Claude, Copilot, Cursor:
-		return string(provider) + " CLI login"
+	case Copilot, Cursor:
+		return "no supported direct credential"
 	default:
 		if definition, ok := compatibleProviders[provider]; ok {
 			return definition.apiKeyEnv
@@ -258,6 +239,13 @@ func requireKey(value, environment string) error {
 	return nil
 }
 
+// allProviders includes retained legacy provider names so loading a previous
+// session produces a clear no-fallback error instead of treating its metadata
+// as malformed. Names exposes only providers that can currently execute.
 var allProviders = map[Provider]struct{}{
 	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, Cursor: {},
+}
+
+var directProviders = map[Provider]struct{}{
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {},
 }

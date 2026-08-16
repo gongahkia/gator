@@ -22,10 +22,9 @@ func runTask(arguments []string, out io.Writer) error {
 		defaultProvider = string(model.OpenAI)
 	}
 	providerName := flags.String("provider", defaultProvider, "model provider")
-	modelName := flags.String("model", os.Getenv("GATOR_MODEL"), "model name; optional for vendor CLI harnesses")
+	modelName := flags.String("model", os.Getenv("GATOR_MODEL"), "model name")
 	baseURL := flags.String("base-url", os.Getenv("GATOR_BASE_URL"), "provider API base URL override")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
-	allowExternalCLI := flags.Bool("allow-external-cli", false, "allow a vendor CLI harness to run with its own permission model")
 	var verification verificationFlags
 	flags.Var(&verification, "verify", "required verification command as a whitespace-separated argv")
 	if err := flags.Parse(arguments); err != nil {
@@ -45,9 +44,6 @@ func runTask(arguments []string, out io.Writer) error {
 	if *modelName == "" {
 		*modelName = model.DefaultModel(provider)
 	}
-	if model.IsHarness(provider) && !*allowExternalCLI {
-		return errors.New("external CLI harnesses require --allow-external-cli")
-	}
 	executor, err := newExecutor(string(provider), *modelName, *baseURL)
 	if err != nil {
 		return err
@@ -61,15 +57,14 @@ func runTask(arguments []string, out io.Writer) error {
 	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
-		RepositoryPath:   workingDirectory,
-		Task:             task,
-		Provider:         string(provider),
-		Model:            *modelName,
-		BaseURL:          *baseURL,
-		MaxSteps:         *maxSteps,
-		Verification:     verification,
-		OnEvent:          printer.Print,
-		AllowExternalCLI: *allowExternalCLI,
+		RepositoryPath: workingDirectory,
+		Task:           task,
+		Provider:       string(provider),
+		Model:          *modelName,
+		BaseURL:        *baseURL,
+		MaxSteps:       *maxSteps,
+		Verification:   verification,
+		OnEvent:        printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {
@@ -119,14 +114,6 @@ func (p *eventPrinter) Print(event agent.Event) {
 		}
 	case agent.EventCompletionBlocked:
 		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
-	case agent.EventHarnessStarted:
-		_, _ = fmt.Fprintf(p.out, "[%02d] delegated CLI → %s\n", event.Step, event.Text)
-	case agent.EventHarnessFinished:
-		if event.ToolError == "" {
-			_, _ = fmt.Fprintf(p.out, "[%02d] delegated CLI ✓ %s\n", event.Step, event.Text)
-		} else {
-			_, _ = fmt.Fprintf(p.out, "[%02d] delegated CLI ! %s\n", event.Step, event.ToolError)
-		}
 	}
 }
 

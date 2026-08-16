@@ -13,7 +13,7 @@ Usage:
   gator tui
   gator help
   gator doctor [--provider PROVIDER]
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--allow-external-cli] --verify 'argv ...' TASK
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] --verify 'argv ...' TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH
@@ -26,12 +26,12 @@ Commands:
   export    write a portable patch for a retained run to standard output
   apply     explicitly apply a retained patch to this clean checkout
 
-Cloud providers use their own API-key environment variable. Supported native
-providers are openai, azure-openai, anthropic, gemini, mistral, xai, groq,
-openrouter, together, fireworks, deepseek, and openai-compatible. Codex, Claude Code,
-GitHub Copilot, and Cursor use their already-authenticated local CLIs; select
-one explicitly and pass --allow-external-cli in script mode. --verify is
-repeatable and every listed command must pass before Gator accepts completion.`
+Cloud providers use their own API-key environment variable. Supported direct
+providers are openai, codex (OPENAI_API_KEY), azure-openai, anthropic, claude
+(ANTHROPIC_API_KEY), gemini, mistral, xai, groq, openrouter, together,
+fireworks, deepseek, and openai-compatible. Gator never delegates its tool
+loop to a vendor CLI. --verify is repeatable and every listed command must
+pass before Gator accepts completion.`
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {

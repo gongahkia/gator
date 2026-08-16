@@ -125,11 +125,10 @@ type attachmentPreview struct {
 }
 
 type executionStream struct {
-	events            chan agent.Event
-	done              chan executionDone
-	cancel            context.CancelFunc
-	steering          chan string
-	steeringSupported bool
+	events   chan agent.Event
+	done     chan executionDone
+	cancel   context.CancelFunc
+	steering chan string
 }
 
 type executionDone struct {

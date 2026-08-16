@@ -34,8 +34,7 @@ type RunCommand struct {
 	Policy CommandPolicy
 }
 
-// CommandResult is a bounded execution record shared by the model tool and
-// Gator's post-harness verification path.
+// CommandResult is a bounded execution record returned to the model tool.
 type CommandResult struct {
 	Argv      []string `json:"argv"`
 	ExitCode  int      `json:"exit_code"`

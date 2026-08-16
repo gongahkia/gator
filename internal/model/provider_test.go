@@ -2,6 +2,7 @@ package model
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
@@ -14,7 +15,9 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		baseURL  string
 	}{
 		{provider: OpenAI, key: "openai-key"},
+		{provider: Codex, key: "openai-key"},
 		{provider: Anthropic, key: "anthropic-key"},
+		{provider: Claude, key: "anthropic-key"},
 		{provider: Gemini, key: "gemini-key"},
 		{provider: Mistral, key: "mistral-key"},
 		{provider: AzureOpenAI, key: "azure-key", baseURL: "https://example.test/chat/completions?api-version=2025-01-01"},
@@ -26,7 +29,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 			if err != nil {
 				t.Fatalf("new backend: %v", err)
 			}
-			if backend.Provider != test.provider || backend.Model == nil || backend.Harness != nil {
+			if backend.Provider != test.provider || backend.Model == nil {
 				t.Fatalf("backend = %#v", backend)
 			}
 		})
@@ -42,6 +45,11 @@ func TestNewRequiresConfiguredKeyAndCompatibleEndpoint(t *testing.T) {
 	}
 	if _, err := ParseProvider("unknown"); err == nil {
 		t.Fatal("unknown provider was accepted")
+	}
+	for _, provider := range []Provider{Copilot, Cursor} {
+		if _, err := New(Config{Provider: provider}); err == nil || !strings.Contains(err.Error(), "will not launch") {
+			t.Fatalf("provider %q error = %v", provider, err)
+		}
 	}
 }
 
@@ -63,7 +71,17 @@ func TestEffectiveModelUsesProviderDefaults(t *testing.T) {
 	if got := EffectiveModel(Gemini, "  chosen-model  "); got != "chosen-model" {
 		t.Fatalf("explicit model = %q", got)
 	}
-	if got := EffectiveModel(Codex, ""); got != "" {
-		t.Fatalf("CLI default = %q", got)
+	if got := EffectiveModel(Codex, ""); got != DefaultModel(OpenAI) {
+		t.Fatalf("Codex default = %q", got)
+	}
+	if got := EffectiveModel(Claude, ""); got != DefaultModel(Anthropic) {
+		t.Fatalf("Claude default = %q", got)
+	}
+	for _, unavailable := range []string{"copilot", "cursor"} {
+		for _, name := range Names() {
+			if name == unavailable {
+				t.Fatalf("unavailable provider %q appeared in direct provider list", unavailable)
+			}
+		}
 	}
 }
