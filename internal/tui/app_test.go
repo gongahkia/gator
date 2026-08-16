@@ -65,6 +65,32 @@ func TestNewCanStartAtTheProjectOrAllThreadPicker(t *testing.T) {
 	}
 }
 
+func TestBeginContinuationSwitchesRepositoryForASelectedCrossProjectThread(t *testing.T) {
+	stateDirectory := t.TempDir()
+	retainedRepository := "/workspace/other-project"
+	worktreePath := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(worktreePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	entry, record, err := journal.Open(retainedRepository, "run-cross-project", worktreePath, stateDirectory, time.Now())
+	if err != nil {
+		t.Fatalf("open session: %v", err)
+	}
+	if err := entry.SaveSession(journal.Session{Version: 2, Repository: retainedRepository, WorktreePath: worktreePath, Provider: "openai", Task: "Cross-project task", ThreadID: "thread-cross", Mode: "execute"}); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+	if err := entry.Close(); err != nil {
+		t.Fatalf("close session: %v", err)
+	}
+
+	model := New(Config{RepositoryPath: "/workspace/current-project", StateDir: stateDirectory})
+	next, _ := model.beginContinuation(record.StatePath)
+	continued := next.(Model)
+	if continued.config.RepositoryPath != retainedRepository || continued.resumeStatePath != record.StatePath || continued.threadID != "thread-cross" {
+		t.Fatalf("cross-project continuation = %#v", continued)
+	}
+}
+
 func TestComposerRejectsEmptyTaskBeforeRun(t *testing.T) {
 	model := New(Config{})
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
