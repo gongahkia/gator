@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -20,6 +19,13 @@ import (
 )
 
 const PDFMediaType = "application/pdf"
+
+const (
+	maxArchiveEntries      = 4_096
+	maxSpreadsheetSheets  = 128
+	maxSpreadsheetRows    = 100_000
+	maxSpreadsheetStrings = 100_000
+)
 
 // IsSupported reports whether a path can become an explicit attachment. Other
 // @ references retain their existing inspect-in-workspace behavior.
@@ -93,18 +99,7 @@ func Load(root workspace.Root, path string, maxBytes int) (agent.Attachment, boo
 }
 
 func readRegularFile(root workspace.Root, path string, maxBytes int) ([]byte, error) {
-	resolved, err := root.ResolveFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("resolve attachment @%s: %w", path, err)
-	}
-	info, err := os.Stat(resolved)
-	if err != nil {
-		return nil, fmt.Errorf("inspect attachment @%s: %w", path, err)
-	}
-	if !info.Mode().IsRegular() || info.Size() > int64(maxBytes) {
-		return nil, fmt.Errorf("attachment @%s must be a regular file no larger than %d MiB", path, maxBytes/(1024*1024))
-	}
-	contents, err := os.ReadFile(resolved)
+	contents, err := root.ReadRegularFile(path, int64(maxBytes))
 	if err != nil {
 		return nil, fmt.Errorf("read attachment @%s: %w", path, err)
 	}
@@ -128,9 +123,9 @@ func extractODT(contents []byte, maxBytes int) (string, error) {
 }
 
 func zipEntry(contents []byte, name string, maxBytes int) ([]byte, error) {
-	reader, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents)))
+	reader, err := documentArchive(contents, maxBytes)
 	if err != nil {
-		return nil, fmt.Errorf("open document archive: %w", err)
+		return nil, err
 	}
 	for _, entry := range reader.File {
 		if entry.Name != name {
@@ -244,9 +239,9 @@ func documentXMLText(data []byte, maxBytes int) (string, error) {
 }
 
 func extractXLSX(contents []byte, maxBytes int) (string, error) {
-	reader, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents)))
+	reader, err := documentArchive(contents, maxBytes)
 	if err != nil {
-		return "", fmt.Errorf("open spreadsheet archive: %w", err)
+		return "", err
 	}
 	entries := make(map[string]*zip.File, len(reader.File))
 	var sheets []string
@@ -258,6 +253,9 @@ func extractXLSX(contents []byte, maxBytes int) (string, error) {
 	}
 	if len(sheets) == 0 {
 		return "", errors.New("spreadsheet archive contains no worksheets")
+	}
+	if len(sheets) > maxSpreadsheetSheets {
+		return "", fmt.Errorf("spreadsheet has more than %d worksheets", maxSpreadsheetSheets)
 	}
 	shared := []string(nil)
 	if entry := entries["xl/sharedStrings.xml"]; entry != nil {
@@ -297,6 +295,37 @@ func extractXLSX(contents []byte, maxBytes int) (string, error) {
 	return strings.TrimSpace(text.String()), nil
 }
 
+func documentArchive(contents []byte, maxBytes int) (*zip.Reader, error) {
+	reader, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents)))
+	if err != nil {
+		return nil, fmt.Errorf("open document archive: %w", err)
+	}
+	if len(reader.File) > maxArchiveEntries {
+		return nil, fmt.Errorf("document archive has more than %d entries", maxArchiveEntries)
+	}
+	maxTotalBytes := uint64(maxBytes) * 4
+	var totalBytes uint64
+	seen := make(map[string]struct{}, len(reader.File))
+	for _, entry := range reader.File {
+		if !safeArchivePath(entry.Name) {
+			return nil, fmt.Errorf("document archive contains unsafe entry %q", entry.Name)
+		}
+		if _, duplicate := seen[entry.Name]; duplicate {
+			return nil, fmt.Errorf("document archive contains duplicate entry %q", entry.Name)
+		}
+		seen[entry.Name] = struct{}{}
+		if entry.UncompressedSize64 > uint64(maxBytes) || totalBytes > maxTotalBytes-entry.UncompressedSize64 {
+			return nil, errors.New("document archive exceeds the extraction limit")
+		}
+		totalBytes += entry.UncompressedSize64
+	}
+	return reader, nil
+}
+
+func safeArchivePath(name string) bool {
+	return name != "" && !strings.Contains(name, "\\") && filepath.IsLocal(name)
+}
+
 func readZipFile(entry *zip.File, maxBytes int) ([]byte, error) {
 	if entry.UncompressedSize64 > uint64(maxBytes) {
 		return nil, errors.New("document text exceeds the extraction limit")
@@ -333,6 +362,9 @@ func sharedStrings(data []byte, maxBytes int) ([]string, error) {
 		case xml.StartElement:
 			switch value.Name.Local {
 			case "si":
+				if len(values) == maxSpreadsheetStrings {
+					return nil, fmt.Errorf("spreadsheet has more than %d shared strings", maxSpreadsheetStrings)
+				}
 				inItem = true
 				current.Reset()
 			case "t":
@@ -368,6 +400,7 @@ func worksheetCSV(data []byte, shared []string, maxBytes int) (string, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(data))
 	var output strings.Builder
 	row := []string(nil)
+	rowCount := 0
 	cellType, value := "", ""
 	inCell, inValue, inInline := false, 0, 0
 	for {
@@ -422,6 +455,10 @@ func worksheetCSV(data []byte, shared []string, maxBytes int) (string, error) {
 					inCell = false
 				}
 			case "row":
+				rowCount++
+				if rowCount > maxSpreadsheetRows {
+					return "", fmt.Errorf("spreadsheet has more than %d rows per worksheet", maxSpreadsheetRows)
+				}
 				if err := writeCSVRow(&output, row); err != nil {
 					return "", err
 				}

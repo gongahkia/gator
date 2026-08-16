@@ -4,6 +4,7 @@ package workspace
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -50,16 +51,9 @@ func (r Root) ResolveFile(path string) (string, error) {
 	if r.path == "" {
 		return "", errors.New("workspace root is not initialized")
 	}
-	if strings.TrimSpace(path) == "" {
-		return "", errors.New("workspace-relative path is required")
-	}
-	if filepath.IsAbs(path) {
-		return "", fmt.Errorf("absolute path %q is not allowed", path)
-	}
-
-	cleaned := filepath.Clean(path)
-	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("path %q escapes the workspace", path)
+	cleaned, err := cleanRelativePath(path)
+	if err != nil {
+		return "", err
 	}
 
 	current := r.path
@@ -91,6 +85,64 @@ func (r Root) ResolveFile(path string) (string, error) {
 		}
 	}
 	return current, nil
+}
+
+// ReadRegularFile reads a bounded regular file through a descriptor-rooted
+// path. On supported platforms os.Root keeps symlink resolution beneath this
+// workspace even if another process changes path components concurrently.
+func (r Root) ReadRegularFile(path string, maxBytes int64) ([]byte, error) {
+	if r.path == "" {
+		return nil, errors.New("workspace root is not initialized")
+	}
+	if maxBytes < 1 {
+		return nil, errors.New("maximum file size must be positive")
+	}
+	cleaned, err := cleanRelativePath(path)
+	if err != nil {
+		return nil, err
+	}
+	directory, err := os.OpenRoot(r.path)
+	if err != nil {
+		return nil, fmt.Errorf("open workspace root: %w", err)
+	}
+	defer directory.Close()
+	file, err := directory.Open(cleaned)
+	if err != nil {
+		return nil, fmt.Errorf("open %q: %w", path, err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat %q: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("path %q is not a regular file", path)
+	}
+	if info.Size() > maxBytes {
+		return nil, fmt.Errorf("file %q exceeds the %d MiB limit", path, maxBytes/(1024*1024))
+	}
+	contents, err := io.ReadAll(io.LimitReader(file, maxBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read %q: %w", path, err)
+	}
+	if int64(len(contents)) > maxBytes {
+		return nil, fmt.Errorf("file %q exceeds the %d MiB limit", path, maxBytes/(1024*1024))
+	}
+	return contents, nil
+}
+
+func cleanRelativePath(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("workspace-relative path is required")
+	}
+	if filepath.IsAbs(path) {
+		return "", fmt.Errorf("absolute path %q is not allowed", path)
+	}
+	cleaned := filepath.Clean(path)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q escapes the workspace", path)
+	}
+	return cleaned, nil
 }
 
 func (r Root) assertInside(path string) error {
