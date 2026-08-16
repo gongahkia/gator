@@ -21,6 +21,8 @@ type slashCommand struct {
 
 var slashCommands = []slashCommand{
 	{name: "/clear", description: "clear the current task"},
+	{name: "/clear-queue", description: "remove every queued instruction"},
+	{name: "/dequeue", description: "remove the next queued instruction"},
 	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
 	{name: "/model", description: "edit the model for the next run"},
@@ -31,6 +33,7 @@ var slashCommands = []slashCommand{
 	{name: "/threads", description: "choose a retained conversation thread"},
 	{name: "/permissions", description: "show the isolated-run policy"},
 	{name: "/quit", description: "exit Gator"},
+	{name: "/queue", description: "show queued follow-up instructions"},
 	{name: "/review", description: "return to the latest review"},
 	{name: "/status", description: "show current run configuration"},
 	{name: "/verify", description: "edit required verification commands"},

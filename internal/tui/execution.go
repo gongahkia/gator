@@ -112,21 +112,24 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stream := &executionStream{
-		events: make(chan agent.Event, 32),
-		done:   make(chan executionDone, 1),
-		cancel: cancel,
+		events:   make(chan agent.Event, 32),
+		done:     make(chan executionDone, 1),
+		cancel:   cancel,
+		steering: make(chan string, maxQueuedInputs),
 	}
 	m.execution = stream
 	m.events = nil
 	m.appendChat(chatEntry{author: chatUser, text: task})
 	m.task.Reset()
-	m.task.Placeholder = "Waiting for Gator..."
+	m.task.Placeholder = "Enter steers this run · Tab queues the next turn..."
 	m.outcome = nil
 	m.runErr = nil
 	m.diff = ""
 	m.diffErr = nil
 	m.diffTruncated = false
 	m.screen = runningScreen
+	m.focus = taskField
+	_ = m.focusField()
 	if m.runMode == gatorrun.PlanMode {
 		m.notice = notice{text: "Creating an isolated worktree for read-only planning...", kind: noticeInfo}
 	} else {
@@ -152,6 +155,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			case <-ctx.Done():
 			}
 		},
+		Steering:         stream.steering,
 		AllowExternalCLI: true,
 	}
 
@@ -215,8 +219,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "File attachments require a native provider; delegated CLI providers cannot receive attachment bytes from Gator.", kind: noticeError}
 			return m, nil
 		}
+		stream.steeringSupported = executor.Harness == nil
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
 	} else {
+		stream.steeringSupported = executor.Harness == nil
 		go executeNew(ctx, stream, executor, request)
 	}
 	return m, waitForExecution(stream)
@@ -315,6 +321,7 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 		m.runMode = gatorrun.PlanMode
 	}
 	m.task.Reset()
+	m.queue = nil
 	m.task.Placeholder = "Describe the next instruction for this retained worktree..."
 	m.chat = nil
 	m.chatIndex = 0
@@ -339,6 +346,7 @@ func (m *Model) returnToComposer() {
 	m.threadID = ""
 	m.runMode = gatorrun.ExecuteMode
 	m.task.Reset()
+	m.queue = nil
 	m.task.Placeholder = "Message Gator..."
 	m.chat = nil
 	m.chatIndex = 0
