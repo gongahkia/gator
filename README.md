@@ -72,7 +72,9 @@ the selected worktree when continuation begins.
 
 Type `/` (or `?` in an empty message) to filter and select local conversation commands;
 type `@` in a task to select a repository file or directory from matching path
-suggestions. Both menus accept arrow keys and `Enter` or `Tab`. Conversation
+suggestions. In the command menu, `Tab` completes the selected command and
+`Enter` executes it; path suggestions accept either key to insert the path.
+Conversation
 commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
 `/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/clear`,
 `/help`, and `/quit`. `/plan` gives native providers an enforced read-only

@@ -71,8 +71,11 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "down", "ctrl+n":
 			m.moveCommandSelection(1)
 			return m, nil
-		case "enter", "tab":
+		case "enter":
 			return m.executeSelectedCommand()
+		case "tab":
+			m.completeSelectedCommand()
+			return m, nil
 		case "esc":
 			m.task.Reset()
 			m.commandIndex = 0

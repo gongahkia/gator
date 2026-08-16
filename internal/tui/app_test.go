@@ -217,16 +217,24 @@ func TestQuestionMarkOpensCommandPalette(t *testing.T) {
 	}
 }
 
-func TestTabAcceptsSlashCommandRecommendation(t *testing.T) {
+func TestTabCompletesSlashCommandWithoutExecutingIt(t *testing.T) {
 	model := New(Config{})
 	model.task.SetValue("/prov")
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
-	if command == nil {
-		t.Fatal("provider command did not focus the provider field")
+	if command != nil {
+		t.Fatal("Tab executed the provider command")
 	}
 	updated := next.(Model)
+	if updated.focus != taskField || updated.task.Value() != "/provider" {
+		t.Fatalf("Tab completion = %#v", updated)
+	}
+	next, command = updated.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("Enter did not execute the completed provider command")
+	}
+	updated = next.(Model)
 	if updated.focus != providerField || updated.task.Value() != "" {
-		t.Fatalf("composer = %#v", updated)
+		t.Fatalf("executed command = %#v", updated)
 	}
 }
 
