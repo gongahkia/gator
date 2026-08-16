@@ -20,18 +20,30 @@ const (
 // Message is the normalized conversation history passed to a model adapter.
 // Tool messages carry a call ID so adapters can preserve provider correlation.
 type Message struct {
-	Role         Role            `json:"role"`
-	Content      string          `json:"content"`
-	Images       []Image         `json:"images,omitempty"`
-	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
-	ToolCallID   string          `json:"tool_call_id,omitempty"`
-	ToolName     string          `json:"tool_name,omitempty"`
+	Role        Role         `json:"role"`
+	Content     string       `json:"content"`
+	Images      []Image      `json:"images,omitempty"`
+	Attachments []Attachment `json:"attachments,omitempty"`
+	ToolCalls   []ToolCall   `json:"tool_calls,omitempty"`
+	ToolCallID  string       `json:"tool_call_id,omitempty"`
+	ToolName    string       `json:"tool_name,omitempty"`
+	// ProviderData contains opaque provider state needed for a valid replay.
 	ProviderData json.RawMessage `json:"provider_data,omitempty"`
 }
 
 // Image is a developer-supplied visual attachment. Data is private session
 // state so stateless providers can receive the same image on every turn.
 type Image struct {
+	Name      string `json:"name"`
+	MediaType string `json:"media_type"`
+	Data      []byte `json:"data"`
+}
+
+// Attachment is a developer-supplied document or extracted text attachment.
+// Data is private session state so stateless providers can replay the same
+// context on every turn. application/pdf retains the original document bytes;
+// text/plain contains Gator's bounded textual representation of a document.
+type Attachment struct {
 	Name      string `json:"name"`
 	MediaType string `json:"media_type"`
 	Data      []byte `json:"data"`
@@ -125,6 +137,7 @@ type EventSink func(Event)
 type RunOptions struct {
 	Task            string
 	Images          []Image
+	Attachments     []Attachment
 	System          string
 	InitialMessages []Message
 	MaxSteps        int

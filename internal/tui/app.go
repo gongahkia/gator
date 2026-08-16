@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -554,6 +555,15 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: err.Error(), kind: noticeError}
 		return m, nil
 	}
+	imageBytes := 0
+	for _, image := range images {
+		imageBytes += len(image.Data)
+	}
+	attachments, err := documentAttachments(m.config.RepositoryPath, references, imageBytes, len(images))
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
 	var verification [][]string
 	if m.runMode == gatorrun.ExecuteMode {
 		var err error
@@ -592,8 +602,8 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
 			return m, nil
 		}
-		if len(images) > 0 && executor.Harness != nil {
-			m.notice = notice{text: "Image attachments require a native provider; delegated CLI providers cannot receive image bytes from Gator.", kind: noticeError}
+		if (len(images) > 0 || len(attachments) > 0) && executor.Harness != nil {
+			m.notice = notice{text: "File attachments require a native provider; delegated CLI providers cannot receive attachment bytes from Gator.", kind: noticeError}
 			return m, nil
 		}
 	}
@@ -629,6 +639,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		StateDir:       m.config.StateDir,
 		ThreadID:       m.threadID,
 		Images:         images,
+		Attachments:    attachments,
 		Mode:           m.runMode,
 		OnEvent: func(event agent.Event) {
 			select {
@@ -685,11 +696,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
 			return m, nil
 		}
-		if len(images) > 0 && executor.Harness != nil {
+		if (len(images) > 0 || len(attachments) > 0) && executor.Harness != nil {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "Image attachments require a native provider; delegated CLI providers cannot receive image bytes from Gator.", kind: noticeError}
+			m.notice = notice{text: "File attachments require a native provider; delegated CLI providers cannot receive attachment bytes from Gator.", kind: noticeError}
 			return m, nil
 		}
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
@@ -1838,10 +1849,12 @@ func (m Model) contextReferencesView() string {
 		label := "@" + reference
 		if imageMediaType(reference) != "" {
 			label = "[image] " + label
+		} else if attachment.IsSupported(reference) {
+			label = "[document] " + label
 		}
 		values = append(values, keyStyle.Render(label))
 	}
-	return labelStyle.Render("Context references") + "\n" + m.panel(strings.Join(values, "  ")) + "\n" + m.inline(dimStyle.Render("Image references attach their pixels to native-provider turns; other paths are inspected first."))
+	return labelStyle.Render("Context references") + "\n" + m.panel(strings.Join(values, "  ")) + "\n" + m.inline(dimStyle.Render("Images, PDFs, and supported documents attach to native-provider turns; other paths are inspected first."))
 }
 
 func (m Model) sessionStatus() string {

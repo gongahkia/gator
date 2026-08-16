@@ -48,7 +48,7 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 	}
 	messages := cloneMessages(options.InitialMessages)
 	if len(messages) == 0 {
-		messages = []Message{{Role: RoleUser, Content: options.Task, Images: cloneImages(options.Images)}}
+		messages = []Message{{Role: RoleUser, Content: options.Task, Images: cloneImages(options.Images), Attachments: cloneAttachments(options.Attachments)}}
 	}
 
 	for step := 1; step <= maxSteps; step++ {
@@ -201,6 +201,7 @@ func cloneMessages(messages []Message) []Message {
 		clones[index] = message
 		clones[index].ToolCalls = cloneCalls(message.ToolCalls)
 		clones[index].Images = cloneImages(message.Images)
+		clones[index].Attachments = cloneAttachments(message.Attachments)
 		clones[index].ProviderData = append(json.RawMessage(nil), message.ProviderData...)
 	}
 	return clones
@@ -214,6 +215,18 @@ func cloneImages(images []Image) []Image {
 	for index, image := range images {
 		clones[index] = image
 		clones[index].Data = append([]byte(nil), image.Data...)
+	}
+	return clones
+}
+
+func cloneAttachments(attachments []Attachment) []Attachment {
+	if attachments == nil {
+		return nil
+	}
+	clones := make([]Attachment, len(attachments))
+	for index, attachment := range attachments {
+		clones[index] = attachment
+		clones[index].Data = append([]byte(nil), attachment.Data...)
 	}
 	return clones
 }

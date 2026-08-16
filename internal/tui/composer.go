@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -59,8 +60,9 @@ type contextReference struct {
 }
 
 const (
-	maxImageAttachments = 4
+	maxInputAttachments = 4
 	maxImageBytes       = 4 * 1024 * 1024
+	maxDocumentBytes    = 4 * 1024 * 1024
 	maxAttachmentBytes  = 8 * 1024 * 1024
 )
 
@@ -263,6 +265,8 @@ func taskWithContextReferences(task string, references []contextReference) strin
 			kind = "directory"
 		} else if imageMediaType(reference.path) != "" {
 			kind = "image attachment"
+		} else if attachment.IsSupported(reference.path) {
+			kind = "document attachment"
 		}
 		fmt.Fprintf(&details, "- %s (%s)\n", reference.path, kind)
 	}
@@ -284,8 +288,8 @@ func imageAttachments(repository string, references []contextReference) ([]agent
 		if reference.isDir || imageMediaType(reference.path) == "" {
 			continue
 		}
-		if len(attachments) == maxImageAttachments {
-			return nil, fmt.Errorf("attach at most %d images per task", maxImageAttachments)
+		if len(attachments) == maxInputAttachments {
+			return nil, fmt.Errorf("attach at most %d files per task", maxInputAttachments)
 		}
 		path, err := root.ResolveFile(reference.path)
 		if err != nil {
@@ -311,6 +315,43 @@ func imageAttachments(repository string, references []contextReference) ([]agent
 		}
 		attachments = append(attachments, agent.Image{Name: reference.path, MediaType: mediaType, Data: data})
 		totalBytes += len(data)
+	}
+	return attachments, nil
+}
+
+// documentAttachments loads PDFs and bounded textual document context from @
+// references. It shares the private-session byte budget with image inputs.
+func documentAttachments(repository string, references []contextReference, imageBytes, imageCount int) ([]agent.Attachment, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, fmt.Errorf("open repository for document attachments: %w", err)
+	}
+	attachments := make([]agent.Attachment, 0)
+	totalBytes := imageBytes
+	for _, reference := range references {
+		if reference.isDir || imageMediaType(reference.path) != "" || !attachment.IsSupported(reference.path) {
+			continue
+		}
+		if imageCount+len(attachments) == maxInputAttachments {
+			return nil, fmt.Errorf("attach at most %d files per task", maxInputAttachments)
+		}
+		remaining := maxAttachmentBytes - totalBytes
+		if remaining < 1 {
+			return nil, fmt.Errorf("attached files exceed the %d MiB total limit", maxAttachmentBytes/(1024*1024))
+		}
+		limit := min(maxDocumentBytes, remaining)
+		loaded, supported, err := attachment.Load(root, reference.path, limit)
+		if err != nil {
+			return nil, err
+		}
+		if !supported {
+			continue
+		}
+		if totalBytes+len(loaded.Data) > maxAttachmentBytes {
+			return nil, fmt.Errorf("attached files exceed the %d MiB total limit", maxAttachmentBytes/(1024*1024))
+		}
+		attachments = append(attachments, loaded)
+		totalBytes += len(loaded.Data)
 	}
 	return attachments, nil
 }

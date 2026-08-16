@@ -38,6 +38,7 @@ type Request struct {
 	ThreadID       string
 	BaseCommit     string
 	Images         []agent.Image
+	Attachments    []agent.Attachment
 	Mode           Mode
 	// AllowExternalCLI is required for delegated vendor CLIs because their
 	// tool permission model is separate from Gator's native allowlist.
@@ -150,7 +151,7 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 		return Outcome{}, err
 	}
 	history := append([]agent.Message(nil), previous.Messages...)
-	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation, Images: request.Images})
+	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation, Images: request.Images, Attachments: request.Attachments})
 	return e.execute(ctx, isolated, request, history, statePath)
 }
 
@@ -178,8 +179,8 @@ func (e Executor) validateRequest(request Request) error {
 	if request.Mode == PlanMode && e.Harness != nil {
 		return errors.New("enforced Plan mode is unavailable for delegated CLI providers; choose a native provider or switch to Execute")
 	}
-	if len(request.Images) > 0 && e.Harness != nil {
-		return errors.New("image attachments are available only to native providers")
+	if (len(request.Images) > 0 || len(request.Attachments) > 0) && e.Harness != nil {
+		return errors.New("file attachments are available only to native providers")
 	}
 	return nil
 }
@@ -231,6 +232,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		result, err = runner.Run(ctx, agent.RunOptions{
 			Task:            request.Task,
 			Images:          request.Images,
+			Attachments:     request.Attachments,
 			System:          system,
 			InitialMessages: initialMessages,
 			MaxSteps:        request.MaxSteps,
