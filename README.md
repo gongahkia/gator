@@ -51,28 +51,28 @@ OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
 ./bin/gator apply /path/to/run-record
 ```
 
-`gator` opens the interactive application when run from a Git checkout and a
-real terminal. Describe the task, keep or edit the suggested verification
-commands, choose a provider and model, and press `Ctrl+R` to start. Provider
-and model fields show keyboard-selectable dropdowns; type to filter, use the
-arrow keys to choose, then press `Enter` or `Tab`. `Tab` moves between task,
-verifier, provider, and model fields. During a run, `Ctrl+C`
-requests cancellation while retaining the isolated worktree. The review screen
-shows the final report, worktree, run record, and a diff preview; press `c` to
-continue a retained thread, `e` for patch handoff commands, `n` for a new task,
-or `d` to refresh the diff.
+`gator` opens a conversation-first terminal application when run from a Git
+checkout and a real terminal. Type a task and press `Ctrl+R` to send it; the
+same prompt accepts follow-up instructions after the run completes. The live
+conversation includes model text and tool activity, while `PgUp` and `PgDn`
+browse earlier entries. Use `/provider`, `/model`, and `/verify` to edit the
+run configuration; their fields show keyboard-selectable dropdowns where
+available. During a run, `Ctrl+C` requests cancellation while retaining the
+isolated worktree. Use `/review` for the final report and diff preview, then
+press `e` for patch handoff commands, `Esc` to return to the conversation, or
+`n` for a new thread.
 
-The composer shows local run prerequisites before `Ctrl+R`: a
-task and verifier list, valid provider settings, required API-key environment
+Before sending, Gator validates the task and local prerequisites: a verifier
+list in Execute mode, valid provider settings, required API-key environment
 variables or a vendor CLI on `PATH`, and provider-specific model/base-URL
-requirements. Press `F1` for the full composer, running, and review shortcut
+requirements. Press `F1` for the conversation, running, and review shortcut
 reference. `Ctrl+O` opens recent retained threads for the current repository;
 the picker shows a summary rather than private run-record paths and validates
 the selected worktree when continuation begins.
 
-Type `/` (or `?` in an empty task) to filter and select local composer commands;
+Type `/` (or `?` in an empty message) to filter and select local conversation commands;
 type `@` in a task to select a repository file or directory from matching path
-suggestions. Both menus accept arrow keys and `Enter` or `Tab`. Composer
+suggestions. Both menus accept arrow keys and `Enter` or `Tab`. Conversation
 commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
 `/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/clear`,
 `/help`, and `/quit`. `/plan` gives native providers an enforced read-only
@@ -184,7 +184,7 @@ tool arguments, tool output, and raw attachment bytes; the worktree is the
 reviewable source of truth. The TUI also keeps one private `0600` unfinished draft per repository
 and lists resumable conversation threads from the same state root. Threads
 retain one worktree across turns and record whether the last turn was Plan or
-Execute. Drafts contain only the composer task, verifier text, provider, and
+Execute. Drafts contain only the current message, verifier text, provider, and
 model, and are removed after Gator finishes a new thread. Set `GATOR_STATE_DIR`
 to use another local state root.
 

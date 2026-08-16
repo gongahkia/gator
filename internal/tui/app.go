@@ -72,6 +72,24 @@ type timelineEntry struct {
 	kind   agent.EventKind
 }
 
+type chatAuthor uint8
+
+const (
+	chatSystem chatAuthor = iota
+	chatUser
+	chatAgent
+	chatTool
+)
+
+// chatEntry is local to the active TUI. The durable session remains the
+// source of truth for resume; this is the readable terminal conversation.
+type chatEntry struct {
+	author    chatAuthor
+	text      string
+	detail    string
+	streaming bool
+}
+
 type attachmentPreview struct {
 	name      string
 	mediaType string
@@ -135,6 +153,8 @@ type Model struct {
 	recentThreads       []journal.RecentThread
 	recentIndex         int
 	events              []timelineEntry
+	chat                []chatEntry
+	chatIndex           int
 	execution           *executionStream
 	cancelling          bool
 
@@ -171,7 +191,7 @@ func New(config Config) Model {
 	}
 
 	task := textarea.New()
-	task.Placeholder = "Describe the bug fix or feature you want to build..."
+	task.Placeholder = "Message Gator..."
 	task.Prompt = ""
 	task.ShowLineNumbers = false
 	task.CharLimit = 16 * 1024
@@ -217,6 +237,7 @@ func New(config Config) Model {
 			kind: noticeInfo,
 		},
 	}
+	application.appendChat(chatEntry{author: chatSystem, text: "New isolated thread. Gator works in a separate Git worktree; use /permissions for the active policy."})
 	if strings.TrimSpace(config.StateDir) != "" {
 		if draft, found, err := journal.LoadDraft(config.StateDir, config.RepositoryPath); err != nil {
 			application.draftErr = err
@@ -245,7 +266,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.resizeInputs()
 	case agentEventMsg:
-		m.events = append(m.events, renderEvent(msg.event))
+		m.appendEvent(msg.event)
 		return m, waitForExecution(m.execution)
 	case executionDoneMsg:
 		wasNewThread := m.resumeStatePath == ""
@@ -257,7 +278,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.resumeStatePath = msg.done.outcome.StatePath
 		}
 		m.runErr = msg.done.err
-		m.screen = reviewScreen
+		m.appendCompletion(msg.done.outcome, msg.done.err)
+		m.screen = composeScreen
+		m.task.Reset()
+		m.task.Placeholder = "Send a follow-up..."
+		m.focus = taskField
+		_ = m.focusField()
+		m.refreshPreflight()
 		if msg.done.err != nil {
 			m.notice = notice{text: m.runMode.String() + " stopped: " + msg.done.err.Error(), kind: noticeError}
 		} else {

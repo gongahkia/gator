@@ -78,13 +78,6 @@ func (m Model) compactLayout() bool {
 	return m.width < 72 || m.height < 40
 }
 
-func (m Model) compactComposer() bool {
-	if m.width == 0 || m.height == 0 {
-		return false
-	}
-	return m.width < 72 || m.height < 40
-}
-
 func (m Model) constrainedLayout() bool {
 	if m.width == 0 || m.height == 0 {
 		return false

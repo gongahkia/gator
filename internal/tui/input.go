@@ -119,6 +119,12 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "ctrl+o":
 		return m.openRecentRuns()
+	case "pgup":
+		m.moveChatSelection(-m.chatEntryLimit())
+		return m, nil
+	case "pgdown":
+		m.moveChatSelection(m.chatEntryLimit())
+		return m, nil
 	case "?":
 		if m.focus == taskField && strings.TrimSpace(m.task.Value()) == "" {
 			m.task.SetValue("/")
@@ -171,6 +177,10 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cancelling = true
 			m.notice = notice{text: "Cancellation requested. Waiting for the current operation to stop...", kind: noticeInfo}
 		}
+	case "pgup":
+		m.moveChatSelection(-m.chatEntryLimit())
+	case "pgdown":
+		m.moveChatSelection(m.chatEntryLimit())
 	}
 	return m, nil
 }
@@ -179,9 +189,13 @@ func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch message.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	case "n", "esc":
+	case "n":
 		m.returnToComposer()
 		return m, nil
+	case "esc":
+		m.screen = composeScreen
+		m.focus = taskField
+		return m, m.focusField()
 	case "c":
 		return m.prepareContinuation()
 	case "d":
@@ -222,6 +236,14 @@ func (m Model) updateTranscript(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m *Model) moveChatSelection(delta int) {
+	if len(m.chat) == 0 {
+		m.chatIndex = 0
+		return
+	}
+	m.chatIndex = min(max(0, m.chatIndex+delta), len(m.chat)-1)
 }
 
 func (m Model) updateHelp(message tea.KeyMsg) (tea.Model, tea.Cmd) {

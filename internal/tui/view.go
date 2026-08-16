@@ -142,167 +142,148 @@ func formatAttachmentSize(bytes int) string {
 }
 
 func (m Model) composeView() string {
-	mode := "new isolated thread · " + m.runMode.String()
-	if m.resumeStatePath != "" {
-		mode = "thread " + compact(m.threadID, 12) + " · " + m.runMode.String()
-	}
-	if m.compactComposer() || (m.height < 52 && (m.commandPaletteVisible() || m.contextCompletionVisible() || m.dropdownVisible())) {
-		return m.compactComposeView(mode)
-	}
-	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
-	if m.runMode == gatorrun.PlanMode {
-		verificationHint = "Plan mode cannot run commands. This verifier policy will apply after switching to Execute."
-	}
-	providerHint := "Choose from the dropdown or type to filter providers."
-	modelHint := "Choose a recommendation or type any model ID supported by the provider."
-	if m.resumeStatePath != "" {
-		verificationHint = "Inherited from the retained run to preserve its command policy."
-		providerHint = "Inherited from the retained run to preserve provider continuity."
-		modelHint = "Inherited from the retained run to preserve conversation continuity."
-	}
-	sections := []string{
-		m.header(mode),
-		m.fieldView("Task", "Explain the desired behavior and any constraints.", m.task.View()),
-	}
-	if palette := m.commandPaletteView(); palette != "" {
-		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
-		return strings.Join(sections, "\n")
-	}
-	if references := m.contextReferencesView(); references != "" {
-		sections = append(sections, references)
-	}
-	if completions := m.contextCompletionView(); completions != "" {
-		sections = append(sections, completions)
-	}
-	providerSection := m.fieldView("Provider", providerHint, m.provider.View())
-	modelSection := m.fieldView("Model", modelHint, m.model.View())
-	if dropdown := m.dropdownView(); dropdown != "" {
-		if m.focus == providerField {
-			providerSection += "\n" + dropdown
-		} else {
-			modelSection += "\n" + dropdown
-		}
-	}
-	sections = append(sections,
-		m.fieldView("Verification", verificationHint, m.verification.View()),
-		providerSection,
-		modelSection,
-	)
-	if readiness := m.preflightView(); readiness != "" {
-		sections = append(sections, readiness)
-	}
-	if warning := m.draftWarningView(); warning != "" {
-		sections = append(sections, warning)
-	}
-	if m.commandOutput != "" {
-		sections = append(sections, labelStyle.Render("Command result"), m.panel(m.commandOutput))
-	}
-	sections = append(sections,
-		m.noticeView(),
-		m.footer("? commands", "ctrl+o threads", "tab switch field", "ctrl+r start "+m.runMode.String(), "f1 shortcuts", "ctrl+c quit"),
-	)
-	return strings.Join(sections, "\n")
+	return m.chatView(false)
 }
 
-func (m Model) compactComposeView(mode string) string {
-	sections := []string{
-		m.header(mode),
-		m.fieldView("Task", "", m.task.View()),
-	}
-	if palette := m.commandPaletteView(); palette != "" {
-		sections = append(sections, palette, m.noticeView(), m.footer("up/down choose", "enter select", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
-		return strings.Join(sections, "\n")
-	}
-	if completions := m.contextCompletionView(); completions != "" {
-		sections = append(sections, completions, m.noticeView(), m.footer("up/down choose", "enter insert", "esc dismiss", "f1 shortcuts", "ctrl+c quit"))
-		return strings.Join(sections, "\n")
-	}
-
-	if m.focus != taskField {
-		label, value := "", ""
-		switch m.focus {
-		case verificationField:
-			label, value = "Verification", m.verification.View()
-		case providerField:
-			label, value = "Provider", m.provider.View()
-		case modelField:
-			label, value = "Model", m.model.View()
-		}
-		sections = append(sections, m.fieldView(label, "", value))
-		if dropdown := m.dropdownView(); dropdown != "" {
-			sections = append(sections, dropdown)
-		}
-	}
-
-	sections = append(sections, m.composerSummary(), m.compactPreflightView())
-	if m.commandOutput != "" {
-		sections = append(sections, labelStyle.Render("Command result"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
-	}
-	if warning := m.draftWarningView(); warning != "" {
-		sections = append(sections, warning)
-	}
-	sections = append(sections,
-		m.noticeView(),
-		m.footer("? commands", "ctrl+o threads", "tab switch field", "ctrl+r start "+m.runMode.String(), "f1 shortcuts", "ctrl+c quit"),
-	)
-	return strings.Join(sections, "\n")
-}
-
-func (m Model) composerSummary() string {
-	verification := "no commands"
-	if m.runMode == gatorrun.PlanMode {
-		verification = "deferred in plan"
-	}
-	if commands, err := parseVerification(m.verification.Value()); err == nil && len(commands) > 0 {
-		verification = fmt.Sprintf("%d command(s)", len(commands))
-	} else if strings.TrimSpace(m.verification.Value()) != "" {
-		verification = "needs attention"
+func (m Model) chatView(running bool) string {
+	mode := "new thread"
+	if m.resumeStatePath != "" {
+		mode = "thread " + compact(m.threadID, 12)
 	}
 	provider := strings.TrimSpace(m.provider.Value())
 	if provider == "" {
-		provider = "not selected"
+		provider = "provider not selected"
 	}
 	model := strings.TrimSpace(m.model.Value())
 	if model == "" {
 		model = "provider default"
 	}
-	text := "verify: " + verification + " · provider: " + provider + " · model: " + model
-	return m.inline(dimStyle.Render(compact(text, m.inlineWidth())))
+	sections := []string{
+		m.header(mode + " · " + m.runMode.String()),
+		m.inline(dimStyle.Render(compact(provider+" · "+model, m.inlineWidth()))),
+		m.chatHistoryView(),
+	}
+
+	if running {
+		status := "Gator is working in an isolated worktree."
+		if m.runMode == gatorrun.PlanMode {
+			status = "Gator is inspecting the worktree in enforced read-only Plan mode."
+		}
+		if m.cancelling {
+			status = "Stopping after the current operation; the worktree will remain reviewable."
+		}
+		sections = append(sections,
+			m.inline(dimStyle.Render(compact(status, m.inlineWidth()))),
+			m.noticeView(),
+			m.footer("pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts"),
+		)
+		return strings.Join(sections, "\n")
+	}
+
+	if configuration := m.chatConfigurationView(); configuration != "" {
+		sections = append(sections, configuration)
+	} else {
+		if palette := m.commandPaletteView(); palette != "" {
+			sections = append(sections, palette)
+		}
+		if references := m.contextReferencesView(); references != "" {
+			sections = append(sections, references)
+		}
+		if completions := m.contextCompletionView(); completions != "" {
+			sections = append(sections, completions)
+		}
+		sections = append(sections, labelStyle.Render("You"), m.panel(m.task.View()))
+	}
+	if m.commandOutput != "" {
+		sections = append(sections, labelStyle.Render("Local status"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
+	}
+	if warning := m.draftWarningView(); warning != "" {
+		sections = append(sections, warning)
+	}
+	sections = append(sections, m.noticeView())
+	if m.focus == taskField {
+		sections = append(sections, m.footer("? commands", "ctrl+o threads", "pgup/pgdn browse", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+	} else {
+		sections = append(sections, m.footer("tab change field", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+	}
+	return strings.Join(sections, "\n")
 }
 
-func (m Model) compactPreflightView() string {
-	if len(m.preflight) == 0 {
-		ready := "Ready to create an isolated worktree."
-		if m.runMode == gatorrun.PlanMode {
-			ready = "Ready to inspect an isolated worktree without edits."
+func (m Model) chatHistoryView() string {
+	if len(m.chat) == 0 {
+		return m.panel(dimStyle.Render("No messages yet. Describe the work you want to do below."))
+	}
+	limit := m.chatEntryLimit()
+	start, end := m.visibleRange(len(m.chat), m.chatIndex, limit)
+	lines := make([]string, 0, (end-start)*2)
+	for index := start; index < end; index++ {
+		entry := m.chat[index]
+		label := "Gator"
+		style := labelStyle
+		switch entry.author {
+		case chatUser:
+			label, style = "You", keyStyle
+		case chatTool:
+			label, style = "Tool", dimStyle
+		case chatSystem:
+			label, style = "System", dimStyle
 		}
-		return m.inline(okStyle.Render(ready))
+		lines = append(lines, style.Render(label)+"  "+compact(entry.text, max(16, m.panelTextWidth()*2)))
+		if entry.detail != "" {
+			lines = append(lines, "      "+dimStyle.Render(compact(entry.detail, max(16, m.panelTextWidth()))))
+		}
 	}
-	label := "Before starting: "
-	if m.resumeStatePath != "" {
-		label = "Before continuing: "
+	return m.panel(strings.Join(lines, "\n"))
+}
+
+func (m Model) chatEntryLimit() int {
+	if m.height <= 0 {
+		return 6
 	}
-	if m.runMode == gatorrun.PlanMode {
-		label = "Before planning: "
+	reserved := m.task.Height() + 12
+	return max(1, (m.height-reserved)/3)
+}
+
+func (m Model) chatConfigurationView() string {
+	if m.focus == taskField {
+		return ""
 	}
-	return m.inline(errorStyle.Render(compact(label+m.preflight[0], m.inlineWidth())))
+	label, hint, value := "", "", ""
+	switch m.focus {
+	case verificationField:
+		label = "Verification policy"
+		hint = "One allowed argv command per line. Use /execute only when every listed command is intentional."
+		value = m.verification.View()
+	case providerField:
+		label = "Provider"
+		hint = "Choose a provider or type to filter it."
+		value = m.provider.View()
+	case modelField:
+		label = "Model"
+		hint = "Choose a recommendation or enter a provider-supported model ID."
+		value = m.model.View()
+	}
+	view := m.fieldView(label, hint, value)
+	if dropdown := m.dropdownView(); dropdown != "" {
+		view += "\n" + dropdown
+	}
+	return view
 }
 
 func (m Model) helpView() string {
 	if m.compactLayout() {
 		lines := []string{
 			"F1  close this help",
-			"Ctrl+R  start the selected mode",
+			"Ctrl+R  send the current message",
 			"Ctrl+O  choose a retained thread",
-			"Tab / Shift+Tab  move between fields",
+			"PgUp / PgDn  browse the conversation",
 			"?  open commands; @  reference a path",
 			"Ctrl+C  quit",
 		}
 		if m.constrainedLayout() {
 			lines = []string{
 				"F1  close this help",
-				"Ctrl+R  start the selected mode",
-				"Tab  move between fields",
+				"Ctrl+R  send the current message",
 				"Ctrl+C  quit",
 			}
 		}
@@ -314,19 +295,19 @@ func (m Model) helpView() string {
 	}
 	sections := []string{
 		m.header("keyboard shortcuts"),
-		labelStyle.Render("Composer") + "\n" + m.panel(strings.Join([]string{
+		labelStyle.Render("Conversation") + "\n" + m.panel(strings.Join([]string{
 			"F1  show or close this help",
-			"Ctrl+R  start the selected mode",
+			"Ctrl+R  send the current message",
 			"Ctrl+O  choose a retained thread",
-			"Tab / Shift+Tab  move between fields",
+			"PgUp / PgDn  browse the conversation",
 			"?  open the / command menu from an empty task",
 			"@  begin a repository-path reference",
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
 			"Arrows + Enter or Tab  choose an open suggestion",
 			"Ctrl+C  quit",
 		}, "\n")),
-		labelStyle.Render("Running") + "\n" + m.panel("F1  show this help\nCtrl+C  request cancellation and retain the worktree"),
-		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc  continue the retained thread\nd  refresh the diff\ne  show patch export/apply commands\nn or Esc  start a new task\nq or Ctrl+C  quit"),
+		labelStyle.Render("Running") + "\n" + m.panel("F1  show this help\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}
 	return strings.Join(sections, "\n")
@@ -371,36 +352,7 @@ func (m Model) recentRunsView() string {
 }
 
 func (m Model) runningView() string {
-	status := "Gator is working in an isolated worktree."
-	if m.runMode == gatorrun.PlanMode {
-		status = "Gator is inspecting the isolated worktree in enforced read-only Plan mode."
-	}
-	if m.cancelling {
-		status = "Gator is stopping; the retained worktree will remain reviewable."
-	}
-	entries := m.events
-	maxEntries := max(1, m.height-7)
-	if len(entries) > maxEntries {
-		entries = entries[len(entries)-maxEntries:]
-	}
-	lines := make([]string, 0, len(entries)+1)
-	if len(entries) == 0 {
-		lines = append(lines, dimStyle.Render("waiting for the first agent event..."))
-	}
-	for _, entry := range entries {
-		lines = append(lines, entry.text)
-		if entry.detail != "" {
-			lines = append(lines, "    "+compact(entry.detail, max(24, m.panelTextWidth()-4)))
-		}
-	}
-	sections := []string{
-		m.header("live " + m.runMode.String()),
-		m.inline(dimStyle.Render(compact(status, m.inlineWidth()))),
-		m.panel(strings.Join(lines, "\n")),
-		m.noticeView(),
-		m.footer("ctrl+c stop after current operation", "f1 shortcuts"),
-	}
-	return strings.Join(sections, "\n")
+	return m.chatView(true)
 }
 
 func (m Model) reviewView() string {

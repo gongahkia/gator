@@ -7,7 +7,68 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	gatorrun "github.com/gongahkia/gator/internal/run"
 )
+
+func (m *Model) appendEvent(event agent.Event) {
+	m.events = append(m.events, renderEvent(event))
+	m.appendChatEvent(event)
+}
+
+func (m *Model) appendChatEvent(event agent.Event) {
+	switch event.Kind {
+	case agent.EventTextDelta:
+		if event.Text == "" {
+			return
+		}
+		if len(m.chat) > 0 {
+			last := &m.chat[len(m.chat)-1]
+			if last.author == chatAgent && last.streaming {
+				last.text += event.Text
+				m.chatIndex = len(m.chat) - 1
+				return
+			}
+		}
+		m.appendChat(chatEntry{author: chatAgent, text: event.Text, streaming: true})
+	case agent.EventText:
+		m.closeStreamingChatEntry()
+		if event.Text != "" {
+			m.appendChat(chatEntry{author: chatAgent, text: event.Text})
+		}
+	case agent.EventToolCalled, agent.EventToolFinished, agent.EventCompletionBlocked, agent.EventHarnessStarted, agent.EventHarnessFinished:
+		m.closeStreamingChatEntry()
+		entry := renderEvent(event)
+		m.appendChat(chatEntry{author: chatTool, text: entry.text, detail: entry.detail})
+	case agent.EventTurnStarted, agent.EventRunFinished:
+		m.closeStreamingChatEntry()
+	}
+}
+
+func (m *Model) appendCompletion(outcome gatorrun.Outcome, runErr error) {
+	m.closeStreamingChatEntry()
+	if runErr != nil {
+		m.appendChat(chatEntry{author: chatSystem, text: "Run stopped: " + runErr.Error()})
+		return
+	}
+	if strings.TrimSpace(outcome.Result.FinalText) != "" {
+		m.appendChat(chatEntry{author: chatAgent, text: outcome.Result.FinalText})
+	}
+	if outcome.Worktree.Path != "" {
+		m.appendChat(chatEntry{author: chatSystem, text: "Run complete. Use /review to inspect the diff and patch handoff commands."})
+	}
+}
+
+func (m *Model) appendChat(entry chatEntry) {
+	m.chat = append(m.chat, entry)
+	m.chatIndex = len(m.chat) - 1
+}
+
+func (m *Model) closeStreamingChatEntry() {
+	if len(m.chat) == 0 {
+		return
+	}
+	m.chat[len(m.chat)-1].streaming = false
+}
 
 func renderEvent(event agent.Event) timelineEntry {
 	prefix := fmt.Sprintf("[%02d]", event.Step)

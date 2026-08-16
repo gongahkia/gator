@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -260,11 +261,11 @@ func TestPlanCommandStartsWithoutVerifierAndUsesReadOnlyTools(t *testing.T) {
 	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyEnter})
 	updated.task.SetValue("Plan the feature before implementation")
 	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyCtrlR})
-	if updated.screen != reviewScreen || updated.runErr != nil || updated.outcome == nil {
+	if updated.screen != composeScreen || updated.runErr != nil || updated.outcome == nil {
 		t.Fatalf("plan run = screen %v, error %v, outcome %#v", updated.screen, updated.runErr, updated.outcome)
 	}
-	if !strings.Contains(updated.View(), "plan review") || updated.outcome.ThreadID == "" {
-		t.Fatalf("plan review = %s", updated.View())
+	if !strings.Contains(updated.View(), "Plan the focused implementation") || updated.outcome.ThreadID == "" {
+		t.Fatalf("plan conversation = %s", updated.View())
 	}
 	for _, tool := range agentModel.requests[0].Tools {
 		if tool.Name == "apply_patch" || tool.Name == "run_command" {
@@ -686,13 +687,17 @@ func TestStartRunRejectsEscapingContextReference(t *testing.T) {
 	}
 }
 
-func TestInteractiveRunStreamsToReview(t *testing.T) {
+func TestInteractiveRunStreamsToConversation(t *testing.T) {
 	repository := testRepository(t)
 	agentModel := &testAgentModel{turns: []agent.Turn{
 		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
 		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
 		{ToolCalls: []agent.ToolCall{{ID: "test", Name: "run_command", Arguments: json.RawMessage(`{"argv":["go","test","./..."]}`)}}},
 		{Text: "The repository is verified and ready for review."},
+		{ToolCalls: []agent.ToolCall{{ID: "follow-up-status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "follow-up-diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "follow-up-test", Name: "run_command", Arguments: json.RawMessage(`{"argv":["go","test","./..."]}`)}}},
+		{Text: "The follow-up is complete."},
 	}}
 	model := New(Config{
 		RepositoryPath: repository,
@@ -706,11 +711,13 @@ func TestInteractiveRunStreamsToReview(t *testing.T) {
 	model.width = 100
 	model.height = 40
 	model.resizeInputs()
+	model.focus = providerField
+	_ = model.focusField()
 	model.task.SetValue("Inspect @hello.go and verify this repository")
 
 	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
-	if updated.screen != reviewScreen {
-		t.Fatalf("screen = %v, want review", updated.screen)
+	if updated.screen != composeScreen {
+		t.Fatalf("screen = %v, want conversation", updated.screen)
 	}
 	if updated.runErr != nil {
 		t.Fatalf("run error = %v", updated.runErr)
@@ -724,8 +731,64 @@ func TestInteractiveRunStreamsToReview(t *testing.T) {
 	if len(agentModel.requests) == 0 || !strings.Contains(agentModel.requests[0].Messages[0].Content, "hello.go (file)") {
 		t.Fatalf("agent did not receive validated context references: %#v", agentModel.requests)
 	}
-	if !strings.Contains(updated.View(), "The repository is verified") {
-		t.Fatalf("review omitted final result: %s", updated.View())
+	if !strings.Contains(updated.View(), "The repository is verified") || !strings.Contains(updated.View(), "Send a follow-up") {
+		t.Fatalf("conversation omitted final result or follow-up prompt: %s", updated.View())
+	}
+	if updated.focus != taskField || !updated.task.Focused() {
+		t.Fatalf("follow-up prompt was not focused: focus %v, task focused %t", updated.focus, updated.task.Focused())
+	}
+
+	updated.task.SetValue("Explain the implementation tradeoff.")
+	continued := drive(t, updated, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if continued.screen != composeScreen || continued.runErr != nil || len(agentModel.requests) != 8 {
+		t.Fatalf("follow-up conversation = screen %v, error %v, requests %d", continued.screen, continued.runErr, len(agentModel.requests))
+	}
+	if !strings.Contains(continued.View(), "The follow-up is complete") {
+		t.Fatalf("conversation omitted follow-up result: %s", continued.View())
+	}
+}
+
+func TestChatAggregatesStreamingTextAndKeepsToolActivityInOrder(t *testing.T) {
+	model := New(Config{})
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
+	model.appendChat(chatEntry{author: chatUser, text: "Implement the feature."})
+	model.appendEvent(agent.Event{Kind: agent.EventTextDelta, Step: 1, Text: "I will "})
+	model.appendEvent(agent.Event{Kind: agent.EventTextDelta, Step: 1, Text: "inspect the repository."})
+	model.appendEvent(agent.Event{Kind: agent.EventToolCalled, Step: 1, ToolCall: &agent.ToolCall{Name: "git_status", Arguments: json.RawMessage(`{}`)}})
+
+	if len(model.chat) != 4 {
+		t.Fatalf("chat entries = %#v", model.chat)
+	}
+	if got := model.chat[2].text; got != "I will inspect the repository." {
+		t.Fatalf("streamed chat text = %q", got)
+	}
+	view := model.View()
+	for _, expected := range []string{"Implement the feature.", "I will inspect the repository.", "tool -> git_status", "Message Gator"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("chat view omitted %q: %s", expected, view)
+		}
+	}
+}
+
+func TestChatPageKeysBrowseConversation(t *testing.T) {
+	model := New(Config{})
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
+	for index := 0; index < 12; index++ {
+		model.appendChat(chatEntry{author: chatAgent, text: fmt.Sprintf("message %d", index)})
+	}
+	last := model.chatIndex
+	up, _ := model.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	browsed := up.(Model)
+	if browsed.chatIndex >= last {
+		t.Fatalf("page up did not move through conversation: %d >= %d", browsed.chatIndex, last)
+	}
+	down, _ := browsed.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	if got := down.(Model).chatIndex; got != last {
+		t.Fatalf("page down index = %d, want %d", got, last)
 	}
 }
 
