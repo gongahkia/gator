@@ -16,20 +16,17 @@ refactors are not a v1 acceptance claim.
 ## Runtime
 
 ```text
-terminal UI -> task/session -> selected backend -> model adapter or vendor CLI
-                     |       |                         |
-                     |       +-> local event journal   +-> isolated Git worktree
-                     v                                      |
-              policy-checked native tools                     v
-                     |                               Gator-owned verification
-                     v                                      |
-             isolated Git worktree <-------------------------+
-                     |
-                     v
-               diff + verification
+terminal UI -> task/session -> selected direct model adapter
+                     |       |                    |
+                     |       +-> local event journal
+                     v                            v
+             policy-checked Gator tools -> isolated Git worktree
+                                                 |
+                                                 v
+                                      diff + verification evidence
 ```
 
-For native cloud providers, the core owns the loop, context selection, tool
+For every supported cloud provider, the core owns the loop, context selection, tool
 schemas, tool execution, policies, event stream, worktree lifecycle, and run
 outcome. An adapter only converts between the provider protocol and the core's
 typed turn contract. This keeps provider-specific details out of safety and
@@ -37,19 +34,19 @@ test-critical code. OpenAI uses Responses; Anthropic uses Messages; Gemini uses
 stateless GenerateContent; and the compatible adapter supports Chat
 Completions-compatible providers.
 
-Delegated CLI providers are deliberately different. Codex, Claude Code,
-GitHub Copilot CLI, and Cursor Agent run their own supported agent loop using
-their existing local login. Gator does not parse, copy, or exchange their OAuth
-state. It supplies the isolated worktree and task, records bounded lifecycle
-events, then performs the required verifier argv calls and Git inspection
-itself. The vendor CLI's tool policy remains its own security boundary, so a
-noninteractive delegated run requires explicit caller acknowledgement.
+Gator never launches a vendor CLI or reads its OAuth state. `codex` and
+`claude` are direct API aliases for the OpenAI Responses and Anthropic Messages
+adapters, so Gator retains the same tool policy, event stream, steering, and
+resume behavior. They require API keys rather than an existing vendor CLI login.
+The retained legacy `copilot` and `cursor` provider names fail clearly because
+Gator has no supported direct model integration for them; they never fall back
+to their vendor CLIs.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, execution mode, and explicit verifier allowlist;
 streams lifecycle events from the executor; and renders the retained worktree
-and current diff for review. Native Plan mode removes patching and command
-tools entirely. Resume keeps one conversation thread on the same worktree and
+and current diff for review. Plan mode removes patching and command tools
+entirely. Resume keeps one conversation thread on the same worktree and
 preserves its original model and verification policy so a continuation cannot
 silently broaden its command authority.
 
@@ -93,9 +90,8 @@ Execute mode exposes only these tools:
 4. run an argv command subject to the run policy;
 5. inspect Git status and diff.
 
-Plan mode exposes only read/search and Git inspection tools. Delegated CLI
-providers are refused in Plan mode because Gator cannot enforce their vendor
-tool permissions.
+Plan mode exposes only read/search and Git inspection tools for every direct
+provider.
 
 Tools validate paths against the worktree root. Command execution, network
 isolation, and write approval are separate policy boundaries; a worktree alone

@@ -16,7 +16,8 @@ import (
 	"github.com/gongahkia/gator/internal/model/openai"
 )
 
-// Provider identifies a supported model backend.
+// Provider identifies a direct model backend or a retained legacy session
+// provider that now fails without a fallback.
 type Provider string
 
 const (
@@ -168,6 +169,13 @@ func Names() []string {
 	return names
 }
 
+// SupportsDirect reports whether Gator can construct a direct adapter for the
+// provider without a vendor CLI or a vendor-owned agent loop.
+func SupportsDirect(provider Provider) bool {
+	_, ok := directProviders[provider]
+	return ok
+}
+
 // SupportsPDFAttachments reports whether Gator's adapter can encode a PDF
 // using the provider's documented native document input. Generic Chat
 // Completions endpoints do not share a stable file-input contract.
@@ -181,7 +189,7 @@ func SupportsPDFAttachments(provider Provider) bool {
 }
 
 // DefaultModel returns the stable default where Gator can select one without
-// guessing a catalog-specific model. Empty means the user or CLI chooses it.
+// guessing a catalog-specific model. Empty means the user must provide one.
 func DefaultModel(provider Provider) string {
 	switch provider {
 	case OpenAI, Codex:

@@ -522,7 +522,7 @@ func (m Model) helpView() string {
 			":w  send from Vim Normal; :wq  send then exit after successful work",
 			"Ctrl+C  quit",
 		}, "\n")),
-		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer a native run at its next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nDelegated CLI providers cannot accept active steering; use Tab\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
 		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\nt  view this run's transcript\ny  view retained thread lineage\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}

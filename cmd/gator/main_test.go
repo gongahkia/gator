@@ -17,6 +17,9 @@ func TestRunHelp(t *testing.T) {
 	if !strings.Contains(output.String(), "Usage:") {
 		t.Fatalf("help output = %q, want usage", output.String())
 	}
+	if strings.Contains(output.String(), "allow-external-cli") {
+		t.Fatalf("help still exposes delegated CLI approval: %q", output.String())
+	}
 }
 
 func TestRunRejectsUnknownCommand(t *testing.T) {
@@ -24,6 +27,25 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	err := run([]string{"ship"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("run error = %v, want unknown-command error", err)
+	}
+}
+
+func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	executor, err := newExecutor("codex", "", "")
+	if err != nil {
+		t.Fatalf("new codex executor: %v", err)
+	}
+	if executor.Model == nil {
+		t.Fatal("Codex did not resolve to a direct model adapter")
+	}
+}
+
+func TestRunRejectsUnsupportedLegacyProviderWithoutFallback(t *testing.T) {
+	var output bytes.Buffer
+	err := runTask([]string{"--provider", "copilot", "--verify", "go test ./...", "Add a focused feature"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "no supported direct model API integration") || !strings.Contains(err.Error(), "will not launch") {
+		t.Fatalf("copilot run error = %v", err)
 	}
 }
 

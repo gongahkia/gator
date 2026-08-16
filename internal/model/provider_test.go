@@ -78,6 +78,10 @@ func TestEffectiveModelUsesProviderDefaults(t *testing.T) {
 		t.Fatalf("Claude default = %q", got)
 	}
 	for _, unavailable := range []string{"copilot", "cursor"} {
+		provider, err := ParseProvider(unavailable)
+		if err != nil || SupportsDirect(provider) {
+			t.Fatalf("direct support for %q = %v, parse error = %v", unavailable, SupportsDirect(provider), err)
+		}
 		for _, name := range Names() {
 			if name == unavailable {
 				t.Fatalf("unavailable provider %q appeared in direct provider list", unavailable)
