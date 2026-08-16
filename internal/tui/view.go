@@ -514,6 +514,7 @@ func (m Model) helpView() string {
 			"Enter  send the current message",
 			"Ctrl+R  send in any input mode",
 			"Ctrl+O  choose a retained thread",
+			"Recent picker: a toggles current repository / all repositories",
 			"PgUp / PgDn  browse the conversation",
 			"?  open the / command menu from an empty task",
 			"@  begin a repository-path reference",

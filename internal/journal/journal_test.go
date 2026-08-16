@@ -328,7 +328,7 @@ func TestListRecentThreadsFallsBackToLegacyRuns(t *testing.T) {
 	}
 }
 
-func TestListAllRecentThreadsIncludesProjectsWithoutExposingStatePaths(t *testing.T) {
+func TestListAllRecentThreadsIncludesProjectsAndPreservesRepositoryMetadata(t *testing.T) {
 	stateDirectory := t.TempDir()
 	firstWorktree := filepath.Join(t.TempDir(), "first")
 	secondWorktree := filepath.Join(t.TempDir(), "second")

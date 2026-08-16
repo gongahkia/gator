@@ -41,7 +41,17 @@ GEMINI_API_KEY=... ./bin/gator run --provider gemini \
 ./bin/gator run --provider codex --allow-external-cli --verify 'go test ./...' \
   'Add a focused feature with tests'
 
-# Continue an interrupted run using the printed run-record path.
+# Open a project-scoped retained-thread picker, continue the latest thread,
+# or target an ID directly. The task is optional: without it, Gator opens the
+# resumed conversation in the TUI.
+./bin/gator resume
+./bin/gator resume --last
+./bin/gator resume thread-identifier
+./bin/gator resume --all
+OPENAI_API_KEY=... ./bin/gator resume --last \
+  'Address the failing verification and finish the patch'
+
+# The original raw run-record form remains supported.
 OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
   'Address the failing verification and finish the patch'
 
@@ -88,8 +98,9 @@ list in Execute mode, valid provider settings, required API-key environment
 variables or a vendor CLI on `PATH`, and provider-specific model/base-URL
 requirements. Press `F1` for the conversation, running, and review shortcut
 reference. `Ctrl+O` opens recent retained threads for the current repository;
-the picker shows a summary rather than private run-record paths and validates
-the selected worktree when continuation begins.
+press `a` in that picker to switch between the current repository and all
+locally retained repositories. The picker shows a summary rather than private
+run-record paths and validates the selected worktree when continuation begins.
 
 Type `/` (or `?` in an empty message) to filter and select local conversation commands;
 type `@` in a task to select a repository file or directory from matching path
@@ -204,7 +215,9 @@ Runs leave code changes in a sibling `*-gator-runs/` worktree, never in the
 active checkout. The printed run-record path defaults to
 `$XDG_STATE_HOME/gator/` (or `~/.local/state/gator/`) and contains a
 metadata-only event journal, final result, and a private `0600` session file
-for `gator resume`. The event log intentionally omits prompts, source text,
+for `gator resume`. `gator resume --last` selects the newest retained thread
+for the current repository; `--all` expands selection to the local state root.
+The event log intentionally omits prompts, source text,
 tool arguments, tool output, and raw attachment bytes; the worktree is the
 reviewable source of truth. The TUI also keeps one private `0600` unfinished draft per repository
 and lists resumable conversation threads from the same state root. Threads

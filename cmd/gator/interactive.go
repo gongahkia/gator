@@ -17,10 +17,10 @@ func interactive() error {
 }
 
 type interactiveOptions struct {
-	RepositoryPath  string
-	ResumeStatePath string
-	StartInRecent   bool
-	RecentAll       bool
+	RepositoryPath    string
+	ResumeStatePath   string
+	StartInRecent     bool
+	RecentAll         bool
 	AllowNoRepository bool
 }
 
