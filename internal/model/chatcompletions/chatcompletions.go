@@ -23,6 +23,7 @@ const maxResponseBytes = 2 * 1024 * 1024
 // ProviderName and APIKeyEnv are only used in clear, non-secret errors.
 type Config struct {
 	APIKey              string
+	APIKeySource        func(context.Context) (string, error)
 	APIKeyEnv           string
 	BaseURL             string
 	Model               string
@@ -43,7 +44,11 @@ type Model struct {
 
 // Complete implements agent.Model.
 func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn, error) {
-	if strings.TrimSpace(m.Config.APIKey) == "" {
+	apiKey, err := m.apiKey(ctx)
+	if err != nil {
+		return agent.Turn{}, err
+	}
+	if strings.TrimSpace(apiKey) == "" {
 		env := m.Config.APIKeyEnv
 		if env == "" {
 			env = "API key"
@@ -76,7 +81,7 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	if authHeader == "Authorization" && authPrefix == "" {
 		authPrefix = "Bearer "
 	}
-	request.Header.Set(authHeader, authPrefix+m.Config.APIKey)
+	request.Header.Set(authHeader, authPrefix+apiKey)
 	request.Header.Set("Content-Type", "application/json")
 	for name, values := range m.Config.Headers {
 		for _, value := range values {
@@ -105,6 +110,17 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	return decodeResponse(contents, m.providerName())
 }
 
+func (m Model) apiKey(ctx context.Context) (string, error) {
+	if m.Config.APIKeySource == nil {
+		return m.Config.APIKey, nil
+	}
+	apiKey, err := m.Config.APIKeySource(ctx)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s credential: %w", m.providerName(), err)
+	}
+	return apiKey, nil
+}
+
 func (m Model) providerName() string {
 	if m.Config.ProviderName != "" {
 		return m.Config.ProviderName
@@ -126,11 +142,12 @@ type request struct {
 }
 
 type message struct {
-	Role       string     `json:"role"`
-	Content    any        `json:"content,omitempty"`
-	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	Name       string     `json:"name,omitempty"`
+	Role             string          `json:"role"`
+	Content          any             `json:"content,omitempty"`
+	ToolCalls        []toolCall      `json:"tool_calls,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
+	Name             string          `json:"name,omitempty"`
+	ReasoningContent json.RawMessage `json:"reasoning_content,omitempty"`
 }
 
 type toolCall struct {
@@ -200,6 +217,17 @@ func encodeMessages(system string, source []agent.Message) ([]message, error) {
 			if message.Content == nil && len(message.ToolCalls) == 0 {
 				return nil, errors.New("agent history contains an empty agent message")
 			}
+			if len(item.ProviderData) > 0 {
+				var providerData struct {
+					ReasoningContent json.RawMessage `json:"reasoning_content"`
+				}
+				if !json.Valid(item.ProviderData) || json.Unmarshal(item.ProviderData, &providerData) != nil {
+					return nil, errors.New("agent history contains invalid Chat Completions provider state")
+				}
+				if len(providerData.ReasoningContent) > 0 && string(providerData.ReasoningContent) != "null" {
+					message.ReasoningContent = append(json.RawMessage(nil), providerData.ReasoningContent...)
+				}
+			}
 			messages = append(messages, message)
 		case agent.RoleTool:
 			if strings.TrimSpace(item.ToolCallID) == "" {
@@ -250,8 +278,9 @@ type chatImageURL struct {
 type response struct {
 	Choices []struct {
 		Message struct {
-			Content   *string    `json:"content"`
-			ToolCalls []toolCall `json:"tool_calls"`
+			Content          *string         `json:"content"`
+			ToolCalls        []toolCall      `json:"tool_calls"`
+			ReasoningContent json.RawMessage `json:"reasoning_content"`
 		} `json:"message"`
 	} `json:"choices"`
 }
@@ -268,6 +297,15 @@ func decodeResponse(contents []byte, provider string) (agent.Turn, error) {
 	turn := agent.Turn{}
 	if message.Content != nil {
 		turn.Text = *message.Content
+	}
+	if len(message.ReasoningContent) > 0 && string(message.ReasoningContent) != "null" {
+		providerData, err := json.Marshal(struct {
+			ReasoningContent json.RawMessage `json:"reasoning_content"`
+		}{ReasoningContent: message.ReasoningContent})
+		if err != nil {
+			return agent.Turn{}, fmt.Errorf("encode %s reasoning state: %w", provider, err)
+		}
+		turn.ProviderData = providerData
 	}
 	for _, item := range message.ToolCalls {
 		if item.Type != "" && item.Type != "function" || strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.Function.Name) == "" || !json.Valid([]byte(item.Function.Arguments)) {

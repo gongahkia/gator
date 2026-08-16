@@ -173,7 +173,7 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if !modelprovider.SupportsOAuthLogin(provider) {
-		m.notice = notice{text: "Provider " + string(provider) + " uses an API key. Set its environment variable or run gator login " + string(provider) + " from a shell.", kind: noticeInfo}
+		m.notice = notice{text: "Provider " + string(provider) + " uses " + modelprovider.CredentialHint(provider) + ".", kind: noticeInfo}
 		return m, nil
 	}
 	if m.oauthLogin != nil {
@@ -252,27 +252,43 @@ type dropdownOption struct {
 
 func providerDropdownOptions() []dropdownOption {
 	descriptions := map[modelprovider.Provider]string{
-		modelprovider.OpenAI:           "OpenAI Responses API",
-		modelprovider.AzureOpenAI:      "Azure OpenAI Chat Completions",
-		modelprovider.Anthropic:        "Anthropic Messages API",
-		modelprovider.Gemini:           "Gemini GenerateContent API",
-		modelprovider.Mistral:          "Mistral Chat Completions",
-		modelprovider.XAI:              "xAI API key or Grok/X account OAuth",
-		modelprovider.Groq:             "Groq Chat Completions",
-		modelprovider.OpenRouter:       "OpenRouter API key or browser-minted key",
-		modelprovider.Together:         "Together AI Chat Completions",
-		modelprovider.Fireworks:        "Fireworks Chat Completions",
-		modelprovider.DeepSeek:         "DeepSeek Chat Completions",
-		modelprovider.Cerebras:         "Cerebras OpenAI-compatible Chat Completions",
-		modelprovider.NVIDIA:           "NVIDIA NIM OpenAI-compatible Chat Completions",
-		modelprovider.HuggingFace:      "Hugging Face Inference Providers Chat Completions",
-		modelprovider.MoonshotAI:       "Moonshot AI Kimi OpenAI-compatible Chat Completions",
-		modelprovider.OpenAICompatible: "custom Chat Completions endpoint",
-		modelprovider.Codex:            "ChatGPT/Codex account OAuth (Gator client)",
-		modelprovider.Claude:           "Claude account OAuth (Gator client)",
-		modelprovider.Copilot:          "GitHub Copilot account OAuth (Gator client)",
-		modelprovider.KimiCoding:       "Kimi Code subscription or Kimi API key",
-		modelprovider.Radius:           "Radius API key or account OAuth (Gator client)",
+		modelprovider.OpenAI:             "OpenAI Responses API",
+		modelprovider.AzureOpenAI:        "Azure OpenAI Chat Completions",
+		modelprovider.Anthropic:          "Anthropic Messages API",
+		modelprovider.Gemini:             "Gemini GenerateContent API",
+		modelprovider.Mistral:            "Mistral Chat Completions",
+		modelprovider.XAI:                "xAI API key or Grok/X account OAuth",
+		modelprovider.Groq:               "Groq Chat Completions",
+		modelprovider.OpenRouter:         "OpenRouter API key or browser-minted key",
+		modelprovider.Together:           "Together AI Chat Completions",
+		modelprovider.Fireworks:          "Fireworks Chat Completions",
+		modelprovider.DeepSeek:           "DeepSeek Chat Completions",
+		modelprovider.Cerebras:           "Cerebras OpenAI-compatible Chat Completions",
+		modelprovider.NVIDIA:             "NVIDIA NIM OpenAI-compatible Chat Completions",
+		modelprovider.HuggingFace:        "Hugging Face Inference Providers Chat Completions",
+		modelprovider.MoonshotAI:         "Moonshot AI Kimi OpenAI-compatible Chat Completions",
+		modelprovider.ZAI:                "Z.AI GLM Coding Plan Chat Completions",
+		modelprovider.MiniMax:            "MiniMax OpenAI-compatible Chat Completions",
+		modelprovider.Baseten:            "Baseten OpenAI-compatible Chat Completions",
+		modelprovider.VercelAIGateway:    "Vercel AI Gateway OpenAI-compatible Chat Completions",
+		modelprovider.AntLing:            "Ant Ling OpenAI-compatible Chat Completions",
+		modelprovider.Xiaomi:             "Xiaomi MiMo OpenAI-compatible Chat Completions",
+		modelprovider.MoonshotAICN:       "Moonshot AI Kimi China OpenAI-compatible Chat Completions",
+		modelprovider.CloudflareWorkers:  "Cloudflare Workers AI Chat Completions",
+		modelprovider.CloudflareGateway:  "Cloudflare AI Gateway Chat Completions",
+		modelprovider.AmazonBedrock:      "Amazon Bedrock Chat Completions",
+		modelprovider.GoogleVertex:       "Google Vertex AI Chat Completions (ADC)",
+		modelprovider.QwenTokenPlan:      "Qwen Token Plan OpenAI-compatible Chat Completions",
+		modelprovider.QwenTokenPlanCN:    "Qwen Token Plan China OpenAI-compatible Chat Completions",
+		modelprovider.XiaomiTokenPlanCN:  "Xiaomi MiMo Token Plan China Chat Completions",
+		modelprovider.XiaomiTokenPlanAMS: "Xiaomi MiMo Token Plan Amsterdam Chat Completions",
+		modelprovider.XiaomiTokenPlanSGP: "Xiaomi MiMo Token Plan Singapore Chat Completions",
+		modelprovider.OpenAICompatible:   "custom Chat Completions endpoint",
+		modelprovider.Codex:              "ChatGPT/Codex subscription · sign in with /login codex",
+		modelprovider.Claude:             "Claude subscription · sign in with /login claude",
+		modelprovider.Copilot:            "GitHub Copilot subscription · sign in with /login copilot",
+		modelprovider.KimiCoding:         "Kimi Code subscription or Kimi API key",
+		modelprovider.Radius:             "Radius API key or account OAuth (Gator client)",
 	}
 	options := make([]dropdownOption, 0, len(descriptions))
 	for _, name := range modelprovider.Names() {
