@@ -18,7 +18,6 @@ const (
 	activityTool
 	activityInspecting
 	activityVerifying
-	activityDelegated
 	activityFinishing
 	activityComplete
 	activityFailed
@@ -142,14 +141,6 @@ func (m *Model) observeActivity(event agent.Event) {
 		m.setActivity(activityInspecting, "completion needs evidence: "+compact(event.Text, 120), at)
 	case agent.EventSteeringApplied:
 		m.setActivity(activityThinking, "applying your steering instruction", at)
-	case agent.EventHarnessStarted:
-		m.setActivity(activityDelegated, "delegated CLI is running: "+compact(event.Text, 100), at)
-	case agent.EventHarnessFinished:
-		if event.ToolError == "" {
-			m.setActivity(activityFinishing, "delegated CLI completed; checking evidence", at)
-		} else {
-			m.setActivity(activityFailed, "delegated CLI failed: "+compact(event.ToolError, 120), at)
-		}
 	case agent.EventRunFinished:
 		m.setActivity(activityFinishing, "preparing the final result", at)
 	}
@@ -226,8 +217,6 @@ func (m Model) activityPhaseLabel() string {
 		return "inspecting"
 	case activityVerifying:
 		return "verifying"
-	case activityDelegated:
-		return "delegated CLI"
 	case activityFinishing:
 		return "finishing"
 	case activityComplete:

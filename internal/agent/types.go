@@ -120,8 +120,6 @@ const (
 	EventToolFinished      EventKind = "tool_finished"
 	EventCompletionBlocked EventKind = "completion_blocked"
 	EventSteeringApplied   EventKind = "steering_applied"
-	EventHarnessStarted    EventKind = "harness_started"
-	EventHarnessFinished   EventKind = "harness_finished"
 	EventRunFinished       EventKind = "run_finished"
 )
 

@@ -118,11 +118,7 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		return m, m.focusField()
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
-		if isExternalProvider(m.provider.Value()) {
-			m.notice = notice{text: "This provider delegates tool permissions to its vendor CLI; Gator verifies the final worktree.", kind: noticeInfo}
-		} else {
-			m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
-		}
+		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
 	case "/quit":
 		return m, tea.Quit
 	case "/queue":
@@ -224,10 +220,8 @@ func providerDropdownOptions() []dropdownOption {
 		modelprovider.Fireworks:        "Fireworks Chat Completions",
 		modelprovider.DeepSeek:         "DeepSeek Chat Completions",
 		modelprovider.OpenAICompatible: "custom Chat Completions endpoint",
-		modelprovider.Codex:            "local Codex CLI subscription",
-		modelprovider.Claude:           "local Claude Code subscription",
-		modelprovider.Copilot:          "local GitHub Copilot CLI subscription",
-		modelprovider.Cursor:           "local Cursor Agent CLI subscription",
+		modelprovider.Codex:            "OpenAI Responses API (Codex alias)",
+		modelprovider.Claude:           "Anthropic Messages API (Claude alias)",
 	}
 	options := make([]dropdownOption, 0, len(descriptions))
 	for _, name := range modelprovider.Names() {
@@ -251,12 +245,6 @@ func modelDropdownOptions(providerName string) []dropdownOption {
 	customDescription := "type a model ID supported by this provider"
 	if provider == modelprovider.AzureOpenAI {
 		customDescription = "type the Azure deployment name"
-	}
-	if modelprovider.IsHarness(provider) {
-		return []dropdownOption{
-			{value: "", label: "provider default", description: "use the default configured in the vendor CLI"},
-			{label: "custom model ID", description: "type a model selector supported by the vendor CLI", custom: true},
-		}
 	}
 	options := []dropdownOption{{label: "custom model ID", description: customDescription, custom: true}}
 	if defaultModel := modelprovider.DefaultModel(provider); defaultModel != "" {
@@ -370,11 +358,7 @@ func (m *Model) applySelectedDropdown() {
 			return
 		}
 		m.model.SetValue(selected.value)
-		if selected.value == "" {
-			m.notice = notice{text: "The provider CLI will choose its configured model.", kind: noticeInfo}
-		} else {
-			m.notice = notice{text: "Model selected: " + selected.value, kind: noticeInfo}
-		}
+		m.notice = notice{text: "Model selected: " + selected.value, kind: noticeInfo}
 	}
 	m.normalizeDropdownSelection()
 	m.persistDraft()
@@ -523,9 +507,6 @@ func (m Model) permissionsStatus() string {
 	commands := "invalid verifier configuration: " + err.Error()
 	if err == nil {
 		commands = formatVerification(verification)
-	}
-	if isExternalProvider(m.provider.Value()) {
-		return "writes: isolated run worktree only\nprovider: delegated CLI with its own permission policy\nGator runs required verification after the CLI exits:\n" + commands + "\nactive checkout: never edited by a normal run"
 	}
 	return "writes: isolated run worktree only\nreads: repository paths only\ncommands allowed:\n" + commands + "\nactive checkout: never edited by a normal run"
 }

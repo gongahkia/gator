@@ -33,7 +33,7 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
-	return gatorrun.Executor{Model: backend.Model, Harness: backend.Harness}, nil
+	return gatorrun.Executor{Model: backend.Model}, nil
 }
 
 func displayModel(value string) string {

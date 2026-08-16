@@ -362,7 +362,7 @@ func TestVimWriteCommandsSubmitAndQuitOnlyAfterSuccessfulWork(t *testing.T) {
 	}
 
 	updated.screen = runningScreen
-	updated.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	updated.execution = &executionStream{steering: make(chan string, 1)}
 	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
 	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
@@ -394,7 +394,7 @@ func TestVimWriteCommandsSubmitAndQuitOnlyAfterSuccessfulWork(t *testing.T) {
 func TestRunningTabQueuesPromptWithoutSteeringTheActiveRun(t *testing.T) {
 	model := New(Config{})
 	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.execution = &executionStream{steering: make(chan string, 1)}
 	model.task.SetValue("After this, add focused tests.")
 
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
@@ -415,7 +415,7 @@ func TestRunningTabQueuesPromptWithoutSteeringTheActiveRun(t *testing.T) {
 func TestRunningTabCompletesPartialSlashCommandBeforeQueueingIt(t *testing.T) {
 	model := New(Config{})
 	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.execution = &executionStream{steering: make(chan string, 1)}
 	model.task.SetValue("/pla")
 
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
@@ -439,7 +439,7 @@ func TestRunningTabCompletesPartialSlashCommandBeforeQueueingIt(t *testing.T) {
 func TestRunningEnterSteersNativeProviderAtBoundary(t *testing.T) {
 	model := New(Config{})
 	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.execution = &executionStream{steering: make(chan string, 1)}
 	model.task.SetValue("Do not change the public API.")
 
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -460,34 +460,13 @@ func TestRunningEnterSteersNativeProviderAtBoundary(t *testing.T) {
 	}
 }
 
-func TestRunningEnterDoesNotPretendToSteerDelegatedCLI(t *testing.T) {
-	model := New(Config{})
-	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: false}
-	model.task.SetValue("Use a smaller diff.")
-
-	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if command != nil {
-		t.Fatal("Enter unexpectedly started a command")
-	}
-	updated := next.(Model)
-	if updated.task.Value() != "Use a smaller diff." || !strings.Contains(updated.notice.text, "Press Tab to queue") {
-		t.Fatalf("delegated steering state = %#v", updated.notice)
-	}
-	select {
-	case instruction := <-updated.execution.steering:
-		t.Fatalf("delegated CLI received steering %q", instruction)
-	default:
-	}
-}
-
 func TestRunningViewShowsEventBackedActivityVerificationAndQueue(t *testing.T) {
 	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
 	model.width = 120
 	model.height = 60
 	model.resizeInputs()
 	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.execution = &executionStream{steering: make(chan string, 1)}
 	model.queue = []queuedInput{{kind: queuedPrompt, text: "Add a regression test after this."}}
 	model.beginRunActivity([][]string{{"go", "test", "./..."}})
 
@@ -551,10 +530,10 @@ func TestLatestRunViewShowsDiffFactsAndFailureRecovery(t *testing.T) {
 func TestRunStatusViewsFitConstrainedTerminals(t *testing.T) {
 	model := New(Config{Verification: [][]string{{"go", "test", "./..."}, {"go", "vet", "./..."}}})
 	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: false}
-	model.queue = []queuedInput{{kind: queuedPrompt, text: "Check the edge cases after the delegated run."}}
+	model.execution = &executionStream{steering: make(chan string, 1)}
+	model.queue = []queuedInput{{kind: queuedPrompt, text: "Check the edge cases after the active run."}}
 	model.beginRunActivity([][]string{{"go", "test", "./..."}, {"go", "vet", "./..."}})
-	model.appendEvent(agent.Event{Kind: agent.EventHarnessStarted, Step: 1, Text: "codex"})
+	model.appendEvent(agent.Event{Kind: agent.EventTurnStarted, Step: 1})
 
 	for _, size := range []struct{ width, height int }{{44, 18}, {18, 10}} {
 		next, _ := model.Update(tea.WindowSizeMsg{Width: size.width, Height: size.height})
@@ -565,7 +544,7 @@ func TestRunStatusViewsFitConstrainedTerminals(t *testing.T) {
 func TestQueueRejectsDirectShellCommandsAndHoldsAfterFailure(t *testing.T) {
 	model := New(Config{})
 	model.screen = runningScreen
-	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.execution = &executionStream{steering: make(chan string, 1)}
 	model.task.SetValue("!rm -rf build")
 	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyTab})
 	if len(updated.queue) != 0 || !strings.Contains(strings.ToLower(updated.notice.text), "direct shell commands") {

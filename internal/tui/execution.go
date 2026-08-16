@@ -90,14 +90,6 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: executorErr.Error(), kind: noticeError}
 			return m, nil
 		}
-		if m.runMode == gatorrun.PlanMode && executor.Harness != nil {
-			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
-			return m, nil
-		}
-		if (len(images) > 0 || len(attachments) > 0) && executor.Harness != nil {
-			m.notice = notice{text: "File attachments require a native provider; delegated CLI providers cannot receive attachment bytes from Gator.", kind: noticeError}
-			return m, nil
-		}
 	}
 
 	if len(images) > 0 || len(attachments) > 0 {
@@ -158,8 +150,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			case <-ctx.Done():
 			}
 		},
-		Steering:         stream.steering,
-		AllowExternalCLI: true,
+		Steering: stream.steering,
 	}
 
 	if m.resumeStatePath != "" {
@@ -208,25 +199,9 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: executorErr.Error(), kind: noticeError}
 			return m, nil
 		}
-		if m.runMode == gatorrun.PlanMode && executor.Harness != nil {
-			cancel()
-			m.execution = nil
-			m.screen = composeScreen
-			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
-			return m, nil
-		}
-		if (len(images) > 0 || len(attachments) > 0) && executor.Harness != nil {
-			cancel()
-			m.execution = nil
-			m.screen = composeScreen
-			m.notice = notice{text: "File attachments require a native provider; delegated CLI providers cannot receive attachment bytes from Gator.", kind: noticeError}
-			return m, nil
-		}
-		stream.steeringSupported = executor.Harness == nil
 		m.beginRunActivity(request.Verification)
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
 	} else {
-		stream.steeringSupported = executor.Harness == nil
 		m.beginRunActivity(request.Verification)
 		go executeNew(ctx, stream, executor, request)
 	}
@@ -390,7 +365,7 @@ func (m *Model) persistDraft() {
 
 // refreshPreflight validates the same provider factory used by Ctrl+R. It
 // deliberately performs no model request: construction only checks local
-// configuration, credential presence, base URL requirements, and CLI paths.
+// configuration, credential presence, and base URL requirements.
 func (m *Model) refreshPreflight() {
 	if m.config.NewExecutor == nil {
 		m.preflight = nil

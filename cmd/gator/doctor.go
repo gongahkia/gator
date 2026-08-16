@@ -38,12 +38,9 @@ func doctor(arguments []string, out io.Writer) error {
 		gitStatus = "detected"
 	}
 	authentication := model.CredentialHint(provider)
-	authenticationStatus := "check with provider CLI"
-	if !model.IsHarness(provider) {
-		authenticationStatus = "missing"
-		if os.Getenv(authentication) != "" {
-			authenticationStatus = "set"
-		}
+	authenticationStatus := "missing"
+	if os.Getenv(authentication) != "" {
+		authenticationStatus = "set"
 	}
 	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\n", gitStatus, provider, authentication, authenticationStatus); err != nil {
 		return err
