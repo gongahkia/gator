@@ -91,3 +91,22 @@ func TestGenerateContentEncodesImageInput(t *testing.T) {
 		t.Fatalf("complete image input: %v", err)
 	}
 }
+
+func TestGenerateContentEncodesPDFAttachment(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body struct {
+			Contents []struct {
+				Parts []json.RawMessage `json:"parts"`
+			} `json:"contents"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || len(body.Contents) != 1 || len(body.Contents[0].Parts) != 2 || !strings.Contains(string(body.Contents[0].Parts[1]), `"mimeType":"application/pdf"`) || !strings.Contains(string(body.Contents[0].Parts[1]), `"data":"cGRm"`) {
+			t.Fatalf("PDF request = %#v, err = %v", body, err)
+		}
+		_, _ = io.WriteString(writer, `{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]}}]}`)
+	}))
+	defer server.Close()
+	model := GenerateContent{APIKey: "test-key", Model: "gemini-test", BaseURL: server.URL, Client: server.Client()}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte("pdf")}}}}}); err != nil {
+		t.Fatalf("complete PDF attachment: %v", err)
+	}
+}

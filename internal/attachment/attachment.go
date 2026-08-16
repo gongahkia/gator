@@ -281,7 +281,11 @@ func extractXLSX(contents []byte, maxBytes int) (string, error) {
 			text.WriteByte('\n')
 		}
 		fmt.Fprintf(&text, "[sheet %s]\n", strings.TrimSuffix(filepath.Base(name), ".xml"))
-		rows, err := worksheetCSV(data, shared, maxBytes-text.Len())
+		remaining := maxBytes - text.Len()
+		if remaining < 1 {
+			return "", errors.New("spreadsheet text exceeds the extraction limit")
+		}
+		rows, err := worksheetCSV(data, shared, remaining)
 		if err != nil {
 			return "", err
 		}

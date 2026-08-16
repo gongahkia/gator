@@ -102,6 +102,29 @@ func TestResponsesEncodesImageInput(t *testing.T) {
 	}
 }
 
+func TestResponsesEncodesPDFAttachment(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body struct {
+			Input []struct {
+				Content []struct {
+					Type     string `json:"type"`
+					FileData string `json:"file_data"`
+					Filename string `json:"filename"`
+				} `json:"content"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || len(body.Input) != 1 || len(body.Input[0].Content) != 2 || body.Input[0].Content[1].Type != "input_file" || body.Input[0].Content[1].Filename != "report.pdf" || body.Input[0].Content[1].FileData != "cGRm" {
+			t.Fatalf("PDF request = %#v, err = %v", body, err)
+		}
+		_, _ = io.WriteString(writer, `{"output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
+	}))
+	defer server.Close()
+	model := Responses{APIKey: "test-key", BaseURL: server.URL, Client: server.Client()}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte("pdf")}}}}}); err != nil {
+		t.Fatalf("complete PDF attachment: %v", err)
+	}
+}
+
 func TestResponsesCompleteDescribesAPIErrorsWithoutKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusTooManyRequests)

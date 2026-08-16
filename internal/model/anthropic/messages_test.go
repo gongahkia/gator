@@ -98,6 +98,21 @@ func TestMessagesEncodesImageInput(t *testing.T) {
 	}
 }
 
+func TestMessagesEncodesPDFAttachment(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body requestBodyView
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || len(body.Messages) != 1 || len(body.Messages[0].Content) != 2 || body.Messages[0].Content[1].Type != "document" || body.Messages[0].Content[1].Source == nil || body.Messages[0].Content[1].Source.MediaType != "application/pdf" || body.Messages[0].Content[1].Source.Data != "cGRm" {
+			t.Fatalf("PDF request = %#v, err = %v", body.Messages, err)
+		}
+		_, _ = io.WriteString(writer, `{"content":[{"type":"text","text":"done"}]}`)
+	}))
+	defer server.Close()
+	model := Messages{APIKey: "test-key", Model: "claude-test", BaseURL: server.URL, Client: server.Client()}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte("pdf")}}}}}); err != nil {
+		t.Fatalf("complete PDF attachment: %v", err)
+	}
+}
+
 type requestBodyView struct {
 	Model    string         `json:"model"`
 	System   string         `json:"system"`
