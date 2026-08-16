@@ -401,6 +401,12 @@ func TestEffectiveModelUsesProviderDefaults(t *testing.T) {
 	if got := EffectiveModel(KimiCoding, ""); got != "kimi-for-coding" {
 		t.Fatalf("Kimi default = %q", got)
 	}
+	if got := EffectiveModel(OpenCode, ""); got != "gpt-5.6-terra" {
+		t.Fatalf("OpenCode default = %q", got)
+	}
+	if got := EffectiveModel(OpenCodeGo, ""); got != "kimi-k2.6" {
+		t.Fatalf("OpenCode Go default = %q", got)
+	}
 	for _, unavailable := range []string{"cursor"} {
 		provider, err := ParseProvider(unavailable)
 		if err != nil || SupportsDirect(provider) {

@@ -809,6 +809,31 @@ func TestProviderDropdownNamesMissingSubscriptionClientRegistration(t *testing.T
 	t.Fatal("Codex provider option was missing")
 }
 
+func TestProviderDropdownDescribesNewDirectProviderChoices(t *testing.T) {
+	model := New(Config{StateDir: t.TempDir()})
+	model.focus = providerField
+	want := map[string]string{
+		"azure-openai-responses": "Responses API",
+		"minimax-cn":             "Messages API",
+		"zai-coding-cn":          "China",
+		"opencode":               "OpenCode Zen",
+		"opencode-go":            "OpenCode Go",
+	}
+	for _, option := range model.dropdownOptions() {
+		fragment, ok := want[option.value]
+		if !ok {
+			continue
+		}
+		if !strings.Contains(option.description, fragment) {
+			t.Fatalf("provider %q description = %q; want %q", option.value, option.description, fragment)
+		}
+		delete(want, option.value)
+	}
+	if len(want) != 0 {
+		t.Fatalf("provider options missing: %#v", want)
+	}
+}
+
 func TestModelDropdownKeepsCustomModelEntryForEndpointSpecificProviders(t *testing.T) {
 	model := New(Config{Provider: "azure-openai"})
 	model.focus = modelField
