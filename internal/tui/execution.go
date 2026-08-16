@@ -118,6 +118,9 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	}
 	m.execution = stream
 	m.events = nil
+	m.appendChat(chatEntry{author: chatUser, text: task})
+	m.task.Reset()
+	m.task.Placeholder = "Waiting for Gator..."
 	m.outcome = nil
 	m.runErr = nil
 	m.diff = ""
@@ -288,7 +291,12 @@ func (m *Model) prepareContinuation() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "This run has no resume record.", kind: noticeError}
 		return *m, nil
 	}
-	return m.beginContinuation(m.outcome.StatePath)
+	m.screen = composeScreen
+	m.task.Reset()
+	m.task.Placeholder = "Send a follow-up..."
+	m.focus = taskField
+	m.refreshPreflight()
+	return *m, m.focusField()
 }
 
 func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
@@ -308,6 +316,9 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 	}
 	m.task.Reset()
 	m.task.Placeholder = "Describe the next instruction for this retained worktree..."
+	m.chat = nil
+	m.chatIndex = 0
+	m.appendChat(chatEntry{author: chatSystem, text: "Continuing a retained thread. The worktree and model context are available; earlier terminal events are not replayed here."})
 	m.verification.SetValue(formatVerification(session.Verification))
 	m.provider.SetValue(session.Provider)
 	m.model.SetValue(session.Model)
@@ -328,8 +339,12 @@ func (m *Model) returnToComposer() {
 	m.threadID = ""
 	m.runMode = gatorrun.ExecuteMode
 	m.task.Reset()
-	m.task.Placeholder = "Describe the bug fix or feature you want to build..."
+	m.task.Placeholder = "Message Gator..."
+	m.chat = nil
+	m.chatIndex = 0
+	m.appendChat(chatEntry{author: chatSystem, text: "New isolated thread. Gator works in a separate Git worktree; use /permissions for the active policy."})
 	m.focus = taskField
+	_ = m.focusField()
 	m.commandOutput = ""
 	m.notice = notice{text: "Ready for a new isolated task.", kind: noticeInfo}
 	m.refreshPreflight()

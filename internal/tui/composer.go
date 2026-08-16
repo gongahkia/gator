@@ -21,7 +21,7 @@ type slashCommand struct {
 
 var slashCommands = []slashCommand{
 	{name: "/clear", description: "clear the current task"},
-	{name: "/help", description: "show Gator composer commands"},
+	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
 	{name: "/model", description: "edit the model for the next run"},
 	{name: "/new", description: "start a new isolated thread"},
