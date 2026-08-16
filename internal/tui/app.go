@@ -147,6 +147,8 @@ type diffLoadedMsg struct {
 	err       error
 }
 
+type activityTickMsg struct{}
+
 // Model is the Bubble Tea state model for Gator's terminal experience.
 type Model struct {
 	config Config
@@ -186,12 +188,16 @@ type Model struct {
 	queue               []queuedInput
 	execution           *executionStream
 	cancelling          bool
+	lastRunCancelled    bool
+	activity            runActivity
+	verificationStatus  []verificationStatus
 
 	outcome         *gatorrun.Outcome
 	runErr          error
 	diff            string
 	diffTruncated   bool
 	diffErr         error
+	diffStats       diffStats
 	resumeStatePath string
 	threadID        string
 	runMode         gatorrun.Mode
@@ -297,17 +303,24 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case agentEventMsg:
 		m.appendEvent(msg.event)
 		return m, waitForExecution(m.execution)
+	case activityTickMsg:
+		if m.screen == runningScreen && m.execution != nil {
+			return m, waitForExecution(m.execution)
+		}
+		return m, nil
 	case executionDoneMsg:
 		wasNewThread := m.resumeStatePath == ""
 		wasCancelling := m.cancelling
 		m.execution = nil
 		m.cancelling = false
+		m.lastRunCancelled = wasCancelling
 		m.outcome = &msg.done.outcome
 		m.threadID = msg.done.outcome.ThreadID
 		if msg.done.outcome.StatePath != "" {
 			m.resumeStatePath = msg.done.outcome.StatePath
 		}
 		m.runErr = msg.done.err
+		m.finishRunActivity(msg.done.err, wasCancelling)
 		m.appendCompletion(msg.done.outcome, msg.done.err)
 		m.screen = composeScreen
 		m.task.Reset()
@@ -356,6 +369,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, loadDiff(msg.done.outcome.Worktree.Root)
 	case diffLoadedMsg:
 		m.diff, m.diffTruncated, m.diffErr = msg.diff, msg.truncated, msg.err
+		if msg.err == nil {
+			m.diffStats = summarizeDiff(msg.diff)
+		}
 		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)

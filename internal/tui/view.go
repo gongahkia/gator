@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -161,18 +162,13 @@ func (m Model) chatView(running bool) string {
 	sections := []string{
 		m.header(mode + " · " + m.runMode.String()),
 		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.vimModeLabel(), m.inlineWidth()))),
-		m.chatHistoryView(),
 	}
 
 	if running {
-		status := "Gator is working in an isolated worktree."
-		if m.runMode == gatorrun.PlanMode {
-			status = "Gator is inspecting the worktree in enforced read-only Plan mode."
+		sections = append(sections, m.activityView(), m.chatHistoryView())
+		if verification := m.verificationStatusView(); verification != "" {
+			sections = append(sections, verification)
 		}
-		if m.cancelling {
-			status = "Stopping after the current operation; the worktree will remain reviewable."
-		}
-		sections = append(sections, m.inline(dimStyle.Render(compact(status, m.inlineWidth()))))
 		if m.vimCommand != "" {
 			sections = append(sections, m.vimCommandView())
 		} else {
@@ -191,14 +187,22 @@ func (m Model) chatView(running bool) string {
 			label += " · " + m.vimModeLabel()
 		}
 		sections = append(sections, labelStyle.Render(label), m.panel(m.task.View()))
-		if len(m.queue) > 0 {
-			sections = append(sections, m.inline(dimStyle.Render(compact(m.queueSummary()+" · /queue manages pending work", m.inlineWidth()))))
+		if preview := m.queuePreviewView(); preview != "" {
+			sections = append(sections, preview)
 		}
 		if m.commandOutput != "" {
 			sections = append(sections, labelStyle.Render("Local status"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
 		}
 		sections = append(sections, m.noticeView(), m.runningFooter())
 		return strings.Join(sections, "\n")
+	}
+
+	sections = append(sections, m.chatHistoryView())
+	if result := m.latestRunView(); result != "" {
+		sections = append(sections, result)
+	}
+	if verification := m.verificationStatusView(); verification != "" {
+		sections = append(sections, verification)
 	}
 
 	if m.vimCommand != "" {
@@ -259,6 +263,141 @@ func (m Model) runningFooter() string {
 	}
 }
 
+func (m Model) activityView() string {
+	phase := m.activityPhaseLabel()
+	detail := m.activity.detail
+	if detail == "" {
+		detail = "creating an isolated worktree"
+	}
+	if m.cancelling {
+		phase = "stopping"
+		detail = "waiting for the current operation to stop; the worktree will remain reviewable"
+	}
+	activity := "● " + phase
+	if duration := m.activityDuration(time.Now()); duration != "" {
+		activity += " · " + duration
+	}
+	providerMode := "native"
+	steering := "Enter steers at a model or tool boundary"
+	if m.execution != nil && !m.execution.steeringSupported {
+		providerMode = "delegated CLI"
+		steering = "Tab queues follow-up work; active steering is unavailable"
+	}
+	mode := m.runMode.String()
+	if m.runMode == gatorrun.PlanMode {
+		mode += " read-only"
+	}
+	turn := m.activity.turn
+	if turn < 1 {
+		turn = 1
+	}
+	facts := fmt.Sprintf("%s · %s · isolated worktree · turn %d/%d", mode, providerMode, turn, m.config.MaxSteps)
+	if age := m.lastActivityAge(time.Now()); age != "" {
+		facts += " · last activity " + age
+	}
+	return labelStyle.Render("Activity") + "\n" + m.panel(
+		keyStyle.Render(compact(activity, m.panelTextWidth()))+"\n"+
+			dimStyle.Render(compact(detail, m.panelTextWidth()))+"\n"+
+			dimStyle.Render(compact(facts+" · "+steering, m.panelTextWidth())),
+	)
+}
+
+func (m Model) verificationStatusView() string {
+	if len(m.verificationStatus) == 0 {
+		return ""
+	}
+	limit := min(3, len(m.verificationStatus))
+	lines := make([]string, 0, limit+1)
+	for index := 0; index < limit; index++ {
+		status := m.verificationStatus[index]
+		icon := "○"
+		switch status.phase {
+		case verificationRunning:
+			icon = "●"
+		case verificationPassed:
+			icon = "✓"
+		case verificationFailed:
+			icon = "✗"
+		}
+		line := icon + " " + strings.Join(status.argv, " ") + " · " + verificationPhaseLabel(status.phase)
+		if status.phase == verificationRunning && !status.startedAt.IsZero() {
+			line += " · " + time.Since(status.startedAt).Round(time.Second).String()
+		}
+		if status.phase == verificationFailed && status.detail != "" {
+			line += " · " + status.detail
+		}
+		style := dimStyle
+		if status.phase == verificationPassed {
+			style = okStyle
+		} else if status.phase == verificationFailed {
+			style = errorStyle
+		}
+		lines = append(lines, style.Render(compact(line, m.panelTextWidth())))
+	}
+	if len(m.verificationStatus) > limit {
+		lines = append(lines, dimStyle.Render(fmt.Sprintf("+%d additional verification command(s)", len(m.verificationStatus)-limit)))
+	}
+	return labelStyle.Render("Verification") + "\n" + m.panel(strings.Join(lines, "\n"))
+}
+
+func (m Model) queuePreviewView() string {
+	if len(m.queue) == 0 {
+		return ""
+	}
+	limit := min(2, len(m.queue))
+	lines := make([]string, 0, limit+1)
+	for index := 0; index < limit; index++ {
+		item := m.queue[index]
+		lines = append(lines, fmt.Sprintf("%d. %s", index+1, compact(item.text, max(16, m.panelTextWidth()-4))))
+	}
+	if len(m.queue) > limit {
+		lines = append(lines, fmt.Sprintf("+%d more · /queue manages pending work", len(m.queue)-limit))
+	} else {
+		lines = append(lines, "/queue manages pending work")
+	}
+	return labelStyle.Render("Queued next · "+m.queueSummary()) + "\n" + m.panel(strings.Join(lines, "\n"))
+}
+
+func (m Model) latestRunView() string {
+	if m.outcome == nil && m.runErr == nil {
+		return ""
+	}
+	if m.runErr != nil {
+		return labelStyle.Render("Latest run") + "\n" + m.panel(errorStyle.Render(compact("Stopped: "+m.runErr.Error(), m.panelTextWidth()))+"\n"+dimStyle.Render(compact(m.failureGuidance(), m.panelTextWidth())))
+	}
+	result := m.verificationSummary()
+	if m.diffStats.ready {
+		if m.diffStats.files == 0 {
+			result += " · no diff visible"
+		} else {
+			result += fmt.Sprintf(" · %d file(s) · +%d −%d", m.diffStats.files, m.diffStats.additions, m.diffStats.deletions)
+		}
+	} else if m.outcome != nil && m.outcome.Worktree.Path != "" {
+		result += " · loading diff summary"
+	}
+	return labelStyle.Render("Latest run") + "\n" + m.panel(okStyle.Render(compact("✓ Complete · "+result, m.panelTextWidth()))+"\n"+dimStyle.Render(compact("Use /review to inspect the retained worktree and patch handoff.", m.panelTextWidth())))
+}
+
+func (m Model) failureGuidance() string {
+	if m.lastRunCancelled {
+		return "Cancelled by you. The worktree is retained; use /review or send a focused follow-up when ready."
+	}
+	if m.runErr == nil {
+		return "Use /review to inspect the retained worktree."
+	}
+	message := strings.ToLower(m.runErr.Error())
+	switch {
+	case strings.Contains(message, "verification"):
+		return "Verification did not complete successfully. Inspect its transcript and output, then send a focused follow-up."
+	case strings.Contains(message, "harness"), strings.Contains(message, "cli"):
+		return "The delegated CLI stopped. Inspect the transcript, check that provider CLI setup is usable, then retry with a focused follow-up."
+	case strings.Contains(message, "api"), strings.Contains(message, "credential"), strings.Contains(message, "authentication"):
+		return "The model provider stopped before completion. Check provider configuration or credentials, then retry the task."
+	default:
+		return "Inspect the transcript and retained worktree with /review, then send a focused follow-up."
+	}
+}
+
 func (m Model) vimCommandView() string {
 	return labelStyle.Render("Vim command") + "\n" + m.panel(keyStyle.Render(m.vimCommand)+"\n"+dimStyle.Render(":w send · :wq send then exit after successful queued work"))
 }
@@ -306,6 +445,15 @@ func (m Model) chatEntryLimit() int {
 		return 6
 	}
 	reserved := m.task.Height() + 12
+	if m.screen == runningScreen {
+		reserved += 6
+		if len(m.verificationStatus) > 0 {
+			reserved += min(5, len(m.verificationStatus)+2)
+		}
+		if len(m.queue) > 0 {
+			reserved += min(4, len(m.queue)+2)
+		}
+	}
 	return max(1, (m.height-reserved)/3)
 }
 

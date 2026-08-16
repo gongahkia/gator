@@ -363,6 +363,19 @@ func TestExecutorVerifiesDelegatedCLIHarnessOutcome(t *testing.T) {
 	if delegated.request.Root != outcome.Worktree.Root.Path() || !containsEvent(outcome.Events, agent.EventHarnessStarted) || !containsEvent(outcome.Events, agent.EventRunFinished) {
 		t.Fatalf("outcome = %#v, request = %#v", outcome, delegated.request)
 	}
+	var verifierArguments struct {
+		Argv []string `json:"argv"`
+	}
+	for _, event := range outcome.Events {
+		if event.Kind == agent.EventToolCalled && event.ToolCall != nil && event.ToolCall.ID == "harness-verify-1" {
+			if err := json.Unmarshal(event.ToolCall.Arguments, &verifierArguments); err != nil {
+				t.Fatalf("decode delegated verifier arguments: %v", err)
+			}
+		}
+	}
+	if got := strings.Join(verifierArguments.Argv, " "); got != "go test ./..." {
+		t.Fatalf("delegated verifier arguments = %q", got)
+	}
 	if _, err := os.Stat(filepath.Join(outcome.Worktree.Path, "delegated.go")); err != nil {
 		t.Fatalf("delegated patch missing: %v", err)
 	}

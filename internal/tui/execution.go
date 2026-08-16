@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
@@ -127,6 +128,8 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	m.diff = ""
 	m.diffErr = nil
 	m.diffTruncated = false
+	m.diffStats = diffStats{}
+	m.lastRunCancelled = false
 	m.screen = runningScreen
 	m.focus = taskField
 	_ = m.focusField()
@@ -220,9 +223,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		stream.steeringSupported = executor.Harness == nil
+		m.beginRunActivity(request.Verification)
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
 	} else {
 		stream.steeringSupported = executor.Harness == nil
+		m.beginRunActivity(request.Verification)
 		go executeNew(ctx, stream, executor, request)
 	}
 	return m, waitForExecution(stream)
@@ -277,11 +282,15 @@ func waitForExecution(stream *executionStream) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		event, ok := <-stream.events
-		if ok {
-			return agentEventMsg{event: event}
+		select {
+		case event, ok := <-stream.events:
+			if ok {
+				return agentEventMsg{event: event}
+			}
+			return executionDoneMsg{done: <-stream.done}
+		case <-time.After(time.Second):
+			return activityTickMsg{}
 		}
-		return executionDoneMsg{done: <-stream.done}
 	}
 }
 
