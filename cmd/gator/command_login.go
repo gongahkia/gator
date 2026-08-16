@@ -46,7 +46,7 @@ func login(arguments []string, out io.Writer) error {
 		return loginOAuth(provider, out)
 	}
 	if !model.SupportsAPIKeyLogin(provider) {
-		return fmt.Errorf("provider %q does not support Gator API-key login", provider)
+		return fmt.Errorf("provider %q uses %s; gator login does not store that credential", provider, model.CredentialHint(provider))
 	}
 	key := strings.TrimSpace(*apiKey)
 	source := "--api-key"

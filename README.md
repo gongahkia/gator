@@ -189,6 +189,20 @@ an endpoint for one scripted run.
 | `nvidia` | `NVIDIA_API_KEY` | NVIDIA NIM OpenAI-compatible Chat Completions |
 | `huggingface` | `HF_TOKEN` | Hugging Face Inference Providers Chat Completions |
 | `moonshotai` | `MOONSHOT_API_KEY` | Moonshot AI Kimi OpenAI-compatible Chat Completions |
+| `zai` | `ZAI_API_KEY` | Z.AI GLM Coding Plan OpenAI-compatible Chat Completions |
+| `minimax` | `MINIMAX_API_KEY` | MiniMax OpenAI-compatible Chat Completions |
+| `baseten` | `BASETEN_API_KEY` | Baseten OpenAI-compatible Chat Completions |
+| `vercel-ai-gateway` | `AI_GATEWAY_API_KEY` | Vercel AI Gateway OpenAI-compatible Chat Completions |
+| `ant-ling` | `ANT_LING_API_KEY` | Ant Ling OpenAI-compatible Chat Completions |
+| `xiaomi` | `MIMO_API_KEY` | Xiaomi MiMo OpenAI-compatible Chat Completions |
+| `moonshotai-cn` | `MOONSHOT_API_KEY` | Moonshot AI Kimi China OpenAI-compatible Chat Completions |
+| `cloudflare-workers-ai` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers AI OpenAI-compatible Chat Completions |
+| `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare unified AI Gateway OpenAI-compatible Chat Completions |
+| `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, optional `AWS_REGION` | Amazon Bedrock OpenAI-compatible Chat Completions |
+| `google-vertex` | Google ADC plus `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` | Google Vertex AI OpenAI-compatible Chat Completions |
+| `qwen-token-plan` | `QWEN_TOKEN_PLAN_API_KEY` | Qwen Token Plan OpenAI-compatible Chat Completions |
+| `qwen-token-plan-cn` | `QWEN_TOKEN_PLAN_CN_API_KEY` | Qwen Token Plan China OpenAI-compatible Chat Completions |
+| `xiaomi-token-plan-cn`, `xiaomi-token-plan-ams`, `xiaomi-token-plan-sgp` | `MIMO_API_KEY` | Xiaomi MiMo prepaid Token Plan Chat Completions |
 | `xai` | `XAI_API_KEY`, or Grok/X account OAuth using a Gator-registered client | OpenAI-compatible Chat Completions |
 | `openrouter` | `OPENROUTER_API_KEY`, or a browser-minted user-controlled API key | OpenAI-compatible Chat Completions |
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
@@ -209,8 +223,15 @@ Claude plan limits; provider billing and eligibility remain provider-defined.
 The predefined compatible providers use these key variables respectively:
 `MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
 `TOGETHER_API_KEY`, `FIREWORKS_API_KEY`, `DEEPSEEK_API_KEY`,
-`CEREBRAS_API_KEY`, `NVIDIA_API_KEY`, `HF_TOKEN`, and `MOONSHOT_API_KEY`.
-Set `--model`
+`CEREBRAS_API_KEY`, `NVIDIA_API_KEY`, `HF_TOKEN`, `MOONSHOT_API_KEY`,
+`ZAI_API_KEY`, `MINIMAX_API_KEY`, `BASETEN_API_KEY`, `AI_GATEWAY_API_KEY`,
+`ANT_LING_API_KEY`, `MIMO_API_KEY`, `QWEN_TOKEN_PLAN_API_KEY`,
+`QWEN_TOKEN_PLAN_CN_API_KEY`, and `CLOUDFLARE_API_TOKEN`. Cloudflare also
+requires `CLOUDFLARE_ACCOUNT_ID` unless a full `--base-url` is supplied.
+Bedrock uses `AWS_BEARER_TOKEN_BEDROCK` and defaults `AWS_REGION` to
+`us-east-1`. Vertex refreshes Google Application Default Credentials directly,
+or accepts `GATOR_VERTEX_ACCESS_TOKEN` for an externally managed short-lived
+token. Set `--model`
 for compatible providers without a Gator default. `gator doctor --provider NAME`
 reports the selected provider's prerequisite without printing a secret.
 

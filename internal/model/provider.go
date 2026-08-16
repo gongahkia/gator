@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/gator/internal/model/gemini"
 	"github.com/gongahkia/gator/internal/model/openai"
 	"github.com/gongahkia/gator/internal/model/radius"
+	"github.com/gongahkia/gator/internal/model/vertex"
 )
 
 // Provider identifies a direct model backend or a retained legacy session
@@ -27,28 +28,44 @@ import (
 type Provider string
 
 const (
-	OpenAI           Provider = "openai"
-	AzureOpenAI      Provider = "azure-openai"
-	Anthropic        Provider = "anthropic"
-	Gemini           Provider = "gemini"
-	Mistral          Provider = "mistral"
-	XAI              Provider = "xai"
-	Groq             Provider = "groq"
-	OpenRouter       Provider = "openrouter"
-	Together         Provider = "together"
-	Fireworks        Provider = "fireworks"
-	DeepSeek         Provider = "deepseek"
-	Cerebras         Provider = "cerebras"
-	NVIDIA           Provider = "nvidia"
-	HuggingFace      Provider = "huggingface"
-	MoonshotAI       Provider = "moonshotai"
-	OpenAICompatible Provider = "openai-compatible"
-	Codex            Provider = "codex"
-	Claude           Provider = "claude"
-	Copilot          Provider = "copilot"
-	KimiCoding       Provider = "kimi-coding"
-	Radius           Provider = "radius"
-	Cursor           Provider = "cursor"
+	OpenAI             Provider = "openai"
+	AzureOpenAI        Provider = "azure-openai"
+	Anthropic          Provider = "anthropic"
+	Gemini             Provider = "gemini"
+	Mistral            Provider = "mistral"
+	XAI                Provider = "xai"
+	Groq               Provider = "groq"
+	OpenRouter         Provider = "openrouter"
+	Together           Provider = "together"
+	Fireworks          Provider = "fireworks"
+	DeepSeek           Provider = "deepseek"
+	Cerebras           Provider = "cerebras"
+	NVIDIA             Provider = "nvidia"
+	HuggingFace        Provider = "huggingface"
+	MoonshotAI         Provider = "moonshotai"
+	ZAI                Provider = "zai"
+	MiniMax            Provider = "minimax"
+	Baseten            Provider = "baseten"
+	VercelAIGateway    Provider = "vercel-ai-gateway"
+	AntLing            Provider = "ant-ling"
+	Xiaomi             Provider = "xiaomi"
+	MoonshotAICN       Provider = "moonshotai-cn"
+	CloudflareWorkers  Provider = "cloudflare-workers-ai"
+	CloudflareGateway  Provider = "cloudflare-ai-gateway"
+	AmazonBedrock      Provider = "amazon-bedrock"
+	GoogleVertex       Provider = "google-vertex"
+	QwenTokenPlan      Provider = "qwen-token-plan"
+	QwenTokenPlanCN    Provider = "qwen-token-plan-cn"
+	XiaomiTokenPlanCN  Provider = "xiaomi-token-plan-cn"
+	XiaomiTokenPlanAMS Provider = "xiaomi-token-plan-ams"
+	XiaomiTokenPlanSGP Provider = "xiaomi-token-plan-sgp"
+	OpenAICompatible   Provider = "openai-compatible"
+	Codex              Provider = "codex"
+	Claude             Provider = "claude"
+	Copilot            Provider = "copilot"
+	KimiCoding         Provider = "kimi-coding"
+	Radius             Provider = "radius"
+	Cursor             Provider = "cursor"
 )
 
 // Config selects one provider. APIKey is optional only because the factory can
@@ -194,7 +211,25 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
-	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, Cerebras, NVIDIA, HuggingFace, MoonshotAI, OpenAICompatible:
+	case CloudflareWorkers, CloudflareGateway:
+		compatible, err := cloudflareConfig(provider, config)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
+	case AmazonBedrock:
+		compatible, err := bedrockConfig(config)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
+	case GoogleVertex:
+		compatible, err := vertexConfig(config)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: chatcompletions.Model{Config: compatible}}, nil
+	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, Cerebras, NVIDIA, HuggingFace, MoonshotAI, ZAI, MiniMax, Baseten, VercelAIGateway, AntLing, Xiaomi, MoonshotAICN, QwenTokenPlan, QwenTokenPlanCN, XiaomiTokenPlanCN, XiaomiTokenPlanAMS, XiaomiTokenPlanSGP, OpenAICompatible:
 		compatible, err := compatibleConfig(provider, config)
 		if err != nil {
 			return Backend{}, err
@@ -205,6 +240,98 @@ func New(config Config) (Backend, error) {
 	default:
 		return Backend{}, fmt.Errorf("unsupported provider %q", provider)
 	}
+}
+
+func bedrockConfig(config Config) (chatcompletions.Config, error) {
+	apiKey, err := key(config, AmazonBedrock, "AWS_BEARER_TOKEN_BEDROCK")
+	if err != nil {
+		return chatcompletions.Config{}, err
+	}
+	if err := requireKey(apiKey, "AWS_BEARER_TOKEN_BEDROCK"); err != nil {
+		return chatcompletions.Config{}, err
+	}
+	baseURL := strings.TrimSpace(config.BaseURL)
+	if baseURL == "" {
+		region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+		if region == "" {
+			region = "us-east-1"
+		}
+		baseURL = "https://bedrock-mantle." + region + ".api.aws/v1/chat/completions"
+	}
+	if strings.TrimSpace(config.Model) == "" {
+		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", AmazonBedrock)
+	}
+	return chatcompletions.Config{
+		APIKey:       apiKey,
+		APIKeyEnv:    "AWS_BEARER_TOKEN_BEDROCK",
+		BaseURL:      baseURL,
+		Model:        config.Model,
+		ProviderName: "Amazon Bedrock",
+		Client:       config.Client,
+	}, nil
+}
+
+func vertexConfig(config Config) (chatcompletions.Config, error) {
+	project := strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	if project == "" {
+		project = strings.TrimSpace(os.Getenv("GCLOUD_PROJECT"))
+	}
+	if project == "" {
+		return chatcompletions.Config{}, errors.New("GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT is required")
+	}
+	location := strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_LOCATION"))
+	if location == "" {
+		return chatcompletions.Config{}, errors.New("GOOGLE_CLOUD_LOCATION is required")
+	}
+	baseURL := strings.TrimSpace(config.BaseURL)
+	if baseURL == "" {
+		baseURL = "https://" + location + "-aiplatform.googleapis.com/v1/projects/" + project + "/locations/" + location + "/endpoints/openapi/chat/completions"
+	}
+	if strings.TrimSpace(config.Model) == "" {
+		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", GoogleVertex)
+	}
+	credentials := vertex.FromEnvironment()
+	return chatcompletions.Config{
+		APIKeySource: credentials.Token,
+		APIKeyEnv:    "GATOR_VERTEX_ACCESS_TOKEN or Google Application Default Credentials",
+		BaseURL:      baseURL,
+		Model:        config.Model,
+		ProviderName: "Google Vertex AI",
+		Client:       config.Client,
+	}, nil
+}
+
+func cloudflareConfig(provider Provider, config Config) (chatcompletions.Config, error) {
+	apiKey, err := key(config, provider, "CLOUDFLARE_API_TOKEN")
+	if err != nil {
+		return chatcompletions.Config{}, err
+	}
+	if err := requireKey(apiKey, "CLOUDFLARE_API_TOKEN"); err != nil {
+		return chatcompletions.Config{}, err
+	}
+	baseURL := strings.TrimSpace(config.BaseURL)
+	if baseURL == "" {
+		accountID := strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCOUNT_ID"))
+		if accountID == "" {
+			return chatcompletions.Config{}, errors.New("CLOUDFLARE_ACCOUNT_ID is required")
+		}
+		baseURL = "https://api.cloudflare.com/client/v4/accounts/" + accountID + "/ai/v1/chat/completions"
+	}
+	if strings.TrimSpace(config.Model) == "" {
+		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", provider)
+	}
+	name := "Cloudflare Workers AI"
+	if provider == CloudflareGateway {
+		name = "Cloudflare AI Gateway"
+	}
+	return chatcompletions.Config{
+		APIKey:       apiKey,
+		APIKeyEnv:    "CLOUDFLARE_API_TOKEN",
+		BaseURL:      baseURL,
+		Model:        config.Model,
+		ProviderName: name,
+		Client:       config.Client,
+	}, nil
 }
 
 func compatibleConfig(provider Provider, config Config) (chatcompletions.Config, error) {
@@ -250,19 +377,31 @@ type compatibleProvider struct {
 }
 
 var compatibleProviders = map[Provider]compatibleProvider{
-	AzureOpenAI:      {name: "Azure OpenAI API", apiKeyEnv: "AZURE_OPENAI_API_KEY", baseURL: "", authorizationHeader: "api-key"},
-	Mistral:          {name: "Mistral API", apiKeyEnv: "MISTRAL_API_KEY", baseURL: "https://api.mistral.ai/v1/chat/completions"},
-	XAI:              {name: "xAI API", apiKeyEnv: "XAI_API_KEY", baseURL: "https://api.x.ai/v1/chat/completions"},
-	Groq:             {name: "Groq API", apiKeyEnv: "GROQ_API_KEY", baseURL: "https://api.groq.com/openai/v1/chat/completions"},
-	OpenRouter:       {name: "OpenRouter API", apiKeyEnv: "OPENROUTER_API_KEY", baseURL: "https://openrouter.ai/api/v1/chat/completions"},
-	Together:         {name: "Together AI API", apiKeyEnv: "TOGETHER_API_KEY", baseURL: "https://api.together.xyz/v1/chat/completions"},
-	Fireworks:        {name: "Fireworks AI API", apiKeyEnv: "FIREWORKS_API_KEY", baseURL: "https://api.fireworks.ai/inference/v1/chat/completions"},
-	DeepSeek:         {name: "DeepSeek API", apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/chat/completions"},
-	Cerebras:         {name: "Cerebras Inference", apiKeyEnv: "CEREBRAS_API_KEY", baseURL: "https://api.cerebras.ai/v1/chat/completions"},
-	NVIDIA:           {name: "NVIDIA NIM", apiKeyEnv: "NVIDIA_API_KEY", baseURL: "https://integrate.api.nvidia.com/v1/chat/completions"},
-	HuggingFace:      {name: "Hugging Face Inference Providers", apiKeyEnv: "HF_TOKEN", baseURL: "https://router.huggingface.co/v1/chat/completions"},
-	MoonshotAI:       {name: "Moonshot AI Kimi API", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.ai/v1/chat/completions"},
-	OpenAICompatible: {name: "OpenAI-compatible API", apiKeyEnv: "GATOR_COMPATIBLE_API_KEY", baseURL: ""},
+	AzureOpenAI:        {name: "Azure OpenAI API", apiKeyEnv: "AZURE_OPENAI_API_KEY", baseURL: "", authorizationHeader: "api-key"},
+	Mistral:            {name: "Mistral API", apiKeyEnv: "MISTRAL_API_KEY", baseURL: "https://api.mistral.ai/v1/chat/completions"},
+	XAI:                {name: "xAI API", apiKeyEnv: "XAI_API_KEY", baseURL: "https://api.x.ai/v1/chat/completions"},
+	Groq:               {name: "Groq API", apiKeyEnv: "GROQ_API_KEY", baseURL: "https://api.groq.com/openai/v1/chat/completions"},
+	OpenRouter:         {name: "OpenRouter API", apiKeyEnv: "OPENROUTER_API_KEY", baseURL: "https://openrouter.ai/api/v1/chat/completions"},
+	Together:           {name: "Together AI API", apiKeyEnv: "TOGETHER_API_KEY", baseURL: "https://api.together.xyz/v1/chat/completions"},
+	Fireworks:          {name: "Fireworks AI API", apiKeyEnv: "FIREWORKS_API_KEY", baseURL: "https://api.fireworks.ai/inference/v1/chat/completions"},
+	DeepSeek:           {name: "DeepSeek API", apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/chat/completions"},
+	Cerebras:           {name: "Cerebras Inference", apiKeyEnv: "CEREBRAS_API_KEY", baseURL: "https://api.cerebras.ai/v1/chat/completions"},
+	NVIDIA:             {name: "NVIDIA NIM", apiKeyEnv: "NVIDIA_API_KEY", baseURL: "https://integrate.api.nvidia.com/v1/chat/completions"},
+	HuggingFace:        {name: "Hugging Face Inference Providers", apiKeyEnv: "HF_TOKEN", baseURL: "https://router.huggingface.co/v1/chat/completions"},
+	MoonshotAI:         {name: "Moonshot AI Kimi API", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.ai/v1/chat/completions"},
+	ZAI:                {name: "Z.AI GLM Coding Plan", apiKeyEnv: "ZAI_API_KEY", baseURL: "https://api.z.ai/api/coding/paas/v4/chat/completions"},
+	MiniMax:            {name: "MiniMax API", apiKeyEnv: "MINIMAX_API_KEY", baseURL: "https://api.minimax.io/v1/chat/completions"},
+	Baseten:            {name: "Baseten Inference", apiKeyEnv: "BASETEN_API_KEY", baseURL: "https://inference.baseten.co/v1/chat/completions", authorizationPrefix: "Api-Key "},
+	VercelAIGateway:    {name: "Vercel AI Gateway", apiKeyEnv: "AI_GATEWAY_API_KEY", baseURL: "https://ai-gateway.vercel.sh/v1/chat/completions"},
+	AntLing:            {name: "Ant Ling API", apiKeyEnv: "ANT_LING_API_KEY", baseURL: "https://api.ant-ling.com/v1/chat/completions"},
+	Xiaomi:             {name: "Xiaomi MiMo API", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://api.xiaomimimo.com/v1/chat/completions"},
+	MoonshotAICN:       {name: "Moonshot AI Kimi API (China)", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.cn/v1/chat/completions"},
+	QwenTokenPlan:      {name: "Qwen Token Plan", apiKeyEnv: "QWEN_TOKEN_PLAN_API_KEY", baseURL: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
+	QwenTokenPlanCN:    {name: "Qwen Token Plan (China)", apiKeyEnv: "QWEN_TOKEN_PLAN_CN_API_KEY", baseURL: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions"},
+	XiaomiTokenPlanCN:  {name: "Xiaomi MiMo Token Plan (China)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"},
+	XiaomiTokenPlanAMS: {name: "Xiaomi MiMo Token Plan (Amsterdam)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-ams.xiaomimimo.com/v1/chat/completions"},
+	XiaomiTokenPlanSGP: {name: "Xiaomi MiMo Token Plan (Singapore)", apiKeyEnv: "MIMO_API_KEY", baseURL: "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"},
+	OpenAICompatible:   {name: "OpenAI-compatible API", apiKeyEnv: "GATOR_COMPATIBLE_API_KEY", baseURL: ""},
 }
 
 // ParseProvider validates a user-visible provider name.
@@ -316,7 +455,7 @@ func SupportsOAuthLogin(provider Provider) bool {
 // SupportsAPIKeyLogin reports whether gator login can safely persist an API
 // key for the provider. Subscription providers use a separate OAuth flow.
 func SupportsAPIKeyLogin(provider Provider) bool {
-	return SupportsDirect(provider) && !RequiresOAuthLogin(provider)
+	return SupportsDirect(provider) && !RequiresOAuthLogin(provider) && provider != GoogleVertex
 }
 
 // SupportsPDFAttachments reports whether Gator's adapter can encode a PDF
@@ -382,6 +521,8 @@ func CredentialHint(provider Provider) string {
 		return "RADIUS_API_KEY or Gator Radius OAuth credential"
 	case Cursor:
 		return "no supported direct credential"
+	case GoogleVertex:
+		return "GATOR_VERTEX_ACCESS_TOKEN or Google Application Default Credentials"
 	default:
 		if definition, ok := compatibleProviders[provider]; ok {
 			return definition.apiKeyEnv
@@ -564,9 +705,9 @@ func requireKey(value, environment string) error {
 // session produces a clear no-fallback error instead of treating its metadata
 // as malformed. Names exposes only providers that can currently execute.
 var allProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {}, Cursor: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, ZAI: {}, MiniMax: {}, Baseten: {}, VercelAIGateway: {}, AntLing: {}, Xiaomi: {}, MoonshotAICN: {}, CloudflareWorkers: {}, CloudflareGateway: {}, AmazonBedrock: {}, GoogleVertex: {}, QwenTokenPlan: {}, QwenTokenPlanCN: {}, XiaomiTokenPlanCN: {}, XiaomiTokenPlanAMS: {}, XiaomiTokenPlanSGP: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {}, Cursor: {},
 }
 
 var directProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, ZAI: {}, MiniMax: {}, Baseten: {}, VercelAIGateway: {}, AntLing: {}, Xiaomi: {}, MoonshotAICN: {}, CloudflareWorkers: {}, CloudflareGateway: {}, AmazonBedrock: {}, GoogleVertex: {}, QwenTokenPlan: {}, QwenTokenPlanCN: {}, XiaomiTokenPlanCN: {}, XiaomiTokenPlanAMS: {}, XiaomiTokenPlanSGP: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {},
 }

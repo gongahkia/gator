@@ -31,6 +31,21 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: NVIDIA, key: "nvidia-key"},
 		{provider: HuggingFace, key: "hf-key"},
 		{provider: MoonshotAI, key: "moonshot-key"},
+		{provider: ZAI, key: "zai-key"},
+		{provider: MiniMax, key: "minimax-key"},
+		{provider: Baseten, key: "baseten-key"},
+		{provider: VercelAIGateway, key: "vercel-key"},
+		{provider: AntLing, key: "ant-ling-key"},
+		{provider: Xiaomi, key: "mimo-key"},
+		{provider: MoonshotAICN, key: "moonshot-cn-key"},
+		{provider: CloudflareWorkers, key: "cloudflare-key", baseURL: "https://example.test/ai/v1/chat/completions"},
+		{provider: CloudflareGateway, key: "cloudflare-key", baseURL: "https://example.test/ai/v1/chat/completions"},
+		{provider: AmazonBedrock, key: "bedrock-key"},
+		{provider: QwenTokenPlan, key: "qwen-token-plan-key"},
+		{provider: QwenTokenPlanCN, key: "qwen-token-plan-cn-key"},
+		{provider: XiaomiTokenPlanCN, key: "mimo-token-plan-cn-key"},
+		{provider: XiaomiTokenPlanAMS, key: "mimo-token-plan-ams-key"},
+		{provider: XiaomiTokenPlanSGP, key: "mimo-token-plan-sgp-key"},
 	}
 	for _, test := range tests {
 		t.Run(string(test.provider), func(t *testing.T) {
@@ -169,6 +184,82 @@ func TestAzureUsesRawAPIKeyHeader(t *testing.T) {
 	adapter, ok := backend.Model.(chatcompletions.Model)
 	if !ok || adapter.Config.AuthorizationHeader != "api-key" || adapter.Config.AuthorizationPrefix != "" {
 		t.Fatalf("adapter = %#v", backend.Model)
+	}
+}
+
+func TestBasetenUsesDocumentedAPIKeyAuthorizationPrefix(t *testing.T) {
+	backend, err := New(Config{Provider: Baseten, APIKey: "baseten-key", Model: "model"})
+	if err != nil {
+		t.Fatalf("new Baseten backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.AuthorizationHeader != "" || adapter.Config.AuthorizationPrefix != "Api-Key " {
+		t.Fatalf("Baseten adapter = %#v", backend.Model)
+	}
+}
+
+func TestZAICodingPlanUsesDedicatedEndpoint(t *testing.T) {
+	backend, err := New(Config{Provider: ZAI, APIKey: "zai-key", Model: "glm-5.1"})
+	if err != nil {
+		t.Fatalf("new Z.AI backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.BaseURL != "https://api.z.ai/api/coding/paas/v4/chat/completions" {
+		t.Fatalf("Z.AI adapter = %#v", backend.Model)
+	}
+}
+
+func TestCloudflareUsesAccountScopedOpenAIEndpoint(t *testing.T) {
+	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "account_123")
+	backend, err := New(Config{Provider: CloudflareWorkers, APIKey: "cloudflare-key", Model: "@cf/openai/gpt-oss-20b"})
+	if err != nil {
+		t.Fatalf("new Cloudflare backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.BaseURL != "https://api.cloudflare.com/client/v4/accounts/account_123/ai/v1/chat/completions" {
+		t.Fatalf("Cloudflare adapter = %#v", backend.Model)
+	}
+}
+
+func TestBedrockUsesRegionScopedOpenAIEndpoint(t *testing.T) {
+	t.Setenv("AWS_REGION", "us-west-2")
+	backend, err := New(Config{Provider: AmazonBedrock, APIKey: "bedrock-key", Model: "openai.gpt-oss-20b-1:0"})
+	if err != nil {
+		t.Fatalf("new Bedrock backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.BaseURL != "https://bedrock-mantle.us-west-2.api.aws/v1/chat/completions" {
+		t.Fatalf("Bedrock adapter = %#v", backend.Model)
+	}
+}
+
+func TestVertexUsesADCBackedOpenAIEndpoint(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "project-123")
+	t.Setenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+	t.Setenv("GATOR_VERTEX_ACCESS_TOKEN", "vertex-access-token")
+	backend, err := New(Config{Provider: GoogleVertex, Model: "google/gemini-2.0-flash-001"})
+	if err != nil {
+		t.Fatalf("new Vertex backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.APIKeySource == nil || adapter.Config.BaseURL != "https://us-central1-aiplatform.googleapis.com/v1/projects/project-123/locations/us-central1/endpoints/openapi/chat/completions" {
+		t.Fatalf("Vertex adapter = %#v", backend.Model)
+	}
+}
+
+func TestVertexRequiresProjectAndLocation(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	t.Setenv("GCLOUD_PROJECT", "")
+	t.Setenv("GOOGLE_CLOUD_LOCATION", "")
+	if _, err := New(Config{Provider: GoogleVertex, Model: "google/gemini-2.0-flash-001"}); err == nil || !strings.Contains(err.Error(), "GOOGLE_CLOUD_PROJECT") {
+		t.Fatalf("missing Vertex configuration error = %v", err)
+	}
+}
+
+func TestCloudflareRequiresAccountIDWithoutEndpointOverride(t *testing.T) {
+	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "")
+	if _, err := New(Config{Provider: CloudflareGateway, APIKey: "cloudflare-key", Model: "openai/gpt-5.2"}); err == nil || !strings.Contains(err.Error(), "CLOUDFLARE_ACCOUNT_ID") {
+		t.Fatalf("missing Cloudflare account ID error = %v", err)
 	}
 }
 

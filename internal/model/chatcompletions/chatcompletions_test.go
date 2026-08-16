@@ -53,6 +53,45 @@ func TestModelConvertsToolCallsAndReplaysResults(t *testing.T) {
 	}
 }
 
+func TestModelPreservesReasoningContentAcrossToolCalls(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		var body struct {
+			Messages []struct {
+				Role             string          `json:"role"`
+				ReasoningContent json.RawMessage `json:"reasoning_content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if requests == 2 {
+			if len(body.Messages) < 2 || string(body.Messages[1].ReasoningContent) != `"private reasoning"` {
+				t.Fatalf("reasoning content was not replayed: %#v", body.Messages)
+			}
+		}
+		_, _ = io.WriteString(writer, `{"choices":[{"message":{"tool_calls":[{"id":"call_1","type":"function","function":{"name":"read_file","arguments":"{}"}}],"reasoning_content":"private reasoning"}}]}`)
+	}))
+	defer server.Close()
+
+	model := Model{Config: Config{APIKey: "test-key", BaseURL: server.URL, Model: "test-model", Client: server.Client()}}
+	first, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect"}}})
+	if err != nil {
+		t.Fatalf("first completion: %v", err)
+	}
+	if string(first.ProviderData) != `{"reasoning_content":"private reasoning"}` {
+		t.Fatalf("provider state = %s", first.ProviderData)
+	}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{
+		{Role: agent.RoleUser, Content: "inspect"},
+		{Role: agent.RoleAgent, ToolCalls: first.ToolCalls, ProviderData: first.ProviderData},
+		{Role: agent.RoleTool, ToolCallID: "call_1", ToolName: "read_file", Content: `{"ok":true}`},
+	}}); err != nil {
+		t.Fatalf("replayed completion: %v", err)
+	}
+}
+
 func TestModelUsesConfiguredAPIKeyHeader(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("api-key") != "azure-key" || request.Header.Get("Authorization") != "" {
@@ -65,6 +104,34 @@ func TestModelUsesConfiguredAPIKeyHeader(t *testing.T) {
 	model := Model{Config: Config{APIKey: "azure-key", APIKeyEnv: "AZURE_OPENAI_API_KEY", BaseURL: server.URL, Model: "deployment", AuthorizationHeader: "api-key", Client: server.Client()}}
 	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}}); err != nil {
 		t.Fatalf("complete: %v", err)
+	}
+}
+
+func TestModelResolvesCredentialForEachRequest(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		if request.Header.Get("Authorization") != "Bearer refreshed-key" {
+			t.Fatalf("authorization = %q", request.Header.Get("Authorization"))
+		}
+		_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"done"}}]}`)
+	}))
+	defer server.Close()
+
+	model := Model{Config: Config{
+		APIKeyEnv: "Google Cloud credentials",
+		APIKeySource: func(context.Context) (string, error) {
+			return "refreshed-key", nil
+		},
+		BaseURL: server.URL,
+		Model:   "test-model",
+		Client:  server.Client(),
+	}}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}}); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+	if requests != 1 {
+		t.Fatalf("requests = %d", requests)
 	}
 }
 
