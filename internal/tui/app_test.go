@@ -890,6 +890,84 @@ func TestRecentRunsPickerLoadsASelectedContinuation(t *testing.T) {
 	}
 }
 
+func TestThreadTreeShowsRetainedLineageWithoutChangingContinuation(t *testing.T) {
+	repository := testRepository(t)
+	stateDirectory := t.TempDir()
+	worktreePath := t.TempDir()
+	create := func(runID, parent, instruction, status string) journal.Record {
+		t.Helper()
+		entry, record, err := journal.Open(repository, runID, worktreePath, stateDirectory, time.Now())
+		if err != nil {
+			t.Fatalf("open %s: %v", runID, err)
+		}
+		messages := []agent.Message{{Role: agent.RoleUser, Content: "Implement retained thread view"}}
+		if instruction != "" {
+			messages = append(messages, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + instruction})
+		}
+		if err := entry.SaveSession(journal.Session{
+			Version:         2,
+			Repository:      repository,
+			WorktreePath:    worktreePath,
+			Provider:        "openai",
+			Model:           "gpt-5.6",
+			Task:            "Implement retained thread view",
+			ThreadID:        "thread-tree-001",
+			Mode:            "execute",
+			Messages:        messages,
+			ParentStatePath: parent,
+		}); err != nil {
+			t.Fatalf("save %s: %v", runID, err)
+		}
+		if err := entry.Finish(status, "Turn result", time.Now()); err != nil {
+			t.Fatalf("finish %s: %v", runID, err)
+		}
+		return record
+	}
+	first := create("run-tree-root", "", "", "completed")
+	second := create("run-tree-head", first.StatePath, "Inspect the retained history", "failed")
+
+	model := New(Config{RepositoryPath: repository, StateDir: stateDirectory})
+	next, _ := model.beginContinuation(second.StatePath)
+	continued := next.(Model)
+	continued.task.SetValue("/tree")
+	next, command := continued.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("thread tree returned an unexpected command")
+	}
+	tree := next.(Model)
+	if tree.screen != threadScreen || tree.threadIndex != 1 || tree.resumeStatePath != second.StatePath {
+		t.Fatalf("thread tree = %#v", tree)
+	}
+	next, _ = tree.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	tree = next.(Model)
+	view := tree.threadTreeView()
+	if !strings.Contains(view, "Retained linear lineage") || !strings.Contains(view, "Inspect the retained history") || strings.Contains(view, second.StatePath) {
+		t.Fatalf("thread tree view = %s", view)
+	}
+	next, _ = tree.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if next.(Model).threadIndex != 0 {
+		t.Fatalf("thread tree did not select the prior turn: %#v", next)
+	}
+	next, _ = next.(Model).Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	returned := next.(Model)
+	if returned.screen != composeScreen || returned.resumeStatePath != second.StatePath {
+		t.Fatalf("thread tree return = %#v", returned)
+	}
+}
+
+func TestThreadTreeRequiresARetainedThread(t *testing.T) {
+	model := New(Config{})
+	model.task.SetValue("/tree")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("missing thread returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.screen != composeScreen || updated.notice.kind != noticeInfo || !strings.Contains(updated.notice.text, "No retained thread") {
+		t.Fatalf("missing thread notice = %#v", updated.notice)
+	}
+}
+
 func TestComposerAllowsQInTaskText(t *testing.T) {
 	model := New(Config{})
 	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})

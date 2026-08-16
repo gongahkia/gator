@@ -101,6 +101,12 @@ reference. `Ctrl+O` opens recent retained threads for the current repository;
 press `a` in that picker to switch between the current repository and all
 locally retained repositories. The picker shows a summary rather than private
 run-record paths and validates the selected worktree when continuation begins.
+`/tree` opens an in-terminal navigator for the active retained thread. It
+shows every saved turn from root to head with its mode, provider/model, status,
+timestamp, prompt summary, and the selected turn's final response. `y` opens
+the same navigator from review. Gator retains a linear parent-linked lineage;
+unlike Pi's branchable session tree, it does not create, switch, or delete
+branches from this view.
 
 Type `/` (or `?` in an empty message) to filter and select local conversation commands;
 type `@` in a task to select a repository file or directory from matching path
@@ -108,7 +114,7 @@ suggestions. In the command menu, `Tab` completes the selected command and
 `Enter` executes it; path suggestions accept either key to insert the path.
 Conversation
 commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
-`/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/clear`,
+`/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/tree`, `/clear`,
 `/queue`, `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives native providers an enforced read-only
 tool surface and does not require a verifier; switch the same retained thread
 to `/execute` when you are ready to make edits. Delegated CLI providers cannot
@@ -222,7 +228,9 @@ tool arguments, tool output, and raw attachment bytes; the worktree is the
 reviewable source of truth. The TUI also keeps one private `0600` unfinished draft per repository
 and lists resumable conversation threads from the same state root. Threads
 retain one worktree across turns and record whether the last turn was Plan or
-Execute. Drafts contain only the current message, verifier text, provider, and
+Execute. Each retained turn points to its immutable parent record, which lets
+`/tree` reconstruct the local root-to-head lineage without replaying the agent.
+Drafts contain only the current message, verifier text, provider, and
 model, and are removed after Gator finishes a new thread. The active-turn queue
 is intentionally absent from drafts and sessions, so a restart never performs
 queued work automatically. Set `GATOR_STATE_DIR`

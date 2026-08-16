@@ -32,6 +32,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateHelp(message)
 	case recentScreen:
 		return m.updateRecentRuns(message)
+	case threadScreen:
+		return m.updateThreadTree(message)
 	default:
 		return m, nil
 	}
@@ -342,7 +344,7 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func runningLocalCommand(command string) bool {
 	switch command {
-	case "/queue", "/dequeue", "/clear-queue":
+	case "/queue", "/dequeue", "/clear-queue", "/tree":
 		return true
 	default:
 		return false
@@ -428,6 +430,8 @@ func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.transcriptIndex = 0
 		m.screen = transcriptScreen
 		return m, nil
+	case "y":
+		return m.openThreadTree(reviewScreen)
 	}
 	return m, nil
 }
@@ -522,6 +526,28 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.beginContinuation(selected.HeadStatePath)
+	}
+	return m, nil
+}
+
+func (m Model) updateThreadTree(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "esc", "q", "y":
+		m.screen = m.threadReturn
+		if m.screen == composeScreen || m.screen == runningScreen {
+			m.focus = taskField
+			return m, m.focusField()
+		}
+	case "r", "ctrl+r":
+		return m.openThreadTree(m.threadReturn)
+	case "up", "ctrl+p":
+		if m.threadIndex > 0 {
+			m.threadIndex--
+		}
+	case "down", "ctrl+n":
+		if m.threadIndex < len(m.threadTurns)-1 {
+			m.threadIndex++
+		}
 	}
 	return m, nil
 }

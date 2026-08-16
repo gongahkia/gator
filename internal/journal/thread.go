@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/gongahkia/gator/internal/agent"
 )
 
 const threadVersion = 1
@@ -46,6 +48,150 @@ type RecentThread struct {
 	TurnCount     int
 	UpdatedAt     time.Time
 	Available     bool
+}
+
+// ThreadTurn is one retained run in a conversation lineage. StatePath is
+// local-only metadata for navigation and must not be rendered as task
+// content. The remaining fields are private session data intended for the
+// terminal thread navigator.
+type ThreadTurn struct {
+	StatePath  string
+	ThreadID   string
+	Provider   string
+	Model      string
+	Mode       string
+	Task       string
+	Status     string
+	StartedAt  time.Time
+	FinishedAt time.Time
+	FinalText  string
+}
+
+const maxThreadLineage = 256
+
+// LoadThreadLineage follows the immutable parent run records from head back
+// to the first turn, returning them in chronological order. A lineage must
+// stay within one repository, worktree, and non-empty thread identity when
+// one is recorded; this avoids presenting an accidentally or maliciously
+// linked set of unrelated retained sessions as one conversation.
+func LoadThreadLineage(headStatePath string) ([]ThreadTurn, error) {
+	if strings.TrimSpace(headStatePath) == "" {
+		return nil, errors.New("thread head state path is required")
+	}
+	statePath := filepath.Clean(headStatePath)
+	seen := make(map[string]struct{}, maxThreadLineage)
+	turns := make([]ThreadTurn, 0, 4)
+	var repository, worktreePath, threadID string
+	for len(turns) < maxThreadLineage {
+		if _, duplicate := seen[statePath]; duplicate {
+			return nil, errors.New("retained thread lineage contains a cycle")
+		}
+		seen[statePath] = struct{}{}
+
+		session, err := LoadSession(statePath)
+		if err != nil {
+			return nil, fmt.Errorf("load retained thread turn: %w", err)
+		}
+		if repository == "" {
+			repository = filepath.Clean(session.Repository)
+			worktreePath = filepath.Clean(session.WorktreePath)
+		} else if filepath.Clean(session.Repository) != repository || filepath.Clean(session.WorktreePath) != worktreePath {
+			return nil, errors.New("retained thread lineage crosses repository or worktree")
+		}
+		if session.ThreadID != "" {
+			if threadID == "" {
+				threadID = session.ThreadID
+			} else if session.ThreadID != threadID {
+				return nil, errors.New("retained thread lineage crosses thread identities")
+			}
+		}
+
+		result, err := loadThreadTurnResult(statePath)
+		if err != nil {
+			return nil, err
+		}
+		turns = append(turns, ThreadTurn{
+			StatePath:  statePath,
+			ThreadID:   session.ThreadID,
+			Provider:   session.Provider,
+			Model:      session.Model,
+			Mode:       session.Mode,
+			Task:       threadTurnTask(session),
+			Status:     result.Status,
+			StartedAt:  result.StartedAt,
+			FinishedAt: result.FinishedAt,
+			FinalText:  result.FinalText,
+		})
+
+		if strings.TrimSpace(session.ParentStatePath) == "" {
+			for left, right := 0, len(turns)-1; left < right; left, right = left+1, right-1 {
+				turns[left], turns[right] = turns[right], turns[left]
+			}
+			return turns, nil
+		}
+		statePath = filepath.Clean(session.ParentStatePath)
+	}
+	return nil, fmt.Errorf("retained thread lineage exceeds %d turns", maxThreadLineage)
+}
+
+type threadTurnResult struct {
+	Status     string    `json:"status"`
+	FinalText  string    `json:"final_text,omitempty"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at"`
+}
+
+func loadThreadTurnResult(statePath string) (threadTurnResult, error) {
+	resultPath := filepath.Join(statePath, "result.json")
+	info, err := os.Stat(resultPath)
+	if errors.Is(err, os.ErrNotExist) {
+		sessionInfo, sessionErr := os.Stat(filepath.Join(statePath, "session.json"))
+		if sessionErr != nil {
+			return threadTurnResult{}, fmt.Errorf("stat retained thread session: %w", sessionErr)
+		}
+		return threadTurnResult{Status: "retained", StartedAt: sessionInfo.ModTime()}, nil
+	}
+	if err != nil {
+		return threadTurnResult{}, fmt.Errorf("stat retained thread result: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return threadTurnResult{}, errors.New("retained thread result is not a regular file")
+	}
+	if info.Size() > 1*1024*1024 {
+		return threadTurnResult{}, errors.New("retained thread result exceeds the 1 MiB limit")
+	}
+	contents, err := os.ReadFile(resultPath)
+	if err != nil {
+		return threadTurnResult{}, fmt.Errorf("read retained thread result: %w", err)
+	}
+	var result threadTurnResult
+	if err := json.Unmarshal(contents, &result); err != nil {
+		return threadTurnResult{}, fmt.Errorf("decode retained thread result: %w", err)
+	}
+	if strings.TrimSpace(result.Status) == "" {
+		result.Status = "retained"
+	}
+	if result.StartedAt.IsZero() {
+		result.StartedAt = info.ModTime()
+	}
+	if result.FinishedAt.IsZero() && result.Status != "retained" {
+		result.FinishedAt = info.ModTime()
+	}
+	return result, nil
+}
+
+func threadTurnTask(session Session) string {
+	const continuationPrefix = "Continue the original task with this developer instruction:\n"
+	for index := len(session.Messages) - 1; index >= 0; index-- {
+		message := session.Messages[index]
+		if message.Role != agent.RoleUser || !strings.HasPrefix(message.Content, continuationPrefix) {
+			continue
+		}
+		if task := strings.TrimSpace(strings.TrimPrefix(message.Content, continuationPrefix)); task != "" {
+			return task
+		}
+	}
+	return session.Task
 }
 
 // SaveThread atomically creates or advances a private thread record.

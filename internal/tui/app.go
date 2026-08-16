@@ -45,6 +45,7 @@ const (
 	transcriptScreen
 	helpScreen
 	recentScreen
+	threadScreen
 )
 
 type field uint8
@@ -182,10 +183,13 @@ type Model struct {
 	draftErr            error
 	helpReturn          screen
 	transcriptReturn    screen
+	threadReturn        screen
 	transcriptIndex     int
 	recentThreads       []journal.RecentThread
 	recentIndex         int
 	recentAll           bool
+	threadTurns         []journal.ThreadTurn
+	threadIndex         int
 	events              []timelineEntry
 	chat                []chatEntry
 	chatIndex           int
