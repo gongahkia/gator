@@ -215,7 +215,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		runner := agent.Runner{
 			Model: e.Model,
 			Tools: runTools,
-			Now: e.Now,
+			Now:   e.Now,
 		}
 		result, err = runner.Run(ctx, agent.RunOptions{
 			Task:            request.Task,
@@ -438,6 +438,15 @@ Treat the user task as an implementation request, not a request for advice. Expl
 			prompt += "- " + strings.Join(command, " ") + "\n"
 		}
 	}
+	if strings.TrimSpace(additional) != "" {
+		prompt += "\n\nRepository instructions:\n" + strings.TrimSpace(additional)
+	}
+	return prompt
+}
+
+func planSystemPrompt(additional string) string {
+	prompt := `You are Gator in enforced Plan mode inside an isolated Git worktree.
+Explore the repository and produce a concise implementation plan. You can inspect files, search, and inspect Git state, but you cannot edit files or run commands. Do not claim that you changed or verified anything. Identify the relevant files, intended changes, tests to add or run after execution, and any uncertainty that needs developer input.`
 	if strings.TrimSpace(additional) != "" {
 		prompt += "\n\nRepository instructions:\n" + strings.TrimSpace(additional)
 	}
