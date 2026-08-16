@@ -165,6 +165,36 @@ func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
 	}
 }
 
+func TestExecutorPersistsDocumentAttachmentsForResume(t *testing.T) {
+	repository := featureRepository(t)
+	stateDirectory := t.TempDir()
+	model := &scriptedModel{turns: []agent.Turn{{Text: "Plan ready."}}}
+	outcome, err := (Executor{Model: model}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Review the attached report",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "attachment-session-001",
+		MaxSteps:       2,
+		StateDir:       stateDirectory,
+		Mode:           PlanMode,
+		Attachments:    []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte("pdf")}},
+	})
+	if err != nil {
+		t.Fatalf("execute plan: %v", err)
+	}
+	if len(model.requests) != 1 || len(model.requests[0].Messages) != 1 || len(model.requests[0].Messages[0].Attachments) != 1 {
+		t.Fatalf("model requests = %#v", model.requests)
+	}
+	session, err := journal.LoadSession(outcome.StatePath)
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if len(session.Messages) < 1 || len(session.Messages[0].Attachments) != 1 || session.Messages[0].Attachments[0].Name != "report.pdf" || string(session.Messages[0].Attachments[0].Data) != "pdf" {
+		t.Fatalf("session attachments = %#v", session.Messages)
+	}
+}
+
 func TestExecutorResumeAdvancesThread(t *testing.T) {
 	repository := featureRepository(t)
 	stateDirectory := t.TempDir()

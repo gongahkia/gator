@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -83,5 +84,12 @@ func TestModelEncodesImageInput(t *testing.T) {
 	model := Model{Config: Config{APIKey: "test-key", BaseURL: server.URL, Model: "test-model", Client: server.Client()}}
 	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}}}}}); err != nil {
 		t.Fatalf("complete image input: %v", err)
+	}
+}
+
+func TestModelRejectsPDFAttachment(t *testing.T) {
+	_, err := requestBody(agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: "application/pdf", Data: []byte("pdf")}}}}}, "test-model")
+	if err == nil || !strings.Contains(err.Error(), "requires the OpenAI Responses") {
+		t.Fatalf("PDF attachment error = %v", err)
 	}
 }

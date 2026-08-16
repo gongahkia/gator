@@ -548,6 +548,36 @@ func TestImageReferenceAttachesPixelsToNativeRun(t *testing.T) {
 	}
 }
 
+func TestPDFReferenceAttachesDocumentToNativeRun(t *testing.T) {
+	repository := testRepository(t)
+	pdf := []byte("%PDF-1.7\ncontent")
+	if err := os.WriteFile(filepath.Join(repository, "report.pdf"), pdf, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentModel := &testAgentModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Plan ready."},
+	}}
+	model := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		StateDir:       t.TempDir(),
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel}, nil
+		},
+	})
+	model.runMode = gatorrun.PlanMode
+	model.task.SetValue("Review @report.pdf")
+	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if updated.runErr != nil || len(agentModel.requests) == 0 {
+		t.Fatalf("PDF run error = %v, requests = %#v", updated.runErr, agentModel.requests)
+	}
+	message := agentModel.requests[0].Messages[0]
+	if len(message.Attachments) != 1 || message.Attachments[0].Name != "report.pdf" || message.Attachments[0].MediaType != "application/pdf" || string(message.Attachments[0].Data) != string(pdf) || !strings.Contains(message.Content, "document attachment") {
+		t.Fatalf("PDF attachment message = %#v", message)
+	}
+}
+
 func TestTranscriptShowsPatchLinesAndReadOutput(t *testing.T) {
 	patch := "--- a/example.go\n+++ b/example.go\n@@ -1 +1 @@\n-old\n+new\n"
 	arguments, err := json.Marshal(struct {
