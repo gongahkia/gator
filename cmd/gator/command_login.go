@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model"
@@ -33,6 +35,15 @@ func login(arguments []string, out io.Writer) error {
 	if !model.SupportsDirect(provider) {
 		return fmt.Errorf("provider %q has no direct Gator API integration", provider)
 	}
+	if model.RequiresOAuthLogin(provider) {
+		if strings.TrimSpace(*apiKey) != "" || strings.TrimSpace(*fromEnvironment) != "" {
+			return fmt.Errorf("provider %q uses subscription OAuth; do not pass an API key", provider)
+		}
+		return loginOAuth(provider, out)
+	}
+	if !model.SupportsAPIKeyLogin(provider) {
+		return fmt.Errorf("provider %q does not support Gator API-key login", provider)
+	}
 	key := strings.TrimSpace(*apiKey)
 	source := "--api-key"
 	if environment := strings.TrimSpace(*fromEnvironment); environment != "" {
@@ -54,6 +65,44 @@ func login(arguments []string, out io.Writer) error {
 		return fmt.Errorf("store Gator credential: %w", err)
 	}
 	_, err = fmt.Fprintf(out, "Stored a Gator credential for %s from %s.\n", provider, source)
+	return err
+}
+
+func loginOAuth(provider model.Provider, out io.Writer) error {
+	flow, err := oauthFlow(provider)
+	if err != nil {
+		return err
+	}
+	attempt, err := auth.BeginBrowserFlow(flow)
+	if err != nil {
+		return fmt.Errorf("start %s OAuth login: %w", provider, err)
+	}
+	callback, err := attempt.StartCallback()
+	if err != nil {
+		return fmt.Errorf("start %s OAuth callback: %w", provider, err)
+	}
+	defer callback.Close()
+	if _, err := fmt.Fprintf(out, "Open this URL to authenticate Gator with %s:\n%s\n\nWaiting for the local callback...\n", provider, attempt.AuthorizationURL()); err != nil {
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	code, err := callback.Wait(context)
+	if err != nil {
+		return fmt.Errorf("complete %s OAuth login: %w", provider, err)
+	}
+	credential, err := attempt.Exchange(context, code)
+	if err != nil {
+		return fmt.Errorf("exchange %s OAuth credential: %w", provider, err)
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return err
+	}
+	if err := credentials.Put(string(provider), credential); err != nil {
+		return fmt.Errorf("store %s OAuth credential: %w", provider, err)
+	}
+	_, err = fmt.Fprintf(out, "Stored a Gator OAuth credential for %s.\n", provider)
 	return err
 }
 

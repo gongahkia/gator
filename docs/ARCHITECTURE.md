@@ -35,12 +35,12 @@ stateless GenerateContent; and the compatible adapter supports Chat
 Completions-compatible providers.
 
 Gator never launches a vendor CLI or reads its OAuth state. `codex` and
-`claude` are direct API aliases for the OpenAI Responses and Anthropic Messages
-adapters, so Gator retains the same tool policy, event stream, steering, and
-resume behavior. They require API keys rather than an existing vendor CLI login.
-The retained legacy `copilot` and `cursor` provider names fail clearly because
-Gator has no supported direct model integration for them; they never fall back
-to their vendor CLIs.
+`claude` use Gator-owned PKCE OAuth credentials and direct Codex Responses or
+Anthropic Messages requests, while Gator retains tool policy, event streaming,
+steering, and resume behavior. Tokens live only in Gator's private auth file
+and refresh before a run; Gator does not impersonate Pi, Codex CLI, or Claude
+Code OAuth clients. `copilot` and `cursor` fail clearly because no complete
+direct Gator integration is available; they never fall back to vendor CLIs.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, execution mode, and explicit verifier allowlist;

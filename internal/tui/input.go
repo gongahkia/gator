@@ -58,6 +58,12 @@ func (m Model) updateAttachmentConfirmation(message tea.KeyMsg) (tea.Model, tea.
 }
 
 func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "ctrl+c" && m.oauthLogin != nil {
+		m.oauthCancel()
+		m.oauthLogin.Cancel()
+		m.notice = notice{text: "OAuth login cancellation requested.", kind: noticeInfo}
+		return m, nil
+	}
 	if m.focus == taskField && m.vimCommand != "" {
 		return m.updateVimCommand(message, false)
 	}

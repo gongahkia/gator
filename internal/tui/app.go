@@ -33,6 +33,16 @@ type Config struct {
 	StartInRecent   bool
 	RecentAll       bool
 	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
+	BeginOAuthLogin func(provider string) (OAuthLogin, error)
+}
+
+// OAuthLogin is an application-owned browser login that has already started a
+// local callback listener. The TUI displays its URL before it waits, so the
+// user can complete or cancel authentication without a hidden subprocess.
+type OAuthLogin interface {
+	URL() string
+	Complete(context.Context) error
+	Cancel()
 }
 
 type screen uint8
@@ -144,6 +154,11 @@ type executionDoneMsg struct {
 	done executionDone
 }
 
+type oauthLoginDoneMsg struct {
+	provider string
+	err      error
+}
+
 type diffLoadedMsg struct {
 	diff      string
 	truncated bool
@@ -194,6 +209,9 @@ type Model struct {
 	chatIndex           int
 	queue               []queuedInput
 	execution           *executionStream
+	oauthLogin          OAuthLogin
+	oauthCancel         context.CancelFunc
+	oauthProvider       string
 	cancelling          bool
 	lastRunCancelled    bool
 	activity            runActivity
@@ -383,6 +401,21 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, loadDiff(msg.done.outcome.Worktree.Root)
+	case oauthLoginDoneMsg:
+		if msg.provider != m.oauthProvider {
+			return m, nil
+		}
+		m.oauthLogin = nil
+		m.oauthCancel = nil
+		m.oauthProvider = ""
+		if msg.err != nil {
+			m.notice = notice{text: "OAuth login stopped: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.commandOutput = "Signed in to " + msg.provider + "."
+		m.notice = notice{text: "OAuth credential stored. The provider is ready for a Gator-owned run.", kind: noticeSuccess}
+		m.refreshPreflight()
+		return m, nil
 	case diffLoadedMsg:
 		m.diff, m.diffTruncated, m.diffErr = msg.diff, msg.truncated, msg.err
 		if msg.err == nil {

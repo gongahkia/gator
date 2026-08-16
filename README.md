@@ -36,8 +36,12 @@ GEMINI_API_KEY=... ./bin/gator run --provider gemini \
   --model gemini-3.5-flash --verify 'go test ./...' \
   'Add a focused feature with tests'
 
-# Codex is a direct OpenAI Responses API alias; Gator owns tools and the loop.
-OPENAI_API_KEY=... ./bin/gator run --provider codex --verify 'go test ./...' \
+# Subscription providers keep Gator's tool loop and use Gator's own OAuth
+# credential file. The client ID must be registered for Gator's loopback URL;
+# Gator does not impersonate Codex, Claude Code, or Pi.
+GATOR_CODEX_OAUTH_CLIENT_ID=... ./bin/gator login codex
+GATOR_CLAUDE_OAUTH_CLIENT_ID=... ./bin/gator login claude
+./bin/gator run --provider codex --verify 'go test ./...' \
   'Add a focused feature with tests'
 
 # Open a project-scoped retained-thread picker, continue the latest thread,
@@ -65,7 +69,7 @@ checkout and a real terminal. Type a task and press `Enter` to send it; the
 same prompt accepts follow-up instructions after the run completes. `Ctrl+R`
 also sends in every input mode. The live
 conversation includes model text and tool activity, while `PgUp` and `PgDn`
-browse earlier entries. Use `/provider`, `/model`, and `/verify` to edit the
+browse earlier entries. Use `/provider`, `/model`, `/login`, and `/verify` to edit the
 run configuration; their fields show keyboard-selectable dropdowns where
 available. During a run, `Enter` sends a steering instruction
 that the agent consumes at its next model or tool boundary; it does not cancel
@@ -167,13 +171,23 @@ an endpoint for one scripted run.
 | Provider | Authentication | Protocol |
 | --- | --- | --- |
 | `openai` | `OPENAI_API_KEY` | OpenAI Responses API |
-| `codex` | `OPENAI_API_KEY` | OpenAI Responses API alias; Gator owns the loop |
+| `codex` | Gator-owned ChatGPT/Codex OAuth credential | ChatGPT Codex Responses endpoint |
 | `anthropic` | `ANTHROPIC_API_KEY` | Anthropic Messages API |
-| `claude` | `ANTHROPIC_API_KEY` | Anthropic Messages API alias; Gator owns the loop |
+| `claude` | Gator-owned Claude Pro/Max OAuth credential | Anthropic Messages endpoint |
 | `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
 | `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
 | `mistral`, `xai`, `groq`, `openrouter`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
+
+`gator login PROVIDER` stores an API-key credential in
+`$XDG_STATE_HOME/gator/auth.json` (or `~/.local/state/gator/auth.json`) with
+`0600` permissions. Explicit `--api-key` wins over the stored credential,
+which wins over the provider environment variable. `/login codex` and
+`/login claude` in the TUI display the browser URL and wait for its loopback
+callback; `Ctrl+C` cancels the pending login. Those subscription logins require
+`GATOR_CODEX_OAUTH_CLIENT_ID` or `GATOR_CLAUDE_OAUTH_CLIENT_ID`, respectively,
+and their registered redirect URL (override the documented loopback defaults
+with `GATOR_CODEX_OAUTH_REDIRECT_URL` or `GATOR_CLAUDE_OAUTH_REDIRECT_URL`).
 
 The predefined compatible providers use these key variables respectively:
 `MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
@@ -189,13 +203,15 @@ tool-call replay in the private session file.
 
 ### Provider ownership
 
-Gator never starts Codex, Claude Code, GitHub Copilot, or Cursor Agent. The
-`codex` and `claude` names are direct API aliases, so they require
-`OPENAI_API_KEY` and `ANTHROPIC_API_KEY` respectively; they do not reuse a
-vendor CLI login or subscription OAuth session. Gator does not read or copy
-another application's OAuth files, tokens, or API keys. The retained legacy
-`copilot` and `cursor` names fail before a run with a clear direct-integration
-error rather than falling back to their vendor CLIs.
+Gator never starts Codex, Claude Code, GitHub Copilot, or Cursor Agent. Its
+`codex` and `claude` adapters make direct model requests with credentials that
+Gator created and stores itself; they do not reuse a vendor CLI session or read
+another application's OAuth files, tokens, or API keys. Gator refreshes a
+near-expiry credential before starting a run. `copilot` and `cursor` remain
+unavailable rather than falling back to their vendor CLIs: Pi has a direct
+Copilot protocol, but it needs an application-controlled GitHub OAuth client
+and per-model protocol routing; Cursor is not a Pi built-in provider and no
+public direct inference contract was verified.
 
 ## Design principles
 

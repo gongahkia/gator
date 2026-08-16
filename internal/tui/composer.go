@@ -24,6 +24,7 @@ var slashCommands = []slashCommand{
 	{name: "/clear-queue", description: "remove every queued instruction"},
 	{name: "/dequeue", description: "remove the next queued instruction"},
 	{name: "/help", description: "show Gator conversation commands"},
+	{name: "/login", description: "sign the selected provider into Gator"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
 	{name: "/model", description: "edit the model for the next run"},
 	{name: "/new", description: "start a new isolated thread"},
@@ -50,6 +51,9 @@ func matchingSlashCommands(value string) []slashCommand {
 		return nil
 	}
 	query = strings.TrimPrefix(query, "/")
+	if fields := strings.Fields(query); len(fields) > 0 {
+		query = fields[0]
+	}
 	var matches []slashCommand
 	for _, command := range slashCommands {
 		if strings.HasPrefix(strings.TrimPrefix(command.name, "/"), query) {

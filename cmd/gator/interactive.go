@@ -81,6 +81,9 @@ func interactiveWithOptions(options interactiveOptions) error {
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)
 		},
+		BeginOAuthLogin: func(provider string) (tui.OAuthLogin, error) {
+			return beginTUIOAuthLogin(provider)
+		},
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	_, err = program.Run()
