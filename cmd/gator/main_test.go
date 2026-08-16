@@ -5,8 +5,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
 )
 
 func TestRunHelp(t *testing.T) {
@@ -30,8 +32,43 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
+func TestLoginAndLogoutStoreOnlyGatorCredential(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
 	t.Setenv("OPENAI_API_KEY", "test-key")
+	var output bytes.Buffer
+	if err := run([]string{"login", "openai"}, &output); err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	if !strings.Contains(output.String(), "Stored a Gator credential for openai") || strings.Contains(output.String(), "test-key") {
+		t.Fatalf("login output = %q", output.String())
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	credential, found, err := credentials.Read("openai")
+	if err != nil || !found || !credential.IsAPIKey() || credential.Key != "test-key" {
+		t.Fatalf("stored credential = %#v, found=%v, error=%v", credential, found, err)
+	}
+	output.Reset()
+	if err := run([]string{"logout", "openai"}, &output); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+	if _, found, err := credentials.Read("openai"); err != nil || found {
+		t.Fatalf("credential after logout found=%v, error=%v", found, err)
+	}
+}
+
+func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	credentials, err := gatorCredentials()
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "access-token", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"chatgpt_account_id": "account_123"}}); err != nil {
+		t.Fatalf("store Codex OAuth credential: %v", err)
+	}
 	executor, err := newExecutor("codex", "", "")
 	if err != nil {
 		t.Fatalf("new codex executor: %v", err)

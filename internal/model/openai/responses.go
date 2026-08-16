@@ -36,6 +36,7 @@ type Responses struct {
 	APIKey  string
 	Model   string
 	BaseURL string
+	Headers http.Header
 	Client  *http.Client
 }
 
@@ -57,8 +58,7 @@ func (r Responses) Complete(ctx context.Context, turn agent.TurnRequest) (agent.
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("create OpenAI request: %w", err)
 	}
-	request.Header.Set("Authorization", "Bearer "+r.APIKey)
-	request.Header.Set("Content-Type", "application/json")
+	r.setHeaders(request, false)
 	response, err := r.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request OpenAI response: %w", err)
@@ -95,9 +95,7 @@ func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, o
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("create OpenAI stream request: %w", err)
 	}
-	request.Header.Set("Authorization", "Bearer "+r.APIKey)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Accept", "text/event-stream")
+	r.setHeaders(request, true)
 	response, err := r.client().Do(request)
 	if err != nil {
 		return agent.Turn{}, fmt.Errorf("request OpenAI stream: %w", err)
@@ -111,6 +109,19 @@ func (r Responses) CompleteStream(ctx context.Context, turn agent.TurnRequest, o
 		return agent.Turn{}, describeAPIError(response.StatusCode, contents)
 	}
 	return decodeSSE(response.Body, onDelta)
+}
+
+func (r Responses) setHeaders(request *http.Request, stream bool) {
+	request.Header.Set("Authorization", "Bearer "+r.APIKey)
+	request.Header.Set("Content-Type", "application/json")
+	if stream {
+		request.Header.Set("Accept", "text/event-stream")
+	}
+	for name, values := range r.Headers {
+		for _, value := range values {
+			request.Header.Add(name, value)
+		}
+	}
 }
 
 func (r Responses) requestBody(turn agent.TurnRequest) (responseRequest, error) {
@@ -194,6 +205,10 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 	for _, message := range messages {
 		switch message.Role {
 		case agent.RoleUser, agent.RoleAgent:
+			role := "user"
+			if message.Role == agent.RoleAgent {
+				role = "assistant"
+			}
 			if message.Content != "" || len(message.Images) > 0 || len(message.Attachments) > 0 {
 				content := any(message.Content)
 				if len(message.Images) > 0 || len(message.Attachments) > 0 {
@@ -216,7 +231,7 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 					}
 					content = parts
 				}
-				input = append(input, inputItem{Role: string(message.Role), Content: content})
+				input = append(input, inputItem{Role: role, Content: content})
 			}
 			if message.Role == agent.RoleAgent {
 				for _, call := range message.ToolCalls {
