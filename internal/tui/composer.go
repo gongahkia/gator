@@ -291,18 +291,7 @@ func imageAttachments(repository string, references []contextReference) ([]agent
 		if len(attachments) == maxInputAttachments {
 			return nil, fmt.Errorf("attach at most %d files per task", maxInputAttachments)
 		}
-		path, err := root.ResolveFile(reference.path)
-		if err != nil {
-			return nil, fmt.Errorf("resolve image @%s: %w", reference.path, err)
-		}
-		info, err := os.Stat(path)
-		if err != nil {
-			return nil, fmt.Errorf("inspect image @%s: %w", reference.path, err)
-		}
-		if !info.Mode().IsRegular() || info.Size() > maxImageBytes {
-			return nil, fmt.Errorf("image @%s must be a regular file no larger than %d MiB", reference.path, maxImageBytes/(1024*1024))
-		}
-		data, err := os.ReadFile(path)
+		data, err := root.ReadRegularFile(reference.path, maxImageBytes)
 		if err != nil {
 			return nil, fmt.Errorf("read image @%s: %w", reference.path, err)
 		}

@@ -36,20 +36,31 @@ type Record struct {
 // run. Unlike events.jsonl, it contains model conversation content and is
 // intentionally written with mode 0600.
 type Session struct {
-	Version         int             `json:"version"`
-	Repository      string          `json:"repository"`
-	WorktreePath    string          `json:"worktree_path"`
-	BaseCommit      string          `json:"base_commit,omitempty"`
-	Provider        string          `json:"provider"`
-	Model           string          `json:"model"`
-	BaseURL         string          `json:"base_url,omitempty"`
-	Task            string          `json:"task"`
-	MaxSteps        int             `json:"max_steps"`
-	Verification    [][]string      `json:"verification"`
-	ThreadID        string          `json:"thread_id,omitempty"`
-	Mode            string          `json:"mode,omitempty"`
-	Messages        []agent.Message `json:"messages"`
-	ParentStatePath string          `json:"parent_state_path,omitempty"`
+	Version            int                   `json:"version"`
+	Repository         string                `json:"repository"`
+	WorktreePath       string                `json:"worktree_path"`
+	BaseCommit         string                `json:"base_commit,omitempty"`
+	Provider           string                `json:"provider"`
+	Model              string                `json:"model"`
+	BaseURL            string                `json:"base_url,omitempty"`
+	Task               string                `json:"task"`
+	MaxSteps           int                   `json:"max_steps"`
+	Verification       [][]string            `json:"verification"`
+	ThreadID           string                `json:"thread_id,omitempty"`
+	Mode               string                `json:"mode,omitempty"`
+	Messages           []agent.Message       `json:"messages"`
+	AttachmentManifest []AttachmentReference `json:"attachment_manifest,omitempty"`
+	ParentStatePath    string                `json:"parent_state_path,omitempty"`
+}
+
+// AttachmentReference records only enough metadata to explain omitted binary
+// context during a continuation. Attachment bytes are intentionally never
+// persisted after a completed turn.
+type AttachmentReference struct {
+	Name      string `json:"name"`
+	MediaType string `json:"media_type"`
+	Bytes     int    `json:"bytes"`
+	SHA256    string `json:"sha256"`
 }
 
 // Open begins recording a run. StateDir overrides the platform default when
@@ -139,6 +150,9 @@ func (j *Journal) SaveSession(session Session) error {
 	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Provider) == "" || strings.TrimSpace(session.Task) == "" {
 		return errors.New("session repository, worktree path, provider, and task are required")
 	}
+	cleanMessages, attachments := sanitizeSessionMessages(session.Messages)
+	session.Messages = cleanMessages
+	session.AttachmentManifest = mergeAttachmentManifest(session.AttachmentManifest, attachments)
 	return writeJSON(filepath.Join(j.directory, "session.json"), session)
 }
 
@@ -172,7 +186,52 @@ func LoadSession(statePath string) (Session, error) {
 	if strings.TrimSpace(session.Repository) == "" || strings.TrimSpace(session.WorktreePath) == "" || strings.TrimSpace(session.Provider) == "" || strings.TrimSpace(session.Task) == "" {
 		return Session{}, errors.New("run session is incomplete")
 	}
+	cleanMessages, attachments := sanitizeSessionMessages(session.Messages)
+	session.Messages = cleanMessages
+	session.AttachmentManifest = mergeAttachmentManifest(session.AttachmentManifest, attachments)
 	return session, nil
+}
+
+func sanitizeSessionMessages(messages []agent.Message) ([]agent.Message, []AttachmentReference) {
+	clean := make([]agent.Message, len(messages))
+	attachments := make([]AttachmentReference, 0)
+	for index, message := range messages {
+		clean[index] = message
+		clean[index].Images = nil
+		clean[index].Attachments = nil
+		for _, image := range message.Images {
+			attachments = append(attachments, attachmentReference(image.Name, image.MediaType, image.Data))
+		}
+		for _, attachment := range message.Attachments {
+			attachments = append(attachments, attachmentReference(attachment.Name, attachment.MediaType, attachment.Data))
+		}
+	}
+	return clean, attachments
+}
+
+func attachmentReference(name, mediaType string, contents []byte) AttachmentReference {
+	digest := sha256.Sum256(contents)
+	return AttachmentReference{Name: name, MediaType: mediaType, Bytes: len(contents), SHA256: hex.EncodeToString(digest[:])}
+}
+
+func mergeAttachmentManifest(existing, additions []AttachmentReference) []AttachmentReference {
+	if len(existing) == 0 && len(additions) == 0 {
+		return nil
+	}
+	merged := make([]AttachmentReference, 0, len(existing)+len(additions))
+	seen := make(map[string]struct{}, len(existing)+len(additions))
+	for _, attachment := range append(append([]AttachmentReference(nil), existing...), additions...) {
+		if attachment.Name == "" || attachment.MediaType == "" || attachment.Bytes < 0 || attachment.SHA256 == "" {
+			continue
+		}
+		key := attachment.Name + "\x00" + attachment.MediaType + "\x00" + attachment.SHA256
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, attachment)
+	}
+	return merged
 }
 
 // Close releases a journal after a caller-side failure. It does not create a
