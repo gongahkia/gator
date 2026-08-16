@@ -17,20 +17,20 @@ const threadVersion = 1
 // worktree. Individual run records remain immutable; HeadStatePath advances
 // after each completed planning or execution turn.
 type Thread struct {
-	Version       int      `json:"version"`
-	ID            string   `json:"id"`
-	Repository    string   `json:"repository"`
-	WorktreePath  string   `json:"worktree_path"`
-	Provider      string   `json:"provider"`
-	Model         string   `json:"model"`
-	BaseURL       string   `json:"base_url,omitempty"`
-	Task          string   `json:"task"`
-	MaxSteps      int      `json:"max_steps"`
+	Version       int        `json:"version"`
+	ID            string     `json:"id"`
+	Repository    string     `json:"repository"`
+	WorktreePath  string     `json:"worktree_path"`
+	Provider      string     `json:"provider"`
+	Model         string     `json:"model"`
+	BaseURL       string     `json:"base_url,omitempty"`
+	Task          string     `json:"task"`
+	MaxSteps      int        `json:"max_steps"`
 	Verification  [][]string `json:"verification"`
-	HeadStatePath string   `json:"head_state_path"`
-	TurnCount     int      `json:"turn_count"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	HeadStatePath string     `json:"head_state_path"`
+	TurnCount     int        `json:"turn_count"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 // RecentThread is a presentation-safe summary for thread pickers. StatePath

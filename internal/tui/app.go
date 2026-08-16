@@ -123,7 +123,7 @@ type Model struct {
 	preflight     []string
 	draftErr      error
 	helpReturn    screen
-	recentRuns    []journal.RecentRun
+	recentThreads []journal.RecentThread
 	recentIndex   int
 	events        []timelineEntry
 	execution     *executionStream
@@ -135,6 +135,8 @@ type Model struct {
 	diffTruncated   bool
 	diffErr         error
 	resumeStatePath string
+	threadID        string
+	runMode         gatorrun.Mode
 }
 
 var (
@@ -236,16 +238,24 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case agentEventMsg:
 		m.events = append(m.events, renderEvent(msg.event))
 		return m, waitForExecution(m.execution)
-	case executionDoneMsg:
+		case executionDoneMsg:
 		m.execution = nil
 		m.cancelling = false
 		m.outcome = &msg.done.outcome
+		m.threadID = msg.done.outcome.ThreadID
+		if msg.done.outcome.StatePath != "" {
+			m.resumeStatePath = msg.done.outcome.StatePath
+		}
 		m.runErr = msg.done.err
 		m.screen = reviewScreen
 		if msg.done.err != nil {
-			m.notice = notice{text: "Run stopped: " + msg.done.err.Error(), kind: noticeError}
+			m.notice = notice{text: m.runMode.String() + " stopped: " + msg.done.err.Error(), kind: noticeError}
 		} else {
-			m.notice = notice{text: "Run complete. Inspect the diff and evidence before applying anything.", kind: noticeSuccess}
+			if m.runMode == gatorrun.PlanMode {
+				m.notice = notice{text: "Plan ready. Continue this thread in Execute mode when you are ready to make changes.", kind: noticeSuccess}
+			} else {
+				m.notice = notice{text: "Run complete. Inspect the diff and evidence before applying anything.", kind: noticeSuccess}
+			}
 		}
 		if msg.done.outcome.StatePath != "" && m.resumeStatePath == "" && strings.TrimSpace(m.config.StateDir) != "" {
 			if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
@@ -442,16 +452,16 @@ func (m Model) updateHelp(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) openRecentRuns() (tea.Model, tea.Cmd) {
-	runs, err := journal.ListRecentRuns(m.config.StateDir, m.config.RepositoryPath, 20)
+	threads, err := journal.ListRecentThreads(m.config.StateDir, m.config.RepositoryPath, 20)
 	if err != nil {
-		m.notice = notice{text: "Load recent runs: " + err.Error(), kind: noticeError}
+		m.notice = notice{text: "Load recent threads: " + err.Error(), kind: noticeError}
 		return m, nil
 	}
-	if len(runs) == 0 {
-		m.notice = notice{text: "No retained runs are available for this repository.", kind: noticeInfo}
+	if len(threads) == 0 {
+		m.notice = notice{text: "No retained threads are available for this repository.", kind: noticeInfo}
 		return m, nil
 	}
-	m.recentRuns = runs
+	m.recentThreads = threads
 	m.recentIndex = 0
 	m.screen = recentScreen
 	return m, nil
@@ -466,23 +476,23 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = composeScreen
 		return m.openRecentRuns()
 	case "up", "ctrl+p":
-		if len(m.recentRuns) > 0 {
-			m.recentIndex = (m.recentIndex - 1 + len(m.recentRuns)) % len(m.recentRuns)
+		if len(m.recentThreads) > 0 {
+			m.recentIndex = (m.recentIndex - 1 + len(m.recentThreads)) % len(m.recentThreads)
 		}
 	case "down", "ctrl+n":
-		if len(m.recentRuns) > 0 {
-			m.recentIndex = (m.recentIndex + 1) % len(m.recentRuns)
+		if len(m.recentThreads) > 0 {
+			m.recentIndex = (m.recentIndex + 1) % len(m.recentThreads)
 		}
 	case "enter":
-		if len(m.recentRuns) == 0 {
+		if len(m.recentThreads) == 0 {
 			return m, nil
 		}
-		selected := m.recentRuns[m.recentIndex]
+		selected := m.recentThreads[m.recentIndex]
 		if !selected.Available {
 			m.notice = notice{text: "The selected retained worktree no longer exists.", kind: noticeError}
 			return m, nil
 		}
-		return m.beginContinuation(selected.StatePath)
+		return m.beginContinuation(selected.HeadStatePath)
 	}
 	return m, nil
 }
