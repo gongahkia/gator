@@ -375,7 +375,7 @@ func TestQueueRejectsDirectShellCommandsAndHoldsAfterFailure(t *testing.T) {
 	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
 	model.task.SetValue("!rm -rf build")
 	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyTab})
-	if len(updated.queue) != 0 || !strings.Contains(updated.notice.text, "Direct shell commands") {
+	if len(updated.queue) != 0 || !strings.Contains(strings.ToLower(updated.notice.text), "direct shell commands") {
 		t.Fatalf("shell queue state = %#v", updated.notice)
 	}
 	updated.queue = []queuedInput{{kind: queuedPrompt, text: "Retry with a smaller change."}}
