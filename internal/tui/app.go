@@ -52,6 +52,14 @@ const (
 	modelField
 )
 
+type vimMode uint8
+
+const (
+	vimOff vimMode = iota
+	vimNormal
+	vimInsert
+)
+
 type noticeKind uint8
 
 const (
@@ -128,6 +136,7 @@ type Model struct {
 
 	screen              screen
 	focus               field
+	vim                 vimMode
 	width               int
 	height              int
 	task                textarea.Model
