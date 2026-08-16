@@ -194,15 +194,25 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 	for _, message := range messages {
 		switch message.Role {
 		case agent.RoleUser, agent.RoleAgent:
-			if message.Content != "" || len(message.Images) > 0 {
+			if message.Content != "" || len(message.Images) > 0 || len(message.Attachments) > 0 {
 				content := any(message.Content)
-				if len(message.Images) > 0 {
-					parts := make([]responseInputPart, 0, len(message.Images)+1)
+				if len(message.Images) > 0 || len(message.Attachments) > 0 {
+					parts := make([]responseInputPart, 0, len(message.Images)+len(message.Attachments)+1)
 					if message.Content != "" {
 						parts = append(parts, responseInputPart{Type: "input_text", Text: message.Content})
 					}
 					for _, image := range message.Images {
 						parts = append(parts, responseInputPart{Type: "input_image", ImageURL: imageDataURL(image)})
+					}
+					for _, attachment := range message.Attachments {
+						switch attachment.MediaType {
+						case "application/pdf":
+							parts = append(parts, responseInputPart{Type: "input_file", FileData: base64.StdEncoding.EncodeToString(attachment.Data), Filename: attachment.Name})
+						case "text/plain":
+							parts = append(parts, responseInputPart{Type: "input_text", Text: agent.AttachmentText(attachment)})
+						default:
+							return nil, fmt.Errorf("OpenAI attachment %q has unsupported media type %q", attachment.Name, attachment.MediaType)
+						}
 					}
 					content = parts
 				}
@@ -238,6 +248,8 @@ type responseInputPart struct {
 	Type     string `json:"type"`
 	Text     string `json:"text,omitempty"`
 	ImageURL string `json:"image_url,omitempty"`
+	FileData string `json:"file_data,omitempty"`
+	Filename string `json:"filename,omitempty"`
 }
 
 func imageDataURL(image agent.Image) string {

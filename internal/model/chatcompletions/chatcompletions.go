@@ -170,7 +170,11 @@ func encodeMessages(system string, source []agent.Message) ([]message, error) {
 	for _, item := range source {
 		switch item.Role {
 		case agent.RoleUser:
-			messages = append(messages, userMessage(item))
+			message, err := userMessage(item)
+			if err != nil {
+				return nil, err
+			}
+			messages = append(messages, message)
 		case agent.RoleAgent:
 			message := message{Role: "assistant"}
 			if item.Content != "" {
@@ -205,18 +209,24 @@ func textMessage(role, content string) message {
 	return message{Role: role, Content: content}
 }
 
-func userMessage(item agent.Message) message {
-	if len(item.Images) == 0 {
-		return textMessage("user", item.Content)
+func userMessage(item agent.Message) (message, error) {
+	if len(item.Images) == 0 && len(item.Attachments) == 0 {
+		return textMessage("user", item.Content), nil
 	}
-	content := make([]chatContentPart, 0, len(item.Images)+1)
+	content := make([]chatContentPart, 0, len(item.Images)+len(item.Attachments)+1)
 	if item.Content != "" {
 		content = append(content, chatContentPart{Type: "text", Text: item.Content})
 	}
 	for _, image := range item.Images {
 		content = append(content, chatContentPart{Type: "image_url", ImageURL: &chatImageURL{URL: "data:" + image.MediaType + ";base64," + base64.StdEncoding.EncodeToString(image.Data)}})
 	}
-	return message{Role: "user", Content: content}
+	for _, attachment := range item.Attachments {
+		if attachment.MediaType != "text/plain" {
+			return message{}, fmt.Errorf("document attachment %q requires the OpenAI Responses, Anthropic Messages, or Gemini provider", attachment.Name)
+		}
+		content = append(content, chatContentPart{Type: "text", Text: agent.AttachmentText(attachment)})
+	}
+	return message{Role: "user", Content: content}, nil
 }
 
 type chatContentPart struct {

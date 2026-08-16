@@ -82,17 +82,30 @@ enter enforced Plan mode. `Ctrl+Space` (reported as `Ctrl+@`
 by many terminals) reopens an active `@` path menu. Use `@path/to/file` or `@"path with spaces"`
 in a task to mark repository files or directories that the agent should inspect
 first. Gator validates every reference against the repository boundary before
-starting; it does not copy the referenced source into the task or journal.
+starting. Ordinary references remain paths only; supported attachments are
+explicitly copied to the private continuation session and sent to the selected
+native provider.
 
-Use `@mock.png`, `@screenshot.jpg`, or `@design.webp` to
-attach up to four repository images (8 MiB total) to a native-provider task.
-Gator stores those image bytes only in the private `0600` continuation session
-so stateless native providers receive them across turns. A delegated CLI is
-rejected for image attachments because Gator cannot verify that CLI's image-input
-contract. In the running view, file reads, commands, tool results, and patch
-line changes are visible as they occur. Press `t` from review to browse the
-current run transcript; it shows model-emitted text and tool activity, not
-hidden chain-of-thought.
+Use `@mock.png`, `@screenshot.jpg`, or `@design.webp` to attach images, and
+`@report.pdf` to attach a PDF, to a native-provider task. Gator also accepts
+`@` references to UTF-8 text/data documents (`.txt`, Markdown, CSV, JSON,
+YAML, TOML, XML, HTML, logs, and common config files) plus `.docx`, `.odt`,
+and `.xlsx`. Office files are extracted locally into plain text; PDFs retain
+their original bytes so OpenAI, Anthropic, and Gemini can use their documented
+document inputs. Text/data attachments work with every native API adapter;
+PDFs require the `openai`, `anthropic`, or `gemini` provider because generic
+Chat Completions endpoints do not share a stable document-input protocol.
+
+Gator permits at most four attachments per task, each up to 4 MiB, with an
+8 MiB combined image/document budget. Attachments must be regular files inside
+the repository. Their bytes stay only in the private `0600` continuation
+session so stateless native providers receive them across turns. A delegated
+CLI is rejected for attachments because Gator cannot verify its file-input
+contract. Unsupported binary `@` paths remain ordinary references that the
+agent can inspect if its tools can read them. In the running view, file reads,
+commands, tool results, and patch line changes are visible as they occur. Press
+`t` from review to browse the current run transcript; it shows model-emitted
+text and tool activity, not hidden chain-of-thought.
 
 The review screen deliberately does not modify the active checkout. To hand off
 reviewed work, `gator export RUN_RECORD_PATH` emits a binary-safe patch to

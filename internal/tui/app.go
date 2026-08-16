@@ -584,6 +584,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: providerErr.Error(), kind: noticeError}
 		return m, nil
 	}
+	if hasPDFAttachment(attachments) && !modelprovider.SupportsPDFAttachments(provider) {
+		m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
+		return m, nil
+	}
 	modelName = modelprovider.EffectiveModel(provider, modelName)
 	m.refreshPreflight()
 	if len(m.preflight) > 0 {
@@ -674,6 +678,13 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: providerErr.Error(), kind: noticeError}
 			return m, nil
 		}
+		if hasPDFAttachment(attachments) && !modelprovider.SupportsPDFAttachments(retainedProvider) {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
+			return m, nil
+		}
 		providerName = previous.Provider
 		modelName = modelprovider.EffectiveModel(retainedProvider, previous.Model)
 		request.Model = modelName
@@ -708,6 +719,15 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		go executeNew(ctx, stream, executor, request)
 	}
 	return m, waitForExecution(stream)
+}
+
+func hasPDFAttachment(attachments []agent.Attachment) bool {
+	for _, attachment := range attachments {
+		if attachment.MediaType == "application/pdf" {
+			return true
+		}
+	}
+	return false
 }
 
 func executeNew(ctx context.Context, stream *executionStream, executor gatorrun.Executor, request gatorrun.Request) {

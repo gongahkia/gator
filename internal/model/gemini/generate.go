@@ -139,12 +139,22 @@ func encodeContents(source []agent.Message) ([]content, error) {
 		item := source[index]
 		switch item.Role {
 		case agent.RoleUser:
-			parts := make([]json.RawMessage, 0, len(item.Images)+1)
+			parts := make([]json.RawMessage, 0, len(item.Images)+len(item.Attachments)+1)
 			if item.Content != "" {
 				parts = append(parts, partText(item.Content))
 			}
 			for _, image := range item.Images {
 				parts = append(parts, partImage(image))
+			}
+			for _, attachment := range item.Attachments {
+				switch attachment.MediaType {
+				case "application/pdf":
+					parts = append(parts, partAttachment(attachment))
+				case "text/plain":
+					parts = append(parts, partText(agent.AttachmentText(attachment)))
+				default:
+					return nil, fmt.Errorf("Gemini attachment %q has unsupported media type %q", attachment.Name, attachment.MediaType)
+				}
 			}
 			if len(parts) == 0 {
 				return nil, errors.New("agent history contains an empty user message")
@@ -202,14 +212,22 @@ func partText(text string) json.RawMessage {
 }
 
 func partImage(image agent.Image) json.RawMessage {
+	return partInlineData(image.MediaType, image.Data)
+}
+
+func partAttachment(attachment agent.Attachment) json.RawMessage {
+	return partInlineData(attachment.MediaType, attachment.Data)
+}
+
+func partInlineData(mediaType string, data []byte) json.RawMessage {
 	var encoded struct {
 		InlineData struct {
 			MIMEType string `json:"mimeType"`
 			Data     string `json:"data"`
 		} `json:"inlineData"`
 	}
-	encoded.InlineData.MIMEType = image.MediaType
-	encoded.InlineData.Data = base64.StdEncoding.EncodeToString(image.Data)
+	encoded.InlineData.MIMEType = mediaType
+	encoded.InlineData.Data = base64.StdEncoding.EncodeToString(data)
 	payload, _ := json.Marshal(encoded)
 	return payload
 }

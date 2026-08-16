@@ -53,12 +53,20 @@ tools entirely. Resume keeps one conversation thread on the same worktree and
 preserves its original model and verification policy so a continuation cannot
 silently broaden its command authority.
 
-Image `@` references are a separate, bounded developer input channel. The TUI
-loads only repository-local PNG, JPEG, and WebP files, attaches their
-pixels to native model messages, and retains them only in the private session
-needed for stateless replay. The live transcript displays model-emitted text,
-tool calls, summaries of reads and commands, and patch line previews. It does
-not attempt to expose hidden model reasoning.
+Supported `@` references are a separate, bounded developer input channel.
+The TUI loads only repository-local PNG, JPEG, and WebP images; PDFs; selected
+UTF-8 text/data formats; and DOCX, ODT, and XLSX documents. Images and PDFs
+retain their original bytes for native provider inputs. Office documents are
+locally converted to bounded plain text before transmission. Gator sends PDFs
+only through adapters with a documented native document protocol (OpenAI
+Responses, Anthropic Messages, and Gemini GenerateContent); text attachments
+are framed as untrusted reference material for every native adapter. Generic
+Chat Completions endpoints therefore fail clearly for PDF inputs rather than
+silently dropping them. At most four attachments may total 8 MiB (4 MiB per
+file), and their bytes exist only in the private session needed for stateless
+replay. The live transcript displays model-emitted text, tool calls, summaries
+of reads and commands, and patch line previews. It does not attempt to expose
+hidden model reasoning.
 
 The OpenAI and Anthropic adapters stream incremental text before converting the
 completed response into the core turn contract. The core does not rely on
