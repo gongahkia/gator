@@ -58,8 +58,16 @@ also sends in every input mode. The live
 conversation includes model text and tool activity, while `PgUp` and `PgDn`
 browse earlier entries. Use `/provider`, `/model`, and `/verify` to edit the
 run configuration; their fields show keyboard-selectable dropdowns where
-available. During a run, `Ctrl+C` requests cancellation while retaining the
-isolated worktree. Use `/review` for the final report and diff preview, then
+available. During a native-provider run, `Enter` sends a steering instruction
+that the agent consumes at its next model or tool boundary; it does not cancel
+the run. `Tab` queues the current prompt for the next turn, and a second `Tab`
+queues an already-completed slash command. Gator runs queued work in FIFO order
+only after the active run succeeds. `/queue`, `/dequeue`, and `/clear-queue`
+inspect or manage the bounded, 16-item in-memory queue. Failed or cancelled
+runs leave queued instructions paused for the developer to inspect; the queue
+is cleared when the TUI exits and is never written to a retained session.
+During a run, `Ctrl+C` requests cancellation while retaining the isolated
+worktree. Use `/review` for the final report and diff preview, then
 press `e` for patch handoff commands, `Esc` to return to the conversation, or
 `n` for a new thread.
 
@@ -83,7 +91,7 @@ suggestions. In the command menu, `Tab` completes the selected command and
 Conversation
 commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
 `/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/clear`,
-`/help`, and `/quit`. `/plan` gives native providers an enforced read-only
+`/queue`, `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives native providers an enforced read-only
 tool surface and does not require a verifier; switch the same retained thread
 to `/execute` when you are ready to make edits. Delegated CLI providers cannot
 enter enforced Plan mode. `Ctrl+Space` (reported as `Ctrl+@`
@@ -170,7 +178,9 @@ Gator therefore requires `--allow-external-cli` in scripted mode and always
 runs the required verifier argv entries itself after the delegated CLI exits.
 Review the retained worktree before applying any patch. A resumed delegated run
 starts a fresh vendor CLI task in the same retained worktree; it does not import
-or emulate a vendor conversation token.
+or emulate a vendor conversation token. Gator cannot inject a steering message
+into a delegated CLI process, so its running composer keeps the text and asks
+you to press `Tab` to queue it instead.
 
 ## Design principles
 
@@ -193,7 +203,9 @@ reviewable source of truth. The TUI also keeps one private `0600` unfinished dra
 and lists resumable conversation threads from the same state root. Threads
 retain one worktree across turns and record whether the last turn was Plan or
 Execute. Drafts contain only the current message, verifier text, provider, and
-model, and are removed after Gator finishes a new thread. Set `GATOR_STATE_DIR`
+model, and are removed after Gator finishes a new thread. The active-turn queue
+is intentionally absent from drafts and sessions, so a restart never performs
+queued work automatically. Set `GATOR_STATE_DIR`
 to use another local state root.
 
 See [the architecture](docs/ARCHITECTURE.md) for the intended runtime and

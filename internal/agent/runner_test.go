@@ -197,16 +197,18 @@ func TestRunnerSkipsPendingToolCallsBeforeApplyingSteering(t *testing.T) {
 	steering := make(chan string, 1)
 	model := &scriptedModel{
 		turns: []Turn{
-			{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}},
+			{ToolCalls: []ToolCall{
+				{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)},
+				{ID: "call-2", Name: "read_file", Arguments: json.RawMessage(`{}`)},
+			}},
 			{Text: "Adjusted plan complete."},
 		},
-		onComplete: func(call int) {
-			if call == 1 {
-				steering <- "Do not read files; summarize the safer next step."
-			}
-		},
 	}
-	tool := &recordingTool{}
+	tool := &recordingTool{onExecute: func(call int) {
+		if call == 1 {
+			steering <- "Do not read more files; summarize the safer next step."
+		}
+	}}
 	var events []Event
 	runner := Runner{Model: model, Tools: []Tool{tool}, Now: fixedClock()}
 
@@ -214,14 +216,14 @@ func TestRunnerSkipsPendingToolCallsBeforeApplyingSteering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if result.FinalText != "Adjusted plan complete." || tool.arguments != nil {
-		t.Fatalf("result = %#v, tool arguments = %s", result, tool.arguments)
+	if result.FinalText != "Adjusted plan complete." || tool.calls != 1 {
+		t.Fatalf("result = %#v, tool calls = %d", result, tool.calls)
 	}
-	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventToolFinished, EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventToolCalled, EventToolFinished, EventToolFinished, EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
 		t.Fatalf("event kinds = %v", got)
 	}
 	messages := model.requests[1].Messages
-	if len(messages) != 4 || messages[1].Role != RoleAgent || messages[2].Role != RoleTool || messages[3].Role != RoleUser || !strings.Contains(messages[2].Content, "skipped after developer steering") || !strings.Contains(messages[3].Content, "Do not read files") {
+	if len(messages) != 5 || messages[1].Role != RoleAgent || messages[2].Role != RoleTool || messages[3].Role != RoleTool || messages[4].Role != RoleUser || !strings.Contains(messages[3].Content, "skipped after developer steering") || !strings.Contains(messages[4].Content, "Do not read more files") {
 		t.Fatalf("second-turn messages = %#v", messages)
 	}
 }
@@ -244,9 +246,8 @@ func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
 }
 
 type scriptedModel struct {
-	turns      []Turn
-	requests   []TurnRequest
-	onComplete func(int)
+	turns    []Turn
+	requests []TurnRequest
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, error) {
@@ -256,9 +257,6 @@ func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, 
 	}
 	turn := m.turns[0]
 	m.turns = m.turns[1:]
-	if m.onComplete != nil {
-		m.onComplete(len(m.requests))
-	}
 	return turn, nil
 }
 
@@ -266,6 +264,8 @@ type recordingTool struct {
 	arguments json.RawMessage
 	result    ToolResult
 	err       error
+	calls     int
+	onExecute func(int)
 }
 
 type streamingModel struct {
@@ -289,7 +289,11 @@ func (t *recordingTool) Definition() ToolDefinition {
 }
 
 func (t *recordingTool) Execute(_ context.Context, arguments json.RawMessage) (ToolResult, error) {
+	t.calls++
 	t.arguments = append(t.arguments[:0], arguments...)
+	if t.onExecute != nil {
+		t.onExecute(t.calls)
+	}
 	return t.result, t.err
 }
 
