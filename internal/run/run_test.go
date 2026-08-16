@@ -118,6 +118,112 @@ func TestExecutorRetainsWorktreeWhenEvidenceIsMissing(t *testing.T) {
 	}
 }
 
+func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
+	repository := featureRepository(t)
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Plan: inspect the feature package, change the relevant implementation, then add a focused test."},
+	}}
+	stateDirectory := t.TempDir()
+	outcome, err := (Executor{Model: model}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Plan a focused feature",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "plan-thread-001",
+		MaxSteps:       4,
+		StateDir:       stateDirectory,
+		Mode:           PlanMode,
+	})
+	if err != nil {
+		t.Fatalf("execute plan: %v", err)
+	}
+	if outcome.ThreadID != "plan-thread-001" || outcome.Result.FinalText == "" {
+		t.Fatalf("plan outcome = %#v", outcome)
+	}
+	if !strings.Contains(model.requests[0].System, "enforced Plan mode") {
+		t.Fatalf("plan system prompt = %q", model.requests[0].System)
+	}
+	for _, tool := range model.requests[0].Tools {
+		if tool.Name == "apply_patch" || tool.Name == "run_command" {
+			t.Fatalf("plan tool surface included %q", tool.Name)
+		}
+	}
+	current, err := journal.LoadSession(outcome.StatePath)
+	if err != nil {
+		t.Fatalf("load plan session: %v", err)
+	}
+	if current.Mode != PlanMode.String() || current.ThreadID != outcome.ThreadID {
+		t.Fatalf("plan session = %#v", current)
+	}
+	thread, err := journal.LoadThread(stateDirectory, repository, outcome.ThreadID)
+	if err != nil {
+		t.Fatalf("load saved thread: %v", err)
+	}
+	if thread.HeadStatePath != outcome.StatePath || thread.TurnCount != 1 {
+		t.Fatalf("saved thread = %#v", thread)
+	}
+}
+
+func TestExecutorResumeAdvancesThread(t *testing.T) {
+	repository := featureRepository(t)
+	stateDirectory := t.TempDir()
+	firstModel := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The worktree is ready for review."},
+	}}
+	first, err := (Executor{Model: firstModel}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Inspect the fixture",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "thread-resume-001",
+		MaxSteps:       4,
+		StateDir:       stateDirectory,
+	})
+	if err != nil {
+		t.Fatalf("execute first turn: %v", err)
+	}
+	previous, err := journal.LoadSession(first.StatePath)
+	if err != nil {
+		t.Fatalf("load first session: %v", err)
+	}
+	secondModel := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The follow-up is ready for review."},
+	}}
+	second, err := (Executor{Model: secondModel}).Resume(context.Background(), previous, first.StatePath, "Review the previous result.", Request{StateDir: stateDirectory})
+	if err != nil {
+		t.Fatalf("resume thread: %v", err)
+	}
+	if second.ThreadID != first.ThreadID || second.Worktree.Path != first.Worktree.Path {
+		t.Fatalf("resumed outcome = %#v", second)
+	}
+	thread, err := journal.LoadThread(stateDirectory, repository, first.ThreadID)
+	if err != nil {
+		t.Fatalf("load resumed thread: %v", err)
+	}
+	if thread.TurnCount != 2 || thread.HeadStatePath != second.StatePath {
+		t.Fatalf("resumed thread = %#v", thread)
+	}
+}
+
+func TestExecutorRejectsPlanModeForDelegatedHarness(t *testing.T) {
+	_, err := (Executor{Harness: &recordingHarness{}}).Execute(context.Background(), Request{
+		RepositoryPath:   featureRepository(t),
+		Task:             "Plan a feature",
+		Provider:         "codex",
+		RunID:            "delegated-plan-001",
+		Mode:             PlanMode,
+		AllowExternalCLI: true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "enforced Plan mode") {
+		t.Fatalf("execute error = %v", err)
+	}
+}
+
 func TestValidateVerification(t *testing.T) {
 	if err := validateVerification([][]string{{}}); err == nil {
 		t.Fatal("empty verification command was accepted")
