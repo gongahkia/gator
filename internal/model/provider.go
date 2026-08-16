@@ -115,6 +115,9 @@ func New(config Config) (Backend, error) {
 		}
 		return Backend{Provider: provider, Model: openai.Responses{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
 	case AzureOpenAIResponses:
+		if strings.TrimSpace(config.Model) == "" {
+			return Backend{}, fmt.Errorf("--model is required for provider %q; use the Azure deployment name", provider)
+		}
 		apiKey, err := key(config, provider, "AZURE_OPENAI_API_KEY")
 		if err != nil {
 			return Backend{}, err
@@ -239,6 +242,9 @@ func New(config Config) (Backend, error) {
 		}
 		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
 	case MiniMax, MiniMaxCN:
+		if strings.TrimSpace(config.Model) == "" {
+			return Backend{}, fmt.Errorf("--model is required for provider %q", provider)
+		}
 		apiKeyEnv := "MINIMAX_API_KEY"
 		if provider == MiniMaxCN {
 			apiKeyEnv = "MINIMAX_CN_API_KEY"
@@ -422,12 +428,16 @@ func openCodeBackend(provider Provider, config Config) (Backend, error) {
 			Client:  config.Client,
 		}}, nil
 	default:
+		providerName := "OpenCode Zen"
+		if provider == OpenCodeGo {
+			providerName = "OpenCode Go"
+		}
 		return Backend{Provider: provider, Model: chatcompletions.Model{Config: chatcompletions.Config{
 			APIKey:       apiKey,
 			APIKeyEnv:    "OPENCODE_API_KEY",
 			BaseURL:      openCodeEndpoint(baseURL, "/chat/completions"),
 			Model:        config.Model,
-			ProviderName: "OpenCode " + map[bool]string{true: "Go", false: "Zen"}[provider == OpenCodeGo],
+			ProviderName: providerName,
 			Client:       config.Client,
 		}}}, nil
 	}
