@@ -173,14 +173,18 @@ func (m Model) chatView(running bool) string {
 			status = "Stopping after the current operation; the worktree will remain reviewable."
 		}
 		sections = append(sections, m.inline(dimStyle.Render(compact(status, m.inlineWidth()))))
-		if palette := m.commandPaletteView(); palette != "" {
-			sections = append(sections, palette)
-		}
-		if references := m.contextReferencesView(); references != "" {
-			sections = append(sections, references)
-		}
-		if completions := m.contextCompletionView(); completions != "" {
-			sections = append(sections, completions)
+		if m.vimCommand != "" {
+			sections = append(sections, m.vimCommandView())
+		} else {
+			if palette := m.commandPaletteView(); palette != "" {
+				sections = append(sections, palette)
+			}
+			if references := m.contextReferencesView(); references != "" {
+				sections = append(sections, references)
+			}
+			if completions := m.contextCompletionView(); completions != "" {
+				sections = append(sections, completions)
+			}
 		}
 		label := "Steer this run"
 		if m.vim != vimOff {
@@ -197,7 +201,9 @@ func (m Model) chatView(running bool) string {
 		return strings.Join(sections, "\n")
 	}
 
-	if configuration := m.chatConfigurationView(); configuration != "" {
+	if m.vimCommand != "" {
+		sections = append(sections, m.vimCommandView())
+	} else if configuration := m.chatConfigurationView(); configuration != "" {
 		sections = append(sections, configuration)
 	} else {
 		if palette := m.commandPaletteView(); palette != "" {
@@ -222,7 +228,9 @@ func (m Model) chatView(running bool) string {
 		sections = append(sections, warning)
 	}
 	sections = append(sections, m.noticeView())
-	if m.focus == taskField {
+	if m.vimCommand != "" {
+		sections = append(sections, m.footer("enter run Vim command", "esc cancel", "f1 shortcuts", "ctrl+c quit"))
+	} else if m.focus == taskField {
 		switch m.vim {
 		case vimNormal:
 			sections = append(sections, m.footer("i/a edit", "enter send", "? commands", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
@@ -238,6 +246,9 @@ func (m Model) chatView(running bool) string {
 }
 
 func (m Model) runningFooter() string {
+	if m.vimCommand != "" {
+		return m.footer("enter run Vim command", "esc cancel", "ctrl+c stop", "f1 shortcuts")
+	}
 	switch m.vim {
 	case vimNormal:
 		return m.footer("i/a edit", "enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
@@ -246,6 +257,10 @@ func (m Model) runningFooter() string {
 	default:
 		return m.footer("enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
 	}
+}
+
+func (m Model) vimCommandView() string {
+	return labelStyle.Render("Vim command") + "\n" + m.panel(keyStyle.Render(m.vimCommand)+"\n"+dimStyle.Render(":w send · :wq send then exit after successful queued work"))
 }
 
 func (m Model) vimModeLabel() string {
@@ -356,6 +371,7 @@ func (m Model) helpView() string {
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
 			"Tab  complete a command or insert a path; Enter runs a command",
 			"/vim  toggle Vim Normal/Insert message editing",
+			":w  send from Vim Normal; :wq  send then exit after successful work",
 			"Ctrl+C  quit",
 		}, "\n")),
 		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer a native run at its next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\nDelegated CLI providers cannot accept active steering; use Tab\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),

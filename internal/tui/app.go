@@ -154,6 +154,8 @@ type Model struct {
 	screen              screen
 	focus               field
 	vim                 vimMode
+	vimCommand          string
+	quitAfterRun        bool
 	width               int
 	height              int
 	task                textarea.Model
@@ -340,6 +342,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.notice = notice{text: "Run stopped. " + m.queueSummary() + " retained; use /queue to inspect it.", kind: noticeError}
 			}
+		}
+		if m.quitAfterRun && msg.done.err == nil && !wasCancelling && len(m.queue) == 0 {
+			m.quitAfterRun = false
+			return m, tea.Quit
+		}
+		if msg.done.err != nil || wasCancelling {
+			m.quitAfterRun = false
 		}
 		if msg.done.outcome.Worktree.Path == "" {
 			return m, nil

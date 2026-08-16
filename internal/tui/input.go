@@ -46,6 +46,7 @@ func (m Model) updateAttachmentConfirmation(message tea.KeyMsg) (tea.Model, tea.
 	case "esc", "n", "ctrl+c":
 		m.attachmentConfirmed = false
 		m.attachmentPreview = nil
+		m.quitAfterRun = false
 		m.screen = composeScreen
 		m.notice = notice{text: "Attachment send cancelled. No file bytes were sent.", kind: noticeInfo}
 		return m, m.focusField()
@@ -55,6 +56,9 @@ func (m Model) updateAttachmentConfirmation(message tea.KeyMsg) (tea.Model, tea.
 }
 
 func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.focus == taskField && m.vimCommand != "" {
+		return m.updateVimCommand(message, false)
+	}
 	if m.focus == taskField && m.vim == vimInsert && message.String() == "esc" {
 		m.vim = vimNormal
 		m.notice = notice{text: "Vim Normal mode. Press i or a to edit; Enter sends.", kind: noticeInfo}
@@ -198,6 +202,9 @@ func (m Model) updateVimNormal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch message.String() {
 	case "enter":
 		return m.startRun()
+	case ":":
+		m.vimCommand = ":"
+		m.notice = notice{text: "Vim command mode. :w sends; :wq sends and exits after successful queued work completes.", kind: noticeInfo}
 	case "i":
 		m.vim = vimInsert
 		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
@@ -232,6 +239,9 @@ func (m Model) updateVimNormal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.vimCommand != "" {
+		return m.updateVimCommand(message, true)
+	}
 	if m.vim == vimInsert && message.String() == "esc" {
 		m.vim = vimNormal
 		m.notice = notice{text: "Vim Normal mode. Press i or a to edit; Enter steers the active run.", kind: noticeInfo}
@@ -337,6 +347,52 @@ func runningLocalCommand(command string) bool {
 	default:
 		return false
 	}
+}
+
+func (m Model) updateVimCommand(message tea.KeyMsg, running bool) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "esc":
+		m.vimCommand = ""
+		m.notice = notice{text: "Vim command cancelled.", kind: noticeInfo}
+		return m, nil
+	case "backspace", "delete":
+		command := []rune(m.vimCommand)
+		if len(command) > 1 {
+			m.vimCommand = string(command[:len(command)-1])
+		}
+		return m, nil
+	case "enter":
+		command := strings.TrimSpace(m.vimCommand)
+		m.vimCommand = ""
+		switch command {
+		case ":w":
+			if running {
+				return m.steerCurrentInput()
+			}
+			return m.startRun()
+		case ":wq":
+			var next tea.Model
+			var runCommand tea.Cmd
+			if running {
+				next, runCommand = m.steerCurrentInput()
+			} else {
+				next, runCommand = m.startRun()
+			}
+			updated := next.(Model)
+			if (!running && (updated.screen == runningScreen || updated.screen == attachmentConfirmScreen)) || (running && updated.task.Value() == "") {
+				updated.quitAfterRun = true
+				updated.notice = notice{text: "Submission accepted. Gator will exit after the active and queued work completes successfully.", kind: noticeInfo}
+			}
+			return updated, runCommand
+		default:
+			m.notice = notice{text: "Unsupported Vim command " + command + ". Use :w or :wq.", kind: noticeError}
+			return m, nil
+		}
+	}
+	if len(message.Runes) > 0 {
+		m.vimCommand += string(message.Runes)
+	}
+	return m, nil
 }
 
 func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {

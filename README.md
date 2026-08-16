@@ -74,7 +74,9 @@ press `e` for patch handoff commands, `Esc` to return to the conversation, or
 `/vim` toggles Vim-style message editing. Vim Normal mode supports `i`/`a`
 to edit, `o` to add a line, `h`/`j`/`k`/`l` to move, `0`/`$` to reach a line
 edge, and `x` to delete. `Enter` sends from Normal mode. In Insert mode,
-`Enter` adds a line and `Esc` returns to Normal mode.
+`Enter` adds a line and `Esc` returns to Normal mode. In Normal mode, `:w`
+also sends the current message; `:wq` sends it and exits only after the active
+and queued work completes successfully.
 
 Before sending, Gator validates the task and local prerequisites: a verifier
 list in Execute mode, valid provider settings, required API-key environment
