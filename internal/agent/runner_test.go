@@ -164,6 +164,68 @@ func TestRunnerUsesProvidedHistory(t *testing.T) {
 	}
 }
 
+func TestRunnerAddsPendingSteeringBeforeTheNextModelTurn(t *testing.T) {
+	steering := make(chan string, 2)
+	steering <- "Focus on the failing verification first."
+	steering <- "Do not change public APIs."
+	model := &scriptedModel{turns: []Turn{{Text: "Understood."}}}
+	var events []Event
+	runner := Runner{Model: model, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{
+		Task:     "Implement the feature",
+		MaxSteps: 1,
+		Steering: steering,
+		OnEvent:  func(event Event) { events = append(events, event) },
+	})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText != "Understood." {
+		t.Fatalf("result = %#v", result)
+	}
+	messages := model.requests[0].Messages
+	if len(messages) != 3 || messages[1].Role != RoleUser || !strings.Contains(messages[1].Content, "failing verification") || !strings.Contains(messages[2].Content, "public APIs") {
+		t.Fatalf("request messages = %#v", messages)
+	}
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+		t.Fatalf("event kinds = %v", got)
+	}
+}
+
+func TestRunnerSkipsPendingToolCallsBeforeApplyingSteering(t *testing.T) {
+	steering := make(chan string, 1)
+	model := &scriptedModel{
+		turns: []Turn{
+			{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}},
+			{Text: "Adjusted plan complete."},
+		},
+		onComplete: func(call int) {
+			if call == 1 {
+				steering <- "Do not read files; summarize the safer next step."
+			}
+		},
+	}
+	tool := &recordingTool{}
+	var events []Event
+	runner := Runner{Model: model, Tools: []Tool{tool}, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{Task: "Implement the feature", MaxSteps: 2, Steering: steering, OnEvent: func(event Event) { events = append(events, event) }})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText != "Adjusted plan complete." || tool.arguments != nil {
+		t.Fatalf("result = %#v, tool arguments = %s", result, tool.arguments)
+	}
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventToolFinished, EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+		t.Fatalf("event kinds = %v", got)
+	}
+	messages := model.requests[1].Messages
+	if len(messages) != 4 || messages[1].Role != RoleAgent || messages[2].Role != RoleTool || messages[3].Role != RoleUser || !strings.Contains(messages[2].Content, "skipped after developer steering") || !strings.Contains(messages[3].Content, "Do not read files") {
+		t.Fatalf("second-turn messages = %#v", messages)
+	}
+}
+
 func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
 	model := streamingModel{turn: Turn{Text: "hello world"}, deltas: []string{"hello ", "world"}}
 	var events []Event
@@ -182,8 +244,9 @@ func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
 }
 
 type scriptedModel struct {
-	turns    []Turn
-	requests []TurnRequest
+	turns      []Turn
+	requests   []TurnRequest
+	onComplete func(int)
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, error) {
@@ -193,6 +256,9 @@ func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, 
 	}
 	turn := m.turns[0]
 	m.turns = m.turns[1:]
+	if m.onComplete != nil {
+		m.onComplete(len(m.requests))
+	}
 	return turn, nil
 }
 

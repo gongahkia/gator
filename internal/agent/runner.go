@@ -51,7 +51,7 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 		messages = []Message{{Role: RoleUser, Content: options.Task, Images: cloneImages(options.Images), Attachments: cloneAttachments(options.Attachments)}}
 	}
 
-	turnLoop:
+turnLoop:
 	for step := 1; step <= maxSteps; step++ {
 		r.consumeSteering(&messages, options.Steering, options.OnEvent, now, step)
 		r.emit(options.OnEvent, Event{Kind: EventTurnStarted, At: now(), Step: step})
@@ -114,8 +114,9 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 		}
 
 		for callIndex, call := range turn.ToolCalls {
-			if r.consumeSteering(&messages, options.Steering, options.OnEvent, now, step) {
+			if instructions := drainSteering(options.Steering); len(instructions) > 0 {
 				r.skipToolCalls(&messages, turn.ToolCalls[callIndex:], options.OnEvent, now, step)
+				r.applySteering(&messages, instructions, options.OnEvent, now, step)
 				continue turnLoop
 			}
 			r.emit(options.OnEvent, Event{Kind: EventToolCalled, At: now(), Step: step, ToolCall: cloneCall(call)})
@@ -142,29 +143,36 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 }
 
 func (r Runner) consumeSteering(messages *[]Message, steering <-chan string, sink EventSink, now func() time.Time, step int) bool {
+	return r.applySteering(messages, drainSteering(steering), sink, now, step)
+}
+
+func drainSteering(steering <-chan string) []string {
 	var instructions []string
 	for {
 		select {
 		case instruction, ok := <-steering:
 			if !ok {
-				steering = nil
-				continue
+				return instructions
 			}
 			instruction = strings.TrimSpace(instruction)
 			if instruction != "" {
 				instructions = append(instructions, instruction)
 			}
 		default:
-			if len(instructions) == 0 {
-				return false
-			}
-			for _, instruction := range instructions {
-				*messages = append(*messages, Message{Role: RoleUser, Content: "Developer steering instruction:\n" + instruction})
-			}
-			r.emit(sink, Event{Kind: EventSteeringApplied, At: now(), Step: step, Text: fmt.Sprintf("%d developer steering instruction(s) accepted", len(instructions))})
-			return true
+			return instructions
 		}
 	}
+}
+
+func (r Runner) applySteering(messages *[]Message, instructions []string, sink EventSink, now func() time.Time, step int) bool {
+	if len(instructions) == 0 {
+		return false
+	}
+	for _, instruction := range instructions {
+		*messages = append(*messages, Message{Role: RoleUser, Content: "Developer steering instruction:\n" + instruction})
+	}
+	r.emit(sink, Event{Kind: EventSteeringApplied, At: now(), Step: step, Text: fmt.Sprintf("%d developer steering instruction(s) accepted", len(instructions))})
+	return true
 }
 
 func (r Runner) skipToolCalls(messages *[]Message, calls []ToolCall, sink EventSink, now func() time.Time, step int) {
