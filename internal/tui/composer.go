@@ -34,6 +34,7 @@ var slashCommands = []slashCommand{
 	{name: "/review", description: "return to the latest review"},
 	{name: "/status", description: "show current run configuration"},
 	{name: "/verify", description: "edit required verification commands"},
+	{name: "/vim", description: "toggle Vim-style message editing"},
 	{name: "/worktree", description: "explain Gator's worktree mode"},
 }
 

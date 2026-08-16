@@ -116,6 +116,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.focus = verificationField
 		m.notice = notice{text: "Edit the allowed verification commands, one argv per line.", kind: noticeInfo}
 		return m, m.focusField()
+	case "/vim":
+		m.toggleVimMode()
 	case "/worktree":
 		m.commandOutput = "Every new Gator run creates a detached worktree beside this repository. The agent can edit only that worktree; your active checkout stays unchanged."
 		m.notice = notice{text: "Worktree isolation is always on for new runs.", kind: noticeInfo}
