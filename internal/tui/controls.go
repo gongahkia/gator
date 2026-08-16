@@ -158,9 +158,6 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 
 func (m Model) openThreadTree(returnScreen screen) (tea.Model, tea.Cmd) {
 	statePath := strings.TrimSpace(m.resumeStatePath)
-	if statePath == "" && m.outcome != nil {
-		statePath = strings.TrimSpace(m.outcome.StatePath)
-	}
 	if statePath == "" {
 		m.notice = notice{text: "No retained thread is available yet. Start or continue a run first.", kind: noticeInfo}
 		return m, nil
