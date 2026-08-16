@@ -67,7 +67,12 @@ inspect or manage the bounded, 16-item in-memory queue. Failed or cancelled
 runs leave queued instructions paused for the developer to inspect; the queue
 is cleared when the TUI exits and is never written to a retained session.
 During a run, `Ctrl+C` requests cancellation while retaining the isolated
-worktree. Use `/review` for the final report and diff preview, then
+worktree. The running view shows an event-backed activity phase, current turn,
+provider mode, verifier state, and a preview of the next queued work; it does
+not estimate token use or fake percentage progress. After a run, the latest
+result summarizes verifier status and the visible diff's file/addition/deletion
+counts. Failure states include the reason plus the relevant next action.
+Use `/review` for the final report and diff preview, then
 press `e` for patch handoff commands, `Esc` to return to the conversation, or
 `n` for a new thread.
 

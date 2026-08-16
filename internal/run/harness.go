@@ -57,7 +57,13 @@ func verifyHarnessOutcome(ctx context.Context, root workspace.Root, verification
 		now = time.Now
 	}
 	for index, argv := range verification {
-		call := agent.ToolCall{ID: fmt.Sprintf("harness-verify-%d", index+1), Name: "run_command"}
+		arguments, err := json.Marshal(struct {
+			Argv []string `json:"argv"`
+		}{Argv: argv})
+		if err != nil {
+			return fmt.Errorf("encode verification command: %w", err)
+		}
+		call := agent.ToolCall{ID: fmt.Sprintf("harness-verify-%d", index+1), Name: "run_command", Arguments: arguments}
 		emit(agent.Event{Kind: agent.EventToolCalled, At: now(), Step: 1, ToolCall: &call})
 		result, err := tools.RunAllowedCommand(ctx, root, tools.CommandPolicy{Allowed: verification}, argv)
 		finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call, ToolResult: result.Output}

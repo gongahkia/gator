@@ -417,6 +417,87 @@ func TestRunningEnterDoesNotPretendToSteerDelegatedCLI(t *testing.T) {
 	}
 }
 
+func TestRunningViewShowsEventBackedActivityVerificationAndQueue(t *testing.T) {
+	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
+	model.width = 120
+	model.height = 60
+	model.resizeInputs()
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.queue = []queuedInput{{kind: queuedPrompt, text: "Add a regression test after this."}}
+	model.beginRunActivity([][]string{{"go", "test", "./..."}})
+
+	now := time.Now()
+	model.appendEvent(agent.Event{Kind: agent.EventTurnStarted, At: now, Step: 3})
+	model.appendEvent(agent.Event{Kind: agent.EventToolCalled, At: now, Step: 3, ToolCall: &agent.ToolCall{Name: "git_status", Arguments: json.RawMessage(`{}`)}})
+	if model.activity.phase != activityInspecting {
+		t.Fatalf("activity phase = %v, want inspecting", model.activity.phase)
+	}
+	view := model.View()
+	for _, expected := range []string{"Activity", "inspecting the isolated worktree", "turn 3/24", "last activity", "Queued next · 1 prompt queued", "Add a regression test after this.", "Verification", "go test ./... · pending"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("running view omitted %q:\n%s", expected, view)
+		}
+	}
+
+	verifier := &agent.ToolCall{Name: "run_command", Arguments: json.RawMessage(`{"argv":["go","test","./..."]}`)}
+	model.appendEvent(agent.Event{Kind: agent.EventToolCalled, At: now, Step: 3, ToolCall: verifier})
+	if model.activity.phase != activityVerifying || model.verificationStatus[0].phase != verificationRunning {
+		t.Fatalf("verifier start = activity %#v, verifier %#v", model.activity, model.verificationStatus)
+	}
+	model.appendEvent(agent.Event{Kind: agent.EventToolFinished, At: now.Add(time.Second), Step: 3, ToolCall: verifier})
+	if model.verificationStatus[0].phase != verificationPassed || model.verificationSummary() != "verification passed" {
+		t.Fatalf("verifier finish = %#v", model.verificationStatus)
+	}
+	next, command := model.Update(activityTickMsg{})
+	if next.(Model).screen != runningScreen || command == nil {
+		t.Fatal("activity tick did not keep the live status refresh scheduled")
+	}
+}
+
+func TestLatestRunViewShowsDiffFactsAndFailureRecovery(t *testing.T) {
+	model := New(Config{})
+	model.width = 120
+	model.height = 60
+	model.resizeInputs()
+	model.outcome = &gatorrun.Outcome{}
+	model.verificationStatus = []verificationStatus{{argv: []string{"go", "test", "./..."}, phase: verificationPassed}}
+	model.diffStats = summarizeDiff("diff --git a/a.go b/a.go\n+one\n-two\ndiff --git a/b.go b/b.go\n+three\n")
+	view := model.View()
+	for _, expected := range []string{"Latest run", "verification passed", "2 file(s) · +2 −1"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("completed view omitted %q:\n%s", expected, view)
+		}
+	}
+
+	model.runErr = errors.New("required verification failed: go test ./...")
+	view = model.View()
+	for _, expected := range []string{"Stopped: required verification failed", "Verification did not complete successfully"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("failure view omitted %q:\n%s", expected, view)
+		}
+	}
+
+	model.lastRunCancelled = true
+	if guidance := model.failureGuidance(); !strings.Contains(guidance, "Cancelled by you") {
+		t.Fatalf("cancellation guidance = %q", guidance)
+	}
+}
+
+func TestRunStatusViewsFitConstrainedTerminals(t *testing.T) {
+	model := New(Config{Verification: [][]string{{"go", "test", "./..."}, {"go", "vet", "./..."}}})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: false}
+	model.queue = []queuedInput{{kind: queuedPrompt, text: "Check the edge cases after the delegated run."}}
+	model.beginRunActivity([][]string{{"go", "test", "./..."}, {"go", "vet", "./..."}})
+	model.appendEvent(agent.Event{Kind: agent.EventHarnessStarted, Step: 1, Text: "codex"})
+
+	for _, size := range []struct{ width, height int }{{44, 18}, {18, 10}} {
+		next, _ := model.Update(tea.WindowSizeMsg{Width: size.width, Height: size.height})
+		assertViewFits(t, next.(Model), size.width, size.height)
+	}
+}
+
 func TestQueueRejectsDirectShellCommandsAndHoldsAfterFailure(t *testing.T) {
 	model := New(Config{})
 	model.screen = runningScreen

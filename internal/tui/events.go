@@ -12,6 +12,7 @@ import (
 
 func (m *Model) appendEvent(event agent.Event) {
 	m.events = append(m.events, renderEvent(event))
+	m.observeActivity(event)
 	m.appendChatEvent(event)
 }
 
