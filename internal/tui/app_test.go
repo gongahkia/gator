@@ -181,6 +181,14 @@ func TestResponsiveViewsFitConstrainedTerminal(t *testing.T) {
 		{Provider: "codex", Model: "", Task: "Selected retained task", TurnCount: 2, UpdatedAt: time.Now(), Available: true},
 		{Provider: "mistral", Model: "mistral-large", Task: "Fifth retained task", TurnCount: 1, UpdatedAt: time.Now(), Available: false},
 	}
+	thread := base
+	thread.screen = threadScreen
+	thread.threadIndex = 2
+	thread.threadTurns = []journal.ThreadTurn{
+		{Provider: "openai", Model: "gpt-5.6", Mode: "execute", Task: "First retained task", Status: "completed", FinishedAt: time.Now(), FinalText: "First turn complete."},
+		{Provider: "openai", Model: "gpt-5.6", Mode: "plan", Task: "Second retained task", Status: "completed", FinishedAt: time.Now(), FinalText: "Plan ready."},
+		{Provider: "openai", Model: "gpt-5.6", Mode: "execute", Task: "Selected retained task", Status: "failed", FinishedAt: time.Now(), FinalText: "Verifier failed."},
+	}
 
 	for name, model := range map[string]Model{
 		"compose": base,
@@ -188,6 +196,7 @@ func TestResponsiveViewsFitConstrainedTerminal(t *testing.T) {
 		"review":  review,
 		"help":    help,
 		"recent":  recent,
+		"thread":  thread,
 	} {
 		t.Run(name, func(t *testing.T) {
 			for _, size := range []struct{ width, height int }{{44, 18}, {18, 10}} {

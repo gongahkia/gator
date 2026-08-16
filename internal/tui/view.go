@@ -663,7 +663,7 @@ func (m Model) threadTreeView() string {
 	selected := m.threadTurns[min(max(0, m.threadIndex), len(m.threadTurns)-1)]
 	sections := []string{
 		m.header(title),
-		dimStyle.Render("Retained linear lineage · Gator does not create or switch branches."),
+		m.inline(dimStyle.Render(compact("Retained linear lineage · Gator does not create or switch branches.", m.inlineWidth()))),
 		m.panel(strings.Join(lines, "\n")),
 		labelStyle.Render(fmt.Sprintf("Selected turn %d", m.threadIndex+1)),
 		m.panel(compact(selected.Task, max(16, m.panelTextWidth()*2))),
@@ -671,7 +671,11 @@ func (m Model) threadTreeView() string {
 	if strings.TrimSpace(selected.FinalText) != "" && !m.compactLayout() {
 		sections = append(sections, labelStyle.Render("Result"), m.panel(compact(selected.FinalText, max(16, m.panelTextWidth()*3))))
 	}
-	sections = append(sections, m.noticeView(), m.footer("up/down select", "r refresh", "y/esc return", "f1 shortcuts"))
+	footer := m.footer("up/down select", "r refresh", "y/esc return", "f1 shortcuts")
+	if m.compactLayout() {
+		footer = m.footer("up/down select", "y/esc return", "f1 help")
+	}
+	sections = append(sections, m.noticeView(), footer)
 	return strings.Join(sections, "\n")
 }
 
