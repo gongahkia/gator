@@ -303,7 +303,7 @@ func (m Model) helpView() string {
 			"?  open the / command menu from an empty task",
 			"@  begin a repository-path reference",
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
-			"Arrows + Enter or Tab  choose an open suggestion",
+			"Tab  complete a command or insert a path; Enter runs a command",
 			"Ctrl+C  quit",
 		}, "\n")),
 		labelStyle.Render("Running") + "\n" + m.panel("F1  show this help\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),

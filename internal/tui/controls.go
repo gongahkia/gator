@@ -41,6 +41,19 @@ func (m *Model) moveCommandSelection(delta int) {
 	m.commandIndex = (m.commandIndex + delta + len(matches)) % len(matches)
 }
 
+// completeSelectedCommand only fills the message composer. Enter remains the
+// explicit action that runs a local slash command.
+func (m *Model) completeSelectedCommand() {
+	matches := m.matchingCommands()
+	if len(matches) == 0 {
+		return
+	}
+	m.task.SetValue(matches[m.commandIndex].name)
+	m.commandIndex = 0
+	m.persistDraft()
+	m.refreshPreflight()
+}
+
 func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	matches := m.matchingCommands()
 	if len(matches) == 0 {
@@ -132,7 +145,7 @@ func (m Model) commandPaletteView() string {
 		}
 		lines = append(lines, line)
 	}
-	return labelStyle.Render("Commands") + "\n" + m.panel(strings.Join(lines, "\n")) + "\n" + m.inline(dimStyle.Render("up/down choose · enter run command · esc dismiss"))
+	return labelStyle.Render("Commands") + "\n" + m.panel(strings.Join(lines, "\n")) + "\n" + m.inline(dimStyle.Render("up/down choose · tab complete · enter run command · esc dismiss"))
 }
 
 type dropdownOption struct {
