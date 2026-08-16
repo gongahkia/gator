@@ -342,6 +342,8 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 
 func (m *Model) returnToComposer() {
 	m.screen = composeScreen
+	m.vimCommand = ""
+	m.quitAfterRun = false
 	m.resumeStatePath = ""
 	m.threadID = ""
 	m.runMode = gatorrun.ExecuteMode

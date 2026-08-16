@@ -279,6 +279,54 @@ func TestVimModeKeepsEnterForNewlinesAndHandlesNormalCommands(t *testing.T) {
 	}
 }
 
+func TestVimWriteCommandsSubmitAndQuitOnlyAfterSuccessfulWork(t *testing.T) {
+	model := New(Config{})
+	model.vim = vimNormal
+	model.task.SetValue("Explain this repository.")
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if model.vimCommand != ":w" {
+		t.Fatalf("Vim command = %q", model.vimCommand)
+	}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal(":w unexpectedly started an asynchronous command without an executor")
+	}
+	updated := next.(Model)
+	if updated.vimCommand != "" || updated.task.Value() != "Explain this repository." || !strings.Contains(updated.notice.text, "No model provider") {
+		t.Fatalf(":w state = command %q, task %q, notice %#v", updated.vimCommand, updated.task.Value(), updated.notice)
+	}
+
+	updated.screen = runningScreen
+	updated.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyEnter})
+	if !updated.quitAfterRun || updated.task.Value() != "" {
+		t.Fatalf(":wq state = quitAfterRun %v, task %q", updated.quitAfterRun, updated.task.Value())
+	}
+	select {
+	case instruction := <-updated.execution.steering:
+		if instruction != "Explain this repository." {
+			t.Fatalf(":wq steering = %q", instruction)
+		}
+	default:
+		t.Fatal(":wq did not submit the running instruction")
+	}
+
+	next, command = updated.Update(executionDoneMsg{done: executionDone{}})
+	if command == nil {
+		t.Fatal(":wq did not request exit after successful completion")
+	}
+	if _, ok := command().(tea.QuitMsg); !ok {
+		t.Fatalf(":wq command = %T, want tea.QuitMsg", command())
+	}
+	if next.(Model).quitAfterRun {
+		t.Fatal(":wq exit state was not cleared")
+	}
+}
+
 func TestRunningTabQueuesPromptWithoutSteeringTheActiveRun(t *testing.T) {
 	model := New(Config{})
 	model.screen = runningScreen
@@ -386,6 +434,31 @@ func TestQueueRejectsDirectShellCommandsAndHoldsAfterFailure(t *testing.T) {
 	paused := next.(Model)
 	if paused.screen != composeScreen || len(paused.queue) != 1 || !strings.Contains(paused.notice.text, "retained") {
 		t.Fatalf("failed queue state = %#v", paused)
+	}
+}
+
+func TestRunningQueueCommandsInspectAndRemoveQueuedWork(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.queue = []queuedInput{{kind: queuedPrompt, text: "Review the generated diff."}}
+	model.task.SetValue("/queue")
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("/queue unexpectedly started a command")
+	}
+	updated := next.(Model)
+	if len(updated.queue) != 1 || !strings.Contains(updated.commandOutput, "Review the generated diff") {
+		t.Fatalf("/queue state = queue %#v, output %q", updated.queue, updated.commandOutput)
+	}
+	updated.task.SetValue("/dequeue")
+	next, command = updated.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("/dequeue unexpectedly started a command")
+	}
+	updated = next.(Model)
+	if len(updated.queue) != 0 || !strings.Contains(updated.notice.text, "Removed next") {
+		t.Fatalf("/dequeue state = queue %#v, notice %#v", updated.queue, updated.notice)
 	}
 }
 

@@ -193,6 +193,35 @@ func TestRunnerAddsPendingSteeringBeforeTheNextModelTurn(t *testing.T) {
 	}
 }
 
+func TestRunnerSupersedesACompletedResponseWhenSteeredDuringModelGeneration(t *testing.T) {
+	steering := make(chan string, 1)
+	model := &scriptedModel{
+		turns: []Turn{{Text: "Obsolete response."}, {Text: "Adjusted response."}},
+		onComplete: func(call int) {
+			if call == 1 {
+				steering <- "Prefer the safer approach."
+			}
+		},
+	}
+	var events []Event
+	runner := Runner{Model: model, Now: fixedClock()}
+
+	result, err := runner.Run(context.Background(), RunOptions{Task: "Implement the feature", MaxSteps: 2, Steering: steering, OnEvent: func(event Event) { events = append(events, event) }})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText != "Adjusted response." {
+		t.Fatalf("result = %#v", result)
+	}
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+		t.Fatalf("event kinds = %v", got)
+	}
+	messages := model.requests[1].Messages
+	if len(messages) != 2 || messages[0].Role != RoleUser || messages[1].Role != RoleUser || !strings.Contains(messages[1].Content, "safer approach") {
+		t.Fatalf("second-turn messages = %#v", messages)
+	}
+}
+
 func TestRunnerSkipsPendingToolCallsBeforeApplyingSteering(t *testing.T) {
 	steering := make(chan string, 1)
 	model := &scriptedModel{
@@ -246,8 +275,9 @@ func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
 }
 
 type scriptedModel struct {
-	turns    []Turn
-	requests []TurnRequest
+	turns      []Turn
+	requests   []TurnRequest
+	onComplete func(int)
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, error) {
@@ -257,6 +287,9 @@ func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, 
 	}
 	turn := m.turns[0]
 	m.turns = m.turns[1:]
+	if m.onComplete != nil {
+		m.onComplete(len(m.requests))
+	}
 	return turn, nil
 }
 
