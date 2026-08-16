@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -29,11 +31,23 @@ func modelFromEnvironment(provider model.Provider) string {
 }
 
 func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, error) {
-	backend, err := model.New(model.Config{Provider: model.Provider(providerName), Model: modelName, BaseURL: baseURL})
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	backend, err := model.New(model.Config{Provider: model.Provider(providerName), Model: modelName, BaseURL: baseURL, Credentials: &credentials})
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
 	return gatorrun.Executor{Model: backend.Model}, nil
+}
+
+func gatorCredentials() (auth.Store, error) {
+	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	if err != nil {
+		return auth.Store{}, err
+	}
+	return auth.New(stateDir)
 }
 
 func displayModel(value string) string {

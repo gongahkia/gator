@@ -3,13 +3,18 @@
 package model
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model/anthropic"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/model/gemini"
@@ -42,11 +47,12 @@ const (
 // Config selects one provider. APIKey is optional only because the factory can
 // obtain the provider's documented environment variable when it is unset.
 type Config struct {
-	Provider Provider
-	Model    string
-	BaseURL  string
-	APIKey   string
-	Client   *http.Client
+	Provider    Provider
+	Model       string
+	BaseURL     string
+	APIKey      string
+	Credentials *auth.Store
+	Client      *http.Client
 }
 
 // Backend contains a direct model adapter. The agent and tool loop remain in
@@ -68,20 +74,55 @@ func New(config Config) (Backend, error) {
 		config.Model = DefaultModel(provider)
 	}
 	switch provider {
-	case OpenAI, Codex:
-		apiKey := key(config, "OPENAI_API_KEY")
+	case OpenAI:
+		apiKey, err := key(config, provider, "OPENAI_API_KEY")
+		if err != nil {
+			return Backend{}, err
+		}
 		if err := requireKey(apiKey, "OPENAI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: openai.Responses{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
-	case Anthropic, Claude:
-		apiKey := key(config, "ANTHROPIC_API_KEY")
+	case Codex:
+		credential, err := oauthCredential(config, provider)
+		if err != nil {
+			return Backend{}, err
+		}
+		accountID, err := codexAccountID(credential)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: openai.Responses{
+			APIKey:  credential.Access,
+			Model:   config.Model,
+			BaseURL: codexResponsesURL(config.BaseURL),
+			Headers: http.Header{
+				"Chatgpt-Account-Id": []string{accountID},
+				"Openai-Beta":        []string{"responses=experimental"},
+				"Originator":         []string{"gator"},
+			},
+			Client: config.Client,
+		}}, nil
+	case Anthropic:
+		apiKey, err := key(config, provider, "ANTHROPIC_API_KEY")
+		if err != nil {
+			return Backend{}, err
+		}
 		if err := requireKey(apiKey, "ANTHROPIC_API_KEY"); err != nil {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: anthropic.Messages{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
+	case Claude:
+		credential, err := oauthCredential(config, provider)
+		if err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: anthropic.Messages{APIKey: credential.Access, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
 	case Gemini:
-		apiKey := key(config, "GEMINI_API_KEY")
+		apiKey, err := key(config, provider, "GEMINI_API_KEY")
+		if err != nil {
+			return Backend{}, err
+		}
 		if err := requireKey(apiKey, "GEMINI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
@@ -104,7 +145,10 @@ func compatibleConfig(provider Provider, config Config) (chatcompletions.Config,
 	if !ok {
 		return chatcompletions.Config{}, fmt.Errorf("provider %q is not OpenAI-compatible", provider)
 	}
-	apiKey := key(config, definition.apiKeyEnv)
+	apiKey, err := key(config, provider, definition.apiKeyEnv)
+	if err != nil {
+		return chatcompletions.Config{}, err
+	}
 	if err := requireKey(apiKey, definition.apiKeyEnv); err != nil {
 		return chatcompletions.Config{}, err
 	}
@@ -233,11 +277,77 @@ func CredentialHint(provider Provider) string {
 	}
 }
 
-func key(config Config, environment string) string {
+// key resolves credentials in the same order exposed by the CLI: an explicit
+// run key, Gator's provider-scoped local credential, then the provider's
+// ambient environment variable. It never reads another application's state.
+func key(config Config, provider Provider, environment string) (string, error) {
 	if config.APIKey != "" {
-		return config.APIKey
+		return config.APIKey, nil
 	}
-	return os.Getenv(environment)
+	if config.Credentials != nil {
+		credential, found, err := config.Credentials.Read(string(provider))
+		if err != nil {
+			return "", fmt.Errorf("read Gator credential for %q: %w", provider, err)
+		}
+		if found && credential.IsAPIKey() {
+			return credential.Key, nil
+		}
+	}
+	return os.Getenv(environment), nil
+}
+
+func oauthCredential(config Config, provider Provider) (auth.Credential, error) {
+	if config.Credentials == nil {
+		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q is required; run 'gator login %s'", provider, provider)
+	}
+	credential, found, err := config.Credentials.Read(string(provider))
+	if err != nil {
+		return auth.Credential{}, fmt.Errorf("read Gator credential for %q: %w", provider, err)
+	}
+	if !found || !credential.IsOAuth() {
+		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q is required; run 'gator login %s'", provider, provider)
+	}
+	if credential.Expired(time.Now()) {
+		return auth.Credential{}, fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s'", provider, provider)
+	}
+	return credential, nil
+}
+
+func codexResponsesURL(baseURL string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		return "https://chatgpt.com/backend-api/codex/responses"
+	}
+	if strings.HasSuffix(baseURL, "/codex/responses") {
+		return baseURL
+	}
+	if strings.HasSuffix(baseURL, "/codex") {
+		return baseURL + "/responses"
+	}
+	return baseURL + "/codex/responses"
+}
+
+func codexAccountID(credential auth.Credential) (string, error) {
+	if accountID := strings.TrimSpace(credential.Extra["chatgpt_account_id"]); accountID != "" {
+		return accountID, nil
+	}
+	parts := strings.Split(credential.Access, ".")
+	if len(parts) != 3 {
+		return "", errors.New("Codex OAuth credential has no ChatGPT account identifier")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", errors.New("decode Codex OAuth credential account identifier")
+	}
+	var claims struct {
+		Auth struct {
+			AccountID string `json:"chatgpt_account_id"`
+		} `json:"https://api.openai.com/auth"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil || strings.TrimSpace(claims.Auth.AccountID) == "" {
+		return "", errors.New("Codex OAuth credential has no ChatGPT account identifier")
+	}
+	return claims.Auth.AccountID, nil
 }
 
 func requireKey(value, environment string) error {

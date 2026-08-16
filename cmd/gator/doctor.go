@@ -37,12 +37,25 @@ func doctor(arguments []string, out io.Writer) error {
 	if err == nil {
 		gitStatus = "detected"
 	}
-	authentication := model.CredentialHint(provider)
+	authentication := "Gator credential or " + model.CredentialHint(provider)
 	authenticationStatus := "missing"
 	if !model.SupportsDirect(provider) {
 		authenticationStatus = "unsupported"
-	} else if os.Getenv(authentication) != "" {
-		authenticationStatus = "set"
+	} else {
+		credentials, credentialErr := gatorCredentials()
+		if credentialErr != nil {
+			return credentialErr
+		}
+		credential, stored, credentialErr := credentials.Read(string(provider))
+		if credentialErr != nil {
+			return credentialErr
+		}
+		switch {
+		case stored && credential.IsAPIKey():
+			authenticationStatus = "stored"
+		case os.Getenv(model.CredentialHint(provider)) != "":
+			authenticationStatus = "set in environment"
+		}
 	}
 	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\n", gitStatus, provider, authentication, authenticationStatus); err != nil {
 		return err
