@@ -85,6 +85,9 @@ func loginOAuth(provider model.Provider, out io.Writer) error {
 	if provider == model.KimiCoding {
 		return loginKimiCoding(out)
 	}
+	if provider == model.Radius {
+		return loginRadius(out)
+	}
 	flow, err := oauthFlow(provider)
 	if err != nil {
 		return err
@@ -170,6 +173,23 @@ func loginKimiCoding(out io.Writer) error {
 		return fmt.Errorf("complete Kimi Code device login: %w", err)
 	}
 	_, err = fmt.Fprintln(out, "Stored a Gator OAuth credential for kimi-coding.")
+	return err
+}
+
+func loginRadius(out io.Writer) error {
+	login, err := beginRadiusDeviceLogin()
+	if err != nil {
+		return fmt.Errorf("start Radius device login: %w", err)
+	}
+	if _, err := fmt.Fprintf(out, "Open this URL and enter the displayed code to authenticate Gator with Radius:\n%s\n\nWaiting for device authorization...\n", login.URL()); err != nil {
+		return err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	if err := login.Complete(context); err != nil {
+		return fmt.Errorf("complete Radius device login: %w", err)
+	}
+	_, err = fmt.Fprintln(out, "Stored a Gator OAuth credential for radius.")
 	return err
 }
 

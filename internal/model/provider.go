@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/model/gemini"
 	"github.com/gongahkia/gator/internal/model/openai"
+	"github.com/gongahkia/gator/internal/model/radius"
 )
 
 // Provider identifies a direct model backend or a retained legacy session
@@ -37,11 +38,16 @@ const (
 	Together         Provider = "together"
 	Fireworks        Provider = "fireworks"
 	DeepSeek         Provider = "deepseek"
+	Cerebras         Provider = "cerebras"
+	NVIDIA           Provider = "nvidia"
+	HuggingFace      Provider = "huggingface"
+	MoonshotAI       Provider = "moonshotai"
 	OpenAICompatible Provider = "openai-compatible"
 	Codex            Provider = "codex"
 	Claude           Provider = "claude"
 	Copilot          Provider = "copilot"
 	KimiCoding       Provider = "kimi-coding"
+	Radius           Provider = "radius"
 	Cursor           Provider = "cursor"
 )
 
@@ -164,6 +170,21 @@ func New(config Config) (Backend, error) {
 			BearerAuth: bearer,
 			Client:     config.Client,
 		}}, nil
+	case Radius:
+		apiKey, err := key(config, provider, "RADIUS_API_KEY")
+		if err != nil {
+			return Backend{}, err
+		}
+		if err := requireKey(apiKey, "RADIUS_API_KEY"); err != nil {
+			return Backend{}, err
+		}
+		return Backend{Provider: provider, Model: radius.Messages{
+			APIKey:  apiKey,
+			Model:   config.Model,
+			BaseURL: config.BaseURL,
+			Gateway: os.Getenv("GATOR_RADIUS_GATEWAY"),
+			Client:  config.Client,
+		}}, nil
 	case Gemini:
 		apiKey, err := key(config, provider, "GEMINI_API_KEY")
 		if err != nil {
@@ -173,7 +194,7 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: gemini.GenerateContent{APIKey: apiKey, Model: config.Model, BaseURL: config.BaseURL, Client: config.Client}}, nil
-	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, OpenAICompatible:
+	case AzureOpenAI, Mistral, XAI, Groq, OpenRouter, Together, Fireworks, DeepSeek, Cerebras, NVIDIA, HuggingFace, MoonshotAI, OpenAICompatible:
 		compatible, err := compatibleConfig(provider, config)
 		if err != nil {
 			return Backend{}, err
@@ -237,6 +258,10 @@ var compatibleProviders = map[Provider]compatibleProvider{
 	Together:         {name: "Together AI API", apiKeyEnv: "TOGETHER_API_KEY", baseURL: "https://api.together.xyz/v1/chat/completions"},
 	Fireworks:        {name: "Fireworks AI API", apiKeyEnv: "FIREWORKS_API_KEY", baseURL: "https://api.fireworks.ai/inference/v1/chat/completions"},
 	DeepSeek:         {name: "DeepSeek API", apiKeyEnv: "DEEPSEEK_API_KEY", baseURL: "https://api.deepseek.com/chat/completions"},
+	Cerebras:         {name: "Cerebras Inference", apiKeyEnv: "CEREBRAS_API_KEY", baseURL: "https://api.cerebras.ai/v1/chat/completions"},
+	NVIDIA:           {name: "NVIDIA NIM", apiKeyEnv: "NVIDIA_API_KEY", baseURL: "https://integrate.api.nvidia.com/v1/chat/completions"},
+	HuggingFace:      {name: "Hugging Face Inference Providers", apiKeyEnv: "HF_TOKEN", baseURL: "https://router.huggingface.co/v1/chat/completions"},
+	MoonshotAI:       {name: "Moonshot AI Kimi API", apiKeyEnv: "MOONSHOT_API_KEY", baseURL: "https://api.moonshot.ai/v1/chat/completions"},
 	OpenAICompatible: {name: "OpenAI-compatible API", apiKeyEnv: "GATOR_COMPATIBLE_API_KEY", baseURL: ""},
 }
 
@@ -281,7 +306,7 @@ func RequiresOAuthLogin(provider Provider) bool {
 // credential in addition to, or instead of, their normal API-key path.
 func SupportsOAuthLogin(provider Provider) bool {
 	switch provider {
-	case Codex, Claude, Copilot, KimiCoding, XAI, OpenRouter:
+	case Codex, Claude, Copilot, KimiCoding, Radius, XAI, OpenRouter:
 		return true
 	default:
 		return false
@@ -316,6 +341,8 @@ func DefaultModel(provider Provider) string {
 		return "claude-sonnet-5"
 	case KimiCoding:
 		return "kimi-for-coding"
+	case Radius:
+		return "auto"
 	case Gemini:
 		return "gemini-3.5-flash"
 	case Mistral:
@@ -351,6 +378,8 @@ func CredentialHint(provider Provider) string {
 		return "Gator GitHub Copilot OAuth credential"
 	case KimiCoding:
 		return "KIMI_API_KEY or Gator Kimi Code OAuth credential"
+	case Radius:
+		return "RADIUS_API_KEY or Gator Radius OAuth credential"
 	case Cursor:
 		return "no supported direct credential"
 	default:
@@ -373,6 +402,8 @@ func APIKeyEnvironment(provider Provider) string {
 		return "GEMINI_API_KEY"
 	case KimiCoding:
 		return "KIMI_API_KEY"
+	case Radius:
+		return "RADIUS_API_KEY"
 	default:
 		if definition, ok := compatibleProviders[provider]; ok {
 			return definition.apiKeyEnv
@@ -396,7 +427,7 @@ func key(config Config, provider Provider, environment string) (string, error) {
 		if found && credential.IsAPIKey() {
 			return credential.Key, nil
 		}
-		if found && credential.IsOAuth() && provider == XAI {
+		if found && credential.IsOAuth() && (provider == XAI || provider == Radius) {
 			if credential.Expired(time.Now()) {
 				return "", fmt.Errorf("Gator OAuth credential for %q expired; run 'gator login %s --subscription'", provider, provider)
 			}
@@ -533,9 +564,9 @@ func requireKey(value, environment string) error {
 // session produces a clear no-fallback error instead of treating its metadata
 // as malformed. Names exposes only providers that can currently execute.
 var allProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Cursor: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {}, Cursor: {},
 }
 
 var directProviders = map[Provider]struct{}{
-	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {},
+	OpenAI: {}, AzureOpenAI: {}, Anthropic: {}, Gemini: {}, Mistral: {}, XAI: {}, Groq: {}, OpenRouter: {}, Together: {}, Fireworks: {}, DeepSeek: {}, Cerebras: {}, NVIDIA: {}, HuggingFace: {}, MoonshotAI: {}, OpenAICompatible: {}, Codex: {}, Claude: {}, Copilot: {}, KimiCoding: {}, Radius: {},
 }

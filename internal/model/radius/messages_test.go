@@ -25,7 +25,7 @@ func TestMessagesDiscoversGatewayAndConvertsStreamingToolCall(t *testing.T) {
 				t.Fatalf("message headers = %#v", request.Header)
 			}
 			var payload struct {
-				Model string `json:"model"`
+				Model   string `json:"model"`
 				Context struct {
 					SystemPrompt string            `json:"systemPrompt"`
 					Messages     []json.RawMessage `json:"messages"`

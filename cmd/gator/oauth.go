@@ -48,6 +48,8 @@ func oauthFlow(provider model.Provider) (auth.BrowserFlow, error) {
 		return xaiOAuthRefreshFlow()
 	case model.KimiCoding:
 		return kimiOAuthRefreshFlow()
+	case model.Radius:
+		return radiusOAuthRefreshFlow()
 	default:
 		return auth.BrowserFlow{}, fmt.Errorf("provider %q has no browser OAuth flow", provider)
 	}
