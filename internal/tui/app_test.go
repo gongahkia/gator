@@ -238,6 +238,47 @@ func TestTabCompletesSlashCommandWithoutExecutingIt(t *testing.T) {
 	}
 }
 
+func TestEnterSendsMessageOutsideVimMode(t *testing.T) {
+	model := New(Config{})
+	model.task.SetValue("Explain this repository.")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("missing executor started an asynchronous command")
+	}
+	updated := next.(Model)
+	if updated.vim != vimOff || updated.task.Value() != "Explain this repository." || !strings.Contains(updated.notice.text, "No model provider") {
+		t.Fatalf("Enter did not attempt to send the message: %#v", updated.notice)
+	}
+}
+
+func TestVimModeKeepsEnterForNewlinesAndHandlesNormalCommands(t *testing.T) {
+	model := New(Config{})
+	model.task.SetValue("/vim")
+	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+	if updated.vim != vimNormal || updated.task.Value() != "" {
+		t.Fatalf("Vim mode = %v, task = %q", updated.vim, updated.task.Value())
+	}
+
+	updated.task.SetValue("one")
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("0")})
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if updated.task.Value() != "ne" {
+		t.Fatalf("Vim x command = %q, want %q", updated.task.Value(), "ne")
+	}
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if updated.vim != vimInsert {
+		t.Fatalf("Vim i command mode = %v, want insert", updated.vim)
+	}
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyEnter})
+	if !strings.Contains(updated.task.Value(), "\n") || updated.screen != composeScreen {
+		t.Fatalf("Vim Insert Enter = task %q, screen %v", updated.task.Value(), updated.screen)
+	}
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyEsc})
+	if updated.vim != vimNormal {
+		t.Fatalf("Vim Escape mode = %v, want normal", updated.vim)
+	}
+}
+
 func TestPlanCommandStartsWithoutVerifierAndUsesReadOnlyTools(t *testing.T) {
 	repository := testRepository(t)
 	agentModel := &testAgentModel{turns: []agent.Turn{

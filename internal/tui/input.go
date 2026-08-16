@@ -55,6 +55,11 @@ func (m Model) updateAttachmentConfirmation(message tea.KeyMsg) (tea.Model, tea.
 }
 
 func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.focus == taskField && m.vim == vimInsert && message.String() == "esc" {
+		m.vim = vimNormal
+		m.notice = notice{text: "Vim Normal mode. Press i or a to edit; Enter sends.", kind: noticeInfo}
+		return m, nil
+	}
 	if m.focus == taskField && message.Type == tea.KeyCtrlAt {
 		m.contextClosed = false
 		m.normalizeContextSelection()
@@ -134,8 +139,19 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.commandIndex = 0
 			return m, nil
 		}
+	case "enter":
+		if m.focus == taskField && m.vim == vimOff {
+			return m.startRun()
+		}
 	case "ctrl+r":
 		return m.startRun()
+	}
+
+	if m.focus == taskField && m.vim == vimNormal {
+		return m.updateVimNormal(message)
+	}
+
+	switch message.String() {
 	case "tab", "shift+tab":
 		if m.resumeStatePath != "" {
 			m.notice = notice{text: "A continuation inherits the model and verification policy from its original run.", kind: noticeInfo}
@@ -148,12 +164,7 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var command tea.Cmd
 	switch m.focus {
 	case taskField:
-		m.task, command = m.task.Update(message)
-		m.normalizeCommandSelection()
-		m.contextClosed = false
-		m.normalizeContextSelection()
-		m.persistDraft()
-		m.refreshPreflight()
+		command = m.updateTask(message)
 	case verificationField:
 		m.verification, command = m.verification.Update(message)
 		m.persistDraft()
@@ -170,6 +181,54 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshPreflight()
 	}
 	return m, command
+}
+
+func (m *Model) updateTask(message tea.Msg) tea.Cmd {
+	var command tea.Cmd
+	m.task, command = m.task.Update(message)
+	m.normalizeCommandSelection()
+	m.contextClosed = false
+	m.normalizeContextSelection()
+	m.persistDraft()
+	m.refreshPreflight()
+	return command
+}
+
+func (m Model) updateVimNormal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "enter":
+		return m.startRun()
+	case "i":
+		m.vim = vimInsert
+		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
+	case "a", "A":
+		m.task.CursorEnd()
+		m.vim = vimInsert
+		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
+	case "o":
+		m.task.CursorEnd()
+		command := m.updateTask(tea.KeyMsg{Type: tea.KeyEnter})
+		m.vim = vimInsert
+		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
+		return m, command
+	case "h", "left":
+		return m, m.updateTask(tea.KeyMsg{Type: tea.KeyLeft})
+	case "j", "down":
+		m.task.CursorDown()
+	case "k", "up":
+		m.task.CursorUp()
+	case "l", "right":
+		return m, m.updateTask(tea.KeyMsg{Type: tea.KeyRight})
+	case "0", "home":
+		m.task.CursorStart()
+	case "$", "end":
+		m.task.CursorEnd()
+	case "x", "delete":
+		return m, m.updateTask(tea.KeyMsg{Type: tea.KeyDelete})
+	case "esc":
+		m.notice = notice{text: "Vim Normal mode. Press i or a to edit; Enter sends.", kind: noticeInfo}
+	}
+	return m, nil
 }
 
 func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {

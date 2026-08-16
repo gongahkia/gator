@@ -52,8 +52,9 @@ OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
 ```
 
 `gator` opens a conversation-first terminal application when run from a Git
-checkout and a real terminal. Type a task and press `Ctrl+R` to send it; the
-same prompt accepts follow-up instructions after the run completes. The live
+checkout and a real terminal. Type a task and press `Enter` to send it; the
+same prompt accepts follow-up instructions after the run completes. `Ctrl+R`
+also sends in every input mode. The live
 conversation includes model text and tool activity, while `PgUp` and `PgDn`
 browse earlier entries. Use `/provider`, `/model`, and `/verify` to edit the
 run configuration; their fields show keyboard-selectable dropdowns where
@@ -61,6 +62,11 @@ available. During a run, `Ctrl+C` requests cancellation while retaining the
 isolated worktree. Use `/review` for the final report and diff preview, then
 press `e` for patch handoff commands, `Esc` to return to the conversation, or
 `n` for a new thread.
+
+`/vim` toggles Vim-style message editing. Vim Normal mode supports `i`/`a`
+to edit, `o` to add a line, `h`/`j`/`k`/`l` to move, `0`/`$` to reach a line
+edge, and `x` to delete. `Enter` sends from Normal mode. In Insert mode,
+`Enter` adds a line and `Esc` returns to Normal mode.
 
 Before sending, Gator validates the task and local prerequisites: a verifier
 list in Execute mode, valid provider settings, required API-key environment

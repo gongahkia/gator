@@ -160,7 +160,7 @@ func (m Model) chatView(running bool) string {
 	}
 	sections := []string{
 		m.header(mode + " · " + m.runMode.String()),
-		m.inline(dimStyle.Render(compact(provider+" · "+model, m.inlineWidth()))),
+		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.vimModeLabel(), m.inlineWidth()))),
 		m.chatHistoryView(),
 	}
 
@@ -192,7 +192,11 @@ func (m Model) chatView(running bool) string {
 		if completions := m.contextCompletionView(); completions != "" {
 			sections = append(sections, completions)
 		}
-		sections = append(sections, labelStyle.Render("You"), m.panel(m.task.View()))
+		label := "You"
+		if m.vim != vimOff {
+			label += " · " + m.vimModeLabel()
+		}
+		sections = append(sections, labelStyle.Render(label), m.panel(m.task.View()))
 	}
 	if m.commandOutput != "" {
 		sections = append(sections, labelStyle.Render("Local status"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
@@ -202,11 +206,29 @@ func (m Model) chatView(running bool) string {
 	}
 	sections = append(sections, m.noticeView())
 	if m.focus == taskField {
-		sections = append(sections, m.footer("? commands", "ctrl+o threads", "pgup/pgdn browse", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+		switch m.vim {
+		case vimNormal:
+			sections = append(sections, m.footer("i/a edit", "enter send", "? commands", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+		case vimInsert:
+			sections = append(sections, m.footer("esc normal", "enter newline", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+		default:
+			sections = append(sections, m.footer("? commands", "ctrl+o threads", "pgup/pgdn browse", "enter send", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+		}
 	} else {
 		sections = append(sections, m.footer("tab change field", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
 	}
 	return strings.Join(sections, "\n")
+}
+
+func (m Model) vimModeLabel() string {
+	switch m.vim {
+	case vimNormal:
+		return "vim normal"
+	case vimInsert:
+		return "vim insert"
+	default:
+		return "chat input"
+	}
 }
 
 func (m Model) chatHistoryView() string {
@@ -274,7 +296,7 @@ func (m Model) helpView() string {
 	if m.compactLayout() {
 		lines := []string{
 			"F1  close this help",
-			"Ctrl+R  send the current message",
+			"Enter  send the current message",
 			"Ctrl+O  choose a retained thread",
 			"PgUp / PgDn  browse the conversation",
 			"?  open commands; @  reference a path",
@@ -283,7 +305,7 @@ func (m Model) helpView() string {
 		if m.constrainedLayout() {
 			lines = []string{
 				"F1  close this help",
-				"Ctrl+R  send the current message",
+				"Enter  send the current message",
 				"Ctrl+C  quit",
 			}
 		}
@@ -297,13 +319,15 @@ func (m Model) helpView() string {
 		m.header("keyboard shortcuts"),
 		labelStyle.Render("Conversation") + "\n" + m.panel(strings.Join([]string{
 			"F1  show or close this help",
-			"Ctrl+R  send the current message",
+			"Enter  send the current message",
+			"Ctrl+R  send in any input mode",
 			"Ctrl+O  choose a retained thread",
 			"PgUp / PgDn  browse the conversation",
 			"?  open the / command menu from an empty task",
 			"@  begin a repository-path reference",
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
 			"Tab  complete a command or insert a path; Enter runs a command",
+			"/vim  toggle Vim Normal/Insert message editing",
 			"Ctrl+C  quit",
 		}, "\n")),
 		labelStyle.Render("Running") + "\n" + m.panel("F1  show this help\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
