@@ -380,3 +380,86 @@ func TestListAllRecentThreadsIncludesProjectsAndPreservesRepositoryMetadata(t *t
 		t.Fatalf("recent thread metadata = %#v", recent)
 	}
 }
+
+func TestLoadThreadLineageReturnsChronologicalPrivateTurnSummaries(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/project"
+	worktreePath := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(worktreePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Date(2026, 8, 16, 9, 0, 0, 0, time.UTC)
+	create := func(runID, parent, instruction, status, finalText string, at time.Time) Record {
+		t.Helper()
+		entry, record, err := Open(repository, runID, worktreePath, stateDirectory, at)
+		if err != nil {
+			t.Fatalf("open %s: %v", runID, err)
+		}
+		messages := []agent.Message{{Role: agent.RoleUser, Content: "Implement the retained feature"}}
+		if instruction != "" {
+			messages = append(messages, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + instruction})
+		}
+		if err := entry.SaveSession(Session{
+			Version:         2,
+			Repository:      repository,
+			WorktreePath:    worktreePath,
+			Provider:        "openai",
+			Model:           "gpt-5.6",
+			Task:            "Implement the retained feature",
+			ThreadID:        "thread-001",
+			Mode:            "execute",
+			Messages:        messages,
+			ParentStatePath: parent,
+		}); err != nil {
+			t.Fatalf("save %s: %v", runID, err)
+		}
+		if err := entry.Finish(status, finalText, at.Add(time.Minute)); err != nil {
+			t.Fatalf("finish %s: %v", runID, err)
+		}
+		return record
+	}
+
+	first := create("run-thread-001", "", "", "completed", "First turn complete.", started)
+	second := create("run-thread-002", first.StatePath, "Address the verifier failure", "failed", "Verifier still fails.", started.Add(2*time.Minute))
+	turns, err := LoadThreadLineage(second.StatePath)
+	if err != nil {
+		t.Fatalf("load lineage: %v", err)
+	}
+	if len(turns) != 2 {
+		t.Fatalf("turn count = %d, want 2", len(turns))
+	}
+	if turns[0].StatePath != first.StatePath || turns[0].Task != "Implement the retained feature" || turns[0].Status != "completed" || turns[0].FinalText != "First turn complete." {
+		t.Fatalf("first turn = %#v", turns[0])
+	}
+	if turns[1].StatePath != second.StatePath || turns[1].Task != "Address the verifier failure" || turns[1].Status != "failed" || turns[1].FinishedAt.IsZero() {
+		t.Fatalf("second turn = %#v", turns[1])
+	}
+}
+
+func TestLoadThreadLineageRejectsMismatchedThreadIdentity(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/project"
+	worktreePath := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(worktreePath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	create := func(runID, threadID, parent string) Record {
+		t.Helper()
+		entry, record, err := Open(repository, runID, worktreePath, stateDirectory, time.Now())
+		if err != nil {
+			t.Fatalf("open %s: %v", runID, err)
+		}
+		if err := entry.SaveSession(Session{Version: 2, Repository: repository, WorktreePath: worktreePath, Provider: "openai", Task: "Retained task", ThreadID: threadID, ParentStatePath: parent}); err != nil {
+			t.Fatalf("save %s: %v", runID, err)
+		}
+		if err := entry.Close(); err != nil {
+			t.Fatalf("close %s: %v", runID, err)
+		}
+		return record
+	}
+	first := create("run-thread-root", "thread-root", "")
+	second := create("run-thread-head", "thread-other", first.StatePath)
+	if _, err := LoadThreadLineage(second.StatePath); err == nil || !strings.Contains(err.Error(), "crosses thread identities") {
+		t.Fatalf("lineage error = %v", err)
+	}
+}

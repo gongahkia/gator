@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -136,6 +137,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		return m, nil
 	case "/recent", "/threads":
 		return m.openRecentRuns()
+	case "/tree":
+		return m.openThreadTree(m.screen)
 	case "/status":
 		m.commandOutput = m.sessionStatus()
 		m.notice = notice{text: "Current configuration shown below.", kind: noticeInfo}
@@ -150,6 +153,31 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.commandOutput = "Every new Gator run creates a detached worktree beside this repository. The agent can edit only that worktree; your active checkout stays unchanged."
 		m.notice = notice{text: "Worktree isolation is always on for new runs.", kind: noticeInfo}
 	}
+	return m, nil
+}
+
+func (m Model) openThreadTree(returnScreen screen) (tea.Model, tea.Cmd) {
+	statePath := strings.TrimSpace(m.resumeStatePath)
+	if statePath == "" && m.outcome != nil {
+		statePath = strings.TrimSpace(m.outcome.StatePath)
+	}
+	if statePath == "" {
+		m.notice = notice{text: "No retained thread is available yet. Start or continue a run first.", kind: noticeInfo}
+		return m, nil
+	}
+	turns, err := journal.LoadThreadLineage(statePath)
+	if err != nil {
+		m.notice = notice{text: "Load retained thread: " + err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if len(turns) == 0 {
+		m.notice = notice{text: "No retained turns are available for this thread.", kind: noticeInfo}
+		return m, nil
+	}
+	m.threadTurns = turns
+	m.threadIndex = len(turns) - 1
+	m.threadReturn = returnScreen
+	m.screen = threadScreen
 	return m, nil
 }
 

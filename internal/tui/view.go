@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
@@ -107,6 +108,8 @@ func (m Model) View() string {
 		view = m.helpView()
 	case recentScreen:
 		view = m.recentRunsView()
+	case threadScreen:
+		view = m.threadTreeView()
 	default:
 		return ""
 	}
@@ -490,6 +493,7 @@ func (m Model) helpView() string {
 			"F1  close this help",
 			"Enter  send the current message",
 			"Ctrl+O  choose a retained thread",
+			"/tree  view retained turn lineage",
 			"PgUp / PgDn  browse the conversation",
 			"?  open commands; @  reference a path",
 			"Ctrl+C  quit",
@@ -515,6 +519,7 @@ func (m Model) helpView() string {
 			"Ctrl+R  send in any input mode",
 			"Ctrl+O  choose a retained thread",
 			"Recent picker: a toggles current repository / all repositories",
+			"/tree  view the retained linear turn lineage",
 			"PgUp / PgDn  browse the conversation",
 			"?  open the / command menu from an empty task",
 			"@  begin a repository-path reference",
@@ -524,8 +529,8 @@ func (m Model) helpView() string {
 			":w  send from Vim Normal; :wq  send then exit after successful work",
 			"Ctrl+C  quit",
 		}, "\n")),
-		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer a native run at its next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\nDelegated CLI providers cannot accept active steering; use Tab\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
-		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
+		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer a native run at its next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nDelegated CLI providers cannot accept active steering; use Tab\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\nt  view this run's transcript\ny  view retained thread lineage\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}
 	return strings.Join(sections, "\n")
@@ -612,8 +617,95 @@ func (m Model) reviewView() string {
 	if m.outcome == nil || m.outcome.StatePath == "" {
 		continueLabel = ""
 	}
-	sections = append(sections, m.footer("d refresh diff", "t transcript", "e patch handoff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
+	sections = append(sections, m.footer("d refresh diff", "t transcript", "y thread tree", "e patch handoff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
 	return strings.Join(sections, "\n")
+}
+
+func (m Model) threadTreeView() string {
+	if len(m.threadTurns) == 0 {
+		return m.header("thread tree") + "\n" + m.panel(dimStyle.Render("No retained turns are available.")) + "\n" + m.footer("esc return")
+	}
+	threadID := m.threadID
+	if threadID == "" {
+		threadID = m.threadTurns[len(m.threadTurns)-1].ThreadID
+	}
+	title := "thread tree"
+	if threadID != "" {
+		title += " · " + compact(threadID, 16)
+	}
+	limit := m.threadTreeLimit()
+	start, end := m.visibleRange(len(m.threadTurns), m.threadIndex, limit)
+	lines := make([]string, 0, (end-start)*2)
+	for index := start; index < end; index++ {
+		turn := m.threadTurns[index]
+		prefix := "  "
+		if index == m.threadIndex {
+			prefix = "> "
+		}
+		branch := "├─"
+		if index == len(m.threadTurns)-1 {
+			branch = "└─"
+		}
+		modelName := turn.Model
+		if modelName == "" {
+			modelName = "provider default"
+		}
+		mode := turn.Mode
+		if mode == "" {
+			mode = "execute"
+		}
+		facts := fmt.Sprintf("%02d · %s · %s · %s", index+1, mode, turn.Provider, modelName)
+		lines = append(lines, prefix+branch+" "+keyStyle.Render(compact(facts, m.panelTextWidth()-4)))
+		status := threadTurnStatusView(turn.Status)
+		timestamp := threadTurnTimestamp(turn)
+		lines = append(lines, "    "+status+dimStyle.Render(" · "+timestamp+" · ")+dimStyle.Render(compact(turn.Task, max(12, m.panelTextWidth()-26))))
+	}
+	selected := m.threadTurns[min(max(0, m.threadIndex), len(m.threadTurns)-1)]
+	sections := []string{
+		m.header(title),
+		dimStyle.Render("Retained linear lineage · Gator does not create or switch branches."),
+		m.panel(strings.Join(lines, "\n")),
+		labelStyle.Render(fmt.Sprintf("Selected turn %d", m.threadIndex+1)),
+		m.panel(compact(selected.Task, max(16, m.panelTextWidth()*2))),
+	}
+	if strings.TrimSpace(selected.FinalText) != "" && !m.compactLayout() {
+		sections = append(sections, labelStyle.Render("Result"), m.panel(compact(selected.FinalText, max(16, m.panelTextWidth()*3))))
+	}
+	sections = append(sections, m.noticeView(), m.footer("up/down select", "r refresh", "y/esc return", "f1 shortcuts"))
+	return strings.Join(sections, "\n")
+}
+
+func (m Model) threadTreeLimit() int {
+	if m.height <= 0 {
+		return 6
+	}
+	return max(1, (m.height-13)/2)
+}
+
+func threadTurnStatusView(status string) string {
+	status = strings.TrimSpace(status)
+	if status == "" {
+		status = "retained"
+	}
+	switch status {
+	case "completed":
+		return okStyle.Render("✓ completed")
+	case "failed":
+		return errorStyle.Render("✗ failed")
+	default:
+		return dimStyle.Render("○ " + status)
+	}
+}
+
+func threadTurnTimestamp(turn journal.ThreadTurn) string {
+	at := turn.FinishedAt
+	if at.IsZero() {
+		at = turn.StartedAt
+	}
+	if at.IsZero() {
+		return "time unavailable"
+	}
+	return at.Local().Format("Jan 2 15:04")
 }
 
 func (m Model) transcriptView() string {
