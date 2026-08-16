@@ -799,17 +799,17 @@ func TestPreflightShowsFactoryConfigurationErrorBeforeRun(t *testing.T) {
 		StateDir:       t.TempDir(),
 		Verification:   [][]string{{"go", "test", "./..."}},
 		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
-			return gatorrun.Executor{}, errors.New("codex CLI is not installed or not on PATH")
+			return gatorrun.Executor{}, errors.New("OPENAI_API_KEY is required")
 		},
 	})
 	model.task.SetValue("Add a focused feature")
 	model.refreshPreflight()
-	if len(model.preflight) != 1 || !strings.Contains(model.preflight[0], "CLI is not installed") {
+	if len(model.preflight) != 1 || !strings.Contains(model.preflight[0], "OPENAI_API_KEY") {
 		t.Fatalf("preflight = %#v", model.preflight)
 	}
 	model.width = 100
 	model.height = 40
-	if !strings.Contains(model.preflightView(), "CLI is not installed") {
+	if !strings.Contains(model.preflightView(), "OPENAI_API_KEY") {
 		t.Fatalf("preflight view = %s", model.preflightView())
 	}
 }

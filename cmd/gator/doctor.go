@@ -39,7 +39,9 @@ func doctor(arguments []string, out io.Writer) error {
 	}
 	authentication := model.CredentialHint(provider)
 	authenticationStatus := "missing"
-	if os.Getenv(authentication) != "" {
+	if !model.SupportsDirect(provider) {
+		authenticationStatus = "unsupported"
+	} else if os.Getenv(authentication) != "" {
 		authenticationStatus = "set"
 	}
 	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\n", gitStatus, provider, authentication, authenticationStatus); err != nil {
