@@ -35,15 +35,38 @@ type Request struct {
 	System         string
 	StateDir       string
 	OnEvent        agent.EventSink
+	ThreadID       string
+	Mode           Mode
 	// AllowExternalCLI is required for delegated vendor CLIs because their
 	// tool permission model is separate from Gator's native allowlist.
 	AllowExternalCLI bool
+}
+
+// Mode controls the native agent tool surface for a turn. Plan mode is
+// intentionally enforced by omitting mutation and command tools.
+type Mode uint8
+
+const (
+	ExecuteMode Mode = iota
+	PlanMode
+)
+
+func (m Mode) String() string {
+	switch m {
+	case ExecuteMode:
+		return "execute"
+	case PlanMode:
+		return "plan"
+	default:
+		return "unknown"
+	}
 }
 
 // Outcome preserves the reviewable artifacts of a completed or failed run.
 type Outcome struct {
 	Worktree  worktree.Worktree
 	StatePath string
+	ThreadID  string
 	Result    agent.Result
 	Events    []agent.Event
 }
@@ -72,6 +95,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		runID = generated
 	}
 	request.RunID = runID
+	if request.ThreadID == "" {
+		request.ThreadID = runID
+	}
 	isolated, err := worktree.Create(ctx, request.RepositoryPath, runID)
 	if err != nil {
 		return Outcome{}, err
@@ -96,6 +122,12 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 	}
 	if request.MaxSteps == 0 {
 		request.MaxSteps = defaultResumeMaxSteps
+	}
+	if request.ThreadID == "" {
+		request.ThreadID = previous.ThreadID
+		if request.ThreadID == "" {
+			request.ThreadID = filepath.Base(statePath)
+		}
 	}
 	if err := e.validateRequest(request); err != nil {
 		return Outcome{}, err
@@ -132,6 +164,12 @@ func (e Executor) validateRequest(request Request) error {
 	if e.Harness != nil && !request.AllowExternalCLI {
 		return errors.New("external CLI harness requires explicit approval")
 	}
+	if request.Mode != ExecuteMode && request.Mode != PlanMode {
+		return fmt.Errorf("unsupported run mode %d", request.Mode)
+	}
+	if request.Mode == PlanMode && e.Harness != nil {
+		return errors.New("enforced Plan mode is unavailable for delegated CLI providers; choose a native provider or switch to Execute")
+	}
 	return nil
 }
 
@@ -165,24 +203,31 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if e.Harness != nil {
 		result, err = e.runHarness(ctx, isolated, request, projectInstructions, initialMessages, emit)
 	} else {
+		runTools := tools.Default(isolated.Root, tools.CommandPolicy{Allowed: request.Verification})
+		system := systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification)
+		var check func([]agent.Message) error
+		if request.Mode == PlanMode {
+			runTools = tools.ReadOnly(isolated.Root)
+			system = planSystemPrompt(joinInstructions(projectInstructions, request.System))
+		} else {
+			check = completionCheck(request.Verification)
+		}
 		runner := agent.Runner{
 			Model: e.Model,
-			Tools: tools.Default(isolated.Root, tools.CommandPolicy{
-				Allowed: request.Verification,
-			}),
+			Tools: runTools,
 			Now: e.Now,
 		}
 		result, err = runner.Run(ctx, agent.RunOptions{
 			Task:            request.Task,
-			System:          systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification),
+			System:          system,
 			InitialMessages: initialMessages,
 			MaxSteps:        request.MaxSteps,
 			OnEvent:         emit,
-			CompletionCheck: completionCheck(request.Verification),
+			CompletionCheck: check,
 		})
 	}
-	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, Result: result, Events: events}
-	if sessionErr := runJournal.SaveSession(journal.Session{
+	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: events}
+	session := journal.Session{
 		Version:         2,
 		Repository:      isolated.Repository,
 		WorktreePath:    isolated.Path,
@@ -192,10 +237,18 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Task:            request.Task,
 		MaxSteps:        request.MaxSteps,
 		Verification:    request.Verification,
+		ThreadID:        request.ThreadID,
+		Mode:            request.Mode.String(),
 		Messages:        result.Messages,
 		ParentStatePath: parentStatePath,
-	}); sessionErr != nil && journalErr == nil {
+	}
+	if sessionErr := runJournal.SaveSession(session); sessionErr != nil && journalErr == nil {
 		journalErr = sessionErr
+	}
+	if journalErr == nil {
+		if threadErr := e.saveThread(stateDir, session, record.StatePath); threadErr != nil {
+			journalErr = threadErr
+		}
 	}
 	status := "completed"
 	if err != nil {
@@ -214,6 +267,33 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return outcome, err
 	}
 	return outcome, nil
+}
+
+func (e Executor) saveThread(stateDir string, session journal.Session, statePath string) error {
+	now := e.now()
+	thread := journal.Thread{
+		Version:       1,
+		ID:            session.ThreadID,
+		Repository:    session.Repository,
+		WorktreePath:  session.WorktreePath,
+		Provider:      session.Provider,
+		Model:         session.Model,
+		BaseURL:       session.BaseURL,
+		Task:          session.Task,
+		MaxSteps:      session.MaxSteps,
+		Verification:  session.Verification,
+		HeadStatePath: statePath,
+		TurnCount:     1,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if previous, err := journal.LoadThread(stateDir, session.Repository, session.ThreadID); err == nil {
+		thread.CreatedAt = previous.CreatedAt
+		thread.TurnCount = previous.TurnCount + 1
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return journal.SaveThread(stateDir, thread)
 }
 
 func (e Executor) runHarness(ctx context.Context, isolated worktree.Worktree, request Request, projectInstructions string, history []agent.Message, emit agent.EventSink) (agent.Result, error) {
