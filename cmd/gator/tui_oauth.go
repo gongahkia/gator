@@ -36,6 +36,9 @@ func beginTUIOAuthLogin(providerName string) (tui.OAuthLogin, error) {
 	if provider == model.KimiCoding {
 		return beginKimiCodingDeviceLogin()
 	}
+	if provider == model.Radius {
+		return beginRadiusDeviceLogin()
+	}
 	flow, err := oauthFlow(provider)
 	if err != nil {
 		return nil, err

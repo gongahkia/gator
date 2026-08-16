@@ -44,6 +44,7 @@ GATOR_CLAUDE_OAUTH_CLIENT_ID=... ./bin/gator login claude
 GATOR_COPILOT_OAUTH_CLIENT_ID=... ./bin/gator login copilot
 GATOR_XAI_OAUTH_CLIENT_ID=... ./bin/gator login xai --subscription
 GATOR_KIMI_CODE_OAUTH_CLIENT_ID=... ./bin/gator login kimi-coding --subscription
+GATOR_RADIUS_OAUTH_CLIENT_ID=... ./bin/gator login radius --subscription
 ./bin/gator login openrouter --subscription
 ./bin/gator run --provider codex --verify 'go test ./...' \
   'Add a focused feature with tests'
@@ -180,9 +181,14 @@ an endpoint for one scripted run.
 | `claude` | Claude account OAuth using a Gator-registered client | Anthropic Messages endpoint |
 | `copilot` | GitHub Copilot account OAuth using a Gator-registered GitHub client | Copilot Chat Completions endpoint and account model catalog |
 | `kimi-coding` | `KIMI_API_KEY` or Kimi Code account OAuth using a Gator-registered client | Kimi's Anthropic-compatible coding Messages endpoint |
+| `radius` | `RADIUS_API_KEY` or Radius account OAuth using a Gator-registered client | Radius `pi-messages` gateway protocol |
 | `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
 | `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
 | `mistral`, `groq`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
+| `cerebras` | `CEREBRAS_API_KEY` | Cerebras OpenAI-compatible Chat Completions |
+| `nvidia` | `NVIDIA_API_KEY` | NVIDIA NIM OpenAI-compatible Chat Completions |
+| `huggingface` | `HF_TOKEN` | Hugging Face Inference Providers Chat Completions |
+| `moonshotai` | `MOONSHOT_API_KEY` | Moonshot AI Kimi OpenAI-compatible Chat Completions |
 | `xai` | `XAI_API_KEY`, or Grok/X account OAuth using a Gator-registered client | OpenAI-compatible Chat Completions |
 | `openrouter` | `OPENROUTER_API_KEY`, or a browser-minted user-controlled API key | OpenAI-compatible Chat Completions |
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
@@ -194,7 +200,7 @@ Gator's own credential material to
 `0600` permissions. Explicit `--api-key` wins over the stored credential,
 which wins over the provider environment variable. `/login PROVIDER` in the
 TUI displays a browser or device-code URL and waits for completion; `Ctrl+C`
-cancels the pending login. Codex, Claude, Copilot, xAI, and Kimi Code require
+cancels the pending login. Codex, Claude, Copilot, xAI, Kimi Code, and Radius require
 their corresponding `GATOR_*_OAUTH_CLIENT_ID` registration. OpenRouter's flow
 does not use a client ID: it exchanges a PKCE authorization code for a
 user-controlled API key. Gator does not claim that Claude account OAuth uses
@@ -202,7 +208,9 @@ Claude plan limits; provider billing and eligibility remain provider-defined.
 
 The predefined compatible providers use these key variables respectively:
 `MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
-`TOGETHER_API_KEY`, `FIREWORKS_API_KEY`, and `DEEPSEEK_API_KEY`. Set `--model`
+`TOGETHER_API_KEY`, `FIREWORKS_API_KEY`, `DEEPSEEK_API_KEY`,
+`CEREBRAS_API_KEY`, `NVIDIA_API_KEY`, `HF_TOKEN`, and `MOONSHOT_API_KEY`.
+Set `--model`
 for compatible providers without a Gator default. `gator doctor --provider NAME`
 reports the selected provider's prerequisite without printing a secret.
 
@@ -215,7 +223,7 @@ tool-call replay in the private session file.
 ### Provider ownership
 
 Gator never starts Codex, Claude Code, GitHub Copilot, or Cursor Agent. Its
-`codex`, `claude`, `copilot`, `kimi-coding`, `xai`, and `openrouter` paths make
+`codex`, `claude`, `copilot`, `kimi-coding`, `radius`, `xai`, and `openrouter` paths make
 direct model requests with credentials Gator creates and stores itself; they
 do not reuse a vendor CLI session or read another application's OAuth files,
 tokens, or API keys. Gator refreshes a near-expiry credential before starting

@@ -35,7 +35,7 @@ stateless GenerateContent; and the compatible adapter supports Chat
 Completions-compatible providers.
 
 Gator never launches a vendor CLI or reads its OAuth state. `codex`, `claude`,
-`copilot`, `kimi-coding`, `xai`, and `openrouter` use direct provider requests
+`copilot`, `kimi-coding`, `radius`, `xai`, and `openrouter` use direct provider requests
 with credentials in Gator's private auth file; Gator retains tool policy,
 event streaming, steering, and resume behavior. Provider account OAuth needs
 a Gator-controlled client registration where the provider requires one, so

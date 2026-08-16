@@ -263,11 +263,16 @@ func providerDropdownOptions() []dropdownOption {
 		modelprovider.Together:         "Together AI Chat Completions",
 		modelprovider.Fireworks:        "Fireworks Chat Completions",
 		modelprovider.DeepSeek:         "DeepSeek Chat Completions",
+		modelprovider.Cerebras:         "Cerebras OpenAI-compatible Chat Completions",
+		modelprovider.NVIDIA:           "NVIDIA NIM OpenAI-compatible Chat Completions",
+		modelprovider.HuggingFace:      "Hugging Face Inference Providers Chat Completions",
+		modelprovider.MoonshotAI:       "Moonshot AI Kimi OpenAI-compatible Chat Completions",
 		modelprovider.OpenAICompatible: "custom Chat Completions endpoint",
 		modelprovider.Codex:            "ChatGPT/Codex account OAuth (Gator client)",
 		modelprovider.Claude:           "Claude account OAuth (Gator client)",
 		modelprovider.Copilot:          "GitHub Copilot account OAuth (Gator client)",
 		modelprovider.KimiCoding:       "Kimi Code subscription or Kimi API key",
+		modelprovider.Radius:           "Radius API key or account OAuth (Gator client)",
 	}
 	options := make([]dropdownOption, 0, len(descriptions))
 	for _, name := range modelprovider.Names() {

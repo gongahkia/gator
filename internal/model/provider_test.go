@@ -10,6 +10,7 @@ import (
 	"github.com/gongahkia/gator/internal/model/anthropic"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/model/openai"
+	"github.com/gongahkia/gator/internal/model/radius"
 )
 
 func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
@@ -25,6 +26,11 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: AzureOpenAI, key: "azure-key", baseURL: "https://example.test/chat/completions?api-version=2025-01-01"},
 		{provider: OpenAICompatible, key: "compatible-key", baseURL: "https://example.test/v1/chat/completions"},
 		{provider: KimiCoding, key: "kimi-key"},
+		{provider: Radius, key: "radius-key"},
+		{provider: Cerebras, key: "cerebras-key"},
+		{provider: NVIDIA, key: "nvidia-key"},
+		{provider: HuggingFace, key: "hf-key"},
+		{provider: MoonshotAI, key: "moonshot-key"},
 	}
 	for _, test := range tests {
 		t.Run(string(test.provider), func(t *testing.T) {
@@ -48,6 +54,7 @@ func TestNewBuildsSubscriptionAdaptersFromGatorOAuthCredentials(t *testing.T) {
 		{provider: Claude},
 		{provider: Copilot, extra: map[string]string{"base_url": "https://api.example.test"}},
 		{provider: KimiCoding},
+		{provider: Radius},
 	} {
 		t.Run(string(test.provider), func(t *testing.T) {
 			store, err := auth.New(t.TempDir())
@@ -80,6 +87,10 @@ func TestNewBuildsSubscriptionAdaptersFromGatorOAuthCredentials(t *testing.T) {
 			case chatcompletions.Model:
 				if adapter.Config.APIKey != "access-token" || adapter.Config.BaseURL != "https://api.example.test/chat/completions" || adapter.Config.RequestHeaders == nil {
 					t.Fatalf("Copilot adapter = %#v", adapter)
+				}
+			case radius.Messages:
+				if test.provider != Radius || adapter.APIKey != "access-token" || adapter.Model != "test-model" {
+					t.Fatalf("Radius adapter = %#v", adapter)
 				}
 			default:
 				t.Fatalf("subscription adapter = %T", backend.Model)
