@@ -24,6 +24,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: Mistral, key: "mistral-key"},
 		{provider: AzureOpenAI, key: "azure-key", baseURL: "https://example.test/chat/completions?api-version=2025-01-01"},
 		{provider: OpenAICompatible, key: "compatible-key", baseURL: "https://example.test/v1/chat/completions"},
+		{provider: KimiCoding, key: "kimi-key"},
 	}
 	for _, test := range tests {
 		t.Run(string(test.provider), func(t *testing.T) {
@@ -45,6 +46,8 @@ func TestNewBuildsSubscriptionAdaptersFromGatorOAuthCredentials(t *testing.T) {
 	}{
 		{provider: Codex, extra: map[string]string{"chatgpt_account_id": "account_123"}},
 		{provider: Claude},
+		{provider: Copilot, extra: map[string]string{"base_url": "https://api.example.test"}},
+		{provider: KimiCoding},
 	} {
 		t.Run(string(test.provider), func(t *testing.T) {
 			store, err := auth.New(t.TempDir())
@@ -66,7 +69,17 @@ func TestNewBuildsSubscriptionAdaptersFromGatorOAuthCredentials(t *testing.T) {
 				}
 			case anthropic.Messages:
 				if adapter.APIKey != "access-token" {
-					t.Fatalf("Claude adapter = %#v", adapter)
+					t.Fatalf("Anthropic-compatible subscription adapter = %#v", adapter)
+				}
+				if test.provider == Claude && (!adapter.BearerAuth || adapter.Headers.Get("Anthropic-Beta") != "oauth-2025-04-20") {
+					t.Fatalf("Claude OAuth adapter = %#v", adapter)
+				}
+				if test.provider == KimiCoding && (!adapter.BearerAuth || adapter.BaseURL != "https://api.kimi.com/coding/v1/messages") {
+					t.Fatalf("Kimi OAuth adapter = %#v", adapter)
+				}
+			case chatcompletions.Model:
+				if adapter.Config.APIKey != "access-token" || adapter.Config.BaseURL != "https://api.example.test/chat/completions" || adapter.Config.RequestHeaders == nil {
+					t.Fatalf("Copilot adapter = %#v", adapter)
 				}
 			default:
 				t.Fatalf("subscription adapter = %T", backend.Model)
@@ -99,6 +112,24 @@ func TestNewUsesProviderScopedStoredCredentialBeforeEnvironment(t *testing.T) {
 	}
 }
 
+func TestNewUsesStoredXAISubscriptionCredential(t *testing.T) {
+	store, err := auth.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("new credentials: %v", err)
+	}
+	if err := store.Put("xai", auth.Credential{Type: "oauth", Access: "xai-access", Refresh: "xai-refresh", Expires: time.Now().Add(time.Hour).UnixMilli()}); err != nil {
+		t.Fatalf("store xAI credential: %v", err)
+	}
+	backend, err := New(Config{Provider: XAI, Model: "grok-test", Credentials: &store})
+	if err != nil {
+		t.Fatalf("new xAI backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.APIKey != "xai-access" {
+		t.Fatalf("xAI adapter = %#v", backend.Model)
+	}
+}
+
 func TestNewRequiresConfiguredKeyAndCompatibleEndpoint(t *testing.T) {
 	if _, err := New(Config{Provider: Anthropic, Model: "test"}); err == nil {
 		t.Fatal("missing Anthropic key was accepted")
@@ -112,7 +143,7 @@ func TestNewRequiresConfiguredKeyAndCompatibleEndpoint(t *testing.T) {
 	if _, err := New(Config{Provider: Codex}); err == nil || !strings.Contains(err.Error(), "OAuth credential") {
 		t.Fatalf("missing Codex OAuth credential error = %v", err)
 	}
-	for _, provider := range []Provider{Copilot, Cursor} {
+	for _, provider := range []Provider{Cursor} {
 		if _, err := New(Config{Provider: provider}); err == nil || !strings.Contains(err.Error(), "will not launch") {
 			t.Fatalf("provider %q error = %v", provider, err)
 		}
@@ -143,7 +174,10 @@ func TestEffectiveModelUsesProviderDefaults(t *testing.T) {
 	if got := EffectiveModel(Claude, ""); got != DefaultModel(Anthropic) {
 		t.Fatalf("Claude default = %q", got)
 	}
-	for _, unavailable := range []string{"copilot", "cursor"} {
+	if got := EffectiveModel(KimiCoding, ""); got != "kimi-for-coding" {
+		t.Fatalf("Kimi default = %q", got)
+	}
+	for _, unavailable := range []string{"cursor"} {
 		provider, err := ParseProvider(unavailable)
 		if err != nil || SupportsDirect(provider) {
 			t.Fatalf("direct support for %q = %v, parse error = %v", unavailable, SupportsDirect(provider), err)

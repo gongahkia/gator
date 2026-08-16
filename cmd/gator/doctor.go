@@ -59,7 +59,7 @@ func doctor(arguments []string, out io.Writer) error {
 			authenticationStatus = "expired"
 		case stored && (credential.IsAPIKey() || credential.IsOAuth()):
 			authenticationStatus = "stored"
-		case model.SupportsAPIKeyLogin(provider) && os.Getenv(model.CredentialHint(provider)) != "":
+		case model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" && os.Getenv(model.APIKeyEnvironment(provider)) != "":
 			authenticationStatus = "set in environment"
 		}
 	}

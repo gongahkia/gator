@@ -3,10 +3,12 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/attachment"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -170,7 +172,7 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: err.Error(), kind: noticeError}
 		return m, nil
 	}
-	if !modelprovider.RequiresOAuthLogin(provider) {
+	if !modelprovider.SupportsOAuthLogin(provider) {
 		m.notice = notice{text: "Provider " + string(provider) + " uses an API key. Set its environment variable or run gator login " + string(provider) + " from a shell.", kind: noticeInfo}
 		return m, nil
 	}
@@ -255,15 +257,17 @@ func providerDropdownOptions() []dropdownOption {
 		modelprovider.Anthropic:        "Anthropic Messages API",
 		modelprovider.Gemini:           "Gemini GenerateContent API",
 		modelprovider.Mistral:          "Mistral Chat Completions",
-		modelprovider.XAI:              "xAI Chat Completions",
+		modelprovider.XAI:              "xAI API key or Grok/X account OAuth",
 		modelprovider.Groq:             "Groq Chat Completions",
-		modelprovider.OpenRouter:       "OpenRouter Chat Completions",
+		modelprovider.OpenRouter:       "OpenRouter API key or browser-minted key",
 		modelprovider.Together:         "Together AI Chat Completions",
 		modelprovider.Fireworks:        "Fireworks Chat Completions",
 		modelprovider.DeepSeek:         "DeepSeek Chat Completions",
 		modelprovider.OpenAICompatible: "custom Chat Completions endpoint",
-		modelprovider.Codex:            "ChatGPT/Codex subscription via Gator OAuth",
-		modelprovider.Claude:           "Claude Pro/Max via Gator OAuth",
+		modelprovider.Codex:            "ChatGPT/Codex account OAuth (Gator client)",
+		modelprovider.Claude:           "Claude account OAuth (Gator client)",
+		modelprovider.Copilot:          "GitHub Copilot account OAuth (Gator client)",
+		modelprovider.KimiCoding:       "Kimi Code subscription or Kimi API key",
 	}
 	options := make([]dropdownOption, 0, len(descriptions))
 	for _, name := range modelprovider.Names() {
@@ -279,7 +283,7 @@ func providerDropdownOptions() []dropdownOption {
 // modelDropdownOptions deliberately offers only model IDs Gator can recommend
 // without guessing an arbitrary provider catalog. The text field remains
 // editable for deployments, aliases, previews, and account-specific models.
-func modelDropdownOptions(providerName string) []dropdownOption {
+func (m Model) modelDropdownOptions(providerName string) []dropdownOption {
 	provider, err := modelprovider.ParseProvider(providerName)
 	if err != nil {
 		return nil
@@ -289,8 +293,35 @@ func modelDropdownOptions(providerName string) []dropdownOption {
 		customDescription = "type the Azure deployment name"
 	}
 	options := []dropdownOption{{label: "custom model ID", description: customDescription, custom: true}}
+	if provider == modelprovider.Copilot {
+		options = append(copilotModelDropdownOptions(m.config.StateDir), options...)
+	}
 	if defaultModel := modelprovider.DefaultModel(provider); defaultModel != "" {
 		options = append([]dropdownOption{{value: defaultModel, label: defaultModel, description: "Gator recommended default"}}, options...)
+	}
+	return options
+}
+
+func copilotModelDropdownOptions(stateDir string) []dropdownOption {
+	store, err := auth.New(stateDir)
+	if err != nil {
+		return nil
+	}
+	credential, found, err := store.Read(string(modelprovider.Copilot))
+	if err != nil || !found {
+		return nil
+	}
+	models := make([]string, 0)
+	for _, value := range strings.Split(credential.Extra["available_model_ids"], ",") {
+		model := strings.TrimSpace(value)
+		if model != "" && !strings.ContainsAny(model, "\r\n") {
+			models = append(models, model)
+		}
+	}
+	sort.Strings(models)
+	options := make([]dropdownOption, 0, len(models))
+	for _, model := range models {
+		options = append(options, dropdownOption{value: model, label: model, description: "enabled for this Copilot account"})
 	}
 	return options
 }
@@ -330,7 +361,7 @@ func (m Model) dropdownOptions() []dropdownOption {
 	case providerField:
 		return matchingDropdownOptions(providerDropdownOptions(), m.provider.Value())
 	case modelField:
-		return matchingDropdownOptions(modelDropdownOptions(m.provider.Value()), m.model.Value())
+		return matchingDropdownOptions(m.modelDropdownOptions(m.provider.Value()), m.model.Value())
 	default:
 		return nil
 	}

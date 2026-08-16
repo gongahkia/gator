@@ -91,6 +91,37 @@ func TestBrowserFlowRefreshRetainsUnrotatedRefreshToken(t *testing.T) {
 	}
 }
 
+func TestBrowserFlowJSONExchangeIncludesState(t *testing.T) {
+	var received map[string]string
+	tokens := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Content-Type") != "application/json" {
+			t.Fatalf("content type = %q", request.Header.Get("Content-Type"))
+		}
+		if err := json.NewDecoder(request.Body).Decode(&received); err != nil {
+			t.Fatalf("decode JSON token request: %v", err)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{"access_token": "access", "refresh_token": "refresh", "expires_in": 3600})
+	}))
+	defer tokens.Close()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve callback port: %v", err)
+	}
+	redirect := "http://" + listener.Addr().String() + "/callback"
+	_ = listener.Close()
+	attempt, err := BeginBrowserFlow(BrowserFlow{ClientID: "gator-client", AuthorizationURL: "https://auth.example.test/authorize", TokenURL: tokens.URL, RedirectURL: redirect, TokenRequestJSON: true, TokenIncludesState: true})
+	if err != nil {
+		t.Fatalf("begin flow: %v", err)
+	}
+	credential, err := attempt.Exchange(context.Background(), "one-time-code")
+	if err != nil {
+		t.Fatalf("exchange JSON credential: %v", err)
+	}
+	if credential.Access != "access" || received["code"] != "one-time-code" || received["state"] != attempt.State() || received["redirect_uri"] != redirect {
+		t.Fatalf("credential = %#v, request = %#v", credential, received)
+	}
+}
+
 func TestBrowserFlowRejectsUnsafeCallback(t *testing.T) {
 	if _, err := BeginBrowserFlow(BrowserFlow{ClientID: "client", AuthorizationURL: "https://example.test/authorize", TokenURL: "https://example.test/token", RedirectURL: "https://example.test/callback"}); err == nil {
 		t.Fatal("non-loopback callback was accepted")

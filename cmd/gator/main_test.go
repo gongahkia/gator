@@ -78,11 +78,11 @@ func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
 	}
 }
 
-func TestRunRejectsUnsupportedLegacyProviderWithoutFallback(t *testing.T) {
+func TestRunRejectsUnsupportedCursorProviderWithoutFallback(t *testing.T) {
 	var output bytes.Buffer
-	err := runTask([]string{"--provider", "copilot", "--verify", "go test ./...", "Add a focused feature"}, &output)
+	err := runTask([]string{"--provider", "cursor", "--verify", "go test ./...", "Add a focused feature"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "no supported direct model API integration") || !strings.Contains(err.Error(), "will not launch") {
-		t.Fatalf("copilot run error = %v", err)
+		t.Fatalf("cursor run error = %v", err)
 	}
 }
 

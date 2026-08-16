@@ -12,7 +12,7 @@ Usage:
   gator
   gator tui
   gator help
-  gator login PROVIDER [--api-key KEY | --from-env NAME]
+  gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME]
   gator logout PROVIDER
   gator doctor [--provider PROVIDER]
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] --verify 'argv ...' TASK

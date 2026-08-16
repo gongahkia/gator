@@ -34,13 +34,16 @@ test-critical code. OpenAI uses Responses; Anthropic uses Messages; Gemini uses
 stateless GenerateContent; and the compatible adapter supports Chat
 Completions-compatible providers.
 
-Gator never launches a vendor CLI or reads its OAuth state. `codex` and
-`claude` use Gator-owned PKCE OAuth credentials and direct Codex Responses or
-Anthropic Messages requests, while Gator retains tool policy, event streaming,
-steering, and resume behavior. Tokens live only in Gator's private auth file
-and refresh before a run; Gator does not impersonate Pi, Codex CLI, or Claude
-Code OAuth clients. `copilot` and `cursor` fail clearly because no complete
-direct Gator integration is available; they never fall back to vendor CLIs.
+Gator never launches a vendor CLI or reads its OAuth state. `codex`, `claude`,
+`copilot`, `kimi-coding`, `xai`, and `openrouter` use direct provider requests
+with credentials in Gator's private auth file; Gator retains tool policy,
+event streaming, steering, and resume behavior. Provider account OAuth needs
+a Gator-controlled client registration where the provider requires one, so
+Gator does not impersonate Pi, Codex CLI, Claude Code, or Copilot clients.
+OpenRouter instead creates a user-controlled API key through its PKCE flow.
+Near-expiry OAuth credentials refresh before a run. Cursor fails clearly
+because no complete direct Gator integration is available; it never falls
+back to a vendor CLI.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, execution mode, and explicit verifier allowlist;

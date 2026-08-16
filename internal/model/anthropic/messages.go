@@ -25,10 +25,12 @@ const (
 
 // Messages is a stateless Anthropic Messages API adapter.
 type Messages struct {
-	APIKey  string
-	Model   string
-	BaseURL string
-	Client  *http.Client
+	APIKey     string
+	Model      string
+	BaseURL    string
+	BearerAuth bool
+	Headers    http.Header
+	Client     *http.Client
 }
 
 // Complete implements agent.Model.
@@ -87,9 +89,18 @@ func (m Messages) do(ctx context.Context, turn agent.TurnRequest, stream bool) (
 	if err != nil {
 		return nil, fmt.Errorf("create Anthropic request: %w", err)
 	}
-	request.Header.Set("x-api-key", m.APIKey)
+	if m.BearerAuth {
+		request.Header.Set("authorization", "Bearer "+m.APIKey)
+	} else {
+		request.Header.Set("x-api-key", m.APIKey)
+	}
 	request.Header.Set("anthropic-version", "2023-06-01")
 	request.Header.Set("content-type", "application/json")
+	for name, values := range m.Headers {
+		for _, value := range values {
+			request.Header.Add(name, value)
+		}
+	}
 	if stream {
 		request.Header.Set("accept", "text/event-stream")
 	}

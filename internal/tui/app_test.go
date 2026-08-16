@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -292,6 +293,22 @@ func TestLoginCommandShowsOAuthURLAndCompletesWithoutStartingRun(t *testing.T) {
 	finished := runTeaCommand(t, started, command)
 	if !login.completed || finished.oauthLogin != nil || !strings.Contains(finished.notice.text, "credential stored") || finished.execution != nil {
 		t.Fatalf("OAuth completion state = %#v", finished)
+	}
+}
+
+func TestCopilotModelDropdownUsesStoredAccountCatalog(t *testing.T) {
+	stateDir := t.TempDir()
+	store, err := auth.New(stateDir)
+	if err != nil {
+		t.Fatalf("new auth store: %v", err)
+	}
+	if err := store.Put("copilot", auth.Credential{Type: "oauth", Access: "access", Refresh: "refresh", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"available_model_ids": "gpt-5, claude-sonnet-5"}}); err != nil {
+		t.Fatalf("store Copilot catalog: %v", err)
+	}
+	model := New(Config{StateDir: stateDir, Provider: "copilot"})
+	options := model.modelDropdownOptions("copilot")
+	if len(options) != 3 || options[0].value != "claude-sonnet-5" || options[1].value != "gpt-5" || !options[2].custom {
+		t.Fatalf("Copilot model options = %#v", options)
 	}
 }
 
