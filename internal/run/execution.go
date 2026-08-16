@@ -1,0 +1,139 @@
+package run
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/worktree"
+)
+
+func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string) (Outcome, error) {
+	projectInstructions, err := loadProjectInstructions(isolated.Repository)
+	if err != nil {
+		return Outcome{Worktree: isolated}, err
+	}
+	stateDir := request.StateDir
+	if stateDir == "" {
+		stateDir = e.StateDir
+	}
+	runJournal, record, err := journal.Open(isolated.Repository, request.RunID, isolated.Path, stateDir, e.now())
+	if err != nil {
+		return Outcome{Worktree: isolated}, err
+	}
+	defer runJournal.Close()
+
+	var events []agent.Event
+	var journalErr error
+	emit := func(event agent.Event) {
+		events = append(events, event)
+		if journalErr == nil {
+			journalErr = runJournal.Append(event)
+		}
+		if request.OnEvent != nil {
+			request.OnEvent(event)
+		}
+	}
+	var result agent.Result
+	if e.Harness != nil {
+		result, err = e.runHarness(ctx, isolated, request, projectInstructions, initialMessages, emit)
+	} else {
+		runTools := tools.Default(isolated.Root, tools.CommandPolicy{Allowed: request.Verification})
+		system := systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification)
+		var check func([]agent.Message) error
+		if request.Mode == PlanMode {
+			runTools = tools.ReadOnly(isolated.Root)
+			system = planSystemPrompt(joinInstructions(projectInstructions, request.System))
+		} else {
+			check = completionCheck(request.Verification)
+		}
+		runner := agent.Runner{
+			Model: e.Model,
+			Tools: runTools,
+			Now:   e.Now,
+		}
+		result, err = runner.Run(ctx, agent.RunOptions{
+			Task:            request.Task,
+			Images:          request.Images,
+			Attachments:     request.Attachments,
+			System:          system,
+			InitialMessages: initialMessages,
+			MaxSteps:        request.MaxSteps,
+			OnEvent:         emit,
+			CompletionCheck: check,
+		})
+	}
+	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: events}
+	session := journal.Session{
+		Version:         2,
+		Repository:      isolated.Repository,
+		WorktreePath:    isolated.Path,
+		BaseCommit:      request.BaseCommit,
+		Provider:        request.Provider,
+		Model:           request.Model,
+		BaseURL:         request.BaseURL,
+		Task:            request.Task,
+		MaxSteps:        request.MaxSteps,
+		Verification:    request.Verification,
+		ThreadID:        request.ThreadID,
+		Mode:            request.Mode.String(),
+		Messages:        result.Messages,
+		ParentStatePath: parentStatePath,
+	}
+	if sessionErr := runJournal.SaveSession(session); sessionErr != nil && journalErr == nil {
+		journalErr = sessionErr
+	}
+	if journalErr == nil {
+		if threadErr := e.saveThread(stateDir, session, record.StatePath); threadErr != nil {
+			journalErr = threadErr
+		}
+	}
+	status := "completed"
+	if err != nil {
+		status = "failed"
+	}
+	if finishErr := runJournal.Finish(status, result.FinalText, e.now()); finishErr != nil && journalErr == nil {
+		journalErr = finishErr
+	}
+	if journalErr != nil {
+		if err != nil {
+			return outcome, fmt.Errorf("agent run failed: %v; write run journal: %w", err, journalErr)
+		}
+		return outcome, fmt.Errorf("write run journal: %w", journalErr)
+	}
+	if err != nil {
+		return outcome, err
+	}
+	return outcome, nil
+}
+
+func (e Executor) saveThread(stateDir string, session journal.Session, statePath string) error {
+	now := e.now()
+	thread := journal.Thread{
+		Version:       1,
+		ID:            session.ThreadID,
+		Repository:    session.Repository,
+		WorktreePath:  session.WorktreePath,
+		Provider:      session.Provider,
+		Model:         session.Model,
+		BaseURL:       session.BaseURL,
+		Task:          session.Task,
+		MaxSteps:      session.MaxSteps,
+		Verification:  session.Verification,
+		HeadStatePath: statePath,
+		TurnCount:     1,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+	if previous, err := journal.LoadThread(stateDir, session.Repository, session.ThreadID); err == nil {
+		thread.CreatedAt = previous.CreatedAt
+		thread.TurnCount = previous.TurnCount + 1
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return journal.SaveThread(stateDir, thread)
+}

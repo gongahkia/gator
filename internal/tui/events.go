@@ -1,0 +1,193 @@
+package tui
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/gongahkia/gator/internal/agent"
+)
+
+func renderEvent(event agent.Event) timelineEntry {
+	prefix := fmt.Sprintf("[%02d]", event.Step)
+	var text, detail string
+	switch event.Kind {
+	case agent.EventTurnStarted:
+		text = prefix + " agent turn started"
+	case agent.EventTextDelta:
+		text = prefix + " agent: " + compact(event.Text, 120)
+		detail = event.Text
+	case agent.EventText:
+		text = prefix + " agent: " + compact(event.Text, 120)
+		detail = event.Text
+	case agent.EventToolCalled:
+		if event.ToolCall != nil {
+			text = prefix + " tool -> " + event.ToolCall.Name
+			detail = describeToolCall(*event.ToolCall)
+		} else {
+			text = prefix + " tool -> unknown"
+		}
+	case agent.EventToolFinished:
+		name := "unknown"
+		if event.ToolCall != nil {
+			name = event.ToolCall.Name
+		}
+		if event.ToolError == "" {
+			text = prefix + " tool ok " + name
+			detail = describeToolResult(name, event.ToolResult)
+		} else {
+			text = prefix + " tool failed " + name + ": " + compact(event.ToolError, 100)
+			detail = event.ToolError
+		}
+	case agent.EventCompletionBlocked:
+		text = prefix + " evidence required: " + compact(event.Text, 120)
+	case agent.EventHarnessStarted:
+		text = prefix + " delegated CLI -> " + compact(event.Text, 80)
+	case agent.EventHarnessFinished:
+		if event.ToolError == "" {
+			text = prefix + " delegated CLI ok " + compact(event.Text, 80)
+		} else {
+			text = prefix + " delegated CLI failed: " + compact(event.ToolError, 100)
+		}
+	case agent.EventRunFinished:
+		text = prefix + " completion proposed"
+	default:
+		text = prefix + " event"
+	}
+	return timelineEntry{step: event.Step, text: text, detail: detail, kind: event.Kind}
+}
+
+func describeToolCall(call agent.ToolCall) string {
+	if call.Name == "apply_patch" {
+		var arguments struct {
+			Patch string `json:"patch"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return patchPreview(arguments.Patch)
+		}
+	}
+	if call.Name == "read_file" || call.Name == "list_files" || call.Name == "search_files" {
+		var arguments struct {
+			Path  string `json:"path"`
+			Query string `json:"query"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			if arguments.Path != "" {
+				return "path: " + arguments.Path
+			}
+			if arguments.Query != "" {
+				return "query: " + arguments.Query
+			}
+		}
+	}
+	if call.Name == "run_command" {
+		var arguments struct {
+			Argv []string `json:"argv"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return "command: " + strings.Join(arguments.Argv, " ")
+		}
+	}
+	return string(call.Arguments)
+}
+
+func describeToolResult(name, result string) string {
+	if result == "" {
+		return ""
+	}
+	if name == "apply_patch" {
+		return "patch applied"
+	}
+	return compact(result, 2_000)
+}
+
+func patchPreview(patch string) string {
+	var files []string
+	var lines []string
+	for _, line := range strings.Split(patch, "\n") {
+		if strings.HasPrefix(line, "+++ b/") {
+			files = append(files, strings.TrimPrefix(line, "+++ b/"))
+			continue
+		}
+		if (strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++")) || (strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---")) {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) > 12 {
+		lines = append(lines[:12], "…")
+	}
+	summary := "edit"
+	if len(files) > 0 {
+		summary += " " + strings.Join(files, ", ")
+	}
+	if len(lines) > 0 {
+		summary += "\n" + strings.Join(lines, "\n")
+	}
+	return summary
+}
+
+func compact(value string, limit int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	if limit <= 0 {
+		return ""
+	}
+	if len(value) <= limit {
+		return value
+	}
+	if limit == 1 {
+		return "…"
+	}
+	return value[:limit-1] + "…"
+}
+
+func isExternalProvider(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "codex", "claude", "copilot", "cursor":
+		return true
+	default:
+		return false
+	}
+}
+
+func nextField(current field, reverse bool) field {
+	if reverse {
+		if current == taskField {
+			return modelField
+		}
+		return current - 1
+	}
+	if current == modelField {
+		return taskField
+	}
+	return current + 1
+}
+
+func formatVerification(commands [][]string) string {
+	lines := make([]string, 0, len(commands))
+	for _, command := range commands {
+		if len(command) > 0 {
+			lines = append(lines, strings.Join(command, " "))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func parseVerification(value string) ([][]string, error) {
+	var commands [][]string
+	for _, line := range strings.Split(value, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		argv := strings.Fields(line)
+		if len(argv) == 0 {
+			continue
+		}
+		commands = append(commands, argv)
+	}
+	if len(commands) == 0 {
+		return nil, errors.New("add at least one verification command before starting a run")
+	}
+	return commands, nil
+}

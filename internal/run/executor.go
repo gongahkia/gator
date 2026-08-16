@@ -1,0 +1,117 @@
+// Package run orchestrates one isolated native coding-agent execution.
+package run
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/worktree"
+)
+
+// Execute creates a new detached worktree and runs the native agent inside it.
+// A worktree is retained even on failure so a developer can inspect recovery
+// state rather than losing a partially completed patch.
+func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error) {
+	if err := e.validateRequest(request); err != nil {
+		return Outcome{}, err
+	}
+	runID := request.RunID
+	if runID == "" {
+		generated, err := newID(e.now())
+		if err != nil {
+			return Outcome{}, err
+		}
+		runID = generated
+	}
+	request.RunID = runID
+	if request.ThreadID == "" {
+		request.ThreadID = runID
+	}
+	isolated, err := worktree.Create(ctx, request.RepositoryPath, runID)
+	if err != nil {
+		return Outcome{}, err
+	}
+	if request.BaseCommit == "" {
+		request.BaseCommit = isolated.BaseCommit
+	}
+	return e.execute(ctx, isolated, request, nil, "")
+}
+
+// Resume continues a retained worktree from a private local session. It starts
+// a new run record and re-requires final status, diff, and verification evidence.
+func (e Executor) Resume(ctx context.Context, previous journal.Session, statePath, continuation string, request Request) (Outcome, error) {
+	if strings.TrimSpace(continuation) == "" {
+		return Outcome{}, errors.New("resume task is required")
+	}
+	request.RepositoryPath = previous.Repository
+	request.Task = previous.Task
+	request.Provider = previous.Provider
+	request.Model = previous.Model
+	request.BaseURL = previous.BaseURL
+	request.Verification = previous.Verification
+	if request.MaxSteps == 0 {
+		request.MaxSteps = previous.MaxSteps
+	}
+	if request.MaxSteps == 0 {
+		request.MaxSteps = defaultResumeMaxSteps
+	}
+	if request.ThreadID == "" {
+		request.ThreadID = previous.ThreadID
+		if request.ThreadID == "" {
+			request.ThreadID = filepath.Base(statePath)
+		}
+	}
+	if request.BaseCommit == "" {
+		request.BaseCommit = previous.BaseCommit
+	}
+	if err := e.validateRequest(request); err != nil {
+		return Outcome{}, err
+	}
+	generated, err := newID(e.now())
+	if err != nil {
+		return Outcome{}, err
+	}
+	request.RunID = generated
+	isolated, err := worktree.OpenExisting(ctx, previous.Repository, previous.WorktreePath, generated)
+	if err != nil {
+		return Outcome{}, err
+	}
+	history := append([]agent.Message(nil), previous.Messages...)
+	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation, Images: request.Images, Attachments: request.Attachments})
+	return e.execute(ctx, isolated, request, history, statePath)
+}
+
+const defaultResumeMaxSteps = 24
+
+func (e Executor) validateRequest(request Request) error {
+	if (e.Model == nil && e.Harness == nil) || (e.Model != nil && e.Harness != nil) {
+		return errors.New("exactly one agent model or CLI harness is required")
+	}
+	if strings.TrimSpace(request.Task) == "" {
+		return errors.New("run task is required")
+	}
+	if err := validateVerification(request.Verification); err != nil {
+		return err
+	}
+	if strings.TrimSpace(request.Provider) == "" {
+		return errors.New("run provider is required")
+	}
+	if e.Harness != nil && !request.AllowExternalCLI {
+		return errors.New("external CLI harness requires explicit approval")
+	}
+	if request.Mode != ExecuteMode && request.Mode != PlanMode {
+		return fmt.Errorf("unsupported run mode %d", request.Mode)
+	}
+	if request.Mode == PlanMode && e.Harness != nil {
+		return errors.New("enforced Plan mode is unavailable for delegated CLI providers; choose a native provider or switch to Execute")
+	}
+	if (len(request.Images) > 0 || len(request.Attachments) > 0) && e.Harness != nil {
+		return errors.New("file attachments are available only to native providers")
+	}
+	return nil
+}
