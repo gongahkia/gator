@@ -902,6 +902,9 @@ func (m Model) composeView() string {
 		return m.compactComposeView(mode)
 	}
 	verificationHint := "One allowed argv command per line. Each must pass before Gator accepts completion."
+	if m.runMode == gatorrun.PlanMode {
+		verificationHint = "Plan mode cannot run commands. This verifier policy will apply after switching to Execute."
+	}
 	providerHint := "Choose from the dropdown or type to filter providers."
 	modelHint := "Choose a recommendation or type any model ID supported by the provider."
 	if m.resumeStatePath != "" {
@@ -999,6 +1002,9 @@ func (m Model) compactComposeView(mode string) string {
 
 func (m Model) composerSummary() string {
 	verification := "no commands"
+	if m.runMode == gatorrun.PlanMode {
+		verification = "deferred in plan"
+	}
 	if commands, err := parseVerification(m.verification.Value()); err == nil && len(commands) > 0 {
 		verification = fmt.Sprintf("%d command(s)", len(commands))
 	} else if strings.TrimSpace(m.verification.Value()) != "" {
@@ -1038,8 +1044,8 @@ func (m Model) helpView() string {
 	if m.compactLayout() {
 		lines := []string{
 			"F1  close this help",
-			"Ctrl+R  start the configured run",
-			"Ctrl+O  choose a retained run",
+			"Ctrl+R  start the selected mode",
+			"Ctrl+O  choose a retained thread",
 			"Tab / Shift+Tab  move between fields",
 			"?  open commands; @  reference a path",
 			"Ctrl+C  quit",
@@ -1047,7 +1053,7 @@ func (m Model) helpView() string {
 		if m.constrainedLayout() {
 			lines = []string{
 				"F1  close this help",
-				"Ctrl+R  start a run",
+				"Ctrl+R  start the selected mode",
 				"Tab  move between fields",
 				"Ctrl+C  quit",
 			}
@@ -1062,8 +1068,8 @@ func (m Model) helpView() string {
 		m.header("keyboard shortcuts"),
 		labelStyle.Render("Composer") + "\n" + m.panel(strings.Join([]string{
 			"F1  show or close this help",
-			"Ctrl+R  start the configured run",
-			"Ctrl+O  choose a retained run",
+			"Ctrl+R  start the selected mode",
+			"Ctrl+O  choose a retained thread",
 			"Tab / Shift+Tab  move between fields",
 			"?  open the / command menu from an empty task",
 			"@  begin a repository-path reference",
@@ -1756,14 +1762,19 @@ func (m Model) contextReferencesView() string {
 
 func (m Model) sessionStatus() string {
 	verification, err := parseVerification(m.verification.Value())
-	verificationText := "invalid: " + err.Error()
+	verificationText := "not configured"
 	if err == nil {
 		verificationText = formatVerification(verification)
+	} else if m.runMode == gatorrun.ExecuteMode {
+		verificationText = "invalid: " + err.Error()
 	}
-	return "repository: " + m.config.RepositoryPath + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\nverification:\n" + verificationText
+	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {
+	if m.runMode == gatorrun.PlanMode {
+		return "mode: enforced Plan\nwrites: disabled\ncommands: disabled\nreads: repository paths and Git state only\nactive checkout: never edited by a normal run"
+	}
 	verification, err := parseVerification(m.verification.Value())
 	commands := "invalid verifier configuration: " + err.Error()
 	if err == nil {

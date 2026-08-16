@@ -229,6 +229,57 @@ func TestTabAcceptsSlashCommandRecommendation(t *testing.T) {
 	}
 }
 
+func TestPlanCommandStartsWithoutVerifierAndUsesReadOnlyTools(t *testing.T) {
+	repository := testRepository(t)
+	agentModel := &testAgentModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Plan the focused implementation and test changes."},
+	}}
+	model := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		StateDir:       t.TempDir(),
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel}, nil
+		},
+	})
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
+	model.task.SetValue("/plan")
+	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+	if updated.runMode != gatorrun.PlanMode || !strings.Contains(updated.notice.text, "read-only") {
+		t.Fatalf("plan command state = %#v", updated)
+	}
+	updated.task.SetValue("/execute")
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyEnter})
+	if updated.runMode != gatorrun.ExecuteMode {
+		t.Fatalf("execute command mode = %v", updated.runMode)
+	}
+	updated.task.SetValue("/plan")
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyEnter})
+	updated.task.SetValue("Plan the feature before implementation")
+	updated = drive(t, updated, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if updated.screen != reviewScreen || updated.runErr != nil || updated.outcome == nil {
+		t.Fatalf("plan run = screen %v, error %v, outcome %#v", updated.screen, updated.runErr, updated.outcome)
+	}
+	if !strings.Contains(updated.View(), "plan review") || updated.outcome.ThreadID == "" {
+		t.Fatalf("plan review = %s", updated.View())
+	}
+	for _, tool := range agentModel.requests[0].Tools {
+		if tool.Name == "apply_patch" || tool.Name == "run_command" {
+			t.Fatalf("plan tool surface included %q", tool.Name)
+		}
+	}
+}
+
+func TestSessionStatusHandlesValidVerifierConfiguration(t *testing.T) {
+	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
+	if status := model.sessionStatus(); !strings.Contains(status, "go test ./...") || !strings.Contains(status, "mode: execute") {
+		t.Fatalf("session status = %q", status)
+	}
+}
+
 func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
 	model := New(Config{Provider: "openai", Model: "gpt-5.6"})
 	model.focus = providerField
