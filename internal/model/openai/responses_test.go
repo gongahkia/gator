@@ -49,6 +49,32 @@ func TestResponsesCompleteConvertsToolCall(t *testing.T) {
 	}
 }
 
+func TestResponsesUsesConfiguredAPIKeyHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if got := request.Header.Get("api-key"); got != "azure-key" {
+			t.Fatalf("api-key = %q", got)
+		}
+		if got := request.Header.Get("Authorization"); got != "" {
+			t.Fatalf("unexpected authorization = %q", got)
+		}
+		_, _ = io.WriteString(writer, `{"output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
+	}))
+	defer server.Close()
+
+	model := Responses{
+		APIKey:              "azure-key",
+		APIKeyEnv:           "AZURE_OPENAI_API_KEY",
+		Model:               "deployment",
+		BaseURL:             server.URL,
+		AuthorizationHeader: "api-key",
+		Client:              server.Client(),
+	}
+	turn, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}})
+	if err != nil || turn.Text != "done" {
+		t.Fatalf("complete = %#v, %v", turn, err)
+	}
+}
+
 func TestResponsesCompleteReplaysFunctionCallAndOutput(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var body responseRequest

@@ -184,13 +184,16 @@ an endpoint for one scripted run.
 | `radius` | `RADIUS_API_KEY` or Radius account OAuth using a Gator-registered client | Radius `pi-messages` gateway protocol |
 | `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
 | `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
+| `azure-openai-responses` | `AZURE_OPENAI_API_KEY` plus `--base-url`, `AZURE_OPENAI_BASE_URL`, or `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI Responses API |
 | `mistral`, `groq`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
 | `cerebras` | `CEREBRAS_API_KEY` | Cerebras OpenAI-compatible Chat Completions |
 | `nvidia` | `NVIDIA_API_KEY` | NVIDIA NIM OpenAI-compatible Chat Completions |
 | `huggingface` | `HF_TOKEN` | Hugging Face Inference Providers Chat Completions |
 | `moonshotai` | `MOONSHOT_API_KEY` | Moonshot AI Kimi OpenAI-compatible Chat Completions |
 | `zai` | `ZAI_API_KEY` | Z.AI GLM Coding Plan OpenAI-compatible Chat Completions |
-| `minimax` | `MINIMAX_API_KEY` | MiniMax OpenAI-compatible Chat Completions |
+| `zai-coding-cn` | `ZAI_CODING_CN_API_KEY` | Z.AI GLM Coding Plan China OpenAI-compatible Chat Completions |
+| `minimax` | `MINIMAX_API_KEY` | MiniMax Anthropic-compatible Messages API |
+| `minimax-cn` | `MINIMAX_CN_API_KEY` | MiniMax China Anthropic-compatible Messages API |
 | `baseten` | `BASETEN_API_KEY` | Baseten OpenAI-compatible Chat Completions |
 | `vercel-ai-gateway` | `AI_GATEWAY_API_KEY` | Vercel AI Gateway OpenAI-compatible Chat Completions |
 | `ant-ling` | `ANT_LING_API_KEY` | Ant Ling OpenAI-compatible Chat Completions |
@@ -200,11 +203,13 @@ an endpoint for one scripted run.
 | `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare unified AI Gateway OpenAI-compatible Chat Completions |
 | `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, optional `AWS_REGION` | Amazon Bedrock OpenAI-compatible Chat Completions |
 | `google-vertex` | Google ADC plus `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` | Google Vertex AI OpenAI-compatible Chat Completions |
-| `qwen-token-plan` | `QWEN_TOKEN_PLAN_API_KEY` | Qwen Token Plan OpenAI-compatible Chat Completions |
+| `qwen-token-plan`, `qwen-token-plan-individual` | `QWEN_TOKEN_PLAN_API_KEY` | Qwen Token Plan OpenAI-compatible Chat Completions |
 | `qwen-token-plan-cn` | `QWEN_TOKEN_PLAN_CN_API_KEY` | Qwen Token Plan China OpenAI-compatible Chat Completions |
 | `xiaomi-token-plan-cn`, `xiaomi-token-plan-ams`, `xiaomi-token-plan-sgp` | `MIMO_API_KEY` | Xiaomi MiMo prepaid Token Plan Chat Completions |
 | `xai` | `XAI_API_KEY`, or Grok/X account OAuth using a Gator-registered client | OpenAI-compatible Chat Completions |
 | `openrouter` | `OPENROUTER_API_KEY`, or a browser-minted user-controlled API key | OpenAI-compatible Chat Completions |
+| `opencode` | `OPENCODE_API_KEY` | OpenCode Zen direct gateway (Responses, Messages, GenerateContent, or Chat Completions by model family) |
+| `opencode-go` | `OPENCODE_API_KEY` | OpenCode Go direct gateway (Responses, Messages, GenerateContent, or Chat Completions by model family) |
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
 
 `gator login PROVIDER` stores an API-key credential, while `gator login
@@ -224,12 +229,15 @@ The predefined compatible providers use these key variables respectively:
 `MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
 `TOGETHER_API_KEY`, `FIREWORKS_API_KEY`, `DEEPSEEK_API_KEY`,
 `CEREBRAS_API_KEY`, `NVIDIA_API_KEY`, `HF_TOKEN`, `MOONSHOT_API_KEY`,
-`ZAI_API_KEY`, `MINIMAX_API_KEY`, `BASETEN_API_KEY`, `AI_GATEWAY_API_KEY`,
+`ZAI_API_KEY`, `ZAI_CODING_CN_API_KEY`, `MINIMAX_API_KEY`, `MINIMAX_CN_API_KEY`,
+`OPENCODE_API_KEY`, `BASETEN_API_KEY`, `AI_GATEWAY_API_KEY`,
 `ANT_LING_API_KEY`, `MIMO_API_KEY`, `QWEN_TOKEN_PLAN_API_KEY`,
 `QWEN_TOKEN_PLAN_CN_API_KEY`, and `CLOUDFLARE_API_TOKEN`. Cloudflare also
 requires `CLOUDFLARE_ACCOUNT_ID` unless a full `--base-url` is supplied.
 Bedrock uses `AWS_BEARER_TOKEN_BEDROCK` and defaults `AWS_REGION` to
-`us-east-1`. Vertex refreshes Google Application Default Credentials directly,
+`us-east-1`. Azure Responses normalizes resource roots to `/openai/v1/responses`
+and uses `AZURE_OPENAI_API_VERSION` (default `v1`) when the base URL has no
+`api-version` query. Vertex refreshes Google Application Default Credentials directly,
 or accepts `GATOR_VERTEX_ACCESS_TOKEN` for an externally managed short-lived
 token. Set `--model`
 for compatible providers without a Gator default. `gator doctor --provider NAME`
@@ -244,12 +252,18 @@ tool-call replay in the private session file.
 ### Provider ownership
 
 Gator never starts Codex, Claude Code, GitHub Copilot, or Cursor Agent. Its
-`codex`, `claude`, `copilot`, `kimi-coding`, `radius`, `xai`, and `openrouter` paths make
+`codex`, `claude`, `copilot`, `kimi-coding`, `radius`, `xai`, `openrouter`, `opencode`, and
+`opencode-go` paths make
 direct model requests with credentials Gator creates and stores itself; they
 do not reuse a vendor CLI session or read another application's OAuth files,
 tokens, or API keys. Gator refreshes a near-expiry credential before starting
 a run. Cursor remains unavailable rather than falling back to its vendor CLI:
 no public direct Cursor inference contract was verified.
+
+`google-vertex` is the explicit cloud-credential exception: it reads Google
+Application Default Credentials (or `GATOR_VERTEX_ACCESS_TOKEN`) and refreshes
+them by direct OAuth requests. It does not invoke `gcloud`, start a coding
+agent, or delegate Gator's tool loop.
 
 ## Design principles
 

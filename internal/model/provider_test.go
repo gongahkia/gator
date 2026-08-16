@@ -9,6 +9,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model/anthropic"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
+	"github.com/gongahkia/gator/internal/model/gemini"
 	"github.com/gongahkia/gator/internal/model/openai"
 	"github.com/gongahkia/gator/internal/model/radius"
 )
@@ -24,6 +25,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: Gemini, key: "gemini-key"},
 		{provider: Mistral, key: "mistral-key"},
 		{provider: AzureOpenAI, key: "azure-key", baseURL: "https://example.test/chat/completions?api-version=2025-01-01"},
+		{provider: AzureOpenAIResponses, key: "azure-key", baseURL: "https://example.test"},
 		{provider: OpenAICompatible, key: "compatible-key", baseURL: "https://example.test/v1/chat/completions"},
 		{provider: KimiCoding, key: "kimi-key"},
 		{provider: Radius, key: "radius-key"},
@@ -32,7 +34,11 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: HuggingFace, key: "hf-key"},
 		{provider: MoonshotAI, key: "moonshot-key"},
 		{provider: ZAI, key: "zai-key"},
+		{provider: ZAICodingCN, key: "zai-cn-key"},
 		{provider: MiniMax, key: "minimax-key"},
+		{provider: MiniMaxCN, key: "minimax-cn-key"},
+		{provider: OpenCode, key: "opencode-key"},
+		{provider: OpenCodeGo, key: "opencode-go-key"},
 		{provider: Baseten, key: "baseten-key"},
 		{provider: VercelAIGateway, key: "vercel-key"},
 		{provider: AntLing, key: "ant-ling-key"},
@@ -43,6 +49,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: AmazonBedrock, key: "bedrock-key"},
 		{provider: QwenTokenPlan, key: "qwen-token-plan-key"},
 		{provider: QwenTokenPlanCN, key: "qwen-token-plan-cn-key"},
+		{provider: QwenTokenPlanIndividual, key: "qwen-token-plan-individual-key"},
 		{provider: XiaomiTokenPlanCN, key: "mimo-token-plan-cn-key"},
 		{provider: XiaomiTokenPlanAMS, key: "mimo-token-plan-ams-key"},
 		{provider: XiaomiTokenPlanSGP, key: "mimo-token-plan-sgp-key"},
@@ -187,6 +194,42 @@ func TestAzureUsesRawAPIKeyHeader(t *testing.T) {
 	}
 }
 
+func TestAzureResponsesUsesRawAPIKeyHeaderAndV1Endpoint(t *testing.T) {
+	backend, err := New(Config{Provider: AzureOpenAIResponses, APIKey: "azure-key", Model: "deployment", BaseURL: "https://example.test/openai/v1"})
+	if err != nil {
+		t.Fatalf("new backend: %v", err)
+	}
+	adapter, ok := backend.Model.(openai.Responses)
+	if !ok || adapter.AuthorizationHeader != "api-key" || adapter.AuthorizationPrefix != "" || adapter.BaseURL != "https://example.test/openai/v1/responses?api-version=v1" {
+		t.Fatalf("adapter = %#v", backend.Model)
+	}
+}
+
+func TestAzureResponsesEndpointConfiguration(t *testing.T) {
+	t.Setenv("AZURE_OPENAI_API_VERSION", "preview")
+	for _, test := range []struct {
+		name string
+		base string
+		want string
+	}{
+		{name: "resource root", base: "https://resource.openai.azure.com", want: "https://resource.openai.azure.com/openai/v1/responses?api-version=preview"},
+		{name: "full endpoint preserves version", base: "https://resource.openai.azure.com/openai/v1/responses?api-version=custom", want: "https://resource.openai.azure.com/openai/v1/responses?api-version=custom"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := azureResponsesURL(test.base)
+			if err != nil || got != test.want {
+				t.Fatalf("azureResponsesURL(%q) = %q, %v", test.base, got, err)
+			}
+		})
+	}
+	t.Setenv("AZURE_OPENAI_BASE_URL", "")
+	t.Setenv("AZURE_OPENAI_RESOURCE_NAME", "resource")
+	got, err := azureResponsesURL("")
+	if err != nil || got != "https://resource.openai.azure.com/openai/v1/responses?api-version=preview" {
+		t.Fatalf("resource endpoint = %q, %v", got, err)
+	}
+}
+
 func TestBasetenUsesDocumentedAPIKeyAuthorizationPrefix(t *testing.T) {
 	backend, err := New(Config{Provider: Baseten, APIKey: "baseten-key", Model: "model"})
 	if err != nil {
@@ -206,6 +249,80 @@ func TestZAICodingPlanUsesDedicatedEndpoint(t *testing.T) {
 	adapter, ok := backend.Model.(chatcompletions.Model)
 	if !ok || adapter.Config.BaseURL != "https://api.z.ai/api/coding/paas/v4/chat/completions" {
 		t.Fatalf("Z.AI adapter = %#v", backend.Model)
+	}
+}
+
+func TestZAICodingPlanChinaUsesDedicatedEndpoint(t *testing.T) {
+	backend, err := New(Config{Provider: ZAICodingCN, APIKey: "zai-cn-key", Model: "glm-5.1"})
+	if err != nil {
+		t.Fatalf("new Z.AI China backend: %v", err)
+	}
+	adapter, ok := backend.Model.(chatcompletions.Model)
+	if !ok || adapter.Config.BaseURL != "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions" || adapter.Config.APIKeyEnv != "ZAI_CODING_CN_API_KEY" {
+		t.Fatalf("Z.AI China adapter = %#v", backend.Model)
+	}
+}
+
+func TestMiniMaxUsesAnthropicMessagesEndpoints(t *testing.T) {
+	for _, test := range []struct {
+		provider Provider
+		key      string
+		endpoint string
+	}{
+		{provider: MiniMax, key: "minimax-key", endpoint: "https://api.minimax.io/anthropic/v1/messages"},
+		{provider: MiniMaxCN, key: "minimax-cn-key", endpoint: "https://api.minimaxi.com/anthropic/v1/messages"},
+	} {
+		t.Run(string(test.provider), func(t *testing.T) {
+			backend, err := New(Config{Provider: test.provider, APIKey: test.key, Model: "MiniMax-M2.7"})
+			if err != nil {
+				t.Fatalf("new backend: %v", err)
+			}
+			adapter, ok := backend.Model.(anthropic.Messages)
+			if !ok || adapter.BaseURL != test.endpoint {
+				t.Fatalf("MiniMax adapter = %#v", backend.Model)
+			}
+		})
+	}
+}
+
+func TestOpenCodeRoutesModelFamiliesToTheirPublishedProtocols(t *testing.T) {
+	for _, test := range []struct {
+		provider Provider
+		model    string
+		assert   func(*testing.T, Backend)
+	}{
+		{provider: OpenCode, model: "gpt-5.6-terra", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(openai.Responses)
+			if !ok || adapter.BaseURL != "https://opencode.ai/zen/v1/responses" {
+				t.Fatalf("Responses adapter = %#v", backend.Model)
+			}
+		}},
+		{provider: OpenCode, model: "claude-sonnet-5", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(anthropic.Messages)
+			if !ok || adapter.BaseURL != "https://opencode.ai/zen/v1/messages" {
+				t.Fatalf("Messages adapter = %#v", backend.Model)
+			}
+		}},
+		{provider: OpenCode, model: "gemini-3.5-flash", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(gemini.GenerateContent)
+			if !ok || adapter.BaseURL != "https://opencode.ai/zen/v1" {
+				t.Fatalf("GenerateContent adapter = %#v", backend.Model)
+			}
+		}},
+		{provider: OpenCodeGo, model: "kimi-k2.6", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(chatcompletions.Model)
+			if !ok || adapter.Config.BaseURL != "https://opencode.ai/zen/go/v1/chat/completions" {
+				t.Fatalf("Chat Completions adapter = %#v", backend.Model)
+			}
+		}},
+	} {
+		t.Run(string(test.provider)+"/"+test.model, func(t *testing.T) {
+			backend, err := New(Config{Provider: test.provider, APIKey: "opencode-key", Model: test.model})
+			if err != nil {
+				t.Fatalf("new backend: %v", err)
+			}
+			test.assert(t, backend)
+		})
 	}
 }
 

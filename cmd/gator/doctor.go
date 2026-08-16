@@ -39,12 +39,18 @@ func doctor(arguments []string, out io.Writer) error {
 		gitStatus = "detected"
 	}
 	authentication := "Gator credential"
-	if model.SupportsAPIKeyLogin(provider) {
+	if provider == model.GoogleVertex {
+		authentication = model.CredentialHint(provider)
+	} else if model.SupportsAPIKeyLogin(provider) {
 		authentication += " or " + model.CredentialHint(provider)
 	}
 	authenticationStatus := "missing"
 	if !model.SupportsDirect(provider) {
 		authenticationStatus = "unsupported"
+	} else if provider == model.GoogleVertex {
+		if model.AmbientCredentialAvailable(provider) {
+			authenticationStatus = "configured"
+		}
 	} else {
 		credentials, credentialErr := gatorCredentials()
 		if credentialErr != nil {
