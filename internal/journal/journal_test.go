@@ -327,3 +327,56 @@ func TestListRecentThreadsFallsBackToLegacyRuns(t *testing.T) {
 		t.Fatalf("legacy recent threads = %#v", recent)
 	}
 }
+
+func TestListAllRecentThreadsIncludesProjectsWithoutExposingStatePaths(t *testing.T) {
+	stateDirectory := t.TempDir()
+	firstWorktree := filepath.Join(t.TempDir(), "first")
+	secondWorktree := filepath.Join(t.TempDir(), "second")
+	for _, worktree := range []string{firstWorktree, secondWorktree} {
+		if err := os.Mkdir(worktree, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstRepository := "/workspace/first-project"
+	secondRepository := "/workspace/second-project"
+	first := Thread{
+		Version:       threadVersion,
+		ID:            "thread-first",
+		Repository:    firstRepository,
+		WorktreePath:  firstWorktree,
+		Provider:      "openai",
+		Task:          "First project task",
+		HeadStatePath: "/state/first",
+		TurnCount:     1,
+		CreatedAt:     time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC),
+		UpdatedAt:     time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC),
+	}
+	second := Thread{
+		Version:       threadVersion,
+		ID:            "thread-second",
+		Repository:    secondRepository,
+		WorktreePath:  secondWorktree,
+		Provider:      "anthropic",
+		Task:          "Second project task",
+		HeadStatePath: "/state/second",
+		TurnCount:     2,
+		CreatedAt:     time.Date(2026, 8, 16, 11, 0, 0, 0, time.UTC),
+		UpdatedAt:     time.Date(2026, 8, 16, 11, 0, 0, 0, time.UTC),
+	}
+	for _, thread := range []Thread{first, second} {
+		if err := SaveThread(stateDirectory, thread); err != nil {
+			t.Fatalf("save thread %s: %v", thread.ID, err)
+		}
+	}
+
+	recent, err := ListAllRecentThreads(stateDirectory, 10)
+	if err != nil {
+		t.Fatalf("list all recent threads: %v", err)
+	}
+	if len(recent) != 2 || recent[0].ID != second.ID || recent[1].ID != first.ID {
+		t.Fatalf("recent threads = %#v", recent)
+	}
+	if recent[0].Repository != secondRepository || recent[1].Repository != firstRepository || !recent[0].Available || !recent[1].Available {
+		t.Fatalf("recent thread metadata = %#v", recent)
+	}
+}

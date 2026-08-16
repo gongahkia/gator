@@ -14,7 +14,7 @@ Usage:
   gator help
   gator doctor [--provider PROVIDER]
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--allow-external-cli] --verify 'argv ...' TASK
-  gator resume [--allow-external-cli] [--max-steps N] RUN_RECORD_PATH TASK
+  gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH
 
@@ -22,7 +22,7 @@ Commands:
   tui       open the interactive terminal application (the default command)
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
-  resume    continue a retained worktree from its local run record
+  resume    select, reopen, or immediately continue a retained local thread
   export    write a portable patch for a retained run to standard output
   apply     explicitly apply a retained patch to this clean checkout
 

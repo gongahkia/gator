@@ -321,6 +321,7 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 		return *m, nil
 	}
 	m.resumeStatePath = statePath
+	m.config.RepositoryPath = session.Repository
 	m.threadID = session.ThreadID
 	if m.threadID == "" {
 		m.threadID = filepath.Base(statePath)
@@ -355,6 +356,7 @@ func (m *Model) returnToComposer() {
 	m.quitAfterRun = false
 	m.resumeStatePath = ""
 	m.threadID = ""
+	m.recentAll = false
 	m.runMode = gatorrun.ExecuteMode
 	m.task.Reset()
 	m.queue = nil

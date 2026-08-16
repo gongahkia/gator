@@ -22,14 +22,17 @@ const maxQueuedInputs = 16
 // interactive session. NewExecutor is injected so the UI stays independent of
 // any particular model provider and can be tested without a network request.
 type Config struct {
-	RepositoryPath string
-	Provider       string
-	Model          string
-	BaseURL        string
-	Verification   [][]string
-	MaxSteps       int
-	StateDir       string
-	NewExecutor    func(provider, model, baseURL string) (gatorrun.Executor, error)
+	RepositoryPath  string
+	Provider        string
+	Model           string
+	BaseURL         string
+	Verification    [][]string
+	MaxSteps        int
+	StateDir        string
+	ResumeStatePath string
+	StartInRecent   bool
+	RecentAll       bool
+	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
 }
 
 type screen uint8
@@ -182,6 +185,7 @@ type Model struct {
 	transcriptIndex     int
 	recentThreads       []journal.RecentThread
 	recentIndex         int
+	recentAll           bool
 	events              []timelineEntry
 	chat                []chatEntry
 	chatIndex           int
@@ -263,6 +267,7 @@ func New(config Config) Model {
 	application := Model{
 		config:       config,
 		screen:       composeScreen,
+		recentAll:    config.RecentAll,
 		task:         task,
 		verification: verification,
 		provider:     provider,
@@ -286,6 +291,14 @@ func New(config Config) Model {
 		}
 	}
 	application.refreshPreflight()
+	if strings.TrimSpace(config.ResumeStatePath) != "" {
+		next, _ := application.beginContinuation(config.ResumeStatePath)
+		return next.(Model)
+	}
+	if config.StartInRecent {
+		next, _ := application.openRecentRuns()
+		return next.(Model)
+	}
 	return application
 }
 
