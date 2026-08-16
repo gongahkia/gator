@@ -174,12 +174,22 @@ func encodeMessages(source []agent.Message) ([]message, error) {
 		item := source[index]
 		switch item.Role {
 		case agent.RoleUser:
-			blocks := make([]contentBlock, 0, len(item.Images)+1)
+			blocks := make([]contentBlock, 0, len(item.Images)+len(item.Attachments)+1)
 			if item.Content != "" {
 				blocks = append(blocks, contentBlock{Type: "text", Text: item.Content})
 			}
 			for _, image := range item.Images {
 				blocks = append(blocks, contentBlock{Type: "image", Source: &imageSource{Type: "base64", MediaType: image.MediaType, Data: base64.StdEncoding.EncodeToString(image.Data)}})
+			}
+			for _, attachment := range item.Attachments {
+				switch attachment.MediaType {
+				case "application/pdf":
+					blocks = append(blocks, contentBlock{Type: "document", Source: &imageSource{Type: "base64", MediaType: attachment.MediaType, Data: base64.StdEncoding.EncodeToString(attachment.Data)}})
+				case "text/plain":
+					blocks = append(blocks, contentBlock{Type: "text", Text: agent.AttachmentText(attachment)})
+				default:
+					return nil, fmt.Errorf("Anthropic attachment %q has unsupported media type %q", attachment.Name, attachment.MediaType)
+				}
 			}
 			if len(blocks) == 0 {
 				return nil, errors.New("agent history contains an empty user message")

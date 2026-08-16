@@ -186,6 +186,18 @@ func IsHarness(provider Provider) bool {
 	}
 }
 
+// SupportsPDFAttachments reports whether Gator's adapter can encode a PDF
+// using the provider's documented native document input. Generic Chat
+// Completions endpoints do not share a stable file-input contract.
+func SupportsPDFAttachments(provider Provider) bool {
+	switch provider {
+	case OpenAI, Anthropic, Gemini:
+		return true
+	default:
+		return false
+	}
+}
+
 // DefaultModel returns the stable default where Gator can select one without
 // guessing a catalog-specific model. Empty means the user or CLI chooses it.
 func DefaultModel(provider Provider) string {
