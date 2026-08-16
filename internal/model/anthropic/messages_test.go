@@ -80,6 +80,24 @@ func TestMessagesStreamAssemblesToolArguments(t *testing.T) {
 	}
 }
 
+func TestMessagesEncodesImageInput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body requestBodyView
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(body.Messages) != 1 || len(body.Messages[0].Content) != 2 || body.Messages[0].Content[1].Source == nil || body.Messages[0].Content[1].Source.MediaType != "image/png" {
+			t.Fatalf("image request = %#v", body.Messages)
+		}
+		_, _ = io.WriteString(writer, `{"content":[{"type":"text","text":"done"}]}`)
+	}))
+	defer server.Close()
+	model := Messages{APIKey: "test-key", Model: "claude-test", BaseURL: server.URL, Client: server.Client()}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}}}}}); err != nil {
+		t.Fatalf("complete image input: %v", err)
+	}
+}
+
 type requestBodyView struct {
 	Model    string         `json:"model"`
 	System   string         `json:"system"`

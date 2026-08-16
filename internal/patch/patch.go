@@ -23,18 +23,26 @@ type Result struct {
 }
 
 // Export produces a portable binary Git patch for all tracked and untracked
-// regular files in a retained worktree. It excludes Gator's private metadata.
-func Export(ctx context.Context, sourcePath string) ([]byte, error) {
+// regular files in a retained worktree. It skips untracked Gator metadata.
+func Export(ctx context.Context, sourcePath, baseCommit string) ([]byte, error) {
 	source, err := workspace.Open(sourcePath)
 	if err != nil {
 		return nil, fmt.Errorf("open source worktree: %w", err)
 	}
-	tracked, err := gitOutput(ctx, source.Path(), "diff", "--no-ext-diff", "--binary", "HEAD")
+	base := "HEAD"
+	if strings.TrimSpace(baseCommit) != "" {
+		base = baseCommit
+	}
+	tracked, err := gitOutput(ctx, source.Path(), "diff", "--no-ext-diff", "--binary", base)
 	if err != nil {
 		return nil, err
 	}
 	patch := append([]byte(nil), tracked...)
-	for _, relative := range untrackedFiles(ctx, source) {
+	untracked, err := untrackedFiles(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	for _, relative := range untracked {
 		path, err := source.ResolveFile(relative)
 		if err != nil {
 			return nil, fmt.Errorf("resolve untracked file %q: %w", relative, err)
@@ -60,8 +68,8 @@ func Export(ctx context.Context, sourcePath string) ([]byte, error) {
 
 // Check verifies that a patch can transfer to a clean target checkout without
 // modifying it. A successful check is the compatibility criterion for apply.
-func Check(ctx context.Context, sourcePath, targetPath string) (Result, error) {
-	patch, target, err := prepare(ctx, sourcePath, targetPath)
+func Check(ctx context.Context, sourcePath, baseCommit, targetPath string) (Result, error) {
+	patch, target, err := prepare(ctx, sourcePath, baseCommit, targetPath)
 	if err != nil {
 		return Result{}, err
 	}
@@ -73,8 +81,8 @@ func Check(ctx context.Context, sourcePath, targetPath string) (Result, error) {
 
 // Apply transfers a reviewed worktree patch to a clean compatible target
 // checkout. Callers must make this explicit; normal Gator runs never invoke it.
-func Apply(ctx context.Context, sourcePath, targetPath string) (Result, error) {
-	patch, target, err := prepare(ctx, sourcePath, targetPath)
+func Apply(ctx context.Context, sourcePath, baseCommit, targetPath string) (Result, error) {
+	patch, target, err := prepare(ctx, sourcePath, baseCommit, targetPath)
 	if err != nil {
 		return Result{}, err
 	}
@@ -87,7 +95,7 @@ func Apply(ctx context.Context, sourcePath, targetPath string) (Result, error) {
 	return Result{Bytes: len(patch)}, nil
 }
 
-func prepare(ctx context.Context, sourcePath, targetPath string) ([]byte, workspace.Root, error) {
+func prepare(ctx context.Context, sourcePath, baseCommit, targetPath string) ([]byte, workspace.Root, error) {
 	source, err := workspace.Open(sourcePath)
 	if err != nil {
 		return nil, workspace.Root{}, fmt.Errorf("open source worktree: %w", err)
@@ -102,7 +110,7 @@ func prepare(ctx context.Context, sourcePath, targetPath string) ([]byte, worksp
 	if err := requireClean(ctx, target.Path()); err != nil {
 		return nil, workspace.Root{}, err
 	}
-	patch, err := Export(ctx, source.Path())
+	patch, err := Export(ctx, source.Path(), baseCommit)
 	if err != nil {
 		return nil, workspace.Root{}, err
 	}
@@ -123,10 +131,10 @@ func requireClean(ctx context.Context, target string) error {
 	return nil
 }
 
-func untrackedFiles(ctx context.Context, root workspace.Root) []string {
+func untrackedFiles(ctx context.Context, root workspace.Root) ([]string, error) {
 	status, err := gitOutput(ctx, root.Path(), "status", "--porcelain=v1", "--untracked-files=all", "-z")
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("list untracked files: %w", err)
 	}
 	files := make([]string, 0)
 	for _, entry := range strings.Split(string(status), "\x00") {
@@ -140,7 +148,7 @@ func untrackedFiles(ctx context.Context, root workspace.Root) []string {
 		}
 		files = append(files, relative)
 	}
-	return files
+	return files, nil
 }
 
 func gitDiffNoIndex(ctx context.Context, directory, relative string) ([]byte, int, error) {

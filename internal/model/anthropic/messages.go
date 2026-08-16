@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -137,6 +138,13 @@ type contentBlock struct {
 	ToolUseID string          `json:"tool_use_id,omitempty"`
 	Content   string          `json:"content,omitempty"`
 	IsError   bool            `json:"is_error,omitempty"`
+	Source    *imageSource    `json:"source,omitempty"`
+}
+
+type imageSource struct {
+	Type      string `json:"type"`
+	MediaType string `json:"media_type"`
+	Data      string `json:"data"`
 }
 
 type functionTool struct {
@@ -166,7 +174,17 @@ func encodeMessages(source []agent.Message) ([]message, error) {
 		item := source[index]
 		switch item.Role {
 		case agent.RoleUser:
-			appendMessage(&messages, "user", []contentBlock{{Type: "text", Text: item.Content}})
+			blocks := make([]contentBlock, 0, len(item.Images)+1)
+			if item.Content != "" {
+				blocks = append(blocks, contentBlock{Type: "text", Text: item.Content})
+			}
+			for _, image := range item.Images {
+				blocks = append(blocks, contentBlock{Type: "image", Source: &imageSource{Type: "base64", MediaType: image.MediaType, Data: base64.StdEncoding.EncodeToString(image.Data)}})
+			}
+			if len(blocks) == 0 {
+				return nil, errors.New("agent history contains an empty user message")
+			}
+			appendMessage(&messages, "user", blocks)
 			index++
 		case agent.RoleAgent:
 			blocks := make([]contentBlock, 0, len(item.ToolCalls)+1)

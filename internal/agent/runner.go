@@ -48,7 +48,7 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 	}
 	messages := cloneMessages(options.InitialMessages)
 	if len(messages) == 0 {
-		messages = []Message{{Role: RoleUser, Content: options.Task}}
+		messages = []Message{{Role: RoleUser, Content: options.Task, Images: cloneImages(options.Images)}}
 	}
 
 	for step := 1; step <= maxSteps; step++ {
@@ -118,7 +118,7 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 				ToolCallID: call.ID,
 				ToolName:   call.Name,
 			})
-			event := Event{Kind: EventToolFinished, At: now(), Step: step, ToolCall: cloneCall(call)}
+			event := Event{Kind: EventToolFinished, At: now(), Step: step, ToolCall: cloneCall(call), ToolResult: content}
 			if toolErr != nil {
 				event.ToolError = toolErr.Error()
 			}
@@ -200,7 +200,20 @@ func cloneMessages(messages []Message) []Message {
 	for index, message := range messages {
 		clones[index] = message
 		clones[index].ToolCalls = cloneCalls(message.ToolCalls)
+		clones[index].Images = cloneImages(message.Images)
 		clones[index].ProviderData = append(json.RawMessage(nil), message.ProviderData...)
+	}
+	return clones
+}
+
+func cloneImages(images []Image) []Image {
+	if images == nil {
+		return nil
+	}
+	clones := make([]Image, len(images))
+	for index, image := range images {
+		clones[index] = image
+		clones[index].Data = append([]byte(nil), image.Data...)
 	}
 	return clones
 }

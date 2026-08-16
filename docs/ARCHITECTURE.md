@@ -46,10 +46,19 @@ itself. The vendor CLI's tool policy remains its own security boundary, so a
 noninteractive delegated run requires explicit caller acknowledgement.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
-It collects a task, model, and explicit verifier allowlist; streams lifecycle
-events from the executor; and renders the retained worktree and current diff
-for review. Resume keeps the original run's model and verification policy so a
-continuation cannot silently broaden its command authority.
+It collects a task, model, execution mode, and explicit verifier allowlist;
+streams lifecycle events from the executor; and renders the retained worktree
+and current diff for review. Native Plan mode removes patching and command
+tools entirely. Resume keeps one conversation thread on the same worktree and
+preserves its original model and verification policy so a continuation cannot
+silently broaden its command authority.
+
+Image `@` references are a separate, bounded developer input channel. The TUI
+loads only repository-local PNG, JPEG, and WebP files, attaches their
+pixels to native model messages, and retains them only in the private session
+needed for stateless replay. The live transcript displays model-emitted text,
+tool calls, summaries of reads and commands, and patch line previews. It does
+not attempt to expose hidden model reasoning.
 
 The OpenAI and Anthropic adapters stream incremental text before converting the
 completed response into the core turn contract. The core does not rely on
@@ -61,13 +70,17 @@ private `0600` session file as the rest of the conversation.
 
 ## Initial tool surface
 
-The first usable runtime will expose only these tools:
+Execute mode exposes only these tools:
 
 1. list and read repository files;
 2. search repository text;
 3. apply a unified patch inside the run worktree;
 4. run an argv command subject to the run policy;
 5. inspect Git status and diff.
+
+Plan mode exposes only read/search and Git inspection tools. Delegated CLI
+providers are refused in Plan mode because Gator cannot enforce their vendor
+tool permissions.
 
 Tools validate paths against the worktree root. Command execution, network
 isolation, and write approval are separate policy boundaries; a worktree alone
@@ -100,3 +113,8 @@ tool name/call ID, and tool errors. It does not persist source text, prompts,
 tool arguments, or tool output. `session.json` is deliberately different: it
 contains the conversation required to resume a run, is written atomically with
 mode `0600`, and should be treated as private local data.
+
+Each new run also writes a private `0600` thread record indexed by repository.
+It advances to the latest session after every completed turn, allowing the TUI
+to retain a single worktree across a multi-turn conversation while preserving
+the immutable per-turn run records.

@@ -36,6 +36,8 @@ type Request struct {
 	StateDir       string
 	OnEvent        agent.EventSink
 	ThreadID       string
+	BaseCommit     string
+	Images         []agent.Image
 	Mode           Mode
 	// AllowExternalCLI is required for delegated vendor CLIs because their
 	// tool permission model is separate from Gator's native allowlist.
@@ -102,6 +104,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if err != nil {
 		return Outcome{}, err
 	}
+	if request.BaseCommit == "" {
+		request.BaseCommit = isolated.BaseCommit
+	}
 	return e.execute(ctx, isolated, request, nil, "")
 }
 
@@ -129,6 +134,9 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 			request.ThreadID = filepath.Base(statePath)
 		}
 	}
+	if request.BaseCommit == "" {
+		request.BaseCommit = previous.BaseCommit
+	}
 	if err := e.validateRequest(request); err != nil {
 		return Outcome{}, err
 	}
@@ -142,7 +150,7 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 		return Outcome{}, err
 	}
 	history := append([]agent.Message(nil), previous.Messages...)
-	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation})
+	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation, Images: request.Images})
 	return e.execute(ctx, isolated, request, history, statePath)
 }
 
@@ -169,6 +177,9 @@ func (e Executor) validateRequest(request Request) error {
 	}
 	if request.Mode == PlanMode && e.Harness != nil {
 		return errors.New("enforced Plan mode is unavailable for delegated CLI providers; choose a native provider or switch to Execute")
+	}
+	if len(request.Images) > 0 && e.Harness != nil {
+		return errors.New("image attachments are available only to native providers")
 	}
 	return nil
 }
@@ -219,6 +230,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		}
 		result, err = runner.Run(ctx, agent.RunOptions{
 			Task:            request.Task,
+			Images:          request.Images,
 			System:          system,
 			InitialMessages: initialMessages,
 			MaxSteps:        request.MaxSteps,
@@ -231,6 +243,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Version:         2,
 		Repository:      isolated.Repository,
 		WorktreePath:    isolated.Path,
+		BaseCommit:      request.BaseCommit,
 		Provider:        request.Provider,
 		Model:           request.Model,
 		BaseURL:         request.BaseURL,
@@ -342,7 +355,7 @@ func verifyHarnessOutcome(ctx context.Context, root workspace.Root, verification
 		call := agent.ToolCall{ID: fmt.Sprintf("harness-verify-%d", index+1), Name: "run_command"}
 		emit(agent.Event{Kind: agent.EventToolCalled, At: now(), Step: 1, ToolCall: &call})
 		result, err := tools.RunAllowedCommand(ctx, root, tools.CommandPolicy{Allowed: verification}, argv)
-		finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call}
+		finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call, ToolResult: result.Output}
 		if err != nil {
 			finished.ToolError = err.Error()
 			emit(finished)
@@ -364,16 +377,19 @@ func verifyHarnessOutcome(ctx context.Context, root workspace.Root, verification
 func inspectHarnessWorktree(ctx context.Context, root workspace.Root, name string, now func() time.Time, emit agent.EventSink) error {
 	call := agent.ToolCall{ID: "harness-" + name, Name: name}
 	emit(agent.Event{Kind: agent.EventToolCalled, At: now(), Step: 1, ToolCall: &call})
-	var err error
+	var (
+		result agent.ToolResult
+		err    error
+	)
 	switch name {
 	case "git_status":
-		_, err = (tools.GitStatus{Root: root}).Execute(ctx, json.RawMessage(`{}`))
+		result, err = (tools.GitStatus{Root: root}).Execute(ctx, json.RawMessage(`{}`))
 	case "git_diff":
-		_, err = (tools.GitDiff{Root: root}).Execute(ctx, json.RawMessage(`{}`))
+		result, err = (tools.GitDiff{Root: root}).Execute(ctx, json.RawMessage(`{}`))
 	default:
 		err = fmt.Errorf("unknown harness inspection %q", name)
 	}
-	finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call}
+	finished := agent.Event{Kind: agent.EventToolFinished, At: now(), Step: 1, ToolCall: &call, ToolResult: result.Content}
 	if err != nil {
 		finished.ToolError = err.Error()
 	}

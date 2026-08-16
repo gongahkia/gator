@@ -15,8 +15,7 @@ The project is being rebuilt from a previous agent meta-harness. The runnable
 milestone includes the native loop, cloud-provider adapters, delegated vendor
 CLI support, worktree-local tools, command policy, durable local run storage,
 and a full-screen terminal application. Real-model usability evidence, context
-compaction, broader replay coverage, and an explicit patch-application flow are
-still in progress.
+compaction, and broader replay coverage are still in progress.
 
 ## Development
 
@@ -45,6 +44,11 @@ GEMINI_API_KEY=... ./bin/gator run --provider gemini \
 # Continue an interrupted run using the printed run-record path.
 OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
   'Address the failing verification and finish the patch'
+
+# Save a portable patch or apply it explicitly to a clean compatible checkout.
+./bin/gator export /path/to/run-record > gator-review.patch
+./bin/gator apply --check /path/to/run-record
+./bin/gator apply /path/to/run-record
 ```
 
 `gator` opens the interactive application when run from a Git checkout and a
@@ -55,29 +59,47 @@ arrow keys to choose, then press `Enter` or `Tab`. `Tab` moves between task,
 verifier, provider, and model fields. During a run, `Ctrl+C`
 requests cancellation while retaining the isolated worktree. The review screen
 shows the final report, worktree, run record, and a diff preview; press `c` to
-continue a retained run, `n` for a new task, or `d` to refresh the diff.
+continue a retained thread, `e` for patch handoff commands, `n` for a new task,
+or `d` to refresh the diff.
 
 The composer shows local run prerequisites before `Ctrl+R`: a
 task and verifier list, valid provider settings, required API-key environment
 variables or a vendor CLI on `PATH`, and provider-specific model/base-URL
 requirements. Press `F1` for the full composer, running, and review shortcut
-reference. `Ctrl+O` opens recent retained runs for the current repository;
+reference. `Ctrl+O` opens recent retained threads for the current repository;
 the picker shows a summary rather than private run-record paths and validates
 the selected worktree when continuation begins.
 
 Type `/` (or `?` in an empty task) to filter and select local composer commands;
 type `@` in a task to select a repository file or directory from matching path
 suggestions. Both menus accept arrow keys and `Enter` or `Tab`. Composer
-commands are `/status`, `/model`, `/verify`, `/permissions`, `/worktree`, `/review`,
-`/recent`, `/clear`, `/help`, and `/quit`. `Ctrl+Space` (reported as `Ctrl+@`
+commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
+`/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/clear`,
+`/help`, and `/quit`. `/plan` gives native providers an enforced read-only
+tool surface and does not require a verifier; switch the same retained thread
+to `/execute` when you are ready to make edits. Delegated CLI providers cannot
+enter enforced Plan mode. `Ctrl+Space` (reported as `Ctrl+@`
 by many terminals) reopens an active `@` path menu. Use `@path/to/file` or `@"path with spaces"`
 in a task to mark repository files or directories that the agent should inspect
 first. Gator validates every reference against the repository boundary before
 starting; it does not copy the referenced source into the task or journal.
 
-The review screen deliberately does not modify the active checkout. Inspect the
-printed worktree before bringing a patch into your branch. The existing `run`
-and `resume` commands remain available for scripts and CI-like usage.
+Use `@mock.png`, `@screenshot.jpg`, or `@design.webp` to
+attach up to four repository images (8 MiB total) to a native-provider task.
+Gator stores those image bytes only in the private `0600` continuation session
+so stateless native providers receive them across turns. A delegated CLI is
+rejected for image attachments because Gator cannot verify that CLI's image-input
+contract. In the running view, file reads, commands, tool results, and patch
+line changes are visible as they occur. Press `t` from review to browse the
+current run transcript; it shows model-emitted text and tool activity, not
+hidden chain-of-thought.
+
+The review screen deliberately does not modify the active checkout. To hand off
+reviewed work, `gator export RUN_RECORD_PATH` emits a binary-safe patch to
+standard output. `gator apply --check RUN_RECORD_PATH` verifies that the current
+checkout is clean and compatible; omitting `--check` applies the patch. Gator
+does not stage, commit, or push the result. The existing `run` and `resume`
+commands remain available for scripts and CI-like usage.
 
 ## Providers
 
@@ -141,10 +163,11 @@ metadata-only event journal, final result, and a private `0600` session file
 for `gator resume`. The event log intentionally omits prompts, source text,
 tool arguments, and tool output; the worktree is the reviewable source of
 truth. The TUI also keeps one private `0600` unfinished draft per repository
-and lists resumable sessions from the same state root; drafts contain only the
-composer task, verifier text, provider, and model, and are removed
-after Gator finishes a new run with a run record. Set `GATOR_STATE_DIR` to use another
-local state root.
+and lists resumable conversation threads from the same state root. Threads
+retain one worktree across turns and record whether the last turn was Plan or
+Execute. Drafts contain only the composer task, verifier text, provider, and
+model, and are removed after Gator finishes a new thread. Set `GATOR_STATE_DIR`
+to use another local state root.
 
 See [the architecture](docs/ARCHITECTURE.md) for the intended runtime and
 acceptance criteria.

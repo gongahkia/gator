@@ -22,10 +22,19 @@ const (
 type Message struct {
 	Role         Role            `json:"role"`
 	Content      string          `json:"content"`
+	Images       []Image         `json:"images,omitempty"`
 	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
 	ToolCallID   string          `json:"tool_call_id,omitempty"`
 	ToolName     string          `json:"tool_name,omitempty"`
 	ProviderData json.RawMessage `json:"provider_data,omitempty"`
+}
+
+// Image is a developer-supplied visual attachment. Data is private session
+// state so stateless providers can receive the same image on every turn.
+type Image struct {
+	Name      string `json:"name"`
+	MediaType string `json:"media_type"`
+	Data      []byte `json:"data"`
 }
 
 // ToolDefinition describes one tool available to the model. Parameters is a
@@ -100,12 +109,13 @@ const (
 // Event is intentionally structured so the UI, journal, and tests observe the
 // same behavior. Details is never used for unbounded raw model transcripts.
 type Event struct {
-	Kind      EventKind `json:"kind"`
-	At        time.Time `json:"at"`
-	Step      int       `json:"step"`
-	ToolCall  *ToolCall `json:"tool_call,omitempty"`
-	ToolError string    `json:"tool_error,omitempty"`
-	Text      string    `json:"text,omitempty"`
+	Kind       EventKind `json:"kind"`
+	At         time.Time `json:"at"`
+	Step       int       `json:"step"`
+	ToolCall   *ToolCall `json:"tool_call,omitempty"`
+	ToolError  string    `json:"tool_error,omitempty"`
+	Text       string    `json:"text,omitempty"`
+	ToolResult string    `json:"-"`
 }
 
 // EventSink receives events in their exact execution order.
@@ -114,6 +124,7 @@ type EventSink func(Event)
 // RunOptions defines one bounded autonomous run.
 type RunOptions struct {
 	Task            string
+	Images          []Image
 	System          string
 	InitialMessages []Message
 	MaxSteps        int

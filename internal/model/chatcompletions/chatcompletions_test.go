@@ -66,3 +66,22 @@ func TestModelUsesConfiguredAPIKeyHeader(t *testing.T) {
 		t.Fatalf("complete: %v", err)
 	}
 }
+
+func TestModelEncodesImageInput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body struct {
+			Messages []struct {
+				Content []json.RawMessage `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || len(body.Messages) != 1 || len(body.Messages[0].Content) != 2 {
+			t.Fatalf("image request = %#v, err = %v", body, err)
+		}
+		_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"done"}}]}`)
+	}))
+	defer server.Close()
+	model := Model{Config: Config{APIKey: "test-key", BaseURL: server.URL, Model: "test-model", Client: server.Client()}}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}}}}}); err != nil {
+		t.Fatalf("complete image input: %v", err)
+	}
+}
