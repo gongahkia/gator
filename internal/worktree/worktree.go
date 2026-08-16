@@ -21,6 +21,7 @@ type Worktree struct {
 	ID         string
 	Repository string
 	Path       string
+	BaseCommit string
 	Root       workspace.Root
 }
 
@@ -56,7 +57,11 @@ func Create(ctx context.Context, repositoryPath, runID string) (Worktree, error)
 	if err != nil {
 		return Worktree{}, fmt.Errorf("open created Gator worktree: %w", err)
 	}
-	return Worktree{ID: runID, Repository: repository, Path: root.Path(), Root: root}, nil
+	baseCommit, err := revision(ctx, root.Path())
+	if err != nil {
+		return Worktree{}, err
+	}
+	return Worktree{ID: runID, Repository: repository, Path: root.Path(), BaseCommit: baseCommit, Root: root}, nil
 }
 
 // OpenExisting validates a retained worktree before a resumed agent run uses
@@ -79,7 +84,25 @@ func OpenExisting(ctx context.Context, repository, path, runID string) (Worktree
 		}
 		return Worktree{}, errors.New("retained path is not a Git worktree")
 	}
-	return Worktree{ID: runID, Repository: repository, Path: root.Path(), Root: root}, nil
+	baseCommit, err := revision(ctx, root.Path())
+	if err != nil {
+		return Worktree{}, err
+	}
+	return Worktree{ID: runID, Repository: repository, Path: root.Path(), BaseCommit: baseCommit, Root: root}, nil
+}
+
+func revision(ctx context.Context, directory string) (string, error) {
+	command := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
+	command.Dir = directory
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return "", commandError("read worktree base revision", err, output)
+	}
+	revision := strings.TrimSpace(string(output))
+	if revision == "" {
+		return "", errors.New("Git did not return a worktree base revision")
+	}
+	return revision, nil
 }
 
 func repositoryRoot(ctx context.Context, path string) (string, error) {

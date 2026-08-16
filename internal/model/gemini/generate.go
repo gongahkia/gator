@@ -5,6 +5,7 @@ package gemini
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -138,7 +139,17 @@ func encodeContents(source []agent.Message) ([]content, error) {
 		item := source[index]
 		switch item.Role {
 		case agent.RoleUser:
-			contents = append(contents, content{Role: "user", Parts: []json.RawMessage{partText(item.Content)}})
+			parts := make([]json.RawMessage, 0, len(item.Images)+1)
+			if item.Content != "" {
+				parts = append(parts, partText(item.Content))
+			}
+			for _, image := range item.Images {
+				parts = append(parts, partImage(image))
+			}
+			if len(parts) == 0 {
+				return nil, errors.New("agent history contains an empty user message")
+			}
+			contents = append(contents, content{Role: "user", Parts: parts})
 			index++
 		case agent.RoleAgent:
 			if json.Valid(item.ProviderData) {
@@ -187,6 +198,19 @@ func partText(text string) json.RawMessage {
 	payload, _ := json.Marshal(struct {
 		Text string `json:"text"`
 	}{Text: text})
+	return payload
+}
+
+func partImage(image agent.Image) json.RawMessage {
+	var encoded struct {
+		InlineData struct {
+			MIMEType string `json:"mimeType"`
+			Data     string `json:"data"`
+		} `json:"inlineData"`
+	}
+	encoded.InlineData.MIMEType = image.MediaType
+	encoded.InlineData.Data = base64.StdEncoding.EncodeToString(image.Data)
+	payload, _ := json.Marshal(encoded)
 	return payload
 }
 

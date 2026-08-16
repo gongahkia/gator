@@ -3,6 +3,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -42,6 +43,7 @@ const (
 	composeScreen screen = iota
 	runningScreen
 	reviewScreen
+	transcriptScreen
 	helpScreen
 	recentScreen
 )
@@ -69,9 +71,10 @@ type notice struct {
 }
 
 type timelineEntry struct {
-	step int
-	text string
-	kind agent.EventKind
+	step   int
+	text   string
+	detail string
+	kind   agent.EventKind
 }
 
 type executionStream struct {
@@ -103,31 +106,33 @@ type diffLoadedMsg struct {
 type Model struct {
 	config Config
 
-	screen        screen
-	focus         field
-	width         int
-	height        int
-	task          textarea.Model
-	verification  textarea.Model
-	provider      textinput.Model
-	model         textinput.Model
-	notice        notice
-	commandOutput string
-	commandIndex  int
-	dropdownIndex int
-	contextIndex  int
-	contextPaths  []string
-	contextLoaded bool
-	contextErr    error
-	contextClosed bool
-	preflight     []string
-	draftErr      error
-	helpReturn    screen
-	recentThreads []journal.RecentThread
-	recentIndex   int
-	events        []timelineEntry
-	execution     *executionStream
-	cancelling    bool
+	screen           screen
+	focus            field
+	width            int
+	height           int
+	task             textarea.Model
+	verification     textarea.Model
+	provider         textinput.Model
+	model            textinput.Model
+	notice           notice
+	commandOutput    string
+	commandIndex     int
+	dropdownIndex    int
+	contextIndex     int
+	contextPaths     []string
+	contextLoaded    bool
+	contextErr       error
+	contextClosed    bool
+	preflight        []string
+	draftErr         error
+	helpReturn       screen
+	transcriptReturn screen
+	transcriptIndex  int
+	recentThreads    []journal.RecentThread
+	recentIndex      int
+	events           []timelineEntry
+	execution        *executionStream
+	cancelling       bool
 
 	outcome         *gatorrun.Outcome
 	runErr          error
@@ -294,6 +299,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateRunning(message)
 	case reviewScreen:
 		return m.updateReview(message)
+	case transcriptScreen:
+		return m.updateTranscript(message)
 	case helpScreen:
 		return m.updateHelp(message)
 	case recentScreen:
@@ -440,6 +447,35 @@ func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.notice = notice{text: "Refreshing the current worktree diff...", kind: noticeInfo}
 		return m, loadDiff(m.outcome.Worktree.Root)
+	case "e":
+		if m.outcome == nil || m.outcome.StatePath == "" {
+			m.notice = notice{text: "No retained run record is available for patch handoff.", kind: noticeError}
+			return m, nil
+		}
+		m.commandOutput = "Export:  gator export " + m.outcome.StatePath + " > gator-review.patch\nCheck:   gator apply --check " + m.outcome.StatePath + "\nApply:   gator apply " + m.outcome.StatePath
+		m.notice = notice{text: "Patch handoff commands shown. Apply remains explicit and requires a clean compatible checkout.", kind: noticeInfo}
+		return m, nil
+	case "t":
+		m.transcriptReturn = reviewScreen
+		m.transcriptIndex = 0
+		m.screen = transcriptScreen
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m Model) updateTranscript(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "esc", "t", "q":
+		m.screen = m.transcriptReturn
+	case "up", "ctrl+p":
+		if m.transcriptIndex > 0 {
+			m.transcriptIndex--
+		}
+	case "down", "ctrl+n":
+		if m.transcriptIndex < len(m.events)-1 {
+			m.transcriptIndex++
+		}
 	}
 	return m, nil
 }
@@ -513,6 +549,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: err.Error(), kind: noticeError}
 		return m, nil
 	}
+	images, err := imageAttachments(m.config.RepositoryPath, references)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
 	var verification [][]string
 	if m.runMode == gatorrun.ExecuteMode {
 		var err error
@@ -551,6 +592,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
 			return m, nil
 		}
+		if len(images) > 0 && executor.Harness != nil {
+			m.notice = notice{text: "Image attachments require a native provider; delegated CLI providers cannot receive image bytes from Gator.", kind: noticeError}
+			return m, nil
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -583,6 +628,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		Verification:   verification,
 		StateDir:       m.config.StateDir,
 		ThreadID:       m.threadID,
+		Images:         images,
 		Mode:           m.runMode,
 		OnEvent: func(event agent.Event) {
 			select {
@@ -637,6 +683,13 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.execution = nil
 			m.screen = composeScreen
 			m.notice = notice{text: "Plan mode is enforced only for native providers. Switch to Execute or choose a native provider.", kind: noticeError}
+			return m, nil
+		}
+		if len(images) > 0 && executor.Harness != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "Image attachments require a native provider; delegated CLI providers cannot receive image bytes from Gator.", kind: noticeError}
 			return m, nil
 		}
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
@@ -883,6 +936,8 @@ func (m Model) View() string {
 		view = m.runningView()
 	case reviewScreen:
 		view = m.reviewView()
+	case transcriptScreen:
+		view = m.transcriptView()
 	case helpScreen:
 		view = m.helpView()
 	case recentScreen:
@@ -1078,7 +1133,7 @@ func (m Model) helpView() string {
 			"Ctrl+C  quit",
 		}, "\n")),
 		labelStyle.Render("Running") + "\n" + m.panel("F1  show this help\nCtrl+C  request cancellation and retain the worktree"),
-		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc  continue the retained worktree\nn or Esc  start a new task\nd  refresh the diff\nq or Ctrl+C  quit"),
+		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc  continue the retained thread\nd  refresh the diff\ne  show patch export/apply commands\nn or Esc  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}
 	return strings.Join(sections, "\n")
@@ -1141,6 +1196,9 @@ func (m Model) runningView() string {
 	}
 	for _, entry := range entries {
 		lines = append(lines, entry.text)
+		if entry.detail != "" {
+			lines = append(lines, "    "+compact(entry.detail, max(24, m.panelTextWidth()-4)))
+		}
 	}
 	sections := []string{
 		m.header("live " + m.runMode.String()),
@@ -1183,7 +1241,29 @@ func (m Model) reviewView() string {
 	if m.outcome == nil || m.outcome.StatePath == "" {
 		continueLabel = ""
 	}
-	sections = append(sections, m.footer("d refresh diff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
+	sections = append(sections, m.footer("d refresh diff", "t transcript", "e patch handoff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
+	return strings.Join(sections, "\n")
+}
+
+func (m Model) transcriptView() string {
+	if len(m.events) == 0 {
+		return m.header("run transcript") + "\n" + m.panel(dimStyle.Render("No live events were recorded for this run.")) + "\n" + m.footer("esc return")
+	}
+	start, end := m.visibleRange(len(m.events), m.transcriptIndex, max(1, m.height/4))
+	sections := []string{m.header("run transcript")}
+	for index := start; index < end; index++ {
+		entry := m.events[index]
+		prefix := "  "
+		if index == m.transcriptIndex {
+			prefix = "> "
+		}
+		content := prefix + entry.text
+		if entry.detail != "" {
+			content += "\n" + entry.detail
+		}
+		sections = append(sections, m.panel(content))
+	}
+	sections = append(sections, m.footer("up/down browse", "t/esc return", "f1 shortcuts"))
 	return strings.Join(sections, "\n")
 }
 
@@ -1755,9 +1835,13 @@ func (m Model) contextReferencesView() string {
 	}
 	values := make([]string, 0, len(references))
 	for _, reference := range references {
-		values = append(values, keyStyle.Render("@"+reference))
+		label := "@" + reference
+		if imageMediaType(reference) != "" {
+			label = "[image] " + label
+		}
+		values = append(values, keyStyle.Render(label))
 	}
-	return labelStyle.Render("Context references") + "\n" + m.panel(strings.Join(values, "  ")) + "\n" + m.inline(dimStyle.Render("Gator validates these paths before a run; the agent inspects them first."))
+	return labelStyle.Render("Context references") + "\n" + m.panel(strings.Join(values, "  ")) + "\n" + m.inline(dimStyle.Render("Image references attach their pixels to native-provider turns; other paths are inspected first."))
 }
 
 func (m Model) sessionStatus() string {
@@ -1796,21 +1880,34 @@ func commandHelp() string {
 
 func renderEvent(event agent.Event) timelineEntry {
 	prefix := fmt.Sprintf("[%02d]", event.Step)
-	var text string
+	var text, detail string
 	switch event.Kind {
 	case agent.EventTurnStarted:
-		text = prefix + " thinking"
+		text = prefix + " agent turn started"
 	case agent.EventTextDelta:
 		text = prefix + " agent: " + compact(event.Text, 120)
+		detail = event.Text
 	case agent.EventText:
 		text = prefix + " agent: " + compact(event.Text, 120)
+		detail = event.Text
 	case agent.EventToolCalled:
-		text = prefix + " tool -> " + event.ToolCall.Name
-	case agent.EventToolFinished:
-		if event.ToolError == "" {
-			text = prefix + " tool ok " + event.ToolCall.Name
+		if event.ToolCall != nil {
+			text = prefix + " tool -> " + event.ToolCall.Name
+			detail = describeToolCall(*event.ToolCall)
 		} else {
-			text = prefix + " tool failed " + event.ToolCall.Name + ": " + compact(event.ToolError, 100)
+			text = prefix + " tool -> unknown"
+		}
+	case agent.EventToolFinished:
+		name := "unknown"
+		if event.ToolCall != nil {
+			name = event.ToolCall.Name
+		}
+		if event.ToolError == "" {
+			text = prefix + " tool ok " + name
+			detail = describeToolResult(name, event.ToolResult)
+		} else {
+			text = prefix + " tool failed " + name + ": " + compact(event.ToolError, 100)
+			detail = event.ToolError
 		}
 	case agent.EventCompletionBlocked:
 		text = prefix + " evidence required: " + compact(event.Text, 120)
@@ -1827,7 +1924,76 @@ func renderEvent(event agent.Event) timelineEntry {
 	default:
 		text = prefix + " event"
 	}
-	return timelineEntry{step: event.Step, text: text, kind: event.Kind}
+	return timelineEntry{step: event.Step, text: text, detail: detail, kind: event.Kind}
+}
+
+func describeToolCall(call agent.ToolCall) string {
+	if call.Name == "apply_patch" {
+		var arguments struct {
+			Patch string `json:"patch"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return patchPreview(arguments.Patch)
+		}
+	}
+	if call.Name == "read_file" || call.Name == "list_files" || call.Name == "search_files" {
+		var arguments struct {
+			Path  string `json:"path"`
+			Query string `json:"query"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			if arguments.Path != "" {
+				return "path: " + arguments.Path
+			}
+			if arguments.Query != "" {
+				return "query: " + arguments.Query
+			}
+		}
+	}
+	if call.Name == "run_command" {
+		var arguments struct {
+			Argv []string `json:"argv"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return "command: " + strings.Join(arguments.Argv, " ")
+		}
+	}
+	return string(call.Arguments)
+}
+
+func describeToolResult(name, result string) string {
+	if result == "" {
+		return ""
+	}
+	if name == "apply_patch" {
+		return "patch applied"
+	}
+	return compact(result, 2_000)
+}
+
+func patchPreview(patch string) string {
+	var files []string
+	var lines []string
+	for _, line := range strings.Split(patch, "\n") {
+		if strings.HasPrefix(line, "+++ b/") {
+			files = append(files, strings.TrimPrefix(line, "+++ b/"))
+			continue
+		}
+		if (strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++")) || (strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---")) {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) > 12 {
+		lines = append(lines[:12], "…")
+	}
+	summary := "edit"
+	if len(files) > 0 {
+		summary += " " + strings.Join(files, ", ")
+	}
+	if len(lines) > 0 {
+		summary += "\n" + strings.Join(lines, "\n")
+	}
+	return summary
 }
 
 func compact(value string, limit int) string {

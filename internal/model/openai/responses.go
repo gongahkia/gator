@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -180,7 +181,7 @@ type functionTool struct {
 type inputItem struct {
 	Type      string `json:"type,omitempty"`
 	Role      string `json:"role,omitempty"`
-	Content   string `json:"content,omitempty"`
+	Content   any    `json:"content,omitempty"`
 	ID        string `json:"id,omitempty"`
 	CallID    string `json:"call_id,omitempty"`
 	Name      string `json:"name,omitempty"`
@@ -193,8 +194,19 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 	for _, message := range messages {
 		switch message.Role {
 		case agent.RoleUser, agent.RoleAgent:
-			if message.Content != "" {
-				input = append(input, inputItem{Role: string(message.Role), Content: message.Content})
+			if message.Content != "" || len(message.Images) > 0 {
+				content := any(message.Content)
+				if len(message.Images) > 0 {
+					parts := make([]responseInputPart, 0, len(message.Images)+1)
+					if message.Content != "" {
+						parts = append(parts, responseInputPart{Type: "input_text", Text: message.Content})
+					}
+					for _, image := range message.Images {
+						parts = append(parts, responseInputPart{Type: "input_image", ImageURL: imageDataURL(image)})
+					}
+					content = parts
+				}
+				input = append(input, inputItem{Role: string(message.Role), Content: content})
 			}
 			if message.Role == agent.RoleAgent {
 				for _, call := range message.ToolCalls {
@@ -220,6 +232,16 @@ func encodeInput(messages []agent.Message) ([]inputItem, error) {
 		}
 	}
 	return input, nil
+}
+
+type responseInputPart struct {
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
+}
+
+func imageDataURL(image agent.Image) string {
+	return "data:" + image.MediaType + ";base64," + base64.StdEncoding.EncodeToString(image.Data)
 }
 
 type responsePayload struct {

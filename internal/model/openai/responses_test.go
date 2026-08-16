@@ -83,6 +83,25 @@ func TestResponsesCompleteReplaysFunctionCallAndOutput(t *testing.T) {
 	}
 }
 
+func TestResponsesEncodesImageInput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body responseRequest
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		content, ok := body.Input[0].Content.([]any)
+		if !ok || len(content) != 2 {
+			t.Fatalf("image content = %#v", body.Input[0].Content)
+		}
+		_, _ = io.WriteString(writer, `{"output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
+	}))
+	defer server.Close()
+	model := Responses{APIKey: "test-key", BaseURL: server.URL, Client: server.Client()}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect", Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}}}}}); err != nil {
+		t.Fatalf("complete image input: %v", err)
+	}
+}
+
 func TestResponsesCompleteDescribesAPIErrorsWithoutKey(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusTooManyRequests)

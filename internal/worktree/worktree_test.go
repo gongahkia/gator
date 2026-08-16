@@ -21,6 +21,9 @@ func TestCreateIsolatedWorktree(t *testing.T) {
 	if worktree.Path == repository {
 		t.Fatal("worktree reused active repository path")
 	}
+	if worktree.BaseCommit == "" {
+		t.Fatal("created worktree did not record its base commit")
+	}
 	if _, err := os.Stat(filepath.Join(worktree.Path, "README.md")); err != nil {
 		t.Fatalf("created worktree did not contain committed file: %v", err)
 	}

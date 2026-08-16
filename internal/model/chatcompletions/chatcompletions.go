@@ -5,6 +5,7 @@ package chatcompletions
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -118,7 +119,7 @@ type request struct {
 
 type message struct {
 	Role       string     `json:"role"`
-	Content    *string    `json:"content,omitempty"`
+	Content    any        `json:"content,omitempty"`
 	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
 	Name       string     `json:"name,omitempty"`
@@ -169,11 +170,11 @@ func encodeMessages(system string, source []agent.Message) ([]message, error) {
 	for _, item := range source {
 		switch item.Role {
 		case agent.RoleUser:
-			messages = append(messages, textMessage("user", item.Content))
+			messages = append(messages, userMessage(item))
 		case agent.RoleAgent:
 			message := message{Role: "assistant"}
 			if item.Content != "" {
-				message.Content = stringPointer(item.Content)
+				message.Content = item.Content
 			}
 			for _, call := range item.ToolCalls {
 				if strings.TrimSpace(call.ID) == "" || strings.TrimSpace(call.Name) == "" || !json.Valid(call.Arguments) {
@@ -192,7 +193,7 @@ func encodeMessages(system string, source []agent.Message) ([]message, error) {
 			if strings.TrimSpace(item.ToolCallID) == "" {
 				return nil, errors.New("agent history contains a tool result without a call id")
 			}
-			messages = append(messages, message{Role: "tool", Content: stringPointer(item.Content), ToolCallID: item.ToolCallID, Name: item.ToolName})
+			messages = append(messages, message{Role: "tool", Content: item.Content, ToolCallID: item.ToolCallID, Name: item.ToolName})
 		default:
 			return nil, fmt.Errorf("agent history contains unsupported role %q", item.Role)
 		}
@@ -201,11 +202,31 @@ func encodeMessages(system string, source []agent.Message) ([]message, error) {
 }
 
 func textMessage(role, content string) message {
-	return message{Role: role, Content: stringPointer(content)}
+	return message{Role: role, Content: content}
 }
 
-func stringPointer(value string) *string {
-	return &value
+func userMessage(item agent.Message) message {
+	if len(item.Images) == 0 {
+		return textMessage("user", item.Content)
+	}
+	content := make([]chatContentPart, 0, len(item.Images)+1)
+	if item.Content != "" {
+		content = append(content, chatContentPart{Type: "text", Text: item.Content})
+	}
+	for _, image := range item.Images {
+		content = append(content, chatContentPart{Type: "image_url", ImageURL: &chatImageURL{URL: "data:" + image.MediaType + ";base64," + base64.StdEncoding.EncodeToString(image.Data)}})
+	}
+	return message{Role: "user", Content: content}
+}
+
+type chatContentPart struct {
+	Type     string        `json:"type"`
+	Text     string        `json:"text,omitempty"`
+	ImageURL *chatImageURL `json:"image_url,omitempty"`
+}
+
+type chatImageURL struct {
+	URL string `json:"url"`
 }
 
 type response struct {

@@ -15,6 +15,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/patch"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tui"
 )
@@ -28,12 +29,16 @@ Usage:
   gator doctor [--provider PROVIDER]
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--allow-external-cli] --verify 'argv ...' TASK
   gator resume [--allow-external-cli] [--max-steps N] RUN_RECORD_PATH TASK
+  gator export RUN_RECORD_PATH
+  gator apply [--check] RUN_RECORD_PATH
 
 Commands:
   tui       open the interactive terminal application (the default command)
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    continue a retained worktree from its local run record
+  export    write a portable patch for a retained run to standard output
+  apply     explicitly apply a retained patch to this clean checkout
 
 Cloud providers use their own API-key environment variable. Supported native
 providers are openai, azure-openai, anthropic, gemini, mistral, xai, groq,
@@ -65,6 +70,10 @@ func run(args []string, out io.Writer) error {
 		return runTask(args[1:], out)
 	case "resume":
 		return resumeTask(args[1:], out)
+	case "export":
+		return exportPatch(args[1:], out)
+	case "apply":
+		return applyPatch(args[1:], out)
 	default:
 		return fmt.Errorf("unknown command %q; run 'gator help'", args[0])
 	}
@@ -189,6 +198,66 @@ func resumeTask(arguments []string, out io.Writer) error {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "\n%s\n", outcome.Result.FinalText)
+	return err
+}
+
+func exportPatch(arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("export", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if len(flags.Args()) != 1 {
+		return errors.New("export requires one run record path")
+	}
+	session, err := journal.LoadSession(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	exported, err := patch.Export(context.Background(), session.WorktreePath, session.BaseCommit)
+	if err != nil {
+		return err
+	}
+	_, err = out.Write(exported)
+	return err
+}
+
+func applyPatch(arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("apply", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	checkOnly := flags.Bool("check", false, "verify that the patch applies without modifying this checkout")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if len(flags.Args()) != 1 {
+		return errors.New("apply requires one run record path")
+	}
+	session, err := journal.LoadSession(flags.Arg(0))
+	if err != nil {
+		return err
+	}
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	target, err := gitRepositoryRoot(workingDirectory)
+	if err != nil {
+		return errors.New("apply must start inside the target Git checkout")
+	}
+	var result patch.Result
+	if *checkOnly {
+		result, err = patch.Check(context.Background(), session.WorktreePath, session.BaseCommit, target)
+	} else {
+		result, err = patch.Apply(context.Background(), session.WorktreePath, session.BaseCommit, target)
+	}
+	if err != nil {
+		return err
+	}
+	if *checkOnly {
+		_, err = fmt.Fprintf(out, "Patch is compatible with this clean checkout (%d bytes).\n", result.Bytes)
+	} else {
+		_, err = fmt.Fprintf(out, "Applied retained patch to this checkout (%d bytes). Review and commit the resulting changes.\n", result.Bytes)
+	}
 	return err
 }
 

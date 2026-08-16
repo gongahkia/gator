@@ -280,6 +280,20 @@ func TestSessionStatusHandlesValidVerifierConfiguration(t *testing.T) {
 	}
 }
 
+func TestReviewShowsExplicitPatchHandoffCommands(t *testing.T) {
+	model := New(Config{})
+	model.screen = reviewScreen
+	model.outcome = &gatorrun.Outcome{StatePath: "/state/run-001"}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	if command != nil {
+		t.Fatal("patch handoff returned an unexpected command")
+	}
+	updated := next.(Model)
+	if !strings.Contains(updated.commandOutput, "gator export /state/run-001") || !strings.Contains(updated.commandOutput, "gator apply --check /state/run-001") {
+		t.Fatalf("patch handoff = %q", updated.commandOutput)
+	}
+}
+
 func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
 	model := New(Config{Provider: "openai", Model: "gpt-5.6"})
 	model.focus = providerField
@@ -501,6 +515,61 @@ func TestContextReferencesAreValidatedAndAddedWithoutSourceContents(t *testing.T
 	task := taskWithContextReferences("Inspect @hello.go", references)
 	if !strings.Contains(task, "hello.go (file)") || strings.Contains(task, "private source content") {
 		t.Fatalf("contextualized task = %q", task)
+	}
+}
+
+func TestImageReferenceAttachesPixelsToNativeRun(t *testing.T) {
+	repository := testRepository(t)
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}
+	if err := os.WriteFile(filepath.Join(repository, "screen.png"), png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentModel := &testAgentModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Plan ready."},
+	}}
+	model := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		StateDir:       t.TempDir(),
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel}, nil
+		},
+	})
+	model.runMode = gatorrun.PlanMode
+	model.task.SetValue("Review @screen.png")
+	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if updated.runErr != nil || len(agentModel.requests) == 0 {
+		t.Fatalf("image run error = %v, requests = %#v", updated.runErr, agentModel.requests)
+	}
+	message := agentModel.requests[0].Messages[0]
+	if len(message.Images) != 1 || message.Images[0].Name != "screen.png" || string(message.Images[0].Data) != string(png) || !strings.Contains(message.Content, "image attachment") {
+		t.Fatalf("image attachment message = %#v", message)
+	}
+}
+
+func TestTranscriptShowsPatchLinesAndReadOutput(t *testing.T) {
+	patch := "--- a/example.go\n+++ b/example.go\n@@ -1 +1 @@\n-old\n+new\n"
+	arguments, err := json.Marshal(struct {
+		Patch string `json:"patch"`
+	}{Patch: patch})
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := renderEvent(agent.Event{Kind: agent.EventToolCalled, Step: 1, ToolCall: &agent.ToolCall{Name: "apply_patch", Arguments: arguments}})
+	if !strings.Contains(called.detail, "-old") || !strings.Contains(called.detail, "+new") {
+		t.Fatalf("patch transcript detail = %q", called.detail)
+	}
+	finished := renderEvent(agent.Event{Kind: agent.EventToolFinished, Step: 1, ToolCall: &agent.ToolCall{Name: "read_file"}, ToolResult: `{"ok":true,"result":{"content":"source"}}`})
+	if !strings.Contains(finished.detail, "source") {
+		t.Fatalf("read transcript detail = %q", finished.detail)
+	}
+	model := New(Config{})
+	model.screen = reviewScreen
+	model.events = []timelineEntry{called, finished}
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	if updated := next.(Model); updated.screen != transcriptScreen || !strings.Contains(updated.transcriptView(), "-old") {
+		t.Fatalf("transcript view = %s", updated.transcriptView())
 	}
 }
 

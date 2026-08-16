@@ -39,6 +39,7 @@ type Session struct {
 	Version         int             `json:"version"`
 	Repository      string          `json:"repository"`
 	WorktreePath    string          `json:"worktree_path"`
+	BaseCommit      string          `json:"base_commit,omitempty"`
 	Provider        string          `json:"provider"`
 	Model           string          `json:"model"`
 	BaseURL         string          `json:"base_url,omitempty"`

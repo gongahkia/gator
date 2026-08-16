@@ -14,21 +14,21 @@ func TestExportAndApplyTransfersTrackedAndUntrackedFiles(t *testing.T) {
 	writeFile(t, source, "tracked.txt", "changed\n")
 	writeFile(t, source, "nested/new feature.txt", "new file\n")
 
-	exported, err := Export(context.Background(), source)
+	exported, err := Export(context.Background(), source, "")
 	if err != nil {
 		t.Fatalf("export patch: %v", err)
 	}
 	if !strings.Contains(string(exported), "tracked.txt") || !strings.Contains(string(exported), "nested/new feature.txt") {
 		t.Fatalf("exported patch = %s", exported)
 	}
-	checked, err := Check(context.Background(), source, target)
+	checked, err := Check(context.Background(), source, "", target)
 	if err != nil {
 		t.Fatalf("check patch: %v", err)
 	}
 	if checked.Bytes != len(exported) {
 		t.Fatalf("check result = %#v, want %d bytes", checked, len(exported))
 	}
-	applied, err := Apply(context.Background(), source, target)
+	applied, err := Apply(context.Background(), source, "", target)
 	if err != nil {
 		t.Fatalf("apply patch: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestApplyRejectsDirtyTargetBeforeCheckingPatchCompatibility(t *testing.T) {
 	source, target := pairedRepositories(t)
 	writeFile(t, source, "tracked.txt", "changed\n")
 	writeFile(t, target, "local.txt", "keep me\n")
-	if _, err := Apply(context.Background(), source, target); err == nil || !strings.Contains(err.Error(), "must be clean") {
+	if _, err := Apply(context.Background(), source, "", target); err == nil || !strings.Contains(err.Error(), "must be clean") {
 		t.Fatalf("apply error = %v", err)
 	}
 	assertFile(t, target, "local.txt", "keep me\n")
@@ -56,10 +56,29 @@ func TestApplyRejectsIncompatibleCleanTarget(t *testing.T) {
 	writeFile(t, target, "tracked.txt", "other base\n")
 	runGit(t, target, "add", "tracked.txt")
 	runGit(t, target, "commit", "--quiet", "-m", "different target")
-	if _, err := Check(context.Background(), source, target); err == nil || !strings.Contains(err.Error(), "not compatible") {
+	if _, err := Check(context.Background(), source, "", target); err == nil || !strings.Contains(err.Error(), "not compatible") {
 		t.Fatalf("check error = %v", err)
 	}
 	assertFile(t, target, "tracked.txt", "other base\n")
+}
+
+func TestExportFromRecordedBaseIncludesCommittedWorktreeChanges(t *testing.T) {
+	source, target := pairedRepositories(t)
+	base := testGitOutput(t, source, "rev-parse", "HEAD")
+	writeFile(t, source, "tracked.txt", "committed change\n")
+	runGit(t, source, "add", "tracked.txt")
+	runGit(t, source, "commit", "--quiet", "-m", "retained change")
+	exported, err := Export(context.Background(), source, base)
+	if err != nil {
+		t.Fatalf("export committed change: %v", err)
+	}
+	if !strings.Contains(string(exported), "committed change") {
+		t.Fatalf("exported patch = %s", exported)
+	}
+	if _, err := Apply(context.Background(), source, base, target); err != nil {
+		t.Fatalf("apply committed change: %v", err)
+	}
+	assertFile(t, target, "tracked.txt", "committed change\n")
 }
 
 func pairedRepositories(t *testing.T) (string, string) {
@@ -111,4 +130,15 @@ func runGit(t *testing.T, directory string, arguments ...string) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), err, output)
 	}
+}
+
+func testGitOutput(t *testing.T, directory string, arguments ...string) string {
+	t.Helper()
+	command := exec.Command("git", arguments...)
+	command.Dir = directory
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("git %s: %v", strings.Join(arguments, " "), err)
+	}
+	return strings.TrimSpace(string(output))
 }
