@@ -25,12 +25,12 @@ type Request struct {
 	// Steering is available only to native model runs. It is deliberately
 	// transient: queued prompts remain a TUI concern and do not resume after a
 	// process restart.
-	Steering       <-chan string
-	ThreadID       string
-	BaseCommit     string
-	Images         []agent.Image
-	Attachments    []agent.Attachment
-	Mode           Mode
+	Steering    <-chan string
+	ThreadID    string
+	BaseCommit  string
+	Images      []agent.Image
+	Attachments []agent.Attachment
+	Mode        Mode
 	// AllowExternalCLI is required for delegated vendor CLIs because their
 	// tool permission model is separate from Gator's native allowlist.
 	AllowExternalCLI bool

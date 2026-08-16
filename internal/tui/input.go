@@ -232,6 +232,68 @@ func (m Model) updateVimNormal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.vim == vimInsert && message.String() == "esc" {
+		m.vim = vimNormal
+		m.notice = notice{text: "Vim Normal mode. Press i or a to edit; Enter steers the active run.", kind: noticeInfo}
+		return m, nil
+	}
+	if message.Type == tea.KeyCtrlAt {
+		m.contextClosed = false
+		m.normalizeContextSelection()
+		if !m.contextCompletionVisible() {
+			m.notice = notice{text: "Type @ followed by a repository path to open path suggestions.", kind: noticeInfo}
+		}
+		return m, nil
+	}
+	if m.commandPaletteVisible() {
+		switch message.String() {
+		case "up", "ctrl+p":
+			m.moveCommandSelection(-1)
+			return m, nil
+		case "down", "ctrl+n":
+			m.moveCommandSelection(1)
+			return m, nil
+		case "tab":
+			if m.selectedCommandIsExact() {
+				return m.queueCurrentInput()
+			}
+			m.completeSelectedCommand()
+			return m, nil
+		case "enter":
+			matches := m.matchingCommands()
+			if len(matches) == 0 {
+				return m, nil
+			}
+			selected := matches[m.commandIndex].name
+			m.task.SetValue(selected)
+			if runningLocalCommand(selected) {
+				return m.executeSelectedCommand()
+			}
+			return m.queueCurrentInput()
+		case "esc":
+			m.task.Reset()
+			m.commandIndex = 0
+			m.notice = notice{text: "Command palette dismissed.", kind: noticeInfo}
+			return m, nil
+		}
+	}
+	if m.contextCompletionVisible() {
+		switch message.String() {
+		case "up", "ctrl+p":
+			m.moveContextSelection(-1)
+			return m, nil
+		case "down", "ctrl+n":
+			m.moveContextSelection(1)
+			return m, nil
+		case "enter", "tab":
+			m.applySelectedContextCompletion()
+			return m, nil
+		case "esc":
+			m.contextClosed = true
+			m.notice = notice{text: "Path suggestions dismissed.", kind: noticeInfo}
+			return m, nil
+		}
+	}
 	switch message.String() {
 	case "ctrl+c":
 		if m.execution != nil && !m.cancelling {
@@ -239,12 +301,42 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cancelling = true
 			m.notice = notice{text: "Cancellation requested. Waiting for the current operation to stop...", kind: noticeInfo}
 		}
+		return m, nil
 	case "pgup":
 		m.moveChatSelection(-m.chatEntryLimit())
+		return m, nil
 	case "pgdown":
 		m.moveChatSelection(m.chatEntryLimit())
+		return m, nil
+	case "?":
+		if strings.TrimSpace(m.task.Value()) == "" {
+			m.task.SetValue("/")
+			m.commandIndex = 0
+			return m, nil
+		}
+	case "tab":
+		return m.queueCurrentInput()
+	case "ctrl+r":
+		return m.steerCurrentInput()
+	case "enter":
+		if m.vim != vimInsert {
+			return m.steerCurrentInput()
+		}
 	}
-	return m, nil
+	if m.vim == vimNormal {
+		return m.updateVimNormal(message)
+	}
+	command := m.updateTask(message)
+	return m, command
+}
+
+func runningLocalCommand(command string) bool {
+	switch command {
+	case "/queue", "/dequeue", "/clear-queue":
+		return true
+	default:
+		return false
+	}
 }
 
 func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {

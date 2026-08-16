@@ -279,6 +279,154 @@ func TestVimModeKeepsEnterForNewlinesAndHandlesNormalCommands(t *testing.T) {
 	}
 }
 
+func TestRunningTabQueuesPromptWithoutSteeringTheActiveRun(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.task.SetValue("After this, add focused tests.")
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if command != nil {
+		t.Fatal("Tab unexpectedly started a command")
+	}
+	updated := next.(Model)
+	if updated.screen != runningScreen || updated.task.Value() != "" || len(updated.queue) != 1 || updated.queue[0].kind != queuedPrompt || updated.queue[0].text != "After this, add focused tests." {
+		t.Fatalf("queued running state = %#v", updated)
+	}
+	select {
+	case instruction := <-updated.execution.steering:
+		t.Fatalf("Tab steered active run with %q", instruction)
+	default:
+	}
+}
+
+func TestRunningTabCompletesPartialSlashCommandBeforeQueueingIt(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.task.SetValue("/pla")
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if command != nil {
+		t.Fatal("Tab unexpectedly started a command")
+	}
+	completed := next.(Model)
+	if completed.task.Value() != "/plan" || len(completed.queue) != 0 {
+		t.Fatalf("partial command Tab = task %q, queue %#v", completed.task.Value(), completed.queue)
+	}
+	next, command = completed.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if command != nil {
+		t.Fatal("second Tab unexpectedly started a command")
+	}
+	queued := next.(Model)
+	if queued.task.Value() != "" || len(queued.queue) != 1 || queued.queue[0].kind != queuedCommand || queued.queue[0].text != "/plan" {
+		t.Fatalf("exact command Tab = %#v", queued)
+	}
+}
+
+func TestRunningEnterSteersNativeProviderAtBoundary(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.task.SetValue("Do not change the public API.")
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("Enter unexpectedly started a command")
+	}
+	updated := next.(Model)
+	select {
+	case instruction := <-updated.execution.steering:
+		if instruction != "Do not change the public API." {
+			t.Fatalf("steering instruction = %q", instruction)
+		}
+	default:
+		t.Fatal("Enter did not send a steering instruction")
+	}
+	if updated.task.Value() != "" || !strings.Contains(updated.notice.text, "next model or tool boundary") {
+		t.Fatalf("steering state = %#v", updated.notice)
+	}
+}
+
+func TestRunningEnterDoesNotPretendToSteerDelegatedCLI(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: false}
+	model.task.SetValue("Use a smaller diff.")
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("Enter unexpectedly started a command")
+	}
+	updated := next.(Model)
+	if updated.task.Value() != "Use a smaller diff." || !strings.Contains(updated.notice.text, "Press Tab to queue") {
+		t.Fatalf("delegated steering state = %#v", updated.notice)
+	}
+	select {
+	case instruction := <-updated.execution.steering:
+		t.Fatalf("delegated CLI received steering %q", instruction)
+	default:
+	}
+}
+
+func TestQueueRejectsDirectShellCommandsAndHoldsAfterFailure(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1), steeringSupported: true}
+	model.task.SetValue("!rm -rf build")
+	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyTab})
+	if len(updated.queue) != 0 || !strings.Contains(updated.notice.text, "Direct shell commands") {
+		t.Fatalf("shell queue state = %#v", updated.notice)
+	}
+	updated.queue = []queuedInput{{kind: queuedPrompt, text: "Retry with a smaller change."}}
+	next, command := updated.Update(executionDoneMsg{done: executionDone{err: errors.New("provider unavailable")}})
+	if command != nil {
+		t.Fatal("failed run unexpectedly dispatched queued work")
+	}
+	paused := next.(Model)
+	if paused.screen != composeScreen || len(paused.queue) != 1 || !strings.Contains(paused.notice.text, "retained") {
+		t.Fatalf("failed queue state = %#v", paused)
+	}
+}
+
+func TestCompletedRunAppliesQueuedCommandAndQueuedPromptStartsRun(t *testing.T) {
+	model := New(Config{})
+	model.screen = runningScreen
+	model.queue = []queuedInput{{kind: queuedCommand, text: "/plan"}}
+	next, command := model.Update(executionDoneMsg{done: executionDone{}})
+	if command != nil {
+		t.Fatal("queued local command unexpectedly returned a command")
+	}
+	updated := next.(Model)
+	if updated.runMode != gatorrun.PlanMode || len(updated.queue) != 0 || !strings.Contains(updated.notice.text, "read-only") {
+		t.Fatalf("queued command dispatch = %#v", updated)
+	}
+
+	repository := testRepository(t)
+	agentModel := &testAgentModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Queued plan complete."},
+	}}
+	queued := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		StateDir:       t.TempDir(),
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel}, nil
+		},
+	})
+	queued.runMode = gatorrun.PlanMode
+	queued.queue = []queuedInput{{kind: queuedPrompt, text: "Plan the queued work."}}
+	next, command, dispatched := queued.dispatchNextQueued()
+	if !dispatched || command == nil || next.(Model).screen != runningScreen {
+		t.Fatalf("queued prompt dispatch = dispatched %v, command %v, model %#v", dispatched, command != nil, next)
+	}
+	finished := runTeaCommand(t, next.(Model), command)
+	if finished.runErr != nil || finished.screen != composeScreen || len(finished.queue) != 0 || len(agentModel.requests) != 2 {
+		t.Fatalf("queued prompt finished = error %v, screen %v, queue %#v, requests %d", finished.runErr, finished.screen, finished.queue, len(agentModel.requests))
+	}
+}
+
 func TestPlanCommandStartsWithoutVerifierAndUsesReadOnlyTools(t *testing.T) {
 	repository := testRepository(t)
 	agentModel := &testAgentModel{turns: []agent.Turn{
@@ -854,6 +1002,16 @@ func drive(t *testing.T, model Model, message tea.Msg) Model {
 		updated = current.(Model)
 	}
 	return updated
+}
+
+func runTeaCommand(t *testing.T, model Model, command tea.Cmd) Model {
+	t.Helper()
+	for command != nil {
+		current, nextCommand := model.Update(command())
+		model = current.(Model)
+		command = nextCommand
+	}
+	return model
 }
 
 func assertViewFits(t *testing.T, model Model, width, height int) {
