@@ -190,8 +190,11 @@ func TestExecutorPersistsDocumentAttachmentsForResume(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load session: %v", err)
 	}
-	if len(session.Messages) < 1 || len(session.Messages[0].Attachments) != 1 || session.Messages[0].Attachments[0].Name != "report.pdf" || string(session.Messages[0].Attachments[0].Data) != "pdf" {
-		t.Fatalf("session attachments = %#v", session.Messages)
+	if len(session.Messages) < 1 || len(session.Messages[0].Attachments) != 0 {
+		t.Fatalf("persisted session attachments = %#v", session.Messages)
+	}
+	if len(session.AttachmentManifest) != 1 || session.AttachmentManifest[0].Name != "report.pdf" || session.AttachmentManifest[0].MediaType != "application/pdf" || session.AttachmentManifest[0].Bytes != len("pdf") || session.AttachmentManifest[0].SHA256 == "" {
+		t.Fatalf("session attachment manifest = %#v", session.AttachmentManifest)
 	}
 }
 

@@ -119,16 +119,23 @@ func (r Root) ReadRegularFile(path string, maxBytes int64) ([]byte, error) {
 		return nil, fmt.Errorf("path %q is not a regular file", path)
 	}
 	if info.Size() > maxBytes {
-		return nil, fmt.Errorf("file %q exceeds the %d MiB limit", path, maxBytes/(1024*1024))
+		return nil, fileSizeLimitError(path, maxBytes)
 	}
 	contents, err := io.ReadAll(io.LimitReader(file, maxBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read %q: %w", path, err)
 	}
 	if int64(len(contents)) > maxBytes {
-		return nil, fmt.Errorf("file %q exceeds the %d MiB limit", path, maxBytes/(1024*1024))
+		return nil, fileSizeLimitError(path, maxBytes)
 	}
 	return contents, nil
+}
+
+func fileSizeLimitError(path string, maxBytes int64) error {
+	if maxBytes%(1024*1024) == 0 {
+		return fmt.Errorf("file %q exceeds the %d MiB limit; attachments must be no larger", path, maxBytes/(1024*1024))
+	}
+	return fmt.Errorf("file %q exceeds the %d-byte limit; attachments must be no larger", path, maxBytes)
 }
 
 func cleanRelativePath(path string) (string, error) {

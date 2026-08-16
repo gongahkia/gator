@@ -87,6 +87,39 @@ func TestLoadRejectsInvalidOrOversizedSupportedAttachments(t *testing.T) {
 	}
 }
 
+func TestOfficeArchiveRejectsUnsafeAndDuplicateEntries(t *testing.T) {
+	repository := t.TempDir()
+	writeArchive(t, filepath.Join(repository, "unsafe.docx"), map[string]string{
+		"../word/document.xml": "outside",
+		"word/document.xml":    "inside",
+	})
+	root, err := workspace.Open(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, supported, err := Load(root, "unsafe.docx", 4096); !supported || err == nil || !strings.Contains(err.Error(), "unsafe entry") {
+		t.Fatalf("unsafe archive supported = %v, err = %v", supported, err)
+	}
+
+	var buffer bytes.Buffer
+	archive := zip.NewWriter(&buffer)
+	for range 2 {
+		entry, err := archive.Create("word/document.xml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write([]byte("duplicate")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := documentArchive(buffer.Bytes(), 4096); err == nil || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("duplicate archive error = %v", err)
+	}
+}
+
 func writeArchive(t *testing.T, path string, files map[string]string) {
 	t.Helper()
 	file, err := os.Create(path)

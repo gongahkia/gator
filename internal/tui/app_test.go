@@ -538,7 +538,11 @@ func TestImageReferenceAttachesPixelsToNativeRun(t *testing.T) {
 	})
 	model.runMode = gatorrun.PlanMode
 	model.task.SetValue("Review @screen.png")
-	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	pending := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if pending.screen != attachmentConfirmScreen || len(agentModel.requests) != 0 {
+		t.Fatalf("image attachment confirmation = screen %v, requests %#v", pending.screen, agentModel.requests)
+	}
+	updated := drive(t, pending, tea.KeyMsg{Type: tea.KeyEnter})
 	if updated.runErr != nil || len(agentModel.requests) == 0 {
 		t.Fatalf("image run error = %v, requests = %#v", updated.runErr, agentModel.requests)
 	}
@@ -568,13 +572,72 @@ func TestPDFReferenceAttachesDocumentToNativeRun(t *testing.T) {
 	})
 	model.runMode = gatorrun.PlanMode
 	model.task.SetValue("Review @report.pdf")
-	updated := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	pending := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if pending.screen != attachmentConfirmScreen || len(agentModel.requests) != 0 {
+		t.Fatalf("PDF attachment confirmation = screen %v, requests %#v", pending.screen, agentModel.requests)
+	}
+	updated := drive(t, pending, tea.KeyMsg{Type: tea.KeyEnter})
 	if updated.runErr != nil || len(agentModel.requests) == 0 {
 		t.Fatalf("PDF run error = %v, requests = %#v", updated.runErr, agentModel.requests)
 	}
 	message := agentModel.requests[0].Messages[0]
 	if len(message.Attachments) != 1 || message.Attachments[0].Name != "report.pdf" || message.Attachments[0].MediaType != "application/pdf" || string(message.Attachments[0].Data) != string(pdf) || !strings.Contains(message.Content, "document attachment") {
 		t.Fatalf("PDF attachment message = %#v", message)
+	}
+}
+
+func TestAttachmentConfirmationCanCancelWithoutSendingBytes(t *testing.T) {
+	repository := testRepository(t)
+	if err := os.WriteFile(filepath.Join(repository, "screen.png"), []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentModel := &testAgentModel{}
+	model := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel}, nil
+		},
+	})
+	model.width, model.height = 120, 48
+	model.runMode = gatorrun.PlanMode
+	model.task.SetValue("Review @screen.png")
+	pending := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if !strings.Contains(pending.View(), "Provider boundary") || !strings.Contains(pending.View(), "PDF byte limits") {
+		t.Fatalf("attachment confirmation view = %s", pending.View())
+	}
+	cancelled := drive(t, pending, tea.KeyMsg{Type: tea.KeyEsc})
+	if cancelled.screen != composeScreen || len(agentModel.requests) != 0 || !strings.Contains(cancelled.notice.text, "No file bytes were sent") {
+		t.Fatalf("cancelled attachment confirmation = %#v, requests %#v", cancelled.notice, agentModel.requests)
+	}
+}
+
+func TestAttachmentConfirmationRequiresFreshConsentWhenBytesChange(t *testing.T) {
+	repository := testRepository(t)
+	path := filepath.Join(repository, "screen.png")
+	first := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01}
+	if err := os.WriteFile(path, first, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	agentModel := &testAgentModel{}
+	model := New(Config{
+		RepositoryPath: repository,
+		Model:          "test-model",
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: agentModel}, nil
+		},
+	})
+	model.runMode = gatorrun.PlanMode
+	model.task.SetValue("Review @screen.png")
+	pending := drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	second := append([]byte(nil), first...)
+	second[len(second)-1] = 0x02
+	if err := os.WriteFile(path, second, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rechecked := drive(t, pending, tea.KeyMsg{Type: tea.KeyEnter})
+	if rechecked.screen != attachmentConfirmScreen || len(agentModel.requests) != 0 || !strings.Contains(rechecked.notice.text, "changed after preview") {
+		t.Fatalf("changed attachment confirmation = screen %v, notice %#v, requests %#v", rechecked.screen, rechecked.notice, agentModel.requests)
 	}
 }
 

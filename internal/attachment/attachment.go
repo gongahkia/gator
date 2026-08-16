@@ -21,7 +21,7 @@ import (
 const PDFMediaType = "application/pdf"
 
 const (
-	maxArchiveEntries      = 4_096
+	maxArchiveEntries     = 4_096
 	maxSpreadsheetSheets  = 128
 	maxSpreadsheetRows    = 100_000
 	maxSpreadsheetStrings = 100_000
