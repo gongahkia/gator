@@ -64,6 +64,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			InitialMessages: initialMessages,
 			MaxSteps:        request.MaxSteps,
 			OnEvent:         emit,
+			Steering:        request.Steering,
 			CompletionCheck: check,
 		})
 	}

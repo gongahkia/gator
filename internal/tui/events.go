@@ -35,6 +35,10 @@ func (m *Model) appendChatEvent(event agent.Event) {
 		if event.Text != "" {
 			m.appendChat(chatEntry{author: chatAgent, text: event.Text})
 		}
+	case agent.EventSteeringApplied:
+		m.closeStreamingChatEntry()
+		entry := renderEvent(event)
+		m.appendChat(chatEntry{author: chatSystem, text: entry.text})
 	case agent.EventToolCalled, agent.EventToolFinished, agent.EventCompletionBlocked, agent.EventHarnessStarted, agent.EventHarnessFinished:
 		m.closeStreamingChatEntry()
 		entry := renderEvent(event)
@@ -103,6 +107,8 @@ func renderEvent(event agent.Event) timelineEntry {
 		}
 	case agent.EventCompletionBlocked:
 		text = prefix + " evidence required: " + compact(event.Text, 120)
+	case agent.EventSteeringApplied:
+		text = prefix + " steering accepted: " + compact(event.Text, 120)
 	case agent.EventHarnessStarted:
 		text = prefix + " delegated CLI -> " + compact(event.Text, 80)
 	case agent.EventHarnessFinished:

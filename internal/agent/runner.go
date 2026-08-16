@@ -51,7 +51,9 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 		messages = []Message{{Role: RoleUser, Content: options.Task, Images: cloneImages(options.Images), Attachments: cloneAttachments(options.Attachments)}}
 	}
 
+	turnLoop:
 	for step := 1; step <= maxSteps; step++ {
+		r.consumeSteering(&messages, options.Steering, options.OnEvent, now, step)
 		r.emit(options.OnEvent, Event{Kind: EventTurnStarted, At: now(), Step: step})
 		request := TurnRequest{
 			System:   options.System,
@@ -74,6 +76,12 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 		}
 		if err != nil {
 			return Result{Messages: messages, Steps: step}, fmt.Errorf("model turn %d: %w", step, err)
+		}
+		// A steering instruction that arrived during model generation supersedes
+		// the unexecuted response. Do not add tool calls to history unless their
+		// matching results will also be added.
+		if r.consumeSteering(&messages, options.Steering, options.OnEvent, now, step) {
+			continue
 		}
 
 		if turn.Text != "" || len(turn.ToolCalls) > 0 {
@@ -105,7 +113,11 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 			return Result{FinalText: turn.Text, Messages: messages, Steps: step}, nil
 		}
 
-		for _, call := range turn.ToolCalls {
+		for callIndex, call := range turn.ToolCalls {
+			if r.consumeSteering(&messages, options.Steering, options.OnEvent, now, step) {
+				r.skipToolCalls(&messages, turn.ToolCalls[callIndex:], options.OnEvent, now, step)
+				continue turnLoop
+			}
 			r.emit(options.OnEvent, Event{Kind: EventToolCalled, At: now(), Step: step, ToolCall: cloneCall(call)})
 			result, toolErr := executeTool(ctx, tools, call)
 			content := result.Content
@@ -127,6 +139,46 @@ func (r Runner) Run(ctx context.Context, options RunOptions) (Result, error) {
 	}
 
 	return Result{Messages: messages, Steps: maxSteps}, fmt.Errorf("agent stopped after reaching the %d-step limit", maxSteps)
+}
+
+func (r Runner) consumeSteering(messages *[]Message, steering <-chan string, sink EventSink, now func() time.Time, step int) bool {
+	var instructions []string
+	for {
+		select {
+		case instruction, ok := <-steering:
+			if !ok {
+				steering = nil
+				continue
+			}
+			instruction = strings.TrimSpace(instruction)
+			if instruction != "" {
+				instructions = append(instructions, instruction)
+			}
+		default:
+			if len(instructions) == 0 {
+				return false
+			}
+			for _, instruction := range instructions {
+				*messages = append(*messages, Message{Role: RoleUser, Content: "Developer steering instruction:\n" + instruction})
+			}
+			r.emit(sink, Event{Kind: EventSteeringApplied, At: now(), Step: step, Text: fmt.Sprintf("%d developer steering instruction(s) accepted", len(instructions))})
+			return true
+		}
+	}
+}
+
+func (r Runner) skipToolCalls(messages *[]Message, calls []ToolCall, sink EventSink, now func() time.Time, step int) {
+	const reason = "tool call skipped after developer steering instruction"
+	for _, call := range calls {
+		content := encodeToolFailure(errors.New(reason))
+		*messages = append(*messages, Message{
+			Role:       RoleTool,
+			Content:    content,
+			ToolCallID: call.ID,
+			ToolName:   call.Name,
+		})
+		r.emit(sink, Event{Kind: EventToolFinished, At: now(), Step: step, ToolCall: cloneCall(call), ToolResult: content, ToolError: reason})
+	}
 }
 
 func indexTools(tools []Tool) (map[string]Tool, []ToolDefinition, error) {

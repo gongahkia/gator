@@ -78,6 +78,21 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/clear":
 		m.commandOutput = ""
 		m.notice = notice{text: "Task cleared.", kind: noticeInfo}
+	case "/clear-queue":
+		removed := len(m.queue)
+		m.queue = nil
+		m.commandOutput = "No prompts queued."
+		m.notice = notice{text: fmt.Sprintf("Removed %d queued instruction(s).", removed), kind: noticeInfo}
+	case "/dequeue":
+		if len(m.queue) == 0 {
+			m.commandOutput = "No prompts queued."
+			m.notice = notice{text: "There is no queued instruction to remove.", kind: noticeInfo}
+			break
+		}
+		removed := m.queue[0]
+		m.queue = m.queue[1:]
+		m.commandOutput = m.queueStatus()
+		m.notice = notice{text: "Removed next queued " + queuedInputLabel(removed) + ".", kind: noticeInfo}
 	case "/help":
 		m.commandOutput = commandHelp()
 		m.notice = notice{text: "Commands operate locally and never start a run by themselves.", kind: noticeInfo}
@@ -109,6 +124,9 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		}
 	case "/quit":
 		return m, tea.Quit
+	case "/queue":
+		m.commandOutput = m.queueStatus()
+		m.notice = notice{text: m.queueSummary() + ". Queued instructions are local to this TUI session.", kind: noticeInfo}
 	case "/review":
 		if m.outcome == nil || m.outcome.Worktree.Path == "" {
 			m.notice = notice{text: "No completed or retained run is available to review yet.", kind: noticeError}
@@ -469,7 +487,7 @@ func (m Model) sessionStatus() string {
 	} else if m.runMode == gatorrun.ExecuteMode {
 		verificationText = "invalid: " + err.Error()
 	}
-	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\nverification:\n" + verificationText
+	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {

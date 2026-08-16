@@ -22,6 +22,10 @@ type Request struct {
 	System         string
 	StateDir       string
 	OnEvent        agent.EventSink
+	// Steering is available only to native model runs. It is deliberately
+	// transient: queued prompts remain a TUI concern and do not resume after a
+	// process restart.
+	Steering       <-chan string
 	ThreadID       string
 	BaseCommit     string
 	Images         []agent.Image

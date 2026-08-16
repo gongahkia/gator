@@ -16,6 +16,7 @@ import (
 )
 
 const defaultMaxSteps = 24
+const maxQueuedInputs = 16
 
 // Config supplies the local configuration and provider factory for an
 // interactive session. NewExecutor is injected so the UI stays independent of
@@ -98,6 +99,20 @@ type chatEntry struct {
 	streaming bool
 }
 
+type queuedInputKind uint8
+
+const (
+	queuedPrompt queuedInputKind = iota
+	queuedCommand
+)
+
+// queuedInput is intentionally TUI-local. A queued instruction is not part of
+// a retained session until it actually begins a run.
+type queuedInput struct {
+	kind queuedInputKind
+	text string
+}
+
 type attachmentPreview struct {
 	name      string
 	mediaType string
@@ -106,9 +121,11 @@ type attachmentPreview struct {
 }
 
 type executionStream struct {
-	events chan agent.Event
-	done   chan executionDone
-	cancel context.CancelFunc
+	events            chan agent.Event
+	done              chan executionDone
+	cancel            context.CancelFunc
+	steering          chan string
+	steeringSupported bool
 }
 
 type executionDone struct {
@@ -164,6 +181,7 @@ type Model struct {
 	events              []timelineEntry
 	chat                []chatEntry
 	chatIndex           int
+	queue               []queuedInput
 	execution           *executionStream
 	cancelling          bool
 
@@ -279,6 +297,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForExecution(m.execution)
 	case executionDoneMsg:
 		wasNewThread := m.resumeStatePath == ""
+		wasCancelling := m.cancelling
 		m.execution = nil
 		m.cancelling = false
 		m.outcome = &msg.done.outcome
@@ -306,6 +325,20 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.done.outcome.StatePath != "" && wasNewThread && strings.TrimSpace(m.config.StateDir) != "" {
 			if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
 				m.draftErr = err
+			}
+		}
+		if msg.done.err == nil && !wasCancelling && len(m.queue) > 0 {
+			m.notice = notice{text: "Previous run completed. Starting the next queued instruction...", kind: noticeInfo}
+			queued, command, dispatched := m.dispatchNextQueued()
+			if dispatched {
+				return queued, command
+			}
+			m = queued.(Model)
+		} else if len(m.queue) > 0 {
+			if wasCancelling {
+				m.notice = notice{text: "Run cancelled. " + m.queueSummary() + " retained; use /queue to inspect it.", kind: noticeInfo}
+			} else {
+				m.notice = notice{text: "Run stopped. " + m.queueSummary() + " retained; use /queue to inspect it.", kind: noticeError}
 			}
 		}
 		if msg.done.outcome.Worktree.Path == "" {

@@ -119,6 +119,7 @@ const (
 	EventToolCalled        EventKind = "tool_called"
 	EventToolFinished      EventKind = "tool_finished"
 	EventCompletionBlocked EventKind = "completion_blocked"
+	EventSteeringApplied   EventKind = "steering_applied"
 	EventHarnessStarted    EventKind = "harness_started"
 	EventHarnessFinished   EventKind = "harness_finished"
 	EventRunFinished       EventKind = "run_finished"
@@ -148,6 +149,9 @@ type RunOptions struct {
 	InitialMessages []Message
 	MaxSteps        int
 	OnEvent         EventSink
+	// Steering receives developer instructions submitted while a native agent
+	// run is active. The runner consumes them only at model/tool boundaries.
+	Steering <-chan string
 	// CompletionCheck may require concrete evidence, such as a diff inspection
 	// or a named verifier, before a final response is accepted.
 	CompletionCheck func([]Message) error
