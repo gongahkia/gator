@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/gongahkia/gator/internal/model"
 )
@@ -37,7 +38,10 @@ func doctor(arguments []string, out io.Writer) error {
 	if err == nil {
 		gitStatus = "detected"
 	}
-	authentication := "Gator credential or " + model.CredentialHint(provider)
+	authentication := "Gator credential"
+	if model.SupportsAPIKeyLogin(provider) {
+		authentication += " or " + model.CredentialHint(provider)
+	}
 	authenticationStatus := "missing"
 	if !model.SupportsDirect(provider) {
 		authenticationStatus = "unsupported"
@@ -51,9 +55,11 @@ func doctor(arguments []string, out io.Writer) error {
 			return credentialErr
 		}
 		switch {
-		case stored && credential.IsAPIKey():
+		case stored && credential.Expired(time.Now()):
+			authenticationStatus = "expired"
+		case stored && (credential.IsAPIKey() || credential.IsOAuth()):
 			authenticationStatus = "stored"
-		case os.Getenv(model.CredentialHint(provider)) != "":
+		case model.SupportsAPIKeyLogin(provider) && os.Getenv(model.CredentialHint(provider)) != "":
 			authenticationStatus = "set in environment"
 		}
 	}

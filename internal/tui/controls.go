@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -73,6 +74,7 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	defer m.persistDraft()
 	defer m.refreshPreflight()
 	command := matches[m.commandIndex]
+	arguments := strings.Fields(strings.TrimSpace(m.task.Value()))
 	m.task.Reset()
 	m.commandIndex = 0
 	switch command.name {
@@ -97,6 +99,12 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/help":
 		m.commandOutput = commandHelp()
 		m.notice = notice{text: "Commands operate locally and never start a run by themselves.", kind: noticeInfo}
+	case "/login":
+		providerName := strings.TrimSpace(m.provider.Value())
+		if len(arguments) > 1 {
+			providerName = arguments[1]
+		}
+		return m.startOAuthLogin(providerName)
 	case "/plan":
 		m.runMode = gatorrun.PlanMode
 		m.notice = notice{text: "Plan mode is read-only: it can inspect the worktree but cannot edit files or run commands.", kind: noticeInfo}
@@ -150,6 +158,40 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Worktree isolation is always on for new runs.", kind: noticeInfo}
 	}
 	return m, nil
+}
+
+func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
+	if m.config.BeginOAuthLogin == nil {
+		m.notice = notice{text: "OAuth login is not configured for this Gator build.", kind: noticeError}
+		return m, nil
+	}
+	provider, err := modelprovider.ParseProvider(providerName)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if !modelprovider.RequiresOAuthLogin(provider) {
+		m.notice = notice{text: "Provider " + string(provider) + " uses an API key. Set its environment variable or run gator login " + string(provider) + " from a shell.", kind: noticeInfo}
+		return m, nil
+	}
+	if m.oauthLogin != nil {
+		m.notice = notice{text: "OAuth login is already waiting for a browser callback. Press Ctrl+C to cancel it.", kind: noticeInfo}
+		return m, nil
+	}
+	login, err := m.config.BeginOAuthLogin(string(provider))
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	context, cancel := context.WithCancel(context.Background())
+	m.oauthLogin = login
+	m.oauthCancel = cancel
+	m.oauthProvider = string(provider)
+	m.commandOutput = "Open this URL to sign Gator in:\n" + login.URL()
+	m.notice = notice{text: "Waiting for the browser callback. Press Ctrl+C to cancel OAuth login.", kind: noticeInfo}
+	return m, func() tea.Msg {
+		return oauthLoginDoneMsg{provider: string(provider), err: login.Complete(context)}
+	}
 }
 
 func (m Model) openThreadTree(returnScreen screen) (tea.Model, tea.Cmd) {
@@ -220,8 +262,8 @@ func providerDropdownOptions() []dropdownOption {
 		modelprovider.Fireworks:        "Fireworks Chat Completions",
 		modelprovider.DeepSeek:         "DeepSeek Chat Completions",
 		modelprovider.OpenAICompatible: "custom Chat Completions endpoint",
-		modelprovider.Codex:            "OpenAI Responses API (Codex alias)",
-		modelprovider.Claude:           "Anthropic Messages API (Claude alias)",
+		modelprovider.Codex:            "ChatGPT/Codex subscription via Gator OAuth",
+		modelprovider.Claude:           "Claude Pro/Max via Gator OAuth",
 	}
 	options := make([]dropdownOption, 0, len(descriptions))
 	for _, name := range modelprovider.Names() {

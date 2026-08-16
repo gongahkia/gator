@@ -269,6 +269,46 @@ func TestSlashPaletteFiltersAndFocusesModel(t *testing.T) {
 	}
 }
 
+func TestLoginCommandShowsOAuthURLAndCompletesWithoutStartingRun(t *testing.T) {
+	login := &fakeOAuthLogin{url: "https://auth.example.test/authorize"}
+	model := New(Config{
+		Provider: "codex",
+		BeginOAuthLogin: func(provider string) (OAuthLogin, error) {
+			if provider != "codex" {
+				t.Fatalf("OAuth provider = %q", provider)
+			}
+			return login, nil
+		},
+	})
+	model.task.SetValue("/login codex")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("login did not start asynchronous completion")
+	}
+	started := next.(Model)
+	if started.execution != nil || started.oauthLogin == nil || !strings.Contains(started.commandOutput, login.url) {
+		t.Fatalf("OAuth login state = %#v", started)
+	}
+	finished := runTeaCommand(t, started, command)
+	if !login.completed || finished.oauthLogin != nil || !strings.Contains(finished.notice.text, "credential stored") || finished.execution != nil {
+		t.Fatalf("OAuth completion state = %#v", finished)
+	}
+}
+
+type fakeOAuthLogin struct {
+	url       string
+	completed bool
+}
+
+func (l *fakeOAuthLogin) URL() string { return l.url }
+
+func (l *fakeOAuthLogin) Complete(context.Context) error {
+	l.completed = true
+	return nil
+}
+
+func (l *fakeOAuthLogin) Cancel() {}
+
 func TestQuestionMarkOpensCommandPalette(t *testing.T) {
 	model := New(Config{})
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})

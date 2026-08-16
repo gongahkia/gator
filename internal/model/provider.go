@@ -220,6 +220,23 @@ func SupportsDirect(provider Provider) bool {
 	return ok
 }
 
+// RequiresOAuthLogin reports providers whose Gator adapter is backed by a
+// subscription OAuth credential rather than a normal provider API key.
+func RequiresOAuthLogin(provider Provider) bool {
+	switch provider {
+	case Codex, Claude:
+		return true
+	default:
+		return false
+	}
+}
+
+// SupportsAPIKeyLogin reports whether gator login can safely persist an API
+// key for the provider. Subscription providers use a separate OAuth flow.
+func SupportsAPIKeyLogin(provider Provider) bool {
+	return SupportsDirect(provider) && !RequiresOAuthLogin(provider)
+}
+
 // SupportsPDFAttachments reports whether Gator's adapter can encode a PDF
 // using the provider's documented native document input. Generic Chat
 // Completions endpoints do not share a stable file-input contract.
@@ -261,10 +278,14 @@ func EffectiveModel(provider Provider, requested string) string {
 // CredentialHint describes the prerequisite without exposing secrets.
 func CredentialHint(provider Provider) string {
 	switch provider {
-	case OpenAI, Codex:
+	case OpenAI:
 		return "OPENAI_API_KEY"
-	case Anthropic, Claude:
+	case Codex:
+		return "Gator Codex OAuth credential"
+	case Anthropic:
 		return "ANTHROPIC_API_KEY"
+	case Claude:
+		return "Gator Claude OAuth credential"
 	case Gemini:
 		return "GEMINI_API_KEY"
 	case Copilot, Cursor:
