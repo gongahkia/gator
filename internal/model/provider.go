@@ -118,11 +118,8 @@ func New(config Config) (Backend, error) {
 		if strings.TrimSpace(config.Model) == "" {
 			return Backend{}, fmt.Errorf("--model is required for provider %q; use the Azure deployment name", provider)
 		}
-		apiKey, err := key(config, provider, "AZURE_OPENAI_API_KEY")
+		credential, err := azureResponsesCredential(config)
 		if err != nil {
-			return Backend{}, err
-		}
-		if err := requireKey(apiKey, "AZURE_OPENAI_API_KEY"); err != nil {
 			return Backend{}, err
 		}
 		baseURL, err := azureResponsesURL(config.BaseURL)
@@ -130,11 +127,12 @@ func New(config Config) (Backend, error) {
 			return Backend{}, err
 		}
 		return Backend{Provider: provider, Model: openai.Responses{
-			APIKey:              apiKey,
-			APIKeyEnv:           "AZURE_OPENAI_API_KEY",
+			APIKey:              credential.value,
+			APIKeyEnv:           credential.source,
 			Model:               config.Model,
 			BaseURL:             baseURL,
-			AuthorizationHeader: "api-key",
+			AuthorizationHeader: credential.header,
+			AuthorizationPrefix: credential.prefix,
 			Client:              config.Client,
 		}}, nil
 	case Codex:
@@ -359,6 +357,46 @@ func azureResponsesURL(configured string) (string, error) {
 	}
 	endpoint.RawQuery = query.Encode()
 	return endpoint.String(), nil
+}
+
+type azureResponsesAuth struct {
+	value  string
+	source string
+	header string
+	prefix string
+}
+
+// azureResponsesCredential resolves API-key authentication before an ambient
+// Entra token. A Gator-owned provider credential retains the normal explicit,
+// stored, then environment precedence used by the rest of the CLI.
+func azureResponsesCredential(config Config) (azureResponsesAuth, error) {
+	if value := strings.TrimSpace(config.APIKey); value != "" {
+		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_API_KEY", header: "api-key"}, nil
+	}
+	if config.Credentials != nil {
+		credential, found, err := config.Credentials.Read(string(AzureOpenAIResponses))
+		if err != nil {
+			return azureResponsesAuth{}, fmt.Errorf("read Gator credential for %q: %w", AzureOpenAIResponses, err)
+		}
+		if found {
+			switch {
+			case credential.IsAPIKey():
+				return azureResponsesAuth{value: credential.Key, source: "Gator Azure OpenAI Responses API-key credential", header: "api-key"}, nil
+			case credential.IsBearerToken():
+				if credential.Expired(time.Now()) {
+					return azureResponsesAuth{}, errors.New("Gator Azure OpenAI Responses bearer token expired; replace it with 'gator login azure-openai-responses --bearer-token' or set AZURE_OPENAI_AUTH_TOKEN")
+				}
+				return azureResponsesAuth{value: credential.Access, source: "Gator Azure OpenAI Responses bearer-token credential", header: "Authorization", prefix: "Bearer "}, nil
+			}
+		}
+	}
+	if value := strings.TrimSpace(os.Getenv("AZURE_OPENAI_API_KEY")); value != "" {
+		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_API_KEY", header: "api-key"}, nil
+	}
+	if value := strings.TrimSpace(os.Getenv("AZURE_OPENAI_AUTH_TOKEN")); value != "" {
+		return azureResponsesAuth{value: value, source: "AZURE_OPENAI_AUTH_TOKEN", header: "Authorization", prefix: "Bearer "}, nil
+	}
+	return azureResponsesAuth{}, errors.New("AZURE_OPENAI_API_KEY or AZURE_OPENAI_AUTH_TOKEN is required")
 }
 
 func miniMaxMessagesURL(configured string, china bool) string {
@@ -718,7 +756,7 @@ func CredentialHint(provider Provider) string {
 	case OpenAI:
 		return "OPENAI_API_KEY"
 	case AzureOpenAIResponses:
-		return "AZURE_OPENAI_API_KEY"
+		return "AZURE_OPENAI_API_KEY or AZURE_OPENAI_AUTH_TOKEN"
 	case Codex:
 		return "Gator Codex OAuth credential"
 	case Anthropic:
@@ -757,6 +795,8 @@ func AmbientCredentialAvailable(provider Provider) bool {
 	switch provider {
 	case GoogleVertex:
 		return vertex.FromEnvironment().Available()
+	case AzureOpenAIResponses:
+		return strings.TrimSpace(os.Getenv("AZURE_OPENAI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("AZURE_OPENAI_AUTH_TOKEN")) != ""
 	default:
 		return false
 	}
