@@ -24,13 +24,16 @@ type Request struct {
 	// Steering is available only to native model runs. It is deliberately
 	// transient: queued prompts remain a TUI concern and do not resume after a
 	// process restart.
-	Steering    <-chan string
-	ThreadID    string
-	BaseCommit  string
-	ForkedFrom  string
-	Images      []agent.Image
-	Attachments []agent.Attachment
-	Mode        Mode
+	Steering   <-chan string
+	ThreadID   string
+	BaseCommit string
+	ForkedFrom string
+	// ForceCompaction requests a model-generated summary of older retained
+	// messages before this turn. It is meaningful for resume and fork flows.
+	ForceCompaction bool
+	Images          []agent.Image
+	Attachments     []agent.Attachment
+	Mode            Mode
 }
 
 // Mode controls the native agent tool surface for a turn. Plan mode is

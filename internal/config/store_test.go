@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ func TestStoreReturnsDefaultsUntilConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load defaults: %v", err)
 	}
-	if settings != Default() {
+	if !reflect.DeepEqual(settings, Default()) {
 		t.Fatalf("settings = %#v, want defaults", settings)
 	}
 }
@@ -35,7 +36,7 @@ func TestStoreSavesPrivateAtomicSettings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if loaded != settings {
+	if !reflect.DeepEqual(loaded, settings) {
 		t.Fatalf("loaded = %#v, want %#v", loaded, settings)
 	}
 	info, err := os.Stat(filepath.Join(root, "gator", "config.json"))

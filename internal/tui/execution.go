@@ -132,18 +132,19 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	}
 
 	request := gatorrun.Request{
-		RepositoryPath: m.config.RepositoryPath,
-		Task:           taskWithContextReferences(task, references),
-		Provider:       providerName,
-		Model:          modelName,
-		BaseURL:        m.config.BaseURL,
-		MaxSteps:       m.config.MaxSteps,
-		Verification:   verification,
-		StateDir:       m.config.StateDir,
-		ThreadID:       m.threadID,
-		Images:         images,
-		Attachments:    attachments,
-		Mode:           m.runMode,
+		RepositoryPath:  m.config.RepositoryPath,
+		Task:            taskWithContextReferences(task, references),
+		Provider:        providerName,
+		Model:           modelName,
+		BaseURL:         m.config.BaseURL,
+		MaxSteps:        m.config.MaxSteps,
+		Verification:    verification,
+		StateDir:        m.config.StateDir,
+		ThreadID:        m.threadID,
+		Images:          images,
+		Attachments:     attachments,
+		Mode:            m.runMode,
+		ForceCompaction: m.forceCompaction,
 		OnEvent: func(event agent.Event) {
 			select {
 			case stream.events <- event:
@@ -193,6 +194,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.beginRunActivity(request.Verification)
+		m.forceCompaction = false
 		go executeFork(ctx, stream, executor, previous, m.forkStatePath, task, request)
 	} else if m.resumeStatePath != "" {
 		previous, loadErr := journal.LoadSession(m.resumeStatePath)
@@ -241,9 +243,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.beginRunActivity(request.Verification)
+		m.forceCompaction = false
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
 	} else {
 		m.beginRunActivity(request.Verification)
+		m.forceCompaction = false
 		go executeNew(ctx, stream, executor, request)
 	}
 	return m, waitForExecution(stream)
@@ -384,6 +388,7 @@ func (m *Model) beginFork(statePath string) (tea.Model, tea.Cmd) {
 	}
 	m.forkStatePath = statePath
 	m.resumeStatePath = ""
+	m.forceCompaction = false
 	m.threadID = ""
 	m.config.RepositoryPath = session.Repository
 	m.runMode = gatorrun.ExecuteMode
@@ -412,6 +417,7 @@ func (m *Model) returnToComposer() {
 	m.quitAfterRun = false
 	m.resumeStatePath = ""
 	m.forkStatePath = ""
+	m.forceCompaction = false
 	m.threadID = ""
 	m.recentAll = false
 	m.runMode = gatorrun.ExecuteMode

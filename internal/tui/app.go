@@ -227,6 +227,7 @@ type Model struct {
 	diffStats       diffStats
 	resumeStatePath string
 	forkStatePath   string
+	forceCompaction bool
 	threadID        string
 	runMode         gatorrun.Mode
 }

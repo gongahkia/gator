@@ -52,7 +52,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	originalMessageCount := len(initialMessages)
 	compactionContext, cancelCompaction := context.WithTimeout(ctx, 45*time.Second)
-	compactedMessages, _, compacted, compactErr := compactMessages(compactionContext, e.Model, system, initialMessages)
+	compactedMessages, _, compacted, compactErr := compactMessages(compactionContext, e.Model, initialMessages, request.ForceCompaction)
 	cancelCompaction()
 	if compactErr != nil {
 		finishErr := runJournal.Finish("failed", "", e.now())
@@ -63,7 +63,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	if compacted {
 		initialMessages = compactedMessages
-		emit(agent.Event{Kind: agent.EventContextCompacted, At: e.now(), Text: fmt.Sprintf("Compacted %d earlier messages before this run.", originalMessageCount-recentMessagesToKeep)})
+		emit(agent.Event{Kind: agent.EventContextCompacted, At: e.now(), Text: fmt.Sprintf("Compacted %d earlier messages before this run.", originalMessageCount-len(compactedMessages)+1)})
 	}
 	runner := agent.Runner{
 		Model: e.Model,

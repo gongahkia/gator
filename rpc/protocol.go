@@ -39,6 +39,7 @@ type Params struct {
 	RunID     string     `json:"run_id,omitempty"`
 	Message   string     `json:"message,omitempty"`
 	All       bool       `json:"all,omitempty"`
+	Compact   bool       `json:"compact,omitempty"`
 }
 
 // Message is one newline-delimited server response, event, or error.
