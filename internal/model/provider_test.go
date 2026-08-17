@@ -19,6 +19,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		provider Provider
 		key      string
 		baseURL  string
+		model    string
 	}{
 		{provider: OpenAI, key: "openai-key"},
 		{provider: Anthropic, key: "anthropic-key"},
@@ -37,8 +38,8 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: ZAICodingCN, key: "zai-cn-key"},
 		{provider: MiniMax, key: "minimax-key"},
 		{provider: MiniMaxCN, key: "minimax-cn-key"},
-		{provider: OpenCode, key: "opencode-key"},
-		{provider: OpenCodeGo, key: "opencode-go-key"},
+		{provider: OpenCode, key: "opencode-key", model: "gpt-5.6-terra"},
+		{provider: OpenCodeGo, key: "opencode-go-key", model: "kimi-k2.6"},
 		{provider: Baseten, key: "baseten-key"},
 		{provider: VercelAIGateway, key: "vercel-key"},
 		{provider: AntLing, key: "ant-ling-key"},
@@ -56,7 +57,11 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(string(test.provider), func(t *testing.T) {
-			backend, err := New(Config{Provider: test.provider, APIKey: test.key, Model: "test-model", BaseURL: test.baseURL, Client: http.DefaultClient})
+			model := test.model
+			if model == "" {
+				model = "test-model"
+			}
+			backend, err := New(Config{Provider: test.provider, APIKey: test.key, Model: model, BaseURL: test.baseURL, Client: http.DefaultClient})
 			if err != nil {
 				t.Fatalf("new backend: %v", err)
 			}
@@ -351,7 +356,7 @@ func TestMiniMaxUsesAnthropicMessagesEndpoints(t *testing.T) {
 	}
 }
 
-func TestOpenCodeRoutesModelFamiliesToTheirPublishedProtocols(t *testing.T) {
+func TestOpenCodeCatalogRoutesPublishedModelsToTheirProtocols(t *testing.T) {
 	for _, test := range []struct {
 		provider Provider
 		model    string
@@ -375,6 +380,24 @@ func TestOpenCodeRoutesModelFamiliesToTheirPublishedProtocols(t *testing.T) {
 				t.Fatalf("GenerateContent adapter = %#v", backend.Model)
 			}
 		}},
+		{provider: OpenCode, model: "kimi-k2.6", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(chatcompletions.Model)
+			if !ok || adapter.Config.BaseURL != "https://opencode.ai/zen/v1/chat/completions" {
+				t.Fatalf("Chat Completions adapter = %#v", backend.Model)
+			}
+		}},
+		{provider: OpenCodeGo, model: "grok-4.5", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(openai.Responses)
+			if !ok || adapter.BaseURL != "https://opencode.ai/zen/go/v1/responses" {
+				t.Fatalf("Responses adapter = %#v", backend.Model)
+			}
+		}},
+		{provider: OpenCodeGo, model: "minimax-m3", assert: func(t *testing.T, backend Backend) {
+			adapter, ok := backend.Model.(anthropic.Messages)
+			if !ok || adapter.BaseURL != "https://opencode.ai/zen/go/v1/messages" {
+				t.Fatalf("Messages adapter = %#v", backend.Model)
+			}
+		}},
 		{provider: OpenCodeGo, model: "kimi-k2.6", assert: func(t *testing.T, backend Backend) {
 			adapter, ok := backend.Model.(chatcompletions.Model)
 			if !ok || adapter.Config.BaseURL != "https://opencode.ai/zen/go/v1/chat/completions" {
@@ -389,6 +412,43 @@ func TestOpenCodeRoutesModelFamiliesToTheirPublishedProtocols(t *testing.T) {
 			}
 			test.assert(t, backend)
 		})
+	}
+}
+
+func TestOpenCodeCatalogRejectsUnknownModels(t *testing.T) {
+	for _, provider := range []Provider{OpenCode, OpenCodeGo} {
+		t.Run(string(provider), func(t *testing.T) {
+			_, err := New(Config{Provider: provider, APIKey: "opencode-key", Model: "not-a-published-model"})
+			if err == nil || !strings.Contains(err.Error(), "embedded") || !strings.Contains(err.Error(), "not-a-published-model") {
+				t.Fatalf("unknown-model error = %v", err)
+			}
+		})
+	}
+}
+
+func TestOpenCodeCatalogHasOnlySupportedProtocols(t *testing.T) {
+	for provider, entries := range openCodeCatalog {
+		if len(entries) == 0 {
+			t.Fatalf("%s has an empty catalog", provider)
+		}
+		for model, protocol := range entries {
+			if model == "" || protocol < openCodeChatCompletions || protocol > openCodeGemini {
+				t.Fatalf("invalid catalog entry %s/%s = %d", provider, model, protocol)
+			}
+		}
+	}
+}
+
+func TestEveryOpenCodeCatalogEntryBuilds(t *testing.T) {
+	for provider, entries := range openCodeCatalog {
+		for model := range entries {
+			t.Run(string(provider)+"/"+model, func(t *testing.T) {
+				backend, err := New(Config{Provider: provider, APIKey: "opencode-key", Model: model})
+				if err != nil || backend.Model == nil {
+					t.Fatalf("new backend = %#v, %v", backend, err)
+				}
+			})
+		}
 	}
 }
 
