@@ -914,8 +914,8 @@ func TestProviderOwnedCodexLoginSelectsHarnessInsteadOfNativeOAuth(t *testing.T)
 		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
 			return gatorrun.Executor{}, errors.New("Gator OAuth credential for \"codex\" is required")
 		},
-		NewDelegateCommand: func(string, string, string, [][]string, string) (*exec.Cmd, error) {
-			return exec.Command("true"), nil
+		NewDelegateCommand: func(string, string, string, [][]string, string) (DelegateCommand, error) {
+			return DelegateCommand{Process: exec.Command("true")}, nil
 		},
 	})
 	next, command := model.Update(connectDoneMsg{provider: "codex"})
@@ -943,7 +943,7 @@ func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
 			nativeCalls++
 			return gatorrun.Executor{}, errors.New("Gator OAuth credential for \"codex\" is required")
 		},
-		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (*exec.Cmd, error) {
+		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (DelegateCommand, error) {
 			delegateCalls++
 			if runtime != "codex" || task != "Inspect this repository" || modelName != "gpt-5.6" || repository != "/tmp/example-repository" {
 				t.Fatalf("delegate input = runtime:%q task:%q model:%q repository:%q", runtime, task, modelName, repository)
@@ -951,7 +951,7 @@ func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
 			if got := formatVerification(verification); got != "go test ./..." {
 				t.Fatalf("delegate verification = %q", got)
 			}
-			return exec.Command("true"), nil
+			return DelegateCommand{Process: exec.Command("true"), Output: func() string { return "delegated output" }}, nil
 		},
 	})
 	model.delegateRuntime = "codex"
@@ -975,6 +975,18 @@ func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
 	finished := completed.(Model)
 	if finished.notice.kind != noticeSuccess || !strings.Contains(finished.commandOutput, "Codex CLI harness completed") {
 		t.Fatalf("harness completion = notice:%#v output:%q", finished.notice, finished.commandOutput)
+	}
+}
+
+func TestDelegatedRunFailureShowsCapturedTerminalOutput(t *testing.T) {
+	model := New(Config{})
+	next, command := model.Update(delegatedRunDoneMsg{runtime: "codex", output: "error: invalid Codex command", err: errors.New("exit status 2")})
+	if command != nil {
+		t.Fatal("delegated failure returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.notice.kind != noticeError || !strings.Contains(updated.commandOutput, "error: invalid Codex command") {
+		t.Fatalf("delegated failure = notice:%#v output:%q", updated.notice, updated.commandOutput)
 	}
 }
 

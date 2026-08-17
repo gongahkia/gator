@@ -121,7 +121,10 @@ func delegateCodexRun(arguments []string, out io.Writer) error {
 		return err
 	}
 	return runDelegatedTask(context.Background(), "codex", task, options, out, func(ctx context.Context, directory string, writer io.Writer) error {
-		arguments := []string{"exec", "--sandbox", "workspace-write", "--approve-for-me", "--cd", directory}
+		// Codex CLI's --approve-for-me selects its workspace-write automation
+		// policy itself. Recent Codex versions reject an explicit --sandbox when
+		// the approval mode is also supplied.
+		arguments := []string{"exec", "--approve-for-me", "--cd", directory}
 		if options.model != "" {
 			arguments = append(arguments, "--model", options.model)
 		}
