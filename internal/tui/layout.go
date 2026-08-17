@@ -9,7 +9,7 @@ import (
 
 func (m Model) header(mode string) string {
 	repository := filepath.Base(filepath.Clean(m.config.RepositoryPath))
-	return m.inline(headerStyle.Render("Gator") + "  " + dimStyle.Render(mode+" · "+repository))
+	return m.inline(headerStyle.Render("Gator") + dimStyle.Render("  "+mode+" · "+repository))
 }
 
 func (m Model) fieldView(label, hint, value string) string {
@@ -94,10 +94,10 @@ func (m Model) inlineWidth() int {
 }
 
 func (m Model) panel(value string) string {
-	if m.width < 8 {
+	if m.width < 4 {
 		return m.inline(value)
 	}
-	return panelStyle.Width(m.width - 4).Render(value)
+	return panelStyle.Width(m.width).Render(value)
 }
 
 func (m Model) inline(value string) string {

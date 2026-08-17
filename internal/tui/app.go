@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
@@ -93,6 +94,15 @@ const (
 	verificationField
 	providerField
 	modelField
+)
+
+type drawerSection uint8
+
+const (
+	drawerThreads drawerSection = iota
+	drawerRuntime
+	drawerActivity
+	drawerReview
 )
 
 type vimMode uint8
@@ -247,6 +257,12 @@ type Model struct {
 	events              []timelineEntry
 	chat                []chatEntry
 	chatIndex           int
+	transcript          viewport.Model
+	followTranscript    bool
+	transcriptUnread    bool
+	drawerOpen          bool
+	drawerSection       drawerSection
+	drawerIndex         int
 	queue               []queuedInput
 	execution           *executionStream
 	oauthLogin          OAuthLogin
@@ -278,7 +294,7 @@ var (
 	keyStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
 	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("78"))
-	panelStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+	panelStyle  = lipgloss.NewStyle().Padding(0, 1)
 )
 
 // applyTheme keeps terminal customization intentionally recognizable: every
@@ -292,7 +308,7 @@ func applyTheme(name string) string {
 		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("226"))
 		errorStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
 		okStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("46"))
-		panelStyle = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(lipgloss.Color("15")).Padding(0, 1)
+		panelStyle = lipgloss.NewStyle().Padding(0, 1)
 		return "contrast"
 	case "mono":
 		headerStyle = lipgloss.NewStyle().Bold(true)
@@ -301,7 +317,7 @@ func applyTheme(name string) string {
 		keyStyle = lipgloss.NewStyle().Bold(true)
 		errorStyle = lipgloss.NewStyle().Bold(true)
 		okStyle = lipgloss.NewStyle().Bold(true)
-		panelStyle = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1)
+		panelStyle = lipgloss.NewStyle().Padding(0, 1)
 		return "mono"
 	default:
 		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))
@@ -310,7 +326,7 @@ func applyTheme(name string) string {
 		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
 		errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 		okStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("78"))
-		panelStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+		panelStyle = lipgloss.NewStyle().Padding(0, 1)
 		return "gator"
 	}
 }
@@ -371,6 +387,8 @@ func New(config Config) Model {
 		verification: verification,
 		provider:     provider,
 		model:        model,
+		transcript:   viewport.New(76, 8),
+		followTranscript: true,
 		notice: notice{
 			text: "Gator works in an isolated Git worktree. Review remains explicit.",
 			kind: noticeInfo,
@@ -416,6 +434,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.resizeInputs()
+		m.syncTranscript(m.followTranscript)
 	case agentEventMsg:
 		m.appendEvent(msg.event)
 		return m, waitForExecution(m.execution)
