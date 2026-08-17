@@ -187,7 +187,11 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.persistDraft()
 		m.refreshPreflight()
 	case providerField:
+		previousProvider := strings.TrimSpace(m.provider.Value())
 		m.provider, command = m.provider.Update(message)
+		if m.delegateRuntime != "" && strings.TrimSpace(m.provider.Value()) != previousProvider {
+			m.delegateRuntime = ""
+		}
 		m.normalizeDropdownSelection()
 		m.persistDraft()
 		m.refreshPreflight()

@@ -154,7 +154,11 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		return m.openThreadTree(m.screen)
 	case "/plan":
 		m.runMode = gatorrun.PlanMode
-		m.notice = notice{text: "Plan mode is read-only: it can inspect the worktree but cannot edit files or run commands.", kind: noticeInfo}
+		if m.delegateRuntime != "" {
+			m.notice = notice{text: delegatedRuntimeLabel(m.delegateRuntime) + " does not support Gator plan mode. Use /execute before sending a task.", kind: noticeInfo}
+		} else {
+			m.notice = notice{text: "Plan mode is read-only: it can inspect the worktree but cannot edit files or run commands.", kind: noticeInfo}
+		}
 	case "/execute":
 		m.runMode = gatorrun.ExecuteMode
 		m.notice = notice{text: "Execute mode will use the configured verifier policy after making changes.", kind: noticeInfo}
@@ -600,6 +604,7 @@ func (m *Model) applySelectedDropdown() {
 	selected := options[m.dropdownIndex]
 	switch m.focus {
 	case providerField:
+		m.delegateRuntime = ""
 		m.provider.SetValue(selected.value)
 		if _, modelName, _, err := m.resolveProviderAndModel(selected.value, ""); err == nil {
 			m.model.SetValue(modelName)
@@ -756,10 +761,17 @@ func (m Model) sessionStatus() string {
 	} else if m.runMode == gatorrun.ExecuteMode {
 		verificationText = "invalid: " + err.Error()
 	}
-	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
+	runtime := "native Gator"
+	if m.delegateRuntime != "" {
+		runtime = delegatedRuntimeLabel(m.delegateRuntime)
+	}
+	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {
+	if m.delegateRuntime != "" {
+		return "runtime: " + delegatedRuntimeLabel(m.delegateRuntime) + "\nGator: creates an isolated worktree and runs the listed verifier commands\nharness: owns agent tools, sandbox, approvals, and session state\nactive checkout: never edited by a delegated run"
+	}
 	if m.runMode == gatorrun.PlanMode {
 		return "mode: enforced Plan\nwrites: disabled\ncommands: disabled\nreads: repository paths and Git state only\nactive checkout: never edited by a normal run"
 	}
@@ -769,6 +781,32 @@ func (m Model) permissionsStatus() string {
 		commands = formatVerification(verification)
 	}
 	return "writes: isolated run worktree only\nreads: repository paths only\ncommands allowed:\n" + commands + "\nactive checkout: never edited by a normal run"
+}
+
+func delegatedRuntimeForProvider(provider string) string {
+	switch strings.TrimSpace(provider) {
+	case string(modelprovider.Codex):
+		return "codex"
+	case string(modelprovider.Copilot):
+		return "copilot"
+	case string(modelprovider.KimiCoding):
+		return "kimi"
+	default:
+		return ""
+	}
+}
+
+func delegatedRuntimeLabel(runtime string) string {
+	switch runtime {
+	case "codex":
+		return "Codex CLI harness"
+	case "copilot":
+		return "GitHub Copilot CLI harness"
+	case "kimi":
+		return "Kimi CLI harness"
+	default:
+		return runtime + " CLI harness"
+	}
 }
 
 func commandHelp() string {
