@@ -730,11 +730,7 @@ func TestCompletedRunAppliesQueuedCommandAndQueuedPromptStartsRun(t *testing.T) 
 	if !dispatched || command == nil || next.(Model).screen != runningScreen {
 		t.Fatalf("queued prompt dispatch = dispatched %v, command %v, model %#v", dispatched, command != nil, next)
 	}
-	completed, completionCommand := next.(Model).Update(delegatedRunDoneMsg{runtime: "codex"})
-	if completionCommand != nil {
-		t.Fatal("harness completion returned an unexpected command")
-	}
-	finished := completed.(Model)
+	finished := runTeaCommand(t, next.(Model), command)
 	if finished.runErr != nil || finished.screen != composeScreen || len(finished.queue) != 0 || len(agentModel.requests) != 2 {
 		t.Fatalf("queued prompt finished = error %v, screen %v, queue %#v, requests %d", finished.runErr, finished.screen, finished.queue, len(agentModel.requests))
 	}
@@ -972,7 +968,11 @@ func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
 	if nativeCalls != 0 || delegateCalls != 1 || next.(Model).execution != nil {
 		t.Fatalf("run dispatch = native:%d delegate:%d execution:%#v", nativeCalls, delegateCalls, next.(Model).execution)
 	}
-	finished := runTeaCommand(t, next.(Model), command)
+	completed, completionCommand := next.(Model).Update(delegatedRunDoneMsg{runtime: "codex"})
+	if completionCommand != nil {
+		t.Fatal("harness completion returned an unexpected command")
+	}
+	finished := completed.(Model)
 	if finished.notice.kind != noticeSuccess || !strings.Contains(finished.commandOutput, "Codex CLI harness completed") {
 		t.Fatalf("harness completion = notice:%#v output:%q", finished.notice, finished.commandOutput)
 	}
