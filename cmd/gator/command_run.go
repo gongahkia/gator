@@ -46,14 +46,11 @@ func runTask(arguments []string, out io.Writer) error {
 	if len(verification) == 0 {
 		return errors.New("at least one --verify command is required; run 'gator doctor' for suggestions")
 	}
-	provider, err := model.ParseProvider(*providerName)
+	resolvedProvider, resolvedModel, err := resolveConfiguredProvider(*providerName, *modelName)
 	if err != nil {
 		return err
 	}
-	if *modelName == "" {
-		*modelName = model.DefaultModel(provider)
-	}
-	executor, err := newExecutor(string(provider), *modelName, *baseURL)
+	executor, err := newExecutor(resolvedProvider, resolvedModel, *baseURL)
 	if err != nil {
 		return err
 	}
@@ -61,15 +58,15 @@ func runTask(arguments []string, out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  task: %s\n", provider, displayModel(*modelName), task); err != nil {
+	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  task: %s\n", resolvedProvider, displayModel(resolvedModel), task); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
 		RepositoryPath: workingDirectory,
 		Task:           task,
-		Provider:       string(provider),
-		Model:          *modelName,
+		Provider:       resolvedProvider,
+		Model:          resolvedModel,
 		BaseURL:        *baseURL,
 		MaxSteps:       *maxSteps,
 		Verification:   verification,

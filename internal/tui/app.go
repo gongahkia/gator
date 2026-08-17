@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -33,6 +34,7 @@ type Config struct {
 	ForkStatePath   string
 	StartInRecent   bool
 	RecentAll       bool
+	CustomProviders []config.CustomProvider
 	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
 	BeginOAuthLogin func(provider string) (OAuthLogin, error)
 }
