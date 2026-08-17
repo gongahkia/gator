@@ -45,7 +45,7 @@ type Config struct {
 	// worktree. It deliberately remains separate from NewExecutor: the harness
 	// owns its credential, tools, approvals, and session state.
 	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (*exec.Cmd, error)
-	SetTheme          func(name string) error
+	SetTheme           func(name string) error
 }
 
 // ExtensionCommand is a visible prompt template contributed by a trusted or
