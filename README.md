@@ -200,7 +200,7 @@ an endpoint for one scripted run.
 | `xiaomi` | `MIMO_API_KEY` | Xiaomi MiMo OpenAI-compatible Chat Completions |
 | `moonshotai-cn` | `MOONSHOT_API_KEY` | Moonshot AI Kimi China OpenAI-compatible Chat Completions |
 | `cloudflare-workers-ai` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers AI OpenAI-compatible Chat Completions |
-| `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare unified AI Gateway OpenAI-compatible Chat Completions |
+| `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_GATEWAY_ID`, and `GATOR_CLOUDFLARE_GATEWAY_PROTOCOL` | Cloudflare AI Gateway native OpenAI Responses, Anthropic Messages, or Workers AI Chat Completions |
 | `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, optional `AWS_REGION` | Amazon Bedrock OpenAI-compatible Chat Completions |
 | `google-vertex` | Google ADC plus `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` | Google Vertex AI OpenAI-compatible Chat Completions |
 | `qwen-token-plan`, `qwen-token-plan-individual` | `QWEN_TOKEN_PLAN_API_KEY` | Qwen Token Plan OpenAI-compatible Chat Completions |
@@ -232,8 +232,14 @@ The predefined compatible providers use these key variables respectively:
 `ZAI_API_KEY`, `ZAI_CODING_CN_API_KEY`, `MINIMAX_API_KEY`, `MINIMAX_CN_API_KEY`,
 `OPENCODE_API_KEY`, `BASETEN_API_KEY`, `AI_GATEWAY_API_KEY`,
 `ANT_LING_API_KEY`, `MIMO_API_KEY`, `QWEN_TOKEN_PLAN_API_KEY`,
-`QWEN_TOKEN_PLAN_CN_API_KEY`, and `CLOUDFLARE_API_TOKEN`. Cloudflare also
+`QWEN_TOKEN_PLAN_CN_API_KEY`, and `CLOUDFLARE_API_TOKEN`. Direct Workers AI
 requires `CLOUDFLARE_ACCOUNT_ID` unless a full `--base-url` is supplied.
+Cloudflare AI Gateway additionally requires `CLOUDFLARE_AI_GATEWAY_ID` and an
+explicit `GATOR_CLOUDFLARE_GATEWAY_PROTOCOL`: `openai-responses` requires an
+`openai/` model, `anthropic-messages` an `anthropic/` model, and
+`workers-ai-chat-completions` an `@cf/` model. Gator uses Cloudflare's account
+REST API with the `cf-aig-gateway-id` request header; it neither infers this
+protocol from a model name nor alters direct Workers AI behavior.
 Azure Responses uses `AZURE_OPENAI_API_KEY` when present, otherwise it accepts
 the short-lived Microsoft Entra bearer token in `AZURE_OPENAI_AUTH_TOKEN` and
 sends it only as `Authorization: Bearer`; the two authentication headers are

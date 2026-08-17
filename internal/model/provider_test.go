@@ -16,10 +16,13 @@ import (
 
 func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 	tests := []struct {
-		provider Provider
-		key      string
-		baseURL  string
-		model    string
+		provider  Provider
+		key       string
+		baseURL   string
+		model     string
+		accountID string
+		gatewayID string
+		protocol  string
 	}{
 		{provider: OpenAI, key: "openai-key"},
 		{provider: Anthropic, key: "anthropic-key"},
@@ -46,7 +49,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 		{provider: Xiaomi, key: "mimo-key"},
 		{provider: MoonshotAICN, key: "moonshot-cn-key"},
 		{provider: CloudflareWorkers, key: "cloudflare-key", baseURL: "https://example.test/ai/v1/chat/completions"},
-		{provider: CloudflareGateway, key: "cloudflare-key", baseURL: "https://example.test/ai/v1/chat/completions"},
+		{provider: CloudflareGateway, key: "cloudflare-key", baseURL: "https://example.test/ai/v1", model: "openai/gpt-5.6", accountID: "account-123", gatewayID: "gateway-123", protocol: "openai-responses"},
 		{provider: AmazonBedrock, key: "bedrock-key"},
 		{provider: QwenTokenPlan, key: "qwen-token-plan-key"},
 		{provider: QwenTokenPlanCN, key: "qwen-token-plan-cn-key"},
@@ -61,7 +64,7 @@ func TestNewBuildsCloudBackendsWithoutCrossProviderCredentials(t *testing.T) {
 			if model == "" {
 				model = "test-model"
 			}
-			backend, err := New(Config{Provider: test.provider, APIKey: test.key, Model: model, BaseURL: test.baseURL, Client: http.DefaultClient})
+			backend, err := New(Config{Provider: test.provider, APIKey: test.key, Model: model, BaseURL: test.baseURL, Client: http.DefaultClient, CloudflareAccountID: test.accountID, CloudflareGatewayID: test.gatewayID, CloudflareGatewayProtocol: test.protocol})
 			if err != nil {
 				t.Fatalf("new backend: %v", err)
 			}
