@@ -71,7 +71,7 @@ func (m *Model) focusField() tea.Cmd {
 }
 
 func (m *Model) resizeInputs() {
-	width := max(1, m.width-8)
+	width := max(1, m.conversationWidth()-4)
 	m.task.SetWidth(width)
 	m.verification.SetWidth(width)
 	m.provider.Width = width
@@ -91,6 +91,7 @@ func (m *Model) resizeInputs() {
 		m.task.SetHeight(7)
 		m.verification.SetHeight(3)
 	}
+	m.resizeConversation()
 }
 
 func (m Model) View() string {

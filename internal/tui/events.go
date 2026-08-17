@@ -27,6 +27,12 @@ func (m *Model) appendChatEvent(event agent.Event) {
 			if last.author == chatAgent && last.streaming {
 				last.text += event.Text
 				m.chatIndex = len(m.chat) - 1
+				if m.followTranscript {
+					m.syncTranscript(true)
+				} else {
+					m.syncTranscript(false)
+					m.transcriptUnread = true
+				}
 				return
 			}
 		}
@@ -66,6 +72,12 @@ func (m *Model) appendCompletion(outcome gatorrun.Outcome, runErr error) {
 func (m *Model) appendChat(entry chatEntry) {
 	m.chat = append(m.chat, entry)
 	m.chatIndex = len(m.chat) - 1
+	if m.followTranscript {
+		m.syncTranscript(true)
+	} else {
+		m.syncTranscript(false)
+		m.transcriptUnread = true
+	}
 }
 
 func (m *Model) closeStreamingChatEntry() {
