@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.25.13"
+      - name: Test release source
+        run: go test ./...
       - name: Build archive
         shell: bash
         env:

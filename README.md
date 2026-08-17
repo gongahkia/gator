@@ -17,6 +17,20 @@ worktree-local tools, command policy, durable local run storage, and a
 full-screen terminal application. Real-model usability evidence, context
 compaction, and broader replay coverage are still in progress.
 
+## Install and update
+
+Published macOS and Linux releases install to `~/.local/bin` by default. The
+installer verifies the release checksum before replacing a binary:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/gongahkia/gator/main/scripts/install.sh | sh
+gator update
+```
+
+Use `gator update --check` to inspect availability without changing the binary.
+Windows releases are published as ZIP archives; replacing a running Windows
+executable is not reliable, so reinstall the current archive instead.
+
 ## Development
 
 ```sh

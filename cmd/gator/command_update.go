@@ -114,6 +114,9 @@ func (u releaseUpdater) latest() (release, error) {
 		return release{}, fmt.Errorf("check for Gator updates: %w", err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return release{}, errors.New("no published Gator release is available yet")
+	}
 	if response.StatusCode != http.StatusOK {
 		return release{}, fmt.Errorf("check for Gator updates: server returned HTTP %d", response.StatusCode)
 	}
