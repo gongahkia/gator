@@ -44,7 +44,7 @@ type Config struct {
 	// NewDelegateCommand starts a vendor-owned harness in a fresh isolated
 	// worktree. It deliberately remains separate from NewExecutor: the harness
 	// owns its credential, tools, approvals, and session state.
-	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (*exec.Cmd, error)
+	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (DelegateCommand, error)
 	SetTheme           func(name string) error
 }
 
@@ -54,6 +54,14 @@ type ExtensionCommand struct {
 	Name        string
 	Description string
 	Prompt      string
+}
+
+// DelegateCommand keeps the process and a bounded caller-owned view of its
+// terminal output together. The latter lets the TUI explain a non-zero exit
+// without attempting to interpret a vendor CLI's private session state.
+type DelegateCommand struct {
+	Process *exec.Cmd
+	Output  func() string
 }
 
 // OAuthLogin is an application-owned browser login that has already started a
@@ -186,6 +194,7 @@ type connectDoneMsg struct {
 
 type delegatedRunDoneMsg struct {
 	runtime string
+	output  string
 	err     error
 }
 
@@ -518,10 +527,16 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.focus = taskField
 		_ = m.focusField()
 		if msg.err != nil {
-			m.commandOutput = delegatedRuntimeLabel(msg.runtime) + " stopped. Its retained worktree path and output were printed in the terminal."
+			m.commandOutput = delegatedRuntimeLabel(msg.runtime) + " stopped."
+			if output := delegatedOutputTail(msg.output); output != "" {
+				m.commandOutput += "\n\nTerminal output:\n" + output
+			}
 			m.notice = notice{text: "Delegated run stopped: " + msg.err.Error(), kind: noticeError}
 		} else {
-			m.commandOutput = delegatedRuntimeLabel(msg.runtime) + " completed. Review its retained worktree path and verifier output printed in the terminal."
+			m.commandOutput = delegatedRuntimeLabel(msg.runtime) + " completed. Review its retained worktree before applying changes."
+			if output := delegatedOutputTail(msg.output); output != "" {
+				m.commandOutput += "\n\nTerminal output:\n" + output
+			}
 			m.notice = notice{text: "Delegated run complete. Review the retained worktree before applying changes.", kind: noticeSuccess}
 			if strings.TrimSpace(m.config.StateDir) != "" {
 				if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
@@ -542,4 +557,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func delegatedOutputTail(value string) string {
+	const limit = 6 * 1024
+	value = strings.TrimSpace(value)
+	if len(value) <= limit {
+		return value
+	}
+	return "… earlier terminal output omitted …\n" + value[len(value)-limit:]
 }

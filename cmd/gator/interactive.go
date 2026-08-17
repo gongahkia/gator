@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/extension"
@@ -114,7 +116,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
 			return exec.Command(os.Args[0], "connect", provider), nil
 		},
-		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (*exec.Cmd, error) {
+		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (tui.DelegateCommand, error) {
 			arguments := []string{"delegate", runtime, "run"}
 			if strings.TrimSpace(modelName) != "" {
 				arguments = append(arguments, "--model", modelName)
@@ -125,13 +127,51 @@ func interactiveWithOptions(options interactiveOptions) error {
 			arguments = append(arguments, "--", task)
 			process := exec.Command(os.Args[0], arguments...)
 			process.Dir = repository
-			return process, nil
+			output := &delegateOutputCapture{}
+			writer := io.MultiWriter(os.Stdout, output)
+			process.Stdout = writer
+			process.Stderr = writer
+			return tui.DelegateCommand{Process: process, Output: output.String}, nil
 		},
 		SetTheme: saveTheme,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	_, err = program.Run()
 	return err
+}
+
+const delegateOutputLimit = 6 * 1024
+
+type delegateOutputCapture struct {
+	mutex     sync.Mutex
+	value     []byte
+	truncated bool
+}
+
+func (capture *delegateOutputCapture) Write(value []byte) (int, error) {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if len(value) >= delegateOutputLimit {
+		capture.value = append(capture.value[:0], value[len(value)-delegateOutputLimit:]...)
+		capture.truncated = true
+		return len(value), nil
+	}
+	if overflow := len(capture.value) + len(value) - delegateOutputLimit; overflow > 0 {
+		copy(capture.value, capture.value[overflow:])
+		capture.value = capture.value[:len(capture.value)-overflow]
+		capture.truncated = true
+	}
+	capture.value = append(capture.value, value...)
+	return len(value), nil
+}
+
+func (capture *delegateOutputCapture) String() string {
+	capture.mutex.Lock()
+	defer capture.mutex.Unlock()
+	if capture.truncated {
+		return "… earlier terminal output omitted …\n" + string(capture.value)
+	}
+	return string(capture.value)
 }
 
 func parseSuggestedVerification(commands []string) [][]string {

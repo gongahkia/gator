@@ -290,9 +290,13 @@ func (m Model) startDelegatedRun(task string) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "This Gator build cannot start a provider-owned harness from the TUI.", kind: noticeError}
 		return m, nil
 	}
-	process, err := m.config.NewDelegateCommand(m.delegateRuntime, taskWithContextReferences(task, references), strings.TrimSpace(m.model.Value()), verification, m.config.RepositoryPath)
+	delegate, err := m.config.NewDelegateCommand(m.delegateRuntime, taskWithContextReferences(task, references), strings.TrimSpace(m.model.Value()), verification, m.config.RepositoryPath)
 	if err != nil {
 		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if delegate.Process == nil {
+		m.notice = notice{text: "This Gator build returned an invalid provider-owned harness command.", kind: noticeError}
 		return m, nil
 	}
 	m.appendChat(chatEntry{author: chatUser, text: task})
@@ -302,8 +306,12 @@ func (m Model) startDelegatedRun(task string) (tea.Model, tea.Cmd) {
 	m.notice = notice{text: "Starting " + delegatedRuntimeLabel(m.delegateRuntime) + " in this terminal...", kind: noticeInfo}
 	m.persistDraft()
 	runtime := m.delegateRuntime
-	return m, tea.ExecProcess(process, func(err error) tea.Msg {
-		return delegatedRunDoneMsg{runtime: runtime, err: err}
+	return m, tea.ExecProcess(delegate.Process, func(err error) tea.Msg {
+		output := ""
+		if delegate.Output != nil {
+			output = delegate.Output()
+		}
+		return delegatedRunDoneMsg{runtime: runtime, output: output, err: err}
 	})
 }
 

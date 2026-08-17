@@ -52,7 +52,7 @@ func TestDelegateCodexRunUsesIsolatedWorktreeAndVerifies(t *testing.T) {
 		t.Fatalf("read delegated command: %v", err)
 	}
 	arguments := string(logged)
-	if !strings.Contains(arguments, "exec\n--sandbox\nworkspace-write\n--approve-for-me\n--cd\n") {
+	if !strings.Contains(arguments, "exec\n--approve-for-me\n--cd\n") || strings.Contains(arguments, "--sandbox\n") {
 		t.Fatalf("Codex run did not use delegated workspace-write mode: %q", arguments)
 	}
 	if !strings.Contains(arguments, "--model\ngpt-test\n--\nAdd a feature\n") {
