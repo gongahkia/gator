@@ -149,12 +149,16 @@ Use `/review` for the final report and diff preview, then
 press `e` for patch handoff commands, `Esc` to return to the conversation, or
 `n` for a new thread.
 
-`/vim` toggles Vim-style message editing. Vim Normal mode supports `i`/`a`
-to edit, `o` to add a line, `h`/`j`/`k`/`l` to move, `0`/`$` to reach a line
-edge, and `x` to delete. `Enter` sends from Normal mode. In Insert mode,
-`Enter` adds a line and `Esc` returns to Normal mode. In Normal mode, `:w`
-also sends the current message; `:wq` sends it and exits only after the active
-and queued work completes successfully.
+`/vim` toggles Vim-style message editing. Vim Normal mode provides counts,
+`h`/`j`/`k`/`l`, `0`/`^`/`$`, `w`/`b`/`e`, `gg`/`G`, insert commands
+`i`/`I`/`a`/`A`/`o`/`O`, `x`/`X`/`r`, operator motions with `d`/`c`/`y`,
+`p`/`P`, and `u` / `Ctrl+R` undo and redo. The composer renders Vim's hybrid
+line-number style by default: the current line is absolute and all other lines
+are relative. Use `:set number`, `:set relativenumber`, `:set nonumber`, or
+`:set norelativenumber` to configure the gutter. `Enter` sends from Normal
+mode; Insert-mode `Enter` adds a line and `Esc` returns to Normal mode. Ex
+commands include `:w` to send, `:wq` or `:x` to send then exit after successful
+active and queued work, `:q` / `:q!` to exit, `:set`, and `:help`.
 
 Before sending, Gator validates the task and local prerequisites: a verifier
 list in Execute mode, valid provider settings, required API-key environment

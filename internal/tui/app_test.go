@@ -1539,6 +1539,91 @@ func TestInteractiveRunStreamsToConversation(t *testing.T) {
 	}
 }
 
+func TestVimNormalEditingSupportsMotionsOperatorsAndUndo(t *testing.T) {
+	model := New(Config{})
+	model.vim = vimNormal
+	model.vimAbsoluteNumbers = true
+	model.vimRelativeNumbers = true
+	model.task.SetValue("alpha beta\ngamma")
+	model.setVimCursor(0, 0)
+	model.syncVimLineNumbers()
+
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if row, column := model.vimCursor(); row != 0 || column != 6 {
+		t.Fatalf("w cursor = %d:%d, want 0:6", row, column)
+	}
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	if row, column := model.vimCursor(); row != 0 || column != 0 {
+		t.Fatalf("b cursor = %d:%d, want 0:0", row, column)
+	}
+
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("w")})
+	if got := model.task.Value(); got != "beta\ngamma" {
+		t.Fatalf("dw value = %q, want beta\\ngamma", got)
+	}
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("u")})
+	if got := model.task.Value(); got != "alpha beta\ngamma" {
+		t.Fatalf("u value = %q", got)
+	}
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyCtrlR})
+	if got := model.task.Value(); got != "beta\ngamma" {
+		t.Fatalf("ctrl+r value = %q", got)
+	}
+
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("0")})
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("X")})
+	if got := model.task.Value(); got != "bXeta\ngamma" {
+		t.Fatalf("a inserted at %q, want bXeta\\ngamma", got)
+	}
+
+	model.vim = vimNormal
+	model.task.SetValue("alpha")
+	model.setVimCursor(0, len([]rune("alpha")))
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model = drive(t, model, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("0")})
+	if got := model.task.Value(); got != "" {
+		t.Fatalf("d0 value = %q, want empty", got)
+	}
+}
+
+func TestVimLineNumbersAndSetCommands(t *testing.T) {
+	model := New(Config{})
+	model.width = 100
+	model.height = 40
+	model.vim = vimNormal
+	model.vimAbsoluteNumbers = true
+	model.vimRelativeNumbers = true
+	model.task.SetValue("one\ntwo\nthree")
+	model.setVimCursor(1, 0)
+	model.resizeInputs()
+
+	view := model.composerInputView()
+	for _, expected := range []string{"1 one", "2 two", "1 three"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("hybrid line number view omitted %q:\n%s", expected, view)
+		}
+	}
+
+	next, command := model.executeVimExCommand(":set nonumber", false)
+	if command != nil {
+		t.Fatal(":set unexpectedly returned a command")
+	}
+	model = next.(Model)
+	if model.vimAbsoluteNumbers || !model.vimRelativeNumbers {
+		t.Fatalf(":set nonumber settings = %s", model.vimNumberSettings())
+	}
+	next, command = model.executeVimExCommand(":set norelativenumber", false)
+	if command != nil {
+		t.Fatal(":set unexpectedly returned a command")
+	}
+	model = next.(Model)
+	if model.vimAbsoluteNumbers || model.vimRelativeNumbers {
+		t.Fatalf(":set norelativenumber settings = %s", model.vimNumberSettings())
+	}
+}
+
 func TestChatAggregatesStreamingTextAndKeepsToolActivityInOrder(t *testing.T) {
 	model := New(Config{})
 	model.width = 100

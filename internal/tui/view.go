@@ -72,11 +72,7 @@ func (m *Model) focusField() tea.Cmd {
 }
 
 func (m *Model) resizeInputs() {
-	width := max(1, m.conversationWidth()-4)
-	if m.drawerUsesSidePane() && m.drawerSection == drawerRuntime && m.focus != taskField {
-		width = max(1, m.drawerWidth()-4)
-	}
-	m.task.SetWidth(width)
+	width := m.composerInputWidth()
 	m.verification.SetWidth(width)
 	m.provider.Width = width
 	m.model.Width = width
@@ -95,6 +91,7 @@ func (m *Model) resizeInputs() {
 		m.task.SetHeight(7)
 		m.verification.SetHeight(3)
 	}
+	m.syncVimLineNumbers()
 	m.resizeConversation()
 }
 
@@ -229,9 +226,9 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 	}
 	sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), labelStyle.Render(label), m.composerInputView(), m.noticeView())
 	if running {
-		sections = append(sections, m.footer("ctrl+b controls", "pgup/pgdn browse", "end latest", "enter steer", "tab queue", "ctrl+c stop"))
+		sections = append(sections, m.runningFooter())
 	} else {
-		sections = append(sections, m.footer("ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands"))
+		sections = append(sections, m.composerFooter())
 	}
 	return strings.Join(sections, "\n")
 }
@@ -248,9 +245,13 @@ func (m Model) composerInputView() string {
 	if prompt == "" {
 		prompt = "Message Gator..."
 	}
-	line := dimStyle.Render(prompt)
+	prefix := ""
+	if m.vimNumberState != nil && m.vimNumberState.enabled {
+		prefix = dimStyle.Render(m.vimNumberState.emptyPrompt())
+	}
+	line := prefix + dimStyle.Render(prompt)
 	if m.task.Focused() {
-		line = keyStyle.Render("›") + " " + line
+		line = prefix + keyStyle.Render("›") + " " + dimStyle.Render(prompt)
 	}
 	return line + strings.Repeat("\n", max(0, m.task.Height()-1))
 }
@@ -261,11 +262,25 @@ func (m Model) runningFooter() string {
 	}
 	switch m.vim {
 	case vimNormal:
-		return m.footer("i/a edit", "enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("i/a edit", ": Ex", "u undo", "ctrl+r redo", "enter steer", "tab queue", "ctrl+c stop")
 	case vimInsert:
 		return m.footer("esc normal", "enter newline", "ctrl+r steer", "tab queue", "ctrl+c stop", "f1 shortcuts")
 	default:
-		return m.footer("enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("ctrl+b controls", "enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
+	}
+}
+
+func (m Model) composerFooter() string {
+	if m.vimCommand != "" {
+		return m.footer("enter execute command", "esc cancel", "backspace edit", "f1 shortcuts")
+	}
+	switch m.vim {
+	case vimNormal:
+		return m.footer("i/a edit", ": Ex", "u undo", "ctrl+r redo", "enter send", "? commands", "f1 shortcuts")
+	case vimInsert:
+		return m.footer("esc normal", "enter newline", "ctrl+r send", "ctrl+b controls", "? commands", "f1 shortcuts")
+	default:
+		return m.footer("ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands")
 	}
 }
 
@@ -398,7 +413,7 @@ func (m Model) failureGuidance() string {
 }
 
 func (m Model) vimCommandView() string {
-	return labelStyle.Render("Vim command") + "\n" + m.panel(keyStyle.Render(m.vimCommand)+"\n"+dimStyle.Render(":w send · :wq send then exit after successful queued work"))
+	return labelStyle.Render("Vim command") + "\n" + m.panel(keyStyle.Render(m.vimCommand)+"\n"+dimStyle.Render(":w send · :wq/:x send then exit · :q! discard and exit · :set line numbers"))
 }
 
 func (m Model) vimModeLabel() string {
@@ -521,7 +536,9 @@ func (m Model) helpView() string {
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
 			"Tab  complete a command or insert a path; Enter runs a command",
 			"/vim  toggle Vim Normal/Insert message editing",
-			":w  send from Vim Normal; :wq  send then exit after successful work",
+			"Vim Normal  counts; h/j/k/l, 0/^/$, w/b/e, gg/G; i/I/a/A/o/O; d/c/y + motions; p/P; u/Ctrl+R",
+			"Vim numbers  hybrid absolute/relative by default; :set number, relativenumber, nonumber, or norelativenumber",
+			"Vim Ex  :w send · :wq or :x send then exit · :q! discard and exit · :help list supported commands",
 			"Ctrl+C  quit",
 		}, "\n")),
 		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),

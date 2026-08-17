@@ -78,10 +78,16 @@ func (m *Model) completeSelectedCommand() {
 func (m *Model) toggleVimMode() {
 	if m.vim == vimOff {
 		m.vim = vimNormal
-		m.notice = notice{text: "Vim mode enabled (Normal). i/a edit · o add line · h/j/k/l move · 0/$ line edge · x delete · Enter send.", kind: noticeInfo}
+		m.vimAbsoluteNumbers = true
+		m.vimRelativeNumbers = true
+		m.resetVimPending()
+		m.syncVimLineNumbers()
+		m.notice = notice{text: "Vim Normal mode enabled. Hybrid line numbers are on; use :set number or :set relativenumber to configure them.", kind: noticeInfo}
 		return
 	}
 	m.vim = vimOff
+	m.resetVimPending()
+	m.syncVimLineNumbers()
 	m.notice = notice{text: "Vim mode disabled. Enter now sends the message.", kind: noticeInfo}
 }
 

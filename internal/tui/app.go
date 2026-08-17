@@ -224,6 +224,15 @@ type Model struct {
 	focus               field
 	vim                 vimMode
 	vimCommand          string
+	vimCount            int
+	vimPending          string
+	vimPendingCount     int
+	vimRegister         vimRegister
+	vimUndo             []vimSnapshot
+	vimRedo             []vimSnapshot
+	vimAbsoluteNumbers  bool
+	vimRelativeNumbers  bool
+	vimNumberState      *vimLineNumberState
 	quitAfterRun        bool
 	width               int
 	height              int
