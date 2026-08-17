@@ -1563,6 +1563,27 @@ func TestChatAggregatesStreamingTextAndKeepsToolActivityInOrder(t *testing.T) {
 	}
 }
 
+func TestEmptyComposerUsesDedicatedPromptInsteadOfTextareaPlaceholderCursor(t *testing.T) {
+	model := New(Config{})
+	model.task.SetHeight(3)
+	view := model.composerInputView()
+	if !strings.Contains(view, "Message Gator...") {
+		t.Fatalf("empty composer omitted prompt: %q", view)
+	}
+	if !strings.Contains(view, "›") {
+		t.Fatalf("focused empty composer omitted caret: %q", view)
+	}
+	if lines := strings.Count(view, "\n") + 1; lines != 3 {
+		t.Fatalf("empty composer lines = %d, want 3: %q", lines, view)
+	}
+
+	model.task.SetValue("Check the repository status.")
+	view = model.composerInputView()
+	if !strings.Contains(view, "Check the repository status.") {
+		t.Fatalf("composer omitted entered text: %q", view)
+	}
+}
+
 func TestChatPageKeysBrowseConversation(t *testing.T) {
 	model := New(Config{})
 	model.width = 100

@@ -227,13 +227,32 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 	if m.vim != vimOff {
 		label += " · " + m.vimModeLabel()
 	}
-	sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), labelStyle.Render(label), m.task.View(), m.noticeView())
+	sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), labelStyle.Render(label), m.composerInputView(), m.noticeView())
 	if running {
 		sections = append(sections, m.footer("ctrl+b controls", "pgup/pgdn browse", "end latest", "enter steer", "tab queue", "ctrl+c stop"))
 	} else {
 		sections = append(sections, m.footer("ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands"))
 	}
 	return strings.Join(sections, "\n")
+}
+
+// composerInputView avoids textarea's focused-placeholder cursor, which draws
+// the cursor over the first placeholder character. The prompt remains visible
+// while the input is empty without making it look like the user typed a letter.
+func (m Model) composerInputView() string {
+	if m.task.Value() != "" {
+		return m.task.View()
+	}
+
+	prompt := strings.TrimSpace(m.task.Placeholder)
+	if prompt == "" {
+		prompt = "Message Gator..."
+	}
+	line := dimStyle.Render(prompt)
+	if m.task.Focused() {
+		line = keyStyle.Render("›") + " " + line
+	}
+	return line + strings.Repeat("\n", max(0, m.task.Height()-1))
 }
 
 func (m Model) runningFooter() string {
