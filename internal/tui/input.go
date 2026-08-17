@@ -178,6 +178,9 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.startRun()
 		}
 	case "ctrl+r":
+		if m.focus == taskField && m.vim == vimNormal {
+			return m.updateVimNormal(message)
+		}
 		return m.startRun()
 	}
 
@@ -228,54 +231,23 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateTask(message tea.Msg) tea.Cmd {
+	before := m.vimSnapshot()
 	var command tea.Cmd
 	m.task, command = m.task.Update(message)
+	if m.vim != vimOff {
+		m.rememberVimEdit(before)
+	}
 	m.normalizeCommandSelection()
 	m.contextClosed = false
 	m.normalizeContextSelection()
 	m.persistDraft()
 	m.refreshPreflight()
+	m.syncVimLineNumbers()
 	return command
 }
 
 func (m Model) updateVimNormal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch message.String() {
-	case "enter":
-		return m.startRun()
-	case ":":
-		m.vimCommand = ":"
-		m.notice = notice{text: "Vim command mode. :w sends; :wq sends and exits after successful queued work completes.", kind: noticeInfo}
-	case "i":
-		m.vim = vimInsert
-		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
-	case "a", "A":
-		m.task.CursorEnd()
-		m.vim = vimInsert
-		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
-	case "o":
-		m.task.CursorEnd()
-		command := m.updateTask(tea.KeyMsg{Type: tea.KeyEnter})
-		m.vim = vimInsert
-		m.notice = notice{text: "Vim Insert mode. Esc returns to Normal mode; Enter adds a line.", kind: noticeInfo}
-		return m, command
-	case "h", "left":
-		return m, m.updateTask(tea.KeyMsg{Type: tea.KeyLeft})
-	case "j", "down":
-		m.task.CursorDown()
-	case "k", "up":
-		m.task.CursorUp()
-	case "l", "right":
-		return m, m.updateTask(tea.KeyMsg{Type: tea.KeyRight})
-	case "0", "home":
-		m.task.CursorStart()
-	case "$", "end":
-		m.task.CursorEnd()
-	case "x", "delete":
-		return m, m.updateTask(tea.KeyMsg{Type: tea.KeyDelete})
-	case "esc":
-		m.notice = notice{text: "Vim Normal mode. Press i or a to edit; Enter sends.", kind: noticeInfo}
-	}
-	return m, nil
+	return m.updateVimNormalMode(message)
 }
 
 func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -373,6 +345,9 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab":
 		return m.queueCurrentInput()
 	case "ctrl+r":
+		if m.vim == vimNormal {
+			return m.updateVimNormal(message)
+		}
 		return m.steerCurrentInput()
 	case "enter":
 		if m.vim != vimInsert {
@@ -396,49 +371,7 @@ func runningLocalCommand(command string) bool {
 }
 
 func (m Model) updateVimCommand(message tea.KeyMsg, running bool) (tea.Model, tea.Cmd) {
-	switch message.String() {
-	case "esc":
-		m.vimCommand = ""
-		m.notice = notice{text: "Vim command cancelled.", kind: noticeInfo}
-		return m, nil
-	case "backspace", "delete":
-		command := []rune(m.vimCommand)
-		if len(command) > 1 {
-			m.vimCommand = string(command[:len(command)-1])
-		}
-		return m, nil
-	case "enter":
-		command := strings.TrimSpace(m.vimCommand)
-		m.vimCommand = ""
-		switch command {
-		case ":w":
-			if running {
-				return m.steerCurrentInput()
-			}
-			return m.startRun()
-		case ":wq":
-			var next tea.Model
-			var runCommand tea.Cmd
-			if running {
-				next, runCommand = m.steerCurrentInput()
-			} else {
-				next, runCommand = m.startRun()
-			}
-			updated := next.(Model)
-			if (!running && (updated.screen == runningScreen || updated.screen == attachmentConfirmScreen)) || (running && updated.task.Value() == "") {
-				updated.quitAfterRun = true
-				updated.notice = notice{text: "Submission accepted. Gator will exit after the active and queued work completes successfully.", kind: noticeInfo}
-			}
-			return updated, runCommand
-		default:
-			m.notice = notice{text: "Unsupported Vim command " + command + ". Use :w or :wq.", kind: noticeError}
-			return m, nil
-		}
-	}
-	if len(message.Runes) > 0 {
-		m.vimCommand += string(message.Runes)
-	}
-	return m, nil
+	return m.updateVimExCommand(message, running)
 }
 
 func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
