@@ -51,6 +51,10 @@ func TestStoreRejectsInvalidAndUnsafeCredentials(t *testing.T) {
 	}
 	for _, credential := range []Credential{
 		{Type: apiKeyType},
+		{Type: bearerTokenType},
+		{Type: bearerTokenType, Access: "token", Key: "not-allowed"},
+		{Type: bearerTokenType, Access: "token", Refresh: "not-allowed"},
+		{Type: bearerTokenType, Access: "token", Expires: -1},
 		{Type: oauthType, Access: "token", Key: "not-allowed"},
 		{Type: oauthType, Access: "token", Expires: -1},
 		{Type: "unknown", Key: "key"},
@@ -81,5 +85,16 @@ func TestOAuthCredentialExpiry(t *testing.T) {
 	credential.Expires = 0
 	if credential.Expired(time.Now()) {
 		t.Fatal("non-expiring OAuth credential was treated as expired")
+	}
+}
+
+func TestBearerTokenCredentialExpiry(t *testing.T) {
+	credential := Credential{Type: bearerTokenType, Access: "access", Expires: time.Now().Add(-time.Second).UnixMilli()}
+	if !credential.Expired(time.Now()) {
+		t.Fatal("expired bearer token was treated as current")
+	}
+	credential.Expires = 0
+	if credential.Expired(time.Now()) {
+		t.Fatal("non-expiring bearer token was treated as expired")
 	}
 }

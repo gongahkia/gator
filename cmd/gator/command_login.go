@@ -15,21 +15,27 @@ import (
 )
 
 func login(arguments []string, out io.Writer) error {
+	if len(arguments) == 0 {
+		return errors.New("usage: gator login PROVIDER [--api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
+	}
+	providerName := arguments[0]
 	flags := flag.NewFlagSet("login", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	apiKey := flags.String("api-key", "", "API key to store (visible to the current process)")
+	bearerToken := flags.String("bearer-token", "", "bearer token to store (visible to the current process)")
+	bearerTokenFromEnvironment := flags.String("bearer-token-from-env", "", "environment variable containing a bearer token")
 	fromEnvironment := flags.String("from-env", "", "environment variable containing the API key")
 	subscription := flags.Bool("subscription", false, "use the provider subscription OAuth flow")
-	if err := flags.Parse(arguments); err != nil {
+	if err := flags.Parse(arguments[1:]); err != nil {
 		return err
 	}
-	if len(flags.Args()) != 1 {
-		return errors.New("usage: gator login PROVIDER [--api-key KEY | --from-env NAME]")
+	if len(flags.Args()) != 0 {
+		return errors.New("usage: gator login PROVIDER [--api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
 	}
-	if strings.TrimSpace(*apiKey) != "" && strings.TrimSpace(*fromEnvironment) != "" {
-		return errors.New("use either --api-key or --from-env, not both")
+	if countNonEmpty(*apiKey, *bearerToken, *bearerTokenFromEnvironment, *fromEnvironment) > 1 {
+		return errors.New("use only one of --api-key, --from-env, --bearer-token, or --bearer-token-from-env")
 	}
-	provider, err := model.ParseProvider(flags.Arg(0))
+	provider, err := model.ParseProvider(providerName)
 	if err != nil {
 		return err
 	}
@@ -47,6 +53,20 @@ func login(arguments []string, out io.Writer) error {
 	}
 	if !model.SupportsAPIKeyLogin(provider) {
 		return fmt.Errorf("provider %q uses %s; gator login does not store that credential", provider, model.CredentialHint(provider))
+	}
+	if token, source := bearerTokenValue(*bearerToken, *bearerTokenFromEnvironment); token != "" {
+		if provider != model.AzureOpenAIResponses {
+			return fmt.Errorf("provider %q does not support a Gator-managed bearer token", provider)
+		}
+		credentials, err := gatorCredentials()
+		if err != nil {
+			return err
+		}
+		if err := credentials.Put(string(provider), auth.Credential{Type: "bearer_token", Access: token}); err != nil {
+			return fmt.Errorf("store Gator credential: %w", err)
+		}
+		_, err = fmt.Fprintf(out, "Stored a Gator bearer token for %s from %s. It is not refreshed; replace it before it expires.\n", provider, source)
+		return err
 	}
 	key := strings.TrimSpace(*apiKey)
 	source := "--api-key"
@@ -70,6 +90,27 @@ func login(arguments []string, out io.Writer) error {
 	}
 	_, err = fmt.Fprintf(out, "Stored a Gator credential for %s from %s.\n", provider, source)
 	return err
+}
+
+func countNonEmpty(values ...string) int {
+	count := 0
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func bearerTokenValue(token, environment string) (string, string) {
+	if token = strings.TrimSpace(token); token != "" {
+		return token, "--bearer-token"
+	}
+	environment = strings.TrimSpace(environment)
+	if environment == "" {
+		return "", ""
+	}
+	return strings.TrimSpace(os.Getenv(environment)), environment
 }
 
 func loginOAuth(provider model.Provider, out io.Writer) error {

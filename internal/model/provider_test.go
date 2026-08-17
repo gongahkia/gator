@@ -210,6 +210,67 @@ func TestAzureResponsesUsesRawAPIKeyHeaderAndV1Endpoint(t *testing.T) {
 	}
 }
 
+func TestAzureResponsesAuthenticationModesAreMutuallyExclusive(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		apiKey            string
+		environmentToken  string
+		storedBearerToken string
+		wantHeader        string
+		wantValue         string
+	}{
+		{name: "explicit API key", apiKey: "azure-key", environmentToken: "entra-token", wantHeader: "api-key", wantValue: "azure-key"},
+		{name: "ambient Entra token", environmentToken: "entra-token", wantHeader: "Authorization", wantValue: "Bearer entra-token"},
+		{name: "stored Entra token", storedBearerToken: "stored-token", wantHeader: "Authorization", wantValue: "Bearer stored-token"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("AZURE_OPENAI_API_KEY", "")
+			t.Setenv("AZURE_OPENAI_AUTH_TOKEN", test.environmentToken)
+			config := Config{Provider: AzureOpenAIResponses, APIKey: test.apiKey, Model: "deployment", BaseURL: "https://example.test"}
+			if test.storedBearerToken != "" {
+				store, err := auth.New(t.TempDir())
+				if err != nil {
+					t.Fatalf("new credentials: %v", err)
+				}
+				if err := store.Put(string(AzureOpenAIResponses), auth.Credential{Type: "bearer_token", Access: test.storedBearerToken}); err != nil {
+					t.Fatalf("store bearer token: %v", err)
+				}
+				config.Credentials = &store
+			}
+			backend, err := New(config)
+			if err != nil {
+				t.Fatalf("new backend: %v", err)
+			}
+			adapter, ok := backend.Model.(openai.Responses)
+			if !ok {
+				t.Fatalf("adapter = %T", backend.Model)
+			}
+			if got := adapter.AuthorizationHeader; got != test.wantHeader || adapter.AuthorizationPrefix+adapter.APIKey != test.wantValue {
+				t.Fatalf("authentication = %q %q", got, adapter.AuthorizationPrefix+adapter.APIKey)
+			}
+			if test.wantHeader == "api-key" && adapter.AuthorizationPrefix != "" {
+				t.Fatalf("API-key adapter set an authorization prefix %q", adapter.AuthorizationPrefix)
+			}
+			if test.wantHeader == "Authorization" && adapter.AuthorizationHeader == "api-key" {
+				t.Fatal("bearer adapter also configured api-key authentication")
+			}
+		})
+	}
+}
+
+func TestAzureResponsesPrefersAmbientAPIKeyOverAmbientEntraToken(t *testing.T) {
+	t.Setenv("AZURE_OPENAI_API_KEY", "azure-key")
+	t.Setenv("AZURE_OPENAI_AUTH_TOKEN", "entra-token")
+	backend, err := New(Config{Provider: AzureOpenAIResponses, Model: "deployment", BaseURL: "https://example.test"})
+	if err != nil {
+		t.Fatalf("new backend: %v", err)
+	}
+	adapter, ok := backend.Model.(openai.Responses)
+	if !ok || adapter.AuthorizationHeader != "api-key" || adapter.APIKey != "azure-key" {
+		t.Fatalf("adapter = %#v", backend.Model)
+	}
+}
+
 func TestAzureResponsesEndpointConfiguration(t *testing.T) {
 	t.Setenv("AZURE_OPENAI_API_VERSION", "preview")
 	for _, test := range []struct {

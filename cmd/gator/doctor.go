@@ -63,8 +63,10 @@ func doctor(arguments []string, out io.Writer) error {
 		switch {
 		case stored && credential.Expired(time.Now()):
 			authenticationStatus = "expired"
-		case stored && (credential.IsAPIKey() || credential.IsOAuth()):
+		case stored && (credential.IsAPIKey() || credential.IsBearerToken() || credential.IsOAuth()):
 			authenticationStatus = "stored"
+		case provider == model.AzureOpenAIResponses && model.AmbientCredentialAvailable(provider):
+			authenticationStatus = "set in environment"
 		case model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" && os.Getenv(model.APIKeyEnvironment(provider)) != "":
 			authenticationStatus = "set in environment"
 		}

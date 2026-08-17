@@ -75,6 +75,33 @@ func TestResponsesUsesConfiguredAPIKeyHeader(t *testing.T) {
 	}
 }
 
+func TestResponsesUsesConfiguredBearerAuthorizationHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if got := request.Header.Get("Authorization"); got != "Bearer entra-token" {
+			t.Fatalf("authorization = %q", got)
+		}
+		if got := request.Header.Get("api-key"); got != "" {
+			t.Fatalf("unexpected api-key = %q", got)
+		}
+		_, _ = io.WriteString(writer, `{"output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
+	}))
+	defer server.Close()
+
+	model := Responses{
+		APIKey:              "entra-token",
+		APIKeyEnv:           "AZURE_OPENAI_AUTH_TOKEN",
+		Model:               "deployment",
+		BaseURL:             server.URL,
+		AuthorizationHeader: "Authorization",
+		AuthorizationPrefix: "Bearer ",
+		Client:              server.Client(),
+	}
+	turn, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}})
+	if err != nil || turn.Text != "done" {
+		t.Fatalf("complete = %#v, %v", turn, err)
+	}
+}
+
 func TestResponsesCompleteReplaysFunctionCallAndOutput(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var body responseRequest

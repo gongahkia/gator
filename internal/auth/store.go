@@ -14,17 +14,18 @@ import (
 )
 
 const (
-	apiKeyType = "api_key"
-	oauthType  = "oauth"
+	apiKeyType      = "api_key"
+	bearerTokenType = "bearer_token"
+	oauthType       = "oauth"
 
 	lockTimeout = 10 * time.Second
 	lockRetry   = 25 * time.Millisecond
 )
 
 // Credential is one provider-scoped credential. API key credentials use Key.
-// OAuth credentials use Access, Refresh, and Expires. Extra holds public
-// protocol metadata such as an account identifier or a Copilot endpoint; it
-// must never contain another credential.
+// Bearer-token and OAuth credentials use Access; only OAuth credentials use
+// Refresh. Extra holds public protocol metadata such as an account identifier
+// or a Copilot endpoint; it must never contain another credential.
 type Credential struct {
 	Type    string            `json:"type"`
 	Key     string            `json:"key,omitempty"`
@@ -44,10 +45,17 @@ func (c Credential) IsAPIKey() bool {
 	return c.Type == apiKeyType
 }
 
-// Expired reports whether an OAuth credential needs refreshing. Non-OAuth
-// credentials and permanent OAuth-derived keys do not expire.
+// IsBearerToken reports whether this credential is a user-supplied bearer
+// token. Gator never refreshes bearer tokens because it does not own their
+// issuing OAuth client or grant.
+func (c Credential) IsBearerToken() bool {
+	return c.Type == bearerTokenType
+}
+
+// Expired reports whether a bearer-token or OAuth credential is past its known
+// expiry. API keys and credentials without an expiry do not expire locally.
 func (c Credential) Expired(now time.Time) bool {
-	return c.IsOAuth() && c.Expires > 0 && now.UnixMilli() >= c.Expires
+	return (c.IsOAuth() || c.IsBearerToken()) && c.Expires > 0 && now.UnixMilli() >= c.Expires
 }
 
 // Store owns Gator's auth.json. StateDir is the same base selected for the
@@ -258,6 +266,10 @@ func validateCredential(credential Credential) error {
 	case apiKeyType:
 		if strings.TrimSpace(credential.Key) == "" || credential.Access != "" || credential.Refresh != "" || credential.Expires != 0 {
 			return errors.New("API key credential is incomplete or contains OAuth fields")
+		}
+	case bearerTokenType:
+		if strings.TrimSpace(credential.Access) == "" || credential.Key != "" || credential.Refresh != "" || credential.Expires < 0 {
+			return errors.New("bearer token credential is incomplete or contains API key or OAuth refresh fields")
 		}
 	case oauthType:
 		if strings.TrimSpace(credential.Access) == "" || credential.Expires < 0 || credential.Key != "" {

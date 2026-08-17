@@ -184,7 +184,7 @@ an endpoint for one scripted run.
 | `radius` | `RADIUS_API_KEY` or Radius account OAuth using a Gator-registered client | Radius `pi-messages` gateway protocol |
 | `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
 | `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
-| `azure-openai-responses` | `AZURE_OPENAI_API_KEY` plus `--base-url`, `AZURE_OPENAI_BASE_URL`, or `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI Responses API |
+| `azure-openai-responses` | `AZURE_OPENAI_API_KEY` or `AZURE_OPENAI_AUTH_TOKEN` plus `--base-url`, `AZURE_OPENAI_BASE_URL`, or `AZURE_OPENAI_RESOURCE_NAME` | Azure OpenAI Responses API |
 | `mistral`, `groq`, `together`, `fireworks`, `deepseek` | Provider-specific API key | OpenAI-compatible Chat Completions |
 | `cerebras` | `CEREBRAS_API_KEY` | Cerebras OpenAI-compatible Chat Completions |
 | `nvidia` | `NVIDIA_API_KEY` | NVIDIA NIM OpenAI-compatible Chat Completions |
@@ -234,6 +234,14 @@ The predefined compatible providers use these key variables respectively:
 `ANT_LING_API_KEY`, `MIMO_API_KEY`, `QWEN_TOKEN_PLAN_API_KEY`,
 `QWEN_TOKEN_PLAN_CN_API_KEY`, and `CLOUDFLARE_API_TOKEN`. Cloudflare also
 requires `CLOUDFLARE_ACCOUNT_ID` unless a full `--base-url` is supplied.
+Azure Responses uses `AZURE_OPENAI_API_KEY` when present, otherwise it accepts
+the short-lived Microsoft Entra bearer token in `AZURE_OPENAI_AUTH_TOKEN` and
+sends it only as `Authorization: Bearer`; the two authentication headers are
+never combined. Obtain that token for the Azure Cognitive Services scope
+`https://cognitiveservices.azure.com/.default` and replace it when it expires.
+`gator login azure-openai-responses --bearer-token-from-env AZURE_OPENAI_AUTH_TOKEN`
+may retain a provider-scoped token in Gator's private credential store, but
+Gator cannot refresh it because it does not own the issuing OAuth client.
 Bedrock uses `AWS_BEARER_TOKEN_BEDROCK` and defaults `AWS_REGION` to
 `us-east-1`. Azure Responses normalizes resource roots to `/openai/v1/responses`
 and uses `AZURE_OPENAI_API_VERSION` (default `v1`) when the base URL has no
