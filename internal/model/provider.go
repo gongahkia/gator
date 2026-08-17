@@ -414,19 +414,9 @@ func miniMaxMessagesURL(configured string, china bool) string {
 	return baseURL + "/v1/messages"
 }
 
-type openCodeProtocol uint8
-
-const (
-	openCodeChatCompletions openCodeProtocol = iota
-	openCodeResponses
-	openCodeAnthropic
-	openCodeGemini
-)
-
-// openCodeBackend reproduces Pi's published model-family routing without
-// launching OpenCode. OpenCode Zen's catalog uses the underlying SDK contract:
-// GPT models use Responses, Claude models use Messages, Gemini models use
-// GenerateContent, and the remaining gateway models use Chat Completions.
+// openCodeBackend uses the checked-in OpenCode model catalog rather than
+// guessing a protocol from a model-family prefix. Gator never launches
+// OpenCode or reads its credential store.
 func openCodeBackend(provider Provider, config Config) (Backend, error) {
 	apiKey, err := key(config, provider, "OPENCODE_API_KEY")
 	if err != nil {
@@ -442,7 +432,11 @@ func openCodeBackend(provider Provider, config Config) (Backend, error) {
 			baseURL += "/go"
 		}
 	}
-	switch openCodeModelProtocol(provider, config.Model) {
+	protocol, found := openCodeModelProtocol(provider, config.Model)
+	if !found {
+		return Backend{}, fmt.Errorf("model %q is not in the embedded %s catalog version %s; choose a documented OpenCode model or update Gator's catalog", config.Model, openCodeProviderName(provider), openCodeCatalogVersion)
+	}
+	switch protocol {
 	case openCodeResponses:
 		return Backend{Provider: provider, Model: openai.Responses{
 			APIKey:    apiKey,
@@ -465,7 +459,7 @@ func openCodeBackend(provider Provider, config Config) (Backend, error) {
 			BaseURL: openCodeAPIVersionBase(baseURL),
 			Client:  config.Client,
 		}}, nil
-	default:
+	case openCodeChatCompletions:
 		providerName := "OpenCode Zen"
 		if provider == OpenCodeGo {
 			providerName = "OpenCode Go"
@@ -478,22 +472,8 @@ func openCodeBackend(provider Provider, config Config) (Backend, error) {
 			ProviderName: providerName,
 			Client:       config.Client,
 		}}}, nil
-	}
-}
-
-func openCodeModelProtocol(provider Provider, model string) openCodeProtocol {
-	model = strings.ToLower(strings.TrimSpace(model))
-	switch {
-	case strings.HasPrefix(model, "gpt-"):
-		return openCodeResponses
-	case strings.HasPrefix(model, "claude-"):
-		return openCodeAnthropic
-	case strings.HasPrefix(model, "gemini-"):
-		return openCodeGemini
-	case provider == OpenCodeGo && model == "minimax-m3":
-		return openCodeAnthropic
 	default:
-		return openCodeChatCompletions
+		return Backend{}, fmt.Errorf("model %q has an unsupported %s protocol in catalog version %s", config.Model, openCodeProviderName(provider), openCodeCatalogVersion)
 	}
 }
 

@@ -208,8 +208,8 @@ an endpoint for one scripted run.
 | `xiaomi-token-plan-cn`, `xiaomi-token-plan-ams`, `xiaomi-token-plan-sgp` | `MIMO_API_KEY` | Xiaomi MiMo prepaid Token Plan Chat Completions |
 | `xai` | `XAI_API_KEY`, or Grok/X account OAuth using a Gator-registered client | OpenAI-compatible Chat Completions |
 | `openrouter` | `OPENROUTER_API_KEY`, or a browser-minted user-controlled API key | OpenAI-compatible Chat Completions |
-| `opencode` | `OPENCODE_API_KEY` | OpenCode Zen direct gateway (Responses, Messages, GenerateContent, or Chat Completions by model family) |
-| `opencode-go` | `OPENCODE_API_KEY` | OpenCode Go direct gateway (Responses, Messages, GenerateContent, or Chat Completions by model family) |
+| `opencode` | `OPENCODE_API_KEY` | OpenCode Zen direct gateway selected by Gator's checked-in model/protocol catalog |
+| `opencode-go` | `OPENCODE_API_KEY` | OpenCode Go direct gateway selected by Gator's checked-in model/protocol catalog |
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
 
 `gator login PROVIDER` stores an API-key credential, while `gator login
@@ -251,7 +251,10 @@ token. Set `--model`
 for compatible providers without a Gator default. `gator doctor --provider NAME`
 reports the selected provider's prerequisite without printing a secret.
 
-The direct adapters preserve Gator's strict tool surface: repository reads and
+The OpenCode catalog is a versioned checked-in snapshot of its published Zen
+and Go endpoint tables. It has no runtime network refresh; Gator rejects an
+unknown OpenCode model with a configuration error until a maintainer refreshes
+the catalog deliberately. The direct adapters preserve Gator's strict tool surface: repository reads and
 writes stay inside the isolated worktree and commands are limited to the
 explicit `--verify` argv entries. They replay normalized history locally; the
 Gemini adapter also retains the provider content needed for thought-signature
