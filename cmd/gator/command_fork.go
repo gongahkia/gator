@@ -103,7 +103,7 @@ func branchState(operation, statePath, instruction string, maxSteps int, out io.
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Fork(context.Background(), session, statePath, instruction, gatorrun.Request{MaxSteps: maxSteps, OnEvent: printer.Print})
 	if outcome.Worktree.Path != "" {
-		if _, writeErr := fmt.Fprintf(out, "\n%s worktree: %s\n", strings.Title(operation), outcome.Worktree.Path); writeErr != nil && err == nil {
+		if _, writeErr := fmt.Fprintf(out, "\n%s worktree: %s\n", operation, outcome.Worktree.Path); writeErr != nil && err == nil {
 			err = writeErr
 		}
 	}

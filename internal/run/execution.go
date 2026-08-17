@@ -50,6 +50,21 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	} else {
 		check = completionCheck(request.Verification)
 	}
+	originalMessageCount := len(initialMessages)
+	compactionContext, cancelCompaction := context.WithTimeout(ctx, 45*time.Second)
+	compactedMessages, _, compacted, compactErr := compactMessages(compactionContext, e.Model, system, initialMessages)
+	cancelCompaction()
+	if compactErr != nil {
+		finishErr := runJournal.Finish("failed", "", e.now())
+		if finishErr != nil {
+			return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("compact retained context: %v; finish failed run journal: %w", compactErr, finishErr)
+		}
+		return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("compact retained context: %w", compactErr)
+	}
+	if compacted {
+		initialMessages = compactedMessages
+		emit(agent.Event{Kind: agent.EventContextCompacted, At: e.now(), Text: fmt.Sprintf("Compacted %d earlier messages before this run.", originalMessageCount-recentMessagesToKeep)})
+	}
 	runner := agent.Runner{
 		Model: e.Model,
 		Tools: runTools,
