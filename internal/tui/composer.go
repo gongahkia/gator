@@ -22,10 +22,12 @@ type slashCommand struct {
 var slashCommands = []slashCommand{
 	{name: "/clear", description: "clear the current task"},
 	{name: "/clear-queue", description: "remove every queued instruction"},
+	{name: "/clone", description: "duplicate the active retained branch"},
 	{name: "/dequeue", description: "remove the next queued instruction"},
 	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/login", description: "sign the selected provider into Gator"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
+	{name: "/fork", description: "choose a retained turn to branch from"},
 	{name: "/model", description: "edit the model for the next run"},
 	{name: "/new", description: "start a new isolated thread"},
 	{name: "/plan", description: "switch to enforced read-only Plan mode"},

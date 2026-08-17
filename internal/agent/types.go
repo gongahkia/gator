@@ -120,6 +120,7 @@ const (
 	EventToolFinished      EventKind = "tool_finished"
 	EventCompletionBlocked EventKind = "completion_blocked"
 	EventSteeringApplied   EventKind = "steering_applied"
+	EventContextCompacted  EventKind = "context_compacted"
 	EventRunFinished       EventKind = "run_finished"
 )
 
