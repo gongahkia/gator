@@ -93,9 +93,9 @@ func LoadThreadLineage(headStatePath string) ([]ThreadTurn, error) {
 			return nil, fmt.Errorf("load retained thread turn: %w", err)
 		}
 		if repository == "" {
-			repository = filepath.Clean(session.Repository)
-			worktreePath = filepath.Clean(session.WorktreePath)
-		} else if filepath.Clean(session.Repository) != repository || filepath.Clean(session.WorktreePath) != worktreePath {
+			repository = repositoryIdentity(session.Repository)
+			worktreePath = repositoryIdentity(session.WorktreePath)
+		} else if !sameRepository(session.Repository, repository) || repositoryIdentity(session.WorktreePath) != worktreePath {
 			return nil, errors.New("retained thread lineage crosses repository or worktree")
 		}
 		if session.ThreadID != "" {
@@ -227,7 +227,7 @@ func LoadThread(stateDir, repository, id string) (Thread, error) {
 	if err != nil {
 		return Thread{}, err
 	}
-	if filepath.Clean(thread.Repository) != filepath.Clean(repository) {
+	if !sameRepository(thread.Repository, repository) {
 		return Thread{}, errors.New("thread repository does not match requested repository")
 	}
 	return thread, nil

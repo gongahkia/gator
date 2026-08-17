@@ -15,8 +15,12 @@ func TestCreateIsolatedWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create worktree: %v", err)
 	}
-	if worktree.Repository != repository {
-		t.Fatalf("repository = %q, want %q", worktree.Repository, repository)
+	canonicalRepository, err := filepath.EvalSymlinks(repository)
+	if err != nil {
+		t.Fatalf("resolve repository: %v", err)
+	}
+	if worktree.Repository != canonicalRepository {
+		t.Fatalf("repository = %q, want %q", worktree.Repository, canonicalRepository)
 	}
 	if worktree.Path == repository {
 		t.Fatal("worktree reused active repository path")

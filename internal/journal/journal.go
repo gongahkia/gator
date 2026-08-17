@@ -302,8 +302,28 @@ func absoluteDirectory(path string) (string, error) {
 }
 
 func repositoryFingerprint(repository string) string {
-	digest := sha256.Sum256([]byte(repository))
+	digest := sha256.Sum256([]byte(repositoryIdentity(repository)))
 	return hex.EncodeToString(digest[:16])
+}
+
+// repositoryIdentity makes one physical checkout map to one local-state
+// namespace. macOS exposes /var as a symlink to /private/var, so preserving
+// the spelling supplied by a caller would otherwise split a repository's
+// threads, drafts, and run records across two identities.
+func repositoryIdentity(repository string) string {
+	abs, err := filepath.Abs(repository)
+	if err != nil {
+		return filepath.Clean(repository)
+	}
+	canonical, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return filepath.Clean(abs)
+	}
+	return filepath.Clean(canonical)
+}
+
+func sameRepository(left, right string) bool {
+	return repositoryIdentity(left) == repositoryIdentity(right)
 }
 
 func validRunID(runID string) bool {

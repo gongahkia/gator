@@ -25,6 +25,9 @@ make build
 ./bin/gator
 ./bin/gator help
 ./bin/gator doctor
+./bin/gator version
+./bin/gator config set default-provider anthropic
+./bin/gator config set default-model claude-sonnet-4-6
 OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \
   'Add a focused feature with tests'
 
@@ -216,10 +219,16 @@ Claude.ai OAuth or Keychain credentials. For another installed harness, use
 receives `GATOR_TASK` and `GATOR_WORKTREE`; its authentication and automation
 contract remain its own responsibility.
 
+For an IDE, CI service, or custom UI, use `gator rpc` rather than parsing the
+human CLI output or private journal files. It is a versioned JSONL protocol
+with explicit run, resume, steer, cancel, status, and thread-listing methods.
+See [RPC integration](docs/RPC.md).
+
 ## Providers
 
-Set `--provider`, or set `GATOR_PROVIDER` before starting the TUI. `GATOR_MODEL`
-and `GATOR_BASE_URL` supply the corresponding defaults. `--base-url` overrides
+Set persistent defaults with `gator config set default-provider NAME` and
+`gator config set default-model NAME`. `GATOR_PROVIDER`, `GATOR_MODEL`, and
+one-run flags override those settings for automation. `--base-url` overrides
 an endpoint for one scripted run.
 
 | Provider | Authentication | Protocol |
