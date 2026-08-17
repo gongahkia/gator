@@ -41,6 +41,8 @@ func doctor(arguments []string, out io.Writer) error {
 	authentication := "Gator credential"
 	if provider == model.GoogleVertex {
 		authentication = model.CredentialHint(provider)
+	} else if provider == model.AmazonBedrock {
+		authentication += " or " + model.CredentialHint(provider)
 	} else if model.SupportsAPIKeyLogin(provider) {
 		authentication += " or " + model.CredentialHint(provider)
 	}
@@ -65,6 +67,8 @@ func doctor(arguments []string, out io.Writer) error {
 			authenticationStatus = "expired"
 		case stored && (credential.IsAPIKey() || credential.IsBearerToken() || credential.IsOAuth()):
 			authenticationStatus = "stored"
+		case provider == model.AmazonBedrock && model.AmbientCredentialAvailable(provider):
+			authenticationStatus = model.AmbientCredentialSource(provider)
 		case provider == model.AzureOpenAIResponses && model.AmbientCredentialAvailable(provider):
 			authenticationStatus = "set in environment"
 		case model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" && os.Getenv(model.APIKeyEnvironment(provider)) != "":

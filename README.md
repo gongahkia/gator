@@ -201,7 +201,7 @@ an endpoint for one scripted run.
 | `moonshotai-cn` | `MOONSHOT_API_KEY` | Moonshot AI Kimi China OpenAI-compatible Chat Completions |
 | `cloudflare-workers-ai` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers AI OpenAI-compatible Chat Completions |
 | `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_GATEWAY_ID`, and `GATOR_CLOUDFLARE_GATEWAY_PROTOCOL` | Cloudflare AI Gateway native OpenAI Responses, Anthropic Messages, or Workers AI Chat Completions |
-| `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, optional `AWS_REGION` | Amazon Bedrock OpenAI-compatible Chat Completions |
+| `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, or standard ambient AWS credentials with optional `AWS_REGION` | Amazon Bedrock OpenAI-compatible Chat Completions |
 | `google-vertex` | Google ADC plus `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` | Google Vertex AI OpenAI-compatible Chat Completions |
 | `qwen-token-plan`, `qwen-token-plan-individual` | `QWEN_TOKEN_PLAN_API_KEY` | Qwen Token Plan OpenAI-compatible Chat Completions |
 | `qwen-token-plan-cn` | `QWEN_TOKEN_PLAN_CN_API_KEY` | Qwen Token Plan China OpenAI-compatible Chat Completions |
@@ -248,8 +248,13 @@ never combined. Obtain that token for the Azure Cognitive Services scope
 `gator login azure-openai-responses --bearer-token-from-env AZURE_OPENAI_AUTH_TOKEN`
 may retain a provider-scoped token in Gator's private credential store, but
 Gator cannot refresh it because it does not own the issuing OAuth client.
-Bedrock uses `AWS_BEARER_TOKEN_BEDROCK` and defaults `AWS_REGION` to
-`us-east-1`. Azure Responses normalizes resource roots to `/openai/v1/responses`
+Bedrock preserves `AWS_BEARER_TOKEN_BEDROCK` as the explicit bearer-token path.
+When no bearer token is supplied, Gator uses the AWS SDK's standard credential
+chain (environment credentials, web identity, shared profiles, ECS task role,
+and EC2 instance role) and directly SigV4-signs the Bedrock Runtime Chat
+Completions request with service `bedrock`; it does not invoke the AWS CLI.
+The default region is `us-east-1` when the standard AWS configuration does not
+set one. Azure Responses normalizes resource roots to `/openai/v1/responses`
 and uses `AZURE_OPENAI_API_VERSION` (default `v1`) when the base URL has no
 `api-version` query. Vertex refreshes Google Application Default Credentials directly,
 or accepts `GATOR_VERTEX_ACCESS_TOKEN` for an externally managed short-lived
