@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/model"
 )
 
 func TestDelegateCodexLoginUsesFirstPartyCLI(t *testing.T) {
@@ -65,14 +68,137 @@ func TestDelegateCodexRunUsesIsolatedWorktreeAndVerifies(t *testing.T) {
 
 func TestDelegateClaudeRefusesSubscriptionCredentials(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	var output bytes.Buffer
 	err := delegate([]string{"claude", "run", "--verify", "git status --short", "Add", "a", "feature"}, &output)
-	if err == nil || !strings.Contains(err.Error(), "ANTHROPIC_API_KEY is required") {
+	if err == nil || !strings.Contains(err.Error(), "Anthropic API key is required") {
 		t.Fatalf("Claude delegated run error = %v", err)
 	}
 	err = delegate([]string{"claude", "login"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "does not offer Claude.ai login") {
 		t.Fatalf("Claude delegated login error = %v", err)
+	}
+}
+
+func TestDelegateClaudeUsesGatorAPIKeyWithoutReadingClaudeCredentials(t *testing.T) {
+	repository := delegatedRepository(t)
+	changeDirectory(t, repository)
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	credentials, err := gatorCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.Put(string(model.Anthropic), auth.Credential{Type: "api_key", Key: "gator-anthropic-key"}); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(t.TempDir(), "claude.log")
+	script := delegatedFixture(t, "printf 'key=%s\\nargs=%s\\n' \"$ANTHROPIC_API_KEY\" \"$*\" > \"$GATOR_DELEGATE_LOG\"\n")
+	t.Setenv("GATOR_CLAUDE_COMMAND", script)
+	t.Setenv("GATOR_DELEGATE_LOG", logPath)
+
+	var output bytes.Buffer
+	err = delegate([]string{"claude", "run", "--verify", "git status --short", "Add", "a", "feature"}, &output)
+	if err != nil {
+		t.Fatalf("delegate Claude run: %v", err)
+	}
+	logged, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(logged), "key=gator-anthropic-key\n") || !strings.Contains(string(logged), "--bare --print --permission-mode acceptEdits") {
+		t.Fatalf("Claude delegated environment and args = %q", logged)
+	}
+	if strings.Contains(output.String(), "gator-anthropic-key") {
+		t.Fatalf("delegate output exposed an API key: %q", output.String())
+	}
+}
+
+func TestDelegateCopilotUsesVendorLoginAndNonInteractiveToolPermission(t *testing.T) {
+	repository := delegatedRepository(t)
+	changeDirectory(t, repository)
+	logPath := filepath.Join(t.TempDir(), "copilot.log")
+	script := delegatedFixture(t, "printf '%s\\n' \"$@\" > \"$GATOR_DELEGATE_LOG\"\n")
+	t.Setenv("GATOR_COPILOT_COMMAND", script)
+	t.Setenv("GATOR_DELEGATE_LOG", logPath)
+
+	var output bytes.Buffer
+	if err := delegate([]string{"copilot", "login", "--host", "https://example.ghe.com"}, &output); err != nil {
+		t.Fatalf("delegate Copilot login: %v", err)
+	}
+	logged, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(logged); got != "login\n--host\nhttps://example.ghe.com\n" {
+		t.Fatalf("Copilot login args = %q", got)
+	}
+
+	if err := delegate([]string{"copilot", "run", "--model", "gpt-test", "--verify", "git status --short", "Add", "a", "feature"}, &output); err != nil {
+		t.Fatalf("delegate Copilot run: %v", err)
+	}
+	logged, err = os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(logged); !strings.Contains(got, "--prompt\nAdd a feature\n--allow-all-tools\n--no-ask-user\n--model\ngpt-test\n") {
+		t.Fatalf("Copilot run args = %q", got)
+	}
+}
+
+func TestDelegateKimiAndOpenCodeUseTheirOwnCredentialStores(t *testing.T) {
+	repository := delegatedRepository(t)
+	changeDirectory(t, repository)
+	kimiLog := filepath.Join(t.TempDir(), "kimi.log")
+	kimiScript := delegatedFixture(t, "printf '%s\\n' \"$@\" > \"$GATOR_DELEGATE_LOG\"\n")
+	t.Setenv("GATOR_KIMI_COMMAND", kimiScript)
+	t.Setenv("GATOR_DELEGATE_LOG", kimiLog)
+
+	var output bytes.Buffer
+	if err := delegate([]string{"kimi", "login"}, &output); err != nil {
+		t.Fatalf("delegate Kimi login: %v", err)
+	}
+	logged, err := os.ReadFile(kimiLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(logged); got != "login\n" {
+		t.Fatalf("Kimi login args = %q", got)
+	}
+	if err := delegate([]string{"kimi", "run", "--model", "kimi-test", "--verify", "git status --short", "Add", "a", "feature"}, &output); err != nil {
+		t.Fatalf("delegate Kimi run: %v", err)
+	}
+	logged, err = os.ReadFile(kimiLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(logged); !strings.Contains(got, "--auto\n--prompt\nAdd a feature\n--output-format\ntext\n--model\nkimi-test\n") {
+		t.Fatalf("Kimi run args = %q", got)
+	}
+
+	opencodeLog := filepath.Join(t.TempDir(), "opencode.log")
+	opencodeScript := delegatedFixture(t, "printf '%s\\n' \"$@\" > \"$GATOR_OPENCODE_LOG\"\n")
+	t.Setenv("GATOR_OPENCODE_COMMAND", opencodeScript)
+	t.Setenv("GATOR_OPENCODE_LOG", opencodeLog)
+	if err := delegate([]string{"opencode", "login", "--provider", "xai"}, &output); err != nil {
+		t.Fatalf("delegate OpenCode login: %v", err)
+	}
+	logged, err = os.ReadFile(opencodeLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(logged); got != "providers\nlogin\n--provider\nxai\n" {
+		t.Fatalf("OpenCode login args = %q", got)
+	}
+	if err := delegate([]string{"opencode", "run", "--model", "xai/grok-build", "--verify", "git status --short", "Add", "a", "feature"}, &output); err != nil {
+		t.Fatalf("delegate OpenCode run: %v", err)
+	}
+	logged, err = os.ReadFile(opencodeLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(logged); !strings.Contains(got, "run\n--dir\n") || !strings.Contains(got, "--auto\n--model\nxai/grok-build\nAdd a feature\n") {
+		t.Fatalf("OpenCode run args = %q", got)
 	}
 }
 

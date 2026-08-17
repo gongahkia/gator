@@ -12,6 +12,7 @@ Usage:
   gator
   gator tui
   gator help
+  gator connect PROVIDER [OPTIONS]
   gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
@@ -23,6 +24,7 @@ Usage:
 
 Commands:
   tui       open the interactive terminal application (the default command)
+  connect   start a provider-owned or API-key onboarding flow
   login     store a provider credential in Gator's private local auth file
   logout    remove a provider credential from Gator's private local auth file
   delegate  run an installed vendor or external agent in an isolated worktree
@@ -33,9 +35,10 @@ Commands:
   apply     explicitly apply a retained patch to this clean checkout
 
 Cloud providers resolve credentials in this order: --api-key, Gator's private
-local auth file, then the provider environment variable. Gator never delegates
-its tool loop to a vendor CLI. --verify is repeatable and every listed command
-must pass before Gator accepts completion.`
+local auth file, then the provider environment variable. Native runs keep
+Gator's tool loop; gator delegate is an explicit installed-harness boundary.
+--verify is repeatable and every listed command must pass before Gator accepts
+completion.`
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
@@ -54,6 +57,8 @@ func run(args []string, out io.Writer) error {
 	}
 
 	switch args[0] {
+	case "connect":
+		return connect(args[1:], out)
 	case "doctor":
 		return doctor(args[1:], out)
 	case "login":

@@ -182,6 +182,13 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "OAuth login is already waiting for a browser callback. Press Ctrl+C to cancel it.", kind: noticeInfo}
 		return m, nil
 	}
+	if command := delegatedConnectCommand(string(provider)); command != "" {
+		if clientIDEnvironment := oauthClientIDEnvironment(string(provider)); clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "" {
+			m.commandOutput = "Native Gator OAuth requires " + clientIDEnvironment + ".\n\nFor the no-registration vendor-CLI route, exit this TUI and run:\n  " + command + "\n\nThen use the matching gator delegate runtime."
+			m.notice = notice{text: "Use the vendor-CLI connection command shown below, or configure Gator's own OAuth client.", kind: noticeInfo}
+			return m, nil
+		}
+	}
 	login, err := m.config.BeginOAuthLogin(string(provider))
 	if err != nil {
 		m.notice = notice{text: err.Error(), kind: noticeError}
@@ -291,7 +298,6 @@ func providerDropdownOptions(stateDir string) []dropdownOption {
 		modelprovider.XiaomiTokenPlanSGP:      "Xiaomi MiMo Token Plan Singapore Chat Completions",
 		modelprovider.OpenAICompatible:        "custom Chat Completions endpoint",
 		modelprovider.Codex:                   "ChatGPT/Codex subscription",
-		modelprovider.Claude:                  "Claude subscription",
 		modelprovider.Copilot:                 "GitHub Copilot subscription",
 		modelprovider.KimiCoding:              "Kimi Code subscription or Kimi API key",
 		modelprovider.Radius:                  "Radius API key or account OAuth (Gator client)",
@@ -303,6 +309,9 @@ func providerDropdownOptions(stateDir string) []dropdownOption {
 	for _, name := range modelprovider.Names() {
 		provider, err := modelprovider.ParseProvider(name)
 		if err != nil {
+			continue
+		}
+		if provider == modelprovider.Claude {
 			continue
 		}
 		description := descriptions[provider]
@@ -322,17 +331,29 @@ func subscriptionDescription(description, provider string, store auth.Store, sto
 		}
 	}
 	if clientIDEnvironment := oauthClientIDEnvironment(provider); clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "" {
+		if command := delegatedConnectCommand(provider); command != "" {
+			return description + " · first-party CLI: " + command
+		}
 		return description + " · requires " + clientIDEnvironment
 	}
 	return description + " · sign in with /login " + provider
+}
+
+func delegatedConnectCommand(provider string) string {
+	switch provider {
+	case string(modelprovider.Codex):
+		return "gator connect codex"
+	case string(modelprovider.Copilot):
+		return "gator connect copilot"
+	default:
+		return ""
+	}
 }
 
 func oauthClientIDEnvironment(provider string) string {
 	switch provider {
 	case string(modelprovider.Codex):
 		return "GATOR_CODEX_OAUTH_CLIENT_ID"
-	case string(modelprovider.Claude):
-		return "GATOR_CLAUDE_OAUTH_CLIENT_ID"
 	case string(modelprovider.Copilot):
 		return "GATOR_COPILOT_OAUTH_CLIENT_ID"
 	default:

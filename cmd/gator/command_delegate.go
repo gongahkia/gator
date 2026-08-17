@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -20,15 +21,23 @@ const delegateUsage = `Usage:
   gator delegate codex login [--device]
   gator delegate codex status
   gator delegate codex run [--model MODEL] --verify 'argv ...' TASK
+  gator delegate copilot login [--host URL]
+  gator delegate copilot run [--model MODEL] --verify 'argv ...' TASK
   gator delegate claude run [--model MODEL] --verify 'argv ...' TASK
+  gator delegate kimi login
+  gator delegate kimi run [--model MODEL] --verify 'argv ...' TASK
+  gator delegate opencode login --provider PROVIDER [--method METHOD]
+  gator delegate opencode status
+  gator delegate opencode run [--model PROVIDER/MODEL] --verify 'argv ...' TASK
   gator delegate external run --task TASK --verify 'argv ...' -- COMMAND [ARG ...]
 
 Delegated runtimes use their own installed CLI and credential store. Gator keeps
 the worktree and verification boundary, but the delegated CLI owns its agent
 tools, sandbox, approvals, session state, and account authentication.
 
-Codex login is first-party Codex CLI login. Claude runs in --bare API-key mode;
-Gator never offers Claude.ai subscription login.`
+Codex, Copilot, and Kimi login invoke their vendor CLI. OpenCode owns the
+provider login it starts. Claude runs in --bare API-key mode; Gator never
+offers Claude.ai subscription login.`
 
 func delegate(arguments []string, out io.Writer) error {
 	if len(arguments) < 2 {
@@ -51,9 +60,35 @@ func delegate(arguments []string, out io.Writer) error {
 	case "claude":
 		switch action {
 		case "login":
-			return errors.New("Gator does not offer Claude.ai login. Anthropic requires third-party products to use an API key unless separately approved; set ANTHROPIC_API_KEY and run 'gator delegate claude run ...'")
+			return errors.New("Gator does not offer Claude.ai login. Anthropic requires third-party products to use an API key unless separately approved; set ANTHROPIC_API_KEY or run 'gator connect claude'")
 		case "run":
 			return delegateClaudeRun(arguments[2:], out)
+		}
+	case "copilot":
+		switch action {
+		case "login":
+			return delegateCopilotLogin(arguments[2:], out)
+		case "run":
+			return delegateCopilotRun(arguments[2:], out)
+		}
+	case "kimi":
+		switch action {
+		case "login":
+			return delegateKimiLogin(arguments[2:], out)
+		case "run":
+			return delegateKimiRun(arguments[2:], out)
+		}
+	case "opencode":
+		switch action {
+		case "login":
+			return delegateOpenCodeLogin(arguments[2:], out)
+		case "status":
+			if len(arguments) != 2 {
+				return errors.New("usage: gator delegate opencode status")
+			}
+			return runDelegateCommand(context.Background(), delegateProgram("opencode"), []string{"providers", "list"}, "", out, nil)
+		case "run":
+			return delegateOpenCodeRun(arguments[2:], out)
 		}
 	case "external":
 		if action == "run" {
@@ -96,10 +131,11 @@ func delegateCodexRun(arguments []string, out io.Writer) error {
 }
 
 func delegateClaudeRun(arguments []string, out io.Writer) error {
-	if strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")) == "" {
-		return errors.New("ANTHROPIC_API_KEY is required for delegated Claude Code runs; Gator deliberately does not use Claude.ai OAuth or Claude Code's stored credentials")
-	}
 	options, task, err := parseDelegatedRunFlags("delegate claude run", arguments)
+	if err != nil {
+		return err
+	}
+	environment, err := delegatedClaudeEnvironment()
 	if err != nil {
 		return err
 	}
@@ -109,7 +145,110 @@ func delegateClaudeRun(arguments []string, out io.Writer) error {
 			arguments = append(arguments, "--model", options.model)
 		}
 		arguments = append(arguments, "--", task)
-		return runDelegateCommand(ctx, delegateProgram("claude"), arguments, directory, writer, nil)
+		return runDelegateCommand(ctx, delegateProgram("claude"), arguments, directory, writer, nil, environment)
+	})
+}
+
+func delegatedClaudeEnvironment() ([]string, error) {
+	if strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")) != "" {
+		return os.Environ(), nil
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return nil, err
+	}
+	credential, found, err := credentials.Read(string(model.Anthropic))
+	if err != nil {
+		return nil, fmt.Errorf("read Gator Anthropic credential: %w", err)
+	}
+	if found && credential.IsAPIKey() && strings.TrimSpace(credential.Key) != "" {
+		return append(os.Environ(), "ANTHROPIC_API_KEY="+credential.Key), nil
+	}
+	return nil, errors.New("an Anthropic API key is required for delegated Claude Code runs; set ANTHROPIC_API_KEY or run 'gator connect claude'. Gator deliberately does not use Claude.ai OAuth or Claude Code's stored credentials")
+}
+
+func delegateCopilotLogin(arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("delegate copilot login", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	host := flags.String("host", "", "GitHub host URL")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if len(flags.Args()) != 0 {
+		return errors.New("usage: gator delegate copilot login [--host URL]")
+	}
+	command := []string{"login"}
+	if value := strings.TrimSpace(*host); value != "" {
+		command = append(command, "--host", value)
+	}
+	return runDelegateCommand(context.Background(), delegateProgram("copilot"), command, "", out, os.Stdin)
+}
+
+func delegateCopilotRun(arguments []string, out io.Writer) error {
+	options, task, err := parseDelegatedRunFlags("delegate copilot run", arguments)
+	if err != nil {
+		return err
+	}
+	return runDelegatedTask(context.Background(), "copilot", task, options, out, func(ctx context.Context, directory string, writer io.Writer) error {
+		command := []string{"--prompt", task, "--allow-all-tools", "--no-ask-user"}
+		if options.model != "" {
+			command = append(command, "--model", options.model)
+		}
+		return runDelegateCommand(ctx, delegateProgram("copilot"), command, directory, writer, nil)
+	})
+}
+
+func delegateKimiLogin(arguments []string, out io.Writer) error {
+	if len(arguments) != 0 {
+		return errors.New("usage: gator delegate kimi login")
+	}
+	return runDelegateCommand(context.Background(), delegateProgram("kimi"), []string{"login"}, "", out, os.Stdin)
+}
+
+func delegateKimiRun(arguments []string, out io.Writer) error {
+	options, task, err := parseDelegatedRunFlags("delegate kimi run", arguments)
+	if err != nil {
+		return err
+	}
+	return runDelegatedTask(context.Background(), "kimi", task, options, out, func(ctx context.Context, directory string, writer io.Writer) error {
+		command := []string{"--auto", "--prompt", task, "--output-format", "text"}
+		if options.model != "" {
+			command = append(command, "--model", options.model)
+		}
+		return runDelegateCommand(ctx, delegateProgram("kimi"), command, directory, writer, nil)
+	})
+}
+
+func delegateOpenCodeLogin(arguments []string, out io.Writer) error {
+	flags := flag.NewFlagSet("delegate opencode login", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	provider := flags.String("provider", "", "OpenCode provider ID or name")
+	method := flags.String("method", "", "OpenCode login method label")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if len(flags.Args()) != 0 || strings.TrimSpace(*provider) == "" {
+		return errors.New("usage: gator delegate opencode login --provider PROVIDER [--method METHOD]")
+	}
+	command := []string{"providers", "login", "--provider", strings.TrimSpace(*provider)}
+	if value := strings.TrimSpace(*method); value != "" {
+		command = append(command, "--method", value)
+	}
+	return runDelegateCommand(context.Background(), delegateProgram("opencode"), command, "", out, os.Stdin)
+}
+
+func delegateOpenCodeRun(arguments []string, out io.Writer) error {
+	options, task, err := parseDelegatedRunFlags("delegate opencode run", arguments)
+	if err != nil {
+		return err
+	}
+	return runDelegatedTask(context.Background(), "opencode", task, options, out, func(ctx context.Context, directory string, writer io.Writer) error {
+		command := []string{"run", "--dir", directory, "--auto"}
+		if options.model != "" {
+			command = append(command, "--model", options.model)
+		}
+		command = append(command, task)
+		return runDelegateCommand(ctx, delegateProgram("opencode"), command, directory, writer, nil)
 	})
 }
 
@@ -218,6 +357,9 @@ func runDelegateCommand(ctx context.Context, program string, arguments []string,
 		command.Env = environment[0]
 	}
 	if err := command.Run(); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return fmt.Errorf("%s is not installed or is not on PATH", filepath.Base(program))
+		}
 		return fmt.Errorf("run %s: %w", filepath.Base(program), err)
 	}
 	return nil

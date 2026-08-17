@@ -24,6 +24,9 @@ func beginTUIOAuthLogin(providerName string) (tui.OAuthLogin, error) {
 	if !model.SupportsOAuthLogin(provider) {
 		return nil, fmt.Errorf("provider %q does not use subscription OAuth", provider)
 	}
+	if provider == model.Claude {
+		return nil, fmt.Errorf("Claude.ai subscription OAuth is not a supported Gator login; use 'gator connect claude' and provider %q", model.Anthropic)
+	}
 	if provider == model.Copilot {
 		return beginCopilotDeviceLogin()
 	}

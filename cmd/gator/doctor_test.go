@@ -65,3 +65,13 @@ func TestDoctorReportsAmbientBedrockAuthenticationWithoutExposingCredentials(t *
 		t.Fatalf("doctor output = %q", text)
 	}
 }
+
+func TestDoctorExplainsClaudeSubscriptionBoundary(t *testing.T) {
+	var output bytes.Buffer
+	if err := doctor([]string{"--provider", "claude"}, &output); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	if got := output.String(); !strings.Contains(got, "unsupported native Claude.ai subscription OAuth") || !strings.Contains(got, "gator connect claude") {
+		t.Fatalf("doctor output = %q", got)
+	}
+}

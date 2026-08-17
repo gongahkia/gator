@@ -35,7 +35,7 @@ stateless GenerateContent; and the compatible adapter supports Chat
 Completions-compatible providers.
 
 Native Gator runs never launch a vendor CLI or read its OAuth state. `codex`,
-`claude`, `copilot`, `kimi-coding`, `radius`, `xai`, and `openrouter` use direct
+`copilot`, `kimi-coding`, `radius`, `xai`, and `openrouter` use direct
 provider requests with credentials in Gator's private auth file; Gator retains
 tool policy, event streaming, steering, and resume behavior. Provider account
 OAuth needs a Gator-controlled client registration where the provider requires
@@ -50,13 +50,14 @@ same isolated retained worktree and then starts an explicitly selected installed
 CLI there; Gator runs the developer's verification commands after that CLI
 exits. The delegated CLI owns its own agent loop, context, tools, approvals,
 sandbox, session state, and credentials, so a delegated run has no native
-steering or Gator session resume. The Codex delegated runtime uses the
-first-party `codex` executable, which owns ChatGPT browser/device login and
-token storage. Claude delegation accepts only `ANTHROPIC_API_KEY` and invokes
-Claude Code with `--bare`, preventing reuse of Claude.ai OAuth or Keychain
-credentials. Generic external delegation passes a task and worktree path only;
-each harness remains responsible for its own documented authentication and
-automation contract.
+steering or Gator session resume. `gator connect` invokes vendor-owned login
+for Codex, Copilot, and Kimi; it invokes OpenCode's provider login for xAI.
+Those credentials stay in the invoked CLI's store. Claude delegation invokes
+`claude --bare`, with `ANTHROPIC_API_KEY` taken from the environment or Gator's
+private Anthropic API-key entry; it deliberately cannot reuse Claude.ai OAuth
+or Keychain credentials. Generic external delegation passes a task and
+worktree path only; each harness remains responsible for its own documented
+authentication and automation contract.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, execution mode, and explicit verifier allowlist;
