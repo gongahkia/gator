@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -58,7 +60,19 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
-	return gatorrun.Executor{Model: backend.Model}, nil
+	store, err := config.DefaultStore()
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	settings, err := store.Load()
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	extensions, err := extension.DefaultResolver(settings)
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	return gatorrun.Executor{Model: backend.Model, Extensions: extensions}, nil
 }
 
 func refreshProviderCredential(ctx context.Context, provider model.Provider, credentials auth.Store, flowFor func(model.Provider) (auth.BrowserFlow, error), now time.Time) error {

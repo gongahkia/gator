@@ -19,6 +19,14 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, err
 	}
+	extensions, err := e.Extensions.Load(isolated.Repository)
+	if err != nil {
+		return Outcome{Worktree: isolated}, fmt.Errorf("load extensions: %w", err)
+	}
+	extensionInstructions, err := extensions.Instructions()
+	if err != nil {
+		return Outcome{Worktree: isolated}, err
+	}
 	stateDir := request.StateDir
 	if stateDir == "" {
 		stateDir = e.StateDir
@@ -42,7 +50,10 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	var result agent.Result
 	runTools := tools.Default(isolated.Root, tools.CommandPolicy{Allowed: request.Verification})
-	system := systemPrompt(joinInstructions(projectInstructions, request.System), request.Verification)
+	if request.Mode == ExecuteMode {
+		runTools = append(runTools, extensions.Tools(isolated.Root)...)
+	}
+	system := systemPrompt(joinInstructions(joinInstructions(projectInstructions, extensionInstructions), request.System), request.Verification)
 	var check func([]agent.Message) error
 	if request.Mode == PlanMode {
 		runTools = tools.ReadOnly(isolated.Root)
