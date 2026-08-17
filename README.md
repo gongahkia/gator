@@ -36,29 +36,46 @@ GEMINI_API_KEY=... ./bin/gator run --provider gemini \
   --model gemini-3.5-flash --verify 'go test ./...' \
   'Add a focused feature with tests'
 
-# Subscription providers keep Gator's tool loop and use Gator's own OAuth
-# credential file. The client ID must be registered for Gator's loopback URL;
-# Gator does not impersonate Codex, Claude Code, or Pi.
+# `connect` is the no-registration subscription route when a vendor CLI offers
+# a public login. Credentials stay in that CLI's credential store.
+./bin/gator connect codex            # first-party Codex browser login
+./bin/gator connect copilot          # first-party Copilot device login
+./bin/gator connect kimi             # first-party Kimi device login
+./bin/gator connect xai              # OpenCode's provider-approved Grok OAuth
+./bin/gator connect openrouter       # browser PKCE flow, mints a Gator API key
+
+# Claude Code delegation uses a standard Anthropic API key, which `connect`
+# persists in Gator's private credential file and passes only to --bare runs.
+ANTHROPIC_API_KEY=... ./bin/gator connect claude
+
+# Radius has no verified public vendor-CLI subscription route. Its API key is
+# the supported no-registration path for native Gator runs.
+RADIUS_API_KEY=... ./bin/gator connect radius
+
+# Native Gator account OAuth is an advanced integration: Gator's client must
+# be registered with the provider. It is distinct from the recommended `connect`
+# route and Gator never impersonates another application's OAuth client.
 GATOR_CODEX_OAUTH_CLIENT_ID=... ./bin/gator login codex
-GATOR_CLAUDE_OAUTH_CLIENT_ID=... ./bin/gator login claude
 GATOR_COPILOT_OAUTH_CLIENT_ID=... ./bin/gator login copilot
 GATOR_XAI_OAUTH_CLIENT_ID=... ./bin/gator login xai --subscription
 GATOR_KIMI_CODE_OAUTH_CLIENT_ID=... ./bin/gator login kimi-coding --subscription
 GATOR_RADIUS_OAUTH_CLIENT_ID=... ./bin/gator login radius --subscription
-./bin/gator login openrouter --subscription
-./bin/gator run --provider codex --verify 'go test ./...' \
-  'Add a focused feature with tests'
 
 # Delegated runtimes are separate from native Gator providers. The installed
-# vendor CLI owns authentication and agent execution; Gator owns the isolated
-# worktree and runs the required verification commands after it exits.
-./bin/gator delegate codex login
+# harness owns its agent execution; Gator creates a worktree and runs required
+# verification commands after the harness exits.
 ./bin/gator delegate codex run --verify 'go test ./...' \
+  'Add a focused feature with tests'
+./bin/gator delegate copilot run --verify 'go test ./...' \
+  'Add a focused feature with tests'
+./bin/gator delegate kimi run --verify 'go test ./...' \
+  'Add a focused feature with tests'
+./bin/gator delegate opencode run --model xai/grok-build --verify 'go test ./...' \
   'Add a focused feature with tests'
 
 # Claude Code delegation intentionally uses only an API key. --bare prevents
-# Claude Code from reusing Claude.ai OAuth or stored CLI credentials.
-ANTHROPIC_API_KEY=... ./bin/gator delegate claude run --verify 'go test ./...' \
+# Claude Code from reusing Claude.ai OAuth or its stored CLI credentials.
+./bin/gator delegate claude run --verify 'go test ./...' \
   'Add a focused feature with tests'
 
 # Open a project-scoped retained-thread picker, continue the latest thread,
@@ -153,7 +170,7 @@ YAML, TOML, XML, HTML, logs, and common config files) plus `.docx`, `.odt`,
 and `.xlsx`. Office files are extracted locally into plain text; PDFs retain
 their original bytes so OpenAI, Anthropic, and Gemini can use their documented
 document inputs. Text/data attachments work with every direct API adapter;
-PDFs require the `openai`, `codex`, `anthropic`, `claude`, or `gemini` provider because generic
+PDFs require the `openai`, `codex`, `anthropic`, or `gemini` provider because generic
 Chat Completions endpoints do not share a stable document-input protocol.
 
 Gator permits at most four attachments per task, each up to 4 MiB, with an
@@ -179,19 +196,25 @@ checkout is clean and compatible; omitting `--check` applies the patch. Gator
 does not stage, commit, or push the result. The existing `run` and `resume`
 commands remain available for scripts and CI-like usage.
 
+`gator connect` is the shortest compliant onboarding path for subscription
+providers. It invokes an installed Codex, GitHub Copilot, or Kimi CLI for that
+vendor's own sign-in. `gator connect xai` invokes OpenCode's xAI provider
+picker, which offers browser OAuth, device-code OAuth, or an API key. Gator
+does not store, copy, or translate any credential those harnesses create.
+
 `gator delegate` is the explicit alternative for an installed agent CLI. It
-creates and retains the same isolated worktree, then executes Gator's required
+creates and retains the same Git worktree, then executes Gator's required
 verification commands after the delegated agent exits. The delegated CLI owns
 its own tool policy, sandbox, approvals, session history, and credentials, so
-delegated runs do not support Gator steering or `gator resume`. `gator delegate
-codex login` invokes Codex's first-party browser/device login; Gator neither
-reads nor copies the credentials it creates. `gator delegate claude run`
-requires `ANTHROPIC_API_KEY` and passes `--bare`, which prevents Claude Code
-from reading Claude.ai OAuth or Keychain credentials. For another installed
-harness, use `gator delegate external run --task '...' --verify '...' --
-command {task}`. `{task}` and `{worktree}` are safe whole-argument placeholders,
-and the process receives `GATOR_TASK` and `GATOR_WORKTREE`; its authentication
-and automation contract remain its own responsibility.
+delegated runs do not support Gator steering or `gator resume`. Copilot's
+non-interactive delegate grants its own tools but does not disable its path or
+URL approval controls. Claude delegation passes either `ANTHROPIC_API_KEY` or
+Gator's stored Anthropic API key to `claude --bare`, which prevents reuse of
+Claude.ai OAuth or Keychain credentials. For another installed harness, use
+`gator delegate external run --task '...' --verify '...' -- command {task}`.
+`{task}` and `{worktree}` are safe whole-argument placeholders, and the process
+receives `GATOR_TASK` and `GATOR_WORKTREE`; its authentication and automation
+contract remain its own responsibility.
 
 ## Providers
 
@@ -202,11 +225,10 @@ an endpoint for one scripted run.
 | Provider | Authentication | Protocol |
 | --- | --- | --- |
 | `openai` | `OPENAI_API_KEY` | OpenAI Responses API |
-| `codex` | ChatGPT/Codex account OAuth using a Gator-registered client | ChatGPT Codex Responses endpoint |
+| `codex` | ChatGPT/Codex account OAuth using a Gator-registered client; `gator connect codex` delegates first-party CLI login | ChatGPT Codex Responses endpoint |
 | `anthropic` | `ANTHROPIC_API_KEY` | Anthropic Messages API |
-| `claude` | Claude account OAuth using a Gator-registered client | Anthropic Messages endpoint |
-| `copilot` | GitHub Copilot account OAuth using a Gator-registered GitHub client | Copilot Chat Completions endpoint and account model catalog |
-| `kimi-coding` | `KIMI_API_KEY` or Kimi Code account OAuth using a Gator-registered client | Kimi's Anthropic-compatible coding Messages endpoint |
+| `copilot` | GitHub Copilot account OAuth using a Gator-registered client; `gator connect copilot` delegates first-party CLI login | Copilot Chat Completions endpoint and account model catalog |
+| `kimi-coding` | `KIMI_API_KEY` or Kimi Code account OAuth using a Gator-registered client; `gator connect kimi` delegates first-party CLI login | Kimi's Anthropic-compatible coding Messages endpoint |
 | `radius` | `RADIUS_API_KEY` or Radius account OAuth using a Gator-registered client | Radius `pi-messages` gateway protocol |
 | `gemini` | `GEMINI_API_KEY` | Gemini GenerateContent API |
 | `azure-openai` | `AZURE_OPENAI_API_KEY` plus `--base-url` and deployment model | Azure OpenAI-compatible Chat Completions |
@@ -239,17 +261,19 @@ an endpoint for one scripted run.
 | `openai-compatible` | `GATOR_COMPATIBLE_API_KEY` plus `--base-url` | Any compatible Chat Completions endpoint |
 
 `gator login PROVIDER` stores an API-key credential, while `gator login
-PROVIDER --subscription` runs a supported account OAuth flow. Both write only
-Gator's own credential material to
+PROVIDER --subscription` runs a native Gator account OAuth flow. Both write
+only Gator's own credential material to
 `$XDG_STATE_HOME/gator/auth.json` (or `~/.local/state/gator/auth.json`) with
 `0600` permissions. Explicit `--api-key` wins over the stored credential,
 which wins over the provider environment variable. `/login PROVIDER` in the
 TUI displays a browser or device-code URL and waits for completion; `Ctrl+C`
-cancels the pending login. Codex, Claude, Copilot, xAI, Kimi Code, and Radius require
+cancels the pending login. Codex, Copilot, xAI, Kimi Code, and Radius require
 their corresponding `GATOR_*_OAUTH_CLIENT_ID` registration. OpenRouter's flow
 does not use a client ID: it exchanges a PKCE authorization code for a
-user-controlled API key. Gator does not claim that Claude account OAuth uses
-Claude plan limits; provider billing and eligibility remain provider-defined.
+user-controlled API key. Prefer `gator connect` when it offers a public
+vendor-CLI path. Claude.ai subscription OAuth is intentionally not offered by
+Gator. Use provider `anthropic` or `gator delegate claude run` with an
+Anthropic API key; provider billing and eligibility remain provider-defined.
 
 The predefined compatible providers use these key variables respectively:
 `MISTRAL_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`,
@@ -299,8 +323,8 @@ tool-call replay in the private session file.
 
 ### Provider ownership
 
-Native `gator run` never starts Codex, Claude Code, GitHub Copilot, or Cursor
-Agent. Its `codex`, `claude`, `copilot`, `kimi-coding`, `radius`, `xai`,
+Native `gator run` never starts Codex, Claude Code, GitHub Copilot, Kimi, or
+Cursor Agent. Its `codex`, `copilot`, `kimi-coding`, `radius`, `xai`,
 `openrouter`, `opencode`, and `opencode-go` paths make direct model requests
 with credentials Gator creates and stores itself; they do not reuse a vendor
 CLI session or read another application's OAuth files, tokens, or API keys.
@@ -309,8 +333,9 @@ remains unavailable rather than falling back to its vendor CLI: no public
 direct Cursor inference contract was verified.
 
 `gator delegate` is a separate, explicit product boundary rather than a native
-provider fallback. It can launch Codex or Claude Code only when selected by the
-developer, and it has the delegated-runtime limitations described above.
+provider fallback. It can launch Codex, Claude Code, Copilot, Kimi, OpenCode,
+or another explicitly selected harness, and has the delegated-runtime
+limitations described above.
 
 `google-vertex` is the explicit cloud-credential exception: it reads Google
 Application Default Credentials (or `GATOR_VERTEX_ACCESS_TOKEN`) and refreshes

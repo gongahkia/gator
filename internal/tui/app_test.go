@@ -271,6 +271,7 @@ func TestSlashPaletteFiltersAndFocusesModel(t *testing.T) {
 }
 
 func TestLoginCommandShowsOAuthURLAndCompletesWithoutStartingRun(t *testing.T) {
+	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "gator-client")
 	login := &fakeOAuthLogin{url: "https://auth.example.test/authorize"}
 	model := New(Config{
 		Provider: "codex",
@@ -794,19 +795,39 @@ func TestProviderDropdownShowsSubscriptionSignInState(t *testing.T) {
 	t.Fatal("Codex provider option was missing")
 }
 
-func TestProviderDropdownNamesMissingSubscriptionClientRegistration(t *testing.T) {
+func TestProviderDropdownOffersVendorCLIWhenNativeOAuthIsUnconfigured(t *testing.T) {
 	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "")
 	model := New(Config{StateDir: t.TempDir()})
 	model.focus = providerField
 	for _, option := range model.dropdownOptions() {
 		if option.value == "codex" {
-			if !strings.Contains(option.description, "GATOR_CODEX_OAUTH_CLIENT_ID") {
+			if !strings.Contains(option.description, "gator connect codex") {
 				t.Fatalf("Codex provider description = %q", option.description)
 			}
 			return
 		}
 	}
 	t.Fatal("Codex provider option was missing")
+}
+
+func TestLoginCommandExplainsVendorCLIPathWhenNativeOAuthIsUnconfigured(t *testing.T) {
+	t.Setenv("GATOR_COPILOT_OAUTH_CLIENT_ID", "")
+	model := New(Config{
+		Provider: "copilot",
+		BeginOAuthLogin: func(string) (OAuthLogin, error) {
+			t.Fatal("unconfigured native OAuth should not invoke the login factory")
+			return nil, nil
+		},
+	})
+	model.task.SetValue("/login copilot")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("unconfigured native OAuth should not start a login")
+	}
+	updated := next.(Model)
+	if !strings.Contains(updated.commandOutput, "gator connect copilot") {
+		t.Fatalf("login guidance = %q", updated.commandOutput)
+	}
 }
 
 func TestProviderDropdownDescribesNewDirectProviderChoices(t *testing.T) {

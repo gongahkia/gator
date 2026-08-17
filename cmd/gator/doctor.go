@@ -39,7 +39,9 @@ func doctor(arguments []string, out io.Writer) error {
 		gitStatus = "detected"
 	}
 	authentication := "Gator credential"
-	if provider == model.GoogleVertex {
+	if provider == model.Claude {
+		authentication = "unsupported native Claude.ai subscription OAuth; use provider anthropic with an API key"
+	} else if provider == model.GoogleVertex {
 		authentication = model.CredentialHint(provider)
 	} else if provider == model.AmazonBedrock {
 		authentication += " or " + model.CredentialHint(provider)
@@ -47,7 +49,9 @@ func doctor(arguments []string, out io.Writer) error {
 		authentication += " or " + model.CredentialHint(provider)
 	}
 	authenticationStatus := "missing"
-	if !model.SupportsDirect(provider) {
+	if provider == model.Claude {
+		authenticationStatus = "use gator connect claude"
+	} else if !model.SupportsDirect(provider) {
 		authenticationStatus = "unsupported"
 	} else if provider == model.GoogleVertex {
 		if model.AmbientCredentialAvailable(provider) {

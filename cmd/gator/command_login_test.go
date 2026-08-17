@@ -33,3 +33,11 @@ func TestLoginRejectsMixedCredentialModes(t *testing.T) {
 		t.Fatalf("mixed login modes error = %v", err)
 	}
 }
+
+func TestLoginRejectsClaudeAISubscriptionOAuth(t *testing.T) {
+	var output bytes.Buffer
+	err := login([]string{"claude"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "not a supported Gator login") || !strings.Contains(err.Error(), "gator connect claude") {
+		t.Fatalf("Claude login error = %v", err)
+	}
+}
