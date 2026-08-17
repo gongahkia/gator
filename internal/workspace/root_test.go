@@ -21,7 +21,11 @@ func TestRootResolveFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve file: %v", err)
 	}
-	if resolved != filepath.Join(directory, "pkg", "main.go") {
+	canonical, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		t.Fatalf("resolve temporary directory: %v", err)
+	}
+	if resolved != filepath.Join(canonical, "pkg", "main.go") {
 		t.Fatalf("resolved = %q", resolved)
 	}
 }

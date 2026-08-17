@@ -6,12 +6,25 @@ import (
 	"os"
 )
 
+// These values are set for release builds with -ldflags. Development builds
+// remain explicit rather than pretending to have a published version.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 const usage = `Gator — native, inspectable coding agent
 
 Usage:
   gator
   gator tui
   gator help
+  gator version
+  gator rpc
+  gator config [show]
+  gator config set default-provider PROVIDER
+  gator config set default-model MODEL
   gator connect PROVIDER [OPTIONS]
   gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
   gator logout PROVIDER
@@ -55,10 +68,21 @@ func run(args []string, out io.Writer) error {
 		_, err := fmt.Fprintln(out, usage)
 		return err
 	}
+	if len(args) == 2 && args[0] == "--mode" && args[1] == "rpc" {
+		return rpcMode(nil, os.Stdin, out)
+	}
+	if args[0] == "version" || args[0] == "--version" || args[0] == "-v" {
+		_, err := fmt.Fprintf(out, "gator %s (%s, %s)\n", version, commit, date)
+		return err
+	}
 
 	switch args[0] {
 	case "connect":
 		return connect(args[1:], out)
+	case "config":
+		return configure(args[1:], out)
+	case "rpc":
+		return rpcMode(args[1:], os.Stdin, out)
 	case "doctor":
 		return doctor(args[1:], out)
 	case "login":

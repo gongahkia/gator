@@ -14,9 +14,13 @@ import (
 )
 
 func providerFromEnvironment() (model.Provider, error) {
-	provider := os.Getenv("GATOR_PROVIDER")
-	if provider == "" {
-		provider = string(model.OpenAI)
+	defaults, err := configuredDefaults()
+	if err != nil {
+		return "", err
+	}
+	provider := defaults.Provider
+	if configured := os.Getenv("GATOR_PROVIDER"); configured != "" {
+		provider = configured
 	}
 	parsed, err := model.ParseProvider(provider)
 	if err != nil {
@@ -28,6 +32,9 @@ func providerFromEnvironment() (model.Provider, error) {
 func modelFromEnvironment(provider model.Provider) string {
 	if model := os.Getenv("GATOR_MODEL"); model != "" {
 		return model
+	}
+	if defaults, err := configuredDefaults(); err == nil && defaults.Model != "" {
+		return defaults.Model
 	}
 	return model.DefaultModel(provider)
 }

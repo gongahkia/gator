@@ -53,7 +53,7 @@ func ListRecentRuns(stateDir, repository string, limit int) ([]RecentRun, error)
 		}
 		statePath := filepath.Join(directory, entry.Name())
 		session, err := LoadSession(statePath)
-		if err != nil || session.Repository != repository {
+		if err != nil || !sameRepository(session.Repository, repository) {
 			continue
 		}
 		info, err := os.Stat(filepath.Join(statePath, "session.json"))

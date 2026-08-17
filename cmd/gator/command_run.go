@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -17,12 +18,20 @@ import (
 func runTask(arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	defaultProvider := os.Getenv("GATOR_PROVIDER")
-	if defaultProvider == "" {
-		defaultProvider = string(model.OpenAI)
+	defaults, err := configuredDefaults()
+	if err != nil {
+		return err
+	}
+	defaultProvider := defaults.Provider
+	if configured := os.Getenv("GATOR_PROVIDER"); configured != "" {
+		defaultProvider = configured
 	}
 	providerName := flags.String("provider", defaultProvider, "model provider")
-	modelName := flags.String("model", os.Getenv("GATOR_MODEL"), "model name")
+	defaultModel := defaults.Model
+	if configured := os.Getenv("GATOR_MODEL"); configured != "" {
+		defaultModel = configured
+	}
+	modelName := flags.String("model", defaultModel, "model name")
 	baseURL := flags.String("base-url", os.Getenv("GATOR_BASE_URL"), "provider API base URL override")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
 	var verification verificationFlags
@@ -81,6 +90,22 @@ func runTask(arguments []string, out io.Writer) error {
 	}
 	_, err = fmt.Fprintf(out, "\n%s\n", outcome.Result.FinalText)
 	return err
+}
+
+func configuredDefaults() (config.Defaults, error) {
+	store, err := config.DefaultStore()
+	if err != nil {
+		return config.Defaults{}, err
+	}
+	settings, err := store.Load()
+	if err != nil {
+		return config.Defaults{}, err
+	}
+	defaults := settings.Defaults
+	if defaults.Provider == "" {
+		defaults.Provider = string(model.OpenAI)
+	}
+	return defaults, nil
 }
 
 type eventPrinter struct {

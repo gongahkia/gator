@@ -24,6 +24,16 @@ func TestRunHelp(t *testing.T) {
 	}
 }
 
+func TestRunVersion(t *testing.T) {
+	var output bytes.Buffer
+	if err := run([]string{"version"}, &output); err != nil {
+		t.Fatalf("run version: %v", err)
+	}
+	if !strings.Contains(output.String(), "gator ") {
+		t.Fatalf("version output = %q", output.String())
+	}
+}
+
 func TestRunRejectsUnknownCommand(t *testing.T) {
 	var output bytes.Buffer
 	err := run([]string{"ship"}, &output)
