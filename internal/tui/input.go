@@ -8,6 +8,10 @@ import (
 )
 
 func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "ctrl+b" && (m.screen == composeScreen || m.screen == runningScreen) {
+		m.toggleDrawer()
+		return m, nil
+	}
 	if message.String() == "f1" {
 		if m.screen == helpScreen {
 			m.screen = m.helpReturn
@@ -19,10 +23,16 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch m.screen {
 	case composeScreen:
+		if m.drawerOpen {
+			return m.updateDrawer(message)
+		}
 		return m.updateComposer(message)
 	case attachmentConfirmScreen:
 		return m.updateAttachmentConfirmation(message)
 	case runningScreen:
+		if m.drawerOpen {
+			return m.updateDrawer(message)
+		}
 		return m.updateRunning(message)
 	case reviewScreen:
 		return m.updateReview(message)
@@ -140,10 +150,16 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+o":
 		return m.openRecentRuns()
 	case "pgup":
-		m.moveChatSelection(-m.chatEntryLimit())
+		m.pageTranscript(false)
 		return m, nil
 	case "pgdown":
-		m.moveChatSelection(m.chatEntryLimit())
+		m.pageTranscript(true)
+		return m, nil
+	case "home":
+		m.transcriptTop()
+		return m, nil
+	case "end":
+		m.transcriptBottom()
 		return m, nil
 	case "?":
 		if m.focus == taskField && strings.TrimSpace(m.task.Value()) == "" {
@@ -325,10 +341,16 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "pgup":
-		m.moveChatSelection(-m.chatEntryLimit())
+		m.pageTranscript(false)
 		return m, nil
 	case "pgdown":
-		m.moveChatSelection(m.chatEntryLimit())
+		m.pageTranscript(true)
+		return m, nil
+	case "home":
+		m.transcriptTop()
+		return m, nil
+	case "end":
+		m.transcriptBottom()
 		return m, nil
 	case "?":
 		if strings.TrimSpace(m.task.Value()) == "" {
