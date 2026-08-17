@@ -21,6 +21,7 @@ Usage:
   gator tui
   gator help
   gator version
+  gator update [--check]
   gator rpc
   gator config [show]
   gator config set default-provider PROVIDER
@@ -81,6 +82,8 @@ func run(args []string, out io.Writer) error {
 		return connect(args[1:], out)
 	case "config":
 		return configure(args[1:], out)
+	case "update":
+		return update(args[1:], out)
 	case "rpc":
 		return rpcMode(args[1:], os.Stdin, out)
 	case "doctor":

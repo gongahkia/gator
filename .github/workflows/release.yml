@@ -45,9 +45,9 @@ jobs:
           if [ "$GOOS" = "windows" ]; then binary="gator.exe"; fi
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o "dist/$name/$binary" ./cmd/gator
           if [ "$GOOS" = "windows" ]; then
-            (cd dist && zip -q -r "$name.zip" "$name")
+            (cd dist && zip -q -r "gator_${GOOS}_${GOARCH}.zip" "$name")
           else
-            tar -C dist -czf "dist/$name.tar.gz" "$name"
+            tar -C dist -czf "dist/gator_${GOOS}_${GOARCH}.tar.gz" "$name"
           fi
           rm -rf "dist/$name"
       - uses: actions/upload-artifact@v4
