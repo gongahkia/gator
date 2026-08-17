@@ -730,7 +730,11 @@ func TestCompletedRunAppliesQueuedCommandAndQueuedPromptStartsRun(t *testing.T) 
 	if !dispatched || command == nil || next.(Model).screen != runningScreen {
 		t.Fatalf("queued prompt dispatch = dispatched %v, command %v, model %#v", dispatched, command != nil, next)
 	}
-	finished := runTeaCommand(t, next.(Model), command)
+	completed, completionCommand := next.(Model).Update(delegatedRunDoneMsg{runtime: "codex"})
+	if completionCommand != nil {
+		t.Fatal("harness completion returned an unexpected command")
+	}
+	finished := completed.(Model)
 	if finished.runErr != nil || finished.screen != composeScreen || len(finished.queue) != 0 || len(agentModel.requests) != 2 {
 		t.Fatalf("queued prompt finished = error %v, screen %v, queue %#v, requests %d", finished.runErr, finished.screen, finished.queue, len(agentModel.requests))
 	}
@@ -908,8 +912,9 @@ func TestLoginCommandRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
 
 func TestProviderOwnedCodexLoginSelectsHarnessInsteadOfNativeOAuth(t *testing.T) {
 	model := New(Config{
-		Provider: "codex",
-		Model:    "gpt-5.6",
+		Provider:     "codex",
+		Model:        "gpt-5.6",
+		Verification: [][]string{{"go", "test", "./..."}},
 		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
 			return gatorrun.Executor{}, errors.New("Gator OAuth credential for \"codex\" is required")
 		},
@@ -955,6 +960,7 @@ func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
 	})
 	model.delegateRuntime = "codex"
 	model.task.SetValue("Inspect this repository")
+	nativeCalls = 0
 	model.refreshPreflight()
 	if len(model.preflight) != 0 {
 		t.Fatalf("harness preflight = %#v", model.preflight)
