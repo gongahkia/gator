@@ -26,6 +26,7 @@ type Thread struct {
 	Provider      string     `json:"provider"`
 	Model         string     `json:"model"`
 	BaseURL       string     `json:"base_url,omitempty"`
+	ForkedFrom    string     `json:"forked_from_state_path,omitempty"`
 	Task          string     `json:"task"`
 	MaxSteps      int        `json:"max_steps"`
 	Verification  [][]string `json:"verification"`
@@ -46,6 +47,7 @@ type RecentThread struct {
 	Model         string
 	Task          string
 	TurnCount     int
+	ForkedFrom    string
 	UpdatedAt     time.Time
 	Available     bool
 }
@@ -273,6 +275,7 @@ func ListRecentThreads(stateDir, repository string, limit int) ([]RecentThread, 
 				Model:         thread.Model,
 				Task:          thread.Task,
 				TurnCount:     thread.TurnCount,
+				ForkedFrom:    thread.ForkedFrom,
 				UpdatedAt:     thread.UpdatedAt,
 				Available:     statErr == nil && info.IsDir(),
 			})
@@ -354,6 +357,7 @@ func ListAllRecentThreads(stateDir string, limit int) ([]RecentThread, error) {
 					Model:         thread.Model,
 					Task:          thread.Task,
 					TurnCount:     thread.TurnCount,
+					ForkedFrom:    thread.ForkedFrom,
 					UpdatedAt:     thread.UpdatedAt,
 					Available:     statErr == nil && info.IsDir(),
 				})
@@ -378,6 +382,25 @@ func ListAllRecentThreads(stateDir string, limit int) ([]RecentThread, error) {
 		threads = threads[:limit]
 	}
 	return threads, nil
+}
+
+// ListThreadForks returns branch summaries grouped by the immutable source
+// turn they forked. A fork is a separate worktree by design, but exposing the
+// relationship here lets a caller present a real session tree without making
+// two branches share mutable source files.
+func ListThreadForks(stateDir, repository string) (map[string][]RecentThread, error) {
+	threads, err := ListRecentThreads(stateDir, repository, 1_000)
+	if err != nil {
+		return nil, err
+	}
+	forks := make(map[string][]RecentThread)
+	for _, thread := range threads {
+		if strings.TrimSpace(thread.ForkedFrom) == "" {
+			continue
+		}
+		forks[thread.ForkedFrom] = append(forks[thread.ForkedFrom], thread)
+	}
+	return forks, nil
 }
 
 func loadThreadPath(path string) (Thread, error) {

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -65,21 +67,33 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		CompletionCheck: check,
 	})
 	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: events}
+	snapshotContext, cancelSnapshot := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	snapshot, snapshotErr := patch.Export(snapshotContext, isolated.Path, request.BaseCommit)
+	cancelSnapshot()
+	if snapshotErr != nil && journalErr == nil {
+		journalErr = fmt.Errorf("create fork snapshot: %w", snapshotErr)
+	}
+	if snapshotErr == nil && journalErr == nil {
+		if snapshotErr := runJournal.SaveSnapshot(snapshot); snapshotErr != nil {
+			journalErr = snapshotErr
+		}
+	}
 	session := journal.Session{
-		Version:         2,
-		Repository:      isolated.Repository,
-		WorktreePath:    isolated.Path,
-		BaseCommit:      request.BaseCommit,
-		Provider:        request.Provider,
-		Model:           request.Model,
-		BaseURL:         request.BaseURL,
-		Task:            request.Task,
-		MaxSteps:        request.MaxSteps,
-		Verification:    request.Verification,
-		ThreadID:        request.ThreadID,
-		Mode:            request.Mode.String(),
-		Messages:        result.Messages,
-		ParentStatePath: parentStatePath,
+		Version:             2,
+		Repository:          isolated.Repository,
+		WorktreePath:        isolated.Path,
+		BaseCommit:          request.BaseCommit,
+		Provider:            request.Provider,
+		Model:               request.Model,
+		BaseURL:             request.BaseURL,
+		Task:                request.Task,
+		MaxSteps:            request.MaxSteps,
+		Verification:        request.Verification,
+		ThreadID:            request.ThreadID,
+		Mode:                request.Mode.String(),
+		Messages:            result.Messages,
+		ParentStatePath:     parentStatePath,
+		ForkedFromStatePath: request.ForkedFrom,
 	}
 	if sessionErr := runJournal.SaveSession(session); sessionErr != nil && journalErr == nil {
 		journalErr = sessionErr
@@ -118,6 +132,7 @@ func (e Executor) saveThread(stateDir string, session journal.Session, statePath
 		Provider:      session.Provider,
 		Model:         session.Model,
 		BaseURL:       session.BaseURL,
+		ForkedFrom:    session.ForkedFromStatePath,
 		Task:          session.Task,
 		MaxSteps:      session.MaxSteps,
 		Verification:  session.Verification,

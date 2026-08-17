@@ -95,6 +95,30 @@ func Apply(ctx context.Context, sourcePath, baseCommit, targetPath string) (Resu
 	return Result{Bytes: len(patch)}, nil
 }
 
+// ApplySnapshot restores a previously exported worktree snapshot into an
+// already-clean isolated worktree. Forking uses this narrower primitive rather
+// than the public Apply flow because the target is created from the snapshot's
+// recorded base commit and is never the developer's active checkout.
+func ApplySnapshot(ctx context.Context, targetPath string, snapshot []byte) error {
+	if len(snapshot) == 0 {
+		return nil
+	}
+	target, err := workspace.Open(targetPath)
+	if err != nil {
+		return fmt.Errorf("open fork worktree: %w", err)
+	}
+	if err := requireClean(ctx, target.Path()); err != nil {
+		return fmt.Errorf("fork worktree is not clean: %w", err)
+	}
+	if err := applyPatch(ctx, target.Path(), snapshot, true); err != nil {
+		return err
+	}
+	if err := applyPatch(ctx, target.Path(), snapshot, false); err != nil {
+		return err
+	}
+	return nil
+}
+
 func prepare(ctx context.Context, sourcePath, baseCommit, targetPath string) ([]byte, workspace.Root, error) {
 	source, err := workspace.Open(sourcePath)
 	if err != nil {

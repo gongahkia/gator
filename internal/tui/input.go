@@ -538,6 +538,18 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateThreadTree(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch message.String() {
+	case "c":
+		if m.resumeStatePath == "" {
+			m.notice = notice{text: "Continue this thread before cloning its active branch.", kind: noticeInfo}
+			return m, nil
+		}
+		return m.beginFork(m.resumeStatePath)
+	case "f":
+		if len(m.threadTurns) == 0 {
+			return m, nil
+		}
+		selected := m.threadTurns[min(max(0, m.threadIndex), len(m.threadTurns)-1)]
+		return m.beginFork(selected.StatePath)
 	case "esc", "q", "y":
 		m.screen = m.threadReturn
 		if m.screen == composeScreen || m.screen == runningScreen {

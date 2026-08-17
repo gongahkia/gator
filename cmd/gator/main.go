@@ -33,6 +33,8 @@ Usage:
   gator doctor [--provider PROVIDER]
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] --verify 'argv ...' TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH
 
@@ -98,6 +100,10 @@ func run(args []string, out io.Writer) error {
 		return runTask(args[1:], out)
 	case "resume":
 		return resumeTask(args[1:], out)
+	case "fork":
+		return forkTask(args[1:], out)
+	case "clone":
+		return cloneTask(args[1:], out)
 	case "export":
 		return exportPatch(args[1:], out)
 	case "apply":
