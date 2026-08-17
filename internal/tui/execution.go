@@ -22,6 +22,9 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Describe a task before starting a run.", kind: noticeError}
 		return m, nil
 	}
+	if m.delegateRuntime != "" {
+		return m.startDelegatedRun(task)
+	}
 	if m.config.NewExecutor == nil {
 		m.notice = notice{text: "No model provider is configured for this Gator build.", kind: noticeError}
 		return m, nil
@@ -261,6 +264,49 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	return m, waitForExecution(stream)
 }
 
+// startDelegatedRun intentionally hands terminal control to the installed
+// harness rather than adapting its credential or trying to simulate its
+// session. Gator still creates the isolated worktree and runs verification.
+func (m Model) startDelegatedRun(task string) (tea.Model, tea.Cmd) {
+	if m.resumeStatePath != "" || m.forkStatePath != "" {
+		m.notice = notice{text: "A provider-owned harness always starts a new isolated worktree; it cannot continue or fork a native Gator thread.", kind: noticeError}
+		return m, nil
+	}
+	if m.runMode != gatorrun.ExecuteMode {
+		m.notice = notice{text: delegatedRuntimeLabel(m.delegateRuntime) + " supports Execute mode only. Run /execute before sending a task.", kind: noticeError}
+		return m, nil
+	}
+	verification, err := parseVerification(m.verification.Value())
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	references, err := resolveContextReferences(task, m.config.RepositoryPath)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if m.config.NewDelegateCommand == nil {
+		m.notice = notice{text: "This Gator build cannot start a provider-owned harness from the TUI.", kind: noticeError}
+		return m, nil
+	}
+	process, err := m.config.NewDelegateCommand(m.delegateRuntime, taskWithContextReferences(task, references), strings.TrimSpace(m.model.Value()), verification, m.config.RepositoryPath)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	m.appendChat(chatEntry{author: chatUser, text: task})
+	m.task.Reset()
+	m.task.Placeholder = "Send another delegated task..."
+	m.commandOutput = "Running " + delegatedRuntimeLabel(m.delegateRuntime) + " in a fresh isolated worktree. Terminal control returns here when it finishes."
+	m.notice = notice{text: "Starting " + delegatedRuntimeLabel(m.delegateRuntime) + " in this terminal...", kind: noticeInfo}
+	m.persistDraft()
+	runtime := m.delegateRuntime
+	return m, tea.ExecProcess(process, func(err error) tea.Msg {
+		return delegatedRunDoneMsg{runtime: runtime, err: err}
+	})
+}
+
 func attachmentPreviews(images []agent.Image, attachments []agent.Attachment) []attachmentPreview {
 	previews := make([]attachmentPreview, 0, len(images)+len(attachments))
 	for _, image := range images {
@@ -354,6 +400,7 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Load retained run: " + err.Error(), kind: noticeError}
 		return *m, nil
 	}
+	m.delegateRuntime = ""
 	m.resumeStatePath = statePath
 	m.config.RepositoryPath = session.Repository
 	m.threadID = session.ThreadID
@@ -394,6 +441,7 @@ func (m *Model) beginFork(statePath string) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Fork retained run: " + err.Error(), kind: noticeError}
 		return *m, nil
 	}
+	m.delegateRuntime = ""
 	m.forkStatePath = statePath
 	m.resumeStatePath = ""
 	m.forceCompaction = false
@@ -428,6 +476,7 @@ func (m *Model) returnToComposer() {
 	m.forceCompaction = false
 	m.threadID = ""
 	m.recentAll = false
+	m.delegateRuntime = ""
 	m.runMode = gatorrun.ExecuteMode
 	m.task.Reset()
 	m.queue = nil
@@ -463,6 +512,25 @@ func (m *Model) persistDraft() {
 // deliberately performs no model request: construction only checks local
 // configuration, credential presence, and base URL requirements.
 func (m *Model) refreshPreflight() {
+	if m.delegateRuntime != "" {
+		issues := make([]string, 0, 3)
+		if m.resumeStatePath != "" || m.forkStatePath != "" {
+			issues = append(issues, "provider-owned harnesses cannot continue or fork a native Gator thread")
+		}
+		if strings.TrimSpace(m.task.Value()) == "" {
+			issues = append(issues, "describe a task")
+		}
+		if m.runMode != gatorrun.ExecuteMode {
+			issues = append(issues, delegatedRuntimeLabel(m.delegateRuntime)+" supports Execute mode only; run /execute")
+		} else if _, err := parseVerification(m.verification.Value()); err != nil {
+			issues = append(issues, err.Error())
+		}
+		if m.config.NewDelegateCommand == nil {
+			issues = append(issues, "this Gator build cannot start a provider-owned harness from the TUI")
+		}
+		m.preflight = issues
+		return
+	}
 	if m.config.NewExecutor == nil {
 		m.preflight = nil
 		return

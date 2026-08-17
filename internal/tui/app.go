@@ -41,6 +41,10 @@ type Config struct {
 	NewExecutor       func(provider, model, baseURL string) (gatorrun.Executor, error)
 	BeginOAuthLogin   func(provider string) (OAuthLogin, error)
 	NewConnectCommand func(provider string) (*exec.Cmd, error)
+	// NewDelegateCommand starts a vendor-owned harness in a fresh isolated
+	// worktree. It deliberately remains separate from NewExecutor: the harness
+	// owns its credential, tools, approvals, and session state.
+	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (*exec.Cmd, error)
 	SetTheme          func(name string) error
 }
 
@@ -180,6 +184,11 @@ type connectDoneMsg struct {
 	err      error
 }
 
+type delegatedRunDoneMsg struct {
+	runtime string
+	err     error
+}
+
 type diffLoadedMsg struct {
 	diff      string
 	truncated bool
@@ -234,6 +243,7 @@ type Model struct {
 	oauthLogin          OAuthLogin
 	oauthCancel         context.CancelFunc
 	oauthProvider       string
+	delegateRuntime     string
 	cancelling          bool
 	lastRunCancelled    bool
 	activity            runActivity
@@ -485,8 +495,41 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Provider-owned login stopped: " + msg.err.Error(), kind: noticeError}
 			return m, nil
 		}
-		m.commandOutput = "Provider-owned login completed for " + msg.provider + ". Its credential remains in that vendor CLI's store. Use the matching gator delegate runtime for harness-owned runs."
-		m.notice = notice{text: "Provider-owned login completed. See the next action below.", kind: noticeSuccess}
+		runtime := delegatedRuntimeForProvider(msg.provider)
+		if runtime == "" || m.config.NewDelegateCommand == nil {
+			m.commandOutput = "Provider-owned login completed for " + msg.provider + ". Its credential remains in that vendor CLI's store. Use the matching gator delegate runtime for harness-owned runs."
+			m.notice = notice{text: "Provider-owned login completed. See the next action below.", kind: noticeSuccess}
+			return m, nil
+		}
+		m.returnToComposer()
+		m.delegateRuntime = runtime
+		m.provider.SetValue(msg.provider)
+		if _, modelName, _, err := m.resolveProviderAndModel(msg.provider, ""); err == nil {
+			m.model.SetValue(modelName)
+		}
+		m.commandOutput = delegatedRuntimeLabel(runtime) + " is ready. Send a task to run it in a fresh isolated worktree. The vendor CLI keeps its own login, tools, approvals, and session state."
+		m.notice = notice{text: "Provider-owned login completed. Harness mode is ready for the next task.", kind: noticeSuccess}
+		m.persistDraft()
+		m.refreshPreflight()
+		return m, nil
+	case delegatedRunDoneMsg:
+		m.task.Reset()
+		m.task.Placeholder = "Send another delegated task..."
+		m.focus = taskField
+		_ = m.focusField()
+		if msg.err != nil {
+			m.commandOutput = delegatedRuntimeLabel(msg.runtime) + " stopped. Its retained worktree path and output were printed in the terminal."
+			m.notice = notice{text: "Delegated run stopped: " + msg.err.Error(), kind: noticeError}
+		} else {
+			m.commandOutput = delegatedRuntimeLabel(msg.runtime) + " completed. Review its retained worktree path and verifier output printed in the terminal."
+			m.notice = notice{text: "Delegated run complete. Review the retained worktree before applying changes.", kind: noticeSuccess}
+			if strings.TrimSpace(m.config.StateDir) != "" {
+				if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
+					m.draftErr = err
+				}
+			}
+		}
+		m.refreshPreflight()
 		return m, nil
 	case diffLoadedMsg:
 		m.diff, m.diffTruncated, m.diffErr = msg.diff, msg.truncated, msg.err
