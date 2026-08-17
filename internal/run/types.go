@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -67,7 +68,8 @@ type Outcome struct {
 
 // Executor combines the provider-independent loop with an isolated worktree.
 type Executor struct {
-	Model    agent.Model
-	Now      func() time.Time
-	StateDir string
+	Model      agent.Model
+	Now        func() time.Time
+	StateDir   string
+	Extensions extension.Resolver
 }

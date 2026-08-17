@@ -15,10 +15,10 @@ const version = 1
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
 type Settings struct {
-	Version            int                 `json:"version"`
-	Defaults           Defaults            `json:"defaults"`
-	Extensions         []Extension         `json:"extensions,omitempty"`
-	TrustedRepositories []string            `json:"trusted_repositories,omitempty"`
+	Version             int         `json:"version"`
+	Defaults            Defaults    `json:"defaults"`
+	Extensions          []Extension `json:"extensions,omitempty"`
+	TrustedRepositories []string    `json:"trusted_repositories,omitempty"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name

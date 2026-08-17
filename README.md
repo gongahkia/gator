@@ -251,6 +251,12 @@ human CLI output or private journal files. It is a versioned JSONL protocol
 with explicit run, resume, steer, cancel, status, and thread-listing methods.
 See [RPC integration](docs/RPC.md).
 
+Gator extensions provide reusable skills, prompt guidance, and optional
+language-neutral JSON sidecar tools. Install a bundle with `gator extension
+install DIRECTORY`; project bundles under `.gator/extensions/` stay inactive
+until `gator extension trust` is run in that repository. Read the exact
+manifest, lifecycle, protocol, and trust boundary in [Extensions](docs/EXTENSIONS.md).
+
 ## Providers
 
 Set persistent defaults with `gator config set default-provider NAME` and

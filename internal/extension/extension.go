@@ -151,7 +151,7 @@ func (t SidecarTool) Execute(ctx context.Context, arguments json.RawMessage) (ag
 		Worktree   string          `json:"worktree"`
 	}{
 		Version: 1, Method: "tool", Extension: t.installed.Manifest.ID, Tool: t.specification.Name,
-		Arguments: arguments, Repository: t.root.Repository(), Worktree: t.root.Path(),
+		Arguments: arguments, Repository: t.root.Path(), Worktree: t.root.Path(),
 	})
 	if err != nil {
 		return agent.ToolResult{}, fmt.Errorf("encode extension request: %w", err)
@@ -253,6 +253,9 @@ func NewResolver(store Store, settings config.Settings) Resolver {
 // Load resolves extensions for repository. Installed extensions are enabled
 // only when config says so; repository extensions require explicit trust.
 func (r Resolver) Load(repository string) (Set, error) {
+	if r.store.path == "" {
+		return Set{}, nil
+	}
 	var loaded []Installed
 	global, err := r.store.List()
 	if err != nil {
@@ -263,7 +266,7 @@ func (r Resolver) Load(repository string) (Set, error) {
 			loaded = append(loaded, installed)
 		}
 	}
-	canonical, err := canonicalRepository(repository)
+	canonical, err := CanonicalRepository(repository)
 	if err != nil {
 		return Set{}, err
 	}
@@ -359,7 +362,8 @@ func safePath(root, value string) (string, error) {
 	return filepath.Join(root, clean), nil
 }
 
-func canonicalRepository(repository string) (string, error) {
+// CanonicalRepository returns the identity used for repository trust records.
+func CanonicalRepository(repository string) (string, error) {
 	abs, err := filepath.Abs(repository)
 	if err != nil {
 		return "", fmt.Errorf("resolve repository: %w", err)
