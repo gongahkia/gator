@@ -14,6 +14,7 @@ Usage:
   gator help
   gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
   gator logout PROVIDER
+  gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] --verify 'argv ...' TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -24,6 +25,7 @@ Commands:
   tui       open the interactive terminal application (the default command)
   login     store a provider credential in Gator's private local auth file
   logout    remove a provider credential from Gator's private local auth file
+  delegate  run an installed vendor or external agent in an isolated worktree
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    select, reopen, or immediately continue a retained local thread
@@ -58,6 +60,8 @@ func run(args []string, out io.Writer) error {
 		return login(args[1:], out)
 	case "logout":
 		return logout(args[1:], out)
+	case "delegate":
+		return delegate(args[1:], out)
 	case "run":
 		return runTask(args[1:], out)
 	case "resume":
