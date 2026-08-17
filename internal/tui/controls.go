@@ -167,14 +167,12 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		return m, m.focusField()
 	case "/model":
 		m.commandOutput = ""
-		m.focus = modelField
 		m.notice = notice{text: "Choose a recommended model or type a model ID, then Tab back to the task.", kind: noticeInfo}
-		return m, m.focusField()
+		return m, m.openRuntimeDrawer(modelField)
 	case "/provider":
 		m.commandOutput = ""
-		m.focus = providerField
 		m.notice = notice{text: "Choose a provider or type to filter it, then Tab back to the task.", kind: noticeInfo}
-		return m, m.focusField()
+		return m, m.openRuntimeDrawer(providerField)
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
 		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
@@ -216,9 +214,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Theme saved and applied.", kind: noticeSuccess}
 	case "/verify":
 		m.commandOutput = ""
-		m.focus = verificationField
 		m.notice = notice{text: "Edit the allowed verification commands, one argv per line.", kind: noticeInfo}
-		return m, m.focusField()
+		return m, m.openRuntimeDrawer(verificationField)
 	case "/vim":
 		m.toggleVimMode()
 	case "/worktree":
