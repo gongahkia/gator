@@ -49,6 +49,18 @@ GATOR_RADIUS_OAUTH_CLIENT_ID=... ./bin/gator login radius --subscription
 ./bin/gator run --provider codex --verify 'go test ./...' \
   'Add a focused feature with tests'
 
+# Delegated runtimes are separate from native Gator providers. The installed
+# vendor CLI owns authentication and agent execution; Gator owns the isolated
+# worktree and runs the required verification commands after it exits.
+./bin/gator delegate codex login
+./bin/gator delegate codex run --verify 'go test ./...' \
+  'Add a focused feature with tests'
+
+# Claude Code delegation intentionally uses only an API key. --bare prevents
+# Claude Code from reusing Claude.ai OAuth or stored CLI credentials.
+ANTHROPIC_API_KEY=... ./bin/gator delegate claude run --verify 'go test ./...' \
+  'Add a focused feature with tests'
+
 # Open a project-scoped retained-thread picker, continue the latest thread,
 # or target an ID directly. The task is optional: without it, Gator opens the
 # resumed conversation in the TUI.
@@ -167,6 +179,20 @@ checkout is clean and compatible; omitting `--check` applies the patch. Gator
 does not stage, commit, or push the result. The existing `run` and `resume`
 commands remain available for scripts and CI-like usage.
 
+`gator delegate` is the explicit alternative for an installed agent CLI. It
+creates and retains the same isolated worktree, then executes Gator's required
+verification commands after the delegated agent exits. The delegated CLI owns
+its own tool policy, sandbox, approvals, session history, and credentials, so
+delegated runs do not support Gator steering or `gator resume`. `gator delegate
+codex login` invokes Codex's first-party browser/device login; Gator neither
+reads nor copies the credentials it creates. `gator delegate claude run`
+requires `ANTHROPIC_API_KEY` and passes `--bare`, which prevents Claude Code
+from reading Claude.ai OAuth or Keychain credentials. For another installed
+harness, use `gator delegate external run --task '...' --verify '...' --
+command {task}`. `{task}` and `{worktree}` are safe whole-argument placeholders,
+and the process receives `GATOR_TASK` and `GATOR_WORKTREE`; its authentication
+and automation contract remain its own responsibility.
+
 ## Providers
 
 Set `--provider`, or set `GATOR_PROVIDER` before starting the TUI. `GATOR_MODEL`
@@ -273,14 +299,18 @@ tool-call replay in the private session file.
 
 ### Provider ownership
 
-Gator never starts Codex, Claude Code, GitHub Copilot, or Cursor Agent. Its
-`codex`, `claude`, `copilot`, `kimi-coding`, `radius`, `xai`, `openrouter`, `opencode`, and
-`opencode-go` paths make
-direct model requests with credentials Gator creates and stores itself; they
-do not reuse a vendor CLI session or read another application's OAuth files,
-tokens, or API keys. Gator refreshes a near-expiry credential before starting
-a run. Cursor remains unavailable rather than falling back to its vendor CLI:
-no public direct Cursor inference contract was verified.
+Native `gator run` never starts Codex, Claude Code, GitHub Copilot, or Cursor
+Agent. Its `codex`, `claude`, `copilot`, `kimi-coding`, `radius`, `xai`,
+`openrouter`, `opencode`, and `opencode-go` paths make direct model requests
+with credentials Gator creates and stores itself; they do not reuse a vendor
+CLI session or read another application's OAuth files, tokens, or API keys.
+Gator refreshes a near-expiry credential before starting a native run. Cursor
+remains unavailable rather than falling back to its vendor CLI: no public
+direct Cursor inference contract was verified.
+
+`gator delegate` is a separate, explicit product boundary rather than a native
+provider fallback. It can launch Codex or Claude Code only when selected by the
+developer, and it has the delegated-runtime limitations described above.
 
 `google-vertex` is the explicit cloud-credential exception: it reads Google
 Application Default Credentials (or `GATOR_VERTEX_ACCESS_TOKEN`) and refreshes
