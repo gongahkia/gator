@@ -139,5 +139,8 @@ func clearCredentialEnvironment(t *testing.T) {
 	} {
 		t.Setenv(name, "")
 	}
+	configurationDirectory := t.TempDir()
+	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(configurationDirectory, "credentials"))
+	t.Setenv("AWS_CONFIG_FILE", filepath.Join(configurationDirectory, "config"))
 	t.Setenv("AWS_EC2_METADATA_DISABLED", "true")
 }
