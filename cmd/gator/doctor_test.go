@@ -52,3 +52,16 @@ func TestDoctorReportsStoredAzureResponsesBearerTokenWithoutExposingIt(t *testin
 		t.Fatalf("doctor output = %q", text)
 	}
 }
+
+func TestDoctorReportsAmbientBedrockAuthenticationWithoutExposingCredentials(t *testing.T) {
+	t.Setenv("AWS_ACCESS_KEY_ID", "do-not-print-this-key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "do-not-print-this-secret")
+	var output bytes.Buffer
+	if err := doctor([]string{"--provider", "amazon-bedrock"}, &output); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	text := output.String()
+	if !strings.Contains(text, "AWS static credentials in environment") || strings.Contains(text, "do-not-print-this-key") || strings.Contains(text, "do-not-print-this-secret") {
+		t.Fatalf("doctor output = %q", text)
+	}
+}

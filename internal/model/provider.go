@@ -3,6 +3,7 @@
 package model
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model/anthropic"
+	"github.com/gongahkia/gator/internal/model/bedrock"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/model/gemini"
 	"github.com/gongahkia/gator/internal/model/openai"
@@ -303,27 +305,41 @@ func bedrockConfig(config Config) (chatcompletions.Config, error) {
 	if err != nil {
 		return chatcompletions.Config{}, err
 	}
-	if err := requireKey(apiKey, "AWS_BEARER_TOKEN_BEDROCK"); err != nil {
-		return chatcompletions.Config{}, err
-	}
-	baseURL := strings.TrimSpace(config.BaseURL)
-	if baseURL == "" {
-		region := strings.TrimSpace(os.Getenv("AWS_REGION"))
-		if region == "" {
-			region = "us-east-1"
-		}
-		baseURL = "https://bedrock-mantle." + region + ".api.aws/v1/chat/completions"
-	}
 	if strings.TrimSpace(config.Model) == "" {
 		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", AmazonBedrock)
 	}
+	baseURL := strings.TrimSpace(config.BaseURL)
+	if strings.TrimSpace(apiKey) != "" {
+		if baseURL == "" {
+			region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+			if region == "" {
+				region = "us-east-1"
+			}
+			baseURL = "https://bedrock-mantle." + region + ".api.aws/v1/chat/completions"
+		}
+		return chatcompletions.Config{
+			APIKey:       apiKey,
+			APIKeyEnv:    "AWS_BEARER_TOKEN_BEDROCK",
+			BaseURL:      baseURL,
+			Model:        config.Model,
+			ProviderName: "Amazon Bedrock",
+			Client:       config.Client,
+		}, nil
+	}
+	signer, err := bedrock.LoadDefault(context.Background(), config.Client)
+	if err != nil {
+		return chatcompletions.Config{}, fmt.Errorf("load standard AWS credentials: %w", err)
+	}
+	if baseURL == "" {
+		baseURL = "https://bedrock-runtime." + signer.Region() + ".amazonaws.com/v1/chat/completions"
+	}
 	return chatcompletions.Config{
-		APIKey:       apiKey,
-		APIKeyEnv:    "AWS_BEARER_TOKEN_BEDROCK",
-		BaseURL:      baseURL,
-		Model:        config.Model,
-		ProviderName: "Amazon Bedrock",
-		Client:       config.Client,
+		APIKeyEnv:     "AWS_BEARER_TOKEN_BEDROCK or standard AWS credentials",
+		BaseURL:       baseURL,
+		Model:         config.Model,
+		ProviderName:  "Amazon Bedrock",
+		RequestSigner: signer.SignRequest,
+		Client:        config.Client,
 	}, nil
 }
 
@@ -871,6 +887,8 @@ func CredentialHint(provider Provider) string {
 		return "OPENAI_API_KEY"
 	case AzureOpenAIResponses:
 		return "AZURE_OPENAI_API_KEY or AZURE_OPENAI_AUTH_TOKEN"
+	case AmazonBedrock:
+		return "AWS_BEARER_TOKEN_BEDROCK or standard AWS credential chain"
 	case Codex:
 		return "Gator Codex OAuth credential"
 	case Anthropic:
@@ -909,11 +927,24 @@ func AmbientCredentialAvailable(provider Provider) bool {
 	switch provider {
 	case GoogleVertex:
 		return vertex.FromEnvironment().Available()
+	case AmazonBedrock:
+		_, available := bedrock.AmbientSource()
+		return available
 	case AzureOpenAIResponses:
 		return strings.TrimSpace(os.Getenv("AZURE_OPENAI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("AZURE_OPENAI_AUTH_TOKEN")) != ""
 	default:
 		return false
 	}
+}
+
+// AmbientCredentialSource returns a non-secret description suitable for local
+// diagnostics. It is empty when a provider has no configured ambient source.
+func AmbientCredentialSource(provider Provider) string {
+	if provider == AmazonBedrock {
+		source, _ := bedrock.AmbientSource()
+		return source
+	}
+	return ""
 }
 
 // APIKeyEnvironment returns the ambient API-key variable for providers that

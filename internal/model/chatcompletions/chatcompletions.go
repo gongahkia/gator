@@ -32,6 +32,7 @@ type Config struct {
 	AuthorizationPrefix string
 	Headers             http.Header
 	RequestHeaders      func(agent.TurnRequest) http.Header
+	RequestSigner       func(context.Context, *http.Request, []byte) error
 	Client              *http.Client
 }
 
@@ -48,7 +49,7 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	if err != nil {
 		return agent.Turn{}, err
 	}
-	if strings.TrimSpace(apiKey) == "" {
+	if strings.TrimSpace(apiKey) == "" && m.Config.RequestSigner == nil {
 		env := m.Config.APIKeyEnv
 		if env == "" {
 			env = "API key"
@@ -81,7 +82,9 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	if authHeader == "Authorization" && authPrefix == "" {
 		authPrefix = "Bearer "
 	}
-	request.Header.Set(authHeader, authPrefix+apiKey)
+	if strings.TrimSpace(apiKey) != "" {
+		request.Header.Set(authHeader, authPrefix+apiKey)
+	}
 	request.Header.Set("Content-Type", "application/json")
 	for name, values := range m.Config.Headers {
 		for _, value := range values {
@@ -93,6 +96,11 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 			for _, value := range values {
 				request.Header.Add(name, value)
 			}
+		}
+	}
+	if m.Config.RequestSigner != nil {
+		if err := m.Config.RequestSigner(ctx, request, payload); err != nil {
+			return agent.Turn{}, fmt.Errorf("sign %s request: %w", m.providerName(), err)
 		}
 	}
 	response, err := m.client().Do(request)
