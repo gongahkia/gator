@@ -906,6 +906,72 @@ func TestLoginCommandRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
 	}
 }
 
+func TestProviderOwnedCodexLoginSelectsHarnessInsteadOfNativeOAuth(t *testing.T) {
+	model := New(Config{
+		Provider: "codex",
+		Model:    "gpt-5.6",
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{}, errors.New("Gator OAuth credential for \"codex\" is required")
+		},
+		NewDelegateCommand: func(string, string, string, [][]string, string) (*exec.Cmd, error) {
+			return exec.Command("true"), nil
+		},
+	})
+	next, command := model.Update(connectDoneMsg{provider: "codex"})
+	if command != nil {
+		t.Fatal("completed login returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.delegateRuntime != "codex" || !strings.Contains(updated.commandOutput, "Codex CLI harness is ready") {
+		t.Fatalf("provider-owned login state = runtime:%q output:%q", updated.delegateRuntime, updated.commandOutput)
+	}
+	if len(updated.preflight) != 1 || updated.preflight[0] != "describe a task" {
+		t.Fatalf("harness preflight = %#v", updated.preflight)
+	}
+}
+
+func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
+	delegateCalls := 0
+	nativeCalls := 0
+	model := New(Config{
+		RepositoryPath: "/tmp/example-repository",
+		Provider:       "codex",
+		Model:          "gpt-5.6",
+		Verification:   [][]string{{"go", "test", "./..."}},
+		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
+			nativeCalls++
+			return gatorrun.Executor{}, errors.New("Gator OAuth credential for \"codex\" is required")
+		},
+		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (*exec.Cmd, error) {
+			delegateCalls++
+			if runtime != "codex" || task != "Inspect this repository" || modelName != "gpt-5.6" || repository != "/tmp/example-repository" {
+				t.Fatalf("delegate input = runtime:%q task:%q model:%q repository:%q", runtime, task, modelName, repository)
+			}
+			if got := formatVerification(verification); got != "go test ./..." {
+				t.Fatalf("delegate verification = %q", got)
+			}
+			return exec.Command("true"), nil
+		},
+	})
+	model.delegateRuntime = "codex"
+	model.task.SetValue("Inspect this repository")
+	model.refreshPreflight()
+	if len(model.preflight) != 0 {
+		t.Fatalf("harness preflight = %#v", model.preflight)
+	}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	if command == nil {
+		t.Fatal("harness run did not start a terminal command")
+	}
+	if nativeCalls != 0 || delegateCalls != 1 || next.(Model).execution != nil {
+		t.Fatalf("run dispatch = native:%d delegate:%d execution:%#v", nativeCalls, delegateCalls, next.(Model).execution)
+	}
+	finished := runTeaCommand(t, next.(Model), command)
+	if finished.notice.kind != noticeSuccess || !strings.Contains(finished.commandOutput, "Codex CLI harness completed") {
+		t.Fatalf("harness completion = notice:%#v output:%q", finished.notice, finished.commandOutput)
+	}
+}
+
 func TestProviderDropdownDescribesNewDirectProviderChoices(t *testing.T) {
 	model := New(Config{StateDir: t.TempDir()})
 	model.focus = providerField
