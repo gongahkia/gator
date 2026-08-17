@@ -114,6 +114,19 @@ func interactiveWithOptions(options interactiveOptions) error {
 		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
 			return exec.Command(os.Args[0], "connect", provider), nil
 		},
+		NewDelegateCommand: func(runtime, task, modelName string, verification [][]string, repository string) (*exec.Cmd, error) {
+			arguments := []string{"delegate", runtime, "run"}
+			if strings.TrimSpace(modelName) != "" {
+				arguments = append(arguments, "--model", modelName)
+			}
+			for _, command := range verification {
+				arguments = append(arguments, "--verify", strings.Join(command, " "))
+			}
+			arguments = append(arguments, "--", task)
+			process := exec.Command(os.Args[0], arguments...)
+			process.Dir = repository
+			return process, nil
+		},
 		SetTheme: saveTheme,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())

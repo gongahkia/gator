@@ -15,6 +15,11 @@ func (m Model) preflightView() string {
 	label := "Before starting"
 	ready := "Ready to create an isolated worktree."
 	readiness := "Run readiness"
+	if m.delegateRuntime != "" {
+		label = "Before running " + delegatedRuntimeLabel(m.delegateRuntime)
+		ready = "Ready to start " + delegatedRuntimeLabel(m.delegateRuntime) + " in an isolated worktree."
+		readiness = "Harness readiness"
+	}
 	if m.runMode == gatorrun.PlanMode {
 		label = "Before planning"
 		ready = "Ready to inspect an isolated worktree without edits."
@@ -160,6 +165,9 @@ func (m Model) chatView(running bool) string {
 	provider := strings.TrimSpace(m.provider.Value())
 	if provider == "" {
 		provider = "provider not selected"
+	}
+	if m.delegateRuntime != "" {
+		provider += " · " + delegatedRuntimeLabel(m.delegateRuntime)
 	}
 	model := strings.TrimSpace(m.model.Value())
 	if model == "" {
