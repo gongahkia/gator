@@ -27,6 +27,7 @@ type Request struct {
 	Steering    <-chan string
 	ThreadID    string
 	BaseCommit  string
+	ForkedFrom  string
 	Images      []agent.Image
 	Attachments []agent.Attachment
 	Mode        Mode

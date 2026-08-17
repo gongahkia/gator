@@ -381,6 +381,31 @@ func TestListAllRecentThreadsIncludesProjectsAndPreservesRepositoryMetadata(t *t
 	}
 }
 
+func TestListThreadForksGroupsIndependentBranchesBySourceTurn(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/project"
+	worktree := filepath.Join(t.TempDir(), "retained")
+	if err := os.Mkdir(worktree, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, thread := range []Thread{
+		{Version: threadVersion, ID: "source-thread", Repository: repository, WorktreePath: worktree, Provider: "openai", Task: "Source", HeadStatePath: "/state/source", TurnCount: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{Version: threadVersion, ID: "fork-one", Repository: repository, WorktreePath: worktree, Provider: "openai", Task: "Fork one", HeadStatePath: "/state/fork-one", ForkedFrom: "/state/source", TurnCount: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{Version: threadVersion, ID: "fork-two", Repository: repository, WorktreePath: worktree, Provider: "openai", Task: "Fork two", HeadStatePath: "/state/fork-two", ForkedFrom: "/state/source", TurnCount: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()},
+	} {
+		if err := SaveThread(stateDirectory, thread); err != nil {
+			t.Fatalf("save %s: %v", thread.ID, err)
+		}
+	}
+	forks, err := ListThreadForks(stateDirectory, repository)
+	if err != nil {
+		t.Fatalf("list forks: %v", err)
+	}
+	if len(forks["/state/source"]) != 2 {
+		t.Fatalf("forks = %#v", forks)
+	}
+}
+
 func TestLoadThreadLineageReturnsChronologicalPrivateTurnSummaries(t *testing.T) {
 	stateDirectory := t.TempDir()
 	repository := "/workspace/project"

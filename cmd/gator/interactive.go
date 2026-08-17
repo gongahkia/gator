@@ -19,6 +19,7 @@ func interactive() error {
 type interactiveOptions struct {
 	RepositoryPath    string
 	ResumeStatePath   string
+	ForkStatePath     string
 	StartInRecent     bool
 	RecentAll         bool
 	AllowNoRepository bool
@@ -76,6 +77,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		StateDir:        stateDir,
 		Verification:    parseSuggestedVerification(suggestedVerificationCommands(repository)),
 		ResumeStatePath: options.ResumeStatePath,
+		ForkStatePath:   options.ForkStatePath,
 		StartInRecent:   options.StartInRecent,
 		RecentAll:       options.RecentAll,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {

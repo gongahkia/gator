@@ -36,21 +36,22 @@ type Record struct {
 // run. Unlike events.jsonl, it contains model conversation content and is
 // intentionally written with mode 0600.
 type Session struct {
-	Version            int                   `json:"version"`
-	Repository         string                `json:"repository"`
-	WorktreePath       string                `json:"worktree_path"`
-	BaseCommit         string                `json:"base_commit,omitempty"`
-	Provider           string                `json:"provider"`
-	Model              string                `json:"model"`
-	BaseURL            string                `json:"base_url,omitempty"`
-	Task               string                `json:"task"`
-	MaxSteps           int                   `json:"max_steps"`
-	Verification       [][]string            `json:"verification"`
-	ThreadID           string                `json:"thread_id,omitempty"`
-	Mode               string                `json:"mode,omitempty"`
-	Messages           []agent.Message       `json:"messages"`
-	AttachmentManifest []AttachmentReference `json:"attachment_manifest,omitempty"`
-	ParentStatePath    string                `json:"parent_state_path,omitempty"`
+	Version             int                   `json:"version"`
+	Repository          string                `json:"repository"`
+	WorktreePath        string                `json:"worktree_path"`
+	BaseCommit          string                `json:"base_commit,omitempty"`
+	Provider            string                `json:"provider"`
+	Model               string                `json:"model"`
+	BaseURL             string                `json:"base_url,omitempty"`
+	Task                string                `json:"task"`
+	MaxSteps            int                   `json:"max_steps"`
+	Verification        [][]string            `json:"verification"`
+	ThreadID            string                `json:"thread_id,omitempty"`
+	Mode                string                `json:"mode,omitempty"`
+	Messages            []agent.Message       `json:"messages"`
+	AttachmentManifest  []AttachmentReference `json:"attachment_manifest,omitempty"`
+	ParentStatePath     string                `json:"parent_state_path,omitempty"`
+	ForkedFromStatePath string                `json:"forked_from_state_path,omitempty"`
 }
 
 // AttachmentReference records only enough metadata to explain omitted binary
@@ -154,6 +155,44 @@ func (j *Journal) SaveSession(session Session) error {
 	session.Messages = cleanMessages
 	session.AttachmentManifest = mergeAttachmentManifest(session.AttachmentManifest, attachments)
 	return writeJSON(filepath.Join(j.directory, "session.json"), session)
+}
+
+// SaveSnapshot stores the exact portable patch state of a completed turn. It
+// is private local state because it can contain repository source, and it is
+// separate from the metadata-only event log. A branch restores this snapshot
+// into a new isolated worktree rather than sharing mutable files with another
+// thread.
+func (j *Journal) SaveSnapshot(snapshot []byte) error {
+	if j == nil || j.directory == "" {
+		return errors.New("journal is not initialized")
+	}
+	if len(snapshot) > 16*1024*1024 {
+		return errors.New("run snapshot exceeds the 16 MiB limit")
+	}
+	return writePrivateBytes(filepath.Join(j.directory, "snapshot.patch"), snapshot)
+}
+
+// LoadSnapshot reads a private patch snapshot retained for a forkable turn.
+func LoadSnapshot(statePath string) ([]byte, error) {
+	if strings.TrimSpace(statePath) == "" {
+		return nil, errors.New("run record path is required")
+	}
+	path := filepath.Join(statePath, "snapshot.patch")
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("stat run snapshot: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("run snapshot is not a regular file")
+	}
+	if info.Size() > 16*1024*1024 {
+		return nil, errors.New("run snapshot exceeds the 16 MiB limit")
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read run snapshot: %w", err)
+	}
+	return contents, nil
 }
 
 // LoadSession reads a session from a run record path printed by Gator.
@@ -341,6 +380,17 @@ func writeJSON(path string, value any) error {
 	}
 	if err := os.Rename(temporary, path); err != nil {
 		return fmt.Errorf("publish run journal file: %w", err)
+	}
+	return nil
+}
+
+func writePrivateBytes(path string, contents []byte) error {
+	temporary := path + ".tmp"
+	if err := os.WriteFile(temporary, contents, 0o600); err != nil {
+		return fmt.Errorf("write private state file: %w", err)
+	}
+	if err := os.Rename(temporary, path); err != nil {
+		return fmt.Errorf("publish private state file: %w", err)
 	}
 	return nil
 }

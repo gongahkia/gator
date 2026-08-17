@@ -14,7 +14,10 @@ import (
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
-var runIDPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
+var (
+	runIDPattern  = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
+	commitPattern = regexp.MustCompile(`\A[0-9a-fA-F]{7,64}\z`)
+)
 
 // Worktree is one isolated checkout retained for agent review and recovery.
 type Worktree struct {
@@ -29,6 +32,20 @@ type Worktree struct {
 // repository. Keeping it outside the active checkout prevents the run's files
 // and metadata from being confused with the developer's own changes.
 func Create(ctx context.Context, repositoryPath, runID string) (Worktree, error) {
+	return create(ctx, repositoryPath, runID, "HEAD")
+}
+
+// CreateAtRevision creates an isolated worktree at a verified immutable Git
+// commit. It is used for session forks, which must reproduce an earlier turn
+// rather than whatever HEAD happens to be when the fork begins.
+func CreateAtRevision(ctx context.Context, repositoryPath, runID, revisionSpec string) (Worktree, error) {
+	if !commitPattern.MatchString(revisionSpec) {
+		return Worktree{}, fmt.Errorf("invalid immutable worktree revision %q", revisionSpec)
+	}
+	return create(ctx, repositoryPath, runID, revisionSpec)
+}
+
+func create(ctx context.Context, repositoryPath, runID, revisionSpec string) (Worktree, error) {
 	if !runIDPattern.MatchString(runID) {
 		return Worktree{}, fmt.Errorf("invalid run id %q", runID)
 	}
@@ -47,7 +64,7 @@ func Create(ctx context.Context, repositoryPath, runID string) (Worktree, error)
 		return Worktree{}, fmt.Errorf("inspect Gator worktree path: %w", err)
 	}
 
-	command := exec.CommandContext(ctx, "git", "worktree", "add", "--detach", path, "HEAD")
+	command := exec.CommandContext(ctx, "git", "worktree", "add", "--detach", path, revisionSpec)
 	command.Dir = repository
 	output, err := command.CombinedOutput()
 	if err != nil {

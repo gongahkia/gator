@@ -1053,6 +1053,13 @@ func TestThreadTreeShowsRetainedLineageWithoutChangingContinuation(t *testing.T)
 	}
 	first := create("run-tree-root", "", "", "completed")
 	second := create("run-tree-head", first.StatePath, "Inspect the retained history", "failed")
+	if err := journal.SaveThread(stateDirectory, journal.Thread{
+		Version: 1, ID: "forked-tree-001", Repository: repository, WorktreePath: worktreePath,
+		Provider: "openai", Model: "gpt-5.6", Task: "Try the alternate approach", HeadStatePath: "/state/forked-tree-001",
+		ForkedFrom: first.StatePath, TurnCount: 1, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("save forked thread: %v", err)
+	}
 
 	model := New(Config{RepositoryPath: repository, StateDir: stateDirectory})
 	next, _ := model.beginContinuation(second.StatePath)
@@ -1069,7 +1076,7 @@ func TestThreadTreeShowsRetainedLineageWithoutChangingContinuation(t *testing.T)
 	next, _ = tree.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
 	tree = next.(Model)
 	view := tree.threadTreeView()
-	if !strings.Contains(view, "Retained linear lineage") || !strings.Contains(view, "Inspect the retained history") || strings.Contains(view, second.StatePath) {
+	if !strings.Contains(view, "press f to fork") || !strings.Contains(view, "Inspect the retained history") || !strings.Contains(view, "fork forked-tree") || strings.Contains(view, second.StatePath) {
 		t.Fatalf("thread tree view = %s", view)
 	}
 	next, _ = tree.Update(tea.KeyMsg{Type: tea.KeyUp})

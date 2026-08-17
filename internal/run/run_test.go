@@ -242,6 +242,68 @@ func TestExecutorResumeAdvancesThread(t *testing.T) {
 	}
 }
 
+func TestExecutorForkRestoresSnapshotIntoNewWorktree(t *testing.T) {
+	repository := featureRepository(t)
+	stateDirectory := t.TempDir()
+	patch := "diff --git a/branch.txt b/branch.txt\n" +
+		"new file mode 100644\n" +
+		"--- /dev/null\n" +
+		"+++ b/branch.txt\n" +
+		"@@ -0,0 +1 @@\n" +
+		"+original branch state\n"
+	firstModel := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "patch", Name: "apply_patch", Arguments: objectArguments(t, struct {
+			Patch string `json:"patch"`
+		}{Patch: patch})}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The original branch is ready."},
+	}}
+	first, err := (Executor{Model: firstModel}).Execute(context.Background(), Request{
+		RepositoryPath: repository, Task: "Create branch state", Provider: "test", Model: "test-model",
+		RunID: "fork-source-001", MaxSteps: 6, StateDir: stateDirectory,
+	})
+	if err != nil {
+		t.Fatalf("execute source branch: %v", err)
+	}
+	if snapshot, err := journal.LoadSnapshot(first.StatePath); err != nil || !strings.Contains(string(snapshot), "branch.txt") {
+		t.Fatalf("source snapshot = %q, %v", snapshot, err)
+	}
+	previous, err := journal.LoadSession(first.StatePath)
+	if err != nil {
+		t.Fatalf("load source session: %v", err)
+	}
+	forkModel := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The fork is ready."},
+	}}
+	fork, err := (Executor{Model: forkModel}).Fork(context.Background(), previous, first.StatePath, "Try an alternate implementation.", Request{StateDir: stateDirectory})
+	if err != nil {
+		t.Fatalf("fork: %v", err)
+	}
+	if fork.ThreadID == first.ThreadID || fork.Worktree.Path == first.Worktree.Path {
+		t.Fatalf("fork reused source branch: %#v", fork)
+	}
+	if contents, err := os.ReadFile(filepath.Join(fork.Worktree.Path, "branch.txt")); err != nil || string(contents) != "original branch state\n" {
+		t.Fatalf("fork did not restore snapshot: %q, %v", contents, err)
+	}
+	forkSession, err := journal.LoadSession(fork.StatePath)
+	if err != nil {
+		t.Fatalf("load fork session: %v", err)
+	}
+	if forkSession.ForkedFromStatePath != first.StatePath || forkSession.ParentStatePath != "" {
+		t.Fatalf("fork session = %#v", forkSession)
+	}
+	thread, err := journal.LoadThread(stateDirectory, repository, fork.ThreadID)
+	if err != nil {
+		t.Fatalf("load fork thread: %v", err)
+	}
+	if thread.ForkedFrom != first.StatePath {
+		t.Fatalf("fork thread = %#v", thread)
+	}
+}
+
 func TestValidateVerification(t *testing.T) {
 	if err := validateVerification([][]string{{}}); err == nil {
 		t.Fatal("empty verification command was accepted")

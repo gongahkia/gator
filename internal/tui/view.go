@@ -154,6 +154,8 @@ func (m Model) chatView(running bool) string {
 	mode := "new thread"
 	if m.resumeStatePath != "" {
 		mode = "thread " + compact(m.threadID, 12)
+	} else if m.forkStatePath != "" {
+		mode = "new fork"
 	}
 	provider := strings.TrimSpace(m.provider.Value())
 	if provider == "" {
@@ -652,11 +654,20 @@ func (m Model) threadTreeView() string {
 		status := threadTurnStatusView(turn.Status)
 		timestamp := threadTurnTimestamp(turn)
 		lines = append(lines, "    "+status+dimStyle.Render(" · "+timestamp+" · ")+dimStyle.Render(compact(turn.Task, max(12, m.panelTextWidth()-26))))
+		for _, fork := range m.threadForks[turn.StatePath] {
+			label := "fork " + compact(fork.ID, 12)
+			if fork.Available {
+				label += " · available"
+			} else {
+				label += " · worktree missing"
+			}
+			lines = append(lines, "    ↳ "+keyStyle.Render(label)+" · "+dimStyle.Render(compact(fork.Task, max(12, m.panelTextWidth()-28))))
+		}
 	}
 	selected := m.threadTurns[min(max(0, m.threadIndex), len(m.threadTurns)-1)]
 	sections := []string{
 		m.header(title),
-		m.inline(dimStyle.Render(compact("Retained linear lineage · Gator does not create or switch branches.", m.inlineWidth()))),
+		m.inline(dimStyle.Render(compact("Select a turn and press f to fork it into a new isolated worktree.", m.inlineWidth()))),
 		m.panel(strings.Join(lines, "\n")),
 		labelStyle.Render(fmt.Sprintf("Selected turn %d", m.threadIndex+1)),
 		m.panel(compact(selected.Task, max(16, m.panelTextWidth()*2))),
@@ -664,7 +675,7 @@ func (m Model) threadTreeView() string {
 	if strings.TrimSpace(selected.FinalText) != "" && !m.compactLayout() {
 		sections = append(sections, labelStyle.Render("Result"), m.panel(compact(selected.FinalText, max(16, m.panelTextWidth()*3))))
 	}
-	footer := m.footer("up/down select", "r refresh", "y/esc return", "f1 shortcuts")
+	footer := m.footer("up/down select", "f fork selected", "c clone current", "r refresh", "y/esc return", "f1 shortcuts")
 	if m.compactLayout() {
 		footer = m.footer("up/down select", "y/esc return", "f1 help")
 	}

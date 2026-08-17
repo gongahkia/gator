@@ -109,6 +109,18 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 			providerName = arguments[1]
 		}
 		return m.startOAuthLogin(providerName)
+	case "/clone":
+		if m.resumeStatePath == "" {
+			m.notice = notice{text: "Continue a retained thread before cloning it.", kind: noticeInfo}
+			return m, nil
+		}
+		return m.beginFork(m.resumeStatePath)
+	case "/fork":
+		if m.resumeStatePath == "" {
+			m.notice = notice{text: "Continue a retained thread before choosing a turn to fork.", kind: noticeInfo}
+			return m, nil
+		}
+		return m.openThreadTree(m.screen)
 	case "/plan":
 		m.runMode = gatorrun.PlanMode
 		m.notice = notice{text: "Plan mode is read-only: it can inspect the worktree but cannot edit files or run commands.", kind: noticeInfo}
@@ -221,6 +233,12 @@ func (m Model) openThreadTree(returnScreen screen) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.threadTurns = turns
+	forks, err := journal.ListThreadForks(m.config.StateDir, m.config.RepositoryPath)
+	if err != nil {
+		m.notice = notice{text: "Load thread forks: " + err.Error(), kind: noticeError}
+		return m, nil
+	}
+	m.threadForks = forks
 	m.threadIndex = len(turns) - 1
 	m.threadReturn = returnScreen
 	m.screen = threadScreen

@@ -153,7 +153,48 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		Steering: stream.steering,
 	}
 
-	if m.resumeStatePath != "" {
+	if m.forkStatePath != "" {
+		previous, loadErr := journal.LoadSession(m.forkStatePath)
+		if loadErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "Load retained fork: " + loadErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		if _, snapshotErr := journal.LoadSnapshot(m.forkStatePath); snapshotErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "Fork retained run: " + snapshotErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		retainedProvider, providerErr := modelprovider.ParseProvider(previous.Provider)
+		if providerErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: providerErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		providerName = previous.Provider
+		modelName = modelprovider.EffectiveModel(retainedProvider, previous.Model)
+		request.Model = modelName
+		request.Provider = providerName
+		request.BaseURL = previous.BaseURL
+		request.Verification = previous.Verification
+		var executorErr error
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, previous.BaseURL)
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: executorErr.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.beginRunActivity(request.Verification)
+		go executeFork(ctx, stream, executor, previous, m.forkStatePath, task, request)
+	} else if m.resumeStatePath != "" {
 		previous, loadErr := journal.LoadSession(m.resumeStatePath)
 		if loadErr != nil {
 			cancel()
@@ -252,6 +293,12 @@ func executeResume(ctx context.Context, stream *executionStream, executor gatorr
 	stream.done <- executionDone{outcome: outcome, err: err}
 }
 
+func executeFork(ctx context.Context, stream *executionStream, executor gatorrun.Executor, previous journal.Session, statePath, instruction string, request gatorrun.Request) {
+	outcome, err := executor.Fork(ctx, previous, statePath, instruction, request)
+	close(stream.events)
+	stream.done <- executionDone{outcome: outcome, err: err}
+}
+
 func waitForExecution(stream *executionStream) tea.Cmd {
 	if stream == nil {
 		return nil
@@ -325,11 +372,46 @@ func (m *Model) beginContinuation(statePath string) (tea.Model, tea.Cmd) {
 	return *m, m.focusField()
 }
 
+func (m *Model) beginFork(statePath string) (tea.Model, tea.Cmd) {
+	session, err := journal.LoadSession(statePath)
+	if err != nil {
+		m.notice = notice{text: "Load retained fork: " + err.Error(), kind: noticeError}
+		return *m, nil
+	}
+	if _, err := journal.LoadSnapshot(statePath); err != nil {
+		m.notice = notice{text: "Fork retained run: " + err.Error(), kind: noticeError}
+		return *m, nil
+	}
+	m.forkStatePath = statePath
+	m.resumeStatePath = ""
+	m.threadID = ""
+	m.config.RepositoryPath = session.Repository
+	m.runMode = gatorrun.ExecuteMode
+	if session.Mode == gatorrun.PlanMode.String() {
+		m.runMode = gatorrun.PlanMode
+	}
+	m.task.Reset()
+	m.queue = nil
+	m.task.Placeholder = "Describe the alternate direction for this fork..."
+	m.chat = nil
+	m.chatIndex = 0
+	m.appendChat(chatEntry{author: chatSystem, text: "Forking a retained turn into a new isolated worktree. The original thread remains unchanged."})
+	m.verification.SetValue(formatVerification(session.Verification))
+	m.provider.SetValue(session.Provider)
+	m.model.SetValue(session.Model)
+	m.screen = composeScreen
+	m.focus = taskField
+	m.notice = notice{text: "Forking turn from " + session.ThreadID + ". Describe the alternate direction.", kind: noticeInfo}
+	m.refreshPreflight()
+	return *m, m.focusField()
+}
+
 func (m *Model) returnToComposer() {
 	m.screen = composeScreen
 	m.vimCommand = ""
 	m.quitAfterRun = false
 	m.resumeStatePath = ""
+	m.forkStatePath = ""
 	m.threadID = ""
 	m.recentAll = false
 	m.runMode = gatorrun.ExecuteMode
@@ -350,7 +432,7 @@ func (m *Model) returnToComposer() {
 // in the repository or exposing it in the event journal. Continuations use a
 // private run session instead, so they do not overwrite the new-run draft.
 func (m *Model) persistDraft() {
-	if m.resumeStatePath != "" || strings.TrimSpace(m.config.StateDir) == "" {
+	if m.resumeStatePath != "" || m.forkStatePath != "" || strings.TrimSpace(m.config.StateDir) == "" {
 		return
 	}
 	err := journal.SaveDraft(m.config.StateDir, journal.Draft{
@@ -372,8 +454,12 @@ func (m *Model) refreshPreflight() {
 		return
 	}
 	issues := make([]string, 0, 3)
-	if m.resumeStatePath != "" {
-		session, err := journal.LoadSession(m.resumeStatePath)
+	if m.resumeStatePath != "" || m.forkStatePath != "" {
+		statePath := m.resumeStatePath
+		if statePath == "" {
+			statePath = m.forkStatePath
+		}
+		session, err := journal.LoadSession(statePath)
 		if err != nil {
 			m.preflight = []string{"load retained run: " + err.Error()}
 			return

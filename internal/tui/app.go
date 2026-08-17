@@ -30,6 +30,7 @@ type Config struct {
 	MaxSteps        int
 	StateDir        string
 	ResumeStatePath string
+	ForkStatePath   string
 	StartInRecent   bool
 	RecentAll       bool
 	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
@@ -203,6 +204,7 @@ type Model struct {
 	recentIndex         int
 	recentAll           bool
 	threadTurns         []journal.ThreadTurn
+	threadForks         map[string][]journal.RecentThread
 	threadIndex         int
 	events              []timelineEntry
 	chat                []chatEntry
@@ -224,6 +226,7 @@ type Model struct {
 	diffErr         error
 	diffStats       diffStats
 	resumeStatePath string
+	forkStatePath   string
 	threadID        string
 	runMode         gatorrun.Mode
 }
@@ -316,6 +319,10 @@ func New(config Config) Model {
 		next, _ := application.beginContinuation(config.ResumeStatePath)
 		return next.(Model)
 	}
+	if strings.TrimSpace(config.ForkStatePath) != "" {
+		next, _ := application.beginFork(config.ForkStatePath)
+		return next.(Model)
+	}
 	if config.StartInRecent {
 		next, _ := application.openRecentRuns()
 		return next.(Model)
@@ -352,6 +359,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.threadID = msg.done.outcome.ThreadID
 		if msg.done.outcome.StatePath != "" {
 			m.resumeStatePath = msg.done.outcome.StatePath
+			m.forkStatePath = ""
 		}
 		m.runErr = msg.done.err
 		m.finishRunActivity(msg.done.err, wasCancelling)
