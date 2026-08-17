@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tui"
@@ -69,28 +71,50 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if err != nil {
 		return err
 	}
+	extensionResolver, err := extension.DefaultResolver(settings)
+	if err != nil {
+		return err
+	}
+	extensions, err := extensionResolver.Load(repository)
+	if err != nil {
+		return fmt.Errorf("load extensions: %w", err)
+	}
+	loadedCommands, err := extensions.Commands()
+	if err != nil {
+		return err
+	}
+	extensionCommands := make([]tui.ExtensionCommand, 0, len(loadedCommands))
+	for _, command := range loadedCommands {
+		extensionCommands = append(extensionCommands, tui.ExtensionCommand{Name: command.Name, Description: command.Description, Prompt: command.Prompt})
+	}
 	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
 	application := tui.New(tui.Config{
-		RepositoryPath:  repository,
-		Provider:        provider,
-		Model:           modelFromProviderName(provider),
-		BaseURL:         os.Getenv("GATOR_BASE_URL"),
-		StateDir:        stateDir,
-		Verification:    parseSuggestedVerification(suggestedVerificationCommands(repository)),
-		ResumeStatePath: options.ResumeStatePath,
-		ForkStatePath:   options.ForkStatePath,
-		StartInRecent:   options.StartInRecent,
-		RecentAll:       options.RecentAll,
-		CustomProviders: settings.CustomProviders,
+		RepositoryPath:    repository,
+		Provider:          provider,
+		Model:             modelFromProviderName(provider),
+		BaseURL:           os.Getenv("GATOR_BASE_URL"),
+		StateDir:          stateDir,
+		Verification:      parseSuggestedVerification(suggestedVerificationCommands(repository)),
+		ResumeStatePath:   options.ResumeStatePath,
+		ForkStatePath:     options.ForkStatePath,
+		StartInRecent:     options.StartInRecent,
+		RecentAll:         options.RecentAll,
+		CustomProviders:   settings.CustomProviders,
+		ExtensionCommands: extensionCommands,
+		Theme:             settings.Theme,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)
 		},
 		BeginOAuthLogin: func(provider string) (tui.OAuthLogin, error) {
 			return beginTUIOAuthLogin(provider)
 		},
+		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
+			return exec.Command(os.Args[0], "connect", provider), nil
+		},
+		SetTheme: saveTheme,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	_, err = program.Run()

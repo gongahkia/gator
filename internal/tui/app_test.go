@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -34,6 +35,59 @@ func TestNewUsesConfiguredRunDefaults(t *testing.T) {
 	}
 	if model.config.MaxSteps != defaultMaxSteps {
 		t.Fatalf("max steps = %d, want %d", model.config.MaxSteps, defaultMaxSteps)
+	}
+}
+
+func TestCustomProviderIsSelectableWithConfiguredModels(t *testing.T) {
+	model := New(Config{
+		RepositoryPath: "/tmp/example-repository",
+		CustomProviders: []config.CustomProvider{{
+			ID: "local-llm", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"qwen3-coder", "deepseek-coder"}, DefaultModel: "qwen3-coder",
+		}},
+	})
+	provider, modelName, custom, err := model.resolveProviderAndModel("local-llm", "")
+	if err != nil || !custom || provider != "local-llm" || modelName != "qwen3-coder" {
+		t.Fatalf("resolve custom provider = %q %q %t %v", provider, modelName, custom, err)
+	}
+	options := model.modelDropdownOptions("local-llm")
+	if len(options) != 2 || options[0].value != "qwen3-coder" || options[1].value != "deepseek-coder" {
+		t.Fatalf("custom model options = %#v", options)
+	}
+}
+
+func TestThemeCommandAppliesAndPersistsNamedTheme(t *testing.T) {
+	defer applyTheme("gator")
+	saved := ""
+	model := New(Config{SetTheme: func(name string) error {
+		saved = name
+		return nil
+	}})
+	model.task.SetValue("/theme mono")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("theme command started asynchronous work")
+	}
+	updated := next.(Model)
+	if saved != "mono" || updated.config.Theme != "mono" || !strings.Contains(updated.notice.text, "saved") {
+		t.Fatalf("theme state = saved:%q theme:%q notice:%q", saved, updated.config.Theme, updated.notice.text)
+	}
+}
+
+func TestExtensionPromptCommandOnlyFillsTheComposer(t *testing.T) {
+	model := New(Config{ExtensionCommands: []ExtensionCommand{{
+		Name: "review-helper:focused_review", Description: "prepare focused review", Prompt: "Review the current diff for concrete findings.",
+	}}})
+	model.task.SetValue("/review-helper:focused_review")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		// textarea focus restoration is a local command, so this branch is only
+		// retained to make the intended no-run behavior explicit.
+	} else if _, ok := next.(Model); !ok {
+		t.Fatal("extension command returned an invalid model")
+	}
+	updated := next.(Model)
+	if updated.task.Value() != "Review the current diff for concrete findings." || !strings.Contains(updated.notice.text, "loaded") {
+		t.Fatalf("extension command state = task:%q notice:%q", updated.task.Value(), updated.notice.text)
 	}
 }
 
@@ -827,6 +881,28 @@ func TestLoginCommandExplainsVendorCLIPathWhenNativeOAuthIsUnconfigured(t *testi
 	updated := next.(Model)
 	if !strings.Contains(updated.commandOutput, "gator connect copilot") {
 		t.Fatalf("login guidance = %q", updated.commandOutput)
+	}
+}
+
+func TestLoginCommandRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
+	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "")
+	model := New(Config{
+		Provider: "codex",
+		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
+			if provider != "codex" {
+				t.Fatalf("provider = %q", provider)
+			}
+			return exec.Command("true"), nil
+		},
+	})
+	model.task.SetValue("/login codex")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("provider-owned login did not start a terminal command")
+	}
+	updated := next.(Model)
+	if !strings.Contains(updated.notice.text, "Opening the provider-owned sign-in") {
+		t.Fatalf("login notice = %q", updated.notice.text)
 	}
 }
 

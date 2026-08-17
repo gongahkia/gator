@@ -29,6 +29,7 @@ type Config struct {
 	StateDir        string
 	DefaultProvider string
 	DefaultModel    string
+	ResolveProvider func(provider, model string) (string, string, error)
 	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
 }
 
@@ -225,12 +226,11 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 	if err != nil {
 		return err
 	}
-	provider, err := model.ParseProvider(previous.Provider)
+	provider, modelName, err := s.resolveModel(previous.Provider, previous.Model)
 	if err != nil {
 		return fmt.Errorf("load retained provider: %w", err)
 	}
-	modelName := model.EffectiveModel(provider, previous.Model)
-	executor, err := s.config.NewExecutor(string(provider), modelName, previous.BaseURL)
+	executor, err := s.config.NewExecutor(provider, modelName, previous.BaseURL)
 	if err != nil {
 		return err
 	}
@@ -278,12 +278,15 @@ func (s *Server) resolveModel(provider, modelName string) (string, string, error
 	if strings.TrimSpace(provider) == "" {
 		provider = s.config.DefaultProvider
 	}
+	if strings.TrimSpace(modelName) == "" {
+		modelName = s.config.DefaultModel
+	}
+	if s.config.ResolveProvider != nil {
+		return s.config.ResolveProvider(provider, modelName)
+	}
 	parsed, err := model.ParseProvider(provider)
 	if err != nil {
 		return "", "", err
-	}
-	if strings.TrimSpace(modelName) == "" {
-		modelName = s.config.DefaultModel
 	}
 	return string(parsed), model.EffectiveModel(parsed, modelName), nil
 }

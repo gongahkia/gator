@@ -32,7 +32,7 @@ func rpcMode(arguments []string, input io.Reader, out io.Writer) error {
 	}
 	server, err := internalrpc.New(internalrpc.Config{
 		Input: input, Output: out, RepositoryPath: repository, StateDir: stateDir,
-		DefaultProvider: defaults.Provider, DefaultModel: defaults.Model, NewExecutor: newExecutor,
+		DefaultProvider: defaults.Provider, DefaultModel: defaults.Model, ResolveProvider: resolveConfiguredProvider, NewExecutor: newExecutor,
 	})
 	if err != nil {
 		return err

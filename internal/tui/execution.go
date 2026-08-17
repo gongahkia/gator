@@ -67,16 +67,17 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Choose a provider before starting a run.", kind: noticeError}
 		return m, nil
 	}
-	provider, providerErr := modelprovider.ParseProvider(providerName)
+	resolvedProvider, resolvedModel, customProvider, providerErr := m.resolveProviderAndModel(providerName, modelName)
 	if providerErr != nil {
 		m.notice = notice{text: providerErr.Error(), kind: noticeError}
 		return m, nil
 	}
-	if hasPDFAttachment(attachments) && !modelprovider.SupportsPDFAttachments(provider) {
+	if hasPDFAttachment(attachments) && (customProvider || !modelprovider.SupportsPDFAttachments(modelprovider.Provider(resolvedProvider))) {
 		m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
 		return m, nil
 	}
-	modelName = modelprovider.EffectiveModel(provider, modelName)
+	providerName = resolvedProvider
+	modelName = resolvedModel
 	m.refreshPreflight()
 	if len(m.preflight) > 0 {
 		m.notice = notice{text: "Resolve configuration before starting: " + m.preflight[0], kind: noticeError}
@@ -170,7 +171,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Fork retained run: " + snapshotErr.Error(), kind: noticeError}
 			return m, nil
 		}
-		retainedProvider, providerErr := modelprovider.ParseProvider(previous.Provider)
+		retainedProvider, retainedModel, retainedCustom, providerErr := m.resolveProviderAndModel(previous.Provider, previous.Model)
 		if providerErr != nil {
 			cancel()
 			m.execution = nil
@@ -178,8 +179,15 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: providerErr.Error(), kind: noticeError}
 			return m, nil
 		}
-		providerName = previous.Provider
-		modelName = modelprovider.EffectiveModel(retainedProvider, previous.Model)
+		if hasPDFAttachment(attachments) && (retainedCustom || !modelprovider.SupportsPDFAttachments(modelprovider.Provider(retainedProvider))) {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
+			return m, nil
+		}
+		providerName = retainedProvider
+		modelName = retainedModel
 		request.Model = modelName
 		request.Provider = providerName
 		request.BaseURL = previous.BaseURL
@@ -212,7 +220,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "The retained run does not record a provider and cannot be continued safely.", kind: noticeError}
 			return m, nil
 		}
-		retainedProvider, providerErr := modelprovider.ParseProvider(previous.Provider)
+		retainedProvider, retainedModel, retainedCustom, providerErr := m.resolveProviderAndModel(previous.Provider, previous.Model)
 		if providerErr != nil {
 			cancel()
 			m.execution = nil
@@ -220,15 +228,15 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.notice = notice{text: providerErr.Error(), kind: noticeError}
 			return m, nil
 		}
-		if hasPDFAttachment(attachments) && !modelprovider.SupportsPDFAttachments(retainedProvider) {
+		if hasPDFAttachment(attachments) && (retainedCustom || !modelprovider.SupportsPDFAttachments(modelprovider.Provider(retainedProvider))) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
 			m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
 			return m, nil
 		}
-		providerName = previous.Provider
-		modelName = modelprovider.EffectiveModel(retainedProvider, previous.Model)
+		providerName = retainedProvider
+		modelName = retainedModel
 		request.Model = modelName
 		request.Provider = providerName
 		request.BaseURL = previous.BaseURL
@@ -470,7 +478,7 @@ func (m *Model) refreshPreflight() {
 			m.preflight = []string{"load retained run: " + err.Error()}
 			return
 		}
-		provider, err := modelprovider.ParseProvider(session.Provider)
+		providerName, modelName, _, err := m.resolveProviderAndModel(session.Provider, session.Model)
 		if err != nil {
 			m.preflight = []string{err.Error()}
 			return
@@ -478,7 +486,7 @@ func (m *Model) refreshPreflight() {
 		if strings.TrimSpace(m.task.Value()) == "" {
 			issues = append(issues, "describe a continuation instruction")
 		}
-		if _, err := m.config.NewExecutor(session.Provider, modelprovider.EffectiveModel(provider, session.Model), session.BaseURL); err != nil {
+		if _, err := m.config.NewExecutor(providerName, modelName, session.BaseURL); err != nil {
 			issues = append(issues, err.Error())
 		}
 		m.preflight = issues
@@ -492,14 +500,12 @@ func (m *Model) refreshPreflight() {
 			issues = append(issues, err.Error())
 		}
 	}
-	providerName := strings.TrimSpace(m.provider.Value())
-	provider, err := modelprovider.ParseProvider(providerName)
+	providerName, modelName, _, err := m.resolveProviderAndModel(m.provider.Value(), m.model.Value())
 	if err != nil {
 		issues = append(issues, err.Error())
 		m.preflight = issues
 		return
 	}
-	modelName := modelprovider.EffectiveModel(provider, m.model.Value())
 	if _, err := m.config.NewExecutor(providerName, modelName, m.config.BaseURL); err != nil {
 		issues = append(issues, err.Error())
 	}

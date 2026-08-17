@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
@@ -111,7 +113,9 @@ func installExtension(arguments []string, extensionStore extension.Store, settin
 	if len(flags.Args()) != 1 {
 		return errors.New(extensionUsage)
 	}
-	installed, err := extensionStore.Install(flags.Args()[0], *replace)
+	context, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	installed, err := extensionStore.InstallSource(context, flags.Args()[0], *replace)
 	if err != nil {
 		return err
 	}

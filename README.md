@@ -119,6 +119,9 @@ OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
 ./bin/gator export /path/to/run-record > gator-review.patch
 ./bin/gator apply --check /path/to/run-record
 ./bin/gator apply /path/to/run-record
+
+# Export a reviewable local HTML transcript. Gator does not upload it.
+./bin/gator transcript /path/to/run-record > gator-transcript.html
 ```
 
 `gator` opens a conversation-first terminal application when run from a Git
@@ -203,6 +206,12 @@ document inputs. Text/data attachments work with every direct API adapter;
 PDFs require the `openai`, `codex`, `anthropic`, or `gemini` provider because generic
 Chat Completions endpoints do not share a stable document-input protocol.
 
+When a selected subscription provider has no Gator-registered OAuth client,
+`/login` opens its supported vendor-owned `gator connect` flow in the same
+terminal and returns to Gator afterward. That sign-in remains owned by the
+vendor CLI; Gator makes the next delegated-harness action explicit rather than
+silently treating the credential as a native Gator credential.
+
 Gator permits at most four attachments per task, each up to 4 MiB, with an
 8 MiB combined image/document budget. Attachments must be regular files inside
 the repository and are read through a descriptor-rooted workspace boundary.
@@ -256,6 +265,16 @@ language-neutral JSON sidecar tools. Install a bundle with `gator extension
 install DIRECTORY`; project bundles under `.gator/extensions/` stay inactive
 until `gator extension trust` is run in that repository. Read the exact
 manifest, lifecycle, protocol, and trust boundary in [Extensions](docs/EXTENSIONS.md).
+
+For a local server or a provider with a compatible endpoint, add it once with
+`gator provider add ID --base-url URL --model MODEL`. The endpoint must speak
+OpenAI Chat Completions; the declared model list is the only selectable list.
+`--api-key-env NAME` references an environment variable without storing a
+secret, while omitting it is the supported keyless-local-server route.
+
+Gator keeps terminal customization deliberately small and readable: `gator
+theme set gator|contrast|mono` persists one named theme, and `/theme NAME`
+applies it immediately in the terminal UI.
 
 ## Providers
 

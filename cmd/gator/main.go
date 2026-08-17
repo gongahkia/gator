@@ -30,6 +30,8 @@ Usage:
   gator extension install [--replace] DIRECTORY
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
+  gator theme list
+  gator theme set gator|contrast|mono
   gator connect PROVIDER [OPTIONS]
   gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
   gator logout PROVIDER
@@ -39,6 +41,7 @@ Usage:
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator transcript RUN_RECORD_PATH > transcript.html
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH
 
@@ -47,12 +50,14 @@ Commands:
   connect   start a provider-owned or API-key onboarding flow
   login     store a provider credential in Gator's private local auth file
   logout    remove a provider credential from Gator's private local auth file
-	delegate  run an installed vendor or external agent in an isolated worktree
-	extension install, enable, trust, or remove Gator extension bundles
-	provider  configure a custom/local Chat Completions provider
+  delegate  run an installed vendor or external agent in an isolated worktree
+  extension install, enable, trust, or remove Gator extension bundles
+  provider  configure a custom/local Chat Completions provider
+  theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    select, reopen, or immediately continue a retained local thread
+  transcript export one retained private session as local HTML
   export    write a portable patch for a retained run to standard output
   apply     explicitly apply a retained patch to this clean checkout
 
@@ -106,6 +111,8 @@ func run(args []string, out io.Writer) error {
 		return extensionCommand(args[1:], out)
 	case "provider":
 		return providerCommand(args[1:], out)
+	case "theme":
+		return themeCommand(args[1:], out)
 	case "run":
 		return runTask(args[1:], out)
 	case "resume":
@@ -114,6 +121,8 @@ func run(args []string, out io.Writer) error {
 		return forkTask(args[1:], out)
 	case "clone":
 		return cloneTask(args[1:], out)
+	case "transcript":
+		return exportTranscript(args[1:], out)
 	case "export":
 		return exportPatch(args[1:], out)
 	case "apply":

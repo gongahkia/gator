@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -24,7 +25,21 @@ func (m Model) matchingCommands() []slashCommand {
 	if m.focus != taskField {
 		return nil
 	}
-	return matchingSlashCommands(m.task.Value())
+	matches := matchingSlashCommands(m.task.Value())
+	query := strings.TrimSpace(m.task.Value())
+	if !strings.HasPrefix(query, "/") || strings.Contains(query, "\n") {
+		return matches
+	}
+	query = strings.TrimPrefix(query, "/")
+	if fields := strings.Fields(query); len(fields) > 0 {
+		query = fields[0]
+	}
+	for _, command := range m.extensionSlashCommands() {
+		if strings.HasPrefix(strings.TrimPrefix(command.name, "/"), query) {
+			matches = append(matches, command)
+		}
+	}
+	return matches
 }
 
 func (m *Model) normalizeCommandSelection() {
@@ -82,6 +97,14 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	m.task.Reset()
 	m.commandIndex = 0
 	switch command.name {
+	default:
+		if command.prompt != "" {
+			m.task.SetValue(command.prompt)
+			m.notice = notice{text: "Extension template loaded. Review it, then send it explicitly.", kind: noticeInfo}
+			return m, m.focusField()
+		}
+		m.notice = notice{text: "Unknown local command.", kind: noticeError}
+		return m, nil
 	case "/clear":
 		m.commandOutput = ""
 		m.notice = notice{text: "Task cleared.", kind: noticeInfo}
@@ -170,6 +193,23 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/status":
 		m.commandOutput = m.sessionStatus()
 		m.notice = notice{text: "Current configuration shown below.", kind: noticeInfo}
+	case "/theme":
+		if len(arguments) == 1 {
+			m.commandOutput = "Current theme: " + m.config.Theme + "\n\nChoose one:\n  /theme gator\n  /theme contrast\n  /theme mono"
+			m.notice = notice{text: "Choose a named theme; the change is saved immediately.", kind: noticeInfo}
+			break
+		}
+		if len(arguments) != 2 || m.config.SetTheme == nil {
+			m.notice = notice{text: "Use /theme gator, /theme contrast, or /theme mono.", kind: noticeError}
+			break
+		}
+		if err := m.config.SetTheme(arguments[1]); err != nil {
+			m.notice = notice{text: err.Error(), kind: noticeError}
+			break
+		}
+		m.config.Theme = applyTheme(arguments[1])
+		m.commandOutput = "Theme set to " + m.config.Theme + "."
+		m.notice = notice{text: "Theme saved and applied.", kind: noticeSuccess}
 	case "/verify":
 		m.commandOutput = ""
 		m.focus = verificationField
@@ -185,8 +225,12 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
-	if m.config.BeginOAuthLogin == nil {
-		m.notice = notice{text: "OAuth login is not configured for this Gator build.", kind: noticeError}
+	if custom, found := m.customProvider(providerName); found {
+		if custom.APIKeyEnv == "" {
+			m.notice = notice{text: "Custom provider " + custom.ID + " is configured without an API key.", kind: noticeInfo}
+		} else {
+			m.notice = notice{text: "Set " + custom.APIKeyEnv + " before running custom provider " + custom.ID + ".", kind: noticeInfo}
+		}
 		return m, nil
 	}
 	provider, err := modelprovider.ParseProvider(providerName)
@@ -204,10 +248,25 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 	}
 	if command := delegatedConnectCommand(string(provider)); command != "" {
 		if clientIDEnvironment := oauthClientIDEnvironment(string(provider)); clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "" {
+			if m.config.NewConnectCommand != nil {
+				process, processErr := m.config.NewConnectCommand(string(provider))
+				if processErr != nil {
+					m.notice = notice{text: processErr.Error(), kind: noticeError}
+					return m, nil
+				}
+				m.notice = notice{text: "Opening the provider-owned sign-in in this terminal...", kind: noticeInfo}
+				return m, tea.ExecProcess(process, func(err error) tea.Msg {
+					return connectDoneMsg{provider: string(provider), err: err}
+				})
+			}
 			m.commandOutput = "Native Gator OAuth requires " + clientIDEnvironment + ".\n\nFor the no-registration vendor-CLI route, exit this TUI and run:\n  " + command + "\n\nThen use the matching gator delegate runtime."
 			m.notice = notice{text: "Use the vendor-CLI connection command shown below, or configure Gator's own OAuth client.", kind: noticeInfo}
 			return m, nil
 		}
+	}
+	if m.config.BeginOAuthLogin == nil {
+		m.notice = notice{text: "OAuth login is not configured for this Gator build.", kind: noticeError}
+		return m, nil
 	}
 	login, err := m.config.BeginOAuthLogin(string(provider))
 	if err != nil {
@@ -285,7 +344,7 @@ type dropdownOption struct {
 	custom      bool
 }
 
-func providerDropdownOptions(stateDir string) []dropdownOption {
+func providerDropdownOptions(stateDir string, customProviders []config.CustomProvider) []dropdownOption {
 	descriptions := map[modelprovider.Provider]string{
 		modelprovider.OpenAI:                  "OpenAI Responses API",
 		modelprovider.AzureOpenAI:             "Azure OpenAI Chat Completions",
@@ -346,6 +405,7 @@ func providerDropdownOptions(stateDir string) []dropdownOption {
 		}
 		options = append(options, dropdownOption{value: name, description: description})
 	}
+	options = append(options, customProviderOptions(customProviders)...)
 	return options
 }
 
@@ -371,6 +431,10 @@ func delegatedConnectCommand(provider string) string {
 		return "gator connect codex"
 	case string(modelprovider.Copilot):
 		return "gator connect copilot"
+	case string(modelprovider.KimiCoding):
+		return "gator connect kimi"
+	case string(modelprovider.XAI):
+		return "gator connect xai"
 	default:
 		return ""
 	}
@@ -382,6 +446,12 @@ func oauthClientIDEnvironment(provider string) string {
 		return "GATOR_CODEX_OAUTH_CLIENT_ID"
 	case string(modelprovider.Copilot):
 		return "GATOR_COPILOT_OAUTH_CLIENT_ID"
+	case string(modelprovider.KimiCoding):
+		return "GATOR_KIMI_CODE_OAUTH_CLIENT_ID"
+	case string(modelprovider.XAI):
+		return "GATOR_XAI_OAUTH_CLIENT_ID"
+	case string(modelprovider.Radius):
+		return "GATOR_RADIUS_OAUTH_CLIENT_ID"
 	default:
 		return ""
 	}
@@ -391,6 +461,17 @@ func oauthClientIDEnvironment(provider string) string {
 // without guessing an arbitrary provider catalog. The text field remains
 // editable for deployments, aliases, previews, and account-specific models.
 func (m Model) modelDropdownOptions(providerName string) []dropdownOption {
+	if custom, found := m.customProvider(providerName); found {
+		options := make([]dropdownOption, 0, len(custom.Models))
+		for _, modelName := range custom.Models {
+			description := "configured custom-provider model"
+			if modelName == custom.DefaultModel {
+				description = "configured default"
+			}
+			options = append(options, dropdownOption{value: modelName, label: modelName, description: description})
+		}
+		return options
+	}
 	provider, err := modelprovider.ParseProvider(providerName)
 	if err != nil {
 		return nil
@@ -466,7 +547,7 @@ func matchingDropdownOptions(options []dropdownOption, query string) []dropdownO
 func (m Model) dropdownOptions() []dropdownOption {
 	switch m.focus {
 	case providerField:
-		return matchingDropdownOptions(providerDropdownOptions(m.config.StateDir), m.provider.Value())
+		return matchingDropdownOptions(providerDropdownOptions(m.config.StateDir, m.config.CustomProviders), m.provider.Value())
 	case modelField:
 		return matchingDropdownOptions(m.modelDropdownOptions(m.provider.Value()), m.model.Value())
 	default:
@@ -520,9 +601,8 @@ func (m *Model) applySelectedDropdown() {
 	switch m.focus {
 	case providerField:
 		m.provider.SetValue(selected.value)
-		provider, err := modelprovider.ParseProvider(selected.value)
-		if err == nil {
-			m.model.SetValue(modelprovider.DefaultModel(provider))
+		if _, modelName, _, err := m.resolveProviderAndModel(selected.value, ""); err == nil {
+			m.model.SetValue(modelName)
 		}
 		m.notice = notice{text: "Provider selected: " + selected.value, kind: noticeInfo}
 	case modelField:
