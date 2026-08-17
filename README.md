@@ -13,9 +13,9 @@ tests, and propose the resulting patch.
 
 The project is being rebuilt from a previous agent meta-harness. The runnable
 milestone includes a Gator-owned native loop, direct cloud-provider adapters,
-worktree-local tools, command policy, durable local run storage, and a
-full-screen terminal application. Real-model usability evidence, context
-compaction, and broader replay coverage are still in progress.
+worktree-local tools, command policy, durable local run storage, a full-screen
+terminal application, and an automation protocol. Real-model usability
+evidence and broader replay coverage are still in progress.
 
 ## Install and update
 
@@ -100,6 +100,7 @@ GATOR_RADIUS_OAUTH_CLIENT_ID=... ./bin/gator login radius --subscription
 # resumed conversation in the TUI.
 ./bin/gator resume
 ./bin/gator resume --last
+./bin/gator resume --last --compact
 ./bin/gator resume thread-identifier
 ./bin/gator resume --all
 OPENAI_API_KEY=... ./bin/gator resume --last \
@@ -108,6 +109,11 @@ OPENAI_API_KEY=... ./bin/gator resume --last \
 # The original raw run-record form remains supported.
 OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
   'Address the failing verification and finish the patch'
+
+# Fork a selected retained turn into a separate worktree, or clone the current
+# retained head. Both retain the original source thread unchanged.
+./bin/gator fork --last 'Try the smaller implementation instead'
+./bin/gator clone --last 'Repeat the active direction with another constraint'
 
 # Save a portable patch or apply it explicitly to a clean compatible checkout.
 ./bin/gator export /path/to/run-record > gator-review.patch
@@ -157,19 +163,26 @@ locally retained repositories. The picker shows a summary rather than private
 run-record paths and validates the selected worktree when continuation begins.
 `/tree` opens an in-terminal navigator for the active retained thread. It
 shows every saved turn from root to head with its mode, provider/model, status,
-timestamp, prompt summary, and the selected turn's final response. `y` opens
-the same navigator from review. Gator retains a linear parent-linked lineage;
-unlike Pi's branchable session tree, it does not create, switch, or delete
-branches from this view.
+timestamp, prompt summary, selected response, and any independent forks. `y`
+opens the same navigator from review. Press `f` on an earlier turn to start an
+alternate branch in a fresh isolated worktree; `/clone` branches from the
+current retained head. Neither operation modifies the source thread.
+
+Gator automatically summarizes older retained context once it exceeds its
+local threshold, retaining the newest messages and recording a visible
+`context_compacted` event. Use `/compact` (or `gator resume --compact`) to
+request that summary before the next retained turn. The original private run
+records remain intact for inspection and forking.
 
 Type `/` (or `?` in an empty message) to filter and select local conversation commands;
 type `@` in a task to select a repository file or directory from matching path
 suggestions. In the command menu, `Tab` completes the selected command and
 `Enter` executes it; path suggestions accept either key to insert the path.
 Conversation
-commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
-`/permissions`, `/worktree`, `/review`, `/threads`, `/recent`, `/tree`, `/clear`,
-`/queue`, `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every
+commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/provider`,
+`/login`, `/verify`, `/permissions`, `/worktree`, `/review`, `/threads`,
+`/recent`, `/tree`, `/fork`, `/clone`, `/compact`, `/clear`, `/queue`,
+`/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every
 provider an enforced read-only tool surface and does not require a verifier;
 switch the same retained thread to `/execute` when you are ready to make edits.
 `Ctrl+Space` (reported as `Ctrl+@`
@@ -379,16 +392,19 @@ agent, or delegate Gator's tool loop.
 Runs leave code changes in a sibling `*-gator-runs/` worktree, never in the
 active checkout. The printed run-record path defaults to
 `$XDG_STATE_HOME/gator/` (or `~/.local/state/gator/`) and contains a
-metadata-only event journal, final result, and a private `0600` session file
-for `gator resume`. `gator resume --last` selects the newest retained thread
+metadata-only event journal, final result, a portable patch snapshot, and a
+private `0600` session file for `gator resume`. `gator resume --last` selects the newest retained thread
 for the current repository; `--all` expands selection to the local state root.
 The event log intentionally omits prompts, source text,
 tool arguments, tool output, and raw attachment bytes; the worktree is the
 reviewable source of truth. The TUI also keeps one private `0600` unfinished draft per repository
 and lists resumable conversation threads from the same state root. Threads
 retain one worktree across turns and record whether the last turn was Plan or
-Execute. Each retained turn points to its immutable parent record, which lets
-`/tree` reconstruct the local root-to-head lineage without replaying the agent.
+Execute. Each retained turn points to its immutable parent record and stores a
+portable patch snapshot. `gator fork` restores that snapshot into a new
+worktree at the saved base commit, so the source thread stays unchanged while
+`/tree` reconstructs local lineage and visible forks without replaying the
+agent.
 Drafts contain only the current message, verifier text, provider, and
 model, and are removed after Gator finishes a new thread. The active-turn queue
 is intentionally absent from drafts and sessions, so a restart never performs

@@ -17,14 +17,15 @@ const (
 
 const compactionPrefix = "Gator compacted context from earlier turns:\n"
 
-func compactMessages(ctx context.Context, model agent.Model, system string, messages []agent.Message) ([]agent.Message, string, bool, error) {
-	if contextBytes(messages) <= maxUncompactedContextBytes || len(messages) <= recentMessagesToKeep {
+func compactMessages(ctx context.Context, model agent.Model, messages []agent.Message, force bool) ([]agent.Message, string, bool, error) {
+	if len(messages) <= 1 || (!force && (contextBytes(messages) <= maxUncompactedContextBytes || len(messages) <= recentMessagesToKeep)) {
 		return messages, "", false, nil
 	}
 	if model == nil {
 		return nil, "", false, errors.New("agent model is required for context compaction")
 	}
-	split := len(messages) - recentMessagesToKeep
+	keep := min(recentMessagesToKeep, len(messages)-1)
+	split := len(messages) - keep
 	older := append([]agent.Message(nil), messages[:split]...)
 	recent := append([]agent.Message(nil), messages[split:]...)
 	turn, err := model.Complete(ctx, agent.TurnRequest{

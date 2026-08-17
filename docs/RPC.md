@@ -30,5 +30,10 @@ private `state_path` required for `resume`. Events expose a tool name, not tool
 arguments or raw output, so an embedding parent does not accidentally inherit
 repository contents or secrets from the agent process.
 
+Set `params.compact` to `true` on `resume` to request a model-generated summary
+of older retained messages before the next turn. Gator emits a
+`context_compacted` event when it does so; immutable private run records are
+not replaced.
+
 Go integrations can import `github.com/gongahkia/gator/rpc` for protocol types
 and the concurrent-safe JSONL `Client`.

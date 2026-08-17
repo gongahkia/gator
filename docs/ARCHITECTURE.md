@@ -65,7 +65,10 @@ streams lifecycle events from the executor; and renders the retained worktree
 and current diff for review. Plan mode removes patching and command tools
 entirely. Resume keeps one conversation thread on the same worktree and
 preserves its original model and verification policy so a continuation cannot
-silently broaden its command authority.
+silently broaden its command authority. Every completed retained turn also
+exports a portable patch snapshot. A fork creates a new worktree at the saved
+base commit, applies that snapshot, and uses a new thread ID; it never mutates
+the source thread.
 
 Supported `@` references are a separate, bounded developer input channel.
 The TUI loads only repository-local PNG, JPEG, and WebP images; PDFs; selected
@@ -146,4 +149,8 @@ data. It records attachment metadata only, never attachment contents.
 Each new run also writes a private `0600` thread record indexed by repository.
 It advances to the latest session after every completed turn, allowing the TUI
 to retain a single worktree across a multi-turn conversation while preserving
-the immutable per-turn run records.
+the immutable per-turn run records. Context compaction runs before a retained
+turn only when the local history crosses its bounded threshold or the caller
+explicitly requests it. It replaces only older in-memory messages with a
+model-generated continuation summary, preserves the newest messages, emits a
+visible event, and never rewrites an existing session record.

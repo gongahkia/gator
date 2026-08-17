@@ -14,7 +14,7 @@ func TestCompactMessagesSummarizesOnlyOlderHistory(t *testing.T) {
 		messages = append(messages, agent.Message{Role: agent.RoleUser, Content: strings.Repeat(string(rune('a'+index%26)), 8*1024)})
 	}
 	model := &scriptedModel{turns: []agent.Turn{{Text: "Objective: finish the parser. Changed files: parser.go. Verification: pending."}}}
-	compacted, summary, didCompact, err := compactMessages(context.Background(), model, "system", messages)
+	compacted, summary, didCompact, err := compactMessages(context.Background(), model, messages, false)
 	if err != nil {
 		t.Fatalf("compact messages: %v", err)
 	}
@@ -31,8 +31,26 @@ func TestCompactMessagesSummarizesOnlyOlderHistory(t *testing.T) {
 
 func TestCompactMessagesLeavesBoundedHistoryUntouched(t *testing.T) {
 	messages := []agent.Message{{Role: agent.RoleUser, Content: "small history"}}
-	compacted, summary, didCompact, err := compactMessages(context.Background(), &scriptedModel{}, "system", messages)
+	compacted, summary, didCompact, err := compactMessages(context.Background(), &scriptedModel{}, messages, false)
 	if err != nil || didCompact || summary != "" || len(compacted) != 1 || compacted[0].Content != "small history" {
 		t.Fatalf("compaction result = %#v, %q, %t, %v", compacted, summary, didCompact, err)
+	}
+}
+
+func TestCompactMessagesAllowsExplicitCompactionOfShortHistory(t *testing.T) {
+	messages := make([]agent.Message, 20)
+	for index := range messages {
+		messages[index] = agent.Message{Role: agent.RoleUser, Content: "short"}
+	}
+	model := &scriptedModel{turns: []agent.Turn{{Text: "preserved decisions"}}}
+	compacted, summary, didCompact, err := compactMessages(context.Background(), model, messages, true)
+	if err != nil {
+		t.Fatalf("compact messages: %v", err)
+	}
+	if !didCompact || summary != "preserved decisions" {
+		t.Fatalf("expected explicit compaction, got compacted=%v summary=%q", didCompact, summary)
+	}
+	if len(compacted) != recentMessagesToKeep+1 || compacted[0].Content != compactionPrefix+"preserved decisions" {
+		t.Fatalf("unexpected compacted history: %#v", compacted)
 	}
 }

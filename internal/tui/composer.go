@@ -23,6 +23,7 @@ var slashCommands = []slashCommand{
 	{name: "/clear", description: "clear the current task"},
 	{name: "/clear-queue", description: "remove every queued instruction"},
 	{name: "/clone", description: "duplicate the active retained branch"},
+	{name: "/compact", description: "summarize older retained context before the next turn"},
 	{name: "/dequeue", description: "remove the next queued instruction"},
 	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/login", description: "sign the selected provider into Gator"},

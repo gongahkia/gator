@@ -209,7 +209,7 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 		return executor.Execute(ctx, gatorrun.Request{
 			RepositoryPath: s.config.RepositoryPath, Task: request.Params.Task, Provider: provider, Model: modelName,
 			BaseURL: request.Params.BaseURL, MaxSteps: request.Params.MaxSteps, Verification: request.Params.Verify,
-			StateDir: s.config.StateDir, Mode: mode, Steering: steering, OnEvent: emit,
+			StateDir: s.config.StateDir, Mode: mode, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
 		})
 	})
 }
@@ -236,7 +236,7 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 	}
 	return s.start(parent, request.ID, func(ctx context.Context, steering <-chan string, emit agent.EventSink) (gatorrun.Outcome, error) {
 		return executor.Resume(ctx, previous, request.Params.StatePath, request.Params.Task, gatorrun.Request{
-			MaxSteps: request.Params.MaxSteps, StateDir: s.config.StateDir, Steering: steering, OnEvent: emit,
+			MaxSteps: request.Params.MaxSteps, StateDir: s.config.StateDir, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
 		})
 	})
 }

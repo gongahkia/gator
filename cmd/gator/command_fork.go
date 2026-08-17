@@ -31,6 +31,7 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 	last := flags.Bool("last", false, "fork the most recent retained thread for this repository")
 	all := flags.Bool("all", false, "include retained threads from other repositories")
 	maxSteps := flags.Int("max-steps", 0, "maximum model turns for this fork")
+	compact := flags.Bool("compact", false, "summarize older retained context before branching")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -49,7 +50,7 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 		if *all {
 			return errors.New("--all cannot be combined with a run record path")
 		}
-		return branchState(operation, target, instruction, *maxSteps, out)
+		return branchState(operation, target, instruction, *maxSteps, *compact, out)
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
@@ -70,14 +71,14 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return branchState(operation, selected.HeadStatePath, instruction, *maxSteps, out)
+	return branchState(operation, selected.HeadStatePath, instruction, *maxSteps, *compact, out)
 }
 
 func forkState(statePath, instruction string, maxSteps int, out io.Writer) error {
-	return branchState("fork", statePath, instruction, maxSteps, out)
+	return branchState("fork", statePath, instruction, maxSteps, false, out)
 }
 
-func branchState(operation, statePath, instruction string, maxSteps int, out io.Writer) error {
+func branchState(operation, statePath, instruction string, maxSteps int, compact bool, out io.Writer) error {
 	session, err := journal.LoadSession(statePath)
 	if err != nil {
 		return err
@@ -101,7 +102,13 @@ func branchState(operation, statePath, instruction string, maxSteps int, out io.
 		return err
 	}
 	printer := eventPrinter{out: out}
-	outcome, err := executor.Fork(context.Background(), session, statePath, instruction, gatorrun.Request{MaxSteps: maxSteps, OnEvent: printer.Print})
+	request := gatorrun.Request{MaxSteps: maxSteps, ForceCompaction: compact, OnEvent: printer.Print}
+	var outcome gatorrun.Outcome
+	if operation == "clone" {
+		outcome, err = executor.Clone(context.Background(), session, statePath, instruction, request)
+	} else {
+		outcome, err = executor.Fork(context.Background(), session, statePath, instruction, request)
+	}
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\n%s worktree: %s\n", operation, outcome.Worktree.Path); writeErr != nil && err == nil {
 			err = writeErr

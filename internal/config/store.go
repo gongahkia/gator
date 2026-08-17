@@ -15,8 +15,10 @@ const version = 1
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
 type Settings struct {
-	Version  int      `json:"version"`
-	Defaults Defaults `json:"defaults"`
+	Version            int                 `json:"version"`
+	Defaults           Defaults            `json:"defaults"`
+	Extensions         []Extension         `json:"extensions,omitempty"`
+	TrustedRepositories []string            `json:"trusted_repositories,omitempty"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -24,6 +26,13 @@ type Settings struct {
 type Defaults struct {
 	Provider string `json:"provider,omitempty"`
 	Model    string `json:"model,omitempty"`
+}
+
+// Extension records whether a globally installed extension is available to
+// native runs. Extension files live in Gator's data directory, not config.json.
+type Extension struct {
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
 }
 
 // Store owns config.json below one configuration root.
@@ -163,6 +172,34 @@ func validate(settings Settings) error {
 	}
 	if len(settings.Defaults.Provider) > 128 || len(settings.Defaults.Model) > 512 {
 		return errors.New("configuration default exceeds its size limit")
+	}
+	if len(settings.Extensions) > 256 {
+		return errors.New("configuration has too many extensions")
+	}
+	enabled := make(map[string]struct{}, len(settings.Extensions))
+	for _, extension := range settings.Extensions {
+		id := strings.TrimSpace(extension.ID)
+		if id == "" || len(id) > 128 {
+			return errors.New("extension ID is required and must be at most 128 bytes")
+		}
+		if _, exists := enabled[id]; exists {
+			return fmt.Errorf("extension %q is configured more than once", id)
+		}
+		enabled[id] = struct{}{}
+	}
+	if len(settings.TrustedRepositories) > 256 {
+		return errors.New("configuration has too many trusted repositories")
+	}
+	trusted := make(map[string]struct{}, len(settings.TrustedRepositories))
+	for _, repository := range settings.TrustedRepositories {
+		path := strings.TrimSpace(repository)
+		if path == "" || len(path) > 4*1024 {
+			return errors.New("trusted repository path is invalid")
+		}
+		if _, exists := trusted[path]; exists {
+			return fmt.Errorf("repository %q is trusted more than once", path)
+		}
+		trusted[path] = struct{}{}
 	}
 	return nil
 }
