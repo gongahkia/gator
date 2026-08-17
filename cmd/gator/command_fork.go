@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/journal"
-	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
@@ -89,16 +88,15 @@ func branchState(operation, statePath, instruction string, maxSteps int, compact
 	if instruction == "" {
 		return interactiveWithOptions(interactiveOptions{RepositoryPath: session.Repository, ForkStatePath: statePath})
 	}
-	provider, err := model.ParseProvider(session.Provider)
+	providerName, modelName, err := resolveConfiguredProvider(session.Provider, session.Model)
 	if err != nil {
 		return fmt.Errorf("load retained provider: %w", err)
 	}
-	modelName := model.EffectiveModel(provider, session.Model)
-	executor, err := newExecutor(string(provider), modelName, session.BaseURL)
+	executor, err := newExecutor(providerName, modelName, session.BaseURL)
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "Gator %s\n  source: %s\n  provider: %s\n  model: %s\n  task: %s\n", operation, session.ThreadID, provider, displayModel(modelName), instruction); err != nil {
+	if _, err := fmt.Fprintf(out, "Gator %s\n  source: %s\n  provider: %s\n  model: %s\n  task: %s\n", operation, session.ThreadID, providerName, displayModel(modelName), instruction); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}

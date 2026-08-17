@@ -61,7 +61,11 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if err := terminal.Close(); err != nil {
 		return fmt.Errorf("close terminal check: %w", err)
 	}
-	provider, err := providerFromEnvironment()
+	provider, err := providerNameFromEnvironment()
+	if err != nil {
+		return err
+	}
+	settings, err := loadSettings()
 	if err != nil {
 		return err
 	}
@@ -71,8 +75,8 @@ func interactiveWithOptions(options interactiveOptions) error {
 	}
 	application := tui.New(tui.Config{
 		RepositoryPath:  repository,
-		Provider:        string(provider),
-		Model:           modelFromEnvironment(provider),
+		Provider:        provider,
+		Model:           modelFromProviderName(provider),
 		BaseURL:         os.Getenv("GATOR_BASE_URL"),
 		StateDir:        stateDir,
 		Verification:    parseSuggestedVerification(suggestedVerificationCommands(repository)),
@@ -80,6 +84,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		ForkStatePath:   options.ForkStatePath,
 		StartInRecent:   options.StartInRecent,
 		RecentAll:       options.RecentAll,
+		CustomProviders: settings.CustomProviders,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)
 		},

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/journal"
-	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
@@ -136,16 +135,15 @@ func resumeState(statePath, continuation string, maxSteps int, compact bool, out
 	if err != nil {
 		return err
 	}
-	provider, err := model.ParseProvider(session.Provider)
+	providerName, modelName, err := resolveConfiguredProvider(session.Provider, session.Model)
 	if err != nil {
 		return fmt.Errorf("load retained provider: %w", err)
 	}
-	modelName := model.EffectiveModel(provider, session.Model)
-	executor, err := newExecutor(string(provider), modelName, session.BaseURL)
+	executor, err := newExecutor(providerName, modelName, session.BaseURL)
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "Gator resume\n  provider: %s\n  model: %s\n  task: %s\n", provider, displayModel(modelName), continuation); err != nil {
+	if _, err := fmt.Fprintf(out, "Gator resume\n  provider: %s\n  model: %s\n  task: %s\n", providerName, displayModel(modelName), continuation); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}
