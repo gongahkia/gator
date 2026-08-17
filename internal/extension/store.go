@@ -1,12 +1,15 @@
 package extension
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -140,6 +143,53 @@ func (s Store) Install(source string, replace bool) (Installed, error) {
 	return load(target, false)
 }
 
+// InstallSource installs either a local bundle directory or an explicit Git
+// repository URL. Re-running with --replace is the intentional package-update
+// mechanism; Gator never refreshes executable extensions in the background.
+func (s Store) InstallSource(ctx context.Context, source string, replace bool) (Installed, error) {
+	info, err := os.Stat(source)
+	if err == nil {
+		if !info.IsDir() {
+			return Installed{}, errors.New("extension source must be a directory or Git repository URL")
+		}
+		return s.Install(source, replace)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return Installed{}, fmt.Errorf("inspect extension source: %w", err)
+	}
+	if !validGitSource(source) {
+		return Installed{}, errors.New("extension source must be a local directory or an https, ssh, or git@ repository URL")
+	}
+	temporary, err := os.MkdirTemp("", "gator-extension-clone-")
+	if err != nil {
+		return Installed{}, fmt.Errorf("create extension clone directory: %w", err)
+	}
+	defer os.RemoveAll(temporary)
+	checkout := filepath.Join(temporary, "source")
+	command := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--", source, checkout)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			return Installed{}, fmt.Errorf("clone extension source: %w", err)
+		}
+		return Installed{}, fmt.Errorf("clone extension source: %s", message)
+	}
+	return s.Install(checkout, replace)
+}
+
+func validGitSource(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.HasPrefix(value, "-") {
+		return false
+	}
+	if strings.HasPrefix(value, "git@") {
+		return true
+	}
+	parsed, err := url.Parse(value)
+	return err == nil && (parsed.Scheme == "https" || parsed.Scheme == "ssh") && parsed.Host != ""
+}
+
 // Remove deletes exactly one globally installed extension. Callers must make
 // deletion explicit in their UI or command flow.
 func (s Store) Remove(id string) error {
@@ -200,10 +250,10 @@ func validateManifest(manifest Manifest) error {
 	if strings.TrimSpace(manifest.Name) == "" || len(manifest.Name) > 128 {
 		return errors.New("extension name is required and must be at most 128 bytes")
 	}
-	if len(manifest.Description) > 1024 || len(manifest.Skills)+len(manifest.Prompts) > 64 || len(manifest.Tools) > 32 {
+	if len(manifest.Description) > 1024 || len(manifest.Skills)+len(manifest.Prompts)+len(manifest.Commands) > 64 || len(manifest.Commands) > 32 || len(manifest.Tools) > 32 {
 		return errors.New("extension manifest exceeds a resource limit")
 	}
-	resources := make(map[string]struct{}, len(manifest.Skills)+len(manifest.Prompts))
+	resources := make(map[string]struct{}, len(manifest.Skills)+len(manifest.Prompts)+len(manifest.Commands))
 	for _, resource := range append(append([]string(nil), manifest.Skills...), manifest.Prompts...) {
 		if _, err := safePath("extension", resource); err != nil {
 			return fmt.Errorf("invalid extension resource %q: %w", resource, err)
@@ -212,6 +262,22 @@ func validateManifest(manifest Manifest) error {
 			return fmt.Errorf("extension resource %q is declared more than once", resource)
 		}
 		resources[resource] = struct{}{}
+	}
+	commands := make(map[string]struct{}, len(manifest.Commands))
+	for _, command := range manifest.Commands {
+		if !toolNamePattern.MatchString(command.Name) {
+			return fmt.Errorf("invalid extension command name %q", command.Name)
+		}
+		if strings.TrimSpace(command.Description) == "" || len(command.Description) > 1024 {
+			return fmt.Errorf("extension command %q requires a description no longer than 1024 bytes", command.Name)
+		}
+		if _, err := safePath("extension", command.Prompt); err != nil {
+			return fmt.Errorf("extension command %q prompt: %w", command.Name, err)
+		}
+		if _, exists := commands[command.Name]; exists {
+			return fmt.Errorf("extension command %q is declared more than once", command.Name)
+		}
+		commands[command.Name] = struct{}{}
 	}
 	tools := make(map[string]struct{}, len(manifest.Tools))
 	for _, tool := range manifest.Tools {

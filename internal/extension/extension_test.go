@@ -17,6 +17,7 @@ func TestInstallLoadsInstructionsAndExecutesSidecarTool(t *testing.T) {
   "id": "review-helper",
   "name": "Review helper",
   "skills": ["skills/review.md"],
+	"commands": [{"name":"focused_review","description":"prepare a focused review","prompt":"prompts/review.md"}],
   "tools": [{
     "name": "review",
     "description": "return a review marker",
@@ -24,8 +25,9 @@ func TestInstallLoadsInstructionsAndExecutesSidecarTool(t *testing.T) {
     "command": ["bin/review"]
   }]
 }`, map[string]fileSpec{
-		"skills/review.md": {contents: "Always inspect the focused diff."},
-		"bin/review":       {contents: "#!/bin/sh\nprintf '%s\\n' '{\"content\":\"reviewed\"}'\n", mode: 0o755},
+		"skills/review.md":  {contents: "Always inspect the focused diff."},
+		"prompts/review.md": {contents: "Review the current diff and report only concrete findings."},
+		"bin/review":        {contents: "#!/bin/sh\nprintf '%s\\n' '{\"content\":\"reviewed\"}'\n", mode: 0o755},
 	})
 	store, err := NewStore(t.TempDir())
 	if err != nil {
@@ -49,6 +51,10 @@ func TestInstallLoadsInstructionsAndExecutesSidecarTool(t *testing.T) {
 	instructions, err := set.Instructions()
 	if err != nil || !strings.Contains(instructions, "Always inspect") || !strings.Contains(instructions, "review-helper") {
 		t.Fatalf("instructions = %q, err = %v", instructions, err)
+	}
+	commands, err := set.Commands()
+	if err != nil || len(commands) != 1 || commands[0].Name != "review-helper:focused_review" || !strings.Contains(commands[0].Prompt, "concrete findings") {
+		t.Fatalf("commands = %#v, err = %v", commands, err)
 	}
 	root, err := workspace.Open(repository)
 	if err != nil {
@@ -111,6 +117,20 @@ func TestInstallRejectsSymlinkedExtensionFiles(t *testing.T) {
 	}
 	if _, err := store.Install(source, false); err == nil || !strings.Contains(err.Error(), "symlink") {
 		t.Fatalf("install error = %v", err)
+	}
+}
+
+func TestValidGitSourceAcceptsOnlyExplicitRemoteForms(t *testing.T) {
+	for value, want := range map[string]bool{
+		"https://github.com/example/review-helper.git": true,
+		"ssh://git@example.com/team/review-helper.git": true,
+		"git@example.com:team/review-helper.git":       true,
+		"-not-a-repository":                            false,
+		"review-helper":                                false,
+	} {
+		if got := validGitSource(value); got != want {
+			t.Fatalf("validGitSource(%q) = %v, want %v", value, got, want)
+		}
 	}
 }
 

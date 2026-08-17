@@ -17,6 +17,18 @@ import (
 type slashCommand struct {
 	name        string
 	description string
+	prompt      string
+}
+
+func (m Model) extensionSlashCommands() []slashCommand {
+	commands := make([]slashCommand, 0, len(m.config.ExtensionCommands))
+	for _, command := range m.config.ExtensionCommands {
+		if strings.TrimSpace(command.Name) == "" || strings.TrimSpace(command.Prompt) == "" {
+			continue
+		}
+		commands = append(commands, slashCommand{name: "/" + command.Name, description: command.Description, prompt: command.Prompt})
+	}
+	return commands
 }
 
 var slashCommands = []slashCommand{
@@ -41,6 +53,7 @@ var slashCommands = []slashCommand{
 	{name: "/queue", description: "show queued follow-up instructions"},
 	{name: "/review", description: "return to the latest review"},
 	{name: "/status", description: "show current run configuration"},
+	{name: "/theme", description: "choose a terminal theme"},
 	{name: "/verify", description: "edit required verification commands"},
 	{name: "/vim", description: "toggle Vim-style message editing"},
 	{name: "/worktree", description: "explain Gator's worktree mode"},

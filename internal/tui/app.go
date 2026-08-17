@@ -4,6 +4,7 @@ package tui
 import (
 	"context"
 	"crypto/sha256"
+	"os/exec"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -23,20 +24,32 @@ const maxQueuedInputs = 16
 // interactive session. NewExecutor is injected so the UI stays independent of
 // any particular model provider and can be tested without a network request.
 type Config struct {
-	RepositoryPath  string
-	Provider        string
-	Model           string
-	BaseURL         string
-	Verification    [][]string
-	MaxSteps        int
-	StateDir        string
-	ResumeStatePath string
-	ForkStatePath   string
-	StartInRecent   bool
-	RecentAll       bool
-	CustomProviders []config.CustomProvider
-	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
-	BeginOAuthLogin func(provider string) (OAuthLogin, error)
+	RepositoryPath    string
+	Provider          string
+	Model             string
+	BaseURL           string
+	Verification      [][]string
+	MaxSteps          int
+	StateDir          string
+	ResumeStatePath   string
+	ForkStatePath     string
+	StartInRecent     bool
+	RecentAll         bool
+	CustomProviders   []config.CustomProvider
+	ExtensionCommands []ExtensionCommand
+	Theme             string
+	NewExecutor       func(provider, model, baseURL string) (gatorrun.Executor, error)
+	BeginOAuthLogin   func(provider string) (OAuthLogin, error)
+	NewConnectCommand func(provider string) (*exec.Cmd, error)
+	SetTheme          func(name string) error
+}
+
+// ExtensionCommand is a visible prompt template contributed by a trusted or
+// explicitly installed extension. Selecting it only fills the composer.
+type ExtensionCommand struct {
+	Name        string
+	Description string
+	Prompt      string
 }
 
 // OAuthLogin is an application-owned browser login that has already started a
@@ -162,6 +175,11 @@ type oauthLoginDoneMsg struct {
 	err      error
 }
 
+type connectDoneMsg struct {
+	provider string
+	err      error
+}
+
 type diffLoadedMsg struct {
 	diff      string
 	truncated bool
@@ -244,8 +262,43 @@ var (
 	panelStyle  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
 )
 
+// applyTheme keeps terminal customization intentionally recognizable: every
+// saved choice has a stable name and no hidden style file is evaluated.
+func applyTheme(name string) string {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "contrast":
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
+		labelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("226"))
+		errorStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
+		okStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("46"))
+		panelStyle = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(lipgloss.Color("15")).Padding(0, 1)
+		return "contrast"
+	case "mono":
+		headerStyle = lipgloss.NewStyle().Bold(true)
+		labelStyle = lipgloss.NewStyle().Bold(true)
+		dimStyle = lipgloss.NewStyle().Faint(true)
+		keyStyle = lipgloss.NewStyle().Bold(true)
+		errorStyle = lipgloss.NewStyle().Bold(true)
+		okStyle = lipgloss.NewStyle().Bold(true)
+		panelStyle = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1)
+		return "mono"
+	default:
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))
+		labelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
+		errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+		okStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("78"))
+		panelStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240")).Padding(0, 1)
+		return "gator"
+	}
+}
+
 // New creates a terminal model in task-composition mode.
 func New(config Config) Model {
+	config.Theme = applyTheme(config.Theme)
 	if strings.TrimSpace(config.RepositoryPath) == "" {
 		config.RepositoryPath = "."
 	}
@@ -426,6 +479,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.commandOutput = "Signed in to " + msg.provider + "."
 		m.notice = notice{text: "OAuth credential stored. The provider is ready for a Gator-owned run.", kind: noticeSuccess}
 		m.refreshPreflight()
+		return m, nil
+	case connectDoneMsg:
+		if msg.err != nil {
+			m.notice = notice{text: "Provider-owned login stopped: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.commandOutput = "Provider-owned login completed for " + msg.provider + ". Its credential remains in that vendor CLI's store. Use the matching gator delegate runtime for harness-owned runs."
+		m.notice = notice{text: "Provider-owned login completed. See the next action below.", kind: noticeSuccess}
 		return m, nil
 	case diffLoadedMsg:
 		m.diff, m.diffTruncated, m.diffErr = msg.diff, msg.truncated, msg.err

@@ -19,6 +19,7 @@ const version = 1
 type Settings struct {
 	Version             int              `json:"version"`
 	Defaults            Defaults         `json:"defaults"`
+	Theme               string           `json:"theme,omitempty"`
 	Extensions          []Extension      `json:"extensions,omitempty"`
 	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
 	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
@@ -190,6 +191,9 @@ func validate(settings Settings) error {
 	}
 	if len(settings.Defaults.Provider) > 128 || len(settings.Defaults.Model) > 512 {
 		return errors.New("configuration default exceeds its size limit")
+	}
+	if settings.Theme != "" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" {
+		return fmt.Errorf("unknown theme %q", settings.Theme)
 	}
 	if len(settings.Extensions) > 256 {
 		return errors.New("configuration has too many extensions")

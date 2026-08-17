@@ -107,6 +107,20 @@ func TestModelUsesConfiguredAPIKeyHeader(t *testing.T) {
 	}
 }
 
+func TestModelAllowsExplicitKeylessEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "" {
+			t.Fatalf("authorization = %q", request.Header.Get("Authorization"))
+		}
+		_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"done"}}]}`)
+	}))
+	defer server.Close()
+	model := Model{Config: Config{AllowEmptyAPIKey: true, BaseURL: server.URL, Model: "local-model", Client: server.Client()}}
+	if _, err := model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "hello"}}}); err != nil {
+		t.Fatalf("complete keyless endpoint: %v", err)
+	}
+}
+
 func TestModelResolvesCredentialForEachRequest(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/config"
-	"github.com/gongahkia/gator/internal/model"
 )
 
 func configure(arguments []string, out io.Writer) error {
@@ -44,11 +43,11 @@ func configure(arguments []string, out io.Writer) error {
 	}
 	switch arguments[1] {
 	case "default-provider":
-		provider, err := model.ParseProvider(value)
+		provider, _, err := resolveConfiguredProvider(value, "")
 		if err != nil {
 			return err
 		}
-		settings.Defaults.Provider = string(provider)
+		settings.Defaults.Provider = provider
 	case "default-model":
 		settings.Defaults.Model = value
 	default:

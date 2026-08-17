@@ -5,6 +5,7 @@ tools to native Gator runs. There is one lifecycle:
 
 ```sh
 gator extension install /path/to/extension
+gator extension install https://github.com/example/review-helper.git
 gator extension list
 gator extension disable extension-id
 gator extension enable extension-id
@@ -16,6 +17,11 @@ Installed bundles live below `$XDG_DATA_HOME/gator/extensions/` (or
 single Gator configuration file, `$XDG_CONFIG_HOME/gator/config.json`. An
 installation is enabled immediately; replacement requires `--replace`, and
 removal requires `--yes`.
+
+`install` accepts a local directory or an explicit `https`, `ssh`, or `git@`
+repository URL. Git sources are cloned shallowly only for that explicit
+installation; re-run the same command with `--replace` to update an installed
+package. Gator never refreshes executable extension code in the background.
 
 ## Project extensions and trust
 
@@ -41,6 +47,13 @@ Every bundle has a `gator-extension.json` file:
   "name": "Review helper",
   "skills": ["skills/review.md"],
   "prompts": ["prompts/team-style.md"],
+  "commands": [
+    {
+      "name": "focused_review",
+      "description": "Load the focused review prompt into the composer.",
+      "prompt": "prompts/focused-review.md"
+    }
+  ],
   "tools": [
     {
       "name": "lookup",
@@ -67,6 +80,12 @@ guidance with the extension ID shown.
 Extension tools are available only in Execute mode and appear to the model as
 `extension_<extension-id>_<tool-name>`. Their declared parameter schema is
 passed through to the direct model adapter.
+
+An extension command appears in the terminal palette as
+`/extension-id:command-name`. Selecting it loads its declared prompt file into
+the composer for review and editing; it never sends a run automatically. This
+is the standard prompt-template interface for packages and keeps user control
+visible at the send boundary.
 
 ## Sidecar tool protocol
 

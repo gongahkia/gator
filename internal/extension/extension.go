@@ -42,13 +42,23 @@ var toolNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
 // paths are exact, relative paths; globs and implicit startup hooks are not
 // supported so an extension's effect is inspectable.
 type Manifest struct {
-	Version     int            `json:"version"`
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Skills      []string       `json:"skills,omitempty"`
-	Prompts     []string       `json:"prompts,omitempty"`
-	Tools       []ToolManifest `json:"tools,omitempty"`
+	Version     int               `json:"version"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	Skills      []string          `json:"skills,omitempty"`
+	Prompts     []string          `json:"prompts,omitempty"`
+	Commands    []CommandManifest `json:"commands,omitempty"`
+	Tools       []ToolManifest    `json:"tools,omitempty"`
+}
+
+// CommandManifest exposes a prompt template through the TUI command palette.
+// Selecting it only fills the composer; sending remains the developer's
+// explicit action.
+type CommandManifest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Prompt      string `json:"prompt"`
 }
 
 // ToolManifest defines one model-callable JSONL sidecar. The command is argv,
@@ -71,6 +81,13 @@ type Installed struct {
 // Set is the extension surface prepared for one native run.
 type Set struct {
 	extensions []Installed
+}
+
+// Command is a prepared extension prompt template for the terminal UI.
+type Command struct {
+	Name        string
+	Description string
+	Prompt      string
 }
 
 // Empty reports whether the set has no installed or trusted project extension.
@@ -97,6 +114,26 @@ func (s Set) Instructions() (string, error) {
 		}
 	}
 	return strings.Join(sections, "\n\n"), nil
+}
+
+// Commands loads declared prompt templates. They are not system instructions:
+// the developer sees the text in the composer and chooses whether to send it.
+func (s Set) Commands() ([]Command, error) {
+	commands := make([]Command, 0)
+	for _, installed := range s.extensions {
+		for _, command := range installed.Manifest.Commands {
+			contents, err := readResource(installed.Root, command.Prompt)
+			if err != nil {
+				return nil, fmt.Errorf("load extension %q command %q: %w", installed.Manifest.ID, command.Name, err)
+			}
+			commands = append(commands, Command{
+				Name:        installed.Manifest.ID + ":" + command.Name,
+				Description: command.Description,
+				Prompt:      strings.TrimSpace(string(contents)),
+			})
+		}
+	}
+	return commands, nil
 }
 
 // Tools exposes extension sidecars only in Execute mode. The sidecar receives
