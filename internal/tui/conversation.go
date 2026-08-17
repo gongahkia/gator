@@ -26,7 +26,7 @@ func (m Model) transcriptHeight() int {
 		return 8
 	}
 	// status rail, divider, composer label/input, notice, and keybar
-	return max(1, m.height-m.task.Height()-6)
+	return max(1, m.height-m.task.Height()-7)
 }
 
 func (m *Model) resizeConversation() {

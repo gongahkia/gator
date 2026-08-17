@@ -86,11 +86,14 @@ func (m Model) constrainedLayout() bool {
 }
 
 func (m Model) panelTextWidth() int {
-	return max(1, m.width-8)
+	return max(1, m.inlineWidth()-2)
 }
 
 func (m Model) inlineWidth() int {
-	return max(1, m.width)
+	if m.width <= 0 {
+		return 0
+	}
+	return m.conversationWidth()
 }
 
 func (m Model) panel(value string) string {
@@ -104,7 +107,7 @@ func (m Model) inline(value string) string {
 	if m.width <= 0 {
 		return value
 	}
-	return lipgloss.NewStyle().MaxWidth(m.width).Render(value)
+	return lipgloss.NewStyle().MaxWidth(m.inlineWidth()).Render(value)
 }
 
 func (m Model) fitToTerminal(view string) string {

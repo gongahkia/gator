@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
@@ -72,6 +73,9 @@ func (m *Model) focusField() tea.Cmd {
 
 func (m *Model) resizeInputs() {
 	width := max(1, m.conversationWidth()-4)
+	if m.drawerUsesSidePane() && m.drawerSection == drawerRuntime && m.focus != taskField {
+		width = max(1, m.drawerWidth()-4)
+	}
 	m.task.SetWidth(width)
 	m.verification.SetWidth(width)
 	m.provider.Width = width
@@ -157,6 +161,9 @@ func (m Model) composeView() string {
 }
 
 func (m Model) chatView(running bool) string {
+	if m.drawerOpen && !m.drawerUsesSidePane() {
+		return m.drawerView(m.width, m.height)
+	}
 	mode := "new thread"
 	if m.resumeStatePath != "" {
 		mode = "thread " + compact(m.threadID, 12)
@@ -174,56 +181,34 @@ func (m Model) chatView(running bool) string {
 	if model == "" {
 		model = "provider default"
 	}
-	sections := []string{
-		m.header(mode + " · " + m.runMode.String()),
-		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.vimModeLabel(), m.inlineWidth()))),
+	main := m.conversationView(mode, provider, model, running)
+	if !m.drawerUsesSidePane() {
+		return main
 	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, main, m.drawerView(m.drawerWidth(), m.height))
+}
 
-	if running {
-		sections = append(sections, m.activityView(), m.chatHistoryView())
-		if verification := m.verificationStatusView(); verification != "" {
-			sections = append(sections, verification)
-		}
-		if m.vimCommand != "" {
-			sections = append(sections, m.vimCommandView())
-		} else {
-			if palette := m.commandPaletteView(); palette != "" {
-				sections = append(sections, palette)
-			}
-			if references := m.contextReferencesView(); references != "" {
-				sections = append(sections, references)
-			}
-			if completions := m.contextCompletionView(); completions != "" {
-				sections = append(sections, completions)
-			}
-		}
-		label := "Steer this run"
-		if m.vim != vimOff {
-			label += " · " + m.vimModeLabel()
-		}
-		sections = append(sections, labelStyle.Render(label), m.panel(m.task.View()))
-		if preview := m.queuePreviewView(); preview != "" {
-			sections = append(sections, preview)
-		}
-		if m.commandOutput != "" {
-			sections = append(sections, labelStyle.Render("Local status"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
-		}
-		sections = append(sections, m.noticeView(), m.runningFooter())
-		return strings.Join(sections, "\n")
+func (m Model) conversationView(mode, provider, model string, running bool) string {
+	width := m.conversationWidth()
+	rail := m.inline(headerStyle.Render("Gator")+dimStyle.Render("  "+mode+" · "+m.runMode.String())) + "\n" +
+		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.vimModeLabel(), width)))
+	transcript := m.transcript
+	transcript.Width = width
+	transcript.Height = m.transcriptHeight()
+	transcript.SetContent(m.transcriptContent())
+	if m.followTranscript {
+		transcript.GotoBottom()
 	}
-
-	sections = append(sections, m.chatHistoryView())
-	if result := m.latestRunView(); result != "" {
-		sections = append(sections, result)
+	sections := []string{rail, dimStyle.Render(strings.Repeat("─", max(1, width))), transcript.View()}
+	if !m.followTranscript {
+		hint := "PgDn/End returns to latest"
+		if m.transcriptUnread {
+			hint = "New activity below · " + hint
+		}
+		sections = append(sections, keyStyle.Render("↓ ")+dimStyle.Render(hint))
 	}
-	if verification := m.verificationStatusView(); verification != "" {
-		sections = append(sections, verification)
-	}
-
 	if m.vimCommand != "" {
-		sections = append(sections, m.vimCommandView())
-	} else if configuration := m.chatConfigurationView(); configuration != "" {
-		sections = append(sections, configuration)
+		sections = append(sections, keyStyle.Render(m.vimCommand))
 	} else {
 		if palette := m.commandPaletteView(); palette != "" {
 			sections = append(sections, palette)
@@ -234,32 +219,19 @@ func (m Model) chatView(running bool) string {
 		if completions := m.contextCompletionView(); completions != "" {
 			sections = append(sections, completions)
 		}
-		label := "You"
-		if m.vim != vimOff {
-			label += " · " + m.vimModeLabel()
-		}
-		sections = append(sections, labelStyle.Render(label), m.panel(m.task.View()))
 	}
-	if m.commandOutput != "" {
-		sections = append(sections, labelStyle.Render("Local status"), m.panel(compact(m.commandOutput, max(16, m.panelTextWidth()*3))))
+	label := "You"
+	if running {
+		label = "Steer"
 	}
-	if warning := m.draftWarningView(); warning != "" {
-		sections = append(sections, warning)
+	if m.vim != vimOff {
+		label += " · " + m.vimModeLabel()
 	}
-	sections = append(sections, m.noticeView())
-	if m.vimCommand != "" {
-		sections = append(sections, m.footer("enter run Vim command", "esc cancel", "f1 shortcuts", "ctrl+c quit"))
-	} else if m.focus == taskField {
-		switch m.vim {
-		case vimNormal:
-			sections = append(sections, m.footer("i/a edit", "enter send", "? commands", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
-		case vimInsert:
-			sections = append(sections, m.footer("esc normal", "enter newline", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
-		default:
-			sections = append(sections, m.footer("? commands", "ctrl+o threads", "pgup/pgdn browse", "enter send", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
-		}
+	sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), labelStyle.Render(label), m.task.View(), m.noticeView())
+	if running {
+		sections = append(sections, m.footer("ctrl+b controls", "pgup/pgdn browse", "end latest", "enter steer", "tab queue", "ctrl+c stop"))
 	} else {
-		sections = append(sections, m.footer("tab change field", "ctrl+r send", "f1 shortcuts", "ctrl+c quit"))
+		sections = append(sections, m.footer("ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands"))
 	}
 	return strings.Join(sections, "\n")
 }

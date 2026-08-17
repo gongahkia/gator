@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/journal"
 )
@@ -33,6 +34,11 @@ func (m *Model) openRuntimeDrawer(active field) tea.Cmd {
 }
 
 func (m *Model) refreshDrawerThreads() {
+	if strings.TrimSpace(m.config.StateDir) == "" {
+		m.recentThreads = nil
+		m.drawerIndex = 0
+		return
+	}
 	var (
 		threads []journal.RecentThread
 		err     error
@@ -51,11 +57,18 @@ func (m *Model) refreshDrawerThreads() {
 }
 
 func (m Model) updateDrawer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "esc" {
+		m.toggleDrawer()
+		return m, nil
+	}
 	if m.focus != taskField {
-		return m.updateComposer(message)
+		next, command := m.updateComposer(message)
+		updated := next.(Model)
+		updated.resizeInputs()
+		return updated, command
 	}
 	switch message.String() {
-	case "esc", "ctrl+b":
+	case "ctrl+b":
 		m.toggleDrawer()
 		return m, nil
 	case "tab":
@@ -142,7 +155,7 @@ func (m Model) drawerView(width, height int) string {
 		headerStyle.Render("Control center"),
 		strings.Join(tabs, " "),
 		m.drawerSectionView(contentWidth),
-		m.inline(dimStyle.Render("Tab sections · Ctrl+B close")),
+		dimStyle.Render("Tab sections · Ctrl+B close"),
 	}
 	return lipgloss.NewStyle().Width(width).PaddingLeft(1).Render(strings.Join(sections, "\n\n"))
 }
@@ -262,7 +275,10 @@ func (m Model) drawerActivityView(width int) string {
 
 func (m Model) drawerReviewView(width int) string {
 	lines := []string{labelStyle.Render("Review")}
-	if m.outcome == nil {
+	if m.runErr != nil {
+		lines = append(lines, errorStyle.Render(compact("Stopped: "+m.runErr.Error(), width)))
+		lines = append(lines, dimStyle.Render(compact(m.failureGuidance(), width)))
+	} else if m.outcome == nil {
 		lines = append(lines, dimStyle.Render("No completed Gator run is available."))
 	} else {
 		lines = append(lines, compact(m.verificationSummary(), width))
