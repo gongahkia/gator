@@ -380,14 +380,14 @@ func New(config Config) Model {
 	provider.Blur()
 
 	application := Model{
-		config:       config,
-		screen:       composeScreen,
-		recentAll:    config.RecentAll,
-		task:         task,
-		verification: verification,
-		provider:     provider,
-		model:        model,
-		transcript:   viewport.New(76, 8),
+		config:           config,
+		screen:           composeScreen,
+		recentAll:        config.RecentAll,
+		task:             task,
+		verification:     verification,
+		provider:         provider,
+		model:            model,
+		transcript:       viewport.New(76, 8),
 		followTranscript: true,
 		notice: notice{
 			text: "Gator works in an isolated Git worktree. Review remains explicit.",

@@ -188,7 +188,7 @@ func TestWindowSizeResizesInputsAndKeepsComposerWithinTerminal(t *testing.T) {
 	if got, want := small.verification.Height(), 1; got != want {
 		t.Fatalf("small verification height = %d, want %d", got, want)
 	}
-	if got, want := small.provider.Width, 36; got != want {
+	if got, want := small.provider.Width, 40; got != want {
 		t.Fatalf("small provider width = %d, want %d", got, want)
 	}
 	assertViewFits(t, small, 44, 18)
@@ -201,7 +201,7 @@ func TestWindowSizeResizesInputsAndKeepsComposerWithinTerminal(t *testing.T) {
 	if got, want := large.verification.Height(), 3; got != want {
 		t.Fatalf("large verification height = %d, want %d", got, want)
 	}
-	if got, want := large.provider.Width, 112; got != want {
+	if got, want := large.provider.Width, 116; got != want {
 		t.Fatalf("large provider width = %d, want %d", got, want)
 	}
 	assertViewFits(t, large, 120, 52)
@@ -589,9 +589,18 @@ func TestRunningViewShowsEventBackedActivityVerificationAndQueue(t *testing.T) {
 		t.Fatalf("activity phase = %v, want inspecting", model.activity.phase)
 	}
 	view := model.View()
-	for _, expected := range []string{"Activity", "inspecting the isolated worktree", "turn 3/24", "last activity", "Queued next · 1 prompt queued", "Add a regression test after this.", "Verification", "go test ./... · pending"} {
+	for _, expected := range []string{"Tool", "tool -> git_status", "ctrl+b controls"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("running view omitted %q:\n%s", expected, view)
+		}
+	}
+	model.drawerOpen = true
+	model.drawerSection = drawerActivity
+	model.resizeInputs()
+	view = model.View()
+	for _, expected := range []string{"Activity", "inspecting the isolated", "1 prompt queued", "Add a regression test", "Verification", "pending · go test ./..."} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("activity drawer omitted %q:\n%s", expected, view)
 		}
 	}
 
@@ -618,8 +627,11 @@ func TestLatestRunViewShowsDiffFactsAndFailureRecovery(t *testing.T) {
 	model.outcome = &gatorrun.Outcome{}
 	model.verificationStatus = []verificationStatus{{argv: []string{"go", "test", "./..."}, phase: verificationPassed}}
 	model.diffStats = summarizeDiff("diff --git a/a.go b/a.go\n+one\n-two\ndiff --git a/b.go b/b.go\n+three\n")
+	model.drawerOpen = true
+	model.drawerSection = drawerReview
+	model.resizeInputs()
 	view := model.View()
-	for _, expected := range []string{"Latest run", "verification passed", "2 file(s) · +2 −1"} {
+	for _, expected := range []string{"Review", "verification passed", "2 files · +2 −1"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("completed view omitted %q:\n%s", expected, view)
 		}
@@ -627,7 +639,7 @@ func TestLatestRunViewShowsDiffFactsAndFailureRecovery(t *testing.T) {
 
 	model.runErr = errors.New("required verification failed: go test ./...")
 	view = model.View()
-	for _, expected := range []string{"Stopped: required verification failed", "Verification did not complete successfully"} {
+	for _, expected := range []string{"Stopped: required verification failed", "Verification did not complete"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("failure view omitted %q:\n%s", expected, view)
 		}
@@ -822,7 +834,7 @@ func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
 	updated.width = 100
 	updated.height = 40
 	updated.resizeInputs()
-	if !strings.Contains(updated.View(), "Recommended models") {
+	if !updated.drawerOpen || !strings.Contains(updated.View(), "Control center") || !strings.Contains(updated.View(), "claude-sonnet-5") {
 		t.Fatalf("model dropdown missing from view: %s", updated.View())
 	}
 }
@@ -1559,16 +1571,62 @@ func TestChatPageKeysBrowseConversation(t *testing.T) {
 	for index := 0; index < 12; index++ {
 		model.appendChat(chatEntry{author: chatAgent, text: fmt.Sprintf("message %d", index)})
 	}
-	last := model.chatIndex
+	model.transcriptBottom()
+	last := model.transcript.YOffset
 	up, _ := model.Update(tea.KeyMsg{Type: tea.KeyPgUp})
 	browsed := up.(Model)
-	if browsed.chatIndex >= last {
-		t.Fatalf("page up did not move through conversation: %d >= %d", browsed.chatIndex, last)
+	if browsed.transcript.YOffset >= last || browsed.followTranscript {
+		t.Fatalf("page up did not leave transcript history: offset=%d follow=%t", browsed.transcript.YOffset, browsed.followTranscript)
+	}
+	beforeAppend := browsed.transcript.YOffset
+	browsed.appendChat(chatEntry{author: chatAgent, text: "new activity while browsing"})
+	if !browsed.transcriptUnread || browsed.transcript.YOffset != beforeAppend {
+		t.Fatalf("new activity changed a browsed transcript: unread=%t offset=%d want=%d", browsed.transcriptUnread, browsed.transcript.YOffset, beforeAppend)
 	}
 	down, _ := browsed.Update(tea.KeyMsg{Type: tea.KeyPgDown})
-	if got := down.(Model).chatIndex; got != last {
-		t.Fatalf("page down index = %d, want %d", got, last)
+	latest, _ := down.(Model).Update(tea.KeyMsg{Type: tea.KeyEnd})
+	if !latest.(Model).followTranscript || latest.(Model).transcriptUnread || !latest.(Model).transcript.AtBottom() {
+		t.Fatalf("end did not restore transcript follow state: %#v", latest.(Model).transcript)
 	}
+}
+
+func TestControlCenterDrawerOpensNavigatesAndFallsBackOnNarrowTerminals(t *testing.T) {
+	model := New(Config{RepositoryPath: testRepository(t)})
+	model.width = 120
+	model.height = 48
+	model.resizeInputs()
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	if command != nil {
+		t.Fatal("opening the control center returned an unexpected command")
+	}
+	opened := next.(Model)
+	if !opened.drawerOpen || !opened.drawerUsesSidePane() || !strings.Contains(opened.View(), "Control center") {
+		t.Fatalf("drawer did not open as a side pane:\n%s", opened.View())
+	}
+	next, _ = opened.Update(tea.KeyMsg{Type: tea.KeyTab})
+	runtime := next.(Model)
+	if runtime.drawerSection != drawerRuntime || !strings.Contains(runtime.View(), "Runtime") {
+		t.Fatalf("drawer did not select runtime: %#v", runtime.drawerSection)
+	}
+	next, command = runtime.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	if command == nil || next.(Model).focus != providerField {
+		t.Fatalf("drawer provider action = focus:%v command:%t", next.(Model).focus, command != nil)
+	}
+	next, _ = next.(Model).Update(tea.KeyMsg{Type: tea.KeyEscape})
+	closed := next.(Model)
+	if closed.drawerOpen || closed.focus != taskField {
+		t.Fatalf("drawer did not close to the composer: %#v", closed)
+	}
+
+	closed.width = 44
+	closed.height = 18
+	closed.resizeInputs()
+	next, _ = closed.Update(tea.KeyMsg{Type: tea.KeyCtrlB})
+	narrow := next.(Model)
+	if !narrow.drawerOpen || narrow.drawerUsesSidePane() || !strings.Contains(narrow.View(), "Control center") {
+		t.Fatalf("drawer did not use narrow-terminal fallback:\n%s", narrow.View())
+	}
+	assertViewFits(t, narrow, 44, 18)
 }
 
 func agentEvent(step int, text string) agent.Event {

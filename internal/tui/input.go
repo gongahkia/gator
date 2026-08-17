@@ -141,6 +141,12 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "tab":
 			m.applySelectedDropdown()
 			m.focus = nextField(m.focus, false)
+			if m.focus != taskField {
+				m.drawerOpen = true
+				m.drawerSection = drawerRuntime
+				m.resizeInputs()
+				m.syncTranscript(m.followTranscript)
+			}
 			return m, m.focusField()
 		}
 	}
@@ -186,6 +192,12 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.focus = nextField(m.focus, message.String() == "shift+tab")
+		if m.focus != taskField {
+			m.drawerOpen = true
+			m.drawerSection = drawerRuntime
+			m.resizeInputs()
+			m.syncTranscript(m.followTranscript)
+		}
 		return m, m.focusField()
 	}
 
