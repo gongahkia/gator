@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -15,10 +17,11 @@ const version = 1
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
 type Settings struct {
-	Version             int         `json:"version"`
-	Defaults            Defaults    `json:"defaults"`
-	Extensions          []Extension `json:"extensions,omitempty"`
-	TrustedRepositories []string    `json:"trusted_repositories,omitempty"`
+	Version             int              `json:"version"`
+	Defaults            Defaults         `json:"defaults"`
+	Extensions          []Extension      `json:"extensions,omitempty"`
+	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
+	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -34,6 +37,21 @@ type Extension struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
 }
+
+// CustomProvider persists one OpenAI-compatible Chat Completions endpoint.
+// APIKeyEnv identifies a process environment variable; config.json never
+// contains the key itself. An empty APIKeyEnv is the intended keyless route for
+// local servers such as Ollama, LM Studio, and vLLM when configured that way.
+type CustomProvider struct {
+	ID           string   `json:"id"`
+	BaseURL      string   `json:"base_url"`
+	APIKeyEnv    string   `json:"api_key_env,omitempty"`
+	Models       []string `json:"models"`
+	DefaultModel string   `json:"default_model"`
+}
+
+var customProviderIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
+var environmentNamePattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,127}$`)
 
 // Store owns config.json below one configuration root.
 type Store struct {
@@ -175,6 +193,45 @@ func validate(settings Settings) error {
 	}
 	if len(settings.Extensions) > 256 {
 		return errors.New("configuration has too many extensions")
+	}
+	if len(settings.CustomProviders) > 128 {
+		return errors.New("configuration has too many custom providers")
+	}
+	providers := make(map[string]struct{}, len(settings.CustomProviders))
+	for _, provider := range settings.CustomProviders {
+		if !customProviderIDPattern.MatchString(provider.ID) {
+			return fmt.Errorf("invalid custom provider ID %q", provider.ID)
+		}
+		if _, exists := providers[provider.ID]; exists {
+			return fmt.Errorf("custom provider %q is configured more than once", provider.ID)
+		}
+		providers[provider.ID] = struct{}{}
+		if len(provider.BaseURL) == 0 || len(provider.BaseURL) > 2048 {
+			return fmt.Errorf("custom provider %q requires a base URL no longer than 2048 bytes", provider.ID)
+		}
+		endpoint, err := url.Parse(provider.BaseURL)
+		if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Host == "" || endpoint.User != nil {
+			return fmt.Errorf("custom provider %q requires an absolute http(s) base URL", provider.ID)
+		}
+		if provider.APIKeyEnv != "" && !environmentNamePattern.MatchString(provider.APIKeyEnv) {
+			return fmt.Errorf("custom provider %q has an invalid API key environment variable", provider.ID)
+		}
+		if len(provider.Models) == 0 || len(provider.Models) > 128 || len(provider.DefaultModel) == 0 || len(provider.DefaultModel) > 512 {
+			return fmt.Errorf("custom provider %q requires 1-128 models and a default model", provider.ID)
+		}
+		models := make(map[string]struct{}, len(provider.Models))
+		for _, name := range provider.Models {
+			if strings.TrimSpace(name) == "" || len(name) > 512 || strings.ContainsAny(name, "\r\n") {
+				return fmt.Errorf("custom provider %q has an invalid model", provider.ID)
+			}
+			if _, exists := models[name]; exists {
+				return fmt.Errorf("custom provider %q lists model %q more than once", provider.ID, name)
+			}
+			models[name] = struct{}{}
+		}
+		if _, exists := models[provider.DefaultModel]; !exists {
+			return fmt.Errorf("custom provider %q default model %q is not listed", provider.ID, provider.DefaultModel)
+		}
 	}
 	enabled := make(map[string]struct{}, len(settings.Extensions))
 	for _, extension := range settings.Extensions {

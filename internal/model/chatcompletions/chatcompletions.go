@@ -25,6 +25,7 @@ type Config struct {
 	APIKey              string
 	APIKeySource        func(context.Context) (string, error)
 	APIKeyEnv           string
+	AllowEmptyAPIKey    bool
 	BaseURL             string
 	Model               string
 	ProviderName        string
@@ -49,7 +50,7 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 	if err != nil {
 		return agent.Turn{}, err
 	}
-	if strings.TrimSpace(apiKey) == "" && m.Config.RequestSigner == nil {
+	if strings.TrimSpace(apiKey) == "" && !m.Config.AllowEmptyAPIKey && m.Config.RequestSigner == nil {
 		env := m.Config.APIKeyEnv
 		if env == "" {
 			env = "API key"

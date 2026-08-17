@@ -7,15 +7,29 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
 func providerFromEnvironment() (model.Provider, error) {
+	provider, err := providerNameFromEnvironment()
+	if err != nil {
+		return "", err
+	}
+	parsed, err := model.ParseProvider(provider)
+	if err != nil {
+		return "", fmt.Errorf("GATOR_PROVIDER: %w", err)
+	}
+	return parsed, nil
+}
+
+func providerNameFromEnvironment() (string, error) {
 	defaults, err := configuredDefaults()
 	if err != nil {
 		return "", err
@@ -24,11 +38,10 @@ func providerFromEnvironment() (model.Provider, error) {
 	if configured := os.Getenv("GATOR_PROVIDER"); configured != "" {
 		provider = configured
 	}
-	parsed, err := model.ParseProvider(provider)
-	if err != nil {
+	if _, _, err := resolveConfiguredProvider(provider, ""); err != nil {
 		return "", fmt.Errorf("GATOR_PROVIDER: %w", err)
 	}
-	return parsed, nil
+	return provider, nil
 }
 
 func modelFromEnvironment(provider model.Provider) string {
@@ -41,7 +54,25 @@ func modelFromEnvironment(provider model.Provider) string {
 	return model.DefaultModel(provider)
 }
 
+func modelFromProviderName(provider string) string {
+	if modelName := os.Getenv("GATOR_MODEL"); modelName != "" {
+		return modelName
+	}
+	if _, modelName, err := resolveConfiguredProvider(provider, ""); err == nil {
+		return modelName
+	}
+	return ""
+}
+
 func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, error) {
+	settings, err := loadSettings()
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	custom, found := configuredCustomProvider(settings, providerName)
+	if found {
+		return newCustomExecutor(settings, custom, modelName, baseURL)
+	}
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
 		return gatorrun.Executor{}, err
@@ -60,19 +91,91 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
-	store, err := config.DefaultStore()
-	if err != nil {
-		return gatorrun.Executor{}, err
+	return executorWithExtensions(backend.Model, settings)
+}
+
+func newCustomExecutor(settings config.Settings, provider config.CustomProvider, modelName, baseURL string) (gatorrun.Executor, error) {
+	if strings.TrimSpace(modelName) == "" {
+		modelName = provider.DefaultModel
 	}
-	settings, err := store.Load()
-	if err != nil {
-		return gatorrun.Executor{}, err
+	if !customProviderSupportsModel(provider, modelName) {
+		return gatorrun.Executor{}, fmt.Errorf("model %q is not configured for custom provider %q", modelName, provider.ID)
 	}
+	if strings.TrimSpace(baseURL) == "" {
+		baseURL = provider.BaseURL
+	}
+	apiKey := ""
+	if provider.APIKeyEnv != "" {
+		apiKey = os.Getenv(provider.APIKeyEnv)
+	}
+	backend := chatcompletions.Model{Config: chatcompletions.Config{
+		APIKey:           apiKey,
+		APIKeyEnv:        provider.APIKeyEnv,
+		AllowEmptyAPIKey: provider.APIKeyEnv == "",
+		BaseURL:          baseURL,
+		Model:            modelName,
+		ProviderName:     "custom provider " + provider.ID,
+	}}
+	return executorWithExtensions(backend, settings)
+}
+
+func executorWithExtensions(backend agent.Model, settings config.Settings) (gatorrun.Executor, error) {
 	extensions, err := extension.DefaultResolver(settings)
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
-	return gatorrun.Executor{Model: backend.Model, Extensions: extensions}, nil
+	return gatorrun.Executor{Model: backend, Extensions: extensions}, nil
+}
+
+// resolveConfiguredProvider uses the persisted custom-model catalog first,
+// then Gator's built-in direct adapters. It returns the default model whenever
+// callers did not specify one.
+func resolveConfiguredProvider(providerName, requestedModel string) (string, string, error) {
+	settings, err := loadSettings()
+	if err != nil {
+		return "", "", err
+	}
+	if custom, found := configuredCustomProvider(settings, providerName); found {
+		modelName := strings.TrimSpace(requestedModel)
+		if modelName == "" {
+			modelName = custom.DefaultModel
+		}
+		if !customProviderSupportsModel(custom, modelName) {
+			return "", "", fmt.Errorf("model %q is not configured for custom provider %q", modelName, custom.ID)
+		}
+		return custom.ID, modelName, nil
+	}
+	provider, err := model.ParseProvider(providerName)
+	if err != nil {
+		return "", "", err
+	}
+	return string(provider), model.EffectiveModel(provider, requestedModel), nil
+}
+
+func loadSettings() (config.Settings, error) {
+	store, err := config.DefaultStore()
+	if err != nil {
+		return config.Settings{}, err
+	}
+	return store.Load()
+}
+
+func configuredCustomProvider(settings config.Settings, providerName string) (config.CustomProvider, bool) {
+	for _, provider := range settings.CustomProviders {
+		if strings.EqualFold(provider.ID, strings.TrimSpace(providerName)) {
+			return provider, true
+		}
+	}
+	return config.CustomProvider{}, false
+}
+
+func customProviderSupportsModel(provider config.CustomProvider, modelName string) bool {
+	for _, configured := range provider.Models {
+		if configured == modelName {
+			return true
+		}
+	}
+	return false
 }
 
 func refreshProviderCredential(ctx context.Context, provider model.Provider, credentials auth.Store, flowFor func(model.Provider) (auth.BrowserFlow, error), now time.Time) error {

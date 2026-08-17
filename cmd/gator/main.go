@@ -28,6 +28,8 @@ Usage:
   gator config set default-model MODEL
   gator extension list
   gator extension install [--replace] DIRECTORY
+  gator provider list
+  gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
   gator connect PROVIDER [OPTIONS]
   gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
   gator logout PROVIDER
@@ -47,6 +49,7 @@ Commands:
   logout    remove a provider credential from Gator's private local auth file
 	delegate  run an installed vendor or external agent in an isolated worktree
 	extension install, enable, trust, or remove Gator extension bundles
+	provider  configure a custom/local Chat Completions provider
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    select, reopen, or immediately continue a retained local thread
@@ -101,6 +104,8 @@ func run(args []string, out io.Writer) error {
 		return delegate(args[1:], out)
 	case "extension":
 		return extensionCommand(args[1:], out)
+	case "provider":
+		return providerCommand(args[1:], out)
 	case "run":
 		return runTask(args[1:], out)
 	case "resume":
