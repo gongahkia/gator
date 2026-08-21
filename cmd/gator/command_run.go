@@ -75,7 +75,7 @@ func runTask(arguments []string, out io.Writer) error {
 		MaxSteps:        *maxSteps,
 		Verification:    verification,
 		AllowedCommands: allowedCommands,
-		Approve:         cliCommandApprover(*trustCommands, out),
+		Approve:         cliCommandApprover(*trustCommands),
 		OnEvent:         printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
@@ -149,7 +149,7 @@ func (p *eventPrinter) Print(event agent.Event) {
 	}
 }
 
-func cliCommandApprover(trust bool, out io.Writer) func(context.Context, []string) (tools.CommandDecision, error) {
+func cliCommandApprover(trust bool) func(context.Context, []string) (tools.CommandDecision, error) {
 	if trust {
 		return func(context.Context, []string) (tools.CommandDecision, error) {
 			return tools.CommandAllowOnce, nil
