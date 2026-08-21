@@ -131,16 +131,16 @@ func TestRunCommandAllowOnceThenAlways(t *testing.T) {
 			return CommandAllowAlways, nil
 		},
 	}}
-	if result := executeTool(t, tool, `{"argv":["true"]}`); !strings.Contains(result, `"exit_code":0`) {
+	if result := executeTool(t, tool, `{"argv":["echo","once"]}`); !strings.Contains(result, `"exit_code":0`) {
 		t.Fatalf("allow once result = %s", result)
 	}
-	if result := executeTool(t, tool, `{"argv":["true"]}`); !strings.Contains(result, `"exit_code":0`) {
+	if result := executeTool(t, tool, `{"argv":["echo","once"]}`); !strings.Contains(result, `"exit_code":0`) {
 		t.Fatalf("second allow result = %s", result)
 	}
 	if calls != 2 {
 		t.Fatalf("approve calls = %d, want 2", calls)
 	}
-	if result := executeTool(t, tool, `{"argv":["true"]}`); !strings.Contains(result, `"exit_code":0`) {
+	if result := executeTool(t, tool, `{"argv":["echo","once"]}`); !strings.Contains(result, `"exit_code":0`) {
 		t.Fatalf("always-allowed result = %s", result)
 	}
 	if calls != 2 {

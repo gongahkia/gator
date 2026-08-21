@@ -43,6 +43,7 @@ make build
 ./bin/gator config set default-provider anthropic
 ./bin/gator config set default-model claude-sonnet-4-6
 OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \
+  --allow-command 'go test ./internal/foo' \
   'Add a focused feature with tests'
 
 ANTHROPIC_API_KEY=... ./bin/gator run --provider anthropic \
@@ -265,7 +266,7 @@ contract remain its own responsibility.
 
 For an IDE, CI service, or custom UI, use `gator rpc` rather than parsing the
 human CLI output or private journal files. It is a versioned JSONL protocol
-with explicit run, resume, steer, cancel, status, and thread-listing methods.
+with explicit run, resume, steer, cancel, approve, status, and thread-listing methods.
 See [RPC integration](docs/RPC.md).
 
 Gator extensions provide reusable skills, prompt guidance, and optional
