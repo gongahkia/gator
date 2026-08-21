@@ -37,6 +37,9 @@ func runTask(arguments []string, out io.Writer) error {
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
 	var verification verificationFlags
 	flags.Var(&verification, "verify", "required verification command as a whitespace-separated argv")
+	var allowedCommands verificationFlags
+	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
+	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -64,14 +67,16 @@ func runTask(arguments []string, out io.Writer) error {
 	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
-		RepositoryPath: workingDirectory,
-		Task:           task,
-		Provider:       resolvedProvider,
-		Model:          resolvedModel,
-		BaseURL:        *baseURL,
-		MaxSteps:       *maxSteps,
-		Verification:   verification,
-		OnEvent:        printer.Print,
+		RepositoryPath:  workingDirectory,
+		Task:            task,
+		Provider:        resolvedProvider,
+		Model:           resolvedModel,
+		BaseURL:         *baseURL,
+		MaxSteps:        *maxSteps,
+		Verification:    verification,
+		AllowedCommands: allowedCommands,
+		Approve:         cliCommandApprover(*trustCommands, out),
+		OnEvent:         printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {
@@ -135,9 +140,44 @@ func (p *eventPrinter) Print(event agent.Event) {
 		} else {
 			_, _ = fmt.Fprintf(p.out, "[%02d] tool ! %s: %s\n", event.Step, event.ToolCall.Name, event.ToolError)
 		}
+	case agent.EventCommandApprovalRequested:
+		_, _ = fmt.Fprintf(p.out, "[%02d] command approval: %s\n", event.Step, strings.Join(event.Argv, " "))
+	case agent.EventCommandApprovalResolved:
+		_, _ = fmt.Fprintf(p.out, "[%02d] command %s\n", event.Step, event.Text)
 	case agent.EventCompletionBlocked:
 		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
 	}
+}
+
+func cliCommandApprover(trust bool, out io.Writer) func(context.Context, []string) (tools.CommandDecision, error) {
+	if trust {
+		return func(context.Context, []string) (tools.CommandDecision, error) {
+			return tools.CommandAllowOnce, nil
+		}
+	}
+	if !stdinIsTTY() {
+		return nil
+	}
+	return func(_ context.Context, argv []string) (tools.CommandDecision, error) {
+		_, _ = fmt.Fprintf(os.Stderr, "Gator: approve worktree command %q?\n  y allow once  a always this argv  n deny\n> ", strings.Join(argv, " "))
+		var line string
+		if _, err := fmt.Fscanln(os.Stdin, &line); err != nil {
+			return tools.CommandDeny, err
+		}
+		switch strings.TrimSpace(strings.ToLower(line)) {
+		case "y", "yes":
+			return tools.CommandAllowOnce, nil
+		case "a", "always":
+			return tools.CommandAllowAlways, nil
+		default:
+			return tools.CommandDeny, nil
+		}
+	}
+}
+
+func stdinIsTTY() bool {
+	info, err := os.Stdin.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 type verificationFlags [][]string
