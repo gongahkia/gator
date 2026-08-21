@@ -91,9 +91,77 @@ func TestRunCommandRequiresExactPolicyMatch(t *testing.T) {
 		t.Fatalf("command result = %s", result)
 	}
 	_, err := tool.Execute(context.Background(), json.RawMessage(`{"argv":["go","env"]}`))
-	if err == nil || !strings.Contains(err.Error(), "not allowed by policy") {
+	if err == nil || !strings.Contains(err.Error(), "require developer approval") {
 		t.Fatalf("unapproved command error = %v", err)
 	}
+}
+
+func TestRunCommandRejectsArgvAndCommandTogether(t *testing.T) {
+	root := testWorkspace(t)
+	_, err := RunCommand{Root: root, Policy: CommandPolicy{Approve: allowOnce}}.Execute(context.Background(), json.RawMessage(`{"argv":["echo","hi"],"command":"echo hi"}`))
+	if err == nil || !strings.Contains(err.Error(), "not both") {
+		t.Fatalf("combined arguments error = %v", err)
+	}
+}
+
+func TestRunCommandDenyDoesNotExecute(t *testing.T) {
+	root := testWorkspace(t)
+	marker := filepath.Join(root.Path(), "should-not-exist")
+	tool := RunCommand{Root: root, Policy: CommandPolicy{Approve: denyAll}}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"argv":["touch","should-not-exist"]}`))
+	if err == nil || !strings.Contains(err.Error(), "denied by developer") {
+		t.Fatalf("denied command error = %v", err)
+	}
+	if _, statErr := os.Stat(marker); !os.IsNotExist(statErr) {
+		t.Fatalf("denied command still created %s", marker)
+	}
+}
+
+func TestRunCommandAllowOnceThenAlways(t *testing.T) {
+	root := testWorkspace(t)
+	memory := NewCommandMemory(nil)
+	calls := 0
+	tool := RunCommand{Root: root, Policy: CommandPolicy{
+		Remembered: memory,
+		Approve: func(context.Context, []string) (CommandDecision, error) {
+			calls++
+			if calls == 1 {
+				return CommandAllowOnce, nil
+			}
+			return CommandAllowAlways, nil
+		},
+	}}
+	if result := executeTool(t, tool, `{"argv":["true"]}`); !strings.Contains(result, `"exit_code":0`) {
+		t.Fatalf("allow once result = %s", result)
+	}
+	if result := executeTool(t, tool, `{"argv":["true"]}`); !strings.Contains(result, `"exit_code":0`) {
+		t.Fatalf("second allow result = %s", result)
+	}
+	if calls != 2 {
+		t.Fatalf("approve calls = %d, want 2", calls)
+	}
+	if result := executeTool(t, tool, `{"argv":["true"]}`); !strings.Contains(result, `"exit_code":0`) {
+		t.Fatalf("always-allowed result = %s", result)
+	}
+	if calls != 2 {
+		t.Fatalf("remembered command still requested approval: calls = %d", calls)
+	}
+}
+
+func TestRunCommandShellFormUsesEffectiveArgv(t *testing.T) {
+	root := testWorkspace(t)
+	result := executeTool(t, RunCommand{Root: root, Policy: CommandPolicy{Approve: allowOnce}}, `{"command":"echo gator-shell"}`)
+	if !strings.Contains(result, "gator-shell") || !strings.Contains(result, `"exit_code":0`) {
+		t.Fatalf("shell command result = %s", result)
+	}
+}
+
+func allowOnce(context.Context, []string) (CommandDecision, error) {
+	return CommandAllowOnce, nil
+}
+
+func denyAll(context.Context, []string) (CommandDecision, error) {
+	return CommandDeny, nil
 }
 
 func TestGitDiffIncludesUntrackedFiles(t *testing.T) {

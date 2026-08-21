@@ -61,7 +61,8 @@ authentication and automation contract.
 
 The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, execution mode, and explicit verifier allowlist;
-streams lifecycle events from the executor; and renders the retained worktree
+streams lifecycle events from the executor; prompts for exploratory command
+approval; and renders the retained worktree
 and current diff for review. Plan mode removes patching and command tools
 entirely. Resume keeps one conversation thread on the same worktree and
 preserves its original model and verification policy so a continuation cannot
@@ -102,20 +103,23 @@ file as the rest of the conversation.
 
 ## Initial tool surface
 
-Execute mode exposes only these tools:
+Execute mode exposes these tools:
 
 1. list and read repository files;
 2. search repository text;
 3. apply a unified patch inside the run worktree;
-4. run an argv command subject to the run policy;
+4. run a worktree process (`argv` with no shell, or `command` via `bash -lc` /
+   `sh -c`); required `--verify` argv runs immediately, and any other invocation
+   waits for allow-once, always-allow-this-argv, or deny;
 5. inspect Git status and diff.
 
 Plan mode exposes only read/search and Git inspection tools for every direct
 provider.
 
-Tools validate paths against the worktree root. Command execution, network
-isolation, and write approval are separate policy boundaries; a worktree alone
-is not a security sandbox.
+File tools validate paths against the worktree root. `run_command` sets cwd to
+that worktree and is not a sandbox: an approved process runs as the Gator user
+and can reach host paths. Network isolation is not claimed. Required
+verification argv must still succeed before Execute completion.
 
 ## Acceptance evidence
 

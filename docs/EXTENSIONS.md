@@ -118,8 +118,8 @@ tool call visibly.
 ## Trust boundary
 
 An executable extension is code selected by the developer. It is outside
-Gator's native `run_command` verifier allowlist and can use the permissions of
+Gator's native `run_command` approval path and can use the permissions of
 the Gator process. Global extensions therefore require an explicit install;
 project extensions require explicit per-repository trust. Gator's own
-worktree, path validation, patching, and verifier policies are unchanged for
-native tools and direct model runs.
+worktree, path validation, patching, verifier, and command-approval policies
+are unchanged for native tools and direct model runs.

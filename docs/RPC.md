@@ -16,19 +16,25 @@ This keeps the same worktree, verifier, and tool policy contract as the TUI.
 
 Every accepted run first returns `{"type":"response","result":{"accepted":true}}`,
 then emits zero or more `event` messages, then one terminal `response` or
-`error` carrying the same request ID. `steer` and `cancel` target an active
-request ID:
+`error` carrying the same request ID. `steer`, `cancel`, and `approve` target an
+active request ID:
 
 ```json
 {"version":1,"id":"steer-1","method":"steer","params":{"run_id":"change-1","message":"Keep the diff limited to the parser."}}
 {"version":1,"id":"cancel-1","method":"cancel","params":{"run_id":"change-1"}}
+{"version":1,"id":"approve-1","method":"approve","params":{"run_id":"change-1","decision":"allow_once"}}
 ```
+
+`decision` is `allow_once`, `allow_always`, or `deny`. Required `--verify` argv
+runs without this prompt. Any other `run_command` blocks until `approve` or
+`cancel`. Clients that ignore `command_approval_requested` will hang; Gator does
+not auto-allow. `always` is remembered on the retained thread, not globally.
 
 The remaining methods are `capabilities`, `status`, `threads`, and `resume`.
 `threads` lists presentation-safe metadata only; a run result supplies the
 private `state_path` required for `resume`. Events expose a tool name, not tool
-arguments or raw output, so an embedding parent does not accidentally inherit
-repository contents or secrets from the agent process.
+arguments or raw output, except `command_approval_requested`, which includes the
+`argv` a parent must see to approve. Command stdout is still omitted.
 
 Set `params.compact` to `true` on `resume` to request a model-generated summary
 of older retained messages before the next turn. Gator emits a

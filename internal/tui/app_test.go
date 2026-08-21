@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/tools"
 )
 
 func TestNewUsesConfiguredRunDefaults(t *testing.T) {
@@ -521,6 +522,57 @@ func TestRunningTabQueuesPromptWithoutSteeringTheActiveRun(t *testing.T) {
 	case instruction := <-updated.execution.steering:
 		t.Fatalf("Tab steered active run with %q", instruction)
 	default:
+	}
+}
+
+func TestCommandApprovalKeysDoNotSteer(t *testing.T) {
+	reply := make(chan tools.CommandDecision, 1)
+	model := New(Config{})
+	model.screen = runningScreen
+	model.execution = &executionStream{steering: make(chan string, 1)}
+	model.pendingApproval = &pendingCommandApproval{argv: []string{"go", "env"}, reply: reply}
+	model.task.SetValue("do not steer this")
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("Enter started an unexpected command during command approval")
+	}
+	updated := next.(Model)
+	if updated.pendingApproval != nil {
+		t.Fatal("pending approval was not consumed")
+	}
+	select {
+	case decision := <-reply:
+		if decision != tools.CommandAllowOnce {
+			t.Fatalf("decision = %s, want allow_once", decision)
+		}
+	default:
+		t.Fatal("allow-once decision was not sent")
+	}
+	select {
+	case instruction := <-updated.execution.steering:
+		t.Fatalf("Enter steered active run with %q", instruction)
+	default:
+	}
+}
+
+func TestCommandApprovalDeny(t *testing.T) {
+	reply := make(chan tools.CommandDecision, 1)
+	model := New(Config{})
+	model.screen = runningScreen
+	model.pendingApproval = &pendingCommandApproval{argv: []string{"rm", "-rf", "/"}, reply: reply}
+
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if next.(Model).pendingApproval != nil {
+		t.Fatal("deny left a pending approval")
+	}
+	select {
+	case decision := <-reply:
+		if decision != tools.CommandDeny {
+			t.Fatalf("decision = %s, want deny", decision)
+		}
+	default:
+		t.Fatal("deny decision was not sent")
 	}
 }
 
