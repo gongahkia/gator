@@ -94,6 +94,35 @@ func TestJournalSavesAndLoadsPrivateSession(t *testing.T) {
 	}
 }
 
+func TestJournalRoundTripsAllowedCommands(t *testing.T) {
+	journal, record, err := Open("/workspace/project", "run-allowed", "/runs/run-allowed", t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatalf("open journal: %v", err)
+	}
+	session := Session{
+		Version:         2,
+		Repository:      "/workspace/project",
+		WorktreePath:    "/runs/run-allowed",
+		Provider:        "openai",
+		Task:            "Explore then verify",
+		Messages:        []agent.Message{{Role: agent.RoleUser, Content: "Explore then verify"}},
+		AllowedCommands: [][]string{{"/bin/bash", "-lc", "go test ./internal/foo"}},
+	}
+	if err := journal.SaveSession(session); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatalf("close journal: %v", err)
+	}
+	loaded, err := LoadSession(record.StatePath)
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if len(loaded.AllowedCommands) != 1 || strings.Join(loaded.AllowedCommands[0], " ") != "/bin/bash -lc go test ./internal/foo" {
+		t.Fatalf("loaded allowed commands = %#v", loaded.AllowedCommands)
+	}
+}
+
 func TestSessionOmitsRawAttachmentBytesAndKeepsManifest(t *testing.T) {
 	journal, record, err := Open("/workspace/project", "run-attachments", "/runs/run-attachments", t.TempDir(), time.Now())
 	if err != nil {

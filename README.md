@@ -133,7 +133,11 @@ browse earlier entries. Use `/provider`, `/model`, `/login`, and `/verify` to ed
 run configuration; their fields show keyboard-selectable dropdowns where
 available. During a run, `Enter` sends a steering instruction
 that the agent consumes at its next model or tool boundary; it does not cancel
-the run. `Tab` queues the current prompt for the next turn, and a second `Tab`
+the run. If the agent requests a command that is not a required verifier, the
+running view instead asks for approval: `y` or `Enter` allow once, `a` always
+allow that exact argv for the rest of the thread, and `n` deny. Denied commands
+return a tool error; the loop continues. This is not a sandbox: cwd is the
+isolated worktree, and an approved process runs as the Gator user. `Tab` queues the current prompt for the next turn, and a second `Tab`
 queues an already-completed slash command. Gator runs queued work in FIFO order
 only after the active run succeeds. `/queue`, `/dequeue`, and `/clear-queue`
 inspect or manage the bounded, 16-item in-memory queue. Failed or cancelled

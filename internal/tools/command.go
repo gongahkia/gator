@@ -180,7 +180,7 @@ func (t RunCommand) approve(ctx context.Context, argv []string) error {
 		t.Policy.Remembered.Remember(argv)
 		return nil
 	default:
-		return fmt.Errorf("command %q denied by developer", argv)
+		return fmt.Errorf("command %q denied by developer", strings.Join(argv, " "))
 	}
 }
 

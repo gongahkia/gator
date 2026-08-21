@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -92,6 +94,76 @@ func TestServerRejectsUnsafeRequestsWithoutStopping(t *testing.T) {
 	}
 }
 
+func TestServerRejectsUnknownApprovalDecision(t *testing.T) {
+	repository := initializedRepository(t)
+	input := strings.NewReader(`{"version":1,"id":"approve-1","method":"approve","params":{"run_id":"run-1","decision":"maybe"}}` + "\n")
+	var output bytes.Buffer
+	server, err := New(Config{
+		Input: input, Output: &output, RepositoryPath: repository, StateDir: t.TempDir(), DefaultProvider: "openai",
+		NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{}, errors.New("must not run")
+		},
+	})
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	if err := server.Serve(context.Background()); err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	messages := decodeMessages(t, output.String())
+	if !hasError(messages, "approve-1", "invalid_request") {
+		t.Fatalf("RPC messages = %#v", messages)
+	}
+}
+
+func TestServerApprovesExploratoryCommand(t *testing.T) {
+	repository := initializedRepository(t)
+	reader, writer := io.Pipe()
+	output := &lockedBuffer{}
+	server, err := New(Config{
+		Input: reader, Output: output, RepositoryPath: repository, StateDir: t.TempDir(), DefaultProvider: "openai",
+		NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: &scriptedModel{turns: []agent.Turn{
+				{ToolCalls: []agent.ToolCall{{ID: "cmd", Name: "run_command", Arguments: json.RawMessage(`{"argv":["echo","exploratory"]}`)}}},
+				{Text: "Stopped after the exploratory command."},
+			}}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- server.Serve(context.Background())
+	}()
+	if _, err := io.WriteString(writer, `{"version":1,"id":"run-1","method":"run","params":{"task":"Explore","provider":"openai","verify":[["true"]]}}`+"\n"); err != nil {
+		t.Fatalf("write run: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for command approval request")
+		}
+		if hasEventWithArgv(decodeLoose(output.String()), "run-1", "command_approval_requested", []string{"echo", "exploratory"}) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if _, err := io.WriteString(writer, `{"version":1,"id":"approve-1","method":"approve","params":{"run_id":"run-1","decision":"allow_once"}}`+"\n"); err != nil {
+		t.Fatalf("write approve: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	messages := decodeLoose(output.String())
+	if !hasResponse(messages, "approve-1") || !hasEvent(messages, "run-1", "command_approval_resolved") {
+		t.Fatalf("RPC messages = %#v", messages)
+	}
+}
+
 type scriptedModel struct {
 	mu    sync.Mutex
 	turns []agent.Turn
@@ -155,6 +227,61 @@ func hasError(messages []protocol.Message, id, code string) bool {
 		}
 	}
 	return false
+}
+
+func hasEventWithArgv(messages []protocol.Message, id, kind string, argv []string) bool {
+	for _, message := range messages {
+		if message.ID != id || message.Type != "event" || message.Event == nil || message.Event.Kind != kind {
+			continue
+		}
+		if len(message.Event.Argv) != len(argv) {
+			continue
+		}
+		match := true
+		for index := range argv {
+			if message.Event.Argv[index] != argv[index] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+func decodeLoose(output string) []protocol.Message {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	messages := make([]protocol.Message, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var message protocol.Message
+		if err := json.Unmarshal([]byte(line), &message); err != nil {
+			continue
+		}
+		messages = append(messages, message)
+	}
+	return messages
+}
+
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(value []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(value)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 func initializedRepository(t *testing.T) string {
