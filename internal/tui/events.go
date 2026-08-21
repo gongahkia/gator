@@ -42,7 +42,7 @@ func (m *Model) appendChatEvent(event agent.Event) {
 		if event.Text != "" {
 			m.appendChat(chatEntry{author: chatAgent, text: event.Text})
 		}
-	case agent.EventSteeringApplied, agent.EventContextCompacted:
+	case agent.EventSteeringApplied, agent.EventContextCompacted, agent.EventCommandApprovalRequested, agent.EventCommandApprovalResolved:
 		m.closeStreamingChatEntry()
 		entry := renderEvent(event)
 		m.appendChat(chatEntry{author: chatSystem, text: entry.text})
@@ -124,6 +124,16 @@ func renderEvent(event agent.Event) timelineEntry {
 		text = prefix + " steering accepted: " + compact(event.Text, 120)
 	case agent.EventContextCompacted:
 		text = prefix + " context compacted: " + compact(event.Text, 120)
+	case agent.EventCommandApprovalRequested:
+		text = prefix + " command approval: " + compact(event.Text, 120)
+		if len(event.Argv) > 0 {
+			detail = strings.Join(event.Argv, " ")
+		}
+	case agent.EventCommandApprovalResolved:
+		text = prefix + " command " + compact(event.Text, 40)
+		if len(event.Argv) > 0 {
+			detail = strings.Join(event.Argv, " ")
+		}
 	case agent.EventRunFinished:
 		text = prefix + " completion proposed"
 	default:
@@ -157,10 +167,16 @@ func describeToolCall(call agent.ToolCall) string {
 	}
 	if call.Name == "run_command" {
 		var arguments struct {
-			Argv []string `json:"argv"`
+			Argv    []string `json:"argv"`
+			Command string   `json:"command"`
 		}
 		if json.Unmarshal(call.Arguments, &arguments) == nil {
-			return "command: " + strings.Join(arguments.Argv, " ")
+			if len(arguments.Argv) > 0 {
+				return "command: " + strings.Join(arguments.Argv, " ")
+			}
+			if arguments.Command != "" {
+				return "command: " + arguments.Command
+			}
 		}
 	}
 	return string(call.Arguments)

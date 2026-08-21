@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,16 +20,88 @@ const (
 	defaultCommandOutput  = 64 * 1024
 )
 
-// CommandPolicy is deliberately allowlist-only. A model cannot turn the
-// command tool into arbitrary shell execution by altering its arguments.
+// CommandDecision is the developer's choice for one exploratory command.
+type CommandDecision int
+
+const (
+	CommandDeny CommandDecision = iota
+	CommandAllowOnce
+	CommandAllowAlways
+)
+
+func (d CommandDecision) String() string {
+	switch d {
+	case CommandAllowOnce:
+		return "allow_once"
+	case CommandAllowAlways:
+		return "allow_always"
+	default:
+		return "deny"
+	}
+}
+
+// CommandMemory is the thread-scoped always-allow list for exact argv.
+type CommandMemory struct {
+	mu       sync.Mutex
+	commands [][]string
+}
+
+// NewCommandMemory copies initial argv entries into a shared allowlist.
+func NewCommandMemory(initial [][]string) *CommandMemory {
+	memory := &CommandMemory{}
+	for _, argv := range initial {
+		memory.Remember(argv)
+	}
+	return memory
+}
+
+// Allows reports whether argv was previously always-allowed.
+func (m *CommandMemory) Allows(argv []string) bool {
+	if m == nil {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return allowed(m.commands, argv)
+}
+
+// Remember records argv for the rest of this thread. Duplicates are ignored.
+func (m *CommandMemory) Remember(argv []string) {
+	if m == nil || len(argv) == 0 || argv[0] == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if allowed(m.commands, argv) {
+		return
+	}
+	m.commands = append(m.commands, cloneArgv(argv))
+}
+
+// Snapshot returns a copy of remembered argv lists.
+func (m *CommandMemory) Snapshot() [][]string {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return cloneArgvList(m.commands)
+}
+
+// CommandPolicy authorizes verification argv automatically and exploratory
+// commands only after an explicit developer decision. A worktree cwd is not a
+// sandbox: approved processes run as the Gator user.
 type CommandPolicy struct {
 	Allowed        [][]string
+	Remembered     *CommandMemory
+	Approve        func(context.Context, []string) (CommandDecision, error)
+	OnEvent        agent.EventSink
 	Timeout        time.Duration
 	MaxOutputBytes int
 }
 
-// RunCommand invokes an exact argv entry allowed by policy. It never invokes a
-// shell and returns nonzero exits as structured results for model recovery.
+// RunCommand runs argv without a shell, or a command string via bash/sh, from
+// the isolated worktree.
 type RunCommand struct {
 	Root   workspace.Root
 	Policy CommandPolicy
@@ -46,25 +119,29 @@ type CommandResult struct {
 func (t RunCommand) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "run_command",
-		Description: "Run one verification command allowed by the current policy. The argv must exactly match an advertised command.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["argv"],"properties":{"argv":{"type":"array","items":{"type":"string"},"minItems":1}}}`),
+		Description: "Run a process in the isolated worktree. Provide exactly one of argv (executed without a shell) or command (run with bash -lc, or sh -c if bash is unavailable). Required verification argv runs immediately. Any other command waits for developer approval. This is not a sandbox: cwd is the worktree, but the process has the Gator user's permissions. Required verification commands must still succeed before you complete.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"argv":{"type":"array","items":{"type":"string"},"minItems":1},"command":{"type":"string"}}}`),
 	}
 }
 
 func (t RunCommand) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var arguments struct {
-		Argv []string `json:"argv"`
+		Argv    []string `json:"argv"`
+		Command string   `json:"command"`
 	}
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	if len(arguments.Argv) == 0 || arguments.Argv[0] == "" {
-		return agent.ToolResult{}, errors.New("command argv is required")
+	argv, err := resolveCommandArgv(arguments.Argv, arguments.Command)
+	if err != nil {
+		return agent.ToolResult{}, err
 	}
-	if !t.allowed(arguments.Argv) {
-		return agent.ToolResult{}, fmt.Errorf("command %q is not allowed by policy", arguments.Argv)
+	if !t.autoAllowed(argv) {
+		if err := t.approve(ctx, argv); err != nil {
+			return agent.ToolResult{}, err
+		}
 	}
-	result, err := RunAllowedCommand(ctx, t.Root, t.Policy, arguments.Argv)
+	result, err := runWorktreeCommand(ctx, t.Root, t.Policy, argv)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -75,18 +152,87 @@ func (t RunCommand) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	return agent.ToolResult{Content: encoded}, nil
 }
 
-func (t RunCommand) allowed(argv []string) bool {
-	return allowed(t.Policy.Allowed, argv)
+func (t RunCommand) autoAllowed(argv []string) bool {
+	return allowed(t.Policy.Allowed, argv) || t.Policy.Remembered.Allows(argv)
 }
 
-// RunAllowedCommand executes an exact argv that appears in policy. It never
-// uses a shell and retains a bounded combined stdout/stderr transcript.
-func RunAllowedCommand(ctx context.Context, root workspace.Root, policy CommandPolicy, argv []string) (CommandResult, error) {
+func (t RunCommand) approve(ctx context.Context, argv []string) error {
+	t.emit(agent.Event{
+		Kind:     agent.EventCommandApprovalRequested,
+		ToolCall: &agent.ToolCall{Name: "run_command"},
+		Text:     strings.Join(argv, " "),
+		Argv:     cloneArgv(argv),
+	})
+	if t.Policy.Approve == nil {
+		t.emitResolved(argv, CommandDeny)
+		return errors.New("command is not allowed by policy; exploratory commands require developer approval")
+	}
+	decision, err := t.Policy.Approve(ctx, argv)
+	if err != nil {
+		t.emitResolved(argv, CommandDeny)
+		return err
+	}
+	t.emitResolved(argv, decision)
+	switch decision {
+	case CommandAllowOnce:
+		return nil
+	case CommandAllowAlways:
+		t.Policy.Remembered.Remember(argv)
+		return nil
+	default:
+		return fmt.Errorf("command %q denied by developer", argv)
+	}
+}
+
+func (t RunCommand) emit(event agent.Event) {
+	if t.Policy.OnEvent != nil {
+		t.Policy.OnEvent(event)
+	}
+}
+
+func (t RunCommand) emitResolved(argv []string, decision CommandDecision) {
+	t.emit(agent.Event{
+		Kind:     agent.EventCommandApprovalResolved,
+		ToolCall: &agent.ToolCall{Name: "run_command"},
+		Text:     decision.String(),
+		Argv:     cloneArgv(argv),
+	})
+}
+
+func resolveCommandArgv(argv []string, command string) ([]string, error) {
+	hasArgv := len(argv) > 0
+	hasCommand := strings.TrimSpace(command) != ""
+	if hasArgv && hasCommand {
+		return nil, errors.New("provide argv or command, not both")
+	}
+	if hasCommand {
+		return shellArgv(command)
+	}
+	if !hasArgv || argv[0] == "" {
+		return nil, errors.New("command argv or command string is required")
+	}
+	return cloneArgv(argv), nil
+}
+
+func shellArgv(command string) ([]string, error) {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return nil, errors.New("command string is required")
+	}
+	if bash, err := exec.LookPath("bash"); err == nil {
+		return []string{bash, "-lc", command}, nil
+	}
+	if sh, err := exec.LookPath("sh"); err == nil {
+		return []string{sh, "-c", command}, nil
+	}
+	return nil, errors.New("neither bash nor sh is available")
+}
+
+// runWorktreeCommand executes argv with cwd set to the worktree. It never
+// invokes a shell itself; callers that need a shell must pass bash/sh argv.
+func runWorktreeCommand(ctx context.Context, root workspace.Root, policy CommandPolicy, argv []string) (CommandResult, error) {
 	if len(argv) == 0 || argv[0] == "" {
 		return CommandResult{}, errors.New("command argv is required")
-	}
-	if !allowed(policy.Allowed, argv) {
-		return CommandResult{}, fmt.Errorf("command %q is not allowed by policy", argv)
 	}
 	timeout := policy.Timeout
 	if timeout <= 0 {
@@ -111,7 +257,7 @@ func RunAllowedCommand(ctx context.Context, root workspace.Root, policy CommandP
 			return CommandResult{}, fmt.Errorf("start command: %w", err)
 		}
 	}
-	return CommandResult{Argv: append([]string(nil), argv...), ExitCode: exitCode, Output: output.String(), Truncated: output.truncated, TimedOut: errors.Is(commandContext.Err(), context.DeadlineExceeded)}, nil
+	return CommandResult{Argv: cloneArgv(argv), ExitCode: exitCode, Output: output.String(), Truncated: output.truncated, TimedOut: errors.Is(commandContext.Err(), context.DeadlineExceeded)}, nil
 }
 
 func allowed(allowlist [][]string, argv []string) bool {
@@ -131,6 +277,35 @@ func allowed(allowlist [][]string, argv []string) bool {
 		}
 	}
 	return false
+}
+
+// MergeArgvLists concatenates argv lists and drops exact duplicates.
+func MergeArgvLists(lists ...[][]string) [][]string {
+	var merged [][]string
+	for _, list := range lists {
+		for _, argv := range list {
+			if len(argv) == 0 || argv[0] == "" || allowed(merged, argv) {
+				continue
+			}
+			merged = append(merged, cloneArgv(argv))
+		}
+	}
+	return merged
+}
+
+func cloneArgv(argv []string) []string {
+	return append([]string(nil), argv...)
+}
+
+func cloneArgvList(list [][]string) [][]string {
+	if len(list) == 0 {
+		return nil
+	}
+	cloned := make([][]string, 0, len(list))
+	for _, argv := range list {
+		cloned = append(cloned, cloneArgv(argv))
+	}
+	return cloned
 }
 
 type limitedBuffer struct {

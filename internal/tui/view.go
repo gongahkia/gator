@@ -217,6 +217,10 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 			sections = append(sections, completions)
 		}
 	}
+	if running && m.pendingApproval != nil {
+		sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), m.commandApprovalView(), m.noticeView(), m.runningFooter())
+		return strings.Join(sections, "\n")
+	}
 	label := "You"
 	if running {
 		label = "Steer"
@@ -256,7 +260,18 @@ func (m Model) composerInputView() string {
 	return line + strings.Repeat("\n", max(0, m.task.Height()-1))
 }
 
+func (m Model) commandApprovalView() string {
+	argv := "(unknown command)"
+	if m.pendingApproval != nil && len(m.pendingApproval.argv) > 0 {
+		argv = strings.Join(m.pendingApproval.argv, " ")
+	}
+	return m.fieldView("Approve worktree command", "cwd is the isolated worktree. The process runs as the Gator user and is not a sandbox.", argv+"\n\ny/enter  allow once\na  always allow this argv for this thread\nn  deny")
+}
+
 func (m Model) runningFooter() string {
+	if m.pendingApproval != nil {
+		return m.footer("y/enter once", "a always", "n deny", "ctrl+c stop")
+	}
 	if m.vimCommand != "" {
 		return m.footer("enter run Vim command", "esc cancel", "ctrl+c stop", "f1 shortcuts")
 	}
@@ -541,7 +556,7 @@ func (m Model) helpView() string {
 			"Vim Ex  :w send · :wq or :x send then exit · :q! discard and exit · :help list supported commands",
 			"Ctrl+C  quit",
 		}, "\n")),
-		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\nCommand approval  y/enter once · a always this argv · n deny\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
 		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\nt  view this run's transcript\ny  view retained thread lineage\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}

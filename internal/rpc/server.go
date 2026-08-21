@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/tools"
 	protocol "github.com/gongahkia/gator/rpc"
 )
 
@@ -40,12 +41,13 @@ type Server struct {
 	config Config
 	write  sync.Mutex
 	mu     sync.Mutex
-	active map[string]activeRun
+	active map[string]*activeRun
 	wait   sync.WaitGroup
 }
 
 type activeRun struct {
 	steering chan<- string
+	approve  chan tools.CommandDecision
 	cancel   context.CancelFunc
 }
 
@@ -63,7 +65,7 @@ func New(config Config) (*Server, error) {
 	if config.NewExecutor == nil {
 		return nil, errors.New("RPC executor factory is required")
 	}
-	return &Server{config: config, active: make(map[string]activeRun)}, nil
+	return &Server{config: config, active: make(map[string]*activeRun)}, nil
 }
 
 // Serve blocks until input closes and all accepted runs reach a terminal
@@ -98,7 +100,7 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 	}
 	switch request.Method {
 	case protocol.MethodCapabilities:
-		s.sendResult(request.ID, map[string]any{"protocol_version": protocol.Version, "methods": []string{protocol.MethodCapabilities, protocol.MethodRun, protocol.MethodResume, protocol.MethodSteer, protocol.MethodCancel, protocol.MethodStatus, protocol.MethodThreads}})
+		s.sendResult(request.ID, map[string]any{"protocol_version": protocol.Version, "methods": []string{protocol.MethodCapabilities, protocol.MethodRun, protocol.MethodResume, protocol.MethodSteer, protocol.MethodCancel, protocol.MethodApprove, protocol.MethodStatus, protocol.MethodThreads}})
 		return nil
 	case protocol.MethodStatus:
 		s.mu.Lock()
@@ -115,6 +117,8 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 		return s.steer(request)
 	case protocol.MethodCancel:
 		return s.cancel(request)
+	case protocol.MethodApprove:
+		return s.approve(request)
 	case protocol.MethodRun:
 		return s.startRun(ctx, request)
 	case protocol.MethodResume:
@@ -211,6 +215,7 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 			RepositoryPath: s.config.RepositoryPath, Task: request.Params.Task, Provider: provider, Model: modelName,
 			BaseURL: request.Params.BaseURL, MaxSteps: request.Params.MaxSteps, Verification: request.Params.Verify,
 			StateDir: s.config.StateDir, Mode: mode, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
+			Approve: s.approveFor(request.ID),
 		})
 	})
 }
@@ -237,6 +242,7 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 	return s.start(parent, request.ID, func(ctx context.Context, steering <-chan string, emit agent.EventSink) (gatorrun.Outcome, error) {
 		return executor.Resume(ctx, previous, request.Params.StatePath, request.Params.Task, gatorrun.Request{
 			MaxSteps: request.Params.MaxSteps, StateDir: s.config.StateDir, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
+			Approve: s.approveFor(request.ID),
 		})
 	})
 }
@@ -249,7 +255,7 @@ func (s *Server) start(parent context.Context, id string, execute func(context.C
 	}
 	ctx, cancel := context.WithCancel(parent)
 	steering := make(chan string, 16)
-	s.active[id] = activeRun{steering: steering, cancel: cancel}
+	s.active[id] = &activeRun{steering: steering, approve: make(chan tools.CommandDecision, 1), cancel: cancel}
 	s.mu.Unlock()
 	s.sendResult(id, map[string]any{"accepted": true, "run_id": id})
 	s.wait.Add(1)
@@ -292,11 +298,64 @@ func (s *Server) resolveModel(provider, modelName string) (string, string, error
 }
 
 func (s *Server) sendEvent(id string, event agent.Event) {
-	message := protocol.Event{Kind: string(event.Kind), Step: event.Step, Text: event.Text, ToolError: event.ToolError}
+	message := protocol.Event{Kind: string(event.Kind), Step: event.Step, Text: event.Text, ToolError: event.ToolError, Argv: event.Argv}
 	if event.ToolCall != nil {
 		message.Tool = event.ToolCall.Name
 	}
 	s.send(protocol.Message{Version: protocol.Version, Type: "event", ID: id, Event: &message, At: event.At.UTC()})
+}
+
+func (s *Server) approveFor(id string) func(context.Context, []string) (tools.CommandDecision, error) {
+	return func(ctx context.Context, _ []string) (tools.CommandDecision, error) {
+		s.mu.Lock()
+		run, ok := s.active[id]
+		s.mu.Unlock()
+		if !ok {
+			return tools.CommandDeny, fmt.Errorf("run %q is not active", id)
+		}
+		select {
+		case decision := <-run.approve:
+			return decision, nil
+		case <-ctx.Done():
+			return tools.CommandDeny, ctx.Err()
+		}
+	}
+}
+
+func (s *Server) approve(request protocol.Request) error {
+	if !validID(request.Params.RunID) {
+		return errors.New("approve requires a valid run_id")
+	}
+	decision, err := parseCommandDecision(request.Params.Decision)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	run, found := s.active[request.Params.RunID]
+	s.mu.Unlock()
+	if !found {
+		return fmt.Errorf("run %q is not active", request.Params.RunID)
+	}
+	select {
+	case run.approve <- decision:
+		s.sendResult(request.ID, map[string]any{"run_id": request.Params.RunID, "decision": decision.String(), "accepted": true})
+		return nil
+	default:
+		return fmt.Errorf("run %q has no pending command approval", request.Params.RunID)
+	}
+}
+
+func parseCommandDecision(value string) (tools.CommandDecision, error) {
+	switch strings.TrimSpace(value) {
+	case "allow_once":
+		return tools.CommandAllowOnce, nil
+	case "allow_always":
+		return tools.CommandAllowAlways, nil
+	case "deny":
+		return tools.CommandDeny, nil
+	default:
+		return tools.CommandDeny, fmt.Errorf("unknown approval decision %q; choose allow_once, allow_always, or deny", value)
+	}
 }
 
 func (s *Server) sendResult(id string, result any) {

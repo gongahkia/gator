@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -16,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/tools"
 )
 
 const defaultMaxSteps = 24
@@ -172,11 +174,22 @@ type attachmentPreview struct {
 	digest    [sha256.Size]byte
 }
 
+type commandApprovalRequest struct {
+	argv  []string
+	reply chan tools.CommandDecision
+}
+
+type pendingCommandApproval struct {
+	argv  []string
+	reply chan tools.CommandDecision
+}
+
 type executionStream struct {
-	events   chan agent.Event
-	done     chan executionDone
-	cancel   context.CancelFunc
-	steering chan string
+	events    chan agent.Event
+	done      chan executionDone
+	cancel    context.CancelFunc
+	steering  chan string
+	approvals chan commandApprovalRequest
 }
 
 type executionDone struct {
@@ -186,6 +199,11 @@ type executionDone struct {
 
 type agentEventMsg struct {
 	event agent.Event
+}
+
+type commandApprovalMsg struct {
+	argv  []string
+	reply chan tools.CommandDecision
 }
 
 type executionDoneMsg struct {
@@ -273,6 +291,7 @@ type Model struct {
 	drawerSection       drawerSection
 	drawerIndex         int
 	queue               []queuedInput
+	pendingApproval     *pendingCommandApproval
 	execution           *executionStream
 	oauthLogin          OAuthLogin
 	oauthCancel         context.CancelFunc
@@ -444,6 +463,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.resizeInputs()
 		m.syncTranscript(m.followTranscript)
+	case commandApprovalMsg:
+		m.pendingApproval = &pendingCommandApproval{argv: append([]string(nil), msg.argv...), reply: msg.reply}
+		m.notice = notice{text: "Approve worktree command: " + strings.Join(msg.argv, " "), kind: noticeInfo}
+		m.setActivity(activityAwaitingApproval, "awaiting command approval", time.Now())
+		return m, waitForExecution(m.execution)
 	case agentEventMsg:
 		m.appendEvent(msg.event)
 		return m, waitForExecution(m.execution)
@@ -453,6 +477,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case executionDoneMsg:
+		m.resolvePendingApproval(tools.CommandDeny)
 		wasNewThread := m.resumeStatePath == ""
 		wasCancelling := m.cancelling
 		m.execution = nil

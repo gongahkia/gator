@@ -18,6 +18,7 @@ const (
 	activityTool
 	activityInspecting
 	activityVerifying
+	activityAwaitingApproval
 	activityFinishing
 	activityComplete
 	activityFailed
@@ -141,6 +142,10 @@ func (m *Model) observeActivity(event agent.Event) {
 		m.setActivity(activityInspecting, "completion needs evidence: "+compact(event.Text, 120), at)
 	case agent.EventSteeringApplied:
 		m.setActivity(activityThinking, "applying your steering instruction", at)
+	case agent.EventCommandApprovalRequested:
+		m.setActivity(activityAwaitingApproval, "awaiting approval: "+compact(event.Text, 120), at)
+	case agent.EventCommandApprovalResolved:
+		m.setActivity(activityThinking, "command approval "+compact(event.Text, 40), at)
 	case agent.EventRunFinished:
 		m.setActivity(activityFinishing, "preparing the final result", at)
 	}
@@ -217,6 +222,8 @@ func (m Model) activityPhaseLabel() string {
 		return "inspecting"
 	case activityVerifying:
 		return "verifying"
+	case activityAwaitingApproval:
+		return "awaiting command approval"
 	case activityFinishing:
 		return "finishing"
 	case activityComplete:

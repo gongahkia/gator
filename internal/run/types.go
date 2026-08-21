@@ -1,10 +1,12 @@
 package run
 
 import (
+	"context"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/extension"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -18,9 +20,11 @@ type Request struct {
 	BaseURL        string
 	RunID          string
 	MaxSteps       int
-	Verification   [][]string
-	System         string
-	StateDir       string
+	Verification    [][]string
+	AllowedCommands [][]string
+	Approve         func(context.Context, []string) (tools.CommandDecision, error)
+	System          string
+	StateDir        string
 	OnEvent        agent.EventSink
 	// Steering is available only to native model runs. It is deliberately
 	// transient: queued prompts remain a TUI concern and do not resume after a

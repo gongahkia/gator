@@ -119,9 +119,11 @@ const (
 	EventToolCalled        EventKind = "tool_called"
 	EventToolFinished      EventKind = "tool_finished"
 	EventCompletionBlocked EventKind = "completion_blocked"
-	EventSteeringApplied   EventKind = "steering_applied"
-	EventContextCompacted  EventKind = "context_compacted"
-	EventRunFinished       EventKind = "run_finished"
+	EventSteeringApplied            EventKind = "steering_applied"
+	EventContextCompacted           EventKind = "context_compacted"
+	EventCommandApprovalRequested   EventKind = "command_approval_requested"
+	EventCommandApprovalResolved    EventKind = "command_approval_resolved"
+	EventRunFinished                EventKind = "run_finished"
 )
 
 // Event is intentionally structured so the UI, journal, and tests observe the
@@ -134,6 +136,9 @@ type Event struct {
 	ToolError  string    `json:"tool_error,omitempty"`
 	Text       string    `json:"text,omitempty"`
 	ToolResult string    `json:"-"`
+	// Argv is the effective process invocation for command-approval events.
+	// The event journal does not persist it.
+	Argv []string `json:"argv,omitempty"`
 }
 
 // EventSink receives events in their exact execution order.

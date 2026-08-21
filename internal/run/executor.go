@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/patch"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -55,6 +56,7 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 	request.Model = previous.Model
 	request.BaseURL = previous.BaseURL
 	request.Verification = previous.Verification
+	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
 	}
@@ -107,6 +109,7 @@ func (e Executor) Fork(ctx context.Context, previous journal.Session, statePath,
 	request.Model = previous.Model
 	request.BaseURL = previous.BaseURL
 	request.Verification = previous.Verification
+	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
 	}
