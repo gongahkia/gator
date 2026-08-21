@@ -45,7 +45,7 @@ func TestJournalRecordsBoundedEventMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(events), "secret source text") || !strings.Contains(string(events), "apply_patch") {
+	if strings.Contains(string(events), "secret source text") || strings.Contains(string(events), "secret-argv") || !strings.Contains(string(events), "apply_patch") {
 		t.Fatalf("event journal = %s", events)
 	}
 	result, err := os.ReadFile(filepath.Join(record.StatePath, "result.json"))

@@ -313,6 +313,24 @@ func TestValidateVerification(t *testing.T) {
 	}
 }
 
+func TestCompletionCheckRequiresVerifierEvenAfterOtherCommands(t *testing.T) {
+	check := completionCheck([][]string{{"go", "test", "./..."}})
+	messages := []agent.Message{
+		{Role: agent.RoleUser, Content: "task"},
+		{Role: agent.RoleTool, ToolName: "git_status", Content: `{"ok":true}`},
+		{Role: agent.RoleTool, ToolName: "git_diff", Content: `{"ok":true}`},
+		{Role: agent.RoleTool, ToolName: "run_command", Content: `{"ok":true,"result":{"argv":["echo","hi"],"exit_code":0}}`},
+	}
+	err := check(messages)
+	if err == nil || !strings.Contains(err.Error(), "go test ./...") {
+		t.Fatalf("completion check = %v, want missing verifier", err)
+	}
+	messages = append(messages, agent.Message{Role: agent.RoleTool, ToolName: "run_command", Content: `{"ok":true,"result":{"argv":["go","test","./..."],"exit_code":0}}`})
+	if err := check(messages); err != nil {
+		t.Fatalf("completion check after verifier: %v", err)
+	}
+}
+
 func TestExecutorLoadsRootAgentInstructions(t *testing.T) {
 	repository := featureRepository(t)
 	writeFile(t, repository, "AGENTS.md", "Always name the feature tests clearly.\n")
