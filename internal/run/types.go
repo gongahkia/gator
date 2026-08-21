@@ -13,19 +13,19 @@ import (
 // Request configures a single coding task. Every listed verification argv is
 // both exposed to the agent and required to succeed before completion.
 type Request struct {
-	RepositoryPath string
-	Task           string
-	Provider       string
-	Model          string
-	BaseURL        string
-	RunID          string
-	MaxSteps       int
+	RepositoryPath  string
+	Task            string
+	Provider        string
+	Model           string
+	BaseURL         string
+	RunID           string
+	MaxSteps        int
 	Verification    [][]string
 	AllowedCommands [][]string
 	Approve         func(context.Context, []string) (tools.CommandDecision, error)
 	System          string
 	StateDir        string
-	OnEvent        agent.EventSink
+	OnEvent         agent.EventSink
 	// Steering is available only to native model runs. It is deliberately
 	// transient: queued prompts remain a TUI concern and do not resume after a
 	// process restart.

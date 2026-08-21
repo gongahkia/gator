@@ -113,17 +113,17 @@ type ToolResult struct {
 type EventKind string
 
 const (
-	EventTurnStarted       EventKind = "turn_started"
-	EventTextDelta         EventKind = "text_delta"
-	EventText              EventKind = "text"
-	EventToolCalled        EventKind = "tool_called"
-	EventToolFinished      EventKind = "tool_finished"
-	EventCompletionBlocked EventKind = "completion_blocked"
-	EventSteeringApplied            EventKind = "steering_applied"
-	EventContextCompacted           EventKind = "context_compacted"
-	EventCommandApprovalRequested   EventKind = "command_approval_requested"
-	EventCommandApprovalResolved    EventKind = "command_approval_resolved"
-	EventRunFinished                EventKind = "run_finished"
+	EventTurnStarted              EventKind = "turn_started"
+	EventTextDelta                EventKind = "text_delta"
+	EventText                     EventKind = "text"
+	EventToolCalled               EventKind = "tool_called"
+	EventToolFinished             EventKind = "tool_finished"
+	EventCompletionBlocked        EventKind = "completion_blocked"
+	EventSteeringApplied          EventKind = "steering_applied"
+	EventContextCompacted         EventKind = "context_compacted"
+	EventCommandApprovalRequested EventKind = "command_approval_requested"
+	EventCommandApprovalResolved  EventKind = "command_approval_resolved"
+	EventRunFinished              EventKind = "run_finished"
 )
 
 // Event is intentionally structured so the UI, journal, and tests observe the

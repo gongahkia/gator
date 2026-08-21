@@ -28,6 +28,9 @@ func TestJournalRecordsBoundedEventMetadata(t *testing.T) {
 			Arguments: json.RawMessage(`{"patch":"secret source text"}`),
 		},
 	}
+	if err := journal.Append(event); err != nil {
+		t.Fatalf("append event: %v", err)
+	}
 	if err := journal.Append(agent.Event{
 		Kind: agent.EventCommandApprovalRequested,
 		At:   now,
