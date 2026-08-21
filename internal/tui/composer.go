@@ -48,7 +48,7 @@ var slashCommands = []slashCommand{
 	{name: "/recent", description: "choose a retained run to continue"},
 	{name: "/threads", description: "choose a retained conversation thread"},
 	{name: "/tree", description: "view the retained turns in this thread"},
-	{name: "/permissions", description: "show the isolated-run policy"},
+	{name: "/permissions", description: "show isolated-run policy and command approval"},
 	{name: "/quit", description: "exit Gator"},
 	{name: "/queue", description: "show queued follow-up instructions"},
 	{name: "/review", description: "return to the latest review"},

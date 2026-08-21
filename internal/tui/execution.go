@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
@@ -109,10 +110,11 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	stream := &executionStream{
-		events:   make(chan agent.Event, 32),
-		done:     make(chan executionDone, 1),
-		cancel:   cancel,
-		steering: make(chan string, maxQueuedInputs),
+		events:    make(chan agent.Event, 32),
+		done:      make(chan executionDone, 1),
+		cancel:    cancel,
+		steering:  make(chan string, maxQueuedInputs),
+		approvals: make(chan commandApprovalRequest, 1),
 	}
 	m.execution = stream
 	m.events = nil
@@ -156,6 +158,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			}
 		},
 		Steering: stream.steering,
+		Approve:  stream.approve,
 	}
 
 	if m.forkStatePath != "" {
@@ -347,6 +350,35 @@ func hasPDFAttachment(attachments []agent.Attachment) bool {
 	return false
 }
 
+func (stream *executionStream) approve(ctx context.Context, argv []string) (tools.CommandDecision, error) {
+	if stream == nil {
+		return tools.CommandDeny, errors.New("execution stream is not active")
+	}
+	reply := make(chan tools.CommandDecision, 1)
+	select {
+	case stream.approvals <- commandApprovalRequest{argv: append([]string(nil), argv...), reply: reply}:
+	case <-ctx.Done():
+		return tools.CommandDeny, ctx.Err()
+	}
+	select {
+	case decision := <-reply:
+		return decision, nil
+	case <-ctx.Done():
+		return tools.CommandDeny, ctx.Err()
+	}
+}
+
+func (m *Model) resolvePendingApproval(decision tools.CommandDecision) {
+	if m.pendingApproval == nil {
+		return
+	}
+	select {
+	case m.pendingApproval.reply <- decision:
+	default:
+	}
+	m.pendingApproval = nil
+}
+
 func executeNew(ctx context.Context, stream *executionStream, executor gatorrun.Executor, request gatorrun.Request) {
 	outcome, err := executor.Execute(ctx, request)
 	close(stream.events)
@@ -374,6 +406,11 @@ func waitForExecution(stream *executionStream) tea.Cmd {
 		case event, ok := <-stream.events:
 			if ok {
 				return agentEventMsg{event: event}
+			}
+			return executionDoneMsg{done: <-stream.done}
+		case request, ok := <-stream.approvals:
+			if ok {
+				return commandApprovalMsg{argv: request.argv, reply: request.reply}
 			}
 			return executionDoneMsg{done: <-stream.done}
 		case <-time.After(time.Second):

@@ -14,6 +14,7 @@ const (
 	MethodCancel       = "cancel"
 	MethodStatus       = "status"
 	MethodThreads      = "threads"
+	MethodApprove      = "approve"
 )
 
 // Request is one newline-delimited command sent to gator rpc.
@@ -38,6 +39,7 @@ type Params struct {
 	ThreadID  string     `json:"thread_id,omitempty"`
 	RunID     string     `json:"run_id,omitempty"`
 	Message   string     `json:"message,omitempty"`
+	Decision  string     `json:"decision,omitempty"`
 	All       bool       `json:"all,omitempty"`
 	Compact   bool       `json:"compact,omitempty"`
 }
@@ -54,14 +56,15 @@ type Message struct {
 }
 
 // Event is the safe, stable projection of a native agent event. Tool
-// arguments and tool output stay out of the protocol to avoid accidentally
-// exposing source or credential material to a parent process.
+// arguments and tool output stay out of the protocol except for command
+// approval requests, which must show the argv a parent is asked to allow.
 type Event struct {
-	Kind      string `json:"kind"`
-	Step      int    `json:"step"`
-	Tool      string `json:"tool,omitempty"`
-	Text      string `json:"text,omitempty"`
-	ToolError string `json:"tool_error,omitempty"`
+	Kind      string   `json:"kind"`
+	Step      int      `json:"step"`
+	Tool      string   `json:"tool,omitempty"`
+	Text      string   `json:"text,omitempty"`
+	ToolError string   `json:"tool_error,omitempty"`
+	Argv      []string `json:"argv,omitempty"`
 }
 
 // Error is an actionable request failure. Codes are stable enough for clients

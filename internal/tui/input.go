@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/tools"
 )
 
 func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -251,6 +252,9 @@ func (m Model) updateVimNormal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.pendingApproval != nil {
+		return m.updateCommandApproval(message)
+	}
 	if m.vimCommand != "" {
 		return m.updateVimCommand(message, true)
 	}
@@ -359,6 +363,33 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	command := m.updateTask(message)
 	return m, command
+}
+
+func (m Model) updateCommandApproval(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "y", "enter":
+		m.resolvePendingApproval(tools.CommandAllowOnce)
+		m.notice = notice{text: "Command allowed once.", kind: noticeInfo}
+		return m, nil
+	case "a":
+		m.resolvePendingApproval(tools.CommandAllowAlways)
+		m.notice = notice{text: "Command allowed for the rest of this thread.", kind: noticeInfo}
+		return m, nil
+	case "n", "d":
+		m.resolvePendingApproval(tools.CommandDeny)
+		m.notice = notice{text: "Command denied.", kind: noticeInfo}
+		return m, nil
+	case "ctrl+c":
+		m.resolvePendingApproval(tools.CommandDeny)
+		if m.execution != nil && !m.cancelling {
+			m.execution.cancel()
+			m.cancelling = true
+			m.notice = notice{text: "Cancellation requested. Waiting for the current operation to stop...", kind: noticeInfo}
+		}
+		return m, nil
+	default:
+		return m, nil
+	}
 }
 
 func runningLocalCommand(command string) bool {

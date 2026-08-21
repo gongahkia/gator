@@ -37,7 +37,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] --verify 'argv ...' TASK
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] --verify 'argv ...' [--allow-command 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -65,7 +65,8 @@ Cloud providers resolve credentials in this order: --api-key, Gator's private
 local auth file, then the provider environment variable. Native runs keep
 Gator's tool loop; gator delegate is an explicit installed-harness boundary.
 --verify is repeatable and every listed command must pass before Gator accepts
-completion.`
+completion. Exploratory worktree commands wait for approval unless listed with
+--allow-command or auto-approved with --trust-commands (unsafe; not a sandbox).`
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {

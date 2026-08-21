@@ -49,7 +49,13 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		}
 	}
 	var result agent.Result
-	runTools := tools.Default(isolated.Root, tools.CommandPolicy{Allowed: request.Verification})
+	remembered := tools.NewCommandMemory(request.AllowedCommands)
+	runTools := tools.Default(isolated.Root, tools.CommandPolicy{
+		Allowed:    request.Verification,
+		Remembered: remembered,
+		Approve:    request.Approve,
+		OnEvent:    emit,
+	})
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
 	}
@@ -120,6 +126,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Messages:            result.Messages,
 		ParentStatePath:     parentStatePath,
 		ForkedFromStatePath: request.ForkedFrom,
+		AllowedCommands:     remembered.Snapshot(),
 	}
 	if sessionErr := runJournal.SaveSession(session); sessionErr != nil && journalErr == nil {
 		journalErr = sessionErr

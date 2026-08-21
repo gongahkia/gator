@@ -783,7 +783,7 @@ func (m Model) permissionsStatus() string {
 	if err == nil {
 		commands = formatVerification(verification)
 	}
-	return "writes: isolated run worktree only\nreads: repository paths only\ncommands allowed:\n" + commands + "\nactive checkout: never edited by a normal run"
+	return "writes: isolated run worktree only (apply_patch)\nreads: repository paths only\ncommands: required --verify argv run immediately; any other argv or shell command waits for y/enter (once), a (always this argv for this thread), or n (deny)\ncwd: isolated worktree\nnot a sandbox: approved processes run as the Gator user and can reach host paths\ncommands allowed without prompt:\n" + commands + "\nactive checkout: never edited by a normal run"
 }
 
 func delegatedRuntimeForProvider(provider string) string {
