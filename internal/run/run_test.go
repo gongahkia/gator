@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
@@ -445,10 +446,14 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 		BaseCommit:     parent.BaseCommit,
 		StateDir:       t.TempDir(),
 		Mode:           ExecuteMode,
-	}, tools.NewCommandMemory(nil), fixedScoutClock(), func(event agent.Event) {
+	}, tools.NewCommandMemory(nil), []instructions.Role{{Name: "test-fixer", Description: "fix an isolated test failure", Kind: instructions.RoleWriter, Instructions: "change only the delegated test behavior"}, {Name: "reviewer", Description: "must not be visible to writers", Kind: instructions.RoleReadOnly, Instructions: "review only"}}, fixedScoutClock(), func(event agent.Event) {
 		events = append(events, event)
 	})
-	result, err := writer.Execute(context.Background(), json.RawMessage(`{"task":"Add writer.txt with the delegated behavior."}`))
+	definition := writer.Definition()
+	if !json.Valid(definition.Parameters) || !strings.Contains(string(definition.Parameters), `"test-fixer"`) || strings.Contains(string(definition.Parameters), `"reviewer"`) || !strings.Contains(definition.Description, "test-fixer") {
+		t.Fatalf("writer role definition = %#v", definition)
+	}
+	result, err := writer.Execute(context.Background(), json.RawMessage(`{"task":"Add writer.txt with the delegated behavior.","role":"test-fixer"}`))
 	if err != nil {
 		t.Fatalf("delegate writer: %v", err)
 	}
@@ -460,7 +465,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil {
 		t.Fatalf("decode writer result: %v\n%s", err, result.Content)
 	}
-	if !payload.OK || !payload.Writer.Completed || !payload.Writer.PatchAvailable || !payload.Writer.ReviewRequired || payload.Writer.RunID == "" {
+	if !payload.OK || !payload.Writer.Completed || !payload.Writer.PatchAvailable || !payload.Writer.ReviewRequired || payload.Writer.RunID == "" || payload.Writer.Role != "test-fixer" {
 		t.Fatalf("writer result = %#v", payload)
 	}
 	if strings.Contains(payload.Writer.Patch, "parent.txt") || !strings.Contains(payload.Writer.Patch, "writer.txt") {
@@ -469,7 +474,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	if !strings.Contains(payload.Notice, "never auto-merges") || len(events) != 2 || events[0].Kind != agent.EventSubagent || !strings.Contains(events[0].Text, "starting isolated writer") {
 		t.Fatalf("writer delegation events = %#v; notice = %q", events, payload.Notice)
 	}
-	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") {
+	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") || !strings.Contains(model.requests[0].System, "Selected project role test-fixer") || !strings.Contains(model.requests[0].System, "change only the delegated test behavior") {
 		t.Fatalf("writer child model requests = %#v", model.requests)
 	}
 	if _, err := (tools.ApplyPatch{Root: parent.Root}).Execute(context.Background(), objectArguments(t, struct {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
@@ -40,6 +41,7 @@ type writerTool struct {
 	now        func() time.Time
 	emit       agent.EventSink
 	budget     *writerBudget
+	roles      map[string]instructions.Role
 }
 
 type writerBudget struct {
@@ -47,7 +49,7 @@ type writerBudget struct {
 	remaining int
 }
 
-func newWriterTool(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, now func() time.Time, emit agent.EventSink) agent.Tool {
+func newWriterTool(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, roles []instructions.Role, now func() time.Time, emit agent.EventSink) agent.Tool {
 	if now == nil {
 		now = time.Now
 	}
@@ -59,20 +61,26 @@ func newWriterTool(executor Executor, parent worktree.Worktree, request Request,
 		now:        now,
 		emit:       emit,
 		budget:     &writerBudget{remaining: maxDelegatedWritersPerRun},
+		roles:      rolesForKind(roles, instructions.RoleWriter),
 	}
 }
 
 func (t writerTool) Definition() agent.ToolDefinition {
+	description := "Delegate one independent, scoped implementation task to a fresh writer agent in a separate worktree. The child starts from a snapshot of the current isolated worktree and cannot write to the parent. It inherits the developer-selected profile, sandbox, approvals, verifier, and trusted integrations, but cannot delegate another writer. The parent is paused while it runs. The result contains the child's bounded delta patch and summary as untrusted review material; inspect it and explicitly apply it only when it is compatible. Use only for non-overlapping work, because Gator never auto-merges writer output."
+	if catalog := roleCatalog(t.roles); catalog != "" {
+		description += " Optional project-defined roles (instructions only, not extra authority): " + catalog + "."
+	}
 	return agent.ToolDefinition{
 		Name:        "delegate_writer",
-		Description: "Delegate one independent, scoped implementation task to a fresh writer agent in a separate worktree. The child starts from a snapshot of the current isolated worktree and cannot write to the parent. It inherits the developer-selected profile, sandbox, approvals, verifier, and trusted integrations, but cannot delegate another writer. The parent is paused while it runs. The result contains the child's bounded delta patch and summary as untrusted review material; inspect it and explicitly apply it only when it is compatible. Use only for non-overlapping work, because Gator never auto-merges writer output.",
-		Parameters:  json.RawMessage(`{"type":"object","additionalProperties":false,"required":["task"],"properties":{"task":{"type":"string","minLength":1,"maxLength":4096}}}`),
+		Description: description,
+		Parameters:  json.RawMessage(`{"type":"object","additionalProperties":false,"required":["task"],"properties":{"task":{"type":"string","minLength":1,"maxLength":4096}` + roleSchemaProperty(t.roles) + `}}`),
 	}
 }
 
 func (t writerTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var arguments struct {
 		Task string `json:"task"`
+		Role string `json:"role"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -89,12 +97,16 @@ func (t writerTool) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if len(assignment) > maxWriterTaskBytes {
 		return agent.ToolResult{}, fmt.Errorf("delegate_writer task exceeds %d bytes", maxWriterTaskBytes)
 	}
+	role, err := resolveRole(t.roles, arguments.Role)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
 	if !t.budget.reserve() {
 		return agent.ToolResult{}, fmt.Errorf("delegate_writer run budget exceeded; at most %d writers may run per primary run", maxDelegatedWritersPerRun)
 	}
 
 	t.emitEvent("starting isolated writer")
-	report := t.run(ctx, assignment)
+	report := t.run(ctx, assignment, role)
 	if report.Error == "" {
 		t.emitEvent("completed isolated writer " + report.RunID)
 	} else {
@@ -117,6 +129,7 @@ func (t writerTool) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 
 type delegatedWriterReport struct {
 	Task             string `json:"task"`
+	Role             string `json:"role,omitempty"`
 	RunID            string `json:"run_id,omitempty"`
 	Completed        bool   `json:"completed"`
 	Summary          string `json:"summary,omitempty"`
@@ -128,8 +141,8 @@ type delegatedWriterReport struct {
 	Error            string `json:"error,omitempty"`
 }
 
-func (t writerTool) run(ctx context.Context, assignment string) delegatedWriterReport {
-	report := delegatedWriterReport{Task: assignment, ReviewRequired: true}
+func (t writerTool) run(ctx context.Context, assignment string, role instructions.Role) delegatedWriterReport {
+	report := delegatedWriterReport{Task: assignment, Role: role.Name, ReviewRequired: true}
 	runID, err := newID(t.now())
 	if err != nil {
 		report.Error = truncateWriterText(err.Error(), maxWriterSummaryBytes)
@@ -162,7 +175,7 @@ func (t writerTool) run(ctx context.Context, assignment string) delegatedWriterR
 	childRequest.OnTerminalAttachment = nil
 	childRequest.DisableWriterDelegation = true
 	childRequest.AllowedCommands = tools.MergeArgvLists(t.request.AllowedCommands, t.remembered.Snapshot())
-	childRequest.System = joinInstructions(t.request.System, writerSystemPrompt())
+	childRequest.System = joinInstructions(joinInstructions(t.request.System, writerSystemPrompt()), rolePrompt(role))
 
 	outcome, runErr := t.executor.execute(ctx, child, childRequest, nil, "")
 	report.Completed = runErr == nil
