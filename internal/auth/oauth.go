@@ -34,6 +34,14 @@ type BrowserFlow struct {
 	TokenRequestJSON   bool
 	TokenIncludesState bool
 	AllowMissingState  bool
+	// AllowMissingExpiry accepts OAuth token responses without expires_in. It
+	// is needed for standards-compliant authorization servers that issue an
+	// opaque token with no client-visible expiry.
+	AllowMissingExpiry bool
+	// RequireBearerToken rejects a token response whose declared token type is
+	// not Bearer. HTTP resource clients use this to avoid accepting a token for
+	// an incompatible authorization scheme.
+	RequireBearerToken bool
 	HTTPClient         *http.Client
 }
 
@@ -59,6 +67,18 @@ func (a BrowserAttempt) CodeVerifier() string {
 // RedirectURL returns the validated loopback callback URL for this attempt.
 func (a BrowserAttempt) RedirectURL() string {
 	return a.flow.RedirectURL
+}
+
+// WithClientID returns the same short-lived authorization attempt with a
+// public client ID selected after a loopback callback has been reserved (for
+// example through OAuth Dynamic Client Registration). The state and PKCE
+// verifier remain unchanged and are never persisted.
+func (a BrowserAttempt) WithClientID(clientID string) (BrowserAttempt, error) {
+	if strings.TrimSpace(clientID) == "" {
+		return BrowserAttempt{}, errors.New("OAuth client ID is required")
+	}
+	a.flow.ClientID = clientID
+	return a, nil
 }
 
 // BeginBrowserFlow validates a public loopback callback and creates the PKCE
@@ -129,6 +149,47 @@ func (a BrowserAttempt) StartCallback() (*Callback, error) {
 	listener, err := net.Listen("tcp", callbackURL.Host)
 	if err != nil {
 		return nil, fmt.Errorf("listen for OAuth callback: %w", err)
+	}
+	return a.startCallback(listener, callbackURL)
+}
+
+// BeginEphemeralLoopbackFlow reserves a private 127.0.0.1 callback before the
+// authorization URL is created. The actual redirect URI can therefore be sent
+// to Dynamic Client Registration without a port-selection race.
+func BeginEphemeralLoopbackFlow(flow BrowserFlow, callbackPath string) (BrowserAttempt, *Callback, error) {
+	if strings.TrimSpace(callbackPath) == "" || !strings.HasPrefix(callbackPath, "/") || strings.Contains(callbackPath, "?") || strings.Contains(callbackPath, "#") {
+		return BrowserAttempt{}, nil, errors.New("OAuth callback path must be an absolute path without query or fragment")
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return BrowserAttempt{}, nil, fmt.Errorf("listen for OAuth callback: %w", err)
+	}
+	closeListener := true
+	defer func() {
+		if closeListener {
+			_ = listener.Close()
+		}
+	}()
+	flow.RedirectURL = "http://" + listener.Addr().String() + callbackPath
+	attempt, err := BeginBrowserFlow(flow)
+	if err != nil {
+		return BrowserAttempt{}, nil, err
+	}
+	callbackURL, err := url.Parse(flow.RedirectURL)
+	if err != nil {
+		return BrowserAttempt{}, nil, fmt.Errorf("parse OAuth redirect URL: %w", err)
+	}
+	callback, err := attempt.startCallback(listener, callbackURL)
+	if err != nil {
+		return BrowserAttempt{}, nil, err
+	}
+	closeListener = false
+	return attempt, callback, nil
+}
+
+func (a BrowserAttempt) startCallback(listener net.Listener, callbackURL *url.URL) (*Callback, error) {
+	if listener == nil || callbackURL == nil {
+		return nil, errors.New("OAuth callback listener is required")
 	}
 	callback := &Callback{listener: listener, result: make(chan callbackResult, 1)}
 	callback.server = &http.Server{Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -282,14 +343,22 @@ func (f BrowserFlow) exchangeToken(ctx context.Context, form url.Values, action 
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int64  `json:"expires_in"`
+		TokenType    string `json:"token_type"`
 	}
 	if err := json.Unmarshal(contents, &token); err != nil {
 		return Credential{}, fmt.Errorf("OAuth %s exchange returned invalid JSON", action)
 	}
-	if strings.TrimSpace(token.AccessToken) == "" || token.ExpiresIn <= 0 {
+	if strings.TrimSpace(token.AccessToken) == "" || (token.ExpiresIn <= 0 && !f.AllowMissingExpiry) {
 		return Credential{}, fmt.Errorf("OAuth %s exchange returned incomplete credentials", action)
 	}
-	return Credential{Type: oauthType, Access: token.AccessToken, Refresh: token.RefreshToken, Expires: time.Now().Add(time.Duration(token.ExpiresIn) * time.Second).UnixMilli()}, nil
+	if f.RequireBearerToken && token.TokenType != "" && !strings.EqualFold(token.TokenType, "bearer") {
+		return Credential{}, fmt.Errorf("OAuth %s exchange returned unsupported token type %q", action, token.TokenType)
+	}
+	expires := int64(0)
+	if token.ExpiresIn > 0 {
+		expires = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second).UnixMilli()
+	}
+	return Credential{Type: oauthType, Access: token.AccessToken, Refresh: token.RefreshToken, Expires: expires}, nil
 }
 
 func (f BrowserFlow) client() *http.Client {
