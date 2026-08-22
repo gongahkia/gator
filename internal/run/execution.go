@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
@@ -15,7 +16,7 @@ import (
 )
 
 func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string) (Outcome, error) {
-	projectInstructions, err := loadProjectInstructions(isolated.Repository)
+	projectInstructionSet, err := instructions.Load(isolated.Repository, request.Scopes)
 	if err != nil {
 		return Outcome{Worktree: isolated}, err
 	}
@@ -64,11 +65,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
 	}
-	system := systemPrompt(joinInstructions(joinInstructions(projectInstructions, extensionInstructions), request.System), request.Verification)
+	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)
 	var check func([]agent.Message) error
 	if request.Mode == PlanMode {
 		runTools = tools.ReadOnly(isolated.Root)
-		system = planSystemPrompt(joinInstructions(projectInstructions, request.System))
+		system = planSystemPrompt(joinInstructions(projectInstructionSet.Content, request.System))
 	} else {
 		check = completionCheck(request.Verification)
 	}
@@ -126,6 +127,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Task:                request.Task,
 		MaxSteps:            request.MaxSteps,
 		Verification:        request.Verification,
+		Scopes:              request.Scopes,
 		ThreadID:            request.ThreadID,
 		Mode:                request.Mode.String(),
 		Messages:            result.Messages,

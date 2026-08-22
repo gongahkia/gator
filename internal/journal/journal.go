@@ -46,6 +46,7 @@ type Session struct {
 	Task                string                `json:"task"`
 	MaxSteps            int                   `json:"max_steps"`
 	Verification        [][]string            `json:"verification"`
+	Scopes              []string              `json:"scopes,omitempty"`
 	ThreadID            string                `json:"thread_id,omitempty"`
 	Mode                string                `json:"mode,omitempty"`
 	Messages            []agent.Message       `json:"messages"`

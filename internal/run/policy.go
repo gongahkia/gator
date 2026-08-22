@@ -6,37 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 )
-
-const maxProjectInstructionsBytes = 64 * 1024
-
-func loadProjectInstructions(repository string) (string, error) {
-	path := filepath.Join(repository, "AGENTS.md")
-	info, err := os.Stat(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("stat AGENTS.md: %w", err)
-	}
-	if !info.Mode().IsRegular() {
-		return "", errors.New("AGENTS.md must be a regular file")
-	}
-	if info.Size() > maxProjectInstructionsBytes {
-		return "", fmt.Errorf("AGENTS.md exceeds the %d-byte limit", maxProjectInstructionsBytes)
-	}
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read AGENTS.md: %w", err)
-	}
-	return string(contents), nil
-}
 
 func joinInstructions(project, request string) string {
 	project = strings.TrimSpace(project)

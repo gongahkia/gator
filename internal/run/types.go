@@ -14,14 +14,17 @@ import (
 // Request configures a single coding task. Every listed verification argv is
 // both exposed to the agent and required to succeed before completion.
 type Request struct {
-	RepositoryPath  string
-	Task            string
-	Provider        string
-	Model           string
-	BaseURL         string
-	RunID           string
-	MaxSteps        int
-	Verification    [][]string
+	RepositoryPath string
+	Task           string
+	Provider       string
+	Model          string
+	BaseURL        string
+	RunID          string
+	MaxSteps       int
+	Verification   [][]string
+	// Scopes identify repository-relative files or directories the task is
+	// focused on. They select directory guidance and declarative project rules.
+	Scopes          []string
 	AllowedCommands [][]string
 	Approve         func(context.Context, []string) (tools.CommandDecision, error)
 	System          string
