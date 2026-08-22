@@ -160,20 +160,33 @@ func TestComposerRejectsEmptyTaskBeforeRun(t *testing.T) {
 }
 
 func TestComposerReportsProviderConfigurationFailureBeforeRun(t *testing.T) {
+	const credentialError = "Gator OAuth credential for \"codex\" is required. Complete the provider-owned sign-in, then retry this exact task after the credential has been stored."
 	model := New(Config{
+		Provider:     "codex",
 		Verification: [][]string{{"go", "test", "./..."}},
 		NewExecutor: func(string, string, string) (gatorrun.Executor, error) {
-			return gatorrun.Executor{}, errors.New("ANTHROPIC_API_KEY is required")
+			return gatorrun.Executor{}, errors.New(credentialError)
 		},
 	})
+	model.width = 64
+	model.height = 24
+	model.resizeInputs()
 	model.task.SetValue("Add a greeting")
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
 	if command != nil {
 		t.Fatal("missing API key started an execution")
 	}
 	updated := next.(Model)
-	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, "ANTHROPIC_API_KEY") {
+	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, credentialError) {
 		t.Fatalf("notice = %#v", updated.notice)
+	}
+	entry := updated.chat[len(updated.chat)-1]
+	if got, want := entry.text, "Unable to start run: Resolve configuration before starting:\n"+credentialError; got != want || !entry.isError {
+		t.Fatalf("transcript error = %#v, want %q", entry, want)
+	}
+	transcript := updated.transcriptContent()
+	if !strings.Contains(transcript, "Gator OAuth credential") || !strings.Contains(transcript, "credential has been stored.") || !updated.followTranscript || !updated.transcript.AtBottom() {
+		t.Fatalf("complete startup failure is not visible in the transcript: content=%q follow=%t atBottom=%t", transcript, updated.followTranscript, updated.transcript.AtBottom())
 	}
 }
 

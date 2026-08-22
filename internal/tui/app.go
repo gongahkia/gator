@@ -151,6 +151,7 @@ type chatEntry struct {
 	text      string
 	detail    string
 	streaming bool
+	isError   bool
 }
 
 type queuedInputKind uint8
