@@ -6,6 +6,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/extension"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -76,4 +77,5 @@ type Executor struct {
 	Now        func() time.Time
 	StateDir   string
 	Extensions extension.Resolver
+	Sandbox    sandbox.Policy
 }

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/gongahkia/gator/internal/sandbox"
 )
 
 const version = 1
@@ -23,6 +25,7 @@ type Settings struct {
 	Extensions          []Extension      `json:"extensions,omitempty"`
 	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
 	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
+	Execution           sandbox.Policy   `json:"execution"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -61,7 +64,7 @@ type Store struct {
 
 // Default returns usable settings without requiring a file on disk.
 func Default() Settings {
-	return Settings{Version: version}
+	return Settings{Version: version, Execution: sandbox.DefaultPolicy()}
 }
 
 // ResolveDir resolves Gator's configuration root. An explicit override and
@@ -194,6 +197,9 @@ func validate(settings Settings) error {
 	}
 	if settings.Theme != "" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" {
 		return fmt.Errorf("unknown theme %q", settings.Theme)
+	}
+	if err := settings.Execution.Validate(); err != nil {
+		return fmt.Errorf("invalid execution policy: %w", err)
 	}
 	if len(settings.Extensions) > 256 {
 		return errors.New("configuration has too many extensions")
