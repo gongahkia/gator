@@ -157,6 +157,9 @@ func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
 	if !delegationAvailable {
 		t.Fatal("plan tool surface omitted read-only delegation")
 	}
+	if hasTool(model.requests[0].Tools, "delegate_writer") {
+		t.Fatalf("plan tool surface included writer delegation: %#v", model.requests[0].Tools)
+	}
 	current, err := journal.LoadSession(outcome.StatePath)
 	if err != nil {
 		t.Fatalf("load plan session: %v", err)
@@ -260,6 +263,89 @@ func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.
 	}
 	if hasTool(planModel.requests[0].Tools, "terminal_start") || hasTool(planModel.requests[0].Tools, "terminal_write") {
 		t.Fatalf("plan tool surface included persistent terminal: %#v", planModel.requests[0].Tools)
+	}
+}
+
+func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing.T) {
+	repository := featureRepository(t)
+	parent, err := worktree.Create(context.Background(), repository, "writer-parent-001")
+	if err != nil {
+		t.Fatalf("create parent worktree: %v", err)
+	}
+	parentPatch := "diff --git a/parent.txt b/parent.txt\n" +
+		"new file mode 100644\n" +
+		"--- /dev/null\n" +
+		"+++ b/parent.txt\n" +
+		"@@ -0,0 +1 @@\n" +
+		"+parent snapshot\n"
+	if _, err := (tools.ApplyPatch{Root: parent.Root}).Execute(context.Background(), objectArguments(t, struct {
+		Patch string `json:"patch"`
+	}{Patch: parentPatch})); err != nil {
+		t.Fatalf("apply parent snapshot: %v", err)
+	}
+	writerPatch := "diff --git a/writer.txt b/writer.txt\n" +
+		"new file mode 100644\n" +
+		"--- /dev/null\n" +
+		"+++ b/writer.txt\n" +
+		"@@ -0,0 +1 @@\n" +
+		"+writer delta\n"
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "patch", Name: "apply_patch", Arguments: objectArguments(t, struct {
+			Patch string `json:"patch"`
+		}{Patch: writerPatch})}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Implemented the independent writer change and inspected its delta."},
+	}}
+	var events []agent.Event
+	writer := newWriterTool(Executor{Model: model}, parent, Request{
+		RepositoryPath: repository,
+		Task:           "Implement both parent and writer work.",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "writer-parent-001",
+		ThreadID:       "writer-parent-001",
+		MaxSteps:       6,
+		BaseCommit:     parent.BaseCommit,
+		StateDir:       t.TempDir(),
+		Mode:           ExecuteMode,
+	}, tools.NewCommandMemory(nil), fixedScoutClock(), func(event agent.Event) {
+		events = append(events, event)
+	})
+	result, err := writer.Execute(context.Background(), json.RawMessage(`{"task":"Add writer.txt with the delegated behavior."}`))
+	if err != nil {
+		t.Fatalf("delegate writer: %v", err)
+	}
+	var payload struct {
+		OK     bool                  `json:"ok"`
+		Writer delegatedWriterReport `json:"writer"`
+		Notice string                `json:"notice"`
+	}
+	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil {
+		t.Fatalf("decode writer result: %v\n%s", err, result.Content)
+	}
+	if !payload.OK || !payload.Writer.Completed || !payload.Writer.PatchAvailable || !payload.Writer.ReviewRequired || payload.Writer.RunID == "" {
+		t.Fatalf("writer result = %#v", payload)
+	}
+	if strings.Contains(payload.Writer.Patch, "parent.txt") || !strings.Contains(payload.Writer.Patch, "writer.txt") {
+		t.Fatalf("writer handoff must contain only the child delta: %q", payload.Writer.Patch)
+	}
+	if !strings.Contains(payload.Notice, "never auto-merges") || len(events) != 2 || events[0].Kind != agent.EventSubagent || !strings.Contains(events[0].Text, "starting isolated writer") {
+		t.Fatalf("writer delegation events = %#v; notice = %q", events, payload.Notice)
+	}
+	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") {
+		t.Fatalf("writer child model requests = %#v", model.requests)
+	}
+	if _, err := (tools.ApplyPatch{Root: parent.Root}).Execute(context.Background(), objectArguments(t, struct {
+		Patch string `json:"patch"`
+	}{Patch: payload.Writer.Patch})); err != nil {
+		t.Fatalf("explicitly apply writer delta to parent: %v", err)
+	}
+	if contents, err := os.ReadFile(filepath.Join(parent.Path, "parent.txt")); err != nil || string(contents) != "parent snapshot\n" {
+		t.Fatalf("parent snapshot changed: %q, %v", contents, err)
+	}
+	if contents, err := os.ReadFile(filepath.Join(parent.Path, "writer.txt")); err != nil || string(contents) != "writer delta\n" {
+		t.Fatalf("writer delta was not explicitly transferable: %q, %v", contents, err)
 	}
 }
 
