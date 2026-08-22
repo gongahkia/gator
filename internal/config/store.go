@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/hooks"
+	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
 
@@ -27,6 +28,7 @@ type Settings struct {
 	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
 	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
 	HookTrusts          []hooks.Trust    `json:"hook_trusts,omitempty"`
+	MCPTrusts           []mcp.Trust      `json:"mcp_trusts,omitempty"`
 	Execution           sandbox.Policy   `json:"execution"`
 }
 
@@ -290,6 +292,24 @@ func validate(settings Settings) error {
 			return fmt.Errorf("repository %q has more than one hook trust record", trust.Repository)
 		}
 		trustedHooks[trust.Repository] = struct{}{}
+	}
+	if len(settings.MCPTrusts) > 256 {
+		return errors.New("configuration has too many MCP trust records")
+	}
+	trustedMCP := make(map[string]struct{}, len(settings.MCPTrusts))
+	for _, trust := range settings.MCPTrusts {
+		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || len(trust.Hash) != 64 {
+			return errors.New("MCP trust record is invalid")
+		}
+		for _, character := range trust.Hash {
+			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+				return errors.New("MCP trust hash is invalid")
+			}
+		}
+		if _, exists := trustedMCP[trust.Repository]; exists {
+			return fmt.Errorf("repository %q has more than one MCP trust record", trust.Repository)
+		}
+		trustedMCP[trust.Repository] = struct{}{}
 	}
 	return nil
 }

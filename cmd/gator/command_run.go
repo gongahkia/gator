@@ -42,6 +42,8 @@ func runTask(arguments []string, out io.Writer) error {
 	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
 	var scopes stringFlags
 	flags.Var(&scopes, "scope", "repository-relative file or directory used to select project instructions (repeatable)")
+	var scouts stringFlags
+	flags.Var(&scouts, "scout", "read-only subagent assignment to run in parallel before the primary run (repeatable, max 4)")
 	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
 	sandboxMode := flags.String("sandbox", "", "execution sandbox: strict or off (default from config)")
 	networkMode := flags.String("network", "", "sandbox network mode: deny or allow (default from config)")
@@ -93,6 +95,7 @@ func runTask(arguments []string, out io.Writer) error {
 		Scopes:           scopes,
 		BaseRef:          *baseRef,
 		CopyIgnoredFiles: *copyIgnoredFiles,
+		Scouts:           scouts,
 		AllowedCommands:  allowedCommands,
 		Approve:          cliCommandApprover(*trustCommands),
 		OnEvent:          printer.Print,
@@ -163,6 +166,8 @@ func (p *eventPrinter) Print(event agent.Event) {
 		_, _ = fmt.Fprintf(p.out, "[%02d] command approval: %s\n", event.Step, strings.Join(event.Argv, " "))
 	case agent.EventCommandApprovalResolved:
 		_, _ = fmt.Fprintf(p.out, "[%02d] command %s\n", event.Step, event.Text)
+	case agent.EventHook:
+		_, _ = fmt.Fprintf(p.out, "[%02d] hook %s\n", event.Step, event.Text)
 	case agent.EventCompletionBlocked:
 		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
 	}

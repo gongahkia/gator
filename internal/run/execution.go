@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
@@ -25,6 +27,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project hooks: %w", err)
 	}
+	mcpSet, err := mcp.Load(ctx, isolated.Path, e.mcpTrust(isolated.Repository))
+	if err != nil {
+		return Outcome{Worktree: isolated}, fmt.Errorf("load project MCP servers: %w", err)
+	}
+	defer mcpSet.Close()
 	extensions, err := e.Extensions.Load(isolated.Repository)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load extensions: %w", err)
@@ -55,14 +62,18 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		}
 	}
 	hookEngine.Emit = func(status hooks.Status) {
-		message := status.Hook + " " + string(status.Event)
-		if status.Message != "" {
-			message += ": " + status.Message
+		decision := "allowed"
+		if !status.Allowed {
+			decision = "denied"
 		}
+		message := status.Hook + " " + string(status.Event) + " " + decision
 		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: message})
 	}
 	if hookEngine.Configured() && !hookEngine.Trusted() {
 		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project hooks are disabled because their bundle hash is not explicitly trusted"})
+	}
+	if mcpSet.Configured() && !mcpSet.Trusted() {
+		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project MCP servers are disabled because their bundle hash is not explicitly trusted"})
 	}
 	var result agent.Result
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
@@ -85,6 +96,30 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	})
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
+		runTools = append(runTools, mcpSet.Tools(func(ctx context.Context, server, tool string) error {
+			argv := []string{"mcp", server, tool}
+			if remembered.Allows(argv) {
+				return nil
+			}
+			emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: strings.Join(argv, " "), Argv: argv})
+			if request.Approve == nil {
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: tools.CommandDeny.String(), Argv: argv})
+				return errors.New("MCP tool requires developer approval")
+			}
+			decision, err := request.Approve(ctx, argv)
+			if err != nil {
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: tools.CommandDeny.String(), Argv: argv})
+				return err
+			}
+			emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: decision.String(), Argv: argv})
+			if decision == tools.CommandAllowAlways {
+				remembered.Remember(argv)
+			}
+			if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
+				return fmt.Errorf("MCP tool %s/%s denied by developer", server, tool)
+			}
+			return nil
+		})...)
 	}
 	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)
 	var check func([]agent.Message) error
@@ -170,6 +205,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		ThreadID:            request.ThreadID,
 		Mode:                request.Mode.String(),
 		HooksHash:           hookEngine.Hash(),
+		MCPHash:             mcpSet.Hash(),
 		Messages:            result.Messages,
 		ParentStatePath:     parentStatePath,
 		ForkedFromStatePath: request.ForkedFrom,
@@ -211,6 +247,15 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 
 func (e Executor) hookTrust(repository string) string {
 	for _, trust := range e.HookTrusts {
+		if trust.Repository == repository {
+			return trust.Hash
+		}
+	}
+	return ""
+}
+
+func (e Executor) mcpTrust(repository string) string {
+	for _, trust := range e.MCPTrusts {
 		if trust.Repository == repository {
 			return trust.Hash
 		}

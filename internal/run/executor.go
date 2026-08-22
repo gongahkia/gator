@@ -44,7 +44,16 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if request.BaseCommit == "" {
 		request.BaseCommit = isolated.BaseCommit
 	}
-	return e.execute(ctx, isolated, request, nil, "")
+	reports, err := e.runScouts(ctx, request, isolated.BaseCommit)
+	if err != nil {
+		return Outcome{Worktree: isolated, ScoutWorktrees: scoutWorktrees(reports)}, err
+	}
+	if context := formatScoutReports(reports); context != "" {
+		request.System = joinInstructions(request.System, context)
+	}
+	outcome, err := e.execute(ctx, isolated, request, nil, "")
+	outcome.ScoutWorktrees = scoutWorktrees(reports)
+	return outcome, err
 }
 
 // Resume continues a retained worktree from a private local session. It starts
@@ -174,5 +183,18 @@ func (e Executor) validateRequest(request Request) error {
 	if request.Mode != ExecuteMode && request.Mode != PlanMode {
 		return fmt.Errorf("unsupported run mode %d", request.Mode)
 	}
+	if len(nonEmptyScouts(request.Scouts)) > maxScouts {
+		return fmt.Errorf("at most %d read-only scouts may run in parallel", maxScouts)
+	}
 	return nil
+}
+
+func scoutWorktrees(reports []scoutReport) []worktree.Worktree {
+	worktrees := make([]worktree.Worktree, 0, len(reports))
+	for _, report := range reports {
+		if report.worktree.Path != "" {
+			worktrees = append(worktrees, report.worktree)
+		}
+	}
+	return worktrees
 }

@@ -84,7 +84,7 @@ type Engine struct {
 type Status struct {
 	Event   Event
 	Hook    string
-	Message string
+	Allowed bool
 }
 
 // Hash returns the configured hook bundle's exact digest, or empty when a
@@ -133,6 +133,16 @@ func BundleHash(repository string) (string, error) {
 	}
 	_, digest, err := loadManifest(root)
 	return digest, err
+}
+
+// CanonicalRepository returns the stable repository identity used by persisted
+// hook trust records.
+func CanonicalRepository(repository string) (string, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return "", err
+	}
+	return root.Path(), nil
 }
 
 func loadManifest(root workspace.Root) ([]activeHook, string, error) {
@@ -287,14 +297,22 @@ func (e Engine) runOne(ctx context.Context, hook activeHook, input []byte) error
 	}
 	defer prepared.Cleanup()
 	output := &limitedBuffer{limit: maxOutput}
+	diagnostics := &limitedBuffer{limit: maxOutput}
 	prepared.Command.Stdin = bytes.NewReader(input)
 	prepared.Command.Stdout = output
-	prepared.Command.Stderr = output
+	prepared.Command.Stderr = diagnostics
 	if err := prepared.Command.Run(); err != nil {
 		if errors.Is(runContext.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("hook %q timed out", hook.spec.Name)
 		}
-		return fmt.Errorf("hook %q failed: %s", hook.spec.Name, strings.TrimSpace(output.String()))
+		message := strings.TrimSpace(diagnostics.String())
+		if message == "" {
+			message = strings.TrimSpace(output.String())
+		}
+		if message == "" {
+			return fmt.Errorf("hook %q failed: %w", hook.spec.Name, err)
+		}
+		return fmt.Errorf("hook %q failed: %s", hook.spec.Name, message)
 	}
 	if output.truncated {
 		return fmt.Errorf("hook %q response exceeds %d bytes", hook.spec.Name, maxOutput)
@@ -313,10 +331,10 @@ func (e Engine) runOne(ctx context.Context, hook activeHook, input []byte) error
 	}
 	switch response.Decision {
 	case "allow":
-		e.emit(Status{Event: hook.spec.Event, Hook: hook.spec.Name, Message: response.Message})
+		e.emit(Status{Event: hook.spec.Event, Hook: hook.spec.Name, Allowed: true})
 		return nil
 	case "deny":
-		e.emit(Status{Event: hook.spec.Event, Hook: hook.spec.Name, Message: response.Message})
+		e.emit(Status{Event: hook.spec.Event, Hook: hook.spec.Name, Allowed: false})
 		if strings.TrimSpace(response.Message) == "" {
 			return fmt.Errorf("hook %q denied %s", hook.spec.Name, hook.spec.Event)
 		}

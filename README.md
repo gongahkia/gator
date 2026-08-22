@@ -137,8 +137,11 @@ that the agent consumes at its next model or tool boundary; it does not cancel
 the run. If the agent requests a command that is not a required verifier, the
 running view instead asks for approval: `y` or `Enter` allow once, `a` always
 allow that exact argv for the rest of the thread, and `n` deny. Denied commands
-return a tool error; the loop continues. This is not a sandbox: cwd is the
-isolated worktree, and an approved process runs as the Gator user. `Tab` queues the current prompt for the next turn, and a second `Tab`
+return a tool error; the loop continues. Native commands use the configured
+strict sandbox by default: macOS uses Seatbelt and Linux uses Bubblewrap, both
+with a private environment, worktree-only writes, and denied network access by
+default. On an unsupported platform strict mode fails closed; `--sandbox off`
+is the explicit host-access escape hatch. `Tab` queues the current prompt for the next turn, and a second `Tab`
 queues an already-completed slash command. Gator runs queued work in FIFO order
 only after the active run succeeds. `/queue`, `/dequeue`, and `/clear-queue`
 inspect or manage the bounded, 16-item in-memory queue. Failed or cancelled
@@ -411,6 +414,34 @@ limitations described above.
 Application Default Credentials (or `GATOR_VERTEX_ACCESS_TOKEN`) and refreshes
 them by direct OAuth requests. It does not invoke `gcloud`, start a coding
 agent, or delegate Gator's tool loop.
+
+## Local execution and trusted project capabilities
+
+`run_command` uses the strict sandbox by default: macOS uses Seatbelt and
+Linux uses Bubblewrap, with a filtered environment, private scratch directory,
+worktree-scoped writes, and denied network access. Strict mode fails closed
+where no platform adapter is available. `--sandbox off`, `--network allow`,
+and user-configured filesystem/environment grants are explicit capability
+grants, not defaults.
+
+Gator resolves root, `.gator`, and scope-specific `AGENTS.md` guidance for
+each `--scope` path. `.gator/rules.json` adds bounded path rules without
+granting executable capability. Project hooks and MCP configuration are
+different: `gator hook trust` pins the hash of `.gator/hooks.json` plus its
+declared executables, and `gator mcp trust` pins `.gator/mcp.json` plus local
+stdio executables. A changed bundle is disabled until re-trusted. Trusted hooks
+run at tool, compaction, verification, and session boundaries in the strict
+sandbox. Trusted MCP bundles can expose repository-relative stdio servers or
+Streamable HTTP servers; every MCP tool invocation still requests approval.
+Remote MCP OAuth is not implemented.
+
+Use `--scout` up to four times for parallel read-only exploration in separate
+worktrees. Reports reach the primary writer as untrusted evidence. New runs
+support `--base REF`, resolved to an immutable commit before creation. Opt in
+to copying ignored setup files with `--copy-ignored`; the exact files must be
+listed in tracked `.gator/worktreeinclude` and remain ignored. Use
+`gator worktree list`, `gator worktree prune`, and the explicit destructive
+`gator worktree remove RUN_ID --yes` to manage retained checkouts.
 
 ## Design principles
 

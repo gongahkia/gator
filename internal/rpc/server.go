@@ -217,6 +217,7 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 			Scopes:           request.Params.Scopes,
 			BaseRef:          request.Params.BaseRef,
 			CopyIgnoredFiles: request.Params.CopyIgnoredFiles,
+			Scouts:           request.Params.Scouts,
 			StateDir:         s.config.StateDir, Mode: mode, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
 			Approve: s.approveFor(request.ID),
 		})
