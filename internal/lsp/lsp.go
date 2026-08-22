@@ -1,5 +1,5 @@
 // Package lsp exposes explicitly trusted local Language Server Protocol
-// diagnostic servers as bounded Gator tools.
+// code-intelligence servers as bounded Gator tools.
 package lsp
 
 import (
@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -62,7 +63,7 @@ type server struct {
 }
 
 // Set is the validated project LSP configuration. It does not start a server
-// until a model requests diagnostics and the developer approves that request.
+// until a model requests a supported lookup and the developer approves it.
 type Set struct {
 	configuredHash string
 	trusted        bool
@@ -132,6 +133,110 @@ func (s Set) Tools(approve func(context.Context, string, string, string) error) 
 		}
 	}
 	return result
+}
+
+// Manager lazily owns at most one sandboxed client for each trusted server in
+// a run. Tool calls remain individually approved; reusing the process merely
+// avoids repeated initialization and lets an LSP maintain its in-run index.
+// It is not shared across runs or worktrees.
+type Manager struct {
+	root    workspace.Root
+	trusted bool
+	servers []server
+	connect func(context.Context, workspace.Root, server) (client, error)
+
+	mu      sync.Mutex
+	clients map[string]client
+}
+
+// NewManager constructs a per-run client manager. Call Close when the run
+// exits so every lazily started language server is terminated.
+func (s Set) NewManager() *Manager {
+	return &Manager{
+		root:    s.root,
+		trusted: s.trusted,
+		servers: append([]server(nil), s.servers...),
+		connect: connect,
+		clients: make(map[string]client),
+	}
+}
+
+// Tools returns this manager's read-only tool surface. An untrusted or empty
+// set has no model-visible tools.
+func (m *Manager) Tools(approve func(context.Context, string, string, string) error) []agent.Tool {
+	if m == nil || !m.trusted {
+		return nil
+	}
+	result := make([]agent.Tool, 0, len(m.servers)*len(lspOperations))
+	for _, specification := range m.servers {
+		for _, operation := range lspOperations {
+			result = append(result, Tool{root: m.root, specification: specification, operation: operation, approve: approve, manager: m})
+		}
+	}
+	return result
+}
+
+func (m *Manager) connection(ctx context.Context, specification server) (client, error) {
+	m.mu.Lock()
+	if existing := m.clients[specification.Name]; existing != nil {
+		m.mu.Unlock()
+		return existing, nil
+	}
+	connect := m.connect
+	m.mu.Unlock()
+	if connect == nil {
+		return nil, errors.New("LSP connection is not configured")
+	}
+	opened, err := connect(ctx, m.root, specification)
+	if err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	if existing := m.clients[specification.Name]; existing != nil {
+		m.mu.Unlock()
+		_ = opened.Close()
+		return existing, nil
+	}
+	m.clients[specification.Name] = opened
+	m.mu.Unlock()
+	return opened, nil
+}
+
+// Discard drops an unhealthy client after an I/O failure so a later approved
+// lookup can create a fresh sandboxed process instead of reusing bad state.
+func (m *Manager) Discard(name string) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	connection := m.clients[name]
+	delete(m.clients, name)
+	m.mu.Unlock()
+	if connection != nil {
+		_ = connection.Close()
+	}
+}
+
+// Close stops every client started for this run. The first shutdown failure is
+// returned after all clients have been given a chance to exit.
+func (m *Manager) Close() error {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	connections := make([]client, 0, len(m.clients))
+	for _, connection := range m.clients {
+		connections = append(connections, connection)
+	}
+	m.clients = make(map[string]client)
+	m.mu.Unlock()
+	var first error
+	for _, connection := range connections {
+		if err := connection.Close(); err != nil && first == nil {
+			first = err
+		}
+	}
+	return first
 }
 
 func loadManifest(root workspace.Root) (manifest, string, error) {
@@ -253,6 +358,7 @@ type Tool struct {
 	operation     lspOperation
 	approve       func(context.Context, string, string, string) error
 	connect       func(context.Context, workspace.Root, server) (client, error)
+	manager       *Manager
 }
 
 func (t Tool) Definition() agent.ToolDefinition {
@@ -338,23 +444,38 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if err := t.approve(ctx, t.specification.Name, string(t.operation), target); err != nil {
 		return agent.ToolResult{}, err
 	}
-	if t.connect == nil {
-		return agent.ToolResult{}, errors.New("LSP connection is not configured")
-	}
-	connection, err := t.connect(ctx, t.root, t.specification)
+	connection, release, err := t.open(ctx)
 	if err != nil {
 		return agent.ToolResult{}, fmt.Errorf("start LSP server %q: %w", t.specification.Name, err)
 	}
-	defer connection.Close()
+	defer release()
 	if !connection.Supports(t.operation) {
 		return agent.ToolResult{}, fmt.Errorf("LSP server %q does not support %s", t.specification.Name, t.operation)
 	}
 	method, request := t.request(resolved, params)
 	response, err := connection.Request(ctx, method, request)
 	if err != nil {
+		if t.manager != nil {
+			t.manager.Discard(t.specification.Name)
+		}
 		return agent.ToolResult{}, fmt.Errorf("request %s from LSP server %q: %w", t.operation, t.specification.Name, err)
 	}
 	return t.format(target, response)
+}
+
+func (t Tool) open(ctx context.Context) (client, func(), error) {
+	if t.manager != nil {
+		connection, err := t.manager.connection(ctx, t.specification)
+		return connection, func() {}, err
+	}
+	if t.connect == nil {
+		return nil, nil, errors.New("LSP connection is not configured")
+	}
+	connection, err := t.connect(ctx, t.root, t.specification)
+	if err != nil {
+		return nil, nil, err
+	}
+	return connection, func() { _ = connection.Close() }, nil
 }
 
 func (t Tool) requiresPosition() bool {
