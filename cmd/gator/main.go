@@ -23,6 +23,7 @@ Usage:
   gator version
   gator update [--check]
   gator rpc
+  gator acp [--verify 'argv ...']
   gator config [show]
   gator config set default-provider PROVIDER
   gator config set default-model MODEL
@@ -56,6 +57,7 @@ Commands:
   login     store a provider credential in Gator's private local auth file
   logout    remove a provider credential from Gator's private local auth file
   delegate  run an installed vendor or external agent in an isolated worktree
+  acp       run a local Agent Client Protocol v1 stdio agent for an editor
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
   theme     list or choose Gator's terminal theme
@@ -91,6 +93,9 @@ func run(args []string, out io.Writer) error {
 	if len(args) == 2 && args[0] == "--mode" && args[1] == "rpc" {
 		return rpcMode(nil, os.Stdin, out)
 	}
+	if len(args) == 2 && args[0] == "--mode" && args[1] == "acp" {
+		return acpMode(nil, os.Stdin, out)
+	}
 	if args[0] == "version" || args[0] == "--version" || args[0] == "-v" {
 		_, err := fmt.Fprintf(out, "gator %s (%s, %s)\n", version, commit, date)
 		return err
@@ -105,6 +110,8 @@ func run(args []string, out io.Writer) error {
 		return update(args[1:], out)
 	case "rpc":
 		return rpcMode(args[1:], os.Stdin, out)
+	case "acp":
+		return acpMode(args[1:], os.Stdin, out)
 	case "doctor":
 		return doctor(args[1:], out)
 	case "login":

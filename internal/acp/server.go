@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -79,11 +80,13 @@ type session struct {
 	statePath    string
 	updatedAt    time.Time
 	active       *activePrompt
+	closing      bool
 }
 
 type activePrompt struct {
 	cancel    context.CancelFunc
 	messageID string
+	done      chan struct{}
 }
 
 type inbound struct {
@@ -140,8 +143,7 @@ func New(config Config) (*Server, error) {
 }
 
 // Serve processes ACP messages until stdio closes. A closed input cancels all
-// active prompts; their terminal responses are intentionally not written to a
-// departed client.
+// active prompts before the server waits for their executor cleanup.
 func (s *Server) Serve(ctx context.Context) error {
 	scanner := bufio.NewScanner(s.config.Input)
 	scanner.Buffer(make([]byte, 4096), maxFrameBytes)
@@ -267,8 +269,9 @@ func (s *Server) initialize(request inbound) error {
 
 func (s *Server) newSession(request inbound) error {
 	var params struct {
-		CWD        string            `json:"cwd"`
-		MCPServers []json.RawMessage `json:"mcpServers"`
+		CWD                   string            `json:"cwd"`
+		AdditionalDirectories []string          `json:"additionalDirectories"`
+		MCPServers            []json.RawMessage `json:"mcpServers"`
 	}
 	if err := decodeParams(request.Params, &params); err != nil {
 		return fmt.Errorf("session/new parameters: %w", err)
@@ -278,6 +281,9 @@ func (s *Server) newSession(request inbound) error {
 	}
 	if err := s.validateCWD(params.CWD); err != nil {
 		return err
+	}
+	if len(params.AdditionalDirectories) != 0 {
+		return errors.New("additional ACP workspace roots are not supported; Gator only operates in its isolated worktree")
 	}
 	if len(params.MCPServers) != 0 {
 		return errors.New("client-supplied MCP servers are not accepted; trust project .gator/mcp.json with gator mcp trust")
@@ -329,7 +335,11 @@ func (s *Server) prompt(parent context.Context, request inbound) error {
 		return fmt.Errorf("ACP session %q already has an active prompt", params.SessionID)
 	}
 	ctx, cancel := context.WithCancel(parent)
-	activity := &activePrompt{cancel: cancel, messageID: s.nextID("message")}
+	if session.closing {
+		s.mu.Unlock()
+		return fmt.Errorf("ACP session %q is closing", params.SessionID)
+	}
+	activity := &activePrompt{cancel: cancel, messageID: s.nextID("message"), done: make(chan struct{})}
 	session.active = activity
 	session.updatedAt = time.Now().UTC()
 	s.wait.Add(1)
@@ -345,6 +355,7 @@ func (s *Server) executePrompt(ctx context.Context, sessionID, task, messageID s
 	defer func() {
 		s.mu.Lock()
 		if session, found := s.sessions[sessionID]; found && session.active != nil && session.active.messageID == messageID {
+			close(session.active.done)
 			session.active = nil
 			session.updatedAt = time.Now().UTC()
 		}
@@ -482,7 +493,8 @@ func (s *Server) setMode(request inbound) error {
 
 func (s *Server) listSessions(request inbound) error {
 	var params struct {
-		CWD string `json:"cwd"`
+		CWD    string `json:"cwd"`
+		Cursor string `json:"cursor"`
 	}
 	if len(request.Params) > 0 {
 		if err := decodeParams(request.Params, &params); err != nil {
@@ -498,8 +510,16 @@ func (s *Server) listSessions(request inbound) error {
 	if err != nil {
 		return fmt.Errorf("list retained ACP sessions: %w", err)
 	}
-	sessions := make([]map[string]any, 0, len(threads))
-	for _, thread := range threads {
+	start := 0
+	if strings.TrimSpace(params.Cursor) != "" {
+		start, err = strconv.Atoi(params.Cursor)
+		if err != nil || start < 0 || start > len(threads) {
+			return errors.New("session/list cursor is invalid")
+		}
+	}
+	end := min(start+100, len(threads))
+	sessions := make([]map[string]any, 0, end-start)
+	for _, thread := range threads[start:end] {
 		sessions = append(sessions, map[string]any{
 			"sessionId": thread.ID,
 			"cwd":       s.repository,
@@ -507,21 +527,32 @@ func (s *Server) listSessions(request inbound) error {
 			"updatedAt": thread.UpdatedAt.UTC().Format(time.RFC3339Nano),
 		})
 	}
-	s.sendResult(responseID(request.ID), map[string]any{"sessions": sessions})
+	result := map[string]any{"sessions": sessions}
+	if end < len(threads) {
+		result["nextCursor"] = strconv.Itoa(end)
+	}
+	s.sendResult(responseID(request.ID), result)
 	return nil
 }
 
 func (s *Server) resumeSession(request inbound) error {
 	var params struct {
-		SessionID  string            `json:"sessionId"`
-		CWD        string            `json:"cwd"`
-		MCPServers []json.RawMessage `json:"mcpServers"`
+		SessionID             string            `json:"sessionId"`
+		CWD                   string            `json:"cwd"`
+		AdditionalDirectories []string          `json:"additionalDirectories"`
+		MCPServers            []json.RawMessage `json:"mcpServers"`
 	}
 	if err := decodeParams(request.Params, &params); err != nil {
 		return fmt.Errorf("%s parameters: %w", request.Method, err)
 	}
 	if err := s.validateCWD(params.CWD); err != nil {
 		return err
+	}
+	if request.Method == "session/load" && !hasField(request.Params, "mcpServers") {
+		return errors.New("session/load requires mcpServers (use [] when none are supplied)")
+	}
+	if len(params.AdditionalDirectories) != 0 {
+		return errors.New("additional ACP workspace roots are not supported; Gator only operates in its isolated worktree")
 	}
 	if len(params.MCPServers) != 0 {
 		return errors.New("client-supplied MCP servers are not accepted; trust project .gator/mcp.json with gator mcp trust")
@@ -574,16 +605,24 @@ func (s *Server) closeSession(request inbound) error {
 	}
 	s.mu.Lock()
 	session, found := s.sessions[params.SessionID]
+	var finished <-chan struct{}
 	if found {
+		session.closing = true
 		if session.active != nil {
 			session.active.cancel()
+			finished = session.active.done
 		}
-		delete(s.sessions, params.SessionID)
 	}
 	s.mu.Unlock()
 	if !found {
 		return fmt.Errorf("unknown ACP session %q", params.SessionID)
 	}
+	if finished != nil {
+		<-finished
+	}
+	s.mu.Lock()
+	delete(s.sessions, params.SessionID)
+	s.mu.Unlock()
 	s.sendResult(responseID(request.ID), map[string]any{})
 	return nil
 }
@@ -601,7 +640,7 @@ func (s *Server) requestPermission(ctx context.Context, sessionID string, argv [
 	}()
 	s.send(outbound{
 		JSONRPC: "2.0",
-		ID:      json.RawMessage(strconvQuote(id)),
+		ID:      json.RawMessage(strconv.Quote(id)),
 		Method:  "session/request_permission",
 		Params: map[string]any{
 			"sessionId": sessionID,
@@ -890,9 +929,4 @@ func cloneArgv(source [][]string) [][]string {
 		result[index] = append([]string(nil), argv...)
 	}
 	return result
-}
-
-func strconvQuote(value string) []byte {
-	encoded, _ := json.Marshal(value)
-	return encoded
 }
