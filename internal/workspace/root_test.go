@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -85,5 +87,28 @@ func TestRootReadRegularFileStaysInsideWorkspace(t *testing.T) {
 	}
 	if _, err := root.ReadRegularFile("escape.txt", 64); err == nil {
 		t.Fatal("read through outside symlink succeeded")
+	}
+}
+
+func TestRootSHA256RegularFile(t *testing.T) {
+	directory := t.TempDir()
+	contents := []byte("fixture contents\n")
+	if err := os.WriteFile(filepath.Join(directory, "fixture.txt"), contents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	root, err := Open(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := root.SHA256RegularFile("fixture.txt", 1024)
+	if err != nil {
+		t.Fatalf("hash regular file: %v", err)
+	}
+	expected := sha256.Sum256(contents)
+	if hash != hex.EncodeToString(expected[:]) {
+		t.Fatalf("hash = %q, want %x", hash, expected)
+	}
+	if _, err := root.SHA256RegularFile("fixture.txt", 2); err == nil {
+		t.Fatal("oversized hash succeeded")
 	}
 }

@@ -80,6 +80,14 @@ the process-level verifier policy. Gator's proprietary `gator rpc` interface
 remains for automation that needs run IDs, steering, and other Gator-specific
 control-plane operations.
 
+Trusted project LSP configuration is a deliberately small, local
+code-intelligence surface. A developer pins `.gator/lsp.json` and its
+repository-local executables with `gator lsp trust`; each model-requested
+diagnostic launch still needs command approval and runs under the strict
+sandbox. The v1 client implements LSP pull diagnostics only, bounds all wire
+and model-visible output, and starts a server only after approval. It is not a
+general IDE or an unreviewed executable-extension path.
+
 Supported `@` references are a separate, bounded developer input channel.
 The TUI loads only repository-local PNG, JPEG, and WebP images; PDFs; selected
 UTF-8 text/data formats; and DOCX, ODT, and XLSX documents. Images and PDFs

@@ -43,12 +43,13 @@ cannot be converted to Execute in place because Gator preserves a thread's
 original command authority.
 
 The same strict process sandbox, isolated worktree, hook policy, project MCP
-trust, and provider credential handling used by the TUI apply to ACP runs. An
-ACP client cannot change the checkout, add filesystem roots, or inject MCP
+and LSP trust, and provider credential handling used by the TUI apply to ACP
+runs. An ACP client cannot change the checkout, add filesystem roots, or inject MCP
 servers: `cwd` must be the repository Gator was started for,
 `additionalDirectories` must be empty, and `mcpServers` must be empty. Trusted
 project MCP configuration continues to come only from `.gator/mcp.json` after
-`gator mcp trust`.
+`gator mcp trust`. Trusted local LSP pull diagnostics continue to come only
+from `.gator/lsp.json` after `gator lsp trust`.
 
 ACP authentication methods are intentionally not advertised. Configure a
 provider through Gator's existing `login`, `connect`, environment, or local
