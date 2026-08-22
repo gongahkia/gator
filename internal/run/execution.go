@@ -39,6 +39,8 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project LSP servers: %w", err)
 	}
+	lspManager := lspSet.NewManager()
+	defer lspManager.Close()
 	extensions, err := e.Extensions.Load(isolated.Repository)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load extensions: %w", err)
@@ -135,7 +137,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, roleSet, request.MaxSteps, e.Now, emit)
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
-		runTools = append(runTools, lspSet.Tools(func(ctx context.Context, server, operation, path string) error {
+		runTools = append(runTools, lspManager.Tools(func(ctx context.Context, server, operation, path string) error {
 			argv := []string{"lsp", server, operation, path}
 			if remembered.Allows(argv) {
 				return nil

@@ -48,8 +48,8 @@ runs. An ACP client cannot change the checkout, add filesystem roots, or inject 
 servers: `cwd` must be the repository Gator was started for,
 `additionalDirectories` must be empty, and `mcpServers` must be empty. Trusted
 project MCP configuration continues to come only from `.gator/mcp.json` after
-`gator mcp trust`. Trusted local LSP pull diagnostics continue to come only
-from `.gator/lsp.json` after `gator lsp trust`.
+`gator mcp trust`. Trusted local LSP diagnostics and read-only navigation
+continue to come only from `.gator/lsp.json` after `gator lsp trust`.
 
 ACP authentication methods are intentionally not advertised. Configure a
 provider through Gator's existing `login`, `connect`, environment, or local

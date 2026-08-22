@@ -185,7 +185,37 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 					t.Fatalf("references parameters = %s, %v", encoded, err)
 				}
 			}
+			if test.operation == workspaceSymbolsOperation {
+				encoded, err := json.Marshal(connection.parameters)
+				if err != nil || !strings.Contains(string(encoded), `"query":"Target"`) {
+					t.Fatalf("workspace-symbol parameters = %s, %v", encoded, err)
+				}
+			}
 		})
+	}
+}
+
+func TestWorkspaceSymbolsAcceptURIOnlyLocationAndRejectInvalidQuery(t *testing.T) {
+	root := testWorkspace(t)
+	writeFile(t, root.Path(), "pkg/target.go", "package pkg\n", 0o600)
+	uri := fileURI(filepath.Join(root.Path(), "pkg", "target.go"))
+	result, err := formatWorkspaceSymbols(root, "Target", "fixture", json.RawMessage(`[{"name":"Target","kind":5,"location":{"uri":`+strconv.Quote(uri)+`}}]`))
+	if err != nil {
+		t.Fatalf("format URI-only workspace symbol: %v", err)
+	}
+	var payload struct {
+		Symbols []struct {
+			Name  string          `json:"name"`
+			Path  string          `json:"path"`
+			Range *presentedRange `json:"range"`
+		} `json:"symbols"`
+	}
+	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil || len(payload.Symbols) != 1 || payload.Symbols[0].Name != "Target" || payload.Symbols[0].Path != "pkg/target.go" || payload.Symbols[0].Range != nil {
+		t.Fatalf("URI-only workspace symbol payload = %#v, %v", payload, err)
+	}
+	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}, operation: workspaceSymbolsOperation}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"query":"line\nbreak"}`)); err == nil || !strings.Contains(err.Error(), "workspace-symbol query") {
+		t.Fatalf("invalid workspace-symbol query error = %v", err)
 	}
 }
 
