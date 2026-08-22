@@ -240,6 +240,9 @@ func LoadRoles(repository string) ([]Role, error) {
 		if err != nil {
 			return nil, err
 		}
+		if body == "" {
+			return nil, fmt.Errorf("agent role %q has empty instructions", candidate.Name)
+		}
 		result = append(result, Role{Name: candidate.Name, Description: candidate.Description, Kind: candidate.Kind, Instructions: body})
 	}
 	return result, nil
@@ -267,7 +270,7 @@ func loadProfilesDocument(root workspace.Root) (profilesDocument, error) {
 
 func validateProfilesDocument(document profilesDocument) error {
 	if document.Version != 1 || len(document.Profiles) > 64 || len(document.Roles) > 32 {
-		return errors.New("agent profiles have an unsupported version or too many entries")
+		return errors.New("agent definitions have an unsupported version or too many entries")
 	}
 	profiles := make(map[string]struct{}, len(document.Profiles))
 	for _, candidate := range document.Profiles {

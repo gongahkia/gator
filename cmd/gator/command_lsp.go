@@ -67,7 +67,7 @@ func lspCommand(arguments []string, out io.Writer) error {
 		if err := store.Save(settings); err != nil {
 			return err
 		}
-		_, err := fmt.Fprintf(out, "Trusted project LSP bundle %s. Each diagnostic lookup still requests approval before starting a server.\n", digest)
+		_, err := fmt.Fprintf(out, "Trusted project LSP bundle %s. Each diagnostic or navigation lookup still requests approval before starting a server.\n", digest)
 		return err
 	case "untrust":
 		settings.LSPTrusts = removeLSPTrust(settings.LSPTrusts, repository)

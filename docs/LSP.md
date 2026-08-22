@@ -3,9 +3,10 @@
 Gator can expose bounded read-only inspection from a repository-local Language
 Server Protocol (LSP) server to an Execute-mode native agent. For one existing
 workspace source file it supports pull diagnostics, hover, go-to definition,
-find references, and document symbols. Definitions and references return only
-regular files inside the active worktree. It does not expose completion, rename,
-code actions, edits, formatting, or a shared workspace-symbol index.
+find references, and document symbols. It also supports a repository-wide
+workspace-symbol query. Definitions, references, and workspace symbols return
+only regular files inside the active worktree. It does not expose completion,
+rename, code actions, edits, formatting, or a persistent shared server/index.
 
 Create `.gator/lsp.json` in the repository:
 
@@ -48,18 +49,19 @@ bundle until it is explicitly trusted again. Remove the trust record with
 When the model asks for an LSP tool, Gator first requests the usual allow-once,
 allow-always, or deny approval using an argv-shaped record such as
 `lsp SERVER definition PATH`. The supported operation names are `diagnostics`,
-`hover`, `definition`, `references`, and `document_symbols`; approval is scoped
-to the exact server, operation, and path. Only after approval does Gator start
-the server. The server runs in Gator's strict sandbox by default with its
-configured network mode. It is started anew for one lookup and shut down
-afterward.
+`hover`, `definition`, `references`, `document_symbols`, and
+`workspace_symbols`; approval is scoped to the exact server, operation, and
+path or symbol query. Only after approval does Gator start the server. The
+server runs in Gator's strict sandbox by default with its configured network
+mode. It is started anew for one lookup and shut down afterward.
 
 Gator implements the LSP 3.17 requests `textDocument/diagnostic`,
 `textDocument/hover`, `textDocument/definition`, `textDocument/references`,
-and `textDocument/documentSymbol`. It advertises and checks the corresponding
-server capability at `initialize`; a server can expose whichever subset it
-supports. Position-taking tools accept a one-based line and zero-based UTF-16
-character offset. LSP uses JSON-RPC 2.0 framed with `Content-Length`; Gator
+`textDocument/documentSymbol`, and `workspace/symbol`. It advertises and
+checks the corresponding server capability at `initialize`; a server can expose
+whichever subset it supports. Position-taking tools accept a one-based line and
+zero-based UTF-16 character offset. The workspace-symbol query is limited to
+512 printable bytes. LSP uses JSON-RPC 2.0 framed with `Content-Length`; Gator
 caps frames at 256 KiB, returns at most 128 diagnostics, locations, or symbols
 and 64 KiB of tool output, and presents result lines as one-based terminal
 values. A server that lacks a requested capability is not started again as a
