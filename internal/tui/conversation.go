@@ -66,11 +66,16 @@ func renderChatEntry(entry chatEntry, width int) string {
 	case chatSystem:
 		label, style = "System", dimStyle
 	}
+	if entry.isError {
+		label, style = "Error", errorStyle
+	}
 	if entry.streaming {
 		label += " · responding"
 	}
 	bodyStyle := lipgloss.NewStyle().Width(width).PaddingLeft(2)
-	if entry.author == chatSystem || entry.author == chatTool {
+	if entry.isError {
+		bodyStyle = bodyStyle.Foreground(errorStyle.GetForeground())
+	} else if entry.author == chatSystem || entry.author == chatTool {
 		bodyStyle = bodyStyle.Foreground(dimStyle.GetForeground())
 	}
 	sections := []string{style.Render(label), bodyStyle.Render(entry.text)}

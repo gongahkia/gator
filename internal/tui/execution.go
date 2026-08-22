@@ -20,25 +20,21 @@ import (
 func (m Model) startRun() (tea.Model, tea.Cmd) {
 	task := strings.TrimSpace(m.task.Value())
 	if task == "" {
-		m.notice = notice{text: "Describe a task before starting a run.", kind: noticeError}
-		return m, nil
+		return m.startFailure("Describe a task before starting a run.")
 	}
 	if m.delegateRuntime != "" {
 		return m.startDelegatedRun(task)
 	}
 	if m.config.NewExecutor == nil {
-		m.notice = notice{text: "No model provider is configured for this Gator build.", kind: noticeError}
-		return m, nil
+		return m.startFailure("No model provider is configured for this Gator build.")
 	}
 	references, err := resolveContextReferences(task, m.config.RepositoryPath)
 	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(err.Error())
 	}
 	images, err := imageAttachments(m.config.RepositoryPath, references)
 	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(err.Error())
 	}
 	imageBytes := 0
 	for _, image := range images {
@@ -46,8 +42,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	}
 	attachments, err := documentAttachments(m.config.RepositoryPath, references, imageBytes, len(images))
 	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(err.Error())
 	}
 	if m.attachmentConfirmed && !sameAttachmentPreviews(m.attachmentPreview, attachmentPreviews(images, attachments)) {
 		m.attachmentConfirmed = false
@@ -61,39 +56,33 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		var err error
 		verification, err = parseVerification(m.verification.Value())
 		if err != nil {
-			m.notice = notice{text: err.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure(err.Error())
 		}
 	}
 	modelName := strings.TrimSpace(m.model.Value())
 	providerName := strings.TrimSpace(m.provider.Value())
 	if providerName == "" {
-		m.notice = notice{text: "Choose a provider before starting a run.", kind: noticeError}
-		return m, nil
+		return m.startFailure("Choose a provider before starting a run.")
 	}
 	resolvedProvider, resolvedModel, customProvider, providerErr := m.resolveProviderAndModel(providerName, modelName)
 	if providerErr != nil {
-		m.notice = notice{text: providerErr.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(providerErr.Error())
 	}
 	if hasPDFAttachment(attachments) && (customProvider || !modelprovider.SupportsPDFAttachments(modelprovider.Provider(resolvedProvider))) {
-		m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
-		return m, nil
+		return m.startFailure("PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.")
 	}
 	providerName = resolvedProvider
 	modelName = resolvedModel
 	m.refreshPreflight()
 	if len(m.preflight) > 0 {
-		m.notice = notice{text: "Resolve configuration before starting: " + m.preflight[0], kind: noticeError}
-		return m, nil
+		return m.startFailure("Resolve configuration before starting:\n" + strings.Join(m.preflight, "\n"))
 	}
 	var executor gatorrun.Executor
 	if m.resumeStatePath == "" {
 		var executorErr error
 		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.config.BaseURL)
 		if executorErr != nil {
-			m.notice = notice{text: executorErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure(executorErr.Error())
 		}
 	}
 
@@ -168,30 +157,26 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "Load retained fork: " + loadErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure("Load retained fork: " + loadErr.Error())
 		}
 		if _, snapshotErr := journal.LoadSnapshot(m.forkStatePath); snapshotErr != nil {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "Fork retained run: " + snapshotErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure("Fork retained run: " + snapshotErr.Error())
 		}
 		retainedProvider, retainedModel, retainedCustom, providerErr := m.resolveProviderAndModel(previous.Provider, previous.Model)
 		if providerErr != nil {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: providerErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure(providerErr.Error())
 		}
 		if hasPDFAttachment(attachments) && (retainedCustom || !modelprovider.SupportsPDFAttachments(modelprovider.Provider(retainedProvider))) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
-			return m, nil
+			return m.startFailure("PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.")
 		}
 		providerName = retainedProvider
 		modelName = retainedModel
@@ -205,8 +190,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: executorErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure(executorErr.Error())
 		}
 		m.beginRunActivity(request.Verification)
 		m.forceCompaction = false
@@ -217,30 +201,26 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "Load retained run: " + loadErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure("Load retained run: " + loadErr.Error())
 		}
 		if strings.TrimSpace(previous.Provider) == "" {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "The retained run does not record a provider and cannot be continued safely.", kind: noticeError}
-			return m, nil
+			return m.startFailure("The retained run does not record a provider and cannot be continued safely.")
 		}
 		retainedProvider, retainedModel, retainedCustom, providerErr := m.resolveProviderAndModel(previous.Provider, previous.Model)
 		if providerErr != nil {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: providerErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure(providerErr.Error())
 		}
 		if hasPDFAttachment(attachments) && (retainedCustom || !modelprovider.SupportsPDFAttachments(modelprovider.Provider(retainedProvider))) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: "PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.", kind: noticeError}
-			return m, nil
+			return m.startFailure("PDF attachments require the OpenAI Responses, Anthropic Messages, or Gemini provider.")
 		}
 		providerName = retainedProvider
 		modelName = retainedModel
@@ -254,8 +234,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			cancel()
 			m.execution = nil
 			m.screen = composeScreen
-			m.notice = notice{text: executorErr.Error(), kind: noticeError}
-			return m, nil
+			return m.startFailure(executorErr.Error())
 		}
 		m.beginRunActivity(request.Verification)
 		m.forceCompaction = false
@@ -273,35 +252,28 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 // session. Gator still creates the isolated worktree and runs verification.
 func (m Model) startDelegatedRun(task string) (tea.Model, tea.Cmd) {
 	if m.resumeStatePath != "" || m.forkStatePath != "" {
-		m.notice = notice{text: "A provider-owned harness always starts a new isolated worktree; it cannot continue or fork a native Gator thread.", kind: noticeError}
-		return m, nil
+		return m.startFailure("A provider-owned harness always starts a new isolated worktree; it cannot continue or fork a native Gator thread.")
 	}
 	if m.runMode != gatorrun.ExecuteMode {
-		m.notice = notice{text: delegatedRuntimeLabel(m.delegateRuntime) + " supports Execute mode only. Run /execute before sending a task.", kind: noticeError}
-		return m, nil
+		return m.startFailure(delegatedRuntimeLabel(m.delegateRuntime) + " supports Execute mode only. Run /execute before sending a task.")
 	}
 	verification, err := parseVerification(m.verification.Value())
 	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(err.Error())
 	}
 	references, err := resolveContextReferences(task, m.config.RepositoryPath)
 	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(err.Error())
 	}
 	if m.config.NewDelegateCommand == nil {
-		m.notice = notice{text: "This Gator build cannot start a provider-owned harness from the TUI.", kind: noticeError}
-		return m, nil
+		return m.startFailure("This Gator build cannot start a provider-owned harness from the TUI.")
 	}
 	delegate, err := m.config.NewDelegateCommand(m.delegateRuntime, taskWithContextReferences(task, references), strings.TrimSpace(m.model.Value()), verification, m.config.RepositoryPath)
 	if err != nil {
-		m.notice = notice{text: err.Error(), kind: noticeError}
-		return m, nil
+		return m.startFailure(err.Error())
 	}
 	if delegate.Process == nil {
-		m.notice = notice{text: "This Gator build returned an invalid provider-owned harness command.", kind: noticeError}
-		return m, nil
+		return m.startFailure("This Gator build returned an invalid provider-owned harness command.")
 	}
 	m.appendChat(chatEntry{author: chatUser, text: task})
 	m.task.Reset()
@@ -317,6 +289,20 @@ func (m Model) startDelegatedRun(task string) (tea.Model, tea.Cmd) {
 		}
 		return delegatedRunDoneMsg{runtime: runtime, output: output, err: err}
 	})
+}
+
+// startFailure leaves the current task editable and records the complete
+// failure in the scrollable conversation. The composer notice remains a
+// compact status signal, while the transcript is the place to inspect long
+// provider and configuration errors.
+func (m Model) startFailure(message string) (tea.Model, tea.Cmd) {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		message = "Unable to start the run."
+	}
+	m.notice = notice{text: message, kind: noticeError}
+	m.appendChat(chatEntry{author: chatSystem, text: "Unable to start run: " + message, isError: true})
+	return m, nil
 }
 
 func attachmentPreviews(images []agent.Image, attachments []agent.Attachment) []attachmentPreview {
