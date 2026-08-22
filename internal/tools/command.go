@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -98,6 +99,7 @@ type CommandPolicy struct {
 	OnEvent        agent.EventSink
 	Timeout        time.Duration
 	MaxOutputBytes int
+	Sandbox        sandbox.Policy
 }
 
 // RunCommand runs argv without a shell, or a command string via bash/sh, from
@@ -241,11 +243,15 @@ func runWorktreeCommand(ctx context.Context, root workspace.Root, policy Command
 	commandContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	output := &limitedBuffer{limit: positiveOr(policy.MaxOutputBytes, defaultCommandOutput)}
-	command := exec.CommandContext(commandContext, argv[0], argv[1:]...)
-	command.Dir = root.Path()
+	prepared, err := sandbox.Prepare(commandContext, sandbox.Request{Dir: root.Path(), Argv: argv, Policy: policy.Sandbox})
+	if err != nil {
+		return CommandResult{}, fmt.Errorf("prepare sandboxed command: %w", err)
+	}
+	defer prepared.Cleanup()
+	command := prepared.Command
 	command.Stdout = output
 	command.Stderr = output
-	err := command.Run()
+	err = command.Run()
 	exitCode := 0
 	if err != nil {
 		var exitError *exec.ExitError

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/sandbox"
 )
 
 func doctor(arguments []string, out io.Writer) error {
@@ -79,7 +80,11 @@ func doctor(arguments []string, out io.Writer) error {
 			authenticationStatus = "set in environment"
 		}
 	}
-	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\n", gitStatus, provider, authentication, authenticationStatus); err != nil {
+	sandboxStatus, sandboxErr := sandbox.StrictAvailability()
+	if sandboxErr != nil {
+		sandboxStatus = "unavailable: " + sandboxErr.Error()
+	}
+	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\n", gitStatus, provider, authentication, authenticationStatus, sandboxStatus); err != nil {
 		return err
 	}
 	suggestionDirectory := workingDirectory

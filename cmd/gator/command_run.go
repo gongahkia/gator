@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
 )
 
@@ -40,6 +41,8 @@ func runTask(arguments []string, out io.Writer) error {
 	var allowedCommands verificationFlags
 	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
 	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
+	sandboxMode := flags.String("sandbox", "", "execution sandbox: strict or off (default from config)")
+	networkMode := flags.String("network", "", "sandbox network mode: deny or allow (default from config)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -58,11 +61,20 @@ func runTask(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if *sandboxMode != "" {
+		executor.Sandbox.Mode = sandbox.Mode(*sandboxMode)
+	}
+	if *networkMode != "" {
+		executor.Sandbox.Network = sandbox.Network(*networkMode)
+	}
+	if err := executor.Sandbox.Validate(); err != nil {
+		return err
+	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  task: %s\n", resolvedProvider, displayModel(resolvedModel), task); err != nil {
+	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  sandbox: %s, network: %s\n  task: %s\n", resolvedProvider, displayModel(resolvedModel), executor.Sandbox.Mode, executor.Sandbox.Network, task); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}

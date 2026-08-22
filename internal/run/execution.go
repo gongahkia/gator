@@ -50,11 +50,16 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	var result agent.Result
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
+	executionPolicy := e.Sandbox.Normalize()
+	if err := executionPolicy.Validate(); err != nil {
+		return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("validate execution policy: %w", err)
+	}
 	runTools := tools.Default(isolated.Root, tools.CommandPolicy{
 		Allowed:    request.Verification,
 		Remembered: remembered,
 		Approve:    request.Approve,
 		OnEvent:    emit,
+		Sandbox:    executionPolicy,
 	})
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)

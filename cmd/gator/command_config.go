@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/sandbox"
 )
 
 func configure(arguments []string, out io.Writer) error {
@@ -31,7 +32,7 @@ func configure(arguments []string, out io.Writer) error {
 		return err
 	}
 	if len(arguments) != 3 || arguments[0] != "set" {
-		return errors.New("usage: gator config set default-provider PROVIDER | gator config set default-model MODEL")
+		return errors.New("usage: gator config set default-provider PROVIDER | gator config set default-model MODEL | gator config set sandbox strict|off | gator config set network deny|allow")
 	}
 	settings, err := store.Load()
 	if err != nil {
@@ -50,8 +51,18 @@ func configure(arguments []string, out io.Writer) error {
 		settings.Defaults.Provider = provider
 	case "default-model":
 		settings.Defaults.Model = value
+	case "sandbox":
+		settings.Execution.Mode = sandbox.Mode(value)
+		if err := settings.Execution.Validate(); err != nil {
+			return err
+		}
+	case "network":
+		settings.Execution.Network = sandbox.Network(value)
+		if err := settings.Execution.Validate(); err != nil {
+			return err
+		}
 	default:
-		return fmt.Errorf("unknown configuration key %q; choose default-provider or default-model", arguments[1])
+		return fmt.Errorf("unknown configuration key %q; choose default-provider, default-model, sandbox, or network", arguments[1])
 	}
 	if err := store.Save(settings); err != nil {
 		return err
