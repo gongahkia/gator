@@ -34,6 +34,7 @@ type Params struct {
 	BaseURL          string     `json:"base_url,omitempty"`
 	Verify           [][]string `json:"verify,omitempty"`
 	Scopes           []string   `json:"scopes,omitempty"`
+	Profile          string     `json:"profile,omitempty"`
 	BaseRef          string     `json:"base_ref,omitempty"`
 	CopyIgnoredFiles bool       `json:"copy_ignored_files,omitempty"`
 	Scouts           []string   `json:"scouts,omitempty"`

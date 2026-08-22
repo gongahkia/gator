@@ -79,6 +79,29 @@ func TestLoadRejectsUnknownRuleFields(t *testing.T) {
 	}
 }
 
+func TestLoadWithProfileAppendsOnlySelectedProfile(t *testing.T) {
+	repository := t.TempDir()
+	writeInstructionFile(t, repository, "AGENTS.md", "base guidance")
+	writeInstructionFile(t, repository, ".gator/profiles/review.md", "review the diff and report findings")
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "profiles": [
+    {"name": "implementer", "instructions": "make the smallest coherent change"},
+    {"name": "reviewer", "file": ".gator/profiles/review.md"}
+  ]
+}`)
+	set, err := LoadWithProfile(repository, nil, "reviewer")
+	if err != nil {
+		t.Fatalf("load profile: %v", err)
+	}
+	if !strings.Contains(set.Content, "base guidance") || !strings.Contains(set.Content, "selected agent profile reviewer") || strings.Contains(set.Content, "smallest coherent") {
+		t.Fatalf("profile content = %q", set.Content)
+	}
+	if _, err := LoadWithProfile(repository, nil, "missing"); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("missing profile error = %v", err)
+	}
+}
+
 func writeInstructionFile(t *testing.T, repository, relative, contents string) {
 	t.Helper()
 	path := filepath.Join(repository, filepath.FromSlash(relative))

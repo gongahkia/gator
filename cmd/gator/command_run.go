@@ -42,6 +42,7 @@ func runTask(arguments []string, out io.Writer) error {
 	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
 	var scopes stringFlags
 	flags.Var(&scopes, "scope", "repository-relative file or directory used to select project instructions (repeatable)")
+	profile := flags.String("profile", "", "named declarative project agent profile")
 	var scouts stringFlags
 	flags.Var(&scouts, "scout", "read-only subagent assignment to run in parallel before the primary run (repeatable, max 4)")
 	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
@@ -93,6 +94,7 @@ func runTask(arguments []string, out io.Writer) error {
 		MaxSteps:         *maxSteps,
 		Verification:     verification,
 		Scopes:           scopes,
+		Profile:          *profile,
 		BaseRef:          *baseRef,
 		CopyIgnoredFiles: *copyIgnoredFiles,
 		Scouts:           scouts,

@@ -215,6 +215,7 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 			RepositoryPath: s.config.RepositoryPath, Task: request.Params.Task, Provider: provider, Model: modelName,
 			BaseURL: request.Params.BaseURL, MaxSteps: request.Params.MaxSteps, Verification: request.Params.Verify,
 			Scopes:           request.Params.Scopes,
+			Profile:          request.Params.Profile,
 			BaseRef:          request.Params.BaseRef,
 			CopyIgnoredFiles: request.Params.CopyIgnoredFiles,
 			Scouts:           request.Params.Scouts,

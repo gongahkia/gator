@@ -71,6 +71,9 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 	if len(request.Scopes) == 0 {
 		request.Scopes = append([]string(nil), previous.Scopes...)
 	}
+	if request.Profile == "" {
+		request.Profile = previous.Profile
+	}
 	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
@@ -126,6 +129,9 @@ func (e Executor) Fork(ctx context.Context, previous journal.Session, statePath,
 	request.Verification = previous.Verification
 	if len(request.Scopes) == 0 {
 		request.Scopes = append([]string(nil), previous.Scopes...)
+	}
+	if request.Profile == "" {
+		request.Profile = previous.Profile
 	}
 	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
 	if request.MaxSteps == 0 {
