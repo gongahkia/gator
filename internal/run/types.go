@@ -7,6 +7,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
+	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
@@ -92,6 +93,7 @@ type Executor struct {
 	StateDir   string
 	Extensions extension.Resolver
 	HookTrusts []hooks.Trust
+	LSPTrusts  []lsp.Trust
 	MCPTrusts  []mcp.Trust
 	Sandbox    sandbox.Policy
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/hooks"
+	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
@@ -28,6 +29,7 @@ type Settings struct {
 	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
 	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
 	HookTrusts          []hooks.Trust    `json:"hook_trusts,omitempty"`
+	LSPTrusts           []lsp.Trust      `json:"lsp_trusts,omitempty"`
 	MCPTrusts           []mcp.Trust      `json:"mcp_trusts,omitempty"`
 	Execution           sandbox.Policy   `json:"execution"`
 }
@@ -310,6 +312,24 @@ func validate(settings Settings) error {
 			return fmt.Errorf("repository %q has more than one MCP trust record", trust.Repository)
 		}
 		trustedMCP[trust.Repository] = struct{}{}
+	}
+	if len(settings.LSPTrusts) > 256 {
+		return errors.New("configuration has too many LSP trust records")
+	}
+	trustedLSP := make(map[string]struct{}, len(settings.LSPTrusts))
+	for _, trust := range settings.LSPTrusts {
+		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || len(trust.Hash) != 64 {
+			return errors.New("LSP trust record is invalid")
+		}
+		for _, character := range trust.Hash {
+			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+				return errors.New("LSP trust hash is invalid")
+			}
+		}
+		if _, exists := trustedLSP[trust.Repository]; exists {
+			return fmt.Errorf("repository %q has more than one LSP trust record", trust.Repository)
+		}
+		trustedLSP[trust.Repository] = struct{}{}
 	}
 	return nil
 }

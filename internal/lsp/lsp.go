@@ -427,12 +427,12 @@ func connect(ctx context.Context, root workspace.Root, specification server) (di
 func (c *nativeClient) initialize(ctx context.Context, root string) error {
 	uri := fileURI(root)
 	result, err := c.call(ctx, "initialize", map[string]any{
-		"processId": os.Getpid(),
-		"clientInfo": map[string]string{"name": "gator", "version": "dev"},
-		"rootUri": uri,
+		"processId":        os.Getpid(),
+		"clientInfo":       map[string]string{"name": "gator", "version": "dev"},
+		"rootUri":          uri,
 		"workspaceFolders": []map[string]string{{"uri": uri, "name": filepath.Base(root)}},
 		"capabilities": map[string]any{
-			"workspace": map[string]any{"configuration": true, "workspaceFolders": true},
+			"workspace":    map[string]any{"configuration": true, "workspaceFolders": true},
 			"textDocument": map[string]any{"diagnostic": map[string]any{"dynamicRegistration": false}},
 		},
 	})
