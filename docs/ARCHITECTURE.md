@@ -71,6 +71,15 @@ exports a portable patch snapshot. A fork creates a new worktree at the saved
 base commit, applies that snapshot, and uses a new thread ID; it never mutates
 the source thread.
 
+`gator acp` is a separate local stdio ACP v1 agent surface for editors. It
+maps ACP sessions to retained Gator threads, streams normalized model/tool
+events as ACP session updates, and maps Gator command approval to ACP
+`session/request_permission`. It does not give an ACP client authority to
+change repository roots, add filesystem roots, inject MCP servers, or weaken
+the process-level verifier policy. Gator's proprietary `gator rpc` interface
+remains for automation that needs run IDs, steering, and other Gator-specific
+control-plane operations.
+
 Supported `@` references are a separate, bounded developer input channel.
 The TUI loads only repository-local PNG, JPEG, and WebP images; PDFs; selected
 UTF-8 text/data formats; and DOCX, ODT, and XLSX documents. Images and PDFs

@@ -267,10 +267,13 @@ Claude.ai OAuth or Keychain credentials. For another installed harness, use
 receives `GATOR_TASK` and `GATOR_WORKTREE`; its authentication and automation
 contract remain its own responsibility.
 
-For an IDE, CI service, or custom UI, use `gator rpc` rather than parsing the
-human CLI output or private journal files. It is a versioned JSONL protocol
-with explicit run, resume, steer, cancel, approve, status, and thread-listing methods.
-See [RPC integration](docs/RPC.md).
+For an ACP-capable editor, use `gator acp` rather than parsing human CLI output
+or private journal files. It implements the local stdio ACP v1 session and
+permission lifecycle while retaining Gator's worktree and verifier policy; see
+[ACP integration](docs/ACP.md). For CI or a bespoke control plane, `gator rpc`
+remains Gator's versioned JSONL protocol with explicit run, resume, steer,
+cancel, approve, status, and thread-listing methods; see
+[RPC integration](docs/RPC.md).
 
 Gator extensions provide reusable skills, prompt guidance, and optional
 language-neutral JSON sidecar tools. Install a bundle with `gator extension
