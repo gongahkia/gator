@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +17,8 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -263,6 +268,137 @@ func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.
 	}
 	if hasTool(planModel.requests[0].Tools, "terminal_start") || hasTool(planModel.requests[0].Tools, "terminal_write") {
 		t.Fatalf("plan tool surface included persistent terminal: %#v", planModel.requests[0].Tools)
+	}
+}
+
+func TestExecutorAttachesDeveloperToExistingTerminalWithoutJournalingRawInput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	repository := featureRepository(t)
+	gate := make(chan struct{})
+	model := &attachedTerminalModel{gate: gate, turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "terminal", Name: "terminal_start", Arguments: objectArguments(t, struct {
+			Argv []string `json:"argv"`
+		}{Argv: []string{sh, "-lc", "sleep 30"}})}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The attached terminal task was stopped when the run completed."},
+	}}
+	attachments := make(chan terminal.Attachment, 2)
+	result := make(chan struct {
+		outcome Outcome
+		err     error
+	}, 1)
+	go func() {
+		outcome, runErr := (Executor{Model: model, Sandbox: sandbox.Policy{Mode: sandbox.Off}}).Execute(context.Background(), Request{
+			RepositoryPath: repository, Task: "Start an attached task", Provider: "test", Model: "test-model", RunID: "attached-terminal-001", MaxSteps: 5, StateDir: t.TempDir(),
+			Approve:              func(context.Context, []string) (tools.CommandDecision, error) { return tools.CommandAllowOnce, nil },
+			OnTerminalAttachment: func(attachment terminal.Attachment) { attachments <- attachment },
+		})
+		result <- struct {
+			outcome Outcome
+			err     error
+		}{outcome, runErr}
+	}()
+	attachment := <-attachments
+	if attachment == nil {
+		t.Fatal("executor detached terminal attachment before exposing it")
+	}
+	if _, exposesStart := attachment.(interface {
+		Start(context.Context, []string) (terminal.Task, error)
+	}); exposesStart {
+		t.Fatal("developer terminal attachment exposed process creation")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	var task terminal.Task
+	for time.Now().Before(deadline) {
+		tasks := attachment.List()
+		if len(tasks) == 1 {
+			task = tasks[0]
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if task.ID == "" || task.Status != "running" {
+		t.Fatalf("attached terminal task = %#v", task)
+	}
+	if _, err := attachment.WriteDeveloper(task.ID, []byte("developer-secret\r")); err != nil {
+		t.Fatalf("write attached terminal input: %v", err)
+	}
+	close(gate)
+	completed := <-result
+	if completed.err != nil {
+		t.Fatalf("execute attached terminal run: %v", completed.err)
+	}
+	foundInputEvent := false
+	for _, event := range completed.outcome.Events {
+		if strings.Contains(event.Text, "developer-secret") || strings.Contains(strings.Join(event.Argv, " "), "developer-secret") {
+			t.Fatalf("raw developer input leaked into event: %#v", event)
+		}
+		if event.Kind == agent.EventTerminal && strings.Contains(event.Text, "developer input") {
+			foundInputEvent = strings.Contains(event.Text, "sha256:")
+		}
+	}
+	if !foundInputEvent {
+		t.Fatalf("developer input metadata was absent from terminal events: %#v", completed.outcome.Events)
+	}
+}
+
+func TestExecutorExposesBoundedHTTPFetchOnlyWithNetworkCapability(t *testing.T) {
+	repository := featureRepository(t)
+	client := &runHTTPClient{body: "source-backed web research"}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "fetch", Name: "http_fetch", Arguments: json.RawMessage(`{"url":"https://example.test/research"}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Fetched the bounded external reference and inspected the worktree."},
+	}}
+	outcome, err := (Executor{Model: model, Sandbox: sandbox.Policy{Mode: sandbox.Off, Network: sandbox.AllowNetwork}, HTTP: tools.HTTPFetchOptions{
+		Client:   client,
+		Resolver: runStaticResolver{"example.test": {{IP: net.ParseIP("93.184.216.34")}}},
+	}}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Research the public API",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "http-fetch-001",
+		MaxSteps:       5,
+		StateDir:       t.TempDir(),
+		Approve: func(context.Context, []string) (tools.CommandDecision, error) {
+			return tools.CommandAllowOnce, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("execute HTTP fetch run: %v", err)
+	}
+	if !hasTool(model.requests[0].Tools, "http_fetch") || client.calls != 1 {
+		t.Fatalf("HTTP tool surface/calls = %#v / %d", model.requests[0].Tools, client.calls)
+	}
+	if got := model.requests[1].Messages[len(model.requests[1].Messages)-1]; got.Role != agent.RoleTool || got.ToolName != "http_fetch" || !strings.Contains(got.Content, "source-backed web research") {
+		t.Fatalf("model did not receive bounded HTTP result: %#v", got)
+	}
+	if !containsEvent(outcome.Events, agent.EventCommandApprovalRequested) {
+		t.Fatalf("HTTP fetch approval was not visible in events: %#v", outcome.Events)
+	}
+
+	deniedModel := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Network access is not available in this run."},
+	}}
+	_, err = (Executor{Model: deniedModel}).Execute(context.Background(), Request{
+		RepositoryPath: repository, Task: "Inspect locally", Provider: "test", Model: "test-model", RunID: "http-fetch-denied-001", MaxSteps: 4, StateDir: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("execute network-denied run: %v", err)
+	}
+	if hasTool(deniedModel.requests[0].Tools, "http_fetch") {
+		t.Fatalf("network-denied tool surface included HTTP fetch: %#v", deniedModel.requests[0].Tools)
 	}
 }
 
@@ -592,6 +728,42 @@ func TestExecutorResumesWithFreshEvidence(t *testing.T) {
 type scriptedModel struct {
 	turns    []agent.Turn
 	requests []agent.TurnRequest
+}
+
+type attachedTerminalModel struct {
+	turns []agent.Turn
+	calls int
+	gate  <-chan struct{}
+}
+
+func (m *attachedTerminalModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	if m.calls == 1 {
+		<-m.gate
+	}
+	if len(m.turns) == 0 {
+		return agent.Turn{}, errors.New("unexpected model call")
+	}
+	turn := m.turns[0]
+	m.turns = m.turns[1:]
+	m.calls++
+	return turn, nil
+}
+
+type runStaticResolver map[string][]net.IPAddr
+
+func (r runStaticResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAddr, error) {
+	addresses := r[host]
+	return append([]net.IPAddr(nil), addresses...), nil
+}
+
+type runHTTPClient struct {
+	body  string
+	calls int
+}
+
+func (c *runHTTPClient) Do(request *http.Request) (*http.Response, error) {
+	c.calls++
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/plain"}}, Body: io.NopCloser(strings.NewReader(c.body)), Request: request}, nil
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {

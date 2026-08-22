@@ -9,6 +9,13 @@ import (
 )
 
 func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "ctrl+t" && (m.screen == composeScreen || m.screen == runningScreen) && m.pendingApproval == nil {
+		m.openAttachedTerminal()
+		if m.screen == terminalScreen && m.execution != nil {
+			return m, waitForExecution(m.execution)
+		}
+		return m, nil
+	}
 	if message.String() == "ctrl+b" && (m.screen == composeScreen || m.screen == runningScreen) {
 		m.toggleDrawer()
 		return m, nil
@@ -35,6 +42,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.updateDrawer(message)
 		}
 		return m.updateRunning(message)
+	case terminalScreen:
+		return m.updateAttachedTerminal(message)
 	case reviewScreen:
 		return m.updateReview(message)
 	case transcriptScreen:

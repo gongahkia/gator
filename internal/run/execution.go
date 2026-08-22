@@ -115,32 +115,44 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		OnExit: func(task terminal.Task) {
 			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: terminalStatusText(task)})
 		},
+		OnDeveloperInput: func(task terminal.Task, input terminal.DeveloperInput) {
+			digest := input.SHA256
+			if len(digest) > 8 {
+				digest = digest[:8]
+			}
+			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: fmt.Sprintf("%s developer input (%d bytes sha256:%s)", task.ID, input.Bytes, digest)})
+		},
 	})
+	if request.OnTerminalAttachment != nil {
+		request.OnTerminalAttachment(terminalManager.Attachment())
+		defer request.OnTerminalAttachment(nil)
+	}
 	defer terminalManager.Close()
 	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, request.MaxSteps, e.Now, emit)
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
-		runTools = append(runTools, lspSet.Tools(func(ctx context.Context, server, path string) error {
-			argv := []string{"lsp", server, "diagnostics", path}
+		runTools = append(runTools, lspSet.Tools(func(ctx context.Context, server, operation, path string) error {
+			argv := []string{"lsp", server, operation, path}
 			if remembered.Allows(argv) {
 				return nil
 			}
-			emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: strings.Join(argv, " "), Argv: argv})
+			toolName := "lsp_" + server + "_" + operation
+			emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: strings.Join(argv, " "), Argv: argv})
 			if request.Approve == nil {
-				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: tools.CommandDeny.String(), Argv: argv})
-				return errors.New("LSP diagnostics require developer approval")
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
+				return fmt.Errorf("LSP %s requires developer approval", operation)
 			}
 			decision, err := request.Approve(ctx, argv)
 			if err != nil {
-				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: tools.CommandDeny.String(), Argv: argv})
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
 				return err
 			}
-			emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: decision.String(), Argv: argv})
+			emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: decision.String(), Argv: argv})
 			if decision == tools.CommandAllowAlways {
 				remembered.Remember(argv)
 			}
 			if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
-				return fmt.Errorf("LSP diagnostics from %s denied by developer", server)
+				return fmt.Errorf("LSP %s from %s denied by developer", operation, server)
 			}
 			return nil
 		})...)
@@ -169,6 +181,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			return nil
 		})...)
 		runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy)...)
+		runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
 		runTools = append(runTools, readonlyScout)
 		if !request.DisableWriterDelegation {
 			runTools = append(runTools, newWriterTool(e, isolated, request, remembered, e.Now, emit))

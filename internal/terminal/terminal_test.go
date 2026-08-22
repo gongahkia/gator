@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -97,6 +99,50 @@ func TestManagerMarksDroppedOutputAndCancelsTasksOnClose(t *testing.T) {
 	state := awaitTerminalExit(t, manager, running.ID)
 	if state.Status != "exited" || state.ExitCode == nil || *state.ExitCode != -1 || !strings.Contains(state.Error, "cancelled") {
 		t.Fatalf("closed terminal state = %#v", state)
+	}
+}
+
+func TestManagerRecordsDeveloperInputWithoutRetainingIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inputs []DeveloperInput
+	var inputMu sync.Mutex
+	manager := New(Config{
+		Root:   root,
+		Policy: sandbox.Policy{Mode: sandbox.Off},
+		OnDeveloperInput: func(_ Task, input DeveloperInput) {
+			inputMu.Lock()
+			inputs = append(inputs, input)
+			inputMu.Unlock()
+		},
+	})
+	defer manager.Close()
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "IFS= read line; printf 'received:%s\\n' \"$line\""})
+	if err != nil {
+		t.Fatalf("start terminal: %v", err)
+	}
+	secret := []byte("developer-only value\r")
+	if _, err := manager.WriteDeveloper(task.ID, secret); err != nil {
+		t.Fatalf("write developer terminal input: %v", err)
+	}
+	_ = awaitTerminalOutput(t, manager, task.ID, 0, "received:developer-only value")
+	inputMu.Lock()
+	defer inputMu.Unlock()
+	if len(inputs) != 1 || inputs[0].Bytes != len(secret) {
+		t.Fatalf("developer input metadata = %#v", inputs)
+	}
+	digest := sha256.Sum256(secret)
+	if inputs[0].SHA256 != hex.EncodeToString(digest[:]) || strings.Contains(inputs[0].SHA256, "developer-only") {
+		t.Fatalf("developer input digest = %#v", inputs[0])
 	}
 }
 

@@ -157,10 +157,11 @@ func describeToolCall(call agent.ToolCall) string {
 			return patchPreview(arguments.Patch)
 		}
 	}
-	if call.Name == "read_file" || call.Name == "list_files" || call.Name == "search_files" {
+	if call.Name == "read_file" || call.Name == "list_files" || call.Name == "search_files" || call.Name == "http_fetch" {
 		var arguments struct {
 			Path  string `json:"path"`
 			Query string `json:"query"`
+			URL   string `json:"url"`
 		}
 		if json.Unmarshal(call.Arguments, &arguments) == nil {
 			if arguments.Path != "" {
@@ -168,6 +169,9 @@ func describeToolCall(call agent.ToolCall) string {
 			}
 			if arguments.Query != "" {
 				return "query: " + arguments.Query
+			}
+			if arguments.URL != "" {
+				return "url: " + arguments.URL
 			}
 		}
 	}

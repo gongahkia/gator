@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 )
 
@@ -82,6 +83,7 @@ const (
 	composeScreen screen = iota
 	attachmentConfirmScreen
 	runningScreen
+	terminalScreen
 	reviewScreen
 	transcriptScreen
 	helpScreen
@@ -191,6 +193,7 @@ type executionStream struct {
 	cancel    context.CancelFunc
 	steering  chan string
 	approvals chan commandApprovalRequest
+	terminals chan terminal.Attachment
 }
 
 type executionDone struct {
@@ -205,6 +208,10 @@ type agentEventMsg struct {
 type commandApprovalMsg struct {
 	argv  []string
 	reply chan tools.CommandDecision
+}
+
+type terminalManagerMsg struct {
+	attachment terminal.Attachment
 }
 
 type executionDoneMsg struct {
@@ -259,6 +266,7 @@ type Model struct {
 	verification        textarea.Model
 	provider            textinput.Model
 	model               textinput.Model
+	terminalInput       textinput.Model
 	notice              notice
 	commandOutput       string
 	commandIndex        int
@@ -302,6 +310,13 @@ type Model struct {
 	lastRunCancelled    bool
 	activity            runActivity
 	verificationStatus  []verificationStatus
+	terminalAttachment  terminal.Attachment
+	terminalTasks       []terminal.Task
+	terminalViews       map[string]attachedTerminalView
+	terminalIndex       int
+	terminalScroll      int
+	terminalErr         error
+	terminalReturn      screen
 
 	outcome         *gatorrun.Outcome
 	runErr          error
@@ -408,6 +423,13 @@ func New(config Config) Model {
 	provider.SetValue(config.Provider)
 	provider.Blur()
 
+	terminalInput := textinput.New()
+	terminalInput.Prompt = "› "
+	terminalInput.Placeholder = "type terminal input, then Enter"
+	terminalInput.CharLimit = 16 * 1024
+	terminalInput.Width = 60
+	terminalInput.Blur()
+
 	application := Model{
 		config:           config,
 		screen:           composeScreen,
@@ -415,6 +437,8 @@ func New(config Config) Model {
 		task:             task,
 		verification:     verification,
 		provider:         provider,
+		terminalInput:    terminalInput,
+		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
 		transcript:       viewport.New(76, 8),
 		followTranscript: true,
@@ -469,11 +493,17 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Approve worktree command: " + strings.Join(msg.argv, " "), kind: noticeInfo}
 		m.setActivity(activityAwaitingApproval, "awaiting command approval", time.Now())
 		return m, waitForExecution(m.execution)
+	case terminalManagerMsg:
+		m.setTerminalAttachment(msg.attachment)
+		return m, waitForExecution(m.execution)
 	case agentEventMsg:
 		m.appendEvent(msg.event)
 		return m, waitForExecution(m.execution)
 	case activityTickMsg:
-		if m.screen == runningScreen && m.execution != nil {
+		if (m.screen == runningScreen || m.screen == terminalScreen) && m.execution != nil {
+			if m.screen == terminalScreen {
+				m.refreshAttachedTerminal()
+			}
 			return m, waitForExecution(m.execution)
 		}
 		return m, nil
@@ -482,6 +512,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		wasNewThread := m.resumeStatePath == ""
 		wasCancelling := m.cancelling
 		m.execution = nil
+		m.setTerminalAttachment(nil)
 		m.cancelling = false
 		m.lastRunCancelled = wasCancelling
 		m.outcome = &msg.done.outcome

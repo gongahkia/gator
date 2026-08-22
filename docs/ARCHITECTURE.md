@@ -106,10 +106,13 @@ control-plane operations.
 Trusted project LSP configuration is a deliberately small, local
 code-intelligence surface. A developer pins `.gator/lsp.json` and its
 repository-local executables with `gator lsp trust`; each model-requested
-diagnostic launch still needs command approval and runs under the strict
-sandbox. The v1 client implements LSP pull diagnostics only, bounds all wire
-and model-visible output, and starts a server only after approval. It is not a
-general IDE or an unreviewed executable-extension path.
+diagnostic or navigation launch still needs operation-specific command approval
+and runs under the strict sandbox. The client implements pull diagnostics,
+hover, definitions, references, and document symbols; it bounds all wire and
+model-visible output, returns only workspace locations, and starts a server
+only after approval. It is not a general IDE or an unreviewed
+executable-extension path: completion, edits, code actions, formatting, and a
+workspace symbol index remain outside this capability.
 
 Trusted Streamable HTTP MCP servers may obtain a Gator-owned public OAuth
 credential only through explicit `gator mcp login`. The client discovers the
@@ -162,14 +165,30 @@ Execute mode exposes these tools:
    waits for allow-once, always-allow-this-argv, or deny;
 5. inspect Git status and diff.
 6. start, read, write, list, and stop bounded persistent pseudo-terminal tasks.
+7. when the developer explicitly allows network access, fetch one approved
+   public HTTPS text resource with `http_fetch`.
 
 Terminal-task starts share the run's strict sandbox, worktree root, network
 policy, filtered environment, and developer command approval. They retain only
 bounded in-memory scrollback and are cancelled at run completion. A model must
 request a separate approval for each distinct terminal input; approval events
-contain an ID, size, and SHA-256 digest rather than the input bytes. The TUI
-receives lifecycle events but Gator does not yet offer a user-attached terminal
-multiplexer or a background task that survives a completed agent run.
+contain an ID, size, and SHA-256 digest rather than the input bytes. During a
+native TUI run, `Ctrl+T` can attach a developer to an existing task: it renders
+bounded, ANSI-stripped line output, allows a line write, ETX interrupt, or task
+stop, and emits only byte-count/digest metadata for direct input. The attachment
+does not create commands, broaden the fixed task sandbox, persist task output,
+or survive a completed agent run. It is a line-oriented attachment rather than
+a VT emulator or an ACP/client terminal multiplexer.
+
+`http_fetch` accepts port-443 HTTPS URLs only. Before a request, Gator resolves
+the hostname, rejects local/private/reserved results, and pins the approved
+public addresses into a proxy-free transport; redirects are returned rather
+than followed. It requires a separate exact-URL approval unless remembered
+within that run (in a memory separate from command approvals), allows at most
+eight requests per run, and exposes no more than 256 KiB of
+textual response content. The fetch tool is absent when network access is
+denied and is not a native search engine, browser automation, or computer-use
+capability.
 
 Plan mode exposes only read/search and Git inspection tools for every direct
 provider.

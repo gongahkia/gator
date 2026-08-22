@@ -44,6 +44,7 @@ type rule struct {
 type profilesDocument struct {
 	Version  int       `json:"version"`
 	Profiles []profile `json:"profiles"`
+	Roles    []role    `json:"roles"`
 }
 
 type profile struct {
@@ -52,6 +53,29 @@ type profile struct {
 	Instructions string `json:"instructions,omitempty"`
 	File         string `json:"file,omitempty"`
 }
+
+type role struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	Kind         string `json:"kind"`
+	Instructions string `json:"instructions,omitempty"`
+	File         string `json:"file,omitempty"`
+}
+
+// Role is a validated project-defined specialization. Its Kind is deliberately
+// limited to Gator's built-in capability classes; a role never grants new
+// filesystem, command, network, extension, or delegation authority.
+type Role struct {
+	Name         string
+	Description  string
+	Kind         string
+	Instructions string
+}
+
+const (
+	RoleReadOnly = "readonly"
+	RoleWriter   = "writer"
+)
 
 // Load collects root guidance, directory-scoped AGENTS files for the requested
 // paths, and matching declarative .gator/rules.json rules. Earlier layers are
@@ -155,55 +179,28 @@ func LoadWithProfile(repository string, scopes []string, name string) (Set, erro
 	if err != nil {
 		return Set{}, err
 	}
-	contents, err := root.ReadRegularFile(".gator/agents.json", maxFileBytes)
+	document, err := loadProfilesDocument(root)
 	if err != nil {
-		if isMissingFileError(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return Set{}, fmt.Errorf("agent profile %q is not configured", name)
 		}
-		return Set{}, fmt.Errorf("read agent profiles: %w", err)
+		return Set{}, err
 	}
-	var document profilesDocument
-	decoder := json.NewDecoder(strings.NewReader(string(contents)))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&document); err != nil {
-		return Set{}, fmt.Errorf("decode agent profiles: %w", err)
+	if err := validateProfilesDocument(document); err != nil {
+		return Set{}, err
 	}
-	if err := requireEOF(decoder); err != nil {
-		return Set{}, fmt.Errorf("decode agent profiles: %w", err)
-	}
-	if document.Version != 1 || len(document.Profiles) > 64 {
-		return Set{}, errors.New("agent profiles have an unsupported version or too many entries")
-	}
-	seen := make(map[string]struct{}, len(document.Profiles))
 	for _, candidate := range document.Profiles {
-		if !validProfileName(candidate.Name) {
-			return Set{}, fmt.Errorf("invalid agent profile %q", candidate.Name)
-		}
-		if _, duplicate := seen[candidate.Name]; duplicate {
-			return Set{}, fmt.Errorf("agent profile %q is repeated", candidate.Name)
-		}
-		seen[candidate.Name] = struct{}{}
-		if (strings.TrimSpace(candidate.Instructions) == "") == (strings.TrimSpace(candidate.File) == "") {
-			return Set{}, fmt.Errorf("agent profile %q requires exactly one of instructions or file", candidate.Name)
-		}
 		if candidate.Name != name {
 			continue
 		}
-		body := strings.TrimSpace(candidate.Instructions)
+		body, profileFile, err := loadAgentInstructions(root, candidate.Name, candidate.Instructions, candidate.File, "profile")
+		if err != nil {
+			return Set{}, err
+		}
 		files := append([]string(nil), set.Files...)
 		files = append(files, ".gator/agents.json")
-		if candidate.File != "" {
-			path := filepath.ToSlash(strings.TrimSpace(candidate.File))
-			path = pathpkgClean(path)
-			if !strings.HasPrefix(path, ".gator/") {
-				return Set{}, fmt.Errorf("agent profile %q file must stay below .gator", candidate.Name)
-			}
-			contents, err := root.ReadRegularFile(filepath.FromSlash(path), maxFileBytes)
-			if err != nil {
-				return Set{}, fmt.Errorf("read agent profile %q: %w", candidate.Name, err)
-			}
-			body = strings.TrimSpace(string(contents))
-			files = append(files, path)
+		if profileFile != "" {
+			files = append(files, profileFile)
 		}
 		section := "Instructions from selected agent profile " + candidate.Name + ":\n" + body
 		if len(set.Content)+len(section) > maxCombinedBytes {
@@ -217,6 +214,118 @@ func LoadWithProfile(repository string, scopes []string, name string) (Set, erro
 		return set, nil
 	}
 	return Set{}, fmt.Errorf("agent profile %q is not configured", name)
+}
+
+// LoadRoles loads validated project-defined subagent specializations. Roles
+// are non-executable prompt data and remain constrained by their fixed Kind.
+// A missing role file is normal for projects which only use profiles.
+func LoadRoles(repository string) ([]Role, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, err
+	}
+	document, err := loadProfilesDocument(root)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if err := validateProfilesDocument(document); err != nil {
+		return nil, err
+	}
+	result := make([]Role, 0, len(document.Roles))
+	for _, candidate := range document.Roles {
+		body, _, err := loadAgentInstructions(root, candidate.Name, candidate.Instructions, candidate.File, "role")
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, Role{Name: candidate.Name, Description: candidate.Description, Kind: candidate.Kind, Instructions: body})
+	}
+	return result, nil
+}
+
+func loadProfilesDocument(root workspace.Root) (profilesDocument, error) {
+	contents, err := root.ReadRegularFile(".gator/agents.json", maxFileBytes)
+	if err != nil {
+		if isMissingFileError(err) {
+			return profilesDocument{}, fs.ErrNotExist
+		}
+		return profilesDocument{}, fmt.Errorf("read agent profiles: %w", err)
+	}
+	var document profilesDocument
+	decoder := json.NewDecoder(strings.NewReader(string(contents)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&document); err != nil {
+		return profilesDocument{}, fmt.Errorf("decode agent profiles: %w", err)
+	}
+	if err := requireEOF(decoder); err != nil {
+		return profilesDocument{}, fmt.Errorf("decode agent profiles: %w", err)
+	}
+	return document, nil
+}
+
+func validateProfilesDocument(document profilesDocument) error {
+	if document.Version != 1 || len(document.Profiles) > 64 || len(document.Roles) > 32 {
+		return errors.New("agent profiles have an unsupported version or too many entries")
+	}
+	profiles := make(map[string]struct{}, len(document.Profiles))
+	for _, candidate := range document.Profiles {
+		if !validProfileName(candidate.Name) {
+			return fmt.Errorf("invalid agent profile %q", candidate.Name)
+		}
+		if _, duplicate := profiles[candidate.Name]; duplicate {
+			return fmt.Errorf("agent profile %q is repeated", candidate.Name)
+		}
+		profiles[candidate.Name] = struct{}{}
+		if err := validateAgentInstructions(candidate.Name, candidate.Instructions, candidate.File, "profile"); err != nil {
+			return err
+		}
+	}
+	roles := make(map[string]struct{}, len(document.Roles))
+	for _, candidate := range document.Roles {
+		if !validProfileName(candidate.Name) {
+			return fmt.Errorf("invalid agent role %q", candidate.Name)
+		}
+		if _, duplicate := roles[candidate.Name]; duplicate {
+			return fmt.Errorf("agent role %q is repeated", candidate.Name)
+		}
+		roles[candidate.Name] = struct{}{}
+		if candidate.Kind != RoleReadOnly && candidate.Kind != RoleWriter {
+			return fmt.Errorf("agent role %q has unsupported kind %q", candidate.Name, candidate.Kind)
+		}
+		if description := strings.TrimSpace(candidate.Description); description == "" || len(description) > 512 || strings.ContainsAny(description, "\r\n") {
+			return fmt.Errorf("agent role %q requires a one-line description no longer than 512 bytes", candidate.Name)
+		}
+		if err := validateAgentInstructions(candidate.Name, candidate.Instructions, candidate.File, "role"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateAgentInstructions(name, inline, file, kind string) error {
+	if (strings.TrimSpace(inline) == "") == (strings.TrimSpace(file) == "") {
+		return fmt.Errorf("agent %s %q requires exactly one of instructions or file", kind, name)
+	}
+	return nil
+}
+
+func loadAgentInstructions(root workspace.Root, name, inline, file, kind string) (string, string, error) {
+	body := strings.TrimSpace(inline)
+	if file == "" {
+		return body, "", nil
+	}
+	path := filepath.ToSlash(strings.TrimSpace(file))
+	path = pathpkgClean(path)
+	if !strings.HasPrefix(path, ".gator/") {
+		return "", "", fmt.Errorf("agent %s %q file must stay below .gator", kind, name)
+	}
+	contents, err := root.ReadRegularFile(filepath.FromSlash(path), maxFileBytes)
+	if err != nil {
+		return "", "", fmt.Errorf("read agent %s %q: %w", kind, name, err)
+	}
+	return strings.TrimSpace(string(contents)), path, nil
 }
 
 func validProfileName(value string) bool {

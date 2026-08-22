@@ -159,6 +159,7 @@ func (t writerTool) run(ctx context.Context, assignment string) delegatedWriterR
 	childRequest.Attachments = nil
 	childRequest.Steering = nil
 	childRequest.OnEvent = nil
+	childRequest.OnTerminalAttachment = nil
 	childRequest.DisableWriterDelegation = true
 	childRequest.AllowedCommands = tools.MergeArgvLists(t.request.AllowedCommands, t.remembered.Snapshot())
 	childRequest.System = joinInstructions(t.request.System, writerSystemPrompt())
