@@ -2,6 +2,8 @@
 package workspace
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -129,6 +131,51 @@ func (r Root) ReadRegularFile(path string, maxBytes int64) ([]byte, error) {
 		return nil, fileSizeLimitError(path, maxBytes)
 	}
 	return contents, nil
+}
+
+// SHA256RegularFile hashes a bounded regular file through a descriptor-rooted
+// workspace path. It avoids copying executable payloads into memory merely to
+// pin their identity in a trusted configuration record.
+func (r Root) SHA256RegularFile(path string, maxBytes int64) (string, error) {
+	if r.path == "" {
+		return "", errors.New("workspace root is not initialized")
+	}
+	if maxBytes < 1 {
+		return "", errors.New("maximum file size must be positive")
+	}
+	cleaned, err := cleanRelativePath(path)
+	if err != nil {
+		return "", err
+	}
+	directory, err := os.OpenRoot(r.path)
+	if err != nil {
+		return "", fmt.Errorf("open workspace root: %w", err)
+	}
+	defer directory.Close()
+	file, err := directory.Open(cleaned)
+	if err != nil {
+		return "", fmt.Errorf("open %q: %w", path, err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("stat %q: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("path %q is not a regular file", path)
+	}
+	if info.Size() > maxBytes {
+		return "", fileSizeLimitError(path, maxBytes)
+	}
+	hash := sha256.New()
+	read, err := io.Copy(hash, io.LimitReader(file, maxBytes+1))
+	if err != nil {
+		return "", fmt.Errorf("hash %q: %w", path, err)
+	}
+	if read > maxBytes {
+		return "", fileSizeLimitError(path, maxBytes)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func fileSizeLimitError(path string, maxBytes int64) error {

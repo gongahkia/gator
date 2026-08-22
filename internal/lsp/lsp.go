@@ -29,6 +29,7 @@ const (
 	manifestPath    = ".gator/lsp.json"
 	manifestVersion = 1
 	maxManifest     = 64 * 1024
+	maxExecutable   = 128 * 1024 * 1024
 	maxServers      = 32
 	maxFrame        = 256 * 1024
 	maxDiagnostics  = 128
@@ -149,7 +150,7 @@ func loadManifest(root workspace.Root) (manifest, string, error) {
 	_, _ = digest.Write([]byte(manifestPath + "\x00"))
 	_, _ = digest.Write(contents)
 	seen := make(map[string]struct{}, len(document.Servers))
-	local := make(map[string][]byte)
+	local := make(map[string]string)
 	for index, specification := range document.Servers {
 		if err := validateServer(specification); err != nil {
 			return manifest{}, "", fmt.Errorf("LSP server %d: %w", index+1, err)
@@ -160,7 +161,7 @@ func loadManifest(root workspace.Root) (manifest, string, error) {
 		seen[specification.Name] = struct{}{}
 		path := filepath.ToSlash(specification.Command[0])
 		if _, found := local[path]; !found {
-			executable, err := executableContents(root, path)
+			executable, err := executableHash(root, path)
 			if err != nil {
 				return manifest{}, "", fmt.Errorf("LSP server %q: %w", specification.Name, err)
 			}
@@ -174,7 +175,7 @@ func loadManifest(root workspace.Root) (manifest, string, error) {
 	sort.Strings(paths)
 	for _, path := range paths {
 		_, _ = digest.Write([]byte("\x00" + path + "\x00"))
-		_, _ = digest.Write(local[path])
+		_, _ = digest.Write([]byte(local[path]))
 	}
 	return document, hex.EncodeToString(digest.Sum(nil)), nil
 }
@@ -205,16 +206,16 @@ func safeRelative(value string) bool {
 	return clean != "." && clean != ".." && !strings.HasPrefix(clean, ".."+string(filepath.Separator))
 }
 
-func executableContents(root workspace.Root, relative string) ([]byte, error) {
+func executableHash(root workspace.Root, relative string) (string, error) {
 	resolved, err := root.ResolveFile(filepath.FromSlash(relative))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	info, err := os.Lstat(resolved)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
-		return nil, errors.New("LSP executable must be an executable regular file")
+		return "", errors.New("LSP executable must be an executable regular file")
 	}
-	return root.ReadRegularFile(filepath.FromSlash(relative), maxManifest)
+	return root.SHA256RegularFile(filepath.FromSlash(relative), maxExecutable)
 }
 
 // Tool adapts one local LSP server to the agent tool contract.
