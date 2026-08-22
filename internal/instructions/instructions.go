@@ -62,9 +62,6 @@ func Load(repository string, scopes []string) (Set, error) {
 			}
 		}
 		contents, err := root.ReadRegularFile(relative, maxFileBytes)
-		if errors.Is(err, filepath.ErrBadPattern) { // defensive: never expected from a fixed path.
-			return err
-		}
 		if err != nil {
 			if isMissingFileError(err) {
 				return nil

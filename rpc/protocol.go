@@ -33,6 +33,7 @@ type Params struct {
 	Model     string     `json:"model,omitempty"`
 	BaseURL   string     `json:"base_url,omitempty"`
 	Verify    [][]string `json:"verify,omitempty"`
+	Scopes    []string   `json:"scopes,omitempty"`
 	MaxSteps  int        `json:"max_steps,omitempty"`
 	Mode      string     `json:"mode,omitempty"`
 	StatePath string     `json:"state_path,omitempty"`

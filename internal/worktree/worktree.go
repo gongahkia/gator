@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -28,11 +29,56 @@ type Worktree struct {
 	Root       workspace.Root
 }
 
+// Options describes the explicit setup that may be applied to a fresh
+// worktree. CopyIgnoredFiles is deliberately opt-in because such files often
+// contain credentials and become model-accessible after copying.
+type Options struct {
+	BaseRef          string
+	CopyIgnoredFiles bool
+}
+
+type ignoredFile struct {
+	path string
+	data []byte
+}
+
 // Create adds a detached worktree at a sibling location of the source
 // repository. Keeping it outside the active checkout prevents the run's files
 // and metadata from being confused with the developer's own changes.
 func Create(ctx context.Context, repositoryPath, runID string) (Worktree, error) {
-	return create(ctx, repositoryPath, runID, "HEAD")
+	return CreateWithOptions(ctx, repositoryPath, runID, Options{})
+}
+
+// CreateWithOptions creates a detached worktree from HEAD or an explicitly
+// selected Git revision. It can copy only the exact ignored files listed in a
+// tracked .gator/worktreeinclude file when the caller explicitly opts in.
+func CreateWithOptions(ctx context.Context, repositoryPath, runID string, options Options) (Worktree, error) {
+	repository, err := repositoryRoot(ctx, repositoryPath)
+	if err != nil {
+		return Worktree{}, err
+	}
+	revisionSpec := "HEAD"
+	if strings.TrimSpace(options.BaseRef) != "" {
+		revisionSpec, err = resolveRevision(ctx, repository, options.BaseRef)
+		if err != nil {
+			return Worktree{}, err
+		}
+	}
+	var setup []ignoredFile
+	if options.CopyIgnoredFiles {
+		setup, err = ignoredFileSetup(ctx, repository)
+		if err != nil {
+			return Worktree{}, err
+		}
+	}
+	worktree, err := create(ctx, repository, runID, revisionSpec)
+	if err != nil {
+		return Worktree{}, err
+	}
+	if err := copyIgnoredFiles(worktree.Root, setup); err != nil {
+		return worktree, fmt.Errorf("copy opted-in ignored files into retained worktree: %w", err)
+	}
+	return worktree, nil
 }
 
 // CreateAtRevision creates an isolated worktree at a verified immutable Git
@@ -43,6 +89,21 @@ func CreateAtRevision(ctx context.Context, repositoryPath, runID, revisionSpec s
 		return Worktree{}, fmt.Errorf("invalid immutable worktree revision %q", revisionSpec)
 	}
 	return create(ctx, repositoryPath, runID, revisionSpec)
+}
+
+// CreateAtReference resolves an explicitly selected Git ref to an immutable
+// commit before creating the worktree. This avoids a branch moving between
+// selection and worktree creation.
+func CreateAtReference(ctx context.Context, repositoryPath, runID, reference string) (Worktree, error) {
+	repository, err := repositoryRoot(ctx, repositoryPath)
+	if err != nil {
+		return Worktree{}, err
+	}
+	revisionSpec, err := resolveRevision(ctx, repository, reference)
+	if err != nil {
+		return Worktree{}, err
+	}
+	return create(ctx, repository, runID, revisionSpec)
 }
 
 func create(ctx context.Context, repositoryPath, runID, revisionSpec string) (Worktree, error) {
@@ -141,6 +202,120 @@ func repositoryRoot(ctx context.Context, path string) (string, error) {
 		return "", fmt.Errorf("resolve Git repository root: %w", err)
 	}
 	return canonical, nil
+}
+
+func resolveRevision(ctx context.Context, repository, reference string) (string, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" || strings.ContainsAny(reference, "\x00\r\n") {
+		return "", fmt.Errorf("invalid worktree base reference %q", reference)
+	}
+	command := exec.CommandContext(ctx, "git", "rev-parse", "--verify", "--end-of-options", reference+"^{commit}")
+	command.Dir = repository
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return "", commandError("resolve worktree base reference", err, output)
+	}
+	revision := strings.TrimSpace(string(output))
+	if !commitPattern.MatchString(revision) {
+		return "", fmt.Errorf("Git returned an invalid worktree base revision for %q", reference)
+	}
+	return revision, nil
+}
+
+const (
+	worktreeIncludePath = ".gator/worktreeinclude"
+	maxSetupFiles       = 128
+	maxSetupFileBytes   = 8 * 1024 * 1024
+	maxSetupTotalBytes  = 32 * 1024 * 1024
+)
+
+func ignoredFileSetup(ctx context.Context, repository string) ([]ignoredFile, error) {
+	if err := requireTrackedSetupFile(ctx, repository); err != nil {
+		return nil, err
+	}
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, err
+	}
+	contents, err := root.ReadRegularFile(worktreeIncludePath, 64*1024)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", worktreeIncludePath, err)
+	}
+	var files []ignoredFile
+	seen := make(map[string]struct{})
+	total := 0
+	for lineNumber, line := range strings.Split(string(contents), "\n") {
+		relative := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if relative == "" || strings.HasPrefix(relative, "#") {
+			continue
+		}
+		if len(files) == maxSetupFiles {
+			return nil, fmt.Errorf("%s lists more than %d files", worktreeIncludePath, maxSetupFiles)
+		}
+		relative = filepath.ToSlash(relative)
+		clean := path.Clean(relative)
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") {
+			return nil, fmt.Errorf("%s line %d is not a repository-relative file", worktreeIncludePath, lineNumber+1)
+		}
+		if _, duplicate := seen[clean]; duplicate {
+			return nil, fmt.Errorf("%s lists %q more than once", worktreeIncludePath, clean)
+		}
+		if err := requireIgnored(ctx, repository, clean); err != nil {
+			return nil, err
+		}
+		data, err := root.ReadRegularFile(filepath.FromSlash(clean), maxSetupFileBytes)
+		if err != nil {
+			return nil, fmt.Errorf("read ignored setup file %q: %w", clean, err)
+		}
+		if total+len(data) > maxSetupTotalBytes {
+			return nil, fmt.Errorf("ignored setup files exceed the %d MiB combined limit", maxSetupTotalBytes/(1024*1024))
+		}
+		seen[clean] = struct{}{}
+		total += len(data)
+		files = append(files, ignoredFile{path: clean, data: data})
+	}
+	return files, nil
+}
+
+func requireTrackedSetupFile(ctx context.Context, repository string) error {
+	command := exec.CommandContext(ctx, "git", "ls-files", "--error-unmatch", "--", worktreeIncludePath)
+	command.Dir = repository
+	if output, err := command.CombinedOutput(); err != nil {
+		return commandError("require tracked "+worktreeIncludePath, err, output)
+	}
+	return nil
+}
+
+func requireIgnored(ctx context.Context, repository, relative string) error {
+	command := exec.CommandContext(ctx, "git", "check-ignore", "-q", "--", relative)
+	command.Dir = repository
+	if output, err := command.CombinedOutput(); err != nil {
+		if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {
+			return fmt.Errorf("worktree setup file %q is not ignored; add it to .gitignore before copying it", relative)
+		}
+		return commandError("check ignored worktree setup file", err, output)
+	}
+	return nil
+}
+
+func copyIgnoredFiles(root workspace.Root, files []ignoredFile) error {
+	directory, err := os.OpenRoot(root.Path())
+	if err != nil {
+		return fmt.Errorf("open target worktree root: %w", err)
+	}
+	defer directory.Close()
+	for _, file := range files {
+		parent := path.Dir(file.path)
+		if parent != "." {
+			if err := directory.MkdirAll(filepath.FromSlash(parent), 0o700); err != nil {
+				return fmt.Errorf("create target directory for %q: %w", file.path, err)
+			}
+		}
+		if err := directory.WriteFile(filepath.FromSlash(file.path), file.data, 0o600); err != nil {
+			return fmt.Errorf("write ignored setup file %q: %w", file.path, err)
+		}
+	}
+	return nil
 }
 
 func commandError(action string, err error, output []byte) error {

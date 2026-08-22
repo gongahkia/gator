@@ -145,6 +145,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		BaseURL:         m.config.BaseURL,
 		MaxSteps:        m.config.MaxSteps,
 		Verification:    verification,
+		Scopes:          contextReferencePaths(references),
 		StateDir:        m.config.StateDir,
 		ThreadID:        m.threadID,
 		Images:          images,

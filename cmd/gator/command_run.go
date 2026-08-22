@@ -40,6 +40,8 @@ func runTask(arguments []string, out io.Writer) error {
 	flags.Var(&verification, "verify", "required verification command as a whitespace-separated argv")
 	var allowedCommands verificationFlags
 	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
+	var scopes stringFlags
+	flags.Var(&scopes, "scope", "repository-relative file or directory used to select project instructions (repeatable)")
 	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
 	sandboxMode := flags.String("sandbox", "", "execution sandbox: strict or off (default from config)")
 	networkMode := flags.String("network", "", "sandbox network mode: deny or allow (default from config)")
@@ -86,6 +88,7 @@ func runTask(arguments []string, out io.Writer) error {
 		BaseURL:         *baseURL,
 		MaxSteps:        *maxSteps,
 		Verification:    verification,
+		Scopes:          scopes,
 		AllowedCommands: allowedCommands,
 		Approve:         cliCommandApprover(*trustCommands),
 		OnEvent:         printer.Print,
@@ -193,6 +196,21 @@ func stdinIsTTY() bool {
 }
 
 type verificationFlags [][]string
+
+type stringFlags []string
+
+func (v *stringFlags) String() string {
+	return strings.Join(*v, ", ")
+}
+
+func (v *stringFlags) Set(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return errors.New("scope must not be empty")
+	}
+	*v = append(*v, value)
+	return nil
+}
 
 func (v *verificationFlags) String() string {
 	commands := make([]string, 0, len(*v))
