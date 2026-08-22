@@ -19,7 +19,7 @@ import (
 )
 
 func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string) (Outcome, error) {
-	projectInstructionSet, err := instructions.Load(isolated.Repository, request.Scopes)
+	projectInstructionSet, err := instructions.LoadWithProfile(isolated.Repository, request.Scopes, request.Profile)
 	if err != nil {
 		return Outcome{Worktree: isolated}, err
 	}
@@ -202,6 +202,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		MaxSteps:            request.MaxSteps,
 		Verification:        request.Verification,
 		Scopes:              request.Scopes,
+		Profile:             request.Profile,
 		ThreadID:            request.ThreadID,
 		Mode:                request.Mode.String(),
 		HooksHash:           hookEngine.Hash(),

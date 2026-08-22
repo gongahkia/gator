@@ -47,6 +47,7 @@ type Session struct {
 	MaxSteps            int                   `json:"max_steps"`
 	Verification        [][]string            `json:"verification"`
 	Scopes              []string              `json:"scopes,omitempty"`
+	Profile             string                `json:"profile,omitempty"`
 	ThreadID            string                `json:"thread_id,omitempty"`
 	Mode                string                `json:"mode,omitempty"`
 	HooksHash           string                `json:"hooks_hash,omitempty"`

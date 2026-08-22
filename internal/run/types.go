@@ -27,6 +27,7 @@ type Request struct {
 	// Scopes identify repository-relative files or directories the task is
 	// focused on. They select directory guidance and declarative project rules.
 	Scopes          []string
+	Profile         string
 	AllowedCommands [][]string
 	Approve         func(context.Context, []string) (tools.CommandDecision, error)
 	System          string

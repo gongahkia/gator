@@ -426,7 +426,8 @@ grants, not defaults.
 
 Gator resolves root, `.gator`, and scope-specific `AGENTS.md` guidance for
 each `--scope` path. `.gator/rules.json` adds bounded path rules without
-granting executable capability. Project hooks and MCP configuration are
+granting executable capability. A developer may select a named declarative
+profile from `.gator/agents.json` with `--profile`. Project hooks and MCP configuration are
 different: `gator hook trust` pins the hash of `.gator/hooks.json` plus its
 declared executables, and `gator mcp trust` pins `.gator/mcp.json` plus local
 stdio executables. A changed bundle is disabled until re-trusted. Trusted hooks

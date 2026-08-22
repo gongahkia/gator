@@ -8,7 +8,7 @@ output. Gator never writes human-formatted output in this mode.
 The protocol has one way to start work: `run` with `mode: "execute"` and an
 explicit `verify` argv list, or `mode: "plan"` for enforced read-only work.
 This keeps the same worktree, verifier, and tool policy contract as the TUI.
-`run` also accepts `scopes`, `base_ref`, `copy_ignored_files`, and `scouts`.
+`run` also accepts `scopes`, `profile`, `base_ref`, `copy_ignored_files`, and `scouts`.
 Scopes select layered project instructions; a base ref is resolved to an
 immutable commit; copying ignored setup files remains opt-in; and scouts are
 bounded read-only subagent assignments. This is Gator's own versioned JSONL
