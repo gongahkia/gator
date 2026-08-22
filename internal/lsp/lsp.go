@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -389,6 +390,7 @@ type nativeClient struct {
 	input   io.WriteCloser
 	output  *bufio.Reader
 	command interface{ Wait() error }
+	kill    func() error
 	cleanup func()
 	next    int64
 }
@@ -417,7 +419,7 @@ func connect(ctx context.Context, root workspace.Root, specification server) (di
 		prepared.Cleanup()
 		return nil, err
 	}
-	client := &nativeClient{input: input, output: bufio.NewReaderSize(output, maxFrame), command: prepared.Command, cleanup: prepared.Cleanup}
+	client := &nativeClient{input: input, output: bufio.NewReaderSize(output, maxFrame), command: prepared.Command, kill: prepared.Command.Process.Kill, cleanup: prepared.Cleanup}
 	if err := client.initialize(ctx, root.Path()); err != nil {
 		_ = client.Close()
 		return nil, err
@@ -473,11 +475,29 @@ func (c *nativeClient) Diagnostics(ctx context.Context, path string) ([]Diagnost
 }
 
 func (c *nativeClient) Close() error {
-	_, _ = c.call(context.Background(), "shutdown", nil)
-	_ = c.notify("exit", nil)
+	shutdown := make(chan error, 1)
+	go func() {
+		_, err := c.call(context.Background(), "shutdown", nil)
+		shutdown <- err
+	}()
+	var shutdownErr error
+	select {
+	case shutdownErr = <-shutdown:
+		if shutdownErr == nil {
+			_ = c.notify("exit", nil)
+		}
+	case <-time.After(2 * time.Second):
+		shutdownErr = errors.New("LSP server did not acknowledge shutdown within 2 seconds")
+		if c.kill != nil {
+			_ = c.kill()
+		}
+	}
 	_ = c.input.Close()
 	err := c.command.Wait()
 	c.cleanup()
+	if shutdownErr != nil {
+		return shutdownErr
+	}
 	return err
 }
 

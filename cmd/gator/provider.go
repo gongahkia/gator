@@ -124,7 +124,11 @@ func executorWithExtensions(backend agent.Model, settings config.Settings) (gato
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
-	return gatorrun.Executor{Model: backend, Extensions: extensions, HookTrusts: settings.HookTrusts, LSPTrusts: settings.LSPTrusts, MCPTrusts: settings.MCPTrusts, Sandbox: settings.Execution}, nil
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	return gatorrun.Executor{Model: backend, Extensions: extensions, HookTrusts: settings.HookTrusts, LSPTrusts: settings.LSPTrusts, MCPTrusts: settings.MCPTrusts, MCPCredentials: credentials, Sandbox: settings.Execution}, nil
 }
 
 // resolveConfiguredProvider uses the persisted custom-model catalog first,

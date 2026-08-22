@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/lsp"
@@ -95,5 +96,9 @@ type Executor struct {
 	HookTrusts []hooks.Trust
 	LSPTrusts  []lsp.Trust
 	MCPTrusts  []mcp.Trust
-	Sandbox    sandbox.Policy
+	// MCPCredentials is the private Gator credential store used only for an
+	// exact configured Streamable HTTP MCP resource. A zero store leaves remote
+	// servers unauthenticated rather than reading another application's state.
+	MCPCredentials auth.Store
+	Sandbox        sandbox.Policy
 }

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -89,6 +90,17 @@ func (s Set) Hash() string     { return s.configuredHash }
 // Load starts and initializes each trusted server. A valid but untrusted
 // project manifest produces an inert set, rather than starting arbitrary code.
 func Load(ctx context.Context, worktreePath, trustedHash string) (Set, error) {
+	return load(ctx, worktreePath, trustedHash, auth.Store{})
+}
+
+// LoadWithCredentials is Load with Gator's private credential store available
+// to explicitly trusted Streamable HTTP servers. Credentials are selected only
+// by an exact canonical MCP resource identifier.
+func LoadWithCredentials(ctx context.Context, worktreePath, trustedHash string, credentials auth.Store) (Set, error) {
+	return load(ctx, worktreePath, trustedHash, credentials)
+}
+
+func load(ctx context.Context, worktreePath, trustedHash string, credentials auth.Store) (Set, error) {
 	root, err := workspace.Open(worktreePath)
 	if err != nil {
 		return Set{}, err
@@ -106,7 +118,7 @@ func Load(ctx context.Context, worktreePath, trustedHash string) (Set, error) {
 	}
 	set.trusted = true
 	for _, specification := range document.Servers {
-		connected, err := connect(ctx, root, specification)
+		connected, err := connect(ctx, root, specification, credentials)
 		if err != nil {
 			_ = set.Close()
 			return Set{}, fmt.Errorf("connect MCP server %q: %w", specification.Name, err)
@@ -271,9 +283,13 @@ func executableContents(root workspace.Root, relative string) ([]byte, error) {
 	return root.ReadRegularFile(filepath.FromSlash(relative), maxManifest)
 }
 
-func connect(ctx context.Context, root workspace.Root, specification server) (client, error) {
+func connect(ctx context.Context, root workspace.Root, specification server, credentials auth.Store) (client, error) {
 	if specification.Transport == "streamable_http" {
-		return newHTTPClient(specification.URL), nil
+		token, configured, err := accessToken(ctx, credentials, specification.URL, time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("load OAuth credential for MCP server %q: %w", specification.Name, err)
+		}
+		return newAuthorizedHTTPClient(specification.URL, token, specification.Name, configured), nil
 	}
 	policy := sandbox.DefaultPolicy()
 	if specification.Network == "allow" {
@@ -403,6 +419,9 @@ func (c *stdioClient) Close() error {
 type httpClient struct {
 	endpoint string
 	client   *http.Client
+	access   string
+	server   string
+	oauth    bool
 	mu       sync.Mutex
 	next     int64
 	session  string
@@ -410,6 +429,14 @@ type httpClient struct {
 
 func newHTTPClient(endpoint string) *httpClient {
 	return &httpClient{endpoint: endpoint, client: &http.Client{Timeout: 2 * time.Minute}}
+}
+
+func newAuthorizedHTTPClient(endpoint, access, server string, oauth bool) *httpClient {
+	client := newHTTPClient(endpoint)
+	client.access = access
+	client.server = server
+	client.oauth = oauth
+	return client
 }
 func (c *httpClient) Call(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	c.mu.Lock()
@@ -427,6 +454,9 @@ func (c *httpClient) Call(ctx context.Context, method string, params any) (json.
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json, text/event-stream")
 	request.Header.Set("MCP-Protocol-Version", "2025-03-26")
+	if c.access != "" {
+		request.Header.Set("Authorization", "Bearer "+c.access)
+	}
 	if c.session != "" {
 		request.Header.Set("Mcp-Session-Id", c.session)
 	}
@@ -436,6 +466,12 @@ func (c *httpClient) Call(ctx context.Context, method string, params any) (json.
 	}
 	defer response.Body.Close()
 	if response.StatusCode/100 != 2 {
+		if response.StatusCode == http.StatusUnauthorized && c.server != "" {
+			if c.oauth {
+				return nil, fmt.Errorf("MCP HTTP server returned 401 Unauthorized; its stored OAuth credential is invalid or expired, run 'gator mcp login %s'", c.server)
+			}
+			return nil, fmt.Errorf("MCP HTTP server returned 401 Unauthorized; authenticate it with 'gator mcp login %s'", c.server)
+		}
 		return nil, fmt.Errorf("MCP HTTP server returned %s", response.Status)
 	}
 	if session := response.Header.Get("Mcp-Session-Id"); session != "" {

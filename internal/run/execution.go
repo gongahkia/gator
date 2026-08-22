@@ -28,7 +28,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project hooks: %w", err)
 	}
-	mcpSet, err := mcp.Load(ctx, isolated.Path, e.mcpTrust(isolated.Repository))
+	mcpSet, err := mcp.LoadWithCredentials(ctx, isolated.Path, e.mcpTrust(isolated.Repository), e.MCPCredentials)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project MCP servers: %w", err)
 	}
@@ -238,6 +238,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		ThreadID:            request.ThreadID,
 		Mode:                request.Mode.String(),
 		HooksHash:           hookEngine.Hash(),
+		LSPHash:             lspSet.Hash(),
 		MCPHash:             mcpSet.Hash(),
 		Messages:            result.Messages,
 		ParentStatePath:     parentStatePath,
