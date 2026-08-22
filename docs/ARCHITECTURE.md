@@ -78,9 +78,21 @@ writer. Each scout receives only read/list/search and Git-inspection tools: no
 patching, process execution, extension, LSP, MCP, or recursive-delegation
 surface. The parent is paused while the batch runs, accepts at most eight
 scouts per run, receives no more than 8 KiB per report, and is told to treat
-all returned text as untrusted evidence. Gator intentionally has no concurrent
-writer-agent facility until it can provide an explicit independent-worktree,
-review, and merge contract.
+all returned text as untrusted evidence.
+
+Execute mode also exposes one-at-a-time `delegate_writer` calls (at most two
+per primary run). Before a writer begins, Gator exports the parent worktree's
+state relative to its immutable base, restores that snapshot into a new
+detached child worktree, and writes an internal detached baseline commit. The
+child therefore reads the exact parent state but produces a clean patch that
+contains only its own delta. It reloads the same selected profile, verifier,
+sandbox policy, approval callback, and trusted extension/LSP/MCP configuration;
+recursive writer delegation is omitted from its tool surface. The parent is
+paused during the child run. Gator returns a bounded 512 KiB patch plus an
+8 KiB summary as untrusted review material but does not apply it: only a
+separate parent `apply_patch` call can transfer it. Larger or failed deltas
+remain in the child worktree for manual inspection. This is a safe local
+handoff primitive, not a parallel writer-team scheduler or conflict resolver.
 
 `gator acp` is a separate local stdio ACP v1 agent surface for editors. It
 maps ACP sessions to retained Gator threads, streams normalized model/tool

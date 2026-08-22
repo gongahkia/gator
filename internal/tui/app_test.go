@@ -199,7 +199,7 @@ func TestSubagentProgressAppearsInScrollableConversation(t *testing.T) {
 	if len(model.chat) == 0 || model.chat[len(model.chat)-1].author != chatSystem || !strings.Contains(model.chat[len(model.chat)-1].text, "subagents starting 2") {
 		t.Fatalf("subagent transcript entry = %#v", model.chat)
 	}
-	if model.activity.phase != activityInspecting || !strings.Contains(model.activity.detail, "read-only subagents") {
+	if model.activity.phase != activityInspecting || !strings.Contains(model.activity.detail, "subagent") {
 		t.Fatalf("subagent activity = %#v", model.activity)
 	}
 	if transcript := model.transcriptContent(); !strings.Contains(transcript, "subagents starting 2") {

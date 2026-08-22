@@ -457,8 +457,19 @@ worktree. Those fresh-context scouts run concurrently, can only read/list/search
 or inspect Git state, and see the primary agent's uncommitted changes. They
 cannot edit, run a command, access extensions, LSP, MCP, or recursively
 delegate. Each report is bounded to 8 KiB and explicitly framed as untrusted
-evidence; Gator permits at most eight dynamic scouts per primary run. This is
-deliberately not a writer-agent or autonomous merge mechanism.
+evidence; Gator permits at most eight dynamic scouts per primary run.
+
+Execute mode also exposes `delegate_writer` for one independent implementation
+task at a time (at most two per primary run). Gator snapshots the current
+isolated worktree into a separate retained writer worktree, establishes a clean
+internal baseline there, and returns only the writer's delta: a concise summary
+and, when it is at most 512 KiB, an explicitly reviewable patch. The primary
+agent is paused while the child runs and must make a separate `apply_patch`
+call to transfer a compatible patch; Gator never auto-merges it. The writer
+inherits the developer-selected profile, verifier, sandbox, approval policy,
+and trusted integrations, but cannot recursively create a writer. A larger or
+failed child delta remains in its retained worktree for manual inspection with
+`gator worktree list`.
 
 Execute mode also gives the native model a persistent terminal-task surface:
 `terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and
@@ -469,6 +480,10 @@ needs its own approval and is represented to the approval UI by a digest rather
 than the input bytes. Terminal tasks are stopped when the agent run ends. This
 is an agent-mediated task manager, not a direct user shell or terminal
 multiplexer.
+
+See the source-backed [terminal-harness capability audit](docs/COMPETITIVE_AUDIT.md)
+for the current comparison with Codex CLI, Claude Code, Cursor CLI, Pi, and
+OpenCode.
 
 ## Design principles
 
