@@ -36,6 +36,10 @@ const (
 type OAuthLoginOptions struct {
 	HTTPClient *http.Client
 	ClientID   string
+	// RedirectURL is an exact loopback redirect URI already registered to a
+	// pre-registered public client. It is required when that client does not
+	// permit an ephemeral port through Dynamic Client Registration.
+	RedirectURL string
 }
 
 // OAuthLogin owns a one-time browser authorization callback. It keeps PKCE
@@ -48,6 +52,52 @@ type OAuthLogin struct {
 	resource      string
 	tokenURL      string
 	clientID      string
+}
+
+// HTTPAuthorizationStatus is safe to display in a local status UI. It never
+// includes a token, client ID, authorization URL, or endpoint URL.
+type HTTPAuthorizationStatus struct {
+	Server        string
+	Authenticated bool
+	Expired       bool
+}
+
+// HTTPAuthorizationStatuses reports whether each configured Streamable HTTP
+// server has a private credential bound to its current exact resource. It does
+// not contact any remote service.
+func HTTPAuthorizationStatuses(repository string, credentials auth.Store, now time.Time) ([]HTTPAuthorizationStatus, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, err
+	}
+	document, _, err := loadManifest(root)
+	if err != nil {
+		return nil, err
+	}
+	statuses := make([]HTTPAuthorizationStatus, 0, len(document.Servers))
+	for _, specification := range document.Servers {
+		if specification.Transport != "streamable_http" {
+			continue
+		}
+		status := HTTPAuthorizationStatus{Server: specification.Name}
+		resource, err := canonicalResource(specification.URL)
+		if err != nil || strings.TrimSpace(credentials.Path()) == "" {
+			statuses = append(statuses, status)
+			continue
+		}
+		key, err := OAuthCredentialKey(resource)
+		if err != nil {
+			statuses = append(statuses, status)
+			continue
+		}
+		credential, found, err := credentials.Read(key)
+		if err == nil && found && credential.IsOAuth() && credential.Extra[extraResource] == resource && strings.TrimSpace(credential.Extra[extraClientID]) != "" && strings.TrimSpace(credential.Extra[extraTokenURL]) != "" {
+			status.Expired = credential.Expired(now)
+			status.Authenticated = !status.Expired
+		}
+		statuses = append(statuses, status)
+	}
+	return statuses, nil
 }
 
 // BeginOAuthLogin discovers the authorization server for one trusted
@@ -81,6 +131,7 @@ func BeginOAuthLogin(ctx context.Context, repository, serverName, trustedHash st
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
+	client = oauthHTTPClient(client)
 	protected, challengeScopes, err := discoverProtectedResource(ctx, client, resource)
 	if err != nil {
 		return nil, fmt.Errorf("discover MCP authorization server: %w", err)
@@ -96,8 +147,12 @@ func BeginOAuthLogin(ctx context.Context, repository, serverName, trustedHash st
 	if len(scopes) == 0 {
 		scopes = append([]string(nil), protected.ScopesSupported...)
 	}
+	clientID := strings.TrimSpace(options.ClientID)
+	if clientID != "" && strings.TrimSpace(options.RedirectURL) == "" {
+		return nil, errors.New("a pre-registered MCP OAuth client requires its exact loopback redirect URI; retry with 'gator mcp login --client-id CLIENT_ID --redirect-url LOOPBACK_URL " + serverName + "'")
+	}
 	flow := auth.BrowserFlow{
-		ClientID:           "gator-pending-registration",
+		ClientID:           clientID,
 		AuthorizationURL:   authorization.AuthorizationEndpoint,
 		TokenURL:           authorization.TokenEndpoint,
 		Scopes:             scopes,
@@ -107,38 +162,55 @@ func BeginOAuthLogin(ctx context.Context, repository, serverName, trustedHash st
 		RequireBearerToken: true,
 		HTTPClient:         client,
 	}
-	attempt, callback, err := auth.BeginEphemeralLoopbackFlow(flow, "/gator/mcp/oauth/callback")
-	if err != nil {
-		return nil, fmt.Errorf("start MCP OAuth callback: %w", err)
-	}
-	closeCallback := true
-	defer func() {
-		if closeCallback {
-			callback.Close()
+	var attempt auth.BrowserAttempt
+	var callback *auth.Callback
+	if strings.TrimSpace(options.RedirectURL) != "" {
+		if clientID == "" {
+			if authorization.RegistrationEndpoint == "" {
+				return nil, errors.New("MCP authorization server has no dynamic registration endpoint; register a public OAuth client and retry with 'gator mcp login --client-id CLIENT_ID --redirect-url LOOPBACK_URL " + serverName + "'")
+			}
+			clientID, err = registerPublicClient(ctx, client, authorization.RegistrationEndpoint, options.RedirectURL)
+			if err != nil {
+				return nil, fmt.Errorf("register public MCP OAuth client: %w", err)
+			}
 		}
-	}()
-	clientID := strings.TrimSpace(options.ClientID)
-	if clientID == "" {
-		clientID = previousClientID(credentials, resource)
-	}
-	if clientID == "" {
-		if authorization.RegistrationEndpoint == "" {
-			return nil, errors.New("MCP authorization server has no dynamic registration endpoint; register a public OAuth client and retry with 'gator mcp login " + serverName + " --client-id CLIENT_ID'")
-		}
-		clientID, err = registerPublicClient(ctx, client, authorization.RegistrationEndpoint, attempt.RedirectURL())
+		flow.ClientID = clientID
+		flow.RedirectURL = options.RedirectURL
+		attempt, err = auth.BeginBrowserFlow(flow)
 		if err != nil {
-			return nil, fmt.Errorf("register public MCP OAuth client: %w", err)
+			return nil, fmt.Errorf("start MCP OAuth flow: %w", err)
 		}
-	}
-	attempt, err = attempt.WithClientID(clientID)
-	if err != nil {
-		return nil, err
+		callback, err = attempt.StartCallback()
+		if err != nil {
+			return nil, fmt.Errorf("start MCP OAuth callback: %w", err)
+		}
+	} else {
+		flow.ClientID = "gator-pending-registration"
+		attempt, callback, err = auth.BeginEphemeralLoopbackFlow(flow, "/gator/mcp/oauth/callback")
+		if err != nil {
+			return nil, fmt.Errorf("start MCP OAuth callback: %w", err)
+		}
+		if clientID == "" {
+			if authorization.RegistrationEndpoint == "" {
+				callback.Close()
+				return nil, errors.New("MCP authorization server has no dynamic registration endpoint; register a public OAuth client and retry with 'gator mcp login --client-id CLIENT_ID --redirect-url LOOPBACK_URL " + serverName + "'")
+			}
+			clientID, err = registerPublicClient(ctx, client, authorization.RegistrationEndpoint, attempt.RedirectURL())
+			if err != nil {
+				callback.Close()
+				return nil, fmt.Errorf("register public MCP OAuth client: %w", err)
+			}
+		}
+		attempt, err = attempt.WithClientID(clientID)
+		if err != nil {
+			callback.Close()
+			return nil, err
+		}
 	}
 	key, err := OAuthCredentialKey(resource)
 	if err != nil {
 		return nil, err
 	}
-	closeCallback = false
 	return &OAuthLogin{attempt: attempt, callback: callback, credentials: credentials, credentialKey: key, resource: resource, tokenURL: authorization.TokenEndpoint, clientID: clientID}, nil
 }
 
@@ -199,6 +271,25 @@ func OAuthCredentialKey(endpoint string) (string, error) {
 	return "mcp-" + hex.EncodeToString(digest[:16]), nil
 }
 
+// OAuthCredentialKeyForServer resolves the current Streamable HTTP server
+// entry to its private credential-store key. It performs no network request
+// and is safe to use for an explicit logout operation.
+func OAuthCredentialKeyForServer(repository, serverName string) (string, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return "", err
+	}
+	document, _, err := loadManifest(root)
+	if err != nil {
+		return "", err
+	}
+	specification, found := findHTTPServer(document, serverName)
+	if !found {
+		return "", fmt.Errorf("Streamable HTTP MCP server %q is not configured", serverName)
+	}
+	return OAuthCredentialKey(specification.URL)
+}
+
 func findHTTPServer(document manifest, name string) (server, bool) {
 	for _, specification := range document.Servers {
 		if specification.Name == name && specification.Transport == "streamable_http" {
@@ -206,18 +297,6 @@ func findHTTPServer(document manifest, name string) (server, bool) {
 		}
 	}
 	return server{}, false
-}
-
-func previousClientID(credentials auth.Store, resource string) string {
-	key, err := OAuthCredentialKey(resource)
-	if err != nil {
-		return ""
-	}
-	credential, found, err := credentials.Read(key)
-	if err != nil || !found || credential.Extra[extraResource] != resource {
-		return ""
-	}
-	return strings.TrimSpace(credential.Extra[extraClientID])
 }
 
 func accessToken(ctx context.Context, credentials auth.Store, endpoint string, now time.Time) (string, bool, error) {
@@ -273,7 +352,7 @@ func discoverProtectedResource(ctx context.Context, client *http.Client, resourc
 	if err != nil {
 		return protectedResourceMetadata{}, nil, err
 	}
-	request.Header.Set("MCP-Protocol-Version", "2025-11-25")
+	request.Header.Set("MCP-Protocol-Version", protocolVersion)
 	response, err := client.Do(request)
 	if err != nil {
 		return protectedResourceMetadata{}, nil, err
@@ -440,12 +519,21 @@ func fetchJSON(ctx context.Context, client *http.Client, endpoint string) ([]byt
 	return contents, nil
 }
 
+// oauthHTTPClient keeps discovery, registration, and token posts on the exact
+// validated endpoint. Following an unexpected redirect could disclose a public
+// client registration body or authorization code to another origin.
+func oauthHTTPClient(source *http.Client) *http.Client {
+	clone := *source
+	clone.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &clone
+}
+
 func protectedMetadataURLs(resource string) []string {
 	parsed, err := url.Parse(resource)
 	if err != nil {
 		return nil
 	}
-	pathPart := strings.TrimPrefix(parsed.EscapedPath(), "/")
+	pathPart := strings.TrimPrefix(parsed.Path, "/")
 	base := *parsed
 	base.RawQuery = ""
 	base.Fragment = ""
@@ -466,7 +554,7 @@ func authorizationMetadataURLs(issuer string) []string {
 	if err != nil {
 		return nil
 	}
-	issuerPath := strings.Trim(parsed.EscapedPath(), "/")
+	issuerPath := strings.Trim(parsed.Path, "/")
 	base := *parsed
 	base.RawQuery = ""
 	base.Fragment = ""
@@ -528,10 +616,11 @@ func validateScopes(scopes []string) error {
 
 func bearerChallenge(values []string) (string, []string) {
 	for _, value := range values {
-		if len(value) < len("Bearer") || !strings.EqualFold(strings.TrimSpace(value[:min(len(value), len("Bearer"))]), "Bearer") {
+		start := bearerSchemeOffset(value)
+		if start < 0 {
 			continue
 		}
-		parameters := parseChallengeParameters(strings.TrimSpace(value[len("Bearer"):]))
+		parameters := parseChallengeParameters(strings.TrimSpace(value[start+len("Bearer"):]))
 		metadata := parameters["resource_metadata"]
 		if metadata == "" {
 			continue
@@ -546,6 +635,24 @@ func bearerChallenge(values []string) (string, []string) {
 		return metadata, scopes
 	}
 	return "", nil
+}
+
+func bearerSchemeOffset(value string) int {
+	lower := strings.ToLower(value)
+	for start := 0; start < len(lower); {
+		index := strings.Index(lower[start:], "bearer")
+		if index < 0 {
+			return -1
+		}
+		index += start
+		before := index == 0 || lower[index-1] == ',' || lower[index-1] == ' ' || lower[index-1] == '\t'
+		after := index+len("bearer") == len(lower) || lower[index+len("bearer")] == ' ' || lower[index+len("bearer")] == '\t'
+		if before && after {
+			return index
+		}
+		start = index + len("bearer")
+	}
+	return -1
 }
 
 func parseChallengeParameters(value string) map[string]string {

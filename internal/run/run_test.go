@@ -7,12 +7,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -143,10 +145,17 @@ func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
 	if !strings.Contains(model.requests[0].System, "enforced Plan mode") {
 		t.Fatalf("plan system prompt = %q", model.requests[0].System)
 	}
+	delegationAvailable := false
 	for _, tool := range model.requests[0].Tools {
 		if tool.Name == "apply_patch" || tool.Name == "run_command" {
 			t.Fatalf("plan tool surface included %q", tool.Name)
 		}
+		if tool.Name == "delegate_readonly" {
+			delegationAvailable = true
+		}
+	}
+	if !delegationAvailable {
+		t.Fatal("plan tool surface omitted read-only delegation")
 	}
 	current, err := journal.LoadSession(outcome.StatePath)
 	if err != nil {
@@ -161,6 +170,96 @@ func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
 	}
 	if thread.HeadStatePath != outcome.StatePath || thread.TurnCount != 1 {
 		t.Fatalf("saved thread = %#v", thread)
+	}
+}
+
+func TestExecutorExposesModelInvocableReadOnlyDelegation(t *testing.T) {
+	repository := featureRepository(t)
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "delegate", Name: "delegate_readonly", Arguments: json.RawMessage(`{"tasks":[{"task":"Inspect the feature package and report relevant tests."}]}`)}}},
+		{Text: "evidence: feature.go and feature_test.go are the relevant files."},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The read-only scout found the relevant implementation and tests; the worktree is ready for review."},
+	}}
+	outcome, err := (Executor{Model: model}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Inspect the feature package",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "delegated-scout-001",
+		MaxSteps:       6,
+		StateDir:       t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("execute with delegated scout: %v", err)
+	}
+	if !containsEvent(outcome.Events, agent.EventSubagent) {
+		t.Fatalf("delegated scout events were not retained: %#v", outcome.Events)
+	}
+	if len(model.requests) != 5 {
+		t.Fatalf("model requests = %d, want parent/scout/parent sequence", len(model.requests))
+	}
+	if !hasTool(model.requests[0].Tools, "delegate_readonly") {
+		t.Fatalf("primary tool surface omitted delegation: %#v", model.requests[0].Tools)
+	}
+	for _, tool := range model.requests[1].Tools {
+		if tool.Name == "apply_patch" || tool.Name == "run_command" || tool.Name == "delegate_readonly" {
+			t.Fatalf("scout received forbidden tool %q", tool.Name)
+		}
+	}
+	if got := model.requests[2].Messages[len(model.requests[2].Messages)-1]; got.Role != agent.RoleTool || got.ToolName != "delegate_readonly" || !strings.Contains(got.Content, "untrusted evidence") {
+		t.Fatalf("parent did not receive bounded untrusted scout report: %#v", got)
+	}
+}
+
+func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	repository := featureRepository(t)
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "terminal", Name: "terminal_start", Arguments: objectArguments(t, struct {
+			Argv []string `json:"argv"`
+		}{Argv: []string{sh, "-lc", "sleep 30"}})}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The long-lived task was started and the worktree is ready for review."},
+	}}
+	outcome, err := (Executor{Model: model}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Start a local development task",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "terminal-task-001",
+		MaxSteps:       5,
+		StateDir:       t.TempDir(),
+		Approve: func(context.Context, []string) (tools.CommandDecision, error) {
+			return tools.CommandAllowOnce, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("execute terminal task: %v", err)
+	}
+	if !hasTool(model.requests[0].Tools, "terminal_start") || !hasTool(model.requests[0].Tools, "terminal_read") {
+		t.Fatalf("execute tool surface omitted persistent terminal: %#v", model.requests[0].Tools)
+	}
+	if !containsEvent(outcome.Events, agent.EventTerminal) {
+		t.Fatalf("terminal cleanup was not visible in the event stream: %#v", outcome.Events)
+	}
+	planModel := &scriptedModel{turns: []agent.Turn{{Text: "Plan only."}}}
+	_, err = (Executor{Model: planModel}).Execute(context.Background(), Request{
+		RepositoryPath: repository, Task: "Plan terminal work", Provider: "test", Model: "test-model", RunID: "terminal-plan-001", MaxSteps: 1, StateDir: t.TempDir(), Mode: PlanMode,
+	})
+	if err != nil {
+		t.Fatalf("execute plan: %v", err)
+	}
+	if hasTool(planModel.requests[0].Tools, "terminal_start") || hasTool(planModel.requests[0].Tools, "terminal_write") {
+		t.Fatalf("plan tool surface included persistent terminal: %#v", planModel.requests[0].Tools)
 	}
 }
 
@@ -431,6 +530,15 @@ func objectArguments(t *testing.T, value any) json.RawMessage {
 func containsEvent(events []agent.Event, kind agent.EventKind) bool {
 	for _, event := range events {
 		if event.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTool(definitions []agent.ToolDefinition, name string) bool {
+	for _, definition := range definitions {
+		if definition.Name == name {
 			return true
 		}
 	}

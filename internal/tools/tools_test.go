@@ -6,10 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -154,6 +158,65 @@ func TestRunCommandShellFormUsesEffectiveArgv(t *testing.T) {
 	if !strings.Contains(result, "gator-shell") || !strings.Contains(result, `"exit_code":0`) {
 		t.Fatalf("shell command result = %s", result)
 	}
+}
+
+func TestTerminalToolsRequireApprovalAndRedactInputFromEvents(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root := testWorkspace(t)
+	manager := terminal.New(terminal.Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}})
+	defer manager.Close()
+	denied := TerminalTools(manager, CommandPolicy{Approve: denyAll})[0]
+	if _, err := denied.Execute(context.Background(), json.RawMessage(`{"argv":["`+sh+`","-lc","sleep 1"]}`)); err == nil || !strings.Contains(err.Error(), "denied") {
+		t.Fatalf("denied terminal start = %v", err)
+	}
+	if len(manager.List()) != 0 {
+		t.Fatalf("denied terminal start created a task: %#v", manager.List())
+	}
+
+	var approvals [][]string
+	var events []agent.Event
+	surface := TerminalTools(manager, CommandPolicy{
+		Remembered: NewCommandMemory(nil),
+		Approve: func(_ context.Context, argv []string) (CommandDecision, error) {
+			approvals = append(approvals, append([]string(nil), argv...))
+			return CommandAllowOnce, nil
+		},
+		OnEvent: func(event agent.Event) { events = append(events, event) },
+	})
+	start := surface[0]
+	result := executeTool(t, start, `{"argv":["`+sh+`","-lc","IFS= read line; printf 'input:%s\\n' \"$line\""]}`)
+	var started struct {
+		Result terminal.Task `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(result), &started); err != nil || started.Result.ID == "" {
+		t.Fatalf("terminal start result = %q, %v", result, err)
+	}
+	write := surface[2]
+	if _, err := write.Execute(context.Background(), json.RawMessage(`{"id":"`+started.Result.ID+`","input":"private value\r"}`)); err != nil {
+		t.Fatalf("terminal write: %v", err)
+	}
+	if len(approvals) != 2 || len(approvals[1]) != 3 || approvals[1][0] != "terminal_write" || strings.Contains(strings.Join(approvals[1], " "), "private value") {
+		t.Fatalf("terminal approvals = %#v", approvals)
+	}
+	for _, event := range events {
+		if strings.Contains(event.Text, "private value") || strings.Contains(strings.Join(event.Argv, " "), "private value") {
+			t.Fatalf("terminal input leaked into approval event: %#v", event)
+		}
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if task := manager.List()[0]; task.Status == "exited" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("terminal task did not exit after approved input")
 }
 
 func allowOnce(context.Context, []string) (CommandDecision, error) {

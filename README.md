@@ -439,8 +439,9 @@ at tool, compaction, verification, and session boundaries in the strict
 sandbox. Trusted LSP bundles expose bounded pull diagnostics and request
 approval before each server launch; see [Local LSP diagnostics](docs/LSP.md).
 Trusted MCP bundles can expose repository-relative stdio servers or Streamable
-HTTP servers; every MCP tool invocation still requests approval. Remote MCP
-OAuth is not implemented.
+HTTP servers; every MCP tool invocation still requests approval. Remote HTTP
+servers can use explicit, standards-based OAuth login with private,
+resource-bound tokens; see [Trusted MCP servers](docs/MCP.md).
 
 Use `--scout` up to four times for parallel read-only exploration in separate
 worktrees. Reports reach the primary writer as untrusted evidence. New runs
@@ -449,6 +450,25 @@ to copying ignored setup files with `--copy-ignored`; the exact files must be
 listed in tracked `.gator/worktreeinclude` and remain ignored. Use
 `gator worktree list`, `gator worktree prune`, and the explicit destructive
 `gator worktree remove RUN_ID --yes` to manage retained checkouts.
+
+During either native Plan or Execute mode, the model can also call
+`delegate_readonly` for one to four focused inspections of the active isolated
+worktree. Those fresh-context scouts run concurrently, can only read/list/search
+or inspect Git state, and see the primary agent's uncommitted changes. They
+cannot edit, run a command, access extensions, LSP, MCP, or recursively
+delegate. Each report is bounded to 8 KiB and explicitly framed as untrusted
+evidence; Gator permits at most eight dynamic scouts per primary run. This is
+deliberately not a writer-agent or autonomous merge mechanism.
+
+Execute mode also gives the native model a persistent terminal-task surface:
+`terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and
+`terminal_stop`. A started task gets a pseudo-terminal in the same strict
+sandbox, worktree, network policy, output bounds, and lifetime limit as the
+run. Starting a task needs the normal command approval; each distinct input
+needs its own approval and is represented to the approval UI by a digest rather
+than the input bytes. Terminal tasks are stopped when the agent run ends. This
+is an agent-mediated task manager, not a direct user shell or terminal
+multiplexer.
 
 ## Design principles
 

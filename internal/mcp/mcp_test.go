@@ -15,7 +15,7 @@ import (
 func TestStreamableHTTPInitializesListsAndCallsTools(t *testing.T) {
 	var session string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("MCP-Protocol-Version") != "2025-03-26" {
+		if request.Header.Get("MCP-Protocol-Version") != protocolVersion {
 			t.Errorf("protocol header = %q", request.Header.Get("MCP-Protocol-Version"))
 		}
 		if session != "" && request.Header.Get("Mcp-Session-Id") != session {

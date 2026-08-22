@@ -71,6 +71,17 @@ exports a portable patch snapshot. A fork creates a new worktree at the saved
 base commit, applies that snapshot, and uses a new thread ID; it never mutates
 the source thread.
 
+The primary agent may invoke `delegate_readonly` while it works. It creates up
+to four fresh-context scouts concurrently against the active isolated
+worktree, so they can inspect the current uncommitted patch without racing a
+writer. Each scout receives only read/list/search and Git-inspection tools: no
+patching, process execution, extension, LSP, MCP, or recursive-delegation
+surface. The parent is paused while the batch runs, accepts at most eight
+scouts per run, receives no more than 8 KiB per report, and is told to treat
+all returned text as untrusted evidence. Gator intentionally has no concurrent
+writer-agent facility until it can provide an explicit independent-worktree,
+review, and merge contract.
+
 `gator acp` is a separate local stdio ACP v1 agent surface for editors. It
 maps ACP sessions to retained Gator threads, streams normalized model/tool
 events as ACP session updates, and maps Gator command approval to ACP
@@ -87,6 +98,15 @@ diagnostic launch still needs command approval and runs under the strict
 sandbox. The v1 client implements LSP pull diagnostics only, bounds all wire
 and model-visible output, and starts a server only after approval. It is not a
 general IDE or an unreviewed executable-extension path.
+
+Trusted Streamable HTTP MCP servers may obtain a Gator-owned public OAuth
+credential only through explicit `gator mcp login`. The client discovers the
+MCP protected resource and authorization server, uses PKCE and the required
+resource indicator, then keys the private credential to that exact canonical
+resource. Project configuration never supplies a token or client secret;
+stdio MCP credentials remain an explicit sandbox-environment concern. This
+keeps the remote integration useful without letting an unreviewed checkout
+redirect a stored token to another server.
 
 Supported `@` references are a separate, bounded developer input channel.
 The TUI loads only repository-local PNG, JPEG, and WebP images; PDFs; selected
@@ -129,6 +149,15 @@ Execute mode exposes these tools:
    `sh -c`); required `--verify` argv runs immediately, and any other invocation
    waits for allow-once, always-allow-this-argv, or deny;
 5. inspect Git status and diff.
+6. start, read, write, list, and stop bounded persistent pseudo-terminal tasks.
+
+Terminal-task starts share the run's strict sandbox, worktree root, network
+policy, filtered environment, and developer command approval. They retain only
+bounded in-memory scrollback and are cancelled at run completion. A model must
+request a separate approval for each distinct terminal input; approval events
+contain an ID, size, and SHA-256 digest rather than the input bytes. The TUI
+receives lifecycle events but Gator does not yet offer a user-attached terminal
+multiplexer or a background task that survives a completed agent run.
 
 Plan mode exposes only read/search and Git inspection tools for every direct
 provider.

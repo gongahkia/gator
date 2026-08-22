@@ -60,7 +60,9 @@ forward provider credentials.
 
 This is a local stdio profile, not a hosted ACP endpoint. It does not provide
 the draft streamable-HTTP/WebSocket transport, client-provided MCP servers,
-terminal delegation, image/audio prompt blocks, embedded resource content, or
-JSON-RPC batch envelopes. Batch envelopes receive a clear `-32600` error rather
-than a partial response. These are intentional unsupported surfaces, not
-fallbacks to Gator's proprietary RPC protocol.
+direct user terminal attachment or delegated vendor-terminal control,
+image/audio prompt blocks, embedded resource content, or JSON-RPC batch
+envelopes. Execute-mode ACP sessions can still expose Gator's approved native
+terminal-task tools as ordinary ACP tool calls. Batch envelopes receive a clear
+`-32600` error rather than a partial response. These are intentional unsupported
+surfaces, not fallbacks to Gator's proprietary RPC protocol.

@@ -31,7 +31,7 @@ Usage:
   gator config set network deny|allow
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
-  gator mcp status|trust|untrust
+  gator mcp status|trust|untrust|login|logout
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list
   gator extension install [--replace] DIRECTORY

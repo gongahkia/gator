@@ -125,6 +125,7 @@ const (
 	EventCommandApprovalResolved  EventKind = "command_approval_resolved"
 	EventHook                     EventKind = "hook"
 	EventSubagent                 EventKind = "subagent"
+	EventTerminal                 EventKind = "terminal"
 	EventRunFinished              EventKind = "run_finished"
 )
 

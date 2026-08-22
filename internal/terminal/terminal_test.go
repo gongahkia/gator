@@ -1,0 +1,144 @@
+package terminal
+
+import (
+	"context"
+	"os/exec"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/workspace"
+)
+
+func TestManagerRunsInteractiveTaskAndBoundsScrollback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exited []Task
+	var exitedMu sync.Mutex
+	manager := New(Config{
+		Root:           root,
+		Policy:         sandbox.Policy{Mode: sandbox.Off},
+		MaxOutputBytes: 24,
+		MaxReadBytes:   8,
+		OnExit: func(task Task) {
+			exitedMu.Lock()
+			exited = append(exited, task)
+			exitedMu.Unlock()
+		},
+	})
+	defer manager.Close()
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "printf 'ready\\n'; IFS= read line; printf 'received:%s\\n' \"$line\""})
+	if err != nil {
+		t.Fatalf("start terminal: %v", err)
+	}
+	first := awaitTerminalOutput(t, manager, task.ID, 0, "ready")
+	if first.Task.Status != "running" {
+		t.Fatalf("task after ready = %#v", first.Task)
+	}
+	if _, err := manager.Write(task.ID, []byte("Ada\r")); err != nil {
+		t.Fatalf("write terminal: %v", err)
+	}
+	second := awaitTerminalOutput(t, manager, task.ID, first.Next, "received:Ada")
+	if second.Next <= first.Next || strings.Contains(second.Output, "ready") {
+		t.Fatalf("incremental terminal output = %#v", second)
+	}
+	awaitTerminalExit(t, manager, task.ID)
+	manager.Close()
+	exitedMu.Lock()
+	defer exitedMu.Unlock()
+	if len(exited) != 1 || exited[0].Status != "exited" || exited[0].ExitCode == nil || *exited[0].ExitCode != 0 {
+		t.Fatalf("terminal exit callback = %#v", exited)
+	}
+}
+
+func TestManagerMarksDroppedOutputAndCancelsTasksOnClose(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := New(Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}, MaxOutputBytes: 12, MaxReadBytes: 12})
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "printf '0123456789abcdef'"})
+	if err != nil {
+		t.Fatalf("start output task: %v", err)
+	}
+	awaitTerminalExit(t, manager, task.ID)
+	read, err := manager.Read(task.ID, 0)
+	if err != nil {
+		t.Fatalf("read terminal: %v", err)
+	}
+	if !read.Dropped || read.Cursor == 0 || read.Output != "456789abcdef" || !read.Task.OutputTruncated {
+		t.Fatalf("bounded output = %#v", read)
+	}
+
+	running, err := manager.Start(context.Background(), []string{sh, "-lc", "sleep 30"})
+	if err != nil {
+		t.Fatalf("start long terminal: %v", err)
+	}
+	manager.Close()
+	state := awaitTerminalExit(t, manager, running.ID)
+	if state.Status != "exited" || state.ExitCode == nil || *state.ExitCode != -1 || !strings.Contains(state.Error, "cancelled") {
+		t.Fatalf("closed terminal state = %#v", state)
+	}
+}
+
+func awaitTerminalOutput(t *testing.T, manager *Manager, id string, cursor int64, want string) ReadResult {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	var last ReadResult
+	var output strings.Builder
+	next := cursor
+	for time.Now().Before(deadline) {
+		read, err := manager.Read(id, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = read
+		if read.Next > next {
+			output.WriteString(read.Output)
+			next = read.Next
+		}
+		if strings.Contains(output.String(), want) {
+			last.Cursor = cursor
+			last.Next = next
+			last.Output = output.String()
+			return last
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("terminal %s did not emit %q; collected output = %q, last = %#v", id, want, output.String(), last)
+	return ReadResult{}
+}
+
+func awaitTerminalExit(t *testing.T, manager *Manager, id string) Task {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, task := range manager.List() {
+			if task.ID == id && task.Status == "exited" {
+				return task
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("terminal %s did not exit", id)
+	return Task{}
+}

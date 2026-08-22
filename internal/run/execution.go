@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -15,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/patch"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -56,8 +58,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	defer runJournal.Close()
 
 	var events []agent.Event
+	var eventMu sync.Mutex
 	var journalErr error
 	emit := func(event agent.Event) {
+		eventMu.Lock()
+		defer eventMu.Unlock()
 		events = append(events, event)
 		if journalErr == nil {
 			journalErr = runJournal.Append(event)
@@ -89,7 +94,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err := executionPolicy.Validate(); err != nil {
 		return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("validate execution policy: %w", err)
 	}
-	runTools := tools.Default(isolated.Root, tools.CommandPolicy{
+	commandPolicy := tools.CommandPolicy{
 		Allowed:    request.Verification,
 		Remembered: remembered,
 		Approve:    request.Approve,
@@ -101,7 +106,18 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			}
 			return hookEngine.Run(ctx, hooks.Verification, "run_command", map[string]any{"argv": argv})
 		},
+	}
+	runTools := tools.Default(isolated.Root, commandPolicy)
+	terminalManager := terminal.New(terminal.Config{
+		Root:   isolated.Root,
+		Policy: executionPolicy,
+		Now:    e.Now,
+		OnExit: func(task terminal.Task) {
+			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: terminalStatusText(task)})
+		},
 	})
+	defer terminalManager.Close()
+	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, request.MaxSteps, e.Now, emit)
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
 		runTools = append(runTools, lspSet.Tools(func(ctx context.Context, server, path string) error {
@@ -152,11 +168,16 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			}
 			return nil
 		})...)
+		runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy)...)
+		runTools = append(runTools, readonlyScout)
+		if !request.DisableWriterDelegation {
+			runTools = append(runTools, newWriterTool(e, isolated, request, remembered, e.Now, emit))
+		}
 	}
 	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)
 	var check func([]agent.Message) error
 	if request.Mode == PlanMode {
-		runTools = tools.ReadOnly(isolated.Root)
+		runTools = append(tools.ReadOnly(isolated.Root), readonlyScout)
 		system = planSystemPrompt(joinInstructions(projectInstructionSet.Content, request.System))
 	} else {
 		check = completionCheck(request.Verification)
@@ -210,7 +231,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		BeforeTool:      beforeTool,
 		AfterTool:       afterTool,
 	})
-	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: events}
+	terminalManager.Close()
+	eventMu.Lock()
+	eventSnapshot := append([]agent.Event(nil), events...)
+	eventMu.Unlock()
+	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: eventSnapshot}
 	snapshotContext, cancelSnapshot := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	snapshot, snapshotErr := patch.Export(snapshotContext, isolated.Path, request.BaseCommit)
 	cancelSnapshot()
@@ -277,6 +302,16 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return outcome, err
 	}
 	return outcome, nil
+}
+
+func terminalStatusText(task terminal.Task) string {
+	if task.ExitCode == nil {
+		return task.ID + " exited"
+	}
+	if task.Error != "" {
+		return fmt.Sprintf("%s exited with code %d: %s", task.ID, *task.ExitCode, task.Error)
+	}
+	return fmt.Sprintf("%s exited with code %d", task.ID, *task.ExitCode)
 }
 
 func (e Executor) hookTrust(repository string) string {
