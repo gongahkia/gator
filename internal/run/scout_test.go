@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -56,7 +57,7 @@ func TestReadOnlyScoutToolDelegatesInParallelWithRestrictedTools(t *testing.T) {
 	}
 	model := &delegatedScoutModel{response: strings.Repeat("e", maxDelegatedReportBytes+128)}
 	var events []agent.Event
-	tool := newReadOnlyScoutTool(model, root, "Follow the repository test conventions.", 4, fixedScoutClock(), func(event agent.Event) {
+	tool := newReadOnlyScoutTool(model, root, "Follow the repository test conventions.", nil, 4, fixedScoutClock(), func(event agent.Event) {
 		events = append(events, event)
 	})
 	result, err := tool.Execute(context.Background(), json.RawMessage(`{"tasks":[{"task":"Inspect tests"},{"task":"Inspect public APIs"}]}`))
@@ -103,7 +104,7 @@ func TestReadOnlyScoutToolEnforcesRunBudgetAndStrictArguments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tool := newReadOnlyScoutTool(&delegatedScoutModel{response: "evidence"}, root, "", 2, fixedScoutClock(), nil)
+	tool := newReadOnlyScoutTool(&delegatedScoutModel{response: "evidence"}, root, "", nil, 2, fixedScoutClock(), nil)
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"tasks":[{"task":"one"}],"unexpected":true}`)); err == nil || !strings.Contains(err.Error(), "unknown field") {
 		t.Fatalf("unknown field error = %v", err)
 	}
@@ -116,6 +117,46 @@ func TestReadOnlyScoutToolEnforcesRunBudgetAndStrictArguments(t *testing.T) {
 	}
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"tasks":[{"task":"nine"}]}`)); err == nil || !strings.Contains(err.Error(), "budget") {
 		t.Fatalf("budget error = %v", err)
+	}
+}
+
+func TestReadOnlyScoutRoleSpecializesPromptWithoutChangingTools(t *testing.T) {
+	repository := featureRepository(t)
+	root, err := workspace.Open(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &delegatedScoutModel{response: "review evidence"}
+	roles := []instructions.Role{
+		{Name: "reviewer", Description: "review a proposed change", Kind: instructions.RoleReadOnly, Instructions: "prioritize regressions and missing tests"},
+		{Name: "writer", Description: "must not be visible to scouts", Kind: instructions.RoleWriter, Instructions: "write code"},
+	}
+	tool := newReadOnlyScoutTool(model, root, "project guidance", roles, 2, fixedScoutClock(), nil)
+	definition := tool.Definition()
+	if !json.Valid(definition.Parameters) || !strings.Contains(string(definition.Parameters), `"reviewer"`) || strings.Contains(string(definition.Parameters), `"writer"`) || !strings.Contains(definition.Description, "reviewer") {
+		t.Fatalf("scout role definition = %#v", definition)
+	}
+	result, err := tool.Execute(context.Background(), json.RawMessage(`{"tasks":[{"task":"Review the parser change","role":"reviewer"}]}`))
+	if err != nil {
+		t.Fatalf("run reviewer scout: %v", err)
+	}
+	var payload struct {
+		Reports []delegatedScoutReport `json:"reports"`
+	}
+	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil || len(payload.Reports) != 1 || payload.Reports[0].Role != "reviewer" {
+		t.Fatalf("role payload = %#v, %v", payload, err)
+	}
+	requests := model.requestsSnapshot()
+	if len(requests) != 1 || !strings.Contains(requests[0].System, "Selected project role reviewer") || !strings.Contains(requests[0].System, "prioritize regressions") {
+		t.Fatalf("role system prompt = %#v", requests)
+	}
+	for _, definition := range requests[0].Tools {
+		if definition.Name == "apply_patch" || definition.Name == "run_command" || definition.Name == "delegate_writer" {
+			t.Fatalf("reviewer role received forbidden tool %q", definition.Name)
+		}
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"tasks":[{"task":"Bad role","role":"writer"}]}`)); err == nil || !strings.Contains(err.Error(), "not available") {
+		t.Fatalf("cross-capability role error = %v", err)
 	}
 }
 

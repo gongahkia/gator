@@ -128,7 +128,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		defer request.OnTerminalAttachment(nil)
 	}
 	defer terminalManager.Close()
-	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, request.MaxSteps, e.Now, emit)
+	roleSet, err := instructions.LoadRoles(isolated.Repository)
+	if err != nil {
+		return Outcome{Worktree: isolated}, fmt.Errorf("load project agent roles: %w", err)
+	}
+	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, roleSet, request.MaxSteps, e.Now, emit)
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
 		runTools = append(runTools, lspSet.Tools(func(ctx context.Context, server, operation, path string) error {
@@ -184,7 +188,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
 		runTools = append(runTools, readonlyScout)
 		if !request.DisableWriterDelegation {
-			runTools = append(runTools, newWriterTool(e, isolated, request, remembered, e.Now, emit))
+			runTools = append(runTools, newWriterTool(e, isolated, request, remembered, roleSet, e.Now, emit))
 		}
 	}
 	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)

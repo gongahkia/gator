@@ -102,6 +102,48 @@ func TestLoadWithProfileAppendsOnlySelectedProfile(t *testing.T) {
 	}
 }
 
+func TestLoadRolesRestrictsDefinitionsToPromptSpecialization(t *testing.T) {
+	repository := t.TempDir()
+	writeInstructionFile(t, repository, ".gator/roles/reviewer.md", "identify regressions and evidence gaps")
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "profiles": [{"name": "implementer", "instructions": "make focused changes"}],
+  "roles": [
+    {"name": "reviewer", "description": "independent code review", "kind": "readonly", "file": ".gator/roles/reviewer.md"},
+    {"name": "test-fixer", "description": "implement a focused failing-test fix", "kind": "writer", "instructions": "modify only the delegated test area"}
+  ]
+}`)
+	roles, err := LoadRoles(repository)
+	if err != nil {
+		t.Fatalf("load roles: %v", err)
+	}
+	if len(roles) != 2 || roles[0].Name != "reviewer" || roles[0].Kind != RoleReadOnly || !strings.Contains(roles[0].Instructions, "regressions") || roles[1].Name != "test-fixer" || roles[1].Kind != RoleWriter {
+		t.Fatalf("roles = %#v", roles)
+	}
+}
+
+func TestLoadRolesRejectsCapabilityEscalationAndMalformedRoles(t *testing.T) {
+	repository := t.TempDir()
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "roles": [
+    {"name": "shell", "description": "run unrestricted commands", "kind": "command", "instructions": "do anything"}
+  ]
+}`)
+	if _, err := LoadRoles(repository); err == nil || !strings.Contains(err.Error(), "unsupported kind") {
+		t.Fatalf("capability-escalating role error = %v", err)
+	}
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "roles": [
+    {"name": "reviewer", "description": "one\ntwo", "kind": "readonly", "instructions": "review"}
+  ]
+}`)
+	if _, err := LoadRoles(repository); err == nil || !strings.Contains(err.Error(), "one-line description") {
+		t.Fatalf("multiline role description error = %v", err)
+	}
+}
+
 func writeInstructionFile(t *testing.T, repository, relative, contents string) {
 	t.Helper()
 	path := filepath.Join(repository, filepath.FromSlash(relative))

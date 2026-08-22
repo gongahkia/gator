@@ -29,6 +29,7 @@ Usage:
   gator config set default-model MODEL
   gator config set sandbox strict|off
   gator config set network deny|allow
+  gator agent list
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
@@ -59,6 +60,7 @@ Commands:
   logout    remove a provider credential from Gator's private local auth file
   delegate  run an installed vendor or external agent in an isolated worktree
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
+  agent     list project-defined, capability-bounded delegation roles
   lsp       trust and inspect local Language Server Protocol diagnostics
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
@@ -108,6 +110,8 @@ func run(args []string, out io.Writer) error {
 		return connect(args[1:], out)
 	case "config":
 		return configure(args[1:], out)
+	case "agent":
+		return agentCommand(args[1:], out)
 	case "update":
 		return update(args[1:], out)
 	case "rpc":
