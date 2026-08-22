@@ -6,7 +6,8 @@ workspace source file it supports pull diagnostics, hover, go-to definition,
 find references, and document symbols. It also supports a repository-wide
 workspace-symbol query. Definitions, references, and workspace symbols return
 only regular files inside the active worktree. It does not expose completion,
-rename, code actions, edits, formatting, or a persistent shared server/index.
+rename, code actions, edits, formatting, or a persistent cross-run
+server/index.
 
 Create `.gator/lsp.json` in the repository:
 
@@ -53,7 +54,9 @@ allow-always, or deny approval using an argv-shaped record such as
 `workspace_symbols`; approval is scoped to the exact server, operation, and
 path or symbol query. Only after approval does Gator start the server. The
 server runs in Gator's strict sandbox by default with its configured network
-mode. It is started anew for one lookup and shut down afterward.
+mode. The first approved lookup lazily starts it; later approved lookups reuse
+that same server only within the current Gator run. Gator shuts it down when
+the run exits or discards it after a transport failure.
 
 Gator implements the LSP 3.17 requests `textDocument/diagnostic`,
 `textDocument/hover`, `textDocument/definition`, `textDocument/references`,
