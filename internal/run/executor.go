@@ -34,7 +34,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if request.ThreadID == "" {
 		request.ThreadID = runID
 	}
-	isolated, err := worktree.Create(ctx, request.RepositoryPath, runID)
+	isolated, err := worktree.CreateWithOptions(ctx, request.RepositoryPath, runID, worktree.Options{
+		BaseRef:          request.BaseRef,
+		CopyIgnoredFiles: request.CopyIgnoredFiles,
+	})
 	if err != nil {
 		return Outcome{}, err
 	}

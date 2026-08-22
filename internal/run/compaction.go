@@ -18,11 +18,20 @@ const (
 const compactionPrefix = "Gator compacted context from earlier turns:\n"
 
 func compactMessages(ctx context.Context, model agent.Model, messages []agent.Message, force bool) ([]agent.Message, string, bool, error) {
+	return compactMessagesWithLifecycle(ctx, model, messages, force, nil)
+}
+
+func compactMessagesWithLifecycle(ctx context.Context, model agent.Model, messages []agent.Message, force bool, lifecycle func(string, map[string]any) error) ([]agent.Message, string, bool, error) {
 	if len(messages) <= 1 || (!force && (contextBytes(messages) <= maxUncompactedContextBytes || len(messages) <= recentMessagesToKeep)) {
 		return messages, "", false, nil
 	}
 	if model == nil {
 		return nil, "", false, errors.New("agent model is required for context compaction")
+	}
+	if lifecycle != nil {
+		if err := lifecycle("pre_compaction", map[string]any{"message_count": len(messages), "forced": force}); err != nil {
+			return nil, "", false, err
+		}
 	}
 	keep := min(recentMessagesToKeep, len(messages)-1)
 	split := len(messages) - keep
@@ -45,6 +54,11 @@ func compactMessages(ctx context.Context, model agent.Model, messages []agent.Me
 	compacted := make([]agent.Message, 0, len(recent)+1)
 	compacted = append(compacted, agent.Message{Role: agent.RoleUser, Content: compactionPrefix + summary})
 	compacted = append(compacted, recent...)
+	if lifecycle != nil {
+		if err := lifecycle("post_compaction", map[string]any{"message_count": len(messages), "summary_bytes": len(summary)}); err != nil {
+			return nil, "", false, err
+		}
+	}
 	return compacted, summary, true, nil
 }
 

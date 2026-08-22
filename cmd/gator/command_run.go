@@ -45,6 +45,8 @@ func runTask(arguments []string, out io.Writer) error {
 	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
 	sandboxMode := flags.String("sandbox", "", "execution sandbox: strict or off (default from config)")
 	networkMode := flags.String("network", "", "sandbox network mode: deny or allow (default from config)")
+	baseRef := flags.String("base", "", "Git ref or revision used as the new worktree base")
+	copyIgnoredFiles := flags.Bool("copy-ignored", false, "copy files explicitly listed in tracked .gator/worktreeinclude (may expose secrets to the agent)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -81,17 +83,19 @@ func runTask(arguments []string, out io.Writer) error {
 	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
-		RepositoryPath:  workingDirectory,
-		Task:            task,
-		Provider:        resolvedProvider,
-		Model:           resolvedModel,
-		BaseURL:         *baseURL,
-		MaxSteps:        *maxSteps,
-		Verification:    verification,
-		Scopes:          scopes,
-		AllowedCommands: allowedCommands,
-		Approve:         cliCommandApprover(*trustCommands),
-		OnEvent:         printer.Print,
+		RepositoryPath:   workingDirectory,
+		Task:             task,
+		Provider:         resolvedProvider,
+		Model:            resolvedModel,
+		BaseURL:          *baseURL,
+		MaxSteps:         *maxSteps,
+		Verification:     verification,
+		Scopes:           scopes,
+		BaseRef:          *baseRef,
+		CopyIgnoredFiles: *copyIgnoredFiles,
+		AllowedCommands:  allowedCommands,
+		Approve:          cliCommandApprover(*trustCommands),
+		OnEvent:          printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {

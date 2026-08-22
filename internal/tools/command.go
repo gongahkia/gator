@@ -100,6 +100,7 @@ type CommandPolicy struct {
 	Timeout        time.Duration
 	MaxOutputBytes int
 	Sandbox        sandbox.Policy
+	BeforeCommand  func(context.Context, []string, bool) error
 }
 
 // RunCommand runs argv without a shell, or a command string via bash/sh, from
@@ -138,7 +139,13 @@ func (t RunCommand) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	if !t.autoAllowed(argv) {
+	autoAllowed := t.autoAllowed(argv)
+	if t.Policy.BeforeCommand != nil {
+		if err := t.Policy.BeforeCommand(ctx, cloneArgv(argv), autoAllowed); err != nil {
+			return agent.ToolResult{}, err
+		}
+	}
+	if !autoAllowed {
 		if err := t.approve(ctx, argv); err != nil {
 			return agent.ToolResult{}, err
 		}

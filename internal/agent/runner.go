@@ -120,7 +120,25 @@ turnLoop:
 				continue turnLoop
 			}
 			r.emit(options.OnEvent, Event{Kind: EventToolCalled, At: now(), Step: step, ToolCall: cloneCall(call)})
-			result, toolErr := executeTool(ctx, tools, call)
+			var result ToolResult
+			var toolErr error
+			executed := false
+			if options.BeforeTool != nil {
+				toolErr = options.BeforeTool(ctx, *cloneCall(call))
+			}
+			if toolErr == nil {
+				executed = true
+				result, toolErr = executeTool(ctx, tools, call)
+			}
+			if executed && options.AfterTool != nil {
+				if afterErr := options.AfterTool(ctx, *cloneCall(call), result, toolErr); afterErr != nil {
+					if toolErr != nil {
+						toolErr = fmt.Errorf("%v; post-tool hook: %w", toolErr, afterErr)
+					} else {
+						toolErr = fmt.Errorf("post-tool hook: %w", afterErr)
+					}
+				}
+			}
 			content := result.Content
 			if toolErr != nil {
 				content = encodeToolFailure(toolErr)

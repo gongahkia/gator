@@ -53,6 +53,9 @@ func Create(ctx context.Context, repositoryPath, runID string) (Worktree, error)
 // selected Git revision. It can copy only the exact ignored files listed in a
 // tracked .gator/worktreeinclude file when the caller explicitly opts in.
 func CreateWithOptions(ctx context.Context, repositoryPath, runID string, options Options) (Worktree, error) {
+	if !runIDPattern.MatchString(runID) {
+		return Worktree{}, fmt.Errorf("invalid run id %q", runID)
+	}
 	repository, err := repositoryRoot(ctx, repositoryPath)
 	if err != nil {
 		return Worktree{}, err

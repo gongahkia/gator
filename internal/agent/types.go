@@ -123,6 +123,7 @@ const (
 	EventContextCompacted         EventKind = "context_compacted"
 	EventCommandApprovalRequested EventKind = "command_approval_requested"
 	EventCommandApprovalResolved  EventKind = "command_approval_resolved"
+	EventHook                     EventKind = "hook"
 	EventRunFinished              EventKind = "run_finished"
 )
 
@@ -159,6 +160,10 @@ type RunOptions struct {
 	// CompletionCheck may require concrete evidence, such as a diff inspection
 	// or a named verifier, before a final response is accepted.
 	CompletionCheck func([]Message) error
+	// BeforeTool and AfterTool are trusted host lifecycle boundaries. A returned
+	// error is surfaced to the model as a failed tool call.
+	BeforeTool func(context.Context, ToolCall) error
+	AfterTool  func(context.Context, ToolCall, ToolResult, error) error
 }
 
 // Result is the terminal state of a completed agent loop.
