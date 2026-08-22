@@ -334,11 +334,11 @@ func (s *Server) prompt(parent context.Context, request inbound) error {
 		s.mu.Unlock()
 		return fmt.Errorf("ACP session %q already has an active prompt", params.SessionID)
 	}
-	ctx, cancel := context.WithCancel(parent)
 	if session.closing {
 		s.mu.Unlock()
 		return fmt.Errorf("ACP session %q is closing", params.SessionID)
 	}
+	ctx, cancel := context.WithCancel(parent)
 	activity := &activePrompt{cancel: cancel, messageID: s.nextID("message"), done: make(chan struct{})}
 	session.active = activity
 	session.updatedAt = time.Now().UTC()
@@ -346,12 +346,13 @@ func (s *Server) prompt(parent context.Context, request inbound) error {
 	s.mu.Unlock()
 
 	id := append(json.RawMessage(nil), responseID(request.ID)...)
-	go s.executePrompt(ctx, session.id, task, activity.messageID, id)
+	go s.executePrompt(ctx, cancel, session.id, task, activity.messageID, id)
 	return nil
 }
 
-func (s *Server) executePrompt(ctx context.Context, sessionID, task, messageID string, response json.RawMessage) {
+func (s *Server) executePrompt(ctx context.Context, cancel context.CancelFunc, sessionID, task, messageID string, response json.RawMessage) {
 	defer s.wait.Done()
+	defer cancel()
 	defer func() {
 		s.mu.Lock()
 		if session, found := s.sessions[sessionID]; found && session.active != nil && session.active.messageID == messageID {
