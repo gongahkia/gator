@@ -117,9 +117,12 @@ Plan mode exposes only read/search and Git inspection tools for every direct
 provider.
 
 File tools validate paths against the worktree root. `run_command` sets cwd to
-that worktree and is not a sandbox: an approved process runs as the Gator user
-and can reach host paths. Network isolation is not claimed. Required
-verification argv must still succeed before Execute completion.
+that worktree and uses the configured strict process sandbox by default. The
+macOS adapter uses Seatbelt; Linux uses Bubblewrap; strict mode fails closed on
+other platforms. The command receives a filtered environment, worktree and
+private-scratch writes, selected runtime reads, and denied network access unless
+the developer explicitly grants more capability. Required verification argv
+must still succeed before Execute completion.
 
 ## Acceptance evidence
 

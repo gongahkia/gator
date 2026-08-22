@@ -41,6 +41,18 @@ type rule struct {
 	File         string   `json:"file,omitempty"`
 }
 
+type profilesDocument struct {
+	Version  int       `json:"version"`
+	Profiles []profile `json:"profiles"`
+}
+
+type profile struct {
+	Name         string `json:"name"`
+	Description  string `json:"description,omitempty"`
+	Instructions string `json:"instructions,omitempty"`
+	File         string `json:"file,omitempty"`
+}
+
 // Load collects root guidance, directory-scoped AGENTS files for the requested
 // paths, and matching declarative .gator/rules.json rules. Earlier layers are
 // shown first; more-specific layers therefore appear later and can refine them.
@@ -126,6 +138,101 @@ func Load(repository string, scopes []string) (Set, error) {
 	files = append(files, ruleFiles...)
 	return Set{Content: strings.Join(sections, "\n\n"), Files: files}, nil
 }
+
+// LoadWithProfile adds one explicitly named, non-executable agent profile
+// after ordinary scoped rules. Profiles are selected by the developer rather
+// than being implicitly activated by repository content.
+func LoadWithProfile(repository string, scopes []string, name string) (Set, error) {
+	set, err := Load(repository, scopes)
+	if err != nil || strings.TrimSpace(name) == "" {
+		return set, err
+	}
+	name = strings.TrimSpace(name)
+	if !validProfileName(name) {
+		return Set{}, fmt.Errorf("invalid agent profile %q", name)
+	}
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return Set{}, err
+	}
+	contents, err := root.ReadRegularFile(".gator/agents.json", maxFileBytes)
+	if err != nil {
+		if isMissingFileError(err) {
+			return Set{}, fmt.Errorf("agent profile %q is not configured", name)
+		}
+		return Set{}, fmt.Errorf("read agent profiles: %w", err)
+	}
+	var document profilesDocument
+	decoder := json.NewDecoder(strings.NewReader(string(contents)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&document); err != nil {
+		return Set{}, fmt.Errorf("decode agent profiles: %w", err)
+	}
+	if err := requireEOF(decoder); err != nil {
+		return Set{}, fmt.Errorf("decode agent profiles: %w", err)
+	}
+	if document.Version != 1 || len(document.Profiles) > 64 {
+		return Set{}, errors.New("agent profiles have an unsupported version or too many entries")
+	}
+	seen := make(map[string]struct{}, len(document.Profiles))
+	for _, candidate := range document.Profiles {
+		if !validProfileName(candidate.Name) {
+			return Set{}, fmt.Errorf("invalid agent profile %q", candidate.Name)
+		}
+		if _, duplicate := seen[candidate.Name]; duplicate {
+			return Set{}, fmt.Errorf("agent profile %q is repeated", candidate.Name)
+		}
+		seen[candidate.Name] = struct{}{}
+		if (strings.TrimSpace(candidate.Instructions) == "") == (strings.TrimSpace(candidate.File) == "") {
+			return Set{}, fmt.Errorf("agent profile %q requires exactly one of instructions or file", candidate.Name)
+		}
+		if candidate.Name != name {
+			continue
+		}
+		body := strings.TrimSpace(candidate.Instructions)
+		files := append([]string(nil), set.Files...)
+		files = append(files, ".gator/agents.json")
+		if candidate.File != "" {
+			path := filepath.ToSlash(strings.TrimSpace(candidate.File))
+			path = pathpkgClean(path)
+			if !strings.HasPrefix(path, ".gator/") {
+				return Set{}, fmt.Errorf("agent profile %q file must stay below .gator", candidate.Name)
+			}
+			contents, err := root.ReadRegularFile(filepath.FromSlash(path), maxFileBytes)
+			if err != nil {
+				return Set{}, fmt.Errorf("read agent profile %q: %w", candidate.Name, err)
+			}
+			body = strings.TrimSpace(string(contents))
+			files = append(files, path)
+		}
+		section := "Instructions from selected agent profile " + candidate.Name + ":\n" + body
+		if len(set.Content)+len(section) > maxCombinedBytes {
+			return Set{}, errors.New("project instructions exceed the 256 KiB combined limit")
+		}
+		if strings.TrimSpace(set.Content) != "" {
+			set.Content += "\n\n"
+		}
+		set.Content += section
+		set.Files = files
+		return set, nil
+	}
+	return Set{}, fmt.Errorf("agent profile %q is not configured", name)
+}
+
+func validProfileName(value string) bool {
+	if len(value) == 0 || len(value) > 64 {
+		return false
+	}
+	for index, character := range value {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') || (index > 0 && (character == '-' || character == '_')) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func pathpkgClean(value string) string { return path.Clean(value) }
 
 func normalizeScopes(scopes []string) ([]string, error) {
 	seen := make(map[string]struct{}, len(scopes))

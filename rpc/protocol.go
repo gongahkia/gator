@@ -36,6 +36,7 @@ type Params struct {
 	Scopes           []string   `json:"scopes,omitempty"`
 	BaseRef          string     `json:"base_ref,omitempty"`
 	CopyIgnoredFiles bool       `json:"copy_ignored_files,omitempty"`
+	Scouts           []string   `json:"scouts,omitempty"`
 	MaxSteps         int        `json:"max_steps,omitempty"`
 	Mode             string     `json:"mode,omitempty"`
 	StatePath        string     `json:"state_path,omitempty"`

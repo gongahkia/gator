@@ -42,7 +42,7 @@ func (m *Model) appendChatEvent(event agent.Event) {
 		if event.Text != "" {
 			m.appendChat(chatEntry{author: chatAgent, text: event.Text})
 		}
-	case agent.EventSteeringApplied, agent.EventContextCompacted, agent.EventCommandApprovalRequested, agent.EventCommandApprovalResolved:
+	case agent.EventSteeringApplied, agent.EventContextCompacted, agent.EventCommandApprovalRequested, agent.EventCommandApprovalResolved, agent.EventHook:
 		m.closeStreamingChatEntry()
 		entry := renderEvent(event)
 		m.appendChat(chatEntry{author: chatSystem, text: entry.text})
@@ -134,6 +134,8 @@ func renderEvent(event agent.Event) timelineEntry {
 		if len(event.Argv) > 0 {
 			detail = strings.Join(event.Argv, " ")
 		}
+	case agent.EventHook:
+		text = prefix + " hook " + compact(event.Text, 120)
 	case agent.EventRunFinished:
 		text = prefix + " completion proposed"
 	default:

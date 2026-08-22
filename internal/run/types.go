@@ -7,6 +7,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
+	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
@@ -41,7 +42,10 @@ type Request struct {
 	// BaseCommit before the worktree is created and is not reused on resume.
 	BaseRef          string
 	CopyIgnoredFiles bool
-	ForkedFrom       string
+	// Scouts are bounded read-only subagent assignments. Each runs in its own
+	// detached worktree before the primary writer receives their evidence.
+	Scouts     []string
+	ForkedFrom string
 	// ForceCompaction requests a model-generated summary of older retained
 	// messages before this turn. It is meaningful for resume and fork flows.
 	ForceCompaction bool
@@ -72,11 +76,12 @@ func (m Mode) String() string {
 
 // Outcome preserves the reviewable artifacts of a completed or failed run.
 type Outcome struct {
-	Worktree  worktree.Worktree
-	StatePath string
-	ThreadID  string
-	Result    agent.Result
-	Events    []agent.Event
+	Worktree       worktree.Worktree
+	StatePath      string
+	ThreadID       string
+	Result         agent.Result
+	Events         []agent.Event
+	ScoutWorktrees []worktree.Worktree
 }
 
 // Executor combines the provider-independent loop with an isolated worktree.
@@ -86,5 +91,6 @@ type Executor struct {
 	StateDir   string
 	Extensions extension.Resolver
 	HookTrusts []hooks.Trust
+	MCPTrusts  []mcp.Trust
 	Sandbox    sandbox.Policy
 }

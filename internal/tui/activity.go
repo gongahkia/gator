@@ -146,6 +146,8 @@ func (m *Model) observeActivity(event agent.Event) {
 		m.setActivity(activityAwaitingApproval, "awaiting approval: "+compact(event.Text, 120), at)
 	case agent.EventCommandApprovalResolved:
 		m.setActivity(activityThinking, "command approval "+compact(event.Text, 40), at)
+	case agent.EventHook:
+		m.setActivity(activityThinking, "trusted hook "+compact(event.Text, 100), at)
 	case agent.EventRunFinished:
 		m.setActivity(activityFinishing, "preparing the final result", at)
 	}

@@ -50,6 +50,7 @@ type Session struct {
 	ThreadID            string                `json:"thread_id,omitempty"`
 	Mode                string                `json:"mode,omitempty"`
 	HooksHash           string                `json:"hooks_hash,omitempty"`
+	MCPHash             string                `json:"mcp_hash,omitempty"`
 	Messages            []agent.Message       `json:"messages"`
 	AttachmentManifest  []AttachmentReference `json:"attachment_manifest,omitempty"`
 	ParentStatePath     string                `json:"parent_state_path,omitempty"`

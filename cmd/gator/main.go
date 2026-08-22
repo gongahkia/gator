@@ -28,6 +28,9 @@ Usage:
   gator config set default-model MODEL
   gator config set sandbox strict|off
   gator config set network deny|allow
+  gator hook status|trust|untrust
+  gator mcp status|trust|untrust
+  gator worktree list|prune|remove RUN_ID --yes
   gator extension list
   gator extension install [--replace] DIRECTORY
   gator provider list
@@ -39,7 +42,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--sandbox strict|off] [--network deny|allow] --verify 'argv ...' [--allow-command 'argv ...'] [--trust-commands] TASK
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -112,6 +115,12 @@ func run(args []string, out io.Writer) error {
 		return delegate(args[1:], out)
 	case "extension":
 		return extensionCommand(args[1:], out)
+	case "hook":
+		return hookCommand(args[1:], out)
+	case "mcp":
+		return mcpCommand(args[1:], out)
+	case "worktree":
+		return worktreeCommand(args[1:], out)
 	case "provider":
 		return providerCommand(args[1:], out)
 	case "theme":
