@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
@@ -32,6 +33,10 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project MCP servers: %w", err)
 	}
 	defer mcpSet.Close()
+	lspSet, err := lsp.Load(isolated.Path, e.lspTrust(isolated.Repository))
+	if err != nil {
+		return Outcome{Worktree: isolated}, fmt.Errorf("load project LSP servers: %w", err)
+	}
 	extensions, err := e.Extensions.Load(isolated.Repository)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load extensions: %w", err)
@@ -75,6 +80,9 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if mcpSet.Configured() && !mcpSet.Trusted() {
 		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project MCP servers are disabled because their bundle hash is not explicitly trusted"})
 	}
+	if lspSet.Configured() && !lspSet.Trusted() {
+		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project LSP servers are disabled because their bundle hash is not explicitly trusted"})
+	}
 	var result agent.Result
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
 	executionPolicy := e.Sandbox.Normalize()
@@ -96,6 +104,30 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	})
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
+		runTools = append(runTools, lspSet.Tools(func(ctx context.Context, server, path string) error {
+			argv := []string{"lsp", server, "diagnostics", path}
+			if remembered.Allows(argv) {
+				return nil
+			}
+			emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: strings.Join(argv, " "), Argv: argv})
+			if request.Approve == nil {
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: tools.CommandDeny.String(), Argv: argv})
+				return errors.New("LSP diagnostics require developer approval")
+			}
+			decision, err := request.Approve(ctx, argv)
+			if err != nil {
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: tools.CommandDeny.String(), Argv: argv})
+				return err
+			}
+			emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "lsp_" + server + "_diagnostics"}, Text: decision.String(), Argv: argv})
+			if decision == tools.CommandAllowAlways {
+				remembered.Remember(argv)
+			}
+			if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
+				return fmt.Errorf("LSP diagnostics from %s denied by developer", server)
+			}
+			return nil
+		})...)
 		runTools = append(runTools, mcpSet.Tools(func(ctx context.Context, server, tool string) error {
 			argv := []string{"mcp", server, tool}
 			if remembered.Allows(argv) {
@@ -257,6 +289,15 @@ func (e Executor) hookTrust(repository string) string {
 
 func (e Executor) mcpTrust(repository string) string {
 	for _, trust := range e.MCPTrusts {
+		if trust.Repository == repository {
+			return trust.Hash
+		}
+	}
+	return ""
+}
+
+func (e Executor) lspTrust(repository string) string {
+	for _, trust := range e.LSPTrusts {
 		if trust.Repository == repository {
 			return trust.Hash
 		}

@@ -30,6 +30,7 @@ Usage:
   gator config set sandbox strict|off
   gator config set network deny|allow
   gator hook status|trust|untrust
+  gator lsp status|trust|untrust
   gator mcp status|trust|untrust
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list
@@ -58,6 +59,7 @@ Commands:
   logout    remove a provider credential from Gator's private local auth file
   delegate  run an installed vendor or external agent in an isolated worktree
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
+  lsp       trust and inspect local Language Server Protocol diagnostics
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
   theme     list or choose Gator's terminal theme
@@ -124,6 +126,8 @@ func run(args []string, out io.Writer) error {
 		return extensionCommand(args[1:], out)
 	case "hook":
 		return hookCommand(args[1:], out)
+	case "lsp":
+		return lspCommand(args[1:], out)
 	case "mcp":
 		return mcpCommand(args[1:], out)
 	case "worktree":
