@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -216,6 +217,50 @@ func TestWorkspaceSymbolsAcceptURIOnlyLocationAndRejectInvalidQuery(t *testing.T
 	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}, operation: workspaceSymbolsOperation}
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"query":"line\nbreak"}`)); err == nil || !strings.Contains(err.Error(), "workspace-symbol query") {
 		t.Fatalf("invalid workspace-symbol query error = %v", err)
+	}
+}
+
+func TestManagerReusesOneClientForMultipleApprovedLookups(t *testing.T) {
+	root := testWorkspace(t)
+	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
+	connection := &fakeClient{responses: map[string]json.RawMessage{
+		"textDocument/hover":          json.RawMessage(`{"contents":"fixture hover"}`),
+		"textDocument/documentSymbol": json.RawMessage(`[]`),
+	}}
+	starts := 0
+	manager := &Manager{
+		root: root, trusted: true, servers: []server{{Name: "fixture", Language: "go"}}, clients: make(map[string]client),
+		connect: func(context.Context, workspace.Root, server) (client, error) {
+			starts++
+			return connection, nil
+		},
+	}
+	var approvals []string
+	tools := manager.Tools(func(_ context.Context, server, operation, target string) error {
+		approvals = append(approvals, server+":"+operation+":"+target)
+		return nil
+	})
+	lookup := func(operation lspOperation) Tool {
+		for _, tool := range tools {
+			candidate := tool.(Tool)
+			if candidate.operation == operation {
+				return candidate
+			}
+		}
+		t.Fatalf("missing manager tool %s", operation)
+		return Tool{}
+	}
+	if _, err := lookup(hoverOperation).Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go","line":1,"character":0}`)); err != nil {
+		t.Fatalf("manager hover: %v", err)
+	}
+	if _, err := lookup(documentSymbolsOperation).Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go"}`)); err != nil {
+		t.Fatalf("manager document symbols: %v", err)
+	}
+	if starts != 1 || connection.closed || !reflect.DeepEqual(approvals, []string{"fixture:hover:pkg/example.go", "fixture:document_symbols:pkg/example.go"}) {
+		t.Fatalf("manager starts=%d closed=%t approvals=%#v", starts, connection.closed, approvals)
+	}
+	if err := manager.Close(); err != nil || !connection.closed {
+		t.Fatalf("close manager: %v, client=%#v", err, connection)
 	}
 }
 
