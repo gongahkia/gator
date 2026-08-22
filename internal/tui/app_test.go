@@ -190,6 +190,37 @@ func TestComposerReportsProviderConfigurationFailureBeforeRun(t *testing.T) {
 	}
 }
 
+func TestSubagentProgressAppearsInScrollableConversation(t *testing.T) {
+	model := New(Config{})
+	model.width = 72
+	model.height = 24
+	model.resizeInputs()
+	model.appendEvent(agent.Event{Kind: agent.EventSubagent, Step: 3, At: time.Now(), Text: "starting 2 read-only scout(s)"})
+	if len(model.chat) == 0 || model.chat[len(model.chat)-1].author != chatSystem || !strings.Contains(model.chat[len(model.chat)-1].text, "subagents starting 2") {
+		t.Fatalf("subagent transcript entry = %#v", model.chat)
+	}
+	if model.activity.phase != activityInspecting || !strings.Contains(model.activity.detail, "read-only subagents") {
+		t.Fatalf("subagent activity = %#v", model.activity)
+	}
+	if transcript := model.transcriptContent(); !strings.Contains(transcript, "subagents starting 2") {
+		t.Fatalf("subagent transcript = %q", transcript)
+	}
+}
+
+func TestTerminalLifecycleAppearsInScrollableConversation(t *testing.T) {
+	model := New(Config{})
+	model.width = 72
+	model.height = 24
+	model.resizeInputs()
+	model.appendEvent(agent.Event{Kind: agent.EventTerminal, Step: 4, At: time.Now(), Text: "term-001 exited with code 0"})
+	if len(model.chat) == 0 || model.chat[len(model.chat)-1].author != chatSystem || !strings.Contains(model.chat[len(model.chat)-1].text, "terminal term-001 exited") {
+		t.Fatalf("terminal transcript entry = %#v", model.chat)
+	}
+	if model.activity.phase != activityTool || !strings.Contains(model.activity.detail, "terminal term-001") {
+		t.Fatalf("terminal activity = %#v", model.activity)
+	}
+}
+
 func TestWindowSizeResizesInputsAndKeepsComposerWithinTerminal(t *testing.T) {
 	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
 	model.task.SetValue("Implement responsive terminal layout")

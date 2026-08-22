@@ -90,8 +90,9 @@ func (m *CommandMemory) Snapshot() [][]string {
 }
 
 // CommandPolicy authorizes verification argv automatically and exploratory
-// commands only after an explicit developer decision. A worktree cwd is not a
-// sandbox: approved processes run as the Gator user.
+// commands only after an explicit developer decision. The process also follows
+// the explicit sandbox policy; strict isolation is the default and sandbox-off
+// host access requires a deliberate run-level capability grant.
 type CommandPolicy struct {
 	Allowed        [][]string
 	Remembered     *CommandMemory
@@ -122,7 +123,7 @@ type CommandResult struct {
 func (t RunCommand) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "run_command",
-		Description: "Run a process in the isolated worktree. Provide exactly one of argv (executed without a shell) or command (run with bash -lc, or sh -c if bash is unavailable). Required verification argv runs immediately. Any other command waits for developer approval. This is not a sandbox: cwd is the worktree, but the process has the Gator user's permissions. Required verification commands must still succeed before you complete.",
+		Description: "Run a process in the isolated worktree. Provide exactly one of argv (executed without a shell) or command (run with bash -lc, or sh -c if bash is unavailable). The process follows the run's sandbox policy: strict isolation and denied network are the defaults; sandbox-off host access is an explicit developer capability grant. Required verification argv runs immediately. Any other command waits for developer approval. Required verification commands must still succeed before you complete.",
 		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"argv":{"type":"array","items":{"type":"string"},"minItems":1},"command":{"type":"string"}}}`),
 	}
 }

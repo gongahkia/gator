@@ -33,7 +33,9 @@ import (
 const (
 	manifestPath    = ".gator/mcp.json"
 	manifestVersion = 1
+	protocolVersion = "2025-11-25"
 	maxManifest     = 64 * 1024
+	maxExecutable   = 128 * 1024 * 1024
 	maxServers      = 32
 	maxToolOutput   = 64 * 1024
 )
@@ -200,7 +202,7 @@ func loadManifest(root workspace.Root) (manifest, string, error) {
 	_, _ = digest.Write([]byte(manifestPath + "\x00"))
 	_, _ = digest.Write(contents)
 	seen := make(map[string]struct{}, len(document.Servers))
-	local := make(map[string][]byte)
+	local := make(map[string]string)
 	for index, specification := range document.Servers {
 		if err := validateServer(specification); err != nil {
 			return manifest{}, "", fmt.Errorf("MCP server %d: %w", index+1, err)
@@ -212,7 +214,7 @@ func loadManifest(root workspace.Root) (manifest, string, error) {
 		if specification.Transport == "stdio" {
 			path := filepath.ToSlash(specification.Command[0])
 			if _, found := local[path]; !found {
-				contents, err := executableContents(root, path)
+				contents, err := executableHash(root, path)
 				if err != nil {
 					return manifest{}, "", fmt.Errorf("MCP server %q: %w", specification.Name, err)
 				}
@@ -227,7 +229,7 @@ func loadManifest(root workspace.Root) (manifest, string, error) {
 	sort.Strings(paths)
 	for _, path := range paths {
 		_, _ = digest.Write([]byte("\x00" + path + "\x00"))
-		_, _ = digest.Write(local[path])
+		_, _ = digest.Write([]byte(local[path]))
 	}
 	return document, hex.EncodeToString(digest.Sum(nil)), nil
 }
@@ -271,16 +273,16 @@ func safeRelative(value string) bool {
 	return clean != "." && clean != ".." && !strings.HasPrefix(clean, ".."+string(filepath.Separator))
 }
 
-func executableContents(root workspace.Root, relative string) ([]byte, error) {
+func executableHash(root workspace.Root, relative string) (string, error) {
 	resolved, err := root.ResolveFile(filepath.FromSlash(relative))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	info, err := os.Lstat(resolved)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
-		return nil, errors.New("MCP stdio executable must be an executable regular file")
+		return "", errors.New("MCP stdio executable must be an executable regular file")
 	}
-	return root.ReadRegularFile(filepath.FromSlash(relative), maxManifest)
+	return root.SHA256RegularFile(filepath.FromSlash(relative), maxExecutable)
 }
 
 func connect(ctx context.Context, root workspace.Root, specification server, credentials auth.Store) (client, error) {
@@ -318,7 +320,7 @@ func connect(ctx context.Context, root workspace.Root, specification server, cre
 }
 
 func listTools(ctx context.Context, client client) ([]toolDescription, error) {
-	if _, err := client.Call(ctx, "initialize", map[string]any{"protocolVersion": "2025-03-26", "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "gator", "version": "dev"}}); err != nil {
+	if _, err := client.Call(ctx, "initialize", map[string]any{"protocolVersion": protocolVersion, "capabilities": map[string]any{}, "clientInfo": map[string]string{"name": "gator", "version": "dev"}}); err != nil {
 		return nil, err
 	}
 	if notifier, ok := client.(interface {
@@ -453,7 +455,7 @@ func (c *httpClient) Call(ctx context.Context, method string, params any) (json.
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json, text/event-stream")
-	request.Header.Set("MCP-Protocol-Version", "2025-03-26")
+	request.Header.Set("MCP-Protocol-Version", protocolVersion)
 	if c.access != "" {
 		request.Header.Set("Authorization", "Bearer "+c.access)
 	}

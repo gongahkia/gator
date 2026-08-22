@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -182,6 +183,102 @@ func TestOAuthLoginRequiresTrustedProjectBundle(t *testing.T) {
 	_, err = BeginOAuthLogin(context.Background(), repository, "remote", "not-the-bundle-hash", credentials, OAuthLoginOptions{})
 	if err == nil || !strings.Contains(err.Error(), "not trusted") {
 		t.Fatalf("untrusted OAuth login error = %v", err)
+	}
+}
+
+func TestProtectedResourceDiscoveryFallsBackToEndpointWellKnownPath(t *testing.T) {
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/team/mcp":
+			writer.WriteHeader(http.StatusMethodNotAllowed)
+		case "/.well-known/oauth-protected-resource/team/mcp":
+			_ = json.NewEncoder(writer).Encode(map[string]any{"authorization_servers": []string{serverURL + "/issuer"}, "scopes_supported": []string{"read", "write"}})
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+	metadata, scopes, err := discoverProtectedResource(context.Background(), server.Client(), server.URL+"/team/mcp")
+	if err != nil {
+		t.Fatalf("discover protected metadata: %v", err)
+	}
+	if len(metadata.AuthorizationServers) != 1 || metadata.AuthorizationServers[0] != server.URL+"/issuer" || len(scopes) != 0 || strings.Join(metadata.ScopesSupported, " ") != "read write" {
+		t.Fatalf("protected metadata=%#v challenge scopes=%#v", metadata, scopes)
+	}
+}
+
+func TestAuthorizationServerDiscoveryFallsBackToOpenIDMetadata(t *testing.T) {
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/.well-known/oauth-authorization-server/tenant":
+			http.NotFound(writer, request)
+		case "/.well-known/openid-configuration/tenant":
+			_ = json.NewEncoder(writer).Encode(map[string]any{"authorization_endpoint": serverURL + "/authorize", "token_endpoint": serverURL + "/token", "code_challenge_methods_supported": []string{"S256"}})
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+	metadata, err := discoverAuthorizationServer(context.Background(), server.Client(), server.URL+"/tenant")
+	if err != nil {
+		t.Fatalf("discover OpenID authorization metadata: %v", err)
+	}
+	if metadata.AuthorizationEndpoint != server.URL+"/authorize" || !metadata.supportsS256() {
+		t.Fatalf("authorization metadata = %#v", metadata)
+	}
+}
+
+func TestOAuthLoginUsesPreRegisteredClientAndExactRedirect(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	redirect := "http://" + listener.Addr().String() + "/callback"
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var serverURL string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/mcp":
+			writer.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+serverURL+`/.well-known/oauth-protected-resource/mcp"`)
+			writer.WriteHeader(http.StatusUnauthorized)
+		case "/.well-known/oauth-protected-resource/mcp":
+			_ = json.NewEncoder(writer).Encode(map[string]any{"authorization_servers": []string{serverURL + "/issuer"}})
+		case "/.well-known/oauth-authorization-server/issuer":
+			_ = json.NewEncoder(writer).Encode(map[string]any{"authorization_endpoint": serverURL + "/authorize", "token_endpoint": serverURL + "/token", "code_challenge_methods_supported": []string{"S256"}})
+		case "/register":
+			t.Fatal("pre-registered client unexpectedly used dynamic registration")
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	serverURL = server.URL
+	repository := oauthRepository(t, server.URL+"/mcp")
+	digest, err := BundleHash(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credentials, err := auth.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	login, err := BeginOAuthLogin(context.Background(), repository, "remote", digest, credentials, OAuthLoginOptions{HTTPClient: server.Client(), ClientID: "registered-client", RedirectURL: redirect})
+	if err != nil {
+		t.Fatalf("begin pre-registered login: %v", err)
+	}
+	defer login.Cancel()
+	if login.RedirectURL() != redirect {
+		t.Fatalf("redirect = %q, want %q", login.RedirectURL(), redirect)
+	}
+	authorizationURL, err := url.Parse(login.URL())
+	if err != nil || authorizationURL.Query().Get("client_id") != "registered-client" || authorizationURL.Query().Get("redirect_uri") != redirect {
+		t.Fatalf("authorization URL = %q, err=%v", login.URL(), err)
 	}
 }
 

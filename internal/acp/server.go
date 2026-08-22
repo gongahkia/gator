@@ -914,7 +914,7 @@ func acpToolKind(name string) string {
 		return "search"
 	case "write_file", "apply_patch":
 		return "edit"
-	case "run_command":
+	case "run_command", "terminal_start", "terminal_write", "terminal_stop":
 		return "execute"
 	default:
 		return "other"

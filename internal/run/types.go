@@ -52,9 +52,13 @@ type Request struct {
 	// ForceCompaction requests a model-generated summary of older retained
 	// messages before this turn. It is meaningful for resume and fork flows.
 	ForceCompaction bool
-	Images          []agent.Image
-	Attachments     []agent.Attachment
-	Mode            Mode
+	// DisableWriterDelegation is an internal recursion guard for a child writer
+	// run. It is not a developer-facing capability: only the primary native
+	// agent may create a writer worktree.
+	DisableWriterDelegation bool
+	Images                  []agent.Image
+	Attachments             []agent.Attachment
+	Mode                    Mode
 }
 
 // Mode controls the native agent tool surface for a turn. Plan mode is
