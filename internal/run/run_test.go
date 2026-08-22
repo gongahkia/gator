@@ -471,7 +471,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	if strings.Contains(payload.Writer.Patch, "parent.txt") || !strings.Contains(payload.Writer.Patch, "writer.txt") {
 		t.Fatalf("writer handoff must contain only the child delta: %q", payload.Writer.Patch)
 	}
-	if !strings.Contains(payload.Notice, "never auto-merges") || len(events) != 2 || events[0].Kind != agent.EventSubagent || !strings.Contains(events[0].Text, "starting isolated writer") {
+	if !strings.Contains(payload.Notice, "never auto-merges") || len(events) != 2 || events[0].Kind != agent.EventSubagent || !strings.Contains(events[0].Text, "starting isolated writer") || !strings.Contains(events[0].Text, "role test-fixer") || !strings.Contains(events[1].Text, "role test-fixer") {
 		t.Fatalf("writer delegation events = %#v; notice = %q", events, payload.Notice)
 	}
 	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") || !strings.Contains(model.requests[0].System, "Selected project role test-fixer") || !strings.Contains(model.requests[0].System, "change only the delegated test behavior") {
@@ -487,6 +487,44 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	}
 	if contents, err := os.ReadFile(filepath.Join(parent.Path, "writer.txt")); err != nil || string(contents) != "writer delta\n" {
 		t.Fatalf("writer delta was not explicitly transferable: %q, %v", contents, err)
+	}
+}
+
+func TestExecutorLoadsProjectRolesForDelegatedScouts(t *testing.T) {
+	repository := featureRepository(t)
+	if err := os.MkdirAll(filepath.Join(repository, ".gator"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, ".gator", "agents.json"), []byte(`{
+  "version": 1,
+  "roles": [{
+    "name": "reviewer",
+    "description": "independent change review",
+    "kind": "readonly",
+    "instructions": "prioritize regressions and missing verification evidence"
+  }]
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	model := &roleIntegrationModel{}
+	outcome, err := (Executor{Model: model}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Review the fixture change",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "role-integration-001",
+		MaxSteps:       4,
+		StateDir:       t.TempDir(),
+		Mode:           PlanMode,
+	})
+	if err != nil {
+		t.Fatalf("execute role integration: %v", err)
+	}
+	if !strings.Contains(outcome.Result.FinalText, "review complete") || !strings.Contains(model.parentToolSchema, `"reviewer"`) || !strings.Contains(model.scoutSystem, "Selected project role reviewer") || !strings.Contains(model.scoutSystem, "prioritize regressions") {
+		t.Fatalf("role integration outcome=%#v parentSchema=%q scoutSystem=%q", outcome.Result, model.parentToolSchema, model.scoutSystem)
+	}
+	if !containsEventText(outcome.Events, agent.EventSubagent, "role(s) reviewer") {
+		t.Fatalf("role selection was not visible in events: %#v", outcome.Events)
 	}
 }
 
@@ -728,6 +766,40 @@ func TestExecutorResumesWithFreshEvidence(t *testing.T) {
 	if current.ParentStatePath != "/state/original" {
 		t.Fatalf("resumed session parent = %q", current.ParentStatePath)
 	}
+}
+
+type roleIntegrationModel struct {
+	parentCalls      int
+	parentToolSchema string
+	scoutSystem      string
+}
+
+func (m *roleIntegrationModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	if strings.Contains(request.System, "You are a read-only scout") {
+		m.scoutSystem = request.System
+		return agent.Turn{Text: "review evidence"}, nil
+	}
+	for _, definition := range request.Tools {
+		if definition.Name == "delegate_readonly" {
+			m.parentToolSchema = string(definition.Parameters)
+			break
+		}
+	}
+	if m.parentCalls == 0 {
+		m.parentCalls++
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "review", Name: "delegate_readonly", Arguments: json.RawMessage(`{"tasks":[{"task":"Review the fixture change","role":"reviewer"}]}`)}}}, nil
+	}
+	m.parentCalls++
+	return agent.Turn{Text: "review complete"}, nil
+}
+
+func containsEventText(events []agent.Event, kind agent.EventKind, text string) bool {
+	for _, event := range events {
+		if event.Kind == kind && strings.Contains(event.Text, text) {
+			return true
+		}
+	}
+	return false
 }
 
 type scriptedModel struct {

@@ -37,6 +37,7 @@ const (
 	maxLocations    = 128
 	maxSymbols      = 128
 	maxHoverBytes   = 32 * 1024
+	maxSymbolQuery  = 512
 	maxToolOutput   = 64 * 1024
 )
 
@@ -228,11 +229,12 @@ func executableHash(root workspace.Root, relative string) (string, error) {
 type lspOperation string
 
 const (
-	diagnosticsOperation     lspOperation = "diagnostics"
-	hoverOperation           lspOperation = "hover"
-	definitionOperation      lspOperation = "definition"
-	referencesOperation      lspOperation = "references"
-	documentSymbolsOperation lspOperation = "document_symbols"
+	diagnosticsOperation      lspOperation = "diagnostics"
+	hoverOperation            lspOperation = "hover"
+	definitionOperation       lspOperation = "definition"
+	referencesOperation       lspOperation = "references"
+	documentSymbolsOperation  lspOperation = "document_symbols"
+	workspaceSymbolsOperation lspOperation = "workspace_symbols"
 )
 
 var lspOperations = []lspOperation{
@@ -241,6 +243,7 @@ var lspOperations = []lspOperation{
 	definitionOperation,
 	referencesOperation,
 	documentSymbolsOperation,
+	workspaceSymbolsOperation,
 }
 
 // Tool adapts one trusted, read-only LSP operation to the agent tool contract.
@@ -261,6 +264,8 @@ func (t Tool) Definition() agent.ToolDefinition {
 	switch t.operation {
 	case diagnosticsOperation, documentSymbolsOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"}}}`)
+	case workspaceSymbolsOperation:
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512,"description":"Symbol-name query within this workspace"}}}`)
 	case referencesOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"include_declaration":{"type":"boolean","description":"Include the symbol declaration in results; defaults to false"}}}`)
 	default:
@@ -282,6 +287,8 @@ func (t Tool) description() string {
 		return "Read-only LSP find-references lookup using " + server + ". line is one-based; character is a zero-based UTF-16 offset. Only workspace locations are returned."
 	case documentSymbolsOperation:
 		return "Read-only LSP document-symbol listing using " + server + ". The path must be a workspace-relative source file."
+	case workspaceSymbolsOperation:
+		return "Read-only LSP workspace-symbol search using " + server + ". The query is limited to symbols in the active workspace; only workspace locations are returned."
 	default:
 		return "Read-only LSP inspection using " + server + "."
 	}
@@ -292,6 +299,7 @@ type toolParameters struct {
 	Line               int    `json:"line"`
 	Character          int    `json:"character"`
 	IncludeDeclaration bool   `json:"include_declaration"`
+	Query              string `json:"query"`
 }
 
 func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.ToolResult, error) {
@@ -299,16 +307,27 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if err := decodeArguments(arguments, &params); err != nil {
 		return agent.ToolResult{}, err
 	}
-	resolved, err := t.root.ResolveFile(params.Path)
-	if err != nil {
-		return agent.ToolResult{}, err
-	}
-	info, err := os.Stat(resolved)
-	if err != nil {
-		return agent.ToolResult{}, fmt.Errorf("stat LSP %s path: %w", t.operation, err)
-	}
-	if !info.Mode().IsRegular() {
-		return agent.ToolResult{}, fmt.Errorf("LSP %s requires a regular source file", t.operation)
+	resolved := ""
+	target := params.Path
+	if t.operation == workspaceSymbolsOperation {
+		params.Query = strings.TrimSpace(params.Query)
+		if params.Query == "" || len(params.Query) > maxSymbolQuery || strings.ContainsAny(params.Query, "\r\n\x00") {
+			return agent.ToolResult{}, fmt.Errorf("LSP workspace-symbol query must contain 1-%d printable bytes", maxSymbolQuery)
+		}
+		target = params.Query
+	} else {
+		var err error
+		resolved, err = t.root.ResolveFile(params.Path)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		info, err := os.Stat(resolved)
+		if err != nil {
+			return agent.ToolResult{}, fmt.Errorf("stat LSP %s path: %w", t.operation, err)
+		}
+		if !info.Mode().IsRegular() {
+			return agent.ToolResult{}, fmt.Errorf("LSP %s requires a regular source file", t.operation)
+		}
 	}
 	if t.requiresPosition() && (params.Line < 1 || params.Character < 0) {
 		return agent.ToolResult{}, errors.New("LSP position requires a one-based line and a zero-based UTF-16 character offset")
@@ -316,7 +335,7 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if t.approve == nil {
 		return agent.ToolResult{}, fmt.Errorf("LSP %s requires developer approval", t.operation)
 	}
-	if err := t.approve(ctx, t.specification.Name, string(t.operation), params.Path); err != nil {
+	if err := t.approve(ctx, t.specification.Name, string(t.operation), target); err != nil {
 		return agent.ToolResult{}, err
 	}
 	if t.connect == nil {
@@ -335,7 +354,7 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if err != nil {
 		return agent.ToolResult{}, fmt.Errorf("request %s from LSP server %q: %w", t.operation, t.specification.Name, err)
 	}
-	return t.format(params.Path, response)
+	return t.format(target, response)
 }
 
 func (t Tool) requiresPosition() bool {
@@ -356,6 +375,8 @@ func (t Tool) request(path string, params toolParameters) (string, any) {
 		return "textDocument/references", map[string]any{"textDocument": document, "position": position, "context": map[string]bool{"includeDeclaration": params.IncludeDeclaration}}
 	case documentSymbolsOperation:
 		return "textDocument/documentSymbol", map[string]any{"textDocument": document}
+	case workspaceSymbolsOperation:
+		return "workspace/symbol", map[string]string{"query": params.Query}
 	default:
 		return "", nil
 	}
@@ -381,6 +402,8 @@ func (t Tool) format(path string, response json.RawMessage) (agent.ToolResult, e
 		return formatLocations(t.root, path, t.specification.Name, t.operation, response)
 	case documentSymbolsOperation:
 		return formatDocumentSymbols(t.root, path, t.specification.Name, response)
+	case workspaceSymbolsOperation:
+		return formatWorkspaceSymbols(t.root, path, t.specification.Name, response)
 	default:
 		return agent.ToolResult{}, fmt.Errorf("unsupported LSP operation %q", t.operation)
 	}
@@ -634,32 +657,40 @@ func presentLocation(root workspace.Root, location lspLocation) (presentedLocati
 	if uri == "" {
 		return presentedLocation{}, false, errors.New("LSP server returned a location without a URI")
 	}
-	parsed, err := url.Parse(uri)
-	if err != nil || parsed.Scheme != "file" || (parsed.Host != "" && parsed.Host != "localhost") || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return presentedLocation{}, false, errors.New("LSP server returned an invalid location URI")
-	}
-	candidate := filepath.Clean(filepath.FromSlash(parsed.Path))
-	relative, err := filepath.Rel(root.Path(), candidate)
-	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
-		return presentedLocation{}, false, nil
-	}
-	resolved, err := root.ResolveFile(relative)
-	if err != nil {
-		return presentedLocation{}, false, nil
-	}
-	info, err := os.Stat(resolved)
-	if err != nil || !info.Mode().IsRegular() {
-		return presentedLocation{}, false, nil
-	}
-	returnedPath, err := filepath.Rel(root.Path(), resolved)
-	if err != nil {
-		return presentedLocation{}, false, nil
+	path, found, err := presentFileURI(root, uri)
+	if err != nil || !found {
+		return presentedLocation{}, found, err
 	}
 	presented, err := presentRange(sourceRange)
 	if err != nil {
 		return presentedLocation{}, false, fmt.Errorf("LSP server returned an invalid location range: %w", err)
 	}
-	return presentedLocation{Path: filepath.ToSlash(returnedPath), Range: presented}, true, nil
+	return presentedLocation{Path: path, Range: presented}, true, nil
+}
+
+func presentFileURI(root workspace.Root, uri string) (string, bool, error) {
+	parsed, err := url.Parse(uri)
+	if err != nil || parsed.Scheme != "file" || (parsed.Host != "" && parsed.Host != "localhost") || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", false, errors.New("LSP server returned an invalid location URI")
+	}
+	candidate := filepath.Clean(filepath.FromSlash(parsed.Path))
+	relative, err := filepath.Rel(root.Path(), candidate)
+	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return "", false, nil
+	}
+	resolved, err := root.ResolveFile(relative)
+	if err != nil {
+		return "", false, nil
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", false, nil
+	}
+	returnedPath, err := filepath.Rel(root.Path(), resolved)
+	if err != nil {
+		return "", false, nil
+	}
+	return filepath.ToSlash(returnedPath), true, nil
 }
 
 func presentRange(value lspRange) (presentedRange, error) {
@@ -693,6 +724,70 @@ type presentedSymbol struct {
 	Range          presentedRange    `json:"range"`
 	SelectionRange presentedRange    `json:"selection_range"`
 	Children       []presentedSymbol `json:"children,omitempty"`
+}
+
+type presentedWorkspaceSymbol struct {
+	Path   string          `json:"path"`
+	Name   string          `json:"name"`
+	Detail string          `json:"detail,omitempty"`
+	Kind   int             `json:"kind"`
+	Range  *presentedRange `json:"range,omitempty"`
+}
+
+func formatWorkspaceSymbols(root workspace.Root, query, server string, response json.RawMessage) (agent.ToolResult, error) {
+	if len(response) == 0 || string(response) == "null" {
+		response = json.RawMessage("[]")
+	}
+	var rawSymbols []json.RawMessage
+	if err := json.Unmarshal(response, &rawSymbols); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("decode workspace symbols: %w", err)
+	}
+	presented := make([]presentedWorkspaceSymbol, 0, min(len(rawSymbols), maxSymbols))
+	truncated := false
+	for _, raw := range rawSymbols {
+		if len(presented) == maxSymbols {
+			truncated = true
+			break
+		}
+		var symbol struct {
+			Name          string `json:"name"`
+			Kind          int    `json:"kind"`
+			ContainerName string `json:"containerName"`
+			Location      struct {
+				URI   string    `json:"uri"`
+				Range *lspRange `json:"range"`
+			} `json:"location"`
+		}
+		if err := json.Unmarshal(raw, &symbol); err != nil {
+			return agent.ToolResult{}, fmt.Errorf("decode workspace symbol: %w", err)
+		}
+		if strings.TrimSpace(symbol.Name) == "" || symbol.Kind < 1 || symbol.Kind > 255 || symbol.Location.URI == "" {
+			return agent.ToolResult{}, errors.New("LSP server returned an invalid workspace symbol")
+		}
+		path, found, err := presentFileURI(root, symbol.Location.URI)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		if !found {
+			truncated = true
+			continue
+		}
+		value := presentedWorkspaceSymbol{Path: path, Name: shorten(symbol.Name, 512), Detail: shorten(symbol.ContainerName, 1024), Kind: symbol.Kind}
+		if symbol.Location.Range != nil {
+			presentedRange, err := presentRange(*symbol.Location.Range)
+			if err != nil {
+				return agent.ToolResult{}, fmt.Errorf("LSP server returned an invalid workspace-symbol range: %w", err)
+			}
+			value.Range = &presentedRange
+		}
+		presented = append(presented, value)
+	}
+	return boundedToolResult(struct {
+		Query     string                     `json:"query"`
+		Server    string                     `json:"server"`
+		Symbols   []presentedWorkspaceSymbol `json:"symbols"`
+		Truncated bool                       `json:"truncated"`
+	}{Query: query, Server: server, Symbols: presented, Truncated: truncated}, "workspace-symbol")
 }
 
 func formatDocumentSymbols(root workspace.Root, path, server string, response json.RawMessage) (agent.ToolResult, error) {
@@ -889,7 +984,11 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 		"rootUri":          uri,
 		"workspaceFolders": []map[string]string{{"uri": uri, "name": filepath.Base(root)}},
 		"capabilities": map[string]any{
-			"workspace": map[string]any{"configuration": true, "workspaceFolders": true},
+			"workspace": map[string]any{
+				"configuration":    true,
+				"workspaceFolders": true,
+				"symbol":           map[string]any{"dynamicRegistration": false},
+			},
 			"textDocument": map[string]any{
 				"diagnostic":     map[string]any{"dynamicRegistration": false},
 				"hover":          map[string]any{"dynamicRegistration": false, "contentFormat": []string{"plaintext", "markdown"}},
@@ -904,22 +1003,24 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 	}
 	var response struct {
 		Capabilities struct {
-			DiagnosticProvider     json.RawMessage `json:"diagnosticProvider"`
-			HoverProvider          json.RawMessage `json:"hoverProvider"`
-			DefinitionProvider     json.RawMessage `json:"definitionProvider"`
-			ReferencesProvider     json.RawMessage `json:"referencesProvider"`
-			DocumentSymbolProvider json.RawMessage `json:"documentSymbolProvider"`
+			DiagnosticProvider      json.RawMessage `json:"diagnosticProvider"`
+			HoverProvider           json.RawMessage `json:"hoverProvider"`
+			DefinitionProvider      json.RawMessage `json:"definitionProvider"`
+			ReferencesProvider      json.RawMessage `json:"referencesProvider"`
+			DocumentSymbolProvider  json.RawMessage `json:"documentSymbolProvider"`
+			WorkspaceSymbolProvider json.RawMessage `json:"workspaceSymbolProvider"`
 		} `json:"capabilities"`
 	}
 	if err := json.Unmarshal(result, &response); err != nil {
 		return fmt.Errorf("decode initialize response: %w", err)
 	}
 	c.support = map[lspOperation]bool{
-		diagnosticsOperation:     capabilityEnabled(response.Capabilities.DiagnosticProvider),
-		hoverOperation:           capabilityEnabled(response.Capabilities.HoverProvider),
-		definitionOperation:      capabilityEnabled(response.Capabilities.DefinitionProvider),
-		referencesOperation:      capabilityEnabled(response.Capabilities.ReferencesProvider),
-		documentSymbolsOperation: capabilityEnabled(response.Capabilities.DocumentSymbolProvider),
+		diagnosticsOperation:      capabilityEnabled(response.Capabilities.DiagnosticProvider),
+		hoverOperation:            capabilityEnabled(response.Capabilities.HoverProvider),
+		definitionOperation:       capabilityEnabled(response.Capabilities.DefinitionProvider),
+		referencesOperation:       capabilityEnabled(response.Capabilities.ReferencesProvider),
+		documentSymbolsOperation:  capabilityEnabled(response.Capabilities.DocumentSymbolProvider),
+		workspaceSymbolsOperation: capabilityEnabled(response.Capabilities.WorkspaceSymbolProvider),
 	}
 	return c.notify("initialized", map[string]any{})
 }

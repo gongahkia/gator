@@ -430,7 +430,9 @@ grants, not defaults.
 Gator resolves root, `.gator`, and scope-specific `AGENTS.md` guidance for
 each `--scope` path. `.gator/rules.json` adds bounded path rules without
 granting executable capability. A developer may select a named declarative
-profile from `.gator/agents.json` with `--profile`. Project hooks, LSP, and MCP configuration are
+profile from `.gator/agents.json` with `--profile`. The same file can define
+capability-bounded roles for delegated scouts and writers; inspect them with
+`gator agent list` and see [project agent roles](docs/AGENTS.md). Project hooks, LSP, and MCP configuration are
 different: `gator hook trust` pins the hash of `.gator/hooks.json` plus its
 declared executables; `gator lsp trust` pins `.gator/lsp.json` plus local LSP
 executables; and `gator mcp trust` pins `.gator/mcp.json` plus local stdio
@@ -458,7 +460,9 @@ worktree. Those fresh-context scouts run concurrently, can only read/list/search
 or inspect Git state, and see the primary agent's uncommitted changes. They
 cannot edit, run a command, access extensions, LSP, MCP, or recursively
 delegate. Each report is bounded to 8 KiB and explicitly framed as untrusted
-evidence; Gator permits at most eight dynamic scouts per primary run.
+evidence; Gator permits at most eight dynamic scouts per primary run. A project
+may add a named `readonly` role to focus one scout's fresh-context prompt, but
+it cannot expand the scout tool surface.
 
 Execute mode also exposes `delegate_writer` for one independent implementation
 task at a time (at most two per primary run). Gator snapshots the current
@@ -470,7 +474,9 @@ call to transfer a compatible patch; Gator never auto-merges it. The writer
 inherits the developer-selected profile, verifier, sandbox, approval policy,
 and trusted integrations, but cannot recursively create a writer. A larger or
 failed child delta remains in its retained worktree for manual inspection with
-`gator worktree list`.
+`gator worktree list`. A named project `writer` role can focus the child prompt,
+but it retains the same serial child-worktree, approval, sandbox, and explicit
+parent-review contract.
 
 Execute mode also gives the native model a persistent terminal-task surface:
 `terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and

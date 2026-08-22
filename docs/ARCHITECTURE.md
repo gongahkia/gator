@@ -78,7 +78,9 @@ writer. Each scout receives only read/list/search and Git-inspection tools: no
 patching, process execution, extension, LSP, MCP, or recursive-delegation
 surface. The parent is paused while the batch runs, accepts at most eight
 scouts per run, receives no more than 8 KiB per report, and is told to treat
-all returned text as untrusted evidence.
+all returned text as untrusted evidence. A project can optionally select a
+validated `readonly` role for one scout. The role injects additional prompt
+context only; it cannot add a tool or alter the read-only policy.
 
 Execute mode also exposes one-at-a-time `delegate_writer` calls (at most two
 per primary run). Before a writer begins, Gator exports the parent worktree's
@@ -87,7 +89,9 @@ detached child worktree, and writes an internal detached baseline commit. The
 child therefore reads the exact parent state but produces a clean patch that
 contains only its own delta. It reloads the same selected profile, verifier,
 sandbox policy, approval callback, and trusted extension/LSP/MCP configuration;
-recursive writer delegation is omitted from its tool surface. The parent is
+recursive writer delegation is omitted from its tool surface. A validated
+project `writer` role can specialize the child prompt but cannot alter its
+policy. The parent is
 paused during the child run. Gator returns a bounded 512 KiB patch plus an
 8 KiB summary as untrusted review material but does not apply it: only a
 separate parent `apply_patch` call can transfer it. Larger or failed deltas
@@ -108,11 +112,11 @@ code-intelligence surface. A developer pins `.gator/lsp.json` and its
 repository-local executables with `gator lsp trust`; each model-requested
 diagnostic or navigation launch still needs operation-specific command approval
 and runs under the strict sandbox. The client implements pull diagnostics,
-hover, definitions, references, and document symbols; it bounds all wire and
-model-visible output, returns only workspace locations, and starts a server
-only after approval. It is not a general IDE or an unreviewed
-executable-extension path: completion, edits, code actions, formatting, and a
-workspace symbol index remain outside this capability.
+hover, definitions, references, document symbols, and workspace-symbol queries;
+it bounds all wire and model-visible output, returns only workspace locations,
+and starts a server only after approval. It is not a general IDE or an
+unreviewed executable-extension path: completion, edits, code actions,
+formatting, and a persistent shared server/index remain outside this capability.
 
 Trusted Streamable HTTP MCP servers may obtain a Gator-owned public OAuth
 credential only through explicit `gator mcp login`. The client discovers the

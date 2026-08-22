@@ -9,6 +9,8 @@ import (
 	"github.com/gongahkia/gator/internal/instructions"
 )
 
+const maxRoleCatalogBytes = 4 * 1024
+
 // rolesForKind exposes only roles which match a pre-existing delegation
 // capability. Project configuration can specialize a worker's prompt, but it
 // cannot turn a read-only scout into a writer or grant a writer new tools.
@@ -51,9 +53,20 @@ func roleCatalog(roles map[string]instructions.Role) string {
 		return ""
 	}
 	parts := make([]string, 0, len(roles))
+	length := 0
 	for _, name := range roleNames(roles) {
 		role := roles[name]
-		parts = append(parts, name+" — "+role.Description)
+		part := name + " — " + role.Description
+		separator := 0
+		if len(parts) > 0 {
+			separator = 2
+		}
+		if length+separator+len(part) > maxRoleCatalogBytes {
+			parts = append(parts, "additional role names are available in the schema")
+			break
+		}
+		parts = append(parts, part)
+		length += separator + len(part)
 	}
 	return strings.Join(parts, "; ")
 }
@@ -72,4 +85,23 @@ func rolePrompt(role instructions.Role) string {
 		return ""
 	}
 	return "Selected project role " + role.Name + ":\n" + role.Instructions
+}
+
+func selectedRoleNames(values []instructions.Role) string {
+	seen := make(map[string]struct{}, len(values))
+	for _, role := range values {
+		if role.Name != "" {
+			seen[role.Name] = struct{}{}
+		}
+	}
+	return strings.Join(roleNamesFromSet(seen), ", ")
+}
+
+func roleNamesFromSet(values map[string]struct{}) []string {
+	names := make([]string, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

@@ -130,6 +130,11 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 			"name": "Target", "kind": 5, "range": location(localURI)["range"], "selectionRange": location(localURI)["range"],
 			"children": []any{map[string]any{"name": "Method", "kind": 6, "range": location(localURI)["range"], "selectionRange": location(localURI)["range"]}},
 		}}),
+		"workspace/symbol": encoded([]any{map[string]any{
+			"name": "Target", "kind": 5, "containerName": "pkg", "location": location(localURI),
+		}, map[string]any{
+			"name": "External", "kind": 5, "location": location(externalURI),
+		}}),
 	}
 	cases := []struct {
 		operation lspOperation
@@ -141,6 +146,7 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 		{operation: definitionOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/definition", contains: []string{"pkg/target.go", `"truncated":true`}},
 		{operation: referencesOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"include_declaration":true}`, method: "textDocument/references", contains: []string{"pkg/target.go"}},
 		{operation: documentSymbolsOperation, arguments: `{"path":"pkg/example.go"}`, method: "textDocument/documentSymbol", contains: []string{"Target", "Method"}},
+		{operation: workspaceSymbolsOperation, arguments: `{"query":"Target"}`, method: "workspace/symbol", contains: []string{`"query":"Target"`, "pkg/target.go", `"truncated":true`}},
 	}
 	for _, test := range cases {
 		t.Run(string(test.operation), func(t *testing.T) {
@@ -158,7 +164,11 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 			if err != nil {
 				t.Fatalf("execute %s: %v", test.operation, err)
 			}
-			if approved != "fixture:"+string(test.operation)+":pkg/example.go" || connection.method != test.method || !connection.closed {
+			target := "pkg/example.go"
+			if test.operation == workspaceSymbolsOperation {
+				target = "Target"
+			}
+			if approved != "fixture:"+string(test.operation)+":"+target || connection.method != test.method || !connection.closed {
 				t.Fatalf("approval=%q client=%#v", approved, connection)
 			}
 			for _, expected := range test.contains {
@@ -211,6 +221,7 @@ func TestNativeClientUsesReadOnlyLookups(t *testing.T) {
 		{method: "textDocument/definition", want: "[]"},
 		{method: "textDocument/references", want: "[]"},
 		{method: "textDocument/documentSymbol", want: "[]"},
+		{method: "workspace/symbol", want: "[]"},
 	} {
 		response, err := client.Request(context.Background(), lookup.method, map[string]any{"textDocument": map[string]string{"uri": fileURI("/fixture/pkg/example.go")}})
 		if err != nil {
@@ -274,11 +285,12 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 		switch message.Method {
 		case "initialize":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"capabilities": map[string]any{
-				"diagnosticProvider":     map[string]any{},
-				"hoverProvider":          true,
-				"definitionProvider":     true,
-				"referencesProvider":     true,
-				"documentSymbolProvider": true,
+				"diagnosticProvider":      map[string]any{},
+				"hoverProvider":           true,
+				"definitionProvider":      true,
+				"referencesProvider":      true,
+				"documentSymbolProvider":  true,
+				"workspaceSymbolProvider": true,
 			}}})
 		case "initialized":
 			continue
@@ -286,7 +298,7 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"kind": "full", "items": []Diagnostic{diagnostic("fixture error", 0, 0, 1)}}})
 		case "textDocument/hover":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"contents": "fixture hover"}})
-		case "textDocument/definition", "textDocument/references", "textDocument/documentSymbol":
+		case "textDocument/definition", "textDocument/references", "textDocument/documentSymbol", "workspace/symbol":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": []any{}})
 		case "shutdown":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": nil})

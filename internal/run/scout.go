@@ -204,7 +204,15 @@ func (t readOnlyScoutTool) Execute(ctx context.Context, raw json.RawMessage) (ag
 		return agent.ToolResult{}, fmt.Errorf("delegate_readonly run budget exceeded; at most %d scouts may run per primary run", maxDelegatedScoutsPerRun)
 	}
 
-	t.emitEvent("starting " + fmt.Sprintf("%d read-only scout(s)", len(assignments)))
+	selectedRoles := make([]instructions.Role, 0, len(assignments))
+	for _, assignment := range assignments {
+		selectedRoles = append(selectedRoles, assignment.role)
+	}
+	eventText := "starting " + fmt.Sprintf("%d read-only scout(s)", len(assignments))
+	if names := selectedRoleNames(selectedRoles); names != "" {
+		eventText += " using role(s) " + names
+	}
+	t.emitEvent(eventText)
 	reports := make([]delegatedScoutReport, len(assignments))
 	var wait sync.WaitGroup
 	for index, item := range assignments {

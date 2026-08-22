@@ -142,6 +142,16 @@ func TestLoadRolesRejectsCapabilityEscalationAndMalformedRoles(t *testing.T) {
 	if _, err := LoadRoles(repository); err == nil || !strings.Contains(err.Error(), "one-line description") {
 		t.Fatalf("multiline role description error = %v", err)
 	}
+	writeInstructionFile(t, repository, ".gator/roles/empty.md", "   ")
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "roles": [
+    {"name": "reviewer", "description": "review changes", "kind": "readonly", "file": ".gator/roles/empty.md"}
+  ]
+}`)
+	if _, err := LoadRoles(repository); err == nil || !strings.Contains(err.Error(), "empty instructions") {
+		t.Fatalf("empty role instructions error = %v", err)
+	}
 }
 
 func writeInstructionFile(t *testing.T, repository, relative, contents string) {

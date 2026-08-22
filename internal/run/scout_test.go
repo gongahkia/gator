@@ -131,7 +131,10 @@ func TestReadOnlyScoutRoleSpecializesPromptWithoutChangingTools(t *testing.T) {
 		{Name: "reviewer", Description: "review a proposed change", Kind: instructions.RoleReadOnly, Instructions: "prioritize regressions and missing tests"},
 		{Name: "writer", Description: "must not be visible to scouts", Kind: instructions.RoleWriter, Instructions: "write code"},
 	}
-	tool := newReadOnlyScoutTool(model, root, "project guidance", roles, 2, fixedScoutClock(), nil)
+	var events []agent.Event
+	tool := newReadOnlyScoutTool(model, root, "project guidance", roles, 2, fixedScoutClock(), func(event agent.Event) {
+		events = append(events, event)
+	})
 	definition := tool.Definition()
 	if !json.Valid(definition.Parameters) || !strings.Contains(string(definition.Parameters), `"reviewer"`) || strings.Contains(string(definition.Parameters), `"writer"`) || !strings.Contains(definition.Description, "reviewer") {
 		t.Fatalf("scout role definition = %#v", definition)
@@ -149,6 +152,9 @@ func TestReadOnlyScoutRoleSpecializesPromptWithoutChangingTools(t *testing.T) {
 	requests := model.requestsSnapshot()
 	if len(requests) != 1 || !strings.Contains(requests[0].System, "Selected project role reviewer") || !strings.Contains(requests[0].System, "prioritize regressions") {
 		t.Fatalf("role system prompt = %#v", requests)
+	}
+	if len(events) != 2 || !strings.Contains(events[0].Text, "role(s) reviewer") || !strings.Contains(events[1].Text, "completed") {
+		t.Fatalf("role events = %#v", events)
 	}
 	for _, definition := range requests[0].Tools {
 		if definition.Name == "apply_patch" || definition.Name == "run_command" || definition.Name == "delegate_writer" {

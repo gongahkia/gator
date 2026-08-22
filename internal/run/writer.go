@@ -105,10 +105,18 @@ func (t writerTool) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 		return agent.ToolResult{}, fmt.Errorf("delegate_writer run budget exceeded; at most %d writers may run per primary run", maxDelegatedWritersPerRun)
 	}
 
-	t.emitEvent("starting isolated writer")
+	startText := "starting isolated writer"
+	if role.Name != "" {
+		startText += " using role " + role.Name
+	}
+	t.emitEvent(startText)
 	report := t.run(ctx, assignment, role)
 	if report.Error == "" {
-		t.emitEvent("completed isolated writer " + report.RunID)
+		completeText := "completed isolated writer " + report.RunID
+		if report.Role != "" {
+			completeText += " using role " + report.Role
+		}
+		t.emitEvent(completeText)
 	} else {
 		t.emitEvent("writer " + report.RunID + " stopped: " + truncateWriterText(report.Error, 160))
 	}
