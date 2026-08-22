@@ -28,21 +28,23 @@ type Request struct {
 // Params contains the union of supported method arguments. Fields unrelated
 // to a method are ignored, allowing clients to use one typed request object.
 type Params struct {
-	Task      string     `json:"task,omitempty"`
-	Provider  string     `json:"provider,omitempty"`
-	Model     string     `json:"model,omitempty"`
-	BaseURL   string     `json:"base_url,omitempty"`
-	Verify    [][]string `json:"verify,omitempty"`
-	Scopes    []string   `json:"scopes,omitempty"`
-	MaxSteps  int        `json:"max_steps,omitempty"`
-	Mode      string     `json:"mode,omitempty"`
-	StatePath string     `json:"state_path,omitempty"`
-	ThreadID  string     `json:"thread_id,omitempty"`
-	RunID     string     `json:"run_id,omitempty"`
-	Message   string     `json:"message,omitempty"`
-	Decision  string     `json:"decision,omitempty"`
-	All       bool       `json:"all,omitempty"`
-	Compact   bool       `json:"compact,omitempty"`
+	Task             string     `json:"task,omitempty"`
+	Provider         string     `json:"provider,omitempty"`
+	Model            string     `json:"model,omitempty"`
+	BaseURL          string     `json:"base_url,omitempty"`
+	Verify           [][]string `json:"verify,omitempty"`
+	Scopes           []string   `json:"scopes,omitempty"`
+	BaseRef          string     `json:"base_ref,omitempty"`
+	CopyIgnoredFiles bool       `json:"copy_ignored_files,omitempty"`
+	MaxSteps         int        `json:"max_steps,omitempty"`
+	Mode             string     `json:"mode,omitempty"`
+	StatePath        string     `json:"state_path,omitempty"`
+	ThreadID         string     `json:"thread_id,omitempty"`
+	RunID            string     `json:"run_id,omitempty"`
+	Message          string     `json:"message,omitempty"`
+	Decision         string     `json:"decision,omitempty"`
+	All              bool       `json:"all,omitempty"`
+	Compact          bool       `json:"compact,omitempty"`
 }
 
 // Message is one newline-delimited server response, event, or error.

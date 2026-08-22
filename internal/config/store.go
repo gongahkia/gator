@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
 
@@ -25,6 +26,7 @@ type Settings struct {
 	Extensions          []Extension      `json:"extensions,omitempty"`
 	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
 	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
+	HookTrusts          []hooks.Trust    `json:"hook_trusts,omitempty"`
 	Execution           sandbox.Policy   `json:"execution"`
 }
 
@@ -267,6 +269,27 @@ func validate(settings Settings) error {
 			return fmt.Errorf("repository %q is trusted more than once", path)
 		}
 		trusted[path] = struct{}{}
+	}
+	if len(settings.HookTrusts) > 256 {
+		return errors.New("configuration has too many hook trust records")
+	}
+	trustedHooks := make(map[string]struct{}, len(settings.HookTrusts))
+	for _, trust := range settings.HookTrusts {
+		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 {
+			return errors.New("hook trust repository path is invalid")
+		}
+		if len(trust.Hash) != 64 {
+			return fmt.Errorf("hook trust for %q has an invalid hash", trust.Repository)
+		}
+		for _, character := range trust.Hash {
+			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+				return fmt.Errorf("hook trust for %q has an invalid hash", trust.Repository)
+			}
+		}
+		if _, exists := trustedHooks[trust.Repository]; exists {
+			return fmt.Errorf("repository %q has more than one hook trust record", trust.Repository)
+		}
+		trustedHooks[trust.Repository] = struct{}{}
 	}
 	return nil
 }

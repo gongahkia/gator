@@ -43,6 +43,80 @@ func TestCreateRejectsInvalidRunID(t *testing.T) {
 	}
 }
 
+func TestCreateWithOptionsUsesResolvedBaseReference(t *testing.T) {
+	repository := initializedRepository(t)
+	first, err := revisionForTest(repository, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "README.md"), []byte("# second\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, repository, "add", "README.md")
+	runGit(t, repository, "-c", "user.name=Gator Test", "-c", "user.email=gator@example.invalid", "commit", "--quiet", "-m", "second")
+
+	created, err := CreateWithOptions(context.Background(), repository, "run-base-001", Options{BaseRef: first})
+	if err != nil {
+		t.Fatalf("create at explicit base: %v", err)
+	}
+	if created.BaseCommit != first {
+		t.Fatalf("base = %s, want %s", created.BaseCommit, first)
+	}
+	contents, err := os.ReadFile(filepath.Join(created.Path, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "# fixture\n" {
+		t.Fatalf("README = %q, want first revision", contents)
+	}
+}
+
+func TestCreateWithOptionsCopiesExplicitIgnoredFiles(t *testing.T) {
+	repository := initializedRepository(t)
+	if err := os.WriteFile(filepath.Join(repository, ".gitignore"), []byte(".env\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(repository, ".gator"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, ".gator", "worktreeinclude"), []byte("# explicit setup\n.env\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, repository, "add", ".gitignore", ".gator/worktreeinclude")
+	runGit(t, repository, "-c", "user.name=Gator Test", "-c", "user.email=gator@example.invalid", "commit", "--quiet", "-m", "setup")
+	if err := os.WriteFile(filepath.Join(repository, ".env"), []byte("SECRET=value\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	created, err := CreateWithOptions(context.Background(), repository, "run-setup-001", Options{CopyIgnoredFiles: true})
+	if err != nil {
+		t.Fatalf("create with ignored setup: %v", err)
+	}
+	contents, err := os.ReadFile(filepath.Join(created.Path, ".env"))
+	if err != nil {
+		t.Fatalf("read copied ignored file: %v", err)
+	}
+	if string(contents) != "SECRET=value\n" {
+		t.Fatalf("copied contents = %q", contents)
+	}
+}
+
+func TestCreateWithOptionsRejectsTrackedOrUnignoredSetup(t *testing.T) {
+	repository := initializedRepository(t)
+	if err := os.MkdirAll(filepath.Join(repository, ".gator"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, ".gator", "worktreeinclude"), []byte("README.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, repository, "add", ".gator/worktreeinclude")
+	runGit(t, repository, "-c", "user.name=Gator Test", "-c", "user.email=gator@example.invalid", "commit", "--quiet", "-m", "setup")
+
+	if _, err := CreateWithOptions(context.Background(), repository, "run-setup-reject-001", Options{CopyIgnoredFiles: true}); err == nil || !strings.Contains(err.Error(), "not ignored") {
+		t.Fatalf("create error = %v, want unignored setup error", err)
+	}
+}
+
 func TestOpenExistingWorktree(t *testing.T) {
 	repository := initializedRepository(t)
 	created, err := Create(context.Background(), repository, "run_resume_001")
@@ -80,4 +154,14 @@ func runGit(t *testing.T, directory string, arguments ...string) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), err, output)
 	}
+}
+
+func revisionForTest(directory, reference string) (string, error) {
+	command := exec.Command("git", "rev-parse", reference)
+	command.Dir = directory
+	output, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }

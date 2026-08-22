@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/patch"
@@ -19,6 +20,10 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	projectInstructionSet, err := instructions.Load(isolated.Repository, request.Scopes)
 	if err != nil {
 		return Outcome{Worktree: isolated}, err
+	}
+	hookEngine, err := hooks.Load(isolated.Path, isolated.Repository, e.hookTrust(isolated.Repository))
+	if err != nil {
+		return Outcome{Worktree: isolated}, fmt.Errorf("load project hooks: %w", err)
 	}
 	extensions, err := e.Extensions.Load(isolated.Repository)
 	if err != nil {
@@ -49,6 +54,16 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			request.OnEvent(event)
 		}
 	}
+	hookEngine.Emit = func(status hooks.Status) {
+		message := status.Hook + " " + string(status.Event)
+		if status.Message != "" {
+			message += ": " + status.Message
+		}
+		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: message})
+	}
+	if hookEngine.Configured() && !hookEngine.Trusted() {
+		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project hooks are disabled because their bundle hash is not explicitly trusted"})
+	}
 	var result agent.Result
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
 	executionPolicy := e.Sandbox.Normalize()
@@ -61,6 +76,12 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Approve:    request.Approve,
 		OnEvent:    emit,
 		Sandbox:    executionPolicy,
+		BeforeCommand: func(ctx context.Context, argv []string, verification bool) error {
+			if !verification || request.Mode != ExecuteMode {
+				return nil
+			}
+			return hookEngine.Run(ctx, hooks.Verification, "run_command", map[string]any{"argv": argv})
+		},
 	})
 	if request.Mode == ExecuteMode {
 		runTools = append(runTools, extensions.Tools(isolated.Root)...)
@@ -75,7 +96,13 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	originalMessageCount := len(initialMessages)
 	compactionContext, cancelCompaction := context.WithTimeout(ctx, 45*time.Second)
-	compactedMessages, _, compacted, compactErr := compactMessages(compactionContext, e.Model, initialMessages, request.ForceCompaction)
+	lifecycle := func(event string, payload map[string]any) error {
+		if request.Mode != ExecuteMode {
+			return nil
+		}
+		return hookEngine.Run(compactionContext, hooks.Event(event), "", payload)
+	}
+	compactedMessages, _, compacted, compactErr := compactMessagesWithLifecycle(compactionContext, e.Model, initialMessages, request.ForceCompaction, lifecycle)
 	cancelCompaction()
 	if compactErr != nil {
 		finishErr := runJournal.Finish("failed", "", e.now())
@@ -93,6 +120,16 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Tools: runTools,
 		Now:   e.Now,
 	}
+	var beforeTool func(context.Context, agent.ToolCall) error
+	var afterTool func(context.Context, agent.ToolCall, agent.ToolResult, error) error
+	if request.Mode == ExecuteMode {
+		beforeTool = func(ctx context.Context, call agent.ToolCall) error {
+			return hookEngine.Run(ctx, hooks.PreToolUse, call.Name, map[string]any{"tool_call_id": call.ID, "arguments": call.Arguments})
+		}
+		afterTool = func(ctx context.Context, call agent.ToolCall, _ agent.ToolResult, toolErr error) error {
+			return hookEngine.Run(ctx, hooks.PostToolUse, call.Name, map[string]any{"tool_call_id": call.ID, "success": toolErr == nil})
+		}
+	}
 	result, err = runner.Run(ctx, agent.RunOptions{
 		Task:            request.Task,
 		Images:          request.Images,
@@ -103,6 +140,8 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		OnEvent:         emit,
 		Steering:        request.Steering,
 		CompletionCheck: check,
+		BeforeTool:      beforeTool,
+		AfterTool:       afterTool,
 	})
 	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: events}
 	snapshotContext, cancelSnapshot := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
@@ -130,13 +169,21 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Scopes:              request.Scopes,
 		ThreadID:            request.ThreadID,
 		Mode:                request.Mode.String(),
+		HooksHash:           hookEngine.Hash(),
 		Messages:            result.Messages,
 		ParentStatePath:     parentStatePath,
 		ForkedFromStatePath: request.ForkedFrom,
 		AllowedCommands:     remembered.Snapshot(),
 	}
-	if sessionErr := runJournal.SaveSession(session); sessionErr != nil && journalErr == nil {
-		journalErr = sessionErr
+	if request.Mode == ExecuteMode {
+		if hookErr := hookEngine.Run(ctx, hooks.SessionSave, "", map[string]any{"run_id": request.RunID, "thread_id": request.ThreadID}); hookErr != nil && journalErr == nil {
+			journalErr = hookErr
+		}
+	}
+	if journalErr == nil {
+		if sessionErr := runJournal.SaveSession(session); sessionErr != nil {
+			journalErr = sessionErr
+		}
 	}
 	if journalErr == nil {
 		if threadErr := e.saveThread(stateDir, session, record.StatePath); threadErr != nil {
@@ -160,6 +207,15 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return outcome, err
 	}
 	return outcome, nil
+}
+
+func (e Executor) hookTrust(repository string) string {
+	for _, trust := range e.HookTrusts {
+		if trust.Repository == repository {
+			return trust.Hash
+		}
+	}
+	return ""
 }
 
 func (e Executor) saveThread(stateDir string, session journal.Session, statePath string) error {

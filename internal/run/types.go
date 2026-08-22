@@ -6,6 +6,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/extension"
+	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
@@ -36,7 +37,11 @@ type Request struct {
 	Steering   <-chan string
 	ThreadID   string
 	BaseCommit string
-	ForkedFrom string
+	// BaseRef selects the initial Git revision for a new run. It is resolved to
+	// BaseCommit before the worktree is created and is not reused on resume.
+	BaseRef          string
+	CopyIgnoredFiles bool
+	ForkedFrom       string
 	// ForceCompaction requests a model-generated summary of older retained
 	// messages before this turn. It is meaningful for resume and fork flows.
 	ForceCompaction bool
@@ -80,5 +85,6 @@ type Executor struct {
 	Now        func() time.Time
 	StateDir   string
 	Extensions extension.Resolver
+	HookTrusts []hooks.Trust
 	Sandbox    sandbox.Policy
 }
