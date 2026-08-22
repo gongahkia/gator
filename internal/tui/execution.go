@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -104,6 +105,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		cancel:    cancel,
 		steering:  make(chan string, maxQueuedInputs),
 		approvals: make(chan commandApprovalRequest, 1),
+		terminals: make(chan terminal.Attachment, 2),
 	}
 	m.execution = stream
 	m.events = nil
@@ -149,6 +151,12 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		},
 		Steering: stream.steering,
 		Approve:  stream.approve,
+		OnTerminalAttachment: func(attachment terminal.Attachment) {
+			select {
+			case stream.terminals <- attachment:
+			case <-ctx.Done():
+			}
+		},
 	}
 
 	if m.forkStatePath != "" {
@@ -400,6 +408,8 @@ func waitForExecution(stream *executionStream) tea.Cmd {
 				return commandApprovalMsg{argv: request.argv, reply: request.reply}
 			}
 			return executionDoneMsg{done: <-stream.done}
+		case attachment := <-stream.terminals:
+			return terminalManagerMsg{attachment: attachment}
 		case <-time.After(time.Second):
 			return activityTickMsg{}
 		}

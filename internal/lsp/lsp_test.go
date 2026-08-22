@@ -34,7 +34,7 @@ func TestLoadPinsExecutableAndTrustsOnlyMatchingBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load trusted bundle: %v", err)
 	}
-	if !trusted.Trusted() || len(trusted.Tools(func(context.Context, string, string) error { return nil })) != 1 {
+	if !trusted.Trusted() || len(trusted.Tools(func(context.Context, string, string, string) error { return nil })) != len(lspOperations) {
 		t.Fatalf("trusted LSP bundle = %#v", trusted)
 	}
 
@@ -51,24 +51,27 @@ func TestLoadPinsExecutableAndTrustsOnlyMatchingBundle(t *testing.T) {
 func TestToolApprovesAndFormatsDiagnostics(t *testing.T) {
 	root := testWorkspace(t)
 	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
-	client := &fakeClient{diagnostics: []Diagnostic{diagnostic("broken declaration", 3, 2, 4)}}
+	connection := &fakeClient{responses: map[string]json.RawMessage{
+		"textDocument/diagnostic": json.RawMessage(`{"kind":"full","items":[{"range":{"start":{"line":3,"character":2},"end":{"line":3,"character":4}},"severity":2,"message":"broken declaration"}]}`),
+	}}
 	approved := ""
 	tool := Tool{
 		root:          root,
 		specification: server{Name: "fixture", Language: "go"},
-		approve: func(_ context.Context, server, path string) error {
-			approved = server + ":" + path
+		operation:     diagnosticsOperation,
+		approve: func(_ context.Context, server, operation, path string) error {
+			approved = server + ":" + operation + ":" + path
 			return nil
 		},
-		connect: func(context.Context, workspace.Root, server) (diagnosticClient, error) { return client, nil },
+		connect: func(context.Context, workspace.Root, server) (client, error) { return connection, nil },
 	}
 
 	result, err := tool.Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go"}`))
 	if err != nil {
 		t.Fatalf("execute diagnostic tool: %v", err)
 	}
-	if approved != "fixture:pkg/example.go" || client.path == "" || !client.closed {
-		t.Fatalf("approval=%q client=%#v", approved, client)
+	if approved != "fixture:diagnostics:pkg/example.go" || connection.method != "textDocument/diagnostic" || !connection.closed {
+		t.Fatalf("approval=%q client=%#v", approved, connection)
 	}
 	if !strings.Contains(result.Content, `"start_line":4`) || !strings.Contains(result.Content, `"severity":"warning"`) || !strings.Contains(result.Content, "broken declaration") {
 		t.Fatalf("diagnostic result = %s", result.Content)
@@ -78,14 +81,105 @@ func TestToolApprovesAndFormatsDiagnostics(t *testing.T) {
 func TestToolRejectsUnapprovedLookup(t *testing.T) {
 	root := testWorkspace(t)
 	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
-	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}}
+	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}, operation: diagnosticsOperation}
 	_, err := tool.Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go"}`))
 	if err == nil || !strings.Contains(err.Error(), "developer approval") {
 		t.Fatalf("unapproved diagnostic error = %v", err)
 	}
 }
 
-func TestNativeClientUsesPullDiagnostics(t *testing.T) {
+func TestToolRejectsUnsupportedServerOperationBeforeRequest(t *testing.T) {
+	root := testWorkspace(t)
+	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
+	connection := &fakeClient{supported: map[lspOperation]bool{hoverOperation: false}}
+	tool := Tool{
+		root: root, specification: server{Name: "fixture", Language: "go"}, operation: hoverOperation,
+		approve: func(context.Context, string, string, string) error { return nil },
+		connect: func(context.Context, workspace.Root, server) (client, error) { return connection, nil },
+	}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go","line":1,"character":0}`))
+	if err == nil || !strings.Contains(err.Error(), "does not support hover") || connection.method != "" || !connection.closed {
+		t.Fatalf("unsupported hover error=%v client=%#v", err, connection)
+	}
+}
+
+func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) {
+	root := testWorkspace(t)
+	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
+	writeFile(t, root.Path(), "pkg/target.go", "package pkg\n", 0o600)
+	localURI := fileURI(filepath.Join(root.Path(), "pkg", "target.go"))
+	externalURI := fileURI("/outside/gator-secret.go")
+	location := func(uri string) map[string]any {
+		return map[string]any{"uri": uri, "range": map[string]any{"start": map[string]int{"line": 2, "character": 1}, "end": map[string]int{"line": 2, "character": 7}}}
+	}
+	encoded := func(value any) json.RawMessage {
+		result, err := json.Marshal(value)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	responses := map[string]json.RawMessage{
+		"textDocument/hover": encoded(map[string]any{
+			"contents": map[string]string{"kind": "markdown", "value": "**Target**"},
+			"range":    location(localURI)["range"],
+		}),
+		"textDocument/definition": encoded([]any{location(localURI), location(externalURI)}),
+		"textDocument/references": encoded([]any{location(localURI)}),
+		"textDocument/documentSymbol": encoded([]any{map[string]any{
+			"name": "Target", "kind": 5, "range": location(localURI)["range"], "selectionRange": location(localURI)["range"],
+			"children": []any{map[string]any{"name": "Method", "kind": 6, "range": location(localURI)["range"], "selectionRange": location(localURI)["range"]}},
+		}}),
+	}
+	cases := []struct {
+		operation lspOperation
+		arguments string
+		method    string
+		contains  []string
+	}{
+		{operation: hoverOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/hover", contains: []string{`"found":true`, `"kind":"markdown"`, "Target"}},
+		{operation: definitionOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/definition", contains: []string{"pkg/target.go", `"truncated":true`}},
+		{operation: referencesOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"include_declaration":true}`, method: "textDocument/references", contains: []string{"pkg/target.go"}},
+		{operation: documentSymbolsOperation, arguments: `{"path":"pkg/example.go"}`, method: "textDocument/documentSymbol", contains: []string{"Target", "Method"}},
+	}
+	for _, test := range cases {
+		t.Run(string(test.operation), func(t *testing.T) {
+			connection := &fakeClient{responses: responses}
+			approved := ""
+			tool := Tool{
+				root: root, specification: server{Name: "fixture", Language: "go"}, operation: test.operation,
+				approve: func(_ context.Context, server, operation, path string) error {
+					approved = server + ":" + operation + ":" + path
+					return nil
+				},
+				connect: func(context.Context, workspace.Root, server) (client, error) { return connection, nil },
+			}
+			result, err := tool.Execute(context.Background(), json.RawMessage(test.arguments))
+			if err != nil {
+				t.Fatalf("execute %s: %v", test.operation, err)
+			}
+			if approved != "fixture:"+string(test.operation)+":pkg/example.go" || connection.method != test.method || !connection.closed {
+				t.Fatalf("approval=%q client=%#v", approved, connection)
+			}
+			for _, expected := range test.contains {
+				if !strings.Contains(result.Content, expected) {
+					t.Fatalf("%s result missing %q: %s", test.operation, expected, result.Content)
+				}
+			}
+			if strings.Contains(result.Content, "gator-secret") {
+				t.Fatalf("%s leaked external LSP location: %s", test.operation, result.Content)
+			}
+			if test.operation == referencesOperation {
+				encoded, err := json.Marshal(connection.parameters)
+				if err != nil || !strings.Contains(string(encoded), `"includeDeclaration":true`) {
+					t.Fatalf("references parameters = %s, %v", encoded, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNativeClientUsesReadOnlyLookups(t *testing.T) {
 	inputReader, inputWriter := io.Pipe()
 	outputReader, outputWriter := io.Pipe()
 	client := &nativeClient{
@@ -100,12 +194,31 @@ func TestNativeClientUsesPullDiagnostics(t *testing.T) {
 	if err := client.initialize(context.Background(), "/fixture"); err != nil {
 		t.Fatalf("initialize LSP client: %v", err)
 	}
-	diagnostics, err := client.Diagnostics(context.Background(), "/fixture/pkg/example.go")
-	if err != nil {
-		t.Fatalf("request diagnostics: %v", err)
+	for _, operation := range lspOperations {
+		if !client.Supports(operation) {
+			t.Fatalf("fixture LSP does not advertise %s: %#v", operation, client.support)
+		}
 	}
-	if len(diagnostics) != 1 || diagnostics[0].Message != "fixture error" {
-		t.Fatalf("diagnostics = %#v", diagnostics)
+	if client.Supports(lspOperation("unsupported")) {
+		t.Fatalf("fixture LSP capability set = %#v", client.support)
+	}
+	for _, lookup := range []struct {
+		method string
+		want   string
+	}{
+		{method: "textDocument/diagnostic", want: "fixture error"},
+		{method: "textDocument/hover", want: "fixture hover"},
+		{method: "textDocument/definition", want: "[]"},
+		{method: "textDocument/references", want: "[]"},
+		{method: "textDocument/documentSymbol", want: "[]"},
+	} {
+		response, err := client.Request(context.Background(), lookup.method, map[string]any{"textDocument": map[string]string{"uri": fileURI("/fixture/pkg/example.go")}})
+		if err != nil {
+			t.Fatalf("request %s: %v", lookup.method, err)
+		}
+		if !strings.Contains(string(response), lookup.want) {
+			t.Fatalf("%s response = %#v", lookup.method, response)
+		}
 	}
 	if err := client.Close(); err != nil {
 		t.Fatalf("close LSP client: %v", err)
@@ -116,14 +229,21 @@ func TestNativeClientUsesPullDiagnostics(t *testing.T) {
 }
 
 type fakeClient struct {
-	diagnostics []Diagnostic
-	path        string
-	closed      bool
+	responses  map[string]json.RawMessage
+	supported  map[lspOperation]bool
+	method     string
+	parameters any
+	closed     bool
 }
 
-func (c *fakeClient) Diagnostics(_ context.Context, path string) ([]Diagnostic, error) {
-	c.path = path
-	return c.diagnostics, nil
+func (c *fakeClient) Request(_ context.Context, method string, parameters any) (json.RawMessage, error) {
+	c.method = method
+	c.parameters = parameters
+	return c.responses[method], nil
+}
+
+func (c *fakeClient) Supports(operation lspOperation) bool {
+	return c.supported == nil || c.supported[operation]
 }
 
 func (c *fakeClient) Close() error {
@@ -153,11 +273,21 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 		}
 		switch message.Method {
 		case "initialize":
-			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"capabilities": map[string]any{"diagnosticProvider": map[string]any{}}}})
+			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"capabilities": map[string]any{
+				"diagnosticProvider":     map[string]any{},
+				"hoverProvider":          true,
+				"definitionProvider":     true,
+				"referencesProvider":     true,
+				"documentSymbolProvider": true,
+			}}})
 		case "initialized":
 			continue
 		case "textDocument/diagnostic":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"kind": "full", "items": []Diagnostic{diagnostic("fixture error", 0, 0, 1)}}})
+		case "textDocument/hover":
+			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"contents": "fixture hover"}})
+		case "textDocument/definition", "textDocument/references", "textDocument/documentSymbol":
+			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": []any{}})
 		case "shutdown":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": nil})
 		case "exit":

@@ -4,6 +4,8 @@ package terminal
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -36,23 +38,81 @@ type Config struct {
 	MaxReadBytes   int
 	Now            func() time.Time
 	OnExit         func(Task)
+	// OnDeveloperInput records a user-attached terminal write without exposing
+	// its raw input. Model tool writes do not use this callback.
+	OnDeveloperInput func(Task, DeveloperInput)
 }
 
 // Manager owns every pseudo-terminal task started during a run. Close cancels
 // all active tasks and waits briefly for their sandbox scratch cleanup.
 type Manager struct {
-	root           workspace.Root
-	policy         sandbox.Policy
-	maxTasks       int
-	lifetime       time.Duration
-	maxOutputBytes int
-	maxReadBytes   int
-	now            func() time.Time
-	onExit         func(Task)
+	root             workspace.Root
+	policy           sandbox.Policy
+	maxTasks         int
+	lifetime         time.Duration
+	maxOutputBytes   int
+	maxReadBytes     int
+	now              func() time.Time
+	onExit           func(Task)
+	onDeveloperInput func(Task, DeveloperInput)
 
 	mu     sync.Mutex
 	nextID uint64
 	tasks  map[string]*task
+}
+
+// Attachment is the restricted developer-facing view of an active terminal
+// manager. It cannot create a process or alter the run's sandbox policy.
+type Attachment interface {
+	List() []Task
+	Read(string, int64) (ReadResult, error)
+	WriteDeveloper(string, []byte) (Task, error)
+	Stop(string) (Task, error)
+}
+
+type attachment struct {
+	manager *Manager
+}
+
+func (a attachment) List() []Task {
+	if a.manager == nil {
+		return nil
+	}
+	return a.manager.List()
+}
+
+func (a attachment) Read(id string, cursor int64) (ReadResult, error) {
+	if a.manager == nil {
+		return ReadResult{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.Read(id, cursor)
+}
+
+func (a attachment) WriteDeveloper(id string, input []byte) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.WriteDeveloper(id, input)
+}
+
+func (a attachment) Stop(id string) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.Stop(id)
+}
+
+// Attachment exposes only operations needed to view and interact with tasks
+// that the model has already started.
+func (m *Manager) Attachment() Attachment {
+	return attachment{manager: m}
+}
+
+// DeveloperInput identifies direct terminal input without retaining the bytes.
+// It is suitable for activity/journal metadata only.
+type DeveloperInput struct {
+	Bytes  int    `json:"bytes"`
+	SHA256 string `json:"sha256"`
 }
 
 // Task describes bounded, non-sensitive terminal state. Output is retrieved
@@ -118,15 +178,16 @@ func New(config Config) *Manager {
 		config.Now = time.Now
 	}
 	return &Manager{
-		root:           config.Root,
-		policy:         config.Policy,
-		maxTasks:       config.MaxTasks,
-		lifetime:       config.Lifetime,
-		maxOutputBytes: config.MaxOutputBytes,
-		maxReadBytes:   config.MaxReadBytes,
-		now:            config.Now,
-		onExit:         config.OnExit,
-		tasks:          make(map[string]*task),
+		root:             config.Root,
+		policy:           config.Policy,
+		maxTasks:         config.MaxTasks,
+		lifetime:         config.Lifetime,
+		maxOutputBytes:   config.MaxOutputBytes,
+		maxReadBytes:     config.MaxReadBytes,
+		now:              config.Now,
+		onExit:           config.OnExit,
+		onDeveloperInput: config.OnDeveloperInput,
+		tasks:            make(map[string]*task),
 	}
 }
 
@@ -201,6 +262,17 @@ func (m *Manager) Read(id string, cursor int64) (ReadResult, error) {
 // Write sends bounded input to a still-running pseudo-terminal. Authorization
 // belongs to the tool layer; this manager only owns the process resource.
 func (m *Manager) Write(id string, input []byte) (Task, error) {
+	return m.write(id, input, false)
+}
+
+// WriteDeveloper sends direct developer input to an existing attached task.
+// It follows the task's already-fixed sandbox but does not reuse the agent's
+// command approval because a developer performed the input action locally.
+func (m *Manager) WriteDeveloper(id string, input []byte) (Task, error) {
+	return m.write(id, input, true)
+}
+
+func (m *Manager) write(id string, input []byte, developer bool) (Task, error) {
 	if len(input) == 0 {
 		return Task{}, errors.New("terminal input is required")
 	}
@@ -224,7 +296,12 @@ func (m *Manager) Write(id string, input []byte) (Task, error) {
 	if err != nil {
 		return Task{}, fmt.Errorf("write terminal task %q: %w", id, err)
 	}
-	return running.snapshot(), nil
+	snapshot := running.snapshot()
+	if developer && m.onDeveloperInput != nil {
+		digest := sha256.Sum256(input)
+		m.onDeveloperInput(snapshot, DeveloperInput{Bytes: len(input), SHA256: hex.EncodeToString(digest[:])})
+	}
+	return snapshot, nil
 }
 
 // Stop requests cancellation. It does not wait indefinitely; use List or Read

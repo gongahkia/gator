@@ -1,11 +1,11 @@
-# Local LSP diagnostics
+# Trusted local LSP
 
-Gator can expose diagnostics from a repository-local Language Server Protocol
-(LSP) server to an Execute-mode native agent. This is a narrow code-intelligence
-surface: Gator requests diagnostics for one existing workspace file and returns
-bounded structured locations, severity, source, code, and message. It does not
-yet expose completion, navigation, symbols, code actions, edits, or a language
-server index.
+Gator can expose bounded read-only inspection from a repository-local Language
+Server Protocol (LSP) server to an Execute-mode native agent. For one existing
+workspace source file it supports pull diagnostics, hover, go-to definition,
+find references, and document symbols. Definitions and references return only
+regular files inside the active worktree. It does not expose completion, rename,
+code actions, edits, formatting, or a shared workspace-symbol index.
 
 Create `.gator/lsp.json` in the repository:
 
@@ -45,19 +45,25 @@ bundle until it is explicitly trusted again. Remove the trust record with
 
 ## Runtime boundary
 
-When the model asks for a server's diagnostic tool, Gator first requests the
-usual allow-once, allow-always, or deny approval using an argv-shaped record:
-`lsp SERVER diagnostics PATH`. Only after approval does it start the server.
-The server runs in Gator's strict sandbox by default with its configured
-network mode. It is started anew for the one lookup and shut down afterward.
+When the model asks for an LSP tool, Gator first requests the usual allow-once,
+allow-always, or deny approval using an argv-shaped record such as
+`lsp SERVER definition PATH`. The supported operation names are `diagnostics`,
+`hover`, `definition`, `references`, and `document_symbols`; approval is scoped
+to the exact server, operation, and path. Only after approval does Gator start
+the server. The server runs in Gator's strict sandbox by default with its
+configured network mode. It is started anew for one lookup and shut down
+afterward.
 
-Gator implements the LSP 3.17 pull-diagnostic request
-`textDocument/diagnostic`; a configured server must advertise
-`diagnosticProvider` during `initialize`. LSP uses JSON-RPC 2.0 framed with
-`Content-Length`; Gator caps frames at 256 KiB, returns at most 128 diagnostics
-and 64 KiB of tool output, and changes LSP's zero-based line numbers to
-one-based terminal output. Servers which offer only push diagnostics are not
-supported by this first surface.
+Gator implements the LSP 3.17 requests `textDocument/diagnostic`,
+`textDocument/hover`, `textDocument/definition`, `textDocument/references`,
+and `textDocument/documentSymbol`. It advertises and checks the corresponding
+server capability at `initialize`; a server can expose whichever subset it
+supports. Position-taking tools accept a one-based line and zero-based UTF-16
+character offset. LSP uses JSON-RPC 2.0 framed with `Content-Length`; Gator
+caps frames at 256 KiB, returns at most 128 diagnostics, locations, or symbols
+and 64 KiB of tool output, and presents result lines as one-based terminal
+values. A server that lacks a requested capability is not started again as a
+fallback and returns a clear unsupported-capability error.
 
 The trust hash and sandbox make the capability explicit, but an LSP executable
 is still code selected by the developer. Do not trust a project LSP bundle you

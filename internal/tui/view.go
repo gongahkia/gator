@@ -76,6 +76,7 @@ func (m *Model) resizeInputs() {
 	m.verification.SetWidth(width)
 	m.provider.Width = width
 	m.model.Width = width
+	m.terminalInput.Width = width
 
 	switch {
 	case m.height < 20:
@@ -107,6 +108,8 @@ func (m Model) View() string {
 		view = m.attachmentConfirmView()
 	case runningScreen:
 		view = m.runningView()
+	case terminalScreen:
+		view = m.attachedTerminalView()
 	case reviewScreen:
 		view = m.reviewView()
 	case transcriptScreen:
@@ -265,7 +268,7 @@ func (m Model) commandApprovalView() string {
 	if m.pendingApproval != nil && len(m.pendingApproval.argv) > 0 {
 		argv = strings.Join(m.pendingApproval.argv, " ")
 	}
-	return m.fieldView("Approve worktree command", "cwd is the isolated worktree. The process runs as the Gator user and is not a sandbox.", argv+"\n\ny/enter  allow once\na  always allow this argv for this thread\nn  deny")
+	return m.fieldView("Approve worktree command", "cwd is the isolated worktree. The process follows this run's configured sandbox policy.", argv+"\n\ny/enter  allow once\na  always allow this argv for this thread\nn  deny")
 }
 
 func (m Model) runningFooter() string {
@@ -281,7 +284,7 @@ func (m Model) runningFooter() string {
 	case vimInsert:
 		return m.footer("esc normal", "enter newline", "ctrl+r steer", "tab queue", "ctrl+c stop", "f1 shortcuts")
 	default:
-		return m.footer("ctrl+b controls", "enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("ctrl+b controls", "ctrl+t terminal", "enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
 	}
 }
 
@@ -556,7 +559,7 @@ func (m Model) helpView() string {
 			"Vim Ex  :w send · :wq or :x send then exit · :q! discard and exit · :help list supported commands",
 			"Ctrl+C  quit",
 		}, "\n")),
-		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\nCommand approval  y/enter once · a always this argv · n deny\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
+		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\nCtrl+T  attach to a model-started terminal task\nCommand approval  y/enter once · a always this argv · n deny\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
 		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\nt  view this run's transcript\ny  view retained thread lineage\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}

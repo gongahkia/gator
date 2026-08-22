@@ -436,8 +436,9 @@ declared executables; `gator lsp trust` pins `.gator/lsp.json` plus local LSP
 executables; and `gator mcp trust` pins `.gator/mcp.json` plus local stdio
 executables. A changed bundle is disabled until re-trusted. Trusted hooks run
 at tool, compaction, verification, and session boundaries in the strict
-sandbox. Trusted LSP bundles expose bounded pull diagnostics and request
-approval before each server launch; see [Local LSP diagnostics](docs/LSP.md).
+sandbox. Trusted LSP bundles expose bounded pull diagnostics and read-only
+navigation, and request approval before each server launch; see
+[Trusted local LSP](docs/LSP.md).
 Trusted MCP bundles can expose repository-relative stdio servers or Streamable
 HTTP servers; every MCP tool invocation still requests approval. Remote HTTP
 servers can use explicit, standards-based OAuth login with private,
@@ -478,8 +479,22 @@ sandbox, worktree, network policy, output bounds, and lifetime limit as the
 run. Starting a task needs the normal command approval; each distinct input
 needs its own approval and is represented to the approval UI by a digest rather
 than the input bytes. Terminal tasks are stopped when the agent run ends. This
-is an agent-mediated task manager, not a direct user shell or terminal
-multiplexer.
+is an agent-mediated task manager, not an arbitrary host shell. While a native
+TUI run is active, `Ctrl+T` opens a line-oriented attachment to an existing
+model-started task: developers can view bounded output, switch tasks, send a
+line or interrupt, and stop that task. Direct input stays inside the task's
+existing sandbox and is journaled only as byte count plus SHA-256 digest. This
+is intentionally not a VT terminal emulator, a background task that survives
+the run, or an ACP/client terminal multiplexer.
+
+When the developer explicitly grants `--network allow` (or `gator config set
+network allow`), Execute mode additionally exposes `http_fetch` for bounded
+web research. Every exact HTTPS URL needs approval unless it was remembered for
+the current run;
+the tool accepts only port 443, resolves and pins public DNS addresses, rejects
+local/private/reserved targets, does not follow redirects, and returns at most
+256 KiB of textual content. It is a native fetch primitive, not a search engine
+or browser automation surface; fetched pages remain untrusted data.
 
 See the source-backed [terminal-harness capability audit](docs/COMPETITIVE_AUDIT.md)
 for the current comparison with Codex CLI, Claude Code, Cursor CLI, Pi, and

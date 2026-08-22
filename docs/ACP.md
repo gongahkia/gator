@@ -60,7 +60,7 @@ forward provider credentials.
 
 This is a local stdio profile, not a hosted ACP endpoint. It does not provide
 the draft streamable-HTTP/WebSocket transport, client-provided MCP servers,
-direct user terminal attachment or delegated vendor-terminal control,
+ACP-client direct user terminal attachment or delegated vendor-terminal control,
 image/audio prompt blocks, embedded resource content, or JSON-RPC batch
 envelopes. Execute-mode ACP sessions can still expose Gator's approved native
 terminal-task tools as ordinary ACP tool calls. Batch envelopes receive a clear

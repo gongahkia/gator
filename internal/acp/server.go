@@ -908,7 +908,7 @@ func titleFor(value string) string {
 
 func acpToolKind(name string) string {
 	switch name {
-	case "read_file", "list_files":
+	case "read_file", "list_files", "http_fetch":
 		return "read"
 	case "search_files":
 		return "search"

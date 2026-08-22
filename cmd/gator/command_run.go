@@ -170,6 +170,10 @@ func (p *eventPrinter) Print(event agent.Event) {
 		_, _ = fmt.Fprintf(p.out, "[%02d] command %s\n", event.Step, event.Text)
 	case agent.EventHook:
 		_, _ = fmt.Fprintf(p.out, "[%02d] hook %s\n", event.Step, event.Text)
+	case agent.EventSubagent:
+		_, _ = fmt.Fprintf(p.out, "[%02d] subagent %s\n", event.Step, event.Text)
+	case agent.EventTerminal:
+		_, _ = fmt.Fprintf(p.out, "[%02d] terminal %s\n", event.Step, event.Text)
 	case agent.EventCompletionBlocked:
 		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
 	}

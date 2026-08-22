@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +20,10 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 func TestNewUsesConfiguredRunDefaults(t *testing.T) {
@@ -218,6 +222,57 @@ func TestTerminalLifecycleAppearsInScrollableConversation(t *testing.T) {
 	}
 	if model.activity.phase != activityTool || !strings.Contains(model.activity.detail, "terminal term-001") {
 		t.Fatalf("terminal activity = %#v", model.activity)
+	}
+}
+
+func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := terminal.New(terminal.Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}})
+	defer manager.Close()
+	if _, err := manager.Start(context.Background(), []string{sh, "-lc", "printf '\\033[31mready\\033[0m\\n'; IFS= read line; printf 'received:%s\\n' \"$line\""}); err != nil {
+		t.Fatalf("start terminal task: %v", err)
+	}
+	model := New(Config{})
+	model.width, model.height = 100, 40
+	model.resizeInputs()
+	next, _ := model.Update(terminalManagerMsg{attachment: manager.Attachment()})
+	attached := next.(Model)
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	attached = next.(Model)
+	if attached.screen != terminalScreen || !strings.Contains(attached.View(), "attached terminal") {
+		t.Fatalf("attached terminal view = %s", attached.View())
+	}
+	attached.terminalInput.SetValue("Ada")
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	attached = next.(Model)
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		attached.refreshAttachedTerminal()
+		if strings.Contains(attached.currentAttachedTerminalOutput(), "received:Ada") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	view := attached.View()
+	if !strings.Contains(view, "ready") || !strings.Contains(view, "received:Ada") || strings.Contains(view, "\x1b[31m") {
+		t.Fatalf("attached terminal output = %q", view)
+	}
+	if !strings.Contains(attached.notice.text, "existing sandbox") {
+		t.Fatalf("developer terminal write notice = %#v", attached.notice)
+	}
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if returned := next.(Model); returned.screen != composeScreen {
+		t.Fatalf("terminal close returned to screen %v", returned.screen)
 	}
 }
 

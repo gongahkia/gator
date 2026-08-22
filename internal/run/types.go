@@ -11,6 +11,7 @@ import (
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
 )
@@ -52,6 +53,10 @@ type Request struct {
 	// ForceCompaction requests a model-generated summary of older retained
 	// messages before this turn. It is meaningful for resume and fork flows.
 	ForceCompaction bool
+	// OnTerminalAttachment receives a restricted view of existing terminal
+	// tasks while the run is alive. It cannot create a task or alter the fixed
+	// sandbox policy.
+	OnTerminalAttachment func(terminal.Attachment)
 	// DisableWriterDelegation is an internal recursion guard for a child writer
 	// run. It is not a developer-facing capability: only the primary native
 	// agent may create a writer worktree.
@@ -104,5 +109,8 @@ type Executor struct {
 	// exact configured Streamable HTTP MCP resource. A zero store leaves remote
 	// servers unauthenticated rather than reading another application's state.
 	MCPCredentials auth.Store
-	Sandbox        sandbox.Policy
+	// HTTP supplies the bounded native web-research transport. It is normally
+	// zero-valued; tests may inject a deterministic client or resolver.
+	HTTP    tools.HTTPFetchOptions
+	Sandbox sandbox.Policy
 }
