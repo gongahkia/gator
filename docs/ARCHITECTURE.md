@@ -114,9 +114,11 @@ diagnostic or navigation launch still needs operation-specific command approval
 and runs under the strict sandbox. The client implements pull diagnostics,
 hover, definitions, references, document symbols, and workspace-symbol queries;
 it bounds all wire and model-visible output, returns only workspace locations,
-and starts a server only after approval. It is not a general IDE or an
-unreviewed executable-extension path: completion, edits, code actions,
-formatting, and a persistent shared server/index remain outside this capability.
+and starts a server only after approval. A run lazily reuses one server per
+trusted configuration, then shuts it down at run exit; no server is shared
+across worktrees or retained runs. It is not a general IDE or an unreviewed
+executable-extension path: completion, edits, code actions, formatting, and a
+persistent cross-run server/index remain outside this capability.
 
 Trusted Streamable HTTP MCP servers may obtain a Gator-owned public OAuth
 credential only through explicit `gator mcp login`. The client discovers the
