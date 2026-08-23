@@ -938,6 +938,10 @@ func TestQueueRejectsDirectShellCommandsAndHoldsAfterFailure(t *testing.T) {
 	if paused.screen != composeScreen || len(paused.queue) != 1 || !strings.Contains(paused.notice.text, "retained") {
 		t.Fatalf("failed queue state = %#v", paused)
 	}
+	entry := paused.chat[len(paused.chat)-1]
+	if entry.text != "Run stopped: provider unavailable" || !entry.isError {
+		t.Fatalf("failed run transcript entry = %#v", entry)
+	}
 }
 
 func TestRunningQueueCommandsInspectAndRemoveQueuedWork(t *testing.T) {

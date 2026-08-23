@@ -47,7 +47,17 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project LSP servers: %w", err)
 	}
 	lspManager := lspSet.NewManager()
-	defer lspManager.Close()
+	releaseLSP := func() { _ = lspManager.Close() }
+	if request.LSPRegistry != nil {
+		request.LSPRegistry.Reconcile(lspSet)
+		if lspSet.Trusted() {
+			lspManager, releaseLSP, err = request.LSPRegistry.Acquire(lspSet)
+			if err != nil {
+				return Outcome{Worktree: isolated}, fmt.Errorf("acquire trusted LSP manager: %w", err)
+			}
+		}
+	}
+	defer releaseLSP()
 	extensions, err := e.Extensions.Load(isolated.Repository)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load extensions: %w", err)

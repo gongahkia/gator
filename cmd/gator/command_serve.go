@@ -24,6 +24,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/appserver"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/lsp"
 	internalrpc "github.com/gongahkia/gator/internal/rpc"
 	"github.com/gongahkia/gator/internal/terminal"
 )
@@ -84,10 +85,12 @@ func serveForeground(arguments []string, out io.Writer) error {
 	}
 	terminals := terminal.NewRegistry()
 	defer terminals.Close()
+	lsps := lsp.NewRegistry()
+	defer lsps.Close()
 	bridge, err := appserver.New(appserver.Config{
 		RPC: internalrpc.Config{
 			RepositoryPath: repository, StateDir: stateDir, DefaultProvider: defaults.Provider, DefaultModel: defaults.Model,
-			ResolveProvider: resolveConfiguredProvider, NewExecutor: newExecutor, TerminalRegistry: terminals,
+			ResolveProvider: resolveConfiguredProvider, NewExecutor: newExecutor, TerminalRegistry: terminals, LSPRegistry: lsps,
 		},
 		Token: token, Version: version,
 	})
@@ -263,8 +266,8 @@ func startServeService(arguments []string, out io.Writer) error {
 			return fmt.Errorf("remove stale app-server state: %w", err)
 		}
 	}
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return fmt.Errorf("create app-server state directory: %w", err)
+	if err := ensureServeStateDirectory(directory); err != nil {
+		return err
 	}
 	ready, err := os.CreateTemp(directory, ".ready-")
 	if err != nil {
@@ -295,12 +298,12 @@ func startServeService(arguments []string, out io.Writer) error {
 		_ = log.Close()
 		return fmt.Errorf("start app-server service: %w", err)
 	}
-	if err := log.Close(); err != nil {
-		_ = terminateServeProcess(command.Process)
-		return fmt.Errorf("close app-server log parent handle: %w", err)
-	}
 	done := make(chan error, 1)
 	go func() { done <- command.Wait() }()
+	if err := log.Close(); err != nil {
+		abortServeProcess(command.Process, done)
+		return fmt.Errorf("close app-server log parent handle: %w", err)
+	}
 	readyState, err := waitServeReady(readyPath, command.Process.Pid, token, done)
 	if err != nil {
 		abortServeProcess(command.Process, done)
@@ -311,7 +314,7 @@ func startServeService(arguments []string, out io.Writer) error {
 		abortServeProcess(command.Process, done)
 		return err
 	}
-	_, err = fmt.Fprintf(out, "Gator app server started\n  URL: %s\n  PID: %d\n  Status: gator serve status --token-file %s\n", service.URL, service.PID, options.tokenFile)
+	_, err = fmt.Fprintf(out, "Gator app server started\n  URL: %s\n  PID: %d\n  Log: %s\n  Status: gator serve status --token-file %s\n", service.URL, service.PID, statePath+".log", options.tokenFile)
 	return err
 }
 
@@ -348,7 +351,7 @@ func serveServiceStatus(arguments []string, out io.Writer) error {
 		_, err := fmt.Fprintln(out, "Gator app server is not running for this repository.")
 		return err
 	}
-	_, err = fmt.Fprintf(out, "Gator app server is running\n  URL: %s\n  PID: %d\n  Started: %s\n", service.URL, service.PID, service.StartedAt.Format(time.RFC3339))
+	_, err = fmt.Fprintf(out, "Gator app server is running\n  URL: %s\n  PID: %d\n  Started: %s\n  Log: %s\n", service.URL, service.PID, service.StartedAt.Format(time.RFC3339), statePath+".log")
 	return err
 }
 
@@ -402,7 +405,7 @@ func stopServeService(arguments []string, out io.Writer) error {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	return errors.New("app-server process did not stop within 10 seconds; inspect its log before retrying")
+	return fmt.Errorf("app-server process did not stop within 10 seconds; inspect %s before retrying", statePath+".log")
 }
 
 func parseServeServiceOptions(arguments []string, includeListen bool) (serveServiceOptions, error) {
@@ -533,7 +536,7 @@ func abortServeProcess(process *os.Process, done <-chan error) {
 	}
 	select {
 	case <-done:
-	case <-time.After(3 * time.Second):
+	default:
 	}
 }
 
@@ -622,8 +625,8 @@ func readServeState(path string, destination any) error {
 }
 
 func writeServeState(path string, value any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return fmt.Errorf("create app-server state directory: %w", err)
+	if err := ensureServeStateDirectory(filepath.Dir(path)); err != nil {
+		return err
 	}
 	payload, err := json.Marshal(value)
 	if err != nil {
@@ -648,6 +651,20 @@ func writeServeState(path string, value any) error {
 	}
 	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf("publish app-server state: %w", err)
+	}
+	return nil
+}
+
+func ensureServeStateDirectory(path string) error {
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return fmt.Errorf("create app-server state directory: %w", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("inspect app-server state directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
+		return errors.New("app-server state directory must be private")
 	}
 	return nil
 }

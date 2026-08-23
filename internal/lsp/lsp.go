@@ -98,7 +98,7 @@ func Load(worktreePath, trustedHash string) (Set, error) {
 		return Set{}, err
 	}
 	if digest == "" {
-		return Set{}, nil
+		return Set{root: root}, nil
 	}
 	set := Set{configuredHash: digest, root: root}
 	if trustedHash == "" || trustedHash != digest {
@@ -147,18 +147,19 @@ func (s Set) Tools(approve func(context.Context, string, string, string) error) 
 	return result
 }
 
-// Manager lazily owns at most one sandboxed client for each trusted server in
-// a run. Tool calls remain individually approved; reusing the process merely
-// avoids repeated initialization and lets an LSP maintain its in-run index.
-// It is not shared across runs or worktrees.
+// Manager lazily owns at most one sandboxed client for each trusted server.
+// Tool calls remain individually approved. A Registry may retain the manager
+// for compatible later native-session runs, never across worktrees.
 type Manager struct {
 	root    workspace.Root
 	trusted bool
 	servers []server
 	connect func(context.Context, workspace.Root, server) (client, error)
 
-	mu      sync.Mutex
-	clients map[string]client
+	mu        sync.Mutex
+	requestMu sync.Mutex
+	closed    bool
+	clients   map[string]client
 }
 
 // NewManager constructs a per-run client manager. Call Close when the run
@@ -190,6 +191,10 @@ func (m *Manager) Tools(approve func(context.Context, string, string, string) er
 
 func (m *Manager) connection(ctx context.Context, specification server) (client, error) {
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return nil, errors.New("LSP manager is closed")
+	}
 	if existing := m.clients[specification.Name]; existing != nil {
 		m.mu.Unlock()
 		return existing, nil
@@ -204,6 +209,11 @@ func (m *Manager) connection(ctx context.Context, specification server) (client,
 		return nil, err
 	}
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		_ = opened.Close()
+		return nil, errors.New("LSP manager is closed")
+	}
 	if existing := m.clients[specification.Name]; existing != nil {
 		m.mu.Unlock()
 		_ = opened.Close()
@@ -214,12 +224,38 @@ func (m *Manager) connection(ctx context.Context, specification server) (client,
 	return opened, nil
 }
 
+// request serializes access to one language-server connection. JSON-RPC IDs
+// and framed responses share one transport, so concurrent tool calls cannot
+// safely interleave them.
+func (m *Manager) request(ctx context.Context, specification server, operation lspOperation, method string, parameters any) (json.RawMessage, error) {
+	m.requestMu.Lock()
+	defer m.requestMu.Unlock()
+	connection, err := m.connection(ctx, specification)
+	if err != nil {
+		return nil, err
+	}
+	if !connection.Supports(operation) {
+		return nil, fmt.Errorf("LSP server %q does not support %s", specification.Name, operation)
+	}
+	response, err := connection.Request(ctx, method, parameters)
+	if err != nil {
+		m.discard(specification.Name)
+	}
+	return response, err
+}
+
 // Discard drops an unhealthy client after an I/O failure so a later approved
 // lookup can create a fresh sandboxed process instead of reusing bad state.
 func (m *Manager) Discard(name string) {
 	if m == nil {
 		return
 	}
+	m.requestMu.Lock()
+	defer m.requestMu.Unlock()
+	m.discard(name)
+}
+
+func (m *Manager) discard(name string) {
 	m.mu.Lock()
 	connection := m.clients[name]
 	delete(m.clients, name)
@@ -235,7 +271,14 @@ func (m *Manager) Close() error {
 	if m == nil {
 		return nil
 	}
+	m.requestMu.Lock()
+	defer m.requestMu.Unlock()
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return nil
+	}
+	m.closed = true
 	connections := make([]client, 0, len(m.clients))
 	for _, connection := range m.clients {
 		connections = append(connections, connection)
@@ -492,20 +535,23 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if err := t.approve(ctx, t.specification.Name, string(t.operation), target); err != nil {
 		return agent.ToolResult{}, err
 	}
-	connection, release, err := t.open(ctx)
-	if err != nil {
-		return agent.ToolResult{}, fmt.Errorf("start LSP server %q: %w", t.specification.Name, err)
-	}
-	defer release()
-	if !connection.Supports(t.operation) {
-		return agent.ToolResult{}, fmt.Errorf("LSP server %q does not support %s", t.specification.Name, t.operation)
-	}
 	method, request := t.request(resolved, params)
-	response, err := connection.Request(ctx, method, request)
-	if err != nil {
-		if t.manager != nil {
-			t.manager.Discard(t.specification.Name)
+	var response json.RawMessage
+	var err error
+	if t.manager != nil {
+		response, err = t.manager.request(ctx, t.specification, t.operation, method, request)
+	} else {
+		connection, release, openErr := t.open(ctx)
+		if openErr != nil {
+			return agent.ToolResult{}, fmt.Errorf("start LSP server %q: %w", t.specification.Name, openErr)
 		}
+		defer release()
+		if !connection.Supports(t.operation) {
+			return agent.ToolResult{}, fmt.Errorf("LSP server %q does not support %s", t.specification.Name, t.operation)
+		}
+		response, err = connection.Request(ctx, method, request)
+	}
+	if err != nil {
 		return agent.ToolResult{}, fmt.Errorf("request %s from LSP server %q: %w", t.operation, t.specification.Name, err)
 	}
 	return t.format(target, response)

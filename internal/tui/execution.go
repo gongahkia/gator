@@ -144,6 +144,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		Mode:             m.runMode,
 		ForceCompaction:  m.forceCompaction,
 		TerminalRegistry: m.terminalRegistry,
+		LSPRegistry:      m.lspRegistry,
 		OnEvent: func(event agent.Event) {
 			select {
 			case stream.events <- event:

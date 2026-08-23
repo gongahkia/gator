@@ -14,6 +14,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/terminal"
@@ -37,6 +38,10 @@ type Config struct {
 	// session. A plain JSONL RPC process deliberately cannot leave a terminal
 	// task running after its own caller exits.
 	TerminalRegistry *terminal.Registry
+	// LSPRegistry is present only for a local app-server session. It retains
+	// trusted managers for exact retained worktrees; a plain JSONL process owns
+	// no durable session and therefore leaves it nil.
+	LSPRegistry *lsp.Registry
 }
 
 // Server processes requests until its input closes. One native run may be
@@ -241,6 +246,7 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 			StateDir:         s.config.StateDir, Mode: mode, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
 			Approve:          s.approveFor(request.ID),
 			TerminalRegistry: s.config.TerminalRegistry,
+			LSPRegistry:      s.config.LSPRegistry,
 		})
 	})
 }
@@ -270,6 +276,7 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 			Scopes:           request.Params.Scopes,
 			Approve:          s.approveFor(request.ID),
 			TerminalRegistry: s.config.TerminalRegistry,
+			LSPRegistry:      s.config.LSPRegistry,
 		})
 	})
 }

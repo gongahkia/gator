@@ -153,10 +153,14 @@ starts a server only after approval. Completion is informational. Code actions,
 formatting, and rename return only bounded edits to existing regular workspace
 files; Gator never executes an LSP command, follows resource operations, or
 applies an LSP edit automatically. A run lazily reuses one server per trusted
-configuration, then shuts it down at run exit; no server is shared across
-worktrees or retained runs. It is not a general IDE or an unreviewed
-executable-extension path: a persistent cross-run server/index remains outside
-this capability.
+configuration. The native TUI and loopback app server may retain up to eight
+idle managers in memory for a later compatible resume of the exact same
+worktree and trusted bundle hash; a later run that observes a trust or
+configuration change retires them, and session shutdown stops them. One-shot RPC and child writers do not receive
+that registry. This is not an editor bridge: Gator sends no document lifecycle
+or incremental-change notifications, stores no durable index, and never shares
+a server across worktrees. It is not a general IDE or an unreviewed
+executable-extension path.
 
 Trusted extension sidecars are a separate executable capability but not a
 process-sandbox exception. Global bundles are explicitly installed; repository

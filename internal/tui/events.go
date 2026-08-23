@@ -58,7 +58,7 @@ func (m *Model) appendChatEvent(event agent.Event) {
 func (m *Model) appendCompletion(outcome gatorrun.Outcome, runErr error) {
 	m.closeStreamingChatEntry()
 	if runErr != nil {
-		m.appendChat(chatEntry{author: chatSystem, text: "Run stopped: " + runErr.Error()})
+		m.appendChat(chatEntry{author: chatSystem, text: "Run stopped: " + runErr.Error(), isError: true})
 		return
 	}
 	if strings.TrimSpace(outcome.Result.FinalText) != "" {
