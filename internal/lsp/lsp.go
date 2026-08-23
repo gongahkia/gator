@@ -49,6 +49,7 @@ const (
 	maxCodeActionKindBytes          = 256
 	maxCodeActionDisabledBytes      = 1024
 	maxCodeActionNewTextBytes       = 16 * 1024
+	maxRenameNameBytes               = 256
 	maxSymbolQuery                  = 512
 	maxToolOutput                   = 64 * 1024
 )
@@ -349,6 +350,8 @@ const (
 	hoverOperation            lspOperation = "hover"
 	completionOperation       lspOperation = "completion"
 	codeActionsOperation      lspOperation = "code_actions"
+	formatOperation           lspOperation = "format"
+	renameOperation           lspOperation = "rename"
 	definitionOperation       lspOperation = "definition"
 	referencesOperation       lspOperation = "references"
 	documentSymbolsOperation  lspOperation = "document_symbols"
@@ -360,6 +363,8 @@ var lspOperations = []lspOperation{
 	hoverOperation,
 	completionOperation,
 	codeActionsOperation,
+	formatOperation,
+	renameOperation,
 	definitionOperation,
 	referencesOperation,
 	documentSymbolsOperation,
@@ -391,6 +396,10 @@ func (t Tool) Definition() agent.ToolDefinition {
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"include_declaration":{"type":"boolean","description":"Include the symbol declaration in results; defaults to false"}}}`)
 	case codeActionsOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based selection start line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 selection start offset"},"end_line":{"type":"integer","minimum":1,"description":"Optional one-based selection end line; defaults to line"},"end_character":{"type":"integer","minimum":0,"description":"Optional zero-based UTF-16 selection end offset; defaults to character"}}}`)
+	case formatOperation:
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"}}}`)
+	case renameOperation:
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character","new_name"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"new_name":{"type":"string","minLength":1,"maxLength":256,"description":"Requested symbol name"}}}`)
 	default:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"}}}`)
 	}
@@ -408,6 +417,10 @@ func (t Tool) description() string {
 		return "Read-only LSP completion lookup using " + server + ". line is one-based; character is a zero-based UTF-16 offset. It returns bounded suggestions and does not apply edits."
 	case codeActionsOperation:
 		return "Read-only LSP code-action lookup using " + server + ". It returns bounded, workspace-confined suggested edits for the selected range. Gator never executes server-provided commands or applies the edits automatically."
+	case formatOperation:
+		return "Read-only LSP document-format lookup using " + server + ". It returns bounded suggested edits for this workspace file; Gator does not apply them automatically."
+	case renameOperation:
+		return "Read-only LSP rename lookup using " + server + ". It returns bounded, workspace-confined suggested edits; Gator does not apply them automatically."
 	case definitionOperation:
 		return "Read-only LSP go-to-definition lookup using " + server + ". line is one-based; character is a zero-based UTF-16 offset. Only workspace locations are returned."
 	case referencesOperation:
@@ -429,6 +442,7 @@ type toolParameters struct {
 	EndCharacter       int    `json:"end_character"`
 	IncludeDeclaration bool   `json:"include_declaration"`
 	Query              string `json:"query"`
+	NewName            string `json:"new_name"`
 }
 
 func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.ToolResult, error) {
@@ -464,6 +478,12 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	if t.operation == codeActionsOperation {
 		if _, err := codeActionRange(params); err != nil {
 			return agent.ToolResult{}, err
+		}
+	}
+	if t.operation == renameOperation {
+		params.NewName = strings.TrimSpace(params.NewName)
+		if params.NewName == "" || len(params.NewName) > maxRenameNameBytes || strings.ContainsAny(params.NewName, "\r\n\x00") {
+			return agent.ToolResult{}, fmt.Errorf("LSP rename new_name must contain 1-%d printable bytes", maxRenameNameBytes)
 		}
 	}
 	if t.approve == nil {
@@ -507,7 +527,7 @@ func (t Tool) open(ctx context.Context) (client, func(), error) {
 }
 
 func (t Tool) requiresPosition() bool {
-	return t.operation == hoverOperation || t.operation == completionOperation || t.operation == codeActionsOperation || t.operation == definitionOperation || t.operation == referencesOperation
+	return t.operation == hoverOperation || t.operation == completionOperation || t.operation == codeActionsOperation || t.operation == renameOperation || t.operation == definitionOperation || t.operation == referencesOperation
 }
 
 func (t Tool) request(path string, params toolParameters) (string, any) {
@@ -523,6 +543,10 @@ func (t Tool) request(path string, params toolParameters) (string, any) {
 	case codeActionsOperation:
 		selection, _ := codeActionRange(params)
 		return "textDocument/codeAction", map[string]any{"textDocument": document, "range": selection, "context": map[string]any{"diagnostics": []any{}}}
+	case formatOperation:
+		return "textDocument/formatting", map[string]any{"textDocument": document, "options": map[string]any{"tabSize": 4, "insertSpaces": true, "trimTrailingWhitespace": false, "insertFinalNewline": false, "trimFinalNewlines": false}}
+	case renameOperation:
+		return "textDocument/rename", map[string]any{"textDocument": document, "position": position, "newName": params.NewName}
 	case definitionOperation:
 		return "textDocument/definition", map[string]any{"textDocument": document, "position": position}
 	case referencesOperation:
@@ -570,6 +594,10 @@ func (t Tool) format(path string, response json.RawMessage) (agent.ToolResult, e
 		return formatCompletions(path, t.specification.Name, response)
 	case codeActionsOperation:
 		return formatCodeActions(t.root, path, t.specification.Name, response)
+	case formatOperation:
+		return formatFormatting(path, t.specification.Name, response)
+	case renameOperation:
+		return formatRename(t.root, path, t.specification.Name, response)
 	case definitionOperation, referencesOperation:
 		return formatLocations(t.root, path, t.specification.Name, t.operation, response)
 	case documentSymbolsOperation:
@@ -860,6 +888,61 @@ func presentWorkspaceEdit(root workspace.Root, raw json.RawMessage) ([]presented
 		result = append(result, edits...)
 	}
 	return result, true, nil
+}
+
+// formatFormatting presents one document-format result as a patch suggestion.
+// Formatting edits are a single atomic proposal: if their count exceeds the
+// shared edit bound, none are returned for the model to partially reproduce.
+func formatFormatting(path, server string, response json.RawMessage) (agent.ToolResult, error) {
+	response = bytes.TrimSpace(response)
+	if len(response) == 0 || string(response) == "null" {
+		response = json.RawMessage("[]")
+	}
+	var rawEdits []lspTextEdit
+	if err := json.Unmarshal(response, &rawEdits); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("decode formatting edits: %w", err)
+	}
+	truncated := len(rawEdits) > maxCodeActionEdits
+	edits := make([]presentedTextEdit, 0)
+	if !truncated {
+		var err error
+		edits, err = presentTextEdits(path, rawEdits)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+	}
+	return boundedToolResult(struct {
+		Path      string              `json:"path"`
+		Server    string              `json:"server"`
+		Operation lspOperation        `json:"operation"`
+		Edits     []presentedTextEdit `json:"edits"`
+		Truncated bool                `json:"truncated"`
+	}{Path: path, Server: server, Operation: formatOperation, Edits: edits, Truncated: truncated}, "format")
+}
+
+// formatRename accepts only a complete, workspace-confined WorkspaceEdit. A
+// rename can affect several files, so exposing a partial proposal would make
+// the suggested change misleading; any unsafe or oversized edit is omitted.
+func formatRename(root workspace.Root, path, server string, response json.RawMessage) (agent.ToolResult, error) {
+	response = bytes.TrimSpace(response)
+	if len(response) == 0 || string(response) == "null" {
+		response = json.RawMessage("{}")
+	}
+	edits, complete, err := presentWorkspaceEdit(root, response)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	truncated := !complete || len(edits) > maxCodeActionEdits
+	if truncated {
+		edits = nil
+	}
+	return boundedToolResult(struct {
+		Path      string              `json:"path"`
+		Server    string              `json:"server"`
+		Operation lspOperation        `json:"operation"`
+		Edits     []presentedTextEdit `json:"edits"`
+		Truncated bool                `json:"truncated"`
+	}{Path: path, Server: server, Operation: renameOperation, Edits: edits, Truncated: truncated}, "rename")
 }
 
 func presentTextEdits(path string, edits []lspTextEdit) ([]presentedTextEdit, error) {
@@ -1488,6 +1571,8 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 				"hover":          map[string]any{"dynamicRegistration": false, "contentFormat": []string{"plaintext", "markdown"}},
 				"completion":     map[string]any{"dynamicRegistration": false, "completionItem": map[string]any{"documentationFormat": []string{"plaintext", "markdown"}}},
 				"codeAction":     map[string]any{"dynamicRegistration": false, "isPreferredSupport": true, "disabledSupport": true, "dataSupport": false},
+				"formatting":     map[string]any{"dynamicRegistration": false},
+				"rename":         map[string]any{"dynamicRegistration": false, "prepareSupport": false},
 				"definition":     map[string]any{"dynamicRegistration": false},
 				"references":     map[string]any{"dynamicRegistration": false},
 				"documentSymbol": map[string]any{"hierarchicalDocumentSymbolSupport": true},
@@ -1503,6 +1588,8 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 			HoverProvider           json.RawMessage `json:"hoverProvider"`
 			CompletionProvider      json.RawMessage `json:"completionProvider"`
 			CodeActionProvider      json.RawMessage `json:"codeActionProvider"`
+			DocumentFormattingProvider json.RawMessage `json:"documentFormattingProvider"`
+			RenameProvider          json.RawMessage `json:"renameProvider"`
 			DefinitionProvider      json.RawMessage `json:"definitionProvider"`
 			ReferencesProvider      json.RawMessage `json:"referencesProvider"`
 			DocumentSymbolProvider  json.RawMessage `json:"documentSymbolProvider"`
@@ -1517,6 +1604,8 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 		hoverOperation:            capabilityEnabled(response.Capabilities.HoverProvider),
 		completionOperation:       capabilityEnabled(response.Capabilities.CompletionProvider),
 		codeActionsOperation:      capabilityEnabled(response.Capabilities.CodeActionProvider),
+		formatOperation:           capabilityEnabled(response.Capabilities.DocumentFormattingProvider),
+		renameOperation:           capabilityEnabled(response.Capabilities.RenameProvider),
 		definitionOperation:       capabilityEnabled(response.Capabilities.DefinitionProvider),
 		referencesOperation:       capabilityEnabled(response.Capabilities.ReferencesProvider),
 		documentSymbolsOperation:  capabilityEnabled(response.Capabilities.DocumentSymbolProvider),
