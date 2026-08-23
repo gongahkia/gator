@@ -434,6 +434,13 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
 		{Text: "Implemented the independent writer change and inspected its delta."},
 	}}
+	stateDirectory := t.TempDir()
+	now := fixedScoutClock()
+	parentJournal, parentRecord, err := journal.Open(parent.Repository, "writer-parent-001", parent.Path, stateDirectory, now())
+	if err != nil {
+		t.Fatalf("open parent writer journal: %v", err)
+	}
+	t.Cleanup(func() { _ = parentJournal.Close() })
 	var events []agent.Event
 	writer := newWriterTool(Executor{Model: model}, parent, Request{
 		RepositoryPath: repository,
@@ -444,9 +451,9 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 		ThreadID:       "writer-parent-001",
 		MaxSteps:       6,
 		BaseCommit:     parent.BaseCommit,
-		StateDir:       t.TempDir(),
+		StateDir:       stateDirectory,
 		Mode:           ExecuteMode,
-	}, tools.NewCommandMemory(nil), []instructions.Role{{Name: "test-fixer", Description: "fix an isolated test failure", Kind: instructions.RoleWriter, Instructions: "change only the delegated test behavior"}, {Name: "reviewer", Description: "must not be visible to writers", Kind: instructions.RoleReadOnly, Instructions: "review only"}}, fixedScoutClock(), func(event agent.Event) {
+	}, tools.NewCommandMemory(nil), parentJournal, []instructions.Role{{Name: "test-fixer", Description: "fix an isolated test failure", Kind: instructions.RoleWriter, Instructions: "change only the delegated test behavior"}, {Name: "reviewer", Description: "must not be visible to writers", Kind: instructions.RoleReadOnly, Instructions: "review only"}}, now, func(event agent.Event) {
 		events = append(events, event)
 	})
 	definition := writer.Definition()
@@ -487,6 +494,13 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	}
 	if contents, err := os.ReadFile(filepath.Join(parent.Path, "writer.txt")); err != nil || string(contents) != "writer delta\n" {
 		t.Fatalf("writer delta was not explicitly transferable: %q, %v", contents, err)
+	}
+	manifests, err := journal.ListChildManifests(parentRecord.StatePath)
+	if err != nil {
+		t.Fatalf("list writer manifests: %v", err)
+	}
+	if len(manifests) != 1 || manifests[0].Status != journal.ChildCompleted || manifests[0].ParentRunID != "writer-parent-001" || manifests[0].WorktreePath == "" || manifests[0].StatePath == "" || manifests[0].TaskSHA256 == "" || manifests[0].PatchSHA256 == "" || manifests[0].PatchBytes != len(payload.Writer.Patch) || !manifests[0].PatchAvailable || !manifests[0].ReviewRequired || !manifests[0].WorktreeRetained {
+		t.Fatalf("writer manifest = %#v", manifests)
 	}
 }
 
