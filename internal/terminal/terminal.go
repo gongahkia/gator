@@ -21,16 +21,17 @@ import (
 )
 
 const (
-	defaultMaxTasks       = 4
-	defaultLifetime       = 15 * time.Minute
-	defaultBackgroundLife = 2 * time.Hour
-	defaultOutputBytes    = 256 * 1024
-	defaultReadBytes      = 16 * 1024
-	defaultTerminalRows   = 24
-	defaultTerminalCols   = 80
-	maxTerminalRows       = 300
-	maxTerminalCols       = 500
-	maxTerminalInputBytes = 16 * 1024
+	defaultMaxTasks          = 4
+	defaultLifetime          = 15 * time.Minute
+	defaultBackgroundLife    = 2 * time.Hour
+	defaultOutputBytes       = 256 * 1024
+	defaultReadBytes         = 16 * 1024
+	defaultTerminalRows      = 24
+	defaultTerminalCols      = 80
+	maxTerminalRows          = 300
+	maxTerminalCols          = 500
+	maxTerminalInputBytes    = 16 * 1024
+	maxTerminalProtocolBytes = 4 * 1024
 )
 
 // Config fixes the resource and policy limits for all terminal tasks belonging
@@ -98,6 +99,9 @@ type Attachment interface {
 	List() []Task
 	Read(string, int64) (ReadResult, error)
 	Resize(string, int, int) (Task, error)
+	// WriteProtocol sends a bounded reply produced by Gator's terminal
+	// emulator. It is not developer or model input and is never journaled.
+	WriteProtocol(string, []byte) (Task, error)
 	WriteDeveloper(string, []byte) (Task, error)
 	WriteDeveloperRaw(string, []byte) (Task, error)
 	FlushDeveloperInput(string) (Task, error)
@@ -127,6 +131,13 @@ func (a attachment) Resize(id string, rows, columns int) (Task, error) {
 		return Task{}, errors.New("terminal attachment is unavailable")
 	}
 	return a.manager.Resize(id, rows, columns)
+}
+
+func (a attachment) WriteProtocol(id string, input []byte) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.WriteProtocol(id, input)
 }
 
 func (a attachment) WriteDeveloper(id string, input []byte) (Task, error) {
@@ -405,6 +416,16 @@ func (m *Manager) Write(id string, input []byte) (Task, error) {
 	return m.write(id, input, developerInputTool)
 }
 
+// WriteProtocol sends a bounded terminal-emulator reply to a still-running
+// task. It is intentionally separate from developer and model input so a
+// device/status response cannot be treated as user activity or model context.
+func (m *Manager) WriteProtocol(id string, input []byte) (Task, error) {
+	if len(input) > maxTerminalProtocolBytes {
+		return Task{}, fmt.Errorf("terminal protocol reply exceeds %d bytes", maxTerminalProtocolBytes)
+	}
+	return m.write(id, input, terminalProtocolInput)
+}
+
 // WriteDeveloper sends direct developer input to an existing attached task.
 // It follows the task's already-fixed sandbox but does not reuse the agent's
 // command approval because a developer performed the input action locally.
@@ -442,6 +463,7 @@ const (
 	developerInputTool developerInputMode = iota
 	developerInputLine
 	developerInputRaw
+	terminalProtocolInput
 )
 
 func (m *Manager) write(id string, input []byte, mode developerInputMode) (Task, error) {

@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/creack/pty v1.1.24
+	github.com/gitpod-io/xterm-go v0.0.0-20260814130527-da33d8e27c30
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/rivo/uniseg v0.4.7
 )

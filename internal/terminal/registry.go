@@ -134,6 +134,14 @@ func (a registryAttachment) Resize(id string, rows, columns int) (Task, error) {
 	return manager.Resize(id, rows, columns)
 }
 
+func (a registryAttachment) WriteProtocol(id string, input []byte) (Task, error) {
+	manager, err := a.manager(id)
+	if err != nil {
+		return Task{}, err
+	}
+	return manager.WriteProtocol(id, input)
+}
+
 func (a registryAttachment) WriteDeveloper(id string, input []byte) (Task, error) {
 	manager, err := a.manager(id)
 	if err != nil {
