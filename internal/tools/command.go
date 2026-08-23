@@ -274,6 +274,15 @@ func runWorktreeCommand(ctx context.Context, root workspace.Root, policy Command
 	return CommandResult{Argv: cloneArgv(argv), ExitCode: exitCode, Output: output.String(), Truncated: output.truncated, TimedOut: errors.Is(commandContext.Err(), context.DeadlineExceeded)}, nil
 }
 
+// RunDeveloperSetup executes an argv that the developer supplied directly as
+// run setup, rather than an argv suggested by a model. It still applies the
+// exact worktree sandbox, environment, timeout, and output bounds in policy;
+// callers must not expose it to model or untrusted-client input because it
+// deliberately bypasses the exploratory-command approval callback.
+func RunDeveloperSetup(ctx context.Context, root workspace.Root, policy CommandPolicy, argv []string) (CommandResult, error) {
+	return runWorktreeCommand(ctx, root, policy, argv)
+}
+
 func allowed(allowlist [][]string, argv []string) bool {
 	for _, permitted := range allowlist {
 		if len(permitted) != len(argv) {

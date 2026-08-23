@@ -104,6 +104,85 @@ func TestExecutorCompletesReviewableFeatureRun(t *testing.T) {
 	}
 }
 
+func TestExecutorRunsExplicitSandboxedWorktreeSetupBeforeAgent(t *testing.T) {
+	repository := featureRepository(t)
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "verify", Name: "run_command", Arguments: json.RawMessage(`{"argv":["true"]}`)}}},
+		{Text: "The prepared worktree is ready for review."},
+	}}
+	outcome, err := (Executor{Model: model, Sandbox: sandbox.Policy{Mode: sandbox.Off}}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Inspect the prepared worktree",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "setup-before-agent-001",
+		MaxSteps:       4,
+		Verification:   [][]string{{"true"}},
+		Setup:          [][]string{{"/bin/sh", "-c", "printf ready > .gator-setup-marker"}},
+		StateDir:       t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("execute setup run: %v", err)
+	}
+	if contents, readErr := os.ReadFile(filepath.Join(outcome.Worktree.Path, ".gator-setup-marker")); readErr != nil || string(contents) != "ready" {
+		t.Fatalf("worktree setup marker = %q, %v", contents, readErr)
+	}
+	setupIndex, turnIndex := -1, -1
+	for index, event := range outcome.Events {
+		if event.Kind == agent.EventWorktreeSetup && strings.HasPrefix(event.Text, "completed") {
+			setupIndex = index
+		}
+		if event.Kind == agent.EventTurnStarted && turnIndex < 0 {
+			turnIndex = index
+		}
+	}
+	if setupIndex < 0 || turnIndex < 0 || setupIndex >= turnIndex {
+		t.Fatalf("setup was not completed before the first agent turn: %#v", outcome.Events)
+	}
+}
+
+func TestExecutorRetainsWorktreeWhenExplicitSetupFails(t *testing.T) {
+	repository := featureRepository(t)
+	outcome, err := (Executor{Model: &scriptedModel{}, Sandbox: sandbox.Policy{Mode: sandbox.Off}}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Run setup",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "setup-failure-001",
+		MaxSteps:       1,
+		Verification:   [][]string{{"true"}},
+		Setup:          [][]string{{"/bin/sh", "-c", "printf setup-failed >&2; exit 7"}},
+		StateDir:       t.TempDir(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "setup-failed") || !strings.Contains(err.Error(), "exited with code 7") {
+		t.Fatalf("setup failure = %v", err)
+	}
+	if outcome.Worktree.Path == "" || outcome.StatePath == "" {
+		t.Fatalf("failed setup did not retain review artifacts: %#v", outcome)
+	}
+	if !containsEvent(outcome.Events, agent.EventWorktreeSetup) {
+		t.Fatalf("failed setup lifecycle event was lost: %#v", outcome.Events)
+	}
+}
+
+func TestExecutorRejectsWorktreeSetupInPlanMode(t *testing.T) {
+	repository := featureRepository(t)
+	_, err := (Executor{Model: &scriptedModel{}}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Plan a prepared change",
+		Provider:       "test",
+		Model:          "test-model",
+		Verification:   [][]string{{"true"}},
+		Setup:          [][]string{{"true"}},
+		Mode:           PlanMode,
+	})
+	if err == nil || !strings.Contains(err.Error(), "only in Execute mode") {
+		t.Fatalf("plan setup error = %v", err)
+	}
+}
+
 func TestExecutorRetainsWorktreeWhenEvidenceIsMissing(t *testing.T) {
 	repository := featureRepository(t)
 	model := &scriptedModel{turns: []agent.Turn{{Text: "Done."}}}

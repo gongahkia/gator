@@ -115,6 +115,18 @@ func validateVerification(verification [][]string) error {
 	return nil
 }
 
+func validateSetup(setup [][]string) error {
+	if len(setup) > 8 {
+		return errors.New("at most 8 worktree setup commands are allowed")
+	}
+	for _, command := range setup {
+		if len(command) == 0 || strings.TrimSpace(command[0]) == "" {
+			return errors.New("worktree setup commands must contain an argv program")
+		}
+	}
+	return nil
+}
+
 func newID(now time.Time) (string, error) {
 	var suffix [4]byte
 	if _, err := rand.Read(suffix[:]); err != nil {

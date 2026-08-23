@@ -742,7 +742,7 @@ func (s *Server) sendEvent(sessionID, messageID string, event agent.Event) {
 			"toolCallId":    event.ToolCall.ID,
 			"status":        status,
 		})
-	case agent.EventSubagent, agent.EventTerminal, agent.EventHook, agent.EventContextCompacted, agent.EventSteeringApplied:
+	case agent.EventSubagent, agent.EventTerminal, agent.EventHook, agent.EventContextCompacted, agent.EventSteeringApplied, agent.EventWorktreeSetup:
 		s.sendLifecycleEvent(sessionID, event)
 	}
 }
@@ -784,6 +784,8 @@ func lifecycleEventTitle(event agent.Event) (string, string) {
 		prefix, kind = "Context", "context"
 	case agent.EventSteeringApplied:
 		prefix, kind = "Steering", "steering"
+	case agent.EventWorktreeSetup:
+		prefix, kind = "Worktree setup", "worktree-setup"
 	}
 	text := strings.Join(strings.Fields(event.Text), " ")
 	if len([]rune(text)) > 768 {

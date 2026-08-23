@@ -126,6 +126,7 @@ const (
 	EventHook                     EventKind = "hook"
 	EventSubagent                 EventKind = "subagent"
 	EventTerminal                 EventKind = "terminal"
+	EventWorktreeSetup            EventKind = "worktree_setup"
 	EventRunFinished              EventKind = "run_finished"
 )
 

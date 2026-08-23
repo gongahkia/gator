@@ -54,6 +54,9 @@ project MCP configuration continues to come only from `.gator/mcp.json` after
 `gator mcp trust`. Trusted local LSP diagnostics, read-only navigation,
 informational completion, and workspace-confined code-action suggestions
 continue to come only from `.gator/lsp.json` after `gator lsp trust`.
+ACP prompts cannot provide a worktree setup command: that capability is limited
+to the local developer's explicit `gator run --setup` invocation, before an
+agent session exists.
 
 ACP authentication methods are intentionally not advertised. Configure a
 provider through Gator's existing `login`, `connect`, environment, or local

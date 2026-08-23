@@ -44,16 +44,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if request.BaseCommit == "" {
 		request.BaseCommit = isolated.BaseCommit
 	}
-	reports, err := e.runScouts(ctx, request, isolated.BaseCommit)
-	if err != nil {
-		return Outcome{Worktree: isolated, ScoutWorktrees: scoutWorktrees(reports)}, err
-	}
-	if context := formatScoutReports(reports); context != "" {
-		request.System = joinInstructions(request.System, context)
-	}
-	outcome, err := e.execute(ctx, isolated, request, nil, "")
-	outcome.ScoutWorktrees = scoutWorktrees(reports)
-	return outcome, err
+	return e.execute(ctx, isolated, request, nil, "", true)
 }
 
 // Resume continues a retained worktree from a private local session. It starts
@@ -75,6 +66,7 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 		request.Profile = previous.Profile
 	}
 	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
+	request.Setup = nil
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
 	}
@@ -104,7 +96,7 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 	}
 	history := append([]agent.Message(nil), previous.Messages...)
 	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task with this developer instruction:\n" + continuation, Images: request.Images, Attachments: request.Attachments})
-	return e.execute(ctx, isolated, request, history, statePath)
+	return e.execute(ctx, isolated, request, history, statePath, false)
 }
 
 // Fork restores one retained turn into a new worktree and continues from that
@@ -134,6 +126,7 @@ func (e Executor) Fork(ctx context.Context, previous journal.Session, statePath,
 		request.Profile = previous.Profile
 	}
 	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
+	request.Setup = nil
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
 	}
@@ -160,7 +153,7 @@ func (e Executor) Fork(ctx context.Context, previous journal.Session, statePath,
 	}
 	history := append([]agent.Message(nil), previous.Messages...)
 	history = append(history, agent.Message{Role: agent.RoleUser, Content: "Continue the original task from this fork with this developer instruction:\n" + continuation, Images: request.Images, Attachments: request.Attachments})
-	return e.execute(ctx, isolation, request, history, "")
+	return e.execute(ctx, isolation, request, history, "", false)
 }
 
 // Clone duplicates a retained branch into a new worktree. Its restoration and
@@ -188,6 +181,12 @@ func (e Executor) validateRequest(request Request) error {
 	}
 	if request.Mode != ExecuteMode && request.Mode != PlanMode {
 		return fmt.Errorf("unsupported run mode %d", request.Mode)
+	}
+	if len(request.Setup) > 0 && request.Mode == PlanMode {
+		return errors.New("worktree setup commands are available only in Execute mode")
+	}
+	if err := validateSetup(request.Setup); err != nil {
+		return err
 	}
 	if len(nonEmptyScouts(request.Scouts)) > maxScouts {
 		return fmt.Errorf("at most %d read-only scouts may run in parallel", maxScouts)
