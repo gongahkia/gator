@@ -340,6 +340,46 @@ func TestAttachedTerminalRawKeyboardInputFlushesOnReturnToControls(t *testing.T)
 	}
 }
 
+func TestCompletedRunKeepsDetachedTerminalAttachedToInteractiveSession(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := terminal.NewRegistry()
+	defer registry.Close()
+	manager := terminal.New(terminal.Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}, Registry: registry})
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "sleep 30"})
+	if err != nil {
+		t.Fatalf("start terminal task: %v", err)
+	}
+	if _, err := manager.Detach(task.ID); err != nil {
+		t.Fatalf("detach terminal task: %v", err)
+	}
+	manager.Close()
+
+	model := New(Config{TerminalRegistry: registry})
+	model.width, model.height = 100, 40
+	model.resizeInputs()
+	model.setTerminalAttachment(registry.Attachment())
+	next, _ := model.Update(executionDoneMsg{})
+	completed := next.(Model)
+	if completed.terminalAttachment == nil || !completed.hasBackgroundTerminalTask() {
+		t.Fatalf("completed TUI dropped detached terminal attachment: %#v", completed.terminalTasks)
+	}
+	next, _ = completed.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	attached := next.(Model)
+	if attached.screen != terminalScreen || !strings.Contains(attached.View(), task.ID) || !strings.Contains(attached.View(), "background") {
+		t.Fatalf("detached terminal attachment view = %s", attached.View())
+	}
+}
+
 func TestWindowSizeResizesInputsAndKeepsComposerWithinTerminal(t *testing.T) {
 	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
 	model.task.SetValue("Implement responsive terminal layout")

@@ -3,21 +3,35 @@ package terminal
 import (
 	"errors"
 	"sort"
+	"strconv"
 	"sync"
 )
+
+const defaultMaxBackgroundTasks = 8
 
 // Registry owns the small set of terminal managers that belong to one
 // interactive Gator process. It is deliberately in-memory: preserving a PTY
 // across application restart requires a separately supervised daemon, not an
 // orphaned child process that this package would be unable to recover safely.
 type Registry struct {
-	mu       sync.Mutex
-	managers map[*Manager]struct{}
+	mu            sync.Mutex
+	managers      map[*Manager]struct{}
+	background    map[*task]struct{}
+	maxBackground int
 }
 
 // NewRegistry creates a process-local background-terminal registry.
 func NewRegistry() *Registry {
-	return &Registry{managers: make(map[*Manager]struct{})}
+	return newRegistry(defaultMaxBackgroundTasks)
+}
+
+func newRegistry(maxBackground int) *Registry {
+	if maxBackground <= 0 {
+		maxBackground = defaultMaxBackgroundTasks
+	}
+	return &Registry{
+		managers: make(map[*Manager]struct{}), background: make(map[*task]struct{}), maxBackground: maxBackground,
+	}
 }
 
 func (r *Registry) register(manager *Manager) {
@@ -35,6 +49,31 @@ func (r *Registry) unregister(manager *Manager) {
 	}
 	r.mu.Lock()
 	delete(r.managers, manager)
+	r.mu.Unlock()
+}
+
+func (r *Registry) reserveDetached(task *task) error {
+	if r == nil || task == nil {
+		return errors.New("terminal background registry is unavailable")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, found := r.background[task]; found {
+		return nil
+	}
+	if len(r.background) >= r.maxBackground {
+		return errors.New("at most " + strconv.Itoa(r.maxBackground) + " background terminal tasks may run in one Gator session")
+	}
+	r.background[task] = struct{}{}
+	return nil
+}
+
+func (r *Registry) releaseDetached(task *task) {
+	if r == nil || task == nil {
+		return
+	}
+	r.mu.Lock()
+	delete(r.background, task)
 	r.mu.Unlock()
 }
 

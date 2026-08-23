@@ -340,6 +340,9 @@ func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.
 	if !hasTool(model.requests[0].Tools, "terminal_start") || !hasTool(model.requests[0].Tools, "terminal_read") {
 		t.Fatalf("execute tool surface omitted persistent terminal: %#v", model.requests[0].Tools)
 	}
+	if hasTool(model.requests[0].Tools, "terminal_detach") {
+		t.Fatalf("noninteractive execute surface exposed terminal_detach: %#v", model.requests[0].Tools)
+	}
 	if !containsEvent(outcome.Events, agent.EventTerminal) {
 		t.Fatalf("terminal cleanup was not visible in the event stream: %#v", outcome.Events)
 	}
@@ -352,6 +355,49 @@ func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.
 	}
 	if hasTool(planModel.requests[0].Tools, "terminal_start") || hasTool(planModel.requests[0].Tools, "terminal_write") {
 		t.Fatalf("plan tool surface included persistent terminal: %#v", planModel.requests[0].Tools)
+	}
+}
+
+func TestExecutorRetainsApprovedDetachedTerminalOnlyInInteractiveRegistry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	repository := featureRepository(t)
+	registry := terminal.NewRegistry()
+	defer registry.Close()
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "terminal", Name: "terminal_start", Arguments: objectArguments(t, struct {
+			Argv []string `json:"argv"`
+		}{Argv: []string{sh, "-lc", "sleep 30"}})}}},
+		{ToolCalls: []agent.ToolCall{{ID: "detach", Name: "terminal_detach", Arguments: json.RawMessage(`{"id":"term-terminal-detached-001-001"}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "The development server remains available in the attached terminal."},
+	}}
+	outcome, err := (Executor{Model: model, Sandbox: sandbox.Policy{Mode: sandbox.Off}}).Execute(context.Background(), Request{
+		RepositoryPath: repository, Task: "Start a development server", Provider: "test", Model: "test-model", RunID: "terminal-detached-001", MaxSteps: 6, StateDir: t.TempDir(),
+		TerminalRegistry: registry,
+		Approve:          func(context.Context, []string) (tools.CommandDecision, error) { return tools.CommandAllowOnce, nil },
+	})
+	if err != nil {
+		t.Fatalf("execute detached terminal run: %v", err)
+	}
+	if !hasTool(model.requests[0].Tools, "terminal_detach") {
+		t.Fatalf("interactive execute surface omitted terminal_detach: %#v", model.requests[0].Tools)
+	}
+	if !containsEventText(outcome.Events, agent.EventTerminal, "detached to this Gator session") {
+		t.Fatalf("detached terminal event was not recorded: %#v", outcome.Events)
+	}
+	tasks := registry.Attachment().List()
+	if len(tasks) != 1 || !tasks[0].Background || tasks[0].Status != "running" {
+		t.Fatalf("detached terminal registry state = %#v", tasks)
+	}
+	if _, err := registry.Attachment().Stop(tasks[0].ID); err != nil {
+		t.Fatalf("stop detached terminal: %v", err)
 	}
 }
 
