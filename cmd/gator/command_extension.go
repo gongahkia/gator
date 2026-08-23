@@ -17,6 +17,7 @@ import (
 
 const extensionUsage = `usage:
   gator extension list
+  gator extension status
   gator extension install [--replace] DIRECTORY
   gator extension enable ID
   gator extension disable ID
@@ -48,6 +49,11 @@ func extensionCommand(arguments []string, out io.Writer) error {
 			return errors.New(extensionUsage)
 		}
 		return listExtensions(extensionStore, settings, out)
+	case "status":
+		if len(arguments) != 1 {
+			return errors.New(extensionUsage)
+		}
+		return projectExtensionStatus(settings, out)
 	case "install":
 		return installExtension(arguments[1:], extensionStore, settingsStore, settings, out)
 	case "enable", "disable":
@@ -123,7 +129,7 @@ func installExtension(arguments []string, extensionStore extension.Store, settin
 	if err := settingsStore.Save(settings); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(out, "Installed and enabled extension %q. Installed extension tools run as code you chose to install.\n", installed.Manifest.ID)
+	_, err = fmt.Fprintf(out, "Installed and enabled extension %q. Its sidecar tools require approval and run under Gator's current sandbox policy.\n", installed.Manifest.ID)
 	return err
 }
 
@@ -165,18 +171,54 @@ func setProjectTrust(trust bool, settingsStore config.Store, settings config.Set
 		return err
 	}
 	if trust {
-		settings.TrustedRepositories = addString(settings.TrustedRepositories, canonical)
+		digest, err := extension.BundleHash(canonical)
+		if err != nil {
+			return err
+		}
+		if digest == "" {
+			return errors.New("no .gator/extensions bundle exists to trust")
+		}
+		settings.ExtensionTrusts = setExtensionTrust(settings.ExtensionTrusts, config.ExtensionTrust{Repository: canonical, Hash: digest})
 	} else {
-		settings.TrustedRepositories = removeString(settings.TrustedRepositories, canonical)
+		settings.ExtensionTrusts = removeExtensionTrust(settings.ExtensionTrusts, canonical)
 	}
 	if err := settingsStore.Save(settings); err != nil {
 		return err
 	}
 	if trust {
-		_, err = fmt.Fprintf(out, "Trusted project extensions in %s. They may provide declared prompts and executable tools on future native runs.\n", canonical)
+		_, err = fmt.Fprintf(out, "Trusted project extension bundle in %s. Any bundle change disables its prompts and tools until you trust its new hash.\n", canonical)
 	} else {
 		_, err = fmt.Fprintf(out, "Stopped trusting project extensions in %s.\n", canonical)
 	}
+	return err
+}
+
+func projectExtensionStatus(settings config.Settings, out io.Writer) error {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	repository, err := gitRepositoryRoot(workingDirectory)
+	if err != nil {
+		return errors.New("project extension status is available only from inside a Git checkout")
+	}
+	canonical, err := extension.CanonicalRepository(repository)
+	if err != nil {
+		return err
+	}
+	digest, err := extension.BundleHash(canonical)
+	if err != nil {
+		return err
+	}
+	if digest == "" {
+		_, err := fmt.Fprintln(out, "No project extensions are configured.")
+		return err
+	}
+	state := "disabled (hash is not trusted)"
+	if extensionTrustFor(settings.ExtensionTrusts, canonical) == digest {
+		state = "active"
+	}
+	_, err = fmt.Fprintf(out, "Project extensions: %s\n  hash: %s\n  state: %s\n", canonical, digest, state)
 	return err
 }
 
@@ -205,6 +247,37 @@ func removeExtensionSetting(values []config.Extension, id string) []config.Exten
 	for _, value := range values {
 		if value.ID != id {
 			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func extensionTrustFor(trusts []config.ExtensionTrust, repository string) string {
+	for _, trust := range trusts {
+		if trust.Repository == repository {
+			return trust.Hash
+		}
+	}
+	return ""
+}
+
+func setExtensionTrust(trusts []config.ExtensionTrust, trust config.ExtensionTrust) []config.ExtensionTrust {
+	for index := range trusts {
+		if trusts[index].Repository == trust.Repository {
+			trusts[index] = trust
+			return trusts
+		}
+	}
+	trusts = append(trusts, trust)
+	sort.Slice(trusts, func(first, second int) bool { return trusts[first].Repository < trusts[second].Repository })
+	return trusts
+}
+
+func removeExtensionTrust(trusts []config.ExtensionTrust, repository string) []config.ExtensionTrust {
+	result := trusts[:0]
+	for _, trust := range trusts {
+		if trust.Repository != repository {
+			result = append(result, trust)
 		}
 	}
 	return result

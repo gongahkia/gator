@@ -14,13 +14,19 @@ const maxAttachedTerminalScreenRows = 1024
 // erase operations needed by progress bars, test dashboards, and simple TUI
 // programs. Unknown control sequences are ignored rather than rendered.
 type terminalDisplay struct {
-	width    int
-	lines    [][]rune
-	row      int
-	column   int
-	savedRow int
-	savedCol int
-	pending  []byte
+	width           int
+	lines           [][]rune
+	row             int
+	column          int
+	savedRow        int
+	savedCol        int
+	primaryLines    [][]rune
+	primaryRow      int
+	primaryColumn   int
+	primarySavedRow int
+	primarySavedCol int
+	alternate       bool
+	pending         []byte
 }
 
 func (s *terminalDisplay) resize(width int) {
@@ -183,10 +189,68 @@ func (s *terminalDisplay) csi(parameters string, command byte) {
 	case 'u':
 		s.row, s.column = s.savedRow, s.savedCol
 		s.ensureRow(s.row)
-	case 'h', 'l', 'm', 'q', 'n', 'r':
-		// Modes, styles, cursor shape/status, and scroll-region controls do
-		// not carry text. The viewport intentionally remains display-only.
+	case 'h':
+		if strings.HasPrefix(parameters, "?") {
+			s.setPrivateModes(values, true)
+		}
+	case 'l':
+		if strings.HasPrefix(parameters, "?") {
+			s.setPrivateModes(values, false)
+		}
+	case 'm', 'q', 'n', 'r':
+		// Styles, cursor shape/status, and scroll-region controls do not carry
+		// text. The viewport intentionally remains display-only.
 	}
+}
+
+func (s *terminalDisplay) setPrivateModes(values []int, enabled bool) {
+	for _, value := range values {
+		switch value {
+		case 47, 1047, 1049:
+			if enabled {
+				s.enterAlternateScreen()
+			} else {
+				s.leaveAlternateScreen()
+			}
+		case 1048:
+			if enabled {
+				s.savedRow, s.savedCol = s.row, s.column
+			} else {
+				s.row, s.column = s.savedRow, s.savedCol
+				s.ensureRow(s.row)
+			}
+		}
+	}
+}
+
+func (s *terminalDisplay) enterAlternateScreen() {
+	if s.alternate {
+		return
+	}
+	s.primaryLines = s.lines
+	s.primaryRow = s.row
+	s.primaryColumn = s.column
+	s.primarySavedRow = s.savedRow
+	s.primarySavedCol = s.savedCol
+	s.lines = nil
+	s.row, s.column = 0, 0
+	s.savedRow, s.savedCol = 0, 0
+	s.alternate = true
+}
+
+func (s *terminalDisplay) leaveAlternateScreen() {
+	if !s.alternate {
+		return
+	}
+	s.lines = s.primaryLines
+	s.row = s.primaryRow
+	s.column = s.primaryColumn
+	s.savedRow = s.primarySavedRow
+	s.savedCol = s.primarySavedCol
+	s.primaryLines = nil
+	s.primaryRow, s.primaryColumn = 0, 0
+	s.primarySavedRow, s.primarySavedCol = 0, 0
+	s.alternate = false
 }
 
 func terminalParameters(value string) []int {

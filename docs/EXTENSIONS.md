@@ -32,9 +32,12 @@ A repository can keep extensions at:
 ```
 
 They do nothing until the developer runs `gator extension trust` from that Git
-checkout. Trust is canonical-path-specific and can be revoked with `gator
-extension untrust`. This is deliberate: cloning or opening a repository must
-not make its files executable merely because Gator starts a task there.
+checkout. Trust records the canonical repository path and a SHA-256 hash of the
+entire extension bundle: any manifest, prompt, executable, helper, or file-mode
+change disables the project bundle until it is reviewed and trusted again. Use
+`gator extension status` to inspect that state and `gator extension untrust` to
+revoke it. This is deliberate: cloning or opening a repository must not make
+its files executable merely because Gator starts a task there.
 
 ## Manifest
 
@@ -112,14 +115,20 @@ The required response is:
 ```
 
 Tool responses are limited to 64 KiB and commands to two minutes (or a shorter
-manifest timeout). A malformed response, nonzero exit, or timeout fails the
-tool call visibly.
+manifest timeout). Every model-requested sidecar invocation requires the same
+allow-once, allow-this-exact-tool, or deny approval used for trusted MCP tools.
+The executable runs under the native run's strict sandbox, filesystem roots,
+filtered environment, and network mode; `--sandbox off` remains the explicit
+host-access escape hatch for the entire run. A malformed response, nonzero
+exit, timeout, or post-load bundle change fails the tool call visibly.
 
 ## Trust boundary
 
-An executable extension is code selected by the developer. It is outside
-Gator's native `run_command` approval path and can use the permissions of
-the Gator process. Global extensions therefore require an explicit install;
-project extensions require explicit per-repository trust. Gator's own
-worktree, path validation, patching, verifier, and command-approval policies
-are unchanged for native tools and direct model runs.
+An executable extension is code selected by the developer. Global extensions
+require an explicit local install; project extensions require explicit
+hash-pinned trust. Neither bypasses the native run's process sandbox or the
+per-tool developer approval boundary. Extension sidecars can write only where
+the run sandbox already permits writes; any resulting worktree change remains
+subject to Gator's final diff, verifier, and explicit patch handoff review.
+Gator rejects symlinks and non-regular files in every extension bundle, and
+rehashes a bundle before reading its guidance or launching its sidecar.

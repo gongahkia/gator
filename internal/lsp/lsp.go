@@ -28,18 +28,29 @@ import (
 )
 
 const (
-	manifestPath    = ".gator/lsp.json"
-	manifestVersion = 1
-	maxManifest     = 64 * 1024
-	maxExecutable   = 128 * 1024 * 1024
-	maxServers      = 32
-	maxFrame        = 256 * 1024
-	maxDiagnostics  = 128
-	maxLocations    = 128
-	maxSymbols      = 128
-	maxHoverBytes   = 32 * 1024
-	maxSymbolQuery  = 512
-	maxToolOutput   = 64 * 1024
+	manifestPath                    = ".gator/lsp.json"
+	manifestVersion                 = 1
+	maxManifest                     = 64 * 1024
+	maxExecutable                   = 128 * 1024 * 1024
+	maxServers                      = 32
+	maxFrame                        = 256 * 1024
+	maxDiagnostics                  = 128
+	maxLocations                    = 128
+	maxSymbols                      = 128
+	maxCompletions                  = 128
+	maxCodeActions                  = 64
+	maxCodeActionEdits              = 128
+	maxHoverBytes                   = 32 * 1024
+	maxCompletionLabelBytes         = 512
+	maxCompletionDetailBytes        = 512
+	maxCompletionDocumentationBytes = 2 * 1024
+	maxCompletionInsertTextBytes    = 512
+	maxCodeActionTitleBytes         = 512
+	maxCodeActionKindBytes          = 256
+	maxCodeActionDisabledBytes      = 1024
+	maxCodeActionNewTextBytes       = 16 * 1024
+	maxSymbolQuery                  = 512
+	maxToolOutput                   = 64 * 1024
 )
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,47}$`)
@@ -336,6 +347,8 @@ type lspOperation string
 const (
 	diagnosticsOperation      lspOperation = "diagnostics"
 	hoverOperation            lspOperation = "hover"
+	completionOperation       lspOperation = "completion"
+	codeActionsOperation      lspOperation = "code_actions"
 	definitionOperation       lspOperation = "definition"
 	referencesOperation       lspOperation = "references"
 	documentSymbolsOperation  lspOperation = "document_symbols"
@@ -345,6 +358,8 @@ const (
 var lspOperations = []lspOperation{
 	diagnosticsOperation,
 	hoverOperation,
+	completionOperation,
+	codeActionsOperation,
 	definitionOperation,
 	referencesOperation,
 	documentSymbolsOperation,
@@ -374,6 +389,8 @@ func (t Tool) Definition() agent.ToolDefinition {
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512,"description":"Symbol-name query within this workspace"}}}`)
 	case referencesOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"include_declaration":{"type":"boolean","description":"Include the symbol declaration in results; defaults to false"}}}`)
+	case codeActionsOperation:
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based selection start line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 selection start offset"},"end_line":{"type":"integer","minimum":1,"description":"Optional one-based selection end line; defaults to line"},"end_character":{"type":"integer","minimum":0,"description":"Optional zero-based UTF-16 selection end offset; defaults to character"}}}`)
 	default:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"}}}`)
 	}
@@ -387,6 +404,10 @@ func (t Tool) description() string {
 		return "Read-only LSP pull diagnostics using " + server + ". The path must be a workspace-relative source file."
 	case hoverOperation:
 		return "Read-only LSP hover information using " + server + ". line is one-based; character is a zero-based UTF-16 offset."
+	case completionOperation:
+		return "Read-only LSP completion lookup using " + server + ". line is one-based; character is a zero-based UTF-16 offset. It returns bounded suggestions and does not apply edits."
+	case codeActionsOperation:
+		return "Read-only LSP code-action lookup using " + server + ". It returns bounded, workspace-confined suggested edits for the selected range. Gator never executes server-provided commands or applies the edits automatically."
 	case definitionOperation:
 		return "Read-only LSP go-to-definition lookup using " + server + ". line is one-based; character is a zero-based UTF-16 offset. Only workspace locations are returned."
 	case referencesOperation:
@@ -404,6 +425,8 @@ type toolParameters struct {
 	Path               string `json:"path"`
 	Line               int    `json:"line"`
 	Character          int    `json:"character"`
+	EndLine            int    `json:"end_line"`
+	EndCharacter       int    `json:"end_character"`
 	IncludeDeclaration bool   `json:"include_declaration"`
 	Query              string `json:"query"`
 }
@@ -437,6 +460,11 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	}
 	if t.requiresPosition() && (params.Line < 1 || params.Character < 0) {
 		return agent.ToolResult{}, errors.New("LSP position requires a one-based line and a zero-based UTF-16 character offset")
+	}
+	if t.operation == codeActionsOperation {
+		if _, err := codeActionRange(params); err != nil {
+			return agent.ToolResult{}, err
+		}
 	}
 	if t.approve == nil {
 		return agent.ToolResult{}, fmt.Errorf("LSP %s requires developer approval", t.operation)
@@ -479,7 +507,7 @@ func (t Tool) open(ctx context.Context) (client, func(), error) {
 }
 
 func (t Tool) requiresPosition() bool {
-	return t.operation == hoverOperation || t.operation == definitionOperation || t.operation == referencesOperation
+	return t.operation == hoverOperation || t.operation == completionOperation || t.operation == codeActionsOperation || t.operation == definitionOperation || t.operation == referencesOperation
 }
 
 func (t Tool) request(path string, params toolParameters) (string, any) {
@@ -490,6 +518,11 @@ func (t Tool) request(path string, params toolParameters) (string, any) {
 		return "textDocument/diagnostic", map[string]any{"textDocument": document}
 	case hoverOperation:
 		return "textDocument/hover", map[string]any{"textDocument": document, "position": position}
+	case completionOperation:
+		return "textDocument/completion", map[string]any{"textDocument": document, "position": position}
+	case codeActionsOperation:
+		selection, _ := codeActionRange(params)
+		return "textDocument/codeAction", map[string]any{"textDocument": document, "range": selection, "context": map[string]any{"diagnostics": []any{}}}
 	case definitionOperation:
 		return "textDocument/definition", map[string]any{"textDocument": document, "position": position}
 	case referencesOperation:
@@ -501,6 +534,20 @@ func (t Tool) request(path string, params toolParameters) (string, any) {
 	default:
 		return "", nil
 	}
+}
+
+func codeActionRange(params toolParameters) (map[string]map[string]int, error) {
+	endLine, endCharacter := params.EndLine, params.EndCharacter
+	if endLine == 0 {
+		endLine, endCharacter = params.Line, params.Character
+	}
+	if endLine < params.Line || (endLine == params.Line && endCharacter < params.Character) || endCharacter < 0 {
+		return nil, errors.New("LSP code-action selection end must not precede its start")
+	}
+	return map[string]map[string]int{
+		"start": {"line": params.Line - 1, "character": params.Character},
+		"end":   {"line": endLine - 1, "character": endCharacter},
+	}, nil
 }
 
 func (t Tool) format(path string, response json.RawMessage) (agent.ToolResult, error) {
@@ -519,6 +566,10 @@ func (t Tool) format(path string, response json.RawMessage) (agent.ToolResult, e
 		return formatDiagnostics(path, t.specification.Name, result.Items)
 	case hoverOperation:
 		return formatHover(path, t.specification.Name, response)
+	case completionOperation:
+		return formatCompletions(path, t.specification.Name, response)
+	case codeActionsOperation:
+		return formatCodeActions(t.root, path, t.specification.Name, response)
 	case definitionOperation, referencesOperation:
 		return formatLocations(t.root, path, t.specification.Name, t.operation, response)
 	case documentSymbolsOperation:
@@ -630,6 +681,202 @@ type presentedLocation struct {
 	Range presentedRange `json:"range"`
 }
 
+type lspTextEdit struct {
+	Range   lspRange `json:"range"`
+	NewText string   `json:"newText"`
+}
+
+type lspWorkspaceEdit struct {
+	Changes         map[string][]lspTextEdit `json:"changes"`
+	DocumentChanges json.RawMessage          `json:"documentChanges"`
+}
+
+type presentedTextEdit struct {
+	Path    string         `json:"path"`
+	Range   presentedRange `json:"range"`
+	NewText string         `json:"new_text"`
+}
+
+type presentedCodeAction struct {
+	Title          string              `json:"title"`
+	Kind           string              `json:"kind,omitempty"`
+	Preferred      bool                `json:"preferred,omitempty"`
+	DisabledReason string              `json:"disabled_reason,omitempty"`
+	Edits          []presentedTextEdit `json:"edits,omitempty"`
+	CommandOmitted bool                `json:"command_omitted,omitempty"`
+}
+
+func formatCodeActions(root workspace.Root, path, server string, response json.RawMessage) (agent.ToolResult, error) {
+	response = bytes.TrimSpace(response)
+	if len(response) == 0 || string(response) == "null" {
+		response = json.RawMessage("[]")
+	}
+	var rawActions []json.RawMessage
+	if err := json.Unmarshal(response, &rawActions); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("decode code actions: %w", err)
+	}
+	actions := make([]presentedCodeAction, 0, min(len(rawActions), maxCodeActions))
+	truncated := len(rawActions) > maxCodeActions
+	remainingEdits := maxCodeActionEdits
+	for _, raw := range rawActions {
+		if len(actions) == maxCodeActions {
+			truncated = true
+			break
+		}
+		action, include, omitted, err := presentCodeAction(root, raw, &remainingEdits)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		if omitted {
+			truncated = true
+		}
+		if !include {
+			continue
+		}
+		candidate := append(actions, action)
+		if _, err := boundedToolResult(struct {
+			Path      string                `json:"path"`
+			Server    string                `json:"server"`
+			Actions   []presentedCodeAction `json:"actions"`
+			Truncated bool                  `json:"truncated"`
+		}{Path: path, Server: server, Actions: candidate, Truncated: true}, "code-action"); err != nil {
+			truncated = true
+			break
+		}
+		actions = candidate
+	}
+	return boundedToolResult(struct {
+		Path      string                `json:"path"`
+		Server    string                `json:"server"`
+		Actions   []presentedCodeAction `json:"actions"`
+		Truncated bool                  `json:"truncated"`
+	}{Path: path, Server: server, Actions: actions, Truncated: truncated}, "code-action")
+}
+
+func presentCodeAction(root workspace.Root, raw json.RawMessage, remainingEdits *int) (presentedCodeAction, bool, bool, error) {
+	var value struct {
+		Title       string `json:"title"`
+		Kind        string `json:"kind"`
+		IsPreferred bool   `json:"isPreferred"`
+		Disabled    *struct {
+			Reason string `json:"reason"`
+		} `json:"disabled"`
+		Edit    json.RawMessage `json:"edit"`
+		Command json.RawMessage `json:"command"`
+	}
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return presentedCodeAction{}, false, false, fmt.Errorf("decode code action: %w", err)
+	}
+	if strings.TrimSpace(value.Title) == "" {
+		return presentedCodeAction{}, false, false, errors.New("LSP server returned a code action without a title")
+	}
+	action := presentedCodeAction{
+		Title:          shorten(value.Title, maxCodeActionTitleBytes),
+		Kind:           shorten(value.Kind, maxCodeActionKindBytes),
+		Preferred:      value.IsPreferred,
+		CommandOmitted: len(bytes.TrimSpace(value.Command)) != 0 && string(bytes.TrimSpace(value.Command)) != "null",
+	}
+	if value.Disabled != nil {
+		action.DisabledReason = shorten(value.Disabled.Reason, maxCodeActionDisabledBytes)
+	}
+	if len(bytes.TrimSpace(value.Edit)) == 0 || string(bytes.TrimSpace(value.Edit)) == "null" {
+		return action, true, false, nil
+	}
+	edits, complete, err := presentWorkspaceEdit(root, value.Edit)
+	if err != nil {
+		return presentedCodeAction{}, false, false, err
+	}
+	if !complete || len(edits) > *remainingEdits {
+		return presentedCodeAction{}, false, true, nil
+	}
+	*remainingEdits -= len(edits)
+	action.Edits = edits
+	return action, true, false, nil
+}
+
+func presentWorkspaceEdit(root workspace.Root, raw json.RawMessage) ([]presentedTextEdit, bool, error) {
+	var edit lspWorkspaceEdit
+	if err := json.Unmarshal(raw, &edit); err != nil {
+		return nil, false, fmt.Errorf("decode code-action workspace edit: %w", err)
+	}
+	if len(edit.Changes) > 0 && len(bytes.TrimSpace(edit.DocumentChanges)) > 0 && string(bytes.TrimSpace(edit.DocumentChanges)) != "null" {
+		return nil, false, nil
+	}
+	if len(edit.Changes) > 0 {
+		uris := make([]string, 0, len(edit.Changes))
+		for uri := range edit.Changes {
+			uris = append(uris, uri)
+		}
+		sort.Strings(uris)
+		result := make([]presentedTextEdit, 0)
+		for _, uri := range uris {
+			path, found, err := presentFileURI(root, uri)
+			if err != nil {
+				return nil, false, err
+			}
+			if !found {
+				return nil, false, nil
+			}
+			edits, err := presentTextEdits(path, edit.Changes[uri])
+			if err != nil {
+				return nil, false, err
+			}
+			result = append(result, edits...)
+		}
+		return result, true, nil
+	}
+	if len(bytes.TrimSpace(edit.DocumentChanges)) == 0 || string(bytes.TrimSpace(edit.DocumentChanges)) == "null" {
+		return nil, true, nil
+	}
+	var changes []json.RawMessage
+	if err := json.Unmarshal(edit.DocumentChanges, &changes); err != nil {
+		return nil, false, fmt.Errorf("decode code-action document changes: %w", err)
+	}
+	result := make([]presentedTextEdit, 0)
+	for _, rawChange := range changes {
+		var change struct {
+			TextDocument struct {
+				URI string `json:"uri"`
+			} `json:"textDocument"`
+			Edits []lspTextEdit `json:"edits"`
+		}
+		if err := json.Unmarshal(rawChange, &change); err != nil {
+			return nil, false, fmt.Errorf("decode code-action document change: %w", err)
+		}
+		if change.TextDocument.URI == "" {
+			return nil, false, nil
+		}
+		path, found, err := presentFileURI(root, change.TextDocument.URI)
+		if err != nil {
+			return nil, false, err
+		}
+		if !found {
+			return nil, false, nil
+		}
+		edits, err := presentTextEdits(path, change.Edits)
+		if err != nil {
+			return nil, false, err
+		}
+		result = append(result, edits...)
+	}
+	return result, true, nil
+}
+
+func presentTextEdits(path string, edits []lspTextEdit) ([]presentedTextEdit, error) {
+	result := make([]presentedTextEdit, 0, len(edits))
+	for _, edit := range edits {
+		if len(edit.NewText) > maxCodeActionNewTextBytes {
+			return nil, errors.New("LSP server returned a code-action edit that exceeds 16 KiB")
+		}
+		rangeValue, err := presentRange(edit.Range)
+		if err != nil {
+			return nil, fmt.Errorf("LSP server returned an invalid code-action edit range: %w", err)
+		}
+		result = append(result, presentedTextEdit{Path: path, Range: rangeValue, NewText: edit.NewText})
+	}
+	return result, nil
+}
+
 func formatHover(path, server string, response json.RawMessage) (agent.ToolResult, error) {
 	if string(response) == "null" {
 		return boundedToolResult(struct {
@@ -716,6 +963,132 @@ func hoverContent(raw json.RawMessage) (string, string, error) {
 		}
 	}
 	return shorten(strings.Join(parts, "\n\n"), maxHoverBytes), kind, nil
+}
+
+type lspCompletionItem struct {
+	Label         string          `json:"label"`
+	Kind          int             `json:"kind,omitempty"`
+	Detail        string          `json:"detail,omitempty"`
+	Documentation json.RawMessage `json:"documentation,omitempty"`
+	InsertText    string          `json:"insertText,omitempty"`
+}
+
+type presentedCompletion struct {
+	Label             string `json:"label"`
+	Kind              int    `json:"kind,omitempty"`
+	Detail            string `json:"detail,omitempty"`
+	DocumentationKind string `json:"documentation_kind,omitempty"`
+	Documentation     string `json:"documentation,omitempty"`
+	InsertText        string `json:"insert_text,omitempty"`
+}
+
+type presentedCompletions struct {
+	Path       string                `json:"path"`
+	Server     string                `json:"server"`
+	Incomplete bool                  `json:"incomplete"`
+	Items      []presentedCompletion `json:"items"`
+	Truncated  bool                  `json:"truncated"`
+}
+
+func formatCompletions(path, server string, response json.RawMessage) (agent.ToolResult, error) {
+	items, incomplete, err := decodeCompletions(response)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	presented := make([]presentedCompletion, 0, min(len(items), maxCompletions))
+	truncated := false
+	for _, raw := range items {
+		if len(presented) == maxCompletions {
+			truncated = true
+			break
+		}
+		item, err := presentCompletion(raw)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		candidate := append(presented, item)
+		if _, err := boundedToolResult(presentedCompletions{Path: path, Server: server, Incomplete: incomplete, Items: candidate, Truncated: truncated}, "completion"); err != nil {
+			truncated = true
+			break
+		}
+		presented = candidate
+	}
+	return boundedToolResult(presentedCompletions{Path: path, Server: server, Incomplete: incomplete, Items: presented, Truncated: truncated}, "completion")
+}
+
+func decodeCompletions(response json.RawMessage) ([]json.RawMessage, bool, error) {
+	response = bytes.TrimSpace(response)
+	if len(response) == 0 || string(response) == "null" {
+		return nil, false, nil
+	}
+	if response[0] == '[' {
+		var items []json.RawMessage
+		if err := json.Unmarshal(response, &items); err != nil {
+			return nil, false, fmt.Errorf("decode completion items: %w", err)
+		}
+		return items, false, nil
+	}
+	if response[0] != '{' {
+		return nil, false, errors.New("LSP server returned an invalid completion response")
+	}
+	var list struct {
+		IsIncomplete bool              `json:"isIncomplete"`
+		Items        []json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(response, &list); err != nil {
+		return nil, false, fmt.Errorf("decode completion list: %w", err)
+	}
+	return list.Items, list.IsIncomplete, nil
+}
+
+func presentCompletion(raw json.RawMessage) (presentedCompletion, error) {
+	var item lspCompletionItem
+	if err := json.Unmarshal(raw, &item); err != nil {
+		return presentedCompletion{}, fmt.Errorf("decode completion item: %w", err)
+	}
+	if strings.TrimSpace(item.Label) == "" || item.Kind < 0 || item.Kind > 25 {
+		return presentedCompletion{}, errors.New("LSP server returned an invalid completion item")
+	}
+	documentation, kind, err := completionDocumentation(item.Documentation)
+	if err != nil {
+		return presentedCompletion{}, err
+	}
+	return presentedCompletion{
+		Label:             shorten(item.Label, maxCompletionLabelBytes),
+		Kind:              item.Kind,
+		Detail:            shorten(item.Detail, maxCompletionDetailBytes),
+		DocumentationKind: kind,
+		Documentation:     documentation,
+		InsertText:        shorten(item.InsertText, maxCompletionInsertTextBytes),
+	}, nil
+}
+
+func completionDocumentation(raw json.RawMessage) (string, string, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", "", nil
+	}
+	if raw[0] == '"' {
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return "", "", fmt.Errorf("decode completion documentation: %w", err)
+		}
+		return shorten(value, maxCompletionDocumentationBytes), "plaintext", nil
+	}
+	if raw[0] != '{' {
+		return "", "", errors.New("LSP server returned invalid completion documentation")
+	}
+	var markup struct {
+		Kind  string `json:"kind"`
+		Value string `json:"value"`
+	}
+	if err := json.Unmarshal(raw, &markup); err != nil {
+		return "", "", fmt.Errorf("decode completion documentation: %w", err)
+	}
+	if markup.Kind != "plaintext" && markup.Kind != "markdown" {
+		return "", "", errors.New("LSP server returned an unsupported completion documentation kind")
+	}
+	return shorten(markup.Value, maxCompletionDocumentationBytes), markup.Kind, nil
 }
 
 func formatLocations(root workspace.Root, path, server string, operation lspOperation, response json.RawMessage) (agent.ToolResult, error) {
@@ -1113,6 +1486,8 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 			"textDocument": map[string]any{
 				"diagnostic":     map[string]any{"dynamicRegistration": false},
 				"hover":          map[string]any{"dynamicRegistration": false, "contentFormat": []string{"plaintext", "markdown"}},
+				"completion":     map[string]any{"dynamicRegistration": false, "completionItem": map[string]any{"documentationFormat": []string{"plaintext", "markdown"}}},
+				"codeAction":     map[string]any{"dynamicRegistration": false, "isPreferredSupport": true, "disabledSupport": true, "dataSupport": false},
 				"definition":     map[string]any{"dynamicRegistration": false},
 				"references":     map[string]any{"dynamicRegistration": false},
 				"documentSymbol": map[string]any{"hierarchicalDocumentSymbolSupport": true},
@@ -1126,6 +1501,8 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 		Capabilities struct {
 			DiagnosticProvider      json.RawMessage `json:"diagnosticProvider"`
 			HoverProvider           json.RawMessage `json:"hoverProvider"`
+			CompletionProvider      json.RawMessage `json:"completionProvider"`
+			CodeActionProvider      json.RawMessage `json:"codeActionProvider"`
 			DefinitionProvider      json.RawMessage `json:"definitionProvider"`
 			ReferencesProvider      json.RawMessage `json:"referencesProvider"`
 			DocumentSymbolProvider  json.RawMessage `json:"documentSymbolProvider"`
@@ -1138,6 +1515,8 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 	c.support = map[lspOperation]bool{
 		diagnosticsOperation:      capabilityEnabled(response.Capabilities.DiagnosticProvider),
 		hoverOperation:            capabilityEnabled(response.Capabilities.HoverProvider),
+		completionOperation:       capabilityEnabled(response.Capabilities.CompletionProvider),
+		codeActionsOperation:      capabilityEnabled(response.Capabilities.CodeActionProvider),
 		definitionOperation:       capabilityEnabled(response.Capabilities.DefinitionProvider),
 		referencesOperation:       capabilityEnabled(response.Capabilities.ReferencesProvider),
 		documentSymbolsOperation:  capabilityEnabled(response.Capabilities.DocumentSymbolProvider),

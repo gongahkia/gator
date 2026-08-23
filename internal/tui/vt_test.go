@@ -34,3 +34,18 @@ func TestTerminalDisplayBoundsRowsAndDropsUnknownControlPayloads(t *testing.T) {
 		t.Fatalf("terminal screen output = %q", got)
 	}
 }
+
+func TestTerminalDisplaySwapsPrivateAlternateScreenAcrossChunks(t *testing.T) {
+	var screen terminalDisplay
+	screen.resize(40)
+	screen.feed("primary prompt\r\n")
+	screen.feed("\x1b[?10")
+	screen.feed("49h\x1b[2Jalternate editor")
+	if got, want := screen.String(), "alternate editor"; got != want {
+		t.Fatalf("alternate screen = %q, want %q", got, want)
+	}
+	screen.feed("\x1b[?1049l")
+	if got, want := screen.String(), "primary prompt\n"; got != want {
+		t.Fatalf("restored primary screen = %q, want %q", got, want)
+	}
+}

@@ -742,7 +742,54 @@ func (s *Server) sendEvent(sessionID, messageID string, event agent.Event) {
 			"toolCallId":    event.ToolCall.ID,
 			"status":        status,
 		})
+	case agent.EventSubagent, agent.EventTerminal, agent.EventHook, agent.EventContextCompacted, agent.EventSteeringApplied:
+		s.sendLifecycleEvent(sessionID, event)
 	}
+}
+
+// sendLifecycleEvent gives ACP clients a structured progress record for
+// Gator-owned work that does not originate from one model ToolCall. Encoding
+// it as an ACP tool call keeps coordinator, terminal, hook, and compaction
+// activity out of model-message chunks while using a standard session update.
+func (s *Server) sendLifecycleEvent(sessionID string, event agent.Event) {
+	if strings.TrimSpace(event.Text) == "" {
+		return
+	}
+	kind, title := lifecycleEventTitle(event)
+	callID := s.nextID(kind)
+	s.notify(sessionID, map[string]any{
+		"sessionUpdate": "tool_call",
+		"toolCallId":    callID,
+		"title":         title,
+		"kind":          "other",
+		"status":        "in_progress",
+	})
+	s.notify(sessionID, map[string]any{
+		"sessionUpdate": "tool_call_update",
+		"toolCallId":    callID,
+		"status":        "completed",
+	})
+}
+
+func lifecycleEventTitle(event agent.Event) (string, string) {
+	prefix, kind := "Gator", "lifecycle"
+	switch event.Kind {
+	case agent.EventSubagent:
+		prefix, kind = "Subagent", "subagent"
+	case agent.EventTerminal:
+		prefix, kind = "Terminal", "terminal"
+	case agent.EventHook:
+		prefix, kind = "Hook", "hook"
+	case agent.EventContextCompacted:
+		prefix, kind = "Context", "context"
+	case agent.EventSteeringApplied:
+		prefix, kind = "Steering", "steering"
+	}
+	text := strings.Join(strings.Fields(event.Text), " ")
+	if len([]rune(text)) > 768 {
+		text = string([]rune(text)[:767]) + "…"
+	}
+	return kind, prefix + ": " + text
 }
 
 func (s *Server) notify(sessionID string, update map[string]any) {

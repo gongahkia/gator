@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/model"
@@ -84,7 +85,11 @@ func doctor(arguments []string, out io.Writer) error {
 	if sandboxErr != nil {
 		sandboxStatus = "unavailable: " + sandboxErr.Error()
 	}
-	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\n", gitStatus, provider, authentication, authenticationStatus, sandboxStatus); err != nil {
+	webSearchStatus := "not configured (set BRAVE_SEARCH_API_KEY)"
+	if strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "" {
+		webSearchStatus = "configured (requires --network allow)"
+	}
+	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\nWeb search: %s\n", gitStatus, provider, authentication, authenticationStatus, sandboxStatus, webSearchStatus); err != nil {
 		return err
 	}
 	suggestionDirectory := workingDirectory

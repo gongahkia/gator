@@ -17,21 +17,21 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 )
 
-const version = 1
+const version = 2
 
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
 type Settings struct {
-	Version             int              `json:"version"`
-	Defaults            Defaults         `json:"defaults"`
-	Theme               string           `json:"theme,omitempty"`
-	Extensions          []Extension      `json:"extensions,omitempty"`
-	CustomProviders     []CustomProvider `json:"custom_providers,omitempty"`
-	TrustedRepositories []string         `json:"trusted_repositories,omitempty"`
-	HookTrusts          []hooks.Trust    `json:"hook_trusts,omitempty"`
-	LSPTrusts           []lsp.Trust      `json:"lsp_trusts,omitempty"`
-	MCPTrusts           []mcp.Trust      `json:"mcp_trusts,omitempty"`
-	Execution           sandbox.Policy   `json:"execution"`
+	Version         int              `json:"version"`
+	Defaults        Defaults         `json:"defaults"`
+	Theme           string           `json:"theme,omitempty"`
+	Extensions      []Extension      `json:"extensions,omitempty"`
+	CustomProviders []CustomProvider `json:"custom_providers,omitempty"`
+	ExtensionTrusts []ExtensionTrust `json:"extension_trusts,omitempty"`
+	HookTrusts      []hooks.Trust    `json:"hook_trusts,omitempty"`
+	LSPTrusts       []lsp.Trust      `json:"lsp_trusts,omitempty"`
+	MCPTrusts       []mcp.Trust      `json:"mcp_trusts,omitempty"`
+	Execution       sandbox.Policy   `json:"execution"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -46,6 +46,14 @@ type Defaults struct {
 type Extension struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
+}
+
+// ExtensionTrust pins the full content of a project's executable extension
+// bundle. A repository path alone is never sufficient authority to execute
+// project-controlled code.
+type ExtensionTrust struct {
+	Repository string `json:"repository"`
+	Hash       string `json:"hash"`
 }
 
 // CustomProvider persists one OpenAI-compatible Chat Completions endpoint.
@@ -260,19 +268,18 @@ func validate(settings Settings) error {
 		}
 		enabled[id] = struct{}{}
 	}
-	if len(settings.TrustedRepositories) > 256 {
-		return errors.New("configuration has too many trusted repositories")
+	if len(settings.ExtensionTrusts) > 256 {
+		return errors.New("configuration has too many extension trust records")
 	}
-	trusted := make(map[string]struct{}, len(settings.TrustedRepositories))
-	for _, repository := range settings.TrustedRepositories {
-		path := strings.TrimSpace(repository)
-		if path == "" || len(path) > 4*1024 {
-			return errors.New("trusted repository path is invalid")
+	trustedExtensions := make(map[string]struct{}, len(settings.ExtensionTrusts))
+	for _, trust := range settings.ExtensionTrusts {
+		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || !validSHA256(trust.Hash) {
+			return errors.New("extension trust record is invalid")
 		}
-		if _, exists := trusted[path]; exists {
-			return fmt.Errorf("repository %q is trusted more than once", path)
+		if _, exists := trustedExtensions[trust.Repository]; exists {
+			return fmt.Errorf("repository %q has more than one extension trust record", trust.Repository)
 		}
-		trusted[path] = struct{}{}
+		trustedExtensions[trust.Repository] = struct{}{}
 	}
 	if len(settings.HookTrusts) > 256 {
 		return errors.New("configuration has too many hook trust records")
@@ -282,13 +289,8 @@ func validate(settings Settings) error {
 		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 {
 			return errors.New("hook trust repository path is invalid")
 		}
-		if len(trust.Hash) != 64 {
+		if !validSHA256(trust.Hash) {
 			return fmt.Errorf("hook trust for %q has an invalid hash", trust.Repository)
-		}
-		for _, character := range trust.Hash {
-			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
-				return fmt.Errorf("hook trust for %q has an invalid hash", trust.Repository)
-			}
 		}
 		if _, exists := trustedHooks[trust.Repository]; exists {
 			return fmt.Errorf("repository %q has more than one hook trust record", trust.Repository)
@@ -300,13 +302,8 @@ func validate(settings Settings) error {
 	}
 	trustedMCP := make(map[string]struct{}, len(settings.MCPTrusts))
 	for _, trust := range settings.MCPTrusts {
-		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || len(trust.Hash) != 64 {
+		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || !validSHA256(trust.Hash) {
 			return errors.New("MCP trust record is invalid")
-		}
-		for _, character := range trust.Hash {
-			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
-				return errors.New("MCP trust hash is invalid")
-			}
 		}
 		if _, exists := trustedMCP[trust.Repository]; exists {
 			return fmt.Errorf("repository %q has more than one MCP trust record", trust.Repository)
@@ -318,13 +315,8 @@ func validate(settings Settings) error {
 	}
 	trustedLSP := make(map[string]struct{}, len(settings.LSPTrusts))
 	for _, trust := range settings.LSPTrusts {
-		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || len(trust.Hash) != 64 {
+		if strings.TrimSpace(trust.Repository) == "" || len(trust.Repository) > 4*1024 || !validSHA256(trust.Hash) {
 			return errors.New("LSP trust record is invalid")
-		}
-		for _, character := range trust.Hash {
-			if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
-				return errors.New("LSP trust hash is invalid")
-			}
 		}
 		if _, exists := trustedLSP[trust.Repository]; exists {
 			return fmt.Errorf("repository %q has more than one LSP trust record", trust.Repository)
@@ -332,6 +324,18 @@ func validate(settings Settings) error {
 		trustedLSP[trust.Repository] = struct{}{}
 	}
 	return nil
+}
+
+func validSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 func absoluteDirectory(path string) (string, error) {

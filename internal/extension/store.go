@@ -237,7 +237,11 @@ func load(root string, project bool) (Installed, error) {
 	if err != nil {
 		return Installed{}, fmt.Errorf("resolve extension root: %w", err)
 	}
-	return Installed{Manifest: manifest, Root: abs, Project: project}, nil
+	digest, err := extensionHash(abs)
+	if err != nil {
+		return Installed{}, fmt.Errorf("hash extension bundle: %w", err)
+	}
+	return Installed{Manifest: manifest, Root: abs, Project: project, Hash: digest}, nil
 }
 
 func validateManifest(manifest Manifest) error {

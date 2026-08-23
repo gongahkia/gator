@@ -6,12 +6,14 @@ package extension
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -76,11 +79,20 @@ type Installed struct {
 	Manifest Manifest
 	Root     string
 	Project  bool
+	Hash     string
 }
 
 // Set is the extension surface prepared for one native run.
 type Set struct {
 	extensions []Installed
+}
+
+// ToolPolicy fixes the authority of every executable extension sidecar for a
+// single run. Extension tools remain separate from Gator's native tools, but
+// they never get a broader host boundary or a silent model-initiated launch.
+type ToolPolicy struct {
+	Sandbox sandbox.Policy
+	Approve func(context.Context, string, string) error
 }
 
 // Command is a prepared extension prompt template for the terminal UI.
@@ -100,6 +112,9 @@ func (s Set) Instructions() (string, error) {
 	var sections []string
 	total := 0
 	for _, installed := range s.extensions {
+		if err := verifyInstalled(installed); err != nil {
+			return "", err
+		}
 		resources := append(append([]string(nil), installed.Manifest.Skills...), installed.Manifest.Prompts...)
 		for _, resource := range resources {
 			contents, err := readResource(installed.Root, resource)
@@ -121,6 +136,9 @@ func (s Set) Instructions() (string, error) {
 func (s Set) Commands() ([]Command, error) {
 	commands := make([]Command, 0)
 	for _, installed := range s.extensions {
+		if err := verifyInstalled(installed); err != nil {
+			return nil, err
+		}
 		for _, command := range installed.Manifest.Commands {
 			contents, err := readResource(installed.Root, command.Prompt)
 			if err != nil {
@@ -138,11 +156,12 @@ func (s Set) Commands() ([]Command, error) {
 
 // Tools exposes extension sidecars only in Execute mode. The sidecar receives
 // an explicit JSON request over stdin and one bounded JSON response on stdout.
-func (s Set) Tools(root workspace.Root) []agent.Tool {
+// Its execution policy comes from the native run rather than the host process.
+func (s Set) Tools(root workspace.Root, policy ToolPolicy) []agent.Tool {
 	var result []agent.Tool
 	for _, installed := range s.extensions {
 		for _, specification := range installed.Manifest.Tools {
-			result = append(result, SidecarTool{installed: installed, specification: specification, root: root})
+			result = append(result, SidecarTool{installed: installed, specification: specification, root: root, policy: policy})
 		}
 	}
 	return result
@@ -153,6 +172,7 @@ type SidecarTool struct {
 	installed     Installed
 	specification ToolManifest
 	root          workspace.Root
+	policy        ToolPolicy
 }
 
 func (t SidecarTool) Definition() agent.ToolDefinition {
@@ -166,6 +186,15 @@ func (t SidecarTool) Definition() agent.ToolDefinition {
 func (t SidecarTool) Execute(ctx context.Context, arguments json.RawMessage) (agent.ToolResult, error) {
 	if !json.Valid(arguments) {
 		return agent.ToolResult{}, errors.New("extension tool arguments must be valid JSON")
+	}
+	if err := verifyInstalled(t.installed); err != nil {
+		return agent.ToolResult{}, err
+	}
+	if t.policy.Approve == nil {
+		return agent.ToolResult{}, fmt.Errorf("extension %q tool %q requires developer approval", t.installed.Manifest.ID, t.specification.Name)
+	}
+	if err := t.policy.Approve(ctx, t.installed.Manifest.ID, t.specification.Name); err != nil {
+		return agent.ToolResult{}, err
 	}
 	commandPath, err := commandPath(t.installed.Root, t.specification.Command[0])
 	if err != nil {
@@ -196,8 +225,21 @@ func (t SidecarTool) Execute(ctx context.Context, arguments json.RawMessage) (ag
 	runContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	output := &boundedBuffer{limit: maxToolOutputBytes}
-	command := exec.CommandContext(runContext, commandPath, t.specification.Command[1:]...)
-	command.Dir = t.root.Path()
+	policy := t.policy.Sandbox.Normalize()
+	policy.ReadOnlyRoots = append(policy.ReadOnlyRoots, t.installed.Root)
+	if err := policy.Validate(); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("validate extension sandbox policy: %w", err)
+	}
+	prepared, err := sandbox.Prepare(runContext, sandbox.Request{
+		Dir:    t.root.Path(),
+		Argv:   append([]string{commandPath}, t.specification.Command[1:]...),
+		Policy: policy,
+	})
+	if err != nil {
+		return agent.ToolResult{}, fmt.Errorf("prepare sandboxed extension %q tool %q: %w", t.installed.Manifest.ID, t.specification.Name, err)
+	}
+	defer prepared.Cleanup()
+	command := prepared.Command
 	command.Stdin = bytes.NewReader(request)
 	command.Stdout = output
 	command.Stderr = output
@@ -262,7 +304,7 @@ func (b *boundedBuffer) String() string { return b.buffer.String() }
 type Resolver struct {
 	store   Store
 	enabled map[string]bool
-	trusted map[string]bool
+	trusted map[string]string
 }
 
 // DefaultResolver creates a resolver from one user settings document.
@@ -280,9 +322,9 @@ func NewResolver(store Store, settings config.Settings) Resolver {
 	for _, extension := range settings.Extensions {
 		enabled[extension.ID] = extension.Enabled
 	}
-	trusted := make(map[string]bool, len(settings.TrustedRepositories))
-	for _, repository := range settings.TrustedRepositories {
-		trusted[repository] = true
+	trusted := make(map[string]string, len(settings.ExtensionTrusts))
+	for _, trust := range settings.ExtensionTrusts {
+		trusted[trust.Repository] = trust.Hash
 	}
 	return Resolver{store: store, enabled: enabled, trusted: trusted}
 }
@@ -307,7 +349,12 @@ func (r Resolver) Load(repository string) (Set, error) {
 	if err != nil {
 		return Set{}, err
 	}
-	if !r.trusted[canonical] {
+	expectedHash := r.trusted[canonical]
+	if expectedHash == "" {
+		return Set{extensions: loaded}, nil
+	}
+	actualHash, err := BundleHash(canonical)
+	if err != nil || actualHash == "" || actualHash != expectedHash {
 		return Set{extensions: loaded}, nil
 	}
 	project, err := loadProjectExtensions(canonical)
@@ -353,7 +400,7 @@ func commandPath(root, value string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve extension tool command: %w", err)
 	}
-	info, err := os.Stat(path)
+	info, err := os.Lstat(path)
 	if err != nil {
 		return "", fmt.Errorf("stat extension tool command: %w", err)
 	}
@@ -412,18 +459,132 @@ func CanonicalRepository(repository string) (string, error) {
 	return canonical, nil
 }
 
+// BundleHash returns the content identity of all repository-local extensions.
+// It rejects symlinks and non-regular files, so a path-only repository trust
+// cannot be turned into authority for a different executable after review.
+func BundleHash(repository string) (string, error) {
+	canonical, err := CanonicalRepository(repository)
+	if err != nil {
+		return "", err
+	}
+	installed, err := loadProjectExtensions(canonical)
+	if err != nil {
+		return "", err
+	}
+	if len(installed) == 0 {
+		return "", nil
+	}
+	digest := sha256.New()
+	_, _ = digest.Write([]byte("gator-project-extensions-v1\x00"))
+	for _, extension := range installed {
+		_, _ = digest.Write([]byte(extension.Manifest.ID + "\x00" + extension.Hash + "\x00"))
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
+}
+
+func verifyInstalled(installed Installed) error {
+	digest, err := extensionHash(installed.Root)
+	if err != nil {
+		return fmt.Errorf("verify extension %q bundle: %w", installed.Manifest.ID, err)
+	}
+	if digest != installed.Hash {
+		return fmt.Errorf("extension %q changed after it was loaded; reload and explicitly trust or reinstall the reviewed bundle", installed.Manifest.ID)
+	}
+	return nil
+}
+
+func extensionHash(root string) (string, error) {
+	info, err := os.Lstat(root)
+	if err != nil {
+		return "", fmt.Errorf("stat extension root: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("extension root must be a real directory")
+	}
+	var files []string
+	total := int64(0)
+	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		entryInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if entryInfo.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("extension contains symlink %q", filepath.ToSlash(relative))
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entryInfo.Mode().IsRegular() {
+			return fmt.Errorf("extension contains unsupported file %q", filepath.ToSlash(relative))
+		}
+		total += entryInfo.Size()
+		if total > maxExtensionBytes {
+			return fmt.Errorf("extension exceeds the %d-byte limit", maxExtensionBytes)
+		}
+		files = append(files, filepath.ToSlash(relative))
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	sort.Strings(files)
+	digest := sha256.New()
+	for _, relative := range files {
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		entryInfo, err := os.Lstat(path)
+		if err != nil {
+			return "", err
+		}
+		if !entryInfo.Mode().IsRegular() {
+			return "", fmt.Errorf("extension file %q changed while hashing", relative)
+		}
+		_, _ = fmt.Fprintf(digest, "%s\x00%o\x00", relative, entryInfo.Mode().Perm())
+		input, err := os.Open(path)
+		if err != nil {
+			return "", err
+		}
+		_, copyErr := io.Copy(digest, input)
+		closeErr := input.Close()
+		if copyErr != nil {
+			return "", copyErr
+		}
+		if closeErr != nil {
+			return "", closeErr
+		}
+		_, _ = digest.Write([]byte{'\x00'})
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
+}
+
 func loadProjectExtensions(repository string) ([]Installed, error) {
-	directory := filepath.Join(repository, ".gator", "extensions")
-	entries, err := os.ReadDir(directory)
-	if errors.Is(err, os.ErrNotExist) {
+	directory, found, err := projectExtensionDirectory(repository)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
 		return nil, nil
 	}
+	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return nil, fmt.Errorf("list project extensions: %w", err)
 	}
 	var installed []Installed
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		info, err := os.Lstat(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("inspect project extension %q: %w", entry.Name(), err)
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return nil, fmt.Errorf("project extension %q must be a real directory", entry.Name())
 		}
 		candidate, err := load(filepath.Join(directory, entry.Name()), true)
@@ -434,4 +595,30 @@ func loadProjectExtensions(repository string) ([]Installed, error) {
 	}
 	sort.Slice(installed, func(first, second int) bool { return installed[first].Manifest.ID < installed[second].Manifest.ID })
 	return installed, nil
+}
+
+func projectExtensionDirectory(repository string) (string, bool, error) {
+	metadata := filepath.Join(repository, ".gator")
+	info, err := os.Lstat(metadata)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("inspect project extension metadata: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", false, errors.New("project extension metadata directory must be a real directory")
+	}
+	directory := filepath.Join(metadata, "extensions")
+	info, err = os.Lstat(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("inspect project extensions directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", false, errors.New("project extensions directory must be a real directory")
+	}
+	return directory, true, nil
 }

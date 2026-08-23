@@ -123,15 +123,27 @@ control-plane operations.
 Trusted project LSP configuration is a deliberately small, local
 code-intelligence surface. A developer pins `.gator/lsp.json` and its
 repository-local executables with `gator lsp trust`; each model-requested
-diagnostic or navigation launch still needs operation-specific command approval
-and runs under the strict sandbox. The client implements pull diagnostics,
-hover, definitions, references, document symbols, and workspace-symbol queries;
-it bounds all wire and model-visible output, returns only workspace locations,
-and starts a server only after approval. A run lazily reuses one server per
-trusted configuration, then shuts it down at run exit; no server is shared
-across worktrees or retained runs. It is not a general IDE or an unreviewed
-executable-extension path: completion, edits, code actions, formatting, and a
-persistent cross-run server/index remain outside this capability.
+diagnostic, navigation, completion, or code-action launch still needs
+operation-specific command approval and runs under the strict sandbox. The
+client implements pull diagnostics, hover, completion, immediate code actions,
+definitions, references, document symbols, and workspace-symbol queries; it
+bounds all wire and model-visible output, returns only workspace locations, and
+starts a server only after approval. Completion is informational. Code actions
+return only bounded edits to existing regular workspace files; Gator never
+executes an LSP command, follows resource operations, or applies an LSP edit
+automatically. A run lazily reuses one server per trusted configuration, then
+shuts it down at run exit; no server is shared across worktrees or retained
+runs. It is not a general IDE or an unreviewed executable-extension path:
+rename, formatting, and a persistent cross-run server/index remain outside this
+capability.
+
+Trusted extension sidecars are a separate executable capability but not a
+process-sandbox exception. Global bundles are explicitly installed; repository
+bundles require a canonical-path trust record that pins the full bundle hash.
+Every model call requires per-tool approval, rechecks the bundle content, and
+runs under the active worktree, environment, filesystem, and network sandbox
+policy. Extension code can therefore not silently gain host authority merely
+because a developer installed or trusted it.
 
 Trusted Streamable HTTP MCP servers may obtain a Gator-owned public OAuth
 credential only through explicit `gator mcp login`. The client discovers the
@@ -185,7 +197,8 @@ Execute mode exposes these tools:
 5. inspect Git status and diff.
 6. start, read, write, list, and stop bounded persistent pseudo-terminal tasks.
 7. when the developer explicitly allows network access, fetch one approved
-   public HTTPS text resource with `http_fetch`.
+   public HTTPS text resource with `http_fetch`, and when
+   `BRAVE_SEARCH_API_KEY` is present, issue one approved `web_search` query.
 
 Terminal-task starts share the run's strict sandbox, worktree root, network
 policy, filtered environment, and developer command approval. They retain only
@@ -194,21 +207,31 @@ request a separate approval for each distinct terminal input; approval events
 contain an ID, size, and SHA-256 digest rather than the input bytes. During a
 native TUI run, `Ctrl+T` can attach a developer to an existing task: it renders
 bounded display output, resizes the existing PTY to its viewport, interprets
-common cursor/erase controls, allows a line write, ETX interrupt, or task stop,
-and emits only byte-count/digest metadata for direct input. The attachment does
-not create commands, broaden the fixed task sandbox, persist task output, or
-survive a completed agent run. It remains a line-oriented attachment rather
-than a full VT emulator or an ACP/client terminal multiplexer.
+common cursor/erase controls and private alternate-screen transitions, allows a
+line write, ETX interrupt, task stop, or opt-in raw keyboard input. Raw mode
+maps normal, control, navigation, and common function keys back to terminal
+bytes; `Ctrl+]` returns to Gator controls. Direct input emits only
+byte-count/digest metadata, with raw keys aggregated until raw mode ends or the
+task exits. The attachment does not create commands, broaden the fixed task
+sandbox, persist task output, or survive a completed agent run. It remains a
+bounded attachment rather than a full VT emulator or an ACP/client terminal
+multiplexer.
 
 `http_fetch` accepts port-443 HTTPS URLs only. Before a request, Gator resolves
 the hostname, rejects local/private/reserved results, and pins the approved
 public addresses into a proxy-free transport; redirects are returned rather
 than followed. It requires a separate exact-URL approval unless remembered
-within that run (in a memory separate from command approvals), allows at most
-eight requests per run, and exposes no more than 256 KiB of
-textual response content. The fetch tool is absent when network access is
-denied and is not a native search engine, browser automation, or computer-use
-capability.
+within that run (in a memory separate from command approvals), and exposes no
+more than 256 KiB of textual response content.
+
+When `BRAVE_SEARCH_API_KEY` is available, `web_search` queries Brave's fixed
+documented Web Search endpoint through that same DNS-pinned, proxy-free
+transport. It validates a 400-byte/50-word query, requires exact-query approval
+in separate memory, shares the eight-request web-research budget with fetches,
+requires a JSON response, and returns at most ten bounded title/URL/snippet
+records. Its token stays only in process memory and the outbound request header;
+it is never persisted, emitted, or sent to the model. Both tools are absent
+when network access is denied. Neither is browser automation or computer use.
 
 Plan mode exposes only read/search and Git inspection tools for every direct
 provider.

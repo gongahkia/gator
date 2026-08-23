@@ -32,6 +32,18 @@ func TestDoctorDescribesAzureResponsesEntraTokenWithoutExposingIt(t *testing.T) 
 	}
 }
 
+func TestDoctorReportsConfiguredWebSearchWithoutToken(t *testing.T) {
+	t.Setenv("BRAVE_SEARCH_API_KEY", "do-not-print-this-search-token")
+	var output bytes.Buffer
+	if err := doctor(nil, &output); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	text := output.String()
+	if !strings.Contains(text, "Web search: configured (requires --network allow)") || strings.Contains(text, "do-not-print-this-search-token") {
+		t.Fatalf("doctor web search output = %q", text)
+	}
+}
+
 func TestDoctorReportsStoredAzureResponsesBearerTokenWithoutExposingIt(t *testing.T) {
 	stateDirectory := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", stateDirectory)
