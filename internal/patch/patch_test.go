@@ -39,6 +39,20 @@ func TestExportAndApplyTransfersTrackedAndUntrackedFiles(t *testing.T) {
 	assertFile(t, target, "nested/new feature.txt", "new file\n")
 }
 
+func TestPathsListsTrackedAndUntrackedChangesWithoutGatorMetadata(t *testing.T) {
+	source, _ := pairedRepositories(t)
+	writeFile(t, source, "tracked.txt", "changed\n")
+	writeFile(t, source, "nested/new.txt", "new\n")
+	writeFile(t, source, ".gator/private.txt", "metadata\n")
+	paths, err := Paths(context.Background(), source, "")
+	if err != nil {
+		t.Fatalf("list changed paths: %v", err)
+	}
+	if got, want := strings.Join(paths, ","), "nested/new.txt,tracked.txt"; got != want {
+		t.Fatalf("changed paths = %q, want %q", got, want)
+	}
+}
+
 func TestApplyRejectsDirtyTargetBeforeCheckingPatchCompatibility(t *testing.T) {
 	source, target := pairedRepositories(t)
 	writeFile(t, source, "tracked.txt", "changed\n")

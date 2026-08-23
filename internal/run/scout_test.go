@@ -157,7 +157,7 @@ func TestReadOnlyScoutRoleSpecializesPromptWithoutChangingTools(t *testing.T) {
 		t.Fatalf("role events = %#v", events)
 	}
 	for _, definition := range requests[0].Tools {
-		if definition.Name == "apply_patch" || definition.Name == "run_command" || definition.Name == "delegate_writer" {
+		if definition.Name == "apply_patch" || definition.Name == "run_command" || definition.Name == "delegate_writer" || definition.Name == "delegate_writers" {
 			t.Fatalf("reviewer role received forbidden tool %q", definition.Name)
 		}
 	}

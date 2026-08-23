@@ -464,19 +464,23 @@ evidence; Gator permits at most eight dynamic scouts per primary run. A project
 may add a named `readonly` role to focus one scout's fresh-context prompt, but
 it cannot expand the scout tool surface.
 
-Execute mode also exposes `delegate_writer` for one independent implementation
-task at a time (at most two per primary run). Gator snapshots the current
-isolated worktree into a separate retained writer worktree, establishes a clean
-internal baseline there, and returns only the writer's delta: a concise summary
-and, when it is at most 512 KiB, an explicitly reviewable patch. The primary
-agent is paused while the child runs and must make a separate `apply_patch`
-call to transfer a compatible patch; Gator never auto-merges it. The writer
-inherits the developer-selected profile, verifier, sandbox, approval policy,
-and trusted integrations, but cannot recursively create a writer. A larger or
-failed child delta remains in its retained worktree for manual inspection with
-`gator worktree list`. A named project `writer` role can focus the child prompt,
-but it retains the same serial child-worktree, approval, sandbox, and explicit
-parent-review contract.
+Execute mode exposes `delegate_writer` for one independent implementation and
+`delegate_writers` for exactly two parallel implementations (at most two writer
+children total per primary run). Every writer starts from the same snapshot of
+the isolated parent worktree in its own retained child worktree, with a clean
+internal baseline. A parallel call must declare non-overlapping
+repository-relative paths; Gator rejects conflicting declarations and reports
+the actual changed paths and any post-run overlap or scope violation. That
+evidence is not a merge decision: the primary agent stays paused, receives only
+summaries and, when no larger than 512 KiB, reviewable patches, and must use a
+separate `apply_patch` call for each compatible delta. Gator never auto-merges
+writer output. Writer children inherit the developer-selected profile,
+verifier, sandbox, approval policy, and trusted integrations, but cannot
+recursively create writers. Their lifecycle, baseline, patch digest, worktree,
+and child run record are saved privately under the parent run record; inspect
+them with `gator child list RUN_RECORD_PATH` or `gator child show
+RUN_RECORD_PATH CHILD_RUN_ID`. A named project `writer` role focuses prompt
+instructions only and cannot weaken these boundaries.
 
 Execute mode also gives the native model a persistent terminal-task surface:
 `terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and
