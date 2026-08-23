@@ -15,6 +15,7 @@ import (
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/tools"
 )
 
 func providerFromEnvironment() (model.Provider, error) {
@@ -128,7 +129,18 @@ func executorWithExtensions(backend agent.Model, settings config.Settings) (gato
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
-	return gatorrun.Executor{Model: backend, Extensions: extensions, HookTrusts: settings.HookTrusts, LSPTrusts: settings.LSPTrusts, MCPTrusts: settings.MCPTrusts, MCPCredentials: credentials, Sandbox: settings.Execution}, nil
+	return gatorrun.Executor{
+		Model:          backend,
+		Extensions:     extensions,
+		HookTrusts:     settings.HookTrusts,
+		LSPTrusts:      settings.LSPTrusts,
+		MCPTrusts:      settings.MCPTrusts,
+		MCPCredentials: credentials,
+		HTTP: tools.HTTPFetchOptions{
+			BraveSearchAPIKey: strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")),
+		},
+		Sandbox: settings.Execution,
+	}, nil
 }
 
 // resolveConfiguredProvider uses the persisted custom-model catalog first,

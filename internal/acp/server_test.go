@@ -151,6 +151,20 @@ func TestServerRequestsPermissionAndUsesClientSelection(t *testing.T) {
 	}
 }
 
+func TestServerReportsSubagentAndTerminalLifecycleAsStructuredTools(t *testing.T) {
+	output := &lockedBuffer{}
+	server := &Server{config: Config{Output: output}}
+	server.sendEvent("session-1", "message-1", agent.Event{Kind: agent.EventSubagent, Text: "starting 2 isolated writers"})
+	server.sendEvent("session-1", "message-1", agent.Event{Kind: agent.EventTerminal, Text: "term-001 exited with code 0"})
+	messages := decode(output.String())
+	if !hasToolCall(messages, "gator-subagent-1", "Subagent: starting 2 isolated writers") || !hasToolUpdate(output.String(), "gator-subagent-1", "completed") {
+		t.Fatalf("subagent lifecycle updates = %s", output.String())
+	}
+	if !hasToolCall(messages, "gator-terminal-2", "Terminal: term-001 exited with code 0") || !hasToolUpdate(output.String(), "gator-terminal-2", "completed") {
+		t.Fatalf("terminal lifecycle updates = %s", output.String())
+	}
+}
+
 func TestServerRejectsForeignWorkspaceAndClientMCP(t *testing.T) {
 	repository := initializedRepository(t)
 	input := strings.NewReader(strings.Join([]string{
@@ -310,6 +324,19 @@ func hasToolUpdate(output, callID, status string) bool {
 		}
 		update, _ := message.Params["update"].(map[string]any)
 		if update["sessionUpdate"] == "tool_call_update" && update["toolCallId"] == callID && update["status"] == status {
+			return true
+		}
+	}
+	return false
+}
+
+func hasToolCall(messages []envelope, callID, title string) bool {
+	for _, message := range messages {
+		if message.Method != "session/update" {
+			continue
+		}
+		update, _ := message.Params["update"].(map[string]any)
+		if update["sessionUpdate"] == "tool_call" && update["toolCallId"] == callID && update["title"] == title && update["kind"] == "other" {
 			return true
 		}
 	}

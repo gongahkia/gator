@@ -125,6 +125,25 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 			"contents": map[string]string{"kind": "markdown", "value": "**Target**"},
 			"range":    location(localURI)["range"],
 		}),
+		"textDocument/completion": encoded(map[string]any{
+			"isIncomplete": true,
+			"items": []any{map[string]any{
+				"label": "Target", "kind": 5, "detail": "fixture symbol", "insertText": "Target",
+				"documentation":       map[string]string{"kind": "markdown", "value": "**Target** completion"},
+				"command":             map[string]string{"title": "untrusted", "command": "dangerous.command"},
+				"additionalTextEdits": []any{map[string]any{"newText": "gator-secret"}},
+			}},
+		}),
+		"textDocument/codeAction": encoded([]any{
+			map[string]any{
+				"title": "Fix Target", "kind": "quickfix", "isPreferred": true,
+				"edit": map[string]any{"changes": map[string]any{localURI: []any{map[string]any{"range": location(localURI)["range"], "newText": "Fixed"}}}},
+			},
+			map[string]any{
+				"title": "External edit", "edit": map[string]any{"changes": map[string]any{externalURI: []any{map[string]any{"range": location(externalURI)["range"], "newText": "outside secret"}}}},
+			},
+			map[string]any{"title": "Run server command", "command": map[string]string{"title": "Danger", "command": "dangerous.command"}},
+		}),
 		"textDocument/definition": encoded([]any{location(localURI), location(externalURI)}),
 		"textDocument/references": encoded([]any{location(localURI)}),
 		"textDocument/documentSymbol": encoded([]any{map[string]any{
@@ -144,6 +163,8 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 		contains  []string
 	}{
 		{operation: hoverOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/hover", contains: []string{`"found":true`, `"kind":"markdown"`, "Target"}},
+		{operation: completionOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/completion", contains: []string{`"incomplete":true`, `"documentation_kind":"markdown"`, `"insert_text":"Target"`}},
+		{operation: codeActionsOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"end_line":3,"end_character":5}`, method: "textDocument/codeAction", contains: []string{"Fix Target", `"new_text":"Fixed"`, `"command_omitted":true`, `"truncated":true`}},
 		{operation: definitionOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/definition", contains: []string{"pkg/target.go", `"truncated":true`}},
 		{operation: referencesOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"include_declaration":true}`, method: "textDocument/references", contains: []string{"pkg/target.go"}},
 		{operation: documentSymbolsOperation, arguments: `{"path":"pkg/example.go"}`, method: "textDocument/documentSymbol", contains: []string{"Target", "Method"}},
@@ -177,7 +198,7 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 					t.Fatalf("%s result missing %q: %s", test.operation, expected, result.Content)
 				}
 			}
-			if strings.Contains(result.Content, "gator-secret") {
+			if strings.Contains(result.Content, "gator-secret") || strings.Contains(result.Content, "outside secret") || strings.Contains(result.Content, "dangerous.command") {
 				t.Fatalf("%s leaked external LSP location: %s", test.operation, result.Content)
 			}
 			if test.operation == referencesOperation {
@@ -192,7 +213,70 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 					t.Fatalf("workspace-symbol parameters = %s, %v", encoded, err)
 				}
 			}
+			if test.operation == completionOperation {
+				encoded, err := json.Marshal(connection.parameters)
+				if err != nil || !strings.Contains(string(encoded), `"line":2`) || !strings.Contains(string(encoded), `"character":1`) {
+					t.Fatalf("completion parameters = %s, %v", encoded, err)
+				}
+				if strings.Contains(result.Content, "dangerous.command") || strings.Contains(result.Content, "gator-secret") {
+					t.Fatalf("completion leaked an edit or command: %s", result.Content)
+				}
+			}
+			if test.operation == codeActionsOperation {
+				encoded, err := json.Marshal(connection.parameters)
+				if err != nil || !strings.Contains(string(encoded), `"start":{"character":1,"line":2}`) || !strings.Contains(string(encoded), `"end":{"character":5,"line":2}`) {
+					t.Fatalf("code-action parameters = %s, %v", encoded, err)
+				}
+			}
 		})
+	}
+}
+
+func TestFormatCompletionsBoundsItemsAndRejectsInvalidData(t *testing.T) {
+	items := make([]map[string]any, maxCompletions+1)
+	for index := range items {
+		items[index] = map[string]any{"label": "Item" + strconv.Itoa(index)}
+	}
+	response, err := json.Marshal(map[string]any{"isIncomplete": true, "items": items})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := formatCompletions("pkg/example.go", "fixture", response)
+	if err != nil {
+		t.Fatalf("format completions: %v", err)
+	}
+	var payload struct {
+		Incomplete bool                  `json:"incomplete"`
+		Items      []presentedCompletion `json:"items"`
+		Truncated  bool                  `json:"truncated"`
+	}
+	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil || !payload.Incomplete || !payload.Truncated || len(payload.Items) != maxCompletions || payload.Items[0].Label != "Item0" {
+		t.Fatalf("completion payload = %#v, %v", payload, err)
+	}
+	result, err = formatCompletions("pkg/example.go", "fixture", json.RawMessage(`[{"label":"array item"}]`))
+	if err != nil || !strings.Contains(result.Content, "array item") || strings.Contains(result.Content, `"incomplete":true`) {
+		t.Fatalf("completion array result = %s, %v", result.Content, err)
+	}
+	if _, err := formatCompletions("pkg/example.go", "fixture", json.RawMessage(`[{"label":"","documentation":{"kind":"html","value":"bad"}}]`)); err == nil || !strings.Contains(err.Error(), "invalid completion item") {
+		t.Fatalf("invalid completion item error = %v", err)
+	}
+	if _, err := formatCompletions("pkg/example.go", "fixture", json.RawMessage(`[{"label":"Target","documentation":{"kind":"html","value":"bad"}}]`)); err == nil || !strings.Contains(err.Error(), "unsupported completion documentation kind") {
+		t.Fatalf("invalid completion documentation error = %v", err)
+	}
+	escaped := make([]map[string]any, maxCompletions)
+	for index := range escaped {
+		escaped[index] = map[string]any{"label": "Item" + strconv.Itoa(index), "documentation": strings.Repeat("\x00", maxCompletionDocumentationBytes)}
+	}
+	response, err = json.Marshal(escaped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err = formatCompletions("pkg/example.go", "fixture", response)
+	if err != nil {
+		t.Fatalf("format escaped completions: %v", err)
+	}
+	if len(result.Content) > maxToolOutput || !strings.Contains(result.Content, `"truncated":true`) {
+		t.Fatalf("escaped completion result is not bounded: %d bytes, %s", len(result.Content), result.Content)
 	}
 }
 
@@ -217,6 +301,27 @@ func TestWorkspaceSymbolsAcceptURIOnlyLocationAndRejectInvalidQuery(t *testing.T
 	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}, operation: workspaceSymbolsOperation}
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"query":"line\nbreak"}`)); err == nil || !strings.Contains(err.Error(), "workspace-symbol query") {
 		t.Fatalf("invalid workspace-symbol query error = %v", err)
+	}
+}
+
+func TestCodeActionsRejectUnsafeEditsAndSelectionRanges(t *testing.T) {
+	root := testWorkspace(t)
+	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
+	uri := fileURI(filepath.Join(root.Path(), "pkg", "example.go"))
+	result, err := formatCodeActions(root, "pkg/example.go", "fixture", json.RawMessage(`[{"title":"create file","edit":{"documentChanges":[{"kind":"create","uri":"file:///tmp/outside"}]}},{"title":"local edit","edit":{"changes":{"`+uri+`":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"fixed"}]}}}]`))
+	if err != nil || !strings.Contains(result.Content, "local edit") || strings.Contains(result.Content, "create file") || !strings.Contains(result.Content, `"truncated":true`) {
+		t.Fatalf("resource-operation code actions = %s, %v", result.Content, err)
+	}
+	result, err = formatCodeActions(root, "pkg/example.go", "fixture", json.RawMessage(`[{"title":"large edit","edit":{"changes":{"`+uri+`":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"`+strings.Repeat("x", maxCodeActionNewTextBytes+1)+`"}]}}}]`))
+	if err == nil || !strings.Contains(err.Error(), "exceeds 16 KiB") {
+		t.Fatalf("oversized code action error = %v", err)
+	}
+	if result.Content != "" {
+		t.Fatalf("unexpected result for oversized code action: %s", result.Content)
+	}
+	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}, operation: codeActionsOperation}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go","line":2,"character":1,"end_line":1,"end_character":1}`)); err == nil || !strings.Contains(err.Error(), "selection end") {
+		t.Fatalf("invalid code-action selection error = %v", err)
 	}
 }
 
@@ -293,6 +398,8 @@ func TestNativeClientUsesReadOnlyLookups(t *testing.T) {
 	}{
 		{method: "textDocument/diagnostic", want: "fixture error"},
 		{method: "textDocument/hover", want: "fixture hover"},
+		{method: "textDocument/completion", want: "fixture completion"},
+		{method: "textDocument/codeAction", want: "[]"},
 		{method: "textDocument/definition", want: "[]"},
 		{method: "textDocument/references", want: "[]"},
 		{method: "textDocument/documentSymbol", want: "[]"},
@@ -362,6 +469,8 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"capabilities": map[string]any{
 				"diagnosticProvider":      map[string]any{},
 				"hoverProvider":           true,
+				"completionProvider":      map[string]any{},
+				"codeActionProvider":      true,
 				"definitionProvider":      true,
 				"referencesProvider":      true,
 				"documentSymbolProvider":  true,
@@ -373,7 +482,9 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"kind": "full", "items": []Diagnostic{diagnostic("fixture error", 0, 0, 1)}}})
 		case "textDocument/hover":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"contents": "fixture hover"}})
-		case "textDocument/definition", "textDocument/references", "textDocument/documentSymbol", "workspace/symbol":
+		case "textDocument/completion":
+			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"isIncomplete": false, "items": []any{map[string]string{"label": "fixture completion"}}}})
+		case "textDocument/codeAction", "textDocument/definition", "textDocument/references", "textDocument/documentSymbol", "workspace/symbol":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": []any{}})
 		case "shutdown":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": nil})

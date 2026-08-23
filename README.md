@@ -278,8 +278,10 @@ cancel, approve, status, and thread-listing methods; see
 Gator extensions provide reusable skills, prompt guidance, and optional
 language-neutral JSON sidecar tools. Install a bundle with `gator extension
 install DIRECTORY`; project bundles under `.gator/extensions/` stay inactive
-until `gator extension trust` is run in that repository. Read the exact
-manifest, lifecycle, protocol, and trust boundary in [Extensions](docs/EXTENSIONS.md).
+until `gator extension trust` records their full content hash in that
+repository. Sidecar calls require approval and run inside the active sandbox,
+not with implicit host access. Read the exact manifest, lifecycle, protocol,
+and trust boundary in [Extensions](docs/EXTENSIONS.md).
 
 For a local server or a provider with a compatible endpoint, add it once with
 `gator provider add ID --base-url URL --model MODEL`. The endpoint must speak
@@ -438,8 +440,10 @@ declared executables; `gator lsp trust` pins `.gator/lsp.json` plus local LSP
 executables; and `gator mcp trust` pins `.gator/mcp.json` plus local stdio
 executables. A changed bundle is disabled until re-trusted. Trusted hooks run
 at tool, compaction, verification, and session boundaries in the strict
-sandbox. Trusted LSP bundles expose bounded pull diagnostics and read-only
-navigation, and request approval before each lookup; see
+sandbox. Trusted LSP bundles expose bounded pull diagnostics, read-only
+navigation, informational completion suggestions, and workspace-confined
+code-action edit suggestions, and request approval
+before each lookup; see
 [Trusted local LSP](docs/LSP.md).
 Trusted MCP bundles can expose repository-relative stdio servers or Streamable
 HTTP servers; every MCP tool invocation still requests approval. Remote HTTP
@@ -492,23 +496,35 @@ run. Starting a task needs the normal command approval; each distinct input
 needs its own approval and is represented to the approval UI by a digest rather
 than the input bytes. Terminal tasks are stopped when the agent run ends. This
 is an agent-mediated task manager, not an arbitrary host shell. While a native
-TUI run is active, `Ctrl+T` opens a line-oriented attachment to an existing
-model-started task: developers can view bounded output, switch tasks, send a
-line or interrupt, and stop that task. The attachment resizes the underlying
-PTY to its viewport and renders common cursor and erase controls, so progress
-and simple terminal dashboards do not accumulate stale lines. Direct input
-stays inside the task's existing sandbox and is journaled only as byte count
-plus SHA-256 digest. This is intentionally not a full VT terminal emulator, a
-background task that survives the run, or an ACP/client terminal multiplexer.
+TUI run is active, `Ctrl+T` opens an attachment to an existing model-started
+task: developers can view bounded output, switch tasks, send a line or
+interrupt, and stop that task. `Ctrl+O` enters opt-in raw-keyboard mode for
+arrows, completion, control keys, and common function keys; `Ctrl+]` returns
+to Gator controls. The attachment resizes the underlying PTY to its viewport
+and renders common cursor, erase, and alternate-screen controls, so progress,
+simple dashboards, and common full-screen buffer transitions do not accumulate
+stale primary-screen lines. Direct input stays inside the task's existing
+sandbox and is journaled only as byte count plus SHA-256 digest; raw keystrokes
+are grouped until raw mode ends or the task exits. This is intentionally not a
+full VT terminal emulator, a background task that survives the run, or an
+ACP/client terminal multiplexer.
 
 When the developer explicitly grants `--network allow` (or `gator config set
 network allow`), Execute mode additionally exposes `http_fetch` for bounded
 web research. Every exact HTTPS URL needs approval unless it was remembered for
-the current run;
-the tool accepts only port 443, resolves and pins public DNS addresses, rejects
-local/private/reserved targets, does not follow redirects, and returns at most
-256 KiB of textual content. It is a native fetch primitive, not a search engine
-or browser automation surface; fetched pages remain untrusted data.
+the current run; the tool accepts only port 443, resolves and pins public DNS
+addresses, rejects local/private/reserved targets, does not follow redirects,
+and returns at most 256 KiB of textual content.
+
+Set `BRAVE_SEARCH_API_KEY` to also expose `web_search` through Brave's
+documented Web Search API. Each exact query needs approval unless remembered
+for the current run; the fixed HTTPS endpoint uses the same proxy-free,
+public-DNS-pinned transport, shares the eight-request web-research budget with
+`http_fetch`, and returns at most ten title/URL/snippet records. The key stays
+in the process environment and outgoing request header only: it is not written
+to Gator configuration, events, or tool results. Search results and fetched
+pages remain untrusted data. This adds native search, not browser automation or
+computer use. [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get)
 
 See the source-backed [terminal-harness capability audit](docs/COMPETITIVE_AUDIT.md)
 for the current comparison with Codex CLI, Claude Code, Cursor CLI, Pi, and

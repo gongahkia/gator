@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
@@ -122,7 +123,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			if len(digest) > 8 {
 				digest = digest[:8]
 			}
-			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: fmt.Sprintf("%s developer input (%d bytes sha256:%s)", task.ID, input.Bytes, digest)})
+			kind := "developer input"
+			if input.Raw {
+				kind = "developer raw input"
+			}
+			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: fmt.Sprintf("%s %s (%d bytes sha256:%s)", task.ID, kind, input.Bytes, digest)})
 		},
 	})
 	if request.OnTerminalAttachment != nil {
@@ -136,7 +141,34 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, roleSet, request.MaxSteps, e.Now, emit)
 	if request.Mode == ExecuteMode {
-		runTools = append(runTools, extensions.Tools(isolated.Root)...)
+		runTools = append(runTools, extensions.Tools(isolated.Root, extension.ToolPolicy{
+			Sandbox: executionPolicy,
+			Approve: func(ctx context.Context, extensionID, tool string) error {
+				argv := []string{"extension", extensionID, tool}
+				if remembered.Allows(argv) {
+					return nil
+				}
+				toolName := "extension_" + strings.ReplaceAll(extensionID, "-", "_") + "_" + tool
+				emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: strings.Join(argv, " "), Argv: argv})
+				if request.Approve == nil {
+					emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
+					return fmt.Errorf("extension tool %s/%s requires developer approval", extensionID, tool)
+				}
+				decision, err := request.Approve(ctx, argv)
+				if err != nil {
+					emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
+					return err
+				}
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: decision.String(), Argv: argv})
+				if decision == tools.CommandAllowAlways {
+					remembered.Remember(argv)
+				}
+				if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
+					return fmt.Errorf("extension tool %s/%s denied by developer", extensionID, tool)
+				}
+				return nil
+			},
+		})...)
 		runTools = append(runTools, lspManager.Tools(func(ctx context.Context, server, operation, path string) error {
 			argv := []string{"lsp", server, operation, path}
 			if remembered.Allows(argv) {

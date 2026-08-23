@@ -146,6 +146,66 @@ func TestManagerRecordsDeveloperInputWithoutRetainingIt(t *testing.T) {
 	}
 }
 
+func TestManagerAggregatesRawDeveloperInputUntilFlush(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inputs []DeveloperInput
+	var inputMu sync.Mutex
+	manager := New(Config{
+		Root:   root,
+		Policy: sandbox.Policy{Mode: sandbox.Off},
+		OnDeveloperInput: func(_ Task, input DeveloperInput) {
+			inputMu.Lock()
+			inputs = append(inputs, input)
+			inputMu.Unlock()
+		},
+	})
+	defer manager.Close()
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "IFS= read line; printf 'received:%s\\n' \"$line\""})
+	if err != nil {
+		t.Fatalf("start terminal: %v", err)
+	}
+	raw := []byte("developer raw")
+	if _, err := manager.WriteDeveloperRaw(task.ID, raw[:9]); err != nil {
+		t.Fatalf("write first raw input: %v", err)
+	}
+	if _, err := manager.WriteDeveloperRaw(task.ID, raw[9:]); err != nil {
+		t.Fatalf("write second raw input: %v", err)
+	}
+	if _, err := manager.FlushDeveloperInput(task.ID); err != nil {
+		t.Fatalf("flush raw input: %v", err)
+	}
+	inputMu.Lock()
+	if len(inputs) != 1 || !inputs[0].Raw || inputs[0].Bytes != len(raw) {
+		inputMu.Unlock()
+		t.Fatalf("raw developer input metadata = %#v", inputs)
+	}
+	digest := sha256.Sum256(raw)
+	if inputs[0].SHA256 != hex.EncodeToString(digest[:]) || strings.Contains(inputs[0].SHA256, "developer raw") {
+		inputMu.Unlock()
+		t.Fatalf("raw developer input digest = %#v", inputs[0])
+	}
+	inputMu.Unlock()
+	if _, err := manager.WriteDeveloper(task.ID, []byte{'\r'}); err != nil {
+		t.Fatalf("finish raw terminal line: %v", err)
+	}
+	_ = awaitTerminalOutput(t, manager, task.ID, 0, "received:developer raw")
+	inputMu.Lock()
+	defer inputMu.Unlock()
+	if len(inputs) != 2 || inputs[1].Raw || inputs[1].Bytes != 1 {
+		t.Fatalf("raw and line developer metadata = %#v", inputs)
+	}
+}
+
 func TestManagerSetsAndResizesPseudoTerminalViewport(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the PTY dependency reports unsupported on Windows")

@@ -35,7 +35,7 @@ Usage:
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
   gator worktree list|prune|remove RUN_ID --yes
-  gator extension list
+  gator extension list|status
   gator extension install [--replace] DIRECTORY
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]

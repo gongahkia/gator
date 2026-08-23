@@ -19,6 +19,9 @@ v1 lifecycle: `initialize`, `session/new`, `session/prompt`, `session/cancel`,
 `session/set_mode`, `session/list`, `session/load`, `session/resume`, and
 `session/close`. Model text streams as `session/update` agent-message chunks;
 tool calls and their terminal status stream as structured ACP tool updates.
+Gator-owned subagent, terminal-exit, hook, compaction, and steering lifecycle
+events also stream as completed `other` tool calls, so an ACP client can show
+progress without treating coordinator messages as model text.
 Gator sends `session/request_permission` for each non-verification command and
 waits for a standard permission response with `allow_once`, `allow_always`, or
 `reject_once`.
@@ -48,7 +51,8 @@ runs. An ACP client cannot change the checkout, add filesystem roots, or inject 
 servers: `cwd` must be the repository Gator was started for,
 `additionalDirectories` must be empty, and `mcpServers` must be empty. Trusted
 project MCP configuration continues to come only from `.gator/mcp.json` after
-`gator mcp trust`. Trusted local LSP diagnostics and read-only navigation
+`gator mcp trust`. Trusted local LSP diagnostics, read-only navigation,
+informational completion, and workspace-confined code-action suggestions
 continue to come only from `.gator/lsp.json` after `gator lsp trust`.
 
 ACP authentication methods are intentionally not advertised. Configure a

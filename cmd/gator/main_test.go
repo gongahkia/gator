@@ -88,6 +88,25 @@ func TestCodexExecutorUsesDirectModelAdapter(t *testing.T) {
 	}
 }
 
+func TestExecutorReadsWebSearchKeyFromEnvironmentOnly(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("BRAVE_SEARCH_API_KEY", "do-not-print-this-search-token")
+	credentials, err := gatorCredentials()
+	if err != nil {
+		t.Fatalf("new credentials: %v", err)
+	}
+	if err := credentials.Put("codex", auth.Credential{Type: "oauth", Access: "access-token", Expires: time.Now().Add(time.Hour).UnixMilli(), Extra: map[string]string{"chatgpt_account_id": "account_123"}}); err != nil {
+		t.Fatalf("store Codex credential: %v", err)
+	}
+	executor, err := newExecutor("codex", "", "")
+	if err != nil {
+		t.Fatalf("new executor: %v", err)
+	}
+	if executor.HTTP.BraveSearchAPIKey != "do-not-print-this-search-token" {
+		t.Fatalf("web search key did not reach the in-memory executor options")
+	}
+}
+
 func TestRunRejectsUnsupportedCursorProviderWithoutFallback(t *testing.T) {
 	var output bytes.Buffer
 	err := runTask([]string{"--provider", "cursor", "--verify", "go test ./...", "Add a focused feature"}, &output)

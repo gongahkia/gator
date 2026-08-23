@@ -57,3 +57,15 @@ func TestStoreRejectsUnknownVersion(t *testing.T) {
 		t.Fatal("saved unsupported version")
 	}
 }
+
+func TestStoreRejectsInvalidExtensionTrust(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	settings := Default()
+	settings.ExtensionTrusts = []ExtensionTrust{{Repository: "/workspace/project", Hash: "not-a-hash"}}
+	if err := store.Save(settings); err == nil {
+		t.Fatal("saved invalid extension trust")
+	}
+}

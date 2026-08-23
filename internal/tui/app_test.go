@@ -279,6 +279,67 @@ func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) 
 	}
 }
 
+func TestAttachedTerminalRawKeyboardInputFlushesOnReturnToControls(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inputs []terminal.DeveloperInput
+	manager := terminal.New(terminal.Config{
+		Root:   root,
+		Policy: sandbox.Policy{Mode: sandbox.Off},
+		OnDeveloperInput: func(_ terminal.Task, input terminal.DeveloperInput) {
+			inputs = append(inputs, input)
+		},
+	})
+	defer manager.Close()
+	if _, err := manager.Start(context.Background(), []string{sh, "-lc", "IFS= read line; printf 'received:%s\\n' \"$line\""}); err != nil {
+		t.Fatalf("start terminal task: %v", err)
+	}
+	model := New(Config{})
+	model.width, model.height = 100, 40
+	model.resizeInputs()
+	next, _ := model.Update(terminalManagerMsg{attachment: manager.Attachment()})
+	attached := next.(Model)
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	attached = next.(Model)
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	attached = next.(Model)
+	if !attached.terminalRawInput || !strings.Contains(attached.View(), "Raw keyboard is active") {
+		t.Fatalf("raw keyboard mode did not open: %s", attached.View())
+	}
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Ada")})
+	attached = next.(Model)
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	attached = next.(Model)
+	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyCtrlCloseBracket})
+	attached = next.(Model)
+	if attached.terminalRawInput || !strings.Contains(attached.notice.text, "Line input is ready") {
+		t.Fatalf("raw keyboard mode did not return to controls: %#v", attached.notice)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		attached.refreshAttachedTerminal()
+		if strings.Contains(attached.currentAttachedTerminalOutput(), "received:Ada") {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if output := attached.currentAttachedTerminalOutput(); !strings.Contains(output, "received:Ada") {
+		t.Fatalf("raw keyboard terminal output = %q", output)
+	}
+	if len(inputs) != 1 || !inputs[0].Raw || inputs[0].Bytes != len("Ada\r") {
+		t.Fatalf("raw keyboard journal metadata = %#v", inputs)
+	}
+}
+
 func TestWindowSizeResizesInputsAndKeepsComposerWithinTerminal(t *testing.T) {
 	model := New(Config{Verification: [][]string{{"go", "test", "./..."}}})
 	model.task.SetValue("Implement responsive terminal layout")

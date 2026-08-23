@@ -51,6 +51,53 @@ func TestHTTPFetchRequiresNetworkApprovalAndReturnsBoundedText(t *testing.T) {
 	}
 }
 
+func TestWebSearchRequiresConfiguredKeyAndReturnsBoundedResults(t *testing.T) {
+	if tools := HTTPTools(CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}}, HTTPFetchOptions{}); len(tools) != 1 || tools[0].Definition().Name != "http_fetch" {
+		t.Fatalf("web search appeared without a configured key: %#v", tools)
+	}
+	if tools := HTTPTools(CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.DenyNetwork}}, HTTPFetchOptions{BraveSearchAPIKey: "do-not-leak"}); len(tools) != 0 {
+		t.Fatalf("network-denied web search surface = %#v", tools)
+	}
+	const token = "do-not-leak"
+	client := &fakeHTTPClient{contentType: "application/json; charset=utf-8", body: `{"web":{"results":[{"title":"One","url":"https://one.example/","description":"first result"},{"title":"Two","url":"https://two.example/","description":"second result"},{"title":"Three","url":"https://three.example/"}]}}`}
+	var approvals [][]string
+	var events []agent.Event
+	tools := HTTPTools(CommandPolicy{
+		Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork},
+		Approve: func(_ context.Context, argv []string) (CommandDecision, error) {
+			approvals = append(approvals, append([]string(nil), argv...))
+			return CommandAllowAlways, nil
+		},
+		OnEvent: func(event agent.Event) { events = append(events, event) },
+	}, HTTPFetchOptions{
+		BraveSearchAPIKey: token,
+		Resolver:          staticResolver{"api.search.brave.com": {{IP: net.ParseIP("93.184.216.34")}}},
+		Client:            client,
+	})
+	if len(tools) != 2 || tools[1].Definition().Name != "web_search" {
+		t.Fatalf("web search tool surface = %#v", tools)
+	}
+	first := executeTool(t, tools[1], `{"query":"Gator web research","count":2}`)
+	if !strings.Contains(first, `"query":"Gator web research"`) || !strings.Contains(first, `"title":"One"`) || !strings.Contains(first, `"title":"Two"`) || strings.Contains(first, `"title":"Three"`) || strings.Contains(first, token) {
+		t.Fatalf("web search result = %s", first)
+	}
+	if len(approvals) != 1 || strings.Join(approvals[0], " ") != "web_search Gator web research" {
+		t.Fatalf("web search approval = %#v", approvals)
+	}
+	if client.lastRequest == nil || client.lastRequest.URL.Host != "api.search.brave.com" || client.lastRequest.URL.Query().Get("q") != "Gator web research" || client.lastRequest.URL.Query().Get("count") != "2" || client.lastRequest.Header.Get("X-Subscription-Token") != token {
+		t.Fatalf("web search request = %#v", client.lastRequest)
+	}
+	for _, event := range events {
+		if strings.Contains(event.Text, token) || strings.Contains(strings.Join(event.Argv, " "), token) {
+			t.Fatalf("web search token leaked into event: %#v", event)
+		}
+	}
+	_ = executeTool(t, tools[1], `{"query":"Gator web research","count":1}`)
+	if len(approvals) != 1 || client.calls != 2 {
+		t.Fatalf("remembered web search approval = %#v, calls=%d", approvals, client.calls)
+	}
+}
+
 func TestHTTPFetchRejectsPrivateMixedAndNonTextTargetsBeforeConnection(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -145,10 +192,12 @@ type fakeHTTPClient struct {
 	body        string
 	location    string
 	calls       int
+	lastRequest *http.Request
 }
 
 func (c *fakeHTTPClient) Do(request *http.Request) (*http.Response, error) {
 	c.calls++
+	c.lastRequest = request.Clone(request.Context())
 	status := c.status
 	if status == 0 {
 		status = http.StatusOK

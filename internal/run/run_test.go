@@ -332,8 +332,8 @@ func TestExecutorAttachesDeveloperToExistingTerminalWithoutJournalingRawInput(t 
 	if task.ID == "" || task.Status != "running" {
 		t.Fatalf("attached terminal task = %#v", task)
 	}
-	if _, err := attachment.WriteDeveloper(task.ID, []byte("developer-secret\r")); err != nil {
-		t.Fatalf("write attached terminal input: %v", err)
+	if _, err := attachment.WriteDeveloperRaw(task.ID, []byte("developer-secret\r")); err != nil {
+		t.Fatalf("write raw attached terminal input: %v", err)
 	}
 	close(gate)
 	completed := <-result
@@ -345,7 +345,7 @@ func TestExecutorAttachesDeveloperToExistingTerminalWithoutJournalingRawInput(t 
 		if strings.Contains(event.Text, "developer-secret") || strings.Contains(strings.Join(event.Argv, " "), "developer-secret") {
 			t.Fatalf("raw developer input leaked into event: %#v", event)
 		}
-		if event.Kind == agent.EventTerminal && strings.Contains(event.Text, "developer input") {
+		if event.Kind == agent.EventTerminal && strings.Contains(event.Text, "developer raw input") {
 			foundInputEvent = strings.Contains(event.Text, "sha256:")
 		}
 	}
@@ -404,6 +404,56 @@ func TestExecutorExposesBoundedHTTPFetchOnlyWithNetworkCapability(t *testing.T) 
 	}
 	if hasTool(deniedModel.requests[0].Tools, "http_fetch") {
 		t.Fatalf("network-denied tool surface included HTTP fetch: %#v", deniedModel.requests[0].Tools)
+	}
+}
+
+func TestExecutorExposesConfiguredWebSearchWithoutLeakingToken(t *testing.T) {
+	repository := featureRepository(t)
+	const token = "do-not-leak-search-token"
+	client := &runHTTPClient{contentType: "application/json", body: `{"web":{"results":[{"title":"Official reference","url":"https://docs.example/reference","description":"source-backed result"}]}}`}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "search", Name: "web_search", Arguments: json.RawMessage(`{"query":"Gator terminal harness","count":1}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Used the approved public result as untrusted research."},
+	}}
+	outcome, err := (Executor{Model: model, Sandbox: sandbox.Policy{Mode: sandbox.Off, Network: sandbox.AllowNetwork}, HTTP: tools.HTTPFetchOptions{
+		BraveSearchAPIKey: token,
+		Client:            client,
+		Resolver:          runStaticResolver{"api.search.brave.com": {{IP: net.ParseIP("93.184.216.34")}}},
+	}}).Execute(context.Background(), Request{
+		RepositoryPath: repository, Task: "Research terminal harnesses", Provider: "test", Model: "test-model", RunID: "web-search-001", MaxSteps: 5, StateDir: t.TempDir(),
+		Approve: func(context.Context, []string) (tools.CommandDecision, error) {
+			return tools.CommandAllowOnce, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("execute web search run: %v", err)
+	}
+	if !hasTool(model.requests[0].Tools, "web_search") || client.calls != 1 || client.lastRequest == nil || client.lastRequest.Header.Get("X-Subscription-Token") != token {
+		t.Fatalf("web search tool surface/request = %#v / %#v", model.requests[0].Tools, client.lastRequest)
+	}
+	if got := model.requests[1].Messages[len(model.requests[1].Messages)-1]; got.Role != agent.RoleTool || got.ToolName != "web_search" || !strings.Contains(got.Content, "Official reference") || strings.Contains(got.Content, token) {
+		t.Fatalf("model did not receive safe web search result: %#v", got)
+	}
+	for _, event := range outcome.Events {
+		if strings.Contains(event.Text, token) || strings.Contains(strings.Join(event.Argv, " "), token) {
+			t.Fatalf("web search token leaked into event: %#v", event)
+		}
+	}
+	deniedModel := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Network access is not available in this run."},
+	}}
+	_, err = (Executor{Model: deniedModel, HTTP: tools.HTTPFetchOptions{BraveSearchAPIKey: token}}).Execute(context.Background(), Request{
+		RepositoryPath: repository, Task: "Inspect locally", Provider: "test", Model: "test-model", RunID: "web-search-denied-001", MaxSteps: 4, StateDir: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("execute network-denied web search run: %v", err)
+	}
+	if hasTool(deniedModel.requests[0].Tools, "web_search") {
+		t.Fatalf("network-denied tool surface included web search: %#v", deniedModel.requests[0].Tools)
 	}
 }
 
@@ -996,13 +1046,20 @@ func (r runStaticResolver) LookupIPAddr(_ context.Context, host string) ([]net.I
 }
 
 type runHTTPClient struct {
-	body  string
-	calls int
+	body        string
+	contentType string
+	calls       int
+	lastRequest *http.Request
 }
 
 func (c *runHTTPClient) Do(request *http.Request) (*http.Response, error) {
 	c.calls++
-	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/plain"}}, Body: io.NopCloser(strings.NewReader(c.body)), Request: request}, nil
+	c.lastRequest = request.Clone(request.Context())
+	contentType := c.contentType
+	if contentType == "" {
+		contentType = "text/plain"
+	}
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{contentType}}, Body: io.NopCloser(strings.NewReader(c.body)), Request: request}, nil
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
