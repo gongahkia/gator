@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 	protocol "github.com/gongahkia/gator/rpc"
 )
@@ -32,6 +33,10 @@ type Config struct {
 	DefaultModel    string
 	ResolveProvider func(provider, model string) (string, string, error)
 	NewExecutor     func(provider, model, baseURL string) (gatorrun.Executor, error)
+	// TerminalRegistry is present only for a local app-server or native TUI
+	// session. A plain JSONL RPC process deliberately cannot leave a terminal
+	// task running after its own caller exits.
+	TerminalRegistry *terminal.Registry
 }
 
 // Server processes requests until its input closes. One native run may be
@@ -100,7 +105,11 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 	}
 	switch request.Method {
 	case protocol.MethodCapabilities:
-		s.sendResult(request.ID, map[string]any{"protocol_version": protocol.Version, "methods": []string{protocol.MethodCapabilities, protocol.MethodRun, protocol.MethodResume, protocol.MethodSteer, protocol.MethodCancel, protocol.MethodApprove, protocol.MethodStatus, protocol.MethodThreads}})
+		methods := []string{protocol.MethodCapabilities, protocol.MethodRun, protocol.MethodResume, protocol.MethodSteer, protocol.MethodCancel, protocol.MethodApprove, protocol.MethodStatus, protocol.MethodThreads}
+		if s.config.TerminalRegistry != nil {
+			methods = append(methods, protocol.MethodTerminalList, protocol.MethodTerminalRead, protocol.MethodTerminalWrite, protocol.MethodTerminalResize, protocol.MethodTerminalStop)
+		}
+		s.sendResult(request.ID, map[string]any{"protocol_version": protocol.Version, "methods": methods})
 		return nil
 	case protocol.MethodStatus:
 		s.mu.Lock()
@@ -119,6 +128,16 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 		return s.cancel(request)
 	case protocol.MethodApprove:
 		return s.approve(request)
+	case protocol.MethodTerminalList:
+		return s.terminalList(request)
+	case protocol.MethodTerminalRead:
+		return s.terminalRead(request)
+	case protocol.MethodTerminalWrite:
+		return s.terminalWrite(request)
+	case protocol.MethodTerminalResize:
+		return s.terminalResize(request)
+	case protocol.MethodTerminalStop:
+		return s.terminalStop(request)
 	case protocol.MethodRun:
 		return s.startRun(ctx, request)
 	case protocol.MethodResume:
@@ -220,7 +239,8 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 			CopyIgnoredFiles: request.Params.CopyIgnoredFiles,
 			Scouts:           request.Params.Scouts,
 			StateDir:         s.config.StateDir, Mode: mode, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
-			Approve: s.approveFor(request.ID),
+			Approve:          s.approveFor(request.ID),
+			TerminalRegistry: s.config.TerminalRegistry,
 		})
 	})
 }
@@ -247,8 +267,9 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 	return s.start(parent, request.ID, func(ctx context.Context, steering <-chan string, emit agent.EventSink) (gatorrun.Outcome, error) {
 		return executor.Resume(ctx, previous, request.Params.StatePath, request.Params.Task, gatorrun.Request{
 			MaxSteps: request.Params.MaxSteps, StateDir: s.config.StateDir, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
-			Scopes:  request.Params.Scopes,
-			Approve: s.approveFor(request.ID),
+			Scopes:           request.Params.Scopes,
+			Approve:          s.approveFor(request.ID),
+			TerminalRegistry: s.config.TerminalRegistry,
 		})
 	})
 }
@@ -349,6 +370,96 @@ func (s *Server) approve(request protocol.Request) error {
 	default:
 		return fmt.Errorf("run %q has no pending command approval", request.Params.RunID)
 	}
+}
+
+func (s *Server) terminalAttachment() (terminal.Attachment, error) {
+	if s.config.TerminalRegistry == nil {
+		return nil, errors.New("background terminal control is available only through gator serve or the native TUI")
+	}
+	return s.config.TerminalRegistry.Attachment(), nil
+}
+
+func (s *Server) terminalList(request protocol.Request) error {
+	attachment, err := s.terminalAttachment()
+	if err != nil {
+		return err
+	}
+	s.sendResult(request.ID, map[string]any{"tasks": attachment.List()})
+	return nil
+}
+
+func (s *Server) terminalRead(request protocol.Request) error {
+	attachment, err := s.terminalAttachment()
+	if err != nil {
+		return err
+	}
+	id := strings.TrimSpace(request.Params.TerminalID)
+	if id == "" {
+		return errors.New("terminal_read requires terminal_id")
+	}
+	result, err := attachment.Read(id, request.Params.Cursor)
+	if err != nil {
+		return err
+	}
+	s.sendResult(request.ID, result)
+	return nil
+}
+
+func (s *Server) terminalWrite(request protocol.Request) error {
+	attachment, err := s.terminalAttachment()
+	if err != nil {
+		return err
+	}
+	id := strings.TrimSpace(request.Params.TerminalID)
+	if id == "" {
+		return errors.New("terminal_write requires terminal_id")
+	}
+	if request.Params.Input == "" {
+		return errors.New("terminal_write requires input")
+	}
+	// The authenticated app-server client is the developer performing direct
+	// input. Manager deliberately keeps these bytes out of model context and a
+	// completed run record.
+	task, err := attachment.WriteDeveloper(id, []byte(request.Params.Input))
+	if err != nil {
+		return err
+	}
+	s.sendResult(request.ID, task)
+	return nil
+}
+
+func (s *Server) terminalResize(request protocol.Request) error {
+	attachment, err := s.terminalAttachment()
+	if err != nil {
+		return err
+	}
+	id := strings.TrimSpace(request.Params.TerminalID)
+	if id == "" {
+		return errors.New("terminal_resize requires terminal_id")
+	}
+	task, err := attachment.Resize(id, request.Params.Rows, request.Params.Columns)
+	if err != nil {
+		return err
+	}
+	s.sendResult(request.ID, task)
+	return nil
+}
+
+func (s *Server) terminalStop(request protocol.Request) error {
+	attachment, err := s.terminalAttachment()
+	if err != nil {
+		return err
+	}
+	id := strings.TrimSpace(request.Params.TerminalID)
+	if id == "" {
+		return errors.New("terminal_stop requires terminal_id")
+	}
+	task, err := attachment.Stop(id)
+	if err != nil {
+		return err
+	}
+	s.sendResult(request.ID, task)
+	return nil
 }
 
 func parseCommandDecision(value string) (tools.CommandDecision, error) {

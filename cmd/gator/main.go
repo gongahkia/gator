@@ -24,6 +24,9 @@ Usage:
   gator update [--check]
   gator rpc
   gator serve token ABSOLUTE_PATH
+  gator serve start --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]
+  gator serve status --token-file ABSOLUTE_PATH
+  gator serve stop --token-file ABSOLUTE_PATH
   gator serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]
   gator acp [--verify 'argv ...']
   gator config [show]

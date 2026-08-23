@@ -276,7 +276,10 @@ cancel, approve, status, and thread-listing methods; see
 [RPC integration](docs/RPC.md). A local editor or controller that prefers HTTP
 can run the authenticated loopback `gator serve` bridge: it accepts that same
 RPC request type and streams the same events over SSE without creating a second
-agent policy; see [local app server](docs/APP_SERVER.md).
+agent policy. It can also control a model-detached terminal within that one
+authenticated server process. Use `gator serve start --token-file PATH` for an
+explicit repository-scoped background bridge, or run `gator serve` in the
+foreground; see [local app server](docs/APP_SERVER.md).
 
 Gator extensions provide reusable skills, prompt guidance, and optional
 language-neutral JSON sidecar tools. Install a bundle with `gator extension
@@ -506,17 +509,19 @@ prompt instructions only and cannot weaken these boundaries.
 
 Execute mode also gives the native model a persistent terminal-task surface:
 `terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and
-`terminal_stop`. In the native TUI only, `terminal_detach` can keep one running
-task after a separate developer approval. A started task gets a pseudo-terminal
+`terminal_stop`. In the native TUI and an authenticated `gator serve` process,
+`terminal_detach` can keep one running task after a separate developer approval.
+A started task gets a pseudo-terminal
 in the same strict
 sandbox, worktree, network policy, output bounds, and lifetime limit as the
 run. Starting a task needs the normal command approval; each distinct input
 needs its own approval and is represented to the approval UI by a digest rather
 than the input bytes. Ordinary tasks stop when the agent run ends. A detached
-task keeps its existing policy, is visible through `Ctrl+T` after the run,
-expires within two hours, and is capped at eight per Gator session. Gator's
-normal shutdown path stops it; it cannot be created from CLI, RPC, ACP, or a
-child writer.
+task keeps its existing policy, is visible through `Ctrl+T` after the run in
+the native TUI or controllable through the app-server's authenticated terminal
+methods, expires within two hours, and is capped at eight per Gator session.
+Gator's normal shutdown path stops it; it cannot be created from direct
+commands, plain JSONL RPC, ACP, or a child writer.
 This is an agent-mediated task manager, not an arbitrary host shell. `Ctrl+T`
 opens an attachment to existing model-started tasks: developers can view
 bounded output, switch tasks, send a line or interrupt, and stop a task.
@@ -527,9 +532,11 @@ and alternate-screen controls, so progress, simple dashboards, and common
 full-screen buffer transitions do not accumulate stale primary-screen lines.
 Direct input stays inside the task's existing sandbox and is journaled only as
 byte count plus SHA-256 digest while its owning run is active; background input
-is not appended to a completed run record. This is intentionally not a full VT
-terminal emulator, restart-surviving terminal daemon, or ACP/client terminal
-multiplexer.
+is not appended to a completed run record. The authenticated app-server
+controller can directly write only to an already detached task; that input never
+becomes model context or a completed-run record. This is intentionally not a
+full VT terminal emulator, restart-surviving terminal daemon, or ACP/client
+terminal multiplexer.
 
 When the developer explicitly grants `--network allow` (or `gator config set
 network allow`), Execute mode additionally exposes `http_fetch` for bounded

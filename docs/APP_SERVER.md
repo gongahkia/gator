@@ -11,6 +11,13 @@ prints its contents.
 
 ```sh
 gator serve token "$HOME/.local/share/gator/app-server-token"
+
+# Explicitly supervise one repository-scoped background service.
+gator serve start --token-file "$HOME/.local/share/gator/app-server-token"
+gator serve status --token-file "$HOME/.local/share/gator/app-server-token"
+gator serve stop --token-file "$HOME/.local/share/gator/app-server-token"
+
+# Or keep the server in the foreground with a caller-selected port.
 gator serve --token-file "$HOME/.local/share/gator/app-server-token" \
   --listen 127.0.0.1:49152
 ```
@@ -20,6 +27,14 @@ reads `TOKEN` from that file. Do not put it in a command line, configuration
 file, browser URL, or repository. `GET /healthz` and `GET /readyz` are the only
 unauthenticated endpoints and disclose only readiness, build version, and RPC
 protocol version.
+
+`gator serve start` is an explicit local service, not an automatic global
+daemon. It inherits the current repository and configuration, starts on a
+random literal-loopback port by default, and writes private repository-scoped
+metadata and a log under Gator's state directory. `status` and `stop` require
+the same token file and first authenticate against the recorded endpoint before
+they act on its PID. The native TUI and ACP do not auto-discover or join this
+service yet.
 
 ## Contract
 
@@ -52,6 +67,34 @@ discarded by this retention policy.
 `GET /openapi.json` publishes the small HTTP wrapper contract. It does not
 invent a second agent API: run/resume/steer/cancel/approve/status/threads stay
 defined by [RPC integration](RPC.md).
+
+## Detached terminals
+
+Only `gator serve` and the native TUI create a process-local terminal registry.
+If an execute-mode model starts a terminal task and requests the separately
+approved `terminal_detach` tool, the app server advertises these additional
+methods from `capabilities`:
+
+```text
+terminal_list
+terminal_read    {"terminal_id":"...", "cursor":0}
+terminal_write   {"terminal_id":"...", "input":"..."}
+terminal_resize  {"terminal_id":"...", "rows":24, "columns":80}
+terminal_stop    {"terminal_id":"..."}
+```
+
+They operate only on that server process's explicitly detached tasks; they
+cannot start a process, change its fixed worktree or sandbox, attach to a task
+from another Gator process, or detach a task themselves. `terminal_write` is
+direct developer input from the authenticated bearer-token holder. Its bytes
+are neither sent to the model nor appended to the completed run record.
+
+Detached tasks retain their original policy, are capped at eight per server
+process, and expire within two hours. A normal `gator serve` shutdown stops
+them. The server handles `Ctrl-C` and normal Unix `SIGTERM` shutdown before it
+releases its terminal registry; `gator serve stop` uses that same path. Tasks
+do not survive a `gator serve` restart, and plain `gator rpc`, ACP, and
+child-writer runs do not offer detachment or these controller methods.
 
 ## Security boundary
 

@@ -7,14 +7,19 @@ import "time"
 const Version = 1
 
 const (
-	MethodCapabilities = "capabilities"
-	MethodRun          = "run"
-	MethodResume       = "resume"
-	MethodSteer        = "steer"
-	MethodCancel       = "cancel"
-	MethodStatus       = "status"
-	MethodThreads      = "threads"
-	MethodApprove      = "approve"
+	MethodCapabilities   = "capabilities"
+	MethodRun            = "run"
+	MethodResume         = "resume"
+	MethodSteer          = "steer"
+	MethodCancel         = "cancel"
+	MethodStatus         = "status"
+	MethodThreads        = "threads"
+	MethodApprove        = "approve"
+	MethodTerminalList   = "terminal_list"
+	MethodTerminalRead   = "terminal_read"
+	MethodTerminalWrite  = "terminal_write"
+	MethodTerminalResize = "terminal_resize"
+	MethodTerminalStop   = "terminal_stop"
 )
 
 // Request is one newline-delimited command sent to gator rpc.
@@ -45,6 +50,11 @@ type Params struct {
 	RunID            string     `json:"run_id,omitempty"`
 	Message          string     `json:"message,omitempty"`
 	Decision         string     `json:"decision,omitempty"`
+	TerminalID       string     `json:"terminal_id,omitempty"`
+	Cursor           int64      `json:"cursor,omitempty"`
+	Input            string     `json:"input,omitempty"`
+	Rows             int        `json:"rows,omitempty"`
+	Columns          int        `json:"columns,omitempty"`
 	All              bool       `json:"all,omitempty"`
 	Compact          bool       `json:"compact,omitempty"`
 }

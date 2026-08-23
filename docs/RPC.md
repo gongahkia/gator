@@ -39,7 +39,9 @@ The remaining methods are `capabilities`, `status`, `threads`, and `resume`.
 `threads` lists presentation-safe metadata only; a run result supplies the
 private `state_path` required for `resume`. Events expose a tool name, not tool
 arguments or raw output, except `command_approval_requested`, which includes the
-`argv` a parent must see to approve. Command stdout is still omitted.
+`argv` a parent must see to approve. Command stdout is still omitted. Method
+availability is discovered through `capabilities`; the plain JSONL process has
+no process-long terminal registry.
 
 Set `params.compact` to `true` on `resume` to request a model-generated summary
 of older retained messages before the next turn. Gator emits a
@@ -56,3 +58,14 @@ accepts this exact request type at `POST /v1/rpc` and emits the same protocol
 messages as SSE at `GET /v1/events/{id}`. It is an authenticated loopback
 bridge, not another execution path: client input cannot add setup commands,
 filesystem roots, MCP servers, credentials, or a weaker policy.
+
+`gator serve` additionally exposes control of an already detached terminal
+task through `terminal_list`, `terminal_read`, `terminal_write`,
+`terminal_resize`, and `terminal_stop`. It advertises those methods only for
+that server process. The complete lifecycle and the direct-developer-input
+boundary are documented in [the app-server guide](APP_SERVER.md#detached-terminals).
+
+For an editor that needs a stable local endpoint, `gator serve start` launches
+one explicit repository-scoped background bridge, while `status` and `stop`
+require the same private token file. It is not automatically started or shared
+with the native TUI or ACP client.
