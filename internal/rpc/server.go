@@ -95,7 +95,7 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 	if request.Version != protocol.Version {
 		return fmt.Errorf("unsupported protocol version %d", request.Version)
 	}
-	if !validID(request.ID) {
+	if !protocol.ValidID(request.ID) {
 		return errors.New("request id must contain 1-128 letters, digits, '.', '_', or '-'")
 	}
 	switch request.Method {
@@ -154,7 +154,7 @@ func (s *Server) threads(request protocol.Request) error {
 }
 
 func (s *Server) steer(request protocol.Request) error {
-	if !validID(request.Params.RunID) {
+	if !protocol.ValidID(request.Params.RunID) {
 		return errors.New("steer requires a valid run_id")
 	}
 	message := strings.TrimSpace(request.Params.Message)
@@ -177,7 +177,7 @@ func (s *Server) steer(request protocol.Request) error {
 }
 
 func (s *Server) cancel(request protocol.Request) error {
-	if !validID(request.Params.RunID) {
+	if !protocol.ValidID(request.Params.RunID) {
 		return errors.New("cancel requires a valid run_id")
 	}
 	s.mu.Lock()
@@ -329,7 +329,7 @@ func (s *Server) approveFor(id string) func(context.Context, []string) (tools.Co
 }
 
 func (s *Server) approve(request protocol.Request) error {
-	if !validID(request.Params.RunID) {
+	if !protocol.ValidID(request.Params.RunID) {
 		return errors.New("approve requires a valid run_id")
 	}
 	decision, err := parseCommandDecision(request.Params.Decision)
@@ -387,17 +387,4 @@ func parseMode(value string) (gatorrun.Mode, error) {
 	default:
 		return 0, fmt.Errorf("unknown run mode %q; choose execute or plan", value)
 	}
-}
-
-func validID(value string) bool {
-	if len(value) == 0 || len(value) > 128 {
-		return false
-	}
-	for _, character := range value {
-		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '.' || character == '_' || character == '-' {
-			continue
-		}
-		return false
-	}
-	return true
 }

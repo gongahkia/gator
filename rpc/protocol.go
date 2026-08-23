@@ -78,3 +78,19 @@ type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
+
+// ValidID reports whether value is a safe request correlation ID. Keeping the
+// rule in the public protocol package lets every transport reject malformed
+// IDs before it allocates per-request state or constructs an event URL.
+func ValidID(value string) bool {
+	if len(value) == 0 || len(value) > 128 {
+		return false
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '.' || character == '_' || character == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}

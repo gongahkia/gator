@@ -273,7 +273,10 @@ permission lifecycle while retaining Gator's worktree and verifier policy; see
 [ACP integration](docs/ACP.md). For CI or a bespoke control plane, `gator rpc`
 remains Gator's versioned JSONL protocol with explicit run, resume, steer,
 cancel, approve, status, and thread-listing methods; see
-[RPC integration](docs/RPC.md).
+[RPC integration](docs/RPC.md). A local editor or controller that prefers HTTP
+can run the authenticated loopback `gator serve` bridge: it accepts that same
+RPC request type and streams the same events over SSE without creating a second
+agent policy; see [local app server](docs/APP_SERVER.md).
 
 Gator extensions provide reusable skills, prompt guidance, and optional
 language-neutral JSON sidecar tools. Install a bundle with `gator extension
