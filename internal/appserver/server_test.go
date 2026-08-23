@@ -6,11 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +21,8 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	internalrpc "github.com/gongahkia/gator/internal/rpc"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/terminal"
 	protocol "github.com/gongahkia/gator/rpc"
 )
 
@@ -36,6 +40,10 @@ func TestServerBridgesPlanRunAndReplaysSSE(t *testing.T) {
 	defer health.Body.Close()
 	if health.StatusCode != http.StatusOK {
 		t.Fatalf("health status = %d", health.StatusCode)
+	}
+	capabilities := submitAndCollect(t, web.URL, protocol.Request{Version: protocol.Version, ID: "capabilities-1", Method: protocol.MethodCapabilities}, hasTerminalResponse)
+	if len(capabilities) != 1 || capabilities[0].Type != "response" || strings.Contains(stringify(capabilities[0].Result), "terminal_") {
+		t.Fatalf("default server capabilities = %#v", capabilities)
 	}
 
 	request := protocol.Request{Version: protocol.Version, ID: "plan-1", Method: protocol.MethodRun, Params: protocol.Params{Mode: "plan", Task: "Inspect the fixture", Provider: "openai"}}
@@ -163,6 +171,64 @@ func TestServerRejectsDuplicateRequestIDs(t *testing.T) {
 	}
 }
 
+func TestServerControlsDetachedTerminalInItsAuthenticatedSession(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	registry := terminal.NewRegistry()
+	defer registry.Close()
+	bridge := testServerWithRegistry(t, &backgroundTerminalModel{argv: []string{sh, "-lc", "printf 'ready\\n'; IFS= read line; printf 'received:%s\\n' \"$line\"; sleep 30"}}, registry)
+	web := httptest.NewServer(bridge.Handler())
+	defer web.Close()
+	capabilities := submitAndCollect(t, web.URL, protocol.Request{Version: protocol.Version, ID: "background-capabilities-001", Method: protocol.MethodCapabilities}, hasTerminalResponse)
+	for _, method := range []string{protocol.MethodTerminalList, protocol.MethodTerminalRead, protocol.MethodTerminalWrite, protocol.MethodTerminalResize, protocol.MethodTerminalStop} {
+		if len(capabilities) != 1 || capabilities[0].Type != "response" || !strings.Contains(stringify(capabilities[0].Result), method) {
+			t.Fatalf("background terminal method %q was not advertised: %#v", method, capabilities)
+		}
+	}
+
+	run := protocol.Request{Version: protocol.Version, ID: "background-run-001", Method: protocol.MethodRun, Params: protocol.Params{
+		Mode: "execute", Task: "Start the development server", Provider: "openai", Verify: [][]string{{"true"}}, MaxSteps: 7,
+	}}
+	messages := submitRunAndApproveTerminalOperations(t, web.URL, run)
+	if !hasEvent(messages, run.ID, "terminal") {
+		t.Fatalf("run did not report detached terminal event: %#v", messages)
+	}
+
+	list := submitAndCollect(t, web.URL, protocol.Request{Version: protocol.Version, ID: "terminal-list-001", Method: protocol.MethodTerminalList}, hasTerminalResponse)
+	if len(list) != 1 || list[0].Type != "response" || !strings.Contains(stringify(list[0].Result), `"background":true`) || !strings.Contains(stringify(list[0].Result), "term-") {
+		t.Fatalf("terminal list response = %#v", list)
+	}
+	terminalID := firstTerminalID(t, list[0].Result)
+	resize := protocol.Request{Version: protocol.Version, ID: "terminal-resize-001", Method: protocol.MethodTerminalResize, Params: protocol.Params{TerminalID: terminalID, Rows: 30, Columns: 100}}
+	if messages := submitAndCollect(t, web.URL, resize, hasTerminalResponse); len(messages) != 1 || messages[0].Type != "response" || !strings.Contains(stringify(messages[0].Result), `"rows":30`) || !strings.Contains(stringify(messages[0].Result), `"columns":100`) {
+		t.Fatalf("terminal resize response = %#v", messages)
+	}
+	write := protocol.Request{Version: protocol.Version, ID: "terminal-write-001", Method: protocol.MethodTerminalWrite, Params: protocol.Params{TerminalID: terminalID, Input: "controller\r"}}
+	if messages := submitAndCollect(t, web.URL, write, hasTerminalResponse); len(messages) != 1 || messages[0].Type != "response" {
+		t.Fatalf("terminal write response = %#v", messages)
+	}
+	for attempt := 1; attempt <= 20; attempt++ {
+		read := protocol.Request{Version: protocol.Version, ID: fmt.Sprintf("terminal-read-%02d", attempt), Method: protocol.MethodTerminalRead, Params: protocol.Params{TerminalID: terminalID}}
+		messages = submitAndCollect(t, web.URL, read, hasTerminalResponse)
+		if len(messages) == 1 && strings.Contains(stringify(messages[0].Result), "received:controller") {
+			break
+		}
+		if attempt == 20 {
+			t.Fatalf("terminal read did not observe developer input: %#v", messages)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	stop := protocol.Request{Version: protocol.Version, ID: "terminal-stop-001", Method: protocol.MethodTerminalStop, Params: protocol.Params{TerminalID: terminalID}}
+	if messages := submitAndCollect(t, web.URL, stop, hasTerminalResponse); len(messages) != 1 || messages[0].Type != "response" {
+		t.Fatalf("terminal stop response = %#v", messages)
+	}
+}
+
 func TestMessageHubReplaysInOrderAndDropsSlowSubscriber(t *testing.T) {
 	hub := newMessageHub(2, 2, 1)
 	if err := hub.reserve("run-1", true); err != nil {
@@ -228,12 +294,19 @@ func TestTerminalMessageKeepsAcceptedRunsOpen(t *testing.T) {
 }
 
 func testServer(t *testing.T, model agent.Model) *Server {
+	return testServerWithRegistry(t, model, nil)
+}
+
+func testServerWithRegistry(t *testing.T, model agent.Model, registry *terminal.Registry) *Server {
 	t.Helper()
 	repository := initializedRepository(t)
 	bridge, err := New(Config{
 		RPC: internalrpc.Config{
 			RepositoryPath: repository, StateDir: t.TempDir(), DefaultProvider: "openai", DefaultModel: "test-model",
-			NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) { return gatorrun.Executor{Model: model}, nil },
+			NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) {
+				return gatorrun.Executor{Model: model, Sandbox: sandbox.Policy{Mode: sandbox.Off}}, nil
+			},
+			TerminalRegistry: registry,
 		},
 		Token: testToken, Version: "test",
 	})
@@ -250,6 +323,155 @@ func testServer(t *testing.T, model agent.Model) *Server {
 		}
 	})
 	return bridge
+}
+
+func submitAndCollect(t *testing.T, base string, request protocol.Request, complete func([]protocol.Message) bool) []protocol.Message {
+	t.Helper()
+	response := postRPC(t, base, request)
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("submit %s status = %d", request.ID, response.StatusCode)
+	}
+	var accepted struct {
+		Events string `json:"events"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&accepted); err != nil || accepted.Events == "" {
+		t.Fatalf("submit %s response=%#v err=%v", request.ID, accepted, err)
+	}
+	return collectMessages(t, base+accepted.Events, request.ID, complete)
+}
+
+func submitRunAndApproveTerminalOperations(t *testing.T, base string, run protocol.Request) []protocol.Message {
+	t.Helper()
+	response := postRPC(t, base, run)
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("submit %s status = %d", run.ID, response.StatusCode)
+	}
+	var accepted struct {
+		Events string `json:"events"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&accepted); err != nil || accepted.Events == "" {
+		t.Fatalf("submit %s response=%#v err=%v", run.ID, accepted, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, base+accepted.Events, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+string(testToken))
+	stream, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stream.Body.Close()
+	if stream.StatusCode != http.StatusOK {
+		t.Fatalf("run SSE status = %d", stream.StatusCode)
+	}
+	approvals := 0
+	var messages []protocol.Message
+	scanner := bufio.NewScanner(stream.Body)
+	scanner.Buffer(make([]byte, 1024), maxRequestBytes)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var message protocol.Message
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &message); err != nil {
+			t.Fatalf("decode run SSE data %q: %v", line, err)
+		}
+		if message.ID != run.ID {
+			continue
+		}
+		messages = append(messages, message)
+		if message.Type == "error" && message.Error != nil {
+			t.Fatalf("run error %s: %s", message.Error.Code, message.Error.Message)
+		}
+		if message.Type == "event" && message.Event != nil && message.Event.Kind == "command_approval_requested" && (message.Event.Tool == "terminal_start" || message.Event.Tool == "terminal_detach") {
+			approvals++
+			approval := protocol.Request{Version: protocol.Version, ID: fmt.Sprintf("terminal-approval-%d", approvals), Method: protocol.MethodApprove, Params: protocol.Params{RunID: run.ID, Decision: "allow_once"}}
+			approvalResponse := postRPC(t, base, approval)
+			approvalResponse.Body.Close()
+			if approvalResponse.StatusCode != http.StatusAccepted {
+				t.Fatalf("approve %s status = %d", approval.ID, approvalResponse.StatusCode)
+			}
+		}
+		if responseCount(messages, run.ID) >= 2 && hasEvent(messages, run.ID, "run_finished") {
+			if approvals != 2 {
+				t.Fatalf("terminal approvals = %d, want 2; messages=%#v", approvals, messages)
+			}
+			return messages
+		}
+	}
+	if err := scanner.Err(); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("read run SSE: %v", err)
+	}
+	t.Fatalf("incomplete run SSE message stream: %#v", messages)
+	return nil
+}
+
+func collectMessages(t *testing.T, address, id string, complete func([]protocol.Message) bool) []protocol.Message {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+string(testToken))
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("SSE status = %d", response.StatusCode)
+	}
+	var messages []protocol.Message
+	scanner := bufio.NewScanner(response.Body)
+	scanner.Buffer(make([]byte, 1024), maxRequestBytes)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var message protocol.Message
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &message); err != nil {
+			t.Fatalf("decode SSE data %q: %v", line, err)
+		}
+		if message.ID == id {
+			messages = append(messages, message)
+		}
+		if complete(messages) {
+			return messages
+		}
+	}
+	if err := scanner.Err(); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("read SSE: %v", err)
+	}
+	t.Fatalf("incomplete SSE message stream for %s: %#v", id, messages)
+	return nil
+}
+
+func hasTerminalResponse(messages []protocol.Message) bool {
+	return len(messages) == 1 && (messages[0].Type == "response" || messages[0].Type == "error")
+}
+
+func firstTerminalID(t *testing.T, result any) string {
+	t.Helper()
+	payload, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Tasks []terminal.Task `json:"tasks"`
+	}
+	if err := json.Unmarshal(payload, &decoded); err != nil || len(decoded.Tasks) != 1 || decoded.Tasks[0].ID == "" {
+		t.Fatalf("decode terminal list result=%s err=%v", payload, err)
+	}
+	return decoded.Tasks[0].ID
 }
 
 func postRPC(t *testing.T, base string, message protocol.Request) *http.Response {
@@ -343,6 +565,57 @@ type scriptedModel struct {
 	mu    sync.Mutex
 	turns []agent.Turn
 	next  int
+}
+
+type backgroundTerminalModel struct {
+	mu    sync.Mutex
+	argv  []string
+	calls int
+}
+
+func (m *backgroundTerminalModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	switch m.calls {
+	case 0:
+		m.calls++
+		arguments, _ := json.Marshal(map[string]any{"argv": m.argv})
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "start", Name: "terminal_start", Arguments: arguments}}}, nil
+	case 1:
+		var task terminal.Task
+		for _, message := range request.Messages {
+			if message.Role != agent.RoleTool || message.ToolName != "terminal_start" {
+				continue
+			}
+			var result struct {
+				Result terminal.Task `json:"result"`
+			}
+			if err := json.Unmarshal([]byte(message.Content), &result); err != nil {
+				return agent.Turn{}, err
+			}
+			task = result.Result
+		}
+		if task.ID == "" {
+			return agent.Turn{}, errors.New("terminal_start result was absent from model context")
+		}
+		m.calls++
+		arguments, _ := json.Marshal(map[string]string{"id": task.ID})
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "detach", Name: "terminal_detach", Arguments: arguments}}}, nil
+	case 2:
+		m.calls++
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}}, nil
+	case 3:
+		m.calls++
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}}, nil
+	case 4:
+		m.calls++
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "verify", Name: "run_command", Arguments: json.RawMessage(`{"argv":["true"]}`)}}}, nil
+	case 5:
+		m.calls++
+		return agent.Turn{Text: "The detached server is ready."}, nil
+	default:
+		return agent.Turn{}, errors.New("unexpected model call")
+	}
 }
 
 func (m *scriptedModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
