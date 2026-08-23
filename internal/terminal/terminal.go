@@ -24,6 +24,10 @@ const (
 	defaultLifetime       = 15 * time.Minute
 	defaultOutputBytes    = 256 * 1024
 	defaultReadBytes      = 16 * 1024
+	defaultTerminalRows   = 24
+	defaultTerminalCols   = 80
+	maxTerminalRows       = 300
+	maxTerminalCols       = 500
 	maxTerminalInputBytes = 16 * 1024
 )
 
@@ -36,6 +40,8 @@ type Config struct {
 	Lifetime       time.Duration
 	MaxOutputBytes int
 	MaxReadBytes   int
+	Rows           int
+	Columns        int
 	Now            func() time.Time
 	OnExit         func(Task)
 	// OnDeveloperInput records a user-attached terminal write without exposing
@@ -52,6 +58,8 @@ type Manager struct {
 	lifetime         time.Duration
 	maxOutputBytes   int
 	maxReadBytes     int
+	rows             int
+	columns          int
 	now              func() time.Time
 	onExit           func(Task)
 	onDeveloperInput func(Task, DeveloperInput)
@@ -66,6 +74,7 @@ type Manager struct {
 type Attachment interface {
 	List() []Task
 	Read(string, int64) (ReadResult, error)
+	Resize(string, int, int) (Task, error)
 	WriteDeveloper(string, []byte) (Task, error)
 	Stop(string) (Task, error)
 }
@@ -86,6 +95,13 @@ func (a attachment) Read(id string, cursor int64) (ReadResult, error) {
 		return ReadResult{}, errors.New("terminal attachment is unavailable")
 	}
 	return a.manager.Read(id, cursor)
+}
+
+func (a attachment) Resize(id string, rows, columns int) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.Resize(id, rows, columns)
 }
 
 func (a attachment) WriteDeveloper(id string, input []byte) (Task, error) {
@@ -127,6 +143,8 @@ type Task struct {
 	ExitCode        *int      `json:"exit_code,omitempty"`
 	Error           string    `json:"error,omitempty"`
 	OutputTruncated bool      `json:"output_truncated"`
+	Rows            int       `json:"rows"`
+	Columns         int       `json:"columns"`
 }
 
 // ReadResult returns output beginning at Cursor. If Dropped is true, the
@@ -155,6 +173,8 @@ type task struct {
 	status   string
 	exitCode *int
 	err      string
+	rows     int
+	columns  int
 	output   terminalBuffer
 	inputMu  sync.Mutex
 }
@@ -174,6 +194,14 @@ func New(config Config) *Manager {
 	if config.MaxReadBytes <= 0 {
 		config.MaxReadBytes = defaultReadBytes
 	}
+	if config.Rows <= 0 {
+		config.Rows = defaultTerminalRows
+	}
+	if config.Columns <= 0 {
+		config.Columns = defaultTerminalCols
+	}
+	config.Rows = minTerminalDimension(config.Rows, maxTerminalRows)
+	config.Columns = minTerminalDimension(config.Columns, maxTerminalCols)
 	if config.Now == nil {
 		config.Now = time.Now
 	}
@@ -184,6 +212,8 @@ func New(config Config) *Manager {
 		lifetime:         config.Lifetime,
 		maxOutputBytes:   config.MaxOutputBytes,
 		maxReadBytes:     config.MaxReadBytes,
+		rows:             config.Rows,
+		columns:          config.Columns,
 		now:              config.Now,
 		onExit:           config.OnExit,
 		onDeveloperInput: config.OnDeveloperInput,
@@ -215,7 +245,7 @@ func (m *Manager) Start(ctx context.Context, argv []string) (Task, error) {
 		cancel()
 		return Task{}, fmt.Errorf("prepare terminal task: %w", err)
 	}
-	file, err := pty.Start(prepared.Command)
+	file, err := pty.StartWithSize(prepared.Command, &pty.Winsize{Rows: uint16(m.rows), Cols: uint16(m.columns)})
 	if err != nil {
 		prepared.Cleanup()
 		cancel()
@@ -233,6 +263,8 @@ func (m *Manager) Start(ctx context.Context, argv []string) (Task, error) {
 		cleanup: prepared.Cleanup,
 		done:    make(chan struct{}),
 		status:  "running",
+		rows:    m.rows,
+		columns: m.columns,
 		output:  terminalBuffer{limit: m.maxOutputBytes},
 	}
 	m.mu.Lock()
@@ -241,6 +273,45 @@ func (m *Manager) Start(ctx context.Context, argv []string) (Task, error) {
 	go running.copyOutput()
 	go running.wait(taskContext)
 	return running.snapshot(), nil
+}
+
+// Resize updates the pseudo-terminal's window size for an attached task. It
+// cannot create a process or change its sandbox; it only lets a real terminal
+// program adapt its layout to the developer's bounded TUI viewport.
+func (m *Manager) Resize(id string, rows, columns int) (Task, error) {
+	if rows < 1 || rows > maxTerminalRows || columns < 1 || columns > maxTerminalCols {
+		return Task{}, fmt.Errorf("terminal size must be between 1x1 and %dx%d", maxTerminalRows, maxTerminalCols)
+	}
+	running, err := m.lookup(id)
+	if err != nil {
+		return Task{}, err
+	}
+	running.mu.Lock()
+	if running.status != "running" || running.file == nil {
+		running.mu.Unlock()
+		return Task{}, fmt.Errorf("terminal task %q is not running", id)
+	}
+	if running.rows == rows && running.columns == columns {
+		snapshot := running.snapshotLocked()
+		running.mu.Unlock()
+		return snapshot, nil
+	}
+	file := running.file
+	running.mu.Unlock()
+	running.inputMu.Lock()
+	err = pty.Setsize(file, &pty.Winsize{Rows: uint16(rows), Cols: uint16(columns)})
+	running.inputMu.Unlock()
+	if err != nil {
+		return Task{}, fmt.Errorf("resize terminal task %q: %w", id, err)
+	}
+	running.mu.Lock()
+	if running.status == "running" && running.file == file {
+		running.rows = rows
+		running.columns = columns
+	}
+	snapshot := running.snapshotLocked()
+	running.mu.Unlock()
+	return snapshot, nil
 }
 
 // Read returns a bounded increment of terminal output. A negative cursor is
@@ -445,7 +516,16 @@ func (t *task) snapshotLocked() Task {
 		ExitCode:        cloneExitCode(t.exitCode),
 		Error:           t.err,
 		OutputTruncated: t.output.start > 0,
+		Rows:            t.rows,
+		Columns:         t.columns,
 	}
+}
+
+func minTerminalDimension(value, maximum int) int {
+	if value > maximum {
+		return maximum
+	}
+	return value
 }
 
 func cloneExitCode(value *int) *int {

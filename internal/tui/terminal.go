@@ -3,7 +3,6 @@ package tui
 import (
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -21,7 +20,7 @@ const (
 // terminal manager remains the source of truth and owns the process lifetime.
 type attachedTerminalView struct {
 	cursor  int64
-	output  string
+	screen  terminalDisplay
 	dropped bool
 }
 
@@ -79,7 +78,20 @@ func (m *Model) refreshAttachedTerminal() {
 		m.terminalIndex = 0
 	}
 	task := m.terminalTasks[m.terminalIndex]
+	if m.screen == terminalScreen && task.Status == "running" {
+		rows, columns := m.attachedTerminalSize()
+		if task.Rows != rows || task.Columns != columns {
+			resized, err := m.terminalAttachment.Resize(task.ID, rows, columns)
+			if err != nil {
+				m.terminalErr = err
+				return
+			}
+			task = resized
+			m.terminalTasks[m.terminalIndex] = resized
+		}
+	}
 	view := m.terminalViews[task.ID]
+	view.screen.resize(task.Columns)
 	for count := 0; count < maxTerminalRefreshChunks; count++ {
 		read, err := m.terminalAttachment.Read(task.ID, view.cursor)
 		if err != nil {
@@ -87,11 +99,11 @@ func (m *Model) refreshAttachedTerminal() {
 			return
 		}
 		if read.Dropped {
-			view.output = terminalDroppedScrollback
+			view.screen.reset()
 			view.dropped = true
 		}
 		if read.Output != "" {
-			view.output = appendAttachedTerminalOutput(view.output, displayTerminalOutput(read.Output))
+			view.screen.feed(read.Output)
 		}
 		if read.Next == view.cursor {
 			break
@@ -194,23 +206,12 @@ func (m Model) currentAttachedTerminalOutput() string {
 	if !found {
 		return ""
 	}
-	return m.terminalViews[task.ID].output
-}
-
-func appendAttachedTerminalOutput(existing, addition string) string {
-	combined := existing + addition
-	if len(combined) <= maxAttachedTerminalBytes {
-		return combined
+	view := m.terminalViews[task.ID]
+	output := view.screen.String()
+	if view.dropped {
+		return terminalDroppedScrollback + output
 	}
-	trimmed := combined[len(combined)-maxAttachedTerminalBytes:]
-	for len(trimmed) > 0 && !utf8.ValidString(trimmed) {
-		_, size := utf8.DecodeRuneInString(trimmed)
-		trimmed = trimmed[size:]
-	}
-	if newline := strings.IndexByte(trimmed, '\n'); newline >= 0 {
-		trimmed = trimmed[newline+1:]
-	}
-	return terminalScrollMarker + trimmed
+	return output
 }
 
 func displayTerminalOutput(value string) string {
@@ -223,6 +224,12 @@ func displayTerminalOutput(value string) string {
 		}
 		return -1
 	}, value)
+}
+
+func (m Model) attachedTerminalSize() (int, int) {
+	rows := min(120, max(6, m.height-13))
+	columns := min(240, max(20, m.panelTextWidth()))
+	return rows, columns
 }
 
 func (m Model) attachedTerminalView() string {
@@ -252,7 +259,7 @@ func (m Model) attachedTerminalView() string {
 		command := displayTerminalOutput(strings.Join(candidate.Argv, " "))
 		tasks = append(tasks, prefix+keyStyle.Render(candidate.ID)+" "+dimStyle.Render(compact(status+" · "+command, max(16, m.panelTextWidth()-14))))
 	}
-	output := m.visibleAttachedTerminalOutput(view.output)
+	output := m.visibleAttachedTerminalOutput(m.currentAttachedTerminalOutput())
 	if output == "" {
 		output = dimStyle.Render("Waiting for terminal output…")
 	}
