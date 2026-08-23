@@ -13,20 +13,31 @@ import (
 	"github.com/gongahkia/gator/internal/terminal"
 )
 
+// TerminalToolOptions controls additive terminal capabilities that are only
+// meaningful when the surrounding client can retain an approved task safely.
+type TerminalToolOptions struct {
+	AllowDetach bool
+}
+
 // TerminalTools exposes the persistent terminal task surface for a single
 // Execute-mode run. The manager owns process cleanup; these tools enforce the
 // same developer approval policy as exploratory commands.
-func TerminalTools(manager *terminal.Manager, policy CommandPolicy) []agent.Tool {
+func TerminalTools(manager *terminal.Manager, policy CommandPolicy, options ...TerminalToolOptions) []agent.Tool {
 	if manager == nil {
 		return nil
 	}
-	return []agent.Tool{
+	allowDetach := len(options) > 0 && options[0].AllowDetach
+	tools := []agent.Tool{
 		terminalStart{manager: manager, policy: policy},
 		terminalRead{manager: manager},
 		terminalWrite{manager: manager, policy: policy},
 		terminalList{manager: manager},
 		terminalStop{manager: manager},
 	}
+	if allowDetach {
+		tools = append(tools, terminalDetach{manager: manager, policy: policy})
+	}
+	return tools
 }
 
 type terminalStart struct {
@@ -37,7 +48,7 @@ type terminalStart struct {
 func (t terminalStart) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "terminal_start",
-		Description: "Start a persistent pseudo-terminal task in the isolated worktree. Provide exactly one of argv (no shell) or command (bash -lc, or sh -c if bash is unavailable). Starting a terminal task follows the strict sandbox/network policy and requires developer approval unless this exact argv was already allowed for the thread. The task is automatically cancelled when the run ends and has bounded lifetime and scrollback. Use terminal_read for output, terminal_write for separately approved input, terminal_list for state, and terminal_stop to cancel it.",
+		Description: "Start a persistent pseudo-terminal task in the isolated worktree. Provide exactly one of argv (no shell) or command (bash -lc, or sh -c if bash is unavailable). Starting a terminal task follows the strict sandbox/network policy and requires developer approval unless this exact argv was already allowed for the thread. The task has bounded lifetime and scrollback and is cancelled when the run ends unless terminal_detach receives separate developer approval in an interactive Gator session. Use terminal_read for output, terminal_write for separately approved input, terminal_list for state, and terminal_stop to cancel it.",
 		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"argv":{"type":"array","items":{"type":"string"},"minItems":1},"command":{"type":"string"}}}`),
 	}
 }
@@ -171,6 +182,44 @@ func (t terminalStop) Definition() agent.ToolDefinition {
 	}
 }
 
+type terminalDetach struct {
+	manager *terminal.Manager
+	policy  CommandPolicy
+}
+
+func (t terminalDetach) Definition() agent.ToolDefinition {
+	return agent.ToolDefinition{
+		Name:        "terminal_detach",
+		Description: "Keep one existing running terminal task alive after this agent run finishes. This requires a separate developer approval because it extends a process beyond the run. The task stays in its exact existing sandbox and worktree, keeps bounded output, lasts at most two hours, and remains available only while this interactive Gator process is running. It is not a daemon or a way to access the host shell.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string","minLength":1}}}`),
+	}
+}
+
+func (t terminalDetach) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+	var arguments struct {
+		ID string `json:"id"`
+	}
+	if err := decodeArguments(raw, &arguments); err != nil {
+		return agent.ToolResult{}, err
+	}
+	id := strings.TrimSpace(arguments.ID)
+	if id == "" {
+		return agent.ToolResult{}, errors.New("terminal task id is required")
+	}
+	if err := authorizeTerminalDetach(ctx, t.policy, id); err != nil {
+		return agent.ToolResult{}, err
+	}
+	task, err := t.manager.Detach(id)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	encoded, err := success(task)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	return agent.ToolResult{Content: encoded}, nil
+}
+
 func (t terminalStop) Execute(_ context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var arguments struct {
 		ID string `json:"id"`
@@ -208,6 +257,11 @@ func authorizeTerminalInput(ctx context.Context, policy CommandPolicy, id string
 		return nil
 	}
 	return approveTerminal(ctx, policy, "terminal_write", argv, fmt.Sprintf("terminal %s input (%d bytes, sha256:%s)", id, len(input), hex.EncodeToString(digest[:8])))
+}
+
+func authorizeTerminalDetach(ctx context.Context, policy CommandPolicy, id string) error {
+	argv := []string{"terminal_detach", id}
+	return approveTerminal(ctx, policy, "terminal_detach", argv, "keep terminal "+id+" alive after this run")
 }
 
 func approveTerminal(ctx context.Context, policy CommandPolicy, toolName string, argv []string, description string) error {

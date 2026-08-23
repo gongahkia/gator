@@ -45,6 +45,9 @@ type Config struct {
 	NewExecutor       func(provider, model, baseURL string) (gatorrun.Executor, error)
 	BeginOAuthLogin   func(provider string) (OAuthLogin, error)
 	NewConnectCommand func(provider string) (*exec.Cmd, error)
+	// TerminalRegistry retains explicitly approved background terminal tasks for
+	// this TUI process. A nil value creates a private registry.
+	TerminalRegistry *terminal.Registry
 	// NewDelegateCommand starts a vendor-owned harness in a fresh isolated
 	// worktree. It deliberately remains separate from NewExecutor: the harness
 	// owns its credential, tools, approvals, and session state.
@@ -311,6 +314,7 @@ type Model struct {
 	activity            runActivity
 	verificationStatus  []verificationStatus
 	terminalAttachment  terminal.Attachment
+	terminalRegistry    *terminal.Registry
 	terminalTasks       []terminal.Task
 	terminalViews       map[string]attachedTerminalView
 	terminalIndex       int
@@ -388,6 +392,9 @@ func New(config Config) Model {
 	if config.MaxSteps == 0 {
 		config.MaxSteps = defaultMaxSteps
 	}
+	if config.TerminalRegistry == nil {
+		config.TerminalRegistry = terminal.NewRegistry()
+	}
 
 	task := textarea.New()
 	task.Placeholder = "Message Gator..."
@@ -439,6 +446,7 @@ func New(config Config) Model {
 		verification:     verification,
 		provider:         provider,
 		terminalInput:    terminalInput,
+		terminalRegistry: config.TerminalRegistry,
 		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
 		transcript:       viewport.New(76, 8),
@@ -475,6 +483,14 @@ func New(config Config) Model {
 		return next.(Model)
 	}
 	return application
+}
+
+// Close releases every task retained by this interactive process. Detached
+// terminals are session-bound by design; quitting Gator is an explicit stop.
+func (m Model) Close() {
+	if m.terminalRegistry != nil {
+		m.terminalRegistry.Close()
+	}
 }
 
 // Init starts no external work until the developer explicitly starts a run.
@@ -516,7 +532,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		wasNewThread := m.resumeStatePath == ""
 		wasCancelling := m.cancelling
 		m.execution = nil
-		m.setTerminalAttachment(nil)
+		if !m.hasBackgroundTerminalTask() {
+			m.setTerminalAttachment(nil)
+		}
 		m.cancelling = false
 		m.lastRunCancelled = wasCancelling
 		m.outcome = &msg.done.outcome
@@ -539,6 +557,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			if m.runMode == gatorrun.PlanMode {
 				m.notice = notice{text: "Plan ready. Continue this thread in Execute mode when you are ready to make changes.", kind: noticeSuccess}
+			} else if m.hasBackgroundTerminalTask() {
+				m.notice = notice{text: "Run complete. A detached terminal task is still running in this Gator session; press Ctrl+T to attach.", kind: noticeSuccess}
 			} else {
 				m.notice = notice{text: "Run complete. Inspect the diff and evidence before applying anything.", kind: noticeSuccess}
 			}
