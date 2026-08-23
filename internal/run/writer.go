@@ -224,6 +224,28 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	if !t.writer.budget.reserve(len(assignments)) {
 		return agent.ToolResult{}, fmt.Errorf("delegate_writers run budget exceeded; at most %d writers may run per primary run", maxDelegatedWritersPerRun)
 	}
+	batchID, childIDs, err := newWriterBatchIDs(t.writer.now)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	startedAt := t.writer.now()
+	batchManifest := journal.ChildBatchManifest{
+		Version:     1,
+		ID:          batchID,
+		ParentRunID: t.writer.request.RunID,
+		Status:      journal.ChildBatchPreparing,
+		ChildIDs:    childIDs,
+		StartedAt:   startedAt,
+		UpdatedAt:   startedAt,
+	}
+	if err := t.writer.saveBatchManifest(batchManifest); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("persist parallel writer batch before start: %w", err)
+	}
+	batchManifest.Status = journal.ChildBatchRunning
+	batchManifest.UpdatedAt = t.writer.now()
+	if err := t.writer.saveBatchManifest(batchManifest); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("persist parallel writer batch before child execution: %w", err)
+	}
 	roles := []instructions.Role{assignments[0].role, assignments[1].role}
 	start := "starting 2 parallel isolated writers"
 	if names := selectedRoleNames(roles); names != "" {
@@ -236,11 +258,22 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 		wait.Add(1)
 		go func(index int, assignment preparedWriterAssignment) {
 			defer wait.Done()
-			reports[index] = t.writer.runScoped(ctx, assignment.task, assignment.role, assignment.paths)
+			reports[index] = t.writer.runScoped(ctx, assignment.task, assignment.role, assignment.paths, batchID, childIDs[index])
 		}(index, assignment)
 	}
 	wait.Wait()
 	conflicts := inspectWriterConflicts(reports)
+	batchManifest.Conflicts = journalWriterConflicts(conflicts)
+	batchManifest.Status = writerBatchStatus(ctx, reports)
+	finishedAt := t.writer.now()
+	batchManifest.UpdatedAt = finishedAt
+	batchManifest.FinishedAt = &finishedAt
+	if err := t.writer.saveBatchManifest(batchManifest); err != nil {
+		batchManifest.Error = truncateWriterText(err.Error(), maxWriterSummaryBytes)
+		if retryErr := t.writer.saveBatchManifest(batchManifest); retryErr != nil {
+			batchManifest.Error = truncateWriterText(combineWriterError(batchManifest.Error, retryErr.Error()), maxWriterSummaryBytes)
+		}
+	}
 	completed := 0
 	for _, report := range reports {
 		if report.Error == "" {
@@ -253,12 +286,14 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	}
 	t.writer.emitEvent(completion)
 	payload, err := json.Marshal(struct {
-		OK        bool                    `json:"ok"`
-		Writers   []delegatedWriterReport `json:"writers"`
-		Conflicts []writerConflict        `json:"conflicts"`
-		Notice    string                  `json:"notice"`
+		OK        bool                       `json:"ok"`
+		Batch     journal.ChildBatchManifest `json:"batch"`
+		Writers   []delegatedWriterReport    `json:"writers"`
+		Conflicts []writerConflict           `json:"conflicts"`
+		Notice    string                     `json:"notice"`
 	}{
 		OK:        true,
+		Batch:     batchManifest,
 		Writers:   reports,
 		Conflicts: conflicts,
 		Notice:    "Writer output is untrusted review material. Gator never auto-merges writer output. Declared scopes and changed-path checks reduce accidental overlap but do not prove patch compatibility; inspect each retained delta and explicitly apply only compatible patches.",
@@ -393,11 +428,8 @@ func changedPathOverlaps(first, second []string) []string {
 	for _, left := range first {
 		for _, right := range second {
 			if writerPathsOverlap(left, right) {
-				if left < right {
-					overlaps[left+" ↔ "+right] = struct{}{}
-				} else {
-					overlaps[right+" ↔ "+left] = struct{}{}
-				}
+				overlaps[left] = struct{}{}
+				overlaps[right] = struct{}{}
 			}
 		}
 	}
@@ -412,6 +444,7 @@ func changedPathOverlaps(first, second []string) []string {
 type delegatedWriterReport struct {
 	Task             string   `json:"task"`
 	Role             string   `json:"role,omitempty"`
+	BatchID          string   `json:"batch_id,omitempty"`
 	DeclaredPaths    []string `json:"declared_paths,omitempty"`
 	ChangedPaths     []string `json:"changed_paths,omitempty"`
 	RunID            string   `json:"run_id,omitempty"`
@@ -426,15 +459,18 @@ type delegatedWriterReport struct {
 }
 
 func (t writerTool) run(ctx context.Context, assignment string, role instructions.Role) delegatedWriterReport {
-	return t.runScoped(ctx, assignment, role, nil)
+	return t.runScoped(ctx, assignment, role, nil, "", "")
 }
 
-func (t writerTool) runScoped(ctx context.Context, assignment string, role instructions.Role, declaredPaths []string) delegatedWriterReport {
-	report := delegatedWriterReport{Task: assignment, Role: role.Name, DeclaredPaths: append([]string(nil), declaredPaths...), ReviewRequired: true}
-	runID, err := newID(t.now())
-	if err != nil {
-		report.Error = truncateWriterText(err.Error(), maxWriterSummaryBytes)
-		return report
+func (t writerTool) runScoped(ctx context.Context, assignment string, role instructions.Role, declaredPaths []string, batchID, runID string) delegatedWriterReport {
+	report := delegatedWriterReport{Task: assignment, Role: role.Name, BatchID: batchID, DeclaredPaths: append([]string(nil), declaredPaths...), ReviewRequired: true}
+	if runID == "" {
+		generated, err := newID(t.now())
+		if err != nil {
+			report.Error = truncateWriterText(err.Error(), maxWriterSummaryBytes)
+			return report
+		}
+		runID = generated
 	}
 	report.RunID = runID
 	startedAt := t.now()
@@ -446,6 +482,7 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 		Status:         journal.ChildPreparing,
 		Repository:     t.parent.Repository,
 		Role:           role.Name,
+		BatchID:        batchID,
 		DeclaredPaths:  append([]string(nil), declaredPaths...),
 		TaskSHA256:     writerDigest(assignment),
 		StartedAt:      startedAt,
@@ -545,6 +582,57 @@ func (t writerTool) saveManifest(manifest journal.ChildManifest) error {
 		return fmt.Errorf("parent run journal is unavailable")
 	}
 	return t.journal.SaveChildManifest(manifest)
+}
+
+func (t writerTool) saveBatchManifest(manifest journal.ChildBatchManifest) error {
+	if t.journal == nil {
+		return fmt.Errorf("parent run journal is unavailable")
+	}
+	return t.journal.SaveChildBatchManifest(manifest)
+}
+
+func newWriterBatchIDs(now func() time.Time) (string, []string, error) {
+	batch, err := newID(now())
+	if err != nil {
+		return "", nil, fmt.Errorf("generate writer batch ID: %w", err)
+	}
+	first, err := newID(now())
+	if err != nil {
+		return "", nil, fmt.Errorf("generate first writer child ID: %w", err)
+	}
+	second, err := newID(now())
+	if err != nil {
+		return "", nil, fmt.Errorf("generate second writer child ID: %w", err)
+	}
+	return "batch-" + strings.TrimPrefix(batch, "run-"), []string{first, second}, nil
+}
+
+func writerBatchStatus(ctx context.Context, reports []delegatedWriterReport) journal.ChildBatchStatus {
+	if ctx.Err() != nil {
+		return journal.ChildBatchCancelled
+	}
+	for _, report := range reports {
+		if strings.TrimSpace(report.Error) != "" {
+			return journal.ChildBatchFailed
+		}
+	}
+	return journal.ChildBatchCompleted
+}
+
+func journalWriterConflicts(conflicts []writerConflict) []journal.ChildConflict {
+	if len(conflicts) == 0 {
+		return nil
+	}
+	converted := make([]journal.ChildConflict, len(conflicts))
+	for index, conflict := range conflicts {
+		converted[index] = journal.ChildConflict{
+			Kind:     conflict.Kind,
+			ChildIDs: append([]string(nil), conflict.Writers...),
+			Paths:    append([]string(nil), conflict.Paths...),
+			Detail:   conflict.Detail,
+		}
+	}
+	return converted
 }
 
 func (t writerTool) finishManifest(manifest *journal.ChildManifest, status journal.ChildStatus, report delegatedWriterReport) {

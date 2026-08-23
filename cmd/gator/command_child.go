@@ -12,7 +12,9 @@ import (
 
 const childUsage = `usage:
   gator child list RUN_RECORD_PATH
-  gator child show RUN_RECORD_PATH CHILD_RUN_ID`
+  gator child show RUN_RECORD_PATH CHILD_RUN_ID
+  gator child batches RUN_RECORD_PATH
+  gator child batch RUN_RECORD_PATH BATCH_ID`
 
 // childCommand exposes parent-owned writer manifests without replaying model
 // conversation content or patch text. It is a recovery surface for retained
@@ -51,7 +53,11 @@ func childCommand(arguments []string, out io.Writer) error {
 			if manifest.PatchBytes > 0 {
 				patch = fmt.Sprintf("%d bytes", manifest.PatchBytes)
 			}
-			if _, err := fmt.Fprintf(out, "  %s  %s  role=%s  patch=%s\n", manifest.ID, manifest.Status, role, patch); err != nil {
+			batch := ""
+			if manifest.BatchID != "" {
+				batch = "  batch=" + manifest.BatchID
+			}
+			if _, err := fmt.Fprintf(out, "  %s  %s  role=%s  patch=%s%s\n", manifest.ID, manifest.Status, role, patch, batch); err != nil {
 				return err
 			}
 		}
@@ -65,6 +71,40 @@ func childCommand(arguments []string, out io.Writer) error {
 			return err
 		}
 		return printChildManifest(manifest, out)
+	case "batches":
+		if len(arguments) != 2 {
+			return errors.New(childUsage)
+		}
+		batches, err := journal.ListChildBatchManifests(arguments[1])
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				_, writeErr := fmt.Fprintln(out, "No retained parallel writer batches.")
+				return writeErr
+			}
+			return err
+		}
+		if len(batches) == 0 {
+			_, err := fmt.Fprintln(out, "No retained parallel writer batches.")
+			return err
+		}
+		if _, err := fmt.Fprintf(out, "Retained parallel writer batches: %s\n", arguments[1]); err != nil {
+			return err
+		}
+		for _, batch := range batches {
+			if _, err := fmt.Fprintf(out, "  %s  %s  children=%s  conflicts=%d\n", batch.ID, batch.Status, strings.Join(batch.ChildIDs, ","), len(batch.Conflicts)); err != nil {
+				return err
+			}
+		}
+		return nil
+	case "batch":
+		if len(arguments) != 3 {
+			return errors.New(childUsage)
+		}
+		batch, err := journal.LoadChildBatchManifest(arguments[1], arguments[2])
+		if err != nil {
+			return err
+		}
+		return printChildBatchManifest(batch, out)
 	default:
 		return fmt.Errorf("unknown child command %q\n%s", arguments[0], childUsage)
 	}
@@ -80,6 +120,7 @@ func printChildManifest(manifest journal.ChildManifest, out io.Writer) error {
 		{"kind", manifest.Kind},
 		{"status", string(manifest.Status)},
 		{"role", valueOrDash(manifest.Role)},
+		{"batch", valueOrDash(manifest.BatchID)},
 		{"repository", manifest.Repository},
 		{"worktree", valueOrDash(manifest.WorktreePath)},
 		{"baseline", valueOrDash(manifest.BaseCommit)},
@@ -109,6 +150,47 @@ func printChildManifest(manifest journal.ChildManifest, out io.Writer) error {
 	}
 	for _, field := range fields {
 		if _, err := fmt.Fprintf(out, "  %s: %s\n", field.name, field.value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printChildBatchManifest(manifest journal.ChildBatchManifest, out io.Writer) error {
+	if _, err := fmt.Fprintln(out, "Parallel writer batch manifest:"); err != nil {
+		return err
+	}
+	fields := []struct {
+		name  string
+		value string
+	}{
+		{"id", manifest.ID},
+		{"parent run", manifest.ParentRunID},
+		{"status", string(manifest.Status)},
+		{"children", strings.Join(manifest.ChildIDs, ", ")},
+		{"conflicts", fmt.Sprintf("%d", len(manifest.Conflicts))},
+		{"started", manifest.StartedAt.Format("2006-01-02T15:04:05Z07:00")},
+		{"updated", manifest.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")},
+	}
+	if manifest.FinishedAt != nil {
+		fields = append(fields, struct {
+			name  string
+			value string
+		}{"finished", manifest.FinishedAt.Format("2006-01-02T15:04:05Z07:00")})
+	}
+	if manifest.Error != "" {
+		fields = append(fields, struct {
+			name  string
+			value string
+		}{"error", strings.ReplaceAll(manifest.Error, "\n", " ")})
+	}
+	for _, field := range fields {
+		if _, err := fmt.Fprintf(out, "  %s: %s\n", field.name, field.value); err != nil {
+			return err
+		}
+	}
+	for index, conflict := range manifest.Conflicts {
+		if _, err := fmt.Fprintf(out, "  conflict %d: %s; children=%s; paths=%s; %s\n", index+1, conflict.Kind, strings.Join(conflict.ChildIDs, ","), strings.Join(conflict.Paths, ","), conflict.Detail); err != nil {
 			return err
 		}
 	}
