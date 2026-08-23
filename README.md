@@ -441,7 +441,7 @@ executables; and `gator mcp trust` pins `.gator/mcp.json` plus local stdio
 executables. A changed bundle is disabled until re-trusted. Trusted hooks run
 at tool, compaction, verification, and session boundaries in the strict
 sandbox. Trusted LSP bundles expose bounded pull diagnostics, read-only
-navigation, informational completion suggestions, and workspace-confined
+navigation, informational completion, formatting, rename, and workspace-confined
 code-action edit suggestions, and request approval
 before each lookup; see
 [Trusted local LSP](docs/LSP.md).

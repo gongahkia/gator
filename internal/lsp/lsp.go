@@ -49,7 +49,7 @@ const (
 	maxCodeActionKindBytes          = 256
 	maxCodeActionDisabledBytes      = 1024
 	maxCodeActionNewTextBytes       = 16 * 1024
-	maxRenameNameBytes               = 256
+	maxRenameNameBytes              = 256
 	maxSymbolQuery                  = 512
 	maxToolOutput                   = 64 * 1024
 )
@@ -1584,16 +1584,16 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 	}
 	var response struct {
 		Capabilities struct {
-			DiagnosticProvider      json.RawMessage `json:"diagnosticProvider"`
-			HoverProvider           json.RawMessage `json:"hoverProvider"`
-			CompletionProvider      json.RawMessage `json:"completionProvider"`
-			CodeActionProvider      json.RawMessage `json:"codeActionProvider"`
+			DiagnosticProvider         json.RawMessage `json:"diagnosticProvider"`
+			HoverProvider              json.RawMessage `json:"hoverProvider"`
+			CompletionProvider         json.RawMessage `json:"completionProvider"`
+			CodeActionProvider         json.RawMessage `json:"codeActionProvider"`
 			DocumentFormattingProvider json.RawMessage `json:"documentFormattingProvider"`
-			RenameProvider          json.RawMessage `json:"renameProvider"`
-			DefinitionProvider      json.RawMessage `json:"definitionProvider"`
-			ReferencesProvider      json.RawMessage `json:"referencesProvider"`
-			DocumentSymbolProvider  json.RawMessage `json:"documentSymbolProvider"`
-			WorkspaceSymbolProvider json.RawMessage `json:"workspaceSymbolProvider"`
+			RenameProvider             json.RawMessage `json:"renameProvider"`
+			DefinitionProvider         json.RawMessage `json:"definitionProvider"`
+			ReferencesProvider         json.RawMessage `json:"referencesProvider"`
+			DocumentSymbolProvider     json.RawMessage `json:"documentSymbolProvider"`
+			WorkspaceSymbolProvider    json.RawMessage `json:"workspaceSymbolProvider"`
 		} `json:"capabilities"`
 	}
 	if err := json.Unmarshal(result, &response); err != nil {

@@ -133,19 +133,20 @@ record for diagnosis.
 Trusted project LSP configuration is a deliberately small, local
 code-intelligence surface. A developer pins `.gator/lsp.json` and its
 repository-local executables with `gator lsp trust`; each model-requested
-diagnostic, navigation, completion, or code-action launch still needs
+diagnostic, navigation, completion, formatting, rename, or code-action launch still needs
 operation-specific command approval and runs under the strict sandbox. The
-client implements pull diagnostics, hover, completion, immediate code actions,
-definitions, references, document symbols, and workspace-symbol queries; it
+client implements pull diagnostics, hover, completion, formatting, rename,
+immediate code actions, definitions, references, document symbols, and
+workspace-symbol queries; it
 bounds all wire and model-visible output, returns only workspace locations, and
-starts a server only after approval. Completion is informational. Code actions
-return only bounded edits to existing regular workspace files; Gator never
-executes an LSP command, follows resource operations, or applies an LSP edit
-automatically. A run lazily reuses one server per trusted configuration, then
-shuts it down at run exit; no server is shared across worktrees or retained
-runs. It is not a general IDE or an unreviewed executable-extension path:
-rename, formatting, and a persistent cross-run server/index remain outside this
-capability.
+starts a server only after approval. Completion is informational. Code actions,
+formatting, and rename return only bounded edits to existing regular workspace
+files; Gator never executes an LSP command, follows resource operations, or
+applies an LSP edit automatically. A run lazily reuses one server per trusted
+configuration, then shuts it down at run exit; no server is shared across
+worktrees or retained runs. It is not a general IDE or an unreviewed
+executable-extension path: a persistent cross-run server/index remains outside
+this capability.
 
 Trusted extension sidecars are a separate executable capability but not a
 process-sandbox exception. Global bundles are explicitly installed; repository
