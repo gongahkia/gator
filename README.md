@@ -527,16 +527,20 @@ opens an attachment to existing model-started tasks: developers can view
 bounded output, switch tasks, send a line or interrupt, and stop a task.
 `Ctrl+O` enters opt-in raw-keyboard mode for arrows, completion, control keys,
 and common function keys; `Ctrl+]` returns to Gator controls. The attachment
-resizes the underlying PTY to its viewport and renders common cursor, erase,
-and alternate-screen controls, so progress, simple dashboards, and common
-full-screen buffer transitions do not accumulate stale primary-screen lines.
-Direct input stays inside the task's existing sandbox and is journaled only as
-byte count plus SHA-256 digest while its owning run is active; background input
-is not appended to a completed run record. The authenticated app-server
-controller can directly write only to an already detached task; that input never
-becomes model context or a completed-run record. This is intentionally not a
-full VT terminal emulator, restart-surviving terminal daemon, or ACP/client
-terminal multiplexer.
+resizes the underlying PTY to its viewport and uses a bounded VT500/xterm text
+emulator: cursor and margin operations, primary and alternate screens,
+scrollback, Unicode cell widths, ANSI/256/RGB color, and text attributes render
+as a terminal application expects. `PgUp`, `PgDn`, `Home`, and `End` scroll the
+emulator's primary-buffer history rather than a flattened transcript. Standard
+device/status replies are capped and returned only to the existing task; they
+are neither developer input nor model context. Direct input stays inside the
+task's existing sandbox and is journaled only as byte count plus SHA-256 digest
+while its owning run is active; background input is not appended to a completed
+run record. The authenticated app-server controller can directly write only to
+an already detached task; that input never becomes model context or a completed
+run record. Terminal graphics, clipboard/window control, and mouse forwarding
+remain intentionally unsupported, as do a restart-surviving terminal daemon and
+ACP/client terminal multiplexer.
 
 When the developer explicitly grants `--network allow` (or `gator config set
 network allow`), Execute mode additionally exposes `http_fetch` for bounded

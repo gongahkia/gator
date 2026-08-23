@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -242,6 +243,42 @@ func TestManagerRecordsDeveloperInputWithoutRetainingIt(t *testing.T) {
 	digest := sha256.Sum256(secret)
 	if inputs[0].SHA256 != hex.EncodeToString(digest[:]) || strings.Contains(inputs[0].SHA256, "developer-only") {
 		t.Fatalf("developer input digest = %#v", inputs[0])
+	}
+}
+
+func TestManagerProtocolRepliesAreBoundedAndNotDeveloperInput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inputs []DeveloperInput
+	manager := New(Config{
+		Root:   root,
+		Policy: sandbox.Policy{Mode: sandbox.Off},
+		OnDeveloperInput: func(_ Task, input DeveloperInput) {
+			inputs = append(inputs, input)
+		},
+	})
+	defer manager.Close()
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "sleep 2"})
+	if err != nil {
+		t.Fatalf("start terminal: %v", err)
+	}
+	if _, err := manager.WriteProtocol(task.ID, []byte("\x1b[0n")); err != nil {
+		t.Fatalf("write protocol reply: %v", err)
+	}
+	if len(inputs) != 0 {
+		t.Fatalf("protocol reply was recorded as developer input: %#v", inputs)
+	}
+	if _, err := manager.WriteProtocol(task.ID, bytes.Repeat([]byte{'x'}, maxTerminalProtocolBytes+1)); err == nil || !strings.Contains(err.Error(), "protocol reply exceeds") {
+		t.Fatalf("oversized protocol reply error = %v", err)
 	}
 }
 
