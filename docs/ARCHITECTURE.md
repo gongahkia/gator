@@ -118,7 +118,12 @@ events as ACP session updates, and maps Gator command approval to ACP
 change repository roots, add filesystem roots, inject MCP servers, or weaken
 the process-level verifier policy. Gator's proprietary `gator rpc` interface
 remains for automation that needs run IDs, steering, and other Gator-specific
-control-plane operations.
+control-plane operations. `gator serve` is a thin authenticated HTTP/SSE bridge
+over that same RPC server: a literal-loopback listener accepts one RPC request
+per `POST /v1/rpc` and replays/streams correlated output at
+`GET /v1/events/{id}`. It uses a private bearer-token file, rejects browser
+origins, bounds request/replay/subscriber buffers, and does not create a second
+executor, remote mode, or client authority over repository and policy settings.
 
 Fresh CLI runs may receive repeatable developer-supplied worktree setup argv.
 Gator runs those exact argv commands only after creating the isolated checkout

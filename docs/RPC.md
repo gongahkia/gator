@@ -48,3 +48,11 @@ not replaced.
 
 Go integrations can import `github.com/gongahkia/gator/rpc` for protocol types
 and the concurrent-safe JSONL `Client`.
+
+## HTTP/SSE transport
+
+For a local controller that cannot manage stdio, [the local app server](APP_SERVER.md)
+accepts this exact request type at `POST /v1/rpc` and emits the same protocol
+messages as SSE at `GET /v1/events/{id}`. It is an authenticated loopback
+bridge, not another execution path: client input cannot add setup commands,
+filesystem roots, MCP servers, credentials, or a weaker policy.

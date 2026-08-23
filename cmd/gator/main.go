@@ -23,6 +23,8 @@ Usage:
   gator version
   gator update [--check]
   gator rpc
+  gator serve token ABSOLUTE_PATH
+  gator serve --token-file ABSOLUTE_PATH [--listen 127.0.0.1:PORT]
   gator acp [--verify 'argv ...']
   gator config [show]
   gator config set default-provider PROVIDER
@@ -60,6 +62,7 @@ Commands:
   login     store a provider credential in Gator's private local auth file
   logout    remove a provider credential from Gator's private local auth file
   delegate  run an installed vendor or external agent in an isolated worktree
+  serve     run the authenticated loopback HTTP/SSE app-server bridge
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
   agent     list project-defined, capability-bounded delegation roles
 	 child     inspect durable manifests for retained isolated writer children
@@ -120,6 +123,8 @@ func run(args []string, out io.Writer) error {
 		return update(args[1:], out)
 	case "rpc":
 		return rpcMode(args[1:], os.Stdin, out)
+	case "serve":
+		return serveCommand(args[1:], out)
 	case "acp":
 		return acpMode(args[1:], os.Stdin, out)
 	case "doctor":
