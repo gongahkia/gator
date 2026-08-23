@@ -1,379 +1,242 @@
 package tui
 
 import (
-	"strconv"
+	"fmt"
 	"strings"
-	"unicode/utf8"
+
+	xterm "github.com/gitpod-io/xterm-go"
 )
 
-const maxAttachedTerminalScreenRows = 1024
+const (
+	maxAttachedTerminalScreenRows    = 1024
+	maxTerminalProtocolResponseBytes = 4 * 1024
+)
 
-// terminalDisplay is a deliberately bounded display interpreter for an
-// attached PTY. It is not an escape hatch into the host terminal: it consumes
-// output already owned by terminal.Manager and handles the common cursor and
-// erase operations needed by progress bars, test dashboards, and simple TUI
-// programs. Unknown control sequences are ignored rather than rendered.
+// terminalDisplay is the bounded, headless terminal emulator behind an
+// attached PTY. It consumes task output into a VT500/xterm screen buffer; it
+// never forwards that output to Gator's host terminal.
 type terminalDisplay struct {
-	width           int
-	lines           [][]rune
-	row             int
-	column          int
-	savedRow        int
-	savedCol        int
-	primaryLines    [][]rune
-	primaryRow      int
-	primaryColumn   int
-	primarySavedRow int
-	primarySavedCol int
-	alternate       bool
-	pending         []byte
+	terminal *xterm.Terminal
+	rows     int
+	columns  int
+	protocol []byte
 }
 
-func (s *terminalDisplay) resize(width int) {
-	if width < 1 {
-		width = 1
+func (s *terminalDisplay) resize(rows, columns int) {
+	if rows < 1 {
+		rows = 1
 	}
-	s.width = width
+	if columns < 1 {
+		columns = 1
+	}
+	if s.terminal == nil {
+		s.newTerminal(rows, columns)
+		return
+	}
+	s.rows, s.columns = rows, columns
+	s.terminal.Resize(columns, rows)
+}
+
+func (s *terminalDisplay) newTerminal(rows, columns int) {
+	colorSchemeQuery := false
+	s.rows, s.columns = rows, columns
+	s.terminal = xterm.New(
+		xterm.WithCols(columns),
+		xterm.WithRows(rows),
+		xterm.WithScrollback(maxAttachedTerminalScreenRows),
+		xterm.WithVtExtensions(xterm.VtExtensions{ColorSchemeQuery: &colorSchemeQuery}),
+	)
+	s.terminal.OnData(func(value string) {
+		remaining := maxTerminalProtocolResponseBytes - len(s.protocol)
+		if remaining <= 0 {
+			return
+		}
+		if len(value) > remaining {
+			value = value[:remaining]
+		}
+		s.protocol = append(s.protocol, value...)
+	})
 }
 
 func (s *terminalDisplay) reset() {
-	width := s.width
-	*s = terminalDisplay{width: width}
+	rows, columns := s.rows, s.columns
+	s.dispose()
+	*s = terminalDisplay{}
+	s.resize(rows, columns)
+}
+
+func (s *terminalDisplay) dispose() {
+	if s.terminal != nil {
+		s.terminal.Dispose()
+	}
+	s.terminal = nil
+	s.protocol = nil
 }
 
 func (s *terminalDisplay) feed(value string) {
 	if value == "" {
 		return
 	}
-	data := append(append([]byte(nil), s.pending...), []byte(value)...)
-	s.pending = nil
-	for index := 0; index < len(data); {
-		current := data[index]
-		switch current {
-		case 0x1b:
-			consumed, complete := s.escape(data[index:])
-			if !complete {
-				s.pending = append(s.pending, data[index:]...)
-				return
-			}
-			index += consumed
-		case '\r':
-			s.column = 0
-			index++
-		case '\n':
-			s.row++
-			s.ensureRow(s.row)
-			index++
-		case '\b':
-			if s.column > 0 {
-				s.column--
-			}
-			index++
-		case '\t':
-			next := ((s.column / 8) + 1) * 8
-			for s.column < next {
-				s.put(' ')
-			}
-			index++
-		default:
-			if current < 0x20 || current == 0x7f {
-				index++
-				continue
-			}
-			runeValue, size := utf8.DecodeRune(data[index:])
-			if runeValue == utf8.RuneError && size == 1 && !utf8.FullRune(data[index:]) {
-				s.pending = append(s.pending, data[index:]...)
-				return
-			}
-			s.put(runeValue)
-			index += size
-		}
+	if s.terminal == nil {
+		s.resize(24, 80)
 	}
+	s.terminal.WriteString(value)
 }
 
-func (s *terminalDisplay) escape(value []byte) (int, bool) {
-	if len(value) < 2 {
-		return 0, false
-	}
-	switch value[1] {
-	case '[':
-		for index := 2; index < len(value); index++ {
-			if value[index] >= 0x40 && value[index] <= 0x7e {
-				s.csi(string(value[2:index]), value[index])
-				return index + 1, true
-			}
-		}
-		return 0, false
-	case ']':
-		for index := 2; index < len(value); index++ {
-			if value[index] == '\a' {
-				return index + 1, true
-			}
-			if value[index] == 0x1b {
-				if index+1 >= len(value) {
-					return 0, false
-				}
-				if value[index+1] == '\\' {
-					return index + 2, true
-				}
-			}
-		}
-		return 0, false
-	case 'P', '^', '_':
-		for index := 2; index < len(value); index++ {
-			if value[index] != 0x1b {
-				continue
-			}
-			if index+1 >= len(value) {
-				return 0, false
-			}
-			if value[index+1] == '\\' {
-				return index + 2, true
-			}
-		}
-		return 0, false
-	case '7':
-		s.savedRow, s.savedCol = s.row, s.column
-	case '8':
-		s.row, s.column = s.savedRow, s.savedCol
-		s.ensureRow(s.row)
-	case 'D':
-		s.row++
-		s.ensureRow(s.row)
-	case 'M':
-		if s.row > 0 {
-			s.row--
-		}
-	case 'c':
-		s.reset()
-	}
-	return 2, true
-}
-
-func (s *terminalDisplay) csi(parameters string, command byte) {
-	values := terminalParameters(parameters)
-	amount := terminalParameter(values, 0, 1)
-	switch command {
-	case 'A':
-		s.row = max(0, s.row-amount)
-	case 'B':
-		s.row += amount
-		s.ensureRow(s.row)
-	case 'C':
-		s.column = min(s.width-1, s.column+amount)
-	case 'D':
-		s.column = max(0, s.column-amount)
-	case 'E':
-		s.row += amount
-		s.column = 0
-		s.ensureRow(s.row)
-	case 'F':
-		s.row = max(0, s.row-amount)
-		s.column = 0
-	case 'G', '`':
-		s.column = max(0, terminalParameter(values, 0, 1)-1)
-	case 'H', 'f':
-		s.row = max(0, terminalParameter(values, 0, 1)-1)
-		s.column = max(0, terminalParameter(values, 1, 1)-1)
-		s.ensureRow(s.row)
-	case 'J':
-		s.eraseDisplay(terminalParameter(values, 0, 0))
-	case 'K':
-		s.eraseLine(terminalParameter(values, 0, 0))
-	case 'P':
-		s.deleteCells(amount)
-	case 'X':
-		s.eraseCells(amount)
-	case 's':
-		s.savedRow, s.savedCol = s.row, s.column
-	case 'u':
-		s.row, s.column = s.savedRow, s.savedCol
-		s.ensureRow(s.row)
-	case 'h':
-		if strings.HasPrefix(parameters, "?") {
-			s.setPrivateModes(values, true)
-		}
-	case 'l':
-		if strings.HasPrefix(parameters, "?") {
-			s.setPrivateModes(values, false)
-		}
-	case 'm', 'q', 'n', 'r':
-		// Styles, cursor shape/status, and scroll-region controls do not carry
-		// text. The viewport intentionally remains display-only.
-	}
-}
-
-func (s *terminalDisplay) setPrivateModes(values []int, enabled bool) {
-	for _, value := range values {
-		switch value {
-		case 47, 1047, 1049:
-			if enabled {
-				s.enterAlternateScreen()
-			} else {
-				s.leaveAlternateScreen()
-			}
-		case 1048:
-			if enabled {
-				s.savedRow, s.savedCol = s.row, s.column
-			} else {
-				s.row, s.column = s.savedRow, s.savedCol
-				s.ensureRow(s.row)
-			}
-		}
-	}
-}
-
-func (s *terminalDisplay) enterAlternateScreen() {
-	if s.alternate {
-		return
-	}
-	s.primaryLines = s.lines
-	s.primaryRow = s.row
-	s.primaryColumn = s.column
-	s.primarySavedRow = s.savedRow
-	s.primarySavedCol = s.savedCol
-	s.lines = nil
-	s.row, s.column = 0, 0
-	s.savedRow, s.savedCol = 0, 0
-	s.alternate = true
-}
-
-func (s *terminalDisplay) leaveAlternateScreen() {
-	if !s.alternate {
-		return
-	}
-	s.lines = s.primaryLines
-	s.row = s.primaryRow
-	s.column = s.primaryColumn
-	s.savedRow = s.primarySavedRow
-	s.savedCol = s.primarySavedCol
-	s.primaryLines = nil
-	s.primaryRow, s.primaryColumn = 0, 0
-	s.primarySavedRow, s.primarySavedCol = 0, 0
-	s.alternate = false
-}
-
-func terminalParameters(value string) []int {
-	value = strings.TrimLeft(value, "?<=>")
-	if value == "" {
-		return nil
-	}
-	parts := strings.Split(value, ";")
-	values := make([]int, len(parts))
-	for index, part := range parts {
-		parsed, err := strconv.Atoi(part)
-		if err == nil && parsed >= 0 {
-			values[index] = parsed
-		}
-	}
-	return values
-}
-
-func terminalParameter(values []int, index, fallback int) int {
-	if index >= len(values) || values[index] == 0 {
-		return fallback
-	}
-	return values[index]
-}
-
-func (s *terminalDisplay) put(value rune) {
-	if s.width < 1 {
-		s.width = 80
-	}
-	if s.column >= s.width {
-		s.row++
-		s.column = 0
-	}
-	s.ensureRow(s.row)
-	line := s.lines[s.row]
-	for len(line) <= s.column {
-		line = append(line, ' ')
-	}
-	line[s.column] = value
-	s.lines[s.row] = line
-	s.column++
-}
-
-func (s *terminalDisplay) ensureRow(row int) {
-	if row < 0 {
-		return
-	}
-	for len(s.lines) <= row {
-		s.lines = append(s.lines, nil)
-	}
-	if len(s.lines) <= maxAttachedTerminalScreenRows {
-		return
-	}
-	drop := len(s.lines) - maxAttachedTerminalScreenRows
-	s.lines = append([][]rune(nil), s.lines[drop:]...)
-	s.row = max(0, s.row-drop)
-	s.savedRow = max(0, s.savedRow-drop)
-}
-
-func (s *terminalDisplay) eraseDisplay(mode int) {
-	s.ensureRow(s.row)
-	switch mode {
-	case 2, 3:
-		s.lines = nil
-		s.row, s.column = 0, 0
-	case 1:
-		for row := 0; row < s.row; row++ {
-			s.lines[row] = nil
-		}
-		s.eraseLine(1)
-	default:
-		s.eraseLine(0)
-		if s.row+1 < len(s.lines) {
-			s.lines = s.lines[:s.row+1]
-		}
-	}
-}
-
-func (s *terminalDisplay) eraseLine(mode int) {
-	s.ensureRow(s.row)
-	line := s.lines[s.row]
-	switch mode {
-	case 1:
-		for index := 0; index < min(len(line), s.column+1); index++ {
-			line[index] = ' '
-		}
-	case 2:
-		line = nil
-	default:
-		if s.column < len(line) {
-			line = line[:s.column]
-		}
-	}
-	s.lines[s.row] = line
-}
-
-func (s *terminalDisplay) eraseCells(count int) {
-	s.ensureRow(s.row)
-	line := s.lines[s.row]
-	for index := s.column; index < min(len(line), s.column+count); index++ {
-		line[index] = ' '
-	}
-	s.lines[s.row] = line
-}
-
-func (s *terminalDisplay) deleteCells(count int) {
-	s.ensureRow(s.row)
-	line := s.lines[s.row]
-	if s.column >= len(line) || count <= 0 {
-		return
-	}
-	end := min(len(line), s.column+count)
-	line = append(line[:s.column], line[end:]...)
-	s.lines[s.row] = line
+func (s *terminalDisplay) takeProtocol() []byte {
+	input := append([]byte(nil), s.protocol...)
+	s.protocol = nil
+	return input
 }
 
 func (s terminalDisplay) String() string {
-	if len(s.lines) == 0 {
+	if s.terminal == nil {
 		return ""
 	}
-	lines := make([]string, len(s.lines))
-	for index, line := range s.lines {
-		lines[index] = strings.TrimRight(string(line), " ")
+	buffer := s.terminal.Buffer()
+	lines := make([]string, buffer.Lines.Length())
+	for index := range lines {
+		lines[index] = buffer.TranslateBufferLineToString(index, true, 0, -1)
+	}
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (s terminalDisplay) viewport() string {
+	if s.terminal == nil {
+		return ""
+	}
+	buffer := s.terminal.Buffer()
+	lines := make([]string, s.terminal.Rows())
+	for row := range lines {
+		lines[row] = s.renderLine(buffer.Lines.Get(buffer.YDisp+row), row)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (s terminalDisplay) renderLine(line *xterm.BufferLine, row int) string {
+	if s.terminal == nil || line == nil {
+		return strings.Repeat(" ", s.columns)
+	}
+	columns := s.terminal.Cols()
+	var output strings.Builder
+	var run strings.Builder
+	var previous xterm.CellData
+	hasPrevious := false
+	previousCursor := false
+	buffer := s.terminal.Buffer()
+	cursorVisible := !s.terminal.IsCursorHidden() && buffer.YDisp == buffer.YBase && row == s.terminal.CursorY()
+
+	flush := func() {
+		if !hasPrevious || run.Len() == 0 {
+			return
+		}
+		output.WriteString(renderTerminalRun(previous, previousCursor, run.String()))
+		run.Reset()
+	}
+	for column := 0; column < columns; column++ {
+		cell := line.LoadCell(column, &xterm.CellData{})
+		if cell.GetWidth() == 0 {
+			continue
+		}
+		cursor := cursorVisible && column == s.terminal.CursorX()
+		if hasPrevious && (cursor != previousCursor || !cell.AttributesEqual(&previous)) {
+			flush()
+			hasPrevious = false
+		}
+		if !hasPrevious {
+			previous = *cell
+			previousCursor = cursor
+			hasPrevious = true
+		}
+		content := cell.GetChars()
+		if content == "" {
+			content = " "
+		}
+		run.WriteString(content)
+	}
+	flush()
+	return output.String()
+}
+
+func (s *terminalDisplay) scrollPages(pages int) {
+	if s.terminal != nil {
+		s.terminal.ScrollPages(pages)
+	}
+}
+
+func (s *terminalDisplay) scrollToTop() {
+	if s.terminal != nil {
+		s.terminal.ScrollToTop()
+	}
+}
+
+func (s *terminalDisplay) scrollToBottom() {
+	if s.terminal != nil {
+		s.terminal.ScrollToBottom()
+	}
+}
+
+func renderTerminalRun(cell xterm.CellData, cursor bool, value string) string {
+	parameters := make([]string, 0, 12)
+	if cell.IsBold() != 0 {
+		parameters = append(parameters, "1")
+	}
+	if cell.IsDim() != 0 {
+		parameters = append(parameters, "2")
+	}
+	if cell.IsItalic() != 0 {
+		parameters = append(parameters, "3")
+	}
+	if cell.IsUnderline() != 0 {
+		switch cell.GetUnderlineStyle() {
+		case xterm.UnderlineStyleDouble:
+			parameters = append(parameters, "21")
+		default:
+			parameters = append(parameters, "4")
+		}
+	}
+	if cell.IsBlink() != 0 {
+		parameters = append(parameters, "5")
+	}
+	if cell.IsInverse() != 0 || cursor {
+		parameters = append(parameters, "7")
+	}
+	if cell.IsInvisible() != 0 {
+		parameters = append(parameters, "8")
+	}
+	if cell.IsStrikethrough() != 0 {
+		parameters = append(parameters, "9")
+	}
+	if cell.IsOverline() != 0 {
+		parameters = append(parameters, "53")
+	}
+	parameters = append(parameters, terminalColorParameters(cell, true)...)
+	parameters = append(parameters, terminalColorParameters(cell, false)...)
+	if len(parameters) == 0 {
+		return value
+	}
+	return "\x1b[" + strings.Join(parameters, ";") + "m" + value + "\x1b[0m"
+}
+
+func terminalColorParameters(cell xterm.CellData, foreground bool) []string {
+	mode := cell.GetFgColorMode()
+	color := cell.GetFgColor()
+	prefix := "38"
+	if !foreground {
+		mode = cell.GetBgColorMode()
+		color = cell.GetBgColor()
+		prefix = "48"
+	}
+	switch mode {
+	case xterm.AttrCMP16, xterm.AttrCMP256:
+		return []string{prefix, "5", fmt.Sprintf("%d", color)}
+	case xterm.AttrCMRGB:
+		rgb := xterm.ToColorRGB(uint32(color))
+		return []string{prefix, "2", fmt.Sprintf("%d", rgb[0]), fmt.Sprintf("%d", rgb[1]), fmt.Sprintf("%d", rgb[2])}
+	default:
+		return nil
+	}
 }

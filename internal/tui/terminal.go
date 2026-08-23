@@ -26,11 +26,13 @@ func (m *Model) setTerminalAttachment(attachment terminal.Attachment) {
 	if m.terminalRawInput && m.terminalAttachment != nil {
 		m.flushAttachedTerminalRawInput()
 	}
+	for _, view := range m.terminalViews {
+		view.screen.dispose()
+	}
 	m.terminalAttachment = attachment
 	m.terminalRawInput = false
 	m.terminalTasks = nil
 	m.terminalIndex = 0
-	m.terminalScroll = 0
 	m.terminalErr = nil
 	m.terminalViews = make(map[string]attachedTerminalView)
 	if attachment == nil {
@@ -50,7 +52,6 @@ func (m *Model) openAttachedTerminal() {
 	m.terminalReturn = m.screen
 	m.screen = terminalScreen
 	m.terminalRawInput = false
-	m.terminalScroll = 0
 	m.refreshAttachedTerminal()
 	_ = m.terminalInput.Focus()
 }
@@ -96,7 +97,7 @@ func (m *Model) refreshAttachedTerminal() {
 		}
 	}
 	view := m.terminalViews[task.ID]
-	view.screen.resize(task.Columns)
+	view.screen.resize(task.Rows, task.Columns)
 	for count := 0; count < maxTerminalRefreshChunks; count++ {
 		read, err := m.terminalAttachment.Read(task.ID, view.cursor)
 		if err != nil {
@@ -109,6 +110,13 @@ func (m *Model) refreshAttachedTerminal() {
 		}
 		if read.Output != "" {
 			view.screen.feed(read.Output)
+			if response := view.screen.takeProtocol(); len(response) > 0 {
+				if _, err := m.terminalAttachment.WriteProtocol(task.ID, response); err != nil {
+					m.terminalViews[task.ID] = view
+					m.terminalErr = err
+					return
+				}
+			}
 		}
 		if read.Next == view.cursor {
 			break
@@ -126,7 +134,6 @@ func (m *Model) moveAttachedTerminal(delta int) {
 		return
 	}
 	m.terminalIndex = (m.terminalIndex + delta + len(m.terminalTasks)) % len(m.terminalTasks)
-	m.terminalScroll = 0
 	m.refreshAttachedTerminal()
 }
 
@@ -169,13 +176,13 @@ func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveAttachedTerminal(-1)
 		return m, nil
 	case "pgup":
-		m.terminalScroll += max(1, m.height-18)
+		m.scrollAttachedTerminal(-1)
 		return m, nil
 	case "pgdown", "end":
-		m.terminalScroll = max(0, m.terminalScroll-max(1, m.height-18))
+		m.scrollAttachedTerminal(1)
 		return m, nil
 	case "home":
-		m.terminalScroll = len(strings.Split(m.currentAttachedTerminalOutput(), "\n"))
+		m.scrollAttachedTerminalToTop()
 		return m, nil
 	case "ctrl+x":
 		task, found := m.selectedTerminalTask()
@@ -306,7 +313,7 @@ func displayTerminalOutput(value string) string {
 }
 
 func (m Model) attachedTerminalSize() (int, int) {
-	rows := min(120, max(6, m.height-13))
+	rows := min(120, max(3, m.height-18))
 	columns := min(240, max(20, m.panelTextWidth()))
 	return rows, columns
 }
@@ -340,7 +347,11 @@ func (m Model) attachedTerminalView() string {
 		command := displayTerminalOutput(strings.Join(candidate.Argv, " "))
 		tasks = append(tasks, prefix+keyStyle.Render(candidate.ID)+" "+dimStyle.Render(compact(status+" · "+command, max(16, m.panelTextWidth()-14))))
 	}
-	output := m.visibleAttachedTerminalOutput(m.currentAttachedTerminalOutput())
+	view := m.terminalViews[task.ID]
+	output := view.screen.viewport()
+	if view.dropped {
+		output = terminalDroppedScrollback + output
+	}
 	if output == "" {
 		output = dimStyle.Render("Waiting for terminal output…")
 	}
@@ -364,20 +375,22 @@ func (m Model) attachedTerminalView() string {
 	return strings.Join(sections, "\n")
 }
 
-func (m Model) visibleAttachedTerminalOutput(output string) string {
-	lines := strings.Split(output, "\n")
-	visible := max(3, m.height-18)
-	end := len(lines) - m.terminalScroll
-	if end < 0 {
-		end = 0
+func (m *Model) scrollAttachedTerminal(pages int) {
+	task, found := m.selectedTerminalTask()
+	if !found {
+		return
 	}
-	start := max(0, end-visible)
-	selected := append([]string(nil), lines[start:end]...)
-	if start > 0 {
-		selected = append([]string{"… scroll up for earlier attached output …"}, selected...)
+	view := m.terminalViews[task.ID]
+	view.screen.scrollPages(pages)
+	m.terminalViews[task.ID] = view
+}
+
+func (m *Model) scrollAttachedTerminalToTop() {
+	task, found := m.selectedTerminalTask()
+	if !found {
+		return
 	}
-	if end < len(lines) {
-		selected = append(selected, "… scroll down for latest attached output …")
-	}
-	return strings.Join(selected, "\n")
+	view := m.terminalViews[task.ID]
+	view.screen.scrollToTop()
+	m.terminalViews[task.ID] = view
 }

@@ -324,7 +324,6 @@ type Model struct {
 	terminalTasks       []terminal.Task
 	terminalViews       map[string]attachedTerminalView
 	terminalIndex       int
-	terminalScroll      int
 	terminalRawInput    bool
 	terminalErr         error
 	terminalReturn      screen
