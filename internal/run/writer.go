@@ -544,6 +544,7 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 	childRequest.OnEvent = nil
 	childRequest.OnTerminalAttachment = nil
 	childRequest.TerminalRegistry = nil
+	childRequest.LSPRegistry = nil
 	childRequest.DisableWriterDelegation = true
 	childRequest.AllowedCommands = tools.MergeArgvLists(t.request.AllowedCommands, t.remembered.Snapshot())
 	childRequest.System = joinInstructions(joinInstructions(t.request.System, writerSystemPrompt()), rolePrompt(role))

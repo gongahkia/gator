@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -89,6 +90,12 @@ func TestServeServiceStateIsPrivateAndRepositoryScoped(t *testing.T) {
 	if _, _, err := loadServeService(path, repository); err == nil || !strings.Contains(err.Error(), "private regular file") {
 		t.Fatalf("world-readable service state error = %v", err)
 	}
+	if err := os.Chmod(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeServeState(path, want); err == nil || !strings.Contains(err.Error(), "state directory must be private") {
+		t.Fatalf("world-readable service directory error = %v", err)
+	}
 }
 
 func TestServeReadyIsExclusiveAndLoopbackOnly(t *testing.T) {
@@ -108,5 +115,28 @@ func TestServeReadyIsExclusiveAndLoopbackOnly(t *testing.T) {
 		if err := validateServeEndpoint(endpoint); err == nil {
 			t.Fatalf("accepted non-local service endpoint %q", endpoint)
 		}
+	}
+}
+
+func TestAbortServeProcessTerminatesAReadinessFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the Unix service supervisor uses SIGTERM")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	command := exec.Command(sh, "-c", "sleep 30")
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	abortServeProcess(command.Process, done)
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		_ = command.Process.Kill()
+		t.Fatal("readiness-failed service remained running")
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/lsp"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
@@ -48,6 +49,10 @@ type Config struct {
 	// TerminalRegistry retains explicitly approved background terminal tasks for
 	// this TUI process. A nil value creates a private registry.
 	TerminalRegistry *terminal.Registry
+	// LSPRegistry retains trusted language-server processes for compatible
+	// resumed worktree runs in this TUI process. A nil value creates a private
+	// registry.
+	LSPRegistry *lsp.Registry
 	// NewDelegateCommand starts a vendor-owned harness in a fresh isolated
 	// worktree. It deliberately remains separate from NewExecutor: the harness
 	// owns its credential, tools, approvals, and session state.
@@ -315,6 +320,7 @@ type Model struct {
 	verificationStatus  []verificationStatus
 	terminalAttachment  terminal.Attachment
 	terminalRegistry    *terminal.Registry
+	lspRegistry         *lsp.Registry
 	terminalTasks       []terminal.Task
 	terminalViews       map[string]attachedTerminalView
 	terminalIndex       int
@@ -395,6 +401,9 @@ func New(config Config) Model {
 	if config.TerminalRegistry == nil {
 		config.TerminalRegistry = terminal.NewRegistry()
 	}
+	if config.LSPRegistry == nil {
+		config.LSPRegistry = lsp.NewRegistry()
+	}
 
 	task := textarea.New()
 	task.Placeholder = "Message Gator..."
@@ -447,6 +456,7 @@ func New(config Config) Model {
 		provider:         provider,
 		terminalInput:    terminalInput,
 		terminalRegistry: config.TerminalRegistry,
+		lspRegistry:      config.LSPRegistry,
 		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
 		transcript:       viewport.New(76, 8),
@@ -490,6 +500,9 @@ func New(config Config) Model {
 func (m Model) Close() {
 	if m.terminalRegistry != nil {
 		m.terminalRegistry.Close()
+	}
+	if m.lspRegistry != nil {
+		m.lspRegistry.Close()
 	}
 }
 

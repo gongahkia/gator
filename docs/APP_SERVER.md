@@ -33,8 +33,9 @@ daemon. It inherits the current repository and configuration, starts on a
 random literal-loopback port by default, and writes private repository-scoped
 metadata and a log under Gator's state directory. `status` and `stop` require
 the same token file and first authenticate against the recorded endpoint before
-they act on its PID. The native TUI and ACP do not auto-discover or join this
-service yet.
+they act on its PID. Gator refuses a service-state directory that is readable
+by another local account. The native TUI and ACP do not auto-discover or join
+this service yet.
 
 ## Contract
 

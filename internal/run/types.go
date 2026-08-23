@@ -66,6 +66,11 @@ type Request struct {
 	// Noninteractive runs deliberately leave it nil, so they cannot orphan a
 	// PTY after their caller exits.
 	TerminalRegistry *terminal.Registry
+	// LSPRegistry is supplied only by a native TUI or local app-server session.
+	// It retains trusted LSP processes for the exact resumed worktree and
+	// configuration hash; plain one-shot and child runs deliberately leave it
+	// nil.
+	LSPRegistry *lsp.Registry
 	// DisableWriterDelegation is an internal recursion guard for a child writer
 	// run. It is not a developer-facing capability: only the primary native
 	// agent may create a writer worktree.
