@@ -226,6 +226,7 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	}
 	batchID, childIDs, err := newWriterBatchIDs(t.writer.now)
 	if err != nil {
+		t.writer.budget.release(len(assignments))
 		return agent.ToolResult{}, err
 	}
 	startedAt := t.writer.now()
@@ -239,11 +240,19 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 		UpdatedAt:   startedAt,
 	}
 	if err := t.writer.saveBatchManifest(batchManifest); err != nil {
+		t.writer.budget.release(len(assignments))
 		return agent.ToolResult{}, fmt.Errorf("persist parallel writer batch before start: %w", err)
 	}
 	batchManifest.Status = journal.ChildBatchRunning
 	batchManifest.UpdatedAt = t.writer.now()
 	if err := t.writer.saveBatchManifest(batchManifest); err != nil {
+		finishedAt := t.writer.now()
+		batchManifest.Status = journal.ChildBatchFailed
+		batchManifest.UpdatedAt = finishedAt
+		batchManifest.FinishedAt = &finishedAt
+		batchManifest.Error = truncateWriterText("persist parallel writer batch before child execution: "+err.Error(), maxWriterSummaryBytes)
+		_ = t.writer.saveBatchManifest(batchManifest)
+		t.writer.budget.release(len(assignments))
 		return agent.ToolResult{}, fmt.Errorf("persist parallel writer batch before child execution: %w", err)
 	}
 	roles := []instructions.Role{assignments[0].role, assignments[1].role}
@@ -758,6 +767,18 @@ func (b *writerBudget) reserve(count int) bool {
 	}
 	b.remaining -= count
 	return true
+}
+
+func (b *writerBudget) release(count int) {
+	if count <= 0 {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.remaining += count
+	if b.remaining > maxDelegatedWritersPerRun {
+		b.remaining = maxDelegatedWritersPerRun
+	}
 }
 
 func (t writerTool) emitEvent(text string) {
