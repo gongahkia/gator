@@ -245,7 +245,7 @@ func validateChildManifestPaths(name string, values []string, maximum int) error
 	}
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
-		if len(value) == 0 || len(value) > maxChildManifestPath || strings.ContainsAny(value, "\\x00\\r\\n") {
+		if len(value) == 0 || len(value) > maxChildManifestPath || strings.ContainsAny(value, "\x00\r\n") {
 			return fmt.Errorf("child manifest %s contain an invalid path", name)
 		}
 		clean := path.Clean(value)

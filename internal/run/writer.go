@@ -376,7 +376,7 @@ func changedPathsOutsideScope(changed, scopes []string) []string {
 	for _, changedPath := range changed {
 		inScope := false
 		for _, scope := range scopes {
-			if writerPathsOverlap(changedPath, scope) {
+			if changedPath == scope || strings.HasPrefix(changedPath, scope+"/") {
 				inScope = true
 				break
 			}

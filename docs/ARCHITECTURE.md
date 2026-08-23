@@ -82,21 +82,32 @@ all returned text as untrusted evidence. A project can optionally select a
 validated `readonly` role for one scout. The role injects additional prompt
 context only; it cannot add a tool or alter the read-only policy.
 
-Execute mode also exposes one-at-a-time `delegate_writer` calls (at most two
-per primary run). Before a writer begins, Gator exports the parent worktree's
-state relative to its immutable base, restores that snapshot into a new
-detached child worktree, and writes an internal detached baseline commit. The
-child therefore reads the exact parent state but produces a clean patch that
-contains only its own delta. It reloads the same selected profile, verifier,
-sandbox policy, approval callback, and trusted extension/LSP/MCP configuration;
-recursive writer delegation is omitted from its tool surface. A validated
-project `writer` role can specialize the child prompt but cannot alter its
-policy. The parent is
-paused during the child run. Gator returns a bounded 512 KiB patch plus an
-8 KiB summary as untrusted review material but does not apply it: only a
-separate parent `apply_patch` call can transfer it. Larger or failed deltas
-remain in the child worktree for manual inspection. This is a safe local
-handoff primitive, not a parallel writer-team scheduler or conflict resolver.
+Execute mode exposes `delegate_writer` for one child and `delegate_writers` for
+exactly two concurrent children; the combined primary-run budget is two. Before
+any writer begins, Gator exports the parent state relative to its immutable
+base, restores that snapshot into a new detached child worktree, and writes an
+internal detached baseline commit. The children therefore read the same parent
+state but produce clean deltas containing only their own work. A parallel call
+must declare non-overlapping repository-relative writable paths. Gator rejects
+overlapping declarations before launch, serializes developer approval prompts,
+and then compares the actual changed paths for scope violations or conflicts.
+It reports that evidence but never resolves or merges a conflict.
+
+Each child writes an atomic private manifest under the parent run record before
+worktree creation, while running, and after completion. The manifest records
+the child ID, role, immutable baseline, retained worktree, child run record,
+task and patch digests, declared and actual paths, and outcome without copying
+prompt or patch text. It remains recoverable after a process failure through
+`gator child list` and `gator child show`. Each child reloads the same selected
+profile, verifier, sandbox policy, approval callback, and trusted
+extension/LSP/MCP configuration; recursive writer delegation is omitted from
+its tool surface. A validated project `writer` role can specialize the child
+prompt but cannot alter its policy. The parent is paused while children run.
+Gator returns a bounded 512 KiB patch plus an 8 KiB summary as untrusted review
+material but does not apply it: only a separate parent `apply_patch` call can
+transfer a compatible delta. Larger or failed deltas remain in retained child
+worktrees for manual inspection. This is bounded parallel worktree scheduling,
+not a background task system or automatic merge engine.
 
 `gator acp` is a separate local stdio ACP v1 agent surface for editors. It
 maps ACP sessions to retained Gator threads, streams normalized model/tool

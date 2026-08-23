@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -82,6 +83,9 @@ func TestExecutorCompletesReviewableFeatureRun(t *testing.T) {
 	}
 	if !strings.Contains(model.requests[0].System, "Gator, a careful coding agent") {
 		t.Fatalf("system prompt was not sent: %q", model.requests[0].System)
+	}
+	if !hasTool(model.requests[0].Tools, "delegate_writer") || !hasTool(model.requests[0].Tools, "delegate_writers") {
+		t.Fatalf("execute tool surface omitted writer delegation: %#v", model.requests[0].Tools)
 	}
 	if _, err := os.Stat(filepath.Join(outcome.Worktree.Path, "greeting.go")); err != nil {
 		t.Fatalf("feature file missing from worktree: %v", err)
@@ -163,7 +167,7 @@ func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
 	if !delegationAvailable {
 		t.Fatal("plan tool surface omitted read-only delegation")
 	}
-	if hasTool(model.requests[0].Tools, "delegate_writer") {
+	if hasTool(model.requests[0].Tools, "delegate_writer") || hasTool(model.requests[0].Tools, "delegate_writers") {
 		t.Fatalf("plan tool surface included writer delegation: %#v", model.requests[0].Tools)
 	}
 	current, err := journal.LoadSession(outcome.StatePath)
@@ -481,7 +485,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	if !strings.Contains(payload.Notice, "never auto-merges") || len(events) != 2 || events[0].Kind != agent.EventSubagent || !strings.Contains(events[0].Text, "starting isolated writer") || !strings.Contains(events[0].Text, "role test-fixer") || !strings.Contains(events[1].Text, "role test-fixer") {
 		t.Fatalf("writer delegation events = %#v; notice = %q", events, payload.Notice)
 	}
-	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") || !strings.Contains(model.requests[0].System, "Selected project role test-fixer") || !strings.Contains(model.requests[0].System, "change only the delegated test behavior") {
+	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") || hasTool(model.requests[0].Tools, "delegate_writers") || !strings.Contains(model.requests[0].System, "Selected project role test-fixer") || !strings.Contains(model.requests[0].System, "change only the delegated test behavior") {
 		t.Fatalf("writer child model requests = %#v", model.requests)
 	}
 	if _, err := (tools.ApplyPatch{Root: parent.Root}).Execute(context.Background(), objectArguments(t, struct {
@@ -501,6 +505,80 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	}
 	if len(manifests) != 1 || manifests[0].Status != journal.ChildCompleted || manifests[0].ParentRunID != "writer-parent-001" || manifests[0].WorktreePath == "" || manifests[0].StatePath == "" || manifests[0].TaskSHA256 == "" || manifests[0].PatchSHA256 == "" || manifests[0].PatchBytes != len(payload.Writer.Patch) || !manifests[0].PatchAvailable || !manifests[0].ReviewRequired || !manifests[0].WorktreeRetained {
 		t.Fatalf("writer manifest = %#v", manifests)
+	}
+}
+
+func TestParallelWriterDelegationUsesSeparateWorktreesAndReportsConflicts(t *testing.T) {
+	repository := featureRepository(t)
+	parent, err := worktree.Create(context.Background(), repository, "writer-batch-parent-001")
+	if err != nil {
+		t.Fatalf("create parent worktree: %v", err)
+	}
+	stateDirectory := t.TempDir()
+	now := fixedScoutClock()
+	parentJournal, parentRecord, err := journal.Open(parent.Repository, "writer-batch-parent-001", parent.Path, stateDirectory, now())
+	if err != nil {
+		t.Fatalf("open parent writer journal: %v", err)
+	}
+	t.Cleanup(func() { _ = parentJournal.Close() })
+	model := &parallelWriterModel{release: make(chan struct{})}
+	writer := newWriterTool(Executor{Model: model}, parent, Request{
+		RepositoryPath: repository,
+		Task:           "Implement independent alpha and beta changes.",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "writer-batch-parent-001",
+		ThreadID:       "writer-batch-parent-001",
+		MaxSteps:       6,
+		BaseCommit:     parent.BaseCommit,
+		StateDir:       stateDirectory,
+		Mode:           ExecuteMode,
+	}, tools.NewCommandMemory(nil), parentJournal, nil, now, nil)
+	batch := writerBatchTool{writer: writer}
+	definition := batch.Definition()
+	if !json.Valid(definition.Parameters) || definition.Name != "delegate_writers" || !strings.Contains(definition.Description, "parallel") {
+		t.Fatalf("parallel writer definition = %#v", definition)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, err := batch.Execute(ctx, json.RawMessage(`{"tasks":[{"task":"Implement the alpha writer assignment.","paths":["alpha"]},{"task":"Implement the beta writer assignment.","paths":["beta"]}]}`))
+	if err != nil {
+		t.Fatalf("delegate parallel writers: %v", err)
+	}
+	var payload struct {
+		OK        bool                    `json:"ok"`
+		Writers   []delegatedWriterReport `json:"writers"`
+		Conflicts []writerConflict        `json:"conflicts"`
+		Notice    string                  `json:"notice"`
+	}
+	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil {
+		t.Fatalf("decode parallel writer result: %v\n%s", err, result.Content)
+	}
+	if !payload.OK || len(payload.Writers) != 2 || len(payload.Conflicts) != 3 || !strings.Contains(payload.Notice, "never auto-merges") {
+		t.Fatalf("parallel writer result = %#v", payload)
+	}
+	for _, report := range payload.Writers {
+		if !report.Completed || !report.PatchAvailable || len(report.ChangedPaths) != 1 || report.ChangedPaths[0] != "shared.txt" || len(report.DeclaredPaths) != 1 || report.Error != "" {
+			t.Fatalf("parallel writer report = %#v", report)
+		}
+	}
+	if model.maxConcurrent != 2 {
+		t.Fatalf("parallel writer model maximum concurrency = %d, want 2", model.maxConcurrent)
+	}
+	manifests, err := journal.ListChildManifests(parentRecord.StatePath)
+	if err != nil {
+		t.Fatalf("list parallel writer manifests: %v", err)
+	}
+	if len(manifests) != 2 || manifests[0].WorktreePath == manifests[1].WorktreePath || manifests[0].ChangedPaths[0] != "shared.txt" || manifests[1].ChangedPaths[0] != "shared.txt" {
+		t.Fatalf("parallel writer manifests = %#v", manifests)
+	}
+	for _, conflict := range payload.Conflicts {
+		if conflict.Kind != "out_of_scope_change" && conflict.Kind != "changed_path_overlap" {
+			t.Fatalf("unexpected parallel writer conflict = %#v", conflict)
+		}
+	}
+	if _, err := batch.Execute(context.Background(), json.RawMessage(`{"tasks":[{"task":"overlap one","paths":["pkg"]},{"task":"overlap two","paths":["pkg/file.go"]}]}`)); err == nil || !strings.Contains(err.Error(), "scopes overlap") {
+		t.Fatalf("overlapping writer scope error = %v", err)
 	}
 }
 
@@ -819,6 +897,71 @@ func containsEventText(events []agent.Event, kind agent.EventKind, text string) 
 type scriptedModel struct {
 	turns    []agent.Turn
 	requests []agent.TurnRequest
+}
+
+type parallelWriterModel struct {
+	mu            sync.Mutex
+	started       int
+	inFlight      int
+	maxConcurrent int
+	release       chan struct{}
+}
+
+func (m *parallelWriterModel) Complete(ctx context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	toolResults := 0
+	for _, message := range request.Messages {
+		if message.Role == agent.RoleTool {
+			toolResults++
+		}
+	}
+	assignment := request.Messages[0].Content
+	if toolResults == 0 {
+		m.mu.Lock()
+		m.started++
+		m.inFlight++
+		if m.inFlight > m.maxConcurrent {
+			m.maxConcurrent = m.inFlight
+		}
+		if m.started == 2 {
+			close(m.release)
+		}
+		m.mu.Unlock()
+		select {
+		case <-m.release:
+		case <-ctx.Done():
+			return agent.Turn{}, ctx.Err()
+		}
+		m.mu.Lock()
+		m.inFlight--
+		m.mu.Unlock()
+		contents := "alpha writer\n"
+		if strings.Contains(assignment, "beta writer") {
+			contents = "beta writer\n"
+		}
+		patch := "diff --git a/shared.txt b/shared.txt\n" +
+			"new file mode 100644\n" +
+			"--- /dev/null\n" +
+			"+++ b/shared.txt\n" +
+			"@@ -0,0 +1 @@\n" +
+			"+" + strings.TrimSuffix(contents, "\n") + "\n"
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "patch", Name: "apply_patch", Arguments: mustJSON(map[string]string{"patch": patch})}}}, nil
+	}
+	switch toolResults {
+	case 1:
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}}, nil
+	case 2:
+		return agent.Turn{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}}, nil
+	default:
+		return agent.Turn{Text: "Implemented and inspected the writer delta."}, nil
+	}
+}
+
+func mustJSON(value any) json.RawMessage {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }
 
 type attachedTerminalModel struct {

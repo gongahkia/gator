@@ -81,6 +81,7 @@ func TestJournalSavesListsAndLoadsPrivateChildManifest(t *testing.T) {
 		Status:         ChildPreparing,
 		Repository:     "/workspace/project",
 		Role:           "test-fixer",
+		DeclaredPaths:  []string{"pkg"},
 		TaskSHA256:     strings.Repeat("a", 64),
 		StartedAt:      now,
 		UpdatedAt:      now,
@@ -97,6 +98,7 @@ func TestJournalSavesListsAndLoadsPrivateChildManifest(t *testing.T) {
 	manifest.PatchBytes = 18
 	manifest.PatchSHA256 = strings.Repeat("b", 64)
 	manifest.PatchAvailable = true
+	manifest.ChangedPaths = []string{"pkg/feature.go"}
 	manifest.FinishedAt = &finished
 	manifest.UpdatedAt = finished
 	if err := journal.SaveChildManifest(manifest); err != nil {
@@ -109,7 +111,7 @@ func TestJournalSavesListsAndLoadsPrivateChildManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load child manifest: %v", err)
 	}
-	if loaded.Status != ChildCompleted || loaded.PatchSHA256 != manifest.PatchSHA256 || loaded.PatchBytes != manifest.PatchBytes || loaded.WorktreePath != manifest.WorktreePath {
+	if loaded.Status != ChildCompleted || loaded.PatchSHA256 != manifest.PatchSHA256 || loaded.PatchBytes != manifest.PatchBytes || loaded.WorktreePath != manifest.WorktreePath || strings.Join(loaded.DeclaredPaths, ",") != "pkg" || strings.Join(loaded.ChangedPaths, ",") != "pkg/feature.go" {
 		t.Fatalf("loaded child manifest = %#v", loaded)
 	}
 	listed, err := ListChildManifests(record.StatePath)
@@ -120,6 +122,13 @@ func TestJournalSavesListsAndLoadsPrivateChildManifest(t *testing.T) {
 		t.Fatalf("listed child manifests = %#v", listed)
 	}
 	path := filepath.Join(record.StatePath, "children", manifest.ID+".json")
+	if err := os.WriteFile(path+".tmp", []byte("interrupted atomic update"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	listed, err = ListChildManifests(record.StatePath)
+	if err != nil || len(listed) != 1 || listed[0].ID != manifest.ID {
+		t.Fatalf("list child manifests with stale temporary file = %#v, %v", listed, err)
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
