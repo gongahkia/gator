@@ -10,9 +10,7 @@ import (
 )
 
 const (
-	maxAttachedTerminalBytes  = 128 * 1024
 	maxTerminalRefreshChunks  = 8
-	terminalScrollMarker      = "… earlier attached terminal output omitted …\n"
 	terminalDroppedScrollback = "… terminal scrollback dropped while this view was inactive …\n"
 )
 
@@ -25,7 +23,11 @@ type attachedTerminalView struct {
 }
 
 func (m *Model) setTerminalAttachment(attachment terminal.Attachment) {
+	if m.terminalRawInput && m.terminalAttachment != nil {
+		m.flushAttachedTerminalRawInput()
+	}
 	m.terminalAttachment = attachment
+	m.terminalRawInput = false
 	m.terminalTasks = nil
 	m.terminalIndex = 0
 	m.terminalScroll = 0
@@ -47,12 +49,15 @@ func (m *Model) openAttachedTerminal() {
 	}
 	m.terminalReturn = m.screen
 	m.screen = terminalScreen
+	m.terminalRawInput = false
 	m.terminalScroll = 0
 	m.refreshAttachedTerminal()
 	_ = m.terminalInput.Focus()
 }
 
 func (m *Model) closeAttachedTerminal() {
+	m.flushAttachedTerminalRawInput()
+	m.terminalRawInput = false
 	m.terminalInput.Blur()
 	m.screen = m.terminalReturn
 	if m.screen == composeScreen || m.screen == runningScreen {
@@ -138,6 +143,9 @@ func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "The attached terminal run has ended.", kind: noticeInfo}
 		return m, nil
 	}
+	if m.terminalRawInput {
+		return m.updateAttachedTerminalRawInput(message)
+	}
 	switch message.String() {
 	case "esc", "ctrl+t":
 		m.closeAttachedTerminal()
@@ -172,6 +180,16 @@ func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+c":
 		return m.writeAttachedTerminalInput([]byte{3}, "Interrupt sent to")
+	case "ctrl+o":
+		task, found := m.selectedTerminalTask()
+		if !found || task.Status != "running" {
+			m.notice = notice{text: "Select a running terminal task before enabling raw keyboard input.", kind: noticeError}
+			return m, nil
+		}
+		m.terminalRawInput = true
+		m.terminalInput.Blur()
+		m.notice = notice{text: "Raw terminal keyboard enabled. Ctrl+] returns to Gator controls.", kind: noticeInfo}
+		return m, nil
 	case "enter":
 		input := m.terminalInput.Value()
 		m.terminalInput.Reset()
@@ -180,6 +198,24 @@ func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var command tea.Cmd
 	m.terminalInput, command = m.terminalInput.Update(message)
 	return m, command
+}
+
+func (m Model) updateAttachedTerminalRawInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.Type == tea.KeyCtrlCloseBracket && !message.Alt {
+		m.flushAttachedTerminalRawInput()
+		m.terminalRawInput = false
+		_ = m.terminalInput.Focus()
+		if m.notice.kind != noticeError {
+			m.notice = notice{text: "Raw terminal keyboard disabled. Line input is ready.", kind: noticeInfo}
+		}
+		return m, nil
+	}
+	input, supported := attachedTerminalKeyInput(message)
+	if !supported {
+		m.notice = notice{text: "That key is not available in raw terminal input.", kind: noticeInfo}
+		return m, nil
+	}
+	return m.writeAttachedTerminalRawInput(input)
 }
 
 func (m Model) writeAttachedTerminalInput(input []byte, action string) (tea.Model, tea.Cmd) {
@@ -199,6 +235,37 @@ func (m Model) writeAttachedTerminalInput(input []byte, action string) (tea.Mode
 	m.notice = notice{text: action + " " + task.ID + " in its existing sandbox.", kind: noticeInfo}
 	m.refreshAttachedTerminal()
 	return m, waitForExecution(m.execution)
+}
+
+func (m Model) writeAttachedTerminalRawInput(input []byte) (tea.Model, tea.Cmd) {
+	task, found := m.selectedTerminalTask()
+	if !found {
+		m.notice = notice{text: "No attached terminal task is selected.", kind: noticeError}
+		return m, nil
+	}
+	if task.Status != "running" {
+		m.notice = notice{text: "Terminal task " + task.ID + " has already exited.", kind: noticeError}
+		return m, nil
+	}
+	if _, err := m.terminalAttachment.WriteDeveloperRaw(task.ID, input); err != nil {
+		m.notice = notice{text: "Write terminal task: " + err.Error(), kind: noticeError}
+		return m, nil
+	}
+	m.refreshAttachedTerminal()
+	return m, nil
+}
+
+func (m *Model) flushAttachedTerminalRawInput() {
+	if !m.terminalRawInput || m.terminalAttachment == nil {
+		return
+	}
+	task, found := m.selectedTerminalTask()
+	if !found {
+		return
+	}
+	if _, err := m.terminalAttachment.FlushDeveloperInput(task.ID); err != nil {
+		m.notice = notice{text: "Record raw terminal input: " + err.Error(), kind: noticeError}
+	}
 }
 
 func (m Model) currentAttachedTerminalOutput() string {
@@ -245,7 +312,6 @@ func (m Model) attachedTerminalView() string {
 		}, "\n")
 	}
 	task, _ := m.selectedTerminalTask()
-	view := m.terminalViews[task.ID]
 	tasks := make([]string, 0, len(m.terminalTasks))
 	for index, candidate := range m.terminalTasks {
 		prefix := "  "
@@ -266,13 +332,19 @@ func (m Model) attachedTerminalView() string {
 	if m.terminalErr != nil {
 		output = errorStyle.Render("Terminal read error: " + m.terminalErr.Error())
 	}
+	input := m.terminalInput.View()
+	footer := m.footer("enter send line", "ctrl+o raw keyboard", "ctrl+c interrupt task", "ctrl+x stop task", "tab switch task", "pgup/pgdn scroll", "esc/ctrl+t return", "f1 shortcuts")
+	if m.terminalRawInput {
+		input = dimStyle.Render("Raw keyboard is active; keys go directly to the task. Ctrl+] returns to Gator controls.")
+		footer = m.footer("ctrl+] controls", "keys send to task", "raw input stays sandboxed", "f1 sends F1 to task")
+	}
 	sections := []string{
 		m.header("attached terminal · " + task.ID),
 		labelStyle.Render("Tasks") + "\n" + m.panel(strings.Join(tasks, "\n")),
 		labelStyle.Render("Output") + "\n" + m.panel(output),
-		labelStyle.Render("Input") + "\n" + m.terminalInput.View(),
+		labelStyle.Render("Input") + "\n" + input,
 		m.noticeView(),
-		m.footer("enter send line", "ctrl+c interrupt task", "ctrl+x stop task", "tab switch task", "pgup/pgdn scroll", "esc/ctrl+t return", "f1 shortcuts"),
+		footer,
 	}
 	return strings.Join(sections, "\n")
 }

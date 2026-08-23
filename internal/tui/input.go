@@ -20,7 +20,7 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.toggleDrawer()
 		return m, nil
 	}
-	if message.String() == "f1" {
+	if message.String() == "f1" && !(m.screen == terminalScreen && m.terminalRawInput) {
 		if m.screen == helpScreen {
 			m.screen = m.helpReturn
 		} else {

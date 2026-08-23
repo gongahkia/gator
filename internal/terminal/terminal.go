@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"os"
 	"os/exec"
 	"strings"
@@ -76,6 +77,8 @@ type Attachment interface {
 	Read(string, int64) (ReadResult, error)
 	Resize(string, int, int) (Task, error)
 	WriteDeveloper(string, []byte) (Task, error)
+	WriteDeveloperRaw(string, []byte) (Task, error)
+	FlushDeveloperInput(string) (Task, error)
 	Stop(string) (Task, error)
 }
 
@@ -111,6 +114,20 @@ func (a attachment) WriteDeveloper(id string, input []byte) (Task, error) {
 	return a.manager.WriteDeveloper(id, input)
 }
 
+func (a attachment) WriteDeveloperRaw(id string, input []byte) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.WriteDeveloperRaw(id, input)
+}
+
+func (a attachment) FlushDeveloperInput(id string) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.FlushDeveloperInput(id)
+}
+
 func (a attachment) Stop(id string) (Task, error) {
 	if a.manager == nil {
 		return Task{}, errors.New("terminal attachment is unavailable")
@@ -129,6 +146,7 @@ func (m *Manager) Attachment() Attachment {
 type DeveloperInput struct {
 	Bytes  int    `json:"bytes"`
 	SHA256 string `json:"sha256"`
+	Raw    bool   `json:"raw,omitempty"`
 }
 
 // Task describes bounded, non-sensitive terminal state. Output is retrieved
@@ -177,6 +195,8 @@ type task struct {
 	columns  int
 	output   terminalBuffer
 	inputMu  sync.Mutex
+	rawBytes int
+	rawHash  hash.Hash
 }
 
 // New creates an empty task manager. Invalid or missing values use intentionally
@@ -333,17 +353,47 @@ func (m *Manager) Read(id string, cursor int64) (ReadResult, error) {
 // Write sends bounded input to a still-running pseudo-terminal. Authorization
 // belongs to the tool layer; this manager only owns the process resource.
 func (m *Manager) Write(id string, input []byte) (Task, error) {
-	return m.write(id, input, false)
+	return m.write(id, input, developerInputTool)
 }
 
 // WriteDeveloper sends direct developer input to an existing attached task.
 // It follows the task's already-fixed sandbox but does not reuse the agent's
 // command approval because a developer performed the input action locally.
 func (m *Manager) WriteDeveloper(id string, input []byte) (Task, error) {
-	return m.write(id, input, true)
+	return m.write(id, input, developerInputLine)
 }
 
-func (m *Manager) write(id string, input []byte, developer bool) (Task, error) {
+// WriteDeveloperRaw sends direct keystrokes from an attached developer. Their
+// audit metadata is accumulated and emitted only when FlushDeveloperInput is
+// called or the task exits, so an interactive session cannot flood the run
+// journal with one event per key.
+func (m *Manager) WriteDeveloperRaw(id string, input []byte) (Task, error) {
+	return m.write(id, input, developerInputRaw)
+}
+
+// FlushDeveloperInput emits the bounded metadata for raw developer input
+// written since the previous flush. It never retains or exposes those bytes.
+func (m *Manager) FlushDeveloperInput(id string) (Task, error) {
+	running, err := m.lookup(id)
+	if err != nil {
+		return Task{}, err
+	}
+	snapshot, input, found := running.flushRawInput()
+	if found && m.onDeveloperInput != nil {
+		m.onDeveloperInput(snapshot, input)
+	}
+	return snapshot, nil
+}
+
+type developerInputMode uint8
+
+const (
+	developerInputTool developerInputMode = iota
+	developerInputLine
+	developerInputRaw
+)
+
+func (m *Manager) write(id string, input []byte, mode developerInputMode) (Task, error) {
 	if len(input) == 0 {
 		return Task{}, errors.New("terminal input is required")
 	}
@@ -363,12 +413,19 @@ func (m *Manager) write(id string, input []byte, developer bool) (Task, error) {
 	running.mu.Unlock()
 	running.inputMu.Lock()
 	_, err = file.Write(input)
+	if err == nil && mode == developerInputRaw {
+		if running.rawHash == nil {
+			running.rawHash = sha256.New()
+		}
+		_, _ = running.rawHash.Write(input)
+		running.rawBytes += len(input)
+	}
 	running.inputMu.Unlock()
 	if err != nil {
 		return Task{}, fmt.Errorf("write terminal task %q: %w", id, err)
 	}
 	snapshot := running.snapshot()
-	if developer && m.onDeveloperInput != nil {
+	if mode == developerInputLine && m.onDeveloperInput != nil {
 		digest := sha256.Sum256(input)
 		m.onDeveloperInput(snapshot, DeveloperInput{Bytes: len(input), SHA256: hex.EncodeToString(digest[:])})
 	}
@@ -494,10 +551,31 @@ func (t *task) wait(taskContext context.Context) {
 	}
 	snapshot := t.snapshotLocked()
 	t.mu.Unlock()
+	_, input, foundInput := t.flushRawInput()
+	if foundInput && t.manager.onDeveloperInput != nil {
+		t.manager.onDeveloperInput(snapshot, input)
+	}
 	if t.manager.onExit != nil {
 		t.manager.onExit(snapshot)
 	}
 	close(t.done)
+}
+
+func (t *task) flushRawInput() (Task, DeveloperInput, bool) {
+	t.inputMu.Lock()
+	if t.rawBytes == 0 || t.rawHash == nil {
+		t.inputMu.Unlock()
+		return t.snapshot(), DeveloperInput{}, false
+	}
+	input := DeveloperInput{
+		Bytes:  t.rawBytes,
+		SHA256: hex.EncodeToString(t.rawHash.Sum(nil)),
+		Raw:    true,
+	}
+	t.rawBytes = 0
+	t.rawHash = nil
+	t.inputMu.Unlock()
+	return t.snapshot(), input, true
 }
 
 func (t *task) snapshot() Task {
