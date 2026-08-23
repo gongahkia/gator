@@ -506,6 +506,9 @@ func (m *Manager) Stop(id string) (Task, error) {
 // their fixed worktree, sandbox, network policy, and bounded output; they do
 // not survive a Gator process exit or a terminal-client restart.
 func (m *Manager) Detach(id string) (Task, error) {
+	if m.registry == nil {
+		return Task{}, errors.New("terminal task cannot detach without an interactive session registry")
+	}
 	running, err := m.lookup(id)
 	if err != nil {
 		return Task{}, err
@@ -520,7 +523,12 @@ func (m *Manager) Detach(id string) (Task, error) {
 		running.mu.Unlock()
 		return snapshot, nil
 	}
+	if err := m.registry.reserveDetached(running); err != nil {
+		running.mu.Unlock()
+		return Task{}, err
+	}
 	if running.limitTimer == nil || !running.limitTimer.Stop() {
+		m.registry.releaseDetached(running)
 		running.mu.Unlock()
 		return Task{}, fmt.Errorf("terminal task %q reached its lifetime limit before it could detach", id)
 	}
@@ -695,6 +703,9 @@ func (t *task) wait(taskContext context.Context) {
 		t.manager.onDeveloperInput(snapshot, input)
 	} else if foundInput && snapshot.Background && t.manager.onBackgroundInput != nil {
 		t.manager.onBackgroundInput(snapshot, input)
+	}
+	if snapshot.Background {
+		t.manager.registry.releaseDetached(t)
 	}
 	if snapshot.Background && t.manager.onBackgroundExit != nil {
 		t.manager.onBackgroundExit(snapshot)

@@ -219,6 +219,69 @@ func TestTerminalToolsRequireApprovalAndRedactInputFromEvents(t *testing.T) {
 	t.Fatal("terminal task did not exit after approved input")
 }
 
+func TestTerminalDetachRequiresInteractiveCapabilityAndSeparateApproval(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root := testWorkspace(t)
+	registry := terminal.NewRegistry()
+	defer registry.Close()
+	manager := terminal.New(terminal.Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}, Registry: registry})
+	if hasToolDefinition(TerminalTools(manager, CommandPolicy{Approve: allowOnce}), "terminal_detach") {
+		t.Fatal("noninteractive terminal tools exposed terminal_detach")
+	}
+	var approvals [][]string
+	surface := TerminalTools(manager, CommandPolicy{Approve: func(_ context.Context, argv []string) (CommandDecision, error) {
+		approvals = append(approvals, append([]string(nil), argv...))
+		return CommandAllowOnce, nil
+	}}, TerminalToolOptions{AllowDetach: true})
+	start := surface[0]
+	result := executeTool(t, start, `{"argv":["`+sh+`","-lc","sleep 30"]}`)
+	var started struct {
+		Result terminal.Task `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(result), &started); err != nil || started.Result.ID == "" {
+		t.Fatalf("terminal start result = %q, %v", result, err)
+	}
+	var detach agent.Tool
+	for _, tool := range surface {
+		if tool.Definition().Name == "terminal_detach" {
+			detach = tool
+			break
+		}
+	}
+	if detach == nil {
+		t.Fatal("interactive terminal tools omitted terminal_detach")
+	}
+	detachedResult := executeTool(t, detach, `{"id":"`+started.Result.ID+`"}`)
+	var detached struct {
+		Result terminal.Task `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(detachedResult), &detached); err != nil || !detached.Result.Background {
+		t.Fatalf("terminal detach result = %q, %v", detachedResult, err)
+	}
+	if len(approvals) != 2 || approvals[1][0] != "terminal_detach" || approvals[1][1] != started.Result.ID {
+		t.Fatalf("detach approvals = %#v", approvals)
+	}
+	manager.Close()
+	if tasks := registry.Attachment().List(); len(tasks) != 1 || tasks[0].Status != "running" || !tasks[0].Background {
+		t.Fatalf("detached task did not outlive manager close: %#v", tasks)
+	}
+}
+
+func hasToolDefinition(surface []agent.Tool, name string) bool {
+	for _, tool := range surface {
+		if tool.Definition().Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func allowOnce(context.Context, []string) (CommandDecision, error) {
 	return CommandAllowOnce, nil
 }
