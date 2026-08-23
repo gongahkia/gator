@@ -494,10 +494,12 @@ than the input bytes. Terminal tasks are stopped when the agent run ends. This
 is an agent-mediated task manager, not an arbitrary host shell. While a native
 TUI run is active, `Ctrl+T` opens a line-oriented attachment to an existing
 model-started task: developers can view bounded output, switch tasks, send a
-line or interrupt, and stop that task. Direct input stays inside the task's
-existing sandbox and is journaled only as byte count plus SHA-256 digest. This
-is intentionally not a VT terminal emulator, a background task that survives
-the run, or an ACP/client terminal multiplexer.
+line or interrupt, and stop that task. The attachment resizes the underlying
+PTY to its viewport and renders common cursor and erase controls, so progress
+and simple terminal dashboards do not accumulate stale lines. Direct input
+stays inside the task's existing sandbox and is journaled only as byte count
+plus SHA-256 digest. This is intentionally not a full VT terminal emulator, a
+background task that survives the run, or an ACP/client terminal multiplexer.
 
 When the developer explicitly grants `--network allow` (or `gator config set
 network allow`), Execute mode additionally exposes `http_fetch` for bounded

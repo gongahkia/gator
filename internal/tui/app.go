@@ -315,6 +315,7 @@ type Model struct {
 	terminalViews       map[string]attachedTerminalView
 	terminalIndex       int
 	terminalScroll      int
+	terminalRawInput    bool
 	terminalErr         error
 	terminalReturn      screen
 
@@ -488,6 +489,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.resizeInputs()
 		m.syncTranscript(m.followTranscript)
+		if m.screen == terminalScreen {
+			m.refreshAttachedTerminal()
+		}
 	case commandApprovalMsg:
 		m.pendingApproval = &pendingCommandApproval{argv: append([]string(nil), msg.argv...), reply: msg.reply}
 		m.notice = notice{text: "Approve worktree command: " + strings.Join(msg.argv, " "), kind: noticeInfo}

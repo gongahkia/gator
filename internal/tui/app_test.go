@@ -239,7 +239,7 @@ func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) 
 	}
 	manager := terminal.New(terminal.Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}})
 	defer manager.Close()
-	if _, err := manager.Start(context.Background(), []string{sh, "-lc", "printf '\\033[31mready\\033[0m\\n'; IFS= read line; printf 'received:%s\\n' \"$line\""}); err != nil {
+	if _, err := manager.Start(context.Background(), []string{sh, "-lc", "printf 'phase 1\\r\\033[2Kphase complete\\n'; printf '\\033[31mready\\033[0m\\n'; IFS= read line; printf 'received:%s\\n' \"$line\""}); err != nil {
 		t.Fatalf("start terminal task: %v", err)
 	}
 	model := New(Config{})
@@ -252,6 +252,9 @@ func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) 
 	if attached.screen != terminalScreen || !strings.Contains(attached.View(), "attached terminal") {
 		t.Fatalf("attached terminal view = %s", attached.View())
 	}
+	if len(attached.terminalTasks) != 1 || attached.terminalTasks[0].Rows == 24 || attached.terminalTasks[0].Columns == 80 {
+		t.Fatalf("attached terminal did not resize its PTY viewport: %#v", attached.terminalTasks)
+	}
 	attached.terminalInput.SetValue("Ada")
 	next, _ = attached.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	attached = next.(Model)
@@ -263,9 +266,9 @@ func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) 
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	view := attached.View()
-	if !strings.Contains(view, "ready") || !strings.Contains(view, "received:Ada") || strings.Contains(view, "\x1b[31m") {
-		t.Fatalf("attached terminal output = %q", view)
+	output := attached.currentAttachedTerminalOutput()
+	if !strings.Contains(output, "phase complete") || strings.Contains(output, "phase 1") || !strings.Contains(output, "ready") || !strings.Contains(output, "received:Ada") || strings.Contains(output, "\x1b[31m") {
+		t.Fatalf("attached terminal output = %q", output)
 	}
 	if !strings.Contains(attached.notice.text, "existing sandbox") {
 		t.Fatalf("developer terminal write notice = %#v", attached.notice)

@@ -193,11 +193,12 @@ bounded in-memory scrollback and are cancelled at run completion. A model must
 request a separate approval for each distinct terminal input; approval events
 contain an ID, size, and SHA-256 digest rather than the input bytes. During a
 native TUI run, `Ctrl+T` can attach a developer to an existing task: it renders
-bounded, ANSI-stripped line output, allows a line write, ETX interrupt, or task
-stop, and emits only byte-count/digest metadata for direct input. The attachment
-does not create commands, broaden the fixed task sandbox, persist task output,
-or survive a completed agent run. It is a line-oriented attachment rather than
-a VT emulator or an ACP/client terminal multiplexer.
+bounded display output, resizes the existing PTY to its viewport, interprets
+common cursor/erase controls, allows a line write, ETX interrupt, or task stop,
+and emits only byte-count/digest metadata for direct input. The attachment does
+not create commands, broaden the fixed task sandbox, persist task output, or
+survive a completed agent run. It remains a line-oriented attachment rather
+than a full VT emulator or an ACP/client terminal multiplexer.
 
 `http_fetch` accepts port-443 HTTPS URLs only. Before a request, Gator resolves
 the hostname, rejects local/private/reserved results, and pins the approved
