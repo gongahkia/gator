@@ -546,15 +546,16 @@ func TestParallelWriterDelegationUsesSeparateWorktreesAndReportsConflicts(t *tes
 		t.Fatalf("delegate parallel writers: %v", err)
 	}
 	var payload struct {
-		OK        bool                    `json:"ok"`
-		Writers   []delegatedWriterReport `json:"writers"`
-		Conflicts []writerConflict        `json:"conflicts"`
-		Notice    string                  `json:"notice"`
+		OK        bool                       `json:"ok"`
+		Batch     journal.ChildBatchManifest `json:"batch"`
+		Writers   []delegatedWriterReport    `json:"writers"`
+		Conflicts []writerConflict           `json:"conflicts"`
+		Notice    string                     `json:"notice"`
 	}
 	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil {
 		t.Fatalf("decode parallel writer result: %v\n%s", err, result.Content)
 	}
-	if !payload.OK || len(payload.Writers) != 2 || len(payload.Conflicts) != 3 || !strings.Contains(payload.Notice, "never auto-merges") {
+	if !payload.OK || payload.Batch.ID == "" || payload.Batch.Status != journal.ChildBatchCompleted || len(payload.Writers) != 2 || len(payload.Conflicts) != 3 || !strings.Contains(payload.Notice, "never auto-merges") {
 		t.Fatalf("parallel writer result = %#v", payload)
 	}
 	for _, report := range payload.Writers {
@@ -569,8 +570,12 @@ func TestParallelWriterDelegationUsesSeparateWorktreesAndReportsConflicts(t *tes
 	if err != nil {
 		t.Fatalf("list parallel writer manifests: %v", err)
 	}
-	if len(manifests) != 2 || manifests[0].WorktreePath == manifests[1].WorktreePath || manifests[0].ChangedPaths[0] != "shared.txt" || manifests[1].ChangedPaths[0] != "shared.txt" {
+	if len(manifests) != 2 || manifests[0].WorktreePath == manifests[1].WorktreePath || manifests[0].ChangedPaths[0] != "shared.txt" || manifests[1].ChangedPaths[0] != "shared.txt" || manifests[0].BatchID != payload.Batch.ID || manifests[1].BatchID != payload.Batch.ID {
 		t.Fatalf("parallel writer manifests = %#v", manifests)
+	}
+	batches, err := journal.ListChildBatchManifests(parentRecord.StatePath)
+	if err != nil || len(batches) != 1 || batches[0].ID != payload.Batch.ID || len(batches[0].Conflicts) != len(payload.Conflicts) {
+		t.Fatalf("parallel writer batch manifests = %#v, %v", batches, err)
 	}
 	for _, conflict := range payload.Conflicts {
 		if conflict.Kind != "out_of_scope_change" && conflict.Kind != "changed_path_overlap" {

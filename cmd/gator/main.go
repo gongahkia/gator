@@ -30,7 +30,7 @@ Usage:
   gator config set sandbox strict|off
   gator config set network deny|allow
   gator agent list
-  gator child list|show RUN_RECORD_PATH [CHILD_RUN_ID]
+  gator child list|show|batches|batch RUN_RECORD_PATH [CHILD_RUN_ID|BATCH_ID]
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
