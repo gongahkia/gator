@@ -302,7 +302,8 @@ func (s *Server) submit(message protocol.Request) error {
 	if !ready {
 		return errors.New("app server is not ready")
 	}
-	if err := s.hub.reserve(message.ID); err != nil {
+	awaitsFinal := message.Method == protocol.MethodRun || message.Method == protocol.MethodResume
+	if err := s.hub.reserve(message.ID, awaitsFinal); err != nil {
 		return err
 	}
 	payload, err := json.Marshal(message)
@@ -451,6 +452,7 @@ type messageStream struct {
 	subscribers  map[uint64]*subscription
 	nextSub      uint64
 	terminal     bool
+	awaitsFinal  bool
 	lastActivity time.Time
 }
 
@@ -473,7 +475,7 @@ func (h *messageHub) Write(value []byte) (int, error) {
 	return len(value), nil
 }
 
-func (h *messageHub) reserve(id string) error {
+func (h *messageHub) reserve(id string, awaitsFinal bool) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.pruneLocked(h.now())
@@ -483,7 +485,7 @@ func (h *messageHub) reserve(id string) error {
 	if len(h.streams) >= h.maxStreams {
 		return errStreamCapacity
 	}
-	h.streams[id] = &messageStream{subscribers: make(map[uint64]*subscription), lastActivity: h.now()}
+	h.streams[id] = &messageStream{subscribers: make(map[uint64]*subscription), awaitsFinal: awaitsFinal, lastActivity: h.now()}
 	return nil
 }
 
@@ -511,7 +513,7 @@ func (h *messageHub) publish(message protocol.Message) {
 			close(subscriber.dropped)
 		}
 	}
-	if terminalMessage(message) {
+	if terminalMessage(message, stream.awaitsFinal) {
 		stream.terminal = true
 	}
 }
@@ -556,14 +558,18 @@ func (h *messageHub) pruneLocked(now time.Time) {
 	}
 }
 
-func terminalMessage(message protocol.Message) bool {
+func terminalMessage(message protocol.Message, awaitsFinal bool) bool {
 	if message.Type == "error" {
 		return true
 	}
 	if message.Type != "response" {
 		return false
 	}
-	if result, ok := message.Result.(map[string]any); ok {
+	if awaitsFinal {
+		result, ok := message.Result.(map[string]any)
+		if !ok {
+			return true
+		}
 		if accepted, found := result["accepted"].(bool); found && accepted {
 			return false
 		}

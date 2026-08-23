@@ -137,6 +137,18 @@ func (m Model) selectedTerminalTask() (terminal.Task, bool) {
 	return m.terminalTasks[m.terminalIndex], true
 }
 
+func (m Model) hasBackgroundTerminalTask() bool {
+	if m.terminalAttachment == nil {
+		return false
+	}
+	for _, task := range m.terminalAttachment.List() {
+		if task.Background && task.Status == "running" {
+			return true
+		}
+	}
+	return false
+}
+
 func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.terminalAttachment == nil {
 		m.closeAttachedTerminal()
@@ -321,6 +333,9 @@ func (m Model) attachedTerminalView() string {
 		status := candidate.Status
 		if candidate.ExitCode != nil {
 			status += " · exit " + strconv.Itoa(*candidate.ExitCode)
+		}
+		if candidate.Background {
+			status += " · background"
 		}
 		command := displayTerminalOutput(strings.Join(candidate.Argv, " "))
 		tasks = append(tasks, prefix+keyStyle.Render(candidate.ID)+" "+dimStyle.Render(compact(status+" · "+command, max(16, m.panelTextWidth()-14))))

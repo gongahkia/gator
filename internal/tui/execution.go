@@ -129,20 +129,21 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	}
 
 	request := gatorrun.Request{
-		RepositoryPath:  m.config.RepositoryPath,
-		Task:            taskWithContextReferences(task, references),
-		Provider:        providerName,
-		Model:           modelName,
-		BaseURL:         m.config.BaseURL,
-		MaxSteps:        m.config.MaxSteps,
-		Verification:    verification,
-		Scopes:          contextReferencePaths(references),
-		StateDir:        m.config.StateDir,
-		ThreadID:        m.threadID,
-		Images:          images,
-		Attachments:     attachments,
-		Mode:            m.runMode,
-		ForceCompaction: m.forceCompaction,
+		RepositoryPath:   m.config.RepositoryPath,
+		Task:             taskWithContextReferences(task, references),
+		Provider:         providerName,
+		Model:            modelName,
+		BaseURL:          m.config.BaseURL,
+		MaxSteps:         m.config.MaxSteps,
+		Verification:     verification,
+		Scopes:           contextReferencePaths(references),
+		StateDir:         m.config.StateDir,
+		ThreadID:         m.threadID,
+		Images:           images,
+		Attachments:      attachments,
+		Mode:             m.runMode,
+		ForceCompaction:  m.forceCompaction,
+		TerminalRegistry: m.terminalRegistry,
 		OnEvent: func(event agent.Event) {
 			select {
 			case stream.events <- event:

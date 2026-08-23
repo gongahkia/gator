@@ -61,6 +61,11 @@ type Request struct {
 	// tasks while the run is alive. It cannot create a task or alter the fixed
 	// sandbox policy.
 	OnTerminalAttachment func(terminal.Attachment)
+	// TerminalRegistry is supplied only by the native interactive client. It
+	// owns explicitly detached background tasks until that Gator process exits.
+	// Noninteractive runs deliberately leave it nil, so they cannot orphan a
+	// PTY after their caller exits.
+	TerminalRegistry *terminal.Registry
 	// DisableWriterDelegation is an internal recursion guard for a child writer
 	// run. It is not a developer-facing capability: only the primary native
 	// agent may create a writer worktree.

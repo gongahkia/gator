@@ -145,9 +145,27 @@ func TestServerRejectsMalformedRequestAndUnknownStream(t *testing.T) {
 	}
 }
 
+func TestServerRejectsDuplicateRequestIDs(t *testing.T) {
+	bridge := testServer(t, &scriptedModel{})
+	web := httptest.NewServer(bridge.Handler())
+	defer web.Close()
+
+	request := protocol.Request{Version: protocol.Version, ID: "status-1", Method: protocol.MethodStatus}
+	first := postRPC(t, web.URL, request)
+	first.Body.Close()
+	if first.StatusCode != http.StatusAccepted {
+		t.Fatalf("first request status = %d", first.StatusCode)
+	}
+	second := postRPC(t, web.URL, request)
+	second.Body.Close()
+	if second.StatusCode != http.StatusConflict {
+		t.Fatalf("duplicate request status = %d", second.StatusCode)
+	}
+}
+
 func TestMessageHubReplaysInOrderAndDropsSlowSubscriber(t *testing.T) {
 	hub := newMessageHub(2, 2, 1)
-	if err := hub.reserve("run-1"); err != nil {
+	if err := hub.reserve("run-1", true); err != nil {
 		t.Fatalf("reserve stream: %v", err)
 	}
 	hub.publish(protocol.Message{ID: "run-1", Type: "event"})
@@ -169,10 +187,10 @@ func TestMessageHubReplaysInOrderAndDropsSlowSubscriber(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("slow subscriber was not dropped")
 	}
-	if err := hub.reserve("run-2"); err != nil {
+	if err := hub.reserve("run-2", false); err != nil {
 		t.Fatalf("reserve second stream: %v", err)
 	}
-	if err := hub.reserve("run-3"); !errors.Is(err, errStreamCapacity) {
+	if err := hub.reserve("run-3", false); !errors.Is(err, errStreamCapacity) {
 		t.Fatalf("stream capacity error = %v", err)
 	}
 }
@@ -180,12 +198,12 @@ func TestMessageHubReplaysInOrderAndDropsSlowSubscriber(t *testing.T) {
 func TestMessageHubReclaimsInactiveTerminalStreams(t *testing.T) {
 	now := time.Date(2026, time.August, 23, 0, 0, 0, 0, time.UTC)
 	hub := newMessageHubWithClock(1, 2, 1, time.Minute, func() time.Time { return now })
-	if err := hub.reserve("complete-1"); err != nil {
+	if err := hub.reserve("complete-1", false); err != nil {
 		t.Fatalf("reserve completed stream: %v", err)
 	}
 	hub.publish(protocol.Message{ID: "complete-1", Type: "response", Result: map[string]any{"ok": true}})
 	now = now.Add(time.Minute)
-	if err := hub.reserve("next-1"); err != nil {
+	if err := hub.reserve("next-1", false); err != nil {
 		t.Fatalf("reserve stream after expiry: %v", err)
 	}
 	if _, _, found := hub.subscribe("complete-1", 0); found {
@@ -194,15 +212,20 @@ func TestMessageHubReclaimsInactiveTerminalStreams(t *testing.T) {
 }
 
 func TestTerminalMessageKeepsAcceptedRunsOpen(t *testing.T) {
-	if terminalMessage(protocol.Message{Type: "response", Result: map[string]any{"accepted": true}}) {
+	accepted := protocol.Message{Type: "response", Result: map[string]any{"accepted": true}}
+	if terminalMessage(accepted, true) {
 		t.Fatal("accepted run was terminal")
 	}
-	if !terminalMessage(protocol.Message{Type: "response", Result: map[string]any{"run_id": "run-1"}}) {
+	if !terminalMessage(accepted, false) {
+		t.Fatal("accepted command response was not terminal")
+	}
+	if !terminalMessage(protocol.Message{Type: "response", Result: map[string]any{"run_id": "run-1"}}, true) {
 		t.Fatal("completed response was not terminal")
 	}
-	if !terminalMessage(protocol.Message{Type: "error"}) {
+	if !terminalMessage(protocol.Message{Type: "error"}, true) {
 		t.Fatal("error was not terminal")
 	}
+}
 
 func testServer(t *testing.T, model agent.Model) *Server {
 	t.Helper()

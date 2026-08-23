@@ -136,8 +136,11 @@ func interactiveWithOptions(options interactiveOptions) error {
 		SetTheme: saveTheme,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
-	_, err = program.Run()
-	return err
+	final, runErr := program.Run()
+	if model, ok := final.(tui.Model); ok {
+		model.Close()
+	}
+	return runErr
 }
 
 const delegateOutputLimit = 6 * 1024

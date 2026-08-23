@@ -143,11 +143,16 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	runTools := tools.Default(isolated.Root, commandPolicy)
 	terminalManager := terminal.New(terminal.Config{
-		Root:   isolated.Root,
-		Policy: executionPolicy,
-		Now:    e.Now,
+		Root:     isolated.Root,
+		Policy:   executionPolicy,
+		IDPrefix: "term-" + request.RunID,
+		Now:      e.Now,
+		Registry: request.TerminalRegistry,
 		OnExit: func(task terminal.Task) {
 			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: terminalStatusText(task)})
+		},
+		OnDetached: func(task terminal.Task) {
+			emit(agent.Event{Kind: agent.EventTerminal, At: e.now(), Text: task.ID + " detached to this Gator session; it keeps its fixed sandbox and stops when the session exits or its background limit is reached"})
 		},
 		OnDeveloperInput: func(task terminal.Task, input terminal.DeveloperInput) {
 			digest := input.SHA256
@@ -162,8 +167,14 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		},
 	})
 	if request.OnTerminalAttachment != nil {
-		request.OnTerminalAttachment(terminalManager.Attachment())
-		defer request.OnTerminalAttachment(nil)
+		attachment := terminalManager.Attachment()
+		if request.TerminalRegistry != nil {
+			attachment = request.TerminalRegistry.Attachment()
+		}
+		request.OnTerminalAttachment(attachment)
+		if request.TerminalRegistry == nil {
+			defer request.OnTerminalAttachment(nil)
+		}
 	}
 	defer terminalManager.Close()
 	roleSet, err := instructions.LoadRoles(isolated.Repository)
@@ -249,7 +260,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			}
 			return nil
 		})...)
-		runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy)...)
+		runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy, tools.TerminalToolOptions{AllowDetach: request.TerminalRegistry != nil})...)
 		runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
 		runTools = append(runTools, readonlyScout)
 		if !request.DisableWriterDelegation {
