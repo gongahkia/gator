@@ -30,6 +30,7 @@ Usage:
   gator config set sandbox strict|off
   gator config set network deny|allow
   gator agent list
+  gator child list|show RUN_RECORD_PATH [CHILD_RUN_ID]
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
@@ -61,6 +62,7 @@ Commands:
   delegate  run an installed vendor or external agent in an isolated worktree
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
   agent     list project-defined, capability-bounded delegation roles
+	 child     inspect durable manifests for retained isolated writer children
   lsp       trust and inspect local Language Server Protocol diagnostics
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
@@ -112,6 +114,8 @@ func run(args []string, out io.Writer) error {
 		return configure(args[1:], out)
 	case "agent":
 		return agentCommand(args[1:], out)
+	case "child":
+		return childCommand(args[1:], out)
 	case "update":
 		return update(args[1:], out)
 	case "rpc":

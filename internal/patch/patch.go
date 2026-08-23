@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/workspace"
@@ -64,6 +65,58 @@ func Export(ctx context.Context, sourcePath, baseCommit string) ([]byte, error) 
 		return nil, fmt.Errorf("review patch exceeds the %d MiB export limit", maxPatchBytes/(1024*1024))
 	}
 	return patch, nil
+}
+
+// Paths returns every repository-relative file touched by a retained
+// worktree's patch. It reports both sides of a rename by disabling rename
+// detection, which is intentionally conservative for orchestration conflict
+// checks. The result includes untracked regular files and excludes Gator's own
+// metadata directory.
+func Paths(ctx context.Context, sourcePath, baseCommit string) ([]string, error) {
+	source, err := workspace.Open(sourcePath)
+	if err != nil {
+		return nil, fmt.Errorf("open source worktree: %w", err)
+	}
+	base := "HEAD"
+	if strings.TrimSpace(baseCommit) != "" {
+		base = baseCommit
+	}
+	tracked, err := gitOutput(ctx, source.Path(), "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base)
+	if err != nil {
+		return nil, err
+	}
+	paths := make(map[string]struct{})
+	for _, value := range bytes.Split(tracked, []byte{0}) {
+		if len(value) == 0 {
+			continue
+		}
+		path, err := patchPath(string(value))
+		if err != nil {
+			return nil, err
+		}
+		if path != "" {
+			paths[path] = struct{}{}
+		}
+	}
+	untracked, err := untrackedFiles(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range untracked {
+		path, err := patchPath(value)
+		if err != nil {
+			return nil, err
+		}
+		if path != "" {
+			paths[path] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(paths))
+	for path := range paths {
+		result = append(result, path)
+	}
+	sort.Strings(result)
+	return result, nil
 }
 
 // Check verifies that a patch can transfer to a clean target checkout without
@@ -173,6 +226,20 @@ func untrackedFiles(ctx context.Context, root workspace.Root) ([]string, error) 
 		files = append(files, relative)
 	}
 	return files, nil
+}
+
+func patchPath(value string) (string, error) {
+	if strings.ContainsRune(value, 0) {
+		return "", errors.New("patch path contains NUL")
+	}
+	clean := filepath.ToSlash(filepath.Clean(value))
+	if clean == ".gator" || strings.HasPrefix(clean, ".gator/") {
+		return "", nil
+	}
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") {
+		return "", fmt.Errorf("patch contains unsafe repository-relative path %q", value)
+	}
+	return clean, nil
 }
 
 func gitDiffNoIndex(ctx context.Context, directory, relative string) ([]byte, int, error) {

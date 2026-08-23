@@ -67,6 +67,97 @@ func TestJournalRejectsUnsafeRunID(t *testing.T) {
 	}
 }
 
+func TestJournalSavesListsAndLoadsPrivateChildManifest(t *testing.T) {
+	now := time.Date(2026, 8, 23, 12, 0, 0, 0, time.UTC)
+	journal, record, err := Open("/workspace/project", "run-parent-001", "/runs/run-parent-001", t.TempDir(), now)
+	if err != nil {
+		t.Fatalf("open journal: %v", err)
+	}
+	manifest := ChildManifest{
+		Version:        1,
+		ID:             "run-child-001",
+		ParentRunID:    "run-parent-001",
+		Kind:           "writer",
+		Status:         ChildPreparing,
+		Repository:     "/workspace/project",
+		Role:           "test-fixer",
+		TaskSHA256:     strings.Repeat("a", 64),
+		StartedAt:      now,
+		UpdatedAt:      now,
+		ReviewRequired: true,
+	}
+	if err := journal.SaveChildManifest(manifest); err != nil {
+		t.Fatalf("save preparing child manifest: %v", err)
+	}
+	finished := now.Add(time.Minute)
+	manifest.Status = ChildCompleted
+	manifest.WorktreePath = "/runs/run-child-001"
+	manifest.BaseCommit = "abcdef0"
+	manifest.StatePath = "/state/run-child-001"
+	manifest.PatchBytes = 18
+	manifest.PatchSHA256 = strings.Repeat("b", 64)
+	manifest.PatchAvailable = true
+	manifest.FinishedAt = &finished
+	manifest.UpdatedAt = finished
+	if err := journal.SaveChildManifest(manifest); err != nil {
+		t.Fatalf("save completed child manifest: %v", err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatalf("close journal: %v", err)
+	}
+	loaded, err := LoadChildManifest(record.StatePath, manifest.ID)
+	if err != nil {
+		t.Fatalf("load child manifest: %v", err)
+	}
+	if loaded.Status != ChildCompleted || loaded.PatchSHA256 != manifest.PatchSHA256 || loaded.PatchBytes != manifest.PatchBytes || loaded.WorktreePath != manifest.WorktreePath {
+		t.Fatalf("loaded child manifest = %#v", loaded)
+	}
+	listed, err := ListChildManifests(record.StatePath)
+	if err != nil {
+		t.Fatalf("list child manifests: %v", err)
+	}
+	if len(listed) != 1 || listed[0].ID != manifest.ID {
+		t.Fatalf("listed child manifests = %#v", listed)
+	}
+	path := filepath.Join(record.StatePath, "children", manifest.ID+".json")
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("child manifest permissions = %o, want 600", info.Mode().Perm())
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "implement the hidden task") {
+		t.Fatalf("child manifest persisted task text: %s", raw)
+	}
+}
+
+func TestJournalRejectsInvalidChildManifest(t *testing.T) {
+	journal, _, err := Open("/workspace/project", "run-parent-002", "/runs/run-parent-002", t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatalf("open journal: %v", err)
+	}
+	t.Cleanup(func() { _ = journal.Close() })
+	err = journal.SaveChildManifest(ChildManifest{
+		Version:     1,
+		ID:          "../escape",
+		ParentRunID: "run-parent-002",
+		Kind:        "writer",
+		Status:      ChildPreparing,
+		Repository:  "/workspace/project",
+		TaskSHA256:  strings.Repeat("a", 64),
+		StartedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "IDs") {
+		t.Fatalf("invalid child manifest error = %v", err)
+	}
+}
+
 func TestJournalSavesAndLoadsPrivateSession(t *testing.T) {
 	journal, record, err := Open("/workspace/project", "run-002", "/runs/run-002", t.TempDir(), time.Now())
 	if err != nil {

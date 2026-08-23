@@ -3,6 +3,7 @@ package run
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/instructions"
+	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worktree"
@@ -42,6 +44,7 @@ type writerTool struct {
 	emit       agent.EventSink
 	budget     *writerBudget
 	roles      map[string]instructions.Role
+	journal    *journal.Journal
 }
 
 type writerBudget struct {
@@ -49,7 +52,7 @@ type writerBudget struct {
 	remaining int
 }
 
-func newWriterTool(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, roles []instructions.Role, now func() time.Time, emit agent.EventSink) agent.Tool {
+func newWriterTool(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, parentJournal *journal.Journal, roles []instructions.Role, now func() time.Time, emit agent.EventSink) agent.Tool {
 	if now == nil {
 		now = time.Now
 	}
@@ -62,6 +65,7 @@ func newWriterTool(executor Executor, parent worktree.Worktree, request Request,
 		emit:       emit,
 		budget:     &writerBudget{remaining: maxDelegatedWritersPerRun},
 		roles:      rolesForKind(roles, instructions.RoleWriter),
+		journal:    parentJournal,
 	}
 }
 
@@ -157,12 +161,47 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 		return report
 	}
 	report.RunID = runID
+	startedAt := t.now()
+	manifest := journal.ChildManifest{
+		Version:        1,
+		ID:             runID,
+		ParentRunID:    t.request.RunID,
+		Kind:           "writer",
+		Status:         journal.ChildPreparing,
+		Repository:     t.parent.Repository,
+		Role:           role.Name,
+		TaskSHA256:     writerDigest(assignment),
+		StartedAt:      startedAt,
+		UpdatedAt:      startedAt,
+		ReviewRequired: true,
+	}
+	if err := t.saveManifest(manifest); err != nil {
+		report.Error = truncateWriterText("persist writer manifest before child start: "+err.Error(), maxWriterSummaryBytes)
+		return report
+	}
 	child, baseline, err := t.createChild(ctx, runID)
 	if child.Path != "" {
 		report.WorktreeRetained = true
+		manifest.WorktreePath = child.Path
+		manifest.WorktreeRetained = true
 	}
 	if err != nil {
 		report.Error = truncateWriterText(err.Error(), maxWriterSummaryBytes)
+		t.finishManifest(&manifest, journal.ChildFailed, report)
+		if saveErr := t.saveManifest(manifest); saveErr != nil {
+			report.Error = combineWriterError(report.Error, "persist failed writer manifest: "+saveErr.Error())
+		}
+		return report
+	}
+	manifest.BaseCommit = baseline
+	manifest.Status = journal.ChildRunning
+	manifest.UpdatedAt = t.now()
+	if err := t.saveManifest(manifest); err != nil {
+		report.Error = truncateWriterText("persist writer manifest before child execution: "+err.Error(), maxWriterSummaryBytes)
+		t.finishManifest(&manifest, journal.ChildFailed, report)
+		if saveErr := t.saveManifest(manifest); saveErr != nil {
+			report.Error = truncateWriterText(combineWriterError(report.Error, "persist failed writer manifest: "+saveErr.Error()), maxWriterSummaryBytes)
+		}
 		return report
 	}
 
@@ -186,10 +225,14 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 	childRequest.System = joinInstructions(joinInstructions(t.request.System, writerSystemPrompt()), rolePrompt(role))
 
 	outcome, runErr := t.executor.execute(ctx, child, childRequest, nil, "")
+	manifest.StatePath = outcome.StatePath
 	report.Completed = runErr == nil
 	report.Summary = truncateWriterText(strings.TrimSpace(outcome.Result.FinalText), maxWriterSummaryBytes)
 	patchContents, patchErr := patch.Export(ctx, child.Path, baseline)
 	report.PatchBytes = len(patchContents)
+	if len(patchContents) > 0 {
+		manifest.PatchSHA256 = writerBytesDigest(patchContents)
+	}
 	if patchErr == nil && len(patchContents) <= maxWriterPatchBytes {
 		report.Patch = string(patchContents)
 		report.PatchAvailable = len(patchContents) > 0
@@ -204,7 +247,52 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 		report.Error = combineWriterError(report.Error, "writer run: "+runErr.Error())
 	}
 	report.Error = truncateWriterText(report.Error, maxWriterSummaryBytes)
+	t.finishManifest(&manifest, writerStatus(ctx, report.Error), report)
+	if saveErr := t.saveManifest(manifest); saveErr != nil {
+		report.Error = truncateWriterText(combineWriterError(report.Error, "persist completed writer manifest: "+saveErr.Error()), maxWriterSummaryBytes)
+	}
 	return report
+}
+
+func (t writerTool) saveManifest(manifest journal.ChildManifest) error {
+	if t.journal == nil {
+		return fmt.Errorf("parent run journal is unavailable")
+	}
+	return t.journal.SaveChildManifest(manifest)
+}
+
+func (t writerTool) finishManifest(manifest *journal.ChildManifest, status journal.ChildStatus, report delegatedWriterReport) {
+	if manifest == nil {
+		return
+	}
+	finished := t.now()
+	manifest.Status = status
+	manifest.UpdatedAt = finished
+	manifest.FinishedAt = &finished
+	manifest.PatchBytes = report.PatchBytes
+	manifest.PatchAvailable = report.PatchAvailable
+	manifest.ReviewRequired = report.ReviewRequired
+	manifest.WorktreeRetained = report.WorktreeRetained
+	manifest.Error = report.Error
+}
+
+func writerStatus(ctx context.Context, reportError string) journal.ChildStatus {
+	if ctx.Err() != nil {
+		return journal.ChildCancelled
+	}
+	if strings.TrimSpace(reportError) != "" {
+		return journal.ChildFailed
+	}
+	return journal.ChildCompleted
+}
+
+func writerDigest(value string) string {
+	return writerBytesDigest([]byte(value))
+}
+
+func writerBytesDigest(value []byte) string {
+	digest := sha256.Sum256(value)
+	return fmt.Sprintf("%x", digest)
 }
 
 func (t writerTool) createChild(ctx context.Context, runID string) (worktree.Worktree, string, error) {
