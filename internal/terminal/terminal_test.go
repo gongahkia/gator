@@ -146,6 +146,47 @@ func TestManagerRecordsDeveloperInputWithoutRetainingIt(t *testing.T) {
 	}
 }
 
+func TestManagerSetsAndResizesPseudoTerminalViewport(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := New(Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}, Rows: 31, Columns: 97})
+	defer manager.Close()
+	task, err := manager.Start(context.Background(), []string{sh, "-lc", "stty size; IFS= read line; stty size"})
+	if err != nil {
+		t.Fatalf("start terminal task: %v", err)
+	}
+	first := awaitTerminalOutput(t, manager, task.ID, 0, "31 97")
+	if first.Task.Rows != 31 || first.Task.Columns != 97 {
+		t.Fatalf("initial terminal size = %#v", first.Task)
+	}
+	resized, err := manager.Attachment().Resize(task.ID, 17, 53)
+	if err != nil {
+		t.Fatalf("resize terminal task: %v", err)
+	}
+	if resized.Rows != 17 || resized.Columns != 53 {
+		t.Fatalf("resized terminal task = %#v", resized)
+	}
+	if _, err := manager.WriteDeveloper(task.ID, []byte("continue\r")); err != nil {
+		t.Fatalf("write resized terminal task: %v", err)
+	}
+	second := awaitTerminalOutput(t, manager, task.ID, first.Next, "17 53")
+	if second.Task.Rows != 17 || second.Task.Columns != 53 {
+		t.Fatalf("resized terminal read = %#v", second.Task)
+	}
+	if _, err := manager.Resize(task.ID, 0, 53); err == nil || !strings.Contains(err.Error(), "size") {
+		t.Fatalf("invalid terminal resize error = %v", err)
+	}
+}
+
 func awaitTerminalOutput(t *testing.T, manager *Manager, id string, cursor int64, want string) ReadResult {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
