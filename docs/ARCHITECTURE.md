@@ -241,17 +241,20 @@ commands, plain JSONL RPC, ACP, and child-writer tool surfaces omit detachment.
 The normal shutdown path stops all detached tasks. A model must request a
 separate approval for each distinct terminal input; approval events contain an
 ID, size, and SHA-256 digest rather than the input bytes. During a native TUI
-run, `Ctrl+T` can attach a developer to an existing task: it renders bounded
-display output, resizes the existing PTY to its viewport, interprets common
-cursor/erase controls and private alternate-screen transitions, allows a line
-write, ETX interrupt, task stop, or opt-in raw keyboard input. Raw mode maps
-normal, control, navigation, and common function keys back to terminal bytes;
-`Ctrl+]` returns to Gator controls. Direct input emits only byte-count/digest
-metadata while its owning run is active, with raw keys aggregated until raw mode
-ends or the task exits. App-server direct input also bypasses model context and
-completed-run records. The attachment does not create commands, broaden the
-fixed task sandbox, persist task output across a Gator restart, or become a
-full VT emulator or ACP/client terminal multiplexer.
+run, `Ctrl+T` can attach a developer to an existing task: it resizes the PTY to
+its viewport and renders the bounded VT500/xterm text screen, including scroll
+regions, primary/alternate buffers, Unicode cell widths, colors, attributes,
+and native primary-buffer scrollback. It allows a line write, ETX interrupt,
+task stop, or opt-in raw keyboard input. Raw mode maps normal, control,
+navigation, and common function keys back to terminal bytes; `Ctrl+]` returns
+to Gator controls. Bounded emulator-generated device/status replies return only
+to the already-running task and are not developer or model input. Direct input
+emits only byte-count/digest metadata while its owning run is active, with raw
+keys aggregated until raw mode ends or the task exits. App-server direct input
+also bypasses model context and completed-run records. The attachment does not
+create commands, broaden the fixed task sandbox, persist task output across a
+Gator restart, render terminal graphics, control the host clipboard/window, or
+become an ACP/client terminal multiplexer.
 
 `http_fetch` accepts port-443 HTTPS URLs only. Before a request, Gator resolves
 the hostname, rejects local/private/reserved results, and pins the approved

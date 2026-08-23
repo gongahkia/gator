@@ -104,6 +104,8 @@ func (m *Model) refreshAttachedTerminal() {
 			m.terminalErr = err
 			return
 		}
+		task = read.Task
+		m.terminalTasks[m.terminalIndex] = task
 		if read.Dropped {
 			view.screen.reset()
 			view.dropped = true
@@ -111,10 +113,12 @@ func (m *Model) refreshAttachedTerminal() {
 		if read.Output != "" {
 			view.screen.feed(read.Output)
 			if response := view.screen.takeProtocol(); len(response) > 0 {
-				if _, err := m.terminalAttachment.WriteProtocol(task.ID, response); err != nil {
-					m.terminalViews[task.ID] = view
-					m.terminalErr = err
-					return
+				if task.Status == "running" {
+					if _, err := m.terminalAttachment.WriteProtocol(task.ID, response); err != nil {
+						m.terminalViews[task.ID] = view
+						m.terminalErr = err
+						return
+					}
 				}
 			}
 		}
@@ -178,8 +182,11 @@ func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "pgup":
 		m.scrollAttachedTerminal(-1)
 		return m, nil
-	case "pgdown", "end":
+	case "pgdown":
 		m.scrollAttachedTerminal(1)
+		return m, nil
+	case "end":
+		m.scrollAttachedTerminalToBottom()
 		return m, nil
 	case "home":
 		m.scrollAttachedTerminalToTop()
@@ -352,7 +359,7 @@ func (m Model) attachedTerminalView() string {
 	if view.dropped {
 		output = terminalDroppedScrollback + output
 	}
-	if output == "" {
+	if !view.dropped && view.screen.String() == "" {
 		output = dimStyle.Render("Waiting for terminal output…")
 	}
 	if m.terminalErr != nil {
@@ -392,5 +399,15 @@ func (m *Model) scrollAttachedTerminalToTop() {
 	}
 	view := m.terminalViews[task.ID]
 	view.screen.scrollToTop()
+	m.terminalViews[task.ID] = view
+}
+
+func (m *Model) scrollAttachedTerminalToBottom() {
+	task, found := m.selectedTerminalTask()
+	if !found {
+		return
+	}
+	view := m.terminalViews[task.ID]
+	view.screen.scrollToBottom()
 	m.terminalViews[task.ID] = view
 }
