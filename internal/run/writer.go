@@ -550,7 +550,7 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 		childRequest.Approve = t.approval.request
 	}
 
-	outcome, runErr := t.executor.execute(ctx, child, childRequest, nil, "")
+	outcome, runErr := t.executor.execute(ctx, child, childRequest, nil, "", false)
 	manifest.StatePath = outcome.StatePath
 	report.Completed = runErr == nil
 	report.Summary = truncateWriterText(strings.TrimSpace(outcome.Result.FinalText), maxWriterSummaryBytes)

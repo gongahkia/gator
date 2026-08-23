@@ -458,6 +458,19 @@ listed in tracked `.gator/worktreeinclude` and remain ignored. Use
 `gator worktree list`, `gator worktree prune`, and the explicit destructive
 `gator worktree remove RUN_ID --yes` to manage retained checkouts.
 
+For dependencies or generated local prerequisites, `gator run` also accepts a
+repeatable developer-supplied `--setup 'argv ...'`. Each value is parsed as a
+whitespace-separated argv and runs once after the isolated worktree (and any
+opted-in copied files) exists, before the model or scouts start. Setup follows
+the selected strict sandbox and network policy, is never read from project
+configuration, is unavailable to Plan mode and ACP/RPC clients, and leaves the
+worktree plus an error record for review if it fails. If bootstrap needs the
+network, grant it explicitly. For example:
+
+```sh
+gator run --network allow --copy-ignored --setup 'npm ci' --verify 'npm test' 'fix the parser'
+```
+
 During either native Plan or Execute mode, the model can also call
 `delegate_readonly` for one to four focused inspections of the active isolated
 worktree. Those fresh-context scouts run concurrently, can only read/list/search

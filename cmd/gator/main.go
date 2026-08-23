@@ -46,7 +46,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--trust-commands] TASK
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]

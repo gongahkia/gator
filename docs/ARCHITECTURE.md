@@ -120,6 +120,16 @@ the process-level verifier policy. Gator's proprietary `gator rpc` interface
 remains for automation that needs run IDs, steering, and other Gator-specific
 control-plane operations.
 
+Fresh CLI runs may receive repeatable developer-supplied worktree setup argv.
+Gator runs those exact argv commands only after creating the isolated checkout
+and copying any explicitly opted-in ignored files, but before scouts or the
+primary model. They inherit the selected sandbox, filesystem, environment,
+network, ten-minute timeout, and bounded output contract. Project files cannot
+declare setup programs, and ACP/RPC clients cannot inject them, so opening a
+repository or connecting an editor never turns project configuration into a
+pre-agent process launch. A failed setup retains the worktree and a failed run
+record for diagnosis.
+
 Trusted project LSP configuration is a deliberately small, local
 code-intelligence surface. A developer pins `.gator/lsp.json` and its
 repository-local executables with `gator lsp trust`; each model-requested

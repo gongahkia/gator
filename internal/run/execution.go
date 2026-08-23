@@ -17,12 +17,18 @@ import (
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/patch"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
-func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string) (Outcome, error) {
+func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string, runInitialScouts bool) (Outcome, error) {
+	executionPolicy := e.Sandbox.Normalize()
+	if err := executionPolicy.Validate(); err != nil {
+		return Outcome{Worktree: isolated, ThreadID: request.ThreadID}, fmt.Errorf("validate execution policy: %w", err)
+	}
 	projectInstructionSet, err := instructions.LoadWithProfile(isolated.Repository, request.Scopes, request.Profile)
 	if err != nil {
 		return Outcome{Worktree: isolated}, err
@@ -91,12 +97,37 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if lspSet.Configured() && !lspSet.Trusted() {
 		emit(agent.Event{Kind: agent.EventHook, At: e.now(), Text: "project LSP servers are disabled because their bundle hash is not explicitly trusted"})
 	}
+	if err := runWorktreeSetup(ctx, isolated.Root, request.Setup, executionPolicy, e.now, emit); err != nil {
+		finishErr := runJournal.Finish("failed", "", e.now())
+		eventMu.Lock()
+		eventSnapshot := append([]agent.Event(nil), events...)
+		eventMu.Unlock()
+		outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Events: eventSnapshot}
+		if finishErr != nil {
+			return outcome, fmt.Errorf("run worktree setup: %v; finish failed run journal: %w", err, finishErr)
+		}
+		return outcome, fmt.Errorf("run worktree setup: %w", err)
+	}
+	var reports []scoutReport
+	if runInitialScouts {
+		reports, err = e.runScouts(ctx, request, isolated.BaseCommit)
+		if err != nil {
+			finishErr := runJournal.Finish("failed", "", e.now())
+			eventMu.Lock()
+			eventSnapshot := append([]agent.Event(nil), events...)
+			eventMu.Unlock()
+			outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Events: eventSnapshot, ScoutWorktrees: scoutWorktrees(reports)}
+			if finishErr != nil {
+				return outcome, fmt.Errorf("run read-only scouts: %v; finish failed run journal: %w", err, finishErr)
+			}
+			return outcome, fmt.Errorf("run read-only scouts: %w", err)
+		}
+		if context := formatScoutReports(reports); context != "" {
+			request.System = joinInstructions(request.System, context)
+		}
+	}
 	var result agent.Result
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
-	executionPolicy := e.Sandbox.Normalize()
-	if err := executionPolicy.Validate(); err != nil {
-		return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("validate execution policy: %w", err)
-	}
 	commandPolicy := tools.CommandPolicy{
 		Allowed:    request.Verification,
 		Remembered: remembered,
@@ -248,7 +279,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		if finishErr != nil {
 			return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("compact retained context: %v; finish failed run journal: %w", compactErr, finishErr)
 		}
-		return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID}, fmt.Errorf("compact retained context: %w", compactErr)
+		return Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, ScoutWorktrees: scoutWorktrees(reports)}, fmt.Errorf("compact retained context: %w", compactErr)
 	}
 	if compacted {
 		initialMessages = compactedMessages
@@ -286,7 +317,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	eventMu.Lock()
 	eventSnapshot := append([]agent.Event(nil), events...)
 	eventMu.Unlock()
-	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: eventSnapshot}
+	outcome := Outcome{Worktree: isolated, StatePath: record.StatePath, ThreadID: request.ThreadID, Result: result, Events: eventSnapshot, ScoutWorktrees: scoutWorktrees(reports)}
 	snapshotContext, cancelSnapshot := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	snapshot, snapshotErr := patch.Export(snapshotContext, isolated.Path, request.BaseCommit)
 	cancelSnapshot()
@@ -363,6 +394,43 @@ func terminalStatusText(task terminal.Task) string {
 		return fmt.Sprintf("%s exited with code %d: %s", task.ID, *task.ExitCode, task.Error)
 	}
 	return fmt.Sprintf("%s exited with code %d", task.ID, *task.ExitCode)
+}
+
+const worktreeSetupTimeout = 10 * time.Minute
+
+func runWorktreeSetup(ctx context.Context, root workspace.Root, commands [][]string, policy sandbox.Policy, now func() time.Time, emit agent.EventSink) error {
+	for index, command := range commands {
+		argv := append([]string(nil), command...)
+		label := strings.Join(argv, " ")
+		if emit != nil {
+			emit(agent.Event{Kind: agent.EventWorktreeSetup, At: now(), Text: fmt.Sprintf("starting %d/%d: %s", index+1, len(commands), label), Argv: argv})
+		}
+		result, err := tools.RunDeveloperSetup(ctx, root, tools.CommandPolicy{
+			Sandbox:        policy,
+			Timeout:        worktreeSetupTimeout,
+			MaxOutputBytes: 64 * 1024,
+		}, argv)
+		if err != nil {
+			return fmt.Errorf("command %d (%s): %w", index+1, label, err)
+		}
+		if result.ExitCode != 0 {
+			output := strings.TrimSpace(result.Output)
+			if result.Truncated {
+				output += "\n[setup output truncated]"
+			}
+			if result.TimedOut {
+				return fmt.Errorf("command %d timed out after %s: %s", index+1, worktreeSetupTimeout, output)
+			}
+			if output == "" {
+				return fmt.Errorf("command %d exited with code %d", index+1, result.ExitCode)
+			}
+			return fmt.Errorf("command %d exited with code %d: %s", index+1, result.ExitCode, output)
+		}
+		if emit != nil {
+			emit(agent.Event{Kind: agent.EventWorktreeSetup, At: now(), Text: fmt.Sprintf("completed %d/%d: %s", index+1, len(commands), label), Argv: argv})
+		}
+	}
+	return nil
 }
 
 func (e Executor) hookTrust(repository string) string {

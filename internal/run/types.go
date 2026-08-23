@@ -46,6 +46,10 @@ type Request struct {
 	// BaseCommit before the worktree is created and is not reused on resume.
 	BaseRef          string
 	CopyIgnoredFiles bool
+	// Setup contains developer-supplied argv commands run once after a new
+	// worktree is created and before agent execution. It is intentionally not
+	// accepted from model tools or remote control-plane clients.
+	Setup [][]string
 	// Scouts are bounded read-only subagent assignments. Each runs in its own
 	// detached worktree before the primary writer receives their evidence.
 	Scouts     []string

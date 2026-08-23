@@ -50,6 +50,8 @@ func runTask(arguments []string, out io.Writer) error {
 	networkMode := flags.String("network", "", "sandbox network mode: deny or allow (default from config)")
 	baseRef := flags.String("base", "", "Git ref or revision used as the new worktree base")
 	copyIgnoredFiles := flags.Bool("copy-ignored", false, "copy files explicitly listed in tracked .gator/worktreeinclude (may expose secrets to the agent)")
+	var setup verificationFlags
+	flags.Var(&setup, "setup", "developer-supplied whitespace-separated worktree setup argv run before the agent (repeatable)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -97,6 +99,7 @@ func runTask(arguments []string, out io.Writer) error {
 		Profile:          *profile,
 		BaseRef:          *baseRef,
 		CopyIgnoredFiles: *copyIgnoredFiles,
+		Setup:            setup,
 		Scouts:           scouts,
 		AllowedCommands:  allowedCommands,
 		Approve:          cliCommandApprover(*trustCommands),
@@ -174,6 +177,8 @@ func (p *eventPrinter) Print(event agent.Event) {
 		_, _ = fmt.Fprintf(p.out, "[%02d] subagent %s\n", event.Step, event.Text)
 	case agent.EventTerminal:
 		_, _ = fmt.Fprintf(p.out, "[%02d] terminal %s\n", event.Step, event.Text)
+	case agent.EventWorktreeSetup:
+		_, _ = fmt.Fprintf(p.out, "[%02d] worktree setup %s\n", event.Step, event.Text)
 	case agent.EventCompletionBlocked:
 		_, _ = fmt.Fprintf(p.out, "[%02d] evidence required: %s\n", event.Step, event.Text)
 	}
