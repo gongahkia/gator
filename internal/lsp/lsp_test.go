@@ -144,6 +144,13 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 			},
 			map[string]any{"title": "Run server command", "command": map[string]string{"title": "Danger", "command": "dangerous.command"}},
 		}),
+		"textDocument/formatting": encoded([]any{map[string]any{
+			"range": location(localURI)["range"], "newText": "Formatted",
+		}}),
+		"textDocument/rename": encoded(map[string]any{"changes": map[string]any{
+			localURI:    []any{map[string]any{"range": location(localURI)["range"], "newText": "Renamed"}},
+			externalURI: []any{map[string]any{"range": location(externalURI)["range"], "newText": "outside secret"}},
+		}}),
 		"textDocument/definition": encoded([]any{location(localURI), location(externalURI)}),
 		"textDocument/references": encoded([]any{location(localURI)}),
 		"textDocument/documentSymbol": encoded([]any{map[string]any{
@@ -165,6 +172,8 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 		{operation: hoverOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/hover", contains: []string{`"found":true`, `"kind":"markdown"`, "Target"}},
 		{operation: completionOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/completion", contains: []string{`"incomplete":true`, `"documentation_kind":"markdown"`, `"insert_text":"Target"`}},
 		{operation: codeActionsOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"end_line":3,"end_character":5}`, method: "textDocument/codeAction", contains: []string{"Fix Target", `"new_text":"Fixed"`, `"command_omitted":true`, `"truncated":true`}},
+		{operation: formatOperation, arguments: `{"path":"pkg/example.go"}`, method: "textDocument/formatting", contains: []string{`"operation":"format"`, `"new_text":"Formatted"`}},
+		{operation: renameOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"new_name":"Renamed"}`, method: "textDocument/rename", contains: []string{`"operation":"rename"`, `"truncated":true`}},
 		{operation: definitionOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1}`, method: "textDocument/definition", contains: []string{"pkg/target.go", `"truncated":true`}},
 		{operation: referencesOperation, arguments: `{"path":"pkg/example.go","line":3,"character":1,"include_declaration":true}`, method: "textDocument/references", contains: []string{"pkg/target.go"}},
 		{operation: documentSymbolsOperation, arguments: `{"path":"pkg/example.go"}`, method: "textDocument/documentSymbol", contains: []string{"Target", "Method"}},
@@ -226,6 +235,12 @@ func TestToolsFormatReadOnlyNavigationAndKeepLocationsInWorkspace(t *testing.T) 
 				encoded, err := json.Marshal(connection.parameters)
 				if err != nil || !strings.Contains(string(encoded), `"start":{"character":1,"line":2}`) || !strings.Contains(string(encoded), `"end":{"character":5,"line":2}`) {
 					t.Fatalf("code-action parameters = %s, %v", encoded, err)
+				}
+			}
+			if test.operation == renameOperation {
+				encoded, err := json.Marshal(connection.parameters)
+				if err != nil || !strings.Contains(string(encoded), `"line":2`) || !strings.Contains(string(encoded), `"character":1`) || !strings.Contains(string(encoded), `"newName":"Renamed"`) {
+					t.Fatalf("rename parameters = %s, %v", encoded, err)
 				}
 			}
 		})
@@ -325,6 +340,38 @@ func TestCodeActionsRejectUnsafeEditsAndSelectionRanges(t *testing.T) {
 	}
 }
 
+func TestFormattingAndRenameOmitIncompleteOrOversizedEdits(t *testing.T) {
+	root := testWorkspace(t)
+	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
+	uri := fileURI(filepath.Join(root.Path(), "pkg", "example.go"))
+	formatting, err := formatFormatting("pkg/example.go", "fixture", json.RawMessage(`[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"fixed"}]`))
+	if err != nil || !strings.Contains(formatting.Content, `"new_text":"fixed"`) || strings.Contains(formatting.Content, `"truncated":true`) {
+		t.Fatalf("formatting result = %s, %v", formatting.Content, err)
+	}
+	many := make([]lspTextEdit, maxCodeActionEdits+1)
+	for index := range many {
+		many[index].Range.Start = Position{Line: index, Character: 0}
+		many[index].Range.End = Position{Line: index, Character: 0}
+		many[index].NewText = "x"
+	}
+	rawMany, err := json.Marshal(many)
+	if err != nil {
+		t.Fatal(err)
+	}
+	formatting, err = formatFormatting("pkg/example.go", "fixture", rawMany)
+	if err != nil || !strings.Contains(formatting.Content, `"truncated":true`) || strings.Contains(formatting.Content, `"new_text"`) {
+		t.Fatalf("oversized formatting result = %s, %v", formatting.Content, err)
+	}
+	rename, err := formatRename(root, "pkg/example.go", "fixture", json.RawMessage(`{"documentChanges":[{"kind":"rename","oldUri":`+strconv.Quote(uri)+`,"newUri":"file:///tmp/outside"}]}`))
+	if err != nil || !strings.Contains(rename.Content, `"truncated":true`) || strings.Contains(rename.Content, `"new_text"`) {
+		t.Fatalf("unsafe rename result = %s, %v", rename.Content, err)
+	}
+	tool := Tool{root: root, specification: server{Name: "fixture", Language: "go"}, operation: renameOperation}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"path":"pkg/example.go","line":1,"character":0,"new_name":"line\nbreak"}`)); err == nil || !strings.Contains(err.Error(), "rename new_name") {
+		t.Fatalf("invalid rename error = %v", err)
+	}
+}
+
 func TestManagerReusesOneClientForMultipleApprovedLookups(t *testing.T) {
 	root := testWorkspace(t)
 	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
@@ -400,6 +447,8 @@ func TestNativeClientUsesReadOnlyLookups(t *testing.T) {
 		{method: "textDocument/hover", want: "fixture hover"},
 		{method: "textDocument/completion", want: "fixture completion"},
 		{method: "textDocument/codeAction", want: "[]"},
+		{method: "textDocument/formatting", want: "[]"},
+		{method: "textDocument/rename", want: "{}"},
 		{method: "textDocument/definition", want: "[]"},
 		{method: "textDocument/references", want: "[]"},
 		{method: "textDocument/documentSymbol", want: "[]"},
@@ -467,14 +516,16 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 		switch message.Method {
 		case "initialize":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"capabilities": map[string]any{
-				"diagnosticProvider":      map[string]any{},
-				"hoverProvider":           true,
-				"completionProvider":      map[string]any{},
-				"codeActionProvider":      true,
-				"definitionProvider":      true,
-				"referencesProvider":      true,
-				"documentSymbolProvider":  true,
-				"workspaceSymbolProvider": true,
+				"diagnosticProvider":         map[string]any{},
+				"hoverProvider":              true,
+				"completionProvider":         map[string]any{},
+				"codeActionProvider":         true,
+				"documentFormattingProvider": true,
+				"renameProvider":             true,
+				"definitionProvider":         true,
+				"referencesProvider":         true,
+				"documentSymbolProvider":     true,
+				"workspaceSymbolProvider":    true,
 			}}})
 		case "initialized":
 			continue
@@ -484,8 +535,10 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"contents": "fixture hover"}})
 		case "textDocument/completion":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"isIncomplete": false, "items": []any{map[string]string{"label": "fixture completion"}}}})
-		case "textDocument/codeAction", "textDocument/definition", "textDocument/references", "textDocument/documentSymbol", "workspace/symbol":
+		case "textDocument/codeAction", "textDocument/formatting", "textDocument/definition", "textDocument/references", "textDocument/documentSymbol", "workspace/symbol":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": []any{}})
+		case "textDocument/rename":
+			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{}})
 		case "shutdown":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": nil})
 		case "exit":
