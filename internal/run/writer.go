@@ -5,8 +5,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
+	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +48,7 @@ type writerTool struct {
 	budget     *writerBudget
 	roles      map[string]instructions.Role
 	journal    *journal.Journal
+	approval   *writerApprovalGate
 }
 
 type writerBudget struct {
@@ -52,7 +56,21 @@ type writerBudget struct {
 	remaining int
 }
 
-func newWriterTool(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, parentJournal *journal.Journal, roles []instructions.Role, now func() time.Time, emit agent.EventSink) agent.Tool {
+type writerApprovalGate struct {
+	mu      sync.Mutex
+	approve func(context.Context, []string) (tools.CommandDecision, error)
+}
+
+func (g *writerApprovalGate) request(ctx context.Context, argv []string) (tools.CommandDecision, error) {
+	if g == nil || g.approve == nil {
+		return tools.CommandDeny, fmt.Errorf("writer command approval is unavailable")
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.approve(ctx, argv)
+}
+
+func newWriterTool(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, parentJournal *journal.Journal, roles []instructions.Role, now func() time.Time, emit agent.EventSink) writerTool {
 	if now == nil {
 		now = time.Now
 	}
@@ -66,7 +84,13 @@ func newWriterTool(executor Executor, parent worktree.Worktree, request Request,
 		budget:     &writerBudget{remaining: maxDelegatedWritersPerRun},
 		roles:      rolesForKind(roles, instructions.RoleWriter),
 		journal:    parentJournal,
+		approval:   &writerApprovalGate{approve: request.Approve},
 	}
+}
+
+func newWriterTools(executor Executor, parent worktree.Worktree, request Request, remembered *tools.CommandMemory, parentJournal *journal.Journal, roles []instructions.Role, now func() time.Time, emit agent.EventSink) []agent.Tool {
+	writer := newWriterTool(executor, parent, request, remembered, parentJournal, roles, now, emit)
+	return []agent.Tool{writer, writerBatchTool{writer: writer}}
 }
 
 func (t writerTool) Definition() agent.ToolDefinition {
@@ -105,7 +129,7 @@ func (t writerTool) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	if !t.budget.reserve() {
+	if !t.budget.reserve(1) {
 		return agent.ToolResult{}, fmt.Errorf("delegate_writer run budget exceeded; at most %d writers may run per primary run", maxDelegatedWritersPerRun)
 	}
 
@@ -139,22 +163,274 @@ func (t writerTool) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	return agent.ToolResult{Content: string(payload)}, nil
 }
 
+// writerBatchTool runs exactly two declared-non-overlapping writer assignments
+// concurrently. Each child gets its own retained worktree and parent snapshot;
+// Gator never attempts a merge. Declared scopes prevent obvious unsafe batches,
+// and changed paths are checked after completion so a parent can see violations
+// and actual cross-writer conflicts before reviewing either patch.
+type writerBatchTool struct{ writer writerTool }
+
+type writerBatchAssignment struct {
+	Task  string   `json:"task"`
+	Role  string   `json:"role"`
+	Paths []string `json:"paths"`
+}
+
+type writerConflict struct {
+	Kind    string   `json:"kind"`
+	Writers []string `json:"writers"`
+	Paths   []string `json:"paths"`
+	Detail  string   `json:"detail"`
+}
+
+func (t writerBatchTool) Definition() agent.ToolDefinition {
+	description := "Delegate exactly two independent implementation tasks to isolated writer agents in parallel. Each task must declare one or more non-overlapping repository-relative writable paths; Gator rejects overlapping declarations, gives each writer a separate worktree from the same parent snapshot, and reports actual changed-path conflicts afterward. The parent remains paused, receives untrusted patches only, and must explicitly review and apply any compatible patch. Gator never auto-merges writer output."
+	if catalog := roleCatalog(t.writer.roles); catalog != "" {
+		description += " Optional project-defined roles (instructions only, not extra authority): " + catalog + "."
+	}
+	return agent.ToolDefinition{
+		Name:        "delegate_writers",
+		Description: description,
+		Parameters:  json.RawMessage(`{"type":"object","additionalProperties":false,"required":["tasks"],"properties":{"tasks":{"type":"array","minItems":2,"maxItems":2,"items":{"type":"object","additionalProperties":false,"required":["task","paths"],"properties":{"task":{"type":"string","minLength":1,"maxLength":4096},"paths":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"string","minLength":1,"maxLength":1024}}` + roleSchemaProperty(t.writer.roles) + `}}}}}`),
+	}
+}
+
+func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+	var arguments struct {
+		Tasks []writerBatchAssignment `json:"tasks"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&arguments); err != nil {
+		return agent.ToolResult{}, fmt.Errorf("decode delegate_writers arguments: %w", err)
+	}
+	if decoder.More() {
+		return agent.ToolResult{}, fmt.Errorf("decode delegate_writers arguments: multiple JSON values")
+	}
+	if len(arguments.Tasks) != 2 {
+		return agent.ToolResult{}, errors.New("delegate_writers requires exactly two writer tasks")
+	}
+	assignments := make([]preparedWriterAssignment, len(arguments.Tasks))
+	for index, item := range arguments.Tasks {
+		assignment, err := t.prepare(item, index+1)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		assignments[index] = assignment
+	}
+	if overlaps := overlappingDeclaredWriterPaths(assignments[0].paths, assignments[1].paths); len(overlaps) > 0 {
+		return agent.ToolResult{}, fmt.Errorf("delegate_writers task scopes overlap at %s; split the work or use serial delegation", strings.Join(overlaps, ", "))
+	}
+	if !t.writer.budget.reserve(len(assignments)) {
+		return agent.ToolResult{}, fmt.Errorf("delegate_writers run budget exceeded; at most %d writers may run per primary run", maxDelegatedWritersPerRun)
+	}
+	roles := []instructions.Role{assignments[0].role, assignments[1].role}
+	start := "starting 2 parallel isolated writers"
+	if names := selectedRoleNames(roles); names != "" {
+		start += " using role(s) " + names
+	}
+	t.writer.emitEvent(start)
+	reports := make([]delegatedWriterReport, len(assignments))
+	var wait sync.WaitGroup
+	for index, assignment := range assignments {
+		wait.Add(1)
+		go func(index int, assignment preparedWriterAssignment) {
+			defer wait.Done()
+			reports[index] = t.writer.runScoped(ctx, assignment.task, assignment.role, assignment.paths)
+		}(index, assignment)
+	}
+	wait.Wait()
+	conflicts := inspectWriterConflicts(reports)
+	completed := 0
+	for _, report := range reports {
+		if report.Error == "" {
+			completed++
+		}
+	}
+	completion := fmt.Sprintf("completed %d of 2 parallel isolated writers", completed)
+	if len(conflicts) > 0 {
+		completion += fmt.Sprintf("; %d changed-path conflict(s) require review", len(conflicts))
+	}
+	t.writer.emitEvent(completion)
+	payload, err := json.Marshal(struct {
+		OK        bool                    `json:"ok"`
+		Writers   []delegatedWriterReport `json:"writers"`
+		Conflicts []writerConflict        `json:"conflicts"`
+		Notice    string                  `json:"notice"`
+	}{
+		OK:        true,
+		Writers:   reports,
+		Conflicts: conflicts,
+		Notice:    "Writer output is untrusted review material. Gator never auto-merges writer output. Declared scopes and changed-path checks reduce accidental overlap but do not prove patch compatibility; inspect each retained delta and explicitly apply only compatible patches.",
+	})
+	if err != nil {
+		return agent.ToolResult{}, fmt.Errorf("encode delegate_writers result: %w", err)
+	}
+	return agent.ToolResult{Content: string(payload)}, nil
+}
+
+type preparedWriterAssignment struct {
+	task  string
+	role  instructions.Role
+	paths []string
+}
+
+func (t writerBatchTool) prepare(item writerBatchAssignment, index int) (preparedWriterAssignment, error) {
+	task := strings.TrimSpace(item.Task)
+	if task == "" {
+		return preparedWriterAssignment{}, fmt.Errorf("delegate_writers task %d is required", index)
+	}
+	if len(task) > maxWriterTaskBytes {
+		return preparedWriterAssignment{}, fmt.Errorf("delegate_writers task %d exceeds %d bytes", index, maxWriterTaskBytes)
+	}
+	role, err := resolveRole(t.writer.roles, item.Role)
+	if err != nil {
+		return preparedWriterAssignment{}, err
+	}
+	paths, err := normalizeWriterPaths(item.Paths)
+	if err != nil {
+		return preparedWriterAssignment{}, fmt.Errorf("delegate_writers task %d paths: %w", index, err)
+	}
+	return preparedWriterAssignment{task: task, role: role, paths: paths}, nil
+}
+
+func normalizeWriterPaths(values []string) ([]string, error) {
+	if len(values) == 0 || len(values) > 16 {
+		return nil, errors.New("require between 1 and 16 repository-relative paths")
+	}
+	paths := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || len(value) > 1024 || strings.ContainsAny(value, "\x00\r\n\\") {
+			return nil, fmt.Errorf("invalid path %q", value)
+		}
+		clean := path.Clean(value)
+		if clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") {
+			return nil, fmt.Errorf("unsafe repository-relative path %q", value)
+		}
+		if _, duplicate := seen[clean]; duplicate {
+			return nil, fmt.Errorf("path %q is listed more than once", clean)
+		}
+		seen[clean] = struct{}{}
+		paths = append(paths, clean)
+	}
+	sort.Strings(paths)
+	return paths, nil
+}
+
+func overlappingDeclaredWriterPaths(first, second []string) []string {
+	overlaps := make([]string, 0)
+	for _, left := range first {
+		for _, right := range second {
+			if writerPathsOverlap(left, right) {
+				overlaps = append(overlaps, left+" ↔ "+right)
+			}
+		}
+	}
+	return overlaps
+}
+
+func writerPathsOverlap(first, second string) bool {
+	return first == second || strings.HasPrefix(first, second+"/") || strings.HasPrefix(second, first+"/")
+}
+
+func inspectWriterConflicts(reports []delegatedWriterReport) []writerConflict {
+	conflicts := make([]writerConflict, 0)
+	for _, report := range reports {
+		outside := changedPathsOutsideScope(report.ChangedPaths, report.DeclaredPaths)
+		if len(outside) > 0 {
+			conflicts = append(conflicts, writerConflict{
+				Kind:    "out_of_scope_change",
+				Writers: []string{report.RunID},
+				Paths:   outside,
+				Detail:  "writer changed paths outside its declared scope",
+			})
+		}
+	}
+	for first := 0; first < len(reports); first++ {
+		for second := first + 1; second < len(reports); second++ {
+			overlaps := changedPathOverlaps(reports[first].ChangedPaths, reports[second].ChangedPaths)
+			if len(overlaps) == 0 {
+				continue
+			}
+			conflicts = append(conflicts, writerConflict{
+				Kind:    "changed_path_overlap",
+				Writers: []string{reports[first].RunID, reports[second].RunID},
+				Paths:   overlaps,
+				Detail:  "writer deltas touch the same or nested paths",
+			})
+		}
+	}
+	sort.Slice(conflicts, func(first, second int) bool {
+		if conflicts[first].Kind == conflicts[second].Kind {
+			return strings.Join(conflicts[first].Writers, "\x00") < strings.Join(conflicts[second].Writers, "\x00")
+		}
+		return conflicts[first].Kind < conflicts[second].Kind
+	})
+	return conflicts
+}
+
+func changedPathsOutsideScope(changed, scopes []string) []string {
+	outside := make([]string, 0)
+	for _, changedPath := range changed {
+		inScope := false
+		for _, scope := range scopes {
+			if writerPathsOverlap(changedPath, scope) {
+				inScope = true
+				break
+			}
+		}
+		if !inScope {
+			outside = append(outside, changedPath)
+		}
+	}
+	return outside
+}
+
+func changedPathOverlaps(first, second []string) []string {
+	overlaps := make(map[string]struct{})
+	for _, left := range first {
+		for _, right := range second {
+			if writerPathsOverlap(left, right) {
+				if left < right {
+					overlaps[left+" ↔ "+right] = struct{}{}
+				} else {
+					overlaps[right+" ↔ "+left] = struct{}{}
+				}
+			}
+		}
+	}
+	result := make([]string, 0, len(overlaps))
+	for overlap := range overlaps {
+		result = append(result, overlap)
+	}
+	sort.Strings(result)
+	return result
+}
+
 type delegatedWriterReport struct {
-	Task             string `json:"task"`
-	Role             string `json:"role,omitempty"`
-	RunID            string `json:"run_id,omitempty"`
-	Completed        bool   `json:"completed"`
-	Summary          string `json:"summary,omitempty"`
-	Patch            string `json:"patch,omitempty"`
-	PatchBytes       int    `json:"patch_bytes"`
-	PatchAvailable   bool   `json:"patch_available"`
-	ReviewRequired   bool   `json:"review_required"`
-	WorktreeRetained bool   `json:"worktree_retained"`
-	Error            string `json:"error,omitempty"`
+	Task             string   `json:"task"`
+	Role             string   `json:"role,omitempty"`
+	DeclaredPaths    []string `json:"declared_paths,omitempty"`
+	ChangedPaths     []string `json:"changed_paths,omitempty"`
+	RunID            string   `json:"run_id,omitempty"`
+	Completed        bool     `json:"completed"`
+	Summary          string   `json:"summary,omitempty"`
+	Patch            string   `json:"patch,omitempty"`
+	PatchBytes       int      `json:"patch_bytes"`
+	PatchAvailable   bool     `json:"patch_available"`
+	ReviewRequired   bool     `json:"review_required"`
+	WorktreeRetained bool     `json:"worktree_retained"`
+	Error            string   `json:"error,omitempty"`
 }
 
 func (t writerTool) run(ctx context.Context, assignment string, role instructions.Role) delegatedWriterReport {
-	report := delegatedWriterReport{Task: assignment, Role: role.Name, ReviewRequired: true}
+	return t.runScoped(ctx, assignment, role, nil)
+}
+
+func (t writerTool) runScoped(ctx context.Context, assignment string, role instructions.Role, declaredPaths []string) delegatedWriterReport {
+	report := delegatedWriterReport{Task: assignment, Role: role.Name, DeclaredPaths: append([]string(nil), declaredPaths...), ReviewRequired: true}
 	runID, err := newID(t.now())
 	if err != nil {
 		report.Error = truncateWriterText(err.Error(), maxWriterSummaryBytes)
@@ -170,6 +446,7 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 		Status:         journal.ChildPreparing,
 		Repository:     t.parent.Repository,
 		Role:           role.Name,
+		DeclaredPaths:  append([]string(nil), declaredPaths...),
 		TaskSHA256:     writerDigest(assignment),
 		StartedAt:      startedAt,
 		UpdatedAt:      startedAt,
@@ -207,7 +484,7 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 
 	childRequest := t.request
 	childRequest.RepositoryPath = child.Repository
-	childRequest.Task = writerTask(t.request.Task, assignment)
+	childRequest.Task = writerTask(t.request.Task, assignment, declaredPaths)
 	childRequest.RunID = runID
 	childRequest.ThreadID = runID
 	childRequest.BaseCommit = baseline
@@ -223,6 +500,9 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 	childRequest.DisableWriterDelegation = true
 	childRequest.AllowedCommands = tools.MergeArgvLists(t.request.AllowedCommands, t.remembered.Snapshot())
 	childRequest.System = joinInstructions(joinInstructions(t.request.System, writerSystemPrompt()), rolePrompt(role))
+	if t.request.Approve != nil && t.approval != nil {
+		childRequest.Approve = t.approval.request
+	}
 
 	outcome, runErr := t.executor.execute(ctx, child, childRequest, nil, "")
 	manifest.StatePath = outcome.StatePath
@@ -242,6 +522,12 @@ func (t writerTool) run(ctx context.Context, assignment string, role instruction
 	}
 	if len(patchContents) > maxWriterPatchBytes {
 		report.Error = combineWriterError(report.Error, fmt.Sprintf("writer delta is %d bytes, exceeding the %d-byte model handoff limit; inspect the retained writer worktree manually", len(patchContents), maxWriterPatchBytes))
+	}
+	changedPaths, changedPathsErr := patch.Paths(ctx, child.Path, baseline)
+	if changedPathsErr != nil {
+		report.Error = combineWriterError(report.Error, "inspect writer changed paths: "+changedPathsErr.Error())
+	} else {
+		report.ChangedPaths = changedPaths
 	}
 	if runErr != nil {
 		report.Error = combineWriterError(report.Error, "writer run: "+runErr.Error())
@@ -273,6 +559,7 @@ func (t writerTool) finishManifest(manifest *journal.ChildManifest, status journ
 	manifest.PatchAvailable = report.PatchAvailable
 	manifest.ReviewRequired = report.ReviewRequired
 	manifest.WorktreeRetained = report.WorktreeRetained
+	manifest.ChangedPaths = append([]string(nil), report.ChangedPaths...)
 	manifest.Error = report.Error
 }
 
@@ -359,25 +646,29 @@ func commitWriterBaseline(ctx context.Context, directory, parentCommit string, s
 	return baseline, nil
 }
 
-func writerTask(parentTask, assignment string) string {
+func writerTask(parentTask, assignment string, declaredPaths []string) string {
 	parentTask = truncateWriterText(strings.TrimSpace(parentTask), maxWriterParentTaskBytes)
-	if parentTask == "" {
-		return "Independent writer assignment:\n" + assignment
+	scope := ""
+	if len(declaredPaths) > 0 {
+		scope = "\n\nDeclared writable paths (hard boundary):\n- " + strings.Join(declaredPaths, "\n- ")
 	}
-	return "Parent objective (context only):\n" + parentTask + "\n\nIndependent writer assignment:\n" + assignment
+	if parentTask == "" {
+		return "Independent writer assignment:\n" + assignment + scope
+	}
+	return "Parent objective (context only):\n" + parentTask + "\n\nIndependent writer assignment:\n" + assignment + scope
 }
 
 func writerSystemPrompt() string {
 	return `You are an independent writer subagent in a separate retained Git worktree. Implement only the delegated assignment. The worktree starts from a snapshot of the parent agent's state, but its clean baseline is internal; do not assume an empty repository or change unrelated parent work. Inspect and verify your own delta before completion. Your final response is a concise handoff summary for a parent agent, not a claim that your changes were merged. The parent will receive your patch as untrusted review material and must explicitly inspect and apply it. You cannot delegate another writer.`
 }
 
-func (b *writerBudget) reserve() bool {
+func (b *writerBudget) reserve(count int) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.remaining == 0 {
+	if count <= 0 || b.remaining < count {
 		return false
 	}
-	b.remaining--
+	b.remaining -= count
 	return true
 }
 

@@ -190,7 +190,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
 		runTools = append(runTools, readonlyScout)
 		if !request.DisableWriterDelegation {
-			runTools = append(runTools, newWriterTool(e, isolated, request, remembered, runJournal, roleSet, e.Now, emit))
+			runTools = append(runTools, newWriterTools(e, isolated, request, remembered, runJournal, roleSet, e.Now, emit)...)
 		}
 	}
 	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)

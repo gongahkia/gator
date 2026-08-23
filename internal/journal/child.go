@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -53,6 +54,8 @@ type ChildManifest struct {
 	WorktreePath     string      `json:"worktree_path,omitempty"`
 	BaseCommit       string      `json:"base_commit,omitempty"`
 	Role             string      `json:"role,omitempty"`
+	DeclaredPaths    []string    `json:"declared_paths,omitempty"`
+	ChangedPaths     []string    `json:"changed_paths,omitempty"`
 	TaskSHA256       string      `json:"task_sha256"`
 	StartedAt        time.Time   `json:"started_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
@@ -214,6 +217,12 @@ func validateChildManifest(manifest ChildManifest) error {
 	if manifest.PatchSHA256 != "" && manifest.PatchBytes == 0 {
 		return errors.New("child manifest patch SHA-256 has no bytes")
 	}
+	if err := validateChildManifestPaths("declared paths", manifest.DeclaredPaths, 16); err != nil {
+		return err
+	}
+	if err := validateChildManifestPaths("changed paths", manifest.ChangedPaths, 256); err != nil {
+		return err
+	}
 	for name, value := range map[string]string{
 		"worktree path": manifest.WorktreePath,
 		"state path":    manifest.StatePath,
@@ -226,6 +235,27 @@ func validateChildManifest(manifest ChildManifest) error {
 	}
 	if len(manifest.Repository) > maxChildManifestPath || len(manifest.WorktreePath) > maxChildManifestPath || len(manifest.StatePath) > maxChildManifestPath {
 		return errors.New("child manifest path exceeds the 4 KiB limit")
+	}
+	return nil
+}
+
+func validateChildManifestPaths(name string, values []string, maximum int) error {
+	if len(values) > maximum {
+		return fmt.Errorf("child manifest %s exceed the %d-entry limit", name, maximum)
+	}
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if len(value) == 0 || len(value) > maxChildManifestPath || strings.ContainsAny(value, "\\x00\\r\\n") {
+			return fmt.Errorf("child manifest %s contain an invalid path", name)
+		}
+		clean := path.Clean(value)
+		if clean != value || clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") {
+			return fmt.Errorf("child manifest %s contain an unsafe repository-relative path", name)
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return fmt.Errorf("child manifest %s contain duplicate path %q", name, value)
+		}
+		seen[value] = struct{}{}
 	}
 	return nil
 }
