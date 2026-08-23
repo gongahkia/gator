@@ -97,9 +97,11 @@ Each child writes an atomic private manifest under the parent run record before
 worktree creation, while running, and after completion. The manifest records
 the child ID, role, immutable baseline, retained worktree, child run record,
 task and patch digests, declared and actual paths, and outcome without copying
-prompt or patch text. It remains recoverable after a process failure through
-`gator child list` and `gator child show`. Each child reloads the same selected
-profile, verifier, sandbox policy, approval callback, and trusted
+prompt or patch text. A batch manifest links the exact two child IDs and saves
+the final changed-path conflict evidence. They remain recoverable after a
+process failure through `gator child list`, `gator child show`, `gator child
+batches`, and `gator child batch`. Each child reloads the same selected profile,
+verifier, sandbox policy, approval callback, and trusted
 extension/LSP/MCP configuration; recursive writer delegation is omitted from
 its tool surface. A validated project `writer` role can specialize the child
 prompt but cannot alter its policy. The parent is paused while children run.

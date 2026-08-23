@@ -477,10 +477,12 @@ separate `apply_patch` call for each compatible delta. Gator never auto-merges
 writer output. Writer children inherit the developer-selected profile,
 verifier, sandbox, approval policy, and trusted integrations, but cannot
 recursively create writers. Their lifecycle, baseline, patch digest, worktree,
-and child run record are saved privately under the parent run record; inspect
-them with `gator child list RUN_RECORD_PATH` or `gator child show
-RUN_RECORD_PATH CHILD_RUN_ID`. A named project `writer` role focuses prompt
-instructions only and cannot weaken these boundaries.
+and child run record are saved privately under the parent run record. A batch
+also persists its two-child schedule and conflict evidence; inspect children
+with `gator child list RUN_RECORD_PATH` and `gator child show RUN_RECORD_PATH
+CHILD_RUN_ID`, or batches with `gator child batches RUN_RECORD_PATH` and `gator
+child batch RUN_RECORD_PATH BATCH_ID`. A named project `writer` role focuses
+prompt instructions only and cannot weaken these boundaries.
 
 Execute mode also gives the native model a persistent terminal-task surface:
 `terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and
