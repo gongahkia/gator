@@ -116,9 +116,12 @@ func TestManagerKeepsExplicitlyDetachedTaskInSessionRegistry(t *testing.T) {
 	}
 	registry := NewRegistry()
 	defer registry.Close()
+	normalExit := make(chan Task, 1)
+	backgroundExit := make(chan Task, 1)
 	manager := New(Config{
 		Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}, IDPrefix: "term-run-001", Registry: registry,
 		Lifetime: 100 * time.Millisecond, BackgroundLifetime: time.Second,
+		OnExit: func(task Task) { normalExit <- task }, OnBackgroundExit: func(task Task) { backgroundExit <- task },
 	})
 	task, err := manager.Start(context.Background(), []string{sh, "-lc", "sleep 30"})
 	if err != nil {
@@ -141,6 +144,19 @@ func TestManagerKeepsExplicitlyDetachedTaskInSessionRegistry(t *testing.T) {
 	state := awaitTerminalExit(t, manager, task.ID)
 	if state.Status != "exited" || !state.Background {
 		t.Fatalf("detached terminal state = %#v", state)
+	}
+	select {
+	case exited := <-backgroundExit:
+		if exited.ID != task.ID || !exited.Background {
+			t.Fatalf("background terminal exit = %#v", exited)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("detached terminal did not use background exit callback")
+	}
+	select {
+	case exited := <-normalExit:
+		t.Fatalf("detached terminal wrote normal run callback: %#v", exited)
+	default:
 	}
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {

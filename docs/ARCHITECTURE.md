@@ -211,27 +211,33 @@ Execute mode exposes these tools:
    `sh -c`); required `--verify` argv runs immediately, and any other invocation
    waits for allow-once, always-allow-this-argv, or deny;
 5. inspect Git status and diff.
-6. start, read, write, list, and stop bounded persistent pseudo-terminal tasks.
+6. start, read, write, list, and stop bounded persistent pseudo-terminal tasks;
+   in the native TUI only, request a separately approved `terminal_detach` for
+   one task that must remain available after the agent run.
 7. when the developer explicitly allows network access, fetch one approved
    public HTTPS text resource with `http_fetch`, and when
    `BRAVE_SEARCH_API_KEY` is present, issue one approved `web_search` query.
 
 Terminal-task starts share the run's strict sandbox, worktree root, network
 policy, filtered environment, and developer command approval. They retain only
-bounded in-memory scrollback and are cancelled at run completion. A model must
-request a separate approval for each distinct terminal input; approval events
-contain an ID, size, and SHA-256 digest rather than the input bytes. During a
-native TUI run, `Ctrl+T` can attach a developer to an existing task: it renders
-bounded display output, resizes the existing PTY to its viewport, interprets
-common cursor/erase controls and private alternate-screen transitions, allows a
-line write, ETX interrupt, task stop, or opt-in raw keyboard input. Raw mode
-maps normal, control, navigation, and common function keys back to terminal
-bytes; `Ctrl+]` returns to Gator controls. Direct input emits only
-byte-count/digest metadata, with raw keys aggregated until raw mode ends or the
-task exits. The attachment does not create commands, broaden the fixed task
-sandbox, persist task output, or survive a completed agent run. It remains a
-bounded attachment rather than a full VT emulator or an ACP/client terminal
-multiplexer.
+bounded in-memory scrollback and ordinary tasks are cancelled at run completion.
+In the native TUI, a model may request `terminal_detach`; a distinct developer
+approval then keeps that existing task in the process-local session registry,
+with its original policy, an at-most-two-hour lifetime, and a session-wide cap
+of eight tasks. Detachment is omitted from CLI, RPC, ACP, and child-writer tool
+surfaces, and Gator's normal shutdown path stops all detached tasks. A model must request a
+separate approval for each distinct terminal input; approval events contain an
+ID, size, and SHA-256 digest rather than the input bytes. During a native TUI
+run, `Ctrl+T` can attach a developer to an existing task: it renders bounded
+display output, resizes the existing PTY to its viewport, interprets common
+cursor/erase controls and private alternate-screen transitions, allows a line
+write, ETX interrupt, task stop, or opt-in raw keyboard input. Raw mode maps
+normal, control, navigation, and common function keys back to terminal bytes;
+`Ctrl+]` returns to Gator controls. Direct input emits only byte-count/digest
+metadata while its owning run is active, with raw keys aggregated until raw mode
+ends or the task exits. The attachment does not create commands, broaden the
+fixed task sandbox, persist task output across a Gator restart, or become a
+full VT emulator or ACP/client terminal multiplexer.
 
 `http_fetch` accepts port-443 HTTPS URLs only. Before a request, Gator resolves
 the hostname, rejects local/private/reserved results, and pins the approved
