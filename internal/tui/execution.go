@@ -308,15 +308,14 @@ func (m Model) startDelegatedRun(task string) (tea.Model, tea.Cmd) {
 }
 
 // startFailure leaves the current task editable and records the complete
-// failure in the scrollable conversation. The composer notice remains a
-// compact status signal, while the transcript is the place to inspect long
-// provider and configuration errors.
+// failure in the scrollable conversation. The transcript is the single source
+// of visible error detail, so the composer does not repeat the same message.
 func (m Model) startFailure(message string) (tea.Model, tea.Cmd) {
 	message = strings.TrimSpace(message)
 	if message == "" {
 		message = "Unable to start the run."
 	}
-	m.notice = notice{text: message, kind: noticeError}
+	m.notice = notice{}
 	m.appendChat(chatEntry{author: chatSystem, text: "Unable to start run: " + message, isError: true})
 	return m, nil
 }

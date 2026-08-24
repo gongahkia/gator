@@ -35,6 +35,8 @@ var slashCommands = []slashCommand{
 	{name: "/clear-queue", description: "remove every queued instruction"},
 	{name: "/clone", description: "duplicate the active retained branch"},
 	{name: "/compact", description: "summarize older retained context before the next turn"},
+	{name: "/copy", description: "copy the most recent Gator response"},
+	{name: "/copyall", description: "copy the full conversation transcript"},
 	{name: "/dequeue", description: "remove the next queued instruction"},
 	{name: "/effort", description: "choose Fast, Standard, Thorough, or Maximum investigation effort"},
 	{name: "/extensions", description: "open trusted extension cards for this surface"},

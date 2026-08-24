@@ -146,6 +146,10 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.forceCompaction = true
 		m.commandOutput = "The next retained-thread run will summarize older context before it starts. The source transcript remains available in its run records."
 		m.notice = notice{text: "Older retained context will be compacted before the next turn.", kind: noticeInfo}
+	case "/copy":
+		return m.copyLatestAgentOutput()
+	case "/copyall":
+		return m.copyConversationTranscript()
 	case "/fork":
 		if m.resumeStatePath == "" {
 			m.notice = notice{text: "Continue a retained thread before choosing a turn to fork.", kind: noticeInfo}
