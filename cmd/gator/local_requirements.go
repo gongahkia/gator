@@ -38,7 +38,7 @@ func writeLocalModelDoctor(out io.Writer, host localmodel.Host) error {
 		}
 	} else {
 		memory := localmodel.FormatBytes(host.TotalMemoryBytes) + " total"
-		if host.AvailableMemoryBytes != 0 {
+		if host.AvailableMemoryKnown || host.AvailableMemoryBytes != 0 {
 			memory += ", " + localmodel.FormatBytes(host.AvailableMemoryBytes) + " available"
 		} else if host.MemoryError != "" {
 			memory += " (available memory unavailable: " + host.MemoryError + ")"
@@ -54,7 +54,7 @@ func writeLocalModelDoctor(out io.Writer, host localmodel.Host) error {
 			storage += " (" + host.ModelDirectorySource + ")"
 		}
 	}
-	if host.AvailableDiskBytes != 0 {
+	if host.AvailableDiskKnown || host.AvailableDiskBytes != 0 {
 		storage += ", " + localmodel.FormatBytes(host.AvailableDiskBytes) + " free"
 	} else if host.DiskError != "" {
 		storage += " (free space unavailable: " + host.DiskError + ")"
@@ -85,11 +85,11 @@ func localModelHostSummary(host localmodel.Host) (string, []string) {
 	summary := host.OS + "/" + host.Architecture
 	if host.TotalMemoryBytes != 0 {
 		summary += " · " + localmodel.FormatBytes(host.TotalMemoryBytes) + " RAM"
-		if host.AvailableMemoryBytes != 0 {
+		if host.AvailableMemoryKnown || host.AvailableMemoryBytes != 0 {
 			summary += " · " + localmodel.FormatBytes(host.AvailableMemoryBytes) + " available"
 		}
 	}
-	if host.AvailableDiskBytes != 0 {
+	if host.AvailableDiskKnown || host.AvailableDiskBytes != 0 {
 		summary += " · " + localmodel.FormatBytes(host.AvailableDiskBytes) + " model storage free"
 	}
 	advice := make([]string, 0, 2)

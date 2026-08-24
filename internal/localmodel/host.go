@@ -24,9 +24,11 @@ func DetectHost() Host {
 		Architecture:         runtime.GOARCH,
 		TotalMemoryBytes:     totalMemory,
 		AvailableMemoryBytes: availableMemory,
+		AvailableMemoryKnown: memoryErr == "",
 		ModelDirectory:       directory,
 		ModelDirectorySource: source,
 		AvailableDiskBytes:   availableDisk,
+		AvailableDiskKnown:   diskErr == "",
 		MemoryError:          memoryErr,
 		DiskError:            diskErr,
 	}

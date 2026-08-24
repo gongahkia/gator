@@ -24,9 +24,11 @@ type Host struct {
 	Architecture         string
 	TotalMemoryBytes     uint64
 	AvailableMemoryBytes uint64
+	AvailableMemoryKnown bool
 	ModelDirectory       string
 	ModelDirectorySource string
 	AvailableDiskBytes   uint64
+	AvailableDiskKnown   bool
 	MemoryError          string
 	DiskError            string
 }
@@ -73,16 +75,16 @@ func Assess(model Model, host Host) Eligibility {
 	if host.TotalMemoryBytes < result.RequiredMemoryBytes {
 		return result.block(fmt.Sprintf("requires at least %s total RAM under Gator's guardrail; detected %s", FormatBytes(result.RequiredMemoryBytes), FormatBytes(host.TotalMemoryBytes)))
 	}
-	if host.AvailableMemoryBytes != 0 && host.AvailableMemoryBytes < result.RequiredMemoryBytes {
+	if availableMemoryKnown(host) && host.AvailableMemoryBytes < result.RequiredMemoryBytes {
 		return result.block(fmt.Sprintf("requires %s currently available RAM under Gator's guardrail; detected %s", FormatBytes(result.RequiredMemoryBytes), FormatBytes(host.AvailableMemoryBytes)))
 	}
-	if host.AvailableDiskBytes != 0 && host.AvailableDiskBytes < result.RequiredDiskBytes {
+	if availableDiskKnown(host) && host.AvailableDiskBytes < result.RequiredDiskBytes {
 		return result.block(fmt.Sprintf("requires %s free in the Ollama model filesystem; detected %s", FormatBytes(result.RequiredDiskBytes), FormatBytes(host.AvailableDiskBytes)))
 	}
-	if host.AvailableMemoryBytes == 0 {
+	if !availableMemoryKnown(host) {
 		result.Advice = append(result.Advice, "Current available RAM could not be measured; Gator checked physical RAM only.")
 	}
-	if host.AvailableDiskBytes == 0 {
+	if !availableDiskKnown(host) {
 		advice := "Ollama model filesystem capacity could not be measured"
 		if host.DiskError != "" {
 			advice += ": " + host.DiskError
@@ -90,6 +92,14 @@ func Assess(model Model, host Host) Eligibility {
 		result.Advice = append(result.Advice, advice+".")
 	}
 	return result
+}
+
+func availableMemoryKnown(host Host) bool {
+	return host.AvailableMemoryKnown || host.AvailableMemoryBytes != 0
+}
+
+func availableDiskKnown(host Host) bool {
+	return host.AvailableDiskKnown || host.AvailableDiskBytes != 0
 }
 
 func (result Eligibility) block(reason string) Eligibility {

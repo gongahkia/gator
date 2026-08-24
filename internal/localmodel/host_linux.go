@@ -24,6 +24,7 @@ func linuxMemory() (uint64, uint64, string) {
 		return 0, 0, fmt.Sprintf("read /proc/meminfo: %v", err)
 	}
 	values := make(map[string]uint64)
+	present := make(map[string]bool)
 	for _, line := range strings.Split(string(content), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 2 || !strings.HasSuffix(fields[0], ":") {
@@ -33,14 +34,16 @@ func linuxMemory() (uint64, uint64, string) {
 		if err != nil {
 			continue
 		}
-		values[strings.TrimSuffix(fields[0], ":")] = value * 1024
+		name := strings.TrimSuffix(fields[0], ":")
+		values[name] = value * 1024
+		present[name] = true
 	}
 	total := values["MemTotal"]
 	available := values["MemAvailable"]
-	if total == 0 {
+	if !present["MemTotal"] || total == 0 {
 		return 0, available, "MemTotal was not present in /proc/meminfo"
 	}
-	if available == 0 {
+	if !present["MemAvailable"] {
 		return total, 0, "MemAvailable was not present in /proc/meminfo"
 	}
 	return total, available, ""

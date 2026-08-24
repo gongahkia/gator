@@ -1,5 +1,6 @@
 .gator/
 bin/
 /gator
+/gator.exe
 coverage.out
 AGENTS.md
