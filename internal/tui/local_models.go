@@ -67,6 +67,9 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "OAuth login cancellation requested.", kind: noticeInfo}
 		return m, nil
 	}
+	if m.localModels.cloudSetup != nil {
+		return m.updateCloudModelSetup(message)
+	}
 	if m.localModels.renaming != nil {
 		return m.updateModelRename(message)
 	}
@@ -128,6 +131,8 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveModelCatalogSelection(1)
 	case "e":
 		return m.beginModelRename()
+	case "c":
+		return m.beginCloudModelSetup()
 	case "l":
 		if m.localModels.section != cloudModelSection {
 			m.notice = notice{text: "Cloud sign-in is available from the Cloud section.", kind: noticeInfo}
@@ -593,6 +598,7 @@ func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
 	}
 	m.provider.SetValue(cloud.provider)
 	m.model.SetValue(cloud.model)
+	m.config.BaseURL = m.providerEndpoint(cloud.provider)
 	m.delegateRuntime = ""
 	m.persistDraft()
 	m.refreshPreflight()
