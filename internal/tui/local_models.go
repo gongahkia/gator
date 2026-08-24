@@ -92,16 +92,19 @@ type localModelOperationDone struct {
 }
 
 type localModelStatusMsg struct {
-	catalog LocalModelCatalog
-	err     error
+	generation uint64
+	catalog    LocalModelCatalog
+	err        error
 }
 
 type localModelProgressMsg struct {
-	progress LocalModelProgress
+	operation *localModelOperation
+	progress  LocalModelProgress
 }
 
 type localModelDoneMsg struct {
-	done localModelOperationDone
+	operation *localModelOperation
+	done      localModelOperationDone
 }
 
 type localModelsState struct {
@@ -114,6 +117,7 @@ type localModelsState struct {
 	progress     LocalModelProgress
 	spinner      spinner.Model
 	err          error
+	generation   uint64
 }
 
 func newLocalModelsState(manager LocalModelManager, spinner spinner.Model) localModelsState {
@@ -136,17 +140,18 @@ func (m Model) beginLocalStatus() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.cancelLocalOperation()
+	m.localModels.generation++
 	m.localModels.action = localModelRefreshing
 	m.localModels.err = nil
-	return m, tea.Batch(m.localModels.spinner.Tick, loadLocalModelStatus(m.localModels.manager))
+	return m, tea.Batch(m.localModels.spinner.Tick, loadLocalModelStatus(m.localModels.manager, m.localModels.generation))
 }
 
-func loadLocalModelStatus(manager LocalModelManager) tea.Cmd {
+func loadLocalModelStatus(manager LocalModelManager, generation uint64) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		catalog, err := manager.Status(ctx)
-		return localModelStatusMsg{catalog: catalog, err: err}
+		return localModelStatusMsg{generation: generation, catalog: catalog, err: err}
 	}
 }
 
@@ -164,6 +169,13 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.localModels.action != localModelIdle {
 		switch message.String() {
 		case "ctrl+c", "esc":
+			if m.localModels.action == localModelRefreshing {
+				m.localModels.generation++
+				m.localModels.action = localModelIdle
+				m.screen = composeScreen
+				m.notice = notice{text: "Local model status check cancelled.", kind: noticeInfo}
+				return m, m.focusField()
+			}
 			m.cancelLocalOperation()
 			m.localModels.action = localModelIdle
 			m.localModels.err = nil
@@ -318,11 +330,11 @@ func waitForLocalModelOperation(operation *localModelOperation) tea.Cmd {
 		select {
 		case progress, open := <-operation.progress:
 			if open {
-				return localModelProgressMsg{progress: progress}
+				return localModelProgressMsg{operation: operation, progress: progress}
 			}
-			return localModelDoneMsg{done: <-operation.done}
+			return localModelDoneMsg{operation: operation, done: <-operation.done}
 		case done := <-operation.done:
-			return localModelDoneMsg{done: done}
+			return localModelDoneMsg{operation: operation, done: done}
 		}
 	}
 }
