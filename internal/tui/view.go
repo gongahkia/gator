@@ -546,7 +546,7 @@ func (m Model) activityView() string {
 	if turn < 1 {
 		turn = 1
 	}
-	facts := fmt.Sprintf("%s · Gator-owned loop · isolated worktree · turn %d/%d", mode, turn, m.config.MaxSteps)
+	facts := fmt.Sprintf("%s · %s effort · Gator-owned loop · isolated worktree · turn %d/%d", mode, m.effort.label(), turn, m.effort.maxSteps(m.config.MaxSteps))
 	if age := m.lastActivityAge(time.Now()); age != "" {
 		facts += " · last activity " + age
 	}

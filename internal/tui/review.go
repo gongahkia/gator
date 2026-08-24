@@ -48,6 +48,11 @@ type reviewFileRow struct {
 	text string
 }
 
+type reviewMouseControl struct {
+	label string
+	key   string
+}
+
 func (m Model) currentReviewSet() review.ChangeSet {
 	return m.reviewSnapshot.ChangeSet(m.reviewScope)
 }
@@ -336,7 +341,7 @@ func (m Model) updateReviewRequest(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.reviewRequest.Blur()
 		m.notice = notice{text: "Change request cancelled. The selected range remains local.", kind: noticeInfo}
 		return m, nil
-	case "ctrl+enter":
+	case "ctrl+r":
 		return m.submitReviewRequest()
 	}
 	var command tea.Cmd
@@ -442,7 +447,7 @@ func (m Model) structuredReviewView() string {
 	set := m.currentReviewSet()
 	scope := map[review.Scope]string{review.All: "all changes", review.Unstaged: "unstaged", review.Staged: "staged"}[m.reviewScope]
 	summary := fmt.Sprintf("%s · %d files · %d additions · %d deletions", scope, set.Stats.Files, set.Stats.Additions, set.Stats.Deletions)
-	sections := []string{m.header("review"), m.inline(keyStyle.Render(summary)), m.inline(dimStyle.Render("1 all · 2 unstaged · 3 staged · Tab changes pane · mouse clicks select"))}
+	sections := []string{m.header("review"), m.inline(keyStyle.Render(summary)), m.inline(m.reviewActionBar())}
 	if m.reviewSnapshot.Truncated {
 		sections = append(sections, m.inline(errorStyle.Render("Review source is truncated; inspect the retained worktree before staging or requesting changes.")))
 	}
@@ -462,12 +467,60 @@ func (m Model) structuredReviewView() string {
 	return m.reviewFooter(sections)
 }
 
+func (m Model) reviewActionBar() string {
+	controls := m.reviewMouseControls()
+	labels := make([]string, 0, len(controls))
+	for _, control := range controls {
+		labels = append(labels, "["+control.label+"]")
+	}
+	return dimStyle.Render("mouse/keys ") + keyStyle.Render(strings.Join(labels, " "))
+}
+
+func (m Model) reviewMouseControls() []reviewMouseControl {
+	if m.reviewRequestOn {
+		return []reviewMouseControl{{label: "send", key: "ctrl+r"}, {label: "cancel", key: "esc"}}
+	}
+	if m.reviewMutation != nil {
+		return []reviewMouseControl{{label: "confirm", key: "enter"}, {label: "cancel", key: "esc"}}
+	}
+	return []reviewMouseControl{
+		{label: "1 all", key: "1"}, {label: "2 unstaged", key: "2"}, {label: "3 staged", key: "3"},
+		{label: "f raw", key: "f"}, {label: "s hunk", key: "s"}, {label: "S file", key: "S"},
+		{label: "v range", key: "v"}, {label: "r request", key: "r"}, {label: "d refresh", key: "d"},
+	}
+}
+
+func (m Model) reviewMouseControlAt(column int) (string, bool) {
+	position := len("mouse/keys ")
+	for _, control := range m.reviewMouseControls() {
+		width := len(control.label) + 2
+		if column >= position && column < position+width {
+			return control.key, true
+		}
+		position += width + 1
+	}
+	return "", false
+}
+
+func reviewMouseKey(value string) tea.KeyMsg {
+	if value == "ctrl+r" {
+		return tea.KeyMsg{Type: tea.KeyCtrlR}
+	}
+	if value == "enter" {
+		return tea.KeyMsg{Type: tea.KeyEnter}
+	}
+	if value == "esc" {
+		return tea.KeyMsg{Type: tea.KeyEsc}
+	}
+	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value)}
+}
+
 func (m Model) reviewFooter(sections []string) string {
 	if m.reviewMutation != nil {
 		sections = append(sections, m.panel(keyStyle.Render("Confirm review update: y/Enter confirm · n/Esc cancel")))
 	}
 	if m.reviewRequestOn {
-		sections = append(sections, labelStyle.Render("Request a change"), m.panel(m.reviewRequest.View()), m.footer("Ctrl+Enter send follow-up", "Esc cancel"))
+		sections = append(sections, labelStyle.Render("Request a change"), m.panel(m.reviewRequest.View()), m.footer("Ctrl+R send follow-up", "Esc cancel"))
 		return strings.Join(sections, "\n")
 	}
 	if summary := m.extensionUISummary("review"); summary != "" {
@@ -621,7 +674,7 @@ func renderFocusedReviewHunk(hunk review.Hunk, selected, from int) []string {
 }
 
 func (m Model) updateReviewMouse(message tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if !m.reviewLoaded || m.reviewRequestOn || m.reviewMutation != nil {
+	if !m.reviewLoaded {
 		return m, nil
 	}
 	if message.Button == tea.MouseButtonWheelUp {
@@ -635,13 +688,22 @@ func (m Model) updateReviewMouse(message tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if message.Action != tea.MouseActionPress || message.Button != tea.MouseButtonLeft {
 		return m, nil
 	}
+	if message.Y == 2 {
+		if key, found := m.reviewMouseControlAt(message.X); found {
+			return m.updateStructuredReview(reviewMouseKey(key))
+		}
+	}
+	if m.reviewRequestOn || m.reviewMutation != nil {
+		return m, nil
+	}
 	set := m.currentReviewSet()
 	if len(set.Files) == 0 {
 		return m, nil
 	}
 	rows := m.reviewFileRows()
-	if !m.compactLayout() && m.width >= 92 && message.X < max(28, m.inlineWidth()/3) && message.Y >= 4 {
-		index := message.Y - 4
+	contentStart := m.reviewContentStartY()
+	if !m.compactLayout() && m.width >= 92 && message.X < max(28, m.inlineWidth()/3) && message.Y >= contentStart {
+		index := message.Y - contentStart
 		if index >= 0 && index < len(rows) && rows[index].file >= 0 {
 			m.reviewPane, m.reviewFileIndex = reviewFilesPane, rows[index].file
 			m.reviewHunkIndex, m.reviewLineIndex, m.reviewRangeFrom = 0, 0, -1
@@ -653,7 +715,7 @@ func (m Model) updateReviewMouse(message tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	start := 4
+	start := contentStart
 	if m.compactLayout() || m.width < 92 {
 		start += len(rows) + 1
 	}
@@ -676,4 +738,12 @@ func (m Model) updateReviewMouse(message tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m Model) reviewContentStartY() int {
+	start := 4
+	if m.reviewSnapshot.Truncated {
+		start++
+	}
+	return start
 }

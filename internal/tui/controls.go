@@ -187,7 +187,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.screen = reviewScreen
-		return m, nil
+		m.notice = notice{text: "Refreshing the retained-worktree review…", kind: noticeInfo}
+		return m, loadReview(*m.outcome)
 	case "/recent", "/threads":
 		return m.openRecentRuns()
 	case "/tree":
@@ -776,7 +777,8 @@ func (m Model) sessionStatus() string {
 	if m.delegateRuntime != "" {
 		runtime = delegatedRuntimeLabel(m.delegateRuntime)
 	}
-	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\nmax steps: " + fmt.Sprint(m.config.MaxSteps) + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
+	effectiveSteps := m.effort.maxSteps(m.config.MaxSteps)
+	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\neffort: " + m.effort.label() + "\nmax steps: " + fmt.Sprint(effectiveSteps) + " (base " + fmt.Sprint(m.config.MaxSteps) + ")\n" + m.queueSummary() + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {

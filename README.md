@@ -169,14 +169,18 @@ provider mode, verifier state, and a preview of the next queued work; it does
 not estimate token use or fake percentage progress. After a run, the latest
 result summarizes verifier status and the visible diff's file/addition/deletion
 counts. Failure states include the reason plus the relevant next action.
-Use `/review` for the final report and diff preview. It starts in focused mode:
-when a unified-diff hunk contains a multi-line block duplicated on both sides
-after indentation-only normalization, Gator collapses that block so the actual
-structural edit remains visible. Press `f` to see the complete raw patch;
-`↑`/`↓`, `j`/`k`, and `PgUp`/`PgDn` scroll either mode. This is review-only:
-the agent's `git_diff` tool and patch export retain the complete raw Git diff.
-Press `e` for patch handoff commands, `Esc` to return to the conversation, or
-`n` for a new thread.
+Use `/review` for a retained-worktree review surface with an expanded changed
+file tree, additions/deletions, hunk navigation, focused/raw rendering per
+file, explicit staged/unstaged file or hunk operations, and range-scoped
+change requests. `v` starts a line range, `r` opens a request, and `Ctrl+R`
+sends that bounded context as a retained-thread follow-up. `e`
+still shows explicit patch handoff commands; the active checkout is never
+changed from review. See [Review surfaces](docs/REVIEW.md) for the full
+terminal controls and the separate authenticated loopback browser surface:
+
+```sh
+./bin/gator review RUN_RECORD_PATH --open
+```
 
 `/vim` toggles Vim-style message editing. Vim Normal mode provides counts,
 `h`/`j`/`k`/`l`, `0`/`^`/`$`, `w`/`b`/`e`, `gg`/`G`, insert commands
@@ -215,7 +219,7 @@ type `@` in a task to select a repository file or directory from matching path
 suggestions. In the command menu, `Tab` completes the selected command and
 `Enter` executes it; path suggestions accept either key to insert the path.
 Conversation
-commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
+commands are `/plan`, `/execute`, `/new`, `/status`, `/effort`, `/model`, `/extensions`, `/verify`,
 `/permissions`, `/worktree`, `/review`, `/threads`,
 `/recent`, `/tree`, `/fork`, `/clone`, `/compact`, `/clear`, `/queue`,
 `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every

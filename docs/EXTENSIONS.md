@@ -57,6 +57,15 @@ Every bundle has a `gator-extension.json` file:
       "prompt": "prompts/focused-review.md"
     }
   ],
+  "ui": [
+    {
+      "id": "review_checklist",
+      "slot": "review",
+      "title": "Team review checklist",
+      "description": "Check exported API impact and regression coverage.",
+      "prompt": "prompts/review-checklist.md"
+    }
+  ],
   "tools": [
     {
       "name": "lookup",
@@ -89,6 +98,22 @@ An extension command appears in the terminal palette as
 the composer for review and editing; it never sends a run automatically. This
 is the standard prompt-template interface for packages and keeps user control
 visible at the send boundary.
+
+## Declarative native UI cards
+
+An extension can contribute up to sixteen static native TUI cards through the
+`ui` manifest field. A card has an ID, `composer` or `review` slot, title, and
+description. It may name one `.md` or `.txt` prompt resource. Gator verifies
+the same installed or hash-pinned project bundle before reading it, renders the
+card with its own native layout and theme, and exposes it through
+`/extensions` in the composer or `x` in review.
+
+Selecting a card with a prompt fills the composer; it does not send a run.
+Cards without a prompt are informational. This is deliberately not a plugin
+webview API: manifests cannot supply JavaScript, CSS, arbitrary key handlers,
+HTTP routes, subprocesses, or dynamic rendering code. Executable behavior
+continues to require an explicit `tools` declaration and the existing
+sandboxed, approval-gated sidecar boundary.
 
 ## Sidecar tool protocol
 
