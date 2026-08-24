@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 )
@@ -36,6 +38,15 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	executor, err := newExecutor(localmodel.ProviderID, "", "")
 	if err != nil || executor.Model == nil {
 		t.Fatalf("local executor = %#v, err = %v", executor, err)
+	}
+	if _, ok := executor.Model.(localmodel.TextOnlyModel); !ok {
+		t.Fatalf("local executor model = %T, want text-only local wrapper", executor.Model)
+	}
+	if _, err := newExecutor(localmodel.ProviderID, "", "http://models.example.com/v1/chat/completions"); err == nil || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("managed local remote override error = %v", err)
+	}
+	if _, err := executor.Model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Images: []agent.Image{{Name: "design.png"}}}}}); err == nil || !strings.Contains(err.Error(), "text only") {
+		t.Fatalf("local image error = %v", err)
 	}
 	if !strings.Contains(output.String(), "Native TUI, run, resume") {
 		t.Fatalf("local use output = %q", output.String())

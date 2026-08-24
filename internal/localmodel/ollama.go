@@ -73,6 +73,21 @@ func NewClient(rawURL string) (Client, error) {
 	return Client{baseURL: parsed, client: http.DefaultClient}, nil
 }
 
+// NewClientFromChatCompletionsURL validates the endpoint persisted for the
+// managed provider and recovers its loopback Ollama runtime root.
+func NewClientFromChatCompletionsURL(rawURL string) (Client, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return Client{}, fmt.Errorf("parse local Chat Completions URL: %w", err)
+	}
+	const suffix = "/v1/chat/completions"
+	if !strings.HasSuffix(parsed.Path, suffix) {
+		return Client{}, errors.New("local Chat Completions URL must end in /v1/chat/completions")
+	}
+	parsed.Path = strings.TrimSuffix(parsed.Path, suffix)
+	return NewClient(parsed.String())
+}
+
 // BaseURL returns the runtime API root used by this client.
 func (c Client) BaseURL() string {
 	if c.baseURL == nil {

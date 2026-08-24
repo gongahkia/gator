@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/localmodel"
 )
 
 func TestProviderCommandPersistsKeylessLocalEndpoint(t *testing.T) {
@@ -52,6 +53,15 @@ func TestProviderCommandRejectsBuiltInProviderID(t *testing.T) {
 	err := providerCommand([]string{"add", "openai", "--base-url", "http://127.0.0.1:11434/v1/chat/completions", "--model", "qwen3-coder"}, &output)
 	if err == nil || !strings.Contains(err.Error(), "conflicts") {
 		t.Fatalf("add built-in provider error = %v", err)
+	}
+}
+
+func TestProviderCommandReservesManagedLocalProviderID(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	var output bytes.Buffer
+	err := providerCommand([]string{"add", localmodel.ProviderID, "--base-url", "http://127.0.0.1:11434/v1/chat/completions", "--model", "qwen3-coder"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "reserved") {
+		t.Fatalf("managed local provider configuration error = %v", err)
 	}
 }
 
