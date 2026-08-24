@@ -103,6 +103,7 @@ func TestLocalModelsShowsUnavailableRuntimeWithoutHidingCatalog(t *testing.T) {
 	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
 		RuntimeURL:   "http://127.0.0.1:11434",
 		RuntimeError: "connect to local Ollama runtime: connection refused",
+		Executable:   "/usr/bin/ollama",
 		Models:       []LocalModel{{ID: "qwen2.5-coder-7b", Name: "Qwen2.5-Coder 7B", Download: "4.7 GB", Context: "32K"}},
 	}}
 	model := New(Config{LocalModels: manager})
@@ -128,6 +129,7 @@ func TestLocalModelsStartOllamaWithGatorByDefault(t *testing.T) {
 	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
 		RuntimeURL:   "http://127.0.0.1:11434",
 		RuntimeError: "connect to local Ollama runtime: connection refused",
+		Executable:   "/usr/bin/ollama",
 		Models:       []LocalModel{{ID: "qwen2.5-coder-7b", Name: "Qwen2.5-Coder 7B"}},
 	}}
 	model := New(Config{LocalModels: manager})
@@ -150,6 +152,52 @@ func TestLocalModelsStartOllamaWithGatorByDefault(t *testing.T) {
 	model = finishLocalModelOperation(t, model)
 	if !manager.started || model.localModels.catalog.RuntimeError != "" || !strings.Contains(model.notice.text, "running under this Gator session") {
 		t.Fatalf("started local runtime = manager:%#v catalog:%#v notice:%q", manager, model.localModels.catalog, model.notice.text)
+	}
+}
+
+func TestLocalModelsOfferInstallationHelpWhenOllamaIsMissing(t *testing.T) {
+	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
+		RuntimeURL:   "http://127.0.0.1:11434",
+		RuntimeError: "connect to local Ollama runtime: connection refused",
+		Dependencies: []LocalDependency{
+			{
+				ID:           "ollama",
+				Name:         "Ollama",
+				Purpose:      "reviewed local coding models",
+				HelpURL:      "https://ollama.com/download",
+				Instructions: []string{"Install Ollama from its official download page, then refresh this screen."},
+			},
+			{
+				ID:           "bubblewrap",
+				Name:         "Bubblewrap",
+				Purpose:      "strict Linux sandboxing",
+				Required:     true,
+				HelpURL:      "https://github.com/containers/bubblewrap",
+				Instructions: []string{"Install the bubblewrap package."},
+			},
+		},
+		Models: []LocalModel{{ID: "qwen2.5-coder-7b", Name: "Qwen2.5-Coder 7B"}},
+	}}
+	model := New(Config{LocalModels: manager})
+	model.width, model.height = 100, 40
+	model.screen = localModelsScreen
+	model.localModels.action = localModelRefreshing
+	model.localModels.generation = 1
+	next, _ := model.Update(localModelStatusMsg{generation: 1, catalog: manager.catalog})
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelConfirmInstall || !strings.Contains(model.View(), "Install Ollama?") {
+		t.Fatalf("install prompt = %#v view:%q", model.localModels, model.View())
+	}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if command != nil || manager.started || !model.localModels.dependencyHelp {
+		t.Fatalf("installation help state = command:%#v manager:%#v state:%#v", command, manager, model.localModels)
+	}
+	view := model.View()
+	if !strings.Contains(view, "https://ollama.com/download") || !strings.Contains(view, "Bubblewrap") || !strings.Contains(model.notice.text, "does not run system installers") {
+		t.Fatalf("installation help view = %q", view)
 	}
 }
 

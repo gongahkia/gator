@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/dependency"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/tui"
 )
@@ -51,7 +53,7 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 	}
 	host := manager.localHost()
 	catalog := manager.catalog(settings, client, nil, host)
-	if binary, lookupErr := exec.LookPath("ollama"); lookupErr == nil {
+	if binary, lookupErr := manager.ollamaPath(); lookupErr == nil {
 		catalog.Executable = binary
 	}
 	version, err := client.Version(ctx)
@@ -87,7 +89,7 @@ func (manager *localModelManager) Start(ctx context.Context) (tui.LocalModelCata
 	}
 	binary, err := manager.ollamaPath()
 	if err != nil {
-		return tui.LocalModelCatalog{}, errors.New("Ollama executable was not found; install it from https://ollama.com/download or start it yourself")
+		return tui.LocalModelCatalog{}, errors.New("Ollama executable was not found; run 'gator doctor' for installation help or visit https://ollama.com/download")
 	}
 	runtime, err := manager.startRuntime(binary)
 	if err != nil {
@@ -96,6 +98,7 @@ func (manager *localModelManager) Start(ctx context.Context) (tui.LocalModelCata
 	readyContext, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := waitForLocalRuntime(readyContext, client, runtime); err != nil {
+		_ = manager.stopRuntime(runtime)
 		return tui.LocalModelCatalog{}, err
 	}
 	return manager.Status(ctx)
@@ -108,6 +111,10 @@ func (manager *localModelManager) Close() error {
 	runtime := manager.runtime
 	manager.runtime = nil
 	manager.runtimeMu.Unlock()
+	return manager.stopRuntime(runtime)
+}
+
+func (manager *localModelManager) stopRuntime(runtime *managedLocalRuntime) error {
 	if runtime == nil || runtime.command.Process == nil || runtime.command.ProcessState != nil {
 		return nil
 	}
@@ -180,12 +187,12 @@ func waitForLocalRuntime(ctx context.Context, client localmodel.Client, runtime 
 	defer ticker.Stop()
 	var lastErr error
 	for {
-		if runtimeReachable(ctx, client) {
-			return nil
-		}
 		probeContext, cancel := context.WithTimeout(ctx, time.Second)
 		_, lastErr = client.Version(probeContext)
 		cancel()
+		if lastErr == nil {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			if lastErr != nil {
@@ -386,7 +393,33 @@ func (manager *localModelManager) catalog(settings config.Settings, client local
 		})
 	}
 	hostSummary, hostAdvice := localModelHostSummary(host)
-	return tui.LocalModelCatalog{RuntimeURL: client.BaseURL(), HostSummary: hostSummary, HostAdvice: hostAdvice, Models: models}
+	return tui.LocalModelCatalog{RuntimeURL: client.BaseURL(), HostSummary: hostSummary, HostAdvice: hostAdvice, Dependencies: localModelDependencies(manager), Models: models}
+}
+
+func localModelDependencies(manager *localModelManager) []tui.LocalDependency {
+	statuses := dependency.Detect()
+	dependencies := make([]tui.LocalDependency, 0, len(statuses))
+	for _, status := range statuses {
+		installed := status.Installed
+		if status.ID == "ollama" {
+			_, err := manager.ollamaPath()
+			installed = err == nil
+		}
+		instructions := []string(nil)
+		if status.Instructions != nil {
+			instructions = status.Instructions(runtime.GOOS)
+		}
+		dependencies = append(dependencies, tui.LocalDependency{
+			ID:           status.ID,
+			Name:         status.Name,
+			Purpose:      status.Purpose,
+			Required:     status.Required,
+			Installed:    installed,
+			HelpURL:      status.HelpURL,
+			Instructions: instructions,
+		})
+	}
+	return dependencies
 }
 
 func (manager *localModelManager) localHost() localmodel.Host {

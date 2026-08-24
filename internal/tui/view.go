@@ -163,6 +163,9 @@ func (m Model) localModelsView() string {
 		sections = append(sections, m.inline(dimStyle.Render(m.localModelsSummary())))
 	} else {
 		sections = append(sections, m.localRuntimeView(), m.localCatalogView())
+		if m.localModels.dependencyHelp {
+			sections = append(sections, m.localDependencyHelpView())
+		}
 		sections = append(sections, m.inline(dimStyle.Render("Cloud provider readiness is available under the Cloud section.")))
 	}
 
@@ -183,6 +186,8 @@ func (m Model) localModelsView() string {
 	if m.localModels.confirmation != localModelNoConfirmation {
 		if m.localModels.confirmation == localModelConfirmStart {
 			sections = append(sections, m.fieldView("Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself"))
+		} else if m.localModels.confirmation == localModelConfirmInstall {
+			sections = append(sections, m.fieldView("Install Ollama?", "Ollama is not installed. Gator can show the official source and platform advice; it never runs a system installer or package manager.", "Enter/y  Open installation help (default)\nn/esc  I'll install it myself"))
 		} else if selected, found := m.selectedLocalModel(); found {
 			if m.localModels.confirmation == localModelConfirmPull {
 				sections = append(sections, m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL))
@@ -198,16 +203,20 @@ func (m Model) localModelsView() string {
 		sections = append(sections, m.noticeView(), m.footer("ctrl+c cancel sign-in", "f1 shortcuts"))
 	} else if m.localModels.confirmation == localModelConfirmStart {
 		sections = append(sections, m.noticeView(), m.footer("enter/y start with Gator", "n/esc start myself", "f1 shortcuts"))
+	} else if m.localModels.confirmation == localModelConfirmInstall {
+		sections = append(sections, m.noticeView(), m.footer("enter/y installation help", "n/esc install myself", "f1 shortcuts"))
 	} else if m.localModels.confirmation == localModelConfirmPull {
 		sections = append(sections, m.noticeView(), m.footer("enter/y download", "esc/n cancel", "f1 shortcuts"))
 	} else if m.localModels.confirmation == localModelConfirmRemove {
 		sections = append(sections, m.noticeView(), m.footer("enter/y remove", "esc/n cancel", "f1 shortcuts"))
 	} else if m.localModels.action != localModelIdle {
 		sections = append(sections, m.noticeView(), m.footer("esc/ctrl+c cancel", "f1 shortcuts"))
+	} else if m.localModels.dependencyHelp {
+		sections = append(sections, m.noticeView(), m.footer("i/esc close help", "f1 shortcuts"))
 	} else if m.localModels.section == cloudModelSection {
 		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
 	} else {
-		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "s start Ollama", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
+		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "s start Ollama", "i install help", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
 	}
 	return strings.Join(sections, "\n")
 }
@@ -237,7 +246,7 @@ func (m Model) cloudModelsView() string {
 func (m Model) localRuntimeView() string {
 	runtime := ""
 	if m.localModels.catalog.Executable == "" {
-		runtime = "Ollama executable: not found\nInstall Ollama from https://ollama.com/download."
+		runtime = "Ollama executable: not found\nPress i for installation help, or open https://ollama.com/download."
 	} else {
 		runtime = "Ollama executable: " + m.localModels.catalog.Executable
 	}
@@ -252,11 +261,37 @@ func (m Model) localRuntimeView() string {
 	}
 	if m.localModels.catalog.RuntimeError != "" {
 		runtime += "\n" + errorStyle.Render("Unavailable: "+compact(m.localModels.catalog.RuntimeError, m.panelTextWidth()))
-		runtime += "\n" + dimStyle.Render("Start it with 'ollama serve' or 'gator local serve', then press r.")
+		if m.ollamaMissing() {
+			runtime += "\n" + dimStyle.Render("Install Ollama, then press r to refresh.")
+		} else {
+			runtime += "\n" + dimStyle.Render("Start it with 'ollama serve' or 'gator local serve', then press r.")
+		}
 	} else if m.localModels.catalog.RuntimeVersion != "" {
 		runtime += "\n" + okStyle.Render("Connected · Ollama "+m.localModels.catalog.RuntimeVersion)
 	}
 	return m.fieldView("Local runtime", "Gator only manages a loopback Ollama runtime; use a custom provider for remote endpoints.", runtime)
+}
+
+func (m Model) localDependencyHelpView() string {
+	missing := m.localMissingDependencies()
+	if len(missing) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(missing)*3)
+	for _, dependency := range missing {
+		role := "optional"
+		if dependency.Required {
+			role = "required"
+		}
+		lines = append(lines, dependency.Name+" · "+role+" for "+dependency.Purpose)
+		if dependency.HelpURL != "" {
+			lines = append(lines, "  Official source: "+dependency.HelpURL)
+		}
+		for _, instruction := range dependency.Instructions {
+			lines = append(lines, "  "+instruction)
+		}
+	}
+	return m.fieldView("Installation help", "Gator detected these prerequisites as missing. It provides checked-in guidance but does not execute system installers or package managers.", strings.Join(lines, "\n"))
 }
 
 func (m Model) localCatalogView() string {

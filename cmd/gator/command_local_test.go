@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
@@ -199,6 +202,56 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	status, err = manager.Status(context.Background())
 	if err != nil || status.Models[0].Name != "desk Qwen" || status.Models[0].DefaultName != "Qwen2.5-Coder 7B" {
 		t.Fatalf("local manager renamed status = %#v, err = %v", status, err)
+	}
+}
+
+func TestLocalModelManagerStopsOnlyTheRuntimeItStarts(t *testing.T) {
+	manager := &localModelManager{
+		command: func(string, ...string) *exec.Cmd {
+			return exec.Command("sh", "-c", "sleep 30")
+		},
+	}
+	runtime, err := manager.startRuntime("ignored")
+	if err != nil || runtime == nil {
+		t.Fatalf("start managed runtime = %#v, %v", runtime, err)
+	}
+	if err := manager.Close(); err != nil {
+		t.Fatalf("close managed runtime: %v", err)
+	}
+	select {
+	case <-runtime.done:
+	case <-time.After(time.Second):
+		t.Fatal("managed runtime was not reaped")
+	}
+	manager.runtimeMu.Lock()
+	defer manager.runtimeMu.Unlock()
+	if manager.runtime != nil {
+		t.Fatalf("managed runtime was retained after close: %#v", manager.runtime)
+	}
+}
+
+func TestLocalModelManagerStartExplainsWhenOllamaIsNotInstalled(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/version" {
+			t.Fatalf("unexpected local endpoint %s", request.URL.Path)
+		}
+		writer.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	store, err := config.DefaultStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := &localModelManager{
+		store:      store,
+		runtimeURL: server.URL,
+		lookPath: func(string) (string, error) {
+			return "", errors.New("not found")
+		},
+	}
+	if _, err := manager.Start(context.Background()); err == nil || !strings.Contains(err.Error(), "Ollama executable was not found") {
+		t.Fatalf("missing Ollama start error = %v", err)
 	}
 }
 

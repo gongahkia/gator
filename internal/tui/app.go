@@ -574,10 +574,13 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.selectActiveModelCatalogEntry()
 		if msg.catalog.RuntimeError != "" {
 			if m.localModels.section == localModelSection && !m.localModels.startDismissed {
-				m.localModels.confirmation = localModelConfirmStart
-				m.notice = notice{text: "Local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
+				m.requestLocalRuntimeRecovery()
 			} else {
-				m.notice = notice{text: "Local runtime is unavailable. Open the Local section to choose whether Gator should start Ollama.", kind: noticeInfo}
+				if m.ollamaMissing() {
+					m.notice = notice{text: "Ollama is not installed. Open the Local section for installation help.", kind: noticeInfo}
+				} else {
+					m.notice = notice{text: "Local runtime is unavailable. Open the Local section to choose whether Gator should start Ollama.", kind: noticeInfo}
+				}
 			}
 		} else {
 			m.localModels.startDismissed = false
