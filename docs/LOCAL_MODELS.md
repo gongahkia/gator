@@ -48,9 +48,14 @@ is not listed here.
 
 The terminal UI has one model-management command: start `gator`, then enter
 `/model` in the composer. Its Cloud section shows direct/cloud provider
-readiness from local credential/configuration evidence, without claiming to
-discover every model enabled by an account. Press `l` to start an eligible
-provider sign-in and `u` or Enter to select a configured cloud model.
+readiness from local credential/configuration evidence. It lists the complete
+checked-in OpenCode Zen and Go gateway model catalogs, plus one stable default
+for every other direct provider; it does not claim to discover every model
+enabled by an account. Press `l` to start an eligible provider sign-in and `u`
+or Enter to select a configured cloud model. The separate Claude Code entry
+opens `gator connect claude`, which records an Anthropic API key for the
+delegated harness; it never reuses a Claude.ai or Claude Code subscription
+credential.
 
 Press Tab to open the Local section. It checks the loopback runtime and shows
 the same reviewed catalog and installed state as `gator local status`. It also
@@ -100,8 +105,12 @@ headroom for the pull. The current catalog evaluates to:
 
 | Gator ID | Gator RAM guardrail | Gator free-disk guardrail |
 | --- | ---: | ---: |
+| `qwen2.5-coder-0.5b` | 759 MiB | 455 MiB |
+| `qwen2.5-coder-1.5b` | 1.8 GiB | 1.1 GiB |
+| `qwen2.5-coder-3b` | 3.5 GiB | 2.1 GiB |
 | `qwen2.5-coder-7b` | 8.8 GiB | 5.3 GiB |
 | `qwen2.5-coder-14b` | 16.8 GiB | 10.1 GiB |
+| `qwen2.5-coder-32b` | 37.3 GiB | 22.4 GiB |
 | `devstral-24b` | 26.1 GiB | 15.6 GiB |
 | `qwen3-coder-30b` | 35.4 GiB | 21.2 GiB |
 
@@ -129,8 +138,12 @@ resource-constrained machine.
 
 | Gator ID | Ollama tag | Published package | Context | Intended use |
 | --- | --- | --- | --- | --- |
-| `qwen2.5-coder-7b` | `qwen2.5-coder:7b` | 4.7 GB | 32K | smallest recommended code-focused option |
+| `qwen2.5-coder-0.5b` | `qwen2.5-coder:0.5b` | 398 MB | 32K | minimal coding option for constrained hardware |
+| `qwen2.5-coder-1.5b` | `qwen2.5-coder:1.5b` | 986 MB | 32K | compact code-focused option for low-memory hosts |
+| `qwen2.5-coder-3b` | `qwen2.5-coder:3b` | 1.9 GB | 32K | small code-focused option for everyday laptops |
+| `qwen2.5-coder-7b` | `qwen2.5-coder:7b` | 4.7 GB | 32K | balanced code-focused option |
 | `qwen2.5-coder-14b` | `qwen2.5-coder:14b` | 9.0 GB | 32K | larger code-focused option |
+| `qwen2.5-coder-32b` | `qwen2.5-coder:32b` | 20 GB | 32K | largest Qwen2.5-Coder option for high-memory hosts |
 | `devstral-24b` | `devstral:24b` | 14 GB | 128K | agentic coding with tool use |
 | `qwen3-coder-30b` | `qwen3-coder:30b` | 19 GB | 256K | long-context agentic coding |
 
