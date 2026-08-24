@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
@@ -16,7 +17,14 @@ import (
 func doctor(arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	defaultProvider := os.Getenv("GATOR_PROVIDER")
+	defaults, err := configuredDefaults()
+	if err != nil {
+		return err
+	}
+	defaultProvider := defaults.Provider
+	if configured := os.Getenv("GATOR_PROVIDER"); configured != "" {
+		defaultProvider = configured
+	}
 	if defaultProvider == "" {
 		defaultProvider = string(model.OpenAI)
 	}
@@ -27,9 +35,17 @@ func doctor(arguments []string, out io.Writer) error {
 	if len(flags.Args()) != 0 {
 		return errors.New("doctor does not accept positional arguments")
 	}
-	provider, err := model.ParseProvider(*providerName)
+	settings, err := loadSettings()
 	if err != nil {
 		return err
+	}
+	custom, customProvider := configuredCustomProvider(settings, *providerName)
+	provider := model.Provider("")
+	if !customProvider {
+		provider, err = model.ParseProvider(*providerName)
+		if err != nil {
+			return err
+		}
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
@@ -41,7 +57,13 @@ func doctor(arguments []string, out io.Writer) error {
 		gitStatus = "detected"
 	}
 	authentication := "Gator credential"
-	if provider == model.Claude {
+	if customProvider {
+		if custom.APIKeyEnv == "" {
+			authentication = "no API key"
+		} else {
+			authentication = "API key from " + custom.APIKeyEnv
+		}
+	} else if provider == model.Claude {
 		authentication = "unsupported native Claude.ai subscription OAuth; use provider anthropic with an API key"
 	} else if provider == model.GoogleVertex {
 		authentication = model.CredentialHint(provider)
@@ -51,7 +73,13 @@ func doctor(arguments []string, out io.Writer) error {
 		authentication += " or " + model.CredentialHint(provider)
 	}
 	authenticationStatus := "missing"
-	if provider == model.Claude {
+	if customProvider {
+		if custom.APIKeyEnv == "" {
+			authenticationStatus = "not required"
+		} else if strings.TrimSpace(os.Getenv(custom.APIKeyEnv)) != "" {
+			authenticationStatus = "set in environment"
+		}
+	} else if provider == model.Claude {
 		authenticationStatus = "use gator connect claude"
 	} else if !model.SupportsDirect(provider) {
 		authenticationStatus = "unsupported"
@@ -89,8 +117,17 @@ func doctor(arguments []string, out io.Writer) error {
 	if strings.TrimSpace(os.Getenv("BRAVE_SEARCH_API_KEY")) != "" {
 		webSearchStatus = "configured (requires --network allow)"
 	}
-	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\nWeb search: %s\n", gitStatus, provider, authentication, authenticationStatus, sandboxStatus, webSearchStatus); err != nil {
+	providerDisplay := string(provider)
+	if customProvider {
+		providerDisplay = custom.ID
+	}
+	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\nWeb search: %s\n", gitStatus, providerDisplay, authentication, authenticationStatus, sandboxStatus, webSearchStatus); err != nil {
 		return err
+	}
+	if customProvider && custom.ID == localmodel.ProviderID {
+		if _, err := fmt.Fprintln(out, "Local runtime: run 'gator local status' to verify the selected loopback Ollama server and model inventory."); err != nil {
+			return err
+		}
 	}
 	suggestionDirectory := workingDirectory
 	if gitStatus == "detected" {

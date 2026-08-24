@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/localmodel"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 )
 
@@ -43,7 +44,9 @@ func customProviderOptions(providers []config.CustomProvider) []dropdownOption {
 	options := make([]dropdownOption, 0, len(providers))
 	for _, provider := range providers {
 		description := "custom OpenAI-compatible Chat Completions"
-		if provider.APIKeyEnv == "" {
+		if provider.ID == localmodel.ProviderID {
+			description = "Gator-managed local Ollama"
+		} else if provider.APIKeyEnv == "" {
 			description += " · no API key"
 		} else {
 			description += " · API key from " + provider.APIKeyEnv
