@@ -19,17 +19,26 @@ evidence and broader replay coverage are still in progress.
 
 ## Install and update
 
-Published macOS and Linux releases install to `~/.local/bin` by default. The
-installer verifies the release checksum before replacing a binary:
+No GitHub release has been published yet. To run the current source, build it
+from a checkout:
+
+```sh
+make build
+./bin/gator
+```
+
+The tagged-release workflow is configured to build macOS, Linux, and Windows
+archives. Once a release exists, macOS and Linux users can use the checksum-
+verifying installer below; Windows users install the ZIP archive because a
+running executable cannot reliably replace itself:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/gongahkia/gator/main/scripts/install.sh | sh
 gator update
 ```
 
-Use `gator update --check` to inspect availability without changing the binary.
-Windows releases are published as ZIP archives; replacing a running Windows
-executable is not reliable, so reinstall the current archive instead.
+Use `gator update --check` to inspect a published update without changing the
+binary.
 
 ## Development
 
@@ -45,6 +54,13 @@ make build
 OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \
   --allow-command 'go test ./internal/foo' \
   'Add a focused feature with tests'
+
+# Explicitly include repository-local visual and document context in a native
+# run. `--image` accepts PNG, JPEG, and WebP; `--attach` accepts PDFs and
+# supported text or Office documents.
+OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \
+  --image screenshot.png --attach design.pdf \
+  'Match the attached design and verify the implementation'
 
 ANTHROPIC_API_KEY=... ./bin/gator run --provider anthropic \
   --model claude-sonnet-4-6 --verify 'go test ./...' \
@@ -105,6 +121,7 @@ GATOR_RADIUS_OAUTH_CLIENT_ID=... ./bin/gator login radius --subscription
 ./bin/gator resume thread-identifier
 ./bin/gator resume --all
 OPENAI_API_KEY=... ./bin/gator resume --last \
+  --image regression.png --attach browser-log.txt \
   'Address the failing verification and finish the patch'
 
 # The original raw run-record form remains supported.
@@ -209,7 +226,9 @@ are sent, Gator shows the exact files, sizes, and selected provider and requires
 an explicit confirmation.
 
 Use `@mock.png`, `@screenshot.jpg`, or `@design.webp` to attach images, and
-`@report.pdf` to attach a PDF, to a direct-provider task. Gator also accepts
+`@report.pdf` to attach a PDF, to a direct-provider task. The non-interactive
+equivalents are `--image PATH` and `--attach PATH` on `run`, `resume`, `fork`,
+and `clone`; paths are always relative to the relevant repository. Gator also accepts
 `@` references to UTF-8 text/data documents (`.txt`, Markdown, CSV, JSON,
 YAML, TOML, XML, HTML, logs, and common config files) plus `.docx`, `.odt`,
 and `.xlsx`. Office files are extracted locally into plain text; PDFs retain
@@ -229,7 +248,8 @@ Gator permits at most four attachments per task, each up to 4 MiB, with an
 the repository and are read through a descriptor-rooted workspace boundary.
 Raw attachment bytes are never written to the private `0600` continuation
 session; Gator retains only a name, media type, size, and SHA-256 manifest, so
-you must explicitly re-add `@` files in a later turn. The selected provider
+you must explicitly re-add `@` files or `--image` / `--attach` paths in a later
+turn. The selected provider
 receives confirmed bytes under its own data-handling and retention policy.
 The byte budget limits local input size but does not cap a PDF's provider-side
 page or token cost. Attachment text is framed as untrusted data, but no LLM

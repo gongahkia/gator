@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,11 +22,125 @@ import (
 const PDFMediaType = "application/pdf"
 
 const (
+	// MaxInputs is the maximum number of developer-supplied images and
+	// documents that a single prompt may include.
+	MaxInputs = 4
+	// MaxImageBytes and MaxDocumentBytes bound one input before it reaches a
+	// provider. Extracted Office text is bounded by MaxDocumentBytes too.
+	MaxImageBytes    = 4 * 1024 * 1024
+	MaxDocumentBytes = 4 * 1024 * 1024
+	// MaxTotalBytes bounds the provider-visible bytes across all inputs.
+	MaxTotalBytes = 8 * 1024 * 1024
+
 	maxArchiveEntries     = 4_096
 	maxSpreadsheetSheets  = 128
 	maxSpreadsheetRows    = 100_000
 	maxSpreadsheetStrings = 100_000
 )
+
+// InputKind identifies the explicit developer-selected type of one prompt
+// attachment. Keeping image and document flags separate avoids treating an
+// arbitrary binary file as model-visible input.
+type InputKind uint8
+
+const (
+	ImageInput InputKind = iota
+	DocumentInput
+)
+
+// Input is a repository-relative, developer-selected image or document.
+type Input struct {
+	Path string
+	Kind InputKind
+}
+
+// IsImage reports whether a path has one of Gator's supported visual-input
+// extensions. LoadImage verifies the actual media type before returning bytes.
+func IsImage(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
+// LoadImage resolves one repository-local visual attachment. Only PNG, JPEG,
+// and WebP are accepted because all Gator-native image adapters have a stable
+// encoding for those formats.
+func LoadImage(root workspace.Root, path string, maxBytes int) (agent.Image, error) {
+	if !IsImage(path) {
+		return agent.Image{}, fmt.Errorf("image @%s must be PNG, JPEG, or WebP", path)
+	}
+	if maxBytes < 1 {
+		return agent.Image{}, errors.New("image size limit must be positive")
+	}
+	contents, err := readRegularFile(root, path, maxBytes)
+	if err != nil {
+		return agent.Image{}, err
+	}
+	mediaType := http.DetectContentType(contents)
+	if !supportedImageMediaType(mediaType) {
+		return agent.Image{}, fmt.Errorf("image @%s must be PNG, JPEG, or WebP", path)
+	}
+	return agent.Image{Name: path, MediaType: mediaType, Data: contents}, nil
+}
+
+// LoadInputs loads a bounded, explicit collection of repository-local visual
+// and document attachments. It is shared by terminal and automation callers so
+// they use the same byte, type, duplicate, and workspace-boundary rules.
+func LoadInputs(root workspace.Root, inputs []Input) ([]agent.Image, []agent.Attachment, error) {
+	if len(inputs) > MaxInputs {
+		return nil, nil, fmt.Errorf("attach at most %d files per task", MaxInputs)
+	}
+	images := make([]agent.Image, 0, len(inputs))
+	attachments := make([]agent.Attachment, 0, len(inputs))
+	seen := make(map[string]struct{}, len(inputs))
+	totalBytes := 0
+	for _, input := range inputs {
+		if strings.TrimSpace(input.Path) == "" {
+			return nil, nil, errors.New("attachment path must not be empty")
+		}
+		cleanPath := filepath.Clean(input.Path)
+		if _, duplicate := seen[cleanPath]; duplicate {
+			return nil, nil, fmt.Errorf("attachment %q was supplied more than once", input.Path)
+		}
+		seen[cleanPath] = struct{}{}
+
+		switch input.Kind {
+		case ImageInput:
+			image, err := LoadImage(root, input.Path, MaxImageBytes)
+			if err != nil {
+				return nil, nil, err
+			}
+			if totalBytes+len(image.Data) > MaxTotalBytes {
+				return nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+			}
+			images = append(images, image)
+			totalBytes += len(image.Data)
+		case DocumentInput:
+			remaining := MaxTotalBytes - totalBytes
+			if remaining < 1 {
+				return nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+			}
+			loaded, supported, err := Load(root, input.Path, min(MaxDocumentBytes, remaining))
+			if err != nil {
+				return nil, nil, err
+			}
+			if !supported {
+				return nil, nil, fmt.Errorf("attachment @%s must be a supported document or UTF-8 text file", input.Path)
+			}
+			if totalBytes+len(loaded.Data) > MaxTotalBytes {
+				return nil, nil, fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+			}
+			attachments = append(attachments, loaded)
+			totalBytes += len(loaded.Data)
+		default:
+			return nil, nil, fmt.Errorf("attachment @%s has an unsupported input kind", input.Path)
+		}
+	}
+	return images, attachments, nil
+}
 
 // IsSupported reports whether a path can become an explicit attachment. Other
 // @ references retain their existing inspect-in-workspace behavior.
@@ -104,6 +219,15 @@ func readRegularFile(root workspace.Root, path string, maxBytes int) ([]byte, er
 		return nil, fmt.Errorf("read attachment @%s: %w", path, err)
 	}
 	return contents, nil
+}
+
+func supportedImageMediaType(mediaType string) bool {
+	switch mediaType {
+	case "image/png", "image/jpeg", "image/webp":
+		return true
+	default:
+		return false
+	}
 }
 
 func extractDOCX(contents []byte, maxBytes int) (string, error) {

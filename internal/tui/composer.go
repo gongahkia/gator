@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"io/fs"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -83,13 +82,6 @@ type contextReference struct {
 	path  string
 	isDir bool
 }
-
-const (
-	maxInputAttachments = 4
-	maxImageBytes       = 4 * 1024 * 1024
-	maxDocumentBytes    = 4 * 1024 * 1024
-	maxAttachmentBytes  = 8 * 1024 * 1024
-)
 
 type contextCompletion struct {
 	start int
@@ -288,7 +280,7 @@ func taskWithContextReferences(task string, references []contextReference) strin
 		kind := "file"
 		if reference.isDir {
 			kind = "directory"
-		} else if imageMediaType(reference.path) != "" {
+		} else if attachment.IsImage(reference.path) {
 			kind = "image attachment"
 		} else if attachment.IsSupported(reference.path) {
 			kind = "document attachment"
@@ -307,95 +299,28 @@ func contextReferencePaths(references []contextReference) []string {
 	return paths
 }
 
-// imageAttachments loads image @ references from inside the repository. The
-// bytes are sent only after an explicit per-send confirmation and are not
-// persisted in a continuation session.
-func imageAttachments(repository string, references []contextReference) ([]agent.Image, error) {
+// promptAttachments loads image and document @ references from inside the
+// repository. The bytes are sent only after an explicit per-send confirmation
+// and are not persisted in a continuation session.
+func promptAttachments(repository string, references []contextReference) ([]agent.Image, []agent.Attachment, error) {
 	root, err := workspace.Open(repository)
 	if err != nil {
-		return nil, fmt.Errorf("open repository for image attachments: %w", err)
+		return nil, nil, fmt.Errorf("open repository for prompt attachments: %w", err)
 	}
-	attachments := make([]agent.Image, 0)
-	totalBytes := 0
+	inputs := make([]attachment.Input, 0, len(references))
 	for _, reference := range references {
-		if reference.isDir || imageMediaType(reference.path) == "" {
+		if reference.isDir {
 			continue
 		}
-		if len(attachments) == maxInputAttachments {
-			return nil, fmt.Errorf("attach at most %d files per task", maxInputAttachments)
+		if attachment.IsImage(reference.path) {
+			inputs = append(inputs, attachment.Input{Path: reference.path, Kind: attachment.ImageInput})
+		} else if attachment.IsSupported(reference.path) {
+			inputs = append(inputs, attachment.Input{Path: reference.path, Kind: attachment.DocumentInput})
 		}
-		data, err := root.ReadRegularFile(reference.path, maxImageBytes)
-		if err != nil {
-			return nil, fmt.Errorf("read image @%s: %w", reference.path, err)
-		}
-		mediaType := http.DetectContentType(data)
-		if !supportedImageMediaType(mediaType) {
-			return nil, fmt.Errorf("image @%s must be PNG, JPEG, or WebP", reference.path)
-		}
-		if totalBytes+len(data) > maxAttachmentBytes {
-			return nil, fmt.Errorf("attached images exceed the %d MiB total limit", maxAttachmentBytes/(1024*1024))
-		}
-		attachments = append(attachments, agent.Image{Name: reference.path, MediaType: mediaType, Data: data})
-		totalBytes += len(data)
 	}
-	return attachments, nil
-}
-
-// documentAttachments loads PDFs and bounded textual document context from @
-// references. It shares the per-send byte budget with image inputs.
-func documentAttachments(repository string, references []contextReference, imageBytes, imageCount int) ([]agent.Attachment, error) {
-	root, err := workspace.Open(repository)
+	images, documents, err := attachment.LoadInputs(root, inputs)
 	if err != nil {
-		return nil, fmt.Errorf("open repository for document attachments: %w", err)
+		return nil, nil, err
 	}
-	attachments := make([]agent.Attachment, 0)
-	totalBytes := imageBytes
-	for _, reference := range references {
-		if reference.isDir || imageMediaType(reference.path) != "" || !attachment.IsSupported(reference.path) {
-			continue
-		}
-		if imageCount+len(attachments) == maxInputAttachments {
-			return nil, fmt.Errorf("attach at most %d files per task", maxInputAttachments)
-		}
-		remaining := maxAttachmentBytes - totalBytes
-		if remaining < 1 {
-			return nil, fmt.Errorf("attached files exceed the %d MiB total limit", maxAttachmentBytes/(1024*1024))
-		}
-		limit := min(maxDocumentBytes, remaining)
-		loaded, supported, err := attachment.Load(root, reference.path, limit)
-		if err != nil {
-			return nil, err
-		}
-		if !supported {
-			continue
-		}
-		if totalBytes+len(loaded.Data) > maxAttachmentBytes {
-			return nil, fmt.Errorf("attached files exceed the %d MiB total limit", maxAttachmentBytes/(1024*1024))
-		}
-		attachments = append(attachments, loaded)
-		totalBytes += len(loaded.Data)
-	}
-	return attachments, nil
-}
-
-func imageMediaType(path string) string {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".png":
-		return "image/png"
-	case ".jpg", ".jpeg":
-		return "image/jpeg"
-	case ".webp":
-		return "image/webp"
-	default:
-		return ""
-	}
-}
-
-func supportedImageMediaType(mediaType string) bool {
-	switch mediaType {
-	case "image/png", "image/jpeg", "image/webp":
-		return true
-	default:
-		return false
-	}
+	return images, documents, nil
 }

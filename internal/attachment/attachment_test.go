@@ -33,6 +33,43 @@ func TestLoadPDFAndTextAttachments(t *testing.T) {
 	}
 }
 
+func TestLoadInputsSharesImageAndDocumentLimits(t *testing.T) {
+	repository := t.TempDir()
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}
+	if err := os.WriteFile(filepath.Join(repository, "screen.png"), png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "notes.md"), []byte("# Notes\nimportant detail"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root, err := workspace.Open(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	images, documents, err := LoadInputs(root, []Input{
+		{Path: "screen.png", Kind: ImageInput},
+		{Path: "notes.md", Kind: DocumentInput},
+	})
+	if err != nil {
+		t.Fatalf("load inputs: %v", err)
+	}
+	if len(images) != 1 || images[0].Name != "screen.png" || string(images[0].Data) != string(png) {
+		t.Fatalf("images = %#v", images)
+	}
+	if len(documents) != 1 || documents[0].Name != "notes.md" || string(documents[0].Data) != "# Notes\nimportant detail" {
+		t.Fatalf("documents = %#v", documents)
+	}
+	if _, _, err := LoadInputs(root, []Input{{Path: "screen.png", Kind: ImageInput}, {Path: "screen.png", Kind: ImageInput}}); err == nil || !strings.Contains(err.Error(), "more than once") {
+		t.Fatalf("duplicate attachment error = %v", err)
+	}
+	if _, _, err := LoadInputs(root, []Input{{Path: "notes.md", Kind: ImageInput}}); err == nil || !strings.Contains(err.Error(), "must be PNG") {
+		t.Fatalf("wrong image type error = %v", err)
+	}
+	if _, _, err := LoadInputs(root, []Input{{Path: "../outside.png", Kind: ImageInput}}); err == nil || !strings.Contains(err.Error(), "escapes the workspace") {
+		t.Fatalf("escaping input error = %v", err)
+	}
+}
+
 func TestLoadExtractsDOCXODTAndXLSX(t *testing.T) {
 	repository := t.TempDir()
 	writeArchive(t, filepath.Join(repository, "report.docx"), map[string]string{

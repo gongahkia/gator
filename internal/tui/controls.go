@@ -746,7 +746,7 @@ func (m Model) contextReferencesView() string {
 	values := make([]string, 0, len(references))
 	for _, reference := range references {
 		label := "@" + reference
-		if imageMediaType(reference) != "" {
+		if attachment.IsImage(reference) {
 			label = "[image] " + label
 		} else if attachment.IsSupported(reference) {
 			label = "[document] " + label

@@ -21,6 +21,10 @@ func resumeTask(arguments []string, out io.Writer) error {
 	compact := flags.Bool("compact", false, "summarize older retained context before continuing")
 	last := flags.Bool("last", false, "resume the most recent retained thread for this repository")
 	all := flags.Bool("all", false, "include retained threads from other repositories")
+	var imagePaths attachmentFlags
+	flags.Var(&imagePaths, "image", "repository-relative PNG, JPEG, or WebP image to include in the continuation (repeatable)")
+	var documentPaths attachmentFlags
+	flags.Var(&documentPaths, "attach", "repository-relative PDF or supported document/text file to include in the continuation (repeatable)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -34,13 +38,16 @@ func resumeTask(arguments []string, out io.Writer) error {
 	}
 
 	if target == "" && !*last {
+		if len(imagePaths)+len(documentPaths) > 0 {
+			return errors.New("--image and --attach require a continuation task")
+		}
 		return interactiveWithOptions(interactiveOptions{StartInRecent: true, RecentAll: *all, AllowNoRepository: *all})
 	}
 	if target != "" && looksLikeRunRecordPath(target) {
 		if *all {
 			return errors.New("--all cannot be combined with a run record path")
 		}
-		return resumeState(target, continuation, *maxSteps, *compact, out)
+		return resumeStateWithAttachments(target, continuation, *maxSteps, *compact, imagePaths, documentPaths, out)
 	}
 
 	workingDirectory, err := os.Getwd()
@@ -63,9 +70,12 @@ func resumeTask(arguments []string, out io.Writer) error {
 		return err
 	}
 	if continuation == "" {
+		if len(imagePaths)+len(documentPaths) > 0 {
+			return errors.New("--image and --attach require a continuation task")
+		}
 		return interactiveWithOptions(interactiveOptions{RepositoryPath: selected.Repository, ResumeStatePath: selected.HeadStatePath})
 	}
-	return resumeState(selected.HeadStatePath, continuation, *maxSteps, *compact, out)
+	return resumeStateWithAttachments(selected.HeadStatePath, continuation, *maxSteps, *compact, imagePaths, documentPaths, out)
 }
 
 const resumeCandidateLimit = 1_000
@@ -124,7 +134,14 @@ func looksLikeRunRecordPath(target string) bool {
 }
 
 func resumeState(statePath, continuation string, maxSteps int, compact bool, out io.Writer) error {
+	return resumeStateWithAttachments(statePath, continuation, maxSteps, compact, nil, nil, out)
+}
+
+func resumeStateWithAttachments(statePath, continuation string, maxSteps int, compact bool, imagePaths, documentPaths []string, out io.Writer) error {
 	if continuation == "" {
+		if len(imagePaths)+len(documentPaths) > 0 {
+			return errors.New("--image and --attach require a continuation task")
+		}
 		session, err := journal.LoadSession(statePath)
 		if err != nil {
 			return err
@@ -132,6 +149,10 @@ func resumeState(statePath, continuation string, maxSteps int, compact bool, out
 		return interactiveWithOptions(interactiveOptions{RepositoryPath: session.Repository, ResumeStatePath: statePath})
 	}
 	session, err := journal.LoadSession(statePath)
+	if err != nil {
+		return err
+	}
+	images, attachments, err := loadPromptAttachments(session.Repository, imagePaths, documentPaths)
 	if err != nil {
 		return err
 	}
@@ -146,11 +167,16 @@ func resumeState(statePath, continuation string, maxSteps int, compact bool, out
 	if _, err := fmt.Fprintf(out, "Gator resume\n  provider: %s\n  model: %s\n  task: %s\n", providerName, displayModel(modelName), continuation); err != nil {
 		return err
 	}
+	if err := writePromptAttachmentSummary(out, images, attachments); err != nil {
+		return err
+	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Resume(context.Background(), session, statePath, continuation, gatorrun.Request{
 		MaxSteps:        maxSteps,
 		ForceCompaction: compact,
 		OnEvent:         printer.Print,
+		Images:          images,
+		Attachments:     attachments,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {

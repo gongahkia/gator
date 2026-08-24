@@ -19,6 +19,18 @@ protocol, not an ACP implementation.
 {"version":1,"id":"change-1","method":"run","params":{"task":"Add a focused test","provider":"openai","verify":[["go","test","./..."]]}}
 ```
 
+`images` and `attachments` optionally supply explicit repository-relative
+paths for a `run` or `resume` request. `images` accepts PNG, JPEG, and WebP;
+`attachments` accepts PDFs and Gator's supported text/data or Office document
+formats. Gator reads these paths through the fixed repository boundary, applies
+the same four-file, 4 MiB-per-file, and 8 MiB-combined limits as the terminal
+UI, and never accepts raw attachment bytes over RPC. This keeps a controller
+from widening Gator's filesystem scope or bypassing attachment validation:
+
+```json
+{"version":1,"id":"visual-1","method":"run","params":{"mode":"plan","task":"Inspect the attached regression.","provider":"openai","images":["failure.png"],"attachments":["browser.log"]}}
+```
+
 Every accepted run first returns `{"type":"response","result":{"accepted":true}}`,
 then emits zero or more `event` messages, then one terminal `response` or
 `error` carrying the same request ID. `steer`, `cancel`, and `approve` target an

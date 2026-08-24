@@ -13,12 +13,14 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 	protocol "github.com/gongahkia/gator/rpc"
 )
 
@@ -234,6 +236,10 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 	if err != nil {
 		return err
 	}
+	images, attachments, err := loadPromptAttachments(s.config.RepositoryPath, request.Params.Images, request.Params.Attachments)
+	if err != nil {
+		return err
+	}
 	return s.start(parent, request.ID, func(ctx context.Context, steering <-chan string, emit agent.EventSink) (gatorrun.Outcome, error) {
 		return executor.Execute(ctx, gatorrun.Request{
 			RepositoryPath: s.config.RepositoryPath, Task: request.Params.Task, Provider: provider, Model: modelName,
@@ -247,6 +253,8 @@ func (s *Server) startRun(parent context.Context, request protocol.Request) erro
 			Approve:          s.approveFor(request.ID),
 			TerminalRegistry: s.config.TerminalRegistry,
 			LSPRegistry:      s.config.LSPRegistry,
+			Images:           images,
+			Attachments:      attachments,
 		})
 	})
 }
@@ -270,6 +278,10 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 	if err != nil {
 		return err
 	}
+	images, attachments, err := loadPromptAttachments(previous.Repository, request.Params.Images, request.Params.Attachments)
+	if err != nil {
+		return err
+	}
 	return s.start(parent, request.ID, func(ctx context.Context, steering <-chan string, emit agent.EventSink) (gatorrun.Outcome, error) {
 		return executor.Resume(ctx, previous, request.Params.StatePath, request.Params.Task, gatorrun.Request{
 			MaxSteps: request.Params.MaxSteps, StateDir: s.config.StateDir, ForceCompaction: request.Params.Compact, Steering: steering, OnEvent: emit,
@@ -277,8 +289,25 @@ func (s *Server) startResume(parent context.Context, request protocol.Request) e
 			Approve:          s.approveFor(request.ID),
 			TerminalRegistry: s.config.TerminalRegistry,
 			LSPRegistry:      s.config.LSPRegistry,
+			Images:           images,
+			Attachments:      attachments,
 		})
 	})
+}
+
+func loadPromptAttachments(repository string, imagePaths, documentPaths []string) ([]agent.Image, []agent.Attachment, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open repository for prompt attachments: %w", err)
+	}
+	inputs := make([]attachment.Input, 0, len(imagePaths)+len(documentPaths))
+	for _, path := range imagePaths {
+		inputs = append(inputs, attachment.Input{Path: path, Kind: attachment.ImageInput})
+	}
+	for _, path := range documentPaths {
+		inputs = append(inputs, attachment.Input{Path: path, Kind: attachment.DocumentInput})
+	}
+	return attachment.LoadInputs(root, inputs)
 }
 
 func (s *Server) start(parent context.Context, id string, execute func(context.Context, <-chan string, agent.EventSink) (gatorrun.Outcome, error)) error {

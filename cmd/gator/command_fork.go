@@ -31,6 +31,10 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 	all := flags.Bool("all", false, "include retained threads from other repositories")
 	maxSteps := flags.Int("max-steps", 0, "maximum model turns for this fork")
 	compact := flags.Bool("compact", false, "summarize older retained context before branching")
+	var imagePaths attachmentFlags
+	flags.Var(&imagePaths, "image", "repository-relative PNG, JPEG, or WebP image to include in the branch instruction (repeatable)")
+	var documentPaths attachmentFlags
+	flags.Var(&documentPaths, "attach", "repository-relative PDF or supported document/text file to include in the branch instruction (repeatable)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -45,11 +49,14 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 	if target == "" && !*last {
 		return fmt.Errorf("%s requires a retained thread ID or --last", operation)
 	}
+	if instruction == "" && len(imagePaths)+len(documentPaths) > 0 {
+		return errors.New("--image and --attach require a branch instruction")
+	}
 	if target != "" && looksLikeRunRecordPath(target) {
 		if *all {
 			return errors.New("--all cannot be combined with a run record path")
 		}
-		return branchState(operation, target, instruction, *maxSteps, *compact, out)
+		return branchStateWithAttachments(operation, target, instruction, *maxSteps, *compact, imagePaths, documentPaths, out)
 	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
@@ -70,7 +77,7 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return branchState(operation, selected.HeadStatePath, instruction, *maxSteps, *compact, out)
+	return branchStateWithAttachments(operation, selected.HeadStatePath, instruction, *maxSteps, *compact, imagePaths, documentPaths, out)
 }
 
 func forkState(statePath, instruction string, maxSteps int, out io.Writer) error {
@@ -78,6 +85,10 @@ func forkState(statePath, instruction string, maxSteps int, out io.Writer) error
 }
 
 func branchState(operation, statePath, instruction string, maxSteps int, compact bool, out io.Writer) error {
+	return branchStateWithAttachments(operation, statePath, instruction, maxSteps, compact, nil, nil, out)
+}
+
+func branchStateWithAttachments(operation, statePath, instruction string, maxSteps int, compact bool, imagePaths, documentPaths []string, out io.Writer) error {
 	session, err := journal.LoadSession(statePath)
 	if err != nil {
 		return err
@@ -86,7 +97,14 @@ func branchState(operation, statePath, instruction string, maxSteps int, compact
 		return fmt.Errorf("retained turn cannot be forked: %w", err)
 	}
 	if instruction == "" {
+		if len(imagePaths)+len(documentPaths) > 0 {
+			return errors.New("--image and --attach require a branch instruction")
+		}
 		return interactiveWithOptions(interactiveOptions{RepositoryPath: session.Repository, ForkStatePath: statePath})
+	}
+	images, attachments, err := loadPromptAttachments(session.Repository, imagePaths, documentPaths)
+	if err != nil {
+		return err
 	}
 	providerName, modelName, err := resolveConfiguredProvider(session.Provider, session.Model)
 	if err != nil {
@@ -99,8 +117,11 @@ func branchState(operation, statePath, instruction string, maxSteps int, compact
 	if _, err := fmt.Fprintf(out, "Gator %s\n  source: %s\n  provider: %s\n  model: %s\n  task: %s\n", operation, session.ThreadID, providerName, displayModel(modelName), instruction); err != nil {
 		return err
 	}
+	if err := writePromptAttachmentSummary(out, images, attachments); err != nil {
+		return err
+	}
 	printer := eventPrinter{out: out}
-	request := gatorrun.Request{MaxSteps: maxSteps, ForceCompaction: compact, OnEvent: printer.Print}
+	request := gatorrun.Request{MaxSteps: maxSteps, ForceCompaction: compact, OnEvent: printer.Print, Images: images, Attachments: attachments}
 	var outcome gatorrun.Outcome
 	if operation == "clone" {
 		outcome, err = executor.Clone(context.Background(), session, statePath, instruction, request)

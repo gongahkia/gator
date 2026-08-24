@@ -44,6 +44,42 @@ func TestServerReportsCapabilitiesAndCompletesPlanRun(t *testing.T) {
 	}
 }
 
+func TestServerLoadsRepositoryAttachmentsForPlanRun(t *testing.T) {
+	repository := initializedRepository(t)
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00}
+	if err := os.WriteFile(filepath.Join(repository, "screen.png"), png, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "notes.md"), []byte("reference"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	input := strings.NewReader(`{"version":1,"id":"plan-attachments","method":"run","params":{"mode":"plan","task":"Inspect the references","provider":"openai","images":["screen.png"],"attachments":["notes.md"]}}` + "\n")
+	var output bytes.Buffer
+	model := &scriptedModel{turns: []agent.Turn{{Text: "Plan ready."}}}
+	server, err := New(Config{
+		Input: input, Output: &output, RepositoryPath: repository, StateDir: t.TempDir(), DefaultProvider: "openai",
+		NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: model}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	if err := server.Serve(context.Background()); err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+	if len(model.requests) != 1 {
+		t.Fatalf("model requests = %#v", model.requests)
+	}
+	message := model.requests[0].Messages[0]
+	if len(message.Images) != 1 || message.Images[0].Name != "screen.png" || string(message.Images[0].Data) != string(png) {
+		t.Fatalf("image attachment = %#v", message.Images)
+	}
+	if len(message.Attachments) != 1 || message.Attachments[0].Name != "notes.md" || string(message.Attachments[0].Data) != "reference" {
+		t.Fatalf("document attachment = %#v", message.Attachments)
+	}
+}
+
 func TestServerCancelsActiveRun(t *testing.T) {
 	repository := initializedRepository(t)
 	input := strings.NewReader(strings.Join([]string{
@@ -165,14 +201,16 @@ func TestServerApprovesExploratoryCommand(t *testing.T) {
 }
 
 type scriptedModel struct {
-	mu    sync.Mutex
-	turns []agent.Turn
-	next  int
+	mu       sync.Mutex
+	turns    []agent.Turn
+	next     int
+	requests []agent.TurnRequest
 }
 
-func (m *scriptedModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+func (m *scriptedModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.requests = append(m.requests, request)
 	if m.next >= len(m.turns) {
 		return agent.Turn{}, errors.New("unexpected model call")
 	}

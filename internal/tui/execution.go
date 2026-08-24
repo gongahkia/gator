@@ -33,15 +33,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m.startFailure(err.Error())
 	}
-	images, err := imageAttachments(m.config.RepositoryPath, references)
-	if err != nil {
-		return m.startFailure(err.Error())
-	}
-	imageBytes := 0
-	for _, image := range images {
-		imageBytes += len(image.Data)
-	}
-	attachments, err := documentAttachments(m.config.RepositoryPath, references, imageBytes, len(images))
+	images, attachments, err := promptAttachments(m.config.RepositoryPath, references)
 	if err != nil {
 		return m.startFailure(err.Error())
 	}
