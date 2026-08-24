@@ -17,27 +17,37 @@ func TestAssessBlocksUnsupportedHostAndResourceShortfalls(t *testing.T) {
 	}{
 		{
 			name: "unsupported OS",
-			host: Host{OS: "plan9", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableDiskBytes: 64 << 30},
+			host: Host{OS: "plan9", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableMemoryKnown: true, AvailableDiskBytes: 64 << 30, AvailableDiskKnown: true},
 			want: "not a supported",
 		},
 		{
 			name: "unsupported architecture",
-			host: Host{OS: "linux", Architecture: "386", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableDiskBytes: 64 << 30},
+			host: Host{OS: "linux", Architecture: "386", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableMemoryKnown: true, AvailableDiskBytes: 64 << 30, AvailableDiskKnown: true},
 			want: "architecture",
 		},
 		{
 			name: "insufficient physical RAM",
-			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 8 << 30, AvailableMemoryBytes: 8 << 30, AvailableDiskBytes: 64 << 30},
+			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 8 << 30, AvailableMemoryBytes: 8 << 30, AvailableMemoryKnown: true, AvailableDiskBytes: 64 << 30, AvailableDiskKnown: true},
 			want: "total RAM",
 		},
 		{
 			name: "insufficient available RAM",
-			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 8 << 30, AvailableDiskBytes: 64 << 30},
+			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 8 << 30, AvailableMemoryKnown: true, AvailableDiskBytes: 64 << 30, AvailableDiskKnown: true},
+			want: "currently available RAM",
+		},
+		{
+			name: "no available RAM",
+			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryKnown: true, AvailableDiskBytes: 64 << 30, AvailableDiskKnown: true},
 			want: "currently available RAM",
 		},
 		{
 			name: "insufficient disk",
-			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableDiskBytes: 1 << 30},
+			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableMemoryKnown: true, AvailableDiskBytes: 1 << 30, AvailableDiskKnown: true},
+			want: "free in the Ollama model filesystem",
+		},
+		{
+			name: "no free disk",
+			host: Host{OS: "linux", Architecture: "amd64", TotalMemoryBytes: 64 << 30, AvailableMemoryBytes: 64 << 30, AvailableMemoryKnown: true, AvailableDiskKnown: true},
 			want: "free in the Ollama model filesystem",
 		},
 	}
@@ -61,7 +71,9 @@ func TestAssessAllowsAdequatelyResourcedHostAndExplainsGuardrail(t *testing.T) {
 		Architecture:         "amd64",
 		TotalMemoryBytes:     64 << 30,
 		AvailableMemoryBytes: 64 << 30,
+		AvailableMemoryKnown: true,
 		AvailableDiskBytes:   64 << 30,
+		AvailableDiskKnown:   true,
 	})
 	if !result.Allowed || result.RequiredMemoryBytes != 38_000_000_000 || result.RequiredDiskBytes != 22_800_000_000 {
 		t.Fatalf("assessment = %#v", result)
