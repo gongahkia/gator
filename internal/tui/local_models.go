@@ -34,20 +34,24 @@ type LocalModelCatalog struct {
 	RuntimeVersion string
 	RuntimeError   string
 	Executable     string
+	HostSummary    string
+	HostAdvice     []string
 	Models         []LocalModel
 }
 
 // LocalModel is one selectable reviewed local coding model.
 type LocalModel struct {
-	ID          string
-	OllamaModel string
-	Name        string
-	DefaultName string
-	Download    string
-	Context     string
-	Summary     string
-	SourceURL   string
-	Installed   bool
+	ID            string
+	OllamaModel   string
+	Name          string
+	DefaultName   string
+	Download      string
+	Context       string
+	Summary       string
+	SourceURL     string
+	Installed     bool
+	Requirement   string
+	BlockedReason string
 }
 
 // LocalModelProgress is a bounded, display-only pull update from the local
@@ -269,8 +273,13 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
 			return m, nil
 		}
-		if _, found := m.selectedLocalModel(); !found {
+		model, found := m.selectedLocalModel()
+		if !found {
 			m.notice = notice{text: "No curated local model is available to download.", kind: noticeError}
+			return m, nil
+		}
+		if model.BlockedReason != "" {
+			m.notice = notice{text: model.Name + " is disabled on this host: " + model.BlockedReason, kind: noticeError}
 			return m, nil
 		}
 		m.localModels.confirmation = localModelConfirmPull
@@ -294,6 +303,10 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if !model.Installed {
 			m.notice = notice{text: model.Name + " is not installed. Press p to review and start its download.", kind: noticeInfo}
+			return m, nil
+		}
+		if model.BlockedReason != "" {
+			m.notice = notice{text: model.Name + " is disabled on this host: " + model.BlockedReason, kind: noticeError}
 			return m, nil
 		}
 		return m.beginLocalUse(model)

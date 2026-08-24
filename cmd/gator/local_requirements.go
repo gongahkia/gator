@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/gongahkia/gator/internal/localmodel"
 )
@@ -105,9 +104,4 @@ func localModelHostSummary(host localmodel.Host) (string, []string) {
 
 func localModelRequirement(eligibility localmodel.Eligibility) string {
 	return "needs " + localmodel.FormatBytes(eligibility.RequiredMemoryBytes) + " RAM / " + localmodel.FormatBytes(eligibility.RequiredDiskBytes) + " disk"
-}
-
-func localModelBlockedReason(model localmodel.Model) string {
-	eligibility := localModelEligibility(model)
-	return strings.TrimSpace(eligibility.Reason)
 }
