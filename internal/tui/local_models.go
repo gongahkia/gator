@@ -3,12 +3,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
+	modelprovider "github.com/gongahkia/gator/internal/model"
 )
 
 // LocalModelManager owns the local runtime and persistent settings operations
@@ -20,6 +24,7 @@ type LocalModelManager interface {
 	Pull(context.Context, string, func(LocalModelProgress)) (LocalModelCatalog, error)
 	Use(context.Context, string) (LocalModelUpdate, error)
 	Remove(context.Context, string) (LocalModelUpdate, error)
+	Rename(context.Context, string, string, string) (map[string]string, error)
 }
 
 // LocalModelCatalog is the display-safe state of Gator's reviewed catalog.
@@ -37,6 +42,7 @@ type LocalModel struct {
 	ID          string
 	OllamaModel string
 	Name        string
+	DefaultName string
 	Download    string
 	Context     string
 	Summary     string
@@ -57,6 +63,7 @@ type LocalModelProgress struct {
 type LocalModelUpdate struct {
 	Catalog         LocalModelCatalog
 	CustomProviders []config.CustomProvider
+	ModelAliases    map[string]string
 	Provider        string
 	Model           string
 }
@@ -69,6 +76,7 @@ const (
 	localModelPulling
 	localModelUsing
 	localModelRemoving
+	localModelRenaming
 )
 
 type localModelConfirmation uint8
@@ -88,6 +96,7 @@ type localModelOperation struct {
 type localModelOperationDone struct {
 	catalog *LocalModelCatalog
 	update  *LocalModelUpdate
+	aliases map[string]string
 	err     error
 }
 
@@ -118,21 +127,53 @@ type localModelsState struct {
 	spinner      spinner.Model
 	err          error
 	generation   uint64
+	section      modelCatalogSection
+	cloudIndex   int
+	renaming     *modelRename
+}
+
+type modelCatalogSection uint8
+
+const (
+	cloudModelSection modelCatalogSection = iota
+	localModelSection
+)
+
+type cloudModelEntry struct {
+	provider   string
+	model      string
+	name       string
+	status     string
+	selectable bool
+	canLogin   bool
+}
+
+type modelRename struct {
+	provider string
+	model    string
+	input    textinput.Model
 }
 
 func newLocalModelsState(manager LocalModelManager, spinner spinner.Model) localModelsState {
 	return localModelsState{manager: manager, spinner: spinner}
 }
 
-func (m Model) openLocalModels() (tea.Model, tea.Cmd) {
+func (m Model) openModelCatalog() (tea.Model, tea.Cmd) {
 	if m.localModels.manager == nil {
-		m.notice = notice{text: "Local model management is unavailable in this TUI session.", kind: noticeError}
+		m.notice = notice{text: "Model management is unavailable in this TUI session.", kind: noticeError}
 		return m, nil
 	}
 	m.screen = localModelsScreen
 	m.localModels.confirmation = localModelNoConfirmation
 	m.localModels.err = nil
+	m.selectActiveModelCatalogEntry()
 	return m.beginLocalStatus()
+}
+
+// openLocalModels remains a private compatibility bridge for TUI callers that
+// predate the unified model catalog. The user-facing command is /model.
+func (m Model) openLocalModels() (tea.Model, tea.Cmd) {
+	return m.openModelCatalog()
 }
 
 func (m Model) beginLocalStatus() (tea.Model, tea.Cmd) {
@@ -163,19 +204,21 @@ func (m *Model) cancelLocalOperation() {
 }
 
 func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "ctrl+c" && m.oauthLogin != nil {
+		m.oauthCancel()
+		m.oauthLogin.Cancel()
+		m.notice = notice{text: "OAuth login cancellation requested.", kind: noticeInfo}
+		return m, nil
+	}
+	if m.localModels.renaming != nil {
+		return m.updateModelRename(message)
+	}
 	if m.localModels.confirmation != localModelNoConfirmation {
 		return m.updateLocalModelConfirmation(message)
 	}
-	if m.localModels.action != localModelIdle {
+	if m.localModels.action != localModelIdle && m.localModels.action != localModelRefreshing {
 		switch message.String() {
 		case "ctrl+c", "esc":
-			if m.localModels.action == localModelRefreshing {
-				m.localModels.generation++
-				m.localModels.action = localModelIdle
-				m.screen = composeScreen
-				m.notice = notice{text: "Local model status check cancelled.", kind: noticeInfo}
-				return m, m.focusField()
-			}
 			m.cancelLocalOperation()
 			m.localModels.action = localModelIdle
 			m.localModels.err = nil
@@ -185,16 +228,43 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch message.String() {
 	case "esc", "q":
+		if m.localModels.action == localModelRefreshing {
+			m.localModels.generation++
+			m.localModels.action = localModelIdle
+		}
 		m.screen = composeScreen
-		m.notice = notice{text: "Returned to the composer. Selected local model remains available for the next run.", kind: noticeInfo}
+		m.notice = notice{text: "Returned to the composer. The selected model remains available for the next run.", kind: noticeInfo}
 		return m, m.focusField()
 	case "r":
 		return m.beginLocalStatus()
+	case "tab", "left", "right":
+		m.toggleModelCatalogSection()
 	case "up", "k", "ctrl+p":
-		m.moveLocalModelSelection(-1)
+		m.moveModelCatalogSelection(-1)
 	case "down", "j", "ctrl+n":
-		m.moveLocalModelSelection(1)
+		m.moveModelCatalogSelection(1)
+	case "e":
+		return m.beginModelRename()
+	case "l":
+		if m.localModels.section != cloudModelSection {
+			m.notice = notice{text: "Cloud sign-in is available from the Cloud section.", kind: noticeInfo}
+			return m, nil
+		}
+		cloud, found := m.selectedCloudModel()
+		if !found {
+			m.notice = notice{text: "No cloud model is selected.", kind: noticeError}
+			return m, nil
+		}
+		if !cloud.canLogin {
+			m.notice = notice{text: "This provider uses " + cloud.status + ".", kind: noticeInfo}
+			return m, nil
+		}
+		return m.startOAuthLogin(cloud.provider)
 	case "p":
+		if m.localModels.section != localModelSection {
+			m.notice = notice{text: "Downloads are available only for reviewed local models.", kind: noticeInfo}
+			return m, nil
+		}
 		if m.localModels.catalog.RuntimeError != "" {
 			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
 			return m, nil
@@ -205,6 +275,14 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.localModels.confirmation = localModelConfirmPull
 	case "u", "enter":
+		if m.localModels.section == cloudModelSection {
+			cloud, found := m.selectedCloudModel()
+			if !found {
+				m.notice = notice{text: "No cloud model is selected.", kind: noticeError}
+				return m, nil
+			}
+			return m.useCloudModel(cloud)
+		}
 		if m.localModels.catalog.RuntimeError != "" {
 			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
 			return m, nil
@@ -220,6 +298,10 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.beginLocalUse(model)
 	case "x", "delete":
+		if m.localModels.section != localModelSection {
+			m.notice = notice{text: "Cloud models are managed by their provider. Gator only removes local model weights here.", kind: noticeInfo}
+			return m, nil
+		}
 		if m.localModels.catalog.RuntimeError != "" {
 			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
 			return m, nil
@@ -347,6 +429,216 @@ func (m Model) selectedLocalModel() (LocalModel, bool) {
 	return m.localModels.catalog.Models[index], true
 }
 
+func (m Model) cloudModels() []cloudModelEntry {
+	entries := make([]cloudModelEntry, 0, len(modelprovider.Names())+len(m.config.CustomProviders))
+	credentialStore, credentialStoreErr := auth.New(m.config.StateDir)
+	for _, providerName := range modelprovider.Names() {
+		provider, err := modelprovider.ParseProvider(providerName)
+		if err != nil || provider == modelprovider.Claude {
+			continue
+		}
+		modelName := modelprovider.DefaultModel(provider)
+		if providerName == strings.TrimSpace(m.provider.Value()) && strings.TrimSpace(m.model.Value()) != "" {
+			modelName = strings.TrimSpace(m.model.Value())
+		}
+		name := providerName
+		selectable := modelName != ""
+		if selectable {
+			name += " · " + m.modelDisplayName(providerName, modelName, modelName)
+		} else {
+			name += " · account model required"
+		}
+		status := cloudProviderStatus(provider, credentialStore, credentialStoreErr)
+		entries = append(entries, cloudModelEntry{
+			provider:   providerName,
+			model:      modelName,
+			name:       name,
+			status:     status,
+			selectable: selectable,
+			canLogin:   modelprovider.SupportsOAuthLogin(provider),
+		})
+	}
+	for _, provider := range m.config.CustomProviders {
+		for _, modelName := range provider.Models {
+			name := provider.ID + " · " + m.modelDisplayName(provider.ID, modelName, modelName)
+			status := "configured custom endpoint"
+			if provider.APIKeyEnv == "" {
+				status += " · no API key"
+			} else if strings.TrimSpace(os.Getenv(provider.APIKeyEnv)) != "" {
+				status += " · API key set"
+			} else {
+				status += " · requires " + provider.APIKeyEnv
+			}
+			entries = append(entries, cloudModelEntry{provider: provider.ID, model: modelName, name: name, status: status, selectable: true})
+		}
+	}
+	return entries
+}
+
+func cloudProviderStatus(provider modelprovider.Provider, store auth.Store, storeErr error) string {
+	if storeErr == nil {
+		credential, found, err := store.Read(string(provider))
+		if err == nil && found {
+			if credential.Expired(time.Now()) {
+				return "stored credential expired"
+			}
+			if credential.IsOAuth() {
+				return "signed in"
+			}
+			return "Gator credential stored"
+		}
+	}
+	if modelprovider.AmbientCredentialAvailable(provider) {
+		if source := modelprovider.AmbientCredentialSource(provider); source != "" {
+			return "ambient credentials: " + source
+		}
+		return "ambient credentials configured"
+	}
+	if environment := modelprovider.APIKeyEnvironment(provider); environment != "" && strings.TrimSpace(os.Getenv(environment)) != "" {
+		return "API key set: " + environment
+	}
+	if modelprovider.SupportsOAuthLogin(provider) {
+		return "sign-in available"
+	}
+	return "requires " + modelprovider.CredentialHint(provider)
+}
+
+func (m Model) selectedCloudModel() (cloudModelEntry, bool) {
+	entries := m.cloudModels()
+	if len(entries) == 0 {
+		return cloudModelEntry{}, false
+	}
+	index := min(max(0, m.localModels.cloudIndex), len(entries)-1)
+	return entries[index], true
+}
+
+func (m *Model) selectActiveModelCatalogEntry() {
+	if strings.EqualFold(strings.TrimSpace(m.provider.Value()), "gator-local") {
+		m.localModels.section = localModelSection
+		for index, local := range m.localModels.catalog.Models {
+			if local.OllamaModel == strings.TrimSpace(m.model.Value()) {
+				m.localModels.selected = index
+				break
+			}
+		}
+		return
+	}
+	m.localModels.section = cloudModelSection
+	for index, cloud := range m.cloudModels() {
+		if cloud.provider == strings.TrimSpace(m.provider.Value()) && cloud.model == strings.TrimSpace(m.model.Value()) {
+			m.localModels.cloudIndex = index
+			return
+		}
+	}
+}
+
+func (m *Model) toggleModelCatalogSection() {
+	if m.localModels.section == cloudModelSection {
+		m.localModels.section = localModelSection
+		return
+	}
+	m.localModels.section = cloudModelSection
+}
+
+func (m *Model) moveModelCatalogSelection(delta int) {
+	if m.localModels.section == localModelSection {
+		m.moveLocalModelSelection(delta)
+		return
+	}
+	entries := m.cloudModels()
+	if len(entries) == 0 {
+		m.localModels.cloudIndex = 0
+		return
+	}
+	m.localModels.cloudIndex = (m.localModels.cloudIndex + delta + len(entries)) % len(entries)
+}
+
+func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
+	if !cloud.selectable {
+		m.notice = notice{text: "This provider requires an account-specific deployment or model ID. Use the provider field to enter it before a run.", kind: noticeInfo}
+		return m, nil
+	}
+	m.provider.SetValue(cloud.provider)
+	m.model.SetValue(cloud.model)
+	m.delegateRuntime = ""
+	m.persistDraft()
+	m.refreshPreflight()
+	m.notice = notice{text: "Selected " + cloud.name + ". Return to the composer and send a task when its readiness is configured.", kind: noticeSuccess}
+	return m, nil
+}
+
+func (m Model) beginModelRename() (tea.Model, tea.Cmd) {
+	provider, model, found := m.selectedModelIdentity()
+	if !found {
+		m.notice = notice{text: "Select a model before changing its display name.", kind: noticeError}
+		return m, nil
+	}
+	input := textinput.New()
+	input.Prompt = ""
+	input.Placeholder = "display name (empty restores the original)"
+	input.CharLimit = 128
+	input.Width = max(24, m.inlineWidth()-2)
+	input.SetValue(m.modelAlias(provider, model))
+	command := input.Focus()
+	m.localModels.renaming = &modelRename{provider: provider, model: model, input: input}
+	return m, command
+}
+
+func (m Model) updateModelRename(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.localModels.renaming == nil {
+		return m, nil
+	}
+	switch message.String() {
+	case "esc", "ctrl+c":
+		m.localModels.renaming = nil
+		m.notice = notice{text: "Model display-name change cancelled.", kind: noticeInfo}
+		return m, nil
+	case "enter":
+		rename := m.localModels.renaming
+		if m.localModels.manager == nil {
+			m.notice = notice{text: "Model management is unavailable in this TUI session.", kind: noticeError}
+			return m, nil
+		}
+		m.localModels.renaming = nil
+		m.localModels.action = localModelRenaming
+		operation := startLocalModelOperation(func(ctx context.Context, _ func(LocalModelProgress)) localModelOperationDone {
+			aliases, err := m.localModels.manager.Rename(ctx, rename.provider, rename.model, rename.input.Value())
+			return localModelOperationDone{aliases: aliases, err: err}
+		})
+		m.localModels.operation = operation
+		return m, tea.Batch(m.localModels.spinner.Tick, waitForLocalModelOperation(operation))
+	}
+	var command tea.Cmd
+	m.localModels.renaming.input, command = m.localModels.renaming.input.Update(message)
+	return m, command
+}
+
+func (m Model) selectedModelIdentity() (string, string, bool) {
+	if m.localModels.section == localModelSection {
+		local, found := m.selectedLocalModel()
+		if !found {
+			return "", "", false
+		}
+		return "gator-local", local.OllamaModel, true
+	}
+	cloud, found := m.selectedCloudModel()
+	if !found || !cloud.selectable {
+		return "", "", false
+	}
+	return cloud.provider, cloud.model, true
+}
+
+func (m Model) modelAlias(provider, model string) string {
+	return strings.TrimSpace(m.config.ModelAliases[config.ModelAliasKey(provider, model)])
+}
+
+func (m Model) modelDisplayName(provider, model, fallback string) string {
+	if alias := m.modelAlias(provider, model); alias != "" {
+		return alias
+	}
+	return fallback
+}
+
 func (m *Model) moveLocalModelSelection(delta int) {
 	if len(m.localModels.catalog.Models) == 0 {
 		m.localModels.selected = 0
@@ -361,6 +653,7 @@ func (m *Model) applyLocalModelCatalog(catalog LocalModelCatalog) {
 		selectedID = selected.ID
 	}
 	m.localModels.catalog = catalog
+	m.applyModelAliases(m.config.ModelAliases)
 	m.localModels.selected = 0
 	for index, model := range catalog.Models {
 		if model.ID == selectedID {
@@ -371,6 +664,9 @@ func (m *Model) applyLocalModelCatalog(catalog LocalModelCatalog) {
 }
 
 func (m *Model) applyLocalModelUpdate(update LocalModelUpdate) {
+	if update.ModelAliases != nil {
+		m.applyModelAliases(update.ModelAliases)
+	}
 	m.applyLocalModelCatalog(update.Catalog)
 	m.config.CustomProviders = append([]config.CustomProvider(nil), update.CustomProviders...)
 	m.provider.SetValue(update.Provider)
@@ -378,6 +674,26 @@ func (m *Model) applyLocalModelUpdate(update LocalModelUpdate) {
 	m.delegateRuntime = ""
 	m.persistDraft()
 	m.refreshPreflight()
+}
+
+func (m *Model) applyModelAliases(aliases map[string]string) {
+	m.config.ModelAliases = cloneModelAliasMap(aliases)
+	for index := range m.localModels.catalog.Models {
+		model := &m.localModels.catalog.Models[index]
+		fallback := model.DefaultName
+		if fallback == "" {
+			fallback = model.Name
+		}
+		model.Name = m.modelDisplayName("gator-local", model.OllamaModel, fallback)
+	}
+}
+
+func cloneModelAliasMap(aliases map[string]string) map[string]string {
+	result := make(map[string]string, len(aliases))
+	for key, value := range aliases {
+		result[key] = value
+	}
+	return result
 }
 
 func (m Model) localModelActionLabel() string {
@@ -390,6 +706,8 @@ func (m Model) localModelActionLabel() string {
 		return "selecting local model"
 	case localModelRemoving:
 		return "removing selected model"
+	case localModelRenaming:
+		return "saving model display name"
 	default:
 		return ""
 	}

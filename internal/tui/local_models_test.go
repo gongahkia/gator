@@ -18,6 +18,7 @@ func TestLocalModelsAreAvailableThroughTheTUIAndConfigureTheNextRun(t *testing.T
 			ID:          "qwen2.5-coder-7b",
 			OllamaModel: "qwen2.5-coder:7b",
 			Name:        "Qwen2.5-Coder 7B",
+			DefaultName: "Qwen2.5-Coder 7B",
 			Download:    "4.7 GB",
 			Context:     "32K",
 			Summary:     "smallest reviewed coding option",
@@ -27,20 +28,34 @@ func TestLocalModelsAreAvailableThroughTheTUIAndConfigureTheNextRun(t *testing.T
 	model := New(Config{RepositoryPath: t.TempDir(), LocalModels: manager})
 	model.width, model.height = 100, 42
 	model.resizeInputs()
-	model.task.SetValue("/local")
+	model.task.SetValue("/model")
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command == nil {
-		t.Fatal("/local did not start a status refresh")
+		t.Fatal("/model did not start a status refresh")
 	}
 	model = next.(Model)
 	if model.screen != localModelsScreen || model.localModels.action != localModelRefreshing {
-		t.Fatalf("/local screen state = screen:%v action:%v", model.screen, model.localModels.action)
+		t.Fatalf("/model screen state = screen:%v action:%v", model.screen, model.localModels.action)
 	}
 
 	next, _ = model.Update(localModelStatusMsg{generation: model.localModels.generation, catalog: manager.catalog})
 	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = next.(Model)
 	if !strings.Contains(model.View(), "Qwen2.5-Coder 7B") || !strings.Contains(model.View(), "Connected · Ollama test") {
 		t.Fatalf("local model view = %q", model.View())
+	}
+
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	model = next.(Model)
+	if model.localModels.renaming == nil {
+		t.Fatal("rename did not open a display-name editor")
+	}
+	model.localModels.renaming.input.SetValue("desk Qwen")
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = finishLocalModelOperation(t, next.(Model))
+	if got := model.localModels.catalog.Models[0].Name; got != "desk Qwen" || model.config.ModelAliases[config.ModelAliasKey("gator-local", "qwen2.5-coder:7b")] != "desk Qwen" {
+		t.Fatalf("renamed local model = %#v aliases:%#v", model.localModels.catalog.Models[0], model.config.ModelAliases)
 	}
 
 	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
@@ -97,6 +112,7 @@ func TestLocalModelsShowsUnavailableRuntimeWithoutHidingCatalog(t *testing.T) {
 	model.localModels.generation = 1
 	next, _ := model.Update(localModelStatusMsg{generation: 1, catalog: manager.catalog})
 	updated := next.(Model)
+	updated.localModels.section = localModelSection
 	view := updated.View()
 	if !strings.Contains(view, "Unavailable") || !strings.Contains(view, "gator local serve") || !strings.Contains(view, "Qwen2.5-Coder 7B") {
 		t.Fatalf("unavailable local model view = %q", view)
@@ -104,6 +120,40 @@ func TestLocalModelsShowsUnavailableRuntimeWithoutHidingCatalog(t *testing.T) {
 	next, command := updated.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
 	if command != nil || next.(Model).localModels.confirmation != localModelNoConfirmation || !strings.Contains(next.(Model).notice.text, "unavailable") {
 		t.Fatalf("pull while unavailable = %#v command:%#v", next.(Model), command)
+	}
+}
+
+func TestModelCatalogShowsCloudReadinessAndSelectsCloudModel(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	manager := &fakeLocalModelManager{}
+	model := New(Config{LocalModels: manager})
+	model.width, model.height = 100, 40
+	next, _ := model.openModelCatalog()
+	model = next.(Model)
+	for index, entry := range model.cloudModels() {
+		if entry.provider == "openai" {
+			model.localModels.cloudIndex = index
+			break
+		}
+	}
+	if !strings.Contains(model.View(), "API key set: OPENAI_API_KEY") {
+		t.Fatalf("cloud readiness view = %q", model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.provider.Value() != "openai" || model.model.Value() == "" {
+		t.Fatalf("cloud selection = provider:%q model:%q", model.provider.Value(), model.model.Value())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	model = next.(Model)
+	if model.localModels.renaming == nil {
+		t.Fatal("cloud rename did not open a display-name editor")
+	}
+	model.localModels.renaming.input.SetValue("work OpenAI")
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = finishLocalModelOperation(t, next.(Model))
+	if model.modelAlias("openai", model.model.Value()) != "work OpenAI" || !strings.Contains(model.View(), "work OpenAI") {
+		t.Fatalf("cloud alias = %#v view:%q", model.config.ModelAliases, model.View())
 	}
 }
 
@@ -166,4 +216,8 @@ func (manager *fakeLocalModelManager) Remove(_ context.Context, id string) (Loca
 	manager.removed = true
 	manager.catalog.Models[0].Installed = false
 	return LocalModelUpdate{Catalog: manager.catalog}, nil
+}
+
+func (manager *fakeLocalModelManager) Rename(_ context.Context, provider, model, alias string) (map[string]string, error) {
+	return map[string]string{config.ModelAliasKey(provider, model): alias}, nil
 }

@@ -27,11 +27,14 @@ type Settings struct {
 	Theme           string           `json:"theme,omitempty"`
 	Extensions      []Extension      `json:"extensions,omitempty"`
 	CustomProviders []CustomProvider `json:"custom_providers,omitempty"`
-	ExtensionTrusts []ExtensionTrust `json:"extension_trusts,omitempty"`
-	HookTrusts      []hooks.Trust    `json:"hook_trusts,omitempty"`
-	LSPTrusts       []lsp.Trust      `json:"lsp_trusts,omitempty"`
-	MCPTrusts       []mcp.Trust      `json:"mcp_trusts,omitempty"`
-	Execution       sandbox.Policy   `json:"execution"`
+	// ModelAliases changes only a model's local display label. Its key is the
+	// stable provider:model identity; Gator always sends the real model ID.
+	ModelAliases    map[string]string `json:"model_aliases,omitempty"`
+	ExtensionTrusts []ExtensionTrust  `json:"extension_trusts,omitempty"`
+	HookTrusts      []hooks.Trust     `json:"hook_trusts,omitempty"`
+	LSPTrusts       []lsp.Trust       `json:"lsp_trusts,omitempty"`
+	MCPTrusts       []mcp.Trust       `json:"mcp_trusts,omitempty"`
+	Execution       sandbox.Policy    `json:"execution"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -66,6 +69,12 @@ type CustomProvider struct {
 	APIKeyEnv    string   `json:"api_key_env,omitempty"`
 	Models       []string `json:"models"`
 	DefaultModel string   `json:"default_model"`
+}
+
+// ModelAliasKey identifies a model display alias. Provider IDs cannot contain
+// colons, so this is unambiguous even when a model ID itself contains one.
+func ModelAliasKey(provider, model string) string {
+	return strings.ToLower(strings.TrimSpace(provider)) + ":" + strings.TrimSpace(model)
 }
 
 var customProviderIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
@@ -220,6 +229,17 @@ func validate(settings Settings) error {
 	}
 	if len(settings.CustomProviders) > 128 {
 		return errors.New("configuration has too many custom providers")
+	}
+	if len(settings.ModelAliases) > 512 {
+		return errors.New("configuration has too many model aliases")
+	}
+	for key, value := range settings.ModelAliases {
+		if strings.TrimSpace(key) == "" || len(key) > 1024 || strings.ContainsAny(key, "\r\n") {
+			return errors.New("model alias key is invalid")
+		}
+		if strings.TrimSpace(value) == "" || len(value) > 128 || strings.ContainsAny(value, "\r\n") {
+			return fmt.Errorf("model alias %q is invalid", key)
+		}
 	}
 	providers := make(map[string]struct{}, len(settings.CustomProviders))
 	for _, provider := range settings.CustomProviders {
