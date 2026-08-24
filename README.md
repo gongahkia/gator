@@ -269,8 +269,11 @@ commands remain available for scripts and CI-like usage.
 `gator connect` is the shortest compliant onboarding path for subscription
 providers. It invokes an installed Codex, GitHub Copilot, or Kimi CLI for that
 vendor's own sign-in. `gator connect xai` invokes OpenCode's xAI provider
-picker, which offers browser OAuth, device-code OAuth, or an API key. Gator
-does not store, copy, or translate any credential those harnesses create.
+picker, which offers browser OAuth, device-code OAuth, or an API key. `gator
+connect claude` stores an Anthropic API key for Gator's API-key Claude Code
+harness route; it does not access a Claude.ai or Claude Code subscription
+credential. Gator does not store, copy, or translate any credential another
+harness creates.
 
 `gator delegate` is the explicit alternative for an installed agent CLI. It
 creates and retains the same Git worktree, then executes Gator's required
@@ -328,12 +331,17 @@ gator run --verify 'go test ./...' 'Add a focused feature with tests'
 Gator manages model packages only through a literal loopback Ollama runtime;
 it does not execute arbitrary model repositories or install a system runtime.
 In the primary terminal UI, `/model` is the single cloud-and-local catalog: it
-shows credential/configuration readiness for cloud choices, signs into eligible
-providers, and provides reviewed local pull, selection, display-name rename,
-refresh, and removal controls. After selection, return to the composer and send
-a verified task normally. The chosen model becomes the default native provider,
-so the same TUI, tools, worktrees, sandbox, verification, retained sessions,
-RPC, and ACP paths apply.
+shows credential/configuration readiness for cloud choices, includes the
+checked-in OpenCode Zen and Go model catalogs, signs into eligible providers,
+and provides reviewed local pull, selection, display-name rename, refresh, and
+removal controls. Codex, Copilot, Kimi, and xAI open their existing provider
+connection routes there when native Gator OAuth is not configured. Claude Code
+is also present there, but its route stores an Anthropic API key for the
+delegated harness and never reuses Claude.ai or Claude Code subscription
+credentials. After selection, return to the composer and send a verified task
+normally. The chosen model becomes the default native provider, so the same
+TUI, tools, worktrees, sandbox, verification, retained sessions, RPC, and ACP
+paths apply.
 See [curated local models](docs/LOCAL_MODELS.md) for model sources, sizes,
 hardware limitations, and removal.
 

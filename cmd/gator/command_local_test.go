@@ -175,7 +175,14 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	}
 	manager := &localModelManager{store: store, runtimeURL: server.URL, host: generousLocalModelHost}
 	status, err := manager.Status(context.Background())
-	if err != nil || status.RuntimeVersion != "test" || len(status.Models) == 0 || !status.Models[0].Installed {
+	installedQwen := false
+	for _, model := range status.Models {
+		if model.ID == "qwen2.5-coder-7b" && model.Installed {
+			installedQwen = true
+			break
+		}
+	}
+	if err != nil || status.RuntimeVersion != "test" || len(status.Models) == 0 || !installedQwen {
 		t.Fatalf("local manager status = %#v, err = %v", status, err)
 	}
 	var progress []tui.LocalModelProgress
