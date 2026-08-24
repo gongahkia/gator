@@ -23,6 +23,7 @@ installer. That would require a separate provenance, checksum, privilege, and
 upgrade policy. It does manage model packages through the loopback runtime:
 
 ```sh
+gator doctor
 gator local status
 gator local list
 gator local pull qwen2.5-coder-7b --yes
@@ -48,7 +49,9 @@ discover every model enabled by an account. Press `l` to start an eligible
 provider sign-in and `u` or Enter to select a configured cloud model.
 
 Press Tab to open the Local section. It checks the loopback runtime and shows
-the same reviewed catalog and installed state as `gator local status`.
+the same reviewed catalog and installed state as `gator local status`. It also
+shows the detected host and marks models that Gator has disabled because they
+do not satisfy its local admission guardrail.
 
 - `↑`/`↓` chooses a catalog model; `p` shows the source and approximate size,
   then `y` or Enter confirms its download. A native animated spinner and
@@ -66,6 +69,48 @@ The TUI does not background `ollama serve`: it is a foreground process and
 Gator does not create an unsupervised local runtime daemon. When the runtime is
 unavailable, the TUI shows the exact `ollama serve`/`gator local serve` recovery
 command while retaining the catalog for inspection.
+
+## Host eligibility guardrail
+
+`gator doctor` detects the operating system, architecture, total RAM, currently
+available RAM where the platform reports it, and free space in the Ollama model
+filesystem. It reports each reviewed model as enabled or disabled and explains
+the exact blocking condition. Gator recognizes Linux, macOS, and Windows on
+`amd64` and `arm64`; an unrecognized OS or architecture is disabled rather than
+assumed compatible.
+
+The published pull size is the only stable per-model resource fact in this
+catalog. Gator therefore uses a deliberately conservative admission policy,
+not an upstream hardware claim: it requires twice that published size in both
+physical RAM and (when measurable) currently available RAM, plus 20% free disk
+headroom for the pull. The current catalog evaluates to:
+
+| Gator ID | Gator RAM guardrail | Gator free-disk guardrail |
+| --- | ---: | ---: |
+| `qwen2.5-coder-7b` | 8.8 GiB | 5.3 GiB |
+| `qwen2.5-coder-14b` | 16.8 GiB | 10.1 GiB |
+| `devstral-24b` | 26.1 GiB | 15.6 GiB |
+| `qwen3-coder-30b` | 35.4 GiB | 21.2 GiB |
+
+Gator blocks `local pull`, `local use`, TUI download/selection, and every
+managed-local executor setup (including a previously selected model) when the
+host fails this policy. It leaves rename and removal available, so a disabled
+model can be removed to reclaim disk. This is intentionally a capacity safety
+check: it does not guarantee useful speed or full context support.
+
+Gator uses `OLLAMA_MODELS` when it is present. Otherwise it follows Ollama's
+documented default model storage location for the detected OS. If Ollama runs
+as a Linux service, set `OLLAMA_MODELS` in that service's environment as well
+as the invoking environment when using a non-default disk. See the
+[Ollama FAQ](https://docs.ollama.com/faq) for model locations and service
+environment setup.
+
+GPU compatibility, available VRAM, context length, quantization, and parallel
+requests are not safely derivable from a generic laptop inspection. Ollama
+chooses its runtime backend; after a model is loaded, run `ollama ps` to see
+whether it is using CPU, GPU, or both. Larger context and parallel requests can
+raise memory use beyond Gator's guardrail, so keep them conservative on a
+resource-constrained machine.
 
 ## Reviewed catalog
 
@@ -86,9 +131,9 @@ source.
 
 Package size is not a hardware guarantee: available RAM/VRAM or unified
 memory, quantization, configured context, and other loaded applications affect
-whether a model runs usefully. Review the upstream model card and license
-before downloading. Gator does not make a performance or benchmark claim for
-any catalog entry.
+whether a model runs usefully. The Gator guardrail above protects against clear
+capacity shortfalls, but cannot make a performance or benchmark claim for any
+catalog entry. Review the upstream model card and license before downloading.
 
 ## Runtime boundary
 

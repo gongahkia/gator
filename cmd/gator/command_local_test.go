@@ -117,6 +117,51 @@ func TestLocalRejectsRemoteRuntimeURL(t *testing.T) {
 	}
 }
 
+func TestLocalEligibilityBlocksPullUseAndManagedExecution(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	previous := inspectLocalModelHost
+	inspectLocalModelHost = func() localmodel.Host {
+		return localmodel.Host{
+			OS:                   "linux",
+			Architecture:         "amd64",
+			TotalMemoryBytes:     8 << 30,
+			AvailableMemoryBytes: 8 << 30,
+			AvailableDiskBytes:   64 << 30,
+		}
+	}
+	t.Cleanup(func() { inspectLocalModelHost = previous })
+
+	server := newLocalModelServer(t)
+	defer server.Close()
+	var output bytes.Buffer
+	if err := localCommand([]string{"pull", "qwen2.5-coder-7b", "--yes", "--url", server.URL}, &output); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
+		t.Fatalf("blocked local pull error = %v", err)
+	}
+	if err := localCommand([]string{"use", "qwen2.5-coder-7b", "--url", server.URL}, &output); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
+		t.Fatalf("blocked local use error = %v", err)
+	}
+	store, err := config.DefaultStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.CustomProviders = []config.CustomProvider{{
+		ID:           localmodel.ProviderID,
+		BaseURL:      server.URL + "/v1/chat/completions",
+		Models:       []string{"qwen2.5-coder:7b"},
+		DefaultModel: "qwen2.5-coder:7b",
+	}}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newExecutor(localmodel.ProviderID, "", ""); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
+		t.Fatalf("blocked local executor error = %v", err)
+	}
+}
+
 func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)

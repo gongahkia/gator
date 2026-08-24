@@ -123,6 +123,40 @@ func TestLocalModelsShowsUnavailableRuntimeWithoutHidingCatalog(t *testing.T) {
 	}
 }
 
+func TestLocalModelsDisableIneligibleCatalogEntriesBeforePullOrUse(t *testing.T) {
+	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
+		RuntimeURL:     "http://127.0.0.1:11434",
+		RuntimeVersion: "test",
+		Models: []LocalModel{{
+			ID:            "qwen2.5-coder-7b",
+			OllamaModel:   "qwen2.5-coder:7b",
+			Name:          "Qwen2.5-Coder 7B",
+			Installed:     true,
+			Requirement:   "needs 8.8 GiB RAM / 5.3 GiB disk",
+			BlockedReason: "requires 8.8 GiB currently available RAM under Gator's guardrail; detected 6.0 GiB",
+		}},
+	}}
+	model := New(Config{LocalModels: manager})
+	model.width, model.height = 100, 40
+	model.screen = localModelsScreen
+	model.localModels.section = localModelSection
+	model.localModels.catalog = manager.catalog
+
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	updated := next.(Model)
+	if command != nil || updated.localModels.confirmation != localModelNoConfirmation || !strings.Contains(updated.notice.text, "disabled on this host") || manager.pulled {
+		t.Fatalf("blocked pull = %#v command:%#v manager:%#v", updated, command, manager)
+	}
+	next, command = updated.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated = next.(Model)
+	if command != nil || updated.localModels.operation != nil || !strings.Contains(updated.notice.text, "disabled on this host") || manager.used {
+		t.Fatalf("blocked use = %#v command:%#v manager:%#v", updated, command, manager)
+	}
+	if view := updated.View(); !strings.Contains(view, "disabled") || !strings.Contains(view, "needs 8.8 GiB RAM") {
+		t.Fatalf("blocked local model view = %q", view)
+	}
+}
+
 func TestModelCatalogShowsCloudReadinessAndSelectsCloudModel(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "test-key")
 	manager := &fakeLocalModelManager{}
