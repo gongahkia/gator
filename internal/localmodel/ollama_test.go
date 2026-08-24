@@ -25,6 +25,28 @@ func TestCatalogResolvesOnlyReviewedModels(t *testing.T) {
 	}
 }
 
+func TestCatalogIncludesPublishedQwenCoderSizeRange(t *testing.T) {
+	for _, test := range []struct {
+		id    string
+		tag   string
+		bytes uint64
+	}{
+		{id: "qwen2.5-coder-0.5b", tag: "qwen2.5-coder:0.5b", bytes: 398_000_000},
+		{id: "qwen2.5-coder-1.5b", tag: "qwen2.5-coder:1.5b", bytes: 986_000_000},
+		{id: "qwen2.5-coder-3b", tag: "qwen2.5-coder:3b", bytes: 1_900_000_000},
+		{id: "qwen2.5-coder-7b", tag: "qwen2.5-coder:7b", bytes: 4_700_000_000},
+		{id: "qwen2.5-coder-14b", tag: "qwen2.5-coder:14b", bytes: 9_000_000_000},
+		{id: "qwen2.5-coder-32b", tag: "qwen2.5-coder:32b", bytes: 20_000_000_000},
+	} {
+		t.Run(test.id, func(t *testing.T) {
+			model, found := Resolve(test.id)
+			if !found || model.OllamaModel != test.tag || model.DownloadBytes != test.bytes {
+				t.Fatalf("catalog model = %#v, found = %t", model, found)
+			}
+		})
+	}
+}
+
 func TestClientRestrictsRuntimeToLoopbackHTTP(t *testing.T) {
 	for _, value := range []string{"https://127.0.0.1:11434", "http://example.com:11434", "http://user:pass@127.0.0.1:11434", "http://127.0.0.1:0"} {
 		if _, err := NewClient(value); err == nil {

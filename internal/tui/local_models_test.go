@@ -269,6 +269,23 @@ func TestModelCatalogShowsCloudReadinessAndSelectsCloudModel(t *testing.T) {
 	}
 }
 
+func TestModelCatalogExposesCheckedInOpenCodeModelsAndClaudeHarness(t *testing.T) {
+	model := New(Config{LocalModels: &fakeLocalModelManager{}})
+	entries := model.cloudModels()
+	var openCodeFound, claudeFound bool
+	for _, entry := range entries {
+		if entry.provider == "opencode" && entry.model == "claude-opus-5" && entry.selectable {
+			openCodeFound = true
+		}
+		if entry.provider == "claude" && entry.name == "Claude Code · API-key harness" && entry.canLogin && !entry.selectable {
+			claudeFound = true
+		}
+	}
+	if !openCodeFound || !claudeFound {
+		t.Fatalf("cloud catalog missing entries: OpenCode=%t Claude=%t entries=%#v", openCodeFound, claudeFound, entries)
+	}
+}
+
 func finishLocalModelOperation(t *testing.T, model Model) Model {
 	t.Helper()
 	for range 8 {

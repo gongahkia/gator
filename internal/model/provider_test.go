@@ -442,6 +442,28 @@ func TestOpenCodeCatalogHasOnlySupportedProtocols(t *testing.T) {
 	}
 }
 
+func TestCuratedModelsExposeTheCheckedInOpenCodeCatalog(t *testing.T) {
+	for _, provider := range []Provider{OpenCode, OpenCodeGo} {
+		models := CuratedModels(provider)
+		if len(models) != len(openCodeCatalog[provider]) || models[0] != DefaultModel(provider) {
+			t.Fatalf("curated models for %s = %#v", provider, models)
+		}
+		seen := make(map[string]bool, len(models))
+		for _, model := range models {
+			if seen[model] {
+				t.Fatalf("duplicate curated model %q for %s", model, provider)
+			}
+			seen[model] = true
+			if _, found := openCodeModelProtocol(provider, model); !found {
+				t.Fatalf("curated model %q is not routed for %s", model, provider)
+			}
+		}
+	}
+	if got := CuratedModels(OpenAI); len(got) != 1 || got[0] != DefaultModel(OpenAI) {
+		t.Fatalf("OpenAI curated models = %#v", got)
+	}
+}
+
 func TestEveryOpenCodeCatalogEntryBuilds(t *testing.T) {
 	for provider, entries := range openCodeCatalog {
 		for model := range entries {

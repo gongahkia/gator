@@ -1220,6 +1220,24 @@ func TestProviderOwnedCodexLoginSelectsHarnessInsteadOfNativeOAuth(t *testing.T)
 	}
 }
 
+func TestProviderOwnedClaudeConnectSelectsClaudeHarness(t *testing.T) {
+	model := New(Config{
+		Provider:     "claude",
+		Verification: [][]string{{"go", "test", "./..."}},
+		NewDelegateCommand: func(string, string, string, [][]string, string) (DelegateCommand, error) {
+			return DelegateCommand{Process: exec.Command("true")}, nil
+		},
+	})
+	next, command := model.Update(connectDoneMsg{provider: "claude"})
+	if command != nil {
+		t.Fatal("completed Claude connection returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.delegateRuntime != "claude" || !strings.Contains(updated.commandOutput, "Claude Code harness is ready") {
+		t.Fatalf("Claude connection state = runtime:%q output:%q", updated.delegateRuntime, updated.commandOutput)
+	}
+}
+
 func TestCodexHarnessRunDoesNotConstructNativeExecutor(t *testing.T) {
 	delegateCalls := 0
 	nativeCalls := 0
