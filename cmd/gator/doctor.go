@@ -124,6 +124,9 @@ func doctor(arguments []string, out io.Writer) error {
 	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\nWeb search: %s\n", gitStatus, providerDisplay, authentication, authenticationStatus, sandboxStatus, webSearchStatus); err != nil {
 		return err
 	}
+	if err := writeLocalModelDoctor(out, inspectLocalModelHost()); err != nil {
+		return err
+	}
 	if customProvider && custom.ID == localmodel.ProviderID {
 		if _, err := fmt.Fprintln(out, "Local runtime: run 'gator local status' to verify the selected loopback Ollama server and model inventory."); err != nil {
 			return err
