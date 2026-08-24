@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
@@ -31,7 +32,7 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 	if err != nil {
 		return tui.LocalModelCatalog{}, err
 	}
-	catalog := manager.catalog(client, nil)
+	catalog := manager.catalog(settings, client, nil)
 	if binary, lookupErr := exec.LookPath("ollama"); lookupErr == nil {
 		catalog.Executable = binary
 	}
@@ -46,7 +47,7 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 		catalog.RuntimeError = "list installed models: " + err.Error()
 		return catalog, nil
 	}
-	catalog.Models = manager.catalog(client, installed).Models
+	catalog.Models = manager.catalog(settings, client, installed).Models
 	return catalog, nil
 }
 
@@ -119,6 +120,7 @@ func (manager *localModelManager) Use(ctx context.Context, id string) (tui.Local
 	return tui.LocalModelUpdate{
 		Catalog:         catalog,
 		CustomProviders: cloneCustomProviders(settings.CustomProviders),
+		ModelAliases:    cloneModelAliases(settings.ModelAliases),
 		Provider:        settings.Defaults.Provider,
 		Model:           settings.Defaults.Model,
 	}, nil
@@ -171,12 +173,42 @@ func (manager *localModelManager) Remove(ctx context.Context, id string) (tui.Lo
 	return tui.LocalModelUpdate{
 		Catalog:         catalog,
 		CustomProviders: cloneCustomProviders(settings.CustomProviders),
+		ModelAliases:    cloneModelAliases(settings.ModelAliases),
 		Provider:        settings.Defaults.Provider,
 		Model:           settings.Defaults.Model,
 	}, nil
 }
 
-func (manager *localModelManager) catalog(client localmodel.Client, installed []localmodel.InstalledModel) tui.LocalModelCatalog {
+func (manager *localModelManager) Rename(ctx context.Context, provider, model, alias string) (map[string]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	provider = strings.TrimSpace(provider)
+	model = strings.TrimSpace(model)
+	alias = strings.TrimSpace(alias)
+	if provider == "" || model == "" {
+		return nil, fmt.Errorf("provider and model are required to rename a display label")
+	}
+	settings, err := manager.store.Load()
+	if err != nil {
+		return nil, err
+	}
+	if settings.ModelAliases == nil {
+		settings.ModelAliases = make(map[string]string)
+	}
+	key := config.ModelAliasKey(provider, model)
+	if alias == "" {
+		delete(settings.ModelAliases, key)
+	} else {
+		settings.ModelAliases[key] = alias
+	}
+	if err := manager.store.Save(settings); err != nil {
+		return nil, err
+	}
+	return cloneModelAliases(settings.ModelAliases), nil
+}
+
+func (manager *localModelManager) catalog(settings config.Settings, client localmodel.Client, installed []localmodel.InstalledModel) tui.LocalModelCatalog {
 	installedNames := installedModelNames(installed)
 	models := make([]tui.LocalModel, 0, len(localmodel.Catalog()))
 	for _, model := range localmodel.Catalog() {
@@ -184,7 +216,8 @@ func (manager *localModelManager) catalog(client localmodel.Client, installed []
 		models = append(models, tui.LocalModel{
 			ID:          model.ID,
 			OllamaModel: model.OllamaModel,
-			Name:        model.Name,
+			Name:        modelDisplayName(settings, localmodel.ProviderID, model.OllamaModel, model.Name),
+			DefaultName: model.Name,
 			Download:    model.Download,
 			Context:     model.Context,
 			Summary:     model.Summary,
@@ -202,6 +235,21 @@ func cloneCustomProviders(providers []config.CustomProvider) []config.CustomProv
 		result = append(result, provider)
 	}
 	return result
+}
+
+func cloneModelAliases(aliases map[string]string) map[string]string {
+	result := make(map[string]string, len(aliases))
+	for key, value := range aliases {
+		result[key] = value
+	}
+	return result
+}
+
+func modelDisplayName(settings config.Settings, provider, model, fallback string) string {
+	if alias := strings.TrimSpace(settings.ModelAliases[config.ModelAliasKey(provider, model)]); alias != "" {
+		return alias
+	}
+	return fallback
 }
 
 var _ tui.LocalModelManager = (*localModelManager)(nil)

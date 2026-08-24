@@ -144,6 +144,14 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	if err != nil || update.Provider != "" || update.Model != "" || len(update.CustomProviders) != 0 {
 		t.Fatalf("local manager remove = %#v, err = %v", update, err)
 	}
+	aliases, err := manager.Rename(context.Background(), localmodel.ProviderID, "qwen2.5-coder:7b", "desk Qwen")
+	if err != nil || aliases[config.ModelAliasKey(localmodel.ProviderID, "qwen2.5-coder:7b")] != "desk Qwen" {
+		t.Fatalf("local manager rename = %#v, err = %v", aliases, err)
+	}
+	status, err = manager.Status(context.Background())
+	if err != nil || status.Models[0].Name != "desk Qwen" || status.Models[0].DefaultName != "Qwen2.5-Coder 7B" {
+		t.Fatalf("local manager renamed status = %#v, err = %v", status, err)
+	}
 }
 
 func newLocalModelServer(t *testing.T) *httptest.Server {

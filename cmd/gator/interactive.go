@@ -110,6 +110,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		StartInRecent:     options.StartInRecent,
 		RecentAll:         options.RecentAll,
 		CustomProviders:   settings.CustomProviders,
+		ModelAliases:      settings.ModelAliases,
 		ExtensionCommands: extensionCommands,
 		Theme:             settings.Theme,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {

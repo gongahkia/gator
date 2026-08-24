@@ -152,12 +152,85 @@ func (m Model) attachmentConfirmView() string {
 }
 
 func (m Model) localModelsView() string {
-	sections := []string{m.header("local coding models")}
+	sections := []string{m.header("models")}
 	if m.localModels.manager == nil {
-		sections = append(sections, m.panel(errorStyle.Render("Local model management was not configured for this TUI session.")), m.noticeView(), m.footer("esc return"))
+		sections = append(sections, m.panel(errorStyle.Render("Model management was not configured for this TUI session.")), m.noticeView(), m.footer("esc return"))
 		return strings.Join(sections, "\n")
 	}
 
+	if m.localModels.section == cloudModelSection {
+		sections = append(sections, m.cloudModelsView())
+		sections = append(sections, m.inline(dimStyle.Render(m.localModelsSummary())))
+	} else {
+		sections = append(sections, m.localRuntimeView(), m.localCatalogView())
+		sections = append(sections, m.inline(dimStyle.Render("Cloud provider readiness is available under the Cloud section.")))
+	}
+
+	if m.localModels.action != localModelIdle {
+		detail := m.localModelActionLabel()
+		if m.localModels.action == localModelPulling {
+			detail = m.localModelProgressLabel()
+		}
+		sections = append(sections, m.fieldView("Working", "The TUI remains responsive; Esc or Ctrl+C requests cancellation.", m.localModels.spinner.View()+" "+detail))
+	}
+
+	if m.localModels.renaming != nil {
+		sections = append(sections, m.fieldView("Rename display label", "This changes only Gator's local label; the provider model ID remains unchanged.", m.localModels.renaming.input.View()))
+	}
+	if m.oauthLogin != nil && strings.TrimSpace(m.commandOutput) != "" {
+		sections = append(sections, m.fieldView("Cloud sign-in", "Complete the provider login in your browser. This TUI stays open while Gator waits for its callback.", m.commandOutput))
+	}
+	if m.localModels.confirmation != localModelNoConfirmation {
+		if selected, found := m.selectedLocalModel(); found {
+			if m.localModels.confirmation == localModelConfirmPull {
+				sections = append(sections, m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL))
+			} else {
+				sections = append(sections, m.fieldView("Confirm removal", "This deletes local model data from the selected Ollama runtime.", selected.Name+" · "+selected.OllamaModel))
+			}
+		}
+	}
+
+	if m.localModels.renaming != nil {
+		sections = append(sections, m.noticeView(), m.footer("enter save", "esc cancel", "f1 shortcuts"))
+	} else if m.oauthLogin != nil {
+		sections = append(sections, m.noticeView(), m.footer("ctrl+c cancel sign-in", "f1 shortcuts"))
+	} else if m.localModels.confirmation == localModelConfirmPull {
+		sections = append(sections, m.noticeView(), m.footer("enter/y download", "esc/n cancel", "f1 shortcuts"))
+	} else if m.localModels.confirmation == localModelConfirmRemove {
+		sections = append(sections, m.noticeView(), m.footer("enter/y remove", "esc/n cancel", "f1 shortcuts"))
+	} else if m.localModels.action != localModelIdle {
+		sections = append(sections, m.noticeView(), m.footer("esc/ctrl+c cancel", "f1 shortcuts"))
+	} else if m.localModels.section == cloudModelSection {
+		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
+	} else {
+		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
+	}
+	return strings.Join(sections, "\n")
+}
+
+func (m Model) cloudModelsView() string {
+	entries := m.cloudModels()
+	if len(entries) == 0 {
+		return m.fieldView("Cloud models", "No direct cloud providers are available in this build.", dimStyle.Render("No cloud providers found."))
+	}
+	start, end := m.visibleRange(len(entries), m.localModels.cloudIndex, m.cloudModelLimit())
+	lines := make([]string, 0, end-start)
+	for index := start; index < end; index++ {
+		entry := entries[index]
+		prefix := "  "
+		if index == m.localModels.cloudIndex {
+			prefix = "> "
+		}
+		status := dimStyle.Render(entry.status)
+		if strings.Contains(entry.status, "signed in") || strings.Contains(entry.status, "configured") || strings.Contains(entry.status, "stored") || strings.Contains(entry.status, "API key set") {
+			status = okStyle.Render(entry.status)
+		}
+		lines = append(lines, prefix+keyStyle.Render(compact(entry.name, max(16, m.panelTextWidth()-4)))+"\n    "+status)
+	}
+	return m.fieldView("Cloud models", "Readiness is credential/configuration state only; Gator does not query or claim an account's complete remote catalog.", strings.Join(lines, "\n"))
+}
+
+func (m Model) localRuntimeView() string {
 	runtime := ""
 	if m.localModels.catalog.Executable == "" {
 		runtime = "Ollama executable: not found\nInstall Ollama from https://ollama.com/download."
@@ -173,61 +246,53 @@ func (m Model) localModelsView() string {
 	} else if m.localModels.catalog.RuntimeVersion != "" {
 		runtime += "\n" + okStyle.Render("Connected · Ollama "+m.localModels.catalog.RuntimeVersion)
 	}
-	sections = append(sections, m.fieldView("Local runtime", "Gator only manages a loopback Ollama runtime; use a custom provider for remote endpoints.", runtime))
+	return m.fieldView("Local runtime", "Gator only manages a loopback Ollama runtime; use a custom provider for remote endpoints.", runtime)
+}
 
-	if m.localModels.action != localModelIdle {
-		detail := m.localModelActionLabel()
-		if m.localModels.action == localModelPulling {
-			detail = m.localModelProgressLabel()
-		}
-		sections = append(sections, m.fieldView("Working", "The TUI remains responsive; Esc or Ctrl+C requests cancellation.", m.localModels.spinner.View()+" "+detail))
-	}
-
-	if m.localModels.confirmation != localModelNoConfirmation {
-		if selected, found := m.selectedLocalModel(); found {
-			if m.localModels.confirmation == localModelConfirmPull {
-				sections = append(sections, m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL))
-			} else {
-				sections = append(sections, m.fieldView("Confirm removal", "This deletes local model data from the selected Ollama runtime.", selected.Name+" · "+selected.OllamaModel))
-			}
-		}
-	}
-
+func (m Model) localCatalogView() string {
 	if len(m.localModels.catalog.Models) == 0 {
-		sections = append(sections, m.panel(dimStyle.Render("Loading the reviewed catalog…")))
-	} else {
-		start, end := m.visibleRange(len(m.localModels.catalog.Models), m.localModels.selected, m.localModelLimit())
-		lines := make([]string, 0, end-start)
-		for index := start; index < end; index++ {
-			model := m.localModels.catalog.Models[index]
-			prefix := "  "
-			if index == m.localModels.selected {
-				prefix = "> "
-			}
-			state := dimStyle.Render("available")
-			if model.Installed {
-				state = okStyle.Render("installed")
-			}
-			line := prefix + keyStyle.Render(model.Name) + " · " + state + " · " + dimStyle.Render(model.Download+" · "+model.Context)
-			lines = append(lines, line+"\n    "+dimStyle.Render(compact(model.Summary+" · "+model.OllamaModel, max(16, m.panelTextWidth()-4))))
-		}
-		selected, _ := m.selectedLocalModel()
-		sections = append(sections, m.fieldView("Reviewed catalog", "Only these reviewed Ollama tags are downloaded through Gator.", strings.Join(lines, "\n")))
-		if !m.compactLayout() && selected.ID != "" {
-			sections = append(sections, m.inline(dimStyle.Render("Selected source: "+selected.SourceURL)))
-		}
+		return m.fieldView("Reviewed local models", "Only reviewed Ollama tags can be downloaded through Gator.", dimStyle.Render("Loading the reviewed catalog…"))
 	}
+	start, end := m.visibleRange(len(m.localModels.catalog.Models), m.localModels.selected, m.localModelLimit())
+	lines := make([]string, 0, end-start)
+	for index := start; index < end; index++ {
+		model := m.localModels.catalog.Models[index]
+		prefix := "  "
+		if index == m.localModels.selected {
+			prefix = "> "
+		}
+		state := dimStyle.Render("available")
+		if model.Installed {
+			state = okStyle.Render("installed")
+		}
+		line := prefix + keyStyle.Render(model.Name) + " · " + state + " · " + dimStyle.Render(model.Download+" · "+model.Context)
+		lines = append(lines, line+"\n    "+dimStyle.Render(compact(model.Summary+" · "+model.OllamaModel, max(16, m.panelTextWidth()-4))))
+	}
+	view := m.fieldView("Reviewed local models", "Only these reviewed Ollama tags are downloaded through Gator.", strings.Join(lines, "\n"))
+	if selected, found := m.selectedLocalModel(); found && !m.compactLayout() && selected.ID != "" {
+		view += "\n" + m.inline(dimStyle.Render("Selected source: "+selected.SourceURL))
+	}
+	return view
+}
 
-	if m.localModels.confirmation == localModelConfirmPull {
-		sections = append(sections, m.noticeView(), m.footer("enter/y download", "esc/n cancel", "f1 shortcuts"))
-	} else if m.localModels.confirmation == localModelConfirmRemove {
-		sections = append(sections, m.noticeView(), m.footer("enter/y remove", "esc/n cancel", "f1 shortcuts"))
-	} else if m.localModels.action != localModelIdle {
-		sections = append(sections, m.noticeView(), m.footer("esc/ctrl+c cancel", "f1 shortcuts"))
-	} else {
-		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "r refresh", "esc composer", "f1 shortcuts"))
+func (m Model) localModelsSummary() string {
+	installed := 0
+	for _, model := range m.localModels.catalog.Models {
+		if model.Installed {
+			installed++
+		}
 	}
-	return strings.Join(sections, "\n")
+	if m.localModels.catalog.RuntimeError != "" {
+		return "Local models: runtime unavailable · Tab opens the reviewed catalog and recovery guidance."
+	}
+	return fmt.Sprintf("Local models: %d/%d reviewed models installed · Tab opens pull, use, remove, and rename controls.", installed, len(m.localModels.catalog.Models))
+}
+
+func (m Model) cloudModelLimit() int {
+	if m.height <= 0 {
+		return 8
+	}
+	return max(1, min(10, (m.height-12)/2))
 }
 
 func (m Model) localModelLimit() int {

@@ -132,14 +132,6 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/help":
 		m.commandOutput = commandHelp()
 		m.notice = notice{text: "Commands operate locally and never start a run by themselves.", kind: noticeInfo}
-	case "/login":
-		providerName := strings.TrimSpace(m.provider.Value())
-		if len(arguments) > 1 {
-			providerName = arguments[1]
-		}
-		return m.startOAuthLogin(providerName)
-	case "/local":
-		return m.openLocalModels()
 	case "/clone":
 		if m.resumeStatePath == "" {
 			m.notice = notice{text: "Continue a retained thread before cloning it.", kind: noticeInfo}
@@ -175,12 +167,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		return m, m.focusField()
 	case "/model":
 		m.commandOutput = ""
-		m.notice = notice{text: "Choose a recommended model or type a model ID, then Tab back to the task.", kind: noticeInfo}
-		return m, m.openRuntimeDrawer(modelField)
-	case "/provider":
-		m.commandOutput = ""
-		m.notice = notice{text: "Choose a provider or type to filter it, then Tab back to the task.", kind: noticeInfo}
-		return m, m.openRuntimeDrawer(providerField)
+		m.notice = notice{text: "Choose and manage cloud or local models. Provider sign-in is available from the Cloud section.", kind: noticeInfo}
+		return m.openModelCatalog()
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
 		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
@@ -431,7 +419,7 @@ func subscriptionDescription(description, provider string, store auth.Store, sto
 		}
 		return description + " · requires " + clientIDEnvironment
 	}
-	return description + " · sign in with /login " + provider
+	return description + " · sign in from /model"
 }
 
 func delegatedConnectCommand(provider string) string {

@@ -512,27 +512,28 @@ func TestRenderEventDoesNotLeakMultilineOutputIntoTimeline(t *testing.T) {
 	}
 }
 
-func TestSlashPaletteFiltersAndFocusesModel(t *testing.T) {
-	model := New(Config{})
+func TestSlashPaletteOpensUnifiedModelCatalog(t *testing.T) {
+	model := New(Config{LocalModels: &fakeLocalModelManager{}})
 	model.task.SetValue("/mo")
 	if commands := model.matchingCommands(); len(commands) != 1 || commands[0].name != "/model" {
 		t.Fatalf("commands = %#v", commands)
 	}
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command == nil {
-		t.Fatal("model command did not focus the model field")
+		t.Fatal("model command did not open the catalog")
 	}
 	updated := next.(Model)
-	if updated.focus != modelField || updated.task.Value() != "" {
+	if updated.screen != localModelsScreen || updated.task.Value() != "" {
 		t.Fatalf("composer = %#v", updated)
 	}
 }
 
-func TestLoginCommandShowsOAuthURLAndCompletesWithoutStartingRun(t *testing.T) {
+func TestModelCatalogStartsCloudOAuthAndCompletesWithoutStartingRun(t *testing.T) {
 	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "gator-client")
 	login := &fakeOAuthLogin{url: "https://auth.example.test/authorize"}
 	model := New(Config{
-		Provider: "codex",
+		Provider:    "codex",
+		LocalModels: &fakeLocalModelManager{},
 		BeginOAuthLogin: func(provider string) (OAuthLogin, error) {
 			if provider != "codex" {
 				t.Fatalf("OAuth provider = %q", provider)
@@ -540,8 +541,8 @@ func TestLoginCommandShowsOAuthURLAndCompletesWithoutStartingRun(t *testing.T) {
 			return login, nil
 		},
 	})
-	model.task.SetValue("/login codex")
-	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = selectCloudModelCatalog(t, model, "codex")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	if command == nil {
 		t.Fatal("login did not start asynchronous completion")
 	}
@@ -585,6 +586,21 @@ func (l *fakeOAuthLogin) Complete(context.Context) error {
 
 func (l *fakeOAuthLogin) Cancel() {}
 
+func selectCloudModelCatalog(t *testing.T, model Model, provider string) Model {
+	t.Helper()
+	next, _ := model.openModelCatalog()
+	model = next.(Model)
+	for index, entry := range model.cloudModels() {
+		if entry.provider == provider {
+			model.localModels.section = cloudModelSection
+			model.localModels.cloudIndex = index
+			return model
+		}
+	}
+	t.Fatalf("cloud provider %q was not found in model catalog", provider)
+	return Model{}
+}
+
 func TestQuestionMarkOpensCommandPalette(t *testing.T) {
 	model := New(Config{})
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("?")})
@@ -598,22 +614,22 @@ func TestQuestionMarkOpensCommandPalette(t *testing.T) {
 }
 
 func TestTabCompletesSlashCommandWithoutExecutingIt(t *testing.T) {
-	model := New(Config{})
-	model.task.SetValue("/prov")
+	model := New(Config{LocalModels: &fakeLocalModelManager{}})
+	model.task.SetValue("/mod")
 	next, command := model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if command != nil {
-		t.Fatal("Tab executed the provider command")
+		t.Fatal("Tab executed the model command")
 	}
 	updated := next.(Model)
-	if updated.focus != taskField || updated.task.Value() != "/provider" {
+	if updated.focus != taskField || updated.task.Value() != "/model" {
 		t.Fatalf("Tab completion = %#v", updated)
 	}
 	next, command = updated.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if command == nil {
-		t.Fatal("Enter did not execute the completed provider command")
+		t.Fatal("Enter did not execute the completed model command")
 	}
 	updated = next.(Model)
-	if updated.focus != providerField || updated.task.Value() != "" {
+	if updated.screen != localModelsScreen || updated.task.Value() != "" {
 		t.Fatalf("executed command = %#v", updated)
 	}
 }
@@ -1135,17 +1151,18 @@ func TestProviderDropdownOffersVendorCLIWhenNativeOAuthIsUnconfigured(t *testing
 	t.Fatal("Codex provider option was missing")
 }
 
-func TestLoginCommandExplainsVendorCLIPathWhenNativeOAuthIsUnconfigured(t *testing.T) {
+func TestModelCatalogExplainsVendorCLIPathWhenNativeOAuthIsUnconfigured(t *testing.T) {
 	t.Setenv("GATOR_COPILOT_OAUTH_CLIENT_ID", "")
 	model := New(Config{
-		Provider: "copilot",
+		Provider:    "copilot",
+		LocalModels: &fakeLocalModelManager{},
 		BeginOAuthLogin: func(string) (OAuthLogin, error) {
 			t.Fatal("unconfigured native OAuth should not invoke the login factory")
 			return nil, nil
 		},
 	})
-	model.task.SetValue("/login copilot")
-	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = selectCloudModelCatalog(t, model, "copilot")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	if command != nil {
 		t.Fatal("unconfigured native OAuth should not start a login")
 	}
@@ -1155,10 +1172,11 @@ func TestLoginCommandExplainsVendorCLIPathWhenNativeOAuthIsUnconfigured(t *testi
 	}
 }
 
-func TestLoginCommandRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
+func TestModelCatalogRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
 	t.Setenv("GATOR_CODEX_OAUTH_CLIENT_ID", "")
 	model := New(Config{
-		Provider: "codex",
+		Provider:    "codex",
+		LocalModels: &fakeLocalModelManager{},
 		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
 			if provider != "codex" {
 				t.Fatalf("provider = %q", provider)
@@ -1166,8 +1184,8 @@ func TestLoginCommandRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
 			return exec.Command("true"), nil
 		},
 	})
-	model.task.SetValue("/login codex")
-	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = selectCloudModelCatalog(t, model, "codex")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	if command == nil {
 		t.Fatal("provider-owned login did not start a terminal command")
 	}

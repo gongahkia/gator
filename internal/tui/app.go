@@ -42,6 +42,7 @@ type Config struct {
 	StartInRecent     bool
 	RecentAll         bool
 	CustomProviders   []config.CustomProvider
+	ModelAliases      map[string]string
 	ExtensionCommands []ExtensionCommand
 	Theme             string
 	NewExecutor       func(provider, model, baseURL string) (gatorrun.Executor, error)
@@ -567,6 +568,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.applyLocalModelCatalog(msg.catalog)
+		m.selectActiveModelCatalogEntry()
 		if msg.catalog.RuntimeError != "" {
 			m.notice = notice{text: "Local runtime is unavailable. Start it, then press r to refresh.", kind: noticeInfo}
 		} else {
@@ -589,6 +591,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.localModels.err = msg.done.err
 		if msg.done.err != nil {
 			m.notice = notice{text: "Local model operation stopped: " + msg.done.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		if msg.done.aliases != nil {
+			m.applyModelAliases(msg.done.aliases)
+			m.notice = notice{text: "Model display name saved. Provider model IDs are unchanged.", kind: noticeSuccess}
 			return m, nil
 		}
 		if msg.done.update != nil {
