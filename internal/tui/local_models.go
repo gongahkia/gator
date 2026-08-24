@@ -37,7 +37,21 @@ type LocalModelCatalog struct {
 	Executable     string
 	HostSummary    string
 	HostAdvice     []string
+	Dependencies   []LocalDependency
 	Models         []LocalModel
+}
+
+// LocalDependency is a display-safe prerequisite result supplied by the
+// application layer. Instructions are guidance only; the TUI never runs an
+// operating-system installer or package manager.
+type LocalDependency struct {
+	ID           string
+	Name         string
+	Purpose      string
+	Required     bool
+	Installed    bool
+	HelpURL      string
+	Instructions []string
 }
 
 // LocalModel is one selectable reviewed local coding model.
@@ -90,6 +104,7 @@ type localModelConfirmation uint8
 const (
 	localModelNoConfirmation localModelConfirmation = iota
 	localModelConfirmStart
+	localModelConfirmInstall
 	localModelConfirmPull
 	localModelConfirmRemove
 )
@@ -138,6 +153,7 @@ type localModelsState struct {
 	cloudIndex     int
 	renaming       *modelRename
 	startDismissed bool
+	dependencyHelp bool
 }
 
 type modelCatalogSection uint8
@@ -173,6 +189,7 @@ func (m Model) openModelCatalog() (tea.Model, tea.Cmd) {
 	}
 	m.screen = localModelsScreen
 	m.localModels.confirmation = localModelNoConfirmation
+	m.localModels.dependencyHelp = false
 	m.localModels.err = nil
 	m.selectActiveModelCatalogEntry()
 	return m.beginLocalStatus()
@@ -221,6 +238,14 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.localModels.renaming != nil {
 		return m.updateModelRename(message)
 	}
+	if m.localModels.dependencyHelp {
+		switch message.String() {
+		case "esc", "i":
+			m.localModels.dependencyHelp = false
+			m.notice = notice{text: "Installation help closed.", kind: noticeInfo}
+		}
+		return m, nil
+	}
 	if m.localModels.confirmation != localModelNoConfirmation {
 		return m.updateLocalModelConfirmation(message)
 	}
@@ -249,12 +274,21 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.localModels.section != localModelSection || m.localModels.catalog.RuntimeError == "" {
 			return m, nil
 		}
-		m.localModels.confirmation = localModelConfirmStart
-		m.localModels.startDismissed = false
+		m.requestLocalRuntimeRecovery()
+	case "i":
+		if m.localModels.section != localModelSection {
+			m.notice = notice{text: "Installation help is available from the Local section.", kind: noticeInfo}
+			return m, nil
+		}
+		if len(m.localMissingDependencies()) == 0 {
+			m.notice = notice{text: "No missing local dependencies were detected.", kind: noticeSuccess}
+			return m, nil
+		}
+		m.localModels.dependencyHelp = true
 	case "tab", "left", "right":
 		m.toggleModelCatalogSection()
 		if m.localModels.section == localModelSection && m.localModels.catalog.RuntimeError != "" && !m.localModels.startDismissed {
-			m.localModels.confirmation = localModelConfirmStart
+			m.localModels.confirmation = m.localRuntimeConfirmation()
 		}
 	case "up", "k", "ctrl+p":
 		m.moveModelCatalogSelection(-1)
@@ -283,8 +317,7 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.localModels.catalog.RuntimeError != "" {
-			m.localModels.confirmation = localModelConfirmStart
-			m.notice = notice{text: "The local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
+			m.requestLocalRuntimeRecovery()
 			return m, nil
 		}
 		model, found := m.selectedLocalModel()
@@ -307,8 +340,7 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.useCloudModel(cloud)
 		}
 		if m.localModels.catalog.RuntimeError != "" {
-			m.localModels.confirmation = localModelConfirmStart
-			m.notice = notice{text: "The local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
+			m.requestLocalRuntimeRecovery()
 			return m, nil
 		}
 		model, found := m.selectedLocalModel()
@@ -345,6 +377,20 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.localModels.confirmation == localModelConfirmInstall {
+		switch message.String() {
+		case "esc", "n", "ctrl+c":
+			m.localModels.confirmation = localModelNoConfirmation
+			m.localModels.startDismissed = true
+			m.notice = notice{text: "Install Ollama yourself from https://ollama.com/download, then press r to refresh.", kind: noticeInfo}
+		case "enter", "y":
+			m.localModels.confirmation = localModelNoConfirmation
+			m.localModels.startDismissed = true
+			m.localModels.dependencyHelp = true
+			m.notice = notice{text: "Installation help is open. Gator does not run system installers or package managers.", kind: noticeInfo}
+		}
+		return m, nil
+	}
 	if m.localModels.confirmation == localModelConfirmStart {
 		switch message.String() {
 		case "esc", "n", "ctrl+c":
@@ -381,6 +427,55 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 		}
 	}
 	return m, nil
+}
+
+func (m *Model) requestLocalRuntimeRecovery() {
+	m.localModels.confirmation = m.localRuntimeConfirmation()
+	m.localModels.startDismissed = false
+	if m.localModels.confirmation == localModelConfirmInstall {
+		m.notice = notice{text: "Ollama is not installed. Choose whether to open installation help.", kind: noticeInfo}
+		return
+	}
+	m.notice = notice{text: "The local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
+}
+
+func (m Model) localRuntimeConfirmation() localModelConfirmation {
+	if m.ollamaMissing() {
+		return localModelConfirmInstall
+	}
+	return localModelConfirmStart
+}
+
+func (m Model) ollamaMissing() bool {
+	for _, dependency := range m.localModels.catalog.Dependencies {
+		if dependency.ID == "ollama" {
+			return !dependency.Installed
+		}
+	}
+	return m.localModels.catalog.Executable == ""
+}
+
+func (m Model) localMissingDependencies() []LocalDependency {
+	missing := make([]LocalDependency, 0, len(m.localModels.catalog.Dependencies))
+	foundOllama := false
+	for _, dependency := range m.localModels.catalog.Dependencies {
+		if dependency.ID == "ollama" {
+			foundOllama = true
+		}
+		if !dependency.Installed {
+			missing = append(missing, dependency)
+		}
+	}
+	if !foundOllama && m.localModels.catalog.Executable == "" {
+		missing = append(missing, LocalDependency{
+			ID:           "ollama",
+			Name:         "Ollama",
+			Purpose:      "reviewed local coding models",
+			HelpURL:      "https://ollama.com/download",
+			Instructions: []string{"Install Ollama from its official download page, then return to Gator and refresh the Local model section."},
+		})
+	}
+	return missing
 }
 
 func (m Model) beginLocalStart() (tea.Model, tea.Cmd) {

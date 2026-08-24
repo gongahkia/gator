@@ -18,9 +18,13 @@ ollama serve
 gator local serve
 ```
 
-Gator intentionally does not download and execute an operating-system
-installer. That would require a separate provenance, checksum, privilege, and
-upgrade policy. It does manage model packages through the loopback runtime:
+Gator detects missing prerequisites and offers checked-in installation guidance
+in `gator doctor` and the native TUI. On Fedora, for example, doctor can point
+to the package needed for Git or Bubblewrap; it links Ollama to its official
+download page. Gator intentionally does not download and execute an
+operating-system installer, package-manager command, or remote install script.
+That would require a separate provenance, checksum, privilege, and upgrade
+policy. It does manage model packages through the loopback runtime:
 
 ```sh
 gator doctor
@@ -65,10 +69,19 @@ do not satisfy its local admission guardrail.
   label restores the original label. `x` requires a second confirmation before
   removing local model data; `r` refreshes runtime and inventory state.
 
-The TUI does not background `ollama serve`: it is a foreground process and
-Gator does not create an unsupervised local runtime daemon. When the runtime is
-unavailable, the TUI shows the exact `ollama serve`/`gator local serve` recovery
-command while retaining the catalog for inspection.
+When the Local section finds that the Ollama executable is missing, it asks to
+open installation help. Press Enter or `y` for the default choice to see the
+official source and platform guidance, or press `n` or Esc to install it
+yourself. Press `i` at any time in the Local section to review all detected
+missing local prerequisites. Gator does not execute those installers.
+
+When the executable is installed but its loopback runtime is unavailable, the
+TUI instead asks how to start it. Press Enter or `y` for the default **Start
+with Gator** choice: Gator starts `ollama serve` as a child of that TUI session,
+waits for its loopback API, and stops only that child when Gator exits. Press
+`n` or Esc to start it yourself with `ollama serve` or `gator local serve`,
+then press `r` to refresh. Gator never adopts or stops an Ollama service that
+was already running.
 
 ## Host eligibility guardrail
 

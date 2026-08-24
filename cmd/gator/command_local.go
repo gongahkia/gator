@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/dependency"
 	"github.com/gongahkia/gator/internal/localmodel"
 )
 
@@ -88,18 +89,27 @@ func localStatus(arguments []string, settings config.Settings, out io.Writer) er
 	if err := writeLocalModelDoctor(out, inspectLocalModelHost()); err != nil {
 		return err
 	}
+	if err := writeDependencyDoctor(out, dependency.Detect()); err != nil {
+		return err
+	}
+	ollamaInstalled := false
 	if binary, lookupErr := exec.LookPath("ollama"); lookupErr == nil {
+		ollamaInstalled = true
 		if _, err := fmt.Fprintf(out, "Ollama executable: %s\n", binary); err != nil {
 			return err
 		}
-	} else if _, err := fmt.Fprintln(out, "Ollama executable: not found (install Ollama from https://ollama.com/download)"); err != nil {
+	} else if _, err := fmt.Fprintln(out, "Ollama executable: not found (see the installation help above)"); err != nil {
 		return err
 	}
 	context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	version, versionErr := client.Version(context)
 	if versionErr != nil {
-		_, err := fmt.Fprintf(out, "Local runtime (%s): unavailable (%v)\nStart it with 'ollama serve' or 'gator local serve'.\n", client.BaseURL(), versionErr)
+		recovery := "Start it with 'ollama serve' or 'gator local serve'."
+		if !ollamaInstalled {
+			recovery = "Install Ollama using the official source above, then run 'gator local status' again."
+		}
+		_, err := fmt.Fprintf(out, "Local runtime (%s): unavailable (%v)\n%s\n", client.BaseURL(), versionErr, recovery)
 		return err
 	}
 	installed, modelErr := client.Models(context)
@@ -121,7 +131,7 @@ func localStatus(arguments []string, settings config.Settings, out io.Writer) er
 func serveLocalRuntime() error {
 	binary, err := exec.LookPath("ollama")
 	if err != nil {
-		return errors.New("Ollama executable was not found; install it from https://ollama.com/download")
+		return errors.New("Ollama executable was not found; run 'gator doctor' for installation help or visit https://ollama.com/download")
 	}
 	command := exec.Command(binary, "serve")
 	command.Stdin = os.Stdin

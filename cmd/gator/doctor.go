@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/dependency"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -122,6 +123,9 @@ func doctor(arguments []string, out io.Writer) error {
 		providerDisplay = custom.ID
 	}
 	if _, err := fmt.Fprintf(out, "Repository: %s\nProvider: %s\nAuthentication (%s): %s\nStrict sandbox: %s\nWeb search: %s\n", gitStatus, providerDisplay, authentication, authenticationStatus, sandboxStatus, webSearchStatus); err != nil {
+		return err
+	}
+	if err := writeDependencyDoctor(out, dependency.Detect()); err != nil {
 		return err
 	}
 	if err := writeLocalModelDoctor(out, inspectLocalModelHost()); err != nil {
