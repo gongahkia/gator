@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
@@ -18,6 +22,18 @@ type localModelManager struct {
 	store      config.Store
 	runtimeURL string
 	host       func() localmodel.Host
+	runtimeMu  sync.Mutex
+	runtime    *managedLocalRuntime
+	command    func(string, ...string) *exec.Cmd
+	lookPath   func(string) (string, error)
+}
+
+type managedLocalRuntime struct {
+	command *exec.Cmd
+	done    chan struct{}
+
+	mu      sync.Mutex
+	exitErr error
 }
 
 func newLocalModelManager(store config.Store) *localModelManager {
@@ -51,6 +67,139 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 	}
 	catalog.Models = manager.catalog(settings, client, installed, host).Models
 	return catalog, nil
+}
+
+// Start launches `ollama serve` only after the TUI receives explicit user
+// confirmation. The child is retained by this interactive Gator session and
+// stopped by Close; an already-running Ollama process is never adopted or
+// stopped.
+func (manager *localModelManager) Start(ctx context.Context) (tui.LocalModelCatalog, error) {
+	settings, err := manager.store.Load()
+	if err != nil {
+		return tui.LocalModelCatalog{}, err
+	}
+	client, err := localClient(manager.runtimeURL, settings)
+	if err != nil {
+		return tui.LocalModelCatalog{}, err
+	}
+	if runtimeReachable(ctx, client) {
+		return manager.Status(ctx)
+	}
+	binary, err := manager.ollamaPath()
+	if err != nil {
+		return tui.LocalModelCatalog{}, errors.New("Ollama executable was not found; install it from https://ollama.com/download or start it yourself")
+	}
+	runtime, err := manager.startRuntime(binary)
+	if err != nil {
+		return tui.LocalModelCatalog{}, err
+	}
+	readyContext, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	if err := waitForLocalRuntime(readyContext, client, runtime); err != nil {
+		return tui.LocalModelCatalog{}, err
+	}
+	return manager.Status(ctx)
+}
+
+// Close stops only the Ollama child that this manager launched. It is called
+// when the interactive TUI exits, preserving a user-managed Ollama process.
+func (manager *localModelManager) Close() error {
+	manager.runtimeMu.Lock()
+	runtime := manager.runtime
+	manager.runtime = nil
+	manager.runtimeMu.Unlock()
+	if runtime == nil || runtime.command.Process == nil || runtime.command.ProcessState != nil {
+		return nil
+	}
+	if err := runtime.command.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		return fmt.Errorf("stop Gator-managed Ollama runtime: %w", err)
+	}
+	select {
+	case <-runtime.done:
+		return nil
+	case <-time.After(2 * time.Second):
+		return errors.New("timed out stopping Gator-managed Ollama runtime")
+	}
+}
+
+func (manager *localModelManager) ollamaPath() (string, error) {
+	if manager.lookPath != nil {
+		return manager.lookPath("ollama")
+	}
+	return exec.LookPath("ollama")
+}
+
+func (manager *localModelManager) startRuntime(binary string) (*managedLocalRuntime, error) {
+	manager.runtimeMu.Lock()
+	defer manager.runtimeMu.Unlock()
+	if manager.runtime != nil {
+		return manager.runtime, nil
+	}
+	newCommand := manager.command
+	if newCommand == nil {
+		newCommand = exec.Command
+	}
+	command := newCommand(binary, "serve")
+	if err := command.Start(); err != nil {
+		return nil, fmt.Errorf("start Ollama: %w", err)
+	}
+	runtime := &managedLocalRuntime{command: command, done: make(chan struct{})}
+	manager.runtime = runtime
+	go manager.waitForManagedRuntime(runtime)
+	return runtime, nil
+}
+
+func (manager *localModelManager) waitForManagedRuntime(runtime *managedLocalRuntime) {
+	err := runtime.command.Wait()
+	runtime.mu.Lock()
+	runtime.exitErr = err
+	runtime.mu.Unlock()
+	close(runtime.done)
+	manager.runtimeMu.Lock()
+	if manager.runtime == runtime {
+		manager.runtime = nil
+	}
+	manager.runtimeMu.Unlock()
+}
+
+func (runtime *managedLocalRuntime) error() error {
+	runtime.mu.Lock()
+	defer runtime.mu.Unlock()
+	return runtime.exitErr
+}
+
+func runtimeReachable(parent context.Context, client localmodel.Client) bool {
+	context, cancel := context.WithTimeout(parent, time.Second)
+	defer cancel()
+	_, err := client.Version(context)
+	return err == nil
+}
+
+func waitForLocalRuntime(ctx context.Context, client localmodel.Client, runtime *managedLocalRuntime) error {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	var lastErr error
+	for {
+		if runtimeReachable(ctx, client) {
+			return nil
+		}
+		probeContext, cancel := context.WithTimeout(ctx, time.Second)
+		_, lastErr = client.Version(probeContext)
+		cancel()
+		select {
+		case <-ctx.Done():
+			if lastErr != nil {
+				return fmt.Errorf("wait for Ollama to start: %w", lastErr)
+			}
+			return fmt.Errorf("wait for Ollama to start: %w", ctx.Err())
+		case <-runtime.done:
+			if err := runtime.error(); err != nil {
+				return fmt.Errorf("Ollama exited before becoming ready: %w", err)
+			}
+			return errors.New("Ollama exited before becoming ready")
+		case <-ticker.C:
+		}
+	}
 }
 
 func (manager *localModelManager) Pull(ctx context.Context, id string, report func(tui.LocalModelProgress)) (tui.LocalModelCatalog, error) {
