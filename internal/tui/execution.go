@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -107,6 +108,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	m.outcome = nil
 	m.runErr = nil
 	m.diff = ""
+	m.focusedDiff = ""
+	m.focusedDiffInfo = diffview.Focused{}
+	m.diffMode = focusedDiffDisplay
+	m.diffOffset = 0
 	m.diffErr = nil
 	m.diffTruncated = false
 	m.diffStats = diffStats{}

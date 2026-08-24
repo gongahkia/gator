@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/lsp"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -338,6 +339,10 @@ type Model struct {
 	outcome         *gatorrun.Outcome
 	runErr          error
 	diff            string
+	focusedDiff     string
+	focusedDiffInfo diffview.Focused
+	diffMode        diffDisplayMode
+	diffOffset      int
 	diffTruncated   bool
 	diffErr         error
 	diffStats       diffStats
@@ -758,6 +763,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case diffLoadedMsg:
 		m.diff, m.diffTruncated, m.diffErr = msg.diff, msg.truncated, msg.err
+		m.focusedDiffInfo = diffview.Focus(msg.diff)
+		m.focusedDiff = m.focusedDiffInfo.Text
+		m.diffOffset = 0
 		if msg.err == nil {
 			m.diffStats = summarizeDiff(msg.diff)
 		}

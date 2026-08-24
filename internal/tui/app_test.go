@@ -1088,6 +1088,62 @@ func TestReviewShowsExplicitPatchHandoffCommands(t *testing.T) {
 	}
 }
 
+func TestReviewUsesFocusedDiffByDefaultAndCanShowTheFullPatch(t *testing.T) {
+	rawDiff := strings.Join([]string{
+		"diff --git a/example.go b/example.go",
+		"--- a/example.go",
+		"+++ b/example.go",
+		"@@ -10,7 +10,3 @@ func run() {",
+		"-\tif enabled {",
+		"-\t\tresult := execute()",
+		"-\t\tpersist(result)",
+		"-\t}",
+		"+\tresult := execute()",
+		"+\tpersist(result)",
+		" }",
+	}, "\n")
+	model := New(Config{})
+	model.width, model.height = 120, 48
+	model.screen = reviewScreen
+	next, _ := model.Update(diffLoadedMsg{diff: rawDiff})
+	model = next.(Model)
+	view := model.View()
+	if !strings.Contains(view, "Focused review: collapsed 2 duplicate lines") || strings.Contains(view, "-\t\tresult := execute()") {
+		t.Fatalf("focused review view = %q", view)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	model = next.(Model)
+	if model.diffMode != fullDiffDisplay || !strings.Contains(model.View(), "-\t\tresult := execute()") {
+		t.Fatalf("full patch view = %q", model.View())
+	}
+}
+
+func TestReviewDiffNavigationIsBounded(t *testing.T) {
+	lines := []string{"diff --git a/example.go b/example.go", "@@ -1 +1 @@"}
+	for index := 0; index < 40; index++ {
+		lines = append(lines, "+line "+fmt.Sprint(index))
+	}
+	model := New(Config{})
+	model.width, model.height = 100, 18
+	model.screen = reviewScreen
+	next, _ := model.Update(diffLoadedMsg{diff: strings.Join(lines, "\n")})
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model = next.(Model)
+	if model.diffOffset != 1 {
+		t.Fatalf("diff offset after down = %d", model.diffOffset)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	model = next.(Model)
+	if model.diffOffset == 0 || !strings.Contains(model.View(), "diff lines above") {
+		t.Fatalf("diff end state = offset:%d view:%q", model.diffOffset, model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyHome})
+	if next.(Model).diffOffset != 0 {
+		t.Fatalf("diff offset after home = %d", next.(Model).diffOffset)
+	}
+}
+
 func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
 	model := New(Config{Provider: "openai", Model: "gpt-5.6"})
 	model.focus = providerField

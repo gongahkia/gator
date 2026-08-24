@@ -1,10 +1,18 @@
 package tui
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+)
+
+type diffDisplayMode uint8
+
+const (
+	focusedDiffDisplay diffDisplayMode = iota
+	fullDiffDisplay
 )
 
 func (m Model) header(mode string) string {
@@ -25,20 +33,73 @@ func (m Model) diffView() string {
 	if m.diffErr != nil {
 		return errorStyle.Render("Unable to load diff: " + m.diffErr.Error())
 	}
-	if m.diff == "" {
+	diff := m.reviewDiffText()
+	if diff == "" {
 		return dimStyle.Render("No changed files are currently visible in the retained worktree.")
 	}
-	lines := strings.Split(m.diff, "\n")
-	maxLines := max(1, m.height-10)
-	truncatedByView := len(lines) > maxLines
-	if truncatedByView {
-		lines = lines[:maxLines]
+	lines := strings.Split(diff, "\n")
+	pageSize := m.reviewDiffPageSize()
+	start := min(max(0, m.diffOffset), max(0, len(lines)-pageSize))
+	end := min(len(lines), start+pageSize)
+	content := make([]string, 0, end-start+3)
+	if m.diffMode == focusedDiffDisplay && m.focusedDiffInfo.HiddenLines > 0 {
+		content = append(content, dimStyle.Render(fmt.Sprintf("Focused review: collapsed %d duplicate lines in %d blocks; press f for the full patch.", m.focusedDiffInfo.HiddenLines, m.focusedDiffInfo.HiddenBlocks)))
 	}
-	content := strings.Join(lines, "\n")
-	if m.diffTruncated || truncatedByView {
-		content += "\n" + dimStyle.Render("… diff preview truncated; inspect the retained worktree for the full patch.")
+	if start > 0 {
+		content = append(content, dimStyle.Render(fmt.Sprintf("… %d diff lines above · up/k or PgUp scroll", start)))
 	}
-	return m.panel(content)
+	for _, line := range lines[start:end] {
+		content = append(content, renderDiffLine(line))
+	}
+	if end < len(lines) {
+		content = append(content, dimStyle.Render(fmt.Sprintf("… %d diff lines below · down/j or PgDn scroll", len(lines)-end)))
+	}
+	if m.diffTruncated {
+		content = append(content, dimStyle.Render("… diff source truncated; inspect the retained worktree for the full patch."))
+	}
+	return m.panel(strings.Join(content, "\n"))
+}
+
+func (m Model) reviewDiffText() string {
+	if m.diffMode == fullDiffDisplay {
+		return m.diff
+	}
+	if m.focusedDiff == "" && m.diff != "" {
+		return m.diff
+	}
+	return m.focusedDiff
+}
+
+func (m Model) reviewDiffPageSize() int {
+	return max(1, m.height-12)
+}
+
+func (m *Model) scrollReviewDiff(delta int) {
+	lines := strings.Split(m.reviewDiffText(), "\n")
+	maxOffset := max(0, len(lines)-m.reviewDiffPageSize())
+	m.diffOffset = min(max(0, m.diffOffset+delta), maxOffset)
+}
+
+func (m *Model) jumpReviewDiffToEnd() {
+	lines := strings.Split(m.reviewDiffText(), "\n")
+	m.diffOffset = max(0, len(lines)-m.reviewDiffPageSize())
+}
+
+func renderDiffLine(line string) string {
+	switch {
+	case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
+		return okStyle.Render(line)
+	case strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---"):
+		return errorStyle.Render(line)
+	case strings.HasPrefix(line, "@@ "):
+		return keyStyle.Render(line)
+	case strings.HasPrefix(line, "diff --") || strings.HasPrefix(line, "index ") || strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ "):
+		return dimStyle.Render(line)
+	case strings.HasPrefix(line, "  … ") && strings.Contains(line, "collapsed in focused review"):
+		return dimStyle.Render(line)
+	default:
+		return line
+	}
 }
 
 func (m Model) noticeView() string {

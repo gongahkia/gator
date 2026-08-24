@@ -771,7 +771,7 @@ func (m Model) helpView() string {
 			"Ctrl+C  quit",
 		}, "\n")),
 		labelStyle.Render("Running") + "\n" + m.panel("Enter  steer at the next model/tool boundary\nTab  queue the next prompt or a slash command\nCtrl+T  attach to a model-started terminal task\nCommand approval  y/enter once · a always this argv · n deny\n/queue, /dequeue, /clear-queue  inspect or manage local queued work\n/tree  view retained prior turns while a continuation runs\nPgUp / PgDn  browse conversation\nCtrl+C  request cancellation and retain the worktree"),
-		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nc or Esc  return to conversation\nd  refresh the diff\nt  view this run's transcript\ny  view retained thread lineage\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
+		labelStyle.Render("Review") + "\n" + m.panel("F1  show this help\nup/down, j/k, PgUp/PgDn  scroll the diff\nf  toggle focused duplicate-block review / full patch\nc or Esc  return to conversation\nd  refresh the diff\nt  view this run's transcript\ny  view retained thread lineage\ne  show patch export/apply commands\nn  start a new task\nq or Ctrl+C  quit"),
 		m.footer("esc close help"),
 	}
 	return strings.Join(sections, "\n")
@@ -858,7 +858,7 @@ func (m Model) reviewView() string {
 	if m.outcome == nil || m.outcome.StatePath == "" {
 		continueLabel = ""
 	}
-	sections = append(sections, m.footer("d refresh diff", "t transcript", "y thread tree", "e patch handoff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
+	sections = append(sections, m.footer("up/down scroll diff", "f focused/full", "d refresh diff", "t transcript", "y thread tree", "e patch handoff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
 	return strings.Join(sections, "\n")
 }
 
