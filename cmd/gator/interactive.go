@@ -106,11 +106,15 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if err != nil {
 		return err
 	}
+	baseURL := strings.TrimSpace(os.Getenv("GATOR_BASE_URL"))
+	if baseURL == "" {
+		baseURL = settings.ProviderEndpoint(provider)
+	}
 	application := tui.New(tui.Config{
 		RepositoryPath:    repository,
 		Provider:          provider,
 		Model:             modelFromProviderName(provider),
-		BaseURL:           os.Getenv("GATOR_BASE_URL"),
+		BaseURL:           baseURL,
 		StateDir:          stateDir,
 		Verification:      parseSuggestedVerification(suggestedVerificationCommands(repository)),
 		ResumeStatePath:   options.ResumeStatePath,
@@ -118,6 +122,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		StartInRecent:     options.StartInRecent,
 		RecentAll:         options.RecentAll,
 		CustomProviders:   settings.CustomProviders,
+		ProviderEndpoints: settings.ProviderEndpoints,
 		ModelAliases:      settings.ModelAliases,
 		ExtensionCommands: extensionCommands,
 		ExtensionUI:       extensionUI,

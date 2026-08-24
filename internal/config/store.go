@@ -25,6 +25,9 @@ type Settings struct {
 	Version         int              `json:"version"`
 	Defaults        Defaults         `json:"defaults"`
 	Theme           string           `json:"theme,omitempty"`
+	// ProviderEndpoints stores explicit non-secret endpoint overrides by
+	// provider ID. Credentials remain exclusively in Gator's auth store.
+	ProviderEndpoints map[string]string `json:"provider_endpoints,omitempty"`
 	Extensions      []Extension      `json:"extensions,omitempty"`
 	CustomProviders []CustomProvider `json:"custom_providers,omitempty"`
 	// ModelAliases changes only a model's local display label. Its key is the
@@ -88,6 +91,12 @@ type Store struct {
 // Default returns usable settings without requiring a file on disk.
 func Default() Settings {
 	return Settings{Version: version, Execution: sandbox.DefaultPolicy()}
+}
+
+// ProviderEndpoint returns a persisted non-secret endpoint override for one
+// built-in provider. Callers may still supply an explicit one-run override.
+func (s Settings) ProviderEndpoint(provider string) string {
+	return strings.TrimSpace(s.ProviderEndpoints[strings.ToLower(strings.TrimSpace(provider))])
 }
 
 // ResolveDir resolves Gator's configuration root. An explicit override and
@@ -232,6 +241,21 @@ func validate(settings Settings) error {
 	}
 	if len(settings.ModelAliases) > 512 {
 		return errors.New("configuration has too many model aliases")
+	}
+	if len(settings.ProviderEndpoints) > 128 {
+		return errors.New("configuration has too many provider endpoint overrides")
+	}
+	for provider, baseURL := range settings.ProviderEndpoints {
+		if !customProviderIDPattern.MatchString(provider) {
+			return fmt.Errorf("invalid provider endpoint ID %q", provider)
+		}
+		if len(baseURL) == 0 || len(baseURL) > 2048 {
+			return fmt.Errorf("provider endpoint %q must be 1-2048 bytes", provider)
+		}
+		endpoint, err := url.Parse(baseURL)
+		if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Host == "" || endpoint.User != nil {
+			return fmt.Errorf("provider endpoint %q requires an absolute http(s) URL", provider)
+		}
 	}
 	for key, value := range settings.ModelAliases {
 		if strings.TrimSpace(key) == "" || len(key) > 1024 || strings.ContainsAny(key, "\r\n") {
