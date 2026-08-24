@@ -112,14 +112,44 @@ func TestLocalModelsShowsUnavailableRuntimeWithoutHidingCatalog(t *testing.T) {
 	model.localModels.generation = 1
 	next, _ := model.Update(localModelStatusMsg{generation: 1, catalog: manager.catalog})
 	updated := next.(Model)
-	updated.localModels.section = localModelSection
+	next, _ = updated.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updated = next.(Model)
 	view := updated.View()
-	if !strings.Contains(view, "Unavailable") || !strings.Contains(view, "gator local serve") || !strings.Contains(view, "Qwen2.5-Coder 7B") {
+	if updated.localModels.confirmation != localModelConfirmStart || !strings.Contains(view, "Unavailable") || !strings.Contains(view, "Start Ollama?") || !strings.Contains(view, "Qwen2.5-Coder 7B") {
 		t.Fatalf("unavailable local model view = %q", view)
 	}
-	next, command := updated.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
-	if command != nil || next.(Model).localModels.confirmation != localModelNoConfirmation || !strings.Contains(next.(Model).notice.text, "unavailable") {
-		t.Fatalf("pull while unavailable = %#v command:%#v", next.(Model), command)
+	next, command := updated.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if command != nil || next.(Model).localModels.confirmation != localModelNoConfirmation || !next.(Model).localModels.startDismissed || !strings.Contains(next.(Model).notice.text, "Start Ollama yourself") {
+		t.Fatalf("manual local runtime choice = confirmation:%v dismissed:%t notice:%q command:%#v", next.(Model).localModels.confirmation, next.(Model).localModels.startDismissed, next.(Model).notice.text, command)
+	}
+}
+
+func TestLocalModelsStartOllamaWithGatorByDefault(t *testing.T) {
+	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
+		RuntimeURL:   "http://127.0.0.1:11434",
+		RuntimeError: "connect to local Ollama runtime: connection refused",
+		Models:       []LocalModel{{ID: "qwen2.5-coder-7b", Name: "Qwen2.5-Coder 7B"}},
+	}}
+	model := New(Config{LocalModels: manager})
+	model.width, model.height = 100, 40
+	model.screen = localModelsScreen
+	model.localModels.action = localModelRefreshing
+	model.localModels.generation = 1
+	next, _ := model.Update(localModelStatusMsg{generation: 1, catalog: manager.catalog})
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelConfirmStart {
+		t.Fatalf("start prompt = %#v", model.localModels)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.localModels.action != localModelStarting || model.localModels.operation == nil {
+		t.Fatalf("start operation = %#v", model.localModels)
+	}
+	model = finishLocalModelOperation(t, model)
+	if !manager.started || model.localModels.catalog.RuntimeError != "" || !strings.Contains(model.notice.text, "running under this Gator session") {
+		t.Fatalf("started local runtime = manager:%#v catalog:%#v notice:%q", manager, model.localModels.catalog, model.notice.text)
 	}
 }
 
