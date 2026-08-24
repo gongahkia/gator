@@ -61,12 +61,17 @@ const (
 // Config selects one provider. APIKey is optional only because the factory can
 // obtain the provider's documented environment variable when it is unset.
 type Config struct {
-	Provider                  Provider
-	Model                     string
-	BaseURL                   string
-	APIKey                    string
-	Credentials               *auth.Store
-	Client                    *http.Client
+	Provider    Provider
+	Model       string
+	BaseURL     string
+	APIKey      string
+	Credentials *auth.Store
+	Client      *http.Client
+	// ProviderOptions contains non-secret configuration selected for this
+	// provider, such as region, project, location, or account ID. It is
+	// intentionally separate from Credentials so callers cannot accidentally
+	// persist a secret in ordinary settings.
+	ProviderOptions           map[string]string
 	CloudflareAccountID       string
 	CloudflareGatewayID       string
 	CloudflareGatewayProtocol string

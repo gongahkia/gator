@@ -21,6 +21,14 @@ func (m Model) conversationWidth() int {
 	return max(1, m.width)
 }
 
+// controlCenterDivider occupies the column reserved between the conversation
+// and the side-pane control center. It has the full terminal height so the
+// split remains unambiguous even when either pane has little content.
+func (m Model) controlCenterDivider() string {
+	height := max(1, m.height)
+	return dimStyle.Render(strings.Repeat("│\n", height-1) + "│")
+}
+
 const (
 	transcriptScrollbarColumns = 2
 	minimumScrollbarWidth      = 24

@@ -207,7 +207,11 @@ func (m Model) localModelsView() string {
 	}
 
 	if m.localModels.cloudSetup != nil {
-		sections = append(sections, m.noticeView(), m.footer("tab/up/down next field", "enter save", "esc cancel", "a auth type", "f1 shortcuts"))
+		keys := []string{"tab/up/down next field", "enter save", "esc cancel"}
+		if m.localModels.cloudSetup.canUseBearerToken() {
+			keys = append(keys, "a auth type")
+		}
+		sections = append(sections, m.noticeView(), m.footer(append(keys, "f1 shortcuts")...))
 	} else if m.localModels.renaming != nil {
 		sections = append(sections, m.noticeView(), m.footer("enter save", "esc cancel", "f1 shortcuts"))
 	} else if m.oauthLogin != nil {
@@ -407,12 +411,12 @@ func (m Model) chatView(running bool) string {
 	if !m.drawerUsesSidePane() {
 		return main
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, main, m.drawerView(m.drawerWidth(), m.height))
+	return lipgloss.JoinHorizontal(lipgloss.Top, main, m.controlCenterDivider(), m.drawerView(m.drawerWidth(), m.height))
 }
 
 func (m Model) conversationView(mode, provider, model string, running bool) string {
 	width := m.conversationWidth()
-	rail := m.inline(headerStyle.Render("Gator")+dimStyle.Render("  "+mode+" · "+m.runMode.String())) + "\n" +
+	rail := m.inline(headerStyle.Render(gatorWordmark)+dimStyle.Render("  "+mode+" · "+m.runMode.String())) + "\n" +
 		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.effort.label()+" effort · "+m.vimModeLabel(), width)))
 	transcript := m.transcript
 	transcript.Width = m.transcriptViewportWidth()

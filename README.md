@@ -346,15 +346,18 @@ it does not execute arbitrary model repositories or install a system runtime.
 In the primary terminal UI, `/model` is the single cloud-and-local catalog: it
 shows credential/configuration readiness for cloud choices, includes the
 checked-in OpenCode Zen and Go model catalogs, signs into eligible providers,
-and provides reviewed local pull, selection, display-name rename, refresh, and
-removal controls. Codex, Copilot, Kimi, and xAI open their existing provider
-connection routes there when native Gator OAuth is not configured. Claude Code
-is also present there, but its route stores an Anthropic API key for the
-delegated harness and never reuses Claude.ai or Claude Code subscription
-credentials. After selection, return to the composer and send a verified task
-normally. The chosen model becomes the default native provider, so the same
-TUI, tools, worktrees, sandbox, verification, retained sessions, RPC, and ACP
-paths apply.
+provides secure built-in cloud configuration as well as reviewed local pull,
+selection, display-name rename, refresh, and removal controls. Press `c` on a
+cloud entry to set the exact model, a masked credential where applicable, an
+endpoint, and its provider-specific non-secret settings. It covers Azure
+endpoints, Bedrock region/profile, Vertex project/location/ADC path, and
+Cloudflare metadata; credentials never enter `config.json`, a draft, or a
+transcript. Codex and Copilot use `l` for account OAuth; Claude Code's `c`
+form stores an Anthropic API key for the delegated harness and never reuses
+Claude.ai or Claude Code subscription credentials. After selection, return to
+the composer and send a verified task normally. The chosen native model becomes
+the default provider, so the same TUI, tools, worktrees, sandbox, verification,
+retained sessions, RPC, and ACP paths apply.
 See [curated local models](docs/LOCAL_MODELS.md) for model sources, sizes,
 hardware limitations, and removal.
 
@@ -396,8 +399,8 @@ an endpoint for one scripted run.
 | `moonshotai-cn` | `MOONSHOT_API_KEY` | Moonshot AI Kimi China OpenAI-compatible Chat Completions |
 | `cloudflare-workers-ai` | `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Workers AI OpenAI-compatible Chat Completions |
 | `cloudflare-ai-gateway` | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_GATEWAY_ID`, and `GATOR_CLOUDFLARE_GATEWAY_PROTOCOL` | Cloudflare AI Gateway native OpenAI Responses, Anthropic Messages, or Workers AI Chat Completions |
-| `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, or standard ambient AWS credentials with optional `AWS_REGION` | Amazon Bedrock OpenAI-compatible Chat Completions |
-| `google-vertex` | Google ADC plus `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` | Google Vertex AI OpenAI-compatible Chat Completions |
+| `amazon-bedrock` | `AWS_BEARER_TOKEN_BEDROCK`, or standard ambient AWS credentials with optional `AWS_REGION` / `AWS_PROFILE` | Amazon Bedrock OpenAI-compatible Chat Completions |
+| `google-vertex` | Google ADC plus `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`; optionally `GOOGLE_APPLICATION_CREDENTIALS` or `GATOR_VERTEX_ACCESS_TOKEN` | Google Vertex AI OpenAI-compatible Chat Completions |
 | `qwen-token-plan`, `qwen-token-plan-individual` | `QWEN_TOKEN_PLAN_API_KEY` | Qwen Token Plan OpenAI-compatible Chat Completions |
 | `qwen-token-plan-cn` | `QWEN_TOKEN_PLAN_CN_API_KEY` | Qwen Token Plan China OpenAI-compatible Chat Completions |
 | `xiaomi-token-plan-cn`, `xiaomi-token-plan-ams`, `xiaomi-token-plan-sgp` | `MIMO_API_KEY` | Xiaomi MiMo prepaid Token Plan Chat Completions |
@@ -451,7 +454,8 @@ chain (environment credentials, web identity, shared profiles, ECS task role,
 and EC2 instance role) and directly SigV4-signs the Bedrock Runtime Chat
 Completions request with service `bedrock`; it does not invoke the AWS CLI.
 The default region is `us-east-1` when the standard AWS configuration does not
-set one. Azure Responses normalizes resource roots to `/openai/v1/responses`
+set one. `/model` can persist a region and shared-profile selection without
+copying AWS credentials. Azure Responses normalizes resource roots to `/openai/v1/responses`
 and uses `AZURE_OPENAI_API_VERSION` (default `v1`) when the base URL has no
 `api-version` query. Vertex refreshes Google Application Default Credentials directly,
 or accepts `GATOR_VERTEX_ACCESS_TOKEN` for an externally managed short-lived
@@ -486,8 +490,10 @@ limitations described above.
 
 `google-vertex` is the explicit cloud-credential exception: it reads Google
 Application Default Credentials (or `GATOR_VERTEX_ACCESS_TOKEN`) and refreshes
-them by direct OAuth requests. It does not invoke `gcloud`, start a coding
-agent, or delegate Gator's tool loop.
+them by direct OAuth requests. `/model` can select a non-secret absolute ADC
+file path, project, and location; it never copies ADC content into Gator's
+settings. It does not invoke `gcloud`, start a coding agent, or delegate
+Gator's tool loop.
 
 ## Local execution and trusted project capabilities
 

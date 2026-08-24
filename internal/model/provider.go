@@ -152,7 +152,7 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 			APIKey:  apiKey,
 			Model:   config.Model,
 			BaseURL: config.BaseURL,
-			Gateway: os.Getenv("GATOR_RADIUS_GATEWAY"),
+			Gateway: providerOption(config, "gateway", "GATOR_RADIUS_GATEWAY"),
 			Client:  config.Client,
 		}}, nil
 	case Gemini:
@@ -221,7 +221,7 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 }
 
 func bedrockConfig(config Config) (chatcompletions.Config, error) {
-	apiKey, err := key(config, AmazonBedrock, "AWS_BEARER_TOKEN_BEDROCK")
+	apiKey, err := bearerOrAPIKey(config, AmazonBedrock, "AWS_BEARER_TOKEN_BEDROCK")
 	if err != nil {
 		return chatcompletions.Config{}, err
 	}
@@ -231,7 +231,7 @@ func bedrockConfig(config Config) (chatcompletions.Config, error) {
 	baseURL := strings.TrimSpace(config.BaseURL)
 	if strings.TrimSpace(apiKey) != "" {
 		if baseURL == "" {
-			region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+			region := providerOption(config, "region", "AWS_REGION")
 			if region == "" {
 				region = "us-east-1"
 			}
@@ -246,7 +246,12 @@ func bedrockConfig(config Config) (chatcompletions.Config, error) {
 			Client:       config.Client,
 		}, nil
 	}
-	signer, err := bedrock.LoadDefault(context.Background(), config.Client)
+	signer, err := bedrock.LoadProfile(
+		context.Background(),
+		config.Client,
+		providerOption(config, "region", "AWS_REGION"),
+		providerOption(config, "profile", "AWS_PROFILE"),
+	)
 	if err != nil {
 		return chatcompletions.Config{}, fmt.Errorf("load standard AWS credentials: %w", err)
 	}
@@ -438,14 +443,14 @@ func openCodeAPIVersionBase(baseURL string) string {
 }
 
 func vertexConfig(config Config) (chatcompletions.Config, error) {
-	project := strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	project := providerOption(config, "project", "GOOGLE_CLOUD_PROJECT")
 	if project == "" {
 		project = strings.TrimSpace(os.Getenv("GCLOUD_PROJECT"))
 	}
 	if project == "" {
 		return chatcompletions.Config{}, errors.New("GOOGLE_CLOUD_PROJECT or GCLOUD_PROJECT is required")
 	}
-	location := strings.TrimSpace(os.Getenv("GOOGLE_CLOUD_LOCATION"))
+	location := providerOption(config, "location", "GOOGLE_CLOUD_LOCATION")
 	if location == "" {
 		return chatcompletions.Config{}, errors.New("GOOGLE_CLOUD_LOCATION is required")
 	}
@@ -456,7 +461,10 @@ func vertexConfig(config Config) (chatcompletions.Config, error) {
 	if strings.TrimSpace(config.Model) == "" {
 		return chatcompletions.Config{}, fmt.Errorf("--model is required for provider %q", GoogleVertex)
 	}
-	credentials := vertex.FromEnvironment()
+	credentials, err := vertexCredentialSource(config)
+	if err != nil {
+		return chatcompletions.Config{}, err
+	}
 	return chatcompletions.Config{
 		APIKeySource: credentials.Token,
 		APIKeyEnv:    "GATOR_VERTEX_ACCESS_TOKEN or Google Application Default Credentials",
@@ -477,7 +485,7 @@ func cloudflareWorkersConfig(config Config) (chatcompletions.Config, error) {
 	}
 	baseURL := strings.TrimSpace(config.BaseURL)
 	if baseURL == "" {
-		accountID := strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCOUNT_ID"))
+		accountID := providerOption(config, "account_id", "CLOUDFLARE_ACCOUNT_ID")
 		if accountID == "" {
 			return chatcompletions.Config{}, errors.New("CLOUDFLARE_ACCOUNT_ID is required")
 		}
@@ -568,6 +576,9 @@ func resolveCloudflareGatewayConfig(config Config) (cloudflareGatewayConfig, err
 	}
 	accountID := strings.TrimSpace(config.CloudflareAccountID)
 	if accountID == "" {
+		accountID = providerOption(config, "account_id", "")
+	}
+	if accountID == "" {
 		accountID = strings.TrimSpace(os.Getenv("CLOUDFLARE_ACCOUNT_ID"))
 	}
 	if accountID == "" {
@@ -575,12 +586,19 @@ func resolveCloudflareGatewayConfig(config Config) (cloudflareGatewayConfig, err
 	}
 	gatewayID := strings.TrimSpace(config.CloudflareGatewayID)
 	if gatewayID == "" {
+		gatewayID = providerOption(config, "gateway_id", "")
+	}
+	if gatewayID == "" {
 		gatewayID = strings.TrimSpace(os.Getenv("CLOUDFLARE_AI_GATEWAY_ID"))
 	}
 	if gatewayID == "" {
 		return cloudflareGatewayConfig{}, errors.New("CLOUDFLARE_AI_GATEWAY_ID is required for provider \"cloudflare-ai-gateway\"")
 	}
-	protocol, err := parseCloudflareGatewayProtocol(config.CloudflareGatewayProtocol)
+	protocolOption := config.CloudflareGatewayProtocol
+	if strings.TrimSpace(protocolOption) == "" {
+		protocolOption = providerOption(config, "gateway_protocol", "")
+	}
+	protocol, err := parseCloudflareGatewayProtocol(protocolOption)
 	if err != nil {
 		return cloudflareGatewayConfig{}, err
 	}
@@ -920,6 +938,68 @@ func key(config Config, provider Provider, environment string) (string, error) {
 		}
 	}
 	return os.Getenv(environment), nil
+}
+
+// bearerOrAPIKey resolves a Gator-owned bearer token in addition to the
+// normal API-key chain. Bedrock accepts an AWS bearer token as an alternative
+// to its standard signed AWS credential chain.
+func bearerOrAPIKey(config Config, provider Provider, environment string) (string, error) {
+	if value := strings.TrimSpace(config.APIKey); value != "" {
+		return value, nil
+	}
+	if config.Credentials != nil {
+		credential, found, err := config.Credentials.Read(string(provider))
+		if err != nil {
+			return "", fmt.Errorf("read Gator credential for %q: %w", provider, err)
+		}
+		if found {
+			switch {
+			case credential.IsAPIKey():
+				return credential.Key, nil
+			case credential.IsBearerToken():
+				if credential.Expired(time.Now()) {
+					return "", fmt.Errorf("Gator bearer token for %q is expired; replace it in /model", provider)
+				}
+				return credential.Access, nil
+			}
+		}
+	}
+	return strings.TrimSpace(os.Getenv(environment)), nil
+}
+
+func vertexCredentialSource(config Config) (vertex.Source, error) {
+	source := vertex.FromEnvironment()
+	if path := providerOption(config, "credentials_path", "GOOGLE_APPLICATION_CREDENTIALS"); path != "" {
+		source.CredentialsPath = path
+	}
+	if config.Credentials == nil {
+		return source, nil
+	}
+	credential, found, err := config.Credentials.Read(string(GoogleVertex))
+	if err != nil {
+		return vertex.Source{}, fmt.Errorf("read Gator credential for %q: %w", GoogleVertex, err)
+	}
+	if !found {
+		return source, nil
+	}
+	if !credential.IsBearerToken() {
+		return source, nil
+	}
+	if credential.Expired(time.Now()) {
+		return vertex.Source{}, errors.New("Gator Google Vertex bearer token expired; replace it in /model or use Application Default Credentials")
+	}
+	source.AccessToken = credential.Access
+	return source, nil
+}
+
+func providerOption(config Config, name, environment string) string {
+	if value := strings.TrimSpace(config.ProviderOptions[name]); value != "" {
+		return value
+	}
+	if environment == "" {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv(environment))
 }
 
 func kimiCredential(config Config) (string, bool, error) {

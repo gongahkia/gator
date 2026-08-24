@@ -51,11 +51,14 @@ The terminal UI has one model-management command: start `gator`, then enter
 readiness from local credential/configuration evidence. It lists the complete
 checked-in OpenCode Zen and Go gateway model catalogs, plus one stable default
 for every other direct provider; it does not claim to discover every model
-enabled by an account. Press `l` to start an eligible provider sign-in and `u`
-or Enter to select a configured cloud model. The separate Claude Code entry
-opens `gator connect claude`, which records an Anthropic API key for the
-delegated harness; it never reuses a Claude.ai or Claude Code subscription
-credential.
+enabled by an account. Press `c` to configure the selected built-in cloud
+provider: model, masked credential where applicable, endpoint, and provider
+metadata. The form includes Azure endpoint/version, Bedrock region/profile,
+Vertex project/location/ADC path, Cloudflare account/gateway metadata, and
+Radius gateway routing. Press `l` to start an eligible provider sign-in and
+`u` or Enter to select a configured cloud model. The separate Claude Code entry
+uses `c` to record an Anthropic API key for the delegated harness; it never
+reuses a Claude.ai or Claude Code subscription credential.
 
 Press Tab to open the Local section. It checks the loopback runtime and shows
 the same reviewed catalog and installed state as `gator local status`. It also

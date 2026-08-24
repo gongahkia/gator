@@ -69,3 +69,26 @@ func TestStoreRejectsInvalidExtensionTrust(t *testing.T) {
 		t.Fatal("saved invalid extension trust")
 	}
 }
+
+func TestStorePersistsNonSecretProviderOptions(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	settings := Default()
+	settings.ProviderOptions = map[string]map[string]string{
+		"google-vertex": {"project": "project-123", "location": "us-central1"},
+	}
+	if err := store.Save(settings); err != nil {
+		t.Fatalf("save provider options: %v", err)
+	}
+	options := settings.OptionsForProvider("google-vertex")
+	options["project"] = "mutated"
+	loaded, err := store.Load()
+	if err != nil {
+		t.Fatalf("load settings: %v", err)
+	}
+	if got := loaded.OptionsForProvider("google-vertex"); got["project"] != "project-123" || got["location"] != "us-central1" {
+		t.Fatalf("provider options = %#v", got)
+	}
+}

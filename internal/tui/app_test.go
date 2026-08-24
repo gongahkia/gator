@@ -2424,6 +2424,14 @@ func TestControlCenterDrawerOpensNavigatesAndFallsBackOnNarrowTerminals(t *testi
 	if !opened.drawerOpen || !opened.drawerUsesSidePane() || !strings.Contains(opened.View(), "Control center") {
 		t.Fatalf("drawer did not open as a side pane:\n%s", opened.View())
 	}
+	if !strings.Contains(opened.View(), gatorWordmark) {
+		t.Fatalf("TUI header is missing the Gator wordmark:\n%s", opened.View())
+	}
+	dividerWidth, dividerHeight := lipgloss.Size(opened.controlCenterDivider())
+	if dividerWidth != 1 || dividerHeight != opened.height {
+		t.Fatalf("control-center divider = %dx%d, want 1x%d", dividerWidth, dividerHeight, opened.height)
+	}
+	assertViewFits(t, opened, 120, 48)
 	next, _ = opened.Update(tea.KeyMsg{Type: tea.KeyTab})
 	runtime := next.(Model)
 	if runtime.drawerSection != drawerRuntime || !strings.Contains(runtime.View(), "Runtime") {
