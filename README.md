@@ -169,8 +169,13 @@ provider mode, verifier state, and a preview of the next queued work; it does
 not estimate token use or fake percentage progress. After a run, the latest
 result summarizes verifier status and the visible diff's file/addition/deletion
 counts. Failure states include the reason plus the relevant next action.
-Use `/review` for the final report and diff preview, then
-press `e` for patch handoff commands, `Esc` to return to the conversation, or
+Use `/review` for the final report and diff preview. It starts in focused mode:
+when a unified-diff hunk contains a multi-line block duplicated on both sides
+after indentation-only normalization, Gator collapses that block so the actual
+structural edit remains visible. Press `f` to see the complete raw patch;
+`↑`/`↓`, `j`/`k`, and `PgUp`/`PgDn` scroll either mode. This is review-only:
+the agent's `git_diff` tool and patch export retain the complete raw Git diff.
+Press `e` for patch handoff commands, `Esc` to return to the conversation, or
 `n` for a new thread.
 
 `/vim` toggles Vim-style message editing. Vim Normal mode provides counts,
