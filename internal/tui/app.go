@@ -556,6 +556,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, command
 		}
 	case localModelStatusMsg:
+		if msg.generation != m.localModels.generation || m.localModels.action != localModelRefreshing {
+			return m, nil
+		}
 		m.localModels.action = localModelIdle
 		m.localModels.operation = nil
 		m.localModels.err = msg.err
@@ -571,12 +574,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case localModelProgressMsg:
-		if m.localModels.operation == nil || m.localModels.action == localModelIdle {
+		if msg.operation == nil || msg.operation != m.localModels.operation || m.localModels.action == localModelIdle {
 			return m, nil
 		}
 		m.localModels.progress = msg.progress
 		return m, waitForLocalModelOperation(m.localModels.operation)
 	case localModelDoneMsg:
+		if msg.operation == nil || msg.operation != m.localModels.operation {
+			return m, nil
+		}
 		m.localModels.operation = nil
 		action := m.localModels.action
 		m.localModels.action = localModelIdle

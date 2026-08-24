@@ -39,6 +39,27 @@ requires `--yes` and removes the selected model from Gator's local provider
 catalog. Use a normal custom provider for a self-hosted model or endpoint that
 is not listed here.
 
+## Native TUI
+
+The terminal UI is the primary local-model workflow. Start `gator`, then enter
+`/local` in the composer. It checks the loopback runtime and displays the same
+reviewed catalog and installed state as `gator local status`.
+
+- `↑`/`↓` chooses a catalog model; `p` shows the source and approximate size,
+  then `y` or Enter confirms its download. A native animated spinner and
+  bounded Ollama progress update while it downloads.
+- `u` or Enter selects an installed model and immediately updates the current
+  TUI's provider and model for the next task. `Esc` returns to the composer;
+  use `/verify` to edit the verification allowlist, then send the task as
+  normal.
+- `x` requires a second confirmation before removing local model data; `r`
+  refreshes runtime and inventory state.
+
+The TUI does not background `ollama serve`: it is a foreground process and
+Gator does not create an unsupervised local runtime daemon. When the runtime is
+unavailable, the TUI shows the exact `ollama serve`/`gator local serve` recovery
+command while retaining the catalog for inspection.
+
 ## Reviewed catalog
 
 | Gator ID | Ollama tag | Published package | Context | Intended use |

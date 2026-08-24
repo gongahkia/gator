@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
+	"github.com/gongahkia/gator/internal/tui"
 )
 
 func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) {
@@ -110,6 +111,38 @@ func TestLocalRejectsRemoteRuntimeURL(t *testing.T) {
 	err := localCommand([]string{"list", "--url", "http://models.example.com:11434"}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "loopback") {
 		t.Fatalf("remote local runtime error = %v", err)
+	}
+}
+
+func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	server := newLocalModelServer(t)
+	defer server.Close()
+	store, err := config.DefaultStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := &localModelManager{store: store, runtimeURL: server.URL}
+	status, err := manager.Status(context.Background())
+	if err != nil || status.RuntimeVersion != "test" || len(status.Models) == 0 || !status.Models[0].Installed {
+		t.Fatalf("local manager status = %#v, err = %v", status, err)
+	}
+	var progress []tui.LocalModelProgress
+	if _, err := manager.Pull(context.Background(), "qwen3-coder-30b", func(update tui.LocalModelProgress) {
+		progress = append(progress, update)
+	}); err != nil {
+		t.Fatalf("local manager pull: %v", err)
+	}
+	if len(progress) == 0 || progress[0].Status != "pulling layers" || progress[0].Completed != 5 || progress[0].Total != 10 {
+		t.Fatalf("local manager progress = %#v", progress)
+	}
+	update, err := manager.Use(context.Background(), "qwen2.5-coder-7b")
+	if err != nil || update.Provider != localmodel.ProviderID || update.Model != "qwen2.5-coder:7b" || len(update.CustomProviders) != 1 {
+		t.Fatalf("local manager use = %#v, err = %v", update, err)
+	}
+	update, err = manager.Remove(context.Background(), "qwen2.5-coder-7b")
+	if err != nil || update.Provider != "" || update.Model != "" || len(update.CustomProviders) != 0 {
+		t.Fatalf("local manager remove = %#v, err = %v", update, err)
 	}
 }
 

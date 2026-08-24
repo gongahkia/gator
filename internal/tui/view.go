@@ -171,7 +171,7 @@ func (m Model) localModelsView() string {
 		runtime += "\n" + errorStyle.Render("Unavailable: "+compact(m.localModels.catalog.RuntimeError, m.panelTextWidth()))
 		runtime += "\n" + dimStyle.Render("Start it with 'ollama serve' or 'gator local serve', then press r.")
 	} else if m.localModels.catalog.RuntimeVersion != "" {
-		runtime += "\n" + okStyle.Render("Connected · Ollama " + m.localModels.catalog.RuntimeVersion)
+		runtime += "\n" + okStyle.Render("Connected · Ollama "+m.localModels.catalog.RuntimeVersion)
 	}
 	sections = append(sections, m.fieldView("Local runtime", "Gator only manages a loopback Ollama runtime; use a custom provider for remote endpoints.", runtime))
 

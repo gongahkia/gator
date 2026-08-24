@@ -328,7 +328,10 @@ gator run --verify 'go test ./...' 'Add a focused feature with tests'
 
 Gator manages model packages only through a literal loopback Ollama runtime;
 it does not execute arbitrary model repositories or install a system runtime.
-The chosen model becomes the default native provider, so the same TUI, tools,
+In the primary terminal UI, `/local` provides the same status, reviewed pull
+with confirmation and progress, model selection, refresh, and removal flow;
+after selection, return to the composer and send a verified task normally. The
+chosen model becomes the default native provider, so the same TUI, tools,
 worktrees, sandbox, verification, retained sessions, RPC, and ACP paths apply.
 See [curated local models](docs/LOCAL_MODELS.md) for model sources, sizes,
 hardware limitations, and removal.

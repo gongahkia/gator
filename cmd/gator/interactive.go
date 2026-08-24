@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -69,7 +70,11 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if err != nil {
 		return err
 	}
-	settings, err := loadSettings()
+	store, err := config.DefaultStore()
+	if err != nil {
+		return err
+	}
+	settings, err := store.Load()
 	if err != nil {
 		return err
 	}
@@ -133,7 +138,8 @@ func interactiveWithOptions(options interactiveOptions) error {
 			process.Stderr = writer
 			return tui.DelegateCommand{Process: process, Output: output.String}, nil
 		},
-		SetTheme: saveTheme,
+		SetTheme:    saveTheme,
+		LocalModels: newLocalModelManager(store),
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	final, runErr := program.Run()
