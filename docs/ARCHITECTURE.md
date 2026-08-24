@@ -63,7 +63,11 @@ The interactive terminal UI is a thin event consumer, not another agent loop.
 It collects a task, model, execution mode, and explicit verifier allowlist;
 streams lifecycle events from the executor; prompts for exploratory command
 approval; and renders the retained worktree
-and current diff for review. Plan mode removes patching and command tools
+and current diff for review. The review screen has a focused, presentation-only
+diff mode that collapses multi-line deletion/addition blocks with identical
+trimmed content, exposing control-flow removal and indentation changes without
+rewriting the patch. It retains a full-patch toggle; model `git_diff`, run
+records, and export/apply always use the original Git diff. Plan mode removes patching and command tools
 entirely. Resume keeps one conversation thread on the same worktree and
 preserves its original model and verification policy so a continuation cannot
 silently broaden its command authority. Every completed retained turn also

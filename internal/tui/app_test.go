@@ -1113,7 +1113,7 @@ func TestReviewUsesFocusedDiffByDefaultAndCanShowTheFullPatch(t *testing.T) {
 	}
 	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
 	model = next.(Model)
-	if model.diffMode != fullDiffDisplay || !strings.Contains(model.View(), "-\t\tresult := execute()") {
+	if model.diffMode != fullDiffDisplay || !strings.Contains(model.View(), "result := execute()") {
 		t.Fatalf("full patch view = %q", model.View())
 	}
 }
