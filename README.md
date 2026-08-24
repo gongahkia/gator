@@ -147,8 +147,10 @@ checkout and a real terminal. Type a task and press `Enter` to send it; the
 same prompt accepts follow-up instructions after the run completes. `Ctrl+R`
 also sends in every input mode. The live
 conversation includes model text and tool activity, while `PgUp` and `PgDn`
-browse earlier entries. Use `/model` to select and manage cloud or local models,
-and `/verify` to edit the run configuration. During a run, `Enter` sends a steering instruction
+browse earlier entries; the mouse wheel does the same. Use `/copy` to copy the
+latest Gator response or `/copyall` to copy the complete plain-text conversation
+transcript. Use `/model` to select and manage cloud or local models, and
+`/verify` to edit the run configuration. During a run, `Enter` sends a steering instruction
 that the agent consumes at its next model or tool boundary; it does not cancel
 the run. If the agent requests a command that is not a required verifier, the
 running view instead asks for approval: `y` or `Enter` allow once, `a` always
@@ -163,12 +165,14 @@ only after the active run succeeds. `/queue`, `/dequeue`, and `/clear-queue`
 inspect or manage the bounded, 16-item in-memory queue. Failed or cancelled
 runs leave queued instructions paused for the developer to inspect; the queue
 is cleared when the TUI exits and is never written to a retained session.
-During a run, `Ctrl+C` requests cancellation while retaining the isolated
-worktree. The running view shows an event-backed activity phase, current turn,
-provider mode, verifier state, and a preview of the next queued work; it does
-not estimate token use or fake percentage progress. After a run, the latest
-result summarizes verifier status and the visible diff's file/addition/deletion
-counts. Failure states include the reason plus the relevant next action.
+`Ctrl+C` clears the composer message without touching the active run. During a
+run, `Ctrl+X` requests cancellation while retaining the isolated worktree;
+`Ctrl+Q` exits Gator and cancels an active native run during cleanup. The
+running view shows an event-backed activity phase, current turn, provider mode,
+verifier state, and a preview of the next queued work; it does not estimate
+token use or fake percentage progress. After a run, the latest result
+summarizes verifier status and the visible diff's file/addition/deletion counts.
+Failure states include the reason plus the relevant next action.
 Use `/review` for a retained-worktree review surface with an expanded changed
 file tree, additions/deletions, hunk navigation, focused/raw rendering per
 file, explicit staged/unstaged file or hunk operations, and range-scoped

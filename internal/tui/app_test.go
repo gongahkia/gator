@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -227,6 +228,9 @@ func TestComposerReportsProviderConfigurationFailureBeforeRun(t *testing.T) {
 	transcript := updated.transcriptContent()
 	if !strings.Contains(transcript, "Gator OAuth credential") || !strings.Contains(transcript, "credential has been stored.") || !updated.followTranscript || !updated.transcript.AtBottom() {
 		t.Fatalf("complete startup failure is not visible in the transcript: content=%q follow=%t atBottom=%t", transcript, updated.followTranscript, updated.transcript.AtBottom())
+	}
+	if count := strings.Count(updated.View(), "Gator OAuth credential"); count != 1 {
+		t.Fatalf("startup error rendered %d times, want once: %s", count, updated.View())
 	}
 }
 
@@ -681,6 +685,55 @@ func TestEnterSendsMessageOutsideVimMode(t *testing.T) {
 	entry := updated.chat[len(updated.chat)-1]
 	if updated.vim != vimOff || updated.task.Value() != "Explain this repository." || !entry.isError || !strings.Contains(entry.text, "No model provider") {
 		t.Fatalf("Enter did not record its startup failure: %#v", entry)
+	}
+}
+
+func TestCtrlCClearsComposerWithoutCancellingActiveRun(t *testing.T) {
+	model := New(Config{})
+	model.task.SetValue("Draft a focused implementation plan.")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if command == nil {
+		t.Fatal("Ctrl+C did not restore focus to the cleared composer")
+	}
+	cleared := next.(Model)
+	if cleared.task.Value() != "" || !strings.Contains(cleared.notice.text, "Message cleared") {
+		t.Fatalf("Ctrl+C composer state = task %q, notice %#v", cleared.task.Value(), cleared.notice)
+	}
+
+	cancelled := false
+	cleared.screen = runningScreen
+	cleared.execution = &executionStream{cancel: func() { cancelled = true }, steering: make(chan string, 1)}
+	cleared.task.SetValue("Check the failing test as well.")
+	next, command = cleared.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if command == nil {
+		t.Fatal("Ctrl+C did not restore focus to the running composer")
+	}
+	updated := next.(Model)
+	if updated.task.Value() != "" || cancelled || updated.cancelling {
+		t.Fatalf("Ctrl+C changed the active run: task %q cancelled=%t state=%t", updated.task.Value(), cancelled, updated.cancelling)
+	}
+
+	next, command = updated.Update(tea.KeyMsg{Type: tea.KeyCtrlX})
+	if command != nil || !next.(Model).cancelling || !cancelled {
+		t.Fatalf("Ctrl+X did not request run cancellation: command=%v state=%#v", command, next.(Model))
+	}
+}
+
+func TestCtrlQQuitsAndCloseCancelsNativeRun(t *testing.T) {
+	model := New(Config{})
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlQ})
+	if next.(Model).screen != composeScreen || command == nil {
+		t.Fatalf("Ctrl+Q = model %#v, command %v", next.(Model), command)
+	}
+	if _, ok := command().(tea.QuitMsg); !ok {
+		t.Fatalf("Ctrl+Q command = %T, want tea.QuitMsg", command())
+	}
+
+	cancelled := false
+	model.execution = &executionStream{cancel: func() { cancelled = true }}
+	model.Close()
+	if !cancelled {
+		t.Fatal("Close did not cancel the active native run")
 	}
 }
 
@@ -2210,6 +2263,106 @@ func TestChatPageKeysBrowseConversation(t *testing.T) {
 	latest, _ := down.(Model).Update(tea.KeyMsg{Type: tea.KeyEnd})
 	if !latest.(Model).followTranscript || latest.(Model).transcriptUnread || !latest.(Model).transcript.AtBottom() {
 		t.Fatalf("end did not restore transcript follow state: %#v", latest.(Model).transcript)
+	}
+}
+
+func TestChatMouseWheelBrowsesConversation(t *testing.T) {
+	model := New(Config{})
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
+	for index := 0; index < 12; index++ {
+		model.appendChat(chatEntry{author: chatAgent, text: fmt.Sprintf("message %d", index)})
+	}
+	model.transcriptBottom()
+	bottom := model.transcript.YOffset
+
+	next, command := model.Update(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	if command != nil {
+		t.Fatal("mouse-wheel transcript scroll returned a command")
+	}
+	browsed := next.(Model)
+	if browsed.transcript.YOffset >= bottom || browsed.followTranscript {
+		t.Fatalf("mouse wheel did not browse transcript history: offset=%d bottom=%d follow=%t", browsed.transcript.YOffset, bottom, browsed.followTranscript)
+	}
+
+	next, _ = browsed.Update(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	if next.(Model).transcript.YOffset <= browsed.transcript.YOffset {
+		t.Fatalf("mouse wheel did not move transcript toward the latest entry: offset=%d", next.(Model).transcript.YOffset)
+	}
+}
+
+func TestCopyCommandsCopyAgentOutputAndPlainTranscript(t *testing.T) {
+	var copied []string
+	model := New(Config{CopyToClipboard: func(text string) error {
+		copied = append(copied, text)
+		return nil
+	}})
+	model.chat = []chatEntry{
+		{author: chatUser, text: "Add a focused feature."},
+		{author: chatAgent, text: "I added the feature.\n\nTests pass."},
+		{author: chatTool, text: "tool ok go_test", detail: "go test ./..."},
+	}
+
+	model.task.SetValue("/copy")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("/copy did not request a clipboard write")
+	}
+	updated, command := next.(Model).Update(command())
+	if command != nil {
+		t.Fatal("clipboard completion returned an unexpected command")
+	}
+	model = updated.(Model)
+	if got, want := copied, []string{"I added the feature.\n\nTests pass."}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("/copy text = %#v, want %#v", got, want)
+	}
+	if model.notice.kind != noticeSuccess || !strings.Contains(model.notice.text, "Latest Gator response copied") {
+		t.Fatalf("/copy notice = %#v", model.notice)
+	}
+
+	model.task.SetValue("/copyall")
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("/copyall did not request a clipboard write")
+	}
+	updated, _ = next.(Model).Update(command())
+	model = updated.(Model)
+	if len(copied) != 2 {
+		t.Fatalf("clipboard writes = %#v", copied)
+	}
+	for _, expected := range []string{"You\nAdd a focused feature.", "Gator\nI added the feature.", "Tool\ntool ok go_test\nDetails\ngo test ./..."} {
+		if !strings.Contains(copied[1], expected) {
+			t.Fatalf("/copyall omitted %q from %q", expected, copied[1])
+		}
+	}
+	if model.notice.kind != noticeSuccess || !strings.Contains(model.notice.text, "Conversation transcript copied") {
+		t.Fatalf("/copyall notice = %#v", model.notice)
+	}
+}
+
+func TestCopyCommandsReportUnavailableContentAndClipboardFailures(t *testing.T) {
+	model := New(Config{})
+	model.chat = []chatEntry{{author: chatSystem, text: "System event"}}
+	model.task.SetValue("/copy")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil {
+		t.Fatal("/copy requested a clipboard write without agent output")
+	}
+	if !strings.Contains(next.(Model).notice.text, "No Gator response") {
+		t.Fatalf("empty /copy notice = %#v", next.(Model).notice)
+	}
+
+	model = New(Config{CopyToClipboard: func(string) error { return errors.New("clipboard unavailable") }})
+	model.chat = []chatEntry{{author: chatAgent, text: "Response"}}
+	model.task.SetValue("/copy")
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("/copy did not request the injected clipboard write")
+	}
+	updated, _ := next.(Model).Update(command())
+	if notice := updated.(Model).notice; notice.kind != noticeError || !strings.Contains(notice.text, "clipboard unavailable") {
+		t.Fatalf("clipboard failure notice = %#v", notice)
 	}
 }
 

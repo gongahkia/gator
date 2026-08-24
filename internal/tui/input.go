@@ -9,6 +9,9 @@ import (
 )
 
 func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "ctrl+q" {
+		return m, tea.Quit
+	}
 	if message.String() == "ctrl+t" && (m.screen == composeScreen || m.screen == runningScreen) && m.pendingApproval == nil {
 		m.openAttachedTerminal()
 		if m.screen == terminalScreen && m.execution != nil {
@@ -93,6 +96,9 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "OAuth login cancellation requested.", kind: noticeInfo}
 		return m, nil
 	}
+	if message.String() == "ctrl+c" {
+		return m.clearComposerInput()
+	}
 	if m.focus == taskField && m.vimCommand != "" {
 		return m.updateVimCommand(message, false)
 	}
@@ -170,8 +176,6 @@ func (m Model) updateComposer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch message.String() {
-	case "ctrl+c":
-		return m, tea.Quit
 	case "ctrl+o":
 		return m.openRecentRuns()
 	case "pgup":
@@ -273,6 +277,12 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.pendingApproval != nil {
 		return m.updateCommandApproval(message)
 	}
+	if message.String() == "ctrl+c" {
+		return m.clearComposerInput()
+	}
+	if message.String() == "ctrl+x" {
+		return m.cancelActiveRun()
+	}
 	if m.vimCommand != "" {
 		return m.updateVimCommand(message, true)
 	}
@@ -339,13 +349,6 @@ func (m Model) updateRunning(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	switch message.String() {
-	case "ctrl+c":
-		if m.execution != nil && !m.cancelling {
-			m.execution.cancel()
-			m.cancelling = true
-			m.notice = notice{text: "Cancellation requested. Waiting for the current operation to stop...", kind: noticeInfo}
-		}
-		return m, nil
 	case "pgup":
 		m.pageTranscript(false)
 		return m, nil
@@ -397,17 +400,39 @@ func (m Model) updateCommandApproval(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.resolvePendingApproval(tools.CommandDeny)
 		m.notice = notice{text: "Command denied.", kind: noticeInfo}
 		return m, nil
-	case "ctrl+c":
+	case "ctrl+c", "ctrl+x":
 		m.resolvePendingApproval(tools.CommandDeny)
-		if m.execution != nil && !m.cancelling {
-			m.execution.cancel()
-			m.cancelling = true
-			m.notice = notice{text: "Cancellation requested. Waiting for the current operation to stop...", kind: noticeInfo}
-		}
-		return m, nil
+		return m.cancelActiveRun()
 	default:
 		return m, nil
 	}
+}
+
+// clearComposerInput clears only the message being composed. It intentionally
+// leaves the active run, model selection, and verifier policy untouched.
+func (m Model) clearComposerInput() (tea.Model, tea.Cmd) {
+	if m.task.Value() == "" && m.vimCommand == "" {
+		m.notice = notice{text: "Message field is already empty.", kind: noticeInfo}
+		return m, nil
+	}
+	m.task.Reset()
+	m.vimCommand = ""
+	m.commandIndex = 0
+	m.contextClosed = false
+	m.persistDraft()
+	m.refreshPreflight()
+	m.syncVimLineNumbers()
+	m.notice = notice{text: "Message cleared.", kind: noticeInfo}
+	return m, m.focusField()
+}
+
+func (m Model) cancelActiveRun() (tea.Model, tea.Cmd) {
+	if m.execution != nil && m.execution.cancel != nil && !m.cancelling {
+		m.execution.cancel()
+		m.cancelling = true
+		m.notice = notice{text: "Cancellation requested. Waiting for the current operation to stop...", kind: noticeInfo}
+	}
+	return m, nil
 }
 
 func runningLocalCommand(command string) bool {

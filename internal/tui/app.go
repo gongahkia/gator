@@ -578,6 +578,9 @@ func New(config Config) Model {
 // Close releases every task retained by this interactive process. Detached
 // terminals are session-bound by design; quitting Gator is an explicit stop.
 func (m Model) Close() {
+	if m.execution != nil && m.execution.cancel != nil {
+		m.execution.cancel()
+	}
 	if closer, ok := m.localModels.manager.(interface{ Close() error }); ok {
 		_ = closer.Close()
 	}
