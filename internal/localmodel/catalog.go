@@ -18,51 +18,56 @@ const (
 // model library. Download is the published package size, not a promise about
 // runtime memory usage, which varies with hardware and context length.
 type Model struct {
-	ID          string
-	OllamaModel string
-	Name        string
-	Download    string
-	Context     string
-	Summary     string
-	SourceURL   string
+	ID            string
+	OllamaModel   string
+	Name          string
+	Download      string
+	DownloadBytes uint64
+	Context       string
+	Summary       string
+	SourceURL     string
 }
 
 var catalog = []Model{
 	{
-		ID:          "qwen2.5-coder-7b",
-		OllamaModel: "qwen2.5-coder:7b",
-		Name:        "Qwen2.5-Coder 7B",
-		Download:    "4.7 GB",
-		Context:     "32K",
-		Summary:     "smallest recommended code-focused option",
-		SourceURL:   "https://ollama.com/library/qwen2.5-coder",
+		ID:            "qwen2.5-coder-7b",
+		OllamaModel:   "qwen2.5-coder:7b",
+		Name:          "Qwen2.5-Coder 7B",
+		Download:      "4.7 GB",
+		DownloadBytes: 4_700_000_000,
+		Context:       "32K",
+		Summary:       "smallest recommended code-focused option",
+		SourceURL:     "https://ollama.com/library/qwen2.5-coder",
 	},
 	{
-		ID:          "qwen2.5-coder-14b",
-		OllamaModel: "qwen2.5-coder:14b",
-		Name:        "Qwen2.5-Coder 14B",
-		Download:    "9.0 GB",
-		Context:     "32K",
-		Summary:     "larger code-focused option for capable local hardware",
-		SourceURL:   "https://ollama.com/library/qwen2.5-coder",
+		ID:            "qwen2.5-coder-14b",
+		OllamaModel:   "qwen2.5-coder:14b",
+		Name:          "Qwen2.5-Coder 14B",
+		Download:      "9.0 GB",
+		DownloadBytes: 9_000_000_000,
+		Context:       "32K",
+		Summary:       "larger code-focused option for capable local hardware",
+		SourceURL:     "https://ollama.com/library/qwen2.5-coder",
 	},
 	{
-		ID:          "devstral-24b",
-		OllamaModel: "devstral:24b",
-		Name:        "Devstral 24B",
-		Download:    "14 GB",
-		Context:     "128K",
-		Summary:     "agentic coding model with tool use",
-		SourceURL:   "https://ollama.com/library/devstral",
+		ID:            "devstral-24b",
+		OllamaModel:   "devstral:24b",
+		Name:          "Devstral 24B",
+		Download:      "14 GB",
+		DownloadBytes: 14_000_000_000,
+		Context:       "128K",
+		Summary:       "agentic coding model with tool use",
+		SourceURL:     "https://ollama.com/library/devstral",
 	},
 	{
-		ID:          "qwen3-coder-30b",
-		OllamaModel: "qwen3-coder:30b",
-		Name:        "Qwen3-Coder 30B",
-		Download:    "19 GB",
-		Context:     "256K",
-		Summary:     "long-context agentic coding model",
-		SourceURL:   "https://ollama.com/library/qwen3-coder",
+		ID:            "qwen3-coder-30b",
+		OllamaModel:   "qwen3-coder:30b",
+		Name:          "Qwen3-Coder 30B",
+		Download:      "19 GB",
+		DownloadBytes: 19_000_000_000,
+		Context:       "256K",
+		Summary:       "long-context agentic coding model",
+		SourceURL:     "https://ollama.com/library/qwen3-coder",
 	},
 }
 
