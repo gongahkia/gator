@@ -207,7 +207,14 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 		t.Fatalf("local manager rename = %#v, err = %v", aliases, err)
 	}
 	status, err = manager.Status(context.Background())
-	if err != nil || status.Models[0].Name != "desk Qwen" || status.Models[0].DefaultName != "Qwen2.5-Coder 7B" {
+	renamedQwen := false
+	for _, model := range status.Models {
+		if model.ID == "qwen2.5-coder-7b" && model.Name == "desk Qwen" && model.DefaultName == "Qwen2.5-Coder 7B" {
+			renamedQwen = true
+			break
+		}
+	}
+	if err != nil || !renamedQwen {
 		t.Fatalf("local manager renamed status = %#v, err = %v", status, err)
 	}
 }

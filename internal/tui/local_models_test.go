@@ -271,18 +271,28 @@ func TestModelCatalogShowsCloudReadinessAndSelectsCloudModel(t *testing.T) {
 
 func TestModelCatalogExposesCheckedInOpenCodeModelsAndClaudeHarness(t *testing.T) {
 	model := New(Config{LocalModels: &fakeLocalModelManager{}})
+	next, _ := model.openModelCatalog()
+	model = next.(Model)
+	model.localModels.section = cloudModelSection
 	entries := model.cloudModels()
-	var openCodeFound, claudeFound bool
-	for _, entry := range entries {
+	openCodeIndex := -1
+	claudeIndex := -1
+	for index, entry := range entries {
 		if entry.provider == "opencode" && entry.model == "claude-opus-5" && entry.selectable {
-			openCodeFound = true
+			openCodeIndex = index
 		}
 		if entry.provider == "claude" && entry.name == "Claude Code · API-key harness" && entry.canLogin && !entry.selectable {
-			claudeFound = true
+			claudeIndex = index
 		}
 	}
-	if !openCodeFound || !claudeFound {
-		t.Fatalf("cloud catalog missing entries: OpenCode=%t Claude=%t entries=%#v", openCodeFound, claudeFound, entries)
+	if openCodeIndex < 0 || claudeIndex < 0 {
+		t.Fatalf("cloud catalog missing entries: OpenCode=%d Claude=%d entries=%#v", openCodeIndex, claudeIndex, entries)
+	}
+	model.localModels.cloudIndex = openCodeIndex
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.provider.Value() != "opencode" || model.model.Value() != "claude-opus-5" {
+		t.Fatalf("OpenCode catalog selection = provider:%q model:%q", model.provider.Value(), model.model.Value())
 	}
 }
 
