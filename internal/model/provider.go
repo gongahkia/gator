@@ -98,17 +98,9 @@ type Backend struct {
 	Model    agent.Model
 }
 
-// New resolves one configured direct provider. It never launches a vendor CLI
-// or reads another application's credential store.
-func New(config Config) (Backend, error) {
-	provider, err := ParseProvider(string(config.Provider))
-	if err != nil {
-		return Backend{}, err
-	}
-	config.Provider = provider
-	if strings.TrimSpace(config.Model) == "" {
-		config.Model = DefaultModel(provider)
-	}
+// newBackend contains provider-specific adapter construction after the public
+// factory has validated and normalized its shared configuration.
+func newBackend(provider Provider, config Config) (Backend, error) {
 	switch provider {
 	case OpenAI:
 		apiKey, err := key(config, provider, "OPENAI_API_KEY")
