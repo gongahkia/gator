@@ -420,6 +420,34 @@ func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch message.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "up", "k", "ctrl+p":
+		m.scrollReviewDiff(-1)
+		return m, nil
+	case "down", "j", "ctrl+n":
+		m.scrollReviewDiff(1)
+		return m, nil
+	case "pgup", "ctrl+u":
+		m.scrollReviewDiff(-m.reviewDiffPageSize())
+		return m, nil
+	case "pgdown", "ctrl+d":
+		m.scrollReviewDiff(m.reviewDiffPageSize())
+		return m, nil
+	case "home", "g":
+		m.diffOffset = 0
+		return m, nil
+	case "end", "G":
+		m.jumpReviewDiffToEnd()
+		return m, nil
+	case "f":
+		if m.diffMode == focusedDiffDisplay {
+			m.diffMode = fullDiffDisplay
+			m.notice = notice{text: "Showing the complete raw patch. Press f to return to focused review.", kind: noticeInfo}
+		} else {
+			m.diffMode = focusedDiffDisplay
+			m.notice = notice{text: "Showing focused review with duplicate blocks collapsed. Press f for the full patch.", kind: noticeInfo}
+		}
+		m.diffOffset = 0
+		return m, nil
 	case "n":
 		m.returnToComposer()
 		return m, nil
