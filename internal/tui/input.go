@@ -417,6 +417,9 @@ func (m Model) updateVimCommand(message tea.KeyMsg, running bool) (tea.Model, te
 }
 
 func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.reviewLoaded {
+		return m.updateStructuredReview(message)
+	}
 	switch message.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit

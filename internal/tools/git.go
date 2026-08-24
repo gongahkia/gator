@@ -100,7 +100,26 @@ func runGit(ctx context.Context, directory string, arguments ...string) (string,
 }
 
 func worktreeDiff(ctx context.Context, root workspace.Root) (string, bool, error) {
-	tracked, truncated, err := runGit(ctx, root.Path(), "diff", "--no-ext-diff", "--binary")
+	// Compare with HEAD so an explicit review-stage operation remains visible to
+	// both the agent and the terminal review surface. Plain `git diff` silently
+	// omits index-only changes.
+	tracked, truncated, err := runGit(ctx, root.Path(), "diff", "--no-ext-diff", "--binary", "HEAD")
+	if err != nil {
+		// A newly initialized repository has no HEAD yet. Keep staged and
+		// unstaged content reviewable rather than treating that normal state as
+		// a tooling failure.
+		staged, stagedTruncated, stagedErr := runGit(ctx, root.Path(), "diff", "--cached", "--no-ext-diff", "--binary")
+		if stagedErr != nil {
+			return tracked, truncated, err
+		}
+		unstaged, unstagedTruncated, unstagedErr := runGit(ctx, root.Path(), "diff", "--no-ext-diff", "--binary")
+		if unstagedErr != nil {
+			return unstaged, stagedTruncated || unstagedTruncated, unstagedErr
+		}
+		tracked = staged + unstaged
+		truncated = stagedTruncated || unstagedTruncated
+		err = nil
+	}
 	if err != nil || truncated {
 		return tracked, truncated, err
 	}

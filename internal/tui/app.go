@@ -831,6 +831,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, loadReview(*m.outcome)
+	case tea.MouseMsg:
+		if m.screen == reviewScreen {
+			return m.updateReviewMouse(msg)
+		}
+		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}

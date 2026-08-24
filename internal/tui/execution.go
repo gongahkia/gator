@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
@@ -115,6 +116,14 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	m.diffErr = nil
 	m.diffTruncated = false
 	m.diffStats = diffStats{}
+	m.reviewSnapshot = review.Snapshot{}
+	m.reviewLoaded = false
+	m.reviewScope = review.All
+	m.reviewPane = reviewFilesPane
+	m.reviewFileIndex, m.reviewHunkIndex, m.reviewLineIndex = 0, 0, 0
+	m.reviewRangeFrom = -1
+	m.reviewMutation = nil
+	m.reviewRequestOn = false
 	m.lastRunCancelled = false
 	m.screen = runningScreen
 	m.focus = taskField
@@ -419,6 +428,24 @@ func loadDiff(root workspace.Root) tea.Cmd {
 	return func() tea.Msg {
 		diff, truncated, err := tools.ReviewDiff(context.Background(), root)
 		return diffLoadedMsg{diff: diff, truncated: truncated, err: err}
+	}
+}
+
+func loadReview(outcome gatorrun.Outcome) tea.Cmd {
+	return func() tea.Msg {
+		if outcome.Worktree.Path == "" {
+			return reviewLoadedMsg{err: errors.New("retained worktree is unavailable")}
+		}
+		baseCommit := ""
+		if outcome.StatePath != "" {
+			session, err := journal.LoadSession(outcome.StatePath)
+			if err != nil {
+				return reviewLoadedMsg{err: err}
+			}
+			baseCommit = session.BaseCommit
+		}
+		snapshot, err := review.Load(context.Background(), outcome.Worktree.Path, baseCommit)
+		return reviewLoadedMsg{snapshot: snapshot, err: err}
 	}
 }
 

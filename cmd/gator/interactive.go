@@ -142,7 +142,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		SetTheme:    saveTheme,
 		LocalModels: newLocalModelManager(store),
 	})
-	program := tea.NewProgram(application, tea.WithAltScreen())
+	program := tea.NewProgram(application, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	final, runErr := program.Run()
 	if model, ok := final.(tui.Model); ok {
 		model.Close()
