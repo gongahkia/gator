@@ -1,7 +1,9 @@
 package model
 
 import (
+	"context"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -529,6 +531,63 @@ func TestCloudflareRequiresAccountIDWithoutEndpointOverride(t *testing.T) {
 	if _, err := New(Config{Provider: CloudflareGateway, APIKey: "cloudflare-key", Model: "openai/gpt-5.2"}); err == nil || !strings.Contains(err.Error(), "CLOUDFLARE_ACCOUNT_ID") {
 		t.Fatalf("missing Cloudflare account ID error = %v", err)
 	}
+}
+
+func TestProviderOptionsConfigureCloudProviderFamilies(t *testing.T) {
+	t.Run("Bedrock region", func(t *testing.T) {
+		backend, err := New(Config{Provider: AmazonBedrock, APIKey: "bedrock-key", Model: "openai.gpt-oss-20b-1:0", ProviderOptions: map[string]string{"region": "eu-west-1"}})
+		if err != nil {
+			t.Fatalf("new Bedrock backend: %v", err)
+		}
+		adapter, ok := backend.Model.(chatcompletions.Model)
+		if !ok || adapter.Config.BaseURL != "https://bedrock-mantle.eu-west-1.api.aws/v1/chat/completions" {
+			t.Fatalf("Bedrock adapter = %#v", backend.Model)
+		}
+	})
+
+	t.Run("Vertex project location and stored access token", func(t *testing.T) {
+		store, err := auth.New(t.TempDir())
+		if err != nil {
+			t.Fatalf("new credential store: %v", err)
+		}
+		if err := store.Put(string(GoogleVertex), auth.Credential{Type: "bearer_token", Access: "vertex-token"}); err != nil {
+			t.Fatalf("store Vertex token: %v", err)
+		}
+		backend, err := New(Config{Provider: GoogleVertex, Model: "google/gemini-2.0-flash-001", Credentials: &store, ProviderOptions: map[string]string{"project": "project-123", "location": "us-central1"}})
+		if err != nil {
+			t.Fatalf("new Vertex backend: %v", err)
+		}
+		adapter, ok := backend.Model.(chatcompletions.Model)
+		if !ok || adapter.Config.APIKeySource == nil || adapter.Config.BaseURL != "https://us-central1-aiplatform.googleapis.com/v1/projects/project-123/locations/us-central1/endpoints/openapi/chat/completions" {
+			t.Fatalf("Vertex adapter = %#v", backend.Model)
+		}
+		token, err := adapter.Config.APIKeySource(context.Background())
+		if err != nil || token != "vertex-token" {
+			t.Fatalf("Vertex token source = %q, %v", token, err)
+		}
+	})
+
+	t.Run("Vertex configured ADC path", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "application-default-credentials.json")
+		source, err := vertexCredentialSource(Config{ProviderOptions: map[string]string{"credentials_path": path}})
+		if err != nil {
+			t.Fatalf("resolve Vertex credential source: %v", err)
+		}
+		if source.CredentialsPath != path {
+			t.Fatalf("Vertex credentials path = %q, want %q", source.CredentialsPath, path)
+		}
+	})
+
+	t.Run("Cloudflare metadata", func(t *testing.T) {
+		backend, err := New(Config{Provider: CloudflareGateway, APIKey: "cloudflare-key", Model: "openai/gpt-5.6", ProviderOptions: map[string]string{"account_id": "account-123", "gateway_id": "gateway-123", "gateway_protocol": "openai-responses"}})
+		if err != nil {
+			t.Fatalf("new Cloudflare Gateway backend: %v", err)
+		}
+		adapter, ok := backend.Model.(openai.Responses)
+		if !ok || adapter.Headers.Get("Cf-Aig-Gateway-Id") != "gateway-123" || !strings.Contains(adapter.BaseURL, "/accounts/account-123/") {
+			t.Fatalf("Cloudflare Gateway adapter = %#v", backend.Model)
+		}
+	})
 }
 
 func TestEffectiveModelUsesProviderDefaults(t *testing.T) {

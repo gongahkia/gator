@@ -22,14 +22,18 @@ const version = 2
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
 type Settings struct {
-	Version         int              `json:"version"`
-	Defaults        Defaults         `json:"defaults"`
-	Theme           string           `json:"theme,omitempty"`
+	Version  int      `json:"version"`
+	Defaults Defaults `json:"defaults"`
+	Theme    string   `json:"theme,omitempty"`
 	// ProviderEndpoints stores explicit non-secret endpoint overrides by
 	// provider ID. Credentials remain exclusively in Gator's auth store.
 	ProviderEndpoints map[string]string `json:"provider_endpoints,omitempty"`
-	Extensions      []Extension      `json:"extensions,omitempty"`
-	CustomProviders []CustomProvider `json:"custom_providers,omitempty"`
+	// ProviderOptions stores provider-specific non-secret settings such as an
+	// Azure resource, Cloudflare account ID, or Vertex project and location.
+	// Secrets never belong here; they remain exclusively in auth.json.
+	ProviderOptions map[string]map[string]string `json:"provider_options,omitempty"`
+	Extensions      []Extension                  `json:"extensions,omitempty"`
+	CustomProviders []CustomProvider             `json:"custom_providers,omitempty"`
 	// ModelAliases changes only a model's local display label. Its key is the
 	// stable provider:model identity; Gator always sends the real model ID.
 	ModelAliases    map[string]string `json:"model_aliases,omitempty"`
@@ -82,6 +86,7 @@ func ModelAliasKey(provider, model string) string {
 
 var customProviderIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 var environmentNamePattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,127}$`)
+var providerOptionNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
 // Store owns config.json below one configuration root.
 type Store struct {
@@ -97,6 +102,20 @@ func Default() Settings {
 // built-in provider. Callers may still supply an explicit one-run override.
 func (s Settings) ProviderEndpoint(provider string) string {
 	return strings.TrimSpace(s.ProviderEndpoints[strings.ToLower(strings.TrimSpace(provider))])
+}
+
+// OptionsForProvider returns a copy of persisted non-secret provider options.
+// Callers can safely specialize it for one run without mutating Settings.
+func (s Settings) OptionsForProvider(provider string) map[string]string {
+	configured := s.ProviderOptions[strings.ToLower(strings.TrimSpace(provider))]
+	if len(configured) == 0 {
+		return nil
+	}
+	options := make(map[string]string, len(configured))
+	for name, value := range configured {
+		options[name] = strings.TrimSpace(value)
+	}
+	return options
 }
 
 // ResolveDir resolves Gator's configuration root. An explicit override and
@@ -255,6 +274,25 @@ func validate(settings Settings) error {
 		endpoint, err := url.Parse(baseURL)
 		if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Host == "" || endpoint.User != nil {
 			return fmt.Errorf("provider endpoint %q requires an absolute http(s) URL", provider)
+		}
+	}
+	if len(settings.ProviderOptions) > 128 {
+		return errors.New("configuration has too many provider option sets")
+	}
+	for provider, options := range settings.ProviderOptions {
+		if !customProviderIDPattern.MatchString(provider) {
+			return fmt.Errorf("invalid provider option ID %q", provider)
+		}
+		if len(options) == 0 || len(options) > 16 {
+			return fmt.Errorf("provider option set %q must contain 1-16 values", provider)
+		}
+		for name, value := range options {
+			if !providerOptionNamePattern.MatchString(name) {
+				return fmt.Errorf("invalid provider option name %q", name)
+			}
+			if strings.TrimSpace(value) == "" || len(value) > 2048 || strings.ContainsAny(value, "\r\n") {
+				return fmt.Errorf("provider option %q for %q is invalid", name, provider)
+			}
 		}
 	}
 	for key, value := range settings.ModelAliases {

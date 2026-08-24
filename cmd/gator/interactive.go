@@ -123,6 +123,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		RecentAll:         options.RecentAll,
 		CustomProviders:   settings.CustomProviders,
 		ProviderEndpoints: settings.ProviderEndpoints,
+		ProviderOptions:   settings.ProviderOptions,
 		ModelAliases:      settings.ModelAliases,
 		ExtensionCommands: extensionCommands,
 		ExtensionUI:       extensionUI,
@@ -133,6 +134,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		BeginOAuthLogin: func(provider string) (tui.OAuthLogin, error) {
 			return beginTUIOAuthLogin(provider)
 		},
+		SaveCloudModel: saveTUICloudModelConfiguration(store, stateDir),
 		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
 			return exec.Command(os.Args[0], "connect", provider), nil
 		},

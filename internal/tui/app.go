@@ -33,21 +33,24 @@ const maxQueuedInputs = 16
 // interactive session. NewExecutor is injected so the UI stays independent of
 // any particular model provider and can be tested without a network request.
 type Config struct {
-	RepositoryPath    string
-	Provider          string
-	Model             string
-	BaseURL           string
-	Verification      [][]string
-	MaxSteps          int
-	StateDir          string
-	ResumeStatePath   string
-	ForkStatePath     string
-	StartInRecent     bool
-	RecentAll         bool
-	CustomProviders   []config.CustomProvider
+	RepositoryPath  string
+	Provider        string
+	Model           string
+	BaseURL         string
+	Verification    [][]string
+	MaxSteps        int
+	StateDir        string
+	ResumeStatePath string
+	ForkStatePath   string
+	StartInRecent   bool
+	RecentAll       bool
+	CustomProviders []config.CustomProvider
 	// ProviderEndpoints contains non-secret endpoint overrides keyed by
 	// provider. It is persisted by SaveCloudModel rather than in drafts.
 	ProviderEndpoints map[string]string
+	// ProviderOptions contains provider-specific non-secret configuration,
+	// keyed first by provider and then by option name.
+	ProviderOptions   map[string]map[string]string
 	ModelAliases      map[string]string
 	ExtensionCommands []ExtensionCommand
 	ExtensionUI       []ExtensionUIContribution
@@ -75,7 +78,7 @@ type Config struct {
 	// SaveCloudModel persists a cloud model's non-secret configuration and, when
 	// supplied, its masked credential in Gator's private auth store.
 	SaveCloudModel func(CloudModelSetup) error
-	SetTheme        func(name string) error
+	SetTheme       func(name string) error
 	// LocalModels manages Gator's reviewed, loopback-only local model catalog.
 	// It is injected from the command layer so the UI does not own runtime
 	// configuration or make network requests on its event loop.
@@ -86,11 +89,13 @@ type Config struct {
 // layer. APIKey is populated only while a save is in progress and must never
 // be rendered, copied to a draft, or returned in a completion message.
 type CloudModelSetup struct {
-	Provider       string
-	Model          string
-	BaseURL        string
-	APIKey         string
-	CredentialType string
+	Provider        string
+	Model           string
+	BaseURL         string
+	Options         map[string]string
+	APIKey          string
+	CredentialType  string
+	DelegateRuntime string
 }
 
 // ExtensionCommand is a visible prompt template contributed by a trusted or
@@ -671,7 +676,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.config.ProviderEndpoints[msg.provider] = msg.baseURL
 		}
-		m.delegateRuntime = ""
+		if m.config.ProviderOptions == nil {
+			m.config.ProviderOptions = make(map[string]map[string]string)
+		}
+		if len(msg.options) == 0 {
+			delete(m.config.ProviderOptions, msg.provider)
+		} else {
+			m.config.ProviderOptions[msg.provider] = cloneProviderOptions(msg.options)
+		}
+		m.delegateRuntime = msg.delegateRuntime
 		m.persistDraft()
 		m.refreshPreflight()
 		m.selectActiveModelCatalogEntry()

@@ -32,9 +32,28 @@ type Signer struct {
 // chain includes static environment values, web identity, shared profiles, ECS
 // task credentials, and EC2 instance metadata without starting the AWS CLI.
 func LoadDefault(ctx context.Context, client *http.Client) (Signer, error) {
-	options := make([]func(*awsconfig.LoadOptions) error, 0, 1)
+	return Load(ctx, client, "")
+}
+
+// Load resolves the standard AWS credential chain and can pin a non-secret
+// region selected by the caller. An empty region preserves AWS SDK resolution.
+func Load(ctx context.Context, client *http.Client, regionOverride string) (Signer, error) {
+	return LoadProfile(ctx, client, regionOverride, "")
+}
+
+// LoadProfile resolves the standard AWS credential chain with an optional
+// shared-profile selection. The profile name is configuration only; Gator
+// never reads it as a credential or copies the profile into its state.
+func LoadProfile(ctx context.Context, client *http.Client, regionOverride, profile string) (Signer, error) {
+	options := make([]func(*awsconfig.LoadOptions) error, 0, 3)
 	if client != nil {
 		options = append(options, awsconfig.WithHTTPClient(client))
+	}
+	if region := strings.TrimSpace(regionOverride); region != "" {
+		options = append(options, awsconfig.WithRegion(region))
+	}
+	if profile := strings.TrimSpace(profile); profile != "" {
+		options = append(options, awsconfig.WithSharedConfigProfile(profile))
 	}
 	configured, err := awsconfig.LoadDefaultConfig(ctx, options...)
 	if err != nil {

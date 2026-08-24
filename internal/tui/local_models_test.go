@@ -7,7 +7,205 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/config"
+	modelprovider "github.com/gongahkia/gator/internal/model"
 )
+
+func TestAzureCloudEndpointExpandsResourceURLs(t *testing.T) {
+	chatEndpoint, err := azureCloudEndpoint(modelprovider.AzureOpenAI, "example-resource.openai.azure.com", "review", "2025-04-01-preview")
+	if err != nil {
+		t.Fatalf("expand Azure Chat Completions endpoint: %v", err)
+	}
+	if want := "https://example-resource.openai.azure.com/openai/deployments/review/chat/completions?api-version=2025-04-01-preview"; chatEndpoint != want {
+		t.Fatalf("Azure Chat Completions endpoint = %q, want %q", chatEndpoint, want)
+	}
+
+	responsesEndpoint, err := azureCloudEndpoint(modelprovider.AzureOpenAIResponses, "https://example-resource.openai.azure.com", "review", "")
+	if err != nil {
+		t.Fatalf("expand Azure Responses endpoint: %v", err)
+	}
+	if want := "https://example-resource.openai.azure.com/openai/v1/responses?api-version=v1"; responsesEndpoint != want {
+		t.Fatalf("Azure Responses endpoint = %q, want %q", responsesEndpoint, want)
+	}
+}
+
+func TestCloudModelSetupMasksCredentialAndUpdatesSelectedModel(t *testing.T) {
+	var saved CloudModelSetup
+	model := New(Config{
+		ProviderEndpoints: map[string]string{"azure-openai": "https://existing.openai.azure.com"},
+		SaveCloudModel: func(setup CloudModelSetup) error {
+			saved = setup
+			return nil
+		},
+	})
+	model.width, model.height = 100, 42
+	model.screen = localModelsScreen
+	form := newCloudModelSetupForm(modelprovider.AzureOpenAI, "review", "", nil, model.inlineWidth())
+	form.credential.SetValue("masked-api-key")
+	form.endpoint.SetValue("example-resource.openai.azure.com")
+	form.apiVersion.SetValue("2025-04-01-preview")
+	form.focus = cloudSetupAPIVersionField
+	model.localModels.cloudSetup = &form
+
+	if view := model.cloudModelSetupView(); strings.Contains(view, "masked-api-key") {
+		t.Fatal("cloud setup view exposed the typed credential")
+	}
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("save did not schedule the configuration callback")
+	}
+	message := command()
+	updated, _ := next.(Model).Update(message)
+	model = updated.(Model)
+	if saved.APIKey != "masked-api-key" || saved.Model != "review" {
+		t.Fatal("cloud configuration callback did not receive the expected setup")
+	}
+	if model.localModels.cloudSetup != nil || model.provider.Value() != "azure-openai" || model.model.Value() != "review" {
+		t.Fatalf("saved TUI selection = form:%#v provider:%q model:%q", model.localModels.cloudSetup, model.provider.Value(), model.model.Value())
+	}
+	if strings.Contains(model.View(), "masked-api-key") {
+		t.Fatal("saved TUI view exposed the typed credential")
+	}
+}
+
+func TestModelCatalogOpensAzureConfigurationForm(t *testing.T) {
+	model := New(Config{
+		LocalModels:       &fakeLocalModelManager{},
+		ProviderEndpoints: map[string]string{"azure-openai": "https://existing.openai.azure.com"},
+		SaveCloudModel:    func(CloudModelSetup) error { return nil },
+	})
+	model.width, model.height = 100, 42
+	model = selectCloudModelCatalog(t, model, "azure-openai")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	if command == nil {
+		t.Fatal("Azure configuration did not focus the first form field")
+	}
+	configured := next.(Model)
+	if configured.localModels.cloudSetup == nil {
+		t.Fatal("Azure configuration form did not open")
+	}
+	if got := configured.localModels.cloudSetup.endpoint.Value(); got != "https://existing.openai.azure.com" {
+		t.Fatalf("pre-filled Azure endpoint = %q", got)
+	}
+	view := configured.View()
+	if !strings.Contains(view, "Deployment or model") || !strings.Contains(view, "Azure resource URL or endpoint") || !strings.Contains(view, "API key") {
+		t.Fatalf("Azure configuration view = %q", view)
+	}
+}
+
+func TestCloudModelSetupSupportsEveryCredentialAndMetadataFamily(t *testing.T) {
+	tests := []struct {
+		name      string
+		provider  modelprovider.Provider
+		configure func(*cloudModelSetupForm)
+		check     func(*testing.T, CloudModelSetup)
+	}{
+		{
+			name:     "Claude Code Anthropic API key",
+			provider: modelprovider.Claude,
+			configure: func(form *cloudModelSetupForm) {
+				form.model.SetValue("claude-sonnet-5")
+				form.credential.SetValue("claude-key")
+			},
+			check: func(t *testing.T, setup CloudModelSetup) {
+				if setup.DelegateRuntime != "claude" || setup.CredentialType != cloudCredentialAPIKey {
+					t.Fatalf("Claude setup = %#v", setup)
+				}
+			},
+		},
+		{
+			name:     "Amazon Bedrock bearer and region",
+			provider: modelprovider.AmazonBedrock,
+			configure: func(form *cloudModelSetupForm) {
+				form.model.SetValue("openai.gpt-oss-20b-1:0")
+				form.credential.SetValue("bedrock-token")
+				form.region.SetValue("eu-west-1")
+				form.awsProfile.SetValue("engineering")
+			},
+			check: func(t *testing.T, setup CloudModelSetup) {
+				if setup.CredentialType != cloudCredentialBearer || setup.Options["region"] != "eu-west-1" || setup.Options["profile"] != "engineering" {
+					t.Fatalf("Bedrock setup = %#v", setup)
+				}
+			},
+		},
+		{
+			name:     "Google Vertex access token project and location",
+			provider: modelprovider.GoogleVertex,
+			configure: func(form *cloudModelSetupForm) {
+				form.model.SetValue("google/gemini-2.0-flash-001")
+				form.credential.SetValue("vertex-token")
+				form.project.SetValue("project-123")
+				form.location.SetValue("us-central1")
+				form.credentialsPath.SetValue("/tmp/gator-adc.json")
+			},
+			check: func(t *testing.T, setup CloudModelSetup) {
+				if setup.CredentialType != cloudCredentialBearer || setup.Options["project"] != "project-123" || setup.Options["location"] != "us-central1" || setup.Options["credentials_path"] != "/tmp/gator-adc.json" {
+					t.Fatalf("Vertex setup = %#v", setup)
+				}
+			},
+		},
+		{
+			name:     "Cloudflare AI Gateway metadata",
+			provider: modelprovider.CloudflareGateway,
+			configure: func(form *cloudModelSetupForm) {
+				form.model.SetValue("openai/gpt-5.6")
+				form.credential.SetValue("cloudflare-token")
+				form.accountID.SetValue("account-123")
+				form.gatewayID.SetValue("gateway-123")
+				form.gatewayProtocol.SetValue("openai-responses")
+			},
+			check: func(t *testing.T, setup CloudModelSetup) {
+				if setup.Options["account_id"] != "account-123" || setup.Options["gateway_id"] != "gateway-123" || setup.Options["gateway_protocol"] != "openai-responses" {
+					t.Fatalf("Cloudflare Gateway setup = %#v", setup)
+				}
+			},
+		},
+		{
+			name:     "Codex account OAuth",
+			provider: modelprovider.Codex,
+			configure: func(form *cloudModelSetupForm) {
+				form.model.SetValue("gpt-5.6")
+			},
+			check: func(t *testing.T, setup CloudModelSetup) {
+				if setup.APIKey != "" || setup.CredentialType != "" {
+					t.Fatalf("Codex setup unexpectedly accepted a credential: %#v", setup)
+				}
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			form := newCloudModelSetupForm(test.provider, "", "", nil, 100)
+			test.configure(&form)
+			setup, err := form.configuration()
+			if err != nil {
+				t.Fatalf("configuration: %v", err)
+			}
+			test.check(t, setup)
+		})
+	}
+}
+
+func TestEveryDirectCloudProviderOffersTUIConfiguration(t *testing.T) {
+	for _, providerName := range modelprovider.Names() {
+		t.Run(providerName, func(t *testing.T) {
+			provider, err := modelprovider.ParseProvider(providerName)
+			if err != nil {
+				t.Fatalf("parse provider: %v", err)
+			}
+			endpoint := ""
+			if provider == modelprovider.AzureOpenAI || provider == modelprovider.AzureOpenAIResponses {
+				endpoint = "https://example-resource.openai.azure.com"
+			}
+			form := newCloudModelSetupForm(provider, "test-model", endpoint, nil, 100)
+			if len(form.fields()) == 0 {
+				t.Fatal("provider has no TUI configuration fields")
+			}
+			if _, err := form.configuration(); err != nil {
+				t.Fatalf("provider configuration form is unavailable: %v", err)
+			}
+		})
+	}
+}
 
 func TestLocalModelsAreAvailableThroughTheTUIAndConfigureTheNextRun(t *testing.T) {
 	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{

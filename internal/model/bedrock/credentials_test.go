@@ -34,7 +34,7 @@ func TestLoadDefaultResolvesStandardCredentialSources(t *testing.T) {
 			},
 		},
 		{
-			name: "selected shared profile",
+			name: "explicit shared profile",
 			run: func(t *testing.T) (Signer, string) {
 				clearCredentialEnvironment(t)
 				directory := t.TempDir()
@@ -42,13 +42,18 @@ func TestLoadDefaultResolvesStandardCredentialSources(t *testing.T) {
 				if err := os.WriteFile(credentialsPath, []byte("[gator]\naws_access_key_id = PROFILEKEY\naws_secret_access_key = profile-secret\n"), 0o600); err != nil {
 					t.Fatalf("write credentials: %v", err)
 				}
+				configurationPath := filepath.Join(directory, "config")
+				if err := os.WriteFile(configurationPath, []byte("[profile gator]\nregion = ap-southeast-1\n"), 0o600); err != nil {
+					t.Fatalf("write configuration: %v", err)
+				}
 				t.Setenv("AWS_SHARED_CREDENTIALS_FILE", credentialsPath)
-				t.Setenv("AWS_CONFIG_FILE", filepath.Join(directory, "config"))
-				t.Setenv("AWS_PROFILE", "gator")
-				t.Setenv("AWS_REGION", "us-east-2")
-				signer, err := LoadDefault(context.Background(), nil)
+				t.Setenv("AWS_CONFIG_FILE", configurationPath)
+				signer, err := LoadProfile(context.Background(), nil, "", "gator")
 				if err != nil {
 					t.Fatalf("load profile credentials: %v", err)
+				}
+				if signer.Region() != "ap-southeast-1" {
+					t.Fatalf("profile region = %q", signer.Region())
 				}
 				return signer, "PROFILEKEY"
 			},

@@ -92,7 +92,13 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 	if err := refreshProviderCredential(context.Background(), provider, credentials, oauthFlow, time.Now()); err != nil {
 		return gatorrun.Executor{}, err
 	}
-	backend, err := model.New(model.Config{Provider: provider, Model: modelName, BaseURL: baseURL, Credentials: &credentials})
+	backend, err := model.New(model.Config{
+		Provider:        provider,
+		Model:           modelName,
+		BaseURL:         baseURL,
+		Credentials:     &credentials,
+		ProviderOptions: settings.OptionsForProvider(providerName),
+	})
 	if err != nil {
 		return gatorrun.Executor{}, err
 	}
