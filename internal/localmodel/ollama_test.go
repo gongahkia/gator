@@ -35,6 +35,12 @@ func TestClientRestrictsRuntimeToLoopbackHTTP(t *testing.T) {
 	if err != nil || client.BaseURL() != "http://localhost:11434" || client.ChatCompletionsURL() != "http://localhost:11434/v1/chat/completions" {
 		t.Fatalf("client = %#v, err = %v", client, err)
 	}
+	if _, err := NewClientFromChatCompletionsURL("http://example.com/v1/chat/completions"); err == nil {
+		t.Fatal("accepted remote managed Chat Completions endpoint")
+	}
+	if _, err := NewClientFromChatCompletionsURL("http://127.0.0.1:11434/v1/responses"); err == nil {
+		t.Fatal("accepted non-Chat-Completions managed endpoint")
+	}
 }
 
 func TestClientManagesOllamaCatalogAndModelLifecycle(t *testing.T) {

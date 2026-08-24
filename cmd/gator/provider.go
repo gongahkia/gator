@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -105,6 +106,11 @@ func newCustomExecutor(settings config.Settings, provider config.CustomProvider,
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = provider.BaseURL
 	}
+	if provider.ID == localmodel.ProviderID {
+		if _, err := localmodel.NewClientFromChatCompletionsURL(baseURL); err != nil {
+			return gatorrun.Executor{}, fmt.Errorf("managed local provider endpoint: %w", err)
+		}
+	}
 	apiKey := ""
 	if provider.APIKeyEnv != "" {
 		apiKey = os.Getenv(provider.APIKeyEnv)
@@ -117,6 +123,9 @@ func newCustomExecutor(settings config.Settings, provider config.CustomProvider,
 		Model:            modelName,
 		ProviderName:     "custom provider " + provider.ID,
 	}}
+	if provider.ID == localmodel.ProviderID {
+		return executorWithExtensions(localmodel.TextOnlyModel{Backend: backend}, settings)
+	}
 	return executorWithExtensions(backend, settings)
 }
 

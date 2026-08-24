@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
 )
 
@@ -183,6 +184,9 @@ func addCustomProvider(arguments []string, store config.Store, settings config.S
 		return errors.New(providerConfigUsage)
 	}
 	id := strings.TrimSpace(arguments[0])
+	if id == localmodel.ProviderID {
+		return fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
+	}
 	if _, err := model.ParseProvider(id); err == nil {
 		return fmt.Errorf("custom provider ID %q conflicts with Gator's built-in provider; choose another ID", id)
 	}
