@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
@@ -1141,6 +1142,70 @@ func TestReviewDiffNavigationIsBounded(t *testing.T) {
 	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyHome})
 	if next.(Model).diffOffset != 0 {
 		t.Fatalf("diff offset after home = %d", next.(Model).diffOffset)
+	}
+}
+
+func TestStructuredReviewNavigatesFilesHunksScopesAndFocusedRawModes(t *testing.T) {
+	model := New(Config{})
+	model.width, model.height = 120, 48
+	model.screen = reviewScreen
+	snapshot := review.Snapshot{
+		All: review.ChangeSet{Files: []review.File{{
+			ID: "aaaaaaaaaaaaaaaaaaaaaaaa", Path: "internal/example.go", Status: "modified", Patch: "diff --git a/internal/example.go b/internal/example.go\n@@ -10 +10 @@\n-old\n+new\n", Stats: review.Stats{Additions: 1, Deletions: 1},
+			Hunks: []review.Hunk{{
+				ID: "bbbbbbbbbbbbbbbbbbbbbbbb", Header: "@@ -10 +10 @@", Stats: review.Stats{Additions: 1, Deletions: 1}, Lines: []review.Line{{Kind: "deletion", Text: "-old", OldLine: 10}, {Kind: "addition", Text: "+new", NewLine: 10}},
+			}},
+		}}, Stats: review.Stats{Files: 1, Additions: 1, Deletions: 1}},
+		Unstaged: review.ChangeSet{Files: []review.File{{
+			ID: "aaaaaaaaaaaaaaaaaaaaaaaa", Path: "internal/example.go", Status: "modified", Patch: "diff --git a/internal/example.go b/internal/example.go\n@@ -10 +10 @@\n-old\n+new\n", Stats: review.Stats{Additions: 1, Deletions: 1},
+			Hunks: []review.Hunk{{
+				ID: "bbbbbbbbbbbbbbbbbbbbbbbb", Header: "@@ -10 +10 @@", Stats: review.Stats{Additions: 1, Deletions: 1}, Lines: []review.Line{{Kind: "deletion", Text: "-old", OldLine: 10}, {Kind: "addition", Text: "+new", NewLine: 10}},
+			}},
+		}}, Stats: review.Stats{Files: 1, Additions: 1, Deletions: 1}},
+	}
+	next, _ := model.Update(reviewLoadedMsg{snapshot: snapshot})
+	model = next.(Model)
+	if !model.reviewLoaded || !strings.Contains(model.View(), "all changes") || !strings.Contains(model.View(), "Focused selected hunk") {
+		t.Fatalf("structured review view = %q", model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	model = next.(Model)
+	if model.reviewScope != review.Unstaged || !strings.Contains(model.View(), "unstaged") {
+		t.Fatalf("review scope = %q view=%q", model.reviewScope, model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	model = next.(Model)
+	if !model.reviewRawFiles["aaaaaaaaaaaaaaaaaaaaaaaa"] || !strings.Contains(model.View(), "Raw patch for this file") {
+		t.Fatalf("raw review view = %q", model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	model = next.(Model)
+	if model.reviewRangeFrom != 0 || model.reviewPane != reviewLinesPane {
+		t.Fatalf("range selection = %d pane=%d", model.reviewRangeFrom, model.reviewPane)
+	}
+}
+
+func TestStructuredReviewMouseSelectsFileAndHunk(t *testing.T) {
+	model := New(Config{})
+	model.width, model.height = 120, 48
+	model.screen = reviewScreen
+	snapshot := review.Snapshot{All: review.ChangeSet{Files: []review.File{
+		{ID: "aaaaaaaaaaaaaaaaaaaaaaaa", Path: "one.go", Hunks: []review.Hunk{{ID: "bbbbbbbbbbbbbbbbbbbbbbbb", Header: "@@ -1 +1 @@", Lines: []review.Line{{Kind: "addition", Text: "+one", NewLine: 1}}}}},
+		{ID: "cccccccccccccccccccccccc", Path: "two.go", Hunks: []review.Hunk{{ID: "dddddddddddddddddddddddd", Header: "@@ -2 +2 @@", Lines: []review.Line{{Kind: "addition", Text: "+two", NewLine: 2}}}}},
+	}}}
+	next, _ := model.Update(reviewLoadedMsg{snapshot: snapshot})
+	model = next.(Model)
+	next, _ = model.Update(tea.MouseMsg{X: 2, Y: 5, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	model = next.(Model)
+	if model.reviewFileIndex != 1 || model.reviewPane != reviewFilesPane {
+		t.Fatalf("mouse file selection = index:%d pane:%d", model.reviewFileIndex, model.reviewPane)
+	}
+	next, _ = model.Update(tea.MouseMsg{X: 70, Y: 4, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	model = next.(Model)
+	if model.reviewPane != reviewHunksPane || model.reviewHunkIndex != 0 {
+		t.Fatalf("mouse hunk selection = index:%d pane:%d", model.reviewHunkIndex, model.reviewPane)
 	}
 }
 
