@@ -57,6 +57,7 @@ Usage:
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator transcript RUN_RECORD_PATH > transcript.html
+  gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH
 
@@ -79,6 +80,7 @@ Commands:
   run       propose a tested patch in an isolated Git worktree
   resume    select, reopen, or immediately continue a retained local thread
   transcript export one retained private session as local HTML
+  review    serve an authenticated loopback browser review for one retained run
   export    write a portable patch for a retained run to standard output
   apply     explicitly apply a retained patch to this clean checkout
 
@@ -166,6 +168,8 @@ func run(args []string, out io.Writer) error {
 		return cloneTask(args[1:], out)
 	case "transcript":
 		return exportTranscript(args[1:], out)
+	case "review":
+		return reviewCommand(args[1:], out)
 	case "export":
 		return exportPatch(args[1:], out)
 	case "apply":
