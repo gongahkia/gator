@@ -19,11 +19,14 @@ func detectHostResources(directory string) (uint64, uint64, uint64, string, stri
 
 func windowsMemory() (uint64, uint64, string) {
 	status := memoryStatusEx{Length: uint32(unsafe.Sizeof(memoryStatusEx{}))}
-	if err := windows.GlobalMemoryStatusEx((*windows.MemStatusEx)(unsafe.Pointer(&status))); err != nil {
+	result, _, err := globalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&status)))
+	if result == 0 {
 		return 0, 0, fmt.Sprintf("read system memory: %v", err)
 	}
 	return status.TotalPhys, status.AvailPhys, ""
 }
+
+var globalMemoryStatusEx = windows.NewLazySystemDLL("kernel32.dll").NewProc("GlobalMemoryStatusEx")
 
 func windowsAvailableDisk(directory string) (uint64, string) {
 	directory, err := windowsExistingDirectory(directory)
