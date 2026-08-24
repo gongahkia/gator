@@ -17,6 +17,7 @@ import (
 )
 
 func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) {
+	useGenerousLocalModelHost(t)
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)
 	defer server.Close()
@@ -66,6 +67,7 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 }
 
 func TestLocalPullRequiresConfirmationAndUsesCuratedTag(t *testing.T) {
+	useGenerousLocalModelHost(t)
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)
 	defer server.Close()
@@ -83,6 +85,7 @@ func TestLocalPullRequiresConfirmationAndUsesCuratedTag(t *testing.T) {
 }
 
 func TestLocalRemoveUpdatesSelectedProviderConfiguration(t *testing.T) {
+	useGenerousLocalModelHost(t)
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)
 	defer server.Close()
@@ -122,7 +125,7 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager := &localModelManager{store: store, runtimeURL: server.URL}
+	manager := &localModelManager{store: store, runtimeURL: server.URL, host: generousLocalModelHost}
 	status, err := manager.Status(context.Background())
 	if err != nil || status.RuntimeVersion != "test" || len(status.Models) == 0 || !status.Models[0].Installed {
 		t.Fatalf("local manager status = %#v, err = %v", status, err)
@@ -151,6 +154,24 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	status, err = manager.Status(context.Background())
 	if err != nil || status.Models[0].Name != "desk Qwen" || status.Models[0].DefaultName != "Qwen2.5-Coder 7B" {
 		t.Fatalf("local manager renamed status = %#v, err = %v", status, err)
+	}
+}
+
+func useGenerousLocalModelHost(t *testing.T) {
+	t.Helper()
+	previous := inspectLocalModelHost
+	inspectLocalModelHost = generousLocalModelHost
+	t.Cleanup(func() { inspectLocalModelHost = previous })
+}
+
+func generousLocalModelHost() localmodel.Host {
+	return localmodel.Host{
+		OS:                   "linux",
+		Architecture:         "amd64",
+		TotalMemoryBytes:     128 << 30,
+		AvailableMemoryBytes: 128 << 30,
+		ModelDirectory:       "/models",
+		AvailableDiskBytes:   128 << 30,
 	}
 }
 

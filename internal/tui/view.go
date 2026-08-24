@@ -240,6 +240,12 @@ func (m Model) localRuntimeView() string {
 	if m.localModels.catalog.RuntimeURL != "" {
 		runtime += "\nRuntime: " + m.localModels.catalog.RuntimeURL
 	}
+	if m.localModels.catalog.HostSummary != "" {
+		runtime += "\nHost: " + m.localModels.catalog.HostSummary
+	}
+	for _, advice := range m.localModels.catalog.HostAdvice {
+		runtime += "\n" + dimStyle.Render(compact(advice, m.panelTextWidth()))
+	}
 	if m.localModels.catalog.RuntimeError != "" {
 		runtime += "\n" + errorStyle.Render("Unavailable: "+compact(m.localModels.catalog.RuntimeError, m.panelTextWidth()))
 		runtime += "\n" + dimStyle.Render("Start it with 'ollama serve' or 'gator local serve', then press r.")
@@ -262,11 +268,20 @@ func (m Model) localCatalogView() string {
 			prefix = "> "
 		}
 		state := dimStyle.Render("available")
-		if model.Installed {
+		if model.BlockedReason != "" {
+			state = errorStyle.Render("disabled")
+		} else if model.Installed {
 			state = okStyle.Render("installed")
 		}
 		line := prefix + keyStyle.Render(model.Name) + " · " + state + " · " + dimStyle.Render(model.Download+" · "+model.Context)
-		lines = append(lines, line+"\n    "+dimStyle.Render(compact(model.Summary+" · "+model.OllamaModel, max(16, m.panelTextWidth()-4))))
+		detail := model.Summary + " · " + model.OllamaModel
+		if model.BlockedReason != "" {
+			detail = "blocked: " + model.BlockedReason
+		}
+		if model.Requirement != "" {
+			detail += " · " + model.Requirement
+		}
+		lines = append(lines, line+"\n    "+dimStyle.Render(compact(detail, max(16, m.panelTextWidth()-4))))
 	}
 	view := m.fieldView("Reviewed local models", "Only these reviewed Ollama tags are downloaded through Gator.", strings.Join(lines, "\n"))
 	if selected, found := m.selectedLocalModel(); found && !m.compactLayout() && selected.ID != "" {

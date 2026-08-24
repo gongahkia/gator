@@ -17,6 +17,7 @@ import (
 type localModelManager struct {
 	store      config.Store
 	runtimeURL string
+	host       func() localmodel.Host
 }
 
 func newLocalModelManager(store config.Store) *localModelManager {
@@ -32,7 +33,8 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 	if err != nil {
 		return tui.LocalModelCatalog{}, err
 	}
-	catalog := manager.catalog(settings, client, nil)
+	host := manager.localHost()
+	catalog := manager.catalog(settings, client, nil, host)
 	if binary, lookupErr := exec.LookPath("ollama"); lookupErr == nil {
 		catalog.Executable = binary
 	}
@@ -47,7 +49,7 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 		catalog.RuntimeError = "list installed models: " + err.Error()
 		return catalog, nil
 	}
-	catalog.Models = manager.catalog(settings, client, installed).Models
+	catalog.Models = manager.catalog(settings, client, installed, host).Models
 	return catalog, nil
 }
 
@@ -55,6 +57,9 @@ func (manager *localModelManager) Pull(ctx context.Context, id string, report fu
 	model, found := localmodel.Resolve(id)
 	if !found {
 		return tui.LocalModelCatalog{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
+	}
+	if eligibility := localmodel.Assess(model, manager.localHost()); !eligibility.Allowed {
+		return tui.LocalModelCatalog{}, fmt.Errorf("%s is disabled on this host: %s", model.Name, eligibility.Reason)
 	}
 	settings, err := manager.store.Load()
 	if err != nil {
@@ -86,6 +91,9 @@ func (manager *localModelManager) Use(ctx context.Context, id string) (tui.Local
 	model, found := localmodel.Resolve(id)
 	if !found {
 		return tui.LocalModelUpdate{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
+	}
+	if eligibility := localmodel.Assess(model, manager.localHost()); !eligibility.Allowed {
+		return tui.LocalModelUpdate{}, fmt.Errorf("%s is disabled on this host: %s", model.Name, eligibility.Reason)
 	}
 	settings, err := manager.store.Load()
 	if err != nil {
@@ -208,24 +216,35 @@ func (manager *localModelManager) Rename(ctx context.Context, provider, model, a
 	return cloneModelAliases(settings.ModelAliases), nil
 }
 
-func (manager *localModelManager) catalog(settings config.Settings, client localmodel.Client, installed []localmodel.InstalledModel) tui.LocalModelCatalog {
+func (manager *localModelManager) catalog(settings config.Settings, client localmodel.Client, installed []localmodel.InstalledModel, host localmodel.Host) tui.LocalModelCatalog {
 	installedNames := installedModelNames(installed)
 	models := make([]tui.LocalModel, 0, len(localmodel.Catalog()))
 	for _, model := range localmodel.Catalog() {
 		_, isInstalled := installedNames[model.OllamaModel]
+		eligibility := localmodel.Assess(model, host)
 		models = append(models, tui.LocalModel{
-			ID:          model.ID,
-			OllamaModel: model.OllamaModel,
-			Name:        modelDisplayName(settings, localmodel.ProviderID, model.OllamaModel, model.Name),
-			DefaultName: model.Name,
-			Download:    model.Download,
-			Context:     model.Context,
-			Summary:     model.Summary,
-			SourceURL:   model.SourceURL,
-			Installed:   isInstalled,
+			ID:            model.ID,
+			OllamaModel:   model.OllamaModel,
+			Name:          modelDisplayName(settings, localmodel.ProviderID, model.OllamaModel, model.Name),
+			DefaultName:   model.Name,
+			Download:      model.Download,
+			Context:       model.Context,
+			Summary:       model.Summary,
+			SourceURL:     model.SourceURL,
+			Installed:     isInstalled,
+			Requirement:   localModelRequirement(eligibility),
+			BlockedReason: eligibility.Reason,
 		})
 	}
-	return tui.LocalModelCatalog{RuntimeURL: client.BaseURL(), Models: models}
+	hostSummary, hostAdvice := localModelHostSummary(host)
+	return tui.LocalModelCatalog{RuntimeURL: client.BaseURL(), HostSummary: hostSummary, HostAdvice: hostAdvice, Models: models}
+}
+
+func (manager *localModelManager) localHost() localmodel.Host {
+	if manager.host != nil {
+		return manager.host()
+	}
+	return inspectLocalModelHost()
 }
 
 func cloneCustomProviders(providers []config.CustomProvider) []config.CustomProvider {

@@ -110,6 +110,13 @@ func newCustomExecutor(settings config.Settings, provider config.CustomProvider,
 		if _, err := localmodel.NewClientFromChatCompletionsURL(baseURL); err != nil {
 			return gatorrun.Executor{}, fmt.Errorf("managed local provider endpoint: %w", err)
 		}
+		reviewed, found := localmodel.Resolve(modelName)
+		if !found {
+			return gatorrun.Executor{}, fmt.Errorf("managed local provider model %q is not in Gator's reviewed catalog", modelName)
+		}
+		if err := requireLocalModelEligibility(reviewed); err != nil {
+			return gatorrun.Executor{}, err
+		}
 	}
 	apiKey := ""
 	if provider.APIKeyEnv != "" {
