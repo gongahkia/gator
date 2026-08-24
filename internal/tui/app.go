@@ -549,6 +549,56 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, waitForExecution(m.execution)
 		}
 		return m, nil
+	case spinner.TickMsg:
+		if m.screen == localModelsScreen && m.localModels.action != localModelIdle {
+			var command tea.Cmd
+			m.localModels.spinner, command = m.localModels.spinner.Update(msg)
+			return m, command
+		}
+	case localModelStatusMsg:
+		m.localModels.action = localModelIdle
+		m.localModels.operation = nil
+		m.localModels.err = msg.err
+		if msg.err != nil {
+			m.notice = notice{text: "Check local models: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.applyLocalModelCatalog(msg.catalog)
+		if msg.catalog.RuntimeError != "" {
+			m.notice = notice{text: "Local runtime is unavailable. Start it, then press r to refresh.", kind: noticeInfo}
+		} else {
+			m.notice = notice{text: "Local model catalog refreshed.", kind: noticeSuccess}
+		}
+		return m, nil
+	case localModelProgressMsg:
+		if m.localModels.operation == nil || m.localModels.action == localModelIdle {
+			return m, nil
+		}
+		m.localModels.progress = msg.progress
+		return m, waitForLocalModelOperation(m.localModels.operation)
+	case localModelDoneMsg:
+		m.localModels.operation = nil
+		action := m.localModels.action
+		m.localModels.action = localModelIdle
+		m.localModels.err = msg.done.err
+		if msg.done.err != nil {
+			m.notice = notice{text: "Local model operation stopped: " + msg.done.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		if msg.done.update != nil {
+			m.applyLocalModelUpdate(*msg.done.update)
+			if action == localModelRemoving {
+				m.notice = notice{text: "Local model removed and current configuration updated.", kind: noticeSuccess}
+			} else {
+				m.notice = notice{text: "Local model selected. Return to the composer and send a task to use it.", kind: noticeSuccess}
+			}
+			return m, nil
+		}
+		if msg.done.catalog != nil {
+			m.applyLocalModelCatalog(*msg.done.catalog)
+		}
+		m.notice = notice{text: "Local model download finished. Press u to select it for Gator.", kind: noticeSuccess}
+		return m, nil
 	case executionDoneMsg:
 		m.resolvePendingApproval(tools.CommandDeny)
 		wasNewThread := m.resumeStatePath == ""

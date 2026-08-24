@@ -54,6 +54,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateRecentRuns(message)
 	case threadScreen:
 		return m.updateThreadTree(message)
+	case localModelsScreen:
+		return m.updateLocalModels(message)
 	default:
 		return m, nil
 	}
