@@ -124,19 +124,20 @@ type localModelDoneMsg struct {
 }
 
 type localModelsState struct {
-	manager      LocalModelManager
-	catalog      LocalModelCatalog
-	selected     int
-	action       localModelAction
-	confirmation localModelConfirmation
-	operation    *localModelOperation
-	progress     LocalModelProgress
-	spinner      spinner.Model
-	err          error
-	generation   uint64
-	section      modelCatalogSection
-	cloudIndex   int
-	renaming     *modelRename
+	manager        LocalModelManager
+	catalog        LocalModelCatalog
+	selected       int
+	action         localModelAction
+	confirmation   localModelConfirmation
+	operation      *localModelOperation
+	progress       LocalModelProgress
+	spinner        spinner.Model
+	err            error
+	generation     uint64
+	section        modelCatalogSection
+	cloudIndex     int
+	renaming       *modelRename
+	startDismissed bool
 }
 
 type modelCatalogSection uint8
@@ -249,8 +250,12 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.localModels.confirmation = localModelConfirmStart
+		m.localModels.startDismissed = false
 	case "tab", "left", "right":
 		m.toggleModelCatalogSection()
+		if m.localModels.section == localModelSection && m.localModels.catalog.RuntimeError != "" && !m.localModels.startDismissed {
+			m.localModels.confirmation = localModelConfirmStart
+		}
 	case "up", "k", "ctrl+p":
 		m.moveModelCatalogSelection(-1)
 	case "down", "j", "ctrl+n":
@@ -344,10 +349,12 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 		switch message.String() {
 		case "esc", "n", "ctrl+c":
 			m.localModels.confirmation = localModelNoConfirmation
+			m.localModels.startDismissed = true
 			m.notice = notice{text: "Start Ollama yourself with 'ollama serve' or 'gator local serve', then press r to refresh.", kind: noticeInfo}
 			return m, nil
 		case "enter", "y":
 			m.localModels.confirmation = localModelNoConfirmation
+			m.localModels.startDismissed = false
 			return m.beginLocalStart()
 		}
 		return m, nil

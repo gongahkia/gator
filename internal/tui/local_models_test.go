@@ -207,12 +207,22 @@ func finishLocalModelOperation(t *testing.T, model Model) Model {
 
 type fakeLocalModelManager struct {
 	catalog LocalModelCatalog
+	started bool
 	pulled  bool
 	used    bool
 	removed bool
 }
 
 func (manager *fakeLocalModelManager) Status(context.Context) (LocalModelCatalog, error) {
+	return manager.catalog, nil
+}
+
+func (manager *fakeLocalModelManager) Start(context.Context) (LocalModelCatalog, error) {
+	manager.started = true
+	manager.catalog.RuntimeError = ""
+	if manager.catalog.RuntimeVersion == "" {
+		manager.catalog.RuntimeVersion = "started"
+	}
 	return manager.catalog, nil
 }
 

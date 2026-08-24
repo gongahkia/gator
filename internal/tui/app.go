@@ -508,6 +508,9 @@ func New(config Config) Model {
 // Close releases every task retained by this interactive process. Detached
 // terminals are session-bound by design; quitting Gator is an explicit stop.
 func (m Model) Close() {
+	if closer, ok := m.localModels.manager.(interface{ Close() error }); ok {
+		_ = closer.Close()
+	}
 	if m.terminalRegistry != nil {
 		m.terminalRegistry.Close()
 	}
@@ -570,13 +573,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyLocalModelCatalog(msg.catalog)
 		m.selectActiveModelCatalogEntry()
 		if msg.catalog.RuntimeError != "" {
-			if m.localModels.section == localModelSection {
+			if m.localModels.section == localModelSection && !m.localModels.startDismissed {
 				m.localModels.confirmation = localModelConfirmStart
 				m.notice = notice{text: "Local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
 			} else {
 				m.notice = notice{text: "Local runtime is unavailable. Open the Local section to choose whether Gator should start Ollama.", kind: noticeInfo}
 			}
 		} else {
+			m.localModels.startDismissed = false
 			m.notice = notice{text: "Local model catalog refreshed.", kind: noticeSuccess}
 		}
 		return m, nil
