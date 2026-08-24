@@ -505,7 +505,7 @@ func New(config Config) Model {
 	localSpinner := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(keyStyle))
 	reviewRequest := textarea.New()
 	reviewRequest.Prompt = ""
-	reviewRequest.Placeholder = "Describe the requested change… (Ctrl+Enter sends a constrained follow-up)"
+	reviewRequest.Placeholder = "Describe the requested change… (Ctrl+R sends a constrained follow-up)"
 	reviewRequest.CharLimit = maximumReviewRequestBytes
 	reviewRequest.SetHeight(5)
 	reviewRequest.SetWidth(76)

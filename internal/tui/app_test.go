@@ -1243,6 +1243,46 @@ func TestStructuredReviewMouseSelectsFileAndHunk(t *testing.T) {
 	}
 }
 
+func TestStructuredReviewMouseActionBarMatchesKeyboardScopeAndStageActions(t *testing.T) {
+	model := New(Config{})
+	model.width, model.height, model.screen = 120, 48, reviewScreen
+	snapshot := review.Snapshot{Unstaged: review.ChangeSet{Files: []review.File{{
+		ID: "aaaaaaaaaaaaaaaaaaaaaaaa", Path: "one.go", Hunks: []review.Hunk{{ID: "bbbbbbbbbbbbbbbbbbbbbbbb", Header: "@@ -1 +1 @@", Lines: []review.Line{{Kind: "addition", Text: "+one", NewLine: 1}}}},
+	}}}}
+	next, _ := model.Update(reviewLoadedMsg{snapshot: snapshot})
+	model = next.(Model)
+	next, _ = model.Update(tea.MouseMsg{X: 20, Y: 2, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	model = next.(Model)
+	if model.reviewScope != review.Unstaged {
+		t.Fatalf("mouse scope = %q", model.reviewScope)
+	}
+	next, _ = model.Update(tea.MouseMsg{X: 52, Y: 2, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	model = next.(Model)
+	if model.reviewMutation == nil || model.reviewMutation.whole {
+		t.Fatalf("mouse stage action did not open hunk confirmation: %#v", model.reviewMutation)
+	}
+	next, _ = model.Update(tea.MouseMsg{X: 12, Y: 2, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress})
+	if next.(Model).reviewMutation == nil {
+		t.Fatal("mouse confirmation did not preserve the explicit mutation command")
+	}
+}
+
+func TestReviewRequestUsesTerminalPortableCtrlRSendShortcut(t *testing.T) {
+	model := New(Config{})
+	model.width, model.height, model.screen = 100, 40, reviewScreen
+	model.reviewLoaded = true
+	model.reviewRequestOn = true
+	model.reviewRequest.SetValue("Please update this line.")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	if command != nil {
+		t.Fatal("request send without a retained run unexpectedly started a command")
+	}
+	updated := next.(Model)
+	if !strings.Contains(updated.notice.text, "no retained thread") {
+		t.Fatalf("Ctrl+R did not reach review request submission: %#v", updated.notice)
+	}
+}
+
 func TestProviderDropdownSelectsProviderAndRecommendedModel(t *testing.T) {
 	model := New(Config{Provider: "openai", Model: "gpt-5.6"})
 	model.focus = providerField
