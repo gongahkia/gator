@@ -48,6 +48,10 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	if _, err := executor.Model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Images: []agent.Image{{Name: "design.png"}}}}}); err == nil || !strings.Contains(err.Error(), "text only") {
 		t.Fatalf("local image error = %v", err)
 	}
+	turn, err := executor.Model.Complete(context.Background(), agent.TurnRequest{Messages: []agent.Message{{Role: agent.RoleUser, Content: "inspect this"}}})
+	if err != nil || turn.Text != "local result" {
+		t.Fatalf("local Chat Completions turn = %#v, err = %v", turn, err)
+	}
 	if !strings.Contains(output.String(), "Native TUI, run, resume") {
 		t.Fatalf("local use output = %q", output.String())
 	}
@@ -132,6 +136,17 @@ func newLocalModelServer(t *testing.T) *httptest.Server {
 			if request.Method != http.MethodDelete {
 				t.Fatalf("delete method = %s", request.Method)
 			}
+		case "/v1/chat/completions":
+			var body struct {
+				Model string `json:"model"`
+			}
+			if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Model != "qwen2.5-coder:7b" {
+				t.Fatalf("Chat Completions model = %q", body.Model)
+			}
+			_, _ = io.WriteString(writer, `{"choices":[{"message":{"content":"local result"}}]}`)
 		default:
 			t.Fatalf("unexpected local endpoint %s", request.URL.Path)
 		}
