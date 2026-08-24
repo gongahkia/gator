@@ -570,7 +570,12 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyLocalModelCatalog(msg.catalog)
 		m.selectActiveModelCatalogEntry()
 		if msg.catalog.RuntimeError != "" {
-			m.notice = notice{text: "Local runtime is unavailable. Start it, then press r to refresh.", kind: noticeInfo}
+			if m.localModels.section == localModelSection {
+				m.localModels.confirmation = localModelConfirmStart
+				m.notice = notice{text: "Local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
+			} else {
+				m.notice = notice{text: "Local runtime is unavailable. Open the Local section to choose whether Gator should start Ollama.", kind: noticeInfo}
+			}
 		} else {
 			m.notice = notice{text: "Local model catalog refreshed.", kind: noticeSuccess}
 		}
@@ -610,7 +615,11 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.done.catalog != nil {
 			m.applyLocalModelCatalog(*msg.done.catalog)
 		}
-		m.notice = notice{text: "Local model download finished. Press u to select it for Gator.", kind: noticeSuccess}
+		if action == localModelStarting {
+			m.notice = notice{text: "Ollama is running under this Gator session. Choose a local model to download or use.", kind: noticeSuccess}
+		} else {
+			m.notice = notice{text: "Local model download finished. Press u to select it for Gator.", kind: noticeSuccess}
+		}
 		return m, nil
 	case executionDoneMsg:
 		m.resolvePendingApproval(tools.CommandDeny)
