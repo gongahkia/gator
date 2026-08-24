@@ -423,29 +423,38 @@ func (m Model) cloudModels() []cloudModelEntry {
 	credentialStore, credentialStoreErr := auth.New(m.config.StateDir)
 	for _, providerName := range modelprovider.Names() {
 		provider, err := modelprovider.ParseProvider(providerName)
-		if err != nil || provider == modelprovider.Claude {
+		if err != nil {
 			continue
 		}
-		modelName := modelprovider.DefaultModel(provider)
-		if providerName == strings.TrimSpace(m.provider.Value()) && strings.TrimSpace(m.model.Value()) != "" {
-			modelName = strings.TrimSpace(m.model.Value())
+		if provider == modelprovider.Claude {
+			entries = append(entries, claudeCodeHarnessEntry(credentialStore, credentialStoreErr))
+			continue
 		}
-		name := providerName
-		selectable := modelName != ""
-		if selectable {
-			name += " · " + m.modelDisplayName(providerName, modelName, modelName)
-		} else {
-			name += " · account model required"
+
+		models := modelprovider.CuratedModels(provider)
+		if providerName == strings.TrimSpace(m.provider.Value()) {
+			models = prependModelIfMissing(models, strings.TrimSpace(m.model.Value()))
 		}
 		status := cloudProviderStatus(provider, credentialStore, credentialStoreErr)
-		entries = append(entries, cloudModelEntry{
-			provider:   providerName,
-			model:      modelName,
-			name:       name,
-			status:     status,
-			selectable: selectable,
-			canLogin:   modelprovider.SupportsOAuthLogin(provider),
-		})
+		if len(models) == 0 {
+			entries = append(entries, cloudModelEntry{
+				provider: providerName,
+				name:     providerName + " · account model required",
+				status:   status,
+				canLogin: modelprovider.SupportsOAuthLogin(provider),
+			})
+			continue
+		}
+		for _, modelName := range models {
+			entries = append(entries, cloudModelEntry{
+				provider:   providerName,
+				model:      modelName,
+				name:       providerName + " · " + m.modelDisplayName(providerName, modelName, modelName),
+				status:     status,
+				selectable: true,
+				canLogin:   modelprovider.SupportsOAuthLogin(provider),
+			})
+		}
 	}
 	for _, provider := range m.config.CustomProviders {
 		for _, modelName := range provider.Models {
@@ -462,6 +471,37 @@ func (m Model) cloudModels() []cloudModelEntry {
 		}
 	}
 	return entries
+}
+
+func prependModelIfMissing(models []string, model string) []string {
+	if model == "" {
+		return models
+	}
+	for _, existing := range models {
+		if existing == model {
+			return models
+		}
+	}
+	return append([]string{model}, models...)
+}
+
+func claudeCodeHarnessEntry(store auth.Store, storeErr error) cloudModelEntry {
+	status := "requires ANTHROPIC_API_KEY"
+	if storeErr == nil {
+		credential, found, err := store.Read(string(modelprovider.Anthropic))
+		if err == nil && found && credential.IsAPIKey() {
+			status = "Anthropic API key stored by Gator"
+		}
+	}
+	if modelprovider.AmbientCredentialAvailable(modelprovider.Anthropic) {
+		status = "API key set: ANTHROPIC_API_KEY"
+	}
+	return cloudModelEntry{
+		provider: string(modelprovider.Claude),
+		name:     "Claude Code · API-key harness",
+		status:   status,
+		canLogin: true,
+	}
 }
 
 func cloudProviderStatus(provider modelprovider.Provider, store auth.Store, storeErr error) string {
@@ -544,6 +584,10 @@ func (m *Model) moveModelCatalogSelection(delta int) {
 
 func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
 	if !cloud.selectable {
+		if cloud.provider == string(modelprovider.Claude) {
+			m.notice = notice{text: "Claude Code is a harness. Press l to provide an Anthropic API key, then send a task through the Claude Code harness.", kind: noticeInfo}
+			return m, nil
+		}
 		m.notice = notice{text: "This provider requires an account-specific deployment or model ID. Use the provider field to enter it before a run.", kind: noticeInfo}
 		return m, nil
 	}

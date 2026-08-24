@@ -1,6 +1,9 @@
 package model
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // openCodeCatalogVersion is the upstream documentation revision used for this
 // checked-in snapshot. Refreshing it is an intentional source change; model
@@ -80,6 +83,33 @@ func openCodeModelProtocol(provider Provider, model string) (openCodeProtocol, b
 	}
 	protocol, ok := entries[strings.TrimSpace(model)]
 	return protocol, ok
+}
+
+// CuratedModels returns the checked-in, selectable model IDs for a provider.
+// For OpenCode gateways the list is the complete embedded upstream catalog;
+// for other providers it contains only Gator's stable default. Callers must
+// still allow an explicit custom model ID for account-specific deployments.
+func CuratedModels(provider Provider) []string {
+	defaultModel := DefaultModel(provider)
+	entries, found := openCodeCatalog[provider]
+	if !found {
+		if defaultModel == "" {
+			return nil
+		}
+		return []string{defaultModel}
+	}
+
+	models := make([]string, 0, len(entries))
+	for model := range entries {
+		if model != defaultModel {
+			models = append(models, model)
+		}
+	}
+	sort.Strings(models)
+	if defaultModel != "" {
+		return append([]string{defaultModel}, models...)
+	}
+	return models
 }
 
 func openCodeProviderName(provider Provider) string {

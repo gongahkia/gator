@@ -244,7 +244,9 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if command := delegatedConnectCommand(string(provider)); command != "" {
-		if clientIDEnvironment := oauthClientIDEnvironment(string(provider)); clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "" {
+		clientIDEnvironment := oauthClientIDEnvironment(string(provider))
+		useVendorConnection := provider == modelprovider.Claude || (clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "")
+		if useVendorConnection {
 			if m.config.NewConnectCommand != nil {
 				process, processErr := m.config.NewConnectCommand(string(provider))
 				if processErr != nil {
@@ -256,7 +258,11 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 					return connectDoneMsg{provider: string(provider), err: err}
 				})
 			}
-			m.commandOutput = "Native Gator OAuth requires " + clientIDEnvironment + ".\n\nFor the no-registration vendor-CLI route, exit this TUI and run:\n  " + command + "\n\nThen use the matching gator delegate runtime."
+			if provider == modelprovider.Claude {
+				m.commandOutput = "Claude Code uses an Anthropic API key in Gator. Gator does not use Claude.ai or Claude Code's stored subscription credential.\n\nExit this TUI and run:\n  " + command + "\n\nThen send a task through the Claude Code harness."
+			} else {
+				m.commandOutput = "Native Gator OAuth requires " + clientIDEnvironment + ".\n\nFor the no-registration vendor-CLI route, exit this TUI and run:\n  " + command + "\n\nThen use the matching gator delegate runtime."
+			}
 			m.notice = notice{text: "Use the vendor-CLI connection command shown below, or configure Gator's own OAuth client.", kind: noticeInfo}
 			return m, nil
 		}
@@ -432,6 +438,8 @@ func delegatedConnectCommand(provider string) string {
 		return "gator connect kimi"
 	case string(modelprovider.XAI):
 		return "gator connect xai"
+	case string(modelprovider.Claude):
+		return "gator connect claude"
 	default:
 		return ""
 	}
@@ -481,8 +489,14 @@ func (m Model) modelDropdownOptions(providerName string) []dropdownOption {
 	if provider == modelprovider.Copilot {
 		options = append(copilotModelDropdownOptions(m.config.StateDir), options...)
 	}
-	if defaultModel := modelprovider.DefaultModel(provider); defaultModel != "" {
-		options = append([]dropdownOption{{value: defaultModel, label: defaultModel, description: "Gator recommended default"}}, options...)
+	models := modelprovider.CuratedModels(provider)
+	for index := len(models) - 1; index >= 0; index-- {
+		modelName := models[index]
+		description := "Gator recommended default"
+		if modelName != modelprovider.DefaultModel(provider) {
+			description = "checked-in provider catalog"
+		}
+		options = append([]dropdownOption{{value: modelName, label: modelName, description: description}}, options...)
 	}
 	return options
 }
@@ -784,6 +798,8 @@ func delegatedRuntimeForProvider(provider string) string {
 		return "copilot"
 	case string(modelprovider.KimiCoding):
 		return "kimi"
+	case string(modelprovider.Claude):
+		return "claude"
 	default:
 		return ""
 	}
@@ -797,6 +813,8 @@ func delegatedRuntimeLabel(runtime string) string {
 		return "GitHub Copilot CLI harness"
 	case "kimi":
 		return "Kimi CLI harness"
+	case "claude":
+		return "Claude Code harness"
 	default:
 		return runtime + " CLI harness"
 	}
