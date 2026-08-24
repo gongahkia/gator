@@ -1195,6 +1195,29 @@ func TestModelCatalogRunsProviderOwnedLoginInTheTUIWhenAvailable(t *testing.T) {
 	}
 }
 
+func TestModelCatalogRunsClaudeConnectViaModel(t *testing.T) {
+	connected := false
+	model := New(Config{
+		Provider:    "claude",
+		LocalModels: &fakeLocalModelManager{},
+		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
+			if provider != "claude" {
+				t.Fatalf("provider = %q", provider)
+			}
+			connected = true
+			return exec.Command("true"), nil
+		},
+	})
+	model = selectCloudModelCatalog(t, model, "claude")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if command == nil || !connected {
+		t.Fatalf("Claude connection command = %#v connected:%t", command, connected)
+	}
+	if !strings.Contains(next.(Model).notice.text, "provider-owned sign-in") {
+		t.Fatalf("Claude connection notice = %q", next.(Model).notice.text)
+	}
+}
+
 func TestProviderOwnedCodexLoginSelectsHarnessInsteadOfNativeOAuth(t *testing.T) {
 	model := New(Config{
 		Provider:     "codex",
