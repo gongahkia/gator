@@ -1,0 +1,20 @@
+Gator  review · .
+all changes · 2 files · 3 additions · 1 deletions
+1 all · 2 unstaged · 3 staged · Tab changes pane · mouse clicks select
+ files
+ > internal/review/ex…
+ internal/review/exam…
+ hunks · internal/review/example.go
+ > 1 @@ -10,2 +10,2 @@ func example() +1 −1
+
+ change
+ Focused selected hunk
+ @@ -10,2 +10,2 @@ func example()
+ >> 10/10  func example() {
+    11/- -    return oldValue
+    -/11 +    return newValue
+ Trusted extension cards
+ Team checklist: Check the exported API and regression coverage.
+ Use /extensions to inspect; card actions only fill the composer.
+Gator works in an isolated Git worktree. Review remains explicit.
+up/down choose  f focused/raw  v range  r request change  s hunk  S fi
