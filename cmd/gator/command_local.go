@@ -75,14 +75,17 @@ func listLocalModels(arguments []string, settings config.Settings, out io.Writer
 		if _, writeErr := fmt.Fprintf(out, "Local runtime: unavailable (%v)\n\n", err); writeErr != nil {
 			return writeErr
 		}
-		return writeLocalCatalog(out, nil)
+		return writeLocalCatalog(out, nil, inspectLocalModelHost())
 	}
-	return writeLocalCatalog(out, installedModelNames(installed))
+	return writeLocalCatalog(out, installedModelNames(installed), inspectLocalModelHost())
 }
 
 func localStatus(arguments []string, settings config.Settings, out io.Writer) error {
 	client, err := localClientFromFlags("local status", arguments, settings)
 	if err != nil {
+		return err
+	}
+	if err := writeLocalModelDoctor(out, inspectLocalModelHost()); err != nil {
 		return err
 	}
 	if binary, lookupErr := exec.LookPath("ollama"); lookupErr == nil {
@@ -135,6 +138,9 @@ func pullLocalModel(arguments []string, settings config.Settings, out io.Writer)
 	if !confirmed {
 		return fmt.Errorf("%s downloads approximately %s from %s; re-run with --yes to confirm", model.Name, model.Download, model.SourceURL)
 	}
+	if err := requireLocalModelEligibility(model); err != nil {
+		return err
+	}
 	startupContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if _, err := client.Version(startupContext); err != nil {
@@ -172,6 +178,9 @@ func pullLocalModel(arguments []string, settings config.Settings, out io.Writer)
 func useLocalModel(arguments []string, store config.Store, settings config.Settings, out io.Writer) error {
 	model, client, _, err := localModelCommand("local use", arguments, settings, false)
 	if err != nil {
+		return err
+	}
+	if err := requireLocalModelEligibility(model); err != nil {
 		return err
 	}
 	context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -311,7 +320,7 @@ func localRuntimeURL(chatCompletionsURL string) (string, error) {
 	return parsed.String(), nil
 }
 
-func writeLocalCatalog(out io.Writer, installed map[string]struct{}) error {
+func writeLocalCatalog(out io.Writer, installed map[string]struct{}, host localmodel.Host) error {
 	if _, err := fmt.Fprintln(out, "Curated local coding models:"); err != nil {
 		return err
 	}
@@ -320,11 +329,16 @@ func writeLocalCatalog(out io.Writer, installed map[string]struct{}) error {
 		if _, found := installed[model.OllamaModel]; found {
 			state = "installed"
 		}
-		if _, err := fmt.Fprintf(out, "  %s  %s  %s  %s context  %s\n    %s\n    %s\n", model.ID, state, model.Download, model.Context, model.Name, model.Summary, model.SourceURL); err != nil {
+		eligibility := localmodel.Assess(model, host)
+		availability := "enabled"
+		if !eligibility.Allowed {
+			availability = "disabled: " + eligibility.Reason
+		}
+		if _, err := fmt.Fprintf(out, "  %s  %s  %s  %s context  %s\n    %s\n    %s\n    %s · %s\n", model.ID, state, model.Download, model.Context, model.Name, model.Summary, model.SourceURL, availability, localModelRequirement(eligibility)); err != nil {
 			return err
 		}
 	}
-	_, err := fmt.Fprintln(out, "Model weights and terms remain governed by each linked upstream source. Runtime memory requirements vary with hardware and context length.")
+	_, err := fmt.Fprintln(out, "Model weights and terms remain governed by each linked upstream source. Gator's eligibility policy is conservative and does not predict performance.")
 	return err
 }
 
