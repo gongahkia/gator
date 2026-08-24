@@ -145,6 +145,7 @@ type localModelsState struct {
 	section        modelCatalogSection
 	cloudIndex     int
 	renaming       *modelRename
+	cloudSetup     *cloudModelSetupForm
 	startDismissed bool
 	dependencyHelp bool
 }

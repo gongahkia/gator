@@ -45,6 +45,9 @@ type Config struct {
 	StartInRecent     bool
 	RecentAll         bool
 	CustomProviders   []config.CustomProvider
+	// ProviderEndpoints contains non-secret endpoint overrides keyed by
+	// provider. It is persisted by SaveCloudModel rather than in drafts.
+	ProviderEndpoints map[string]string
 	ModelAliases      map[string]string
 	ExtensionCommands []ExtensionCommand
 	ExtensionUI       []ExtensionUIContribution
@@ -69,11 +72,25 @@ type Config struct {
 	// CopyToClipboard writes text to the operating system clipboard. A nil
 	// value uses Gator's platform clipboard integration.
 	CopyToClipboard func(string) error
+	// SaveCloudModel persists a cloud model's non-secret configuration and, when
+	// supplied, its masked credential in Gator's private auth store.
+	SaveCloudModel func(CloudModelSetup) error
 	SetTheme        func(name string) error
 	// LocalModels manages Gator's reviewed, loopback-only local model catalog.
 	// It is injected from the command layer so the UI does not own runtime
 	// configuration or make network requests on its event loop.
 	LocalModels LocalModelManager
+}
+
+// CloudModelSetup is the secret-safe boundary between the TUI and the command
+// layer. APIKey is populated only while a save is in progress and must never
+// be rendered, copied to a draft, or returned in a completion message.
+type CloudModelSetup struct {
+	Provider       string
+	Model          string
+	BaseURL        string
+	APIKey         string
+	CredentialType string
 }
 
 // ExtensionCommand is a visible prompt template contributed by a trusted or

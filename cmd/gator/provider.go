@@ -75,6 +75,9 @@ func newExecutor(providerName, modelName, baseURL string) (gatorrun.Executor, er
 	if found {
 		return newCustomExecutor(settings, custom, modelName, baseURL)
 	}
+	if strings.TrimSpace(baseURL) == "" {
+		baseURL = settings.ProviderEndpoint(providerName)
+	}
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
 		return gatorrun.Executor{}, err
