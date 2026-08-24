@@ -44,6 +44,7 @@ Usage:
   gator extension install [--replace] DIRECTORY
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
+  gator local list|status|serve|pull|use|remove
   gator theme list
   gator theme set gator|contrast|mono
   gator connect PROVIDER [OPTIONS]
@@ -72,6 +73,7 @@ Commands:
   lsp       trust and inspect local Language Server Protocol diagnostics
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
+  local     install, select, and manage curated Ollama coding models
   theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
@@ -150,6 +152,8 @@ func run(args []string, out io.Writer) error {
 		return worktreeCommand(args[1:], out)
 	case "provider":
 		return providerCommand(args[1:], out)
+	case "local":
+		return localCommand(args[1:], out)
 	case "theme":
 		return themeCommand(args[1:], out)
 	case "run":
