@@ -42,6 +42,10 @@ func runTask(arguments []string, out io.Writer) error {
 	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
 	var scopes stringFlags
 	flags.Var(&scopes, "scope", "repository-relative file or directory used to select project instructions (repeatable)")
+	var imagePaths attachmentFlags
+	flags.Var(&imagePaths, "image", "repository-relative PNG, JPEG, or WebP image to include in the initial prompt (repeatable)")
+	var documentPaths attachmentFlags
+	flags.Var(&documentPaths, "attach", "repository-relative PDF or supported document/text file to include in the initial prompt (repeatable)")
 	profile := flags.String("profile", "", "named declarative project agent profile")
 	var scouts stringFlags
 	flags.Var(&scouts, "scout", "read-only subagent assignment to run in parallel before the primary run (repeatable, max 4)")
@@ -62,6 +66,14 @@ func runTask(arguments []string, out io.Writer) error {
 	if len(verification) == 0 {
 		return errors.New("at least one --verify command is required; run 'gator doctor' for suggestions")
 	}
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+	images, attachments, err := loadPromptAttachments(workingDirectory, imagePaths, documentPaths)
+	if err != nil {
+		return err
+	}
 	resolvedProvider, resolvedModel, err := resolveConfiguredProvider(*providerName, *modelName)
 	if err != nil {
 		return err
@@ -79,11 +91,10 @@ func runTask(arguments []string, out io.Writer) error {
 	if err := executor.Sandbox.Validate(); err != nil {
 		return err
 	}
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
 	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  sandbox: %s, network: %s\n  task: %s\n", resolvedProvider, displayModel(resolvedModel), executor.Sandbox.Mode, executor.Sandbox.Network, task); err != nil {
+		return err
+	}
+	if err := writePromptAttachmentSummary(out, images, attachments); err != nil {
 		return err
 	}
 	printer := eventPrinter{out: out}
@@ -100,6 +111,8 @@ func runTask(arguments []string, out io.Writer) error {
 		BaseRef:          *baseRef,
 		CopyIgnoredFiles: *copyIgnoredFiles,
 		Setup:            setup,
+		Images:           images,
+		Attachments:      attachments,
 		Scouts:           scouts,
 		AllowedCommands:  allowedCommands,
 		Approve:          cliCommandApprover(*trustCommands),
