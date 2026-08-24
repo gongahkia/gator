@@ -442,7 +442,11 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 		}
 	}
 	if running && m.pendingApproval != nil {
-		sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), m.commandApprovalView(), m.noticeView(), m.runningFooter())
+		sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), m.commandApprovalView())
+		if notice := m.noticeView(); notice != "" {
+			sections = append(sections, notice)
+		}
+		sections = append(sections, m.runningFooter())
 		return strings.Join(sections, "\n")
 	}
 	label := "You"
@@ -452,7 +456,10 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 	if m.vim != vimOff {
 		label += " · " + m.vimModeLabel()
 	}
-	sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), labelStyle.Render(label), m.composerInputView(), m.noticeView())
+	sections = append(sections, dimStyle.Render(strings.Repeat("─", max(1, width))), labelStyle.Render(label), m.composerInputView())
+	if notice := m.noticeView(); notice != "" {
+		sections = append(sections, notice)
+	}
 	if running {
 		sections = append(sections, m.runningFooter())
 	} else {
@@ -505,7 +512,7 @@ func (m Model) runningFooter() string {
 	case vimInsert:
 		return m.footer("esc normal", "enter newline", "ctrl+r steer", "tab queue", "ctrl+c stop", "f1 shortcuts")
 	default:
-		return m.footer("ctrl+b controls", "ctrl+t terminal", "enter steer", "tab queue", "pgup/pgdn browse", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("ctrl+b controls", "ctrl+t terminal", "enter steer", "tab queue", "pgup/pgdn/wheel browse", "ctrl+c stop", "f1 shortcuts")
 	}
 }
 
@@ -519,7 +526,7 @@ func (m Model) composerFooter() string {
 	case vimInsert:
 		return m.footer("esc normal", "enter newline", "ctrl+r send", "ctrl+b controls", "? commands", "f1 shortcuts")
 	default:
-		return m.footer("ctrl+s effort", "/model models", "ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands")
+		return m.footer("ctrl+s effort", "/model models", "ctrl+b controls", "ctrl+o threads", "pgup/pgdn/wheel browse", "end latest", "enter send", "? commands")
 	}
 }
 

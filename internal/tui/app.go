@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -65,7 +66,10 @@ type Config struct {
 	// worktree. It deliberately remains separate from NewExecutor: the harness
 	// owns its credential, tools, approvals, and session state.
 	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (DelegateCommand, error)
-	SetTheme           func(name string) error
+	// CopyToClipboard writes text to the operating system clipboard. A nil
+	// value uses Gator's platform clipboard integration.
+	CopyToClipboard func(string) error
+	SetTheme        func(name string) error
 	// LocalModels manages Gator's reviewed, loopback-only local model catalog.
 	// It is injected from the command layer so the UI does not own runtime
 	// configuration or make network requests on its event loop.
@@ -339,6 +343,7 @@ type Model struct {
 	transcript          viewport.Model
 	followTranscript    bool
 	transcriptUnread    bool
+	copyToClipboard     func(string) error
 	drawerOpen          bool
 	drawerSection       drawerSection
 	drawerIndex         int
@@ -503,6 +508,10 @@ func New(config Config) Model {
 	terminalInput.Blur()
 
 	localSpinner := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(keyStyle))
+	copyToClipboard := config.CopyToClipboard
+	if copyToClipboard == nil {
+		copyToClipboard = clipboard.WriteAll
+	}
 	reviewRequest := textarea.New()
 	reviewRequest.Prompt = ""
 	reviewRequest.Placeholder = "Describe the requested change… (Ctrl+R sends a constrained follow-up)"
@@ -531,6 +540,7 @@ func New(config Config) Model {
 		reviewRequest:    reviewRequest,
 		transcript:       viewport.New(76, 8),
 		followTranscript: true,
+		copyToClipboard:  copyToClipboard,
 		notice: notice{
 			text: "Gator works in an isolated Git worktree. Review remains explicit.",
 			kind: noticeInfo,
@@ -619,6 +629,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.localModels.spinner, command = m.localModels.spinner.Update(msg)
 			return m, command
 		}
+	case clipboardWriteMsg:
+		return m.applyClipboardWrite(msg), nil
 	case localModelStatusMsg:
 		if msg.generation != m.localModels.generation || m.localModels.action != localModelRefreshing {
 			return m, nil
@@ -856,6 +868,16 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		if m.screen == reviewScreen {
 			return m.updateReviewMouse(msg)
+		}
+		if m.screen == composeScreen || m.screen == runningScreen {
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				m.pageTranscript(false)
+				return m, nil
+			case tea.MouseButtonWheelDown:
+				m.pageTranscript(true)
+				return m, nil
+			}
 		}
 		return m, nil
 	case tea.KeyMsg:

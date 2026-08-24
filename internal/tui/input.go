@@ -412,7 +412,7 @@ func (m Model) updateCommandApproval(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func runningLocalCommand(command string) bool {
 	switch command {
-	case "/queue", "/dequeue", "/clear-queue", "/tree":
+	case "/copy", "/copyall", "/queue", "/dequeue", "/clear-queue", "/tree":
 		return true
 	default:
 		return false

@@ -193,8 +193,9 @@ func TestComposerRejectsEmptyTaskBeforeRun(t *testing.T) {
 		t.Fatal("empty task started an execution")
 	}
 	updated := next.(Model)
-	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, "Describe a task") {
-		t.Fatalf("notice = %#v", updated.notice)
+	entry := updated.chat[len(updated.chat)-1]
+	if !entry.isError || !strings.Contains(entry.text, "Describe a task") || updated.notice.text != "" {
+		t.Fatalf("startup failure = entry %#v, notice %#v", entry, updated.notice)
 	}
 }
 
@@ -216,8 +217,8 @@ func TestComposerReportsProviderConfigurationFailureBeforeRun(t *testing.T) {
 		t.Fatal("missing API key started an execution")
 	}
 	updated := next.(Model)
-	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, credentialError) {
-		t.Fatalf("notice = %#v", updated.notice)
+	if updated.notice.text != "" || updated.noticeView() != "" {
+		t.Fatalf("startup failure repeated outside the transcript: %#v", updated.notice)
 	}
 	entry := updated.chat[len(updated.chat)-1]
 	if got, want := entry.text, "Unable to start run: Resolve configuration before starting:\n"+credentialError; got != want || !entry.isError {
@@ -677,8 +678,9 @@ func TestEnterSendsMessageOutsideVimMode(t *testing.T) {
 		t.Fatal("missing executor started an asynchronous command")
 	}
 	updated := next.(Model)
-	if updated.vim != vimOff || updated.task.Value() != "Explain this repository." || !strings.Contains(updated.notice.text, "No model provider") {
-		t.Fatalf("Enter did not attempt to send the message: %#v", updated.notice)
+	entry := updated.chat[len(updated.chat)-1]
+	if updated.vim != vimOff || updated.task.Value() != "Explain this repository." || !entry.isError || !strings.Contains(entry.text, "No model provider") {
+		t.Fatalf("Enter did not record its startup failure: %#v", entry)
 	}
 }
 
@@ -724,8 +726,9 @@ func TestVimWriteCommandsSubmitAndQuitOnlyAfterSuccessfulWork(t *testing.T) {
 		t.Fatal(":w unexpectedly started an asynchronous command without an executor")
 	}
 	updated := next.(Model)
-	if updated.vimCommand != "" || updated.task.Value() != "Explain this repository." || !strings.Contains(updated.notice.text, "No model provider") {
-		t.Fatalf(":w state = command %q, task %q, notice %#v", updated.vimCommand, updated.task.Value(), updated.notice)
+	entry := updated.chat[len(updated.chat)-1]
+	if updated.vimCommand != "" || updated.task.Value() != "Explain this repository." || !entry.isError || !strings.Contains(entry.text, "No model provider") {
+		t.Fatalf(":w state = command %q, task %q, entry %#v", updated.vimCommand, updated.task.Value(), entry)
 	}
 
 	updated.screen = runningScreen
@@ -1986,8 +1989,9 @@ func TestStartRunRejectsEscapingContextReference(t *testing.T) {
 		t.Fatal("escaping context reference started a run")
 	}
 	updated := next.(Model)
-	if updated.notice.kind != noticeError || !strings.Contains(updated.notice.text, "escapes the workspace") {
-		t.Fatalf("notice = %#v", updated.notice)
+	entry := updated.chat[len(updated.chat)-1]
+	if !entry.isError || !strings.Contains(entry.text, "escapes the workspace") || updated.notice.text != "" {
+		t.Fatalf("workspace failure = entry %#v, notice %#v", entry, updated.notice)
 	}
 }
 
