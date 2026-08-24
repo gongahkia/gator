@@ -651,6 +651,32 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case clipboardWriteMsg:
 		return m.applyClipboardWrite(msg), nil
+	case cloudModelSetupSavedMsg:
+		if msg.err != nil {
+			if m.localModels.cloudSetup != nil {
+				m.localModels.cloudSetup.saving = false
+			}
+			m.notice = notice{text: "Save cloud model configuration: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.localModels.cloudSetup = nil
+		m.provider.SetValue(msg.provider)
+		m.model.SetValue(msg.model)
+		m.config.BaseURL = msg.baseURL
+		if m.config.ProviderEndpoints == nil {
+			m.config.ProviderEndpoints = make(map[string]string)
+		}
+		if msg.baseURL == "" {
+			delete(m.config.ProviderEndpoints, msg.provider)
+		} else {
+			m.config.ProviderEndpoints[msg.provider] = msg.baseURL
+		}
+		m.delegateRuntime = ""
+		m.persistDraft()
+		m.refreshPreflight()
+		m.selectActiveModelCatalogEntry()
+		m.notice = notice{text: "Cloud model configuration saved. The selected model is ready when its provider reports configured.", kind: noticeSuccess}
+		return m, nil
 	case localModelStatusMsg:
 		if msg.generation != m.localModels.generation || m.localModels.action != localModelRefreshing {
 			return m, nil

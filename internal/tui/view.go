@@ -186,6 +186,9 @@ func (m Model) localModelsView() string {
 	if m.localModels.renaming != nil {
 		sections = append(sections, m.fieldView("Rename display label", "This changes only Gator's local label; the provider model ID remains unchanged.", m.localModels.renaming.input.View()))
 	}
+	if setup := m.cloudModelSetupView(); setup != "" {
+		sections = append(sections, setup)
+	}
 	if m.oauthLogin != nil && strings.TrimSpace(m.commandOutput) != "" {
 		sections = append(sections, m.fieldView("Cloud sign-in", "Complete the provider login in your browser. This TUI stays open while Gator waits for its callback.", m.commandOutput))
 	}
@@ -203,7 +206,9 @@ func (m Model) localModelsView() string {
 		}
 	}
 
-	if m.localModels.renaming != nil {
+	if m.localModels.cloudSetup != nil {
+		sections = append(sections, m.noticeView(), m.footer("tab/up/down next field", "enter save", "esc cancel", "a auth type", "f1 shortcuts"))
+	} else if m.localModels.renaming != nil {
 		sections = append(sections, m.noticeView(), m.footer("enter save", "esc cancel", "f1 shortcuts"))
 	} else if m.oauthLogin != nil {
 		sections = append(sections, m.noticeView(), m.footer("ctrl+c cancel sign-in", "f1 shortcuts"))
@@ -220,7 +225,7 @@ func (m Model) localModelsView() string {
 	} else if m.localModels.dependencyHelp {
 		sections = append(sections, m.noticeView(), m.footer("i/esc close help", "f1 shortcuts"))
 	} else if m.localModels.section == cloudModelSection {
-		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
+		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "c configure", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
 	} else {
 		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "s start Ollama", "i install help", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
 	}
@@ -246,7 +251,7 @@ func (m Model) cloudModelsView() string {
 		}
 		lines = append(lines, prefix+keyStyle.Render(compact(entry.name, max(16, m.panelTextWidth()-4)))+"\n    "+status)
 	}
-	return m.fieldView("Cloud models", "Readiness is credential/configuration state only; Gator does not query or claim an account's complete remote catalog.", strings.Join(lines, "\n"))
+	return m.fieldView("Cloud models", "Readiness is credential/configuration state only; c opens secure model, credential, and endpoint configuration. Gator does not query or claim an account's complete remote catalog.", strings.Join(lines, "\n"))
 }
 
 func (m Model) localRuntimeView() string {
