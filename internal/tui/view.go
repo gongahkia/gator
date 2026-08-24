@@ -501,32 +501,32 @@ func (m Model) commandApprovalView() string {
 
 func (m Model) runningFooter() string {
 	if m.pendingApproval != nil {
-		return m.footer("y/enter once", "a always", "n deny", "ctrl+c stop")
+		return m.footer("y/enter once", "a always", "n deny", "ctrl+c/ctrl+x stop", "ctrl+q quit")
 	}
 	if m.vimCommand != "" {
-		return m.footer("enter run Vim command", "esc cancel", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("enter run Vim command", "esc cancel", "ctrl+c clear", "ctrl+x stop", "ctrl+q quit", "f1 shortcuts")
 	}
 	switch m.vim {
 	case vimNormal:
-		return m.footer("i/a edit", ": Ex", "u undo", "ctrl+r redo", "enter steer", "tab queue", "ctrl+c stop")
+		return m.footer("i/a edit", ": Ex", "u undo", "ctrl+r redo", "enter steer", "tab queue", "ctrl+c clear", "ctrl+x stop", "ctrl+q quit")
 	case vimInsert:
-		return m.footer("esc normal", "enter newline", "ctrl+r steer", "tab queue", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("esc normal", "enter newline", "ctrl+r steer", "tab queue", "ctrl+c clear", "ctrl+x stop", "ctrl+q quit", "f1 shortcuts")
 	default:
-		return m.footer("ctrl+b controls", "ctrl+t terminal", "enter steer", "tab queue", "pgup/pgdn/wheel browse", "ctrl+c stop", "f1 shortcuts")
+		return m.footer("ctrl+b controls", "ctrl+t terminal", "enter steer", "tab queue", "pgup/pgdn/wheel browse", "ctrl+c clear", "ctrl+x stop", "ctrl+q quit", "f1 shortcuts")
 	}
 }
 
 func (m Model) composerFooter() string {
 	if m.vimCommand != "" {
-		return m.footer("enter execute command", "esc cancel", "backspace edit", "f1 shortcuts")
+		return m.footer("enter execute command", "esc cancel", "ctrl+c clear", "ctrl+q quit", "f1 shortcuts")
 	}
 	switch m.vim {
 	case vimNormal:
-		return m.footer("i/a edit", ": Ex", "u undo", "ctrl+r redo", "enter send", "? commands", "f1 shortcuts")
+		return m.footer("i/a edit", ": Ex", "u undo", "ctrl+r redo", "enter send", "ctrl+c clear", "ctrl+q quit", "? commands", "f1 shortcuts")
 	case vimInsert:
-		return m.footer("esc normal", "enter newline", "ctrl+r send", "ctrl+b controls", "? commands", "f1 shortcuts")
+		return m.footer("esc normal", "enter newline", "ctrl+r send", "ctrl+b controls", "ctrl+c clear", "ctrl+q quit", "? commands", "f1 shortcuts")
 	default:
-		return m.footer("ctrl+s effort", "/model models", "ctrl+b controls", "ctrl+o threads", "pgup/pgdn/wheel browse", "end latest", "enter send", "? commands")
+		return m.footer("ctrl+s effort", "/model models", "ctrl+b controls", "ctrl+o threads", "pgup/pgdn/wheel browse", "end latest", "enter send", "ctrl+c clear", "ctrl+q quit", "? commands")
 	}
 }
 
