@@ -90,9 +90,17 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if err != nil {
 		return err
 	}
+	loadedUI, err := extensions.UI()
+	if err != nil {
+		return err
+	}
 	extensionCommands := make([]tui.ExtensionCommand, 0, len(loadedCommands))
 	for _, command := range loadedCommands {
 		extensionCommands = append(extensionCommands, tui.ExtensionCommand{Name: command.Name, Description: command.Description, Prompt: command.Prompt})
+	}
+	extensionUI := make([]tui.ExtensionUIContribution, 0, len(loadedUI))
+	for _, contribution := range loadedUI {
+		extensionUI = append(extensionUI, tui.ExtensionUIContribution{ID: contribution.ID, Slot: contribution.Slot, Title: contribution.Title, Description: contribution.Description, Prompt: contribution.Prompt})
 	}
 	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
@@ -112,6 +120,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		CustomProviders:   settings.CustomProviders,
 		ModelAliases:      settings.ModelAliases,
 		ExtensionCommands: extensionCommands,
+		ExtensionUI:       extensionUI,
 		Theme:             settings.Theme,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)

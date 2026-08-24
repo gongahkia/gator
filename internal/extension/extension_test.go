@@ -79,6 +79,52 @@ func TestInstallLoadsInstructionsAndExecutesSidecarTool(t *testing.T) {
 	}
 }
 
+func TestDeclarativeUIContributionLoadsPromptWithoutAnExecutableSurface(t *testing.T) {
+	source := writeExtension(t, `{
+  "version": 1,
+  "id": "review-card",
+  "name": "Review card",
+  "ui": [{"id":"checklist","slot":"review","title":"Team checklist","description":"Check the public API and regression coverage.","prompt":"prompts/checklist.md"}]
+}`, map[string]fileSpec{"prompts/checklist.md": {contents: "Review the selected change against the team checklist."}})
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Install(source, false); err != nil {
+		t.Fatal(err)
+	}
+	settings := config.Default()
+	settings.Extensions = []config.Extension{{ID: "review-card", Enabled: true}}
+	set, err := NewResolver(store, settings).Load(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	contributions, err := set.UI()
+	if err != nil || len(contributions) != 1 {
+		t.Fatalf("UI contributions = %#v, %v", contributions, err)
+	}
+	item := contributions[0]
+	if item.ID != "review-card:checklist" || item.Slot != "review" || !strings.Contains(item.Prompt, "team checklist") {
+		t.Fatalf("UI contribution = %#v", item)
+	}
+}
+
+func TestDeclarativeUIRejectsUnsupportedSlotsAndPromptPaths(t *testing.T) {
+	for _, manifest := range []string{
+		`{"version":1,"id":"bad-ui","name":"Bad UI","ui":[{"id":"card","slot":"browser","title":"Bad","description":"No."}]}`,
+		`{"version":1,"id":"bad-path","name":"Bad path","ui":[{"id":"card","slot":"review","title":"Bad","description":"No.","prompt":"../escape.md"}]}`,
+	} {
+		source := writeExtension(t, manifest, nil)
+		store, err := NewStore(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Install(source, false); err == nil {
+			t.Fatalf("invalid UI manifest installed: %s", manifest)
+		}
+	}
+}
+
 func TestProjectExtensionsRequireExplicitRepositoryTrust(t *testing.T) {
 	repository := t.TempDir()
 	writeExtensionAt(t, filepath.Join(repository, ".gator", "extensions", "project-guide"), `{

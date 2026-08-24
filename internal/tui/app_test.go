@@ -44,6 +44,40 @@ func TestNewUsesConfiguredRunDefaults(t *testing.T) {
 	}
 }
 
+func TestEffortPickerKeepsModelChoiceExplicitAndChangesTurnBudget(t *testing.T) {
+	model := New(Config{MaxSteps: 24})
+	model.width, model.height = 100, 40
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	model = next.(Model)
+	if model.screen != effortScreen || !strings.Contains(model.View(), "Standard") || !strings.Contains(model.View(), "/model") {
+		t.Fatalf("effort picker view = %q", model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	model = next.(Model)
+	if model.screen != composeScreen || model.effort != effortThorough || model.effort.maxSteps(model.config.MaxSteps) != 36 {
+		t.Fatalf("effort selection = screen:%d effort:%d steps:%d", model.screen, model.effort, model.effort.maxSteps(model.config.MaxSteps))
+	}
+	if model.model.Value() != "" || model.provider.Value() != "openai" {
+		t.Fatalf("effort selection unexpectedly changed model configuration: %q/%q", model.provider.Value(), model.model.Value())
+	}
+}
+
+func TestExtensionUIIsHostRenderedAndOnlyFillsComposerOnExplicitSelection(t *testing.T) {
+	model := New(Config{ExtensionUI: []ExtensionUIContribution{{ID: "team:review", Slot: "composer", Title: "Team review", Description: "Apply the team review checklist.", Prompt: "Review the current change against the team checklist."}}})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/extensions")
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.screen != extensionUIScreen || !strings.Contains(model.View(), "Team review") {
+		t.Fatalf("extension UI view = %q", model.View())
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.screen != composeScreen || model.task.Value() != "Review the current change against the team checklist." {
+		t.Fatalf("extension UI action = screen:%d task:%q", model.screen, model.task.Value())
+	}
+}
+
 func TestCustomProviderIsSelectableWithConfiguredModels(t *testing.T) {
 	model := New(Config{
 		RepositoryPath: "/tmp/example-repository",

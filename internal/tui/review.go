@@ -241,6 +241,8 @@ func (m Model) updateStructuredReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "y":
 		return m.openThreadTree(reviewScreen)
+	case "x":
+		return m.openExtensionUI(reviewScreen)
 	case "n":
 		m.returnToComposer()
 		return m, nil
@@ -456,7 +458,10 @@ func (m Model) reviewFooter(sections []string) string {
 		sections = append(sections, labelStyle.Render("Request a change"), m.panel(m.reviewRequest.View()), m.footer("Ctrl+Enter send follow-up", "Esc cancel"))
 		return strings.Join(sections, "\n")
 	}
-	sections = append(sections, m.noticeView(), m.footer("up/down choose", "f focused/raw", "v range", "r request change", "s hunk", "S file", "d refresh", "e handoff", "c continue", "q quit"))
+	if summary := m.extensionUISummary("review"); summary != "" {
+		sections = append(sections, summary)
+	}
+	sections = append(sections, m.noticeView(), m.footer("up/down choose", "f focused/raw", "v range", "r request change", "s hunk", "S file", "x extension cards", "d refresh", "e handoff", "c continue", "q quit"))
 	return strings.Join(sections, "\n")
 }
 

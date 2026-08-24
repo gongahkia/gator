@@ -46,7 +46,11 @@ type Config struct {
 	CustomProviders   []config.CustomProvider
 	ModelAliases      map[string]string
 	ExtensionCommands []ExtensionCommand
+	ExtensionUI       []ExtensionUIContribution
 	Theme             string
+	// Effort is an optional intent-level default. It changes Gator's bounded
+	// agent-turn budget; it does not silently pick a provider or model.
+	Effort            string
 	NewExecutor       func(provider, model, baseURL string) (gatorrun.Executor, error)
 	BeginOAuthLogin   func(provider string) (OAuthLogin, error)
 	NewConnectCommand func(provider string) (*exec.Cmd, error)
@@ -72,6 +76,17 @@ type Config struct {
 // explicitly installed extension. Selecting it only fills the composer.
 type ExtensionCommand struct {
 	Name        string
+	Description string
+	Prompt      string
+}
+
+// ExtensionUIContribution is a host-rendered card from a verified extension.
+// It intentionally contains static text and an optional composer template,
+// never executable UI code, a style sheet, or a browser endpoint.
+type ExtensionUIContribution struct {
+	ID          string
+	Slot        string
+	Title       string
 	Description string
 	Prompt      string
 }
@@ -105,6 +120,8 @@ const (
 	helpScreen
 	recentScreen
 	threadScreen
+	effortScreen
+	extensionUIScreen
 	localModelsScreen
 )
 
@@ -346,34 +363,38 @@ type Model struct {
 	terminalErr         error
 	terminalReturn      screen
 
-	outcome         *gatorrun.Outcome
-	runErr          error
-	diff            string
-	focusedDiff     string
-	focusedDiffInfo diffview.Focused
-	diffMode        diffDisplayMode
-	diffOffset      int
-	diffTruncated   bool
-	diffErr         error
-	diffStats       diffStats
-	reviewSnapshot  review.Snapshot
-	reviewLoaded    bool
-	reviewScope     review.Scope
-	reviewPane      reviewPane
-	reviewFileIndex int
-	reviewHunkIndex int
-	reviewLineIndex int
-	reviewRangeFrom int
-	reviewRawFiles  map[string]bool
-	reviewMutation  *reviewMutation
-	reviewRequest   textarea.Model
-	reviewRequestOn bool
-	resumeStatePath string
-	forkStatePath   string
-	forceCompaction bool
-	threadID        string
-	runMode         gatorrun.Mode
-	localModels     localModelsState
+	outcome           *gatorrun.Outcome
+	runErr            error
+	diff              string
+	focusedDiff       string
+	focusedDiffInfo   diffview.Focused
+	diffMode          diffDisplayMode
+	diffOffset        int
+	diffTruncated     bool
+	diffErr           error
+	diffStats         diffStats
+	reviewSnapshot    review.Snapshot
+	reviewLoaded      bool
+	reviewScope       review.Scope
+	reviewPane        reviewPane
+	reviewFileIndex   int
+	reviewHunkIndex   int
+	reviewLineIndex   int
+	reviewRangeFrom   int
+	reviewRawFiles    map[string]bool
+	reviewMutation    *reviewMutation
+	reviewRequest     textarea.Model
+	reviewRequestOn   bool
+	resumeStatePath   string
+	forkStatePath     string
+	forceCompaction   bool
+	threadID          string
+	runMode           gatorrun.Mode
+	effort            effortLevel
+	effortIndex       int
+	extensionUIIndex  int
+	extensionUIReturn screen
+	localModels       localModelsState
 }
 
 var (
@@ -503,6 +524,7 @@ func New(config Config) Model {
 		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
 		localModels:      newLocalModelsState(config.LocalModels, localSpinner),
+		effort:           parseEffort(config.Effort),
 		reviewScope:      review.All,
 		reviewRangeFrom:  -1,
 		reviewRawFiles:   make(map[string]bool),

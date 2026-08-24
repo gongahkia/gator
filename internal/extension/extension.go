@@ -52,6 +52,7 @@ type Manifest struct {
 	Skills      []string          `json:"skills,omitempty"`
 	Prompts     []string          `json:"prompts,omitempty"`
 	Commands    []CommandManifest `json:"commands,omitempty"`
+	UI          []UIManifest      `json:"ui,omitempty"`
 	Tools       []ToolManifest    `json:"tools,omitempty"`
 }
 
@@ -62,6 +63,17 @@ type CommandManifest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Prompt      string `json:"prompt"`
+}
+
+// UIManifest contributes a static, native TUI card. It cannot provide code,
+// CSS, JavaScript, subprocesses, or a network endpoint. An optional prompt
+// resource turns the card into an explicit composer-fill action only.
+type UIManifest struct {
+	ID          string `json:"id"`
+	Slot        string `json:"slot"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Prompt      string `json:"prompt,omitempty"`
 }
 
 // ToolManifest defines one model-callable JSONL sidecar. The command is argv,
@@ -98,6 +110,16 @@ type ToolPolicy struct {
 // Command is a prepared extension prompt template for the terminal UI.
 type Command struct {
 	Name        string
+	Description string
+	Prompt      string
+}
+
+// UIContribution is a verified, static extension card prepared for Gator's
+// native UI. Prompt remains data until the developer explicitly selects it.
+type UIContribution struct {
+	ID          string
+	Slot        string
+	Title       string
 	Description string
 	Prompt      string
 }
@@ -152,6 +174,32 @@ func (s Set) Commands() ([]Command, error) {
 		}
 	}
 	return commands, nil
+}
+
+// UI loads declarative native-UI contributions. This intentionally exposes no
+// executable or browser-rendered extension surface: the host owns layout,
+// input, styling, and action boundaries.
+func (s Set) UI() ([]UIContribution, error) {
+	contributions := make([]UIContribution, 0)
+	for _, installed := range s.extensions {
+		if err := verifyInstalled(installed); err != nil {
+			return nil, err
+		}
+		for _, item := range installed.Manifest.UI {
+			prompt := ""
+			if item.Prompt != "" {
+				contents, err := readResource(installed.Root, item.Prompt)
+				if err != nil {
+					return nil, fmt.Errorf("load extension %q UI contribution %q: %w", installed.Manifest.ID, item.ID, err)
+				}
+				prompt = strings.TrimSpace(string(contents))
+			}
+			contributions = append(contributions, UIContribution{
+				ID: installed.Manifest.ID + ":" + item.ID, Slot: item.Slot, Title: item.Title, Description: item.Description, Prompt: prompt,
+			})
+		}
+	}
+	return contributions, nil
 }
 
 // Tools exposes extension sidecars only in Execute mode. The sidecar receives

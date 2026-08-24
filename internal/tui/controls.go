@@ -162,6 +162,10 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/execute":
 		m.runMode = gatorrun.ExecuteMode
 		m.notice = notice{text: "Execute mode will use the configured verifier policy after making changes.", kind: noticeInfo}
+	case "/effort":
+		return m.openEffortPicker()
+	case "/extensions":
+		return m.openExtensionUI(m.screen)
 	case "/new":
 		m.returnToComposer()
 		return m, m.focusField()
