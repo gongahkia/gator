@@ -1,4 +1,10 @@
-# Custom and local providers
+# Custom providers and local endpoints
+
+For Gator's reviewed Ollama coding-model catalog, use
+[`gator local`](LOCAL_MODELS.md). It downloads a selected package with explicit
+confirmation and binds it to every native Gator interface without manually
+entering an endpoint. This document covers the separate path for a local server
+or compatible endpoint that you operate yourself.
 
 Gator's custom-provider path is for an OpenAI-compatible Chat Completions
 endpoint that you operate or have independently documented. It keeps Gator's
@@ -8,7 +14,7 @@ protocol; only the inference endpoint changes.
 Create the provider once:
 
 ```sh
-# Ollama, LM Studio, or vLLM when their server exposes this endpoint.
+# A manually operated Ollama, LM Studio, or vLLM endpoint.
 gator provider add local-llm \
   --base-url http://127.0.0.1:11434/v1/chat/completions \
   --model qwen3-coder

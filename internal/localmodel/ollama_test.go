@@ -49,7 +49,9 @@ func TestClientManagesOllamaCatalogAndModelLifecycle(t *testing.T) {
 			if request.Method != http.MethodPost {
 				t.Fatalf("pull method = %s", request.Method)
 			}
-			var body struct{ Model string `json:"model"` }
+			var body struct {
+				Model string `json:"model"`
+			}
 			if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
@@ -59,7 +61,9 @@ func TestClientManagesOllamaCatalogAndModelLifecycle(t *testing.T) {
 			if request.Method != http.MethodDelete {
 				t.Fatalf("delete method = %s", request.Method)
 			}
-			var body struct{ Model string `json:"model"` }
+			var body struct {
+				Model string `json:"model"`
+			}
 			if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}

@@ -315,6 +315,24 @@ OpenAI Chat Completions; the declared model list is the only selectable list.
 `--api-key-env NAME` references an environment variable without storing a
 secret, while omitting it is the supported keyless-local-server route.
 
+For a reviewed local coding model running through Ollama, use the first-class
+catalog instead of manually configuring the endpoint:
+
+```sh
+gator local status
+gator local list
+gator local pull qwen2.5-coder-7b --yes
+gator local use qwen2.5-coder-7b
+gator run --verify 'go test ./...' 'Add a focused feature with tests'
+```
+
+Gator manages model packages only through a literal loopback Ollama runtime;
+it does not execute arbitrary model repositories or install a system runtime.
+The chosen model becomes the default native provider, so the same TUI, tools,
+worktrees, sandbox, verification, retained sessions, RPC, and ACP paths apply.
+See [curated local models](docs/LOCAL_MODELS.md) for model sources, sizes,
+hardware limitations, and removal.
+
 Gator keeps terminal customization deliberately small and readable: `gator
 theme set gator|contrast|mono` persists one named theme, and `/theme NAME`
 applies it immediately in the terminal UI.
