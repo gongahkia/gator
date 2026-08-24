@@ -181,7 +181,9 @@ func (m Model) localModelsView() string {
 		sections = append(sections, m.fieldView("Cloud sign-in", "Complete the provider login in your browser. This TUI stays open while Gator waits for its callback.", m.commandOutput))
 	}
 	if m.localModels.confirmation != localModelNoConfirmation {
-		if selected, found := m.selectedLocalModel(); found {
+		if m.localModels.confirmation == localModelConfirmStart {
+			sections = append(sections, m.fieldView("Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself"))
+		} else if selected, found := m.selectedLocalModel(); found {
 			if m.localModels.confirmation == localModelConfirmPull {
 				sections = append(sections, m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL))
 			} else {
@@ -194,6 +196,8 @@ func (m Model) localModelsView() string {
 		sections = append(sections, m.noticeView(), m.footer("enter save", "esc cancel", "f1 shortcuts"))
 	} else if m.oauthLogin != nil {
 		sections = append(sections, m.noticeView(), m.footer("ctrl+c cancel sign-in", "f1 shortcuts"))
+	} else if m.localModels.confirmation == localModelConfirmStart {
+		sections = append(sections, m.noticeView(), m.footer("enter/y start with Gator", "n/esc start myself", "f1 shortcuts"))
 	} else if m.localModels.confirmation == localModelConfirmPull {
 		sections = append(sections, m.noticeView(), m.footer("enter/y download", "esc/n cancel", "f1 shortcuts"))
 	} else if m.localModels.confirmation == localModelConfirmRemove {
@@ -203,7 +207,7 @@ func (m Model) localModelsView() string {
 	} else if m.localModels.section == cloudModelSection {
 		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
 	} else {
-		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
+		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "s start Ollama", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
 	}
 	return strings.Join(sections, "\n")
 }

@@ -21,6 +21,7 @@ import (
 // explain recovery without losing the curated choices.
 type LocalModelManager interface {
 	Status(context.Context) (LocalModelCatalog, error)
+	Start(context.Context) (LocalModelCatalog, error)
 	Pull(context.Context, string, func(LocalModelProgress)) (LocalModelCatalog, error)
 	Use(context.Context, string) (LocalModelUpdate, error)
 	Remove(context.Context, string) (LocalModelUpdate, error)
@@ -78,6 +79,7 @@ const (
 	localModelIdle localModelAction = iota
 	localModelRefreshing
 	localModelPulling
+	localModelStarting
 	localModelUsing
 	localModelRemoving
 	localModelRenaming
@@ -87,6 +89,7 @@ type localModelConfirmation uint8
 
 const (
 	localModelNoConfirmation localModelConfirmation = iota
+	localModelConfirmStart
 	localModelConfirmPull
 	localModelConfirmRemove
 )
@@ -241,6 +244,11 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.focusField()
 	case "r":
 		return m.beginLocalStatus()
+	case "s":
+		if m.localModels.section != localModelSection || m.localModels.catalog.RuntimeError == "" {
+			return m, nil
+		}
+		m.localModels.confirmation = localModelConfirmStart
 	case "tab", "left", "right":
 		m.toggleModelCatalogSection()
 	case "up", "k", "ctrl+p":
@@ -270,7 +278,8 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.localModels.catalog.RuntimeError != "" {
-			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
+			m.localModels.confirmation = localModelConfirmStart
+			m.notice = notice{text: "The local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
 			return m, nil
 		}
 		model, found := m.selectedLocalModel()
@@ -293,7 +302,8 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.useCloudModel(cloud)
 		}
 		if m.localModels.catalog.RuntimeError != "" {
-			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
+			m.localModels.confirmation = localModelConfirmStart
+			m.notice = notice{text: "The local runtime is unavailable. Choose whether Gator should start Ollama.", kind: noticeInfo}
 			return m, nil
 		}
 		model, found := m.selectedLocalModel()
@@ -330,6 +340,18 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.localModels.confirmation == localModelConfirmStart {
+		switch message.String() {
+		case "esc", "n", "ctrl+c":
+			m.localModels.confirmation = localModelNoConfirmation
+			m.notice = notice{text: "Start Ollama yourself with 'ollama serve' or 'gator local serve', then press r to refresh.", kind: noticeInfo}
+			return m, nil
+		case "enter", "y":
+			m.localModels.confirmation = localModelNoConfirmation
+			return m.beginLocalStart()
+		}
+		return m, nil
+	}
 	model, found := m.selectedLocalModel()
 	if !found {
 		m.localModels.confirmation = localModelNoConfirmation
@@ -352,6 +374,22 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 		}
 	}
 	return m, nil
+}
+
+func (m Model) beginLocalStart() (tea.Model, tea.Cmd) {
+	if m.localModels.manager == nil {
+		return m, nil
+	}
+	m.cancelLocalOperation()
+	m.localModels.action = localModelStarting
+	m.localModels.progress = LocalModelProgress{Status: "starting Ollama"}
+	m.localModels.err = nil
+	operation := startLocalModelOperation(func(ctx context.Context, _ func(LocalModelProgress)) localModelOperationDone {
+		catalog, err := m.localModels.manager.Start(ctx)
+		return localModelOperationDone{catalog: &catalog, err: err}
+	})
+	m.localModels.operation = operation
+	return m, tea.Batch(m.localModels.spinner.Tick, waitForLocalModelOperation(operation))
 }
 
 func (m Model) beginLocalPull(model LocalModel) (tea.Model, tea.Cmd) {
@@ -715,6 +753,8 @@ func (m Model) localModelActionLabel() string {
 		return "checking local runtime"
 	case localModelPulling:
 		return "downloading selected model"
+	case localModelStarting:
+		return "starting Ollama"
 	case localModelUsing:
 		return "selecting local model"
 	case localModelRemoving:
