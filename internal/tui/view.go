@@ -828,6 +828,9 @@ func (m Model) runningView() string {
 }
 
 func (m Model) reviewView() string {
+	if m.reviewLoaded {
+		return m.structuredReviewView()
+	}
 	title := "review"
 	if m.runMode == gatorrun.PlanMode {
 		title = "plan review"

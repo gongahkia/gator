@@ -125,7 +125,7 @@ func (m Model) updateDrawer(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.notice = notice{text: "Refreshing the current worktree diff...", kind: noticeInfo}
-			return m, loadDiff(m.outcome.Worktree.Root)
+			return m, loadReview(*m.outcome)
 		case "enter":
 			if m.outcome == nil {
 				m.notice = notice{text: "No completed run is available to review yet.", kind: noticeInfo}
