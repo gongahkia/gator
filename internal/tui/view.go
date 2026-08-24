@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/journal"
@@ -409,13 +410,13 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 	rail := m.inline(headerStyle.Render("Gator")+dimStyle.Render("  "+mode+" · "+m.runMode.String())) + "\n" +
 		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.effort.label()+" effort · "+m.vimModeLabel(), width)))
 	transcript := m.transcript
-	transcript.Width = width
+	transcript.Width = m.transcriptViewportWidth()
 	transcript.Height = m.transcriptHeight()
 	transcript.SetContent(m.transcriptContent())
 	if m.followTranscript {
 		transcript.GotoBottom()
 	}
-	sections := []string{rail, dimStyle.Render(strings.Repeat("─", max(1, width))), transcript.View()}
+	sections := []string{rail, dimStyle.Render(strings.Repeat("─", max(1, width))), m.transcriptViewportView(transcript)}
 	if !m.followTranscript {
 		hint := "PgDn/End returns to latest"
 		if m.transcriptUnread {
@@ -466,6 +467,41 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 		sections = append(sections, m.composerFooter())
 	}
 	return strings.Join(sections, "\n")
+}
+
+func (m Model) transcriptViewportView(transcript viewport.Model) string {
+	if !m.showsTranscriptScrollbar(transcript) {
+		return transcript.View()
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, transcript.View(), " ", m.transcriptScrollbar(transcript))
+}
+
+func (m Model) showsTranscriptScrollbar(transcript viewport.Model) bool {
+	return m.conversationWidth() >= minimumScrollbarWidth && transcript.Height > 0 && transcript.TotalLineCount() > transcript.Height
+}
+
+func (m Model) transcriptScrollbar(transcript viewport.Model) string {
+	height := transcript.Height
+	total := transcript.TotalLineCount()
+	if height <= 0 || total <= height {
+		return ""
+	}
+	thumbHeight := max(1, min(height, (height*height+total-1)/total))
+	maxOffset := height - thumbHeight
+	maxScroll := total - height
+	thumbOffset := 0
+	if maxScroll > 0 && maxOffset > 0 {
+		thumbOffset = (transcript.YOffset*maxOffset + maxScroll/2) / maxScroll
+	}
+	lines := make([]string, height)
+	for row := range lines {
+		if row >= thumbOffset && row < thumbOffset+thumbHeight {
+			lines[row] = keyStyle.Render("█")
+		} else {
+			lines[row] = dimStyle.Render("│")
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // composerInputView avoids textarea's focused-placeholder cursor, which draws
