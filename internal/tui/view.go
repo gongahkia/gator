@@ -279,7 +279,11 @@ func (m Model) localCatalogView() string {
 			detail = "blocked: " + model.BlockedReason
 		}
 		if model.Requirement != "" {
-			detail += " · " + model.Requirement
+			if model.BlockedReason != "" {
+				detail = model.Requirement + " · " + detail
+			} else {
+				detail += " · " + model.Requirement
+			}
 		}
 		lines = append(lines, line+"\n    "+dimStyle.Render(compact(detail, max(16, m.panelTextWidth()-4))))
 	}
