@@ -38,6 +38,7 @@ var slashCommands = []slashCommand{
 	{name: "/dequeue", description: "remove the next queued instruction"},
 	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/login", description: "sign the selected provider into Gator"},
+	{name: "/local", description: "manage reviewed local coding models"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
 	{name: "/fork", description: "choose a retained turn to branch from"},
 	{name: "/model", description: "edit the model for the next run"},

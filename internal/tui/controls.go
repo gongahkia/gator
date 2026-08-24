@@ -138,6 +138,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 			providerName = arguments[1]
 		}
 		return m.startOAuthLogin(providerName)
+	case "/local":
+		return m.openLocalModels()
 	case "/clone":
 		if m.resumeStatePath == "" {
 			m.notice = notice{text: "Continue a retained thread before cloning it.", kind: noticeInfo}

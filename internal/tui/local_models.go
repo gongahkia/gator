@@ -183,12 +183,20 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down", "j", "ctrl+n":
 		m.moveLocalModelSelection(1)
 	case "p":
+		if m.localModels.catalog.RuntimeError != "" {
+			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
+			return m, nil
+		}
 		if _, found := m.selectedLocalModel(); !found {
 			m.notice = notice{text: "No curated local model is available to download.", kind: noticeError}
 			return m, nil
 		}
 		m.localModels.confirmation = localModelConfirmPull
 	case "u", "enter":
+		if m.localModels.catalog.RuntimeError != "" {
+			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
+			return m, nil
+		}
 		model, found := m.selectedLocalModel()
 		if !found {
 			m.notice = notice{text: "No curated local model is selected.", kind: noticeError}
@@ -200,6 +208,10 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.beginLocalUse(model)
 	case "x", "delete":
+		if m.localModels.catalog.RuntimeError != "" {
+			m.notice = notice{text: "The local runtime is unavailable. Start Ollama, then press r to refresh.", kind: noticeError}
+			return m, nil
+		}
 		model, found := m.selectedLocalModel()
 		if !found || !model.Installed {
 			m.notice = notice{text: "Select an installed curated model before removing it.", kind: noticeInfo}
