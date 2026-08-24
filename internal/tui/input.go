@@ -20,6 +20,9 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.toggleDrawer()
 		return m, nil
 	}
+	if message.String() == "ctrl+s" && m.screen == composeScreen && !m.drawerOpen {
+		return m.openEffortPicker()
+	}
 	if message.String() == "f1" && !(m.screen == terminalScreen && m.terminalRawInput) {
 		if m.screen == helpScreen {
 			m.screen = m.helpReturn
@@ -54,6 +57,10 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateRecentRuns(message)
 	case threadScreen:
 		return m.updateThreadTree(message)
+	case effortScreen:
+		return m.updateEffort(message)
+	case extensionUIScreen:
+		return m.updateExtensionUI(message)
 	case localModelsScreen:
 		return m.updateLocalModels(message)
 	default:

@@ -254,7 +254,7 @@ func validateManifest(manifest Manifest) error {
 	if strings.TrimSpace(manifest.Name) == "" || len(manifest.Name) > 128 {
 		return errors.New("extension name is required and must be at most 128 bytes")
 	}
-	if len(manifest.Description) > 1024 || len(manifest.Skills)+len(manifest.Prompts)+len(manifest.Commands) > 64 || len(manifest.Commands) > 32 || len(manifest.Tools) > 32 {
+	if len(manifest.Description) > 1024 || len(manifest.Skills)+len(manifest.Prompts)+len(manifest.Commands)+len(manifest.UI) > 64 || len(manifest.Commands) > 32 || len(manifest.UI) > 16 || len(manifest.Tools) > 32 {
 		return errors.New("extension manifest exceeds a resource limit")
 	}
 	resources := make(map[string]struct{}, len(manifest.Skills)+len(manifest.Prompts)+len(manifest.Commands))
@@ -282,6 +282,27 @@ func validateManifest(manifest Manifest) error {
 			return fmt.Errorf("extension command %q is declared more than once", command.Name)
 		}
 		commands[command.Name] = struct{}{}
+	}
+	uiIDs := make(map[string]struct{}, len(manifest.UI))
+	for _, item := range manifest.UI {
+		if !toolNamePattern.MatchString(item.ID) {
+			return fmt.Errorf("invalid extension UI contribution id %q", item.ID)
+		}
+		if item.Slot != "composer" && item.Slot != "review" {
+			return fmt.Errorf("extension UI contribution %q slot must be composer or review", item.ID)
+		}
+		if strings.TrimSpace(item.Title) == "" || len(item.Title) > 128 || strings.TrimSpace(item.Description) == "" || len(item.Description) > 1024 {
+			return fmt.Errorf("extension UI contribution %q requires a title and description within their limits", item.ID)
+		}
+		if item.Prompt != "" {
+			if _, err := safePath("extension", item.Prompt); err != nil {
+				return fmt.Errorf("extension UI contribution %q prompt: %w", item.ID, err)
+			}
+		}
+		if _, exists := uiIDs[item.ID]; exists {
+			return fmt.Errorf("extension UI contribution %q is declared more than once", item.ID)
+		}
+		uiIDs[item.ID] = struct{}{}
 	}
 	tools := make(map[string]struct{}, len(manifest.Tools))
 	for _, tool := range manifest.Tools {

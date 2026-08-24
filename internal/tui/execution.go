@@ -140,7 +140,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		Provider:         providerName,
 		Model:            modelName,
 		BaseURL:          m.config.BaseURL,
-		MaxSteps:         m.config.MaxSteps,
+		MaxSteps:         m.effort.maxSteps(m.config.MaxSteps),
 		Verification:     verification,
 		Scopes:           contextReferencePaths(references),
 		StateDir:         m.config.StateDir,

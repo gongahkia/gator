@@ -120,6 +120,10 @@ func (m Model) View() string {
 		view = m.recentRunsView()
 	case threadScreen:
 		view = m.threadTreeView()
+	case effortScreen:
+		view = m.effortView()
+	case extensionUIScreen:
+		view = m.extensionUIView()
 	case localModelsScreen:
 		view = m.localModelsView()
 	default:
@@ -153,6 +157,7 @@ func (m Model) attachmentConfirmView() string {
 
 func (m Model) localModelsView() string {
 	sections := []string{m.header("models")}
+	sections = append(sections, m.inline(dimStyle.Render("Effort: "+m.effort.label()+" · intent-level turn budget. Ctrl+S or /effort changes it; this screen controls exact models and logins.")))
 	if m.localModels.manager == nil {
 		sections = append(sections, m.panel(errorStyle.Render("Model management was not configured for this TUI session.")), m.noticeView(), m.footer("esc return"))
 		return strings.Join(sections, "\n")
@@ -402,7 +407,7 @@ func (m Model) chatView(running bool) string {
 func (m Model) conversationView(mode, provider, model string, running bool) string {
 	width := m.conversationWidth()
 	rail := m.inline(headerStyle.Render("Gator")+dimStyle.Render("  "+mode+" · "+m.runMode.String())) + "\n" +
-		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.vimModeLabel(), width)))
+		m.inline(dimStyle.Render(compact(provider+" · "+model+" · "+m.effort.label()+" effort · "+m.vimModeLabel(), width)))
 	transcript := m.transcript
 	transcript.Width = width
 	transcript.Height = m.transcriptHeight()
@@ -429,6 +434,11 @@ func (m Model) conversationView(mode, provider, model string, running bool) stri
 		}
 		if completions := m.contextCompletionView(); completions != "" {
 			sections = append(sections, completions)
+		}
+	}
+	if !running {
+		if summary := m.extensionUISummary("composer"); summary != "" {
+			sections = append(sections, summary)
 		}
 	}
 	if running && m.pendingApproval != nil {
@@ -509,7 +519,7 @@ func (m Model) composerFooter() string {
 	case vimInsert:
 		return m.footer("esc normal", "enter newline", "ctrl+r send", "ctrl+b controls", "? commands", "f1 shortcuts")
 	default:
-		return m.footer("ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands")
+		return m.footer("ctrl+s effort", "/model models", "ctrl+b controls", "ctrl+o threads", "pgup/pgdn browse", "end latest", "enter send", "? commands")
 	}
 }
 

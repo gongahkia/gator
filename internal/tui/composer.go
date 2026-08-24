@@ -36,6 +36,8 @@ var slashCommands = []slashCommand{
 	{name: "/clone", description: "duplicate the active retained branch"},
 	{name: "/compact", description: "summarize older retained context before the next turn"},
 	{name: "/dequeue", description: "remove the next queued instruction"},
+	{name: "/effort", description: "choose Fast, Standard, Thorough, or Maximum investigation effort"},
+	{name: "/extensions", description: "open trusted extension cards for this surface"},
 	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
 	{name: "/fork", description: "choose a retained turn to branch from"},
