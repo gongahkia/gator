@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -58,6 +59,10 @@ type Config struct {
 	// owns its credential, tools, approvals, and session state.
 	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (DelegateCommand, error)
 	SetTheme           func(name string) error
+	// LocalModels manages Gator's reviewed, loopback-only local model catalog.
+	// It is injected from the command layer so the UI does not own runtime
+	// configuration or make network requests on its event loop.
+	LocalModels LocalModelManager
 }
 
 // ExtensionCommand is a visible prompt template contributed by a trusted or
@@ -97,6 +102,7 @@ const (
 	helpScreen
 	recentScreen
 	threadScreen
+	localModelsScreen
 )
 
 type field uint8
@@ -339,6 +345,7 @@ type Model struct {
 	forceCompaction bool
 	threadID        string
 	runMode         gatorrun.Mode
+	localModels     localModelsState
 }
 
 var (
@@ -446,6 +453,8 @@ func New(config Config) Model {
 	terminalInput.Width = 60
 	terminalInput.Blur()
 
+	localSpinner := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(keyStyle))
+
 	application := Model{
 		config:           config,
 		screen:           composeScreen,
@@ -458,6 +467,7 @@ func New(config Config) Model {
 		lspRegistry:      config.LSPRegistry,
 		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
+		localModels:      newLocalModelsState(config.LocalModels, localSpinner),
 		transcript:       viewport.New(76, 8),
 		followTranscript: true,
 		notice: notice{
