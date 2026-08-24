@@ -147,9 +147,8 @@ checkout and a real terminal. Type a task and press `Enter` to send it; the
 same prompt accepts follow-up instructions after the run completes. `Ctrl+R`
 also sends in every input mode. The live
 conversation includes model text and tool activity, while `PgUp` and `PgDn`
-browse earlier entries. Use `/provider`, `/model`, `/login`, and `/verify` to edit the
-run configuration; their fields show keyboard-selectable dropdowns where
-available. During a run, `Enter` sends a steering instruction
+browse earlier entries. Use `/model` to select and manage cloud or local models,
+and `/verify` to edit the run configuration. During a run, `Enter` sends a steering instruction
 that the agent consumes at its next model or tool boundary; it does not cancel
 the run. If the agent requests a command that is not a required verifier, the
 running view instead asks for approval: `y` or `Enter` allow once, `a` always
@@ -211,8 +210,8 @@ type `@` in a task to select a repository file or directory from matching path
 suggestions. In the command menu, `Tab` completes the selected command and
 `Enter` executes it; path suggestions accept either key to insert the path.
 Conversation
-commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/provider`,
-`/login`, `/verify`, `/permissions`, `/worktree`, `/review`, `/threads`,
+commands are `/plan`, `/execute`, `/new`, `/status`, `/model`, `/verify`,
+`/permissions`, `/worktree`, `/review`, `/threads`,
 `/recent`, `/tree`, `/fork`, `/clone`, `/compact`, `/clear`, `/queue`,
 `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every
 provider an enforced read-only tool surface and does not require a verifier;
@@ -238,10 +237,10 @@ PDFs require the `openai`, `codex`, `anthropic`, or `gemini` provider because ge
 Chat Completions endpoints do not share a stable document-input protocol.
 
 When a selected subscription provider has no Gator-registered OAuth client,
-`/login` opens its supported vendor-owned `gator connect` flow in the same
-terminal and returns to Gator afterward. That sign-in remains owned by the
-vendor CLI; Gator makes the next delegated-harness action explicit rather than
-silently treating the credential as a native Gator credential.
+the Cloud section of `/model` opens its supported vendor-owned `gator connect`
+flow in the same terminal and returns to Gator afterward. That sign-in remains
+owned by the vendor CLI; Gator makes the next delegated-harness action explicit
+rather than silently treating the credential as a native Gator credential.
 
 Gator permits at most four attachments per task, each up to 4 MiB, with an
 8 MiB combined image/document budget. Attachments must be regular files inside
@@ -328,11 +327,13 @@ gator run --verify 'go test ./...' 'Add a focused feature with tests'
 
 Gator manages model packages only through a literal loopback Ollama runtime;
 it does not execute arbitrary model repositories or install a system runtime.
-In the primary terminal UI, `/local` provides the same status, reviewed pull
-with confirmation and progress, model selection, refresh, and removal flow;
-after selection, return to the composer and send a verified task normally. The
-chosen model becomes the default native provider, so the same TUI, tools,
-worktrees, sandbox, verification, retained sessions, RPC, and ACP paths apply.
+In the primary terminal UI, `/model` is the single cloud-and-local catalog: it
+shows credential/configuration readiness for cloud choices, signs into eligible
+providers, and provides reviewed local pull, selection, display-name rename,
+refresh, and removal controls. After selection, return to the composer and send
+a verified task normally. The chosen model becomes the default native provider,
+so the same TUI, tools, worktrees, sandbox, verification, retained sessions,
+RPC, and ACP paths apply.
 See [curated local models](docs/LOCAL_MODELS.md) for model sources, sizes,
 hardware limitations, and removal.
 
@@ -390,9 +391,9 @@ PROVIDER --subscription` runs a native Gator account OAuth flow. Both write
 only Gator's own credential material to
 `$XDG_STATE_HOME/gator/auth.json` (or `~/.local/state/gator/auth.json`) with
 `0600` permissions. Explicit `--api-key` wins over the stored credential,
-which wins over the provider environment variable. `/login PROVIDER` in the
-TUI displays a browser or device-code URL and waits for completion; `Ctrl+C`
-cancels the pending login. Codex, Copilot, xAI, Kimi Code, and Radius require
+which wins over the provider environment variable. The Cloud section of
+`/model` displays a browser or device-code URL for eligible providers and waits
+for completion; `Ctrl+C` cancels the pending login. Codex, Copilot, xAI, Kimi Code, and Radius require
 their corresponding `GATOR_*_OAUTH_CLIENT_ID` registration. OpenRouter's flow
 does not use a client ID: it exchanges a PKCE authorization code for a
 user-controlled API key. Prefer `gator connect` when it offers a public
