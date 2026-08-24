@@ -55,6 +55,11 @@ func SaveReviewFeedback(statePath string, feedback ReviewFeedback) (ReviewFeedba
 	if len(all) >= maximumReviewFeedback {
 		return ReviewFeedback{}, fmt.Errorf("review feedback limit reached (%d); continue the thread or remove resolved feedback before adding more", maximumReviewFeedback)
 	}
+	for _, existing := range all {
+		if existing.ID == clean.ID {
+			return ReviewFeedback{}, errors.New("review feedback id already exists")
+		}
+	}
 	all = append(all, clean)
 	if err := writeJSON(filepath.Join(statePath, "review-feedback.json"), all); err != nil {
 		return ReviewFeedback{}, fmt.Errorf("save review feedback: %w", err)
@@ -132,9 +137,11 @@ func ReviewFollowUp(feedback ReviewFeedback) string {
 
 func sanitizeReviewFeedback(value ReviewFeedback) (ReviewFeedback, error) {
 	value.File = strings.TrimSpace(value.File)
-	if _, err := reviewRelativePath(value.File); err != nil {
+	path, err := reviewRelativePath(value.File)
+	if err != nil {
 		return ReviewFeedback{}, err
 	}
+	value.File = path
 	value.HunkID = strings.TrimSpace(value.HunkID)
 	if value.HunkID != "" && !reviewOpaqueID(value.HunkID) {
 		return ReviewFeedback{}, errors.New("review hunk id is invalid")

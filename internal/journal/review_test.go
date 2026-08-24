@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReviewFeedbackIsPrivateValidatedAndProducesBoundedFollowUp(t *testing.T) {
@@ -28,7 +29,7 @@ func TestReviewFeedbackIsPrivateValidatedAndProducesBoundedFollowUp(t *testing.T
 	path := filepath.Join(record.StatePath, "review-feedback.json")
 	info, err := os.Stat(path)
 	if err != nil {
-		.Fatal(err)
+		t.Fatal(err)
 	}
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("feedback mode = %o, want 600", info.Mode().Perm())
@@ -64,7 +65,7 @@ func openJournalForReview(t *testing.T) Record {
 	if err := os.MkdirAll(worktree, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	journal, record, err := Open(repository, "run-review-001", worktree, t.TempDir(), nowForTest())
+	journal, record, err := Open(repository, "run-review-001", worktree, t.TempDir(), time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
 	}

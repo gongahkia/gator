@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/lsp"
+	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
@@ -256,6 +257,15 @@ type diffLoadedMsg struct {
 	err       error
 }
 
+type reviewLoadedMsg struct {
+	snapshot review.Snapshot
+	err      error
+}
+
+type reviewMutationDoneMsg struct {
+	err error
+}
+
 type activityTickMsg struct{}
 
 // Model is the Bubble Tea state model for Gator's terminal experience.
@@ -346,6 +356,18 @@ type Model struct {
 	diffTruncated   bool
 	diffErr         error
 	diffStats       diffStats
+	reviewSnapshot  review.Snapshot
+	reviewLoaded    bool
+	reviewScope     review.Scope
+	reviewPane      reviewPane
+	reviewFileIndex int
+	reviewHunkIndex int
+	reviewLineIndex int
+	reviewRangeFrom int
+	reviewRawFiles  map[string]bool
+	reviewMutation  *reviewMutation
+	reviewRequest   textarea.Model
+	reviewRequestOn bool
 	resumeStatePath string
 	forkStatePath   string
 	forceCompaction bool
@@ -460,6 +482,13 @@ func New(config Config) Model {
 	terminalInput.Blur()
 
 	localSpinner := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(keyStyle))
+	reviewRequest := textarea.New()
+	reviewRequest.Prompt = ""
+	reviewRequest.Placeholder = "Describe the requested change… (Ctrl+Enter sends a constrained follow-up)"
+	reviewRequest.CharLimit = maximumReviewRequestBytes
+	reviewRequest.SetHeight(5)
+	reviewRequest.SetWidth(76)
+	reviewRequest.Blur()
 
 	application := Model{
 		config:           config,
@@ -474,6 +503,10 @@ func New(config Config) Model {
 		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
 		localModels:      newLocalModelsState(config.LocalModels, localSpinner),
+		reviewScope:      review.All,
+		reviewRangeFrom:  -1,
+		reviewRawFiles:   make(map[string]bool),
+		reviewRequest:    reviewRequest,
 		transcript:       viewport.New(76, 8),
 		followTranscript: true,
 		notice: notice{
@@ -698,7 +731,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.done.outcome.Worktree.Path == "" {
 			return m, nil
 		}
-		return m, loadDiff(msg.done.outcome.Worktree.Root)
+		return m, loadReview(msg.done.outcome)
 	case oauthLoginDoneMsg:
 		if msg.provider != m.oauthProvider {
 			return m, nil
@@ -770,6 +803,34 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.diffStats = summarizeDiff(msg.diff)
 		}
 		return m, nil
+	case reviewLoadedMsg:
+		m.reviewLoaded = msg.err == nil
+		m.diffErr = msg.err
+		if msg.err != nil {
+			return m, nil
+		}
+		m.reviewSnapshot = msg.snapshot
+		m.reviewScope = review.All
+		m.reviewPane = reviewFilesPane
+		m.reviewFileIndex = 0
+		m.reviewHunkIndex = 0
+		m.reviewLineIndex = 0
+		m.reviewRangeFrom = -1
+		m.reviewMutation = nil
+		m.reviewRequestOn = false
+		m.normalizeReviewSelection()
+		return m, nil
+	case reviewMutationDoneMsg:
+		m.reviewMutation = nil
+		if msg.err != nil {
+			m.notice = notice{text: "Update review selection: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.notice = notice{text: "Review selection updated in the retained worktree.", kind: noticeSuccess}
+		if m.outcome == nil {
+			return m, nil
+		}
+		return m, loadReview(*m.outcome)
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}

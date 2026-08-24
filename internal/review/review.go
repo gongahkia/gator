@@ -450,12 +450,12 @@ func parseFile(patch string) File {
 	}
 	file.Path, _ = safePatchPath(file.Path)
 	file.OldPath, _ = safePatchPath(file.OldPath)
+	file.ID = stableID(file.Path + "\x00" + file.OldPath + "\x00" + file.Status)
 	file.Hunks = parseHunks(file)
 	for _, hunk := range file.Hunks {
 		file.Stats.Additions += hunk.Stats.Additions
 		file.Stats.Deletions += hunk.Stats.Deletions
 	}
-	file.ID = stableID(file.Path + "\x00" + file.OldPath + "\x00" + file.Status)
 	return file
 }
 
