@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/reviewweb"
@@ -70,14 +71,44 @@ func parseReviewWebOptions(arguments []string) (reviewWebOptions, error) {
 	flags.SetOutput(io.Discard)
 	listen := flags.String("listen", "127.0.0.1:0", "loopback TCP address to listen on")
 	open := flags.Bool("open", false, "open the one-use local URL with xdg-open")
-	if err := flags.Parse(arguments); err != nil {
+	flagArguments, positional, err := splitReviewWebArguments(arguments)
+	if err != nil {
 		return reviewWebOptions{}, err
 	}
-	if len(flags.Args()) != 1 {
+	if err := flags.Parse(flagArguments); err != nil {
+		return reviewWebOptions{}, err
+	}
+	if len(positional) != 1 || len(flags.Args()) != 0 {
 		return reviewWebOptions{}, errors.New("usage: gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]")
 	}
 	if err := validateLoopbackAddress(*listen); err != nil {
 		return reviewWebOptions{}, err
 	}
-	return reviewWebOptions{statePath: flags.Arg(0), listen: *listen, open: *open}, nil
+	return reviewWebOptions{statePath: positional[0], listen: *listen, open: *open}, nil
+}
+
+// splitReviewWebArguments permits the documented path-first form as well as
+// conventional flag-first use. The standard flag package stops at the first
+// positional argument, which would otherwise make the documented command fail.
+func splitReviewWebArguments(arguments []string) ([]string, []string, error) {
+	flags := make([]string, 0, len(arguments))
+	positional := make([]string, 0, 1)
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		switch {
+		case argument == "--open" || strings.HasPrefix(argument, "--listen="):
+			flags = append(flags, argument)
+		case argument == "--listen":
+			if index+1 >= len(arguments) {
+				return nil, nil, errors.New("--listen requires an address")
+			}
+			flags = append(flags, argument, arguments[index+1])
+			index++
+		case strings.HasPrefix(argument, "-"):
+			return nil, nil, fmt.Errorf("unknown review option %q", argument)
+		default:
+			positional = append(positional, argument)
+		}
+	}
+	return flags, positional, nil
 }

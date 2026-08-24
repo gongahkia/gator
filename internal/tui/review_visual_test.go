@@ -24,10 +24,21 @@ func TestReviewVisualSnapshots(t *testing.T) {
 			}
 			expected := normalizeReviewSnapshot(string(expectedBytes))
 			if actual != expected {
-				t.Fatalf("review visual snapshot changed for %s:\n--- want\n%s\n--- got\n%s", size.name, expected, actual)
+				index := firstSnapshotDifference(expected, actual)
+				t.Fatalf("review visual snapshot changed for %s at byte %d: want %q got %q", size.name, index, expected[index:min(len(expected), index+24)], actual[index:min(len(actual), index+24)])
 			}
 		})
 	}
+}
+
+func firstSnapshotDifference(first, second string) int {
+	limit := min(len(first), len(second))
+	for index := 0; index < limit; index++ {
+		if first[index] != second[index] {
+			return index
+		}
+	}
+	return limit
 }
 
 func reviewVisualFixture(width, height int) Model {
@@ -42,9 +53,26 @@ func reviewVisualFixture(width, height int) Model {
 }
 
 func normalizeReviewSnapshot(value string) string {
-	lines := strings.Split(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
+	lines := strings.Split(strings.ToValidUTF8(strings.ReplaceAll(value, "\r\n", "\n"), "�"), "\n")
 	for index := range lines {
-		lines[index] = strings.TrimRight(lines[index], " ")
+		lines[index] = strings.TrimRight(compressReplacementRunes(lines[index]), " ")
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func compressReplacementRunes(value string) string {
+	var result strings.Builder
+	previousReplacement := false
+	for _, character := range value {
+		if character == '�' {
+			if previousReplacement {
+				continue
+			}
+			previousReplacement = true
+		} else {
+			previousReplacement = false
+		}
+		result.WriteRune(character)
+	}
+	return result.String()
 }

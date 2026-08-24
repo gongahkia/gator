@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -34,6 +35,17 @@ type reviewRange struct {
 	endLine   int
 	before    []string
 	after     []string
+}
+
+type reviewFileTreeNode struct {
+	name     string
+	children map[string]*reviewFileTreeNode
+	file     int
+}
+
+type reviewFileRow struct {
+	file int
+	text string
 }
 
 func (m Model) currentReviewSet() review.ChangeSet {
@@ -466,18 +478,10 @@ func (m Model) reviewFooter(sections []string) string {
 }
 
 func (m Model) reviewFilesView() string {
-	set := m.currentReviewSet()
 	lines := []string{reviewPaneLabel("files", m.reviewPane == reviewFilesPane)}
-	for index, file := range set.Files {
-		prefix := "  "
-		if index == m.reviewFileIndex {
-			prefix = "> "
-		}
-		label := fmt.Sprintf("%s%s  +%d −%d", prefix, file.Path, file.Stats.Additions, file.Stats.Deletions)
-		if file.Binary {
-			label += "  binary"
-		}
-		if index == m.reviewFileIndex {
+	for _, row := range m.reviewFileRows() {
+		label := row.text
+		if row.file == m.reviewFileIndex {
 			label = keyStyle.Render(compact(label, max(16, m.inlineWidth()/3-2)))
 		} else {
 			label = compact(label, max(16, m.inlineWidth()/3-2))
@@ -485,6 +489,54 @@ func (m Model) reviewFilesView() string {
 		lines = append(lines, label)
 	}
 	return m.panel(strings.Join(lines, "\n"))
+}
+
+// reviewFileRows renders a stable, expanded directory tree instead of a flat
+// changed-path list. The leaf stores its original selection index, keeping
+// keyboard and mouse selection tied to the same review data.
+func (m Model) reviewFileRows() []reviewFileRow {
+	set := m.currentReviewSet()
+	root := &reviewFileTreeNode{children: make(map[string]*reviewFileTreeNode), file: -1}
+	for index, file := range set.Files {
+		current := root
+		for _, part := range strings.Split(file.Path, "/") {
+			if current.children[part] == nil {
+				current.children[part] = &reviewFileTreeNode{name: part, children: make(map[string]*reviewFileTreeNode), file: -1}
+			}
+			current = current.children[part]
+		}
+		current.file = index
+	}
+	rows := make([]reviewFileRow, 0, len(set.Files)*2)
+	var walk func(*reviewFileTreeNode, int)
+	walk = func(node *reviewFileTreeNode, depth int) {
+		names := make([]string, 0, len(node.children))
+		for name := range node.children {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			child := node.children[name]
+			indent := strings.Repeat("  ", depth)
+			if child.file < 0 {
+				rows = append(rows, reviewFileRow{file: -1, text: indent + name + "/"})
+				walk(child, depth+1)
+				continue
+			}
+			file := set.Files[child.file]
+			prefix := "  "
+			if child.file == m.reviewFileIndex {
+				prefix = "> "
+			}
+			label := fmt.Sprintf("%s%s%s  +%d −%d", indent, prefix, name, file.Stats.Additions, file.Stats.Deletions)
+			if file.Binary {
+				label += "  binary"
+			}
+			rows = append(rows, reviewFileRow{file: child.file, text: label})
+		}
+	}
+	walk(root, 0)
+	return rows
 }
 
 func (m Model) reviewHunksAndPatchView() string {
@@ -587,10 +639,11 @@ func (m Model) updateReviewMouse(message tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if len(set.Files) == 0 {
 		return m, nil
 	}
+	rows := m.reviewFileRows()
 	if !m.compactLayout() && m.width >= 92 && message.X < max(28, m.inlineWidth()/3) && message.Y >= 4 {
 		index := message.Y - 4
-		if index >= 0 && index < len(set.Files) {
-			m.reviewPane, m.reviewFileIndex = reviewFilesPane, index
+		if index >= 0 && index < len(rows) && rows[index].file >= 0 {
+			m.reviewPane, m.reviewFileIndex = reviewFilesPane, rows[index].file
 			m.reviewHunkIndex, m.reviewLineIndex, m.reviewRangeFrom = 0, 0, -1
 			m.normalizeReviewSelection()
 		}
@@ -602,7 +655,7 @@ func (m Model) updateReviewMouse(message tea.MouseMsg) (tea.Model, tea.Cmd) {
 	}
 	start := 4
 	if m.compactLayout() || m.width < 92 {
-		start += len(set.Files) + 1
+		start += len(rows) + 1
 	}
 	if message.Y >= start && message.Y < start+len(file.Hunks) {
 		m.reviewPane, m.reviewHunkIndex = reviewHunksPane, message.Y-start
