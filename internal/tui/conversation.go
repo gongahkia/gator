@@ -21,6 +21,21 @@ func (m Model) conversationWidth() int {
 	return max(1, m.width)
 }
 
+const (
+	transcriptScrollbarColumns = 2
+	minimumScrollbarWidth      = 24
+)
+
+// transcriptViewportWidth reserves a narrow gutter for a scrollbar on normal
+// terminals. Constrained layouts keep every column available to the message.
+func (m Model) transcriptViewportWidth() int {
+	width := m.conversationWidth()
+	if width < minimumScrollbarWidth {
+		return width
+	}
+	return max(1, width-transcriptScrollbarColumns)
+}
+
 func (m Model) transcriptHeight() int {
 	if m.height <= 0 {
 		return 8
@@ -30,7 +45,7 @@ func (m Model) transcriptHeight() int {
 }
 
 func (m *Model) resizeConversation() {
-	m.transcript.Width = m.conversationWidth()
+	m.transcript.Width = m.transcriptViewportWidth()
 	m.transcript.Height = m.transcriptHeight()
 }
 

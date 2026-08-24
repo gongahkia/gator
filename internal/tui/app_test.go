@@ -2266,6 +2266,51 @@ func TestChatPageKeysBrowseConversation(t *testing.T) {
 	}
 }
 
+func TestConversationScrollbarTracksTranscriptPosition(t *testing.T) {
+	model := New(Config{})
+	model.width = 100
+	model.height = 40
+	model.resizeInputs()
+	for index := 0; index < 20; index++ {
+		model.appendChat(chatEntry{author: chatAgent, text: fmt.Sprintf("message %d", index)})
+	}
+
+	model.transcriptTop()
+	if !model.showsTranscriptScrollbar(model.transcript) {
+		t.Fatalf("scrollable transcript did not enable its scrollbar: lines=%d height=%d", model.transcript.TotalLineCount(), model.transcript.Height)
+	}
+	topThumb := scrollbarThumbRow(model.transcriptScrollbar(model.transcript))
+	if topThumb != 0 {
+		t.Fatalf("top scrollbar thumb row = %d, want 0", topThumb)
+	}
+
+	model.transcriptBottom()
+	bottomThumb := scrollbarThumbRow(model.transcriptScrollbar(model.transcript))
+	if bottomThumb <= topThumb {
+		t.Fatalf("bottom scrollbar thumb row = %d, want after %d", bottomThumb, topThumb)
+	}
+	if !strings.Contains(model.View(), "█") {
+		t.Fatalf("conversation view omitted the scrollbar thumb: %s", model.View())
+	}
+
+	short := New(Config{})
+	short.width = 100
+	short.height = 40
+	short.resizeInputs()
+	if short.showsTranscriptScrollbar(short.transcript) || short.transcriptScrollbar(short.transcript) != "" {
+		t.Fatal("short transcript unexpectedly rendered a scrollbar")
+	}
+}
+
+func scrollbarThumbRow(scrollbar string) int {
+	for row, line := range strings.Split(scrollbar, "\n") {
+		if strings.Contains(line, "█") {
+			return row
+		}
+	}
+	return -1
+}
+
 func TestChatMouseWheelBrowsesConversation(t *testing.T) {
 	model := New(Config{})
 	model.width = 100
