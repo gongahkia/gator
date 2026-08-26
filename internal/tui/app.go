@@ -22,6 +22,7 @@ import (
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 )
@@ -55,6 +56,7 @@ type Config struct {
 	ExtensionCommands []ExtensionCommand
 	ExtensionUI       []ExtensionUIContribution
 	Theme             string
+	Execution         sandbox.Policy
 	// Effort is an optional intent-level default. It changes Gator's bounded
 	// agent-turn budget; it does not silently pick a provider or model.
 	Effort            string
@@ -83,6 +85,58 @@ type Config struct {
 	// It is injected from the command layer so the UI does not own runtime
 	// configuration or make network requests on its event loop.
 	LocalModels LocalModelManager
+	// Management exposes inspect-first project trust and retained-artifact
+	// operations. The command layer owns filesystem/config mutation; the TUI
+	// only renders typed state and asks for explicit confirmation.
+	Management ManagementBackend
+}
+
+// ManagementBackend is the narrow command-layer boundary used by /manage.
+// Destructive actions receive stable IDs and are always confirmed in the TUI.
+type ManagementBackend interface {
+	Snapshot(runRecord string) (ManagementSnapshot, error)
+	SetTrust(kind string, trusted bool) error
+	SetExtensionEnabled(id string, enabled bool) error
+	RemoveExtension(id string) error
+	PruneWorktrees() error
+	RemoveWorktree(id string) error
+}
+
+type ManagementSnapshot struct {
+	Trusts     []ManagedTrust
+	Worktrees  []ManagedWorktree
+	Children   []ManagedChild
+	Extensions []ManagedExtension
+}
+
+type ManagedTrust struct {
+	Kind       string
+	Hash       string
+	Configured bool
+	Trusted    bool
+}
+
+type ManagedWorktree struct {
+	ID   string
+	Path string
+}
+
+type ManagedChild struct {
+	ID           string
+	Status       string
+	Role         string
+	BatchID      string
+	WorktreePath string
+	PatchBytes   int
+	Error        string
+}
+
+type ManagedExtension struct {
+	ID          string
+	Name        string
+	Description string
+	Enabled     bool
+	Tools       int
 }
 
 // CloudModelSetup is the secret-safe boundary between the TUI and the command
@@ -149,6 +203,7 @@ const (
 	effortScreen
 	extensionUIScreen
 	localModelsScreen
+	managementScreen
 )
 
 type field uint8
@@ -422,6 +477,7 @@ type Model struct {
 	extensionUIIndex  int
 	extensionUIReturn screen
 	localModels       localModelsState
+	management        managementState
 }
 
 var (
@@ -555,6 +611,7 @@ func New(config Config) Model {
 		terminalViews:    make(map[string]attachedTerminalView),
 		model:            model,
 		localModels:      newLocalModelsState(config.LocalModels, localSpinner),
+		management:       newManagementState(config.Management),
 		effort:           parseEffort(config.Effort),
 		reviewScope:      review.All,
 		reviewRangeFrom:  -1,
@@ -759,6 +816,31 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Local model download finished. Press u to select it for Gator.", kind: noticeSuccess}
 		}
 		return m, nil
+	case managementSnapshotMsg:
+		m.management.loading = false
+		m.management.err = msg.err
+		if msg.err != nil {
+			m.notice = notice{text: "Refresh management state: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.management.data = msg.snapshot
+		if count := m.managementItemCount(); count == 0 {
+			m.management.index = 0
+		} else if m.management.index >= count {
+			m.management.index = count - 1
+		}
+		return m, nil
+	case managementActionMsg:
+		m.management.loading = false
+		if msg.err != nil {
+			m.management.err = msg.err
+			m.notice = notice{text: msg.message + ": " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.management.err = nil
+		m.notice = notice{text: msg.message + ".", kind: noticeSuccess}
+		m.management.loading = true
+		return m, loadManagement(m.management.backend, m.activeRunRecord())
 	case executionDoneMsg:
 		m.resolvePendingApproval(tools.CommandDeny)
 		wasNewThread := m.resumeStatePath == ""

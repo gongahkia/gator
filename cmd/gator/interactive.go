@@ -110,6 +110,10 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if baseURL == "" {
 		baseURL = settings.ProviderEndpoint(provider)
 	}
+	management, err := newTUIManagementBackend(repository, store)
+	if err != nil {
+		return fmt.Errorf("configure TUI management: %w", err)
+	}
 	application := tui.New(tui.Config{
 		RepositoryPath:    repository,
 		Provider:          provider,
@@ -128,6 +132,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		ExtensionCommands: extensionCommands,
 		ExtensionUI:       extensionUI,
 		Theme:             settings.Theme,
+		Execution:         settings.Execution,
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)
 		},
@@ -157,6 +162,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		},
 		SetTheme:    saveTheme,
 		LocalModels: newLocalModelManager(store),
+		Management:  management,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	final, runErr := program.Run()

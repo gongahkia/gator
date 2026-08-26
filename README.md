@@ -223,12 +223,16 @@ type `@` in a task to select a repository file or directory from matching path
 suggestions. In the command menu, `Tab` completes the selected command and
 `Enter` executes it; path suggestions accept either key to insert the path.
 Conversation
-commands are `/plan`, `/execute`, `/new`, `/status`, `/effort`, `/model`, `/extensions`, `/verify`,
+commands are `/plan`, `/execute`, `/new`, `/status`, `/effort`, `/model`, `/manage`, `/extensions`, `/verify`,
 `/permissions`, `/worktree`, `/review`, `/threads`,
 `/recent`, `/tree`, `/fork`, `/clone`, `/compact`, `/clear`, `/queue`,
 `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every
 provider an enforced read-only tool surface and does not require a verifier;
 switch the same retained thread to `/execute` when you are ready to make edits.
+`/manage` opens an inspect-first local control center for project hook/LSP/MCP/
+extension trust, retained worktrees, writer-child manifests, and installed
+extension state. Trust changes, extension removal, and worktree removal require
+an explicit confirmation; project executable content remains hash-pinned.
 `Ctrl+Space` (reported as `Ctrl+@`
 by many terminals) reopens an active `@` path menu. Use `@path/to/file` or `@"path with spaces"`
 in a task to mark repository files or directories that the agent should inspect

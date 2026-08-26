@@ -177,6 +177,10 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.commandOutput = ""
 		m.notice = notice{text: "Choose and manage cloud or local models. Provider sign-in is available from the Cloud section.", kind: noticeInfo}
 		return m.openModelCatalog()
+	case "/manage":
+		m.commandOutput = ""
+		m.notice = notice{text: "Inspect local state before changing trust or retained artifacts.", kind: noticeInfo}
+		return m.openManagement()
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
 		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
@@ -797,7 +801,20 @@ func (m Model) permissionsStatus() string {
 	if err == nil {
 		commands = formatVerification(verification)
 	}
-	return "writes: isolated run worktree only (apply_patch)\nreads: repository paths only\ncommands: required --verify argv run immediately; any other argv or shell command waits for y/enter (once), a (always this argv for this thread), or n (deny)\ncwd: isolated worktree\nnot a sandbox: approved processes run as the Gator user and can reach host paths\ncommands allowed without prompt:\n" + commands + "\nactive checkout: never edited by a normal run"
+	policy := m.config.Execution.Normalize()
+	filesystem := "worktree and private scratch only"
+	if len(policy.ReadOnlyRoots) > 0 || len(policy.WritableRoots) > 0 {
+		filesystem += fmt.Sprintf(" · %d extra read-only and %d extra writable grant(s)", len(policy.ReadOnlyRoots), len(policy.WritableRoots))
+	}
+	environment := "filtered"
+	if len(policy.Environment) > 0 {
+		environment += fmt.Sprintf(" · %d explicitly forwarded variable(s)", len(policy.Environment))
+	}
+	sandboxStatus := string(policy.Mode) + " (OS-enforced Seatbelt on macOS or Bubblewrap on Linux; strict mode fails closed when unavailable)"
+	if policy.Mode == "off" {
+		sandboxStatus = "off (approved commands run with the Gator user's host authority)"
+	}
+	return "writes: isolated run worktree only (apply_patch)\nreads: repository paths only\ncommands: required --verify argv run immediately; any other argv or shell command waits for y/enter (once), a (always this exact argv for this thread), or n (deny)\ncwd: isolated worktree\nsandbox: " + sandboxStatus + "\nnetwork: " + string(policy.Network) + "\nfilesystem: " + filesystem + "\nenvironment: " + environment + "\ncommands allowed without prompt:\n" + commands + "\nactive checkout: never edited by a normal run"
 }
 
 func delegatedRuntimeForProvider(provider string) string {

@@ -66,6 +66,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateExtensionUI(message)
 	case localModelsScreen:
 		return m.updateLocalModels(message)
+	case managementScreen:
+		return m.updateManagement(message)
 	default:
 		return m, nil
 	}
