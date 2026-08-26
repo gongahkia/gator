@@ -2589,7 +2589,14 @@ func (backend *fakeManagementBackend) SetTrust(kind string, trusted bool) error 
 	return nil
 }
 
-func (*fakeManagementBackend) SetExtensionEnabled(string, bool) error { return nil }
-func (*fakeManagementBackend) RemoveExtension(string) error           { return nil }
-func (*fakeManagementBackend) PruneWorktrees() error                  { return nil }
-func (*fakeManagementBackend) RemoveWorktree(string) error            { return nil }
+func (*fakeManagementBackend) SetExecutionPolicy(string, string) error { return nil }
+func (*fakeManagementBackend) SetDefaults(string, string) error        { return nil }
+func (*fakeManagementBackend) SetExtensionEnabled(string, bool) error  { return nil }
+func (*fakeManagementBackend) RemoveExtension(string) error            { return nil }
+func (*fakeManagementBackend) PruneWorktrees() error                   { return nil }
+func (*fakeManagementBackend) RemoveWorktree(string) error             { return nil }
+func (*fakeManagementBackend) ExportArtifact(string, string) (string, error) {
+	return "/tmp/export", nil
+}
+func (*fakeManagementBackend) CheckPatch(string) (int, error) { return 42, nil }
+func (*fakeManagementBackend) ApplyPatch(string) (int, error) { return 42, nil }

@@ -95,18 +95,43 @@ type Config struct {
 // Destructive actions receive stable IDs and are always confirmed in the TUI.
 type ManagementBackend interface {
 	Snapshot(runRecord string) (ManagementSnapshot, error)
+	SetExecutionPolicy(mode, network string) error
+	SetDefaults(provider, model string) error
 	SetTrust(kind string, trusted bool) error
 	SetExtensionEnabled(id string, enabled bool) error
 	RemoveExtension(id string) error
 	PruneWorktrees() error
 	RemoveWorktree(id string) error
+	ExportArtifact(kind, runRecord string) (string, error)
+	CheckPatch(runRecord string) (int, error)
+	ApplyPatch(runRecord string) (int, error)
 }
 
 type ManagementSnapshot struct {
+	Settings   ManagedSettings
 	Trusts     []ManagedTrust
+	Runs       []ManagedRun
 	Worktrees  []ManagedWorktree
 	Children   []ManagedChild
 	Extensions []ManagedExtension
+}
+
+type ManagedSettings struct {
+	SandboxMode     string
+	Network         string
+	DefaultProvider string
+	DefaultModel    string
+}
+
+type ManagedRun struct {
+	ID           string
+	StatePath    string
+	WorktreePath string
+	Provider     string
+	Model        string
+	Task         string
+	UpdatedAt    time.Time
+	Available    bool
 }
 
 type ManagedTrust struct {
@@ -824,6 +849,8 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.management.data = msg.snapshot
+		m.config.Execution.Mode = sandbox.Mode(msg.snapshot.Settings.SandboxMode)
+		m.config.Execution.Network = sandbox.Network(msg.snapshot.Settings.Network)
 		if count := m.managementItemCount(); count == 0 {
 			m.management.index = 0
 		} else if m.management.index >= count {
@@ -838,9 +865,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.management.err = nil
+		m.management.actionDetail = msg.detail
+		if msg.checkedRun != "" {
+			m.management.checkedRunRecord = msg.checkedRun
+		} else if strings.HasPrefix(msg.message, "Applied") || strings.Contains(strings.ToLower(msg.message), "apply retained") {
+			m.management.checkedRunRecord = ""
+		}
 		m.notice = notice{text: msg.message + ".", kind: noticeSuccess}
 		m.management.loading = true
-		return m, loadManagement(m.management.backend, m.activeRunRecord())
+		return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
 	case executionDoneMsg:
 		m.resolvePendingApproval(tools.CommandDeny)
 		wasNewThread := m.resumeStatePath == ""
