@@ -10,7 +10,9 @@ import (
 type managementSection uint8
 
 const (
-	managementTrust managementSection = iota
+	managementSettings managementSection = iota
+	managementTrust
+	managementRuns
 	managementWorktrees
 	managementChildren
 	managementExtensions
@@ -24,11 +26,18 @@ type managementState struct {
 	loading bool
 	err     error
 	confirm *managementConfirmation
+	// selectedRunRecord scopes child browsing and artifact operations without
+	// exposing private state paths as editable user input.
+	selectedRunRecord string
+	checkedRunRecord  string
+	actionDetail      string
 }
 
 type managementConfirmation struct {
 	action string
 	id     string
+	value  string
+	value2 string
 	label  string
 }
 
@@ -38,8 +47,10 @@ type managementSnapshotMsg struct {
 }
 
 type managementActionMsg struct {
-	message string
-	err     error
+	message    string
+	detail     string
+	checkedRun string
+	err        error
 }
 
 func newManagementState(backend ManagementBackend) managementState {
@@ -55,8 +66,11 @@ func (m Model) openManagement() (tea.Model, tea.Cmd) {
 	m.management.err = nil
 	m.management.confirm = nil
 	m.management.index = 0
+	m.management.selectedRunRecord = m.activeRunRecord()
+	m.management.checkedRunRecord = ""
+	m.management.actionDetail = ""
 	m.screen = managementScreen
-	return m, loadManagement(m.management.backend, m.activeRunRecord())
+	return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
 }
 
 func (m Model) activeRunRecord() string {
@@ -76,7 +90,13 @@ func loadManagement(backend ManagementBackend, runRecord string) tea.Cmd {
 func runManagementAction(backend ManagementBackend, confirmation managementConfirmation) tea.Cmd {
 	return func() tea.Msg {
 		var err error
+		detail := ""
+		checkedRun := ""
 		switch confirmation.action {
+		case "set-policy":
+			err = backend.SetExecutionPolicy(confirmation.value, confirmation.value2)
+		case "set-defaults":
+			err = backend.SetDefaults(confirmation.value, confirmation.value2)
 		case "trust":
 			err = backend.SetTrust(confirmation.id, true)
 		case "untrust":
@@ -91,11 +111,31 @@ func runManagementAction(backend ManagementBackend, confirmation managementConfi
 			err = backend.RemoveWorktree(confirmation.id)
 		case "prune-worktrees":
 			err = backend.PruneWorktrees()
+		case "export-patch", "export-transcript":
+			kind := strings.TrimPrefix(confirmation.action, "export-")
+			detail, err = backend.ExportArtifact(kind, confirmation.id)
+		case "check-patch":
+			var bytes int
+			bytes, err = backend.CheckPatch(confirmation.id)
+			if err == nil {
+				detail = fmt.Sprintf("Patch is compatible with the clean active checkout (%d bytes).", bytes)
+				checkedRun = confirmation.id
+			}
+		case "apply-patch":
+			var bytes int
+			bytes, err = backend.ApplyPatch(confirmation.id)
+			if err == nil {
+				detail = fmt.Sprintf("Applied %d bytes to the active checkout. Review and commit the resulting changes.", bytes)
+			}
 		default:
 			err = fmt.Errorf("unknown management action %q", confirmation.action)
 		}
-		return managementActionMsg{message: confirmation.label, err: err}
+		return managementActionMsg{message: confirmation.label, detail: detail, checkedRun: checkedRun, err: err}
 	}
+}
+
+func runImmediateManagementAction(backend ManagementBackend, action, runRecord, label string) tea.Cmd {
+	return runManagementAction(backend, managementConfirmation{action: action, id: runRecord, label: label})
 }
 
 func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -124,10 +164,10 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = composeScreen
 		return m, m.focusField()
 	case "left", "h":
-		m.management.section = (m.management.section + 3) % 4
+		m.management.section = (m.management.section + 5) % 6
 		m.management.index = 0
 	case "right", "l", "tab":
-		m.management.section = (m.management.section + 1) % 4
+		m.management.section = (m.management.section + 1) % 6
 		m.management.index = 0
 	case "up", "k", "ctrl+p":
 		m.moveManagementSelection(-1)
@@ -135,7 +175,57 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveManagementSelection(1)
 	case "r", "ctrl+r":
 		m.management.loading = true
-		return m, loadManagement(m.management.backend, m.activeRunRecord())
+		return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
+	case "enter":
+		switch m.management.section {
+		case managementSettings:
+			return m.prepareSettingsChange()
+		case managementRuns:
+			if item, ok := m.selectedRun(); ok {
+				m.management.selectedRunRecord = item.StatePath
+				m.management.checkedRunRecord = ""
+				m.management.loading = true
+				m.notice = notice{text: "Selected retained run " + item.ID + " for artifact and child inspection.", kind: noticeInfo}
+				return m, loadManagement(m.management.backend, item.StatePath)
+			}
+		}
+	case "d":
+		if m.management.section == managementSettings {
+			provider := strings.TrimSpace(m.provider.Value())
+			model := strings.TrimSpace(m.model.Value())
+			if provider != "" {
+				m.management.confirm = &managementConfirmation{
+					action: "set-defaults", value: provider, value2: model,
+					label: "Save " + provider + "/" + valueOrEmpty(model) + " as the default provider and model",
+				}
+			}
+		}
+	case "c":
+		if item, ok := m.selectedRun(); ok {
+			m.management.loading = true
+			return m, runImmediateManagementAction(m.management.backend, "check-patch", item.StatePath, "Check retained patch compatibility")
+		}
+	case "e":
+		if item, ok := m.selectedRun(); ok {
+			m.management.loading = true
+			return m, runImmediateManagementAction(m.management.backend, "export-patch", item.StatePath, "Export retained patch privately")
+		}
+	case "H":
+		if item, ok := m.selectedRun(); ok {
+			m.management.loading = true
+			return m, runImmediateManagementAction(m.management.backend, "export-transcript", item.StatePath, "Export retained HTML transcript privately")
+		}
+	case "a":
+		if item, ok := m.selectedRun(); ok {
+			if m.management.checkedRunRecord != item.StatePath {
+				m.notice = notice{text: "Run a successful compatibility check with c before applying this retained patch.", kind: noticeError}
+				break
+			}
+			m.management.confirm = &managementConfirmation{
+				action: "apply-patch", id: item.StatePath,
+				label: "Apply retained run " + item.ID + " to the clean active checkout",
+			}
+		}
 	case "t":
 		if item, ok := m.selectedTrust(); ok && item.Configured {
 			action := "trust"
@@ -184,10 +274,56 @@ func (m *Model) moveManagementSelection(delta int) {
 	m.management.index = (m.management.index + delta + count) % count
 }
 
+func (m Model) prepareSettingsChange() (tea.Model, tea.Cmd) {
+	settings := m.management.data.Settings
+	switch m.management.index {
+	case 0:
+		next := "off"
+		if settings.SandboxMode == "off" {
+			next = "strict"
+		}
+		label := "Set default process sandbox to " + next
+		if next == "off" {
+			label += " (approved commands will have host authority)"
+		}
+		m.management.confirm = &managementConfirmation{
+			action: "set-policy", value: next, value2: settings.Network, label: label,
+		}
+	case 1:
+		next := "allow"
+		if settings.Network == "allow" {
+			next = "deny"
+		}
+		label := "Set default sandbox network access to " + next
+		if next == "allow" {
+			label += " (agent-started processes may make outbound connections)"
+		}
+		m.management.confirm = &managementConfirmation{
+			action: "set-policy", value: settings.SandboxMode, value2: next, label: label,
+		}
+	case 2:
+		provider := strings.TrimSpace(m.provider.Value())
+		model := strings.TrimSpace(m.model.Value())
+		if provider == "" {
+			m.notice = notice{text: "Select a provider in /model before saving TUI defaults.", kind: noticeError}
+			return m, nil
+		}
+		m.management.confirm = &managementConfirmation{
+			action: "set-defaults", value: provider, value2: model,
+			label: "Save " + provider + "/" + valueOrEmpty(model) + " as the default provider and model",
+		}
+	}
+	return m, nil
+}
+
 func (m Model) managementItemCount() int {
 	switch m.management.section {
+	case managementSettings:
+		return 3
 	case managementTrust:
 		return len(m.management.data.Trusts)
+	case managementRuns:
+		return len(m.management.data.Runs)
 	case managementWorktrees:
 		return len(m.management.data.Worktrees)
 	case managementChildren:
@@ -197,6 +333,13 @@ func (m Model) managementItemCount() int {
 	default:
 		return 0
 	}
+}
+
+func (m Model) selectedRun() (ManagedRun, bool) {
+	if m.management.section != managementRuns || len(m.management.data.Runs) == 0 {
+		return ManagedRun{}, false
+	}
+	return m.management.data.Runs[min(m.management.index, len(m.management.data.Runs)-1)], true
 }
 
 func (m Model) selectedTrust() (ManagedTrust, bool) {
@@ -222,7 +365,7 @@ func (m Model) selectedExtension() (ManagedExtension, bool) {
 
 func (m Model) managementView() string {
 	sections := []string{m.header("manage")}
-	tabs := []string{"trust", "worktrees", "children", "extensions"}
+	tabs := []string{"settings", "trust", "runs", "worktrees", "children", "extensions"}
 	for index := range tabs {
 		if managementSection(index) == m.management.section {
 			tabs[index] = keyStyle.Render("[" + tabs[index] + "]")
@@ -242,11 +385,18 @@ func (m Model) managementView() string {
 	if confirmation := m.management.confirm; confirmation != nil {
 		sections = append(sections, m.panel(errorStyle.Render(confirmation.label+"?\nThis action requires explicit confirmation. Press y to continue or n to cancel.")))
 	}
+	if m.management.actionDetail != "" {
+		sections = append(sections, m.panel(okStyle.Render(m.management.actionDetail)))
+	}
 	sections = append(sections, m.noticeView())
 	footer := []string{"left/right section", "up/down choose", "r refresh", "esc return"}
 	switch m.management.section {
+	case managementSettings:
+		footer = append([]string{"enter change", "d save current model defaults"}, footer...)
 	case managementTrust:
 		footer = append([]string{"t trust/untrust"}, footer...)
+	case managementRuns:
+		footer = append([]string{"enter select", "c check", "a apply", "e export patch", "shift+h export HTML"}, footer...)
 	case managementWorktrees:
 		footer = append([]string{"x remove", "p prune metadata"}, footer...)
 	case managementExtensions:
@@ -259,6 +409,13 @@ func (m Model) managementView() string {
 func (m Model) managementRows() string {
 	var rows []string
 	switch m.management.section {
+	case managementSettings:
+		settings := m.management.data.Settings
+		rows = append(rows,
+			"sandbox  "+valueOrEmpty(settings.SandboxMode),
+			"network  "+valueOrEmpty(settings.Network),
+			"defaults  "+valueOrEmpty(settings.DefaultProvider)+"/"+valueOrEmpty(settings.DefaultModel),
+		)
 	case managementTrust:
 		for _, item := range m.management.data.Trusts {
 			state := "not configured"
@@ -269,6 +426,18 @@ func (m Model) managementRows() string {
 				state = "active"
 			}
 			rows = append(rows, item.Kind+"  "+state)
+		}
+	case managementRuns:
+		for _, item := range m.management.data.Runs {
+			state := "worktree missing"
+			if item.Available {
+				state = "available"
+			}
+			selected := ""
+			if item.StatePath == m.management.selectedRunRecord {
+				selected = " · selected"
+			}
+			rows = append(rows, fmt.Sprintf("%s  %s/%s  %s%s", item.ID, item.Provider, item.Model, state, selected))
 		}
 	case managementWorktrees:
 		for _, item := range m.management.data.Worktrees {
@@ -308,9 +477,34 @@ func (m Model) managementRows() string {
 
 func (m Model) managementDetail() string {
 	switch m.management.section {
+	case managementSettings:
+		switch m.management.index {
+		case 0:
+			return labelStyle.Render("Process sandbox") + "\n" + dimStyle.Render("Strict is the safe default. Turning it off gives every separately approved command the Gator process's host authority.")
+		case 1:
+			return labelStyle.Render("Sandbox network") + "\n" + dimStyle.Render("Denied by default. Allowing network affects agent-started processes; Gator web tools retain their own URL/query approvals.")
+		default:
+			return labelStyle.Render("Provider defaults") + "\n" + dimStyle.Render("Enter or d saves the provider/model currently selected in /model. Credentials remain in the private auth store.")
+		}
 	case managementTrust:
 		if item, ok := m.selectedTrust(); ok && item.Hash != "" {
 			return labelStyle.Render("Selected bundle") + "\n" + item.Kind + "\nsha256: " + item.Hash + "\n" + dimStyle.Render("Trust activates only this exact content hash. Every executable operation still follows its own approval and sandbox policy.")
+		}
+	case managementRuns:
+		if item, ok := m.selectedRun(); ok {
+			availability := "retained worktree missing"
+			if item.Available {
+				availability = "retained worktree available"
+			}
+			check := "not checked for apply"
+			if m.management.checkedRunRecord == item.StatePath {
+				check = "compatibility check passed in this TUI state"
+			}
+			return labelStyle.Render("Retained run") + "\n" +
+				compact(item.Task, m.panelTextWidth()) + "\n" +
+				"updated: " + item.UpdatedAt.Local().Format("2006-01-02 15:04") + "\n" +
+				availability + " · " + check + "\n" +
+				dimStyle.Render("Exports stay private under Gator's state directory. Apply requires a clean checkout, a successful c check, then a separate confirmation.")
 		}
 	case managementWorktrees:
 		if item, ok := m.selectedWorktree(); ok {

@@ -110,7 +110,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if baseURL == "" {
 		baseURL = settings.ProviderEndpoint(provider)
 	}
-	management, err := newTUIManagementBackend(repository, store)
+	management, err := newTUIManagementBackend(repository, stateDir, store)
 	if err != nil {
 		return fmt.Errorf("configure TUI management: %w", err)
 	}
