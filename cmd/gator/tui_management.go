@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
+	modelprovider "github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tui"
@@ -53,7 +54,7 @@ func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementS
 	if err != nil {
 		return tui.ManagementSnapshot{}, err
 	}
-	children, err := childSnapshot(runRecord)
+	children, batches, err := childSnapshot(runRecord)
 	if err != nil {
 		return tui.ManagementSnapshot{}, err
 	}
@@ -75,7 +76,7 @@ func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementS
 			SandboxMode: string(policy.Mode), Network: string(policy.Network),
 			DefaultProvider: settings.Defaults.Provider, DefaultModel: settings.Defaults.Model,
 		},
-		Trusts: trusts, Runs: managedRuns, Worktrees: worktrees, Children: children, Extensions: extensions,
+		Trusts: trusts, Runs: managedRuns, Worktrees: worktrees, Children: children, Batches: batches, Extensions: extensions,
 	}, nil
 }
 
@@ -154,16 +155,17 @@ func (backend *tuiManagementBackend) extensionSnapshot(settings config.Settings)
 	return result, nil
 }
 
-func childSnapshot(runRecord string) ([]tui.ManagedChild, error) {
+func childSnapshot(runRecord string) ([]tui.ManagedChild, []tui.ManagedBatch, error) {
 	if strings.TrimSpace(runRecord) == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	manifests, err := journal.ListChildManifests(runRecord)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		manifests = nil
+		err = nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	result := make([]tui.ManagedChild, 0, len(manifests))
 	for _, manifest := range manifests {
@@ -177,7 +179,27 @@ func childSnapshot(runRecord string) ([]tui.ManagedChild, error) {
 			Error:        manifest.Error,
 		})
 	}
-	return result, nil
+	batchManifests, err := journal.ListChildBatchManifests(runRecord)
+	if errors.Is(err, os.ErrNotExist) {
+		batchManifests = nil
+	} else if err != nil {
+		return nil, nil, err
+	}
+	batches := make([]tui.ManagedBatch, 0, len(batchManifests))
+	for _, batch := range batchManifests {
+		conflicts := make([]tui.ManagedConflict, 0, len(batch.Conflicts))
+		for _, conflict := range batch.Conflicts {
+			conflicts = append(conflicts, tui.ManagedConflict{
+				Kind: conflict.Kind, ChildIDs: append([]string(nil), conflict.ChildIDs...),
+				Paths: append([]string(nil), conflict.Paths...), Detail: conflict.Detail,
+			})
+		}
+		batches = append(batches, tui.ManagedBatch{
+			ID: batch.ID, Status: string(batch.Status), ChildIDs: append([]string(nil), batch.ChildIDs...),
+			Conflicts: conflicts, Error: batch.Error,
+		})
+	}
+	return result, batches, nil
 }
 
 func (backend *tuiManagementBackend) SetExecutionPolicy(mode, network string) error {
@@ -207,6 +229,22 @@ func (backend *tuiManagementBackend) SetDefaults(provider, model string) error {
 	settings, err := backend.settings.Load()
 	if err != nil {
 		return err
+	}
+	if custom, found := configuredCustomProvider(settings, provider); found {
+		if model == "" {
+			model = custom.DefaultModel
+		}
+		if !customProviderSupportsModel(custom, model) {
+			return fmt.Errorf("model %q is not configured for custom provider %q", model, custom.ID)
+		}
+		provider = custom.ID
+	} else {
+		parsed, err := modelprovider.ParseProvider(provider)
+		if err != nil {
+			return err
+		}
+		provider = string(parsed)
+		model = modelprovider.EffectiveModel(parsed, model)
 	}
 	settings.Defaults.Provider = provider
 	settings.Defaults.Model = model
@@ -448,6 +486,20 @@ func (backend *tuiManagementBackend) managedSession(runRecord string) (journal.S
 	runRecord = strings.TrimSpace(runRecord)
 	if runRecord == "" {
 		return journal.Session{}, "", errors.New("retained run record is required")
+	}
+	runs, err := journal.ListRecentRuns(backend.stateDir, backend.repository, 10000)
+	if err != nil {
+		return journal.Session{}, "", err
+	}
+	managed := false
+	for _, run := range runs {
+		if filepath.Clean(run.StatePath) == filepath.Clean(runRecord) {
+			managed = true
+			break
+		}
+	}
+	if !managed {
+		return journal.Session{}, "", errors.New("retained run is not managed for this repository")
 	}
 	session, err := journal.LoadSession(runRecord)
 	if err != nil {

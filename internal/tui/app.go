@@ -113,6 +113,7 @@ type ManagementSnapshot struct {
 	Runs       []ManagedRun
 	Worktrees  []ManagedWorktree
 	Children   []ManagedChild
+	Batches    []ManagedBatch
 	Extensions []ManagedExtension
 }
 
@@ -154,6 +155,21 @@ type ManagedChild struct {
 	WorktreePath string
 	PatchBytes   int
 	Error        string
+}
+
+type ManagedBatch struct {
+	ID        string
+	Status    string
+	ChildIDs  []string
+	Conflicts []ManagedConflict
+	Error     string
+}
+
+type ManagedConflict struct {
+	Kind     string
+	ChildIDs []string
+	Paths    []string
+	Detail   string
 }
 
 type ManagedExtension struct {
@@ -851,6 +867,14 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.management.data = msg.snapshot
 		m.config.Execution.Mode = sandbox.Mode(msg.snapshot.Settings.SandboxMode)
 		m.config.Execution.Network = sandbox.Network(msg.snapshot.Settings.Network)
+		if m.management.section == managementRuns && m.management.selectedRunRecord != "" {
+			for index, run := range msg.snapshot.Runs {
+				if run.StatePath == m.management.selectedRunRecord {
+					m.management.index = index
+					break
+				}
+			}
+		}
 		if count := m.managementItemCount(); count == 0 {
 			m.management.index = 0
 		} else if m.management.index >= count {
@@ -861,6 +885,7 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.management.loading = false
 		if msg.err != nil {
 			m.management.err = msg.err
+			m.management.actionDetail = ""
 			m.notice = notice{text: msg.message + ": " + msg.err.Error(), kind: noticeError}
 			return m, nil
 		}

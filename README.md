@@ -229,10 +229,15 @@ commands are `/plan`, `/execute`, `/new`, `/status`, `/effort`, `/model`, `/mana
 `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every
 provider an enforced read-only tool surface and does not require a verifier;
 switch the same retained thread to `/execute` when you are ready to make edits.
-`/manage` opens an inspect-first local control center for project hook/LSP/MCP/
-extension trust, retained worktrees, writer-child manifests, and installed
-extension state. Trust changes, extension removal, and worktree removal require
-an explicit confirmation; project executable content remains hash-pinned.
+`/manage` opens an inspect-first local control center for execution defaults,
+project hook/LSP/MCP/extension trust, retained runs and worktrees, writer-child
+manifests, and installed extension state. It can save the currently selected
+provider/model as the default, change strict/off sandbox and deny/allow network
+defaults after an explicit confirmation, privately export a retained patch or
+HTML transcript below Gator's state directory, and transfer a retained patch
+only after a clean-checkout compatibility check plus a separate apply
+confirmation. Trust changes, extension removal, and worktree removal also
+require confirmation; project executable content remains hash-pinned.
 `Ctrl+Space` (reported as `Ctrl+@`
 by many terminals) reopens an active `@` path menu. Use `@path/to/file` or `@"path with spaces"`
 in a task to mark repository files or directories that the agent should inspect

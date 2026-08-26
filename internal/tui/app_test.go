@@ -2552,6 +2552,8 @@ func TestManagementHubLoadsTypedStateAndConfirmsTrustChanges(t *testing.T) {
 	}
 	next, _ = model.Update(command())
 	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
+	model = next.(Model)
 	if view := model.View(); !strings.Contains(view, "hooks") || !strings.Contains(view, "abc123") {
 		t.Fatalf("management view = %q", view)
 	}
@@ -2575,9 +2577,97 @@ func TestManagementHubLoadsTypedStateAndConfirmsTrustChanges(t *testing.T) {
 	}
 }
 
+func TestManagementSettingsPersistOnlyAfterConfirmation(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		Settings: ManagedSettings{SandboxMode: "strict", Network: "deny", DefaultProvider: "openai", DefaultModel: "gpt"},
+	}}
+	model := New(Config{Management: backend})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/manage")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.management.confirm == nil || len(backend.policyChanges) != 0 {
+		t.Fatalf("sandbox change before confirmation = confirm:%#v changes:%#v", model.management.confirm, backend.policyChanges)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	if got, want := backend.policyChanges, []string{"off:deny"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("policy changes = %#v, want %#v", got, want)
+	}
+}
+
+func TestManagementApplyRequiresSuccessfulCheckAndSeparateConfirmation(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		Runs: []ManagedRun{{ID: "run-1", StatePath: "/state/run-1", Provider: "openai", Model: "gpt", Available: true}},
+	}}
+	model := New(Config{Management: backend})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/manage")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	model = next.(Model)
+	for range 2 {
+		next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
+		model = next.(Model)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	model = next.(Model)
+	if model.management.confirm != nil || len(backend.applied) != 0 {
+		t.Fatalf("unchecked apply = confirm:%#v applied:%#v", model.management.confirm, backend.applied)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("compatibility check did not start")
+	}
+	next, refresh := model.Update(command())
+	model = next.(Model)
+	if model.management.checkedRunRecord != "/state/run-1" || refresh == nil {
+		t.Fatalf("check state = %q refresh:%v", model.management.checkedRunRecord, refresh)
+	}
+	next, _ = model.Update(refresh())
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	model = next.(Model)
+	if model.management.confirm == nil || len(backend.applied) != 0 {
+		t.Fatalf("checked apply confirmation = %#v applied:%#v", model.management.confirm, backend.applied)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	if got, want := backend.applied, []string{"/state/run-1"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("applied runs = %#v, want %#v", got, want)
+	}
+}
+
+func TestManagementShowsWriterBatchConflictEvidence(t *testing.T) {
+	model := New(Config{})
+	model.width, model.height = 100, 40
+	model.screen = managementScreen
+	model.management.section = managementChildren
+	model.management.data.Batches = []ManagedBatch{{
+		ID: "batch-1", Status: "completed", ChildIDs: []string{"child-a", "child-b"},
+		Conflicts: []ManagedConflict{{Kind: "path_overlap", ChildIDs: []string{"child-a", "child-b"}, Paths: []string{"internal/shared.go"}, Detail: "both writers changed the same file"}},
+	}}
+	view := model.View()
+	for _, expected := range []string{"batch-1", "path_overlap", "internal/shared.go", "both writers changed"} {
+		if !strings.Contains(view, expected) {
+			t.Fatalf("batch conflict view missing %q: %q", expected, view)
+		}
+	}
+}
+
 type fakeManagementBackend struct {
-	snapshot     ManagementSnapshot
-	trustChanges []string
+	snapshot      ManagementSnapshot
+	trustChanges  []string
+	policyChanges []string
+	applied       []string
 }
 
 func (backend *fakeManagementBackend) Snapshot(string) (ManagementSnapshot, error) {
@@ -2589,14 +2679,20 @@ func (backend *fakeManagementBackend) SetTrust(kind string, trusted bool) error 
 	return nil
 }
 
-func (*fakeManagementBackend) SetExecutionPolicy(string, string) error { return nil }
-func (*fakeManagementBackend) SetDefaults(string, string) error        { return nil }
-func (*fakeManagementBackend) SetExtensionEnabled(string, bool) error  { return nil }
-func (*fakeManagementBackend) RemoveExtension(string) error            { return nil }
-func (*fakeManagementBackend) PruneWorktrees() error                   { return nil }
-func (*fakeManagementBackend) RemoveWorktree(string) error             { return nil }
+func (backend *fakeManagementBackend) SetExecutionPolicy(mode, network string) error {
+	backend.policyChanges = append(backend.policyChanges, mode+":"+network)
+	return nil
+}
+func (*fakeManagementBackend) SetDefaults(string, string) error       { return nil }
+func (*fakeManagementBackend) SetExtensionEnabled(string, bool) error { return nil }
+func (*fakeManagementBackend) RemoveExtension(string) error           { return nil }
+func (*fakeManagementBackend) PruneWorktrees() error                  { return nil }
+func (*fakeManagementBackend) RemoveWorktree(string) error            { return nil }
 func (*fakeManagementBackend) ExportArtifact(string, string) (string, error) {
 	return "/tmp/export", nil
 }
 func (*fakeManagementBackend) CheckPatch(string) (int, error) { return 42, nil }
-func (*fakeManagementBackend) ApplyPatch(string) (int, error) { return 42, nil }
+func (backend *fakeManagementBackend) ApplyPatch(run string) (int, error) {
+	backend.applied = append(backend.applied, run)
+	return 42, nil
+}

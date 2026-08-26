@@ -152,6 +152,7 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			confirmation := *m.management.confirm
 			m.management.confirm = nil
 			m.management.loading = true
+			m.management.actionDetail = ""
 			return m, runManagementAction(m.management.backend, confirmation)
 		case "n", "esc", "ctrl+c":
 			m.management.confirm = nil
@@ -175,6 +176,8 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveManagementSelection(1)
 	case "r", "ctrl+r":
 		m.management.loading = true
+		m.management.checkedRunRecord = ""
+		m.management.actionDetail = ""
 		return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
 	case "enter":
 		switch m.management.section {
@@ -203,17 +206,28 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "c":
 		if item, ok := m.selectedRun(); ok {
 			m.management.loading = true
+			m.management.actionDetail = ""
 			return m, runImmediateManagementAction(m.management.backend, "check-patch", item.StatePath, "Check retained patch compatibility")
 		}
 	case "e":
 		if item, ok := m.selectedRun(); ok {
 			m.management.loading = true
+			m.management.actionDetail = ""
 			return m, runImmediateManagementAction(m.management.backend, "export-patch", item.StatePath, "Export retained patch privately")
 		}
-	case "H":
+	case "t":
 		if item, ok := m.selectedRun(); ok {
 			m.management.loading = true
+			m.management.actionDetail = ""
 			return m, runImmediateManagementAction(m.management.backend, "export-transcript", item.StatePath, "Export retained HTML transcript privately")
+		} else if item, ok := m.selectedTrust(); ok && item.Configured {
+			action := "trust"
+			label := "Trust current " + item.Kind + " bundle"
+			if item.Trusted {
+				action = "untrust"
+				label = "Stop trusting " + item.Kind + " bundle"
+			}
+			m.management.confirm = &managementConfirmation{action: action, id: item.Kind, label: label}
 		}
 	case "a":
 		if item, ok := m.selectedRun(); ok {
@@ -225,16 +239,6 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 				action: "apply-patch", id: item.StatePath,
 				label: "Apply retained run " + item.ID + " to the clean active checkout",
 			}
-		}
-	case "t":
-		if item, ok := m.selectedTrust(); ok && item.Configured {
-			action := "trust"
-			label := "Trust current " + item.Kind + " bundle"
-			if item.Trusted {
-				action = "untrust"
-				label = "Stop trusting " + item.Kind + " bundle"
-			}
-			m.management.confirm = &managementConfirmation{action: action, id: item.Kind, label: label}
 		}
 	case " ":
 		if item, ok := m.selectedExtension(); ok {
@@ -327,7 +331,7 @@ func (m Model) managementItemCount() int {
 	case managementWorktrees:
 		return len(m.management.data.Worktrees)
 	case managementChildren:
-		return len(m.management.data.Children)
+		return len(m.management.data.Children) + len(m.management.data.Batches)
 	case managementExtensions:
 		return len(m.management.data.Extensions)
 	default:
@@ -396,7 +400,7 @@ func (m Model) managementView() string {
 	case managementTrust:
 		footer = append([]string{"t trust/untrust"}, footer...)
 	case managementRuns:
-		footer = append([]string{"enter select", "c check", "a apply", "e export patch", "shift+h export HTML"}, footer...)
+		footer = append([]string{"enter select", "c check", "a apply", "e export patch", "t export HTML"}, footer...)
 	case managementWorktrees:
 		footer = append([]string{"x remove", "p prune metadata"}, footer...)
 	case managementExtensions:
@@ -449,7 +453,10 @@ func (m Model) managementRows() string {
 			if role == "" {
 				role = "-"
 			}
-			rows = append(rows, fmt.Sprintf("%s  %s  role=%s  patch=%d bytes", item.ID, item.Status, role, item.PatchBytes))
+			rows = append(rows, fmt.Sprintf("child %s  %s  role=%s  patch=%d bytes", item.ID, item.Status, role, item.PatchBytes))
+		}
+		for _, item := range m.management.data.Batches {
+			rows = append(rows, fmt.Sprintf("batch %s  %s  children=%d  conflicts=%d", item.ID, item.Status, len(item.ChildIDs), len(item.Conflicts)))
 		}
 	case managementExtensions:
 		for _, item := range m.management.data.Extensions {
@@ -511,13 +518,32 @@ func (m Model) managementDetail() string {
 			return labelStyle.Render("Selected worktree") + "\n" + item.Path + "\n" + dimStyle.Render("Removal deletes retained files. Private run records remain separate.")
 		}
 	case managementChildren:
-		if len(m.management.data.Children) > 0 {
+		if m.management.index < len(m.management.data.Children) {
 			item := m.management.data.Children[min(m.management.index, len(m.management.data.Children)-1)]
 			detail := "worktree: " + valueOrEmpty(item.WorktreePath) + "\nbatch: " + valueOrEmpty(item.BatchID)
 			if item.Error != "" {
 				detail += "\nerror: " + item.Error
 			}
 			return labelStyle.Render("Writer child") + "\n" + detail
+		}
+		batchIndex := m.management.index - len(m.management.data.Children)
+		if batchIndex >= 0 && batchIndex < len(m.management.data.Batches) {
+			item := m.management.data.Batches[batchIndex]
+			lines := []string{
+				"status: " + item.Status,
+				"children: " + valueOrEmpty(strings.Join(item.ChildIDs, ", ")),
+				fmt.Sprintf("conflicts: %d", len(item.Conflicts)),
+			}
+			for index, conflict := range item.Conflicts {
+				lines = append(lines, fmt.Sprintf("%d. %s · children=%s · paths=%s", index+1, conflict.Kind, strings.Join(conflict.ChildIDs, ","), strings.Join(conflict.Paths, ",")))
+				if strings.TrimSpace(conflict.Detail) != "" {
+					lines = append(lines, "   "+compact(conflict.Detail, max(8, m.panelTextWidth()-3)))
+				}
+			}
+			if item.Error != "" {
+				lines = append(lines, "error: "+item.Error)
+			}
+			return labelStyle.Render("Parallel writer batch") + "\n" + strings.Join(lines, "\n")
 		}
 	case managementExtensions:
 		if item, ok := m.selectedExtension(); ok {
