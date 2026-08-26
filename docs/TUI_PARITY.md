@@ -61,10 +61,10 @@ package manager.
 | `serve token/start/status/stop` | None | intentionally CLI only | Loopback app-server lifecycle for external clients. |
 | `acp [--verify …]` | None | intentionally CLI only | Stdio editor-agent protocol. |
 | `config show` | `/status` and `/permissions` show only active session state | partial | No full, redacted settings inspector. |
-| `config set default-provider/default-model` | `/model` Cloud configuration saves a direct provider/model default | partial | Selecting an already-configured model with `u` remains session-only; custom and harness defaults do not have a persistent editor. |
-| `config set sandbox/network` | `/permissions` is read-only | CLI only | No persistent sandbox or network policy editor. |
+| `config set default-provider/default-model` | `/manage` saves the provider/model currently selected in `/model` after confirmation | complete | — |
+| `config set sandbox/network` | `/manage` shows and confirms strict/off sandbox and deny/allow network defaults; `/permissions` explains the effective policy | complete | — |
 | `agent list` | None | CLI only | Project-defined role inventory is not displayed. |
-| `child list/show/batches/batch` | `/manage` browses writer-child status, role, patch size, retained worktree, batch ID, and errors for the active retained run | partial | Batch conflict records and arbitrary run-record selection remain CLI-only. |
+| `child list/show/batches/batch` | `/manage` selects arbitrary retained runs and browses writer-child status, role, patch size, worktree, batch schedules, and path-conflict evidence | complete | — |
 | `hook status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes | complete | — |
 | `lsp status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes; runtime operations still require approval | complete | — |
 | `mcp status/trust/untrust/login/logout` | `/manage` shows configured hash/state and confirms trust changes | partial | OAuth login, authentication status, and credential removal remain CLI-only. |
@@ -97,10 +97,10 @@ package manager.
 | `resume` | `/recent`, `Ctrl+O`, all-repository toggle, then compose a continuation | partial | No path/ID text target, exact max-step input, or direct noninteractive continuation. |
 | `fork` | `/tree` and `/fork` choose a retained turn | partial | No direct ID/path, exact max steps, or noninteractive instruction flags. |
 | `clone` | `/clone` clones the active retained branch | partial | No arbitrary-turn picker, direct ID/path, exact max steps, or noninteractive instruction flags. |
-| `transcript RUN_RECORD_PATH` | Scrollable in-TUI transcript and `/copyall` | partial | No HTML export or arbitrary run-record picker. |
+| `transcript RUN_RECORD_PATH` | `/manage` selects retained runs and writes private HTML exports below Gator's state directory; active transcript remains scrollable and copyable | complete | — |
 | `review RUN_RECORD_PATH [--open]` | `/review` provides structured retained-worktree review and focused diffs | partial | No browser-review server, listen-address input, or arbitrary run-record picker. |
-| `export RUN_RECORD_PATH` | Review shows the exact export command | partial | No direct patch file/clipboard export action. |
-| `apply [--check] RUN_RECORD_PATH` | Review shows the exact apply/check commands | partial | No explicit clean-checkout compatibility check or apply confirmation flow. |
+| `export RUN_RECORD_PATH` | `/manage` selects retained runs and writes private patch exports below Gator's state directory | complete | — |
+| `apply [--check] RUN_RECORD_PATH` | `/manage` requires a successful clean-checkout compatibility check for the selected run, then a separate apply confirmation | complete | — |
 
 ## Gaps to implement next
 
@@ -111,10 +111,10 @@ defines the next bounded iteration rather than implying broad parity.
 1. **Credential lifecycle in `/model`** — add a safe `remove credential`
    confirmation and provider credential metadata. Entry and provider-specific
    configuration are complete; removal remains CLI-only.
-2. **Persistent execution-policy editor** — add a Settings panel for default
-   provider/model, strict/off sandbox, and allow/deny network. The control
-   must explain that relaxing either policy is security-relevant and save only
-   after confirmation.
+2. **Persistent execution-policy editor** — implemented in `/manage` for the
+   currently selected provider/model, strict/off sandbox, and deny/allow
+   network. Security-relaxing changes explain their effect and save only after
+   confirmation.
 3. **Project integration trust center** — implemented in `/manage` for status,
    exact manifest hash, trust, and untrust for hooks, LSP, MCP, and project
    extensions. MCP OAuth setup remains CLI-only and retains the trusted-
@@ -126,10 +126,11 @@ defines the next bounded iteration rather than implying broad parity.
 5. **Extension manager** — `/manage` now provides inventory, enable/disable,
    removal confirmation, and project trust review. Install path/URL input is
    still CLI-only and must preserve bounded source validation.
-6. **Retained-artifact/worktree manager** — `/manage` now browses worktrees and
-   active-run writer children and confirms prune/remove. Arbitrary run-record
-   selection, batch-conflict detail, transcript/patch export, clean-check, and
-   apply remain to be added.
+6. **Retained-artifact/worktree manager** — `/manage` now selects arbitrary
+   repository run records, scopes writer-child browsing to the selection,
+   writes private transcript/patch exports, performs clean-checkout
+   compatibility checks, confirms apply, manages worktree prune/remove, and
+   displays writer-batch path-conflict evidence.
 7. **Advanced run editor** — exact turn cap, base revision, setup commands,
    copy-ignored opt-in, scopes, agent profile, scout assignments, and explicit
    pre-approved argv. Each option needs a safety explanation; `trust-commands`
