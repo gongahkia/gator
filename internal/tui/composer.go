@@ -43,6 +43,7 @@ var slashCommands = []slashCommand{
 	{name: "/help", description: "show Gator conversation commands"},
 	{name: "/execute", description: "switch this thread to Execute mode"},
 	{name: "/fork", description: "choose a retained turn to branch from"},
+	{name: "/manage", description: "manage project trust, worktrees, writer children, and extensions"},
 	{name: "/model", description: "manage cloud and local models for the next run"},
 	{name: "/new", description: "start a new isolated thread"},
 	{name: "/plan", description: "switch to enforced read-only Plan mode"},

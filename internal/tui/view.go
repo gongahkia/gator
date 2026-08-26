@@ -127,6 +127,8 @@ func (m Model) View() string {
 		view = m.extensionUIView()
 	case localModelsScreen:
 		view = m.localModelsView()
+	case managementScreen:
+		view = m.managementView()
 	default:
 		return ""
 	}

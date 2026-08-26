@@ -64,13 +64,13 @@ package manager.
 | `config set default-provider/default-model` | `/model` Cloud configuration saves a direct provider/model default | partial | Selecting an already-configured model with `u` remains session-only; custom and harness defaults do not have a persistent editor. |
 | `config set sandbox/network` | `/permissions` is read-only | CLI only | No persistent sandbox or network policy editor. |
 | `agent list` | None | CLI only | Project-defined role inventory is not displayed. |
-| `child list/show/batches/batch` | None | CLI only | Retained writer-child manifests and batches are not browsable. |
-| `hook status/trust/untrust` | None | CLI only | Project hook trust cannot be inspected or changed. |
-| `lsp status/trust/untrust` | Runtime LSP approval can occur during a run | partial | Bundle status, hash review, and persistent trust revocation are absent. |
-| `mcp status/trust/untrust/login/logout` | MCP use can occur during a trusted run | partial | Status, trust decision, OAuth setup, and credential removal are absent. |
-| `worktree list/prune/remove` | Current run can be reviewed | partial | No global retained-worktree list, stale-metadata prune, or confirmed deletion. |
-| `extension list/status` | `/extensions` renders cards from already trusted extensions | partial | It is not an extension inventory or status view. |
-| `extension install/enable/disable/remove/trust/untrust` | None | CLI only | No extension management or project trust controls. |
+| `child list/show/batches/batch` | `/manage` browses writer-child status, role, patch size, retained worktree, batch ID, and errors for the active retained run | partial | Batch conflict records and arbitrary run-record selection remain CLI-only. |
+| `hook status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes | complete | — |
+| `lsp status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes; runtime operations still require approval | complete | — |
+| `mcp status/trust/untrust/login/logout` | `/manage` shows configured hash/state and confirms trust changes | partial | OAuth login, authentication status, and credential removal remain CLI-only. |
+| `worktree list/prune/remove` | `/manage` lists retained worktrees and confirms metadata pruning or deletion | complete | — |
+| `extension list/status` | `/manage` shows installed extension metadata/state; `/extensions` renders trusted static cards | complete | — |
+| `extension install/enable/disable/remove/trust/untrust` | `/manage` confirms enable/disable, removal, and project trust changes | partial | Source installation remains CLI-only so URL/path entry and replacement stay explicit. |
 | `provider list` | `/model` lists configured custom-provider models for selection | partial | Endpoint and credential-source details are not editable. |
 | `provider add/discover/remove` | None | CLI only | No custom-provider editor, discovery action, or confirmed removal. |
 | `local list/status` | `/model` Local section | complete | The CLI remains preferable for scripts and textual diagnostics. |
@@ -105,7 +105,8 @@ package manager.
 ## Gaps to implement next
 
 These are ordered by impact on the stated goal that the TUI be a complete
-configuration surface. They are not implemented by this change.
+configuration surface. Completed portions are marked below; remaining detail
+defines the next bounded iteration rather than implying broad parity.
 
 1. **Credential lifecycle in `/model`** — add a safe `remove credential`
    confirmation and provider credential metadata. Entry and provider-specific
@@ -114,20 +115,21 @@ configuration surface. They are not implemented by this change.
    provider/model, strict/off sandbox, and allow/deny network. The control
    must explain that relaxing either policy is security-relevant and save only
    after confirmation.
-3. **Project integration trust center** — status, manifest hash, trust, and
-   untrust for hooks, LSP, and MCP; MCP OAuth must retain the current
-   trusted-manifest precondition.
+3. **Project integration trust center** — implemented in `/manage` for status,
+   exact manifest hash, trust, and untrust for hooks, LSP, MCP, and project
+   extensions. MCP OAuth setup remains CLI-only and retains the trusted-
+   manifest precondition.
 4. **Custom provider manager** — text fields for ID, OpenAI-compatible chat
    endpoint, model list/default, and credential-source policy; catalog
    discovery and deletion need an explicit confirmation. Do not put a custom
    provider API key in `config.json`.
-5. **Extension manager** — inventory, install path input, enable/disable,
-   remove confirmation, and project trust review. Installation must preserve
-   the current bounded source validation and never execute extension UI code.
-6. **Retained-artifact/worktree manager** — browser for run records, child
-   manifests, worktrees, transcript export, patch export, clean-check, and
-   confirmed apply/remove. Apply/delete need exact target display and a final
-   confirmation.
+5. **Extension manager** — `/manage` now provides inventory, enable/disable,
+   removal confirmation, and project trust review. Install path/URL input is
+   still CLI-only and must preserve bounded source validation.
+6. **Retained-artifact/worktree manager** — `/manage` now browses worktrees and
+   active-run writer children and confirms prune/remove. Arbitrary run-record
+   selection, batch-conflict detail, transcript/patch export, clean-check, and
+   apply remain to be added.
 7. **Advanced run editor** — exact turn cap, base revision, setup commands,
    copy-ignored opt-in, scopes, agent profile, scout assignments, and explicit
    pre-approved argv. Each option needs a safety explanation; `trust-commands`

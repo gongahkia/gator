@@ -2534,3 +2534,62 @@ func runGit(t *testing.T, directory string, arguments ...string) {
 		t.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), err, output)
 	}
 }
+
+func TestManagementHubLoadsTypedStateAndConfirmsTrustChanges(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		Trusts:     []ManagedTrust{{Kind: "hooks", Hash: "abc123", Configured: true}},
+		Worktrees:  []ManagedWorktree{{ID: "run-1", Path: "/tmp/repo-gator-runs/run-1"}},
+		Children:   []ManagedChild{{ID: "child-1", Status: "completed", Role: "writer", PatchBytes: 42}},
+		Extensions: []ManagedExtension{{ID: "review", Name: "Review", Enabled: true, Tools: 1}},
+	}}
+	model := New(Config{Management: backend})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/manage")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.screen != managementScreen || command == nil {
+		t.Fatalf("open management = screen:%d command:%v", model.screen, command)
+	}
+	next, _ = model.Update(command())
+	model = next.(Model)
+	if view := model.View(); !strings.Contains(view, "hooks") || !strings.Contains(view, "abc123") {
+		t.Fatalf("management view = %q", view)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	model = next.(Model)
+	if model.management.confirm == nil {
+		t.Fatal("trust action did not require confirmation")
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("confirmed trust action did not start")
+	}
+	next, command = model.Update(command())
+	model = next.(Model)
+	if len(backend.trustChanges) != 1 || backend.trustChanges[0] != "hooks:true" {
+		t.Fatalf("trust changes = %#v", backend.trustChanges)
+	}
+	if command == nil {
+		t.Fatal("successful action did not refresh management state")
+	}
+}
+
+type fakeManagementBackend struct {
+	snapshot     ManagementSnapshot
+	trustChanges []string
+}
+
+func (backend *fakeManagementBackend) Snapshot(string) (ManagementSnapshot, error) {
+	return backend.snapshot, nil
+}
+
+func (backend *fakeManagementBackend) SetTrust(kind string, trusted bool) error {
+	backend.trustChanges = append(backend.trustChanges, fmt.Sprintf("%s:%t", kind, trusted))
+	return nil
+}
+
+func (*fakeManagementBackend) SetExtensionEnabled(string, bool) error { return nil }
+func (*fakeManagementBackend) RemoveExtension(string) error           { return nil }
+func (*fakeManagementBackend) PruneWorktrees() error                  { return nil }
+func (*fakeManagementBackend) RemoveWorktree(string) error            { return nil }
