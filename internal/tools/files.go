@@ -35,8 +35,8 @@ type ReadFile struct {
 func (t ReadFile) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "read_file",
-		Description: "Read a bounded line range from a text file in the workspace.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`),
+		Description: "Read a bounded line range from a text file in the primary workspace or an approved read-only external root.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Primary-worktree-relative path or an approved external-root absolute path"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`),
 	}
 }
 
@@ -128,8 +128,8 @@ type ListFiles struct {
 func (t ListFiles) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "list_files",
-		Description: "List repository files below a workspace-relative directory. Use this before guessing paths.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
+		Description: "List files below a primary-worktree-relative directory or an approved read-only external-root absolute directory. Use this before guessing paths.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","description":"Primary-worktree-relative path or an approved external-root absolute path"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
 	}
 }
 
@@ -171,8 +171,8 @@ type SearchFiles struct {
 func (t SearchFiles) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "search_files",
-		Description: "Search literal text in workspace files and return matching lines with paths and line numbers.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1},"path":{"type":"string"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
+		Description: "Search literal text in primary-worktree or approved read-only external-root files and return matching lines with paths and line numbers.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1},"path":{"type":"string","description":"Primary-worktree-relative path or an approved external-root absolute path"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
 	}
 }
 

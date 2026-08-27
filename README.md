@@ -622,7 +622,8 @@ needs its own approval and is represented to the approval UI by a digest rather
 than the input bytes. Ordinary tasks stop when the agent run ends. A detached
 task keeps its existing policy, is visible through `Ctrl+T` after the run in
 the native TUI or controllable through the app-server's authenticated terminal
-methods, expires within two hours, and is capped at eight per Gator session.
+methods, expires within two hours while running, and retains at most eight
+restartable histories per Gator session.
 Gator's normal shutdown path stops it; it cannot be created from direct
 commands, plain JSONL RPC, ACP, or a child writer.
 This is an agent-mediated task manager, not an arbitrary host shell. `Ctrl+T`

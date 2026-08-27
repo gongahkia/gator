@@ -330,6 +330,7 @@ func (s *Server) executePrompt(ctx context.Context, cancel context.CancelFunc, s
 		s.mu.Lock()
 		if session, found := s.sessions[sessionID]; found {
 			session.statePath = outcome.StatePath
+			session.messages = append([]agent.Message(nil), outcome.Result.Messages...)
 			if session.title == "" {
 				session.title = titleFor(task)
 			}
@@ -481,7 +482,21 @@ func (s *Server) resumeSession(request inbound) error {
 	if existing, found := s.sessions[params.SessionID]; found {
 		existing.additional = append([]workspace.Root(nil), additional...)
 		mode := s.modeState(existing)
+		messages := append([]agent.Message(nil), existing.messages...)
+		statePath := existing.statePath
 		s.mu.Unlock()
+		if request.Method == "session/load" && len(messages) == 0 && statePath != "" {
+			previous, loadErr := journal.LoadSession(statePath)
+			if loadErr != nil {
+				return fmt.Errorf("load retained ACP session %q: %w", params.SessionID, loadErr)
+			}
+			messages = previous.Messages
+		}
+		if request.Method == "session/load" {
+			s.replaySession(params.SessionID, messages)
+			s.sendResult(responseID(request.ID), json.RawMessage("null"))
+			return nil
+		}
 		s.sendResult(responseID(request.ID), map[string]any{"modes": mode})
 		return nil
 	}
@@ -509,13 +524,68 @@ func (s *Server) resumeSession(request inbound) error {
 		mode:         mode,
 		title:        titleFor(thread.Task),
 		statePath:    thread.HeadStatePath,
+		messages:     append([]agent.Message(nil), previous.Messages...),
 		updatedAt:    time.Now().UTC(),
 	}
 	s.mu.Lock()
 	s.sessions[session.id] = session
 	s.mu.Unlock()
+	if request.Method == "session/load" {
+		s.replaySession(session.id, session.messages)
+		s.sendResult(responseID(request.ID), json.RawMessage("null"))
+		return nil
+	}
 	s.sendResult(responseID(request.ID), map[string]any{"modes": s.modeState(session)})
 	return nil
+}
+
+// replaySession projects retained conversation entries into ACP session
+// updates before session/load replies. It keeps tool results out of message
+// text while preserving tool-call progress as structured updates.
+func (s *Server) replaySession(sessionID string, messages []agent.Message) {
+	for _, message := range messages {
+		var update string
+		switch message.Role {
+		case agent.RoleUser:
+			update = "user_message_chunk"
+		case agent.RoleAgent:
+			update = "agent_message_chunk"
+		default:
+			continue
+		}
+		if message.Content != "" {
+			s.notify(sessionID, map[string]any{
+				"sessionUpdate": update,
+				"messageId":     s.nextID("replay"),
+				"content":       map[string]any{"type": "text", "text": message.Content},
+			})
+		}
+		if message.Role != agent.RoleAgent {
+			continue
+		}
+		for _, call := range message.ToolCalls {
+			if call.ID == "" || call.Name == "" {
+				continue
+			}
+			s.notify(sessionID, map[string]any{
+				"sessionUpdate": "tool_call",
+				"toolCallId":    call.ID,
+				"title":         call.Name,
+				"kind":          acpToolKind(call.Name),
+				"status":        "in_progress",
+			})
+		}
+	}
+	for _, message := range messages {
+		if message.Role != agent.RoleTool || message.ToolCallID == "" {
+			continue
+		}
+		s.notify(sessionID, map[string]any{
+			"sessionUpdate": "tool_call_update",
+			"toolCallId":    message.ToolCallID,
+			"status":        "completed",
+		})
+	}
 }
 
 func (s *Server) closeSession(request inbound) error {
