@@ -80,3 +80,38 @@ func ListRecentRuns(stateDir, repository string, limit int) ([]RecentRun, error)
 	}
 	return runs, nil
 }
+
+// ManagedRunRecord returns the cleaned state path if runRecord is a retained
+// run directory for repository under stateDir. Membership is a path check, not
+// a capped recency scan, so an old run remains managed even when it falls off
+// the recent-run list.
+func ManagedRunRecord(stateDir, repository, runRecord string) (string, error) {
+	runRecord = strings.TrimSpace(runRecord)
+	if runRecord == "" {
+		return "", errors.New("retained run record is required")
+	}
+	if strings.TrimSpace(repository) == "" {
+		return "", errors.New("recent-run repository is required")
+	}
+	base, err := resolveStateDir(stateDir)
+	if err != nil {
+		return "", err
+	}
+	expected := filepath.Join(base, "gator", "runs", repositoryFingerprint(repository))
+	absolute, err := filepath.Abs(runRecord)
+	if err != nil {
+		return "", fmt.Errorf("resolve retained run record: %w", err)
+	}
+	record := filepath.Clean(absolute)
+	if resolved, err := filepath.EvalSymlinks(expected); err == nil {
+		expected = resolved
+	}
+	if resolved, err := filepath.EvalSymlinks(record); err == nil {
+		record = resolved
+	}
+	relative, err := filepath.Rel(expected, record)
+	if err != nil || relative == "." || !filepath.IsLocal(relative) || filepath.Base(relative) != relative || !validRunID(relative) {
+		return "", errors.New("retained run is not managed for this repository")
+	}
+	return record, nil
+}

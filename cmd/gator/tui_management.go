@@ -483,23 +483,9 @@ func (backend *tuiManagementBackend) ApplyPatch(runRecord string) (int, error) {
 }
 
 func (backend *tuiManagementBackend) managedSession(runRecord string) (journal.Session, string, error) {
-	runRecord = strings.TrimSpace(runRecord)
-	if runRecord == "" {
-		return journal.Session{}, "", errors.New("retained run record is required")
-	}
-	runs, err := journal.ListRecentRuns(backend.stateDir, backend.repository, 10000)
+	runRecord, err := journal.ManagedRunRecord(backend.stateDir, backend.repository, runRecord)
 	if err != nil {
 		return journal.Session{}, "", err
-	}
-	managed := false
-	for _, run := range runs {
-		if filepath.Clean(run.StatePath) == filepath.Clean(runRecord) {
-			managed = true
-			break
-		}
-	}
-	if !managed {
-		return journal.Session{}, "", errors.New("retained run is not managed for this repository")
 	}
 	session, err := journal.LoadSession(runRecord)
 	if err != nil {

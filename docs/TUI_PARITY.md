@@ -90,7 +90,7 @@ package manager.
 | `run --provider/--model/--base-url` | Runtime drawer and `/model` configuration | partial | Endpoint override is persistent rather than an explicit one-run field. |
 | `run --image/--attach` | `@` path references, preview, and confirmation | complete | — |
 | `run --max-steps` | `/effort` controls bounded turn budgets | partial | No exact integer turn-cap input. |
-| `run --sandbox/--network` | `/permissions` reports the policy | CLI only | No persisted policy editor. |
+| `run --sandbox/--network` | `/manage` persists sandbox/network defaults; `/permissions` reports the effective policy | partial | One-run `--sandbox`/`--network` overrides remain CLI-only. |
 | `run --base/--copy-ignored/--setup` | None | CLI only | These alter worktree construction and require explicit advanced controls. |
 | `run --scope/--profile/--scout` | `@` references constrain context paths | partial | No explicit scope list, profile picker, or scout assignment editor. |
 | `run --allow-command/--trust-commands` | Per-command approval in TUI | partial | No pre-approved argv list or unsafe whole-run auto-approve switch. |

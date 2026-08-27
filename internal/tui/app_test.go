@@ -2646,6 +2646,44 @@ func TestManagementApplyRequiresSuccessfulCheckAndSeparateConfirmation(t *testin
 	}
 }
 
+func TestManagementRefreshClearsCompatibilityCheck(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		Runs: []ManagedRun{{ID: "run-1", StatePath: "/state/run-1", Provider: "openai", Model: "gpt", Available: true}},
+	}}
+	model := New(Config{Management: backend})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/manage")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	model = next.(Model)
+	for range 2 {
+		next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
+		model = next.(Model)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	model = next.(Model)
+	next, refresh := model.Update(command())
+	model = next.(Model)
+	next, _ = model.Update(refresh())
+	model = next.(Model)
+	if model.management.checkedRunRecord != "/state/run-1" {
+		t.Fatalf("checked run = %q", model.management.checkedRunRecord)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r")})
+	model = next.(Model)
+	if command == nil || model.management.checkedRunRecord != "" {
+		t.Fatalf("refresh did not clear check: command=%v checked=%q", command, model.management.checkedRunRecord)
+	}
+	next, _ = model.Update(command())
+	model = next.(Model)
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	model = next.(Model)
+	if model.management.confirm != nil || len(backend.applied) != 0 {
+		t.Fatalf("apply after refresh = confirm:%#v applied:%#v", model.management.confirm, backend.applied)
+	}
+}
+
 func TestManagementShowsWriterBatchConflictEvidence(t *testing.T) {
 	model := New(Config{})
 	model.width, model.height = 100, 40

@@ -626,3 +626,28 @@ func TestLoadThreadLineageRejectsMismatchedThreadIdentity(t *testing.T) {
 		t.Fatalf("lineage error = %v", err)
 	}
 }
+
+func TestManagedRunRecordRejectsOtherRepositoriesAndEscapes(t *testing.T) {
+	stateDirectory := t.TempDir()
+	now := time.Now()
+	journal, record, err := Open("/workspace/project", "run-001", "/runs/run-001", stateDirectory, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ManagedRunRecord(stateDirectory, "/workspace/project", record.StatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Clean(got) != repositoryIdentity(record.StatePath) && filepath.Clean(got) != filepath.Clean(record.StatePath) {
+		t.Fatalf("managed path = %q, want %q", got, record.StatePath)
+	}
+	if _, err := ManagedRunRecord(stateDirectory, "/workspace/other", record.StatePath); err == nil || !strings.Contains(err.Error(), "not managed") {
+		t.Fatalf("other repository = %v", err)
+	}
+	if _, err := ManagedRunRecord(stateDirectory, "/workspace/project", filepath.Join(record.StatePath, "..")); err == nil {
+		t.Fatal("parent directory was accepted as a run record")
+	}
+}
