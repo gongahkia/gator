@@ -79,12 +79,15 @@ func (m *Model) resizeInputs() {
 	m.model.Width = width
 	m.terminalInput.Width = width
 	m.runOptions.maxSteps.Width = width
+	m.runOptions.baseURL.Width = width
 	m.runOptions.baseRef.Width = width
 	m.runOptions.setup.SetWidth(width)
 	m.runOptions.scopes.SetWidth(width)
 	m.runOptions.scouts.SetWidth(width)
 	m.runOptions.allowed.SetWidth(width)
 	m.runOptions.prefixes.SetWidth(width)
+	m.recentTarget.Width = width
+	m.reviewWeb.listen.Width = width
 
 	switch {
 	case m.height < 20:
@@ -140,6 +143,8 @@ func (m Model) View() string {
 		view = m.doctorView()
 	case runOptionsScreen:
 		view = m.runOptionsView()
+	case reviewWebScreen:
+		view = m.reviewWebView()
 	default:
 		return ""
 	}

@@ -72,6 +72,8 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateDoctor(message)
 	case runOptionsScreen:
 		return m.updateRunOptions(message)
+	case reviewWebScreen:
+		return m.updateReviewWeb(message)
 	default:
 		return m, nil
 	}

@@ -100,7 +100,9 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	defer m.persistDraft()
 	defer m.refreshPreflight()
 	command := matches[m.commandIndex]
-	arguments := strings.Fields(strings.TrimSpace(m.task.Value()))
+	raw := strings.TrimSpace(m.task.Value())
+	remainder := strings.TrimSpace(strings.TrimPrefix(raw, command.name))
+	arguments := strings.Fields(raw)
 	m.task.Reset()
 	m.commandIndex = 0
 	switch command.name {
