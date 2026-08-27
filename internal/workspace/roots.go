@@ -1,0 +1,183 @@
+package workspace
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+)
+
+// RootSet is a primary writable workspace plus explicitly granted read-only
+// directories. Relative paths always resolve inside Primary. Absolute paths
+// are accepted only for files below an additional root, which makes a caller
+// opt in visibly when it leaves the worktree.
+type RootSet struct {
+	primary    Root
+	additional []Root
+}
+
+// NewRootSet creates a stable boundary around a primary workspace and already
+// canonicalized additional roots. Duplicate roots and the primary root are
+// ignored. The caller is responsible for deciding which host paths to grant.
+func NewRootSet(primary Root, additional []Root) RootSet {
+	seen := map[string]struct{}{primary.Path(): {}}
+	result := RootSet{primary: primary, additional: make([]Root, 0, len(additional))}
+	for _, root := range additional {
+		if root.Path() == "" {
+			continue
+		}
+		if _, found := seen[root.Path()]; found {
+			continue
+		}
+		seen[root.Path()] = struct{}{}
+		result.additional = append(result.additional, root)
+	}
+	sort.Slice(result.additional, func(first, second int) bool {
+		return result.additional[first].Path() < result.additional[second].Path()
+	})
+	return result
+}
+
+// OpenAdditionalRoots validates and canonicalizes absolute existing
+// directories supplied by an integration boundary. The filesystem root is
+// deliberately never a usable additional root.
+func OpenAdditionalRoots(paths []string, maximum int) ([]Root, error) {
+	if maximum > 0 && len(paths) > maximum {
+		return nil, fmt.Errorf("at most %d additional workspace roots are allowed", maximum)
+	}
+	result := make([]Root, 0, len(paths))
+	seen := make(map[string]struct{}, len(paths))
+	for _, path := range paths {
+		if !filepath.IsAbs(path) {
+			return nil, fmt.Errorf("additional workspace root %q must be an absolute path", path)
+		}
+		root, err := Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("open additional workspace root %q: %w", path, err)
+		}
+		if root.Path() == string(filepath.Separator) {
+			return nil, errors.New("additional workspace root must not be the filesystem root")
+		}
+		if _, duplicate := seen[root.Path()]; duplicate {
+			continue
+		}
+		seen[root.Path()] = struct{}{}
+		result = append(result, root)
+	}
+	return result, nil
+}
+
+func (r RootSet) Primary() Root { return r.primary }
+
+// Additional returns an independent copy of the read-only roots.
+func (r RootSet) Additional() []Root { return append([]Root(nil), r.additional...) }
+
+// Paths returns the primary root followed by canonical additional roots. It
+// is intended for protocol workspace-folder lists and cache identities.
+func (r RootSet) Paths() []string {
+	result := make([]string, 0, len(r.additional)+1)
+	if r.primary.Path() != "" {
+		result = append(result, r.primary.Path())
+	}
+	for _, root := range r.additional {
+		result = append(result, root.Path())
+	}
+	return result
+}
+
+// ResolveFile resolves a primary-relative or additional-root absolute path.
+func (r RootSet) ResolveFile(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return r.primary.ResolveFile(path)
+	}
+	root, relative, found := r.additionalFor(path, false)
+	if !found || relative == "." {
+		return "", fmt.Errorf("absolute path %q is outside the read-only workspace roots", path)
+	}
+	return root.ResolveFile(relative)
+}
+
+// ResolveDirectory resolves a list/search directory. An empty path denotes
+// the primary workspace; an additional root itself may be named absolutely.
+func (r RootSet) ResolveDirectory(path string) (string, error) {
+	if path == "" || path == "." {
+		return r.primary.Path(), nil
+	}
+	if filepath.IsAbs(path) {
+		root, relative, found := r.additionalFor(path, false)
+		if !found {
+			return "", fmt.Errorf("absolute path %q is outside the read-only workspace roots", path)
+		}
+		if relative == "." {
+			return root.Path(), nil
+		}
+		return root.ResolveFile(relative)
+	}
+	return r.primary.ResolveFile(path)
+}
+
+// ResolveReturnedFile resolves an absolute file URI path reported by a trusted
+// LSP server. Unlike ResolveFile, it also accepts the primary root because
+// protocol responses necessarily use absolute file URIs.
+func (r RootSet) ResolveReturnedFile(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("returned workspace path %q must be absolute", path)
+	}
+	root, relative, found := r.additionalFor(path, true)
+	if !found || relative == "." {
+		return "", fmt.Errorf("returned path %q is outside the workspace roots", path)
+	}
+	return root.ResolveFile(relative)
+}
+
+// DisplayPath preserves the established relative convention for the primary
+// worktree and uses a canonical absolute path for an additional root.
+func (r RootSet) DisplayPath(path string) string {
+	if relative, inside := relativeToRoot(r.primary, path); inside {
+		return filepath.ToSlash(relative)
+	}
+	return path
+}
+
+// IsPrimary reports whether a resolved path is within the writable primary
+// worktree. It is useful for consumers that may inspect external roots but
+// must never return edit proposals for them.
+func (r RootSet) IsPrimary(path string) bool {
+	_, inside := relativeToRoot(r.primary, path)
+	return inside
+}
+
+func (r RootSet) additionalFor(path string, includePrimary bool) (Root, string, bool) {
+	if includePrimary {
+		if relative, inside := relativeToRoot(r.primary, path); inside {
+			return r.primary, relative, true
+		}
+	}
+	for _, root := range r.additional {
+		if relative, inside := relativeToRoot(root, path); inside {
+			return root, relative, true
+		}
+	}
+	return Root{}, "", false
+}
+
+func relativeToRoot(root Root, path string) (string, bool) {
+	if root.Path() == "" {
+		return "", false
+	}
+	cleaned := filepath.Clean(path)
+	relative, err := filepath.Rel(root.Path(), cleaned)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return "", false
+	}
+	if relative == "." {
+		return relative, true
+	}
+	info, err := os.Lstat(cleaned)
+	if err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return "", false
+	}
+	return relative, true
+}

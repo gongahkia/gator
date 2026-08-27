@@ -114,7 +114,7 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 	case protocol.MethodCapabilities:
 		methods := []string{protocol.MethodCapabilities, protocol.MethodRun, protocol.MethodResume, protocol.MethodSteer, protocol.MethodCancel, protocol.MethodApprove, protocol.MethodStatus, protocol.MethodThreads}
 		if s.config.TerminalRegistry != nil {
-			methods = append(methods, protocol.MethodTerminalList, protocol.MethodTerminalRead, protocol.MethodTerminalWrite, protocol.MethodTerminalResize, protocol.MethodTerminalStop)
+			methods = append(methods, protocol.MethodTerminalList, protocol.MethodTerminalRead, protocol.MethodTerminalWrite, protocol.MethodTerminalResize, protocol.MethodTerminalStop, protocol.MethodTerminalRestart)
 		}
 		s.sendResult(request.ID, map[string]any{"protocol_version": protocol.Version, "methods": methods})
 		return nil
@@ -145,6 +145,8 @@ func (s *Server) handle(ctx context.Context, request protocol.Request) error {
 		return s.terminalResize(request)
 	case protocol.MethodTerminalStop:
 		return s.terminalStop(request)
+	case protocol.MethodTerminalRestart:
+		return s.terminalRestart(request)
 	case protocol.MethodRun:
 		return s.startRun(ctx, request)
 	case protocol.MethodResume:
@@ -491,6 +493,23 @@ func (s *Server) terminalStop(request protocol.Request) error {
 		return errors.New("terminal_stop requires terminal_id")
 	}
 	task, err := attachment.Stop(id)
+	if err != nil {
+		return err
+	}
+	s.sendResult(request.ID, task)
+	return nil
+}
+
+func (s *Server) terminalRestart(request protocol.Request) error {
+	attachment, err := s.terminalAttachment()
+	if err != nil {
+		return err
+	}
+	id := strings.TrimSpace(request.Params.TerminalID)
+	if id == "" {
+		return errors.New("terminal_restart requires terminal_id")
+	}
+	task, err := attachment.Restart(id)
 	if err != nil {
 		return err
 	}

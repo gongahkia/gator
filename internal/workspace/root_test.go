@@ -48,6 +48,41 @@ func TestRootRejectsEscapingPaths(t *testing.T) {
 	}
 }
 
+func TestRootSetSeparatesPrimaryAndAdditionalRoots(t *testing.T) {
+	primaryPath := t.TempDir()
+	externalPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(primaryPath, "inside.txt"), []byte("primary"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(externalPath, "outside.txt"), []byte("external"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	primary, err := Open(primaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	additional, err := OpenAdditionalRoots([]string{externalPath, externalPath}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := NewRootSet(primary, additional)
+	inside, err := roots.ResolveFile("inside.txt")
+	if err != nil || roots.DisplayPath(inside) != "inside.txt" || !roots.IsPrimary(inside) {
+		t.Fatalf("primary resolution path=%q err=%v", inside, err)
+	}
+	externalFile := filepath.Join(additional[0].Path(), "outside.txt")
+	outside, err := roots.ResolveFile(externalFile)
+	if err != nil || roots.DisplayPath(outside) != externalFile || roots.IsPrimary(outside) {
+		t.Fatalf("external resolution path=%q err=%v", outside, err)
+	}
+	if _, err := roots.ResolveFile(primary.Path()); err == nil {
+		t.Fatal("absolute primary path was accepted as an additional-root path")
+	}
+	if _, err := roots.ResolveFile(filepath.Join(t.TempDir(), "secret.txt")); err == nil {
+		t.Fatal("outside absolute path was accepted")
+	}
+}
+
 func TestRootRejectsSymlinkOutsideWorkspace(t *testing.T) {
 	directory := t.TempDir()
 	external := t.TempDir()

@@ -69,6 +69,31 @@ func TestRegistryRetiresUntrustedAndChangedConfiguration(t *testing.T) {
 	}
 }
 
+func TestRegistryDoesNotReuseManagerForDifferentExternalRoots(t *testing.T) {
+	registry := newRegistry(2)
+	set := registryTestSet(t, "shared")
+	externalOne := testWorkspace(t)
+	externalTwo := testWorkspace(t)
+	firstSet := set.WithAdditionalRoots([]workspace.Root{externalOne})
+	first, releaseFirst, err := registry.Acquire(firstSet)
+	if err != nil {
+		t.Fatalf("acquire first roots: %v", err)
+	}
+	connection := &fakeClient{}
+	first.clients["fixture"] = connection
+	releaseFirst()
+	secondSet := set.WithAdditionalRoots([]workspace.Root{externalTwo})
+	second, releaseSecond, err := registry.Acquire(secondSet)
+	if err != nil {
+		t.Fatalf("acquire changed roots: %v", err)
+	}
+	if second == first || !connection.closed {
+		t.Fatalf("external root change reused=%t closed=%t", second == first, connection.closed)
+	}
+	releaseSecond()
+	registry.Close()
+}
+
 func TestLoadWithoutManifestKeepsRootForRegistryReconciliation(t *testing.T) {
 	root := testWorkspace(t)
 	set, err := Load(root.Path(), "")
@@ -166,7 +191,7 @@ func TestManagerSerializesRequestsOverSharedTransport(t *testing.T) {
 	for range 2 {
 		go func() {
 			defer wait.Done()
-			if _, err := manager.request(context.Background(), specification, hoverOperation, "textDocument/hover", nil); err != nil {
+			if _, err := manager.request(context.Background(), specification, hoverOperation, "", "textDocument/hover", nil); err != nil {
 				t.Errorf("shared manager request: %v", err)
 			}
 		}()
@@ -227,4 +252,6 @@ func (c *serialClient) Request(context.Context, string, any) (json.RawMessage, e
 }
 
 func (c *serialClient) Supports(lspOperation) bool { return true }
+func (c *serialClient) DocumentSyncKind() int      { return 0 }
+func (c *serialClient) Notify(string, any) error   { return nil }
 func (c *serialClient) Close() error               { return nil }

@@ -94,7 +94,9 @@ type Manager struct {
 }
 
 // Attachment is the restricted developer-facing view of an active terminal
-// manager. It cannot create a process or alter the run's sandbox policy.
+// manager. Restart may create a new process only from an exited task's exact
+// argv and fixed sandbox policy; no operation can choose a new command or
+// alter authority.
 type Attachment interface {
 	List() []Task
 	Read(string, int64) (ReadResult, error)
@@ -106,6 +108,7 @@ type Attachment interface {
 	WriteDeveloperRaw(string, []byte) (Task, error)
 	FlushDeveloperInput(string) (Task, error)
 	Stop(string) (Task, error)
+	Restart(string) (Task, error)
 }
 
 type attachment struct {
@@ -166,6 +169,13 @@ func (a attachment) Stop(id string) (Task, error) {
 		return Task{}, errors.New("terminal attachment is unavailable")
 	}
 	return a.manager.Stop(id)
+}
+
+func (a attachment) Restart(id string) (Task, error) {
+	if a.manager == nil {
+		return Task{}, errors.New("terminal attachment is unavailable")
+	}
+	return a.manager.Restart(id)
 }
 
 // Attachment exposes only operations needed to view and interact with tasks
@@ -523,6 +533,24 @@ func (m *Manager) Stop(id string) (Task, error) {
 	return running.snapshot(), nil
 }
 
+// Restart starts a new task from an exited task's exact argv. The old task and
+// scrollback remain immutable, and the replacement receives a new ID. This is
+// a fresh sandboxed process, not PTY reattachment or process resurrection.
+func (m *Manager) Restart(id string) (Task, error) {
+	previous, err := m.lookup(id)
+	if err != nil {
+		return Task{}, err
+	}
+	snapshot := previous.snapshot()
+	if snapshot.Status == "running" {
+		return Task{}, fmt.Errorf("terminal task %q is still running", id)
+	}
+	if len(snapshot.Argv) == 0 {
+		return Task{}, fmt.Errorf("terminal task %q has no restartable command", id)
+	}
+	return m.Start(context.Background(), snapshot.Argv)
+}
+
 // Detach marks a running task as a session-background task. The caller must
 // obtain explicit developer approval before calling it. Detached tasks retain
 // their fixed worktree, sandbox, network policy, and bounded output; they do
@@ -657,6 +685,9 @@ func (m *Manager) unregisterIfIdle() {
 	if m.registry == nil {
 		return
 	}
+	if m.registry.retains(m) {
+		return
+	}
 	m.mu.Lock()
 	for _, running := range m.tasks {
 		running.mu.Lock()
@@ -727,7 +758,7 @@ func (t *task) wait(taskContext context.Context) {
 		t.manager.onBackgroundInput(snapshot, input)
 	}
 	if snapshot.Background {
-		t.manager.registry.releaseDetached(t)
+		t.manager.registry.finishDetached(t)
 	}
 	if snapshot.Background && t.manager.onBackgroundExit != nil {
 		t.manager.onBackgroundExit(snapshot)

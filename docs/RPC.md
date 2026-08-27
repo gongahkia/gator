@@ -73,9 +73,11 @@ filesystem roots, MCP servers, credentials, or a weaker policy.
 
 `gator serve` additionally exposes control of an already detached terminal
 task through `terminal_list`, `terminal_read`, `terminal_write`,
-`terminal_resize`, and `terminal_stop`. It advertises those methods only for
-that server process. The complete lifecycle and the direct-developer-input
-boundary are documented in [the app-server guide](APP_SERVER.md#detached-terminals).
+`terminal_resize`, `terminal_stop`, and `terminal_restart`. Restart is allowed
+only after the selected task exits and creates a new task from its exact argv
+and fixed sandbox policy. These methods are advertised only for that server
+process. The complete lifecycle and the direct-developer-input boundary are
+documented in [the app-server guide](APP_SERVER.md#detached-terminals).
 
 For an editor that needs a stable local endpoint, `gator serve start` launches
 one explicit repository-scoped background bridge, while `status` and `stop`

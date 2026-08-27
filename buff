@@ -1,6 +1,3 @@
-  5. Strengthen LSP/ACP — document synchronization, durable index lifecycle, reconnect tests, and
-     potentially additional workspace handling.
-  6. Advance terminal UX — multiple PTYs, switching, lifecycle controls, and restart semantics.
   7. Complete TUI leftovers — redacted config inspector, version/update status, provider advanced options,
      and OpenCode management.
   8. Harden the app server — overload, replay/reconnect, token-file race, stale PID, shutdown, and fuzz

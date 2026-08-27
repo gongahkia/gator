@@ -26,9 +26,10 @@ const (
 // ReadFile reads a bounded line range from a regular text file in the run
 // workspace.
 type ReadFile struct {
-	Root     workspace.Root
-	MaxBytes int
-	MaxLines int
+	Root            workspace.Root
+	AdditionalRoots []workspace.Root
+	MaxBytes        int
+	MaxLines        int
 }
 
 func (t ReadFile) Definition() agent.ToolDefinition {
@@ -48,7 +49,8 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	path, err := t.Root.ResolveFile(arguments.Path)
+	roots := workspace.NewRootSet(t.Root, t.AdditionalRoots)
+	path, err := roots.ResolveFile(arguments.Path)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -104,7 +106,7 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 		Content   string `json:"content"`
 		Truncated bool   `json:"truncated"`
 	}{
-		Path:      displayPath(t.Root, path),
+		Path:      roots.DisplayPath(path),
 		StartLine: start,
 		EndLine:   end,
 		Content:   selected,
@@ -118,8 +120,9 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 
 // ListFiles lists regular files under one workspace-relative directory.
 type ListFiles struct {
-	Root       workspace.Root
-	MaxResults int
+	Root            workspace.Root
+	AdditionalRoots []workspace.Root
+	MaxResults      int
 }
 
 func (t ListFiles) Definition() agent.ToolDefinition {
@@ -138,12 +141,13 @@ func (t ListFiles) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRe
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	directory, err := resolveDirectory(t.Root, arguments.Path)
+	roots := workspace.NewRootSet(t.Root, t.AdditionalRoots)
+	directory, err := resolveDirectory(roots, arguments.Path)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
 	maxResults := boundedResultLimit(arguments.MaxResults, t.MaxResults)
-	files, truncated, err := walkFiles(t.Root, directory, maxResults, func(_ string, _ fs.DirEntry) bool { return true })
+	files, truncated, err := walkFiles(roots, directory, maxResults, func(_ string, _ fs.DirEntry) bool { return true })
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -159,8 +163,9 @@ func (t ListFiles) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRe
 
 // SearchFiles finds literal query matches in bounded text files.
 type SearchFiles struct {
-	Root       workspace.Root
-	MaxResults int
+	Root            workspace.Root
+	AdditionalRoots []workspace.Root
+	MaxResults      int
 }
 
 func (t SearchFiles) Definition() agent.ToolDefinition {
@@ -183,7 +188,8 @@ func (t SearchFiles) Execute(_ context.Context, raw json.RawMessage) (agent.Tool
 	if strings.TrimSpace(arguments.Query) == "" {
 		return agent.ToolResult{}, errors.New("search query is required")
 	}
-	directory, err := resolveDirectory(t.Root, arguments.Path)
+	roots := workspace.NewRootSet(t.Root, t.AdditionalRoots)
+	directory, err := resolveDirectory(roots, arguments.Path)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -220,7 +226,7 @@ func (t SearchFiles) Execute(_ context.Context, raw json.RawMessage) (agent.Tool
 			if !strings.Contains(line, arguments.Query) {
 				continue
 			}
-			matches = append(matches, match{Path: displayPath(t.Root, path), Line: index + 1, Text: line})
+			matches = append(matches, match{Path: roots.DisplayPath(path), Line: index + 1, Text: line})
 			if len(matches) >= maxResults {
 				truncated = true
 				return fs.SkipAll
@@ -245,11 +251,8 @@ func schema(value string) json.RawMessage {
 	return json.RawMessage(value)
 }
 
-func resolveDirectory(root workspace.Root, path string) (string, error) {
-	if path == "" || path == "." {
-		return root.Path(), nil
-	}
-	directory, err := root.ResolveFile(path)
+func resolveDirectory(roots workspace.RootSet, path string) (string, error) {
+	directory, err := roots.ResolveDirectory(path)
 	if err != nil {
 		return "", err
 	}
@@ -263,7 +266,7 @@ func resolveDirectory(root workspace.Root, path string) (string, error) {
 	return directory, nil
 }
 
-func walkFiles(root workspace.Root, directory string, maxResults int, keep func(string, fs.DirEntry) bool) ([]string, bool, error) {
+func walkFiles(roots workspace.RootSet, directory string, maxResults int, keep func(string, fs.DirEntry) bool) ([]string, bool, error) {
 	var files []string
 	truncated := false
 	err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
@@ -284,7 +287,7 @@ func walkFiles(root workspace.Root, directory string, maxResults int, keep func(
 			return fs.SkipAll
 		}
 		if keep(path, entry) {
-			files = append(files, displayPath(root, path))
+			files = append(files, roots.DisplayPath(path))
 		}
 		return nil
 	})
@@ -297,14 +300,6 @@ func walkFiles(root workspace.Root, directory string, maxResults int, keep func(
 
 func ignoredDirectory(name string) bool {
 	return name == ".git" || name == ".gator"
-}
-
-func displayPath(root workspace.Root, path string) string {
-	relative, err := filepath.Rel(root.Path(), path)
-	if err != nil {
-		return path
-	}
-	return filepath.ToSlash(relative)
 }
 
 func boundedResultLimit(requested, configured int) int {

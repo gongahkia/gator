@@ -14,6 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 	"github.com/gongahkia/gator/internal/worktree"
 )
 
@@ -30,9 +31,13 @@ type Request struct {
 	Verification   [][]string
 	// Scopes identify repository-relative files or directories the task is
 	// focused on. They select directory guidance and declarative project rules.
-	Scopes          []string
-	Profile         string
-	AllowedCommands [][]string
+	Scopes []string
+	// AdditionalReadOnlyRoots are canonical external directories an integration
+	// has explicitly granted for read-oriented tools and trusted LSP indexing.
+	// They never widen patch, terminal, or command authority.
+	AdditionalReadOnlyRoots []workspace.Root
+	Profile                 string
+	AllowedCommands         [][]string
 	// AllowedCommandPrefixes are developer-supplied literal argv prefixes.
 	// They never include verification commands and never survive a profile
 	// omit of run_command.

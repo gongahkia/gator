@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"os/exec"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -63,6 +64,39 @@ func TestManagerRunsInteractiveTaskAndBoundsScrollback(t *testing.T) {
 	defer exitedMu.Unlock()
 	if len(exited) != 1 || exited[0].Status != "exited" || exited[0].ExitCode == nil || *exited[0].ExitCode != 0 {
 		t.Fatalf("terminal exit callback = %#v", exited)
+	}
+}
+
+func TestRestartCreatesNewTaskAndPreservesExitedTask(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the PTY dependency reports unsupported on Windows")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh is unavailable")
+	}
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := New(Config{Root: root, Policy: sandbox.Policy{Mode: sandbox.Off}})
+	defer manager.Close()
+	original, err := manager.Start(context.Background(), []string{sh, "-lc", "printf restarted"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	awaitTerminalExit(t, manager, original.ID)
+	restarted, err := manager.Attachment().Restart(original.ID)
+	if err != nil {
+		t.Fatalf("restart terminal: %v", err)
+	}
+	if restarted.ID == original.ID || !reflect.DeepEqual(restarted.Argv, original.Argv) {
+		t.Fatalf("restarted task = %#v, original = %#v", restarted, original)
+	}
+	awaitTerminalExit(t, manager, restarted.ID)
+	tasks := manager.List()
+	if len(tasks) != 2 || tasks[0].ID != original.ID || tasks[1].ID != restarted.ID {
+		t.Fatalf("terminal history after restart = %#v", tasks)
 	}
 }
 
@@ -159,14 +193,18 @@ func TestManagerKeepsExplicitlyDetachedTaskInSessionRegistry(t *testing.T) {
 		t.Fatalf("detached terminal wrote normal run callback: %#v", exited)
 	default:
 	}
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		if len(registry.Attachment().List()) == 0 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	listed = registry.Attachment().List()
+	if len(listed) != 1 || listed[0].ID != task.ID || listed[0].Status != "exited" {
+		t.Fatalf("exited detached terminal history = %#v", listed)
 	}
-	t.Fatalf("stopped detached terminal remained in registry: %#v", registry.Attachment().List())
+	restarted, err := registry.Attachment().Restart(task.ID)
+	if err != nil || restarted.ID == task.ID {
+		t.Fatalf("restart detached terminal task=%#v err=%v", restarted, err)
+	}
+	if _, err := registry.Attachment().Stop(restarted.ID); err != nil {
+		t.Fatalf("stop restarted detached terminal: %v", err)
+	}
+	_ = awaitTerminalExit(t, manager, restarted.ID)
 }
 
 func TestRegistryCapsDetachedTerminalTasksAcrossManagers(t *testing.T) {

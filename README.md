@@ -627,7 +627,8 @@ Gator's normal shutdown path stops it; it cannot be created from direct
 commands, plain JSONL RPC, ACP, or a child writer.
 This is an agent-mediated task manager, not an arbitrary host shell. `Ctrl+T`
 opens an attachment to existing model-started tasks: developers can view
-bounded output, switch tasks, send a line or interrupt, and stop a task.
+bounded output, switch tasks, send a line or interrupt, stop a task, and use
+`Ctrl+R` to restart an exited task with its exact previous argv and sandbox.
 `Ctrl+O` enters opt-in raw-keyboard mode for arrows, completion, control keys,
 and common function keys; `Ctrl+]` returns to Gator controls. The attachment
 resizes the underlying PTY to its viewport and uses a bounded VT500/xterm text

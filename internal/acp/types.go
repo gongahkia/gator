@@ -10,6 +10,7 @@ import (
 
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 const (
@@ -55,6 +56,7 @@ type Server struct {
 type session struct {
 	id           string
 	cwd          string
+	additional   []workspace.Root
 	provider     string
 	model        string
 	verification [][]string
