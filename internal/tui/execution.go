@@ -213,10 +213,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		modelName = retainedModel
 		request.Model = modelName
 		request.Provider = providerName
-		request.BaseURL = previous.BaseURL
+		request.BaseURL = m.runBaseURL(previous.BaseURL)
 		request.Verification = previous.Verification
 		var executorErr error
-		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.runBaseURL(previous.BaseURL))
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, request.BaseURL)
 		if executorErr != nil {
 			cancel()
 			m.execution = nil
@@ -264,10 +264,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		modelName = retainedModel
 		request.Model = modelName
 		request.Provider = providerName
-		request.BaseURL = previous.BaseURL
+		request.BaseURL = m.runBaseURL(previous.BaseURL)
 		request.Verification = previous.Verification
 		var executorErr error
-		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.runBaseURL(previous.BaseURL))
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, request.BaseURL)
 		if executorErr != nil {
 			cancel()
 			m.execution = nil

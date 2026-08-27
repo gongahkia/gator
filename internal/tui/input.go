@@ -587,8 +587,21 @@ func (m Model) openRecentRuns() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.recentTarget.Focused() {
+		switch message.String() {
+		case "esc":
+			m.recentTarget.Blur()
+			return m, nil
+		case "enter":
+			return m.continueFromRecentTarget()
+		}
+		var command tea.Cmd
+		m.recentTarget, command = m.recentTarget.Update(message)
+		return m, command
+	}
 	switch message.String() {
 	case "esc", "q":
+		m.recentTarget.Blur()
 		m.screen = composeScreen
 		return m, m.focusField()
 	case "r", "ctrl+r":
@@ -598,6 +611,10 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.recentAll = !m.recentAll
 		m.screen = composeScreen
 		return m.openRecentRuns()
+	case "p", "tab":
+		_ = m.recentTarget.Focus()
+		m.notice = notice{text: "Enter a thread ID, unique prefix, or run-record path. Esc returns to the list.", kind: noticeInfo}
+		return m, nil
 	case "up", "ctrl+p":
 		if len(m.recentThreads) > 0 {
 			m.recentIndex = (m.recentIndex - 1 + len(m.recentThreads)) % len(m.recentThreads)
@@ -607,6 +624,9 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.recentIndex = (m.recentIndex + 1) % len(m.recentThreads)
 		}
 	case "enter":
+		if target := strings.TrimSpace(m.recentTarget.Value()); target != "" {
+			return m.continueFromRecentTarget()
+		}
 		if len(m.recentThreads) == 0 {
 			return m, nil
 		}
@@ -618,6 +638,21 @@ func (m Model) updateRecentRuns(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.beginContinuation(selected.HeadStatePath)
 	}
 	return m, nil
+}
+
+func (m Model) continueFromRecentTarget() (tea.Model, tea.Cmd) {
+	target := strings.TrimSpace(m.recentTarget.Value())
+	if target == "" {
+		m.notice = notice{text: "Type a thread ID, unique prefix, or run-record path.", kind: noticeError}
+		return m, nil
+	}
+	resolved, err := journal.ResolveRetainedTarget(m.config.StateDir, m.config.RepositoryPath, target, m.recentAll)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	m.recentTarget.Blur()
+	return m.beginContinuation(resolved.HeadStatePath)
 }
 
 func (m Model) updateThreadTree(message tea.KeyMsg) (tea.Model, tea.Cmd) {

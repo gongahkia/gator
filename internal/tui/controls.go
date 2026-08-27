@@ -136,11 +136,7 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.commandOutput = commandHelp()
 		m.notice = notice{text: "Commands operate locally and never start a run by themselves.", kind: noticeInfo}
 	case "/clone":
-		if m.resumeStatePath == "" {
-			m.notice = notice{text: "Continue a retained thread before cloning it.", kind: noticeInfo}
-			return m, nil
-		}
-		return m.beginFork(m.resumeStatePath)
+		return m.bindRetainedTarget("clone", remainder)
 	case "/compact":
 		if m.resumeStatePath == "" && m.forkStatePath == "" {
 			m.notice = notice{text: "Start, continue, or fork a retained thread before compacting its context.", kind: noticeInfo}
@@ -154,11 +150,7 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/copyall":
 		return m.copyConversationTranscript()
 	case "/fork":
-		if m.resumeStatePath == "" {
-			m.notice = notice{text: "Continue a retained thread before choosing a turn to fork.", kind: noticeInfo}
-			return m, nil
-		}
-		return m.openThreadTree(m.screen)
+		return m.bindRetainedTarget("fork", remainder)
 	case "/plan":
 		m.runMode = gatorrun.PlanMode
 		if m.delegateRuntime != "" {
@@ -202,13 +194,24 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.commandOutput = m.queueStatus()
 		m.notice = notice{text: m.queueSummary() + ". Queued instructions are local to this TUI session.", kind: noticeInfo}
 	case "/review":
+		if remainder != "" {
+			target, _ := splitTargetAndInstruction(remainder)
+			resolved, err := journal.ResolveRetainedTarget(m.config.StateDir, m.config.RepositoryPath, target, m.recentAll)
+			if err != nil {
+				m.notice = notice{text: err.Error(), kind: noticeError}
+				return m, nil
+			}
+			return m.openReviewRecord(resolved.HeadStatePath)
+		}
 		if m.outcome == nil || m.outcome.Worktree.Path == "" {
-			m.notice = notice{text: "No completed or retained run is available to review yet.", kind: noticeError}
+			m.notice = notice{text: "No completed or retained run is available to review yet. Pass a thread ID or run record path.", kind: noticeError}
 			return m, nil
 		}
 		m.screen = reviewScreen
 		m.notice = notice{text: "Refreshing the retained-worktree review…", kind: noticeInfo}
 		return m, loadReview(*m.outcome)
+	case "/resume":
+		return m.bindRetainedTarget("resume", remainder)
 	case "/recent", "/threads":
 		return m.openRecentRuns()
 	case "/tree":
@@ -816,7 +819,7 @@ func (m Model) permissionsStatus() string {
 	if err == nil {
 		commands = formatVerification(verification)
 	}
-	policy := m.config.Execution.Normalize()
+	policy := m.effectiveExecutionPolicy()
 	filesystem := "worktree and private scratch only"
 	if len(policy.ReadOnlyRoots) > 0 || len(policy.WritableRoots) > 0 {
 		filesystem += fmt.Sprintf(" · %d extra read-only and %d extra writable grant(s)", len(policy.ReadOnlyRoots), len(policy.WritableRoots))
