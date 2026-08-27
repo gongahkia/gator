@@ -680,6 +680,8 @@ type Model struct {
 	management        managementState
 	doctor            doctorState
 	runOptions        runOptionsState
+	reviewWeb         reviewWebState
+	recentTarget      textinput.Model
 }
 
 var (
@@ -787,6 +789,13 @@ func New(config Config) Model {
 	terminalInput.Width = 60
 	terminalInput.Blur()
 
+	recentTarget := textinput.New()
+	recentTarget.Prompt = ""
+	recentTarget.Placeholder = "thread ID or run record path"
+	recentTarget.CharLimit = 512
+	recentTarget.Width = 60
+	recentTarget.Blur()
+
 	localSpinner := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(keyStyle))
 	copyToClipboard := config.CopyToClipboard
 	if copyToClipboard == nil {
@@ -808,6 +817,7 @@ func New(config Config) Model {
 		verification:     verification,
 		provider:         provider,
 		terminalInput:    terminalInput,
+		recentTarget:     recentTarget,
 		terminalRegistry: config.TerminalRegistry,
 		lspRegistry:      config.LSPRegistry,
 		terminalViews:    make(map[string]attachedTerminalView),
@@ -815,6 +825,7 @@ func New(config Config) Model {
 		localModels:      newLocalModelsState(config.LocalModels, localSpinner),
 		management:       newManagementState(config.Management),
 		runOptions:       newRunOptionsState(),
+		reviewWeb:        newReviewWebState(),
 		effort:           parseEffort(config.Effort),
 		reviewScope:      review.All,
 		reviewRangeFrom:  -1,
@@ -874,6 +885,7 @@ func (m Model) Close() {
 		m.lspRegistry.Close()
 	}
 	m.discardStagedExtension()
+	m.stopReviewWeb()
 }
 
 // Init starts no external work until the developer explicitly starts a run.
@@ -1091,6 +1103,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.doctor.data = msg.snapshot
+		return m, nil
+	case reviewWebStartedMsg:
+		m.applyReviewWebStarted(msg)
 		return m, nil
 	case managementSnapshotMsg:
 		m.management.loading = false
