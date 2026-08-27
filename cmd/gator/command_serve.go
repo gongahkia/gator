@@ -87,12 +87,14 @@ func serveForeground(arguments []string, out io.Writer) error {
 	defer terminals.Close()
 	lsps := lsp.NewRegistry()
 	defer lsps.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), serveSignals()...)
+	defer stop()
 	bridge, err := appserver.New(appserver.Config{
 		RPC: internalrpc.Config{
 			RepositoryPath: repository, StateDir: stateDir, DefaultProvider: defaults.Provider, DefaultModel: defaults.Model,
 			ResolveProvider: resolveConfiguredProvider, NewExecutor: newExecutor, TerminalRegistry: terminals, LSPRegistry: lsps,
 		},
-		Token: token, Version: version,
+		Token: token, Version: version, RequestShutdown: stop,
 	})
 	if err != nil {
 		return err
@@ -102,8 +104,6 @@ func serveForeground(arguments []string, out io.Writer) error {
 		return fmt.Errorf("listen on %s: %w", *listen, err)
 	}
 	defer listener.Close()
-	ctx, stop := signal.NotifyContext(context.Background(), serveSignals()...)
-	defer stop()
 	if err := bridge.Start(ctx); err != nil {
 		return err
 	}
@@ -137,7 +137,9 @@ func serveForeground(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if waitErr := bridge.Wait(); waitErr != nil {
+	waitContext, waitCancel := context.WithTimeout(context.Background(), serveShutdownTimeout)
+	defer waitCancel()
+	if waitErr := bridge.WaitContext(waitContext); waitErr != nil {
 		return fmt.Errorf("app server stopped: %w", waitErr)
 	}
 	return nil
@@ -162,22 +164,50 @@ func readServeToken(path string) ([]byte, error) {
 	if !filepath.IsAbs(path) {
 		return nil, errors.New("--token-file must be an absolute path")
 	}
-	info, err := os.Lstat(path)
+	file, err := openPrivateServeFile(path, 4097, "app-server token file")
 	if err != nil {
-		return nil, fmt.Errorf("stat app-server token file: %w", err)
+		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&0o077 != 0 || info.Size() > 4097 {
-		return nil, errors.New("app-server token file must be a private regular file with mode 0600 and at most 4097 bytes")
-	}
-	contents, err := os.ReadFile(path)
+	defer file.Close()
+	contents, err := io.ReadAll(io.LimitReader(file, 4098))
 	if err != nil {
 		return nil, fmt.Errorf("read app-server token file: %w", err)
+	}
+	if len(contents) > 4097 {
+		return nil, errors.New("app-server token file must be a private regular file with mode 0600 and at most 4097 bytes")
 	}
 	contents = bytes.TrimSpace(contents)
 	if len(contents) == 0 {
 		return nil, errors.New("app-server token file must contain a token")
 	}
 	return append([]byte(nil), contents...), nil
+}
+
+// openPrivateServeFile opens the exact regular file that was inspected. The
+// Lstat/Open/Fstat identity check prevents a local path swap from turning a
+// private-token or service-state read into a read of a different file.
+func openPrivateServeFile(path string, maxBytes int64, label string) (*os.File, error) {
+	before, err := os.Lstat(path)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", label, err)
+	}
+	if !before.Mode().IsRegular() || before.Mode()&0o077 != 0 || before.Size() > maxBytes {
+		return nil, fmt.Errorf("%s must be a private regular file", label)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", label, err)
+	}
+	after, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("stat opened %s: %w", label, err)
+	}
+	if !after.Mode().IsRegular() || after.Mode()&0o077 != 0 || after.Size() > maxBytes || !os.SameFile(before, after) {
+		_ = file.Close()
+		return nil, fmt.Errorf("%s changed while opening; retry", label)
+	}
+	return file, nil
 }
 
 func createServeToken(arguments []string, out io.Writer) error {
@@ -387,12 +417,11 @@ func stopServeService(arguments []string, out io.Writer) error {
 		_, err := fmt.Fprintln(out, "Gator app server is not running for this repository.")
 		return err
 	}
-	process, err := os.FindProcess(service.PID)
+	shutdown, cancel := context.WithTimeout(context.Background(), time.Second)
+	err = requestServeShutdown(shutdown, service.URL, token)
+	cancel()
 	if err != nil {
-		return fmt.Errorf("find app-server process: %w", err)
-	}
-	if err := terminateServeProcess(process); err != nil {
-		return fmt.Errorf("request app-server shutdown: %w", err)
+		return fmt.Errorf("request authenticated app-server shutdown: %w; refusing to signal recorded PID %d", err, service.PID)
 	}
 	deadline := time.Now().Add(serveShutdownTimeout)
 	for time.Now().Before(deadline) {
@@ -598,14 +627,7 @@ func validateServeEndpoint(value string) error {
 }
 
 func readServeState(path string, destination any) error {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() || info.Mode()&0o077 != 0 || info.Size() > maxServeStateBytes {
-		return errors.New("app-server state file must be a private regular file")
-	}
-	file, err := os.Open(path)
+	file, err := openPrivateServeFile(path, maxServeStateBytes, "app-server state file")
 	if err != nil {
 		return err
 	}
@@ -693,7 +715,7 @@ func serveServiceHealthy(ctx context.Context, endpoint string, token []byte) (bo
 		return false, err
 	}
 	request.Header.Set("Authorization", "Bearer "+string(token))
-	client := &http.Client{Timeout: time.Second, Transport: &http.Transport{Proxy: nil}}
+	client := serveServiceHTTPClient()
 	response, err := client.Do(request)
 	if err != nil {
 		return false, err
@@ -703,4 +725,34 @@ func serveServiceHealthy(ctx context.Context, endpoint string, token []byte) (bo
 		return false, fmt.Errorf("app-server endpoint returned HTTP %d", response.StatusCode)
 	}
 	return true, nil
+}
+
+func requestServeShutdown(ctx context.Context, endpoint string, token []byte) error {
+	if err := validateServeEndpoint(endpoint); err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint+"/v1/shutdown", nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Authorization", "Bearer "+string(token))
+	response, err := serveServiceHTTPClient().Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("app-server endpoint returned HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
+func serveServiceHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout:   time.Second,
+		Transport: &http.Transport{Proxy: nil},
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }

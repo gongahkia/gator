@@ -74,6 +74,15 @@ type Config struct {
 	// worktree. It deliberately remains separate from NewExecutor: the harness
 	// owns its credential, tools, approvals, and session state.
 	NewDelegateCommand func(runtime, task, model string, verification [][]string, repository string) (DelegateCommand, error)
+	// NewOpenCodeCommand runs a narrowly scoped OpenCode management command in
+	// the developer's terminal. It is separate from a delegated run because
+	// login and status remain owned by the installed OpenCode CLI.
+	NewOpenCodeCommand func(arguments []string) (*exec.Cmd, error)
+	// Build identifies this running binary without performing network I/O.
+	Build BuildInfo
+	// CheckForUpdate performs a check-only update lookup. The TUI never
+	// self-replaces while it owns the terminal process.
+	CheckForUpdate func() (UpdateStatus, error)
 	// CopyToClipboard writes text to the operating system clipboard. A nil
 	// value uses Gator's platform clipboard integration.
 	CopyToClipboard func(string) error
@@ -97,6 +106,20 @@ type Config struct {
 	// ModelManagement persists cloud credentials and custom-provider metadata.
 	// Secrets never enter TUI state; the backend returns display-safe results.
 	ModelManagement ModelManagementBackend
+}
+
+// BuildInfo is immutable, non-secret build provenance suitable for the TUI.
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
+// UpdateStatus is the result of a check-only release lookup.
+type UpdateStatus struct {
+	Current   string
+	Latest    string
+	Available bool
 }
 
 // ManagementBackend is the narrow command-layer boundary used by /manage.
@@ -170,6 +193,7 @@ type DoctorLocalModel struct {
 }
 
 type ManagementSnapshot struct {
+	Config     ManagedConfig
 	Settings   ManagedSettings
 	Trusts     []ManagedTrust
 	MCPAuth    []ManagedMCPAuth
@@ -179,6 +203,15 @@ type ManagementSnapshot struct {
 	Batches    []ManagedBatch
 	Extensions []ManagedExtension
 	LSPRuntime []ManagedLSPRuntime
+}
+
+// ManagedConfig is a bounded, display-safe rendering of config.json. It is
+// intentionally distinct from the private auth store: a backend must redact
+// any secret-shaped values before returning this snapshot.
+type ManagedConfig struct {
+	Path      string
+	JSON      string
+	Truncated bool
 }
 
 // ManagedMCPAuth is display-safe MCP authorization state for one configured
@@ -562,6 +595,17 @@ type delegatedRunDoneMsg struct {
 	err     error
 }
 
+type openCodeCommandDoneMsg struct {
+	action   string
+	provider string
+	err      error
+}
+
+type updateStatusMsg struct {
+	status UpdateStatus
+	err    error
+}
+
 type diffLoadedMsg struct {
 	diff      string
 	truncated bool
@@ -644,6 +688,7 @@ type Model struct {
 	oauthCancel         context.CancelFunc
 	oauthProvider       string
 	delegateRuntime     string
+	updateChecking      bool
 	cancelling          bool
 	lastRunCancelled    bool
 	activity            runActivity
@@ -1299,6 +1344,50 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Provider-owned login completed. Harness mode is ready for the next task.", kind: noticeSuccess}
 		m.persistDraft()
 		m.refreshPreflight()
+		return m, nil
+	case openCodeCommandDoneMsg:
+		if msg.err != nil {
+			m.notice = notice{text: "OpenCode " + msg.action + " stopped: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		if msg.action == "login" {
+			m.returnToComposer()
+			m.delegateRuntime = "opencode"
+			m.provider.SetValue("opencode")
+			m.commandOutput = "OpenCode login completed for " + msg.provider + ". Select a harness model with /opencode use PROVIDER/MODEL, then send an Execute-mode task."
+			m.notice = notice{text: "OpenCode provider login completed. The installed CLI retains its credential.", kind: noticeSuccess}
+			m.persistDraft()
+			m.refreshPreflight()
+			return m, m.focusField()
+		}
+		m.commandOutput = "OpenCode authentication status completed in the terminal. Use /opencode login PROVIDER [METHOD] to change a provider connection."
+		m.notice = notice{text: "OpenCode status completed.", kind: noticeSuccess}
+		return m, nil
+	case updateStatusMsg:
+		m.updateChecking = false
+		if msg.err != nil {
+			m.commandOutput = m.versionStatus() + "\n\nUpdate check failed: " + msg.err.Error()
+			m.notice = notice{text: "Update check failed: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		current := strings.TrimSpace(msg.status.Current)
+		if current == "" {
+			current = strings.TrimSpace(m.config.Build.Version)
+		}
+		if current == "" {
+			current = "dev"
+		}
+		latest := strings.TrimSpace(msg.status.Latest)
+		if msg.status.Available {
+			m.commandOutput = "Gator " + latest + " is available; this TUI is running " + current + ".\n\nExit the TUI and run 'gator update' to download, verify, and replace the executable."
+			m.notice = notice{text: "A newer Gator release is available. The running TUI was not changed.", kind: noticeInfo}
+			return m, nil
+		}
+		m.commandOutput = "Gator " + current + " is up to date."
+		if latest != "" && latest != current {
+			m.commandOutput += " Latest published release: " + latest + "."
+		}
+		m.notice = notice{text: "No update was installed; the running build is current.", kind: noticeSuccess}
 		return m, nil
 	case delegatedRunDoneMsg:
 		m.task.Reset()

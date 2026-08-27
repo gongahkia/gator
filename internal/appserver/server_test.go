@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -171,6 +174,168 @@ func TestServerRejectsDuplicateRequestIDs(t *testing.T) {
 	}
 }
 
+func TestServerReturnsTooManyRequestsWhenStreamCapacityIsFull(t *testing.T) {
+	bridge := testServer(t, &scriptedModel{})
+	bridge.hub.maxStreams = 1
+	web := httptest.NewServer(bridge.Handler())
+	defer web.Close()
+
+	first := postRPC(t, web.URL, protocol.Request{Version: protocol.Version, ID: "capacity-1", Method: protocol.MethodStatus})
+	first.Body.Close()
+	if first.StatusCode != http.StatusAccepted {
+		t.Fatalf("first request status = %d", first.StatusCode)
+	}
+	second := postRPC(t, web.URL, protocol.Request{Version: protocol.Version, ID: "capacity-2", Method: protocol.MethodStatus})
+	second.Body.Close()
+	if second.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("overload status = %d", second.StatusCode)
+	}
+}
+
+func TestServerRejectsLostReplayCursorAndAllowsRecoverableReconnect(t *testing.T) {
+	bridge := testServer(t, &scriptedModel{})
+	bridge.hub.maxHistory = 2
+	if err := bridge.hub.reserve("replay-1", false); err != nil {
+		t.Fatalf("reserve replay stream: %v", err)
+	}
+	for index := 0; index < 3; index++ {
+		bridge.hub.publish(protocol.Message{ID: "replay-1", Type: "event"})
+	}
+	web := httptest.NewServer(bridge.Handler())
+	defer web.Close()
+
+	stale, err := http.NewRequest(http.MethodGet, web.URL+"/v1/events/replay-1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale.Header.Set("Authorization", "Bearer "+string(testToken))
+	stale.Header.Set("Last-Event-ID", "0")
+	response, err := http.DefaultClient.Do(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusConflict {
+		t.Fatalf("lost replay status = %d", response.StatusCode)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	recovered, err := http.NewRequestWithContext(ctx, http.MethodGet, web.URL+"/v1/events/replay-1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recovered.Header.Set("Authorization", "Bearer "+string(testToken))
+	recovered.Header.Set("Last-Event-ID", "1")
+	response, err = http.DefaultClient.Do(recovered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("recover replay status = %d", response.StatusCode)
+	}
+	reader := bufio.NewScanner(response.Body)
+	reader.Buffer(make([]byte, 1024), maxRequestBytes)
+	var sequences []int
+	for reader.Scan() {
+		line := reader.Text()
+		if !strings.HasPrefix(line, "id: ") {
+			continue
+		}
+		sequence, err := strconv.Atoi(strings.TrimPrefix(line, "id: "))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sequences = append(sequences, sequence)
+		if len(sequences) == 2 {
+			break
+		}
+	}
+	cancel()
+	if got := fmt.Sprint(sequences); got != "[2 3]" {
+		t.Fatalf("recovered event ids = %s", got)
+	}
+}
+
+func TestServerCloseReleasesWaitingSSESubscriber(t *testing.T) {
+	bridge := testServer(t, &scriptedModel{})
+	if err := bridge.hub.reserve("waiting-1", true); err != nil {
+		t.Fatalf("reserve waiting stream: %v", err)
+	}
+	web := httptest.NewServer(bridge.Handler())
+	defer web.Close()
+	request, err := http.NewRequest(http.MethodGet, web.URL+"/v1/events/waiting-1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+string(testToken))
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := io.ReadAll(response.Body)
+		finished <- err
+	}()
+	if err := bridge.Close(); err != nil {
+		t.Fatalf("close bridge: %v", err)
+	}
+	select {
+	case err := <-finished:
+		if err != nil {
+			t.Fatalf("read closed SSE: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("SSE subscriber remained blocked after server close")
+	}
+}
+
+func TestServerAuthenticatedShutdownDelegatesToListenerOwner(t *testing.T) {
+	bridge := testServer(t, &scriptedModel{})
+	called := make(chan struct{})
+	bridge.requestShutdown = func() { close(called) }
+	web := httptest.NewServer(bridge.Handler())
+	defer web.Close()
+	request, err := http.NewRequest(http.MethodPost, web.URL+"/v1/shutdown", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+string(testToken))
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusAccepted {
+		t.Fatalf("shutdown status = %d", response.StatusCode)
+	}
+	select {
+	case <-called:
+	case <-time.After(time.Second):
+		t.Fatal("listener owner was not asked to shut down")
+	}
+}
+
+func TestServerWaitContextHonorsShutdownDeadline(t *testing.T) {
+	bridge, err := New(Config{
+		RPC: internalrpc.Config{
+			RepositoryPath: t.TempDir(), DefaultProvider: "openai", DefaultModel: "test-model",
+			NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) { return gatorrun.Executor{}, nil },
+		},
+		Token: testToken,
+	})
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := bridge.WaitContext(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("wait deadline error = %v", err)
+	}
+}
+
 func TestServerControlsDetachedTerminalInItsAuthenticatedSession(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the PTY dependency reports unsupported on Windows")
@@ -264,15 +429,15 @@ func TestMessageHubReplaysInOrderAndDropsSlowSubscriber(t *testing.T) {
 	}
 	hub.publish(protocol.Message{ID: "run-1", Type: "event"})
 	hub.publish(protocol.Message{ID: "run-1", Type: "response"})
-	history, subscriber, found := hub.subscribe("run-1", 0)
-	if !found || len(history) != 2 || history[0].Sequence != 1 || history[1].Sequence != 2 {
-		t.Fatalf("history = %#v, found=%t", history, found)
+	history, subscriber, err := hub.subscribe("run-1", 0, false)
+	if err != nil || len(history) != 2 || history[0].Sequence != 1 || history[1].Sequence != 2 {
+		t.Fatalf("history = %#v, err=%v", history, err)
 	}
 	subscriber.cancel()
 
-	_, slow, found := hub.subscribe("run-1", 2)
-	if !found {
-		t.Fatal("subscribe slow client")
+	_, slow, err := hub.subscribe("run-1", 2, true)
+	if err != nil {
+		t.Fatalf("subscribe slow client: %v", err)
 	}
 	hub.publish(protocol.Message{ID: "run-1", Type: "event"})
 	hub.publish(protocol.Message{ID: "run-1", Type: "event"})
@@ -300,9 +465,86 @@ func TestMessageHubReclaimsInactiveTerminalStreams(t *testing.T) {
 	if err := hub.reserve("next-1", false); err != nil {
 		t.Fatalf("reserve stream after expiry: %v", err)
 	}
-	if _, _, found := hub.subscribe("complete-1", 0); found {
+	if _, _, err := hub.subscribe("complete-1", 0, false); !errors.Is(err, errStreamNotFound) {
 		t.Fatal("expired stream remained available")
 	}
+}
+
+func TestMessageHubRejectsUnrecoverableReplayCursors(t *testing.T) {
+	hub := newMessageHub(1, 2, 2)
+	if err := hub.reserve("run-1", false); err != nil {
+		t.Fatalf("reserve stream: %v", err)
+	}
+	for index := 0; index < 3; index++ {
+		hub.publish(protocol.Message{ID: "run-1", Type: "event"})
+	}
+	if _, _, err := hub.subscribe("run-1", 0, true); !errors.Is(err, errReplayUnavailable) {
+		t.Fatalf("stale replay cursor error = %v", err)
+	}
+	history, subscription, err := hub.subscribe("run-1", 1, true)
+	if err != nil || len(history) != 2 || history[0].Sequence != 2 || history[1].Sequence != 3 {
+		t.Fatalf("recoverable replay = %#v, %v", history, err)
+	}
+	subscription.cancel()
+	if _, _, err := hub.subscribe("run-1", 4, true); !errors.Is(err, errEventCursorAhead) {
+		t.Fatalf("ahead replay cursor error = %v", err)
+	}
+}
+
+func FuzzEventCursor(f *testing.F) {
+	for _, value := range []string{"", "0", "1", "18446744073709551615", "-1", "+1", "not-a-number", " 42 "} {
+		f.Add(value)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		cursor, present, err := eventCursor(value)
+		if err == nil && strings.TrimSpace(value) != "" && !present {
+			t.Fatalf("non-empty valid cursor was not marked present: %q", value)
+		}
+		if err == nil && !present && cursor != 0 {
+			t.Fatalf("empty cursor = %d", cursor)
+		}
+	})
+}
+
+func FuzzServerHTTPInput(f *testing.F) {
+	repository := f.TempDir()
+	bridge, err := New(Config{
+		RPC: internalrpc.Config{
+			RepositoryPath: repository, DefaultProvider: "openai", DefaultModel: "test-model",
+			NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) { return gatorrun.Executor{}, nil },
+		},
+		Token: testToken,
+	})
+	if err != nil {
+		f.Fatalf("new fuzz server: %v", err)
+	}
+	for _, seed := range []struct{ method, path, body, cursor string }{
+		{http.MethodPost, "/v1/rpc", `{"version":1,"id":"status-1","method":"status"}`, ""},
+		{http.MethodPost, "/v1/rpc", `not-json`, ""},
+		{http.MethodGet, "/v1/events/status-1", "", "0"},
+		{http.MethodGet, "/openapi.json", "", ""},
+	} {
+		f.Add(seed.method, seed.path, seed.body, seed.cursor)
+	}
+	f.Fuzz(func(t *testing.T, method, path, body, cursor string) {
+		request := &http.Request{
+			Method: method,
+			URL:    &url.URL{Path: path},
+			Header: http.Header{
+				"Authorization": []string{"Bearer " + string(testToken)},
+				"Content-Type":  []string{"application/json"},
+			},
+			Body: io.NopCloser(strings.NewReader(body)),
+		}
+		if cursor != "" {
+			request.Header.Set("Last-Event-ID", cursor)
+		}
+		response := httptest.NewRecorder()
+		bridge.Handler().ServeHTTP(response, request)
+		if response.Code < 100 || response.Code > 599 {
+			t.Fatalf("invalid response status %d", response.Code)
+		}
+	})
 }
 
 func TestTerminalMessageKeepsAcceptedRunsOpen(t *testing.T) {

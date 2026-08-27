@@ -582,17 +582,19 @@ func (t Tool) Definition() agent.ToolDefinition {
 	}
 	switch t.operation {
 	case diagnosticsOperation, documentSymbolsOperation:
-		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"}}}`)
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Primary-worktree-relative source-file path or approved external-root absolute source-file path"}}}`)
 	case workspaceSymbolsOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512,"description":"Symbol-name query within this workspace"}}}`)
 	case referencesOperation:
-		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"include_declaration":{"type":"boolean","description":"Include the symbol declaration in results; defaults to false"}}}`)
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Primary-worktree-relative source-file path or approved external-root absolute source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"include_declaration":{"type":"boolean","description":"Include the symbol declaration in results; defaults to false"}}}`)
 	case codeActionsOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based selection start line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 selection start offset"},"end_line":{"type":"integer","minimum":1,"description":"Optional one-based selection end line; defaults to line"},"end_character":{"type":"integer","minimum":0,"description":"Optional zero-based UTF-16 selection end offset; defaults to character"}}}`)
 	case formatOperation:
-		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"}}}`)
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Primary-worktree-relative source-file path; external roots are read-only"}}}`)
 	case renameOperation:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character","new_name"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"},"new_name":{"type":"string","minLength":1,"maxLength":256,"description":"Requested symbol name"}}}`)
+	case hoverOperation, completionOperation, definitionOperation:
+		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Primary-worktree-relative source-file path or approved external-root absolute source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"}}}`)
 	default:
 		definition.Parameters = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line","character"],"properties":{"path":{"type":"string","description":"Workspace-relative source-file path"},"line":{"type":"integer","minimum":1,"description":"One-based source line"},"character":{"type":"integer","minimum":0,"description":"Zero-based UTF-16 character offset"}}}`)
 	}
@@ -603,7 +605,7 @@ func (t Tool) description() string {
 	server := t.specification.Name + " (" + t.specification.Language + ")"
 	switch t.operation {
 	case diagnosticsOperation:
-		return "Read-only LSP pull diagnostics using " + server + ". The path must be a workspace-relative source file."
+		return "Read-only LSP pull diagnostics using " + server + ". The path may be primary-worktree-relative or an approved external-root absolute source file."
 	case hoverOperation:
 		return "Read-only LSP hover information using " + server + ". line is one-based; character is a zero-based UTF-16 offset."
 	case completionOperation:
@@ -619,7 +621,7 @@ func (t Tool) description() string {
 	case referencesOperation:
 		return "Read-only LSP find-references lookup using " + server + ". line is one-based; character is a zero-based UTF-16 offset. Only workspace locations are returned."
 	case documentSymbolsOperation:
-		return "Read-only LSP document-symbol listing using " + server + ". The path must be a workspace-relative source file."
+		return "Read-only LSP document-symbol listing using " + server + ". The path may be primary-worktree-relative or an approved external-root absolute source file."
 	case workspaceSymbolsOperation:
 		return "Read-only LSP workspace-symbol search using " + server + ". The query is limited to symbols in the active workspace; only workspace locations are returned."
 	default:

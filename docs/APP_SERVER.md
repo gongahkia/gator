@@ -58,7 +58,10 @@ same RPC `response`, `event`, and `error` messages that `gator rpc` writes as
 JSONL. Each SSE item has a monotonic ID. Reconnect with `Last-Event-ID` to
 replay later retained messages. Gator keeps at most 256 messages per request
 ID and 64 queued messages per client; a slow client receives an `overflow`
-event and must reconnect with its last observed event ID.
+event and must reconnect with its last observed event ID. If that ID predates
+the retained replay window (or is ahead of the stream), the reconnect receives
+`409 Conflict` instead of silently skipping messages; the client must
+reconcile its request state before it resumes streaming.
 
 To bound a long-lived local process, Gator retains terminal streams for fifteen
 minutes after their last client disconnects, up to 1,024 streams. It then
@@ -97,9 +100,11 @@ Detached tasks retain their original policy, are capped at eight retained
 histories per server process, and expire within two hours while running. A
 normal `gator serve` shutdown stops them. The server handles `Ctrl-C` and
 normal Unix `SIGTERM` shutdown before it releases its terminal registry;
-`gator serve stop` uses that same path. Tasks do not survive a `gator serve`
-restart, and plain `gator rpc`, ACP, and child-writer runs do not offer
-detachment or these controller methods.
+`gator serve stop` asks the authenticated server's `POST /v1/shutdown`
+endpoint to use that same path, rather than trusting or signaling the PID in a
+state file. Tasks do not survive a `gator serve` restart, and plain `gator
+rpc`, ACP, and child-writer runs do not offer detachment or these controller
+methods.
 
 ## Security boundary
 
@@ -110,7 +115,8 @@ port forwarding when a remote client is necessary, and keep the local bearer
 token private. The server has a 1 MiB request limit, bounded per-request replay
 history, bounded subscriber queues, five-second header reads, and fifteen-second
 request reads. SSE has no write timeout by design because it is a long-lived
-event stream.
+event stream. Token and service-state reads verify the same private regular
+file before and after opening it, rejecting symlink or replacement races.
 
 This is a local bridge, not a hosted executor, remote worktree service, or
 organization policy plane. It cannot change Gator's repository root, inject

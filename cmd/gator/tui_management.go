@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -32,6 +33,8 @@ type tuiManagementBackend struct {
 	lspRegistry *lsp.Registry
 }
 
+const maxManagedConfigBytes = 16 * 1024
+
 func newTUIManagementBackend(repository, stateDir string, settings config.Store, lspRegistry *lsp.Registry) (tui.ManagementBackend, error) {
 	extensions, err := extension.DefaultStore()
 	if err != nil {
@@ -42,6 +45,10 @@ func newTUIManagementBackend(repository, stateDir string, settings config.Store,
 
 func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementSnapshot, error) {
 	settings, err := backend.settings.Load()
+	if err != nil {
+		return tui.ManagementSnapshot{}, err
+	}
+	configuration, err := redactedManagedConfig(backend.settings.Path(), settings)
 	if err != nil {
 		return tui.ManagementSnapshot{}, err
 	}
@@ -79,6 +86,7 @@ func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementS
 	}
 	policy := settings.Execution.Normalize()
 	return tui.ManagementSnapshot{
+		Config: configuration,
 		Settings: tui.ManagedSettings{
 			SandboxMode: string(policy.Mode), Network: string(policy.Network),
 			DefaultProvider: settings.Defaults.Provider, DefaultModel: settings.Defaults.Model,
@@ -86,6 +94,83 @@ func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementS
 		Trusts: trusts, MCPAuth: mcpAuth, Runs: managedRuns, Worktrees: worktrees, Children: children, Batches: batches, Extensions: extensions,
 		LSPRuntime: backend.lspRuntimeSnapshot(),
 	}, nil
+}
+
+// redactedManagedConfig creates a display-only representation of config.json.
+// The normal schema excludes credentials, but this is intentionally defensive:
+// option keys are extensible and URLs can contain capability-bearing query
+// values, so neither are safe to render blindly in an inspector.
+func redactedManagedConfig(path string, settings config.Settings) (tui.ManagedConfig, error) {
+	payload, err := json.Marshal(settings)
+	if err != nil {
+		return tui.ManagedConfig{}, fmt.Errorf("encode configuration for inspection: %w", err)
+	}
+	var document any
+	if err := json.Unmarshal(payload, &document); err != nil {
+		return tui.ManagedConfig{}, fmt.Errorf("decode configuration for inspection: %w", err)
+	}
+	redactManagedConfigValue(document, "")
+	payload, err = json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		return tui.ManagedConfig{}, fmt.Errorf("render redacted configuration: %w", err)
+	}
+	result := tui.ManagedConfig{Path: path}
+	if len(payload) > maxManagedConfigBytes {
+		result.JSON = strings.ToValidUTF8(string(payload[:maxManagedConfigBytes]), "")
+		result.Truncated = true
+		return result, nil
+	}
+	result.JSON = string(payload)
+	return result, nil
+}
+
+func redactManagedConfigValue(value any, parent string) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, item := range typed {
+			if managedConfigSecretKey(key) {
+				typed[key] = "[redacted]"
+				continue
+			}
+			if stringValue, ok := item.(string); ok && (key == "base_url" || key == "gateway" || parent == "provider_endpoints") {
+				typed[key] = redactManagedConfigURL(stringValue)
+				continue
+			}
+			redactManagedConfigValue(item, key)
+		}
+	case []any:
+		for _, item := range typed {
+			redactManagedConfigValue(item, parent)
+		}
+	}
+}
+
+func managedConfigSecretKey(key string) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	if strings.HasSuffix(key, "_env") {
+		return false
+	}
+	for _, fragment := range []string{"api_key", "token", "secret", "password", "authorization", "credential", "access", "refresh", "signature"} {
+		if strings.Contains(key, fragment) {
+			return true
+		}
+	}
+	return false
+}
+
+func redactManagedConfigURL(value string) string {
+	endpoint, err := url.Parse(value)
+	if err != nil || endpoint.User != nil {
+		return "[redacted]"
+	}
+	query := endpoint.Query()
+	for key := range query {
+		if managedConfigSecretKey(key) {
+			query.Set(key, "[redacted]")
+		}
+	}
+	endpoint.RawQuery = query.Encode()
+	return endpoint.String()
 }
 
 func (backend *tuiManagementBackend) lspRuntimeSnapshot() []tui.ManagedLSPRuntime {

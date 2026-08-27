@@ -115,8 +115,13 @@ func (manager *localModelManager) Close() error {
 }
 
 func (manager *localModelManager) stopRuntime(runtime *managedLocalRuntime) error {
-	if runtime == nil || runtime.command.Process == nil || runtime.command.ProcessState != nil {
+	if runtime == nil || runtime.command.Process == nil {
 		return nil
+	}
+	select {
+	case <-runtime.done:
+		return nil
+	default:
 	}
 	if err := runtime.command.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 		return fmt.Errorf("stop Gator-managed Ollama runtime: %w", err)
