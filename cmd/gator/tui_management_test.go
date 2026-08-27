@@ -48,6 +48,37 @@ func TestTUIManagementPersistsValidatedPolicyAndDefaults(t *testing.T) {
 	}
 }
 
+func TestRedactedManagedConfigNeverDisplaysSecretShapedValues(t *testing.T) {
+	settings := config.Default()
+	settings.ProviderEndpoints = map[string]string{
+		"openai": "https://models.example.com/v1?api_key=endpoint-secret&region=sg",
+	}
+	settings.ProviderOptions = map[string]map[string]string{
+		"openai": {
+			"access_token": "option-secret",
+			"api_key_env":  "OPENAI_API_KEY",
+		},
+	}
+	settings.CustomProviders = []config.CustomProvider{{
+		ID: "team-gateway", BaseURL: "https://gateway.example.com/v1/chat/completions?token=url-secret",
+		APIKeyEnv: "TEAM_GATEWAY_API_KEY", Models: []string{"coding-large"}, DefaultModel: "coding-large",
+	}}
+	inspector, err := redactedManagedConfig("/private/config.json", settings)
+	if err != nil {
+		t.Fatalf("redact configuration: %v", err)
+	}
+	for _, secret := range []string{"endpoint-secret", "option-secret", "url-secret"} {
+		if strings.Contains(inspector.JSON, secret) {
+			t.Fatalf("inspector leaked %q: %s", secret, inspector.JSON)
+		}
+	}
+	for _, safe := range []string{"OPENAI_API_KEY", "TEAM_GATEWAY_API_KEY", "[redacted]"} {
+		if !strings.Contains(inspector.JSON, safe) {
+			t.Fatalf("inspector omitted safe/redaction marker %q: %s", safe, inspector.JSON)
+		}
+	}
+}
+
 func TestTUIManagementExportsPrivatelyChecksAndAppliesRetainedPatch(t *testing.T) {
 	root := t.TempDir()
 	repository := filepath.Join(root, "repository")

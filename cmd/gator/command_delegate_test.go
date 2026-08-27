@@ -187,7 +187,7 @@ func TestDelegateKimiAndOpenCodeUseTheirOwnCredentialStores(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(logged); got != "providers\nlogin\n--provider\nxai\n" {
+	if got := string(logged); got != "auth\nlogin\n--provider\nxai\n" {
 		t.Fatalf("OpenCode login args = %q", got)
 	}
 	if err := delegate([]string{"opencode", "run", "--model", "xai/grok-build", "--verify", "git status --short", "Add", "a", "feature"}, &output); err != nil {

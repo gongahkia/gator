@@ -164,10 +164,19 @@ func interactiveWithOptions(options interactiveOptions) error {
 			process.Stderr = writer
 			return tui.DelegateCommand{Process: process, Output: output.String}, nil
 		},
-		SetTheme:    saveTheme,
-		LocalModels: newLocalModelManager(store),
-		Management:  management,
-		Doctor:      newTUIDoctorBackend(settings.Execution),
+		NewOpenCodeCommand: func(arguments []string) (*exec.Cmd, error) {
+			if len(arguments) == 0 || (arguments[0] != "status" && arguments[0] != "login") {
+				return nil, errors.New("invalid OpenCode management action")
+			}
+			command := append([]string{"delegate", "opencode"}, arguments...)
+			return exec.Command(os.Args[0], command...), nil
+		},
+		Build:          tui.BuildInfo{Version: version, Commit: commit, Date: date},
+		CheckForUpdate: tuiUpdateStatus,
+		SetTheme:       saveTheme,
+		LocalModels:    newLocalModelManager(store),
+		Management:     management,
+		Doctor:         newTUIDoctorBackend(settings.Execution),
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	final, runErr := program.Run()
@@ -175,6 +184,23 @@ func interactiveWithOptions(options interactiveOptions) error {
 		model.Close()
 	}
 	return runErr
+}
+
+// tuiUpdateStatus intentionally stops at release metadata. Replacing an
+// executable while Bubble Tea owns the terminal would make the current
+// process's provenance unclear, so the TUI directs a developer to the normal
+// verified `gator update` command after it exits.
+func tuiUpdateStatus() (tui.UpdateStatus, error) {
+	updater := defaultUpdater()
+	latest, err := updater.latest()
+	if err != nil {
+		return tui.UpdateStatus{}, err
+	}
+	available, err := newerVersion(version, latest.TagName)
+	if err != nil {
+		return tui.UpdateStatus{}, err
+	}
+	return tui.UpdateStatus{Current: version, Latest: latest.TagName, Available: available}, nil
 }
 
 const delegateOutputLimit = 6 * 1024

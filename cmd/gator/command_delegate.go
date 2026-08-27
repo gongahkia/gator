@@ -86,7 +86,7 @@ func delegate(arguments []string, out io.Writer) error {
 			if len(arguments) != 2 {
 				return errors.New("usage: gator delegate opencode status")
 			}
-			return runDelegateCommand(context.Background(), delegateProgram("opencode"), []string{"providers", "list"}, "", out, nil)
+			return runDelegateCommand(context.Background(), delegateProgram("opencode"), []string{"auth", "list"}, "", out, nil)
 		case "run":
 			return delegateOpenCodeRun(arguments[2:], out)
 		}
@@ -233,7 +233,7 @@ func delegateOpenCodeLogin(arguments []string, out io.Writer) error {
 	if len(flags.Args()) != 0 || strings.TrimSpace(*provider) == "" {
 		return errors.New("usage: gator delegate opencode login --provider PROVIDER [--method METHOD]")
 	}
-	command := []string{"providers", "login", "--provider", strings.TrimSpace(*provider)}
+	command := []string{"auth", "login", "--provider", strings.TrimSpace(*provider)}
 	if value := strings.TrimSpace(*method); value != "" {
 		command = append(command, "--method", value)
 	}

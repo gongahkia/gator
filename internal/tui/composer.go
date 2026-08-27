@@ -48,6 +48,7 @@ var slashCommands = []slashCommand{
 	{name: "/manage", description: "manage project trust, worktrees, writer children, and extensions"},
 	{name: "/model", description: "manage cloud and local models for the next run"},
 	{name: "/new", description: "start a new isolated thread"},
+	{name: "/opencode", description: "manage the installed OpenCode harness: status, login, and model selection"},
 	{name: "/plan", description: "switch to enforced read-only Plan mode"},
 	{name: "/recent", description: "choose a retained run, or type a thread ID / run-record path"},
 	{name: "/threads", description: "choose a retained conversation thread"},
@@ -60,7 +61,9 @@ var slashCommands = []slashCommand{
 	{name: "/run", description: "edit one-run endpoint, sandbox/network, prefixes; not saved to config.json"},
 	{name: "/status", description: "show current run configuration"},
 	{name: "/theme", description: "choose a terminal theme"},
+	{name: "/update", description: "check for a published Gator update without replacing this running binary"},
 	{name: "/verify", description: "edit required verification commands"},
+	{name: "/version", description: "show Gator build and update status"},
 	{name: "/vim", description: "toggle Vim-style message editing"},
 	{name: "/worktree", description: "explain Gator's worktree mode"},
 }

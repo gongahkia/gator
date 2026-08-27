@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,6 +34,24 @@ func TestCreateServeTokenCreatesPrivateReadableToken(t *testing.T) {
 	}
 	if err := createServeToken([]string{path}, &output); err == nil {
 		t.Fatal("existing token file was overwritten")
+	}
+}
+
+func TestReadServeTokenRejectsSymlinkSwapTargets(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permission behavior varies on Windows")
+	}
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target-token")
+	if err := os.WriteFile(target, []byte("gator-app-server-test-token-0123456789\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(directory, "token-link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readServeToken(link); err == nil || !strings.Contains(err.Error(), "private regular file") {
+		t.Fatalf("symlink token read error = %v", err)
 	}
 }
 
@@ -115,6 +136,30 @@ func TestServeReadyIsExclusiveAndLoopbackOnly(t *testing.T) {
 		if err := validateServeEndpoint(endpoint); err == nil {
 			t.Fatalf("accepted non-local service endpoint %q", endpoint)
 		}
+	}
+}
+
+func TestRequestServeShutdownUsesOnlyTheAuthenticatedLoopbackEndpoint(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/shutdown" || request.Method != http.MethodPost {
+			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
+		}
+		if request.Header.Get("Authorization") != "Bearer test-token" {
+			t.Fatalf("authorization = %q", request.Header.Get("Authorization"))
+		}
+		called = true
+		writer.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+	if err := requestServeShutdown(context.Background(), server.URL, []byte("test-token")); err != nil {
+		t.Fatalf("request shutdown: %v", err)
+	}
+	if !called {
+		t.Fatal("shutdown endpoint was not called")
+	}
+	if err := requestServeShutdown(context.Background(), "http://example.com:49152", []byte("test-token")); err == nil {
+		t.Fatal("non-loopback shutdown endpoint was accepted")
 	}
 }
 

@@ -35,6 +35,10 @@ const (
 var (
 	errDuplicateRequestID = errors.New("request id has already been submitted to this app server")
 	errStreamCapacity     = errors.New("app server event-stream capacity is exhausted; retry later")
+	errStreamNotFound     = errors.New("event stream was not found")
+	errHubClosed          = errors.New("app server is shutting down")
+	errReplayUnavailable  = errors.New("event history no longer covers Last-Event-ID; reconcile the request state before reconnecting")
+	errEventCursorAhead   = errors.New("Last-Event-ID is ahead of this event stream")
 )
 
 // Config supplies the RPC dependencies and local transport constraints. Token
@@ -47,21 +51,27 @@ type Config struct {
 	MaxStreams      int
 	MaxHistory      int
 	SubscriberQueue int
+	// RequestShutdown is set only by a process that owns the HTTP listener.
+	// When non-nil, the authenticated shutdown endpoint asks that owner to
+	// begin its ordinary graceful shutdown path.
+	RequestShutdown func()
 }
 
 // Server bridges HTTP requests to one in-process JSONL RPC server and stores a
 // bounded replay window per request ID for reconnecting SSE clients.
 type Server struct {
-	backend *internalrpc.Server
-	input   *io.PipeWriter
-	hub     *messageHub
-	token   []byte
-	version string
+	backend         *internalrpc.Server
+	input           *io.PipeWriter
+	hub             *messageHub
+	token           []byte
+	version         string
+	requestShutdown func()
 
 	write     sync.Mutex
 	mu        sync.Mutex
 	started   bool
 	stopped   bool
+	closing   bool
 	cancel    context.CancelFunc
 	done      chan struct{}
 	serveErr  error
@@ -101,7 +111,7 @@ func New(config Config) (*Server, error) {
 		_ = writer.Close()
 		return nil, err
 	}
-	return &Server{backend: backend, input: writer, hub: hub, token: token, version: config.Version, done: make(chan struct{})}, nil
+	return &Server{backend: backend, input: writer, hub: hub, token: token, version: config.Version, requestShutdown: config.RequestShutdown, done: make(chan struct{})}, nil
 }
 
 func validToken(value []byte) ([]byte, error) {
@@ -146,7 +156,7 @@ func (s *Server) Start(parent context.Context) error {
 }
 
 // Close stops request ingress, cancels active runs, and releases waiting SSE
-// handlers through their request contexts. It is safe to call more than once.
+// handlers immediately. It is safe to call more than once.
 func (s *Server) Close() error {
 	if s == nil {
 		return nil
@@ -154,8 +164,12 @@ func (s *Server) Close() error {
 	var closeErr error
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
+		s.closing = true
 		cancel := s.cancel
 		s.mu.Unlock()
+		if s.hub != nil {
+			s.hub.close()
+		}
 		if cancel != nil {
 			cancel()
 		}
@@ -168,10 +182,22 @@ func (s *Server) Close() error {
 
 // Wait reports the RPC loop's terminal error after the server has stopped.
 func (s *Server) Wait() error {
+	return s.WaitContext(context.Background())
+}
+
+// WaitContext reports the RPC loop's terminal error, unless a caller's
+// lifecycle deadline expires first. A listener host uses this to avoid an
+// unbounded shutdown when a third-party model implementation ignores context
+// cancellation.
+func (s *Server) WaitContext(ctx context.Context) error {
 	if s == nil {
 		return errors.New("app server is not initialized")
 	}
-	<-s.done
+	select {
+	case <-s.done:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.serveErr
@@ -202,6 +228,12 @@ func (s *Server) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 			return
 		}
 		s.submitHTTP(writer, request)
+	case request.URL.Path == "/v1/shutdown":
+		if !s.authorized(request) {
+			writeUnauthorized(writer)
+			return
+		}
+		s.shutdownHTTP(writer, request)
 	case strings.HasPrefix(request.URL.Path, "/v1/events/"):
 		if !s.authorized(request) {
 			writeUnauthorized(writer)
@@ -219,7 +251,7 @@ func (s *Server) health(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	ready := s.started && !s.stopped && s.serveErr == nil
+	ready := s.started && !s.stopped && !s.closing && s.serveErr == nil
 	s.mu.Unlock()
 	if !ready {
 		writeError(writer, http.StatusServiceUnavailable, "app server is not ready")
@@ -233,15 +265,34 @@ func (s *Server) openAPI(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
+	paths := map[string]any{
+		"/healthz":        map[string]any{"get": map[string]string{"summary": "Read local readiness without authentication"}},
+		"/v1/rpc":         map[string]any{"post": map[string]any{"summary": "Submit one Gator RPC v1 request", "requestBody": map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{}}}}},
+		"/v1/events/{id}": map[string]any{"get": map[string]any{"summary": "Replay and stream correlated RPC messages as SSE", "parameters": []map[string]any{{"name": "id", "in": "path", "required": true, "schema": map[string]string{"type": "string"}}, {"name": "Last-Event-ID", "in": "header", "required": false, "schema": map[string]string{"type": "integer"}}}}},
+	}
+	if s.requestShutdown != nil {
+		paths["/v1/shutdown"] = map[string]any{"post": map[string]string{"summary": "Ask the owning local process to begin graceful shutdown"}}
+	}
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"openapi": "3.1.0",
 		"info":    map[string]string{"title": "Gator local app server", "version": s.version},
-		"paths": map[string]any{
-			"/healthz":        map[string]any{"get": map[string]string{"summary": "Read local readiness without authentication"}},
-			"/v1/rpc":         map[string]any{"post": map[string]any{"summary": "Submit one Gator RPC v1 request", "requestBody": map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{}}}}},
-			"/v1/events/{id}": map[string]any{"get": map[string]any{"summary": "Replay and stream correlated RPC messages as SSE", "parameters": []map[string]any{{"name": "id", "in": "path", "required": true, "schema": map[string]string{"type": "string"}}, {"name": "Last-Event-ID", "in": "header", "required": false, "schema": map[string]string{"type": "integer"}}}}},
-		},
+		"paths":   paths,
 	})
+}
+
+func (s *Server) shutdownHTTP(writer http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		writeError(writer, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.requestShutdown == nil {
+		writeError(writer, http.StatusNotFound, "this app-server host does not expose lifecycle shutdown")
+		return
+	}
+	writeJSON(writer, http.StatusAccepted, map[string]any{"stopping": true})
+	// Cancel after committing the response so an HTTP server never waits for
+	// the shutdown request that asked it to stop.
+	go s.requestShutdown()
 }
 
 func (s *Server) submitHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -297,7 +348,7 @@ func ensureEOF(decoder *json.Decoder) error {
 
 func (s *Server) submit(message protocol.Request) error {
 	s.mu.Lock()
-	ready := s.started && !s.stopped && s.serveErr == nil
+	ready := s.started && !s.stopped && !s.closing && s.serveErr == nil
 	s.mu.Unlock()
 	if !ready {
 		return errors.New("app server is not ready")
@@ -331,14 +382,22 @@ func (s *Server) eventsHTTP(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusBadRequest, "event stream id is invalid")
 		return
 	}
-	after, err := eventCursor(request.Header.Get("Last-Event-ID"))
+	after, hasCursor, err := eventCursor(request.Header.Get("Last-Event-ID"))
 	if err != nil {
 		writeError(writer, http.StatusBadRequest, "Last-Event-ID must be a non-negative integer")
 		return
 	}
-	history, subscription, ok := s.hub.subscribe(id, after)
-	if !ok {
+	history, subscription, err := s.hub.subscribe(id, after, hasCursor)
+	if errors.Is(err, errStreamNotFound) {
 		writeError(writer, http.StatusNotFound, "event stream was not found")
+		return
+	}
+	if errors.Is(err, errReplayUnavailable) || errors.Is(err, errEventCursorAhead) {
+		writeError(writer, http.StatusConflict, err.Error())
+		return
+	}
+	if err != nil {
+		writeError(writer, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 	defer subscription.cancel()
@@ -371,6 +430,8 @@ func (s *Server) eventsHTTP(writer http.ResponseWriter, request *http.Request) {
 			_, _ = io.WriteString(writer, "event: overflow\ndata: {\"error\":\"event subscriber overflow; reconnect with Last-Event-ID\"}\n\n")
 			flusher.Flush()
 			return
+		case <-s.hub.done:
+			return
 		case <-heartbeat.C:
 			_, _ = io.WriteString(writer, ": heartbeat\n\n")
 			flusher.Flush()
@@ -380,12 +441,16 @@ func (s *Server) eventsHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func eventCursor(value string) (uint64, error) {
+func eventCursor(value string) (uint64, bool, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return 0, nil
+		return 0, false, nil
 	}
-	return strconv.ParseUint(value, 10, 64)
+	cursor, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, false, err
+	}
+	return cursor, true, nil
 }
 
 func writeSSE(writer io.Writer, item storedMessage) error {
@@ -444,6 +509,8 @@ type messageHub struct {
 	subscriberQueue int
 	retention       time.Duration
 	now             func() time.Time
+	done            chan struct{}
+	closed          bool
 }
 
 type messageStream struct {
@@ -463,8 +530,18 @@ func newMessageHub(maxStreams, maxHistory, subscriberQueue int) *messageHub {
 func newMessageHubWithClock(maxStreams, maxHistory, subscriberQueue int, retention time.Duration, now func() time.Time) *messageHub {
 	return &messageHub{
 		streams: make(map[string]*messageStream), maxStreams: maxStreams, maxHistory: maxHistory, subscriberQueue: subscriberQueue,
-		retention: retention, now: now,
+		retention: retention, now: now, done: make(chan struct{}),
 	}
+}
+
+func (h *messageHub) close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed {
+		return
+	}
+	h.closed = true
+	close(h.done)
 }
 
 func (h *messageHub) Write(value []byte) (int, error) {
@@ -478,6 +555,9 @@ func (h *messageHub) Write(value []byte) (int, error) {
 func (h *messageHub) reserve(id string, awaitsFinal bool) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.closed {
+		return errHubClosed
+	}
 	h.pruneLocked(h.now())
 	if _, found := h.streams[id]; found {
 		return errDuplicateRequestID
@@ -492,6 +572,9 @@ func (h *messageHub) reserve(id string, awaitsFinal bool) error {
 func (h *messageHub) publish(message protocol.Message) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.closed {
+		return
+	}
 	stream, found := h.streams[message.ID]
 	if !found {
 		return
@@ -518,12 +601,26 @@ func (h *messageHub) publish(message protocol.Message) {
 	}
 }
 
-func (h *messageHub) subscribe(id string, after uint64) ([]storedMessage, *subscription, bool) {
+func (h *messageHub) subscribe(id string, after uint64, hasCursor bool) ([]storedMessage, *subscription, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.closed {
+		return nil, nil, errHubClosed
+	}
 	stream, found := h.streams[id]
 	if !found {
-		return nil, nil, false
+		return nil, nil, errStreamNotFound
+	}
+	if hasCursor {
+		if after > stream.next {
+			return nil, nil, errEventCursorAhead
+		}
+		if len(stream.history) > 0 {
+			first := stream.history[0].Sequence
+			if after < first && first-after > 1 {
+				return nil, nil, errReplayUnavailable
+			}
+		}
 	}
 	stream.lastActivity = h.now()
 	history := make([]storedMessage, 0, len(stream.history))
@@ -544,7 +641,7 @@ func (h *messageHub) subscribe(id string, after uint64) ([]storedMessage, *subsc
 			stream.lastActivity = h.now()
 		}
 	}
-	return history, subscription, true
+	return history, subscription, nil
 }
 
 func (h *messageHub) pruneLocked(now time.Time) {

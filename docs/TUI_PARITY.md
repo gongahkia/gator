@@ -55,12 +55,12 @@ package manager.
 | --- | --- | --- | --- |
 | `tui` | Default interactive surface | complete | — |
 | `help` | `/help`, `?`, and `F1` | partial | TUI documents TUI controls, not the full pipeable CLI reference. |
-| `version` | None | CLI only | No build/version panel. |
-| `update [--check]` | None | CLI only | Update and self-replacement remain outside the running TUI. |
+| `version` | `/version` | complete | Shows running build provenance without network I/O. |
+| `update [--check]` | `/update` | partial | The TUI checks only; download and self-replacement remain an explicit post-exit CLI action. |
 | `rpc` | None | intentionally CLI only | Stdio protocol for programmatic clients. |
 | `serve token/start/status/stop` | None | intentionally CLI only | Loopback app-server lifecycle for external clients. |
 | `acp [--verify …]` | None | intentionally CLI only | Stdio editor-agent protocol. |
-| `config show` | `/status` and `/permissions` show only active session state | partial | No full, redacted settings inspector. |
+| `config show` | `/manage` → Config | complete | Bounded redacted inspector never reads `auth.json`; secret-shaped values and sensitive URL query values are hidden. |
 | `config set default-provider/default-model` | `/manage` saves the provider/model currently selected in `/model` after confirmation | complete | — |
 | `config set sandbox/network` | `/manage` shows and confirms strict/off sandbox and deny/allow network defaults; `/permissions` explains the effective policy | complete | — |
 | `agent list` | `/agents` lists profiles and capability-bounded roles | complete | Profiles and role overlays can only narrow policy; roles never expand tools. |
@@ -78,12 +78,12 @@ package manager.
 | `local pull/use/remove` | Curated pull/use/remove with confirmation | complete | The per-command `--url` override has no TUI editor. |
 | `theme list/set` | `/theme` | complete | — |
 | `connect codex/copilot/kimi` | `/model` → Cloud → `l` runs the provider-owned sign-in flow | partial | CLI-only flags such as Codex device auth and Copilot host override are not exposed. |
-| `connect xai/openrouter/radius` | `/model` → Cloud → `l` can start Gator OAuth or the corresponding supported flow | partial | Provider-specific advanced options remain CLI-only. |
+| `connect xai/openrouter/radius` | `/model` → Cloud → `c` exposes endpoint/advanced settings and `l` starts the supported sign-in flow | complete | xAI's vendor-owned sign-in selects the OpenCode harness afterwards. |
 | `connect claude` | `/model` → Cloud → `c` configures the masked Anthropic key and selects the Claude Code harness | complete | `gator connect claude` remains a CLI alternative for scripted onboarding. |
 | `login PROVIDER` | `/model` → Cloud → `c` configures every built-in direct provider; `l` starts supported OAuth | complete | CLI remains preferable for scripted onboarding and environment-variable management. |
 | `logout PROVIDER` | `/model` → Cloud → `d` confirms removal of the stored Gator credential and reports remaining ambient sources | complete | Environment variables, AWS/ADC, and vendor CLI logins are never unset from the TUI. |
 | `delegate codex/copilot/claude/kimi run` | `/model` selects the matching harness; send a task to run it in an isolated worktree | partial | Login options and exact one-shot CLI flags are absent. |
-| `delegate opencode login/status/run` | None | CLI only | No OpenCode harness management surface. |
+| `delegate opencode login/status/run` | `/opencode` runs status/login in the vendor CLI and selects `PROVIDER/MODEL` for the next task | complete | Gator keeps the isolated-worktree and verification boundary; OpenCode keeps credentials, tools, approvals, and session state. |
 | `delegate external run` | None | CLI only | Arbitrary command execution belongs to the explicit CLI boundary. |
 | `doctor [--provider]` | `/doctor` reports Git, provider auth kind/status, sandbox availability, web search, dependencies, and local models | complete | Inspect-only: it never starts Ollama, OAuth, or mutates configuration. |
 | `run` basic task | Composer, model selection, verifier editor, plan/execute mode, approvals, and review | complete | — |
@@ -147,10 +147,12 @@ defines the next bounded iteration rather than implying broad parity.
    `/recent` also accepts a typed target (`p`). Review `b` starts the
    loopback browser listener with an editable listen address and optional
    open; it is not `gator serve` and has no RPC.
-9. **Diagnostics and vendor harnesses** — `/doctor` is a get-only local
-   report. OpenCode harness login/status/run remains CLI-only. Keep `rpc`,
-   `acp`, and `serve` as CLI contracts even if the TUI later offers
-   status/help links for them.
+9. **Diagnostics and vendor harnesses** — implemented: `/doctor` is a get-only
+   local report; `/opencode status`, `/opencode login PROVIDER [METHOD]`, and
+   `/opencode use PROVIDER/MODEL` expose the installed OpenCode harness without
+   importing its credential or session state. `/version` is local build
+   provenance and `/update` is check-only. Keep `rpc`, `acp`, and `serve` as
+   CLI contracts even if the TUI later offers status/help links for them.
 
 ## Deliberate boundaries
 

@@ -22,6 +22,7 @@ const (
 	managementWorktrees
 	managementChildren
 	managementExtensions
+	managementConfig
 	managementSectionCount
 )
 
@@ -522,6 +523,8 @@ func (m Model) managementItemCount() int {
 	switch m.management.section {
 	case managementSettings:
 		return 3
+	case managementConfig:
+		return 0
 	case managementTrust:
 		return len(m.management.data.Trusts)
 	case managementMCPAuth:
@@ -576,7 +579,7 @@ func (m Model) selectedExtension() (ManagedExtension, bool) {
 
 func (m Model) managementView() string {
 	sections := []string{m.header("manage")}
-	tabs := []string{"settings", "trust", "mcp auth", "runs", "worktrees", "children", "extensions"}
+	tabs := []string{"settings", "trust", "mcp auth", "runs", "worktrees", "children", "extensions", "config"}
 	for index := range tabs {
 		if managementSection(index) == m.management.section {
 			tabs[index] = keyStyle.Render("[" + tabs[index] + "]")
@@ -623,6 +626,8 @@ func (m Model) managementView() string {
 	switch m.management.section {
 	case managementSettings:
 		footer = append([]string{"enter change", "d save current model defaults"}, footer...)
+	case managementConfig:
+		footer = append([]string{"redacted local settings"}, footer...)
 	case managementTrust:
 		footer = append([]string{"t trust/untrust"}, footer...)
 	case managementMCPAuth:
@@ -651,6 +656,13 @@ func (m Model) managementRows() string {
 			"network  "+valueOrEmpty(settings.Network),
 			"defaults  "+valueOrEmpty(settings.DefaultProvider)+"/"+valueOrEmpty(settings.DefaultModel),
 		)
+	case managementConfig:
+		configuration := m.management.data.Config
+		state := fmt.Sprintf("%d bytes redacted", len(configuration.JSON))
+		if configuration.Truncated {
+			state += " · truncated"
+		}
+		rows = append(rows, "config.json  "+state, "path  "+valueOrEmpty(configuration.Path))
 	case managementTrust:
 		for _, item := range m.management.data.Trusts {
 			state := "not configured"
@@ -728,6 +740,17 @@ func (m Model) managementDetail() string {
 		default:
 			return labelStyle.Render("Provider defaults") + "\n" + dimStyle.Render("Enter or d saves the provider/model currently selected in /model. Credentials remain in the private auth store.")
 		}
+	case managementConfig:
+		configuration := m.management.data.Config
+		detail := labelStyle.Render("Redacted configuration inspector") + "\n" +
+			dimStyle.Render("This is config.json only. Gator auth.json is never read or displayed here; secret-shaped values and sensitive URL query parameters are redacted.")
+		if configuration.JSON != "" {
+			detail += "\n\n" + configuration.JSON
+		}
+		if configuration.Truncated {
+			detail += "\n\n" + dimStyle.Render("Output is bounded for terminal responsiveness. Use the config file path above for the complete local document.")
+		}
+		return detail
 	case managementTrust:
 		if item, ok := m.selectedTrust(); ok && item.Hash != "" {
 			detail := labelStyle.Render("Selected bundle") + "\n" + item.Kind + "\nsha256: " + item.Hash + "\n" + dimStyle.Render("Trust activates only this exact content hash. Every executable operation still follows its own approval and sandbox policy.")

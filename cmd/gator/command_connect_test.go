@@ -40,7 +40,7 @@ func TestConnectXAIUsesOpenCodeAndClaudeStoresAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := string(logged); got != "providers\nlogin\n--provider\nxai\n" {
+	if got := string(logged); got != "auth\nlogin\n--provider\nxai\n" {
 		t.Fatalf("xAI connect args = %q", got)
 	}
 	if !strings.Contains(output.String(), "Starting OpenCode's xAI provider login") {

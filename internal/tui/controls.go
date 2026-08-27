@@ -172,6 +172,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.commandOutput = ""
 		m.notice = notice{text: "Choose and manage cloud or local models. Provider sign-in is available from the Cloud section.", kind: noticeInfo}
 		return m.openModelCatalog()
+	case "/opencode":
+		return m.openOpenCodeManagement(strings.Fields(remainder))
 	case "/manage":
 		m.commandOutput = ""
 		m.notice = notice{text: "Inspect local state before changing trust or retained artifacts.", kind: noticeInfo}
@@ -219,6 +221,23 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/status":
 		m.commandOutput = m.sessionStatus()
 		m.notice = notice{text: "Current configuration shown below.", kind: noticeInfo}
+	case "/version":
+		m.commandOutput = m.versionStatus()
+		m.notice = notice{text: "Running build information shown below. Use /update to check the published release without changing this TUI process.", kind: noticeInfo}
+	case "/update":
+		if m.updateChecking {
+			m.notice = notice{text: "An update check is already in progress.", kind: noticeInfo}
+			return m, nil
+		}
+		if m.config.CheckForUpdate == nil {
+			m.commandOutput = m.versionStatus() + "\n\nUpdate checks are not configured in this Gator build. Exit the TUI and use 'gator update --check' when available."
+			m.notice = notice{text: "This build has no update-check service configured.", kind: noticeInfo}
+			return m, nil
+		}
+		m.updateChecking = true
+		m.commandOutput = m.versionStatus() + "\n\nChecking for a published update…"
+		m.notice = notice{text: "Checking release metadata; this does not download or replace Gator.", kind: noticeInfo}
+		return m, checkForUpdate(m.config.CheckForUpdate)
 	case "/theme":
 		if len(arguments) == 1 {
 			m.commandOutput = "Current theme: " + m.config.Theme + "\n\nChoose one:\n  /theme gator\n  /theme contrast\n  /theme mono"
@@ -312,6 +331,96 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 	m.notice = notice{text: "Waiting for the browser callback. Press Ctrl+C to cancel OAuth login.", kind: noticeInfo}
 	return m, func() tea.Msg {
 		return oauthLoginDoneMsg{provider: string(provider), err: login.Complete(context)}
+	}
+}
+
+// openOpenCodeManagement keeps vendor-owned authentication explicit while
+// making its lifecycle available from the TUI. It never reads OpenCode's
+// credential file or adapts its private session format; the installed CLI
+// remains the authority for both.
+func (m Model) openOpenCodeManagement(arguments []string) (tea.Model, tea.Cmd) {
+	usage := "OpenCode harness management:\n  /opencode status\n  /opencode login PROVIDER [METHOD]\n  /opencode use PROVIDER/MODEL\n\nLogin and status run the installed OpenCode CLI in this terminal. 'use' selects the OpenCode harness for the next Execute-mode task; Gator still creates the isolated worktree and runs its verifier."
+	if len(arguments) == 0 {
+		m.commandOutput = usage
+		m.notice = notice{text: "OpenCode owns provider credentials, tools, approvals, and session state.", kind: noticeInfo}
+		return m, nil
+	}
+	switch arguments[0] {
+	case "status":
+		if len(arguments) != 1 {
+			m.notice = notice{text: "Usage: /opencode status", kind: noticeError}
+			return m, nil
+		}
+		return m.runOpenCodeCommand("status", "", []string{"status"})
+	case "login":
+		if len(arguments) < 2 || len(arguments) > 3 || strings.TrimSpace(arguments[1]) == "" {
+			m.notice = notice{text: "Usage: /opencode login PROVIDER [METHOD]", kind: noticeError}
+			return m, nil
+		}
+		command := []string{"login", "--provider", arguments[1]}
+		if len(arguments) == 3 {
+			command = append(command, "--method", arguments[2])
+		}
+		return m.runOpenCodeCommand("login", arguments[1], command)
+	case "use":
+		if len(arguments) != 2 || !strings.Contains(arguments[1], "/") || strings.HasPrefix(arguments[1], "/") || strings.HasSuffix(arguments[1], "/") {
+			m.notice = notice{text: "Usage: /opencode use PROVIDER/MODEL", kind: noticeError}
+			return m, nil
+		}
+		m.returnToComposer()
+		m.delegateRuntime = "opencode"
+		m.provider.SetValue("opencode")
+		m.model.SetValue(arguments[1])
+		m.commandOutput = "OpenCode CLI harness is selected for " + arguments[1] + ". Send an Execute-mode task to start it in a fresh isolated worktree."
+		m.notice = notice{text: "OpenCode harness selected. Gator will not access OpenCode credentials or session data.", kind: noticeSuccess}
+		m.persistDraft()
+		m.refreshPreflight()
+		return m, m.focusField()
+	default:
+		m.commandOutput = usage
+		m.notice = notice{text: "Unknown OpenCode management action.", kind: noticeError}
+		return m, nil
+	}
+}
+
+func (m Model) runOpenCodeCommand(action, provider string, arguments []string) (tea.Model, tea.Cmd) {
+	if m.config.NewOpenCodeCommand == nil {
+		m.notice = notice{text: "OpenCode management is unavailable in this Gator build. Use 'gator delegate opencode …' from a shell.", kind: noticeError}
+		return m, nil
+	}
+	process, err := m.config.NewOpenCodeCommand(arguments)
+	if err != nil {
+		m.notice = notice{text: err.Error(), kind: noticeError}
+		return m, nil
+	}
+	if process == nil {
+		m.notice = notice{text: "This Gator build returned an invalid OpenCode command.", kind: noticeError}
+		return m, nil
+	}
+	m.notice = notice{text: "Opening OpenCode " + action + " in this terminal…", kind: noticeInfo}
+	return m, tea.ExecProcess(process, func(err error) tea.Msg {
+		return openCodeCommandDoneMsg{action: action, provider: provider, err: err}
+	})
+}
+
+func (m Model) versionStatus() string {
+	build := m.config.Build
+	if strings.TrimSpace(build.Version) == "" {
+		build.Version = "dev"
+	}
+	if strings.TrimSpace(build.Commit) == "" {
+		build.Commit = "none"
+	}
+	if strings.TrimSpace(build.Date) == "" {
+		build.Date = "unknown"
+	}
+	return "Gator " + build.Version + "\ncommit: " + build.Commit + "\nbuilt: " + build.Date
+}
+
+func checkForUpdate(check func() (UpdateStatus, error)) tea.Cmd {
+	return func() tea.Msg {
+		status, err := check()
+		return updateStatusMsg{status: status, err: err}
 	}
 }
 
@@ -909,6 +1018,8 @@ func delegatedRuntimeForProvider(provider string) string {
 		return "kimi"
 	case string(modelprovider.Claude):
 		return "claude"
+	case string(modelprovider.XAI):
+		return "opencode"
 	default:
 		return ""
 	}
@@ -924,6 +1035,8 @@ func delegatedRuntimeLabel(runtime string) string {
 		return "Kimi CLI harness"
 	case "claude":
 		return "Claude Code harness"
+	case "opencode":
+		return "OpenCode CLI harness"
 	default:
 		return runtime + " CLI harness"
 	}

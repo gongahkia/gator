@@ -1,7 +1,0 @@
-  7. Complete TUI leftovers — redacted config inspector, version/update status, provider advanced options,
-     and OpenCode management.
-  8. Harden the app server — overload, replay/reconnect, token-file race, stale PID, shutdown, and fuzz
-     testing.
-  9. Improve Windows support — first determine a defensible strict sandbox strategy; PTY coverage follows.
-  10. Prepare delivery/release — release checklist, artifact verification, changelog, installer testing,
-      and GitHub/GitLab integration design.

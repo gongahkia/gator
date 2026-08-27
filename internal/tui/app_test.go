@@ -1494,6 +1494,23 @@ func TestProviderOwnedCodexLoginSelectsHarnessInsteadOfNativeOAuth(t *testing.T)
 	}
 }
 
+func TestProviderOwnedXAILoginSelectsOpenCodeHarness(t *testing.T) {
+	model := New(Config{
+		Provider: "xai",
+		NewDelegateCommand: func(string, string, string, [][]string, string) (DelegateCommand, error) {
+			return DelegateCommand{Process: exec.Command("true")}, nil
+		},
+	})
+	next, command := model.Update(connectDoneMsg{provider: "xai"})
+	if command != nil {
+		t.Fatal("completed xAI login returned an unexpected command")
+	}
+	updated := next.(Model)
+	if updated.delegateRuntime != "opencode" || !strings.Contains(updated.commandOutput, "OpenCode CLI harness is ready") {
+		t.Fatalf("xAI connection state = runtime:%q output:%q", updated.delegateRuntime, updated.commandOutput)
+	}
+}
+
 func TestProviderOwnedClaudeConnectSelectsClaudeHarness(t *testing.T) {
 	model := New(Config{
 		Provider:     "claude",
@@ -1509,6 +1526,66 @@ func TestProviderOwnedClaudeConnectSelectsClaudeHarness(t *testing.T) {
 	updated := next.(Model)
 	if updated.delegateRuntime != "claude" || !strings.Contains(updated.commandOutput, "Claude Code harness is ready") {
 		t.Fatalf("Claude connection state = runtime:%q output:%q", updated.delegateRuntime, updated.commandOutput)
+	}
+}
+
+func TestOpenCodeManagementSelectsTheVendorHarnessWithoutReadingCredentials(t *testing.T) {
+	var received []string
+	model := New(Config{
+		NewOpenCodeCommand: func(arguments []string) (*exec.Cmd, error) {
+			received = append([]string(nil), arguments...)
+			return exec.Command("true"), nil
+		},
+	})
+	model.task.SetValue("/opencode login xai")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil || !reflect.DeepEqual(received, []string{"login", "--provider", "xai"}) {
+		t.Fatalf("OpenCode login command = %#v args=%#v", command, received)
+	}
+	updated, command := next.(Model).Update(openCodeCommandDoneMsg{action: "login", provider: "xai"})
+	if command == nil {
+		t.Fatal("OpenCode login did not return focus command")
+	}
+	model = updated.(Model)
+	if model.delegateRuntime != "opencode" || model.provider.Value() != "opencode" || !strings.Contains(model.commandOutput, "OpenCode login completed") {
+		t.Fatalf("OpenCode login state = runtime:%q provider:%q output:%q", model.delegateRuntime, model.provider.Value(), model.commandOutput)
+	}
+	model.task.SetValue("/opencode use xai/grok-build")
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("OpenCode selection did not focus composer")
+	}
+	model = next.(Model)
+	if model.delegateRuntime != "opencode" || model.provider.Value() != "opencode" || model.model.Value() != "xai/grok-build" {
+		t.Fatalf("OpenCode selection = runtime:%q provider:%q model:%q", model.delegateRuntime, model.provider.Value(), model.model.Value())
+	}
+}
+
+func TestVersionAndCheckOnlyUpdateStatusStayInsideTheTUI(t *testing.T) {
+	model := New(Config{
+		Build: BuildInfo{Version: "v1.2.3", Commit: "abc123", Date: "2026-08-27"},
+		CheckForUpdate: func() (UpdateStatus, error) {
+			return UpdateStatus{Current: "v1.2.3", Latest: "v1.2.4", Available: true}, nil
+		},
+	})
+	model.task.SetValue("/version")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command != nil || !strings.Contains(next.(Model).commandOutput, "v1.2.3") || !strings.Contains(next.(Model).commandOutput, "abc123") {
+		t.Fatalf("version output = %q command=%v", next.(Model).commandOutput, command)
+	}
+	model = next.(Model)
+	model.task.SetValue("/update")
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil || !next.(Model).updateChecking {
+		t.Fatalf("update check = command:%v checking:%t", command, next.(Model).updateChecking)
+	}
+	updated, follow := next.(Model).Update(command())
+	if follow != nil {
+		t.Fatal("update result returned an unexpected command")
+	}
+	model = updated.(Model)
+	if model.updateChecking || !strings.Contains(model.commandOutput, "v1.2.4") || !strings.Contains(model.commandOutput, "gator update") {
+		t.Fatalf("update output = checking:%t %q", model.updateChecking, model.commandOutput)
 	}
 }
 
