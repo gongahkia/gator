@@ -572,17 +572,17 @@ func (m Model) openRecentRuns() (tea.Model, tea.Cmd) {
 		m.notice = notice{text: "Load recent threads: " + err.Error(), kind: noticeError}
 		return m, nil
 	}
-	if len(threads) == 0 {
-		message := "No retained threads are available for this repository."
-		if m.recentAll {
-			message = "No retained threads are available in this state directory."
-		}
-		m.notice = notice{text: message, kind: noticeInfo}
-		return m, nil
-	}
 	m.recentThreads = threads
 	m.recentIndex = 0
+	m.recentTarget.Blur()
 	m.screen = recentScreen
+	if len(threads) == 0 {
+		message := "No retained threads are listed. Press p to enter a thread ID or run-record path."
+		if m.recentAll {
+			message = "No retained threads are listed in this state directory. Press p to enter a thread ID or run-record path."
+		}
+		m.notice = notice{text: message, kind: noticeInfo}
+	}
 	return m, nil
 }
 

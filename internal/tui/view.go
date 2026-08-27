@@ -979,7 +979,7 @@ func (m Model) reviewView() string {
 	if m.outcome == nil || m.outcome.StatePath == "" {
 		continueLabel = ""
 	}
-	sections = append(sections, m.footer("up/down scroll diff", "f focused/full", "d refresh diff", "t transcript", "y thread tree", "e patch handoff", continueLabel, "n new task", "f1 shortcuts", "q quit"))
+	sections = append(sections, m.footer("up/down scroll diff", "f focused/full", "d refresh diff", "t transcript", "y thread tree", "e patch handoff", "b browser review", continueLabel, "n new task", "f1 shortcuts", "q quit"))
 	return strings.Join(sections, "\n")
 }
 
