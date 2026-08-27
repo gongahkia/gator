@@ -89,6 +89,9 @@ type Config struct {
 	// operations. The command layer owns filesystem/config mutation; the TUI
 	// only renders typed state and asks for explicit confirmation.
 	Management ManagementBackend
+	// ModelManagement persists cloud credentials and custom-provider metadata.
+	// Secrets never enter TUI state; the backend returns display-safe results.
+	ModelManagement ModelManagementBackend
 }
 
 // ManagementBackend is the narrow command-layer boundary used by /manage.
@@ -178,6 +181,54 @@ type ManagedExtension struct {
 	Description string
 	Enabled     bool
 	Tools       int
+}
+
+// ModelManagementBackend is the secret-safe command-layer boundary for /model
+// credential removal and custom OpenAI-compatible provider editing.
+type ModelManagementBackend interface {
+	CredentialStatuses() ([]StoredCredentialStatus, error)
+	RemoveCredential(provider string) (CredentialRemovalResult, error)
+	SaveCustomProvider(CustomProviderSetup) ([]config.CustomProvider, error)
+	RemoveCustomProvider(id string) ([]config.CustomProvider, error)
+	DiscoverCustomProvider(id string) (CustomProviderDiscovery, error)
+	ApplyCustomProviderDiscovery(id string, models []string) ([]config.CustomProvider, error)
+}
+
+// StoredCredentialStatus is display-safe metadata about one Gator auth.json
+// entry. It must never include key, access, or refresh material.
+type StoredCredentialStatus struct {
+	Provider string
+	StoreKey string
+	Present  bool
+	Kind     string
+	Expired  bool
+}
+
+// CredentialRemovalResult reports whether a Gator-owned credential was deleted
+// and which non-secret ambient sources still exist in this process.
+type CredentialRemovalResult struct {
+	Provider         string
+	StoreKey         string
+	Removed          bool
+	Kind             string
+	RemainingSources []string
+}
+
+// CustomProviderSetup is non-secret custom-provider metadata. APIKeyEnv is an
+// environment variable name, never a key value.
+type CustomProviderSetup struct {
+	ID           string
+	BaseURL      string
+	APIKeyEnv    string
+	Models       []string
+	DefaultModel string
+}
+
+// CustomProviderDiscovery is an untrusted /models catalog preview.
+type CustomProviderDiscovery struct {
+	ID           string
+	Models       []string
+	DefaultModel string
 }
 
 // CloudModelSetup is the secret-safe boundary between the TUI and the command
@@ -787,6 +838,68 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshPreflight()
 		m.selectActiveModelCatalogEntry()
 		m.notice = notice{text: "Cloud model configuration saved. The selected model is ready when its provider reports configured.", kind: noticeSuccess}
+		return m, nil
+	case credentialStatusesMsg:
+		if msg.err != nil {
+			m.notice = notice{text: "Read stored credentials: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.applyCredentialStatuses(msg.statuses)
+		return m, nil
+	case credentialRemovedMsg:
+		if msg.err != nil {
+			m.notice = notice{text: "Remove Gator credential: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		delete(m.localModels.credentials, msg.result.StoreKey)
+		m.notice = notice{text: credentialRemovalNotice(msg.result), kind: noticeSuccess}
+		if m.config.ModelManagement != nil {
+			return m, loadCredentialStatuses(m.config.ModelManagement)
+		}
+		return m, nil
+	case customProviderSavedMsg:
+		if m.localModels.customSetup != nil {
+			m.localModels.customSetup.saving = false
+		}
+		if msg.err != nil {
+			m.notice = notice{text: "Save custom provider: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.localModels.customSetup = nil
+		m.localModels.pendingCustom = nil
+		m.applyCustomProviders(msg.providers, msg.id)
+		m.notice = notice{text: "Saved custom provider " + msg.id + ". The API key environment variable was not written to config.json.", kind: noticeSuccess}
+		return m, nil
+	case customProviderRemovedMsg:
+		if msg.err != nil {
+			m.notice = notice{text: "Remove custom provider: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.applyCustomProviders(msg.providers, msg.id)
+		m.notice = notice{text: "Removed custom provider " + msg.id + ". Its API key environment variable was not changed.", kind: noticeSuccess}
+		return m, nil
+	case customProviderDiscoverMsg:
+		if msg.generation != m.localModels.generation || m.localModels.action != localModelDiscovering {
+			return m, nil
+		}
+		m.localModels.action = localModelIdle
+		if msg.err != nil {
+			m.notice = notice{text: "Discover custom provider models: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		preview := msg.preview
+		m.localModels.discovery = &preview
+		m.localModels.confirmation = localModelConfirmApplyDiscovery
+		m.notice = notice{text: "Discovered model IDs are untrusted server data. Confirm to replace the configured catalog.", kind: noticeInfo}
+		return m, nil
+	case customProviderAppliedMsg:
+		if msg.err != nil {
+			m.notice = notice{text: "Apply discovered models: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.localModels.discovery = nil
+		m.applyCustomProviders(msg.providers, msg.id)
+		m.notice = notice{text: "Replaced the model catalog for " + msg.id + " with discovered IDs.", kind: noticeSuccess}
 		return m, nil
 	case localModelStatusMsg:
 		if msg.generation != m.localModels.generation || m.localModels.action != localModelRefreshing {

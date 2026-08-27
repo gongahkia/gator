@@ -139,7 +139,8 @@ func interactiveWithOptions(options interactiveOptions) error {
 		BeginOAuthLogin: func(provider string) (tui.OAuthLogin, error) {
 			return beginTUIOAuthLogin(provider)
 		},
-		SaveCloudModel: saveTUICloudModelConfiguration(store, stateDir),
+		SaveCloudModel:  saveTUICloudModelConfiguration(store, stateDir),
+		ModelManagement: newTUIModelManagementBackend(store, stateDir),
 		NewConnectCommand: func(provider string) (*exec.Cmd, error) {
 			return exec.Command(os.Args[0], "connect", provider), nil
 		},

@@ -191,21 +191,14 @@ func (m Model) localModelsView() string {
 	if setup := m.cloudModelSetupView(); setup != "" {
 		sections = append(sections, setup)
 	}
+	if setup := m.customProviderSetupView(); setup != "" {
+		sections = append(sections, setup)
+	}
 	if m.oauthLogin != nil && strings.TrimSpace(m.commandOutput) != "" {
 		sections = append(sections, m.fieldView("Cloud sign-in", "Complete the provider login in your browser. This TUI stays open while Gator waits for its callback.", m.commandOutput))
 	}
 	if m.localModels.confirmation != localModelNoConfirmation {
-		if m.localModels.confirmation == localModelConfirmStart {
-			sections = append(sections, m.fieldView("Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself"))
-		} else if m.localModels.confirmation == localModelConfirmInstall {
-			sections = append(sections, m.fieldView("Install Ollama?", "Ollama is not installed. Gator can show the official source and platform advice; it never runs a system installer or package manager.", "Enter/y  Open installation help (default)\nn/esc  I'll install it myself"))
-		} else if selected, found := m.selectedLocalModel(); found {
-			if m.localModels.confirmation == localModelConfirmPull {
-				sections = append(sections, m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL))
-			} else {
-				sections = append(sections, m.fieldView("Confirm removal", "This deletes local model data from the selected Ollama runtime.", selected.Name+" · "+selected.OllamaModel))
-			}
-		}
+		sections = append(sections, m.modelCatalogConfirmationView())
 	}
 
 	if m.localModels.cloudSetup != nil {
@@ -214,6 +207,8 @@ func (m Model) localModelsView() string {
 			keys = append(keys, "a auth type")
 		}
 		sections = append(sections, m.noticeView(), m.footer(append(keys, "f1 shortcuts")...))
+	} else if m.localModels.customSetup != nil && m.localModels.confirmation != localModelConfirmSaveCustom {
+		sections = append(sections, m.noticeView(), m.footer("tab next field", "enter review", "esc cancel", "f1 shortcuts"))
 	} else if m.localModels.renaming != nil {
 		sections = append(sections, m.noticeView(), m.footer("enter save", "esc cancel", "f1 shortcuts"))
 	} else if m.oauthLogin != nil {
@@ -224,18 +219,59 @@ func (m Model) localModelsView() string {
 		sections = append(sections, m.noticeView(), m.footer("enter/y installation help", "n/esc install myself", "f1 shortcuts"))
 	} else if m.localModels.confirmation == localModelConfirmPull {
 		sections = append(sections, m.noticeView(), m.footer("enter/y download", "esc/n cancel", "f1 shortcuts"))
-	} else if m.localModels.confirmation == localModelConfirmRemove {
-		sections = append(sections, m.noticeView(), m.footer("enter/y remove", "esc/n cancel", "f1 shortcuts"))
+	} else if m.localModels.confirmation == localModelConfirmRemove || m.localModels.confirmation == localModelConfirmRemoveCredential || m.localModels.confirmation == localModelConfirmRemoveCustom || m.localModels.confirmation == localModelConfirmSaveCustom || m.localModels.confirmation == localModelConfirmApplyDiscovery {
+		sections = append(sections, m.noticeView(), m.footer("enter/y confirm", "esc/n cancel", "f1 shortcuts"))
 	} else if m.localModels.action != localModelIdle {
 		sections = append(sections, m.noticeView(), m.footer("esc/ctrl+c cancel", "f1 shortcuts"))
 	} else if m.localModels.dependencyHelp {
 		sections = append(sections, m.noticeView(), m.footer("i/esc close help", "f1 shortcuts"))
 	} else if m.localModels.section == cloudModelSection {
-		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "c configure", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
+		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "c configure", "n new provider", "g discover", "d remove credential", "x remove provider", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
 	} else {
 		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "s start Ollama", "i install help", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
 	}
 	return strings.Join(sections, "\n")
+}
+
+func (m Model) modelCatalogConfirmationView() string {
+	switch m.localModels.confirmation {
+	case localModelConfirmStart:
+		return m.fieldView("Start Ollama?", "Gator can start 'ollama serve' as a child of this TUI and stops it when Gator exits. You can instead start it yourself.", "Enter/y  Start with Gator (default)\nn/esc  I'll start it myself")
+	case localModelConfirmInstall:
+		return m.fieldView("Install Ollama?", "Ollama is not installed. Gator can show the official source and platform advice; it never runs a system installer or package manager.", "Enter/y  Open installation help (default)\nn/esc  I'll install it myself")
+	case localModelConfirmPull:
+		if selected, found := m.selectedLocalModel(); found {
+			return m.fieldView("Confirm download", "Model weights and upstream terms remain governed by the linked source.", selected.Name+" · approximately "+selected.Download+"\n"+selected.SourceURL)
+		}
+	case localModelConfirmRemove:
+		if selected, found := m.selectedLocalModel(); found {
+			return m.fieldView("Confirm removal", "This deletes local model data from the selected Ollama runtime.", selected.Name+" · "+selected.OllamaModel)
+		}
+	case localModelConfirmRemoveCredential:
+		if cloud, found := m.selectedCloudModel(); found {
+			status := m.storedCredential(cloud.provider)
+			detail := cloud.provider + " · stored " + status.Kind + "\nOnly Gator's private credential file is changed. Environment variables, AWS/ADC, one-run keys, and vendor CLI logins remain."
+			if cloud.provider == "claude" {
+				detail = "Claude Code · stored Anthropic API key\nThis removes the Gator-owned Anthropic key. ANTHROPIC_API_KEY in the environment is not unset."
+			}
+			return m.fieldView("Remove stored Gator credential?", "This does not revoke the upstream key and does not log you out of vendor CLIs.", detail)
+		}
+	case localModelConfirmRemoveCustom:
+		if cloud, found := m.selectedCloudModel(); found {
+			return m.fieldView("Remove custom provider?", "This deletes endpoint metadata from Gator config.json. The named API key environment variable is not changed or unset.", cloud.provider)
+		}
+	case localModelConfirmSaveCustom:
+		if m.localModels.pendingCustom != nil {
+			return m.fieldView("Save custom provider?", "Review the destination before writing non-secret metadata. No API key is stored.", customProviderReviewText(*m.localModels.pendingCustom))
+		}
+	case localModelConfirmApplyDiscovery:
+		if m.localModels.discovery != nil {
+			preview := *m.localModels.discovery
+			limit := min(12, len(preview.Models))
+			return m.fieldView("Replace configured models?", "These IDs came from an untrusted /models response. Confirming overwrites the configured catalog.", preview.ID+" default "+preview.DefaultModel+"\n"+strings.Join(preview.Models[:limit], "\n"))
+		}
+	}
+	return ""
 }
 
 func (m Model) cloudModelsView() string {
@@ -257,7 +293,7 @@ func (m Model) cloudModelsView() string {
 		}
 		lines = append(lines, prefix+keyStyle.Render(compact(entry.name, max(16, m.panelTextWidth()-4)))+"\n    "+status)
 	}
-	return m.fieldView("Cloud models", "Readiness is credential/configuration state only; c opens secure model, credential, and endpoint configuration. Gator does not query or claim an account's complete remote catalog.", strings.Join(lines, "\n"))
+	return m.fieldView("Cloud models", "Readiness is credential/configuration state only. c configures a built-in provider or edits a custom endpoint; n creates a custom provider; d removes a stored Gator credential; g previews /models. Gator does not claim a complete remote catalog.", strings.Join(lines, "\n"))
 }
 
 func (m Model) localRuntimeView() string {
