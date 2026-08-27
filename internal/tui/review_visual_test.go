@@ -18,7 +18,14 @@ func TestReviewVisualSnapshots(t *testing.T) {
 		t.Run(size.name, func(t *testing.T) {
 			model := reviewVisualFixture(size.width, size.height)
 			actual := normalizeReviewSnapshot(ansi.Strip(model.View()))
-			expectedBytes, err := os.ReadFile(filepath.Join("testdata", "review_"+size.name+".golden"))
+			path := filepath.Join("testdata", "review_"+size.name+".golden")
+			if os.Getenv("UPDATE_REVIEW_GOLDEN") != "" {
+				if err := os.WriteFile(path, []byte(actual+"\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			expectedBytes, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
 			}

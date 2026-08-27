@@ -41,6 +41,13 @@ inspect the current worktree before editing.
 `gator apply` handoff commands. Gator's `git_diff` tool also includes staged
 changes, so a later continuation does not silently lose an index-only change.
 
+`/review TARGET` loads a retained thread ID, unique prefix, or run-record
+directory instead of the latest completed run. Press `b` to start the same
+loopback browser review the CLI exposes: edit the listen address (loopback
+only), toggle `o` to open the one-use URL, `enter` to start, and `s` to stop.
+The URL is shown on that screen and is not copied into drafts or transcripts.
+This is not `gator serve` and has no RPC access.
+
 ## Browser review
 
 Use a separate foreground local server for a retained run:

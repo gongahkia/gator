@@ -14,4 +14,4 @@ mouse/keys [1 all] [2 unstaged] [3 staged] [f raw] [s hunk] [S file] [v range] [
  Team checklist: Check the exported API and regression coverage.
  Use /extensions to inspect; card actions only fill the composer.
 Gator works in an isolated Git worktree. Review remains explicit.
-up/down choose  f focused/raw  v range  r request change  s hunk  S file  x extension cards  d refresh  e handoff  c con
+up/down choose  f focused/raw  v range  r request change  s hunk  S file  x extension cards  d refresh  e handoff  b bro

@@ -5,7 +5,7 @@ mouse/keys [1 all] [2 unstaged] [3 staged] [f raw] [s hunk] [S file] [
  internal/
  review/
  > example.go +1 −1
- example_test.go +2 ��
+ example_test.go +2 �
  hunks · internal/review/example.go
  > 1 @@ -10,2 +10,2 @@ func example() +1 −1
 

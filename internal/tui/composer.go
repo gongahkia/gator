@@ -57,7 +57,7 @@ var slashCommands = []slashCommand{
 	{name: "/queue", description: "show queued follow-up instructions"},
 	{name: "/review", description: "open review; optional TARGET is a thread ID or run-record path"},
 	{name: "/resume", description: "resume TARGET [instruction…] using a thread ID, prefix, or run-record path"},
-	{name: "/run", description: "edit advanced run options for the next native run"},
+	{name: "/run", description: "edit one-run endpoint, sandbox/network, prefixes; not saved to config.json"},
 	{name: "/status", description: "show current run configuration"},
 	{name: "/theme", description: "choose a terminal theme"},
 	{name: "/verify", description: "edit required verification commands"},

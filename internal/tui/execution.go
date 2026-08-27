@@ -146,7 +146,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		Task:             taskWithContextReferences(task, references),
 		Provider:         providerName,
 		Model:            modelName,
-		BaseURL:          m.config.BaseURL,
+		BaseURL:          m.runBaseURL(""),
 		MaxSteps:         m.effort.maxSteps(m.config.MaxSteps),
 		Verification:     verification,
 		Scopes:           contextReferencePaths(references),
