@@ -235,15 +235,6 @@ func clearDeletedCustomProviderReferences(settings *config.Settings, id string) 
 	}
 }
 
-func cloneCustomProviders(providers []config.CustomProvider) []config.CustomProvider {
-	cloned := make([]config.CustomProvider, len(providers))
-	copy(cloned, providers)
-	for index := range cloned {
-		cloned[index].Models = append([]string(nil), providers[index].Models...)
-	}
-	return cloned
-}
-
 func storedCredentialStatus(storeKey string, credential auth.Credential, now time.Time) tui.StoredCredentialStatus {
 	return tui.StoredCredentialStatus{
 		Provider: storeKey,
