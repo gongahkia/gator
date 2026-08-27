@@ -66,6 +66,7 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 		request.Profile = previous.Profile
 	}
 	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
+	request.AllowedCommandPrefixes = tools.MergeArgvLists(previous.AllowedCommandPrefixes, request.AllowedCommandPrefixes)
 	request.Setup = nil
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
@@ -126,6 +127,7 @@ func (e Executor) Fork(ctx context.Context, previous journal.Session, statePath,
 		request.Profile = previous.Profile
 	}
 	request.AllowedCommands = tools.MergeArgvLists(previous.AllowedCommands, request.AllowedCommands)
+	request.AllowedCommandPrefixes = tools.MergeArgvLists(previous.AllowedCommandPrefixes, request.AllowedCommandPrefixes)
 	request.Setup = nil
 	if request.MaxSteps == 0 {
 		request.MaxSteps = previous.MaxSteps
@@ -188,8 +190,20 @@ func (e Executor) validateRequest(request Request) error {
 	if err := validateSetup(request.Setup); err != nil {
 		return err
 	}
+	if err := validateCommandPrefixes(request.AllowedCommandPrefixes); err != nil {
+		return err
+	}
 	if len(nonEmptyScouts(request.Scouts)) > maxScouts {
 		return fmt.Errorf("at most %d read-only scouts may run in parallel", maxScouts)
+	}
+	return nil
+}
+
+func validateCommandPrefixes(prefixes [][]string) error {
+	for _, pattern := range prefixes {
+		if err := tools.ValidateCommandPrefix(pattern); err != nil {
+			return err
+		}
 	}
 	return nil
 }

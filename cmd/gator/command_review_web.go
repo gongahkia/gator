@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"time"
@@ -53,7 +52,7 @@ func reviewCommand(arguments []string, out io.Writer) error {
 		return err
 	}
 	if options.open {
-		if err := exec.Command("xdg-open", url).Start(); err != nil {
+		if err := reviewweb.OpenInBrowser(url); err != nil {
 			if _, outputErr := fmt.Fprintf(out, "Could not open a browser automatically: %v\n", err); outputErr != nil {
 				return outputErr
 			}
@@ -81,7 +80,7 @@ func parseReviewWebOptions(arguments []string) (reviewWebOptions, error) {
 	if len(positional) != 1 || len(flags.Args()) != 0 {
 		return reviewWebOptions{}, errors.New("usage: gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]")
 	}
-	if err := validateLoopbackAddress(*listen); err != nil {
+	if err := reviewweb.ValidateListenAddress(*listen); err != nil {
 		return reviewWebOptions{}, err
 	}
 	return reviewWebOptions{statePath: positional[0], listen: *listen, open: *open}, nil

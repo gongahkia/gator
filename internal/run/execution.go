@@ -33,6 +33,20 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, err
 	}
+	executionPolicy, modeName, maxSteps, profilePolicy, err := instructions.Meet(executionPolicy, request.Mode.String(), request.MaxSteps, projectInstructionSet.Policy)
+	if err != nil {
+		return Outcome{Worktree: isolated}, fmt.Errorf("apply agent profile policy: %w", err)
+	}
+	if modeName == PlanMode.String() {
+		request.Mode = PlanMode
+	}
+	if maxSteps > 0 {
+		request.MaxSteps = maxSteps
+	}
+	if profilePolicy.HasOmit(instructions.OmitRunCommand) {
+		request.AllowedCommands = nil
+		request.AllowedCommandPrefixes = nil
+	}
 	hookEngine, err := hooks.Load(isolated.Path, isolated.Repository, e.hookTrust(isolated.Repository))
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project hooks: %w", err)
@@ -50,7 +64,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	releaseLSP := func() { _ = lspManager.Close() }
 	if request.LSPRegistry != nil {
 		request.LSPRegistry.Reconcile(lspSet)
-		if lspSet.Trusted() {
+		if lspSet.Trusted() && !profilePolicy.HasOmit(instructions.OmitLSP) {
 			lspManager, releaseLSP, err = request.LSPRegistry.Acquire(lspSet)
 			if err != nil {
 				return Outcome{Worktree: isolated}, fmt.Errorf("acquire trusted LSP manager: %w", err)
@@ -140,6 +154,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	remembered := tools.NewCommandMemory(request.AllowedCommands)
 	commandPolicy := tools.CommandPolicy{
 		Allowed:    request.Verification,
+		Prefixes:   request.AllowedCommandPrefixes,
 		Remembered: remembered,
 		Approve:    request.Approve,
 		OnEvent:    emit,
@@ -152,6 +167,9 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		},
 	}
 	runTools := tools.Default(isolated.Root, commandPolicy)
+	if profilePolicy.HasOmit(instructions.OmitApplyPatch) || profilePolicy.HasOmit(instructions.OmitRunCommand) {
+		runTools = filterTools(runTools, profilePolicy)
+	}
 	terminalManager := terminal.New(terminal.Config{
 		Root:     isolated.Root,
 		Policy:   executionPolicy,
@@ -193,18 +211,47 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	}
 	readonlyScout := newReadOnlyScoutTool(e.Model, isolated.Root, projectInstructionSet.Content, roleSet, request.MaxSteps, e.Now, emit)
 	if request.Mode == ExecuteMode {
-		runTools = append(runTools, extensions.Tools(isolated.Root, extension.ToolPolicy{
-			Sandbox: executionPolicy,
-			Approve: func(ctx context.Context, extensionID, tool string) error {
-				argv := []string{"extension", extensionID, tool}
+		if !profilePolicy.HasOmit(instructions.OmitExtension) {
+			runTools = append(runTools, extensions.Tools(isolated.Root, extension.ToolPolicy{
+				Sandbox: executionPolicy,
+				Approve: func(ctx context.Context, extensionID, tool string) error {
+					argv := []string{"extension", extensionID, tool}
+					if remembered.Allows(argv) {
+						return nil
+					}
+					toolName := "extension_" + strings.ReplaceAll(extensionID, "-", "_") + "_" + tool
+					emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: strings.Join(argv, " "), Argv: argv})
+					if request.Approve == nil {
+						emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
+						return fmt.Errorf("extension tool %s/%s requires developer approval", extensionID, tool)
+					}
+					decision, err := request.Approve(ctx, argv)
+					if err != nil {
+						emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
+						return err
+					}
+					emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: decision.String(), Argv: argv})
+					if decision == tools.CommandAllowAlways {
+						remembered.Remember(argv)
+					}
+					if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
+						return fmt.Errorf("extension tool %s/%s denied by developer", extensionID, tool)
+					}
+					return nil
+				},
+			})...)
+		}
+		if !profilePolicy.HasOmit(instructions.OmitLSP) {
+			runTools = append(runTools, lspManager.Tools(func(ctx context.Context, server, operation, path string) error {
+				argv := []string{"lsp", server, operation, path}
 				if remembered.Allows(argv) {
 					return nil
 				}
-				toolName := "extension_" + strings.ReplaceAll(extensionID, "-", "_") + "_" + tool
+				toolName := "lsp_" + server + "_" + operation
 				emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: strings.Join(argv, " "), Argv: argv})
 				if request.Approve == nil {
 					emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
-					return fmt.Errorf("extension tool %s/%s requires developer approval", extensionID, tool)
+					return fmt.Errorf("LSP %s requires developer approval", operation)
 				}
 				decision, err := request.Approve(ctx, argv)
 				if err != nil {
@@ -216,71 +263,57 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 					remembered.Remember(argv)
 				}
 				if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
-					return fmt.Errorf("extension tool %s/%s denied by developer", extensionID, tool)
+					return fmt.Errorf("LSP %s from %s denied by developer", operation, server)
 				}
 				return nil
-			},
-		})...)
-		runTools = append(runTools, lspManager.Tools(func(ctx context.Context, server, operation, path string) error {
-			argv := []string{"lsp", server, operation, path}
-			if remembered.Allows(argv) {
+			})...)
+		}
+		if !profilePolicy.HasOmit(instructions.OmitMCP) {
+			runTools = append(runTools, mcpSet.Tools(func(ctx context.Context, server, tool string) error {
+				argv := []string{"mcp", server, tool}
+				if remembered.Allows(argv) {
+					return nil
+				}
+				emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: strings.Join(argv, " "), Argv: argv})
+				if request.Approve == nil {
+					emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: tools.CommandDeny.String(), Argv: argv})
+					return errors.New("MCP tool requires developer approval")
+				}
+				decision, err := request.Approve(ctx, argv)
+				if err != nil {
+					emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: tools.CommandDeny.String(), Argv: argv})
+					return err
+				}
+				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: decision.String(), Argv: argv})
+				if decision == tools.CommandAllowAlways {
+					remembered.Remember(argv)
+				}
+				if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
+					return fmt.Errorf("MCP tool %s/%s denied by developer", server, tool)
+				}
 				return nil
-			}
-			toolName := "lsp_" + server + "_" + operation
-			emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: strings.Join(argv, " "), Argv: argv})
-			if request.Approve == nil {
-				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
-				return fmt.Errorf("LSP %s requires developer approval", operation)
-			}
-			decision, err := request.Approve(ctx, argv)
-			if err != nil {
-				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: tools.CommandDeny.String(), Argv: argv})
-				return err
-			}
-			emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: toolName}, Text: decision.String(), Argv: argv})
-			if decision == tools.CommandAllowAlways {
-				remembered.Remember(argv)
-			}
-			if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
-				return fmt.Errorf("LSP %s from %s denied by developer", operation, server)
-			}
-			return nil
-		})...)
-		runTools = append(runTools, mcpSet.Tools(func(ctx context.Context, server, tool string) error {
-			argv := []string{"mcp", server, tool}
-			if remembered.Allows(argv) {
-				return nil
-			}
-			emit(agent.Event{Kind: agent.EventCommandApprovalRequested, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: strings.Join(argv, " "), Argv: argv})
-			if request.Approve == nil {
-				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: tools.CommandDeny.String(), Argv: argv})
-				return errors.New("MCP tool requires developer approval")
-			}
-			decision, err := request.Approve(ctx, argv)
-			if err != nil {
-				emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: tools.CommandDeny.String(), Argv: argv})
-				return err
-			}
-			emit(agent.Event{Kind: agent.EventCommandApprovalResolved, At: e.now(), ToolCall: &agent.ToolCall{Name: "mcp_" + server + "_" + tool}, Text: decision.String(), Argv: argv})
-			if decision == tools.CommandAllowAlways {
-				remembered.Remember(argv)
-			}
-			if decision != tools.CommandAllowOnce && decision != tools.CommandAllowAlways {
-				return fmt.Errorf("MCP tool %s/%s denied by developer", server, tool)
-			}
-			return nil
-		})...)
-		runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy, tools.TerminalToolOptions{AllowDetach: request.TerminalRegistry != nil})...)
-		runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
-		runTools = append(runTools, readonlyScout)
-		if !request.DisableWriterDelegation {
+			})...)
+		}
+		if !profilePolicy.HasOmit(instructions.OmitTerminal) {
+			runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy, tools.TerminalToolOptions{AllowDetach: request.TerminalRegistry != nil})...)
+		}
+		if !profilePolicy.HasOmit(instructions.OmitHTTP) {
+			runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
+		}
+		if !profilePolicy.HasOmit(instructions.OmitDelegateReadOnly) {
+			runTools = append(runTools, readonlyScout)
+		}
+		if !request.DisableWriterDelegation && !profilePolicy.HasOmit(instructions.OmitDelegateWriter) {
 			runTools = append(runTools, newWriterTools(e, isolated, request, remembered, runJournal, roleSet, e.Now, emit)...)
 		}
 	}
 	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)
 	var check func([]agent.Message) error
 	if request.Mode == PlanMode {
-		runTools = append(tools.ReadOnly(isolated.Root), readonlyScout)
+		runTools = tools.ReadOnly(isolated.Root)
+		if !profilePolicy.HasOmit(instructions.OmitDelegateReadOnly) {
+			runTools = append(runTools, readonlyScout)
+		}
 		system = planSystemPrompt(joinInstructions(projectInstructionSet.Content, request.System))
 	} else {
 		check = completionCheck(request.Verification)
@@ -371,7 +404,8 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		Messages:            result.Messages,
 		ParentStatePath:     parentStatePath,
 		ForkedFromStatePath: request.ForkedFrom,
-		AllowedCommands:     remembered.Snapshot(),
+		AllowedCommands:        remembered.Snapshot(),
+		AllowedCommandPrefixes: request.AllowedCommandPrefixes,
 	}
 	if request.Mode == ExecuteMode {
 		if hookErr := hookEngine.Run(ctx, hooks.SessionSave, "", map[string]any{"run_id": request.RunID, "thread_id": request.ThreadID}); hookErr != nil && journalErr == nil {
@@ -405,6 +439,24 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		return outcome, err
 	}
 	return outcome, nil
+}
+
+func filterTools(available []agent.Tool, policy instructions.ProfilePolicy) []agent.Tool {
+	if !policy.HasOmit(instructions.OmitApplyPatch) && !policy.HasOmit(instructions.OmitRunCommand) {
+		return available
+	}
+	filtered := make([]agent.Tool, 0, len(available))
+	for _, tool := range available {
+		name := tool.Definition().Name
+		if policy.HasOmit(instructions.OmitApplyPatch) && name == "apply_patch" {
+			continue
+		}
+		if policy.HasOmit(instructions.OmitRunCommand) && name == "run_command" {
+			continue
+		}
+		filtered = append(filtered, tool)
+	}
+	return filtered
 }
 
 func terminalStatusText(task terminal.Task) string {

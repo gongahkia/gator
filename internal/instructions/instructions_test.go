@@ -102,6 +102,23 @@ func TestLoadWithProfileAppendsOnlySelectedProfile(t *testing.T) {
 	}
 }
 
+func TestListProfilesReturnsPolicyWithoutActivatingInstructions(t *testing.T) {
+	repository := t.TempDir()
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "profiles": [
+    {"name": "reviewer", "description": "read-only review", "instructions": "report findings", "policy": {"mode": "plan", "omit": ["lsp", "run_command"]}}
+  ]
+}`)
+	profiles, err := ListProfiles(repository)
+	if err != nil {
+		t.Fatalf("list profiles: %v", err)
+	}
+	if len(profiles) != 1 || profiles[0].Name != "reviewer" || !profiles[0].Policy.HasOmit(OmitLSP) || profiles[0].Policy.Mode != "plan" {
+		t.Fatalf("profiles = %#v", profiles)
+	}
+}
+
 func TestLoadRolesRestrictsDefinitionsToPromptSpecialization(t *testing.T) {
 	repository := t.TempDir()
 	writeInstructionFile(t, repository, ".gator/roles/reviewer.md", "identify regressions and evidence gaps")

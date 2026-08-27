@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/journal"
@@ -43,7 +42,7 @@ func resumeTask(arguments []string, out io.Writer) error {
 		}
 		return interactiveWithOptions(interactiveOptions{StartInRecent: true, RecentAll: *all, AllowNoRepository: *all})
 	}
-	if target != "" && looksLikeRunRecordPath(target) {
+	if target != "" && journal.LooksLikeRunRecordPath(target) {
 		if *all {
 			return errors.New("--all cannot be combined with a run record path")
 		}
@@ -81,56 +80,32 @@ func resumeTask(arguments []string, out io.Writer) error {
 const resumeCandidateLimit = 1_000
 
 func resolveResumeThread(stateDir, repository, target string, last, all bool) (journal.RecentThread, error) {
-	var (
-		threads []journal.RecentThread
-		err     error
-	)
-	if all {
-		threads, err = journal.ListAllRecentThreads(stateDir, resumeCandidateLimit)
-	} else {
-		threads, err = journal.ListRecentThreads(stateDir, repository, resumeCandidateLimit)
-	}
-	if err != nil {
-		return journal.RecentThread{}, err
-	}
-	if len(threads) == 0 {
-		return journal.RecentThread{}, errors.New("no retained threads are available; start a new Gator run first")
-	}
 	if last {
-		return requireAvailableThread(threads[0])
-	}
-
-	var matches []journal.RecentThread
-	for _, thread := range threads {
-		if thread.ID == target {
-			return requireAvailableThread(thread)
+		var (
+			threads []journal.RecentThread
+			err     error
+		)
+		if all {
+			threads, err = journal.ListAllRecentThreads(stateDir, resumeCandidateLimit)
+		} else {
+			threads, err = journal.ListRecentThreads(stateDir, repository, resumeCandidateLimit)
 		}
-		if strings.HasPrefix(thread.ID, target) {
-			matches = append(matches, thread)
+		if err != nil {
+			return journal.RecentThread{}, err
 		}
+		if len(threads) == 0 {
+			return journal.RecentThread{}, errors.New("no retained threads are available; start a new Gator run first")
+		}
+		if !threads[0].Available {
+			return journal.RecentThread{}, fmt.Errorf("retained thread %q cannot resume because its worktree no longer exists", threads[0].ID)
+		}
+		return threads[0], nil
 	}
-	if len(matches) == 0 {
-		return journal.RecentThread{}, fmt.Errorf("no retained thread matches %q; run 'gator resume' to choose one", target)
-	}
-	if len(matches) > 1 {
-		return journal.RecentThread{}, fmt.Errorf("retained thread prefix %q is ambiguous; use a longer ID or run 'gator resume'", target)
-	}
-	return requireAvailableThread(matches[0])
-}
-
-func requireAvailableThread(thread journal.RecentThread) (journal.RecentThread, error) {
-	if !thread.Available {
-		return journal.RecentThread{}, fmt.Errorf("retained thread %q cannot resume because its worktree no longer exists", thread.ID)
-	}
-	return thread, nil
+	return journal.ResolveRetainedTarget(stateDir, repository, target, all)
 }
 
 func looksLikeRunRecordPath(target string) bool {
-	if filepath.IsAbs(target) || strings.ContainsRune(target, filepath.Separator) {
-		return true
-	}
-	info, err := os.Stat(target)
-	return err == nil && info.IsDir()
+	return journal.LooksLikeRunRecordPath(target)
 }
 
 func resumeState(statePath, continuation string, maxSteps int, compact bool, out io.Writer) error {

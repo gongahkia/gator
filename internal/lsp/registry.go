@@ -125,6 +125,42 @@ func (r *Registry) Acquire(set Set) (*Manager, func(), error) {
 	return manager, release, nil
 }
 
+// ManagerInspect is a lock-and-copy view of one cached manager. Status
+// surfaces must use this instead of Acquire.
+type ManagerInspect struct {
+	Worktree string
+	Hash     string
+	Active   int
+	Retired  bool
+	UsedAt   time.Time
+	Servers  []ServerInspect
+}
+
+// Snapshot copies idle and in-use managers without creating entries or
+// starting language servers.
+func (r *Registry) Snapshot() []ManagerInspect {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]ManagerInspect, 0, len(r.entries))
+	for _, entry := range r.entries {
+		inspect := ManagerInspect{
+			Worktree: entry.root,
+			Hash:     entry.hash,
+			Active:   entry.active,
+			Retired:  entry.retired,
+			UsedAt:   entry.usedAt,
+		}
+		if entry.manager != nil {
+			inspect.Servers = entry.manager.Inspect()
+		}
+		result = append(result, inspect)
+	}
+	return result
+}
+
 // Close stops every cached manager, including a manager held by an in-flight
 // run. The owning TUI or app-server calls this only during session shutdown.
 func (r *Registry) Close() {

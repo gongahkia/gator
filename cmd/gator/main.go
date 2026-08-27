@@ -52,7 +52,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--trust-commands] TASK
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -69,7 +69,7 @@ Commands:
   delegate  run an installed vendor or external agent in an isolated worktree
   serve     run the authenticated loopback HTTP/SSE app-server bridge
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
-  agent     list project-defined, capability-bounded delegation roles
+  agent     list project-defined profiles and capability-bounded roles
 	 child     inspect durable manifests for retained isolated writer children
   lsp       trust and inspect local Language Server Protocol diagnostics
   extension install, enable, trust, or remove Gator extension bundles
@@ -89,7 +89,7 @@ local auth file, then the provider environment variable. Native runs keep
 Gator's tool loop; gator delegate is an explicit installed-harness boundary.
 --verify is repeatable and every listed command must pass before Gator accepts
 completion. Exploratory worktree commands wait for approval unless listed with
---allow-command or auto-approved with --trust-commands (unsafe; not a sandbox).`
+--allow-command, --allow-command-prefix, or auto-approved with --trust-commands (unsafe; not a sandbox).`
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/lsp"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tui"
 )
@@ -110,7 +111,8 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if baseURL == "" {
 		baseURL = settings.ProviderEndpoint(provider)
 	}
-	management, err := newTUIManagementBackend(repository, stateDir, store)
+	lspRegistry := lsp.NewRegistry()
+	management, err := newTUIManagementBackend(repository, stateDir, store, lspRegistry)
 	if err != nil {
 		return fmt.Errorf("configure TUI management: %w", err)
 	}
@@ -136,6 +138,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		NewExecutor: func(provider, modelName, baseURL string) (gatorrun.Executor, error) {
 			return newExecutor(provider, modelName, baseURL)
 		},
+		LSPRegistry: lspRegistry,
 		BeginOAuthLogin: func(provider string) (tui.OAuthLogin, error) {
 			return beginTUIOAuthLogin(provider)
 		},
@@ -164,6 +167,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 		SetTheme:    saveTheme,
 		LocalModels: newLocalModelManager(store),
 		Management:  management,
+		Doctor:      newTUIDoctorBackend(settings.Execution),
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	final, runErr := program.Run()

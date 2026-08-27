@@ -68,6 +68,10 @@ func (m Model) handleKey(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.updateLocalModels(message)
 	case managementScreen:
 		return m.updateManagement(message)
+	case doctorScreen:
+		return m.updateDoctor(message)
+	case runOptionsScreen:
+		return m.updateRunOptions(message)
 	default:
 		return m, nil
 	}

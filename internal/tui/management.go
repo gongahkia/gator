@@ -1,9 +1,14 @@
 package tui
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/url"
+	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -12,10 +17,12 @@ type managementSection uint8
 const (
 	managementSettings managementSection = iota
 	managementTrust
+	managementMCPAuth
 	managementRuns
 	managementWorktrees
 	managementChildren
 	managementExtensions
+	managementSectionCount
 )
 
 type managementState struct {
@@ -31,6 +38,15 @@ type managementState struct {
 	selectedRunRecord string
 	checkedRunRecord  string
 	actionDetail      string
+	// mcpLoginServer and mcpLoginURL describe an in-flight MCP browser
+	// authorization. The URL is shown before Gator waits for its callback so
+	// the developer can complete or cancel it deliberately.
+	mcpLoginServer string
+	mcpLoginURL    string
+	// installSource is the visible source entry field for a new extension.
+	// installPreview holds staged bytes awaiting explicit confirmation.
+	installSource  *textinput.Model
+	installPreview *ExtensionInstallPreview
 }
 
 type managementConfirmation struct {
@@ -53,6 +69,16 @@ type managementActionMsg struct {
 	err        error
 }
 
+type mcpLoginDoneMsg struct {
+	server string
+	err    error
+}
+
+type extensionPreparedMsg struct {
+	preview ExtensionInstallPreview
+	err     error
+}
+
 func newManagementState(backend ManagementBackend) managementState {
 	return managementState{backend: backend}
 }
@@ -69,6 +95,8 @@ func (m Model) openManagement() (tea.Model, tea.Cmd) {
 	m.management.selectedRunRecord = m.activeRunRecord()
 	m.management.checkedRunRecord = ""
 	m.management.actionDetail = ""
+	m.management.mcpLoginServer = ""
+	m.management.mcpLoginURL = ""
 	m.screen = managementScreen
 	return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
 }
@@ -107,6 +135,15 @@ func runManagementAction(backend ManagementBackend, confirmation managementConfi
 			err = backend.SetExtensionEnabled(confirmation.id, false)
 		case "remove-extension":
 			err = backend.RemoveExtension(confirmation.id)
+		case "install-extension":
+			replace := confirmation.value2 == "replace"
+			if err = backend.CommitExtensionInstall(confirmation.id, confirmation.value, replace); err == nil {
+				detail = "Installed and enabled the reviewed bundle. Its tools stay approval-gated and sandboxed."
+			}
+		case "remove-mcp-credential":
+			if err = backend.RemoveMCPCredential(confirmation.id); err == nil {
+				detail = "Removed Gator's stored OAuth credential for MCP server " + confirmation.id + ". Any credential held by another application is unchanged."
+			}
 		case "remove-worktree":
 			err = backend.RemoveWorktree(confirmation.id)
 		case "prune-worktrees":
@@ -139,12 +176,21 @@ func runImmediateManagementAction(backend ManagementBackend, action, runRecord, 
 }
 
 func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if message.String() == "ctrl+c" && m.oauthLogin != nil {
+		m.oauthCancel()
+		m.oauthLogin.Cancel()
+		m.notice = notice{text: "MCP authorization cancellation requested.", kind: noticeInfo}
+		return m, nil
+	}
 	if m.management.loading {
 		if message.String() == "esc" {
 			m.screen = composeScreen
 			return m, m.focusField()
 		}
 		return m, nil
+	}
+	if m.management.installSource != nil && m.management.confirm == nil {
+		return m.updateExtensionSourceEntry(message)
 	}
 	if m.management.confirm != nil {
 		switch message.String() {
@@ -153,22 +199,36 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.management.confirm = nil
 			m.management.loading = true
 			m.management.actionDetail = ""
+			if confirmation.action == "install-extension" {
+				m.management.installPreview = nil
+			}
 			return m, runManagementAction(m.management.backend, confirmation)
 		case "n", "esc", "ctrl+c":
 			m.management.confirm = nil
 			m.notice = notice{text: "Management action cancelled.", kind: noticeInfo}
+			if m.management.installPreview != nil {
+				m.discardStagedExtension()
+				m.notice = notice{text: "Discarded the staged extension bundle without installing it.", kind: noticeInfo}
+			}
 		}
 		return m, nil
 	}
 	switch message.String() {
 	case "esc", "q":
+		m.discardStagedExtension()
 		m.screen = composeScreen
 		return m, m.focusField()
 	case "left", "h":
-		m.management.section = (m.management.section + 5) % 6
+		m.management.section = (m.management.section + managementSectionCount - 1) % managementSectionCount
 		m.management.index = 0
-	case "right", "l", "tab":
-		m.management.section = (m.management.section + 1) % 6
+	case "right", "tab":
+		m.management.section = (m.management.section + 1) % managementSectionCount
+		m.management.index = 0
+	case "l":
+		if m.management.section == managementMCPAuth {
+			return m.beginMCPLogin()
+		}
+		m.management.section = (m.management.section + 1) % managementSectionCount
 		m.management.index = 0
 	case "up", "k", "ctrl+p":
 		m.moveManagementSelection(-1)
@@ -193,6 +253,15 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case "d":
+		if m.management.section == managementMCPAuth {
+			if item, ok := m.selectedMCPAuth(); ok {
+				m.management.confirm = &managementConfirmation{
+					action: "remove-mcp-credential", id: item.Server,
+					label: "Remove Gator's stored OAuth credential for MCP server " + item.Server,
+				}
+			}
+			break
+		}
 		if m.management.section == managementSettings {
 			provider := strings.TrimSpace(m.provider.Value())
 			model := strings.TrimSpace(m.model.Value())
@@ -240,6 +309,10 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 				label: "Apply retained run " + item.ID + " to the clean active checkout",
 			}
 		}
+	case "i":
+		if m.management.section == managementExtensions {
+			return m.beginExtensionSourceEntry()
+		}
 	case " ":
 		if item, ok := m.selectedExtension(); ok {
 			action := "enable-extension"
@@ -268,6 +341,131 @@ func (m Model) updateManagement(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+func (m Model) beginExtensionSourceEntry() (tea.Model, tea.Cmd) {
+	m.discardStagedExtension()
+	input := textinput.New()
+	input.Prompt = "› "
+	input.Placeholder = "/path/to/bundle or https://host/owner/repo.git"
+	input.CharLimit = 1024
+	input.Width = 60
+	input.Focus()
+	m.management.installSource = &input
+	m.notice = notice{text: "Enter a local bundle directory or an https Git URL. Gator stages and hashes it before anything is installed.", kind: noticeInfo}
+	return m, textinput.Blink
+}
+
+func (m Model) updateExtensionSourceEntry(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch message.String() {
+	case "esc", "ctrl+c":
+		m.management.installSource = nil
+		m.notice = notice{text: "Extension installation cancelled. Nothing was fetched or staged.", kind: noticeInfo}
+		return m, nil
+	case "enter":
+		source := strings.TrimSpace(m.management.installSource.Value())
+		if err := validateExtensionSource(source); err != nil {
+			m.notice = notice{text: err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.management.installSource = nil
+		m.management.loading = true
+		m.management.actionDetail = ""
+		m.notice = notice{text: "Staging and hashing the extension source. Nothing is installed until you confirm the exact bundle.", kind: noticeInfo}
+		return m, prepareExtension(m.management.backend, source)
+	}
+	input, command := m.management.installSource.Update(message)
+	m.management.installSource = &input
+	return m, command
+}
+
+// validateExtensionSource keeps the TUI narrower than the CLI on purpose. A
+// one-key install of executable code accepts only a real local directory or a
+// hosted HTTPS Git URL: no shell, package manager, ssh, git@, or plain HTTP.
+func validateExtensionSource(source string) error {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return errors.New("enter a local bundle directory or an https Git repository URL")
+	}
+	if strings.ContainsAny(source, "\r\n\x00") || strings.HasPrefix(source, "-") {
+		return errors.New("extension source contains unsupported characters")
+	}
+	if strings.HasPrefix(source, "git@") || strings.HasPrefix(source, "ssh://") {
+		return errors.New("install ssh and git@ sources with the gator extension command; the TUI accepts only local directories and https URLs")
+	}
+	if parsed, err := url.Parse(source); err == nil && parsed.Scheme != "" {
+		if parsed.Scheme != "https" {
+			return errors.New("remote extension sources must use https")
+		}
+		if parsed.Host == "" || parsed.User != nil {
+			return errors.New("https extension sources require a host and must not embed credentials")
+		}
+		return nil
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		return errors.New("extension source must be an existing local directory or an https Git repository URL")
+	}
+	if !info.IsDir() {
+		return errors.New("local extension sources must be a bundle directory")
+	}
+	return nil
+}
+
+func prepareExtension(backend ManagementBackend, source string) tea.Cmd {
+	return func() tea.Msg {
+		preview, err := backend.PrepareExtension(source)
+		return extensionPreparedMsg{preview: preview, err: err}
+	}
+}
+
+// discardStagedExtension removes staged executable code whenever the review is
+// abandoned. It runs synchronously so leaving the screen cannot leave an
+// unreviewed bundle behind in the store.
+func (m *Model) discardStagedExtension() {
+	m.management.installSource = nil
+	preview := m.management.installPreview
+	m.management.installPreview = nil
+	if preview == nil || m.management.backend == nil {
+		return
+	}
+	_ = m.management.backend.DiscardExtensionPrepare(preview.Token)
+}
+
+// beginMCPLogin refuses before any browser URL exists unless this exact
+// project manifest hash is already trusted. The backend repeats that check, so
+// an out-of-date snapshot cannot authorize an untrusted remote server.
+func (m Model) beginMCPLogin() (tea.Model, tea.Cmd) {
+	item, ok := m.selectedMCPAuth()
+	if !ok {
+		return m, nil
+	}
+	if !item.BundleTrusted {
+		m.notice = notice{text: "Trust the current .gator/mcp.json hash in the trust section before authenticating " + item.Server + ".", kind: noticeError}
+		return m, nil
+	}
+	if m.oauthLogin != nil {
+		m.notice = notice{text: "An authorization is already waiting for its browser callback. Press Ctrl+C to cancel it.", kind: noticeInfo}
+		return m, nil
+	}
+	login, err := m.management.backend.BeginMCPOAuthLogin(item.Server)
+	if err != nil {
+		m.notice = notice{text: "Start MCP authorization: " + err.Error(), kind: noticeError}
+		return m, nil
+	}
+	loginContext, cancel := context.WithCancel(context.Background())
+	m.oauthLogin = login
+	m.oauthCancel = cancel
+	m.oauthProvider = mcpLoginProvider(item.Server)
+	m.management.mcpLoginServer = item.Server
+	m.management.mcpLoginURL = login.URL()
+	m.notice = notice{text: "Open the authorization URL below. Gator is waiting for its loopback callback; press Ctrl+C to cancel.", kind: noticeInfo}
+	server := item.Server
+	return m, func() tea.Msg {
+		return mcpLoginDoneMsg{server: server, err: login.Complete(loginContext)}
+	}
+}
+
+func mcpLoginProvider(server string) string { return "mcp:" + server }
 
 func (m *Model) moveManagementSelection(delta int) {
 	count := m.managementItemCount()
@@ -326,6 +524,8 @@ func (m Model) managementItemCount() int {
 		return 3
 	case managementTrust:
 		return len(m.management.data.Trusts)
+	case managementMCPAuth:
+		return len(m.management.data.MCPAuth)
 	case managementRuns:
 		return len(m.management.data.Runs)
 	case managementWorktrees:
@@ -353,6 +553,13 @@ func (m Model) selectedTrust() (ManagedTrust, bool) {
 	return m.management.data.Trusts[min(m.management.index, len(m.management.data.Trusts)-1)], true
 }
 
+func (m Model) selectedMCPAuth() (ManagedMCPAuth, bool) {
+	if m.management.section != managementMCPAuth || len(m.management.data.MCPAuth) == 0 {
+		return ManagedMCPAuth{}, false
+	}
+	return m.management.data.MCPAuth[min(m.management.index, len(m.management.data.MCPAuth)-1)], true
+}
+
 func (m Model) selectedWorktree() (ManagedWorktree, bool) {
 	if m.management.section != managementWorktrees || len(m.management.data.Worktrees) == 0 {
 		return ManagedWorktree{}, false
@@ -369,7 +576,7 @@ func (m Model) selectedExtension() (ManagedExtension, bool) {
 
 func (m Model) managementView() string {
 	sections := []string{m.header("manage")}
-	tabs := []string{"settings", "trust", "runs", "worktrees", "children", "extensions"}
+	tabs := []string{"settings", "trust", "mcp auth", "runs", "worktrees", "children", "extensions"}
 	for index := range tabs {
 		if managementSection(index) == m.management.section {
 			tabs[index] = keyStyle.Render("[" + tabs[index] + "]")
@@ -386,8 +593,27 @@ func (m Model) managementView() string {
 			sections = append(sections, m.panel(detail))
 		}
 	}
+	if m.management.installSource != nil {
+		sections = append(sections, m.panel(labelStyle.Render("Install an extension")+"\n"+m.management.installSource.View()+"\n"+dimStyle.Render("Local bundle directory or https Git URL. Gator stages a private copy and shows its hash before anything is installed.")))
+	}
+	if preview := m.management.installPreview; preview != nil {
+		state := "new installation"
+		if preview.AlreadyInstalled {
+			state = "replaces the installed bundle with this ID"
+		}
+		sections = append(sections, m.panel(labelStyle.Render("Staged extension")+"\n"+
+			preview.ID+"  "+preview.Name+"\n"+
+			"source: "+preview.Source+"\n"+
+			"sha256: "+preview.Hash+"\n"+
+			fmt.Sprintf("tools=%d commands=%d skills=%d prompts=%d ui=%d", preview.Tools, preview.Commands, preview.Skills, preview.Prompts, preview.UI)+"\n"+
+			state+"\n"+
+			dimStyle.Render("Confirming installs exactly these staged bytes. Extension tools run with your user's authority inside the active sandbox and still request approval.")))
+	}
 	if confirmation := m.management.confirm; confirmation != nil {
 		sections = append(sections, m.panel(errorStyle.Render(confirmation.label+"?\nThis action requires explicit confirmation. Press y to continue or n to cancel.")))
+	}
+	if m.management.mcpLoginURL != "" {
+		sections = append(sections, m.panel(labelStyle.Render("Authorize MCP server "+m.management.mcpLoginServer)+"\n"+m.management.mcpLoginURL+"\n"+dimStyle.Render("Gator is waiting for its own loopback callback. Press Ctrl+C to cancel.")))
 	}
 	if m.management.actionDetail != "" {
 		sections = append(sections, m.panel(okStyle.Render(m.management.actionDetail)))
@@ -399,12 +625,17 @@ func (m Model) managementView() string {
 		footer = append([]string{"enter change", "d save current model defaults"}, footer...)
 	case managementTrust:
 		footer = append([]string{"t trust/untrust"}, footer...)
+	case managementMCPAuth:
+		footer = append([]string{"l sign in", "d remove credential"}, footer...)
 	case managementRuns:
 		footer = append([]string{"enter select", "c check", "a apply", "e export patch", "t export HTML"}, footer...)
 	case managementWorktrees:
 		footer = append([]string{"x remove", "p prune metadata"}, footer...)
 	case managementExtensions:
-		footer = append([]string{"space enable/disable", "x remove"}, footer...)
+		footer = append([]string{"i install from source", "space enable/disable", "x remove"}, footer...)
+	}
+	if m.management.installSource != nil {
+		footer = []string{"enter stage and review", "esc cancel"}
 	}
 	sections = append(sections, m.footer(footer...))
 	return strings.Join(sections, "\n")
@@ -430,6 +661,10 @@ func (m Model) managementRows() string {
 				state = "active"
 			}
 			rows = append(rows, item.Kind+"  "+state)
+		}
+	case managementMCPAuth:
+		for _, item := range m.management.data.MCPAuth {
+			rows = append(rows, item.Server+"  "+mcpAuthStateLabel(item))
 		}
 	case managementRuns:
 		for _, item := range m.management.data.Runs {
@@ -495,7 +730,22 @@ func (m Model) managementDetail() string {
 		}
 	case managementTrust:
 		if item, ok := m.selectedTrust(); ok && item.Hash != "" {
-			return labelStyle.Render("Selected bundle") + "\n" + item.Kind + "\nsha256: " + item.Hash + "\n" + dimStyle.Render("Trust activates only this exact content hash. Every executable operation still follows its own approval and sandbox policy.")
+			detail := labelStyle.Render("Selected bundle") + "\n" + item.Kind + "\nsha256: " + item.Hash + "\n" + dimStyle.Render("Trust activates only this exact content hash. Every executable operation still follows its own approval and sandbox policy.")
+			if item.Kind == "lsp" {
+				detail += "\n" + m.lspRuntimeDetail()
+			}
+			return detail
+		}
+	case managementMCPAuth:
+		if item, ok := m.selectedMCPAuth(); ok {
+			gate := "bundle hash trusted"
+			if !item.BundleTrusted {
+				gate = "bundle hash not trusted · sign-in is unavailable"
+			}
+			return labelStyle.Render("Streamable HTTP MCP server") + "\n" +
+				item.Server + "\n" +
+				mcpAuthStateLabel(item) + " · " + gate + "\n" +
+				dimStyle.Render("Sign-in opens a loopback PKCE flow bound to this exact configured resource. Removing a credential deletes only Gator's stored token; every MCP tool still requests approval before use.")
 		}
 	case managementRuns:
 		if item, ok := m.selectedRun(); ok {
@@ -551,6 +801,51 @@ func (m Model) managementDetail() string {
 		}
 	}
 	return ""
+}
+
+func mcpAuthStateLabel(item ManagedMCPAuth) string {
+	switch {
+	case item.Authenticated:
+		return "authenticated"
+	case item.Expired:
+		return "expired"
+	default:
+		return "not authenticated"
+	}
+}
+
+func (m Model) lspRuntimeDetail() string {
+	if len(m.management.data.LSPRuntime) == 0 {
+		return "session cache: none\n" + dimStyle.Render("Status never starts a language server. The first approved lookup starts one for a trusted hash.")
+	}
+	lines := []string{fmt.Sprintf("session cache: %d manager(s)", len(m.management.data.LSPRuntime))}
+	for _, entry := range m.management.data.LSPRuntime {
+		state := "idle"
+		if entry.Active > 0 {
+			state = fmt.Sprintf("in use (%d)", entry.Active)
+		}
+		if entry.Retired {
+			state += " · retired"
+		}
+		hash := entry.Hash
+		if len(hash) > 12 {
+			hash = hash[:12]
+		}
+		servers := make([]string, 0, len(entry.Servers))
+		for _, server := range entry.Servers {
+			label := server.Name + "=idle"
+			if server.Started {
+				label = server.Name + "=running"
+			}
+			servers = append(servers, label)
+		}
+		line := "worktree " + valueOrEmpty(entry.Worktree) + " hash " + hash + " " + state
+		if len(servers) > 0 {
+			line += " · " + strings.Join(servers, ", ")
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n") + "\n" + dimStyle.Render("This view never calls Acquire or starts a server.")
 }
 
 func valueOrEmpty(value string) string {

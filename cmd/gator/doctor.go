@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/dependency"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
@@ -57,58 +58,9 @@ func doctor(arguments []string, out io.Writer) error {
 	if err == nil {
 		gitStatus = "detected"
 	}
-	authentication := "Gator credential"
-	if customProvider {
-		if custom.APIKeyEnv == "" {
-			authentication = "no API key"
-		} else {
-			authentication = "API key from " + custom.APIKeyEnv
-		}
-	} else if provider == model.Claude {
-		authentication = "unsupported native Claude.ai subscription OAuth; use provider anthropic with an API key"
-	} else if provider == model.GoogleVertex {
-		authentication = model.CredentialHint(provider)
-	} else if provider == model.AmazonBedrock {
-		authentication += " or " + model.CredentialHint(provider)
-	} else if model.SupportsAPIKeyLogin(provider) {
-		authentication += " or " + model.CredentialHint(provider)
-	}
-	authenticationStatus := "missing"
-	if customProvider {
-		if custom.APIKeyEnv == "" {
-			authenticationStatus = "not required"
-		} else if strings.TrimSpace(os.Getenv(custom.APIKeyEnv)) != "" {
-			authenticationStatus = "set in environment"
-		}
-	} else if provider == model.Claude {
-		authenticationStatus = "use gator connect claude"
-	} else if !model.SupportsDirect(provider) {
-		authenticationStatus = "unsupported"
-	} else if provider == model.GoogleVertex {
-		if model.AmbientCredentialAvailable(provider) {
-			authenticationStatus = "configured"
-		}
-	} else {
-		credentials, credentialErr := gatorCredentials()
-		if credentialErr != nil {
-			return credentialErr
-		}
-		credential, stored, credentialErr := credentials.Read(string(provider))
-		if credentialErr != nil {
-			return credentialErr
-		}
-		switch {
-		case stored && credential.Expired(time.Now()):
-			authenticationStatus = "expired"
-		case stored && (credential.IsAPIKey() || credential.IsBearerToken() || credential.IsOAuth()):
-			authenticationStatus = "stored"
-		case provider == model.AmazonBedrock && model.AmbientCredentialAvailable(provider):
-			authenticationStatus = model.AmbientCredentialSource(provider)
-		case provider == model.AzureOpenAIResponses && model.AmbientCredentialAvailable(provider):
-			authenticationStatus = "set in environment"
-		case model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" && os.Getenv(model.APIKeyEnvironment(provider)) != "":
-			authenticationStatus = "set in environment"
-		}
+	authentication, authenticationStatus, err := inspectProviderAuth(custom, customProvider, provider)
+	if err != nil {
+		return err
 	}
 	sandboxStatus, sandboxErr := sandbox.StrictAvailability()
 	if sandboxErr != nil {
@@ -150,4 +102,65 @@ func doctor(arguments []string, out io.Writer) error {
 		return err
 	}
 	return nil
+}
+
+func inspectProviderAuth(custom config.CustomProvider, customProvider bool, provider model.Provider) (string, string, error) {
+	authentication := "Gator credential"
+	if customProvider {
+		if custom.APIKeyEnv == "" {
+			authentication = "no API key"
+		} else {
+			authentication = "API key from " + custom.APIKeyEnv
+		}
+	} else if provider == model.Claude {
+		authentication = "unsupported native Claude.ai subscription OAuth; use provider anthropic with an API key"
+	} else if provider == model.GoogleVertex {
+		authentication = model.CredentialHint(provider)
+	} else if provider == model.AmazonBedrock {
+		authentication += " or " + model.CredentialHint(provider)
+	} else if model.SupportsAPIKeyLogin(provider) {
+		authentication += " or " + model.CredentialHint(provider)
+	}
+	authenticationStatus := "missing"
+	if customProvider {
+		if custom.APIKeyEnv == "" {
+			authenticationStatus = "not required"
+		} else if strings.TrimSpace(os.Getenv(custom.APIKeyEnv)) != "" {
+			authenticationStatus = "set in environment"
+		}
+		return authentication, authenticationStatus, nil
+	}
+	if provider == model.Claude {
+		return authentication, "use gator connect claude", nil
+	}
+	if !model.SupportsDirect(provider) {
+		return authentication, "unsupported", nil
+	}
+	if provider == model.GoogleVertex {
+		if model.AmbientCredentialAvailable(provider) {
+			authenticationStatus = "configured"
+		}
+		return authentication, authenticationStatus, nil
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return "", "", err
+	}
+	credential, stored, err := credentials.Read(string(provider))
+	if err != nil {
+		return "", "", err
+	}
+	switch {
+	case stored && credential.Expired(time.Now()):
+		authenticationStatus = "expired"
+	case stored && (credential.IsAPIKey() || credential.IsBearerToken() || credential.IsOAuth()):
+		authenticationStatus = "stored"
+	case provider == model.AmazonBedrock && model.AmbientCredentialAvailable(provider):
+		authenticationStatus = model.AmbientCredentialSource(provider)
+	case provider == model.AzureOpenAIResponses && model.AmbientCredentialAvailable(provider):
+		authenticationStatus = "set in environment"
+	case model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != "" && os.Getenv(model.APIKeyEnvironment(provider)) != "":
+		authenticationStatus = "set in environment"
+	}
+	return authentication, authenticationStatus, nil
 }

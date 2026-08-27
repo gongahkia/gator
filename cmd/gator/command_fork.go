@@ -52,7 +52,7 @@ func branchTask(operation string, arguments []string, out io.Writer) error {
 	if instruction == "" && len(imagePaths)+len(documentPaths) > 0 {
 		return errors.New("--image and --attach require a branch instruction")
 	}
-	if target != "" && looksLikeRunRecordPath(target) {
+	if target != "" && journal.LooksLikeRunRecordPath(target) {
 		if *all {
 			return errors.New("--all cannot be combined with a run record path")
 		}

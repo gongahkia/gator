@@ -32,7 +32,11 @@ type Request struct {
 	Scopes          []string
 	Profile         string
 	AllowedCommands [][]string
-	Approve         func(context.Context, []string) (tools.CommandDecision, error)
+	// AllowedCommandPrefixes are developer-supplied literal argv prefixes.
+	// They never include verification commands and never survive a profile
+	// omit of run_command.
+	AllowedCommandPrefixes [][]string
+	Approve                func(context.Context, []string) (tools.CommandDecision, error)
 	System          string
 	StateDir        string
 	OnEvent         agent.EventSink

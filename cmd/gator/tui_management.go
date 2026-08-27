@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/extension"
@@ -23,18 +25,19 @@ import (
 )
 
 type tuiManagementBackend struct {
-	repository string
-	stateDir   string
-	settings   config.Store
-	extensions extension.Store
+	repository  string
+	stateDir    string
+	settings    config.Store
+	extensions  extension.Store
+	lspRegistry *lsp.Registry
 }
 
-func newTUIManagementBackend(repository, stateDir string, settings config.Store) (tui.ManagementBackend, error) {
+func newTUIManagementBackend(repository, stateDir string, settings config.Store, lspRegistry *lsp.Registry) (tui.ManagementBackend, error) {
 	extensions, err := extension.DefaultStore()
 	if err != nil {
 		return nil, err
 	}
-	return &tuiManagementBackend{repository: repository, stateDir: stateDir, settings: settings, extensions: extensions}, nil
+	return &tuiManagementBackend{repository: repository, stateDir: stateDir, settings: settings, extensions: extensions, lspRegistry: lspRegistry}, nil
 }
 
 func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementSnapshot, error) {
@@ -51,6 +54,10 @@ func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementS
 		return tui.ManagementSnapshot{}, err
 	}
 	extensions, err := backend.extensionSnapshot(settings)
+	if err != nil {
+		return tui.ManagementSnapshot{}, err
+	}
+	mcpAuth, err := backend.mcpAuthSnapshot(settings)
 	if err != nil {
 		return tui.ManagementSnapshot{}, err
 	}
@@ -76,8 +83,126 @@ func (backend *tuiManagementBackend) Snapshot(runRecord string) (tui.ManagementS
 			SandboxMode: string(policy.Mode), Network: string(policy.Network),
 			DefaultProvider: settings.Defaults.Provider, DefaultModel: settings.Defaults.Model,
 		},
-		Trusts: trusts, Runs: managedRuns, Worktrees: worktrees, Children: children, Batches: batches, Extensions: extensions,
+		Trusts: trusts, MCPAuth: mcpAuth, Runs: managedRuns, Worktrees: worktrees, Children: children, Batches: batches, Extensions: extensions,
+		LSPRuntime: backend.lspRuntimeSnapshot(),
 	}, nil
+}
+
+func (backend *tuiManagementBackend) lspRuntimeSnapshot() []tui.ManagedLSPRuntime {
+	snapshot := backend.lspRegistry.Snapshot()
+	result := make([]tui.ManagedLSPRuntime, 0, len(snapshot))
+	for _, entry := range snapshot {
+		servers := make([]tui.ManagedLSPServer, 0, len(entry.Servers))
+		for _, server := range entry.Servers {
+			servers = append(servers, tui.ManagedLSPServer{Name: server.Name, Language: server.Language, Started: server.Started})
+		}
+		result = append(result, tui.ManagedLSPRuntime{
+			Worktree: entry.Worktree, Hash: entry.Hash, Active: entry.Active, Retired: entry.Retired, Servers: servers,
+		})
+	}
+	return result
+}
+
+// mcpAuthSnapshot reports per-server authorization state without contacting
+// any remote service. It reads the manifest only to enumerate configured
+// Streamable HTTP server names; tokens never leave the private store.
+func (backend *tuiManagementBackend) mcpAuthSnapshot(settings config.Settings) ([]tui.ManagedMCPAuth, error) {
+	repository, digest, trusted, err := backend.mcpTrustState(settings)
+	if err != nil || digest == "" {
+		return nil, err
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return nil, err
+	}
+	statuses, err := mcp.HTTPAuthorizationStatuses(repository, credentials, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	result := make([]tui.ManagedMCPAuth, 0, len(statuses))
+	for _, status := range statuses {
+		result = append(result, tui.ManagedMCPAuth{
+			Server:        status.Server,
+			Authenticated: status.Authenticated,
+			Expired:       status.Expired,
+			BundleTrusted: trusted,
+		})
+	}
+	return result, nil
+}
+
+func (backend *tuiManagementBackend) mcpTrustState(settings config.Settings) (string, string, bool, error) {
+	repository, err := mcp.CanonicalRepository(backend.repository)
+	if err != nil {
+		return "", "", false, err
+	}
+	digest, err := mcp.BundleHash(repository)
+	if err != nil {
+		return "", "", false, err
+	}
+	return repository, digest, digest != "" && mcpTrustFor(settings.MCPTrusts, repository) == digest, nil
+}
+
+// BeginMCPOAuthLogin re-checks the trusted manifest hash in the command layer
+// before the MCP package discovers an authorization server, so a stale TUI
+// snapshot can never produce a browser URL for untrusted project config.
+func (backend *tuiManagementBackend) BeginMCPOAuthLogin(server string) (tui.OAuthLogin, error) {
+	server = strings.TrimSpace(server)
+	if server == "" {
+		return nil, errors.New("choose a configured Streamable HTTP MCP server")
+	}
+	settings, err := backend.settings.Load()
+	if err != nil {
+		return nil, err
+	}
+	repository, digest, trusted, err := backend.mcpTrustState(settings)
+	if err != nil {
+		return nil, err
+	}
+	if digest == "" {
+		return nil, errors.New("no .gator/mcp.json exists to authenticate")
+	}
+	if !trusted {
+		return nil, errors.New("project MCP configuration is not trusted; review and trust it before authenticating a remote server")
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return nil, err
+	}
+	login, err := mcp.BeginOAuthLogin(context.Background(), repository, server, digest, credentials, mcp.OAuthLoginOptions{
+		ClientID:    strings.TrimSpace(os.Getenv("GATOR_MCP_CLIENT_ID")),
+		RedirectURL: strings.TrimSpace(os.Getenv("GATOR_MCP_REDIRECT_URL")),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return login, nil
+}
+
+// RemoveMCPCredential deletes exactly one Gator-owned MCP token. It resolves
+// the credential key from the current manifest so an unrelated stored entry
+// cannot be deleted by name.
+func (backend *tuiManagementBackend) RemoveMCPCredential(server string) error {
+	server = strings.TrimSpace(server)
+	if server == "" {
+		return errors.New("choose a configured Streamable HTTP MCP server")
+	}
+	repository, err := mcp.CanonicalRepository(backend.repository)
+	if err != nil {
+		return err
+	}
+	key, err := mcp.OAuthCredentialKeyForServer(repository, server)
+	if err != nil {
+		return err
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return err
+	}
+	if err := credentials.Delete(key); err != nil {
+		return fmt.Errorf("remove MCP OAuth credential: %w", err)
+	}
+	return nil
 }
 
 func (backend *tuiManagementBackend) trustSnapshot(settings config.Settings) ([]tui.ManagedTrust, error) {
@@ -352,6 +477,80 @@ func (backend *tuiManagementBackend) SetExtensionEnabled(id string, enabled bool
 	}
 	settings.Extensions = setExtensionSetting(settings.Extensions, id, enabled)
 	return backend.settings.Save(settings)
+}
+
+// PrepareExtension stages one source and returns display-safe metadata. It
+// deliberately does not write settings: a staged bundle is unreferenced code
+// until CommitExtensionInstall publishes the reviewed hash.
+func (backend *tuiManagementBackend) PrepareExtension(source string) (tui.ExtensionInstallPreview, error) {
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return tui.ExtensionInstallPreview{}, errors.New("enter a local bundle directory or an https Git repository URL")
+	}
+	if err := tuiInstallableExtensionSource(source); err != nil {
+		return tui.ExtensionInstallPreview{}, err
+	}
+	context, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	prepared, err := backend.extensions.PrepareSource(context, source)
+	if err != nil {
+		return tui.ExtensionInstallPreview{}, err
+	}
+	return tui.ExtensionInstallPreview{
+		Token: prepared.Token, Source: source, ID: prepared.ID, Name: prepared.Name,
+		Description: prepared.Description, Hash: prepared.Hash, Skills: prepared.Skills,
+		Prompts: prepared.Prompts, Commands: prepared.Commands, UI: prepared.UI,
+		Tools: prepared.Tools, AlreadyInstalled: prepared.AlreadyInstalled,
+	}, nil
+}
+
+// CommitExtensionInstall publishes the reviewed staged bytes and only then
+// enables the extension, so a cancelled review never leaves an enabled entry.
+func (backend *tuiManagementBackend) CommitExtensionInstall(token, hash string, replace bool) error {
+	installed, err := backend.extensions.CommitPrepared(token, hash, replace)
+	if err != nil {
+		return err
+	}
+	settings, err := backend.settings.Load()
+	if err != nil {
+		return err
+	}
+	settings.Extensions = setExtensionSetting(settings.Extensions, installed.Manifest.ID, true)
+	return backend.settings.Save(settings)
+}
+
+func (backend *tuiManagementBackend) DiscardExtensionPrepare(token string) error {
+	return backend.extensions.DiscardPrepared(token)
+}
+
+// tuiInstallableExtensionSource repeats the TUI's narrower source rule in the
+// command layer so a stale or manipulated UI cannot reach ssh, git@, or plain
+// HTTP fetching through the one-key install path.
+func tuiInstallableExtensionSource(source string) error {
+	if strings.ContainsAny(source, "\r\n\x00") || strings.HasPrefix(source, "-") {
+		return errors.New("extension source contains unsupported characters")
+	}
+	if strings.HasPrefix(source, "git@") || strings.HasPrefix(source, "ssh://") {
+		return errors.New("install ssh and git@ sources with 'gator extension install'; the TUI accepts only local directories and https URLs")
+	}
+	parsed, err := url.Parse(source)
+	if err == nil && parsed.Scheme != "" {
+		if parsed.Scheme != "https" {
+			return errors.New("remote extension sources must use https")
+		}
+		if parsed.Host == "" || parsed.User != nil {
+			return errors.New("https extension sources require a host and must not embed credentials")
+		}
+		return nil
+	}
+	info, statErr := os.Lstat(source)
+	if statErr != nil {
+		return errors.New("extension source must be an existing local directory or an https Git repository URL")
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("local extension sources must be a real bundle directory")
+	}
+	return nil
 }
 
 func (backend *tuiManagementBackend) RemoveExtension(id string) error {

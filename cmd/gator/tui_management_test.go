@@ -130,6 +130,24 @@ func TestTUIManagementExportsPrivatelyChecksAndAppliesRetainedPatch(t *testing.T
 	}
 }
 
+func TestTUIManagementRejectsNonHTTPSExtensionSources(t *testing.T) {
+	root := t.TempDir()
+	settings, err := config.New(filepath.Join(root, "config"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	extensions, err := extension.NewStore(filepath.Join(root, "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &tuiManagementBackend{repository: root, stateDir: filepath.Join(root, "state"), settings: settings, extensions: extensions}
+	for _, source := range []string{"git@example.com:team/ext.git", "ssh://git@example.com/team/ext.git", "http://example.com/ext.git"} {
+		if _, err := backend.PrepareExtension(source); err == nil {
+			t.Fatalf("prepare accepted %q", source)
+		}
+	}
+}
+
 func runManagementGit(t *testing.T, directory string, arguments ...string) string {
 	t.Helper()
 	command := exec.Command("git", arguments...)

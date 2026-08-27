@@ -27,6 +27,7 @@ const (
 type Set struct {
 	Content string
 	Files   []string
+	Policy  ProfilePolicy
 }
 
 type rulesDocument struct {
@@ -48,10 +49,11 @@ type profilesDocument struct {
 }
 
 type profile struct {
-	Name         string `json:"name"`
-	Description  string `json:"description,omitempty"`
-	Instructions string `json:"instructions,omitempty"`
-	File         string `json:"file,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description,omitempty"`
+	Instructions string        `json:"instructions,omitempty"`
+	File         string        `json:"file,omitempty"`
+	Policy       ProfilePolicy `json:"policy,omitempty"`
 }
 
 type role struct {
@@ -211,9 +213,36 @@ func LoadWithProfile(repository string, scopes []string, name string) (Set, erro
 		}
 		set.Content += section
 		set.Files = files
+		set.Policy = candidate.Policy
+		set.Policy.Omit = mergeOmit(candidate.Policy.Omit)
 		return set, nil
 	}
 	return Set{}, fmt.Errorf("agent profile %q is not configured", name)
+}
+
+// ListProfiles returns developer-selectable profiles without activating any.
+func ListProfiles(repository string) ([]Profile, error) {
+	root, err := workspace.Open(repository)
+	if err != nil {
+		return nil, err
+	}
+	document, err := loadProfilesDocument(root)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if err := validateProfilesDocument(document); err != nil {
+		return nil, err
+	}
+	result := make([]Profile, 0, len(document.Profiles))
+	for _, candidate := range document.Profiles {
+		policy := candidate.Policy
+		policy.Omit = mergeOmit(policy.Omit)
+		result = append(result, Profile{Name: candidate.Name, Description: candidate.Description, Policy: policy})
+	}
+	return result, nil
 }
 
 // LoadRoles loads validated project-defined subagent specializations. Roles
@@ -284,6 +313,10 @@ func validateProfilesDocument(document profilesDocument) error {
 		if err := validateAgentInstructions(candidate.Name, candidate.Instructions, candidate.File, "profile"); err != nil {
 			return err
 		}
+		if err := validateProfilePolicy(candidate.Name, candidate.Policy); err != nil {
+			return err
+		}
+		candidate.Policy.Omit = mergeOmit(candidate.Policy.Omit)
 	}
 	roles := make(map[string]struct{}, len(document.Roles))
 	for _, candidate := range document.Roles {

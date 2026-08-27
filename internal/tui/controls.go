@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
@@ -181,9 +182,18 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		m.commandOutput = ""
 		m.notice = notice{text: "Inspect local state before changing trust or retained artifacts.", kind: noticeInfo}
 		return m.openManagement()
+	case "/doctor":
+		m.commandOutput = ""
+		return m.openDoctor()
+	case "/run":
+		m.commandOutput = ""
+		return m.openRunOptions()
+	case "/agents":
+		m.commandOutput = m.agentsStatus()
+		m.notice = notice{text: "Profiles can only narrow policy. Roles remain prompt-only specializations.", kind: noticeInfo}
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
-		m.notice = notice{text: "Verifier commands are the only commands the agent may run.", kind: noticeInfo}
+		m.notice = notice{text: "Verifier, exact allow-command, and literal prefixes may run without a prompt; everything else waits.", kind: noticeInfo}
 	case "/quit":
 		return m, tea.Quit
 	case "/queue":
@@ -786,7 +796,10 @@ func (m Model) sessionStatus() string {
 		runtime = delegatedRuntimeLabel(m.delegateRuntime)
 	}
 	effectiveSteps := m.effort.maxSteps(m.config.MaxSteps)
-	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\neffort: " + m.effort.label() + "\nmax steps: " + fmt.Sprint(effectiveSteps) + " (base " + fmt.Sprint(m.config.MaxSteps) + ")\n" + m.queueSummary() + "\nverification:\n" + verificationText
+	if exact, err := parseExactTurnCap(m.runOptions.maxSteps.Value()); err == nil && exact > 0 {
+		effectiveSteps = exact
+	}
+	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\neffort: " + m.effort.label() + "\nmax steps: " + fmt.Sprint(effectiveSteps) + " (base " + fmt.Sprint(m.config.MaxSteps) + ")\n" + m.runOptionsStatus() + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {
@@ -814,7 +827,48 @@ func (m Model) permissionsStatus() string {
 	if policy.Mode == "off" {
 		sandboxStatus = "off (approved commands run with the Gator user's host authority)"
 	}
-	return "writes: isolated run worktree only (apply_patch)\nreads: repository paths only\ncommands: required --verify argv run immediately; any other argv or shell command waits for y/enter (once), a (always this exact argv for this thread), or n (deny)\ncwd: isolated worktree\nsandbox: " + sandboxStatus + "\nnetwork: " + string(policy.Network) + "\nfilesystem: " + filesystem + "\nenvironment: " + environment + "\ncommands allowed without prompt:\n" + commands + "\nactive checkout: never edited by a normal run"
+	prefixes, _ := parseArgvLines(m.runOptions.prefixes.Value())
+	allowed, _ := parseArgvLines(m.runOptions.allowed.Value())
+	prefixText := "none"
+	if len(prefixes) > 0 {
+		prefixText = formatVerification(prefixes)
+	}
+	allowedText := "none"
+	if len(allowed) > 0 {
+		allowedText = formatVerification(allowed)
+	}
+	return "writes: isolated run worktree only (apply_patch)\nreads: repository paths only\ncommands: required --verify argv run immediately; literal prefixes and exact allow-command argv also run immediately; any other argv waits for y/enter (once), a (always this exact argv for this thread), or n (deny)\ncwd: isolated worktree\nsandbox: " + sandboxStatus + "\nnetwork: " + string(policy.Network) + "\nfilesystem: " + filesystem + "\nenvironment: " + environment + "\ncommands allowed without prompt:\n" + commands + "\nexact allow-command:\n" + allowedText + "\nliteral command prefixes:\n" + prefixText + "\nactive checkout: never edited by a normal run"
+}
+
+func (m Model) agentsStatus() string {
+	lines := []string{"Project profiles can only narrow sandbox, network, mode, turn cap, and tool families. Roles are prompt-only and never expand tools."}
+	profiles, err := instructions.ListProfiles(m.config.RepositoryPath)
+	if err != nil {
+		lines = append(lines, "Profiles: "+err.Error())
+	} else if len(profiles) == 0 {
+		lines = append(lines, "Profiles: none configured")
+	} else {
+		lines = append(lines, "Profiles:")
+		for _, profile := range profiles {
+			omit := "none"
+			if len(profile.Policy.Omit) > 0 {
+				omit = strings.Join(profile.Policy.Omit, ", ")
+			}
+			lines = append(lines, fmt.Sprintf("  %s  %s  omit=%s", profile.Name, profile.Description, omit))
+		}
+	}
+	roles, err := instructions.LoadRoles(m.config.RepositoryPath)
+	if err != nil {
+		lines = append(lines, "Roles: "+err.Error())
+	} else if len(roles) == 0 {
+		lines = append(lines, "Roles: none configured")
+	} else {
+		lines = append(lines, "Roles:")
+		for _, role := range roles {
+			lines = append(lines, fmt.Sprintf("  %s  %s  %s", role.Name, role.Kind, role.Description))
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func delegatedRuntimeForProvider(provider string) string {

@@ -173,6 +173,33 @@ func (s Set) NewManager() *Manager {
 	}
 }
 
+// ServerInspect is a process-start snapshot for one configured server. It
+// never contacts the language server.
+type ServerInspect struct {
+	Name     string
+	Language string
+	Started  bool
+}
+
+// Inspect copies configured servers and whether a client has already been
+// started. It must not call connect or Tools.
+func (m *Manager) Inspect() []ServerInspect {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]ServerInspect, 0, len(m.servers))
+	for _, specification := range m.servers {
+		result = append(result, ServerInspect{
+			Name:     specification.Name,
+			Language: specification.Language,
+			Started:  m.clients[specification.Name] != nil,
+		})
+	}
+	return result
+}
+
 // Tools returns this manager's read-only tool surface. An untrusted or empty
 // set has no model-visible tools.
 func (m *Manager) Tools(approve func(context.Context, string, string, string) error) []agent.Tool {
