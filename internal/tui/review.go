@@ -258,6 +258,8 @@ func (m Model) updateStructuredReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "y":
 		return m.openThreadTree(reviewScreen)
+	case "b":
+		return m.openReviewWeb()
 	case "x":
 		return m.openExtensionUI(reviewScreen)
 	case "n":
