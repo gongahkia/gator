@@ -31,6 +31,7 @@ func (m Model) extensionSlashCommands() []slashCommand {
 }
 
 var slashCommands = []slashCommand{
+	{name: "/agents", description: "list project profiles and prompt-only roles"},
 	{name: "/clear", description: "clear the current task"},
 	{name: "/clear-queue", description: "remove every queued instruction"},
 	{name: "/clone", description: "duplicate the active retained branch"},
@@ -38,6 +39,7 @@ var slashCommands = []slashCommand{
 	{name: "/copy", description: "copy the most recent Gator response"},
 	{name: "/copyall", description: "copy the full conversation transcript"},
 	{name: "/dequeue", description: "remove the next queued instruction"},
+	{name: "/doctor", description: "inspect local diagnostics without starting services"},
 	{name: "/effort", description: "choose Fast, Standard, Thorough, or Maximum investigation effort"},
 	{name: "/extensions", description: "open trusted extension cards for this surface"},
 	{name: "/help", description: "show Gator conversation commands"},
@@ -54,6 +56,7 @@ var slashCommands = []slashCommand{
 	{name: "/quit", description: "exit Gator"},
 	{name: "/queue", description: "show queued follow-up instructions"},
 	{name: "/review", description: "return to the latest review"},
+	{name: "/run", description: "edit advanced run options for the next native run"},
 	{name: "/status", description: "show current run configuration"},
 	{name: "/theme", description: "choose a terminal theme"},
 	{name: "/verify", description: "edit required verification commands"},

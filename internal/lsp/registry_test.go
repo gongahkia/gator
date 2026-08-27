@@ -123,6 +123,36 @@ func TestRegistryEvictsOldestIdleManagerAndRejectsActiveOverflow(t *testing.T) {
 	full.Close()
 }
 
+func TestRegistrySnapshotDoesNotCreateOrStartManagers(t *testing.T) {
+	registry := newRegistry(2)
+	if snapshot := registry.Snapshot(); len(snapshot) != 0 {
+		t.Fatalf("empty snapshot = %#v", snapshot)
+	}
+	if len(registry.entries) != 0 {
+		t.Fatalf("snapshot created entries: %#v", registry.entries)
+	}
+	set := registryTestSet(t, "idle")
+	manager := set.NewManager()
+	connects := 0
+	manager.connect = func(context.Context, workspace.Root, server) (client, error) {
+		connects++
+		return &fakeClient{}, nil
+	}
+	registry.entries[registryKey(set.root.Path(), set.configuredHash)] = &registryEntry{
+		root: set.root.Path(), hash: set.configuredHash, manager: manager,
+	}
+	snapshot := registry.Snapshot()
+	if len(snapshot) != 1 || snapshot[0].Hash != "idle" || len(snapshot[0].Servers) != 1 || snapshot[0].Servers[0].Started {
+		t.Fatalf("idle snapshot = %#v", snapshot)
+	}
+	if connects != 0 {
+		t.Fatalf("snapshot started %d language server(s)", connects)
+	}
+	if len(registry.entries) != 1 {
+		t.Fatalf("snapshot mutated entries: %#v", registry.entries)
+	}
+}
+
 func TestManagerSerializesRequestsOverSharedTransport(t *testing.T) {
 	connection := &serialClient{started: make(chan struct{}), unblock: make(chan struct{})}
 	manager := &Manager{

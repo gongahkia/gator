@@ -57,7 +57,8 @@ type Session struct {
 	AttachmentManifest  []AttachmentReference `json:"attachment_manifest,omitempty"`
 	ParentStatePath     string                `json:"parent_state_path,omitempty"`
 	ForkedFromStatePath string                `json:"forked_from_state_path,omitempty"`
-	AllowedCommands     [][]string            `json:"allowed_commands,omitempty"`
+	AllowedCommands        [][]string            `json:"allowed_commands,omitempty"`
+	AllowedCommandPrefixes [][]string            `json:"allowed_command_prefixes,omitempty"`
 }
 
 // AttachmentReference records only enough metadata to explain omitted binary

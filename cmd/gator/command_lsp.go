@@ -54,7 +54,10 @@ func lspCommand(arguments []string, out io.Writer) error {
 		if lspTrustFor(settings.LSPTrusts, repository) == digest {
 			state = "active"
 		}
-		_, err := fmt.Fprintf(out, "Project LSP servers: %s\n  hash: %s\n  state: %s\n", repository, digest, state)
+		if _, err := fmt.Fprintf(out, "Project LSP servers: %s\n  hash: %s\n  state: %s\n  session cache: none\n", repository, digest, state); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(out, "  Status never starts a language server. The first approved lookup starts one for a trusted hash.")
 		return err
 	case "trust":
 		if hashErr != nil {

@@ -63,14 +63,14 @@ package manager.
 | `config show` | `/status` and `/permissions` show only active session state | partial | No full, redacted settings inspector. |
 | `config set default-provider/default-model` | `/manage` saves the provider/model currently selected in `/model` after confirmation | complete | — |
 | `config set sandbox/network` | `/manage` shows and confirms strict/off sandbox and deny/allow network defaults; `/permissions` explains the effective policy | complete | — |
-| `agent list` | None | CLI only | Project-defined role inventory is not displayed. |
+| `agent list` | `/agents` lists profiles and prompt-only roles | complete | Profiles can only narrow policy; roles never expand tools. |
 | `child list/show/batches/batch` | `/manage` selects arbitrary retained runs and browses writer-child status, role, patch size, worktree, batch schedules, and path-conflict evidence | complete | — |
 | `hook status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes | complete | — |
-| `lsp status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes; runtime operations still require approval | complete | — |
-| `mcp status/trust/untrust/login/logout` | `/manage` shows configured hash/state and confirms trust changes | partial | OAuth login, authentication status, and credential removal remain CLI-only. |
+| `lsp status/trust/untrust` | `/manage` shows configured hash/state, idle session-cache status, and confirms trust changes; runtime operations still require approval | complete | Opening `/manage` inspects the cache without starting servers. |
+| `mcp status/trust/untrust/login/logout` | `/manage` shows configured hash/state, display-safe auth status, and confirms trust, loopback PKCE login, or credential removal | complete | Login stays unavailable until the current `.gator/mcp.json` hash is trusted. |
 | `worktree list/prune/remove` | `/manage` lists retained worktrees and confirms metadata pruning or deletion | complete | — |
 | `extension list/status` | `/manage` shows installed extension metadata/state; `/extensions` renders trusted static cards | complete | — |
-| `extension install/enable/disable/remove/trust/untrust` | `/manage` confirms enable/disable, removal, and project trust changes | partial | Source installation remains CLI-only so URL/path entry and replacement stay explicit. |
+| `extension install/enable/disable/remove/trust/untrust` | `/manage` stages a local directory or HTTPS Git source, reviews the hash, and commits those exact bytes after confirmation | complete | TUI install rejects SSH/`git@`/plain HTTP. CLI may still clone those sources. |
 | `provider list` | `/model` lists configured custom-provider models and shows endpoint/credential-source status | complete | — |
 | `provider add/discover/remove` | `/model` creates and edits custom Chat Completions providers, previews `/models`, and confirms catalog replacement or removal | complete | CLI remains preferable for scripts. Discovery still requires an explicit apply step. |
 | `local list/status` | `/model` Local section | complete | The CLI remains preferable for scripts and textual diagnostics. |
@@ -85,15 +85,15 @@ package manager.
 | `delegate codex/copilot/claude/kimi run` | `/model` selects the matching harness; send a task to run it in an isolated worktree | partial | Login options and exact one-shot CLI flags are absent. |
 | `delegate opencode login/status/run` | None | CLI only | No OpenCode harness management surface. |
 | `delegate external run` | None | CLI only | Arbitrary command execution belongs to the explicit CLI boundary. |
-| `doctor [--provider]` | Local-model status includes host and dependency advice | partial | No full provider, sandbox, Git, web-search, and dependency diagnostic report. |
+| `doctor [--provider]` | `/doctor` reports Git, provider auth kind/status, sandbox availability, web search, dependencies, and local models | complete | Inspect-only: it never starts Ollama, OAuth, or mutates configuration. |
 | `run` basic task | Composer, model selection, verifier editor, plan/execute mode, approvals, and review | complete | — |
 | `run --provider/--model/--base-url` | Runtime drawer and `/model` configuration | partial | Endpoint override is persistent rather than an explicit one-run field. |
 | `run --image/--attach` | `@` path references, preview, and confirmation | complete | — |
-| `run --max-steps` | `/effort` controls bounded turn budgets | partial | No exact integer turn-cap input. |
+| `run --max-steps` | `/effort` plus `/run` exact turn cap | complete | An exact cap overrides `/effort` for that run. |
 | `run --sandbox/--network` | `/manage` persists sandbox/network defaults; `/permissions` reports the effective policy | partial | One-run `--sandbox`/`--network` overrides remain CLI-only. |
-| `run --base/--copy-ignored/--setup` | None | CLI only | These alter worktree construction and require explicit advanced controls. |
-| `run --scope/--profile/--scout` | `@` references constrain context paths | partial | No explicit scope list, profile picker, or scout assignment editor. |
-| `run --allow-command/--trust-commands` | Per-command approval in TUI | partial | No pre-approved argv list or unsafe whole-run auto-approve switch. |
+| `run --base/--copy-ignored/--setup` | `/run` edits these for new worktrees; setup and copy-ignored require confirmation | complete | Hidden on resume/fork. Setup is Execute-only. |
+| `run --scope/--profile/--scout` | `@` references plus `/run` extra scopes, profile picker, and ≤4 scouts | complete | Profiles can only narrow policy. |
+| `run --allow-command/--trust-commands` | Per-command approval plus `/run` exact argv and literal-token prefixes | partial | `--trust-commands` remains CLI-only and is not a TUI toggle. |
 | `resume` | `/recent`, `Ctrl+O`, all-repository toggle, then compose a continuation | partial | No path/ID text target, exact max-step input, or direct noninteractive continuation. |
 | `fork` | `/tree` and `/fork` choose a retained turn | partial | No direct ID/path, exact max steps, or noninteractive instruction flags. |
 | `clone` | `/clone` clones the active retained branch | partial | No arbitrary-turn picker, direct ID/path, exact max steps, or noninteractive instruction flags. |
@@ -117,28 +117,31 @@ defines the next bounded iteration rather than implying broad parity.
    network. Security-relaxing changes explain their effect and save only after
    confirmation.
 3. **Project integration trust center** — implemented in `/manage` for status,
-   exact manifest hash, trust, and untrust for hooks, LSP, MCP, and project
-   extensions. MCP OAuth setup remains CLI-only and retains the trusted-
-   manifest precondition.
+   exact manifest    hash, trust, and untrust for hooks, LSP, MCP, and project
+   extensions. MCP OAuth login is available from the mcp auth tab after the
+   current manifest hash is trusted.
 4. **Custom provider manager** — implemented in `/model` for ID, Chat
    Completions URL, model list/default, optional API-key environment variable
    name, two-step `/models` discovery, and confirmed removal. API keys are
    never written to `config.json`.
-5. **Extension manager** — `/manage` now provides inventory, enable/disable,
-   removal confirmation, and project trust review. Install path/URL input is
-   still CLI-only and must preserve bounded source validation.
+5. **Extension manager** — `/manage` stages a local directory or HTTPS Git
+   source, shows the staged hash, and publishes those exact bytes only after
+   confirmation. Enable/disable, removal, and project trust remain confirmed
+   actions.
 6. **Retained-artifact/worktree manager** — `/manage` now selects arbitrary
    repository run records, scopes writer-child browsing to the selection,
    writes private transcript/patch exports, performs clean-checkout
    compatibility checks, confirms apply, manages worktree prune/remove, and
    displays writer-batch path-conflict evidence.
-7. **Advanced run editor** — exact turn cap, base revision, setup commands,
-   copy-ignored opt-in, scopes, agent profile, scout assignments, and explicit
-   pre-approved argv. Each option needs a safety explanation; `trust-commands`
-   should not be made a casual toggle.
-8. **Diagnostics and vendor harnesses** — full Doctor report and OpenCode
-   harness login/status/run controls. Keep `rpc`, `acp`, and `serve` as CLI
-   contracts even if the TUI later offers status/help links for them.
+7. **Advanced run editor** — `/run` edits exact turn cap, base revision,
+   setup argv, copy-ignored opt-in, extra scopes, a narrowing profile,
+   bounded scouts, exact allow-command argv, and literal-token prefixes.
+   Setup and copy-ignored require confirmation. `--trust-commands`,
+   sandbox-off, and network-allow are not TUI toggles.
+8. **Diagnostics and vendor harnesses** — `/doctor` is a get-only local
+   report. OpenCode harness login/status/run remains CLI-only. Keep `rpc`,
+   `acp`, and `serve` as CLI contracts even if the TUI later offers
+   status/help links for them.
 
 ## Deliberate boundaries
 

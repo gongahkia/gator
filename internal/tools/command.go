@@ -95,6 +95,7 @@ func (m *CommandMemory) Snapshot() [][]string {
 // host access requires a deliberate run-level capability grant.
 type CommandPolicy struct {
 	Allowed        [][]string
+	Prefixes       [][]string
 	Remembered     *CommandMemory
 	Approve        func(context.Context, []string) (CommandDecision, error)
 	OnEvent        agent.EventSink
@@ -163,7 +164,7 @@ func (t RunCommand) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 }
 
 func (t RunCommand) autoAllowed(argv []string) bool {
-	return allowed(t.Policy.Allowed, argv) || t.Policy.Remembered.Allows(argv)
+	return allowed(t.Policy.Allowed, argv) || t.Policy.Remembered.Allows(argv) || PrefixAllows(t.Policy.Prefixes, argv)
 }
 
 func (t RunCommand) approve(ctx context.Context, argv []string) error {

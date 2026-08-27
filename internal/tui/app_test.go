@@ -2612,7 +2612,7 @@ func TestManagementApplyRequiresSuccessfulCheckAndSeparateConfirmation(t *testin
 	model = next.(Model)
 	next, _ = model.Update(command())
 	model = next.(Model)
-	for range 2 {
+	for range 3 {
 		next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
 		model = next.(Model)
 	}
@@ -2657,7 +2657,7 @@ func TestManagementRefreshClearsCompatibilityCheck(t *testing.T) {
 	model = next.(Model)
 	next, _ = model.Update(command())
 	model = next.(Model)
-	for range 2 {
+	for range 3 {
 		next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
 		model = next.(Model)
 	}
@@ -2684,6 +2684,189 @@ func TestManagementRefreshClearsCompatibilityCheck(t *testing.T) {
 	}
 }
 
+func openManagementMCPAuth(t *testing.T, backend *fakeManagementBackend) Model {
+	t.Helper()
+	model := New(Config{Management: backend})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/manage")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("open management did not load a snapshot")
+	}
+	next, _ = model.Update(command())
+	model = next.(Model)
+	for range 2 {
+		next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
+		model = next.(Model)
+	}
+	if model.management.section != managementMCPAuth {
+		t.Fatalf("section = %d, want MCP auth", model.management.section)
+	}
+	return model
+}
+
+func TestManagementMCPLoginRequiresTrustedManifestBeforeAuthorizationURL(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		MCPAuth: []ManagedMCPAuth{{Server: "docs", BundleTrusted: false}},
+	}}
+	model := openManagementMCPAuth(t, backend)
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	model = next.(Model)
+	if command != nil || len(backend.mcpLogins) != 0 {
+		t.Fatalf("untrusted login started: command=%v logins=%#v", command, backend.mcpLogins)
+	}
+	if model.oauthLogin != nil || model.management.mcpLoginURL != "" {
+		t.Fatalf("untrusted login exposed a URL: %q", model.management.mcpLoginURL)
+	}
+	if view := model.View(); !strings.Contains(view, "Trust the current .gator/mcp.json hash") {
+		t.Fatalf("untrusted login view = %q", view)
+	}
+}
+
+func TestManagementMCPLoginShowsURLOnlyAfterTrustAndStoresOnCompletion(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		MCPAuth: []ManagedMCPAuth{{Server: "docs", BundleTrusted: true}},
+	}}
+	model := openManagementMCPAuth(t, backend)
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	model = next.(Model)
+	if command == nil || len(backend.mcpLogins) != 1 || backend.mcpLogins[0] != "docs" {
+		t.Fatalf("trusted login = command:%v logins:%#v", command, backend.mcpLogins)
+	}
+	view := model.View()
+	if !strings.Contains(view, "https://authorization.example/authorize?server=docs") {
+		t.Fatalf("authorization URL missing from view: %q", view)
+	}
+	next, refresh := model.Update(command())
+	model = next.(Model)
+	if !backend.mcpLoginStarted.completed {
+		t.Fatal("login did not complete through the backend flow")
+	}
+	if model.oauthLogin != nil || model.management.mcpLoginURL != "" {
+		t.Fatalf("completed login left state: login=%v url=%q", model.oauthLogin, model.management.mcpLoginURL)
+	}
+	if refresh == nil {
+		t.Fatal("completed login did not refresh authorization state")
+	}
+}
+
+func TestManagementMCPCredentialRemovalRequiresConfirmation(t *testing.T) {
+	backend := &fakeManagementBackend{snapshot: ManagementSnapshot{
+		MCPAuth: []ManagedMCPAuth{{Server: "docs", Authenticated: true, BundleTrusted: true}},
+	}}
+	model := openManagementMCPAuth(t, backend)
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model = next.(Model)
+	if model.management.confirm == nil || len(backend.mcpRemovals) != 0 {
+		t.Fatalf("removal before confirmation = confirm:%#v removals:%#v", model.management.confirm, backend.mcpRemovals)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	model = next.(Model)
+	if len(backend.mcpRemovals) != 0 {
+		t.Fatalf("cancelled removal ran: %#v", backend.mcpRemovals)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model = next.(Model)
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("confirmed removal did not start")
+	}
+	next, _ = model.Update(command())
+	if got, want := backend.mcpRemovals, []string{"docs"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("removals = %#v, want %#v", got, want)
+	}
+}
+
+func openManagementExtensions(t *testing.T, backend *fakeManagementBackend) Model {
+	t.Helper()
+	model := New(Config{Management: backend})
+	model.width, model.height = 100, 40
+	model.task.SetValue("/manage")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	model = next.(Model)
+	for range 6 {
+		next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRight})
+		model = next.(Model)
+	}
+	if model.management.section != managementExtensions {
+		t.Fatalf("section = %d, want extensions", model.management.section)
+	}
+	return model
+}
+
+func TestManagementExtensionInstallRejectsSSHAndHTTPBeforePrepare(t *testing.T) {
+	backend := &fakeManagementBackend{}
+	model := openManagementExtensions(t, backend)
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	model = next.(Model)
+	if model.management.installSource == nil {
+		t.Fatal("install did not open source entry")
+	}
+	model.management.installSource.SetValue("git@example.com:team/ext.git")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if command != nil || len(backend.preparedSources) != 0 {
+		t.Fatalf("ssh source reached prepare: command=%v sources=%#v", command, backend.preparedSources)
+	}
+	model.management.installSource.SetValue("http://example.com/ext.git")
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if command != nil || len(backend.preparedSources) != 0 {
+		t.Fatalf("http source reached prepare: command=%v sources=%#v", command, backend.preparedSources)
+	}
+}
+
+func TestManagementExtensionInstallCommitsReviewedHashAndDiscardsOnCancel(t *testing.T) {
+	source := t.TempDir()
+	backend := &fakeManagementBackend{
+		preparePreview: ExtensionInstallPreview{Token: ".prepare-test", ID: "review-helper", Name: "Review helper", Hash: "abc123", Tools: 2},
+	}
+	model := openManagementExtensions(t, backend)
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	model = next.(Model)
+	model.management.installSource.SetValue(source)
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("valid local source did not start prepare")
+	}
+	next, _ = model.Update(command())
+	model = next.(Model)
+	if model.management.confirm == nil || !strings.Contains(model.management.confirm.label, "abc123") || !strings.Contains(model.View(), "tools=2") {
+		t.Fatalf("preview confirm = %#v view=%q", model.management.confirm, model.View())
+	}
+	if len(backend.committed) != 0 {
+		t.Fatalf("prepare committed: %#v", backend.committed)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	model = next.(Model)
+	if len(backend.committed) != 0 || !reflect.DeepEqual(backend.discarded, []string{".prepare-test"}) {
+		t.Fatalf("cancel commit=%#v discard=%#v", backend.committed, backend.discarded)
+	}
+
+	backend.discarded = nil
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	model = next.(Model)
+	model.management.installSource.SetValue(source)
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	next, _ = model.Update(command())
+	model = next.(Model)
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("confirmed install did not start")
+	}
+	next, _ = model.Update(command())
+	if got, want := backend.committed, []string{".prepare-test:abc123:false"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("committed = %#v, want %#v", got, want)
+	}
+}
+
 func TestManagementShowsWriterBatchConflictEvidence(t *testing.T) {
 	model := New(Config{})
 	model.width, model.height = 100, 40
@@ -2702,10 +2885,19 @@ func TestManagementShowsWriterBatchConflictEvidence(t *testing.T) {
 }
 
 type fakeManagementBackend struct {
-	snapshot      ManagementSnapshot
-	trustChanges  []string
-	policyChanges []string
-	applied       []string
+	snapshot        ManagementSnapshot
+	trustChanges    []string
+	policyChanges   []string
+	applied         []string
+	mcpLogins       []string
+	mcpRemovals     []string
+	mcpLoginErr     error
+	mcpLoginStarted *stubOAuthLogin
+	preparedSources []string
+	preparePreview  ExtensionInstallPreview
+	prepareErr      error
+	committed       []string
+	discarded       []string
 }
 
 func (backend *fakeManagementBackend) Snapshot(string) (ManagementSnapshot, error) {
@@ -2724,8 +2916,28 @@ func (backend *fakeManagementBackend) SetExecutionPolicy(mode, network string) e
 func (*fakeManagementBackend) SetDefaults(string, string) error       { return nil }
 func (*fakeManagementBackend) SetExtensionEnabled(string, bool) error { return nil }
 func (*fakeManagementBackend) RemoveExtension(string) error           { return nil }
-func (*fakeManagementBackend) PruneWorktrees() error                  { return nil }
-func (*fakeManagementBackend) RemoveWorktree(string) error            { return nil }
+func (backend *fakeManagementBackend) PrepareExtension(source string) (ExtensionInstallPreview, error) {
+	backend.preparedSources = append(backend.preparedSources, source)
+	if backend.prepareErr != nil {
+		return ExtensionInstallPreview{}, backend.prepareErr
+	}
+	preview := backend.preparePreview
+	if preview.Token == "" {
+		preview = ExtensionInstallPreview{Token: ".prepare-test", Source: source, ID: "review-helper", Name: "Review helper", Hash: "abc123", Tools: 2}
+	}
+	preview.Source = source
+	return preview, nil
+}
+func (backend *fakeManagementBackend) CommitExtensionInstall(token, hash string, replace bool) error {
+	backend.committed = append(backend.committed, fmt.Sprintf("%s:%s:%t", token, hash, replace))
+	return nil
+}
+func (backend *fakeManagementBackend) DiscardExtensionPrepare(token string) error {
+	backend.discarded = append(backend.discarded, token)
+	return nil
+}
+func (*fakeManagementBackend) PruneWorktrees() error       { return nil }
+func (*fakeManagementBackend) RemoveWorktree(string) error { return nil }
 func (*fakeManagementBackend) ExportArtifact(string, string) (string, error) {
 	return "/tmp/export", nil
 }
@@ -2733,4 +2945,118 @@ func (*fakeManagementBackend) CheckPatch(string) (int, error) { return 42, nil }
 func (backend *fakeManagementBackend) ApplyPatch(run string) (int, error) {
 	backend.applied = append(backend.applied, run)
 	return 42, nil
+}
+
+func (backend *fakeManagementBackend) BeginMCPOAuthLogin(server string) (OAuthLogin, error) {
+	backend.mcpLogins = append(backend.mcpLogins, server)
+	if backend.mcpLoginErr != nil {
+		return nil, backend.mcpLoginErr
+	}
+	login := &stubOAuthLogin{url: "https://authorization.example/authorize?server=" + server}
+	backend.mcpLoginStarted = login
+	return login, nil
+}
+
+func (backend *fakeManagementBackend) RemoveMCPCredential(server string) error {
+	backend.mcpRemovals = append(backend.mcpRemovals, server)
+	return nil
+}
+
+type stubOAuthLogin struct {
+	url       string
+	completed bool
+	cancelled bool
+}
+
+func (login *stubOAuthLogin) URL() string { return login.url }
+
+func (login *stubOAuthLogin) Complete(context.Context) error {
+	login.completed = true
+	return nil
+}
+
+func (login *stubOAuthLogin) Cancel() { login.cancelled = true }
+
+func TestDoctorScreenIsInspectOnlyAndOmitsSecrets(t *testing.T) {
+	backend := &fakeDoctorBackend{snapshot: DoctorSnapshot{
+		Provider: "openai", AuthKind: "Gator credential", AuthStatus: "stored",
+		Sandbox: "available", WebSearchStatus: "configured (requires --network allow)",
+		SuggestedVerify:  []string{"go test ./..."},
+		EffectiveSandbox: "strict", EffectiveNetwork: "deny",
+	}}
+	model := New(Config{Doctor: backend})
+	model.width, model.height = 100, 40
+	model.provider.SetValue("openai")
+	model.task.SetValue("/doctor")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if command == nil {
+		t.Fatal("doctor did not load a snapshot")
+	}
+	next, _ = model.Update(command())
+	model = next.(Model)
+	if model.screen != doctorScreen || backend.calls != 1 {
+		t.Fatalf("doctor screen=%d calls=%d", model.screen, backend.calls)
+	}
+	view := model.View()
+	if strings.Contains(view, "sk-") || strings.Contains(view, "secret") {
+		t.Fatalf("doctor view leaked a secret: %q", view)
+	}
+	if !strings.Contains(view, "Inspect-only") && !strings.Contains(model.notice.text, "Inspect-only") {
+		t.Fatalf("doctor missing inspect-only notice: %q", view)
+	}
+	if !strings.Contains(view, "go test ./...") {
+		t.Fatalf("doctor view missing suggested verify: %q", view)
+	}
+}
+
+func TestRunEditorRejectsShellPrefixAndRequiresCopyIgnoredConfirm(t *testing.T) {
+	model := New(Config{})
+	model.width, model.height = 120, 48
+	model.task.SetValue("/run")
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.screen != runOptionsScreen {
+		t.Fatalf("run options screen = %d", model.screen)
+	}
+	model.runOptions.prefixes.SetValue("bash -lc echo")
+	model.refreshPreflight()
+	if len(model.collectRunOptionIssues()) == 0 {
+		t.Fatal("shell prefix was accepted")
+	}
+	model.runOptions.prefixes.SetValue("go test")
+	if issues := model.collectRunOptionIssues(); len(issues) != 0 {
+		t.Fatalf("literal prefix rejected: %v", issues)
+	}
+	model.runOptions.field = runFieldCopyIgnored
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	model = next.(Model)
+	if !model.runOptions.copyIgnored || model.runOptions.copyIgnoredAck || model.runOptions.confirm != "copy-ignored" {
+		t.Fatalf("copy-ignored confirm = %#v", model.runOptions)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = next.(Model)
+	model.runOptions.copyIgnored = true
+	model.runOptions.copyIgnoredAck = false
+	model.config.NewExecutor = func(string, string, string) (gatorrun.Executor, error) {
+		return gatorrun.Executor{}, nil
+	}
+	model.screen = composeScreen
+	model.task.SetValue("implement the feature")
+	model.verification.SetValue("go test ./...")
+	next, _ = model.startRun()
+	model = next.(Model)
+	if model.screen != runOptionsScreen || model.runOptions.confirm != "copy-ignored" {
+		t.Fatalf("start without ack = screen %d confirm %q notice %q", model.screen, model.runOptions.confirm, model.notice.text)
+	}
+}
+
+type fakeDoctorBackend struct {
+	snapshot DoctorSnapshot
+	calls    int
+}
+
+func (backend *fakeDoctorBackend) Snapshot(string) (DoctorSnapshot, error) {
+	backend.calls++
+	return backend.snapshot, nil
 }

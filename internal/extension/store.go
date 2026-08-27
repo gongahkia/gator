@@ -178,6 +178,217 @@ func (s Store) InstallSource(ctx context.Context, source string, replace bool) (
 	return s.Install(checkout, replace)
 }
 
+// Prepared is display-safe metadata for a staged, not-yet-installed bundle.
+// It deliberately omits the staging path, file list, and prompt bodies: the
+// hash is the object a reviewer confirms, not untrusted bundle text.
+type Prepared struct {
+	Token            string
+	ID               string
+	Name             string
+	Description      string
+	Hash             string
+	Skills           int
+	Prompts          int
+	Commands         int
+	UI               int
+	Tools            int
+	AlreadyInstalled bool
+}
+
+const preparedPrefix = ".prepare-"
+
+// PrepareSource snapshots a local directory or clones an HTTPS/SSH Git source
+// exactly once into a private staging directory and validates it. Nothing is
+// published and no configuration changes until CommitPrepared runs with the
+// reviewed hash, so the bytes a developer approves are the bytes installed.
+func (s Store) PrepareSource(ctx context.Context, source string) (Prepared, error) {
+	if strings.TrimSpace(s.path) == "" {
+		return Prepared{}, errors.New("extension store is not initialized")
+	}
+	if err := os.MkdirAll(s.path, 0o700); err != nil {
+		return Prepared{}, fmt.Errorf("create extension store: %w", err)
+	}
+	staging, err := os.MkdirTemp(s.path, preparedPrefix)
+	if err != nil {
+		return Prepared{}, fmt.Errorf("create extension staging directory: %w", err)
+	}
+	published := false
+	defer func() {
+		if !published {
+			_ = os.RemoveAll(staging)
+		}
+	}()
+	if err := os.Chmod(staging, 0o700); err != nil {
+		return Prepared{}, fmt.Errorf("secure extension staging directory: %w", err)
+	}
+	root, err := s.materializeSource(ctx, source, staging)
+	if err != nil {
+		return Prepared{}, err
+	}
+	candidate, err := load(root, false)
+	if err != nil {
+		return Prepared{}, err
+	}
+	installed := false
+	if _, err := os.Lstat(filepath.Join(s.path, candidate.Manifest.ID)); err == nil {
+		installed = true
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return Prepared{}, fmt.Errorf("inspect installed extension: %w", err)
+	}
+	published = true
+	return Prepared{
+		Token:            filepath.Base(staging),
+		ID:               candidate.Manifest.ID,
+		Name:             candidate.Manifest.Name,
+		Description:      candidate.Manifest.Description,
+		Hash:             candidate.Hash,
+		Skills:           len(candidate.Manifest.Skills),
+		Prompts:          len(candidate.Manifest.Prompts),
+		Commands:         len(candidate.Manifest.Commands),
+		UI:               len(candidate.Manifest.UI),
+		Tools:            len(candidate.Manifest.Tools),
+		AlreadyInstalled: installed,
+	}, nil
+}
+
+// materializeSource copies a local bundle or clones a remote repository into
+// staging exactly once. The returned root is the validated bundle directory.
+func (s Store) materializeSource(ctx context.Context, source, staging string) (string, error) {
+	bundle := filepath.Join(staging, "bundle")
+	info, err := os.Stat(source)
+	if err == nil {
+		if !info.IsDir() {
+			return "", errors.New("extension source must be a directory or Git repository URL")
+		}
+		local, err := os.Lstat(source)
+		if err != nil {
+			return "", fmt.Errorf("stat extension source: %w", err)
+		}
+		if !local.IsDir() || local.Mode()&os.ModeSymlink != 0 {
+			return "", errors.New("extension source must be a real directory")
+		}
+		absolute, err := filepath.Abs(source)
+		if err != nil {
+			return "", fmt.Errorf("resolve extension source: %w", err)
+		}
+		if err := os.MkdirAll(bundle, 0o700); err != nil {
+			return "", fmt.Errorf("create extension staging directory: %w", err)
+		}
+		if err := copyTree(absolute, bundle); err != nil {
+			return "", err
+		}
+		return bundle, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("inspect extension source: %w", err)
+	}
+	if !validGitSource(source) {
+		return "", errors.New("extension source must be a local directory or an https, ssh, or git@ repository URL")
+	}
+	checkout := filepath.Join(staging, "checkout")
+	command := exec.CommandContext(ctx, "git", "clone", "--depth", "1", "--", source, checkout)
+	if output, err := command.CombinedOutput(); err != nil {
+		if message := strings.TrimSpace(string(output)); message != "" {
+			return "", fmt.Errorf("clone extension source: %s", message)
+		}
+		return "", fmt.Errorf("clone extension source: %w", err)
+	}
+	if err := os.MkdirAll(bundle, 0o700); err != nil {
+		return "", fmt.Errorf("create extension staging directory: %w", err)
+	}
+	if err := copyTree(checkout, bundle); err != nil {
+		return "", err
+	}
+	if err := os.RemoveAll(checkout); err != nil {
+		return "", fmt.Errorf("discard extension clone: %w", err)
+	}
+	return bundle, nil
+}
+
+// CommitPrepared publishes exactly the staged bytes whose hash was reviewed.
+// It re-reads and re-hashes the staging directory, so a bundle mutated after
+// review, or a source that changed between preparation and confirmation, can
+// never be installed under an approved hash.
+func (s Store) CommitPrepared(token, expectedHash string, replace bool) (Installed, error) {
+	staging, err := s.preparedPath(token)
+	if err != nil {
+		return Installed{}, err
+	}
+	expectedHash = strings.TrimSpace(expectedHash)
+	if expectedHash == "" {
+		return Installed{}, errors.New("commit requires the reviewed extension bundle hash")
+	}
+	candidate, err := load(filepath.Join(staging, "bundle"), false)
+	if err != nil {
+		return Installed{}, err
+	}
+	if candidate.Hash != expectedHash {
+		_ = os.RemoveAll(staging)
+		return Installed{}, errors.New("staged extension no longer matches the reviewed bundle hash")
+	}
+	target := filepath.Join(s.path, candidate.Manifest.ID)
+	if _, err := os.Lstat(target); err == nil {
+		if !replace {
+			return Installed{}, fmt.Errorf("extension %q is already installed; confirm replacement to overwrite it", candidate.Manifest.ID)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return Installed{}, fmt.Errorf("inspect installed extension: %w", err)
+	}
+	if replace {
+		if err := os.RemoveAll(target); err != nil {
+			return Installed{}, fmt.Errorf("replace extension %q: %w", candidate.Manifest.ID, err)
+		}
+	}
+	if err := os.Rename(filepath.Join(staging, "bundle"), target); err != nil {
+		return Installed{}, fmt.Errorf("publish extension %q: %w", candidate.Manifest.ID, err)
+	}
+	if err := os.RemoveAll(staging); err != nil {
+		return Installed{}, fmt.Errorf("discard extension staging directory: %w", err)
+	}
+	published, err := load(target, false)
+	if err != nil {
+		return Installed{}, err
+	}
+	if published.Hash != expectedHash {
+		return Installed{}, errors.New("published extension does not match the reviewed bundle hash")
+	}
+	return published, nil
+}
+
+// DiscardPrepared removes one staged bundle. Cancelling a review, navigating
+// away, and shutting the session down all discard staged executable code.
+func (s Store) DiscardPrepared(token string) error {
+	staging, err := s.preparedPath(token)
+	if err != nil {
+		return err
+	}
+	if err := os.RemoveAll(staging); err != nil {
+		return fmt.Errorf("discard extension staging directory: %w", err)
+	}
+	return nil
+}
+
+func (s Store) preparedPath(token string) (string, error) {
+	if strings.TrimSpace(s.path) == "" {
+		return "", errors.New("extension store is not initialized")
+	}
+	if !strings.HasPrefix(token, preparedPrefix) || token != filepath.Base(token) || strings.ContainsAny(token, `/\`) {
+		return "", errors.New("invalid staged extension token")
+	}
+	staging := filepath.Join(s.path, token)
+	info, err := os.Lstat(staging)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", errors.New("staged extension is no longer available; prepare the source again")
+	}
+	if err != nil {
+		return "", fmt.Errorf("inspect staged extension: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("staged extension must be a real directory")
+	}
+	return staging, nil
+}
+
 func validGitSource(value string) bool {
 	value = strings.TrimSpace(value)
 	if value == "" || strings.HasPrefix(value, "-") {

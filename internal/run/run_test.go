@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
@@ -262,6 +263,62 @@ func TestExecutorRunsReadOnlyPlanTurnAndSavesThread(t *testing.T) {
 	}
 	if thread.HeadStatePath != outcome.StatePath || thread.TurnCount != 1 {
 		t.Fatalf("saved thread = %#v", thread)
+	}
+}
+
+func TestExecutorProfileOmitSkipsLSPAcquireAndCommandTools(t *testing.T) {
+	repository := featureRepository(t)
+	writeFile(t, repository, ".gator/diagnostic-server", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(repository, ".gator", "diagnostic-server"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, repository, ".gator/lsp.json", `{"version":1,"servers":[{"name":"fixture","command":[".gator/diagnostic-server"],"language":"go"}]}`)
+	writeFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "profiles": [{"name":"reviewer","instructions":"review only","policy":{"mode":"plan","omit":["lsp","run_command","apply_patch","delegate_readonly"]}}]
+}`)
+	runGit(t, repository, "add", ".gator")
+	runGit(t, repository, "-c", "user.name=Gator Test", "-c", "user.email=gator@example.invalid", "commit", "--quiet", "-m", "agents")
+	digest, err := lsp.BundleHash(repository)
+	if err != nil {
+		t.Fatalf("hash LSP bundle: %v", err)
+	}
+	registry := lsp.NewRegistry()
+	t.Cleanup(registry.Close)
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "Review complete."},
+	}}
+	outcome, err := (Executor{
+		Model:     model,
+		LSPTrusts: []lsp.Trust{{Repository: repository, Hash: digest}},
+	}).Execute(context.Background(), Request{
+		RepositoryPath: repository,
+		Task:           "Review the fixture",
+		Provider:       "test",
+		Model:          "test-model",
+		RunID:          "omit-lsp-001",
+		MaxSteps:       4,
+		StateDir:       t.TempDir(),
+		Profile:        "reviewer",
+		LSPRegistry:    registry,
+	})
+	if err != nil {
+		t.Fatalf("execute omit profile: %v", err)
+	}
+	if outcome.Result.FinalText == "" {
+		t.Fatalf("omit profile outcome = %#v", outcome)
+	}
+	if len(registry.Snapshot()) != 0 {
+		t.Fatalf("omit lsp acquired session cache: %#v", registry.Snapshot())
+	}
+	if hasTool(model.requests[0].Tools, "run_command") || hasTool(model.requests[0].Tools, "apply_patch") || hasTool(model.requests[0].Tools, "delegate_readonly") {
+		t.Fatalf("omitted tools still present: %#v", model.requests[0].Tools)
+	}
+	for _, tool := range model.requests[0].Tools {
+		if strings.HasPrefix(tool.Name, "lsp_") {
+			t.Fatalf("lsp tool present after omit: %s", tool.Name)
+		}
 	}
 }
 

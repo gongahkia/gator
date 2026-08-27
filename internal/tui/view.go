@@ -78,6 +78,13 @@ func (m *Model) resizeInputs() {
 	m.provider.Width = width
 	m.model.Width = width
 	m.terminalInput.Width = width
+	m.runOptions.maxSteps.Width = width
+	m.runOptions.baseRef.Width = width
+	m.runOptions.setup.SetWidth(width)
+	m.runOptions.scopes.SetWidth(width)
+	m.runOptions.scouts.SetWidth(width)
+	m.runOptions.allowed.SetWidth(width)
+	m.runOptions.prefixes.SetWidth(width)
 
 	switch {
 	case m.height < 20:
@@ -129,6 +136,10 @@ func (m Model) View() string {
 		view = m.localModelsView()
 	case managementScreen:
 		view = m.managementView()
+	case doctorScreen:
+		view = m.doctorView()
+	case runOptionsScreen:
+		view = m.runOptionsView()
 	default:
 		return ""
 	}
@@ -860,7 +871,9 @@ func (m Model) helpView() string {
 			"Recent picker: a toggles current repository / all repositories",
 			"/tree  view the retained linear turn lineage",
 			"PgUp / PgDn  browse the conversation",
-			"?  open the / command menu from an empty task",
+			"/run  edit advanced run options",
+			"/doctor  inspect local diagnostics",
+			"/agents  list narrowing profiles and prompt-only roles",
 			"@  begin a repository-path reference",
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
 			"Tab  complete a command or insert a path; Enter runs a command",

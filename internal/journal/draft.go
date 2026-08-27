@@ -14,13 +14,25 @@ import (
 // It intentionally contains no provider credentials, tool outputs, or source
 // content. Repository context references remain part of the task text only.
 type Draft struct {
-	Version      int       `json:"version"`
-	Repository   string    `json:"repository"`
-	Task         string    `json:"task"`
-	Verification string    `json:"verification"`
-	Provider     string    `json:"provider"`
-	Model        string    `json:"model"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Version         int       `json:"version"`
+	Repository      string    `json:"repository"`
+	Task            string    `json:"task"`
+	Verification    string    `json:"verification"`
+	Provider        string    `json:"provider"`
+	Model           string    `json:"model"`
+	MaxSteps        int       `json:"max_steps,omitempty"`
+	BaseRef         string    `json:"base_ref,omitempty"`
+	BaseURL         string    `json:"base_url,omitempty"`
+	Sandbox         string    `json:"sandbox,omitempty"`
+	Network         string    `json:"network,omitempty"`
+	Setup           string    `json:"setup,omitempty"`
+	CopyIgnored     bool      `json:"copy_ignored,omitempty"`
+	Scopes          string    `json:"scopes,omitempty"`
+	Profile         string    `json:"profile,omitempty"`
+	Scouts          string    `json:"scouts,omitempty"`
+	AllowedCommands string    `json:"allowed_commands,omitempty"`
+	CommandPrefixes string    `json:"command_prefixes,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 const draftVersion = 1

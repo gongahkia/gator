@@ -312,6 +312,101 @@ func ListRecentThreads(stateDir, repository string, limit int) ([]RecentThread, 
 	return threads, nil
 }
 
+const retainedTargetLimit = 1_000
+
+// LooksLikeRunRecordPath reports whether target is a filesystem path rather
+// than a thread ID. Thread IDs are single path elements without separators.
+func LooksLikeRunRecordPath(target string) bool {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return false
+	}
+	if filepath.IsAbs(target) || strings.ContainsRune(target, filepath.Separator) {
+		return true
+	}
+	info, err := os.Stat(target)
+	return err == nil && info.IsDir()
+}
+
+// ResolveRetainedTarget maps a thread ID, ID prefix, or run-record directory
+// to one available retained thread. all searches every repository under the
+// state directory; otherwise only repository is considered.
+func ResolveRetainedTarget(stateDir, repository, target string, all bool) (RecentThread, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return RecentThread{}, errors.New("retained thread ID or run record path is required")
+	}
+	if LooksLikeRunRecordPath(target) {
+		session, err := LoadSession(target)
+		if err != nil {
+			return RecentThread{}, err
+		}
+		info, err := os.Stat(session.WorktreePath)
+		if err != nil || !info.IsDir() {
+			id := session.ThreadID
+			if id == "" {
+				id = filepath.Base(target)
+			}
+			return RecentThread{}, fmt.Errorf("retained thread %q cannot resume because its worktree no longer exists", id)
+		}
+		id := session.ThreadID
+		if id == "" {
+			id = filepath.Base(target)
+		}
+		return RecentThread{
+			ID:            id,
+			Repository:    session.Repository,
+			HeadStatePath: target,
+			WorktreePath:  session.WorktreePath,
+			Provider:      session.Provider,
+			Model:         session.Model,
+			Task:          session.Task,
+			Available:     true,
+		}, nil
+	}
+	var (
+		threads []RecentThread
+		err     error
+	)
+	if all {
+		threads, err = ListAllRecentThreads(stateDir, retainedTargetLimit)
+	} else {
+		if strings.TrimSpace(repository) == "" {
+			return RecentThread{}, errors.New("thread repository is required")
+		}
+		threads, err = ListRecentThreads(stateDir, repository, retainedTargetLimit)
+	}
+	if err != nil {
+		return RecentThread{}, err
+	}
+	if len(threads) == 0 {
+		return RecentThread{}, errors.New("no retained threads are available; start a new Gator run first")
+	}
+	var matches []RecentThread
+	for _, thread := range threads {
+		if thread.ID == target {
+			return requireAvailableThread(thread)
+		}
+		if strings.HasPrefix(thread.ID, target) {
+			matches = append(matches, thread)
+		}
+	}
+	if len(matches) == 0 {
+		return RecentThread{}, fmt.Errorf("no retained thread matches %q", target)
+	}
+	if len(matches) > 1 {
+		return RecentThread{}, fmt.Errorf("retained thread prefix %q is ambiguous; use a longer ID or a run record path", target)
+	}
+	return requireAvailableThread(matches[0])
+}
+
+func requireAvailableThread(thread RecentThread) (RecentThread, error) {
+	if !thread.Available {
+		return RecentThread{}, fmt.Errorf("retained thread %q cannot resume because its worktree no longer exists", thread.ID)
+	}
+	return thread, nil
+}
+
 // ListAllRecentThreads returns the newest retained threads across local
 // repositories. It is intentionally opt-in: callers normally use the
 // project-scoped ListRecentThreads picker instead.

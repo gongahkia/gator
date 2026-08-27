@@ -77,6 +77,8 @@ type Config struct {
 	// CopyToClipboard writes text to the operating system clipboard. A nil
 	// value uses Gator's platform clipboard integration.
 	CopyToClipboard func(string) error
+	// OpenBrowser opens a loopback review URL. A nil value uses the platform opener.
+	OpenBrowser func(string) error
 	// SaveCloudModel persists a cloud model's non-secret configuration and, when
 	// supplied, its masked credential in Gator's private auth store.
 	SaveCloudModel func(CloudModelSetup) error
@@ -89,6 +91,9 @@ type Config struct {
 	// operations. The command layer owns filesystem/config mutation; the TUI
 	// only renders typed state and asks for explicit confirmation.
 	Management ManagementBackend
+	// Doctor is a get-only local diagnostic snapshot. It must never start
+	// services, open OAuth, or mutate configuration.
+	Doctor DoctorBackend
 	// ModelManagement persists cloud credentials and custom-provider metadata.
 	// Secrets never enter TUI state; the backend returns display-safe results.
 	ModelManagement ModelManagementBackend
@@ -103,6 +108,23 @@ type ManagementBackend interface {
 	SetTrust(kind string, trusted bool) error
 	SetExtensionEnabled(id string, enabled bool) error
 	RemoveExtension(id string) error
+	// PrepareExtension stages one local directory or hosted HTTPS Git source
+	// and returns display-safe metadata for review. It must not publish the
+	// bundle or change any configuration.
+	PrepareExtension(source string) (ExtensionInstallPreview, error)
+	// CommitExtensionInstall publishes exactly the staged bytes identified by
+	// token whose hash equals the reviewed hash, then enables the extension.
+	CommitExtensionInstall(token, hash string, replace bool) error
+	// DiscardExtensionPrepare removes a staged bundle that was not installed.
+	DiscardExtensionPrepare(token string) error
+	// BeginMCPOAuthLogin starts a loopback browser authorization for exactly
+	// one configured Streamable HTTP MCP server. Implementations must refuse
+	// before emitting an authorization URL unless the current project manifest
+	// hash is already trusted.
+	BeginMCPOAuthLogin(server string) (OAuthLogin, error)
+	// RemoveMCPCredential deletes only Gator's own stored token for one
+	// configured MCP server. It never contacts the remote service.
+	RemoveMCPCredential(server string) error
 	PruneWorktrees() error
 	RemoveWorktree(id string) error
 	ExportArtifact(kind, runRecord string) (string, error)
@@ -110,14 +132,65 @@ type ManagementBackend interface {
 	ApplyPatch(runRecord string) (int, error)
 }
 
+type DoctorBackend interface {
+	Snapshot(provider string) (DoctorSnapshot, error)
+}
+
+type DoctorSnapshot struct {
+	RepositoryDetected  bool
+	RepositoryPath      string
+	Provider            string
+	AuthKind            string
+	AuthStatus          string
+	Sandbox             string
+	WebSearchConfigured bool
+	WebSearchStatus     string
+	Dependencies        []DoctorDependency
+	LocalHost           string
+	LocalModels         []DoctorLocalModel
+	SuggestedVerify     []string
+	EffectiveSandbox    string
+	EffectiveNetwork    string
+}
+
+type DoctorDependency struct {
+	Name      string
+	Installed bool
+	Required  bool
+	Purpose   string
+	HelpURL   string
+	Advice    []string
+}
+
+type DoctorLocalModel struct {
+	ID      string
+	Allowed bool
+	Reason  string
+	Needs   string
+}
+
 type ManagementSnapshot struct {
 	Settings   ManagedSettings
 	Trusts     []ManagedTrust
+	MCPAuth    []ManagedMCPAuth
 	Runs       []ManagedRun
 	Worktrees  []ManagedWorktree
 	Children   []ManagedChild
 	Batches    []ManagedBatch
 	Extensions []ManagedExtension
+	LSPRuntime []ManagedLSPRuntime
+}
+
+// ManagedMCPAuth is display-safe MCP authorization state for one configured
+// Streamable HTTP server. It deliberately carries no token, endpoint URL,
+// client identifier, or authorization-server metadata.
+type ManagedMCPAuth struct {
+	Server        string
+	Authenticated bool
+	Expired       bool
+	// BundleTrusted reports whether the current .gator/mcp.json hash is the
+	// explicitly trusted hash. Login stays unavailable while it is false.
+	BundleTrusted bool
 }
 
 type ManagedSettings struct {
@@ -181,6 +254,38 @@ type ManagedExtension struct {
 	Description string
 	Enabled     bool
 	Tools       int
+}
+
+type ManagedLSPRuntime struct {
+	Worktree string
+	Hash     string
+	Active   int
+	Retired  bool
+	Servers  []ManagedLSPServer
+}
+
+type ManagedLSPServer struct {
+	Name     string
+	Language string
+	Started  bool
+}
+
+// ExtensionInstallPreview describes staged executable code awaiting review.
+// Token identifies the private staging directory; Hash is the object the
+// developer confirms, and only those exact bytes may then be published.
+type ExtensionInstallPreview struct {
+	Token            string
+	Source           string
+	ID               string
+	Name             string
+	Description      string
+	Hash             string
+	Skills           int
+	Prompts          int
+	Commands         int
+	UI               int
+	Tools            int
+	AlreadyInstalled bool
 }
 
 // ModelManagementBackend is the secret-safe command-layer boundary for /model
@@ -296,6 +401,9 @@ const (
 	extensionUIScreen
 	localModelsScreen
 	managementScreen
+	doctorScreen
+	runOptionsScreen
+	reviewWebScreen
 )
 
 type field uint8
@@ -570,6 +678,8 @@ type Model struct {
 	extensionUIReturn screen
 	localModels       localModelsState
 	management        managementState
+	doctor            doctorState
+	runOptions        runOptionsState
 }
 
 var (
@@ -704,6 +814,7 @@ func New(config Config) Model {
 		model:            model,
 		localModels:      newLocalModelsState(config.LocalModels, localSpinner),
 		management:       newManagementState(config.Management),
+		runOptions:       newRunOptionsState(),
 		effort:           parseEffort(config.Effort),
 		reviewScope:      review.All,
 		reviewRangeFrom:  -1,
@@ -727,6 +838,7 @@ func New(config Config) Model {
 			application.verification.SetValue(draft.Verification)
 			application.provider.SetValue(draft.Provider)
 			application.model.SetValue(draft.Model)
+			application.applyDraftRunOptions(draft)
 			application.notice = notice{text: "Restored the unfinished draft saved " + draft.UpdatedAt.Local().Format("Jan 2 15:04") + ".", kind: noticeInfo}
 		}
 	}
@@ -761,6 +873,7 @@ func (m Model) Close() {
 	if m.lspRegistry != nil {
 		m.lspRegistry.Close()
 	}
+	m.discardStagedExtension()
 }
 
 // Init starts no external work until the developer explicitly starts a run.
@@ -970,6 +1083,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Local model download finished. Press u to select it for Gator.", kind: noticeSuccess}
 		}
 		return m, nil
+	case doctorSnapshotMsg:
+		m.doctor.loading = false
+		m.doctor.err = msg.err
+		if msg.err != nil {
+			m.notice = notice{text: "Refresh diagnostics: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.doctor.data = msg.snapshot
+		return m, nil
 	case managementSnapshotMsg:
 		m.management.loading = false
 		m.management.err = msg.err
@@ -994,6 +1116,41 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.management.index = count - 1
 		}
 		return m, nil
+	case extensionPreparedMsg:
+		m.management.loading = false
+		if msg.err != nil {
+			m.notice = notice{text: "Stage extension source: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		preview := msg.preview
+		m.management.installPreview = &preview
+		label := "Install extension " + preview.ID + " from the staged bundle sha256:" + preview.Hash
+		replace := ""
+		if preview.AlreadyInstalled {
+			replace = "replace"
+			label = "Replace installed extension " + preview.ID + " with the staged bundle sha256:" + preview.Hash
+		}
+		m.management.confirm = &managementConfirmation{
+			action: "install-extension", id: preview.Token, value: preview.Hash, value2: replace, label: label,
+		}
+		m.notice = notice{text: "Review the staged bundle. Only these exact bytes are installed if you confirm.", kind: noticeInfo}
+		return m, nil
+	case mcpLoginDoneMsg:
+		if msg.server != m.management.mcpLoginServer {
+			return m, nil
+		}
+		m.oauthLogin = nil
+		m.oauthCancel = nil
+		m.oauthProvider = ""
+		m.management.mcpLoginServer = ""
+		m.management.mcpLoginURL = ""
+		if msg.err != nil {
+			m.notice = notice{text: "MCP authorization stopped: " + msg.err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.notice = notice{text: "Stored a Gator OAuth credential bound to MCP server " + msg.server + ". Its tools still require approval.", kind: noticeSuccess}
+		m.management.loading = true
+		return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
 	case managementActionMsg:
 		m.management.loading = false
 		if msg.err != nil {

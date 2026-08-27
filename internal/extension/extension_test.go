@@ -249,6 +249,109 @@ func TestSidecarRequiresApprovalUsesSandboxEnvironmentAndDetectsDrift(t *testing
 	}
 }
 
+func TestPrepareSourceCommitsStagedBytesAfterSourceMutation(t *testing.T) {
+	source := writeExtension(t, `{"version":1,"id":"review-helper","name":"Review helper","tools":[{"name":"review","description":"marker","parameters":{"type":"object","additionalProperties":false},"command":["bin/review"]}]}`, map[string]fileSpec{
+		"bin/review": {contents: "#!/bin/sh\nprintf original\n", mode: 0o755},
+	})
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := store.PrepareSource(context.Background(), source)
+	if err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
+	if prepared.ID != "review-helper" || prepared.Tools != 1 || prepared.Hash == "" || prepared.AlreadyInstalled {
+		t.Fatalf("prepared = %#v", prepared)
+	}
+	listed, err := store.List()
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("list after prepare = %#v, %v", listed, err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "bin", "review"), []byte("#!/bin/sh\nprintf mutated\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	installed, err := store.CommitPrepared(prepared.Token, prepared.Hash, false)
+	if err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	if installed.Hash != prepared.Hash {
+		t.Fatalf("installed hash = %s, want staged %s", installed.Hash, prepared.Hash)
+	}
+	contents, err := os.ReadFile(filepath.Join(installed.Root, "bin", "review"))
+	if err != nil || !strings.Contains(string(contents), "original") || strings.Contains(string(contents), "mutated") {
+		t.Fatalf("installed sidecar = %q, %v", contents, err)
+	}
+}
+
+func TestCommitPreparedRejectsHashMismatchAndMissingReplace(t *testing.T) {
+	source := writeExtension(t, `{"version":1,"id":"review-helper","name":"Review helper"}`, nil)
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Install(source, false); err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := store.PrepareSource(context.Background(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prepared.AlreadyInstalled {
+		t.Fatal("prepare did not report the existing installation")
+	}
+	if _, err := store.CommitPrepared(prepared.Token, prepared.Hash, false); err == nil || !strings.Contains(err.Error(), "already installed") {
+		t.Fatalf("commit without replace = %v", err)
+	}
+	if _, err := store.CommitPrepared(prepared.Token, "sha256:deadbeef", true); err == nil || !strings.Contains(err.Error(), "reviewed bundle hash") {
+		t.Fatalf("wrong hash commit = %v", err)
+	}
+	if listed, err := store.List(); err != nil || len(listed) != 1 {
+		t.Fatalf("store after failed commits = %#v, %v", listed, err)
+	}
+	if _, err := store.PrepareSource(context.Background(), source); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDiscardPreparedRemovesStagingWithoutPublishing(t *testing.T) {
+	source := writeExtension(t, `{"version":1,"id":"review-helper","name":"Review helper"}`, nil)
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := store.PrepareSource(context.Background(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DiscardPrepared(prepared.Token); err != nil {
+		t.Fatal(err)
+	}
+	if listed, err := store.List(); err != nil || len(listed) != 0 {
+		t.Fatalf("list after discard = %#v, %v", listed, err)
+	}
+	if _, err := store.CommitPrepared(prepared.Token, prepared.Hash, false); err == nil {
+		t.Fatal("commit after discard succeeded")
+	}
+}
+
+func TestPrepareSourceRejectsSymlinksAndFlagLikeSources(t *testing.T) {
+	source := writeExtension(t, `{"version":1,"id":"unsafe","name":"Unsafe"}`, nil)
+	if err := os.Symlink("/tmp", filepath.Join(source, "outside")); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PrepareSource(context.Background(), source); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("prepare symlink error = %v", err)
+	}
+	if _, err := store.PrepareSource(context.Background(), "-not-a-repository"); err == nil {
+		t.Fatal("prepare accepted a flag-like source")
+	}
+}
+
 func TestInstallRejectsSymlinkedExtensionFiles(t *testing.T) {
 	source := writeExtension(t, `{"version":1,"id":"unsafe","name":"Unsafe"}`, nil)
 	if err := os.Symlink("/tmp", filepath.Join(source, "outside")); err != nil {

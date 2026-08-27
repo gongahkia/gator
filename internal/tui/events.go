@@ -266,7 +266,7 @@ func formatVerification(commands [][]string) string {
 	return strings.Join(lines, "\n")
 }
 
-func parseVerification(value string) ([][]string, error) {
+func parseArgvLines(value string) ([][]string, error) {
 	var commands [][]string
 	for _, line := range strings.Split(value, "\n") {
 		line = strings.TrimSpace(line)
@@ -274,10 +274,29 @@ func parseVerification(value string) ([][]string, error) {
 			continue
 		}
 		argv := strings.Fields(line)
-		if len(argv) == 0 {
-			continue
+		if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
+			return nil, errors.New("each command line must start with a program token")
 		}
 		commands = append(commands, argv)
+	}
+	return commands, nil
+}
+
+func parseLineList(value string) []string {
+	var items []string
+	for _, line := range strings.Split(value, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			items = append(items, line)
+		}
+	}
+	return items
+}
+
+func parseVerification(value string) ([][]string, error) {
+	commands, err := parseArgvLines(value)
+	if err != nil {
+		return nil, err
 	}
 	if len(commands) == 0 {
 		return nil, errors.New("add at least one verification command before starting a run")

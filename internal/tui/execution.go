@@ -72,10 +72,17 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 	if len(m.preflight) > 0 {
 		return m.startFailure("Resolve configuration before starting:\n" + strings.Join(m.preflight, "\n"))
 	}
+	if m.runSafetyAckNeeded() {
+		return m.openRunOptions()
+	}
 	var executor gatorrun.Executor
 	if m.resumeStatePath == "" {
 		var executorErr error
-		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.config.BaseURL)
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.runBaseURL(""))
+		if executorErr != nil {
+			return m.startFailure(executorErr.Error())
+		}
+		executor, executorErr = m.applyExecutorOverrides(executor)
 		if executorErr != nil {
 			return m.startFailure(executorErr.Error())
 		}
@@ -166,6 +173,14 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			}
 		},
 	}
+	var applyErr error
+	request, applyErr = m.applyAdvancedRequest(request)
+	if applyErr != nil {
+		cancel()
+		m.execution = nil
+		m.screen = composeScreen
+		return m.startFailure(applyErr.Error())
+	}
 
 	if m.forkStatePath != "" {
 		previous, loadErr := journal.LoadSession(m.forkStatePath)
@@ -201,7 +216,14 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		request.BaseURL = previous.BaseURL
 		request.Verification = previous.Verification
 		var executorErr error
-		executor, executorErr = m.config.NewExecutor(providerName, modelName, previous.BaseURL)
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.runBaseURL(previous.BaseURL))
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			return m.startFailure(executorErr.Error())
+		}
+		executor, executorErr = m.applyExecutorOverrides(executor)
 		if executorErr != nil {
 			cancel()
 			m.execution = nil
@@ -245,7 +267,14 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		request.BaseURL = previous.BaseURL
 		request.Verification = previous.Verification
 		var executorErr error
-		executor, executorErr = m.config.NewExecutor(providerName, modelName, previous.BaseURL)
+		executor, executorErr = m.config.NewExecutor(providerName, modelName, m.runBaseURL(previous.BaseURL))
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			return m.startFailure(executorErr.Error())
+		}
+		executor, executorErr = m.applyExecutorOverrides(executor)
 		if executorErr != nil {
 			cancel()
 			m.execution = nil
@@ -565,12 +594,25 @@ func (m *Model) persistDraft() {
 	if m.resumeStatePath != "" || m.forkStatePath != "" || strings.TrimSpace(m.config.StateDir) == "" {
 		return
 	}
+	extras := m.draftRunOptions()
 	err := journal.SaveDraft(m.config.StateDir, journal.Draft{
-		Repository:   m.config.RepositoryPath,
-		Task:         m.task.Value(),
-		Verification: m.verification.Value(),
-		Provider:     strings.TrimSpace(m.provider.Value()),
-		Model:        strings.TrimSpace(m.model.Value()),
+		Repository:      m.config.RepositoryPath,
+		Task:            m.task.Value(),
+		Verification:    m.verification.Value(),
+		Provider:        strings.TrimSpace(m.provider.Value()),
+		Model:           strings.TrimSpace(m.model.Value()),
+		MaxSteps:        extras.MaxSteps,
+		BaseRef:         extras.BaseRef,
+		BaseURL:         extras.BaseURL,
+		Sandbox:         extras.Sandbox,
+		Network:         extras.Network,
+		Setup:           extras.Setup,
+		CopyIgnored:     extras.CopyIgnored,
+		Scopes:          extras.Scopes,
+		Profile:         extras.Profile,
+		Scouts:          extras.Scouts,
+		AllowedCommands: extras.AllowedCommands,
+		CommandPrefixes: extras.CommandPrefixes,
 	})
 	m.draftErr = err
 }
@@ -621,9 +663,10 @@ func (m *Model) refreshPreflight() {
 		if strings.TrimSpace(m.task.Value()) == "" {
 			issues = append(issues, "describe a continuation instruction")
 		}
-		if _, err := m.config.NewExecutor(providerName, modelName, session.BaseURL); err != nil {
+		if _, err := m.config.NewExecutor(providerName, modelName, m.runBaseURL(session.BaseURL)); err != nil {
 			issues = append(issues, err.Error())
 		}
+		issues = append(issues, m.collectRunOptionIssues()...)
 		m.preflight = issues
 		return
 	}
@@ -641,8 +684,9 @@ func (m *Model) refreshPreflight() {
 		m.preflight = issues
 		return
 	}
-	if _, err := m.config.NewExecutor(providerName, modelName, m.config.BaseURL); err != nil {
+	if _, err := m.config.NewExecutor(providerName, modelName, m.runBaseURL("")); err != nil {
 		issues = append(issues, err.Error())
 	}
+	issues = append(issues, m.collectRunOptionIssues()...)
 	m.preflight = issues
 }

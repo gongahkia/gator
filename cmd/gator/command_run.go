@@ -40,6 +40,8 @@ func runTask(arguments []string, out io.Writer) error {
 	flags.Var(&verification, "verify", "required verification command as a whitespace-separated argv")
 	var allowedCommands verificationFlags
 	flags.Var(&allowedCommands, "allow-command", "pre-approve an exact worktree argv for this run")
+	var allowedPrefixes verificationFlags
+	flags.Var(&allowedPrefixes, "allow-command-prefix", "pre-approve a literal argv prefix for this run")
 	var scopes stringFlags
 	flags.Var(&scopes, "scope", "repository-relative file or directory used to select project instructions (repeatable)")
 	var imagePaths attachmentFlags
@@ -99,24 +101,25 @@ func runTask(arguments []string, out io.Writer) error {
 	}
 	printer := eventPrinter{out: out}
 	outcome, err := executor.Execute(context.Background(), gatorrun.Request{
-		RepositoryPath:   workingDirectory,
-		Task:             task,
-		Provider:         resolvedProvider,
-		Model:            resolvedModel,
-		BaseURL:          *baseURL,
-		MaxSteps:         *maxSteps,
-		Verification:     verification,
-		Scopes:           scopes,
-		Profile:          *profile,
-		BaseRef:          *baseRef,
-		CopyIgnoredFiles: *copyIgnoredFiles,
-		Setup:            setup,
-		Images:           images,
-		Attachments:      attachments,
-		Scouts:           scouts,
-		AllowedCommands:  allowedCommands,
-		Approve:          cliCommandApprover(*trustCommands),
-		OnEvent:          printer.Print,
+		RepositoryPath:         workingDirectory,
+		Task:                   task,
+		Provider:               resolvedProvider,
+		Model:                  resolvedModel,
+		BaseURL:                *baseURL,
+		MaxSteps:               *maxSteps,
+		Verification:           verification,
+		Scopes:                 scopes,
+		Profile:                *profile,
+		BaseRef:                *baseRef,
+		CopyIgnoredFiles:       *copyIgnoredFiles,
+		Setup:                  setup,
+		Images:                 images,
+		Attachments:            attachments,
+		Scouts:                 scouts,
+		AllowedCommands:        allowedCommands,
+		AllowedCommandPrefixes: allowedPrefixes,
+		Approve:                cliCommandApprover(*trustCommands),
+		OnEvent:                printer.Print,
 	})
 	if outcome.Worktree.Path != "" {
 		if _, writeErr := fmt.Fprintf(out, "\nReview worktree: %s\n", outcome.Worktree.Path); writeErr != nil && err == nil {

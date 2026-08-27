@@ -42,7 +42,7 @@ func TestAgentCommandListsProjectRolesWithoutActivatingThem(t *testing.T) {
 		t.Fatalf("list agent roles: %v", err)
 	}
 	value := output.String()
-	for _, expected := range []string{"Project agent roles:", "reviewer  readonly  independent review", "writer  writer  focused implementation"} {
+	for _, expected := range []string{"Project agents:", "Roles (prompt-only specializations):", "reviewer  readonly  independent review", "writer  writer  focused implementation"} {
 		if !strings.Contains(value, expected) {
 			t.Fatalf("agent list missing %q: %q", expected, value)
 		}
