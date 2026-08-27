@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gongahkia/gator/internal/agent"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -63,6 +64,7 @@ type session struct {
 	mode         gatorrun.Mode
 	title        string
 	statePath    string
+	messages     []agent.Message
 	updatedAt    time.Time
 	active       *activePrompt
 	closing      bool

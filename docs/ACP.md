@@ -31,7 +31,9 @@ processed while a prompt is running. Closing a session cancels its active work
 and waits for the executor to release the retained worktree before completing
 the close request. Retained Gator thread IDs are ACP session IDs, so
 `session/list` and `session/load`/`session/resume` restore local conversations
-without exposing private run-record paths.
+without exposing private run-record paths. `session/load` replays retained user,
+agent, and structured tool-call updates before its response; `session/resume`
+restores context without replay for a reconnecting client.
 
 ## Execution policy
 

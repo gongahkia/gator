@@ -256,7 +256,8 @@ bounded in-memory scrollback and ordinary tasks are cancelled at run completion.
 In the native TUI or authenticated `gator serve` process, a model may request
 `terminal_detach`; a distinct developer approval then keeps that existing task
 in the process-local session registry, with its original policy, an
-at-most-two-hour lifetime, and a session-wide cap of eight tasks. In the native
+at-most-two-hour running lifetime, and a session-wide cap of eight retained
+histories. In the native
 TUI, `Ctrl+T` attaches locally; `gator serve` additionally exposes
 `terminal_list/read/write/resize/stop/restart` to its authenticated controller. Direct
 commands, plain JSONL RPC, ACP, and child-writer tool surfaces omit detachment.

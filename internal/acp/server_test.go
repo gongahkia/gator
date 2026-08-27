@@ -114,6 +114,22 @@ func TestServerInitializesRunsPlanListsAndResumesSession(t *testing.T) {
 	if resumed.Result.(map[string]any)["modes"].(map[string]any)["currentModeId"] != "plan" {
 		t.Fatalf("session/resume after reconnect = %#v", resumed)
 	}
+	writeMessage(t, reconnectWriter, map[string]any{"jsonrpc": "2.0", "id": "load", "method": "session/load", "params": map[string]any{"sessionId": sessionID, "cwd": repository, "mcpServers": []any{}}})
+	replayed := waitFor(t, reconnectOutput, func(message envelope) bool {
+		if message.Method != "session/update" || message.Params["sessionId"] != sessionID {
+			return false
+		}
+		update, _ := message.Params["update"].(map[string]any)
+		content, _ := update["content"].(map[string]any)
+		return update["sessionUpdate"] == "user_message_chunk" && content["text"] == "Inspect the fixture."
+	})
+	if replayed.Method == "" {
+		t.Fatal("session/load did not replay retained conversation")
+	}
+	loaded := waitFor(t, reconnectOutput, func(message envelope) bool { return message.ID == "load" && message.Error == nil })
+	if loaded.Result != nil {
+		t.Fatalf("session/load result = %#v, want null", loaded)
+	}
 	if err := reconnectWriter.Close(); err != nil {
 		t.Fatal(err)
 	}
