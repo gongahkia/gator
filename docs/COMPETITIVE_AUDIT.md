@@ -1,6 +1,6 @@
 # Terminal-harness capability audit
 
-This is a source-backed product audit as of 2026-08-24, not a model-quality
+This is a source-backed product audit as of 2026-08-27, not a model-quality
 benchmark. It compares the committed Gator architecture and tests with public
 primary documentation. A documented competitor capability is not evidence that
 it is reliable in every environment; it is the feature bar users can reasonably
@@ -8,17 +8,16 @@ expect.
 
 ## Conclusion
 
-Gator is now a credible local, cross-provider coding-agent core: it creates an
-isolated worktree by default, applies a strict OS process sandbox, has a typed
-tool loop with approvals and verification, persists resumable runs, supports
-trusted hooks/MCP/LSP, and exposes both ACP and a Gator-specific headless
-control plane. It is stronger than many extension-first tools at refusing
-untrusted project executables and remote credential redirection.
+Gator is a credible local, cross-provider coding-agent core: isolated
+worktrees, a strict OS process sandbox, typed tools with approvals and
+verification, resumable runs, trusted hooks/MCP/LSP, ACP plus a loopback
+control plane, and a TUI that covers native configuration, one-run policy
+overrides, retained-thread targeting, and loopback browser review.
 
-It is not yet a full replacement for Codex CLI, Claude Code, Cursor CLI, Pi,
-or OpenCode. The largest remaining local-product gaps are a full terminal UX,
-configurable agent types and parallel writer-team orchestration, richer browser
-tools, and persistent code intelligence. Hosted
+It is not a full replacement for Codex CLI, Claude Code, Cursor CLI, Pi, or
+OpenCode. The largest remaining local-product gaps are detached writer
+lifecycle, broader configurable agent types, a full JavaScript/screenshot
+browser, durable code intelligence, and a Windows strict sandbox. Hosted
 agents, organization governance, and cloud handoff are separate services, not
 omissions that a local Go binary can honestly claim to solve.
 
@@ -31,9 +30,9 @@ omissions that a local Go binary can honestly claim to solve.
 | MCP and credentials | Explicitly trusted stdio and Streamable HTTP servers; per-tool approval; resource-bound OAuth discovery, PKCE, DCR or pre-registered public clients, and private credential storage. | Stronger default trust posture than automatic project-server connection. It is intentionally narrower than broad plugin ecosystems. [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization), [OpenCode MCP](https://opencode.ai/v2/docs/mcp-servers) |
 | Local coding models | `gator local` exposes a checked-in catalog of four Ollama-hosted coding models, shows source and package size, requires confirmation before a model pull or removal, confines runtime management to literal loopback HTTP, and persists the selected installed model as a no-key OpenAI-compatible provider. The normal Gator loop, tools, worktrees, sandbox, sessions, TUI, JSONL RPC, and ACP remain unchanged. | This closes the manual endpoint-configuration gap for a small, auditable local catalog. It deliberately does not execute arbitrary Hugging Face repositories, silently install a system runtime, proxy a remote endpoint, or claim local-model quality without evaluation evidence. [Ollama API](https://docs.ollama.com/api/openai-compatibility), [Ollama model management](https://docs.ollama.com/api/introduction) |
 | Rules, profiles, hooks, and extensions | Layered `AGENTS.md`, bounded declarative rules/profiles, capability-bounded project role prompts, trusted hash-pinned hooks, and explicit global or hash-pinned project extension bundles. Extension sidecars use the active strict sandbox and require per-tool approval. | The project can specialize a child prompt, but cannot configure arbitrary tools or permissions. This is safer and narrower than the hook/skill/plugin contracts in larger harnesses; unlike Pi packages, extensions do not receive implicit host authority. [Claude Code features](https://code.claude.com/docs/en/features-overview), [Pi extensions](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md) |
-| Subagents | CLI callers can schedule up to four separate-worktree scouts. Native models have `delegate_readonly`: batches of one to four fresh-context scouts, bounded to eight per run, share the active worktree only through read/search/Git tools, and return 8 KiB untrusted reports. Execute mode offers one serial writer or exactly two parallel writers, with two writers total per run. Each writer has a separate worktree from the same parent snapshot; parallel calls must declare non-overlapping paths, then Gator records actual paths and reports scope violations or overlap. Atomic parent-owned child and batch manifests retain baseline, state, patch digest, worktree, run record, grouping, and final conflict evidence. Roles change prompt only; patch application remains explicit and Gator never auto-merges. | This is a bounded, conflict-aware local writer scheduler without permission escalation. Codex, Claude Code, Cursor, and OpenCode still offer per-role model/tool policies, user/global definitions, background execution, broader orchestration, and richer conflict handling. Gator has no detached/background writer lifecycle or automatic conflict resolution. [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Claude Code subagents](https://code.claude.com/docs/en/sub-agents), [Cursor subagents](https://prod.cursor.com/docs/subagents), [OpenCode agents](https://opencode.ai/docs/agents) |
+| Subagents | CLI callers can schedule up to four separate-worktree scouts. Native models have `delegate_readonly`: batches of one to four fresh-context scouts, bounded to eight per run, share the active worktree only through read/search/Git tools, and return 8 KiB untrusted reports. Execute mode offers one serial writer or exactly two parallel writers, with two writers total per run. Each writer has a separate worktree from the same parent snapshot; parallel calls must declare non-overlapping paths, then Gator records scope violations and overlap. Ref-free patch commits feed `git merge-tree --write-tree`, so real textual conflicts are reported without touching refs or worktrees. Parent-owned manifests retain effective narrowed policy, ownership/deadline/heartbeat, baseline, verifier/patch digests, child state, and comparison evidence. Writer roles may further restrict inherited policy. Patch application remains explicit and Gator never auto-merges. | This is a bounded, conflict-aware local writer scheduler without permission escalation. Codex, Claude Code, Cursor, and OpenCode still offer user/global definitions, detached execution, broader orchestration, and richer semantic conflict handling. Gator has durable foreground lifecycle evidence but no detached/background writer registry or automatic conflict resolution. [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents), [Claude Code subagents](https://code.claude.com/docs/en/sub-agents), [Cursor subagents](https://prod.cursor.com/docs/subagents), [OpenCode agents](https://opencode.ai/docs/agents) |
 | Code intelligence | Trusted local LSP pull diagnostics, hover, completion, immediate code actions, formatting, rename, definitions, references, document symbols, and workspace-symbol queries with executable hash pinning, operation-specific approval, a strict sandbox, wire/output limits, workspace-only returned locations, and one lazy server per configuration. The native TUI and loopback app server retain up to eight idle managers only for a compatible resume of the exact retained worktree and trusted bundle hash; the next run that observes a change retires the cache and session exit stops it. Completion is informational; edit-producing operations expose only bounded workspace edits and never execute server commands or apply changes automatically. | This closes basic navigation, lookup-completion, reviewed quick-fix/format/rename discovery, and session-local resume indexing. Durable indexing and editor document synchronization remain IDE-integration gaps. [LSP code action](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) |
-| Terminal and browser work | Execute mode has `terminal_start/read/write/list/stop`: a sandboxed PTY task manager with a 15-minute ordinary lifetime, bounded scrollback, task cancellation on run exit, and separate digest-redacted approval for model input. In the native TUI and authenticated `gator serve`, a second approval permits `terminal_detach` for one existing task in a process-local registry: its original sandbox is fixed, it expires within two hours, is capped at eight tasks, and the normal shutdown path stops it. The native TUI attaches through `Ctrl+T`; an app-server bearer-token holder can list, read, write, resize, or stop only an explicitly detached task, without forwarding its input to the model or completed run record. The TUI attachment sizes its PTY to the viewport and renders a bounded VT500/xterm text screen: scroll regions, primary/alternate buffers, Unicode widths, ANSI/256/RGB color, attributes, and native scrollback. It offers line input, interrupt, stop, or opt-in raw keyboard input; bounded device/status replies return only to the already-running task. With an explicit network grant, it also offers approval-gated public HTTPS text fetches and Brave API search. Terminal graphics, clipboard/window control, mouse forwarding, restart-surviving terminal service, browser automation, and computer-use remain unavailable. | This closes text-terminal rendering gaps for interactive TUIs as well as persistent-process, developer-attachment, session-background terminal, and source-backed web research. A graphical terminal surface, browser automation, and supervised restart recovery remain material gaps. MCP can provide optional browser tools but is not a first-party fallback. [OpenCode CLI](https://opencode.ai/v2/docs/cli), [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get), [Pi extension subagent example](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/subagent/index.ts) |
+| Terminal and browser work | Execute mode has `terminal_start/read/write/list/stop`: a sandboxed PTY task manager with a 15-minute ordinary lifetime, bounded scrollback, task cancellation on run exit, and separate digest-redacted approval for model input. In the native TUI and authenticated `gator serve`, a second approval permits `terminal_detach` for one existing task in a process-local registry: its original sandbox is fixed, it expires within two hours, is capped at eight tasks, and the normal shutdown path stops it. With an explicit network grant, Gator also offers approved public HTTPS fetches, Brave API search, and an ephemeral document browser for navigation, bounded visible-text/link/form snapshots, extraction, link GETs, and form GET/POST actions. Every transition reuses public-DNS pinning and the shared request budget; redirects, private targets, subresources, JavaScript, cookies, secret/file fields, downloads, and arbitrary DOM/computer control are absent. | This closes bounded first-party document navigation and form-action automation, not full browser parity. Graphical terminal output, JavaScript rendering, screenshots, authenticated profiles, multi-page tabs, unrestricted computer use, and supervised restart recovery remain unavailable. [Playwright BrowserContext](https://playwright.dev/docs/api/class-browsercontext), [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get) |
 | Automation/control plane | Versioned local JSONL RPC handles run/steer/cancel/approve; `gator serve` exposes that protocol on an authenticated literal-loopback HTTP/SSE bridge with bounded replay and an OpenAPI wrapper document. `gator serve start/status/stop` explicitly supervises one repository-scoped background bridge, with private state/log files and token-authenticated endpoint checks before PID control. Its capabilities additionally control only explicitly detached terminal tasks in that one server process; ACP v1 over stdio maps sessions, model tools, approvals, and subagent/terminal/coordinator lifecycle updates. | This is viable for a local editor, desktop client, or CI-side controller that needs to maintain an approved dev process after the agent run. It is still not Codex's remote app-server or OpenCode's automatically discovered user-wide server: no remote listener, CORS, client-provided MCP, batch requests, media prompts, hosted transport, auto-discovery by TUI/ACP, or restart-surviving task daemon. [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Cursor CLI ACP](https://prod.cursor.com/docs/cli/using), [OpenCode server](https://dev.opencode.ai/docs/server/) |
 | Delivery, hosted agents, governance | Local diff/patch handoff and MCP-backed integrations only. No first-party PR/issue/CI workflow, remote executor, notifications, user identity, audit service, organization policy, or cloud handoff. | GitHub/GitLab delivery should be MCP-backed before a bespoke API. Managed background agents and governance need server-side product infrastructure. |
 
@@ -59,19 +58,16 @@ omissions that a local Go binary can honestly claim to solve.
 
 ## Recommended build order
 
-1. **Terminal UX, fuller code intelligence, and browser research.** Evolve the
-   line-oriented terminal attachment into a multiplexer only with a stable
-   isolation and transcript contract; extend the bounded session LSP cache only
-   with separately reviewed lifecycle and document-synchronization design; add
-   browser automation only if its network policy, approval, output, and session
-   lifecycle can be bounded as tightly as native web research.
-2. **Control-plane hardening.** Keep the loopback HTTP/SSE bridge small and
-   prove its reconnect, overload, and credential-file behavior in release
-   testing. Keep remote execution separate rather than exposing an unauthenticated
-   local agent listener.
-3. **Delivery integrations.** Use trusted OAuth MCP servers for GitHub/GitLab
-   issue, review, and CI interaction, then assess whether a first-party client
-   is justified by demonstrated reliability limits.
+1. **Detached writer lifecycle.** Build explicit start/status/cancel/collect on
+   the durable foreground manifest contract; do not add auto-merge.
+2. **Browser depth only when justified.** JavaScript or screenshots require
+   per-request interception, service-worker/WebSocket blocking, ephemeral
+   contexts, and equivalent SSRF tests; keep computer use out of the default.
+3. **Control-plane hardening.** Keep the loopback HTTP/SSE bridge small and
+   prove reconnect, overload, and credential-file behavior in release
+   testing. Keep remote execution separate.
+4. **Delivery integrations.** Trusted OAuth MCP for GitHub/GitLab, then
+   decide whether a first-party client is justified.
 
 The implementation decisions and exact test evidence belong in the source and
 release notes; this audit intentionally remains a current capability map rather

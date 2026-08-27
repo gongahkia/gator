@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -318,6 +319,25 @@ func TestExecutorProfileOmitSkipsLSPAcquireAndCommandTools(t *testing.T) {
 	for _, tool := range model.requests[0].Tools {
 		if strings.HasPrefix(tool.Name, "lsp_") {
 			t.Fatalf("lsp tool present after omit: %s", tool.Name)
+		}
+	}
+}
+
+func TestBrowserOmitKeepsPlainHTTPResearch(t *testing.T) {
+	available := tools.HTTPTools(tools.CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}}, tools.HTTPFetchOptions{})
+	filtered := filterBrowserTools(available)
+	foundHTTP := false
+	for _, tool := range filtered {
+		if tool.Definition().Name == "http_fetch" {
+			foundHTTP = true
+		}
+	}
+	if !foundHTTP {
+		t.Fatal("browser omit removed plain HTTP research")
+	}
+	for _, tool := range filtered {
+		if strings.HasPrefix(tool.Definition().Name, "browser_") {
+			t.Fatalf("browser tool survived browser omit: %s", tool.Definition().Name)
 		}
 	}
 }
@@ -689,7 +709,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 		BaseCommit:     parent.BaseCommit,
 		StateDir:       stateDirectory,
 		Mode:           ExecuteMode,
-	}, tools.NewCommandMemory(nil), parentJournal, []instructions.Role{{Name: "test-fixer", Description: "fix an isolated test failure", Kind: instructions.RoleWriter, Instructions: "change only the delegated test behavior"}, {Name: "reviewer", Description: "must not be visible to writers", Kind: instructions.RoleReadOnly, Instructions: "review only"}}, now, func(event agent.Event) {
+	}, tools.NewCommandMemory(nil), parentJournal, []instructions.Role{{Name: "test-fixer", Description: "fix an isolated test failure", Kind: instructions.RoleWriter, Instructions: "change only the delegated test behavior", Policy: instructions.ProfilePolicy{Network: "deny", Omit: []string{instructions.OmitHTTP, instructions.OmitTerminal, instructions.OmitMCP}}}, {Name: "reviewer", Description: "must not be visible to writers", Kind: instructions.RoleReadOnly, Instructions: "review only"}}, now, func(event agent.Event) {
 		events = append(events, event)
 	})
 	definition := writer.Definition()
@@ -717,7 +737,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	if !strings.Contains(payload.Notice, "never auto-merges") || len(events) != 2 || events[0].Kind != agent.EventSubagent || !strings.Contains(events[0].Text, "starting isolated writer") || !strings.Contains(events[0].Text, "role test-fixer") || !strings.Contains(events[1].Text, "role test-fixer") {
 		t.Fatalf("writer delegation events = %#v; notice = %q", events, payload.Notice)
 	}
-	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") || hasTool(model.requests[0].Tools, "delegate_writers") || !strings.Contains(model.requests[0].System, "Selected project role test-fixer") || !strings.Contains(model.requests[0].System, "change only the delegated test behavior") {
+	if len(model.requests) != 4 || hasTool(model.requests[0].Tools, "delegate_writer") || hasTool(model.requests[0].Tools, "delegate_writers") || hasTool(model.requests[0].Tools, "http_fetch") || hasTool(model.requests[0].Tools, "terminal_start") || !strings.Contains(model.requests[0].System, "Selected project role test-fixer") || !strings.Contains(model.requests[0].System, "change only the delegated test behavior") {
 		t.Fatalf("writer child model requests = %#v", model.requests)
 	}
 	if _, err := (tools.ApplyPatch{Root: parent.Root}).Execute(context.Background(), objectArguments(t, struct {
@@ -735,7 +755,7 @@ func TestWriterDelegationReturnsOnlyChildDeltaForExplicitParentReview(t *testing
 	if err != nil {
 		t.Fatalf("list writer manifests: %v", err)
 	}
-	if len(manifests) != 1 || manifests[0].Status != journal.ChildCompleted || manifests[0].ParentRunID != "writer-parent-001" || manifests[0].WorktreePath == "" || manifests[0].StatePath == "" || manifests[0].TaskSHA256 == "" || manifests[0].PatchSHA256 == "" || manifests[0].PatchBytes != len(payload.Writer.Patch) || !manifests[0].PatchAvailable || !manifests[0].ReviewRequired || !manifests[0].WorktreeRetained {
+	if len(manifests) != 1 || manifests[0].Status != journal.ChildCompleted || manifests[0].ParentRunID != "writer-parent-001" || manifests[0].ParentWorktree != parent.Path || manifests[0].Provider != "test" || manifests[0].Model != "test-model" || manifests[0].WorktreePath == "" || manifests[0].StatePath == "" || manifests[0].TaskSHA256 == "" || manifests[0].VerificationSHA256 == "" || manifests[0].PatchSHA256 == "" || manifests[0].PatchCommit == "" || manifests[0].OwnerPID <= 0 || manifests[0].HeartbeatAt.IsZero() || manifests[0].EffectiveMode != "execute" || manifests[0].EffectiveNetwork != "deny" || !slices.Contains(manifests[0].OmittedCapabilities, instructions.OmitHTTP) || manifests[0].PatchBytes != len(payload.Writer.Patch) || !manifests[0].PatchAvailable || !manifests[0].ReviewRequired || !manifests[0].WorktreeRetained {
 		t.Fatalf("writer manifest = %#v", manifests)
 	}
 }
@@ -787,7 +807,7 @@ func TestParallelWriterDelegationUsesSeparateWorktreesAndReportsConflicts(t *tes
 	if err := json.Unmarshal([]byte(result.Content), &payload); err != nil {
 		t.Fatalf("decode parallel writer result: %v\n%s", err, result.Content)
 	}
-	if !payload.OK || payload.Batch.ID == "" || payload.Batch.Status != journal.ChildBatchCompleted || len(payload.Writers) != 2 || len(payload.Conflicts) != 3 || !strings.Contains(payload.Notice, "never auto-merges") {
+	if !payload.OK || payload.Batch.ID == "" || payload.Batch.Status != journal.ChildBatchCompleted || payload.Batch.ComparisonStatus != "conflict" || len(payload.Writers) != 2 || len(payload.Conflicts) != 4 || !strings.Contains(payload.Notice, "never auto-merges") {
 		t.Fatalf("parallel writer result = %#v", payload)
 	}
 	for _, report := range payload.Writers {
@@ -810,7 +830,7 @@ func TestParallelWriterDelegationUsesSeparateWorktreesAndReportsConflicts(t *tes
 		t.Fatalf("parallel writer batch manifests = %#v, %v", batches, err)
 	}
 	for _, conflict := range payload.Conflicts {
-		if conflict.Kind != "out_of_scope_change" && conflict.Kind != "changed_path_overlap" {
+		if conflict.Kind != "out_of_scope_change" && conflict.Kind != "changed_path_overlap" && conflict.Kind != "textual_merge_conflict" {
 			t.Fatalf("unexpected parallel writer conflict = %#v", conflict)
 		}
 	}

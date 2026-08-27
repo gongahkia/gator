@@ -37,6 +37,14 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("apply agent profile policy: %w", err)
 	}
+	if rolePolicy := request.RolePolicy; rolePolicy.Mode != "" || rolePolicy.Sandbox != "" || rolePolicy.Network != "" || rolePolicy.MaxSteps > 0 || len(rolePolicy.Omit) > 0 {
+		var applied instructions.ProfilePolicy
+		executionPolicy, modeName, maxSteps, applied, err = instructions.Meet(executionPolicy, modeName, maxSteps, rolePolicy)
+		if err != nil {
+			return Outcome{Worktree: isolated}, fmt.Errorf("apply delegated role policy: %w", err)
+		}
+		profilePolicy.Omit = append(profilePolicy.Omit, applied.Omit...)
+	}
 	if modeName == PlanMode.String() {
 		request.Mode = PlanMode
 	}
@@ -298,7 +306,11 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			runTools = append(runTools, tools.TerminalTools(terminalManager, commandPolicy, tools.TerminalToolOptions{AllowDetach: request.TerminalRegistry != nil})...)
 		}
 		if !profilePolicy.HasOmit(instructions.OmitHTTP) {
-			runTools = append(runTools, tools.HTTPTools(commandPolicy, e.HTTP)...)
+			webTools := tools.HTTPTools(commandPolicy, e.HTTP)
+			if profilePolicy.HasOmit(instructions.OmitBrowser) {
+				webTools = filterBrowserTools(webTools)
+			}
+			runTools = append(runTools, webTools...)
 		}
 		if !profilePolicy.HasOmit(instructions.OmitDelegateReadOnly) {
 			runTools = append(runTools, readonlyScout)
@@ -384,26 +396,26 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		}
 	}
 	session := journal.Session{
-		Version:             2,
-		Repository:          isolated.Repository,
-		WorktreePath:        isolated.Path,
-		BaseCommit:          request.BaseCommit,
-		Provider:            request.Provider,
-		Model:               request.Model,
-		BaseURL:             request.BaseURL,
-		Task:                request.Task,
-		MaxSteps:            request.MaxSteps,
-		Verification:        request.Verification,
-		Scopes:              request.Scopes,
-		Profile:             request.Profile,
-		ThreadID:            request.ThreadID,
-		Mode:                request.Mode.String(),
-		HooksHash:           hookEngine.Hash(),
-		LSPHash:             lspSet.Hash(),
-		MCPHash:             mcpSet.Hash(),
-		Messages:            result.Messages,
-		ParentStatePath:     parentStatePath,
-		ForkedFromStatePath: request.ForkedFrom,
+		Version:                2,
+		Repository:             isolated.Repository,
+		WorktreePath:           isolated.Path,
+		BaseCommit:             request.BaseCommit,
+		Provider:               request.Provider,
+		Model:                  request.Model,
+		BaseURL:                request.BaseURL,
+		Task:                   request.Task,
+		MaxSteps:               request.MaxSteps,
+		Verification:           request.Verification,
+		Scopes:                 request.Scopes,
+		Profile:                request.Profile,
+		ThreadID:               request.ThreadID,
+		Mode:                   request.Mode.String(),
+		HooksHash:              hookEngine.Hash(),
+		LSPHash:                lspSet.Hash(),
+		MCPHash:                mcpSet.Hash(),
+		Messages:               result.Messages,
+		ParentStatePath:        parentStatePath,
+		ForkedFromStatePath:    request.ForkedFrom,
 		AllowedCommands:        remembered.Snapshot(),
 		AllowedCommandPrefixes: request.AllowedCommandPrefixes,
 	}
@@ -452,6 +464,17 @@ func filterTools(available []agent.Tool, policy instructions.ProfilePolicy) []ag
 			continue
 		}
 		if policy.HasOmit(instructions.OmitRunCommand) && name == "run_command" {
+			continue
+		}
+		filtered = append(filtered, tool)
+	}
+	return filtered
+}
+
+func filterBrowserTools(available []agent.Tool) []agent.Tool {
+	filtered := make([]agent.Tool, 0, len(available))
+	for _, tool := range available {
+		if strings.HasPrefix(tool.Definition().Name, "browser_") {
 			continue
 		}
 		filtered = append(filtered, tool)

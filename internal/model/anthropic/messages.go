@@ -45,7 +45,7 @@ func (m Messages) Complete(ctx context.Context, turn agent.TurnRequest) (agent.T
 		return agent.Turn{}, fmt.Errorf("read Anthropic response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, describeAPIError(response.StatusCode, contents)
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
 	}
 	return decodeResponse(contents)
 }
@@ -64,7 +64,7 @@ func (m Messages) CompleteStream(ctx context.Context, turn agent.TurnRequest, on
 		if readErr != nil {
 			return agent.Turn{}, fmt.Errorf("read Anthropic stream error: %w", readErr)
 		}
-		return agent.Turn{}, describeAPIError(response.StatusCode, contents)
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
 	}
 	return decodeSSE(response.Body, onDelta)
 }

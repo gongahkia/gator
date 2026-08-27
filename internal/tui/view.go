@@ -878,7 +878,7 @@ func (m Model) helpView() string {
 			"PgUp / PgDn  browse the conversation",
 			"/run  edit advanced run options",
 			"/doctor  inspect local diagnostics",
-			"/agents  list narrowing profiles and prompt-only roles",
+			"/agents  list narrowing profiles and role overlays",
 			"@  begin a repository-path reference",
 			"Ctrl+Space (Ctrl+@)  reopen @ path suggestions",
 			"Tab  complete a command or insert a path; Enter runs a command",

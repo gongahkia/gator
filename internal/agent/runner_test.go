@@ -114,6 +114,72 @@ func TestRunnerStopsAtStepLimit(t *testing.T) {
 	}
 }
 
+func TestRunnerRecoversFromMalformedToolCallsWithoutExecutingThem(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{
+		{ToolCalls: []ToolCall{
+			{ID: "missing-name", Name: "not_a_tool", Arguments: json.RawMessage(`{}`)},
+			{ID: "bad-json", Name: "read_file", Arguments: json.RawMessage(`{`)},
+			{Name: "read_file", Arguments: json.RawMessage(`{"path":"README.md"}`)},
+		}},
+		{Text: "I recovered after invalid tool calls."},
+	}}
+	tool := &recordingTool{result: ToolResult{Content: `{"ok":true}`}}
+	runner := Runner{Model: model, Tools: []Tool{tool}, Now: fixedClock()}
+	result, err := runner.Run(context.Background(), RunOptions{Task: "inspect", MaxSteps: 3})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if tool.calls != 0 {
+		t.Fatalf("malformed calls executed %d times", tool.calls)
+	}
+	if result.FinalText != "I recovered after invalid tool calls." {
+		t.Fatalf("final text = %q", result.FinalText)
+	}
+	if len(model.requests) != 2 {
+		t.Fatalf("requests = %d", len(model.requests))
+	}
+	failures := model.requests[1].Messages[len(model.requests[1].Messages)-3:]
+	if !strings.Contains(failures[0].Content, "not available") || !strings.Contains(failures[1].Content, "invalid JSON") || !strings.Contains(failures[2].Content, "id is required") {
+		t.Fatalf("tool failures = %#v", failures)
+	}
+}
+
+func TestRunnerRetriesTransientProviderErrorsWithoutMutatingHistory(t *testing.T) {
+	model := &scriptedModel{
+		failures: []error{TransientError{Err: errors.New("HTTP 429: rate limit reached")}},
+		turns:    []Turn{{Text: "Recovered after a rate limit."}},
+	}
+	runner := Runner{Model: model, Now: fixedClock()}
+	result, err := runner.Run(context.Background(), RunOptions{Task: "retryable turn", MaxSteps: 2})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if result.FinalText != "Recovered after a rate limit." || len(model.requests) != 2 {
+		t.Fatalf("result = %#v requests=%d", result, len(model.requests))
+	}
+	if len(model.requests[0].Messages) != len(model.requests[1].Messages) {
+		t.Fatalf("retry mutated history: first=%d second=%d", len(model.requests[0].Messages), len(model.requests[1].Messages))
+	}
+	agents := 0
+	for _, message := range result.Messages {
+		if message.Role == RoleAgent {
+			agents++
+		}
+	}
+	if agents != 1 {
+		t.Fatalf("retry debris entered history: %#v", result.Messages)
+	}
+}
+
+func TestRunnerDoesNotRetryPermanentProviderErrors(t *testing.T) {
+	model := &scriptedModel{failures: []error{errors.New("HTTP 400: invalid_request")}}
+	runner := Runner{Model: model, Now: fixedClock()}
+	_, err := runner.Run(context.Background(), RunOptions{Task: "permanent failure", MaxSteps: 2})
+	if err == nil || !strings.Contains(err.Error(), "HTTP 400") || len(model.requests) != 1 {
+		t.Fatalf("permanent error = %v requests=%d", err, len(model.requests))
+	}
+}
+
 func TestRunnerRequiresCompletionEvidence(t *testing.T) {
 	model := &scriptedModel{turns: []Turn{
 		{Text: "The feature is done."},
@@ -276,12 +342,18 @@ func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
 
 type scriptedModel struct {
 	turns      []Turn
+	failures   []error
 	requests   []TurnRequest
 	onComplete func(int)
 }
 
 func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, error) {
 	m.requests = append(m.requests, request)
+	if len(m.failures) > 0 {
+		err := m.failures[0]
+		m.failures = m.failures[1:]
+		return Turn{}, err
+	}
 	if len(m.turns) == 0 {
 		return Turn{}, errors.New("unexpected model call")
 	}

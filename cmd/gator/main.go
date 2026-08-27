@@ -56,6 +56,7 @@ Usage:
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live]
   gator transcript RUN_RECORD_PATH > transcript.html
   gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
   gator export RUN_RECORD_PATH
@@ -79,6 +80,7 @@ Commands:
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    select, reopen, or immediately continue a retained local thread
+  eval      run a bounded evaluation fixture and write a JSON report
   transcript export one retained private session as local HTML
   review    serve an authenticated loopback browser review for one retained run
   export    write a portable patch for a retained run to standard output
@@ -166,6 +168,8 @@ func run(args []string, out io.Writer) error {
 		return forkTask(args[1:], out)
 	case "clone":
 		return cloneTask(args[1:], out)
+	case "eval":
+		return evalCommand(args[1:], out)
 	case "transcript":
 		return exportTranscript(args[1:], out)
 	case "review":

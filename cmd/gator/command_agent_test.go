@@ -22,7 +22,7 @@ func TestAgentCommandListsProjectRolesWithoutActivatingThem(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repository, ".gator", "agents.json"), []byte(`{
   "version": 1,
   "roles": [
-    {"name":"writer","description":"focused implementation","kind":"writer","instructions":"write only the assigned area"},
+    {"name":"writer","description":"focused implementation","kind":"writer","instructions":"write only the assigned area","policy":{"network":"deny","omit":["browser"]}},
     {"name":"reviewer","description":"independent review","kind":"readonly","instructions":"report evidence"}
   ]
 }`), 0o600); err != nil {
@@ -42,7 +42,7 @@ func TestAgentCommandListsProjectRolesWithoutActivatingThem(t *testing.T) {
 		t.Fatalf("list agent roles: %v", err)
 	}
 	value := output.String()
-	for _, expected := range []string{"Project agents:", "Roles (prompt-only specializations):", "reviewer  readonly  independent review", "writer  writer  focused implementation"} {
+	for _, expected := range []string{"Project agents:", "Roles (can only narrow inherited policy):", "reviewer  readonly  independent review  policy=inherit", "writer  writer  focused implementation  policy=network:deny;omit:browser"} {
 		if !strings.Contains(value, expected) {
 			t.Fatalf("agent list missing %q: %q", expected, value)
 		}

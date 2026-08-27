@@ -114,7 +114,7 @@ func (m Model) Complete(ctx context.Context, turn agent.TurnRequest) (agent.Turn
 		return agent.Turn{}, fmt.Errorf("read %s response: %w", m.providerName(), err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, describeAPIError(m.providerName(), response.StatusCode, contents)
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(m.providerName(), response.StatusCode, contents))
 	}
 	return decodeResponse(contents, m.providerName())
 }

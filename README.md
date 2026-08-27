@@ -11,11 +11,13 @@ tests, and propose the resulting patch.
 
 ## Status
 
-The project is being rebuilt from a previous agent meta-harness. The runnable
-milestone includes a Gator-owned native loop, direct cloud-provider adapters,
-worktree-local tools, command policy, durable local run storage, a full-screen
-terminal application, and an automation protocol. Real-model usability
-evidence and broader replay coverage are still in progress.
+The runnable milestone includes a Gator-owned native loop, direct cloud-provider
+adapters, worktree-local tools, command policy, durable local run storage, a
+full-screen terminal application, an automation protocol, and an offline
+evaluation harness. See [release evidence](docs/RELEASE_EVIDENCE.md) for the
+automated checks and dogfood checklist. No GitHub release has been published
+yet; real-repository dogfood logs are still the human gate for a daily-driver
+claim.
 
 ## Install and update
 
@@ -49,6 +51,8 @@ make build
 ./bin/gator help
 ./bin/gator doctor
 ./bin/gator version
+# Offline evaluation: unique --run-id per attempt. See docs/RELEASE_EVIDENCE.md.
+# ./bin/gator eval ./internal/eval/testdata/greeting --script ./path/to/script.json
 ./bin/gator config set default-provider anthropic
 ./bin/gator config set default-model claude-sonnet-4-6
 OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \
@@ -585,19 +589,26 @@ children total per primary run). Every writer starts from the same snapshot of
 the isolated parent worktree in its own retained child worktree, with a clean
 internal baseline. A parallel call must declare non-overlapping
 repository-relative paths; Gator rejects conflicting declarations and reports
-the actual changed paths and any post-run overlap or scope violation. That
-evidence is not a merge decision: the primary agent stays paused, receives only
-summaries and, when no larger than 512 KiB, reviewable patches, and must use a
-separate `apply_patch` call for each compatible delta. Gator never auto-merges
-writer output. Writer children inherit the developer-selected profile,
+the actual changed paths and any post-run overlap or scope violation. It also
+creates ref-free comparison commits and runs Git's three-way `merge-tree`
+analysis without changing a ref, index, or worktree. A clean textual comparison
+is still not a semantic merge decision: the primary agent stays paused,
+receives only summaries and, when no larger than 512 KiB, reviewable patches,
+and must use a separate `apply_patch` call for each compatible delta. Gator
+never auto-merges writer output. Writer children inherit the developer-selected
+profile,
 verifier, sandbox, approval policy, and trusted integrations, but cannot
-recursively create writers. Their lifecycle, baseline, patch digest, worktree,
-and child run record are saved privately under the parent run record. A batch
-also persists its two-child schedule and conflict evidence; inspect children
+recursively create writers. Their lifecycle, effective narrowed policy,
+owner/deadline/heartbeat, baseline, verifier and patch digests, comparison
+commit, worktree, and child run record are saved privately under the parent run
+record. A batch also persists its two-child schedule, changed-path evidence,
+and three-way comparison result; inspect children
 with `gator child list RUN_RECORD_PATH` and `gator child show RUN_RECORD_PATH
 CHILD_RUN_ID`, or batches with `gator child batches RUN_RECORD_PATH` and `gator
-child batch RUN_RECORD_PATH BATCH_ID`. A named project `writer` role focuses
-prompt instructions only and cannot weaken these boundaries.
+child batch RUN_RECORD_PATH BATCH_ID`. A named project `writer` role can focus
+prompt instructions and further narrow sandbox, network, step, or tool policy;
+the role meet cannot restore authority removed by the parent profile. See
+[writer orchestration](docs/WRITERS.md).
 
 Execute mode also gives the native model a persistent terminal-task surface:
 `terminal_start`, `terminal_read`, `terminal_write`, `terminal_list`, and
@@ -641,6 +652,16 @@ the current run; the tool accepts only port 443, resolves and pins public DNS
 addresses, rejects local/private/reserved targets, does not follow redirects,
 and returns at most 256 KiB of textual content.
 
+The same explicit network grant exposes an ephemeral document browser:
+`browser_navigate`, `browser_snapshot`, `browser_extract`, and `browser_act`.
+It returns bounded visible text and stable link/form references, and every
+navigation or action destination needs approval before a new DNS-pinned
+request. It fetches only the main document, rejects private/reserved targets,
+does not follow redirects, and has no JavaScript, subresources, cookies,
+persistent profile, downloads, arbitrary DOM evaluation, or computer control.
+Actions are limited to link GETs and HTML form GET/POST requests; password and
+file inputs are refused. See [bounded document browser](docs/BROWSER.md).
+
 Set `BRAVE_SEARCH_API_KEY` to also expose `web_search` through Brave's
 documented Web Search API. Each exact query needs approval unless remembered
 for the current run; the fixed HTTPS endpoint uses the same proxy-free,
@@ -648,8 +669,9 @@ public-DNS-pinned transport, shares the eight-request web-research budget with
 `http_fetch`, and returns at most ten title/URL/snippet records. The key stays
 in the process environment and outgoing request header only: it is not written
 to Gator configuration, events, or tool results. Search results and fetched
-pages remain untrusted data. This adds native search, not browser automation or
-computer use. [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get)
+pages remain untrusted data. The bounded document browser is intentionally not
+a full JavaScript browser, authenticated browser profile, screenshot tool, or
+computer-use system. [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get)
 
 See the source-backed [terminal-harness capability audit](docs/COMPETITIVE_AUDIT.md)
 for the current comparison with Codex CLI, Claude Code, Cursor CLI, Pi, and

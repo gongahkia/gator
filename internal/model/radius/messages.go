@@ -80,7 +80,7 @@ func (m Messages) complete(ctx context.Context, turn agent.TurnRequest, onDelta 
 		if readErr != nil {
 			return agent.Turn{}, fmt.Errorf("read Radius response: %w", readErr)
 		}
-		return agent.Turn{}, fmt.Errorf("Radius request returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, fmt.Errorf("Radius request returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body))))
 	}
 	return decodeSSE(response.Body, onDelta)
 }

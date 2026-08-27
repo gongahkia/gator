@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -216,13 +218,14 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	}
 	startedAt := t.writer.now()
 	batchManifest := journal.ChildBatchManifest{
-		Version:     1,
-		ID:          batchID,
-		ParentRunID: t.writer.request.RunID,
-		Status:      journal.ChildBatchPreparing,
-		ChildIDs:    childIDs,
-		StartedAt:   startedAt,
-		UpdatedAt:   startedAt,
+		Version:          1,
+		ID:               batchID,
+		ParentRunID:      t.writer.request.RunID,
+		Status:           journal.ChildBatchPreparing,
+		ChildIDs:         childIDs,
+		ComparisonStatus: "pending",
+		StartedAt:        startedAt,
+		UpdatedAt:        startedAt,
 	}
 	if err := t.writer.saveBatchManifest(batchManifest); err != nil {
 		t.writer.budget.release(len(assignments))
@@ -257,6 +260,17 @@ func (t writerBatchTool) Execute(ctx context.Context, raw json.RawMessage) (agen
 	}
 	wait.Wait()
 	conflicts := inspectWriterConflicts(reports)
+	comparisonStatus, comparisonTree, comparisonDetail := compareWriterPatchCommits(ctx, t.writer.parent.Path, reports)
+	batchManifest.ComparisonStatus = comparisonStatus
+	batchManifest.ComparisonTree = comparisonTree
+	batchManifest.ComparisonDetail = comparisonDetail
+	if comparisonStatus == "conflict" {
+		conflicts = append(conflicts, writerConflict{
+			Kind: "textual_merge_conflict", Writers: []string{reports[0].RunID, reports[1].RunID},
+			Paths:  changedPathOverlaps(reports[0].ChangedPaths, reports[1].ChangedPaths),
+			Detail: "Git three-way comparison found a textual merge conflict; inspect both retained patches",
+		})
+	}
 	batchManifest.Conflicts = journalWriterConflicts(conflicts)
 	batchManifest.Status = writerBatchStatus(ctx, reports)
 	finishedAt := t.writer.now()
@@ -309,6 +323,7 @@ type delegatedWriterReport struct {
 	Summary          string   `json:"summary,omitempty"`
 	Patch            string   `json:"patch,omitempty"`
 	PatchBytes       int      `json:"patch_bytes"`
+	PatchCommit      string   `json:"patch_commit,omitempty"`
 	PatchAvailable   bool     `json:"patch_available"`
 	ReviewRequired   bool     `json:"review_required"`
 	WorktreeRetained bool     `json:"worktree_retained"`
@@ -331,20 +346,42 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 	}
 	report.RunID = runID
 	startedAt := t.now()
+	effective, effectiveErr := t.effectiveRolePolicy(role)
+	if effectiveErr != nil {
+		report.Error = truncateWriterText(effectiveErr.Error(), maxWriterSummaryBytes)
+		return report
+	}
+	var deadline *time.Time
+	if value, ok := ctx.Deadline(); ok {
+		deadline = &value
+	}
 	manifest := journal.ChildManifest{
-		Version:        1,
-		ID:             runID,
-		ParentRunID:    t.request.RunID,
-		Kind:           "writer",
-		Status:         journal.ChildPreparing,
-		Repository:     t.parent.Repository,
-		Role:           role.Name,
-		BatchID:        batchID,
-		DeclaredPaths:  append([]string(nil), declaredPaths...),
-		TaskSHA256:     writerDigest(assignment),
-		StartedAt:      startedAt,
-		UpdatedAt:      startedAt,
-		ReviewRequired: true,
+		Version:             1,
+		ID:                  runID,
+		ParentRunID:         t.request.RunID,
+		Kind:                "writer",
+		Status:              journal.ChildPreparing,
+		Repository:          t.parent.Repository,
+		ParentWorktree:      t.parent.Path,
+		Provider:            t.request.Provider,
+		Model:               t.request.Model,
+		Profile:             t.request.Profile,
+		Role:                role.Name,
+		BatchID:             batchID,
+		DeclaredPaths:       append([]string(nil), declaredPaths...),
+		TaskSHA256:          writerDigest(assignment),
+		VerificationSHA256:  writerJSONDigest(t.request.Verification),
+		EffectiveMode:       effective.mode,
+		EffectiveSandbox:    effective.sandbox,
+		EffectiveNetwork:    effective.network,
+		MaxSteps:            effective.maxSteps,
+		OmittedCapabilities: append([]string(nil), effective.omit...),
+		OwnerPID:            os.Getpid(),
+		HeartbeatAt:         startedAt,
+		DeadlineAt:          deadline,
+		StartedAt:           startedAt,
+		UpdatedAt:           startedAt,
+		ReviewRequired:      true,
 	}
 	if err := t.saveManifest(manifest); err != nil {
 		report.Error = truncateWriterText("persist writer manifest before child start: "+err.Error(), maxWriterSummaryBytes)
@@ -367,6 +404,7 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 	manifest.BaseCommit = baseline
 	manifest.Status = journal.ChildRunning
 	manifest.UpdatedAt = t.now()
+	manifest.HeartbeatAt = manifest.UpdatedAt
 	if err := t.saveManifest(manifest); err != nil {
 		report.Error = truncateWriterText("persist writer manifest before child execution: "+err.Error(), maxWriterSummaryBytes)
 		t.finishManifest(&manifest, journal.ChildFailed, report)
@@ -394,6 +432,7 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 	childRequest.TerminalRegistry = nil
 	childRequest.LSPRegistry = nil
 	childRequest.DisableWriterDelegation = true
+	childRequest.RolePolicy = role.Policy
 	childRequest.AllowedCommands = tools.MergeArgvLists(t.request.AllowedCommands, t.remembered.Snapshot())
 	childRequest.System = joinInstructions(joinInstructions(t.request.System, writerSystemPrompt()), rolePrompt(role))
 	if t.request.Approve != nil && t.approval != nil {
@@ -412,6 +451,15 @@ func (t writerTool) runScoped(ctx context.Context, assignment string, role instr
 	if patchErr == nil && len(patchContents) <= maxWriterPatchBytes {
 		report.Patch = string(patchContents)
 		report.PatchAvailable = len(patchContents) > 0
+	}
+	if patchErr == nil && len(patchContents) > 0 {
+		commit, commitErr := createWriterPatchCommit(ctx, child.Path, baseline, patchContents)
+		if commitErr != nil {
+			report.Error = combineWriterError(report.Error, "prepare writer comparison commit: "+commitErr.Error())
+		} else {
+			report.PatchCommit = commit
+			manifest.PatchCommit = commit
+		}
 	}
 	if patchErr != nil {
 		report.Error = combineWriterError(report.Error, "export writer delta: "+patchErr.Error())
@@ -478,6 +526,39 @@ func writerBatchStatus(ctx context.Context, reports []delegatedWriterReport) jou
 	return journal.ChildBatchCompleted
 }
 
+func compareWriterPatchCommits(ctx context.Context, directory string, reports []delegatedWriterReport) (string, string, string) {
+	if len(reports) != 2 || reports[0].PatchCommit == "" || reports[1].PatchCommit == "" {
+		return "unavailable", "", "comparison requires two exported writer patch commits"
+	}
+	command := exec.CommandContext(ctx, "git", "merge-tree", "--write-tree", "--messages", reports[0].PatchCommit, reports[1].PatchCommit)
+	command.Dir = directory
+	var output writerGitBuffer
+	output.limit = maxWriterGitOutput
+	command.Stdout = &output
+	command.Stderr = &output
+	err := command.Run()
+	if output.truncated {
+		return "unavailable", "", "git merge-tree output exceeded the bounded comparison limit"
+	}
+	text := strings.TrimSpace(output.String())
+	if err == nil {
+		tree := text
+		if newline := strings.IndexByte(tree, '\n'); newline >= 0 {
+			tree = tree[:newline]
+		}
+		return "clean", strings.TrimSpace(tree), "Git three-way comparison completed without textual conflicts; semantic review is still required"
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return "conflict", "", "Git three-way comparison reported conflicts; no patch was merged or applied"
+	}
+	if text == "" {
+		text = err.Error()
+	}
+	text = strings.Join(strings.Fields(text), " ")
+	return "unavailable", "", truncateWriterText(text, 512)
+}
+
 func journalWriterConflicts(conflicts []writerConflict) []journal.ChildConflict {
 	if len(conflicts) == 0 {
 		return nil
@@ -501,6 +582,7 @@ func (t writerTool) finishManifest(manifest *journal.ChildManifest, status journ
 	finished := t.now()
 	manifest.Status = status
 	manifest.UpdatedAt = finished
+	manifest.HeartbeatAt = finished
 	manifest.FinishedAt = &finished
 	manifest.PatchBytes = report.PatchBytes
 	manifest.PatchAvailable = report.PatchAvailable
@@ -527,6 +609,49 @@ func writerDigest(value string) string {
 func writerBytesDigest(value []byte) string {
 	digest := sha256.Sum256(value)
 	return fmt.Sprintf("%x", digest)
+}
+
+func writerJSONDigest(value any) string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return ""
+	}
+	return writerBytesDigest(encoded)
+}
+
+type writerEffectivePolicy struct {
+	mode, sandbox, network string
+	maxSteps               int
+	omit                   []string
+}
+
+func (t writerTool) effectiveRolePolicy(role instructions.Role) (writerEffectivePolicy, error) {
+	set, err := instructions.LoadWithProfile(t.parent.Repository, t.request.Scopes, t.request.Profile)
+	if err != nil {
+		return writerEffectivePolicy{}, fmt.Errorf("load parent profile for writer role: %w", err)
+	}
+	policy, mode, steps, profile, err := instructions.Meet(t.executor.Sandbox.Normalize(), t.request.Mode.String(), t.request.MaxSteps, set.Policy)
+	if err != nil {
+		return writerEffectivePolicy{}, fmt.Errorf("apply parent profile for writer role: %w", err)
+	}
+	policy, mode, steps, narrowed, err := instructions.Meet(policy, mode, steps, role.Policy)
+	if err != nil {
+		return writerEffectivePolicy{}, fmt.Errorf("apply writer role policy: %w", err)
+	}
+	seen := make(map[string]struct{}, len(profile.Omit)+len(narrowed.Omit))
+	omit := make([]string, 0, len(profile.Omit)+len(narrowed.Omit))
+	for _, item := range append(append([]string(nil), profile.Omit...), narrowed.Omit...) {
+		if _, found := seen[item]; found {
+			continue
+		}
+		seen[item] = struct{}{}
+		omit = append(omit, item)
+	}
+	sort.Strings(omit)
+	return writerEffectivePolicy{
+		mode: mode, sandbox: string(policy.Mode), network: string(policy.Network),
+		maxSteps: steps, omit: omit,
+	}, nil
 }
 
 func (t writerTool) createChild(ctx context.Context, runID string) (worktree.Worktree, string, error) {
@@ -591,6 +716,47 @@ func commitWriterBaseline(ctx context.Context, directory, parentCommit string, s
 		return "", err
 	}
 	return baseline, nil
+}
+
+// createWriterPatchCommit turns a child's exported patch into an unreachable
+// commit using a temporary index. It writes no ref and never changes either
+// worktree; the object exists only so git merge-tree can perform a real
+// three-way comparison between sibling results.
+func createWriterPatchCommit(ctx context.Context, directory, baseline string, contents []byte) (string, error) {
+	index, err := os.CreateTemp("", "gator-writer-index-*")
+	if err != nil {
+		return "", err
+	}
+	indexPath := index.Name()
+	if err := index.Close(); err != nil {
+		_ = os.Remove(indexPath)
+		return "", err
+	}
+	if err := os.Remove(indexPath); err != nil {
+		return "", err
+	}
+	defer os.Remove(indexPath)
+	environment := append(os.Environ(), "GIT_INDEX_FILE="+indexPath)
+	if _, err := writerGitOutputEnv(ctx, directory, environment, nil, "read-tree", baseline); err != nil {
+		return "", err
+	}
+	if _, err := writerGitOutputEnv(ctx, directory, environment, contents, "apply", "--cached", "--check", "--binary"); err != nil {
+		return "", err
+	}
+	if _, err := writerGitOutputEnv(ctx, directory, environment, contents, "apply", "--cached", "--binary"); err != nil {
+		return "", err
+	}
+	tree, err := writerGitOutputEnv(ctx, directory, environment, nil, "write-tree")
+	if err != nil {
+		return "", err
+	}
+	commit, err := writerGitOutputEnv(ctx, directory, environment, nil,
+		"-c", "user.name=Gator Writer", "-c", "user.email=gator-writer@invalid",
+		"commit-tree", strings.TrimSpace(tree), "-p", baseline, "-m", "gator writer comparison")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(commit), nil
 }
 
 func writerTask(parentTask, assignment string, declaredPaths []string) string {
@@ -658,8 +824,15 @@ func runWriterGit(ctx context.Context, directory string, input []byte, arguments
 }
 
 func writerGitOutput(ctx context.Context, directory string, input []byte, arguments ...string) (string, error) {
+	return writerGitOutputEnv(ctx, directory, nil, input, arguments...)
+}
+
+func writerGitOutputEnv(ctx context.Context, directory string, environment []string, input []byte, arguments ...string) (string, error) {
 	command := exec.CommandContext(ctx, "git", arguments...)
 	command.Dir = directory
+	if environment != nil {
+		command.Env = environment
+	}
 	if input != nil {
 		command.Stdin = bytes.NewReader(input)
 	}

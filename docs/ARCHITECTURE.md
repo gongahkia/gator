@@ -95,25 +95,42 @@ state but produce clean deltas containing only their own work. A parallel call
 must declare non-overlapping repository-relative writable paths. Gator rejects
 overlapping declarations before launch, serializes developer approval prompts,
 and then compares the actual changed paths for scope violations or conflicts.
-It reports that evidence but never resolves or merges a conflict.
+For each bounded patch it also creates an unreachable comparison commit through
+a temporary Git index, then runs `git merge-tree --write-tree` against the two
+siblings. This detects real three-way textual conflicts without changing a ref,
+index, or worktree. Path evidence and Git comparison status are both displayed;
+neither is treated as proof of semantic compatibility or a merge instruction.
 
 Each child writes an atomic private manifest under the parent run record before
 worktree creation, while running, and after completion. The manifest records
 the child ID, role, immutable baseline, retained worktree, child run record,
-task and patch digests, declared and actual paths, and outcome without copying
-prompt or patch text. A batch manifest links the exact two child IDs and saves
-the final changed-path conflict evidence. They remain recoverable after a
+task, verifier, and patch digests, comparison commit, declared and actual
+paths, effective mode/sandbox/network/step/tool restrictions, owner PID,
+heartbeat/deadline, and outcome without copying prompt or patch text. A batch
+manifest links the exact two child IDs and saves changed-path evidence plus the
+three-way comparison status, result tree when clean, and bounded diagnostic.
+They remain recoverable after a
 process failure through `gator child list`, `gator child show`, `gator child
 batches`, and `gator child batch`. Each child reloads the same selected profile,
 verifier, sandbox policy, approval callback, and trusted
 extension/LSP/MCP configuration; recursive writer delegation is omitted from
 its tool surface. A validated project `writer` role can specialize the child
-prompt but cannot alter its policy. The parent is paused while children run.
+prompt and further restrict policy; its policy is met after the parent profile
+and can never widen authority. The parent is paused while children run.
 Gator returns a bounded 512 KiB patch plus an 8 KiB summary as untrusted review
 material but does not apply it: only a separate parent `apply_patch` call can
 transfer a compatible delta. Larger or failed deltas remain in retained child
 worktrees for manual inspection. This is bounded parallel worktree scheduling,
-not a background task system or automatic merge engine.
+not an automatic merge engine.
+
+The durable writer lifecycle is intentionally parent-owned. Preparing, running,
+and terminal transitions carry process ownership, heartbeat, and deadline
+evidence so an interrupted foreground scheduler remains diagnosable. A future
+detached writer registry must retain the exact immutable policy and deadline,
+offer explicit status/cancel collection, cap concurrent children, and cancel
+all owned children during normal process shutdown. It must not infer completion
+from a stale PID, restore approvals after restart, or apply a result. This
+release does not detach writer execution from the parent run.
 
 `gator acp` is a separate local stdio ACP v1 agent surface for editors. It
 maps ACP sessions to retained Gator threads, streams normalized model/tool
@@ -267,14 +284,28 @@ than followed. It requires a separate exact-URL approval unless remembered
 within that run (in a memory separate from command approvals), and exposes no
 more than 256 KiB of textual response content.
 
+The same network grant exposes an ephemeral bounded document browser:
+`browser_navigate`, `browser_snapshot`, `browser_extract`, and `browser_act`.
+It fetches only a single approved main document at a time through the same
+public-address-pinned transport. It does not load subresources, run JavaScript,
+follow redirects, use cookies, open popups, download files, retain a profile,
+or evaluate arbitrary DOM code. Snapshots contain bounded normalized visible
+text plus stable link/form references. Actions are limited to approved link
+GETs and form GET/POST requests with explicitly supplied fields; password and
+file fields are refused. Every destination is normalized, resolved, and pinned
+again immediately before its request. The browser shares the eight-request
+budget with fetch and search.
+
 When `BRAVE_SEARCH_API_KEY` is available, `web_search` queries Brave's fixed
 documented Web Search endpoint through that same DNS-pinned, proxy-free
 transport. It validates a 400-byte/50-word query, requires exact-query approval
 in separate memory, shares the eight-request web-research budget with fetches,
 requires a JSON response, and returns at most ten bounded title/URL/snippet
 records. Its token stays only in process memory and the outbound request header;
-it is never persisted, emitted, or sent to the model. Both tools are absent
-when network access is denied. Neither is browser automation or computer use.
+it is never persisted, emitted, or sent to the model. All web tools are absent
+when network access is denied. The document browser is deliberately not a
+JavaScript browser, screenshot engine, authenticated browsing profile, or
+unrestricted computer-use surface.
 
 Plan mode exposes only read/search and Git inspection tools for every direct
 provider.
@@ -301,6 +332,10 @@ Before calling a release useful for daily work, Gator must have:
   fixes;
 - a documented evaluation run with fixed task, model, tool policy, budget,
   time limit, and verifier.
+
+The first, second, third, and fifth items have automated coverage in
+`go test ./...` and `gator eval`. The dogfood log remains a human process;
+the template is in [release evidence](RELEASE_EVIDENCE.md).
 
 Benchmark results can demonstrate a bounded configuration only. They cannot by
 themselves establish general parity with Pi, Codex CLI, or any particular model.

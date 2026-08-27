@@ -83,6 +83,7 @@ func HTTPTools(policy CommandPolicy, options HTTPFetchOptions) []agent.Tool {
 			memory:  newHTTPApprovalMemory(),
 		})
 	}
+	result = append(result, newBrowserTools(policy, options, budget)...)
 	return result
 }
 

@@ -295,13 +295,23 @@ func childSnapshot(runRecord string) ([]tui.ManagedChild, []tui.ManagedBatch, er
 	result := make([]tui.ManagedChild, 0, len(manifests))
 	for _, manifest := range manifests {
 		result = append(result, tui.ManagedChild{
-			ID:           manifest.ID,
-			Status:       string(manifest.Status),
-			Role:         manifest.Role,
-			BatchID:      manifest.BatchID,
-			WorktreePath: manifest.WorktreePath,
-			PatchBytes:   manifest.PatchBytes,
-			Error:        manifest.Error,
+			ID:                  manifest.ID,
+			Status:              string(manifest.Status),
+			Role:                manifest.Role,
+			BatchID:             manifest.BatchID,
+			WorktreePath:        manifest.WorktreePath,
+			Provider:            manifest.Provider,
+			Model:               manifest.Model,
+			Profile:             manifest.Profile,
+			DeclaredPaths:       append([]string(nil), manifest.DeclaredPaths...),
+			ChangedPaths:        append([]string(nil), manifest.ChangedPaths...),
+			EffectiveMode:       manifest.EffectiveMode,
+			EffectiveSandbox:    manifest.EffectiveSandbox,
+			EffectiveNetwork:    manifest.EffectiveNetwork,
+			MaxSteps:            manifest.MaxSteps,
+			OmittedCapabilities: append([]string(nil), manifest.OmittedCapabilities...),
+			PatchBytes:          manifest.PatchBytes,
+			Error:               manifest.Error,
 		})
 	}
 	batchManifests, err := journal.ListChildBatchManifests(runRecord)
@@ -321,7 +331,8 @@ func childSnapshot(runRecord string) ([]tui.ManagedChild, []tui.ManagedBatch, er
 		}
 		batches = append(batches, tui.ManagedBatch{
 			ID: batch.ID, Status: string(batch.Status), ChildIDs: append([]string(nil), batch.ChildIDs...),
-			Conflicts: conflicts, Error: batch.Error,
+			Conflicts: conflicts, ComparisonStatus: batch.ComparisonStatus,
+			ComparisonTree: batch.ComparisonTree, ComparisonDetail: batch.ComparisonDetail, Error: batch.Error,
 		})
 	}
 	return result, batches, nil

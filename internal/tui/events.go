@@ -159,7 +159,7 @@ func describeToolCall(call agent.ToolCall) string {
 			return patchPreview(arguments.Patch)
 		}
 	}
-	if call.Name == "read_file" || call.Name == "list_files" || call.Name == "search_files" || call.Name == "http_fetch" {
+	if call.Name == "read_file" || call.Name == "list_files" || call.Name == "search_files" || call.Name == "http_fetch" || call.Name == "browser_navigate" {
 		var arguments struct {
 			Path  string `json:"path"`
 			Query string `json:"query"`
@@ -176,6 +176,34 @@ func describeToolCall(call agent.ToolCall) string {
 				return "url: " + arguments.URL
 			}
 		}
+	}
+	if call.Name == "browser_snapshot" {
+		return "current bounded document"
+	}
+	if call.Name == "browser_extract" {
+		var arguments struct {
+			Kind  string `json:"kind"`
+			Query string `json:"query"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			detail := "kind: " + arguments.Kind
+			if arguments.Query != "" {
+				detail += " · query: " + arguments.Query
+			}
+			return detail
+		}
+		return "bounded document extraction"
+	}
+	if call.Name == "browser_act" {
+		var arguments struct {
+			Action string            `json:"action"`
+			Ref    string            `json:"ref"`
+			Fields map[string]string `json:"fields"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return fmt.Sprintf("action: %s · ref: %s · fields: %d (values hidden)", arguments.Action, arguments.Ref, len(arguments.Fields))
+		}
+		return "bounded browser action (field values hidden)"
 	}
 	if call.Name == "run_command" {
 		var arguments struct {

@@ -43,10 +43,15 @@ func TestChildCommandListsAndShowsDurableWriterManifest(t *testing.T) {
 		Kind:             "writer",
 		Status:           journal.ChildCompleted,
 		Repository:       "/workspace/project",
+		ParentWorktree:   "/runs/run-parent-cli",
 		WorktreePath:     "/runs/run-child-cli",
 		BaseCommit:       "abcdef0",
+		Provider:         "test",
+		Model:            "test-model",
 		Role:             "test-fixer",
 		BatchID:          batch.ID,
+		DeclaredPaths:    []string{"internal/feature"},
+		ChangedPaths:     []string{"internal/feature/feature.go"},
 		TaskSHA256:       strings.Repeat("a", 64),
 		StartedAt:        now,
 		UpdatedAt:        finished,
@@ -72,7 +77,7 @@ func TestChildCommandListsAndShowsDurableWriterManifest(t *testing.T) {
 	if err := childCommand([]string{"show", record.StatePath, "run-child-cli"}, &output); err != nil {
 		t.Fatalf("show child manifest: %v", err)
 	}
-	if got := output.String(); !strings.Contains(got, "task sha256: "+manifest.TaskSHA256) || !strings.Contains(got, "batch: batch-child-cli") || !strings.Contains(got, "child record: /state/run-child-cli") || !strings.Contains(got, "42 bytes (available to parent)") {
+	if got := output.String(); !strings.Contains(got, "task sha256: "+manifest.TaskSHA256) || !strings.Contains(got, "batch: batch-child-cli") || !strings.Contains(got, "parent worktree: /runs/run-parent-cli") || !strings.Contains(got, "provider: test") || !strings.Contains(got, "model: test-model") || !strings.Contains(got, "declared paths: internal/feature") || !strings.Contains(got, "changed paths: internal/feature/feature.go") || !strings.Contains(got, "child record: /state/run-child-cli") || !strings.Contains(got, "42 bytes (available to parent)") {
 		t.Fatalf("child show = %q", got)
 	}
 	output.Reset()

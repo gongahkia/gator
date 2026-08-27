@@ -47,29 +47,43 @@ const (
 // The parent manifest is an orchestration and recovery record, not another
 // conversation transcript.
 type ChildManifest struct {
-	Version          int         `json:"version"`
-	ID               string      `json:"id"`
-	ParentRunID      string      `json:"parent_run_id"`
-	Kind             string      `json:"kind"`
-	Status           ChildStatus `json:"status"`
-	Repository       string      `json:"repository"`
-	WorktreePath     string      `json:"worktree_path,omitempty"`
-	BaseCommit       string      `json:"base_commit,omitempty"`
-	Role             string      `json:"role,omitempty"`
-	BatchID          string      `json:"batch_id,omitempty"`
-	DeclaredPaths    []string    `json:"declared_paths,omitempty"`
-	ChangedPaths     []string    `json:"changed_paths,omitempty"`
-	TaskSHA256       string      `json:"task_sha256"`
-	StartedAt        time.Time   `json:"started_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
-	FinishedAt       *time.Time  `json:"finished_at,omitempty"`
-	StatePath        string      `json:"state_path,omitempty"`
-	PatchSHA256      string      `json:"patch_sha256,omitempty"`
-	PatchBytes       int         `json:"patch_bytes"`
-	PatchAvailable   bool        `json:"patch_available"`
-	ReviewRequired   bool        `json:"review_required"`
-	WorktreeRetained bool        `json:"worktree_retained"`
-	Error            string      `json:"error,omitempty"`
+	Version             int         `json:"version"`
+	ID                  string      `json:"id"`
+	ParentRunID         string      `json:"parent_run_id"`
+	Kind                string      `json:"kind"`
+	Status              ChildStatus `json:"status"`
+	Repository          string      `json:"repository"`
+	ParentWorktree      string      `json:"parent_worktree,omitempty"`
+	WorktreePath        string      `json:"worktree_path,omitempty"`
+	BaseCommit          string      `json:"base_commit,omitempty"`
+	Provider            string      `json:"provider,omitempty"`
+	Model               string      `json:"model,omitempty"`
+	Profile             string      `json:"profile,omitempty"`
+	Role                string      `json:"role,omitempty"`
+	BatchID             string      `json:"batch_id,omitempty"`
+	DeclaredPaths       []string    `json:"declared_paths,omitempty"`
+	ChangedPaths        []string    `json:"changed_paths,omitempty"`
+	TaskSHA256          string      `json:"task_sha256"`
+	VerificationSHA256  string      `json:"verification_sha256,omitempty"`
+	EffectiveMode       string      `json:"effective_mode,omitempty"`
+	EffectiveSandbox    string      `json:"effective_sandbox,omitempty"`
+	EffectiveNetwork    string      `json:"effective_network,omitempty"`
+	MaxSteps            int         `json:"max_steps,omitempty"`
+	OmittedCapabilities []string    `json:"omitted_capabilities,omitempty"`
+	OwnerPID            int         `json:"owner_pid,omitempty"`
+	HeartbeatAt         time.Time   `json:"heartbeat_at,omitempty"`
+	DeadlineAt          *time.Time  `json:"deadline_at,omitempty"`
+	StartedAt           time.Time   `json:"started_at"`
+	UpdatedAt           time.Time   `json:"updated_at"`
+	FinishedAt          *time.Time  `json:"finished_at,omitempty"`
+	StatePath           string      `json:"state_path,omitempty"`
+	PatchSHA256         string      `json:"patch_sha256,omitempty"`
+	PatchCommit         string      `json:"patch_commit,omitempty"`
+	PatchBytes          int         `json:"patch_bytes"`
+	PatchAvailable      bool        `json:"patch_available"`
+	ReviewRequired      bool        `json:"review_required"`
+	WorktreeRetained    bool        `json:"worktree_retained"`
+	Error               string      `json:"error,omitempty"`
 }
 
 // ChildBatchStatus captures the durable scheduling state of one parallel
@@ -100,16 +114,19 @@ type ChildConflict struct {
 // details; this record keeps the grouping and final conflict assessment
 // recoverable if Gator exits before returning it to the parent agent.
 type ChildBatchManifest struct {
-	Version     int              `json:"version"`
-	ID          string           `json:"id"`
-	ParentRunID string           `json:"parent_run_id"`
-	Status      ChildBatchStatus `json:"status"`
-	ChildIDs    []string         `json:"child_ids"`
-	StartedAt   time.Time        `json:"started_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
-	FinishedAt  *time.Time       `json:"finished_at,omitempty"`
-	Conflicts   []ChildConflict  `json:"conflicts,omitempty"`
-	Error       string           `json:"error,omitempty"`
+	Version          int              `json:"version"`
+	ID               string           `json:"id"`
+	ParentRunID      string           `json:"parent_run_id"`
+	Status           ChildBatchStatus `json:"status"`
+	ChildIDs         []string         `json:"child_ids"`
+	StartedAt        time.Time        `json:"started_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
+	FinishedAt       *time.Time       `json:"finished_at,omitempty"`
+	Conflicts        []ChildConflict  `json:"conflicts,omitempty"`
+	ComparisonStatus string           `json:"comparison_status,omitempty"`
+	ComparisonTree   string           `json:"comparison_tree,omitempty"`
+	ComparisonDetail string           `json:"comparison_detail,omitempty"`
+	Error            string           `json:"error,omitempty"`
 }
 
 // SaveChildManifest atomically publishes one parent-owned child state
@@ -349,8 +366,31 @@ func validateChildManifest(manifest ChildManifest) error {
 	if !validManifestSHA256(manifest.TaskSHA256) {
 		return errors.New("child manifest task SHA-256 is invalid")
 	}
+	if manifest.VerificationSHA256 != "" && !validManifestSHA256(manifest.VerificationSHA256) {
+		return errors.New("child manifest verification SHA-256 is invalid")
+	}
+	if manifest.OwnerPID < 0 || manifest.MaxSteps < 0 {
+		return errors.New("child manifest owner or step budget is invalid")
+	}
+	if !manifest.HeartbeatAt.IsZero() && (manifest.HeartbeatAt.Before(manifest.StartedAt) || manifest.HeartbeatAt.After(manifest.UpdatedAt)) {
+		return errors.New("child manifest heartbeat is outside its lifecycle")
+	}
+	if manifest.DeadlineAt != nil && manifest.DeadlineAt.Before(manifest.StartedAt) {
+		return errors.New("child manifest deadline precedes start")
+	}
+	if len(manifest.OmittedCapabilities) > 16 {
+		return errors.New("child manifest has too many omitted capabilities")
+	}
+	for _, capability := range manifest.OmittedCapabilities {
+		if capability == "" || len(capability) > 64 || strings.ContainsAny(capability, "\x00\r\n") {
+			return errors.New("child manifest omitted capability is invalid")
+		}
+	}
 	if manifest.PatchSHA256 != "" && !validManifestSHA256(manifest.PatchSHA256) {
 		return errors.New("child manifest patch SHA-256 is invalid")
+	}
+	if manifest.PatchCommit != "" && !validGitObjectID(manifest.PatchCommit) {
+		return errors.New("child manifest patch commit is invalid")
 	}
 	if manifest.PatchBytes < 0 {
 		return errors.New("child manifest patch bytes are invalid")
@@ -368,16 +408,20 @@ func validateChildManifest(manifest ChildManifest) error {
 		return err
 	}
 	for name, value := range map[string]string{
-		"worktree path": manifest.WorktreePath,
-		"state path":    manifest.StatePath,
-		"role":          manifest.Role,
-		"error":         manifest.Error,
+		"worktree path":        manifest.WorktreePath,
+		"parent worktree path": manifest.ParentWorktree,
+		"state path":           manifest.StatePath,
+		"provider":             manifest.Provider,
+		"model":                manifest.Model,
+		"profile":              manifest.Profile,
+		"role":                 manifest.Role,
+		"error":                manifest.Error,
 	} {
 		if len(value) > maxChildManifestText {
 			return fmt.Errorf("child manifest %s exceeds the %d-byte limit", name, maxChildManifestText)
 		}
 	}
-	if len(manifest.Repository) > maxChildManifestPath || len(manifest.WorktreePath) > maxChildManifestPath || len(manifest.StatePath) > maxChildManifestPath {
+	if len(manifest.Repository) > maxChildManifestPath || len(manifest.ParentWorktree) > maxChildManifestPath || len(manifest.WorktreePath) > maxChildManifestPath || len(manifest.StatePath) > maxChildManifestPath {
 		return errors.New("child manifest path exceeds the 4 KiB limit")
 	}
 	return nil
@@ -424,6 +468,23 @@ func validateChildBatchManifest(manifest ChildBatchManifest) error {
 	if len(manifest.Conflicts) > 8 {
 		return errors.New("child batch manifest exceeds the 8-conflict limit")
 	}
+	switch manifest.ComparisonStatus {
+	case "", "pending", "clean", "conflict", "unavailable":
+	default:
+		return errors.New("child batch manifest comparison status is invalid")
+	}
+	if manifest.ComparisonStatus == "clean" && !validGitObjectID(manifest.ComparisonTree) {
+		return errors.New("clean child batch comparison requires a result tree")
+	}
+	if (manifest.ComparisonStatus == "conflict" || manifest.ComparisonStatus == "unavailable") && strings.TrimSpace(manifest.ComparisonDetail) == "" {
+		return errors.New("non-clean child batch comparison requires detail")
+	}
+	if manifest.ComparisonTree != "" && !validGitObjectID(manifest.ComparisonTree) {
+		return errors.New("child batch comparison tree is invalid")
+	}
+	if len(manifest.ComparisonTree) > 128 || len(manifest.ComparisonDetail) > maxChildManifestText {
+		return errors.New("child batch manifest comparison evidence is too large")
+	}
 	for _, conflict := range manifest.Conflicts {
 		if conflict.Kind == "" || len(conflict.Kind) > 64 || len(conflict.Detail) == 0 || len(conflict.Detail) > maxChildManifestText || strings.ContainsAny(conflict.Detail, "\r\n") {
 			return errors.New("child batch manifest conflict is invalid")
@@ -469,6 +530,14 @@ func validateChildManifestPaths(name string, values []string, maximum int) error
 
 func validManifestSHA256(value string) bool {
 	if len(value) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func validGitObjectID(value string) bool {
+	if len(value) != 40 && len(value) != 64 {
 		return false
 	}
 	_, err := hex.DecodeString(value)

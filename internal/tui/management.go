@@ -691,7 +691,7 @@ func (m Model) managementRows() string {
 			rows = append(rows, fmt.Sprintf("child %s  %s  role=%s  patch=%d bytes", item.ID, item.Status, role, item.PatchBytes))
 		}
 		for _, item := range m.management.data.Batches {
-			rows = append(rows, fmt.Sprintf("batch %s  %s  children=%d  conflicts=%d", item.ID, item.Status, len(item.ChildIDs), len(item.Conflicts)))
+			rows = append(rows, fmt.Sprintf("batch %s  %s  comparison=%s  conflicts=%d", item.ID, item.Status, valueOrEmpty(item.ComparisonStatus), len(item.Conflicts)))
 		}
 	case managementExtensions:
 		for _, item := range m.management.data.Extensions {
@@ -770,7 +770,17 @@ func (m Model) managementDetail() string {
 	case managementChildren:
 		if m.management.index < len(m.management.data.Children) {
 			item := m.management.data.Children[min(m.management.index, len(m.management.data.Children)-1)]
-			detail := "worktree: " + valueOrEmpty(item.WorktreePath) + "\nbatch: " + valueOrEmpty(item.BatchID)
+			detail := "worktree: " + valueOrEmpty(item.WorktreePath) +
+				"\nbatch: " + valueOrEmpty(item.BatchID) +
+				"\nmodel: " + valueOrEmpty(strings.Trim(item.Provider+"/"+item.Model, "/")) +
+				"\nprofile: " + valueOrEmpty(item.Profile) +
+				"\ndeclared paths: " + valueOrEmpty(strings.Join(item.DeclaredPaths, ", ")) +
+				"\nchanged paths: " + valueOrEmpty(strings.Join(item.ChangedPaths, ", ")) +
+				"\npolicy: mode=" + valueOrEmpty(item.EffectiveMode) +
+				" sandbox=" + valueOrEmpty(item.EffectiveSandbox) +
+				" network=" + valueOrEmpty(item.EffectiveNetwork) +
+				fmt.Sprintf(" max_steps=%d", item.MaxSteps) +
+				" omit=" + valueOrEmpty(strings.Join(item.OmittedCapabilities, ","))
 			if item.Error != "" {
 				detail += "\nerror: " + item.Error
 			}
@@ -782,7 +792,14 @@ func (m Model) managementDetail() string {
 			lines := []string{
 				"status: " + item.Status,
 				"children: " + valueOrEmpty(strings.Join(item.ChildIDs, ", ")),
+				"three-way comparison: " + valueOrEmpty(item.ComparisonStatus),
 				fmt.Sprintf("conflicts: %d", len(item.Conflicts)),
+			}
+			if item.ComparisonTree != "" {
+				lines = append(lines, "comparison tree: "+item.ComparisonTree)
+			}
+			if item.ComparisonDetail != "" {
+				lines = append(lines, compact(item.ComparisonDetail, m.panelTextWidth()))
 			}
 			for index, conflict := range item.Conflicts {
 				lines = append(lines, fmt.Sprintf("%d. %s · children=%s · paths=%s", index+1, conflict.Kind, strings.Join(conflict.ChildIDs, ","), strings.Join(conflict.Paths, ",")))

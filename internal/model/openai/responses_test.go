@@ -190,6 +190,9 @@ func TestResponsesCompleteDescribesAPIErrorsWithoutKey(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "HTTP 429: rate limit reached") || strings.Contains(err.Error(), "do-not-leak") {
 		t.Fatalf("API error = %v", err)
 	}
+	if !agent.IsTransient(err) {
+		t.Fatalf("429 was not marked transient: %v", err)
+	}
 }
 
 func TestResponsesRequiresAPIKey(t *testing.T) {
