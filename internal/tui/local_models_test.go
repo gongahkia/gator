@@ -538,7 +538,7 @@ func TestCloudCredentialRemovalRequiresConfirmation(t *testing.T) {
 	if backend.removed != "openai" {
 		t.Fatalf("removed = %q", backend.removed)
 	}
-	if strings.Contains(model.notice.text, "logged out") || !strings.Contains(model.notice.text, "OPENAI_API_KEY") && !strings.Contains(model.notice.text, "were not changed") {
+	if strings.Contains(model.notice.text, "logged out") || !strings.Contains(model.notice.text, "were not changed") {
 		t.Fatalf("notice = %q", model.notice.text)
 	}
 }
@@ -612,27 +612,26 @@ func TestCustomProviderDiscoveryPreviewRequiresConfirm(t *testing.T) {
 		discovery: CustomProviderDiscovery{ID: "team-gateway", Models: []string{"alpha", "beta"}, DefaultModel: "alpha"},
 	}
 	model := New(Config{
-		LocalModels:       &fakeLocalModelManager{},
-		ModelManagement:   backend,
-		CustomProviders:   backend.providers,
-		Provider:          "team-gateway",
-		Model:             "old",
+		LocalModels:     &fakeLocalModelManager{},
+		ModelManagement: backend,
+		CustomProviders: backend.providers,
+		Provider:        "team-gateway",
+		Model:           "old",
 	})
 	model.width, model.height = 100, 42
 	model = selectCloudModelCatalog(t, model, "team-gateway")
-	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
-	if command == nil {
-		t.Fatal("discover did not start")
-	}
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
 	model = next.(Model)
-	message := waitForTeaCommands(t, command)
-	updated, _ := model.Update(message)
+	if model.localModels.action != localModelDiscovering {
+		t.Fatalf("action = %v", model.localModels.action)
+	}
+	updated, _ := model.Update(customProviderDiscoverMsg{generation: model.localModels.generation, preview: backend.discovery})
 	model = updated.(Model)
 	if model.localModels.confirmation != localModelConfirmApplyDiscovery || backend.applied {
 		t.Fatalf("preview applied early: confirm=%v applied=%t", model.localModels.confirmation, backend.applied)
 	}
-	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	message = command()
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	message := command()
 	updated, _ = next.(Model).Update(message)
 	model = updated.(Model)
 	if !backend.applied || strings.Join(model.config.CustomProviders[0].Models, ",") != "alpha,beta" {
@@ -642,7 +641,7 @@ func TestCustomProviderDiscoveryPreviewRequiresConfirm(t *testing.T) {
 
 func TestGatorLocalCustomProviderIsReadOnlyInCloudCatalog(t *testing.T) {
 	model := New(Config{
-		LocalModels: &fakeLocalModelManager{},
+		LocalModels:     &fakeLocalModelManager{},
 		ModelManagement: &fakeModelManagement{},
 		CustomProviders: []config.CustomProvider{{
 			ID: "gator-local", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"qwen2.5-coder:7b"}, DefaultModel: "qwen2.5-coder:7b",
@@ -668,7 +667,7 @@ func TestSelectingCustomProviderUsesItsEndpoint(t *testing.T) {
 		CustomProviders: []config.CustomProvider{{
 			ID: "team-gateway", BaseURL: "https://models.example.com/v1/chat/completions", Models: []string{"coding-large"}, DefaultModel: "coding-large",
 		}},
-		BaseURL: "https://api.openai.com",
+		BaseURL:  "https://api.openai.com",
 		Provider: "openai",
 	})
 	model.width, model.height = 100, 42
@@ -678,14 +677,6 @@ func TestSelectingCustomProviderUsesItsEndpoint(t *testing.T) {
 	if model.config.BaseURL != "https://models.example.com/v1/chat/completions" {
 		t.Fatalf("selected custom base URL = %q", model.config.BaseURL)
 	}
-}
-
-func waitForTeaCommands(t *testing.T, command tea.Cmd) tea.Msg {
-	t.Helper()
-	if command == nil {
-		t.Fatal("missing command")
-	}
-	return command()
 }
 
 type fakeModelManagement struct {
@@ -731,6 +722,8 @@ func (backend *fakeModelManagement) ApplyCustomProviderDiscovery(id string, mode
 	}
 	return backend.providers, nil
 }
+
+type fakeLocalModelManager struct {
 	catalog LocalModelCatalog
 	started bool
 	pulled  bool

@@ -38,15 +38,20 @@ gator provider discover local-llm --apply
 gator provider remove local-llm --yes
 ```
 
-The terminal picker and JSONL RPC validate the same catalog. A custom provider
+The terminal picker and JSONL RPC validate the same catalog. In `/model`, `n`
+creates a custom provider, `c` on a custom row edits it, `g` previews the
+sibling `/models` catalog as untrusted server data, and `x` removes endpoint
+metadata after confirmation. A custom provider
 does not accept PDFs because the generic Chat Completions protocol has no
 stable document-input format. Gator persists endpoint metadata and model IDs in
 `config.json`, never API keys. A keyless endpoint sends no `Authorization`
 header; a keyed endpoint reads exactly the named environment variable at run
-start.
+start. Removing a provider does not unset that environment variable.
 
 `discover` requests the standard sibling `/models` endpoint derived from a
-base URL ending in `/chat/completions`. It prints discovered IDs first;
-`--apply` is the explicit step that replaces the persisted model catalog. The
+base URL ending in `/chat/completions`. Off-origin redirects are rejected. It
+prints discovered IDs first; `--apply` or the TUI confirmation is the explicit
+step that replaces the persisted model catalog. The
 existing default is retained when still present, otherwise Gator selects the
-first discovered ID.
+first discovered ID. Removing a provider also clears defaults and display
+aliases that pointed at it.

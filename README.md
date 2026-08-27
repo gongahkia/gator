@@ -338,6 +338,10 @@ For a local server or a provider with a compatible endpoint, add it once with
 OpenAI Chat Completions; the declared model list is the only selectable list.
 `--api-key-env NAME` references an environment variable without storing a
 secret, while omitting it is the supported keyless-local-server route.
+`/model` can create, edit, discover, and remove the same metadata after
+confirmation. `gator logout PROVIDER` and `/model` `d` remove only a stored
+Gator credential and report remaining ambient sources; they do not unset
+environment variables or vendor CLI logins.
 
 For a reviewed local coding model running through Ollama, use the first-class
 catalog instead of manually configuring the endpoint:
@@ -355,16 +359,23 @@ it does not execute arbitrary model repositories or install a system runtime.
 In the primary terminal UI, `/model` is the single cloud-and-local catalog: it
 shows credential/configuration readiness for cloud choices, includes the
 checked-in OpenCode Zen and Go model catalogs, signs into eligible providers,
-provides secure built-in cloud configuration as well as reviewed local pull,
-selection, display-name rename, refresh, and removal controls. Press `c` on a
+provides secure built-in cloud configuration, custom OpenAI-compatible provider
+editing, stored-credential removal, and reviewed local pull, selection,
+display-name rename, refresh, and removal controls. Press `c` on a built-in
 cloud entry to set the exact model, a masked credential where applicable, an
-endpoint, and its provider-specific non-secret settings. It covers Azure
-endpoints, Bedrock region/profile, Vertex project/location/ADC path, and
-Cloudflare metadata; credentials never enter `config.json`, a draft, or a
-transcript. Codex and Copilot use `l` for account OAuth; Claude Code's `c`
-form stores an Anthropic API key for the delegated harness and never reuses
-Claude.ai or Claude Code subscription credentials. After selection, return to
-the composer and send a verified task normally. The chosen native model becomes
+endpoint, and its provider-specific non-secret settings. Press `d` to remove a
+stored Gator credential after confirmation; that deletes only the private
+`auth.json` entry and reports any remaining environment, AWS, or ADC source
+instead of claiming a full logout. Press `n` to create a custom Chat Completions
+provider, `c` on a custom row to edit it, `g` to preview `/models`, and `x` to
+remove its metadata. Custom providers store an environment variable name, never
+an API key. Built-in cloud configuration covers Azure endpoints, Bedrock
+region/profile, Vertex project/location/ADC path, and Cloudflare metadata;
+credentials never enter `config.json`, a draft, or a transcript. Codex and
+Copilot use `l` for account OAuth; Claude Code's `c` form stores an Anthropic
+API key for the delegated harness and never reuses Claude.ai or Claude Code
+subscription credentials. After selection, return to the composer and send a
+verified task normally. The chosen native model becomes
 the default provider, so the same TUI, tools, worktrees, sandbox, verification,
 retained sessions, RPC, and ACP paths apply.
 See [curated local models](docs/LOCAL_MODELS.md) for model sources, sizes,
