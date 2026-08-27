@@ -71,8 +71,8 @@ package manager.
 | `worktree list/prune/remove` | `/manage` lists retained worktrees and confirms metadata pruning or deletion | complete | — |
 | `extension list/status` | `/manage` shows installed extension metadata/state; `/extensions` renders trusted static cards | complete | — |
 | `extension install/enable/disable/remove/trust/untrust` | `/manage` confirms enable/disable, removal, and project trust changes | partial | Source installation remains CLI-only so URL/path entry and replacement stay explicit. |
-| `provider list` | `/model` lists configured custom-provider models for selection | partial | Endpoint and credential-source details are not editable. |
-| `provider add/discover/remove` | None | CLI only | No custom-provider editor, discovery action, or confirmed removal. |
+| `provider list` | `/model` lists configured custom-provider models and shows endpoint/credential-source status | complete | — |
+| `provider add/discover/remove` | `/model` creates and edits custom Chat Completions providers, previews `/models`, and confirms catalog replacement or removal | complete | CLI remains preferable for scripts. Discovery still requires an explicit apply step. |
 | `local list/status` | `/model` Local section | complete | The CLI remains preferable for scripts and textual diagnostics. |
 | `local serve` | Recovery prompt can start Ollama as a TUI child | complete | CLI `serve` remains useful when no TUI is running. |
 | `local pull/use/remove` | Curated pull/use/remove with confirmation | complete | The per-command `--url` override has no TUI editor. |
@@ -81,7 +81,7 @@ package manager.
 | `connect xai/openrouter/radius` | `/model` → Cloud → `l` can start Gator OAuth or the corresponding supported flow | partial | Provider-specific advanced options remain CLI-only. |
 | `connect claude` | `/model` → Cloud → `c` configures the masked Anthropic key and selects the Claude Code harness | complete | `gator connect claude` remains a CLI alternative for scripted onboarding. |
 | `login PROVIDER` | `/model` → Cloud → `c` configures every built-in direct provider; `l` starts supported OAuth | complete | CLI remains preferable for scripted onboarding and environment-variable management. |
-| `logout PROVIDER` | None | CLI only | Stored cloud credentials cannot yet be removed from `/model`. |
+| `logout PROVIDER` | `/model` → Cloud → `d` confirms removal of the stored Gator credential and reports remaining ambient sources | complete | Environment variables, AWS/ADC, and vendor CLI logins are never unset from the TUI. |
 | `delegate codex/copilot/claude/kimi run` | `/model` selects the matching harness; send a task to run it in an isolated worktree | partial | Login options and exact one-shot CLI flags are absent. |
 | `delegate opencode login/status/run` | None | CLI only | No OpenCode harness management surface. |
 | `delegate external run` | None | CLI only | Arbitrary command execution belongs to the explicit CLI boundary. |
@@ -108,9 +108,10 @@ These are ordered by impact on the stated goal that the TUI be a complete
 configuration surface. Completed portions are marked below; remaining detail
 defines the next bounded iteration rather than implying broad parity.
 
-1. **Credential lifecycle in `/model`** — add a safe `remove credential`
-   confirmation and provider credential metadata. Entry and provider-specific
-   configuration are complete; removal remains CLI-only.
+1. **Credential lifecycle in `/model`** — implemented: `d` removes a stored
+   Gator credential after confirmation, names the credential kind, and reports
+   remaining ambient sources. Environment variables and vendor CLI stores are
+   not unset. Claude Code removal targets the Anthropic store key.
 2. **Persistent execution-policy editor** — implemented in `/manage` for the
    currently selected provider/model, strict/off sandbox, and deny/allow
    network. Security-relaxing changes explain their effect and save only after
@@ -119,10 +120,10 @@ defines the next bounded iteration rather than implying broad parity.
    exact manifest hash, trust, and untrust for hooks, LSP, MCP, and project
    extensions. MCP OAuth setup remains CLI-only and retains the trusted-
    manifest precondition.
-4. **Custom provider manager** — text fields for ID, OpenAI-compatible chat
-   endpoint, model list/default, and credential-source policy; catalog
-   discovery and deletion need an explicit confirmation. Do not put a custom
-   provider API key in `config.json`.
+4. **Custom provider manager** — implemented in `/model` for ID, Chat
+   Completions URL, model list/default, optional API-key environment variable
+   name, two-step `/models` discovery, and confirmed removal. API keys are
+   never written to `config.json`.
 5. **Extension manager** — `/manage` now provides inventory, enable/disable,
    removal confirmation, and project trust review. Install path/URL input is
    still CLI-only and must preserve bounded source validation.

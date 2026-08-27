@@ -141,10 +141,6 @@ func (form *customProviderSetupForm) fields() []customProviderField {
 	return []customProviderField{customProviderURLField, customProviderEnvField, customProviderModelsField, customProviderDefaultField}
 }
 
-func (form *customProviderSetupForm) focusedID() customProviderField {
-	return form.focus
-}
-
 func (form *customProviderSetupForm) moveFocus(delta int) tea.Cmd {
 	fields := form.fields()
 	index := 0
