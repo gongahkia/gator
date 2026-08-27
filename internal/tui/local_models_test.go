@@ -508,7 +508,229 @@ func finishLocalModelOperation(t *testing.T, model Model) Model {
 	return Model{}
 }
 
-type fakeLocalModelManager struct {
+func TestCloudCredentialRemovalRequiresConfirmation(t *testing.T) {
+	backend := &fakeModelManagement{
+		credentials: []StoredCredentialStatus{{Provider: "openai", StoreKey: "openai", Present: true, Kind: "API key"}},
+	}
+	model := New(Config{LocalModels: &fakeLocalModelManager{}, ModelManagement: backend})
+	model.width, model.height = 100, 42
+	model = selectCloudModelCatalog(t, model, "openai")
+	model.applyCredentialStatuses(backend.credentials)
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelConfirmRemoveCredential {
+		t.Fatalf("confirmation = %v", model.localModels.confirmation)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelNoConfirmation || backend.removed != "" {
+		t.Fatalf("cancel mutated credentials: confirm=%v removed=%q", model.localModels.confirmation, backend.removed)
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	model = next.(Model)
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("confirm did not schedule credential removal")
+	}
+	message := command()
+	updated, _ := next.(Model).Update(message)
+	model = updated.(Model)
+	if backend.removed != "openai" {
+		t.Fatalf("removed = %q", backend.removed)
+	}
+	if strings.Contains(model.notice.text, "logged out") || !strings.Contains(model.notice.text, "OPENAI_API_KEY") && !strings.Contains(model.notice.text, "were not changed") {
+		t.Fatalf("notice = %q", model.notice.text)
+	}
+}
+
+func TestCustomProviderEditorCreatesAndRemovesWithoutSecrets(t *testing.T) {
+	backend := &fakeModelManagement{}
+	model := New(Config{LocalModels: &fakeLocalModelManager{}, ModelManagement: backend})
+	model.width, model.height = 100, 42
+	model.screen = localModelsScreen
+	model.localModels.section = cloudModelSection
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if command == nil {
+		t.Fatal("create form did not focus")
+	}
+	model = next.(Model)
+	if model.localModels.customSetup == nil {
+		t.Fatal("custom provider form did not open")
+	}
+	form := model.localModels.customSetup
+	form.id.SetValue("team-gateway")
+	form.baseURL.SetValue("https://models.example.com/v1/chat/completions")
+	form.apiKeyEnv.SetValue("TEAM_GATEWAY_API_KEY")
+	form.models.SetValue("coding-large\ncoding-small")
+	form.defaultModel.SetValue("coding-large")
+	form.focus = customProviderDefaultField
+	if view := model.customProviderSetupView(); strings.Contains(view, "sk-secret") {
+		t.Fatal("custom provider view contained a secret")
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelConfirmSaveCustom || model.localModels.pendingCustom == nil {
+		t.Fatalf("review confirmation missing: %#v", model.localModels)
+	}
+	if strings.Contains(model.View(), "sk-") {
+		t.Fatal("review view leaked a secret")
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if command == nil {
+		t.Fatal("save did not schedule")
+	}
+	message := command()
+	updated, _ := next.(Model).Update(message)
+	model = updated.(Model)
+	if len(backend.providers) != 1 || backend.providers[0].APIKeyEnv != "TEAM_GATEWAY_API_KEY" {
+		t.Fatalf("saved providers = %#v", backend.providers)
+	}
+	if model.provider.Value() != "team-gateway" || model.config.BaseURL != "https://models.example.com/v1/chat/completions" {
+		t.Fatalf("selection = provider %q url %q", model.provider.Value(), model.config.BaseURL)
+	}
+
+	model = selectCloudModelCatalog(t, model, "team-gateway")
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelConfirmRemoveCustom {
+		t.Fatalf("remove confirmation = %v", model.localModels.confirmation)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	message = command()
+	updated, _ = next.(Model).Update(message)
+	model = updated.(Model)
+	if len(backend.providers) != 0 {
+		t.Fatalf("providers after remove = %#v", backend.providers)
+	}
+}
+
+func TestCustomProviderDiscoveryPreviewRequiresConfirm(t *testing.T) {
+	backend := &fakeModelManagement{
+		providers: []config.CustomProvider{{
+			ID: "team-gateway", BaseURL: "https://models.example.com/v1/chat/completions", Models: []string{"old"}, DefaultModel: "old",
+		}},
+		discovery: CustomProviderDiscovery{ID: "team-gateway", Models: []string{"alpha", "beta"}, DefaultModel: "alpha"},
+	}
+	model := New(Config{
+		LocalModels:       &fakeLocalModelManager{},
+		ModelManagement:   backend,
+		CustomProviders:   backend.providers,
+		Provider:          "team-gateway",
+		Model:             "old",
+	})
+	model.width, model.height = 100, 42
+	model = selectCloudModelCatalog(t, model, "team-gateway")
+	next, command := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("g")})
+	if command == nil {
+		t.Fatal("discover did not start")
+	}
+	model = next.(Model)
+	message := waitForTeaCommands(t, command)
+	updated, _ := model.Update(message)
+	model = updated.(Model)
+	if model.localModels.confirmation != localModelConfirmApplyDiscovery || backend.applied {
+		t.Fatalf("preview applied early: confirm=%v applied=%t", model.localModels.confirmation, backend.applied)
+	}
+	next, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	message = command()
+	updated, _ = next.(Model).Update(message)
+	model = updated.(Model)
+	if !backend.applied || strings.Join(model.config.CustomProviders[0].Models, ",") != "alpha,beta" {
+		t.Fatalf("applied catalog = %#v", model.config.CustomProviders)
+	}
+}
+
+func TestGatorLocalCustomProviderIsReadOnlyInCloudCatalog(t *testing.T) {
+	model := New(Config{
+		LocalModels: &fakeLocalModelManager{},
+		ModelManagement: &fakeModelManagement{},
+		CustomProviders: []config.CustomProvider{{
+			ID: "gator-local", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"qwen2.5-coder:7b"}, DefaultModel: "qwen2.5-coder:7b",
+		}},
+	})
+	model.width, model.height = 100, 42
+	model = selectCloudModelCatalog(t, model, "gator-local")
+	next, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	model = next.(Model)
+	if model.localModels.customSetup != nil || model.localModels.cloudSetup != nil {
+		t.Fatal("gator-local opened an editor")
+	}
+	next, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	model = next.(Model)
+	if model.localModels.confirmation != localModelNoConfirmation {
+		t.Fatal("gator-local removal was offered from Cloud")
+	}
+}
+
+func TestSelectingCustomProviderUsesItsEndpoint(t *testing.T) {
+	model := New(Config{
+		LocalModels: &fakeLocalModelManager{},
+		CustomProviders: []config.CustomProvider{{
+			ID: "team-gateway", BaseURL: "https://models.example.com/v1/chat/completions", Models: []string{"coding-large"}, DefaultModel: "coding-large",
+		}},
+		BaseURL: "https://api.openai.com",
+		Provider: "openai",
+	})
+	model.width, model.height = 100, 42
+	model = selectCloudModelCatalog(t, model, "team-gateway")
+	next, _ := model.useCloudModel(model.cloudModels()[model.localModels.cloudIndex])
+	model = next.(Model)
+	if model.config.BaseURL != "https://models.example.com/v1/chat/completions" {
+		t.Fatalf("selected custom base URL = %q", model.config.BaseURL)
+	}
+}
+
+func waitForTeaCommands(t *testing.T, command tea.Cmd) tea.Msg {
+	t.Helper()
+	if command == nil {
+		t.Fatal("missing command")
+	}
+	return command()
+}
+
+type fakeModelManagement struct {
+	credentials []StoredCredentialStatus
+	providers   []config.CustomProvider
+	discovery   CustomProviderDiscovery
+	removed     string
+	applied     bool
+}
+
+func (backend *fakeModelManagement) CredentialStatuses() ([]StoredCredentialStatus, error) {
+	return append([]StoredCredentialStatus(nil), backend.credentials...), nil
+}
+
+func (backend *fakeModelManagement) RemoveCredential(provider string) (CredentialRemovalResult, error) {
+	backend.removed = provider
+	backend.credentials = nil
+	return CredentialRemovalResult{Provider: provider, StoreKey: provider, Removed: true, Kind: "API key", RemainingSources: []string{"OPENAI_API_KEY"}}, nil
+}
+
+func (backend *fakeModelManagement) SaveCustomProvider(setup CustomProviderSetup) ([]config.CustomProvider, error) {
+	provider := config.CustomProvider{ID: setup.ID, BaseURL: setup.BaseURL, APIKeyEnv: setup.APIKeyEnv, Models: setup.Models, DefaultModel: setup.DefaultModel}
+	backend.providers = []config.CustomProvider{provider}
+	return backend.providers, nil
+}
+
+func (backend *fakeModelManagement) RemoveCustomProvider(id string) ([]config.CustomProvider, error) {
+	backend.providers = nil
+	return nil, nil
+}
+
+func (backend *fakeModelManagement) DiscoverCustomProvider(id string) (CustomProviderDiscovery, error) {
+	return backend.discovery, nil
+}
+
+func (backend *fakeModelManagement) ApplyCustomProviderDiscovery(id string, models []string) ([]config.CustomProvider, error) {
+	backend.applied = true
+	if len(backend.providers) == 0 {
+		backend.providers = []config.CustomProvider{{ID: id, Models: models, DefaultModel: models[0]}}
+	} else {
+		backend.providers[0].Models = append([]string(nil), models...)
+		backend.providers[0].DefaultModel = models[0]
+	}
+	return backend.providers, nil
+}
 	catalog LocalModelCatalog
 	started bool
 	pulled  bool
