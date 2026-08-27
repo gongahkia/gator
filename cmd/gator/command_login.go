@@ -12,6 +12,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/tui"
 )
 
 func login(arguments []string, out io.Writer) error {
@@ -262,13 +263,32 @@ func logout(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if !model.SupportsDirect(provider) {
+		return fmt.Errorf("provider %q has no Gator-managed cloud credential", provider)
+	}
 	credentials, err := gatorCredentials()
 	if err != nil {
 		return err
 	}
-	if err := credentials.Delete(string(provider)); err != nil {
-		return fmt.Errorf("remove Gator credential: %w", err)
+	storeKey := gatorCredentialStoreKey(provider)
+	existing, found, err := credentials.Read(storeKey)
+	if err != nil {
+		return err
 	}
-	_, err = fmt.Fprintf(out, "Removed the Gator credential for %s.\n", provider)
+	if found {
+		if err := credentials.Delete(storeKey); err != nil {
+			return fmt.Errorf("remove Gator credential: %w", err)
+		}
+	}
+	result := tui.CredentialRemovalResult{
+		Provider:         string(provider),
+		StoreKey:         storeKey,
+		Removed:          found,
+		RemainingSources: remainingCredentialSources(provider),
+	}
+	if found {
+		result.Kind = credentialKindLabel(existing)
+	}
+	_, err = fmt.Fprintln(out, describeCredentialRemoval(result))
 	return err
 }

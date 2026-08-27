@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/localmodel"
 	modelprovider "github.com/gongahkia/gator/internal/model"
 )
 
@@ -41,7 +42,18 @@ func (m Model) beginLocalStatus() (tea.Model, tea.Cmd) {
 	m.localModels.generation++
 	m.localModels.action = localModelRefreshing
 	m.localModels.err = nil
-	return m, tea.Batch(m.localModels.spinner.Tick, loadLocalModelStatus(m.localModels.manager, m.localModels.generation))
+	commands := []tea.Cmd{m.localModels.spinner.Tick, loadLocalModelStatus(m.localModels.manager, m.localModels.generation)}
+	if m.config.ModelManagement != nil {
+		commands = append(commands, loadCredentialStatuses(m.config.ModelManagement))
+	}
+	return m, tea.Batch(commands...)
+}
+
+func loadCredentialStatuses(backend ModelManagementBackend) tea.Cmd {
+	return func() tea.Msg {
+		statuses, err := backend.CredentialStatuses()
+		return credentialStatusesMsg{statuses: statuses, err: err}
+	}
 }
 
 func loadLocalModelStatus(manager LocalModelManager, generation uint64) tea.Cmd {
@@ -70,6 +82,12 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.localModels.cloudSetup != nil {
 		return m.updateCloudModelSetup(message)
 	}
+	if m.localModels.confirmation != localModelNoConfirmation {
+		return m.updateLocalModelConfirmation(message)
+	}
+	if m.localModels.customSetup != nil {
+		return m.updateCustomProviderSetup(message)
+	}
 	if m.localModels.renaming != nil {
 		return m.updateModelRename(message)
 	}
@@ -88,6 +106,7 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch message.String() {
 		case "ctrl+c", "esc":
 			m.cancelLocalOperation()
+			m.localModels.generation++
 			m.localModels.action = localModelIdle
 			m.localModels.err = nil
 			m.notice = notice{text: "Local model operation cancellation requested.", kind: noticeInfo}
@@ -131,8 +150,22 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveModelCatalogSelection(1)
 	case "e":
 		return m.beginModelRename()
+	case "n":
+		if m.localModels.section != cloudModelSection {
+			m.notice = notice{text: "Custom providers are created from the Cloud section.", kind: noticeInfo}
+			return m, nil
+		}
+		return m.beginCustomProviderCreate()
 	case "c":
-		return m.beginCloudModelSetup()
+		if m.localModels.section != cloudModelSection {
+			m.notice = notice{text: "Cloud configuration is available from the Cloud section.", kind: noticeInfo}
+			return m, nil
+		}
+		return m.beginCustomProviderEdit()
+	case "g":
+		return m.beginCustomProviderDiscover()
+	case "d":
+		return m.beginRemoveCloudCredential()
 	case "l":
 		if m.localModels.section != cloudModelSection {
 			m.notice = notice{text: "Cloud sign-in is available from the Cloud section.", kind: noticeInfo}
@@ -196,8 +229,7 @@ func (m Model) updateLocalModels(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.beginLocalUse(model)
 	case "x", "delete":
 		if m.localModels.section != localModelSection {
-			m.notice = notice{text: "Cloud models are managed by their provider. Gator only removes local model weights here.", kind: noticeInfo}
-			return m, nil
+			return m.beginRemoveCustomProvider()
 		}
 		if m.localModels.catalog.RuntimeError != "" {
 			if m.ollamaMissing() {
@@ -246,25 +278,51 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 		}
 		return m, nil
 	}
-	model, found := m.selectedLocalModel()
-	if !found {
-		m.localModels.confirmation = localModelNoConfirmation
-		m.notice = notice{text: "The selected local model is no longer available.", kind: noticeError}
-		return m, nil
-	}
 	switch message.String() {
 	case "esc", "n", "ctrl+c":
+		confirmation := m.localModels.confirmation
 		m.localModels.confirmation = localModelNoConfirmation
-		m.notice = notice{text: "Local model operation cancelled before it started.", kind: noticeInfo}
+		m.localModels.pendingCustom = nil
+		m.localModels.discovery = nil
+		switch confirmation {
+		case localModelConfirmRemoveCredential:
+			m.notice = notice{text: "Credential removal cancelled. The stored Gator credential was not changed.", kind: noticeInfo}
+		case localModelConfirmRemoveCustom:
+			m.notice = notice{text: "Custom provider removal cancelled. Configuration was not changed.", kind: noticeInfo}
+		case localModelConfirmSaveCustom:
+			m.notice = notice{text: "Custom provider save cancelled. Configuration was not written.", kind: noticeInfo}
+		case localModelConfirmApplyDiscovery:
+			m.notice = notice{text: "Model catalog replacement cancelled. Discovered IDs were not saved.", kind: noticeInfo}
+		default:
+			m.notice = notice{text: "Local model operation cancelled before it started.", kind: noticeInfo}
+		}
 		return m, nil
 	case "enter", "y":
 		confirmation := m.localModels.confirmation
 		m.localModels.confirmation = localModelNoConfirmation
 		switch confirmation {
 		case localModelConfirmPull:
+			model, found := m.selectedLocalModel()
+			if !found {
+				m.notice = notice{text: "The selected local model is no longer available.", kind: noticeError}
+				return m, nil
+			}
 			return m.beginLocalPull(model)
 		case localModelConfirmRemove:
+			model, found := m.selectedLocalModel()
+			if !found {
+				m.notice = notice{text: "The selected local model is no longer available.", kind: noticeError}
+				return m, nil
+			}
 			return m.beginLocalRemove(model)
+		case localModelConfirmRemoveCredential:
+			return m.removeCloudCredential()
+		case localModelConfirmRemoveCustom:
+			return m.removeCustomProvider()
+		case localModelConfirmSaveCustom:
+			return m.saveReviewedCustomProvider()
+		case localModelConfirmApplyDiscovery:
+			return m.applyCustomProviderDiscovery()
 		}
 	}
 	return m, nil
@@ -432,7 +490,7 @@ func (m Model) cloudModels() []cloudModelEntry {
 			continue
 		}
 		if provider == modelprovider.Claude {
-			entries = append(entries, claudeCodeHarnessEntry(credentialStore, credentialStoreErr))
+			entries = append(entries, claudeCodeHarnessEntry(credentialStore, credentialStoreErr, m.localModels.credentials))
 			continue
 		}
 
@@ -440,7 +498,7 @@ func (m Model) cloudModels() []cloudModelEntry {
 		if providerName == strings.TrimSpace(m.provider.Value()) {
 			models = prependModelIfMissing(models, strings.TrimSpace(m.model.Value()))
 		}
-		status := cloudProviderStatus(provider, credentialStore, credentialStoreErr)
+		status := cloudProviderStatus(provider, credentialStore, credentialStoreErr, m.localModels.credentials)
 		if len(models) == 0 {
 			entries = append(entries, cloudModelEntry{
 				provider: providerName,
@@ -472,7 +530,7 @@ func (m Model) cloudModels() []cloudModelEntry {
 			} else {
 				status += " · requires " + provider.APIKeyEnv
 			}
-			entries = append(entries, cloudModelEntry{provider: provider.ID, model: modelName, name: name, status: status, selectable: true})
+			entries = append(entries, cloudModelEntry{provider: provider.ID, model: modelName, name: name, status: status, selectable: true, custom: true})
 		}
 	}
 	return entries
@@ -490,9 +548,11 @@ func prependModelIfMissing(models []string, model string) []string {
 	return append([]string{model}, models...)
 }
 
-func claudeCodeHarnessEntry(store auth.Store, storeErr error) cloudModelEntry {
+func claudeCodeHarnessEntry(store auth.Store, storeErr error, cached map[string]StoredCredentialStatus) cloudModelEntry {
 	status := "requires ANTHROPIC_API_KEY"
-	if storeErr == nil {
+	if cachedStatus, ok := cached[string(modelprovider.Anthropic)]; ok && cachedStatus.Present {
+		status = "Anthropic API key stored by Gator"
+	} else if storeErr == nil {
 		credential, found, err := store.Read(string(modelprovider.Anthropic))
 		if err == nil && found && credential.IsAPIKey() {
 			status = "Anthropic API key stored by Gator"
@@ -509,9 +569,18 @@ func claudeCodeHarnessEntry(store auth.Store, storeErr error) cloudModelEntry {
 	}
 }
 
-func cloudProviderStatus(provider modelprovider.Provider, store auth.Store, storeErr error) string {
+func cloudProviderStatus(provider modelprovider.Provider, store auth.Store, storeErr error, cached map[string]StoredCredentialStatus) string {
+	if status, ok := cached[gatorCredentialCacheKey(string(provider))]; ok && status.Present {
+		if status.Expired {
+			return "stored credential expired"
+		}
+		if status.Kind == "OAuth credential" {
+			return "signed in"
+		}
+		return "Gator credential stored"
+	}
 	if storeErr == nil {
-		credential, found, err := store.Read(string(provider))
+		credential, found, err := store.Read(gatorCredentialCacheKey(string(provider)))
 		if err == nil && found {
 			if credential.Expired(time.Now()) {
 				return "stored credential expired"
@@ -598,7 +667,11 @@ func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
 	}
 	m.provider.SetValue(cloud.provider)
 	m.model.SetValue(cloud.model)
-	m.config.BaseURL = m.providerEndpoint(cloud.provider)
+	if custom, found := m.customProvider(cloud.provider); found {
+		m.config.BaseURL = custom.BaseURL
+	} else {
+		m.config.BaseURL = strings.TrimSpace(m.config.ProviderEndpoints[strings.ToLower(strings.TrimSpace(cloud.provider))])
+	}
 	m.delegateRuntime = ""
 	m.persistDraft()
 	m.refreshPreflight()
@@ -749,6 +822,8 @@ func (m Model) localModelActionLabel() string {
 		return "removing selected model"
 	case localModelRenaming:
 		return "saving model display name"
+	case localModelDiscovering:
+		return "requesting untrusted model catalog"
 	default:
 		return ""
 	}
@@ -764,4 +839,204 @@ func (m Model) localModelProgressLabel() string {
 		return fmt.Sprintf("%s (%d%%)", status, progress.Completed*100/progress.Total)
 	}
 	return status
+}
+
+func gatorCredentialCacheKey(provider string) string {
+	if provider == string(modelprovider.Claude) {
+		return string(modelprovider.Anthropic)
+	}
+	return provider
+}
+
+func (m Model) storedCredential(provider string) StoredCredentialStatus {
+	key := gatorCredentialCacheKey(provider)
+	if status, ok := m.localModels.credentials[key]; ok {
+		return status
+	}
+	store, err := auth.New(m.config.StateDir)
+	if err != nil {
+		return StoredCredentialStatus{Provider: provider, StoreKey: key}
+	}
+	credential, found, err := store.Read(key)
+	if err != nil || !found {
+		return StoredCredentialStatus{Provider: provider, StoreKey: key}
+	}
+	return StoredCredentialStatus{
+		Provider: provider,
+		StoreKey: key,
+		Present:  true,
+		Kind:     credentialKindName(credential),
+		Expired:  credential.Expired(time.Now()),
+	}
+}
+
+func credentialKindName(credential auth.Credential) string {
+	switch {
+	case credential.IsOAuth():
+		return "OAuth credential"
+	case credential.IsBearerToken():
+		return "bearer token"
+	default:
+		return "API key"
+	}
+}
+
+func (m *Model) applyCredentialStatuses(statuses []StoredCredentialStatus) {
+	m.localModels.credentials = make(map[string]StoredCredentialStatus, len(statuses))
+	for _, status := range statuses {
+		m.localModels.credentials[status.StoreKey] = status
+	}
+}
+
+func (m Model) beginRemoveCloudCredential() (tea.Model, tea.Cmd) {
+	if m.localModels.section != cloudModelSection {
+		m.notice = notice{text: "Stored cloud credentials are removed from the Cloud section.", kind: noticeInfo}
+		return m, nil
+	}
+	cloud, found := m.selectedCloudModel()
+	if !found {
+		m.notice = notice{text: "Select a cloud provider before removing its Gator credential.", kind: noticeError}
+		return m, nil
+	}
+	if cloud.custom {
+		m.notice = notice{text: "Custom providers read an environment variable at run time. Gator does not store their API keys.", kind: noticeInfo}
+		return m, nil
+	}
+	if m.config.ModelManagement == nil {
+		m.notice = notice{text: "Credential management is unavailable in this TUI session.", kind: noticeError}
+		return m, nil
+	}
+	status := m.storedCredential(cloud.provider)
+	if !status.Present {
+		m.notice = notice{text: "No Gator credential is stored for " + cloud.provider + ". Environment variables and vendor CLI logins are unchanged.", kind: noticeInfo}
+		return m, nil
+	}
+	m.localModels.confirmation = localModelConfirmRemoveCredential
+	m.notice = notice{text: "Confirm removal of the stored Gator credential. Ambient environment credentials are not unset.", kind: noticeInfo}
+	return m, nil
+}
+
+func (m Model) removeCloudCredential() (tea.Model, tea.Cmd) {
+	cloud, found := m.selectedCloudModel()
+	if !found || m.config.ModelManagement == nil {
+		m.notice = notice{text: "Credential management is unavailable in this TUI session.", kind: noticeError}
+		return m, nil
+	}
+	provider := cloud.provider
+	return m, func() tea.Msg {
+		result, err := m.config.ModelManagement.RemoveCredential(provider)
+		return credentialRemovedMsg{result: result, err: err}
+	}
+}
+
+func (m Model) beginRemoveCustomProvider() (tea.Model, tea.Cmd) {
+	cloud, found := m.selectedCloudModel()
+	if !found || !cloud.custom {
+		m.notice = notice{text: "Cloud models are managed by their provider. Gator only removes custom endpoint metadata or local model weights here.", kind: noticeInfo}
+		return m, nil
+	}
+	if cloud.provider == localmodel.ProviderID {
+		m.notice = notice{text: "Gator-managed local Ollama is removed from the Local section.", kind: noticeInfo}
+		return m, nil
+	}
+	if m.config.ModelManagement == nil {
+		m.notice = notice{text: "Custom provider management is unavailable in this TUI session.", kind: noticeError}
+		return m, nil
+	}
+	m.localModels.confirmation = localModelConfirmRemoveCustom
+	m.notice = notice{text: "Confirm removal of custom provider metadata. The API key environment variable is not changed.", kind: noticeInfo}
+	return m, nil
+}
+
+func (m Model) removeCustomProvider() (tea.Model, tea.Cmd) {
+	cloud, found := m.selectedCloudModel()
+	if !found || m.config.ModelManagement == nil {
+		m.notice = notice{text: "Custom provider management is unavailable in this TUI session.", kind: noticeError}
+		return m, nil
+	}
+	id := cloud.provider
+	return m, func() tea.Msg {
+		providers, err := m.config.ModelManagement.RemoveCustomProvider(id)
+		return customProviderRemovedMsg{providers: providers, id: id, err: err}
+	}
+}
+
+func (m Model) beginCustomProviderDiscover() (tea.Model, tea.Cmd) {
+	if m.localModels.section != cloudModelSection {
+		m.notice = notice{text: "Model discovery is available from the Cloud section.", kind: noticeInfo}
+		return m, nil
+	}
+	cloud, found := m.selectedCloudModel()
+	if !found || !cloud.custom {
+		m.notice = notice{text: "Select a custom provider before requesting its /models catalog.", kind: noticeInfo}
+		return m, nil
+	}
+	if cloud.provider == localmodel.ProviderID {
+		m.notice = notice{text: "Gator-managed local Ollama uses the reviewed Local catalog, not /models discovery.", kind: noticeInfo}
+		return m, nil
+	}
+	if m.config.ModelManagement == nil {
+		m.notice = notice{text: "Custom provider management is unavailable in this TUI session.", kind: noticeError}
+		return m, nil
+	}
+	m.localModels.generation++
+	generation := m.localModels.generation
+	m.localModels.action = localModelDiscovering
+	id := cloud.provider
+	return m, tea.Batch(m.localModels.spinner.Tick, func() tea.Msg {
+		preview, err := m.config.ModelManagement.DiscoverCustomProvider(id)
+		return customProviderDiscoverMsg{generation: generation, preview: preview, err: err}
+	})
+}
+
+func (m Model) applyCustomProviderDiscovery() (tea.Model, tea.Cmd) {
+	if m.localModels.discovery == nil || m.config.ModelManagement == nil {
+		m.notice = notice{text: "No discovered model catalog is waiting to be applied.", kind: noticeError}
+		return m, nil
+	}
+	preview := *m.localModels.discovery
+	return m, func() tea.Msg {
+		providers, err := m.config.ModelManagement.ApplyCustomProviderDiscovery(preview.ID, preview.Models)
+		return customProviderAppliedMsg{providers: providers, id: preview.ID, err: err}
+	}
+}
+
+func (m *Model) applyCustomProviders(providers []config.CustomProvider, selectID string) {
+	m.config.CustomProviders = append([]config.CustomProvider(nil), providers...)
+	for index := range m.config.CustomProviders {
+		m.config.CustomProviders[index].Models = append([]string(nil), providers[index].Models...)
+	}
+	if selectID == "" {
+		return
+	}
+	if custom, found := m.customProvider(selectID); found {
+		m.provider.SetValue(custom.ID)
+		m.model.SetValue(custom.DefaultModel)
+		m.config.BaseURL = custom.BaseURL
+		m.delegateRuntime = ""
+		m.persistDraft()
+		m.refreshPreflight()
+		m.selectActiveModelCatalogEntry()
+		return
+	}
+	if strings.EqualFold(strings.TrimSpace(m.provider.Value()), selectID) {
+		m.provider.SetValue(string(modelprovider.OpenAI))
+		m.model.SetValue(modelprovider.DefaultModel(modelprovider.OpenAI))
+		m.config.BaseURL = strings.TrimSpace(m.config.ProviderEndpoints[string(modelprovider.OpenAI)])
+		m.delegateRuntime = ""
+		m.persistDraft()
+		m.refreshPreflight()
+		m.selectActiveModelCatalogEntry()
+	}
+}
+
+func credentialRemovalNotice(result CredentialRemovalResult) string {
+	if result.Removed {
+		text := "Removed the stored Gator " + result.Kind + " for " + result.Provider + ". Environment variables, AWS/ADC, and vendor CLI credentials were not changed."
+		if len(result.RemainingSources) > 0 {
+			return text + " This process can still authenticate via " + strings.Join(result.RemainingSources, ", ") + "."
+		}
+		return text
+	}
+	return "No Gator credential was stored for " + result.Provider + "."
 }

@@ -71,10 +71,11 @@ func providerCommand(arguments []string, out io.Writer) error {
 			return fmt.Errorf("custom provider %q is not configured", arguments[1])
 		}
 		settings.CustomProviders = removeCustomProvider(settings.CustomProviders, arguments[1])
+		clearDeletedCustomProviderReferences(&settings, arguments[1])
 		if err := store.Save(settings); err != nil {
 			return err
 		}
-		_, err := fmt.Fprintf(out, "Removed custom provider %q.\n", arguments[1])
+		_, err := fmt.Fprintf(out, "Removed custom provider %q. Its API key environment variable was not changed.\n", arguments[1])
 		return err
 	default:
 		return fmt.Errorf("unknown provider command %q\n%s", arguments[0], providerConfigUsage)
@@ -131,7 +132,7 @@ func discoverModels(provider config.CustomProvider) ([]string, error) {
 			request.Header.Set("Authorization", "Bearer "+key)
 		}
 	}
-	response, err := http.DefaultClient.Do(request)
+	response, err := modelCatalogClient().Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("request %q model catalog: %w", provider.ID, err)
 	}
@@ -165,6 +166,25 @@ func discoverModels(provider config.CustomProvider) ([]string, error) {
 	return models, nil
 }
 
+func modelCatalogClient() *http.Client {
+	return &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(request *http.Request, via []*http.Request) error {
+			if len(via) == 0 {
+				return nil
+			}
+			origin := via[0].URL
+			if request.URL.Scheme != origin.Scheme || request.URL.Host != origin.Host {
+				return fmt.Errorf("model catalog redirected off origin from %s to %s", origin.Host, request.URL.Host)
+			}
+			if len(via) >= 5 {
+				return errors.New("model catalog followed too many redirects")
+			}
+			return nil
+		},
+	}
+}
+
 func modelsEndpoint(baseURL string) (string, error) {
 	endpoint, err := url.Parse(baseURL)
 	if err != nil {
@@ -184,11 +204,8 @@ func addCustomProvider(arguments []string, store config.Store, settings config.S
 		return errors.New(providerConfigUsage)
 	}
 	id := strings.TrimSpace(arguments[0])
-	if id == localmodel.ProviderID {
-		return fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
-	}
-	if _, err := model.ParseProvider(id); err == nil {
-		return fmt.Errorf("custom provider ID %q conflicts with Gator's built-in provider; choose another ID", id)
+	if err := reservedCustomProviderIDError(id); err != nil {
+		return err
 	}
 	flags := flag.NewFlagSet("provider add", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -225,6 +242,17 @@ func (v *stringList) Set(value string) error {
 		return errors.New("model ID is required and cannot contain a newline")
 	}
 	*v = append(*v, value)
+	return nil
+}
+
+func reservedCustomProviderIDError(id string) error {
+	id = strings.TrimSpace(id)
+	if id == localmodel.ProviderID {
+		return fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
+	}
+	if _, err := model.ParseProvider(id); err == nil {
+		return fmt.Errorf("custom provider ID %q conflicts with Gator's built-in provider; choose another ID", id)
+	}
 	return nil
 }
 

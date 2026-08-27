@@ -90,6 +90,7 @@ const (
 	localModelUsing
 	localModelRemoving
 	localModelRenaming
+	localModelDiscovering
 )
 
 type localModelConfirmation uint8
@@ -100,6 +101,10 @@ const (
 	localModelConfirmInstall
 	localModelConfirmPull
 	localModelConfirmRemove
+	localModelConfirmRemoveCredential
+	localModelConfirmRemoveCustom
+	localModelConfirmSaveCustom
+	localModelConfirmApplyDiscovery
 )
 
 type localModelOperation struct {
@@ -146,6 +151,10 @@ type localModelsState struct {
 	cloudIndex     int
 	renaming       *modelRename
 	cloudSetup     *cloudModelSetupForm
+	customSetup    *customProviderSetupForm
+	pendingCustom  *CustomProviderSetup
+	discovery      *CustomProviderDiscovery
+	credentials    map[string]StoredCredentialStatus
 	startDismissed bool
 	dependencyHelp bool
 }
@@ -164,6 +173,7 @@ type cloudModelEntry struct {
 	status     string
 	selectable bool
 	canLogin   bool
+	custom     bool
 }
 
 type modelRename struct {
