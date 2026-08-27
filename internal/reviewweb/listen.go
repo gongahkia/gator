@@ -13,11 +13,11 @@ import (
 func ValidateListenAddress(address string) error {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil || strings.TrimSpace(port) == "" {
-		return errors.New("review --listen must be an IP address and TCP port, such as 127.0.0.1:0")
+		return errors.New("listen address must be an IP address and TCP port, such as 127.0.0.1:0")
 	}
 	ip := net.ParseIP(host)
 	if ip == nil || !ip.IsLoopback() {
-		return errors.New("review accepts loopback addresses only; use SSH port forwarding for remote access")
+		return errors.New("listen address must be loopback; use SSH port forwarding for remote access")
 	}
 	return nil
 }

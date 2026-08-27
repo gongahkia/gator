@@ -522,6 +522,8 @@ func (m Model) updateReview(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "y":
 		return m.openThreadTree(reviewScreen)
+	case "b":
+		return m.openReviewWeb()
 	}
 	return m, nil
 }

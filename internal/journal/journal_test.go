@@ -651,3 +651,67 @@ func TestManagedRunRecordRejectsOtherRepositoriesAndEscapes(t *testing.T) {
 		t.Fatal("parent directory was accepted as a run record")
 	}
 }
+
+func TestResolveRetainedTargetMatchesPathPrefixAndRejectsMissingWorktree(t *testing.T) {
+	stateDirectory := t.TempDir()
+	repository := "/workspace/current-project"
+	worktreePath := t.TempDir()
+	entry, record, err := Open(repository, "run-target-001", worktreePath, stateDirectory, time.Now())
+	if err != nil {
+		t.Fatalf("open journal: %v", err)
+	}
+	if err := entry.SaveSession(Session{Version: 2, Repository: repository, WorktreePath: worktreePath, Provider: "openai", Task: "Targeted task", ThreadID: "thread-alpha"}); err != nil {
+		t.Fatalf("save session: %v", err)
+	}
+	if err := entry.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveThread(stateDirectory, Thread{
+		Version: 1, ID: "thread-alpha", Repository: repository, WorktreePath: worktreePath,
+		Provider: "openai", Task: "Targeted task", HeadStatePath: record.StatePath, TurnCount: 1,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("save thread: %v", err)
+	}
+	if err := SaveThread(stateDirectory, Thread{
+		Version: 1, ID: "thread-beta", Repository: repository, WorktreePath: t.TempDir(),
+		Provider: "openai", Task: "Other task", HeadStatePath: filepath.Join(stateDirectory, "missing"), TurnCount: 1,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("save second thread: %v", err)
+	}
+
+	byPath, err := ResolveRetainedTarget(stateDirectory, repository, record.StatePath, false)
+	if err != nil || byPath.HeadStatePath != record.StatePath || !byPath.Available {
+		t.Fatalf("path target = %#v, %v", byPath, err)
+	}
+	byID, err := ResolveRetainedTarget(stateDirectory, repository, "thread-alpha", false)
+	if err != nil || byID.ID != "thread-alpha" {
+		t.Fatalf("id target = %#v, %v", byID, err)
+	}
+	byPrefix, err := ResolveRetainedTarget(stateDirectory, repository, "thread-a", false)
+	if err != nil || byPrefix.ID != "thread-alpha" {
+		t.Fatalf("prefix target = %#v, %v", byPrefix, err)
+	}
+	if _, err := ResolveRetainedTarget(stateDirectory, repository, "thread", false); err == nil {
+		t.Fatal("ambiguous prefix was accepted")
+	}
+
+	missingWorktree := filepath.Join(t.TempDir(), "gone")
+	missingEntry, missingRecord, err := Open(repository, "run-missing-001", missingWorktree, stateDirectory, time.Now())
+	if err != nil {
+		t.Fatalf("open missing journal: %v", err)
+	}
+	if err := missingEntry.SaveSession(Session{Version: 2, Repository: repository, WorktreePath: missingWorktree, Provider: "openai", Task: "Gone", ThreadID: "thread-gone"}); err != nil {
+		t.Fatalf("save missing session: %v", err)
+	}
+	if err := missingEntry.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(missingWorktree); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ResolveRetainedTarget(stateDirectory, repository, missingRecord.StatePath, false); err == nil {
+		t.Fatal("missing worktree path was accepted")
+	}
+}

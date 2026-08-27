@@ -87,18 +87,18 @@ package manager.
 | `delegate external run` | None | CLI only | Arbitrary command execution belongs to the explicit CLI boundary. |
 | `doctor [--provider]` | `/doctor` reports Git, provider auth kind/status, sandbox availability, web search, dependencies, and local models | complete | Inspect-only: it never starts Ollama, OAuth, or mutates configuration. |
 | `run` basic task | Composer, model selection, verifier editor, plan/execute mode, approvals, and review | complete | — |
-| `run --provider/--model/--base-url` | Runtime drawer and `/model` configuration | partial | Endpoint override is persistent rather than an explicit one-run field. |
+| `run --provider/--model/--base-url` | Runtime drawer, `/model` persistent endpoint, and `/run` one-run base URL | complete | `/run` endpoint is session-local (draft + this process). `/model` remains the persistent default. |
 | `run --image/--attach` | `@` path references, preview, and confirmation | complete | — |
 | `run --max-steps` | `/effort` plus `/run` exact turn cap | complete | An exact cap overrides `/effort` for that run. |
-| `run --sandbox/--network` | `/manage` persists sandbox/network defaults; `/permissions` reports the effective policy | partial | One-run `--sandbox`/`--network` overrides remain CLI-only. |
+| `run --sandbox/--network` | `/manage` persists defaults; `/run` overrides them for this process only | complete | Relaxing to sandbox-off or network-allow requires confirmation. Not written to `config.json`. |
 | `run --base/--copy-ignored/--setup` | `/run` edits these for new worktrees; setup and copy-ignored require confirmation | complete | Hidden on resume/fork. Setup is Execute-only. |
 | `run --scope/--profile/--scout` | `@` references plus `/run` extra scopes, profile picker, and ≤4 scouts | complete | Profiles can only narrow policy. |
 | `run --allow-command/--trust-commands` | Per-command approval plus `/run` exact argv and literal-token prefixes | partial | `--trust-commands` remains CLI-only and is not a TUI toggle. |
-| `resume` | `/recent`, `Ctrl+O`, all-repository toggle, then compose a continuation | partial | No path/ID text target, exact max-step input, or direct noninteractive continuation. |
-| `fork` | `/tree` and `/fork` choose a retained turn | partial | No direct ID/path, exact max steps, or noninteractive instruction flags. |
-| `clone` | `/clone` clones the active retained branch | partial | No arbitrary-turn picker, direct ID/path, exact max steps, or noninteractive instruction flags. |
+| `resume` | `/recent`/`Ctrl+O` list, `p` text target, or `/resume TARGET [instruction…]` | complete | Exact CLI `--max-steps` remains `/run` / `/effort`. |
+| `fork` | `/tree`, `/fork`, or `/fork TARGET [instruction…]` | complete | Exact CLI `--max-steps` remains `/run` / `/effort`. |
+| `clone` | `/clone` or `/clone TARGET [instruction…]` | complete | Exact CLI `--max-steps` remains `/run` / `/effort`. |
 | `transcript RUN_RECORD_PATH` | `/manage` selects retained runs and writes private HTML exports below Gator's state directory; active transcript remains scrollable and copyable | complete | — |
-| `review RUN_RECORD_PATH [--open]` | `/review` provides structured retained-worktree review and focused diffs | partial | No browser-review server, listen-address input, or arbitrary run-record picker. |
+| `review RUN_RECORD_PATH [--open]` | `/review`, `/review TARGET`, and `b` loopback browser review | complete | Listen stays loopback-only. This is not `gator serve`. |
 | `export RUN_RECORD_PATH` | `/manage` selects retained runs and writes private patch exports below Gator's state directory | complete | — |
 | `apply [--check] RUN_RECORD_PATH` | `/manage` requires a successful clean-checkout compatibility check for the selected run, then a separate apply confirmation | complete | — |
 
@@ -117,7 +117,7 @@ defines the next bounded iteration rather than implying broad parity.
    network. Security-relaxing changes explain their effect and save only after
    confirmation.
 3. **Project integration trust center** — implemented in `/manage` for status,
-   exact manifest    hash, trust, and untrust for hooks, LSP, MCP, and project
+   exact manifest hash, trust, and untrust for hooks, LSP, MCP, and project
    extensions. MCP OAuth login is available from the mcp auth tab after the
    current manifest hash is trusted.
 4. **Custom provider manager** — implemented in `/model` for ID, Chat
@@ -133,12 +133,20 @@ defines the next bounded iteration rather than implying broad parity.
    writes private transcript/patch exports, performs clean-checkout
    compatibility checks, confirms apply, manages worktree prune/remove, and
    displays writer-batch path-conflict evidence.
-7. **Advanced run editor** — `/run` edits exact turn cap, base revision,
+7. **Advanced run editor** — `/run` edits exact turn cap, one-run base URL,
+   one-run sandbox/network (confirm before off/allow), base revision,
    setup argv, copy-ignored opt-in, extra scopes, a narrowing profile,
    bounded scouts, exact allow-command argv, and literal-token prefixes.
-   Setup and copy-ignored require confirmation. `--trust-commands`,
-   sandbox-off, and network-allow are not TUI toggles.
-8. **Diagnostics and vendor harnesses** — `/doctor` is a get-only local
+   Setup, copy-ignored, sandbox-off, and network-allow require confirmation.
+   `--trust-commands` is not a TUI toggle. One-run fields are not written to
+   `config.json`.
+8. **Retained targeting and browser review** — `/resume`, `/fork`, `/clone`,
+   and `/review` accept a thread ID, unique prefix, or run-record path.
+   An instruction after the target starts that continuation immediately.
+   `/recent` also accepts a typed target (`p`). Review `b` starts the
+   loopback browser listener with an editable listen address and optional
+   open; it is not `gator serve` and has no RPC.
+9. **Diagnostics and vendor harnesses** — `/doctor` is a get-only local
    report. OpenCode harness login/status/run remains CLI-only. Keep `rpc`,
    `acp`, and `serve` as CLI contracts even if the TUI later offers
    status/help links for them.

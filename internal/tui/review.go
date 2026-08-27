@@ -528,7 +528,7 @@ func (m Model) reviewFooter(sections []string) string {
 	if summary := m.extensionUISummary("review"); summary != "" {
 		sections = append(sections, summary)
 	}
-	sections = append(sections, m.noticeView(), m.footer("up/down choose", "f focused/raw", "v range", "r request change", "s hunk", "S file", "x extension cards", "d refresh", "e handoff", "c continue", "q quit"))
+	sections = append(sections, m.noticeView(), m.footer("up/down choose", "f focused/raw", "v range", "r request change", "s hunk", "S file", "x extension cards", "d refresh", "e handoff", "b browser review", "c continue", "q quit"))
 	return strings.Join(sections, "\n")
 }
 

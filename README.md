@@ -203,9 +203,12 @@ variables, and provider-specific model/base-URL
 requirements. Press `F1` for the conversation, running, and review shortcut
 reference. `Ctrl+O` opens recent retained threads for the current repository;
 press `a` in that picker to switch between the current repository and all
-locally retained repositories. The picker shows a summary rather than private
+locally retained repositories, or `p` to type a thread ID, unique prefix, or
+run-record path. The picker shows a summary rather than private
 run-record paths and validates the selected worktree when continuation begins.
-`/tree` opens an in-terminal navigator for the active retained thread. It
+`/resume TARGET [instruction…]`, `/fork TARGET [instruction…]`, and
+`/clone TARGET [instruction…]` bind the same way; an instruction starts that
+continuation immediately. `/tree` opens an in-terminal navigator for the active retained thread. It
 shows every saved turn from root to head with its mode, provider/model, status,
 timestamp, prompt summary, selected response, and any independent forks. `y`
 opens the same navigator from review. Press `f` on an earlier turn to start an
@@ -224,7 +227,7 @@ suggestions. In the command menu, `Tab` completes the selected command and
 `Enter` executes it; path suggestions accept either key to insert the path.
 Conversation
 commands are `/plan`, `/execute`, `/new`, `/status`, `/effort`, `/model`, `/manage`, `/extensions`, `/verify`,
-`/permissions`, `/worktree`, `/review`, `/threads`,
+`/permissions`, `/worktree`, `/review`, `/run`, `/resume`, `/threads`,
 `/recent`, `/tree`, `/fork`, `/clone`, `/compact`, `/clear`, `/queue`,
 `/dequeue`, `/clear-queue`, `/help`, and `/quit`. `/plan` gives every
 provider an enforced read-only tool surface and does not require a verifier;
