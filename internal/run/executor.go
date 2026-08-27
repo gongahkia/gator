@@ -57,7 +57,9 @@ func (e Executor) Resume(ctx context.Context, previous journal.Session, statePat
 	request.Task = previous.Task
 	request.Provider = previous.Provider
 	request.Model = previous.Model
-	request.BaseURL = previous.BaseURL
+	if strings.TrimSpace(request.BaseURL) == "" {
+		request.BaseURL = previous.BaseURL
+	}
 	request.Verification = previous.Verification
 	if len(request.Scopes) == 0 {
 		request.Scopes = append([]string(nil), previous.Scopes...)
@@ -118,7 +120,9 @@ func (e Executor) Fork(ctx context.Context, previous journal.Session, statePath,
 	request.Task = previous.Task
 	request.Provider = previous.Provider
 	request.Model = previous.Model
-	request.BaseURL = previous.BaseURL
+	if strings.TrimSpace(request.BaseURL) == "" {
+		request.BaseURL = previous.BaseURL
+	}
 	request.Verification = previous.Verification
 	if len(request.Scopes) == 0 {
 		request.Scopes = append([]string(nil), previous.Scopes...)
