@@ -185,7 +185,7 @@ func TestServerControlsDetachedTerminalInItsAuthenticatedSession(t *testing.T) {
 	web := httptest.NewServer(bridge.Handler())
 	defer web.Close()
 	capabilities := submitAndCollect(t, web.URL, protocol.Request{Version: protocol.Version, ID: "background-capabilities-001", Method: protocol.MethodCapabilities}, hasTerminalResponse)
-	for _, method := range []string{protocol.MethodTerminalList, protocol.MethodTerminalRead, protocol.MethodTerminalWrite, protocol.MethodTerminalResize, protocol.MethodTerminalStop} {
+	for _, method := range []string{protocol.MethodTerminalList, protocol.MethodTerminalRead, protocol.MethodTerminalWrite, protocol.MethodTerminalResize, protocol.MethodTerminalStop, protocol.MethodTerminalRestart} {
 		if len(capabilities) != 1 || capabilities[0].Type != "response" || !strings.Contains(stringify(capabilities[0].Result), method) {
 			t.Fatalf("background terminal method %q was not advertised: %#v", method, capabilities)
 		}
@@ -226,6 +226,34 @@ func TestServerControlsDetachedTerminalInItsAuthenticatedSession(t *testing.T) {
 	stop := protocol.Request{Version: protocol.Version, ID: "terminal-stop-001", Method: protocol.MethodTerminalStop, Params: protocol.Params{TerminalID: terminalID}}
 	if messages := submitAndCollect(t, web.URL, stop, hasTerminalResponse); len(messages) != 1 || messages[0].Type != "response" {
 		t.Fatalf("terminal stop response = %#v", messages)
+	}
+	for attempt := 1; attempt <= 20; attempt++ {
+		list = submitAndCollect(t, web.URL, protocol.Request{Version: protocol.Version, ID: fmt.Sprintf("terminal-list-after-stop-%02d", attempt), Method: protocol.MethodTerminalList}, hasTerminalResponse)
+		var payload struct {
+			Tasks []terminal.Task `json:"tasks"`
+		}
+		encoded, _ := json.Marshal(list[0].Result)
+		_ = json.Unmarshal(encoded, &payload)
+		if len(payload.Tasks) == 1 && payload.Tasks[0].Status == "exited" {
+			break
+		}
+		if attempt == 20 {
+			t.Fatalf("terminal did not exit after stop: %#v", list)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	restart := protocol.Request{Version: protocol.Version, ID: "terminal-restart-001", Method: protocol.MethodTerminalRestart, Params: protocol.Params{TerminalID: terminalID}}
+	messages = submitAndCollect(t, web.URL, restart, hasTerminalResponse)
+	if len(messages) != 1 || messages[0].Type != "response" {
+		t.Fatalf("terminal restart response = %#v", messages)
+	}
+	var restarted terminal.Task
+	encoded, _ := json.Marshal(messages[0].Result)
+	if err := json.Unmarshal(encoded, &restarted); err != nil || restarted.ID == terminalID || restarted.Status != "running" {
+		t.Fatalf("restarted terminal=%#v err=%v", restarted, err)
+	}
+	if messages := submitAndCollect(t, web.URL, protocol.Request{Version: protocol.Version, ID: "terminal-stop-restarted-001", Method: protocol.MethodTerminalStop, Params: protocol.Params{TerminalID: restarted.ID}}, hasTerminalResponse); len(messages) != 1 || messages[0].Type != "response" {
+		t.Fatalf("restarted terminal stop response = %#v", messages)
 	}
 }
 

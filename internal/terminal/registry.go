@@ -10,9 +10,9 @@ import (
 const defaultMaxBackgroundTasks = 8
 
 // Registry owns the small set of terminal managers that belong to one
-// interactive Gator process. It is deliberately in-memory: preserving a PTY
-// across application restart requires a separately supervised daemon, not an
-// orphaned child process that this package would be unable to recover safely.
+// interactive Gator process. Detached task histories remain available after
+// exit so a developer can inspect or restart their exact command; neither a
+// PTY nor its history survives an application restart.
 type Registry struct {
 	mu            sync.Mutex
 	managers      map[*Manager]struct{}
@@ -75,6 +75,29 @@ func (r *Registry) releaseDetached(task *task) {
 	r.mu.Lock()
 	delete(r.background, task)
 	r.mu.Unlock()
+}
+
+// finishDetached intentionally preserves the reservation and manager after
+// exit. This bounds detached histories by the same small process-wide limit
+// and keeps a completed task reachable for safe restart.
+func (r *Registry) finishDetached(task *task) {
+	if r == nil || task == nil {
+		return
+	}
+}
+
+func (r *Registry) retains(manager *Manager) bool {
+	if r == nil || manager == nil {
+		return false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for task := range r.background {
+		if task.manager == manager {
+			return true
+		}
+	}
+	return false
 }
 
 // Attachment aggregates the restricted developer view from every registered
@@ -172,6 +195,14 @@ func (a registryAttachment) Stop(id string) (Task, error) {
 		return Task{}, err
 	}
 	return manager.Stop(id)
+}
+
+func (a registryAttachment) Restart(id string) (Task, error) {
+	manager, err := a.manager(id)
+	if err != nil {
+		return Task{}, err
+	}
+	return manager.Restart(id)
 }
 
 func (a registryAttachment) manager(id string) (*Manager, error) {

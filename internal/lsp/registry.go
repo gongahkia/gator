@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
@@ -21,6 +22,7 @@ type Registry struct {
 
 type registryEntry struct {
 	root    string
+	roots   string
 	hash    string
 	manager *Manager
 	active  int
@@ -75,7 +77,7 @@ func (r *Registry) Acquire(set Set) (*Manager, func(), error) {
 		closeManagers(closing)
 		return nil, nil, errors.New("LSP registry is closed")
 	}
-	key := registryKey(set.root.Path(), set.configuredHash)
+	key := registryKey(set.root.Path(), set.configuredHash, set.rootKey())
 	entry := r.entries[key]
 	if entry == nil {
 		for len(r.entries) >= r.limit {
@@ -90,6 +92,7 @@ func (r *Registry) Acquire(set Set) (*Manager, func(), error) {
 		}
 		entry = &registryEntry{
 			root:    set.root.Path(),
+			roots:   set.rootKey(),
 			hash:    set.configuredHash,
 			manager: set.NewManager(),
 			usedAt:  r.now(),
@@ -188,7 +191,7 @@ func (r *Registry) reconcileLocked(set Set) []*Manager {
 		if entry.root != set.root.Path() {
 			continue
 		}
-		if set.trusted && set.configuredHash == entry.hash {
+		if set.trusted && set.configuredHash == entry.hash && set.rootKey() == entry.roots {
 			continue
 		}
 		entry.retired = true
@@ -216,8 +219,8 @@ func (r *Registry) oldestIdleLocked() (string, *registryEntry) {
 	return oldestKey, oldest
 }
 
-func registryKey(root, hash string) string {
-	return root + "\x00" + hash
+func registryKey(root, hash string, roots ...string) string {
+	return root + "\x00" + hash + "\x00" + strings.Join(roots, "\x00")
 }
 
 func closeManagers(managers []*Manager) {

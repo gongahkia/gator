@@ -82,20 +82,24 @@ terminal_read    {"terminal_id":"...", "cursor":0}
 terminal_write   {"terminal_id":"...", "input":"..."}
 terminal_resize  {"terminal_id":"...", "rows":24, "columns":80}
 terminal_stop    {"terminal_id":"..."}
+terminal_restart {"terminal_id":"..."}
 ```
 
 They operate only on that server process's explicitly detached tasks; they
-cannot start a process, change its fixed worktree or sandbox, attach to a task
-from another Gator process, or detach a task themselves. `terminal_write` is
+cannot choose a process command, change its fixed worktree or sandbox, attach
+to a task from another Gator process, or detach a task themselves.
+`terminal_restart` starts a fresh task only from an exited task's exact argv;
+the original task and its scrollback remain available. `terminal_write` is
 direct developer input from the authenticated bearer-token holder. Its bytes
 are neither sent to the model nor appended to the completed run record.
 
-Detached tasks retain their original policy, are capped at eight per server
-process, and expire within two hours. A normal `gator serve` shutdown stops
-them. The server handles `Ctrl-C` and normal Unix `SIGTERM` shutdown before it
-releases its terminal registry; `gator serve stop` uses that same path. Tasks
-do not survive a `gator serve` restart, and plain `gator rpc`, ACP, and
-child-writer runs do not offer detachment or these controller methods.
+Detached tasks retain their original policy, are capped at eight retained
+histories per server process, and expire within two hours while running. A
+normal `gator serve` shutdown stops them. The server handles `Ctrl-C` and
+normal Unix `SIGTERM` shutdown before it releases its terminal registry;
+`gator serve stop` uses that same path. Tasks do not survive a `gator serve`
+restart, and plain `gator rpc`, ACP, and child-writer runs do not offer
+detachment or these controller methods.
 
 ## Security boundary
 

@@ -299,7 +299,7 @@ func TestWorkspaceSymbolsAcceptURIOnlyLocationAndRejectInvalidQuery(t *testing.T
 	root := testWorkspace(t)
 	writeFile(t, root.Path(), "pkg/target.go", "package pkg\n", 0o600)
 	uri := fileURI(filepath.Join(root.Path(), "pkg", "target.go"))
-	result, err := formatWorkspaceSymbols(root, "Target", "fixture", json.RawMessage(`[{"name":"Target","kind":5,"location":{"uri":`+strconv.Quote(uri)+`}}]`))
+	result, err := formatWorkspaceSymbols(workspace.NewRootSet(root, nil), "Target", "fixture", json.RawMessage(`[{"name":"Target","kind":5,"location":{"uri":`+strconv.Quote(uri)+`}}]`))
 	if err != nil {
 		t.Fatalf("format URI-only workspace symbol: %v", err)
 	}
@@ -323,11 +323,11 @@ func TestCodeActionsRejectUnsafeEditsAndSelectionRanges(t *testing.T) {
 	root := testWorkspace(t)
 	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
 	uri := fileURI(filepath.Join(root.Path(), "pkg", "example.go"))
-	result, err := formatCodeActions(root, "pkg/example.go", "fixture", json.RawMessage(`[{"title":"create file","edit":{"documentChanges":[{"kind":"create","uri":"file:///tmp/outside"}]}},{"title":"local edit","edit":{"changes":{"`+uri+`":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"fixed"}]}}}]`))
+	result, err := formatCodeActions(workspace.NewRootSet(root, nil), "pkg/example.go", "fixture", json.RawMessage(`[{"title":"create file","edit":{"documentChanges":[{"kind":"create","uri":"file:///tmp/outside"}]}},{"title":"local edit","edit":{"changes":{"`+uri+`":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"fixed"}]}}}]`))
 	if err != nil || !strings.Contains(result.Content, "local edit") || strings.Contains(result.Content, "create file") || !strings.Contains(result.Content, `"truncated":true`) {
 		t.Fatalf("resource-operation code actions = %s, %v", result.Content, err)
 	}
-	result, err = formatCodeActions(root, "pkg/example.go", "fixture", json.RawMessage(`[{"title":"large edit","edit":{"changes":{"`+uri+`":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"`+strings.Repeat("x", maxCodeActionNewTextBytes+1)+`"}]}}}]`))
+	result, err = formatCodeActions(workspace.NewRootSet(root, nil), "pkg/example.go", "fixture", json.RawMessage(`[{"title":"large edit","edit":{"changes":{"`+uri+`":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":0}},"newText":"`+strings.Repeat("x", maxCodeActionNewTextBytes+1)+`"}]}}}]`))
 	if err == nil || !strings.Contains(err.Error(), "exceeds 16 KiB") {
 		t.Fatalf("oversized code action error = %v", err)
 	}
@@ -362,7 +362,7 @@ func TestFormattingAndRenameOmitIncompleteOrOversizedEdits(t *testing.T) {
 	if err != nil || !strings.Contains(formatting.Content, `"truncated":true`) || strings.Contains(formatting.Content, `"new_text"`) {
 		t.Fatalf("oversized formatting result = %s, %v", formatting.Content, err)
 	}
-	rename, err := formatRename(root, "pkg/example.go", "fixture", json.RawMessage(`{"documentChanges":[{"kind":"rename","oldUri":`+strconv.Quote(uri)+`,"newUri":"file:///tmp/outside"}]}`))
+	rename, err := formatRename(workspace.NewRootSet(root, nil), "pkg/example.go", "fixture", json.RawMessage(`{"documentChanges":[{"kind":"rename","oldUri":`+strconv.Quote(uri)+`,"newUri":"file:///tmp/outside"}]}`))
 	if err != nil || !strings.Contains(rename.Content, `"truncated":true`) || strings.Contains(rename.Content, `"new_text"`) {
 		t.Fatalf("unsafe rename result = %s, %v", rename.Content, err)
 	}
@@ -411,8 +411,107 @@ func TestManagerReusesOneClientForMultipleApprovedLookups(t *testing.T) {
 	if starts != 1 || connection.closed || !reflect.DeepEqual(approvals, []string{"fixture:hover:pkg/example.go", "fixture:document_symbols:pkg/example.go"}) {
 		t.Fatalf("manager starts=%d closed=%t approvals=%#v", starts, connection.closed, approvals)
 	}
+	if !reflect.DeepEqual(connection.notifications, []string{"textDocument/didOpen"}) {
+		t.Fatalf("document notifications = %#v", connection.notifications)
+	}
 	if err := manager.Close(); err != nil || !connection.closed {
 		t.Fatalf("close manager: %v, client=%#v", err, connection)
+	}
+	if !reflect.DeepEqual(connection.notifications, []string{"textDocument/didOpen", "textDocument/didClose"}) {
+		t.Fatalf("close notifications = %#v", connection.notifications)
+	}
+}
+
+func TestManagerSynchronizesChangesAndReopensAfterDiscard(t *testing.T) {
+	root := testWorkspace(t)
+	path := filepath.Join(root.Path(), "pkg/example.go")
+	writeFile(t, root.Path(), "pkg/example.go", "package pkg\n", 0o600)
+	first := &fakeClient{responses: map[string]json.RawMessage{"textDocument/hover": json.RawMessage(`{"contents":"first"}`)}}
+	second := &fakeClient{responses: map[string]json.RawMessage{"textDocument/hover": json.RawMessage(`{"contents":"second"}`)}}
+	connections := []client{first, second}
+	manager := &Manager{
+		root: root, trusted: true, servers: []server{{Name: "fixture", Language: "go"}}, clients: make(map[string]client),
+		connect: func(context.Context, workspace.Root, server) (client, error) {
+			connection := connections[0]
+			connections = connections[1:]
+			return connection, nil
+		},
+	}
+	tool := manager.Tools(func(context.Context, string, string, string) error { return nil })[1].(Tool)
+	arguments := json.RawMessage(`{"path":"pkg/example.go","line":1,"character":0}`)
+	if _, err := tool.Execute(context.Background(), arguments); err != nil {
+		t.Fatalf("first hover: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("package pkg\n\nvar Changed = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tool.Execute(context.Background(), arguments); err != nil {
+		t.Fatalf("changed hover: %v", err)
+	}
+	manager.Discard("fixture")
+	if _, err := tool.Execute(context.Background(), arguments); err != nil {
+		t.Fatalf("reconnected hover: %v", err)
+	}
+	if !reflect.DeepEqual(first.notifications, []string{"textDocument/didOpen", "textDocument/didChange", "textDocument/didClose"}) {
+		t.Fatalf("first client notifications = %#v", first.notifications)
+	}
+	if !reflect.DeepEqual(second.notifications, []string{"textDocument/didOpen"}) {
+		t.Fatalf("second client notifications = %#v", second.notifications)
+	}
+	_ = manager.Close()
+}
+
+func TestLSPExternalRootIsInspectableButNotEditable(t *testing.T) {
+	root := testWorkspace(t)
+	externalPath := t.TempDir()
+	writeFile(t, externalPath, "external.go", "package external\n", 0o600)
+	external, err := workspace.Open(externalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	externalFile := filepath.Join(external.Path(), "external.go")
+	connection := &fakeClient{responses: map[string]json.RawMessage{
+		"textDocument/hover": json.RawMessage(`{"contents":"external hover"}`),
+	}}
+	manager := &Manager{
+		root: root, roots: workspace.NewRootSet(root, []workspace.Root{external}), trusted: true,
+		servers: []server{{Name: "fixture", Language: "go"}}, clients: make(map[string]client),
+		connect: func(context.Context, workspace.Root, server) (client, error) { return connection, nil },
+	}
+	tools := manager.Tools(func(context.Context, string, string, string) error { return nil })
+	var hover, format Tool
+	for _, candidate := range tools {
+		tool := candidate.(Tool)
+		switch tool.operation {
+		case hoverOperation:
+			hover = tool
+		case formatOperation:
+			format = tool
+		}
+	}
+	result, err := hover.Execute(context.Background(), json.RawMessage(`{"path":`+strconv.Quote(externalFile)+`,"line":1,"character":0}`))
+	if err != nil || !strings.Contains(result.Content, externalFile) {
+		t.Fatalf("external hover result=%q err=%v", result.Content, err)
+	}
+	if _, err := format.Execute(context.Background(), json.RawMessage(`{"path":`+strconv.Quote(externalFile)+`}`)); err == nil || !strings.Contains(err.Error(), "read-only external") {
+		t.Fatalf("external format error = %v", err)
+	}
+}
+
+func TestDocumentSyncKind(t *testing.T) {
+	for raw, want := range map[string]int{
+		`0`:            0,
+		`1`:            1,
+		`2`:            2,
+		`3`:            0,
+		`false`:        0,
+		`{"change":1}`: 1,
+		`{"change":2}`: 2,
+		`{"change":0}`: 0,
+	} {
+		if got := documentSyncKind(json.RawMessage(raw)); got != want {
+			t.Errorf("documentSyncKind(%s) = %d, want %d", raw, got, want)
+		}
 	}
 }
 
@@ -471,11 +570,12 @@ func TestNativeClientUsesReadOnlyLookups(t *testing.T) {
 }
 
 type fakeClient struct {
-	responses  map[string]json.RawMessage
-	supported  map[lspOperation]bool
-	method     string
-	parameters any
-	closed     bool
+	responses     map[string]json.RawMessage
+	supported     map[lspOperation]bool
+	method        string
+	parameters    any
+	notifications []string
+	closed        bool
 }
 
 func (c *fakeClient) Request(_ context.Context, method string, parameters any) (json.RawMessage, error) {
@@ -487,6 +587,13 @@ func (c *fakeClient) Request(_ context.Context, method string, parameters any) (
 func (c *fakeClient) Supports(operation lspOperation) bool {
 	return c.supported == nil || c.supported[operation]
 }
+
+func (c *fakeClient) Notify(method string, _ any) error {
+	c.notifications = append(c.notifications, method)
+	return nil
+}
+
+func (c *fakeClient) DocumentSyncKind() int { return 1 }
 
 func (c *fakeClient) Close() error {
 	c.closed = true
@@ -516,6 +623,7 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 		switch message.Method {
 		case "initialize":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"capabilities": map[string]any{
+				"textDocumentSync":           1,
 				"diagnosticProvider":         map[string]any{},
 				"hoverProvider":              true,
 				"completionProvider":         map[string]any{},
@@ -528,6 +636,8 @@ func serveFixtureLSP(input io.Reader, output io.Writer, done chan<- error) {
 				"workspaceSymbolProvider":    true,
 			}}})
 		case "initialized":
+			continue
+		case "textDocument/didOpen", "textDocument/didChange", "textDocument/didClose":
 			continue
 		case "textDocument/diagnostic":
 			writeFrame(output, map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(message.ID), "result": map[string]any{"kind": "full", "items": []Diagnostic{diagnostic("fixture error", 0, 0, 1)}}})

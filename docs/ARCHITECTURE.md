@@ -176,12 +176,13 @@ files; Gator never executes an LSP command, follows resource operations, or
 applies an LSP edit automatically. A run lazily reuses one server per trusted
 configuration. The native TUI and loopback app server may retain up to eight
 idle managers in memory for a later compatible resume of the exact same
-worktree and trusted bundle hash; a later run that observes a trust or
-configuration change retires them, and session shutdown stops them. One-shot RPC and child writers do not receive
-that registry. This is not an editor bridge: Gator sends no document lifecycle
-or incremental-change notifications, stores no durable index, and never shares
-a server across worktrees. It is not a general IDE or an unreviewed
-executable-extension path.
+worktree, trusted bundle hash, and read-only external-root set; a later run
+that observes a trust, configuration, or root-set change retires them, and
+session shutdown stops them. One-shot RPC and child writers do not receive that
+registry. When supported by the server, Gator sends the standard document
+open/change/close lifecycle from bounded on-disk snapshots. It stores no
+on-disk index and never shares a server across incompatible worktrees or root
+sets. It is not a general IDE or an unreviewed executable-extension path.
 
 Trusted extension sidecars are a separate executable capability but not a
 process-sandbox exception. Global bundles are explicitly installed; repository
@@ -257,7 +258,7 @@ In the native TUI or authenticated `gator serve` process, a model may request
 in the process-local session registry, with its original policy, an
 at-most-two-hour lifetime, and a session-wide cap of eight tasks. In the native
 TUI, `Ctrl+T` attaches locally; `gator serve` additionally exposes
-`terminal_list/read/write/resize/stop` to its authenticated controller. Direct
+`terminal_list/read/write/resize/stop/restart` to its authenticated controller. Direct
 commands, plain JSONL RPC, ACP, and child-writer tool surfaces omit detachment.
 The normal shutdown path stops all detached tasks. A model must request a
 separate approval for each distinct terminal input; approval events contain an

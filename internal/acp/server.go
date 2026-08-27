@@ -172,7 +172,7 @@ func (s *Server) initialize(request inbound) error {
 			"loadSession":         true,
 			"promptCapabilities":  map[string]any{"image": false, "audio": false, "embeddedContext": false},
 			"mcpCapabilities":     map[string]any{"http": false, "sse": false},
-			"sessionCapabilities": map[string]any{"list": map[string]any{}, "resume": map[string]any{}, "close": map[string]any{}},
+			"sessionCapabilities": map[string]any{"list": map[string]any{}, "resume": map[string]any{}, "close": map[string]any{}, "additionalDirectories": map[string]any{}},
 			"auth":                map[string]any{},
 		},
 		"authMethods": []any{},
@@ -196,8 +196,9 @@ func (s *Server) newSession(request inbound) error {
 	if err := s.validateCWD(params.CWD); err != nil {
 		return err
 	}
-	if len(params.AdditionalDirectories) != 0 {
-		return errors.New("additional ACP workspace roots are not supported; Gator only operates in its isolated worktree")
+	additional, err := s.validateAdditionalDirectories(params.AdditionalDirectories)
+	if err != nil {
+		return err
 	}
 	if len(params.MCPServers) != 0 {
 		return errors.New("client-supplied MCP servers are not accepted; trust project .gator/mcp.json with gator mcp trust")
@@ -213,6 +214,7 @@ func (s *Server) newSession(request inbound) error {
 	session := &session{
 		id:           id,
 		cwd:          s.repository,
+		additional:   append([]workspace.Root(nil), additional...),
 		provider:     provider,
 		model:        modelName,
 		verification: cloneArgv(s.config.DefaultVerification),
@@ -286,6 +288,7 @@ func (s *Server) executePrompt(ctx context.Context, cancel context.CancelFunc, s
 	}
 	provider, modelName, mode := session.provider, session.model, session.mode
 	verification := cloneArgv(session.verification)
+	additional := append([]workspace.Root(nil), session.additional...)
 	statePath := session.statePath
 	s.mu.Unlock()
 
@@ -295,15 +298,16 @@ func (s *Server) executePrompt(ctx context.Context, cancel context.CancelFunc, s
 		return
 	}
 	request := gatorrun.Request{
-		RepositoryPath: s.repository,
-		Task:           task,
-		Provider:       provider,
-		Model:          modelName,
-		BaseURL:        s.config.DefaultBaseURL,
-		Verification:   verification,
-		StateDir:       s.config.StateDir,
-		ThreadID:       sessionID,
-		Mode:           mode,
+		RepositoryPath:          s.repository,
+		Task:                    task,
+		Provider:                provider,
+		Model:                   modelName,
+		BaseURL:                 s.config.DefaultBaseURL,
+		Verification:            verification,
+		AdditionalReadOnlyRoots: additional,
+		StateDir:                s.config.StateDir,
+		ThreadID:                sessionID,
+		Mode:                    mode,
 		OnEvent: func(event agent.Event) {
 			s.sendEvent(sessionID, messageID, event)
 		},
@@ -466,14 +470,16 @@ func (s *Server) resumeSession(request inbound) error {
 	if request.Method == "session/load" && !hasField(request.Params, "mcpServers") {
 		return errors.New("session/load requires mcpServers (use [] when none are supplied)")
 	}
-	if len(params.AdditionalDirectories) != 0 {
-		return errors.New("additional ACP workspace roots are not supported; Gator only operates in its isolated worktree")
+	additional, err := s.validateAdditionalDirectories(params.AdditionalDirectories)
+	if err != nil {
+		return err
 	}
 	if len(params.MCPServers) != 0 {
 		return errors.New("client-supplied MCP servers are not accepted; trust project .gator/mcp.json with gator mcp trust")
 	}
 	s.mu.Lock()
 	if existing, found := s.sessions[params.SessionID]; found {
+		existing.additional = append([]workspace.Root(nil), additional...)
 		mode := s.modeState(existing)
 		s.mu.Unlock()
 		s.sendResult(responseID(request.ID), map[string]any{"modes": mode})
@@ -496,6 +502,7 @@ func (s *Server) resumeSession(request inbound) error {
 	session := &session{
 		id:           params.SessionID,
 		cwd:          s.repository,
+		additional:   append([]workspace.Root(nil), additional...),
 		provider:     previous.Provider,
 		model:        previous.Model,
 		verification: cloneArgv(previous.Verification),
@@ -736,6 +743,14 @@ func (s *Server) validateCWD(cwd string) error {
 		return fmt.Errorf("ACP cwd %q is outside the repository this Gator process was started for", cwd)
 	}
 	return nil
+}
+
+func (s *Server) validateAdditionalDirectories(directories []string) ([]workspace.Root, error) {
+	roots, err := workspace.OpenAdditionalRoots(directories, 32)
+	if err != nil {
+		return nil, fmt.Errorf("ACP additionalDirectories: %w", err)
+	}
+	return roots, nil
 }
 
 func (s *Server) resolveModel() (string, string, error) {

@@ -8,7 +8,11 @@ import (
 // client is the bounded RPC surface used by approved LSP tools.
 type client interface {
 	Request(context.Context, string, any) (json.RawMessage, error)
+	Notify(string, any) error
 	Supports(lspOperation) bool
+	// DocumentSyncKind is the LSP TextDocumentSyncKind advertised at
+	// initialize: 0 (none), 1 (full), or 2 (incremental).
+	DocumentSyncKind() int
 	Close() error
 }
 

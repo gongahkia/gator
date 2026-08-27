@@ -204,6 +204,30 @@ func (m Model) updateAttachedTerminal(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.refreshAttachedTerminal()
 		return m, nil
+	case "ctrl+r":
+		task, found := m.selectedTerminalTask()
+		if !found {
+			m.notice = notice{text: "No attached terminal task is selected.", kind: noticeError}
+			return m, nil
+		}
+		if task.Status == "running" {
+			m.notice = notice{text: "Stop " + task.ID + " before restarting it.", kind: noticeError}
+			return m, nil
+		}
+		restarted, err := m.terminalAttachment.Restart(task.ID)
+		if err != nil {
+			m.notice = notice{text: "Restart terminal task: " + err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.refreshAttachedTerminal()
+		for index, candidate := range m.terminalTasks {
+			if candidate.ID == restarted.ID {
+				m.terminalIndex = index
+				break
+			}
+		}
+		m.notice = notice{text: "Restarted " + task.ID + " as new task " + restarted.ID + " in the same sandbox.", kind: noticeInfo}
+		return m, nil
 	case "ctrl+c":
 		return m.writeAttachedTerminalInput([]byte{3}, "Interrupt sent to")
 	case "ctrl+o":
@@ -366,7 +390,7 @@ func (m Model) attachedTerminalView() string {
 		output = errorStyle.Render("Terminal read error: " + m.terminalErr.Error())
 	}
 	input := m.terminalInput.View()
-	footer := m.footer("enter send line", "ctrl+o raw keyboard", "ctrl+c interrupt task", "ctrl+x stop task", "tab switch task", "pgup/pgdn scroll", "esc/ctrl+t return", "f1 shortcuts")
+	footer := m.footer("enter send line", "ctrl+o raw keyboard", "ctrl+c interrupt task", "ctrl+x stop task", "ctrl+r restart exited", "tab switch task", "pgup/pgdn scroll", "esc/ctrl+t return", "f1 shortcuts")
 	if m.terminalRawInput {
 		input = dimStyle.Render("Raw keyboard is active; keys go directly to the task. Ctrl+] returns to Gator controls.")
 		footer = m.footer("ctrl+] controls", "keys send to task", "raw input stays sandboxed", "f1 sends F1 to task")

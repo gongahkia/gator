@@ -21,10 +21,11 @@ import (
 
 func TestServerInitializesRunsPlanListsAndResumesSession(t *testing.T) {
 	repository := initializedRepository(t)
+	stateDir := t.TempDir()
 	reader, writer := io.Pipe()
 	output := &lockedBuffer{}
 	server, err := New(Config{
-		Input: reader, Output: output, RepositoryPath: repository, StateDir: t.TempDir(), DefaultProvider: "openai", AgentVersion: "test",
+		Input: reader, Output: output, RepositoryPath: repository, StateDir: stateDir, DefaultProvider: "openai", AgentVersion: "test",
 		NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) {
 			return gatorrun.Executor{Model: &scriptedModel{turns: []agent.Turn{{Text: "Plan ready."}}}}, nil
 		},
@@ -83,17 +84,41 @@ func TestServerInitializesRunsPlanListsAndResumesSession(t *testing.T) {
 
 	writeMessage(t, writer, map[string]any{"jsonrpc": "2.0", "id": "close", "method": "session/close", "params": map[string]any{"sessionId": sessionID}})
 	_ = waitFor(t, output, func(message envelope) bool { return message.ID == "close" && message.Result != nil })
-	writeMessage(t, writer, map[string]any{"jsonrpc": "2.0", "id": "resume", "method": "session/resume", "params": map[string]any{"sessionId": sessionID, "cwd": repository}})
-	resumed := waitFor(t, output, func(message envelope) bool { return message.ID == "resume" && message.Result != nil })
-	if resumed.Result.(map[string]any)["modes"].(map[string]any)["currentModeId"] != "plan" {
-		t.Fatalf("session/resume response = %#v", resumed)
-	}
-
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := <-done; err != nil {
 		t.Fatalf("serve ACP: %v", err)
+	}
+
+	reconnectReader, reconnectWriter := io.Pipe()
+	reconnectOutput := &lockedBuffer{}
+	reconnected, err := New(Config{
+		Input: reconnectReader, Output: reconnectOutput, RepositoryPath: repository, StateDir: stateDir, DefaultProvider: "openai", AgentVersion: "test",
+		NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) {
+			return gatorrun.Executor{Model: &scriptedModel{turns: []agent.Turn{{Text: "Resumed."}}}}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("new reconnected ACP server: %v", err)
+	}
+	reconnectDone := make(chan error, 1)
+	go func() { reconnectDone <- reconnected.Serve(context.Background()) }()
+	writeMessage(t, reconnectWriter, map[string]any{
+		"jsonrpc": "2.0", "id": "reinitialize", "method": "initialize",
+		"params": map[string]any{"protocolVersion": 1, "clientCapabilities": map[string]any{}},
+	})
+	_ = waitFor(t, reconnectOutput, func(message envelope) bool { return message.ID == "reinitialize" && message.Result != nil })
+	writeMessage(t, reconnectWriter, map[string]any{"jsonrpc": "2.0", "id": "resume", "method": "session/resume", "params": map[string]any{"sessionId": sessionID, "cwd": repository}})
+	resumed := waitFor(t, reconnectOutput, func(message envelope) bool { return message.ID == "resume" && message.Result != nil })
+	if resumed.Result.(map[string]any)["modes"].(map[string]any)["currentModeId"] != "plan" {
+		t.Fatalf("session/resume after reconnect = %#v", resumed)
+	}
+	if err := reconnectWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-reconnectDone; err != nil {
+		t.Fatalf("serve reconnected ACP: %v", err)
 	}
 }
 
@@ -148,6 +173,70 @@ func TestServerRequestsPermissionAndUsesClientSelection(t *testing.T) {
 	}
 	if err := <-done; err != nil {
 		t.Fatalf("serve ACP: %v", err)
+	}
+}
+
+func TestAdditionalWorkspaceDirectoriesAreBoundedToRepository(t *testing.T) {
+	repository := initializedRepository(t)
+	nested := filepath.Join(repository, "packages", "api")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	server, err := New(Config{
+		Input: strings.NewReader(""), Output: &lockedBuffer{}, RepositoryPath: repository, StateDir: t.TempDir(), DefaultProvider: "openai",
+		NewExecutor: func(_, _, _ string) (gatorrun.Executor, error) { return gatorrun.Executor{}, nil },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := server.validateAdditionalDirectories([]string{nested, nested})
+	if err != nil {
+		t.Fatalf("validate additional workspace: %v", err)
+	}
+	canonicalNested, err := filepath.EvalSymlinks(nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roots) != 1 || roots[0].Path() != canonicalNested {
+		t.Fatalf("additional workspace roots = %#v", roots)
+	}
+	outside := t.TempDir()
+	outsideRoots, err := server.validateAdditionalDirectories([]string{outside})
+	canonicalOutside, resolveErr := filepath.EvalSymlinks(outside)
+	if resolveErr != nil {
+		t.Fatal(resolveErr)
+	}
+	if err != nil || len(outsideRoots) != 1 || outsideRoots[0].Path() != canonicalOutside {
+		t.Fatalf("external workspace root = %#v, %v", outsideRoots, err)
+	}
+	params, err := json.Marshal(map[string]any{"cwd": repository, "additionalDirectories": []string{outside}, "mcpServers": []any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := server.newSession(inbound{ID: json.RawMessage(`"new"`), Params: params}); err != nil {
+		t.Fatalf("new session with external root: %v", err)
+	}
+	server.mu.Lock()
+	var session *session
+	for _, candidate := range server.sessions {
+		session = candidate
+	}
+	server.mu.Unlock()
+	if session == nil || len(session.additional) != 1 || session.additional[0].Path() != canonicalOutside {
+		t.Fatalf("new-session external roots = %#v", session)
+	}
+	resumeParams, err := json.Marshal(map[string]any{"sessionId": session.id, "cwd": repository, "additionalDirectories": []any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := server.resumeSession(inbound{ID: json.RawMessage(`"resume"`), Method: "session/resume", Params: resumeParams}); err != nil {
+		t.Fatalf("resume session with empty roots: %v", err)
+	}
+	server.mu.Lock()
+	additionalCount := len(session.additional)
+	server.mu.Unlock()
+	if additionalCount != 0 {
+		t.Fatalf("resume restored omitted roots: %#v", session.additional)
 	}
 }
 

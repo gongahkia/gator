@@ -7,19 +7,20 @@ import "time"
 const Version = 1
 
 const (
-	MethodCapabilities   = "capabilities"
-	MethodRun            = "run"
-	MethodResume         = "resume"
-	MethodSteer          = "steer"
-	MethodCancel         = "cancel"
-	MethodStatus         = "status"
-	MethodThreads        = "threads"
-	MethodApprove        = "approve"
-	MethodTerminalList   = "terminal_list"
-	MethodTerminalRead   = "terminal_read"
-	MethodTerminalWrite  = "terminal_write"
-	MethodTerminalResize = "terminal_resize"
-	MethodTerminalStop   = "terminal_stop"
+	MethodCapabilities    = "capabilities"
+	MethodRun             = "run"
+	MethodResume          = "resume"
+	MethodSteer           = "steer"
+	MethodCancel          = "cancel"
+	MethodStatus          = "status"
+	MethodThreads         = "threads"
+	MethodApprove         = "approve"
+	MethodTerminalList    = "terminal_list"
+	MethodTerminalRead    = "terminal_read"
+	MethodTerminalWrite   = "terminal_write"
+	MethodTerminalResize  = "terminal_resize"
+	MethodTerminalStop    = "terminal_stop"
+	MethodTerminalRestart = "terminal_restart"
 )
 
 // Request is one newline-delimited command sent to gator rpc.

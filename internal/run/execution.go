@@ -68,6 +68,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project LSP servers: %w", err)
 	}
+	lspSet = lspSet.WithAdditionalRoots(request.AdditionalReadOnlyRoots)
 	lspManager := lspSet.NewManager()
 	releaseLSP := func() { _ = lspManager.Close() }
 	if request.LSPRegistry != nil {
@@ -174,7 +175,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			return hookEngine.Run(ctx, hooks.Verification, "run_command", map[string]any{"argv": argv})
 		},
 	}
-	runTools := tools.Default(isolated.Root, commandPolicy)
+	runTools := tools.Default(isolated.Root, commandPolicy, request.AdditionalReadOnlyRoots...)
 	if profilePolicy.HasOmit(instructions.OmitApplyPatch) || profilePolicy.HasOmit(instructions.OmitRunCommand) {
 		runTools = filterTools(runTools, profilePolicy)
 	}
@@ -322,7 +323,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 	system := systemPrompt(joinInstructions(joinInstructions(projectInstructionSet.Content, extensionInstructions), request.System), request.Verification)
 	var check func([]agent.Message) error
 	if request.Mode == PlanMode {
-		runTools = tools.ReadOnly(isolated.Root)
+		runTools = tools.ReadOnly(isolated.Root, request.AdditionalReadOnlyRoots...)
 		if !profilePolicy.HasOmit(instructions.OmitDelegateReadOnly) {
 			runTools = append(runTools, readonlyScout)
 		}

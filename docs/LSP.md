@@ -71,12 +71,18 @@ explicit trust, it retires the old manager; an in-flight run releases it before
 it is stopped.
 Gator shuts every cached manager down when that TUI or app-server process exits
 and discards an unhealthy client after a transport failure. Requests sharing a
-manager are serialized over its JSON-RPC transport.
+manager are serialized over its JSON-RPC transport. This cache is intentionally
+process-local: it preserves a compatible live server index for a retained
+worktree but does not write an index or resurrect a process after restart.
 
-This is not editor synchronization: Gator does not send `didOpen`,
-`didChange`, or `didClose`, does not retain a cache across restart, and never
-shares an LSP process between worktrees. The model continues to read files from
-the worktree for every lookup.
+When a server advertises `textDocumentSync`, Gator synchronizes each
+file-targeted lookup from its current on-disk snapshot: it sends `didOpen` once,
+sends a full-content `didChange` only when the bounded (128 KiB) content hash
+changes, and sends `didClose` on discard or shutdown. Incremental-capable
+servers receive a valid full replacement because Gator observes files, not
+editor keystrokes. Servers without document synchronization remain supported.
+Gator never shares an LSP process between distinct worktrees or distinct
+additional-root sets.
 
 Gator implements the LSP 3.17 requests `textDocument/diagnostic`,
 `textDocument/hover`, `textDocument/completion`, `textDocument/codeAction`,

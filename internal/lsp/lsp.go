@@ -48,6 +48,7 @@ const (
 	maxCodeActionKindBytes          = 256
 	maxCodeActionDisabledBytes      = 1024
 	maxCodeActionNewTextBytes       = 16 * 1024
+	maxDocumentSyncBytes            = 128 * 1024
 	maxRenameNameBytes              = 256
 	maxSymbolQuery                  = 512
 	maxToolOutput                   = 64 * 1024
@@ -79,12 +80,29 @@ type Set struct {
 	configuredHash string
 	trusted        bool
 	root           workspace.Root
+	additional     []workspace.Root
 	servers        []server
 }
 
 func (s Set) Configured() bool { return s.configuredHash != "" }
 func (s Set) Trusted() bool    { return s.trusted }
 func (s Set) Hash() string     { return s.configuredHash }
+
+// WithAdditionalRoots returns a copy that may inspect the supplied
+// read-only directories. They do not change manifest trust or grant patch or
+// command authority.
+func (s Set) WithAdditionalRoots(roots []workspace.Root) Set {
+	s.additional = workspace.NewRootSet(s.root, roots).Additional()
+	return s
+}
+
+func (s Set) rootSet() workspace.RootSet {
+	return workspace.NewRootSet(s.root, s.additional)
+}
+
+func (s Set) rootKey() string {
+	return strings.Join(s.rootSet().Paths(), "\x00")
+}
 
 // Load validates an LSP manifest. A valid but untrusted manifest is inert.
 func Load(worktreePath, trustedHash string) (Set, error) {
@@ -140,7 +158,7 @@ func (s Set) Tools(approve func(context.Context, string, string, string) error) 
 	result := make([]agent.Tool, 0, len(s.servers)*len(lspOperations))
 	for _, specification := range s.servers {
 		for _, operation := range lspOperations {
-			result = append(result, Tool{root: s.root, specification: specification, operation: operation, approve: approve, connect: connect})
+			result = append(result, Tool{root: s.root, roots: s.rootSet(), specification: specification, operation: operation, approve: approve, connectRoots: connect})
 		}
 	}
 	return result
@@ -150,26 +168,39 @@ func (s Set) Tools(approve func(context.Context, string, string, string) error) 
 // Tool calls remain individually approved. A Registry may retain the manager
 // for compatible later native-session runs, never across worktrees.
 type Manager struct {
-	root    workspace.Root
-	trusted bool
-	servers []server
-	connect func(context.Context, workspace.Root, server) (client, error)
+	root         workspace.Root
+	roots        workspace.RootSet
+	trusted      bool
+	servers      []server
+	connect      func(context.Context, workspace.Root, server) (client, error)
+	connectRoots func(context.Context, workspace.RootSet, server) (client, error)
 
 	mu        sync.Mutex
 	requestMu sync.Mutex
 	closed    bool
 	clients   map[string]client
+	documents map[string]documentState
+}
+
+type documentState struct {
+	server  string
+	path    string
+	uri     string
+	version int
+	digest  [sha256.Size]byte
 }
 
 // NewManager constructs a per-run client manager. Call Close when the run
 // exits so every lazily started language server is terminated.
 func (s Set) NewManager() *Manager {
 	return &Manager{
-		root:    s.root,
-		trusted: s.trusted,
-		servers: append([]server(nil), s.servers...),
-		connect: connect,
-		clients: make(map[string]client),
+		root:         s.root,
+		roots:        s.rootSet(),
+		trusted:      s.trusted,
+		servers:      append([]server(nil), s.servers...),
+		connectRoots: connect,
+		clients:      make(map[string]client),
+		documents:    make(map[string]documentState),
 	}
 }
 
@@ -200,6 +231,13 @@ func (m *Manager) Inspect() []ServerInspect {
 	return result
 }
 
+func (m *Manager) rootSet() workspace.RootSet {
+	if m.roots.Primary().Path() != "" {
+		return m.roots
+	}
+	return workspace.NewRootSet(m.root, nil)
+}
+
 // Tools returns this manager's read-only tool surface. An untrusted or empty
 // set has no model-visible tools.
 func (m *Manager) Tools(approve func(context.Context, string, string, string) error) []agent.Tool {
@@ -209,7 +247,7 @@ func (m *Manager) Tools(approve func(context.Context, string, string, string) er
 	result := make([]agent.Tool, 0, len(m.servers)*len(lspOperations))
 	for _, specification := range m.servers {
 		for _, operation := range lspOperations {
-			result = append(result, Tool{root: m.root, specification: specification, operation: operation, approve: approve, manager: m})
+			result = append(result, Tool{roots: m.rootSet(), specification: specification, operation: operation, approve: approve, manager: m})
 		}
 	}
 	return result
@@ -226,11 +264,18 @@ func (m *Manager) connection(ctx context.Context, specification server) (client,
 		return existing, nil
 	}
 	connect := m.connect
+	connectRoots := m.connectRoots
 	m.mu.Unlock()
-	if connect == nil {
+	if connect == nil && connectRoots == nil {
 		return nil, errors.New("LSP connection is not configured")
 	}
-	opened, err := connect(ctx, m.root, specification)
+	var opened client
+	var err error
+	if connectRoots != nil {
+		opened, err = connectRoots(ctx, m.rootSet(), specification)
+	} else {
+		opened, err = connect(ctx, m.rootSet().Primary(), specification)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +298,7 @@ func (m *Manager) connection(ctx context.Context, specification server) (client,
 // request serializes access to one language-server connection. JSON-RPC IDs
 // and framed responses share one transport, so concurrent tool calls cannot
 // safely interleave them.
-func (m *Manager) request(ctx context.Context, specification server, operation lspOperation, method string, parameters any) (json.RawMessage, error) {
+func (m *Manager) request(ctx context.Context, specification server, operation lspOperation, path, method string, parameters any) (json.RawMessage, error) {
 	m.requestMu.Lock()
 	defer m.requestMu.Unlock()
 	connection, err := m.connection(ctx, specification)
@@ -263,11 +308,58 @@ func (m *Manager) request(ctx context.Context, specification server, operation l
 	if !connection.Supports(operation) {
 		return nil, fmt.Errorf("LSP server %q does not support %s", specification.Name, operation)
 	}
+	if path != "" {
+		if err := m.syncDocument(connection, specification, path); err != nil {
+			m.discard(specification.Name)
+			return nil, err
+		}
+	}
 	response, err := connection.Request(ctx, method, parameters)
 	if err != nil {
 		m.discard(specification.Name)
 	}
 	return response, err
+}
+
+func (m *Manager) syncDocument(connection client, specification server, path string) error {
+	if connection.DocumentSyncKind() == 0 {
+		return nil
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read LSP synchronized document: %w", err)
+	}
+	if len(contents) > maxDocumentSyncBytes {
+		return fmt.Errorf("LSP synchronized document exceeds the %d KiB limit", maxDocumentSyncBytes/1024)
+	}
+	digest := sha256.Sum256(contents)
+	key := specification.Name + "\x00" + path
+	if m.documents == nil {
+		m.documents = make(map[string]documentState)
+	}
+	state, opened := m.documents[key]
+	if opened && state.digest == digest {
+		return nil
+	}
+	if !opened {
+		state = documentState{server: specification.Name, path: path, uri: fileURI(path), version: 1, digest: digest}
+		if err := connection.Notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{
+			"uri": state.uri, "languageId": specification.Language, "version": state.version, "text": string(contents),
+		}}); err != nil {
+			return fmt.Errorf("open synchronized LSP document: %w", err)
+		}
+	} else {
+		state.version++
+		state.digest = digest
+		if err := connection.Notify("textDocument/didChange", map[string]any{
+			"textDocument":   map[string]any{"uri": state.uri, "version": state.version},
+			"contentChanges": []map[string]any{{"text": string(contents)}},
+		}); err != nil {
+			return fmt.Errorf("change synchronized LSP document: %w", err)
+		}
+	}
+	m.documents[key] = state
+	return nil
 }
 
 // Discard drops an unhealthy client after an I/O failure so a later approved
@@ -287,7 +379,23 @@ func (m *Manager) discard(name string) {
 	delete(m.clients, name)
 	m.mu.Unlock()
 	if connection != nil {
+		m.closeDocuments(name, connection)
 		_ = connection.Close()
+	}
+}
+
+func (m *Manager) closeDocuments(server string, connection client) {
+	if connection == nil {
+		return
+	}
+	for key, state := range m.documents {
+		if state.server != server {
+			continue
+		}
+		if connection.DocumentSyncKind() != 0 {
+			_ = connection.Notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": state.uri}})
+		}
+		delete(m.documents, key)
 	}
 }
 
@@ -305,15 +413,20 @@ func (m *Manager) Close() error {
 		return nil
 	}
 	m.closed = true
-	connections := make([]client, 0, len(m.clients))
-	for _, connection := range m.clients {
-		connections = append(connections, connection)
+	type namedClient struct {
+		name       string
+		connection client
+	}
+	connections := make([]namedClient, 0, len(m.clients))
+	for name, connection := range m.clients {
+		connections = append(connections, namedClient{name: name, connection: connection})
 	}
 	m.clients = make(map[string]client)
 	m.mu.Unlock()
 	var first error
-	for _, connection := range connections {
-		if err := connection.Close(); err != nil && first == nil {
+	for _, item := range connections {
+		m.closeDocuments(item.name, item.connection)
+		if err := item.connection.Close(); err != nil && first == nil {
 			first = err
 		}
 	}
@@ -442,12 +555,23 @@ var lspOperations = []lspOperation{
 
 // Tool adapts one trusted, read-only LSP operation to the agent tool contract.
 type Tool struct {
+	// root and connect retain the narrow pre-multi-root test seam. Production
+	// construction supplies roots and connectRoots.
 	root          workspace.Root
+	roots         workspace.RootSet
 	specification server
 	operation     lspOperation
 	approve       func(context.Context, string, string, string) error
 	connect       func(context.Context, workspace.Root, server) (client, error)
+	connectRoots  func(context.Context, workspace.RootSet, server) (client, error)
 	manager       *Manager
+}
+
+func (t Tool) rootSet() workspace.RootSet {
+	if t.roots.Primary().Path() != "" {
+		return t.roots
+	}
+	return workspace.NewRootSet(t.root, nil)
 }
 
 func (t Tool) Definition() agent.ToolDefinition {
@@ -529,7 +653,8 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 		target = params.Query
 	} else {
 		var err error
-		resolved, err = t.root.ResolveFile(params.Path)
+		roots := t.rootSet()
+		resolved, err = roots.ResolveFile(params.Path)
 		if err != nil {
 			return agent.ToolResult{}, err
 		}
@@ -540,6 +665,10 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 		if !info.Mode().IsRegular() {
 			return agent.ToolResult{}, fmt.Errorf("LSP %s requires a regular source file", t.operation)
 		}
+		if !roots.IsPrimary(resolved) && (t.operation == codeActionsOperation || t.operation == formatOperation || t.operation == renameOperation) {
+			return agent.ToolResult{}, fmt.Errorf("LSP %s is unavailable for read-only external workspace files", t.operation)
+		}
+		target = roots.DisplayPath(resolved)
 	}
 	if t.requiresPosition() && (params.Line < 1 || params.Character < 0) {
 		return agent.ToolResult{}, errors.New("LSP position requires a one-based line and a zero-based UTF-16 character offset")
@@ -565,7 +694,7 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 	var response json.RawMessage
 	var err error
 	if t.manager != nil {
-		response, err = t.manager.request(ctx, t.specification, t.operation, method, request)
+		response, err = t.manager.request(ctx, t.specification, t.operation, resolved, method, request)
 	} else {
 		connection, release, openErr := t.open(ctx)
 		if openErr != nil {
@@ -574,6 +703,20 @@ func (t Tool) Execute(ctx context.Context, arguments json.RawMessage) (agent.Too
 		defer release()
 		if !connection.Supports(t.operation) {
 			return agent.ToolResult{}, fmt.Errorf("LSP server %q does not support %s", t.specification.Name, t.operation)
+		}
+		if resolved != "" && connection.DocumentSyncKind() != 0 {
+			contents, readErr := os.ReadFile(resolved)
+			if readErr != nil {
+				return agent.ToolResult{}, fmt.Errorf("read LSP synchronized document: %w", readErr)
+			}
+			if len(contents) > maxDocumentSyncBytes {
+				return agent.ToolResult{}, fmt.Errorf("LSP synchronized document exceeds the %d KiB limit", maxDocumentSyncBytes/1024)
+			}
+			document := map[string]any{"uri": fileURI(resolved), "languageId": t.specification.Language, "version": 1, "text": string(contents)}
+			if notifyErr := connection.Notify("textDocument/didOpen", map[string]any{"textDocument": document}); notifyErr != nil {
+				return agent.ToolResult{}, fmt.Errorf("open synchronized LSP document: %w", notifyErr)
+			}
+			defer connection.Notify("textDocument/didClose", map[string]any{"textDocument": map[string]any{"uri": fileURI(resolved)}})
 		}
 		response, err = connection.Request(ctx, method, request)
 	}
@@ -591,7 +734,14 @@ func (t Tool) open(ctx context.Context) (client, func(), error) {
 	if t.connect == nil {
 		return nil, nil, errors.New("LSP connection is not configured")
 	}
-	connection, err := t.connect(ctx, t.root, t.specification)
+	if t.connectRoots != nil {
+		connection, err := t.connectRoots(ctx, t.rootSet(), t.specification)
+		if err != nil {
+			return nil, nil, err
+		}
+		return connection, func() { _ = connection.Close() }, nil
+	}
+	connection, err := t.connect(ctx, t.rootSet().Primary(), t.specification)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -647,6 +797,7 @@ func codeActionRange(params toolParameters) (map[string]map[string]int, error) {
 }
 
 func (t Tool) format(path string, response json.RawMessage) (agent.ToolResult, error) {
+	roots := t.rootSet()
 	switch t.operation {
 	case diagnosticsOperation:
 		var result struct {
@@ -665,17 +816,17 @@ func (t Tool) format(path string, response json.RawMessage) (agent.ToolResult, e
 	case completionOperation:
 		return formatCompletions(path, t.specification.Name, response)
 	case codeActionsOperation:
-		return formatCodeActions(t.root, path, t.specification.Name, response)
+		return formatCodeActions(roots, path, t.specification.Name, response)
 	case formatOperation:
 		return formatFormatting(path, t.specification.Name, response)
 	case renameOperation:
-		return formatRename(t.root, path, t.specification.Name, response)
+		return formatRename(roots, path, t.specification.Name, response)
 	case definitionOperation, referencesOperation:
-		return formatLocations(t.root, path, t.specification.Name, t.operation, response)
+		return formatLocations(roots, path, t.specification.Name, t.operation, response)
 	case documentSymbolsOperation:
-		return formatDocumentSymbols(t.root, path, t.specification.Name, response)
+		return formatDocumentSymbols(roots, path, t.specification.Name, response)
 	case workspaceSymbolsOperation:
-		return formatWorkspaceSymbols(t.root, path, t.specification.Name, response)
+		return formatWorkspaceSymbols(roots, path, t.specification.Name, response)
 	default:
 		return agent.ToolResult{}, fmt.Errorf("unsupported LSP operation %q", t.operation)
 	}
@@ -720,7 +871,7 @@ func formatDiagnostics(path, server string, diagnostics []Diagnostic) (agent.Too
 	return boundedToolResult(result, "diagnostic")
 }
 
-func formatCodeActions(root workspace.Root, path, server string, response json.RawMessage) (agent.ToolResult, error) {
+func formatCodeActions(root workspace.RootSet, path, server string, response json.RawMessage) (agent.ToolResult, error) {
 	response = bytes.TrimSpace(response)
 	if len(response) == 0 || string(response) == "null" {
 		response = json.RawMessage("[]")
@@ -767,7 +918,7 @@ func formatCodeActions(root workspace.Root, path, server string, response json.R
 	}{Path: path, Server: server, Actions: actions, Truncated: truncated}, "code-action")
 }
 
-func presentCodeAction(root workspace.Root, raw json.RawMessage, remainingEdits *int) (presentedCodeAction, bool, bool, error) {
+func presentCodeAction(root workspace.RootSet, raw json.RawMessage, remainingEdits *int) (presentedCodeAction, bool, bool, error) {
 	var value struct {
 		Title       string `json:"title"`
 		Kind        string `json:"kind"`
@@ -808,7 +959,7 @@ func presentCodeAction(root workspace.Root, raw json.RawMessage, remainingEdits 
 	return action, true, false, nil
 }
 
-func presentWorkspaceEdit(root workspace.Root, raw json.RawMessage) ([]presentedTextEdit, bool, error) {
+func presentWorkspaceEdit(root workspace.RootSet, raw json.RawMessage) ([]presentedTextEdit, bool, error) {
 	var edit lspWorkspaceEdit
 	if err := json.Unmarshal(raw, &edit); err != nil {
 		return nil, false, fmt.Errorf("decode code-action workspace edit: %w", err)
@@ -824,7 +975,7 @@ func presentWorkspaceEdit(root workspace.Root, raw json.RawMessage) ([]presented
 		sort.Strings(uris)
 		result := make([]presentedTextEdit, 0)
 		for _, uri := range uris {
-			path, found, err := presentFileURI(root, uri)
+			path, found, err := presentEditableFileURI(root, uri)
 			if err != nil {
 				return nil, false, err
 			}
@@ -860,7 +1011,7 @@ func presentWorkspaceEdit(root workspace.Root, raw json.RawMessage) ([]presented
 		if change.TextDocument.URI == "" {
 			return nil, false, nil
 		}
-		path, found, err := presentFileURI(root, change.TextDocument.URI)
+		path, found, err := presentEditableFileURI(root, change.TextDocument.URI)
 		if err != nil {
 			return nil, false, err
 		}
@@ -909,7 +1060,7 @@ func formatFormatting(path, server string, response json.RawMessage) (agent.Tool
 // formatRename accepts only a complete, workspace-confined WorkspaceEdit. A
 // rename can affect several files, so exposing a partial proposal would make
 // the suggested change misleading; any unsafe or oversized edit is omitted.
-func formatRename(root workspace.Root, path, server string, response json.RawMessage) (agent.ToolResult, error) {
+func formatRename(root workspace.RootSet, path, server string, response json.RawMessage) (agent.ToolResult, error) {
 	response = bytes.TrimSpace(response)
 	if len(response) == 0 || string(response) == "null" {
 		response = json.RawMessage("{}")
@@ -1135,7 +1286,7 @@ func completionDocumentation(raw json.RawMessage) (string, string, error) {
 	return shorten(markup.Value, maxCompletionDocumentationBytes), markup.Kind, nil
 }
 
-func formatLocations(root workspace.Root, path, server string, operation lspOperation, response json.RawMessage) (agent.ToolResult, error) {
+func formatLocations(root workspace.RootSet, path, server string, operation lspOperation, response json.RawMessage) (agent.ToolResult, error) {
 	locations, err := decodeLocations(response)
 	if err != nil {
 		return agent.ToolResult{}, err
@@ -1184,7 +1335,7 @@ func decodeLocations(response json.RawMessage) ([]lspLocation, error) {
 	return locations, nil
 }
 
-func presentLocation(root workspace.Root, location lspLocation) (presentedLocation, bool, error) {
+func presentLocation(root workspace.RootSet, location lspLocation) (presentedLocation, bool, error) {
 	uri, sourceRange := location.URI, location.Range
 	if location.TargetURI != "" {
 		uri, sourceRange = location.TargetURI, location.TargetRange
@@ -1206,17 +1357,13 @@ func presentLocation(root workspace.Root, location lspLocation) (presentedLocati
 	return presentedLocation{Path: path, Range: presented}, true, nil
 }
 
-func presentFileURI(root workspace.Root, uri string) (string, bool, error) {
+func presentFileURI(root workspace.RootSet, uri string) (string, bool, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil || parsed.Scheme != "file" || (parsed.Host != "" && parsed.Host != "localhost") || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return "", false, errors.New("LSP server returned an invalid location URI")
 	}
 	candidate := filepath.Clean(filepath.FromSlash(parsed.Path))
-	relative, err := filepath.Rel(root.Path(), candidate)
-	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
-		return "", false, nil
-	}
-	resolved, err := root.ResolveFile(relative)
+	resolved, err := root.ResolveReturnedFile(candidate)
 	if err != nil {
 		return "", false, nil
 	}
@@ -1224,11 +1371,20 @@ func presentFileURI(root workspace.Root, uri string) (string, bool, error) {
 	if err != nil || !info.Mode().IsRegular() {
 		return "", false, nil
 	}
-	returnedPath, err := filepath.Rel(root.Path(), resolved)
-	if err != nil {
+	return root.DisplayPath(resolved), true, nil
+}
+
+// presentEditableFileURI keeps LSP edit suggestions inside the isolated
+// worktree even when the same server indexes ACP read-only external roots.
+func presentEditableFileURI(root workspace.RootSet, uri string) (string, bool, error) {
+	path, found, err := presentFileURI(root, uri)
+	if err != nil || !found {
+		return path, found, err
+	}
+	if filepath.IsAbs(path) {
 		return "", false, nil
 	}
-	return filepath.ToSlash(returnedPath), true, nil
+	return path, true, nil
 }
 
 func presentRange(value lspRange) (presentedRange, error) {
@@ -1238,7 +1394,7 @@ func presentRange(value lspRange) (presentedRange, error) {
 	return presentedRange{StartLine: value.Start.Line + 1, StartCharacter: value.Start.Character, EndLine: value.End.Line + 1, EndCharacter: value.End.Character}, nil
 }
 
-func formatWorkspaceSymbols(root workspace.Root, query, server string, response json.RawMessage) (agent.ToolResult, error) {
+func formatWorkspaceSymbols(root workspace.RootSet, query, server string, response json.RawMessage) (agent.ToolResult, error) {
 	if len(response) == 0 || string(response) == "null" {
 		response = json.RawMessage("[]")
 	}
@@ -1294,7 +1450,7 @@ func formatWorkspaceSymbols(root workspace.Root, query, server string, response 
 	}{Query: query, Server: server, Symbols: presented, Truncated: truncated}, "workspace-symbol")
 }
 
-func formatDocumentSymbols(root workspace.Root, path, server string, response json.RawMessage) (agent.ToolResult, error) {
+func formatDocumentSymbols(root workspace.RootSet, path, server string, response json.RawMessage) (agent.ToolResult, error) {
 	if len(response) == 0 || string(response) == "null" {
 		response = json.RawMessage("[]")
 	}
@@ -1372,7 +1528,7 @@ func presentSymbol(symbol lspDocumentSymbol, remaining *int, truncated *bool) (p
 	return value, true, nil
 }
 
-func presentSymbolInformation(root workspace.Root, raw json.RawMessage, remaining *int, truncated *bool) (presentedSymbol, bool, error) {
+func presentSymbolInformation(root workspace.RootSet, raw json.RawMessage, remaining *int, truncated *bool) (presentedSymbol, bool, error) {
 	if *remaining == 0 {
 		*truncated = true
 		return presentedSymbol{}, false, nil
@@ -1439,19 +1595,24 @@ func decodeArguments(arguments json.RawMessage, destination any) error {
 }
 
 type nativeClient struct {
-	input   io.WriteCloser
-	output  *bufio.Reader
-	command interface{ Wait() error }
-	kill    func() error
-	cleanup func()
-	next    int64
-	support map[lspOperation]bool
+	input        io.WriteCloser
+	output       *bufio.Reader
+	command      interface{ Wait() error }
+	kill         func() error
+	cleanup      func()
+	next         int64
+	support      map[lspOperation]bool
+	documentSync int
 }
 
-func connect(ctx context.Context, root workspace.Root, specification server) (client, error) {
+func connect(ctx context.Context, roots workspace.RootSet, specification server) (client, error) {
+	root := roots.Primary()
 	policy := sandbox.DefaultPolicy()
 	if specification.Network == "allow" {
 		policy.Network = sandbox.AllowNetwork
+	}
+	for _, additional := range roots.Additional() {
+		policy.ReadOnlyRoots = append(policy.ReadOnlyRoots, additional.Path())
 	}
 	argv := append([]string{filepath.Join(root.Path(), filepath.FromSlash(specification.Command[0]))}, specification.Command[1:]...)
 	prepared, err := sandbox.Prepare(ctx, sandbox.Request{Dir: root.Path(), Argv: argv, Policy: policy})
@@ -1473,20 +1634,24 @@ func connect(ctx context.Context, root workspace.Root, specification server) (cl
 		return nil, err
 	}
 	client := &nativeClient{input: input, output: bufio.NewReaderSize(output, maxFrame), command: prepared.Command, kill: prepared.Command.Process.Kill, cleanup: prepared.Cleanup}
-	if err := client.initialize(ctx, root.Path()); err != nil {
+	if err := client.initialize(ctx, root.Path(), roots.Additional()...); err != nil {
 		_ = client.Close()
 		return nil, err
 	}
 	return client, nil
 }
 
-func (c *nativeClient) initialize(ctx context.Context, root string) error {
+func (c *nativeClient) initialize(ctx context.Context, root string, additional ...workspace.Root) error {
 	uri := fileURI(root)
+	folders := []map[string]string{{"uri": uri, "name": filepath.Base(root)}}
+	for _, extra := range additional {
+		folders = append(folders, map[string]string{"uri": fileURI(extra.Path()), "name": filepath.Base(extra.Path())})
+	}
 	result, err := c.call(ctx, "initialize", map[string]any{
 		"processId":        os.Getpid(),
 		"clientInfo":       map[string]string{"name": "gator", "version": "dev"},
 		"rootUri":          uri,
-		"workspaceFolders": []map[string]string{{"uri": uri, "name": filepath.Base(root)}},
+		"workspaceFolders": folders,
 		"capabilities": map[string]any{
 			"workspace": map[string]any{
 				"configuration":    true,
@@ -1521,6 +1686,7 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 			ReferencesProvider         json.RawMessage `json:"referencesProvider"`
 			DocumentSymbolProvider     json.RawMessage `json:"documentSymbolProvider"`
 			WorkspaceSymbolProvider    json.RawMessage `json:"workspaceSymbolProvider"`
+			TextDocumentSync           json.RawMessage `json:"textDocumentSync"`
 		} `json:"capabilities"`
 	}
 	if err := json.Unmarshal(result, &response); err != nil {
@@ -1538,6 +1704,7 @@ func (c *nativeClient) initialize(ctx context.Context, root string) error {
 		documentSymbolsOperation:  capabilityEnabled(response.Capabilities.DocumentSymbolProvider),
 		workspaceSymbolsOperation: capabilityEnabled(response.Capabilities.WorkspaceSymbolProvider),
 	}
+	c.documentSync = documentSyncKind(response.Capabilities.TextDocumentSync)
 	return c.notify("initialized", map[string]any{})
 }
 
@@ -1545,12 +1712,41 @@ func capabilityEnabled(value json.RawMessage) bool {
 	return len(value) != 0 && string(value) != "false" && string(value) != "null"
 }
 
+// documentSyncKind accepts the two LSP ServerCapabilities forms: a numeric
+// TextDocumentSyncKind or TextDocumentSyncOptions with its change kind.
+func documentSyncKind(raw json.RawMessage) int {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0
+	}
+	var kind int
+	if json.Unmarshal(raw, &kind) == nil {
+		if kind == 1 || kind == 2 {
+			return kind
+		}
+		return 0
+	}
+	var options struct {
+		Change int `json:"change"`
+	}
+	if json.Unmarshal(raw, &options) == nil && (options.Change == 1 || options.Change == 2) {
+		return options.Change
+	}
+	return 0
+}
+
 func (c *nativeClient) Supports(operation lspOperation) bool {
 	return c.support[operation]
 }
 
+func (c *nativeClient) DocumentSyncKind() int { return c.documentSync }
+
 func (c *nativeClient) Request(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	return c.call(ctx, method, params)
+}
+
+func (c *nativeClient) Notify(method string, params any) error {
+	return c.notify(method, params)
 }
 
 func (c *nativeClient) Close() error {

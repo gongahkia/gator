@@ -47,13 +47,19 @@ original command authority.
 
 The same strict process sandbox, isolated worktree, hook policy, project MCP
 and LSP trust, and provider credential handling used by the TUI apply to ACP
-runs. An ACP client cannot change the checkout, add filesystem roots, or inject MCP
-servers: `cwd` must be the repository Gator was started for,
-`additionalDirectories` must be empty, and `mcpServers` must be empty. Trusted
-project MCP configuration continues to come only from `.gator/mcp.json` after
-`gator mcp trust`. Trusted local LSP diagnostics, read-only navigation,
-informational completion, formatting, rename, and workspace-confined code-action suggestions
-continue to come only from `.gator/lsp.json` after `gator lsp trust`.
+runs. `cwd` must be the repository Gator was started for and `mcpServers` must
+be empty. ACP clients may additionally supply up to 32 existing absolute
+directories through `additionalDirectories`; they are canonicalized and become
+read-only context for `read_file`, `list_files`, `search_files`, and trusted LSP
+navigation/indexing. External-root paths are absolute, while primary-worktree
+paths remain relative. They never widen patch, command, or terminal authority;
+formatting, rename, and code-action edits are unavailable for external files.
+The complete root list must be supplied again on `session/load` and
+`session/resume` and is never restored implicitly from the retained session.
+Trusted project MCP configuration continues to come only from `.gator/mcp.json`
+after `gator mcp trust`. Trusted local LSP diagnostics, read-only navigation,
+informational completion, formatting, rename, and workspace-confined code-action
+suggestions continue to come only from `.gator/lsp.json` after `gator lsp trust`.
 ACP prompts cannot provide a worktree setup command: that capability is limited
 to the local developer's explicit `gator run --setup` invocation, before an
 agent session exists.
