@@ -63,7 +63,7 @@ package manager.
 | `config show` | `/status` and `/permissions` show only active session state | partial | No full, redacted settings inspector. |
 | `config set default-provider/default-model` | `/manage` saves the provider/model currently selected in `/model` after confirmation | complete | — |
 | `config set sandbox/network` | `/manage` shows and confirms strict/off sandbox and deny/allow network defaults; `/permissions` explains the effective policy | complete | — |
-| `agent list` | `/agents` lists profiles and prompt-only roles | complete | Profiles can only narrow policy; roles never expand tools. |
+| `agent list` | `/agents` lists profiles and capability-bounded roles | complete | Profiles and role overlays can only narrow policy; roles never expand tools. |
 | `child list/show/batches/batch` | `/manage` selects arbitrary retained runs and browses writer-child status, role, patch size, worktree, batch schedules, and path-conflict evidence | complete | — |
 | `hook status/trust/untrust` | `/manage` shows configured hash/state and confirms trust changes | complete | — |
 | `lsp status/trust/untrust` | `/manage` shows configured hash/state, idle session-cache status, and confirms trust changes; runtime operations still require approval | complete | Opening `/manage` inspects the cache without starting servers. |
@@ -101,6 +101,7 @@ package manager.
 | `review RUN_RECORD_PATH [--open]` | `/review`, `/review TARGET`, and `b` loopback browser review | complete | Listen stays loopback-only. This is not `gator serve`. |
 | `export RUN_RECORD_PATH` | `/manage` selects retained runs and writes private patch exports below Gator's state directory | complete | — |
 | `apply [--check] RUN_RECORD_PATH` | `/manage` requires a successful clean-checkout compatibility check for the selected run, then a separate apply confirmation | complete | — |
+| `eval DIR` | None | CLI only | Offline `--script` or `--live` evaluation; writes a JSON report. Not a TUI workflow. |
 
 ## Gaps to implement next
 

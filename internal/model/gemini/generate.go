@@ -65,7 +65,7 @@ func (g GenerateContent) Complete(ctx context.Context, turn agent.TurnRequest) (
 		return agent.Turn{}, fmt.Errorf("read Gemini response: %w", err)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return agent.Turn{}, describeAPIError(response.StatusCode, contents)
+		return agent.Turn{}, agent.HTTPStatusError(response.StatusCode, describeAPIError(response.StatusCode, contents))
 	}
 	return decodeResponse(contents)
 }

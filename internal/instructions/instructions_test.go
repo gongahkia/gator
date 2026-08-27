@@ -127,14 +127,14 @@ func TestLoadRolesRestrictsDefinitionsToPromptSpecialization(t *testing.T) {
   "profiles": [{"name": "implementer", "instructions": "make focused changes"}],
   "roles": [
     {"name": "reviewer", "description": "independent code review", "kind": "readonly", "file": ".gator/roles/reviewer.md"},
-    {"name": "test-fixer", "description": "implement a focused failing-test fix", "kind": "writer", "instructions": "modify only the delegated test area"}
+    {"name": "test-fixer", "description": "implement a focused failing-test fix", "kind": "writer", "instructions": "modify only the delegated test area", "policy":{"network":"deny","max_steps":4,"omit":["mcp","terminal"]}}
   ]
 }`)
 	roles, err := LoadRoles(repository)
 	if err != nil {
 		t.Fatalf("load roles: %v", err)
 	}
-	if len(roles) != 2 || roles[0].Name != "reviewer" || roles[0].Kind != RoleReadOnly || !strings.Contains(roles[0].Instructions, "regressions") || roles[1].Name != "test-fixer" || roles[1].Kind != RoleWriter {
+	if len(roles) != 2 || roles[0].Name != "reviewer" || roles[0].Kind != RoleReadOnly || !strings.Contains(roles[0].Instructions, "regressions") || roles[1].Name != "test-fixer" || roles[1].Kind != RoleWriter || roles[1].Policy.Network != "deny" || roles[1].Policy.MaxSteps != 4 || !roles[1].Policy.HasOmit(OmitMCP) {
 		t.Fatalf("roles = %#v", roles)
 	}
 }
@@ -149,6 +149,15 @@ func TestLoadRolesRejectsCapabilityEscalationAndMalformedRoles(t *testing.T) {
 }`)
 	if _, err := LoadRoles(repository); err == nil || !strings.Contains(err.Error(), "unsupported kind") {
 		t.Fatalf("capability-escalating role error = %v", err)
+	}
+	writeInstructionFile(t, repository, ".gator/agents.json", `{
+  "version": 1,
+  "roles": [
+    {"name": "writer", "description": "unsafe widening", "kind": "writer", "instructions": "write", "policy":{"network":"allow"}}
+  ]
+}`)
+	if _, err := LoadRoles(repository); err == nil || !strings.Contains(err.Error(), "network can only force deny") {
+		t.Fatalf("capability-widening role policy error = %v", err)
 	}
 	writeInstructionFile(t, repository, ".gator/agents.json", `{
   "version": 1,

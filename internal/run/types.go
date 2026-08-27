@@ -8,6 +8,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
+	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -37,9 +38,9 @@ type Request struct {
 	// omit of run_command.
 	AllowedCommandPrefixes [][]string
 	Approve                func(context.Context, []string) (tools.CommandDecision, error)
-	System          string
-	StateDir        string
-	OnEvent         agent.EventSink
+	System                 string
+	StateDir               string
+	OnEvent                agent.EventSink
 	// Steering is available only to native model runs. It is deliberately
 	// transient: queued prompts remain a TUI concern and do not resume after a
 	// process restart.
@@ -79,9 +80,13 @@ type Request struct {
 	// run. It is not a developer-facing capability: only the primary native
 	// agent may create a writer worktree.
 	DisableWriterDelegation bool
-	Images                  []agent.Image
-	Attachments             []agent.Attachment
-	Mode                    Mode
+	// RolePolicy is an internal restrictive overlay selected from a validated
+	// project writer role. It is met after the developer-selected profile and
+	// therefore cannot restore any authority removed by the parent run.
+	RolePolicy  instructions.ProfilePolicy
+	Images      []agent.Image
+	Attachments []agent.Attachment
+	Mode        Mode
 }
 
 // Mode controls the native agent tool surface for a turn. Plan mode is

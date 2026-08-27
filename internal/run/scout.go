@@ -223,7 +223,7 @@ func (t readOnlyScoutTool) Execute(ctx context.Context, raw json.RawMessage) (ag
 			result, err := runner.Run(ctx, agent.RunOptions{
 				Task:     "Read-only scout assignment:\n" + assignment.task,
 				System:   scoutSystemPrompt(t.instructions, assignment.role),
-				MaxSteps: t.maxSteps,
+				MaxSteps: narrowedScoutMaxSteps(t.maxSteps, assignment.role.Policy.MaxSteps),
 			})
 			report := delegatedScoutReport{Task: assignment.task, Role: assignment.role.Name}
 			if err != nil {
@@ -258,6 +258,13 @@ func (t readOnlyScoutTool) Execute(ctx context.Context, raw json.RawMessage) (ag
 		return agent.ToolResult{}, fmt.Errorf("encode delegate_readonly result: %w", err)
 	}
 	return agent.ToolResult{Content: string(payload)}, nil
+}
+
+func narrowedScoutMaxSteps(parent, role int) int {
+	if role > 0 && (parent <= 0 || role < parent) {
+		return role
+	}
+	return parent
 }
 
 type delegatedScoutReport struct {

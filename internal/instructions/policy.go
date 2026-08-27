@@ -32,6 +32,7 @@ const (
 	OmitMCP              = "mcp"
 	OmitExtension        = "extension"
 	OmitHTTP             = "http"
+	OmitBrowser          = "browser"
 	OmitTerminal         = "terminal"
 	OmitDelegateWriter   = "delegate_writer"
 	OmitDelegateReadOnly = "delegate_readonly"
@@ -40,7 +41,7 @@ const (
 )
 
 var knownProfileOmits = map[string]struct{}{
-	OmitLSP: {}, OmitMCP: {}, OmitExtension: {}, OmitHTTP: {}, OmitTerminal: {},
+	OmitLSP: {}, OmitMCP: {}, OmitExtension: {}, OmitHTTP: {}, OmitBrowser: {}, OmitTerminal: {},
 	OmitDelegateWriter: {}, OmitDelegateReadOnly: {}, OmitRunCommand: {}, OmitApplyPatch: {},
 }
 

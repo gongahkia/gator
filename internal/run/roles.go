@@ -45,7 +45,7 @@ func roleSchemaProperty(roles map[string]instructions.Role) string {
 	if err != nil {
 		return ""
 	}
-	return `,"role":{"type":"string","enum":` + string(encoded) + `,"description":"Optional project-defined specialist role. It changes instructions only, never capabilities."}`
+	return `,"role":{"type":"string","enum":` + string(encoded) + `,"description":"Optional project-defined specialist role. It may narrow inherited capabilities but can never grant authority."}`
 }
 
 func roleCatalog(roles map[string]instructions.Role) string {

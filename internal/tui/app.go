@@ -224,21 +224,34 @@ type ManagedWorktree struct {
 }
 
 type ManagedChild struct {
-	ID           string
-	Status       string
-	Role         string
-	BatchID      string
-	WorktreePath string
-	PatchBytes   int
-	Error        string
+	ID                  string
+	Status              string
+	Role                string
+	BatchID             string
+	WorktreePath        string
+	Provider            string
+	Model               string
+	Profile             string
+	DeclaredPaths       []string
+	ChangedPaths        []string
+	EffectiveMode       string
+	EffectiveSandbox    string
+	EffectiveNetwork    string
+	MaxSteps            int
+	OmittedCapabilities []string
+	PatchBytes          int
+	Error               string
 }
 
 type ManagedBatch struct {
-	ID        string
-	Status    string
-	ChildIDs  []string
-	Conflicts []ManagedConflict
-	Error     string
+	ID               string
+	Status           string
+	ChildIDs         []string
+	Conflicts        []ManagedConflict
+	ComparisonStatus string
+	ComparisonTree   string
+	ComparisonDetail string
+	Error            string
 }
 
 type ManagedConflict struct {

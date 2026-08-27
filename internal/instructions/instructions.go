@@ -57,21 +57,24 @@ type profile struct {
 }
 
 type role struct {
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	Kind         string `json:"kind"`
-	Instructions string `json:"instructions,omitempty"`
-	File         string `json:"file,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	Kind         string        `json:"kind"`
+	Instructions string        `json:"instructions,omitempty"`
+	File         string        `json:"file,omitempty"`
+	Policy       ProfilePolicy `json:"policy,omitempty"`
 }
 
-// Role is a validated project-defined specialization. Its Kind is deliberately
-// limited to Gator's built-in capability classes; a role never grants new
-// filesystem, command, network, extension, or delegation authority.
+// Role is a validated project-defined specialization. Policy is a restrictive
+// meet applied after the parent profile: a role can remove tools, force strict
+// sandboxing or denied network, and reduce the step budget, but never widen
+// authority.
 type Role struct {
 	Name         string
 	Description  string
 	Kind         string
 	Instructions string
+	Policy       ProfilePolicy
 }
 
 const (
@@ -272,7 +275,7 @@ func LoadRoles(repository string) ([]Role, error) {
 		if body == "" {
 			return nil, fmt.Errorf("agent role %q has empty instructions", candidate.Name)
 		}
-		result = append(result, Role{Name: candidate.Name, Description: candidate.Description, Kind: candidate.Kind, Instructions: body})
+		result = append(result, Role{Name: candidate.Name, Description: candidate.Description, Kind: candidate.Kind, Instructions: body, Policy: candidate.Policy})
 	}
 	return result, nil
 }
@@ -334,6 +337,9 @@ func validateProfilesDocument(document profilesDocument) error {
 			return fmt.Errorf("agent role %q requires a one-line description no longer than 512 bytes", candidate.Name)
 		}
 		if err := validateAgentInstructions(candidate.Name, candidate.Instructions, candidate.File, "role"); err != nil {
+			return err
+		}
+		if err := validateProfilePolicy("role "+candidate.Name, candidate.Policy); err != nil {
 			return err
 		}
 	}

@@ -15,9 +15,8 @@ const agentUsage = `usage:
   gator agent list`
 
 // agentCommand makes project-defined profiles and roles inspectable before a
-// model is allowed to select one. Profiles can only narrow run policy. Roles
-// are non-executable prompt data; their kind remains enforced by the native
-// delegation tool surface.
+// model is allowed to select one. Profiles and role overlays can only narrow
+// run policy; role kind remains enforced by the native delegation tool surface.
 func agentCommand(arguments []string, out io.Writer) error {
 	if len(arguments) != 1 || arguments[0] != "list" {
 		return errors.New(agentUsage)
@@ -65,13 +64,36 @@ func agentCommand(arguments []string, out io.Writer) error {
 		return err
 	}
 	sort.Slice(roles, func(first, second int) bool { return roles[first].Name < roles[second].Name })
-	if _, err := fmt.Fprintln(out, "Roles (prompt-only specializations):"); err != nil {
+	if _, err := fmt.Fprintln(out, "Roles (can only narrow inherited policy):"); err != nil {
 		return err
 	}
 	for _, role := range roles {
-		if _, err := fmt.Fprintf(out, "  %s  %s  %s\n", role.Name, role.Kind, role.Description); err != nil {
+		if _, err := fmt.Fprintf(out, "  %s  %s  %s  policy=%s\n", role.Name, role.Kind, role.Description, agentPolicySummary(role.Policy)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func agentPolicySummary(policy instructions.ProfilePolicy) string {
+	parts := make([]string, 0, 5)
+	if policy.Mode != "" {
+		parts = append(parts, "mode:"+policy.Mode)
+	}
+	if policy.Sandbox != "" {
+		parts = append(parts, "sandbox:"+policy.Sandbox)
+	}
+	if policy.Network != "" {
+		parts = append(parts, "network:"+policy.Network)
+	}
+	if policy.MaxSteps > 0 {
+		parts = append(parts, fmt.Sprintf("max_steps:%d", policy.MaxSteps))
+	}
+	if len(policy.Omit) > 0 {
+		parts = append(parts, "omit:"+strings.Join(policy.Omit, ","))
+	}
+	if len(parts) == 0 {
+		return "inherit"
+	}
+	return strings.Join(parts, ";")
 }

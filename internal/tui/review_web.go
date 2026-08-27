@@ -144,7 +144,6 @@ func (m *Model) applyReviewWebStarted(msg reviewWebStartedMsg) {
 	}
 	if msg.url != "" {
 		m.reviewWeb.url = msg.url
-		m.commandOutput = "Gator browser review (loopback-only)\n  URL: " + msg.url + "\n  Scope: retained worktree only; the active checkout is untouched\n  Security: one-use URL, HttpOnly same-site session, no RPC access\n  Stop: s on this screen, or quit Gator"
 	}
 	if msg.err != nil && msg.url == "" {
 		m.notice = notice{text: "Start browser review: " + msg.err.Error(), kind: noticeError}

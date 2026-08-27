@@ -2874,13 +2874,24 @@ func TestManagementShowsWriterBatchConflictEvidence(t *testing.T) {
 	model.management.section = managementChildren
 	model.management.data.Batches = []ManagedBatch{{
 		ID: "batch-1", Status: "completed", ChildIDs: []string{"child-a", "child-b"},
+		ComparisonStatus: "conflict", ComparisonDetail: "Git three-way comparison reported conflicts",
 		Conflicts: []ManagedConflict{{Kind: "path_overlap", ChildIDs: []string{"child-a", "child-b"}, Paths: []string{"internal/shared.go"}, Detail: "both writers changed the same file"}},
 	}}
 	view := model.View()
-	for _, expected := range []string{"batch-1", "path_overlap", "internal/shared.go", "both writers changed"} {
+	for _, expected := range []string{"batch-1", "comparison=conflict", "three-way comparison: conflict", "Git three-way comparison", "path_overlap", "internal/shared.go", "both writers changed"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("batch conflict view missing %q: %q", expected, view)
 		}
+	}
+}
+
+func TestBrowserActionTimelineHidesSubmittedFieldValues(t *testing.T) {
+	detail := describeToolCall(agent.ToolCall{
+		Name:      "browser_act",
+		Arguments: json.RawMessage(`{"action":"submit","ref":"form-1","fields":{"q":"do-not-render"}}`),
+	})
+	if strings.Contains(detail, "do-not-render") || !strings.Contains(detail, "fields: 1") || !strings.Contains(detail, "values hidden") {
+		t.Fatalf("browser action timeline detail = %q", detail)
 	}
 }
 
@@ -3186,6 +3197,9 @@ func TestBrowserReviewRejectsNonLoopbackAndStartsOnLoopback(t *testing.T) {
 	}
 	if !strings.HasPrefix(opened, "http://") || strings.Contains(opened, "0.0.0.0") {
 		t.Fatalf("opened URL = %q", opened)
+	}
+	if strings.Contains(model.commandOutput, model.reviewWeb.url) || strings.Contains(model.plainTranscript(), model.reviewWeb.url) {
+		t.Fatalf("one-use review URL leaked into command output or transcript")
 	}
 }
 

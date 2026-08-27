@@ -63,19 +63,25 @@ turnLoop:
 		var streamedText bool
 		var turn Turn
 		var err error
-		if model, ok := r.Model.(StreamingModel); ok {
-			turn, err = model.CompleteStream(ctx, request, func(delta string) {
-				if delta == "" {
-					return
-				}
-				streamedText = true
-				r.emit(options.OnEvent, Event{Kind: EventTextDelta, At: now(), Step: step, Text: delta})
-			})
-		} else {
-			turn, err = r.Model.Complete(ctx, request)
-		}
-		if err != nil {
-			return Result{Messages: messages, Steps: step}, fmt.Errorf("model turn %d: %w", step, err)
+		for attempt := 1; attempt <= maxTransientAttempts; attempt++ {
+			streamedText = false
+			if model, ok := r.Model.(StreamingModel); ok {
+				turn, err = model.CompleteStream(ctx, request, func(delta string) {
+					if delta == "" {
+						return
+					}
+					streamedText = true
+					r.emit(options.OnEvent, Event{Kind: EventTextDelta, At: now(), Step: step, Text: delta})
+				})
+			} else {
+				turn, err = r.Model.Complete(ctx, request)
+			}
+			if err == nil {
+				break
+			}
+			if streamedText || !IsTransient(err) || attempt == maxTransientAttempts {
+				return Result{Messages: messages, Steps: step}, formatTurnError(step, err)
+			}
 		}
 		// A steering instruction that arrived during model generation supersedes
 		// the unexecuted response. Do not add tool calls to history unless their

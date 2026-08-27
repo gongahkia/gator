@@ -54,3 +54,27 @@ func TestCompactMessagesAllowsExplicitCompactionOfShortHistory(t *testing.T) {
 		t.Fatalf("unexpected compacted history: %#v", compacted)
 	}
 }
+
+func TestCompactMessagesRejectsToolCallingSummaries(t *testing.T) {
+	messages := make([]agent.Message, 20)
+	for index := range messages {
+		messages[index] = agent.Message{Role: agent.RoleUser, Content: "short"}
+	}
+	model := &scriptedModel{turns: []agent.Turn{{Text: "ignored", ToolCalls: []agent.ToolCall{{ID: "call-1", Name: "read_file", Arguments: []byte(`{}`)}}}}}
+	compacted, summary, didCompact, err := compactMessages(context.Background(), model, messages, true)
+	if err == nil || didCompact || summary != "" || compacted != nil {
+		t.Fatalf("tool-calling summary = %#v %q %t %v", compacted, summary, didCompact, err)
+	}
+}
+
+func TestCompactMessagesDoesNotReturnPartialHistoryOnFailure(t *testing.T) {
+	messages := make([]agent.Message, 20)
+	for index := range messages {
+		messages[index] = agent.Message{Role: agent.RoleUser, Content: "keep-original"}
+	}
+	model := &scriptedModel{}
+	compacted, summary, didCompact, err := compactMessages(context.Background(), model, messages, true)
+	if err == nil || didCompact || summary != "" || compacted != nil {
+		t.Fatalf("failed compaction = %#v %q %t %v", compacted, summary, didCompact, err)
+	}
+}

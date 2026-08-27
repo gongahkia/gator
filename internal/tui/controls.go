@@ -184,7 +184,7 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 		return m.openRunOptions()
 	case "/agents":
 		m.commandOutput = m.agentsStatus()
-		m.notice = notice{text: "Profiles can only narrow policy. Roles remain prompt-only specializations.", kind: noticeInfo}
+		m.notice = notice{text: "Profiles and role overlays can only narrow policy; role kinds remain fixed.", kind: noticeInfo}
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
 		m.notice = notice{text: "Verifier, exact allow-command, and literal prefixes may run without a prompt; everything else waits.", kind: noticeInfo}
@@ -846,7 +846,7 @@ func (m Model) permissionsStatus() string {
 }
 
 func (m Model) agentsStatus() string {
-	lines := []string{"Project profiles can only narrow sandbox, network, mode, turn cap, and tool families. Roles are prompt-only and never expand tools."}
+	lines := []string{"Project profiles and role overlays can only narrow sandbox, network, mode, turn cap, and tool families. Roles never expand tools or change kind."}
 	profiles, err := instructions.ListProfiles(m.config.RepositoryPath)
 	if err != nil {
 		lines = append(lines, "Profiles: "+err.Error())
@@ -870,10 +870,33 @@ func (m Model) agentsStatus() string {
 	} else {
 		lines = append(lines, "Roles:")
 		for _, role := range roles {
-			lines = append(lines, fmt.Sprintf("  %s  %s  %s", role.Name, role.Kind, role.Description))
+			lines = append(lines, fmt.Sprintf("  %s  %s  %s  policy=%s", role.Name, role.Kind, role.Description, tuiAgentPolicySummary(role.Policy)))
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func tuiAgentPolicySummary(policy instructions.ProfilePolicy) string {
+	parts := make([]string, 0, 5)
+	if policy.Mode != "" {
+		parts = append(parts, "mode:"+policy.Mode)
+	}
+	if policy.Sandbox != "" {
+		parts = append(parts, "sandbox:"+policy.Sandbox)
+	}
+	if policy.Network != "" {
+		parts = append(parts, "network:"+policy.Network)
+	}
+	if policy.MaxSteps > 0 {
+		parts = append(parts, fmt.Sprintf("max_steps:%d", policy.MaxSteps))
+	}
+	if len(policy.Omit) > 0 {
+		parts = append(parts, "omit:"+strings.Join(policy.Omit, ","))
+	}
+	if len(parts) == 0 {
+		return "inherit"
+	}
+	return strings.Join(parts, ";")
 }
 
 func delegatedRuntimeForProvider(provider string) string {

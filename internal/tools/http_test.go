@@ -29,7 +29,7 @@ func TestHTTPFetchRequiresNetworkApprovalAndReturnsBoundedText(t *testing.T) {
 		},
 		OnEvent: func(event agent.Event) { events = append(events, event) },
 	}, HTTPFetchOptions{Resolver: staticResolver{"example.test": {{IP: net.ParseIP("93.184.216.34")}}}, Client: client, MaxResponseBytes: 4})
-	if len(tools) != 1 || tools[0].Definition().Name != "http_fetch" {
+	if len(tools) != 5 || tools[0].Definition().Name != "http_fetch" || tools[1].Definition().Name != "browser_navigate" {
 		t.Fatalf("network-allowed tool surface = %#v", tools)
 	}
 	first := executeTool(t, tools[0], `{"url":"https://example.test/research?q=gator"}`)
@@ -52,7 +52,7 @@ func TestHTTPFetchRequiresNetworkApprovalAndReturnsBoundedText(t *testing.T) {
 }
 
 func TestWebSearchRequiresConfiguredKeyAndReturnsBoundedResults(t *testing.T) {
-	if tools := HTTPTools(CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}}, HTTPFetchOptions{}); len(tools) != 1 || tools[0].Definition().Name != "http_fetch" {
+	if tools := HTTPTools(CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.AllowNetwork}}, HTTPFetchOptions{}); len(tools) != 5 || tools[0].Definition().Name != "http_fetch" {
 		t.Fatalf("web search appeared without a configured key: %#v", tools)
 	}
 	if tools := HTTPTools(CommandPolicy{Sandbox: sandbox.Policy{Network: sandbox.DenyNetwork}}, HTTPFetchOptions{BraveSearchAPIKey: "do-not-leak"}); len(tools) != 0 {
@@ -74,7 +74,7 @@ func TestWebSearchRequiresConfiguredKeyAndReturnsBoundedResults(t *testing.T) {
 		Resolver:          staticResolver{"api.search.brave.com": {{IP: net.ParseIP("93.184.216.34")}}},
 		Client:            client,
 	})
-	if len(tools) != 2 || tools[1].Definition().Name != "web_search" {
+	if len(tools) != 6 || tools[1].Definition().Name != "web_search" {
 		t.Fatalf("web search tool surface = %#v", tools)
 	}
 	first := executeTool(t, tools[1], `{"query":"Gator web research","count":2}`)
