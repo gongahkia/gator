@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -337,9 +336,6 @@ func TestServerWaitContextHonorsShutdownDeadline(t *testing.T) {
 }
 
 func TestServerControlsDetachedTerminalInItsAuthenticatedSession(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")

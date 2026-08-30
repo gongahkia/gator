@@ -29,10 +29,9 @@ make build
 ./bin/gator
 ```
 
-The tagged-release workflow is configured to build macOS, Linux, and Windows
-archives. Once a release exists, macOS and Linux users can use the checksum-
-verifying installer below; Windows users install the ZIP archive because a
-running executable cannot reliably replace itself:
+Gator supports macOS and Linux on `amd64` and `arm64`. The tagged-release
+workflow publishes checksum-verified archives for those platforms. Once a
+release exists, install with:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/gongahkia/gator/main/scripts/install.sh | sh
@@ -57,9 +56,10 @@ make build
 
 # Real-model evaluation is noninteractive and writes a per-case suite report.
 # See docs/EVALUATION.md for safe container execution and evidence criteria.
-OPENAI_API_KEY=... ./bin/gator eval suite ./internal/eval/testdata \
+OPENAI_API_KEY=... ./bin/gator eval suite ./internal/eval/testdata/core-v1 \
   --live --provider openai --model gpt-5.6 \
-  --report-dir /tmp/gator-eval/live-001 --require-resolved
+  --environment-id 'gator-eval@sha256:IMAGE_DIGEST' --attempts 3 \
+  --report-dir /tmp/gator-eval/core-001 --require-resolved
 ./bin/gator config set default-provider anthropic
 ./bin/gator config set default-model claude-sonnet-4-6
 OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \

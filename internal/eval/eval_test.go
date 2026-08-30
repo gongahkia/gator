@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -68,9 +67,6 @@ func TestLoadCheckedInCoreSuiteRequiresStrictHiddenScoring(t *testing.T) {
 }
 
 func TestCoreSuiteOraclesDistinguishBaselineFromReferenceSolution(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("strict command sandbox is intentionally unavailable on Windows")
-	}
 	suite, err := LoadSuite("testdata/core-v1")
 	if err != nil {
 		t.Fatal(err)
@@ -151,6 +147,18 @@ func TestRunRejectsUnversionedSpecBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestValidateEnvironmentIDRequiresContentAddress(t *testing.T) {
+	valid := "ghcr.io/acme/gator-eval@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	if err := ValidateEnvironmentID(valid); err != nil {
+		t.Fatalf("valid environment ID rejected: %v", err)
+	}
+	for _, value := range []string{"", "gator-eval:latest", "sha256:short", "gator-eval@sha512:0123456789abcdef"} {
+		if err := ValidateEnvironmentID(value); err == nil {
+			t.Fatalf("invalid environment ID accepted: %q", value)
+		}
+	}
+}
+
 func TestRunRecordsResolvedOfflineEvaluation(t *testing.T) {
 	repository := greetingRepository(t)
 	spec := Spec{
@@ -228,9 +236,6 @@ func TestRunScoreFailureDowngradesResolvedAgentOutcome(t *testing.T) {
 }
 
 func TestRunStrictScoreCanReadFixtureWithoutExposingItToTheAgent(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("strict command sandbox is intentionally unavailable on Windows")
-	}
 	spec, err := LoadSpec("testdata/live-greeting")
 	if err != nil {
 		t.Fatal(err)

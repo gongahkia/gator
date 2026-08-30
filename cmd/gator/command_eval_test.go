@@ -64,3 +64,11 @@ func TestEvalSuiteRequiresEnvironmentIdentityBeforeProviderSetup(t *testing.T) {
 		t.Fatalf("suite error = %v", err)
 	}
 }
+
+func TestEvalSuiteRejectsMutableEnvironmentIdentityBeforeProviderSetup(t *testing.T) {
+	var output bytes.Buffer
+	err := evalCommand([]string{"suite", "../../internal/eval/testdata/core-v1", "--live", "--environment-id", "gator-eval:latest"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "OCI image digest") {
+		t.Fatalf("suite mutable environment identity error = %v", err)
+	}
+}

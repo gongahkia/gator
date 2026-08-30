@@ -15,11 +15,11 @@ control plane, and a TUI that covers native configuration, one-run policy
 overrides, retained-thread targeting, and loopback browser review.
 
 It is not a full replacement for Codex CLI, Claude Code, Cursor CLI, Pi, or
-OpenCode. The largest remaining local-product gaps are detached writer
-lifecycle, broader configurable agent types, a full JavaScript/screenshot
-browser, durable code intelligence, and a Windows strict sandbox. Hosted
-agents, organization governance, and cloud handoff are separate services, not
-omissions that a local Go binary can honestly claim to solve.
+OpenCode. Gator supports Linux and macOS only. The largest remaining
+local-product gaps are detached writer lifecycle, broader configurable agent
+types, a full JavaScript/screenshot browser, and durable code intelligence.
+Hosted agents, organization governance, and cloud handoff are separate
+services, not omissions that a local Go binary can honestly claim to solve.
 
 ## Capability map
 

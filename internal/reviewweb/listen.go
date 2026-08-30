@@ -2,6 +2,7 @@ package reviewweb
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"os/exec"
@@ -38,9 +39,9 @@ func OpenInBrowser(rawURL string) error {
 	switch runtime.GOOS {
 	case "darwin":
 		return exec.Command("open", rawURL).Start()
-	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL).Start()
-	default:
+	case "linux":
 		return exec.Command("xdg-open", rawURL).Start()
+	default:
+		return fmt.Errorf("browser review is supported only on Linux and macOS, not %s", runtime.GOOS)
 	}
 }

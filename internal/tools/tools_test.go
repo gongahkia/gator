@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -161,9 +160,6 @@ func TestRunCommandShellFormUsesEffectiveArgv(t *testing.T) {
 }
 
 func TestTerminalToolsRequireApprovalAndRedactInputFromEvents(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -220,9 +216,6 @@ func TestTerminalToolsRequireApprovalAndRedactInputFromEvents(t *testing.T) {
 }
 
 func TestTerminalDetachRequiresInteractiveCapabilityAndSeparateApproval(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")

@@ -57,7 +57,7 @@ func Assess(model Model, host Host) Eligibility {
 		},
 	}
 	if !supportedOS(host.OS) {
-		return result.block(fmt.Sprintf("%s is not a supported local-model OS; Gator verifies Ollama hosts only on Linux, macOS, and Windows", host.OS))
+		return result.block(fmt.Sprintf("%s is not a supported local-model OS; Gator verifies Ollama hosts only on Linux and macOS", host.OS))
 	}
 	if !supportedArchitecture(host.Architecture) {
 		return result.block(fmt.Sprintf("%s is not a supported 64-bit local-model architecture", host.Architecture))
@@ -124,7 +124,7 @@ func requiredDiskBytes(model Model) uint64 {
 
 func supportedOS(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "linux", "darwin", "windows":
+	case "linux", "darwin":
 		return true
 	default:
 		return false

@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -73,9 +72,6 @@ func update(arguments []string, out io.Writer) error {
 	if version == "dev" {
 		return fmt.Errorf("a development build cannot update itself; install %s with the documented install command", latest.TagName)
 	}
-	if runtime.GOOS == "windows" {
-		return fmt.Errorf("Gator %s is available; Windows cannot replace a running executable, so reinstall with the documented install command", latest.TagName)
-	}
 	if err := updater.install(latest); err != nil {
 		return err
 	}
@@ -134,6 +130,9 @@ func (u releaseUpdater) install(latest release) error {
 	if u.GOOS == "" || u.GOARCH == "" {
 		return errors.New("update platform is required")
 	}
+	if !supportedPlatform(u.GOOS) {
+		return fmt.Errorf("Gator updates support only Linux and macOS; %s is not supported", u.GOOS)
+	}
 	archiveName := archiveName(u.GOOS, u.GOARCH)
 	archive, found := findAsset(latest.Assets, archiveName)
 	if !found {
@@ -155,7 +154,7 @@ func (u releaseUpdater) install(latest release) error {
 	if !strings.EqualFold(expected, hex.EncodeToString(digest[:])) {
 		return errors.New("Gator release checksum did not match; update was not installed")
 	}
-	binary, err := extractBinary(payload, archiveName, u.GOOS)
+	binary, err := extractBinary(payload, archiveName)
 	if err != nil {
 		return err
 	}
@@ -223,11 +222,7 @@ func (u releaseUpdater) download(url string) ([]byte, error) {
 }
 
 func archiveName(goos, goarch string) string {
-	name := "gator_" + goos + "_" + goarch
-	if goos == "windows" {
-		return name + ".zip"
-	}
-	return name + ".tar.gz"
+	return "gator_" + goos + "_" + goarch + ".tar.gz"
 }
 
 func findAsset(assets []releaseAsset, name string) (releaseAsset, bool) {
@@ -239,28 +234,9 @@ func findAsset(assets []releaseAsset, name string) (releaseAsset, bool) {
 	return releaseAsset{}, false
 }
 
-func extractBinary(contents []byte, archiveName, goos string) ([]byte, error) {
-	binaryName := "gator"
-	if goos == "windows" {
-		binaryName += ".exe"
-	}
-	if strings.HasSuffix(archiveName, ".zip") {
-		reader, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents)))
-		if err != nil {
-			return nil, fmt.Errorf("read Gator release archive: %w", err)
-		}
-		for _, entry := range reader.File {
-			if filepath.Base(entry.Name) != binaryName || entry.FileInfo().IsDir() {
-				continue
-			}
-			file, err := entry.Open()
-			if err != nil {
-				return nil, fmt.Errorf("open Gator binary in release archive: %w", err)
-			}
-			defer file.Close()
-			return readUpdateBinary(file)
-		}
-		return nil, errors.New("Gator release archive does not contain the expected binary")
+func extractBinary(contents []byte, archiveName string) ([]byte, error) {
+	if !strings.HasSuffix(archiveName, ".tar.gz") {
+		return nil, errors.New("Gator release archive must be a tar.gz file")
 	}
 	gzipReader, err := gzip.NewReader(bytes.NewReader(contents))
 	if err != nil {
@@ -276,7 +252,7 @@ func extractBinary(contents []byte, archiveName, goos string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("read Gator release archive: %w", err)
 		}
-		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != binaryName {
+		if header.Typeflag != tar.TypeReg || filepath.Base(header.Name) != "gator" {
 			continue
 		}
 		return readUpdateBinary(reader)

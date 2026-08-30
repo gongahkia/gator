@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -266,9 +265,6 @@ func TestTerminalLifecycleAppearsInScrollableConversation(t *testing.T) {
 }
 
 func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -320,9 +316,6 @@ func TestAttachedTerminalShowsBoundedOutputAndSendsDeveloperInput(t *testing.T) 
 }
 
 func TestAttachedTerminalRawKeyboardInputFlushesOnReturnToControls(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -381,9 +374,6 @@ func TestAttachedTerminalRawKeyboardInputFlushesOnReturnToControls(t *testing.T)
 }
 
 func TestCompletedRunKeepsDetachedTerminalAttachedToInteractiveSession(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")

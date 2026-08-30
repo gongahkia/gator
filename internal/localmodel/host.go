@@ -48,12 +48,6 @@ func ollamaModelDirectory(osName string) (string, string, error) {
 			return "", "Ollama macOS default", err
 		}
 		return filepath.Join(home, ".ollama", "models"), "Ollama macOS default", nil
-	case "windows":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", "Ollama Windows default", err
-		}
-		return filepath.Join(home, ".ollama", "models"), "Ollama Windows default", nil
 	default:
 		return "", "unknown", nil
 	}
