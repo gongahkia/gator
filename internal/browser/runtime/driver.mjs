@@ -1,5 +1,7 @@
 import { chromium } from 'playwright';
 import { createInterface } from 'node:readline';
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 
 const maxTextBytes = 32 * 1024;
 const maxElements = 128;
@@ -43,16 +45,95 @@ function allowedURL(value) {
   return origins.has(`${parsed.protocol}//${parsed.hostname.toLowerCase()}:${port}`);
 }
 
+function ipv6Groups(value) {
+  let address = value.toLowerCase();
+  if (isIP(address) !== 6) return null;
+  const lastColon = address.lastIndexOf(':');
+  const tail = address.slice(lastColon + 1);
+  if (isIP(tail) === 4) {
+    const bytes = tail.split('.').map(Number);
+    address = `${address.slice(0, lastColon)}:${((bytes[0] << 8) | bytes[1]).toString(16)}:${((bytes[2] << 8) | bytes[3]).toString(16)}`;
+  }
+  const parts = address.split('::');
+  if (parts.length > 2) return null;
+  const left = parts[0] === '' ? [] : parts[0].split(':');
+  const right = parts.length === 1 || parts[1] === '' ? [] : parts[1].split(':');
+  const zeroes = 8 - left.length - right.length;
+  if (zeroes < 0 || (parts.length === 1 && zeroes !== 0)) return null;
+  const groups = [...left, ...Array(zeroes).fill('0'), ...right];
+  if (groups.length !== 8 || groups.some(group => !/^[0-9a-f]{1,4}$/.test(group))) return null;
+  return groups.map(group => Number.parseInt(group, 16));
+}
+
+function mappedIPv4Address(groups) {
+  if (!groups || groups.slice(0, 5).some(group => group !== 0) || groups[5] !== 0xffff) return null;
+  return `${groups[6] >> 8}.${groups[6] & 0xff}.${groups[7] >> 8}.${groups[7] & 0xff}`;
+}
+
+function publicIPv4Address(parts) {
+  const [a, b, c] = parts;
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 0 && c <= 255) return false;
+  if (a === 192 && b === 2) return false;
+  if (a === 192 && b === 88 && c === 99) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 198 && (b === 18 || b === 19 || b === 51)) return false;
+  if (a === 203 && b === 0 && c === 113) return false;
+  return true;
+}
+
+function publicAddress(value) {
+  const address = value.toLowerCase();
+  if (isIP(address) === 4) return publicIPv4Address(address.split('.').map(Number));
+  const groups = ipv6Groups(address);
+  if (!groups) return false;
+  const mapped = mappedIPv4Address(groups);
+  if (mapped) return publicIPv4Address(mapped.split('.').map(Number));
+  const allZero = groups.every(group => group === 0);
+  if (allZero || (groups.slice(0, 7).every(group => group === 0) && groups[7] === 1)) return false;
+  if ((groups[0] & 0xfe00) === 0xfc00 || (groups[0] & 0xffc0) === 0xfe80 || (groups[0] & 0xff00) === 0xff00) return false;
+  return !(groups[0] === 0x2001 && groups[1] === 0x0db8);
+}
+
+function loopbackAddress(value) {
+  const address = value.toLowerCase();
+  if (isIP(address) === 4) return /^127\./.test(address);
+  const groups = ipv6Groups(address);
+  const mapped = mappedIPv4Address(groups);
+  if (mapped) return /^127\./.test(mapped);
+  return groups !== null && groups.slice(0, 7).every(group => group === 0) && groups[7] === 1;
+}
+
+async function safeRequestURL(value) {
+  if (!allowedURL(value)) return false;
+  let parsed;
+  try { parsed = new URL(value); } catch { return false; }
+  const hostname = parsed.hostname.toLowerCase();
+  const networkHost = hostname.replace(/^\[|\]$/g, '');
+  let addresses;
+  try {
+    addresses = isIP(networkHost) ? [{ address: networkHost }] : await lookup(networkHost, { all: true, verbatim: true });
+  } catch {
+    return false;
+  }
+  if (!addresses.length) return false;
+  const loopbackOrigin = networkHost === 'localhost' || loopbackAddress(networkHost);
+  return addresses.every(item => loopbackOrigin ? loopbackAddress(item.address) : publicAddress(item.address));
+}
+
 async function applyPolicy(page) {
   if (managed && !managedPolicyApplied) {
     managedPolicyApplied = true;
     await context.route('**/*', async route => {
-      if (allowedURL(route.request().url())) return route.continue();
+      if (await safeRequestURL(route.request().url())) return route.continue();
       return route.abort('blockedbyclient');
     });
     if (typeof context.routeWebSocket === 'function') {
       await context.routeWebSocket('**/*', async route => {
-        if (!allowedURL(route.url())) return route.close();
+        if (!(await safeRequestURL(route.url()))) return route.close();
         return route.connectToServer();
       });
     }
@@ -67,12 +148,12 @@ async function applyPolicy(page) {
   page.__gatorPolicyApplied = true;
   await page.route('**/*', async route => {
     const request = route.request();
-    if (allowedURL(request.url())) return route.continue();
+    if (await safeRequestURL(request.url())) return route.continue();
     return route.abort('blockedbyclient');
   });
   if (typeof page.routeWebSocket === 'function') {
     await page.routeWebSocket('**/*', async route => {
-      if (!allowedURL(route.url())) return route.close();
+      if (!(await safeRequestURL(route.url()))) return route.close();
       return route.connectToServer();
     });
   }
@@ -187,7 +268,7 @@ async function dispatch(method, params = {}) {
       return { png: (await page.screenshot({ type: 'png' })).toString('base64') };
     }
     case 'navigate': {
-      if (!allowedURL(params.url)) fail('browser URL origin is not approved for this session');
+      if (!(await safeRequestURL(params.url))) fail('browser URL origin is not approved for this session or no longer resolves to an approved address');
       const page = pageFor(params.tab_id);
       await applyPolicy(page);
       await page.goto(params.url, { waitUntil: 'domcontentloaded', timeout: 30000 });

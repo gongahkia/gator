@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,15 +12,18 @@ import (
 )
 
 // TestSidecarManagedBrowserIntegration is intentionally opt-in because it
-// launches Chromium. Set GATOR_BROWSER_INTEGRATION_STATE_DIR to a private
-// state directory whose runtime was explicitly installed with
-// `gator browser install`.
+// launches Chromium. Set GATOR_BROWSER_INTEGRATION=1 to install the pinned
+// test runtime in a temporary private state directory, or provide
+// GATOR_BROWSER_INTEGRATION_STATE_DIR for a preinstalled runtime.
 func TestSidecarManagedBrowserIntegration(t *testing.T) {
 	stateDir := os.Getenv("GATOR_BROWSER_INTEGRATION_STATE_DIR")
-	if stateDir == "" {
-		t.Skip("set GATOR_BROWSER_INTEGRATION_STATE_DIR to run Chromium integration")
+	if stateDir == "" && os.Getenv("GATOR_BROWSER_INTEGRATION") != "1" {
+		t.Skip("set GATOR_BROWSER_INTEGRATION=1 to run Chromium integration")
 	}
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	if stateDir == "" {
+		stateDir = t.TempDir()
+	}
+	fixture := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/":
 			_, _ = writer.Write([]byte(`<!doctype html><title>Gator browser fixture</title><button id="change" onclick="document.body.dataset.clicked='yes';this.textContent='clicked'">change</button><script>fetch('/data')</script>`))
@@ -28,14 +32,20 @@ func TestSidecarManagedBrowserIntegration(t *testing.T) {
 		default:
 			http.NotFound(writer, request)
 		}
-	}))
+	})
+	server := httptest.NewServer(fixture)
 	defer server.Close()
 	store, err := Open(stateDir)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	if status := Runtime(store); !status.Installed {
-		t.Fatalf("runtime status = %#v", status)
+		installContext, installCancel := context.WithTimeout(context.Background(), 20*time.Minute)
+		_, installErr := InstallRuntime(installContext, store)
+		installCancel()
+		if installErr != nil {
+			t.Fatalf("InstallRuntime: %v", installErr)
+		}
 	}
 	session, err := store.Start(StartOptions{VisualCapture: true})
 	if err != nil {
@@ -62,6 +72,19 @@ func TestSidecarManagedBrowserIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
+	stopped := false
+	t.Cleanup(func() {
+		if stopped {
+			return
+		}
+		_, _ = client.Stop(context.Background())
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("browser service did not stop during cleanup")
+		}
+	})
 	tabs, err := client.CandidateTabs(context.Background())
 	if err != nil || len(tabs) != 1 {
 		t.Fatalf("CandidateTabs = %#v, %v", tabs, err)
@@ -93,6 +116,21 @@ func TestSidecarManagedBrowserIntegration(t *testing.T) {
 	if err != nil || len(capture.PNG) == 0 || capture.Artifact.Kind != "screenshot" {
 		t.Fatalf("Screenshot = %#v, %v", capture, err)
 	}
+	listener, listenErr := net.Listen("tcp6", "[::1]:0")
+	if listenErr == nil {
+		ipv6Server := httptest.NewUnstartedServer(fixture)
+		ipv6Server.Listener = listener
+		ipv6Server.Start()
+		if _, err := client.AddOrigin(context.Background(), ipv6Server.URL); err != nil {
+			ipv6Server.Close()
+			t.Fatalf("AddOrigin IPv6: %v", err)
+		}
+		snapshot, err = client.Navigate(context.Background(), session.ID, tabs[0].ID, ipv6Server.URL)
+		ipv6Server.Close()
+		if err != nil || snapshot.Title != "Gator browser fixture" {
+			t.Fatalf("Navigate IPv6 = %#v, %v", snapshot, err)
+		}
+	}
 	if _, err := client.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
@@ -104,4 +142,5 @@ func TestSidecarManagedBrowserIntegration(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("browser service did not stop")
 	}
+	stopped = true
 }

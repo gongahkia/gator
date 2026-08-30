@@ -286,17 +286,18 @@ than followed. It requires a separate exact-URL approval unless remembered
 within that run (in a memory separate from command approvals), and exposes no
 more than 256 KiB of textual response content.
 
-The same network grant exposes an ephemeral bounded document browser:
-`browser_navigate`, `browser_snapshot`, `browser_extract`, and `browser_act`.
-It fetches only a single approved main document at a time through the same
-public-address-pinned transport. It does not load subresources, run JavaScript,
-follow redirects, use cookies, open popups, download files, retain a profile,
-or evaluate arbitrary DOM code. Snapshots contain bounded normalized visible
-text plus stable link/form references. Actions are limited to approved link
-GETs and form GET/POST requests with explicitly supplied fields; password and
-file fields are refused. Every destination is normalized, resolved, and pinned
-again immediately before its request. The browser shares the eight-request
-budget with fetch and search.
+A real browser is never implied by the network grant. It requires a separately
+started or attached local Chromium session, developer-selected tabs, approved
+origins, and an explicit `--browser-session` grant to an Execute-mode run. The
+session exposes `browser_tabs`, `browser_snapshot`, `browser_screenshot`,
+`browser_navigate`, `browser_click`, `browser_fill`, `browser_select`,
+`browser_press`, `browser_download`, and `browser_upload`. It uses a pinned
+local Playwright/Chromium runtime, JavaScript rendering, bounded accessibility
+snapshots, temporary managed profiles, explicit screenshot/upload consent, and
+fresh approval for every mutation. The agent never receives raw selectors,
+JavaScript evaluation, cookies, storage, arbitrary file paths, or CDP access.
+See [local controlled browser sessions](BROWSER.md) for the full local-session
+and attached-browser trust boundaries.
 
 When `BRAVE_SEARCH_API_KEY` is available, `web_search` queries Brave's fixed
 documented Web Search endpoint through that same DNS-pinned, proxy-free

@@ -32,3 +32,23 @@ jobs:
         run: go vet ./...
       - name: Build
         run: go build ./cmd/gator
+
+  browser:
+    name: browser-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.13"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - name: Test pinned Chromium browser controller
+        env:
+          GATOR_BROWSER_INTEGRATION: "1"
+        run: go test -count=1 -run TestSidecarManagedBrowserIntegration ./internal/browser

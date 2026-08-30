@@ -102,6 +102,17 @@ func browserCommand(arguments []string, out io.Writer) error {
 		}
 		session, err := client.Stop(context.Background())
 		if err != nil {
+			if !errors.Is(err, gatorbrowser.ErrUnavailable) {
+				return err
+			}
+			session, err = store.Stop(arguments[1])
+			if err != nil {
+				return err
+			}
+			if err := gatorbrowser.RemoveToken(store, arguments[1]); err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(out, "Revoked unavailable browser session %s\n", session.ID)
 			return err
 		}
 		_, err = fmt.Fprintf(out, "Stopped browser session %s\n", session.ID)
@@ -199,6 +210,12 @@ func launchBrowserDaemon(store *gatorbrowser.Store, stateDir string, session gat
 	if err != nil {
 		return err
 	}
+	revokeToken := true
+	defer func() {
+		if revokeToken {
+			_ = gatorbrowser.RemoveToken(store, session.ID)
+		}
+	}()
 	arguments := []string{"browser", "daemon", "--state-dir", stateDir, "--session", session.ID, "--mode", string(session.Mode), "--token-file", tokenFile}
 	if session.Headed {
 		arguments = append(arguments, "--headed")
@@ -227,6 +244,7 @@ func launchBrowserDaemon(store *gatorbrowser.Store, stateDir string, session gat
 		_ = command.Process.Kill()
 		return err
 	}
+	revokeToken = false
 	_, err = fmt.Fprintf(out, "Browser daemon started (pid %d).\n", command.Process.Pid)
 	return err
 }

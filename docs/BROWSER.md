@@ -36,7 +36,7 @@ only for the developer; agent tools can see only selected tabs. `gator browser
 stop SESSION_ID` closes a managed browser, disconnects an attached browser, and
 revokes the local token. The TUI exposes the same operations with `/browser`:
 `start`, `attach`, `tabs`, `select`, `use`, `origins`, `visual`, `upload`,
-`artifacts`, `stop`, and `none`.
+`artifacts`, `export`, `stop`, and `none`.
 
 List capture metadata with `gator browser artifacts SESSION_ID`; copy one to a
 new developer-selected path without overwriting an existing file through
@@ -74,7 +74,10 @@ origins through the CLI or TUI. Public origins are HTTPS on port 443;
 `localhost`, `127.0.0.1`, and `::1` may use HTTP or HTTPS on an explicitly
 approved port. Localhost is resolved before approval and must resolve only to
 loopback; other private, link-local, multicast, file, data, and credentialed
-URLs are rejected.
+URLs are rejected. The sidecar revalidates every routed hostname and aborts a
+request that resolves to a non-public address (or outside loopback for a local
+origin). Chromium does not expose a connection-pinning API, so this is a
+revalidation control rather than a claim of DNS pinning.
 
 The managed browser blocks service workers and routes navigation, redirects,
 frames, scripts, images, fetch/XHR, and WebSockets through the same exact
@@ -101,11 +104,13 @@ bytes, cookies, request headers, request bodies, CDP endpoints, or tokens.
 The runtime lockfile pins Playwright 1.56.1 and its Chromium revision under
 Gator's private state directory. Installation requires locally installed Node
 18+ and npm; it uses the checked-in lockfile and Playwright's explicit Chromium
-installer. Gator does not currently bundle Node in release archives.
+installer. When a Gator update changes the embedded controller or lockfile,
+`gator browser status` requires an explicit `gator browser install` refresh.
+Gator does not currently bundle Node in release archives.
 
 Snapshots are bounded to 32 KiB of visible text and 128 visible actionable
 elements. Screenshot observations are bounded to 2 MiB PNG; retained local
 browser artifacts and downloads are capped at 8 MiB each, while registered
 uploads are capped at 128 MiB. These bounds are enforcement limits, not a
 claim that browser page content is safe: all page text, accessibility labels,
-console-visible output, and screenshots are untrusted input to a model.
+and screenshots are untrusted input to a model.
