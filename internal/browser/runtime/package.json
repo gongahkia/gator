@@ -1,0 +1,9 @@
+{
+  "name": "gator-browser-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned local Playwright runtime for Gator browser sessions",
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}
