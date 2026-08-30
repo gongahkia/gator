@@ -155,8 +155,8 @@ async function dispatch(method, params = {}) {
   switch (method) {
     case 'start': return start(params);
     case 'set_origins': {
-      if (!Array.isArray(params.origins)) fail('browser origins are invalid');
-      origins = new Set(params.origins.map(item => item.url));
+      if (params.origins !== null && !Array.isArray(params.origins)) fail('browser origins are invalid');
+      origins = new Set((params.origins || []).map(item => item.url));
       return { ok: true };
     }
     case 'candidate_tabs': return knownPages();
