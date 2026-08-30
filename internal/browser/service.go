@@ -115,6 +115,8 @@ func (service *Service) Run(ctx context.Context) error {
 		_ = listener.Close()
 		_ = os.Remove(service.socket)
 		_ = service.driver.Close()
+		_, _ = service.store.Stop(service.sessionID)
+		removeToken(service.store, service.sessionID)
 	}()
 	if session, err := service.store.Get(service.sessionID); err != nil {
 		return err
@@ -171,13 +173,17 @@ func (service *Service) handle(ctx context.Context, request rpcRequest) rpcRespo
 	case "candidate_tabs":
 		result, err = service.driver.CandidateTabs(ctx)
 	case "select_tabs":
-		var parameters struct{ Tabs []Tab `json:"tabs"` }
+		var parameters struct {
+			Tabs []Tab `json:"tabs"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			result, err = service.store.SelectTabs(service.sessionID, parameters.Tabs)
 		}
 	case "add_origin":
-		var parameters struct{ URL string `json:"url"` }
+		var parameters struct {
+			URL string `json:"url"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			var session Session
@@ -188,7 +194,9 @@ func (service *Service) handle(ctx context.Context, request rpcRequest) rpcRespo
 			result = session
 		}
 	case "remove_origin":
-		var parameters struct{ URL string `json:"url"` }
+		var parameters struct {
+			URL string `json:"url"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			var session Session
@@ -199,19 +207,25 @@ func (service *Service) handle(ctx context.Context, request rpcRequest) rpcRespo
 			result = session
 		}
 	case "set_visual_capture":
-		var parameters struct{ Allowed bool `json:"allowed"` }
+		var parameters struct {
+			Allowed bool `json:"allowed"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			result, err = service.store.SetVisualCapture(service.sessionID, parameters.Allowed)
 		}
 	case "allow_upload":
-		var parameters struct{ Path string `json:"path"` }
+		var parameters struct {
+			Path string `json:"path"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			result, err = service.allowUpload(parameters.Path)
 		}
 	case "snapshot":
-		var parameters struct{ TabID string `json:"tab_id"` }
+		var parameters struct {
+			TabID string `json:"tab_id"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			err = service.requireSelected(parameters.TabID)
@@ -220,7 +234,9 @@ func (service *Service) handle(ctx context.Context, request rpcRequest) rpcRespo
 			result, err = service.driver.Snapshot(ctx, parameters.TabID)
 		}
 	case "screenshot":
-		var parameters struct{ TabID string `json:"tab_id"` }
+		var parameters struct {
+			TabID string `json:"tab_id"`
+		}
 		err = decodeParams(request.Params, &parameters)
 		if err == nil {
 			result, err = service.screenshot(ctx, parameters.TabID)
