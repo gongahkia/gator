@@ -14,9 +14,10 @@ import (
 	"github.com/gongahkia/gator/internal/eval"
 	"github.com/gongahkia/gator/internal/extension"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 )
 
-const evalUsage = "usage: gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]"
+const evalUsage = "usage: gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]"
 
 type evalFlags struct {
 	runID           string
@@ -26,6 +27,8 @@ type evalFlags struct {
 	provider        string
 	model           string
 	baseURL         string
+	environmentID   string
+	attempts        int
 	live            bool
 	requireResolved bool
 }
@@ -34,6 +37,7 @@ type evalRuntime struct {
 	live     bool
 	provider string
 	model    string
+	baseURL  string
 	executor gatorrun.Executor
 }
 
@@ -167,6 +171,8 @@ func parseEvalArguments(name string, arguments []string, suite bool) (string, ev
 	flags.StringVar(&options.provider, "provider", "", "provider for a live evaluation")
 	flags.StringVar(&options.model, "model", "", "model for a live evaluation")
 	flags.StringVar(&options.baseURL, "base-url", "", "provider base URL for a live evaluation")
+	flags.StringVar(&options.environmentID, "environment-id", "", "immutable evaluation environment identity, such as an OCI image digest")
+	flags.IntVar(&options.attempts, "attempts", 1, "independent live attempts per suite case")
 	flags.BoolVar(&options.live, "live", false, "use a real provider")
 	flags.BoolVar(&options.requireResolved, "require-resolved", false, "exit nonzero after writing reports unless every run resolved")
 	target, flagArguments, err := splitEvalArguments(arguments)
@@ -178,7 +184,7 @@ func parseEvalArguments(name string, arguments []string, suite bool) (string, ev
 	}
 	if strings.TrimSpace(target) == "" {
 		if suite {
-			return "", evalFlags{}, errors.New("usage: gator eval suite DIR [--run-id ID] [--report-dir DIR] --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]")
+			return "", evalFlags{}, errors.New("usage: gator eval suite DIR [--run-id ID] [--report-dir DIR] --attempts N --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]")
 		}
 		return "", evalFlags{}, errors.New(evalUsage)
 	}
@@ -195,7 +201,7 @@ func parseEvalArguments(name string, arguments []string, suite bool) (string, ev
 func splitEvalArguments(arguments []string) (string, []string, error) {
 	valueFlags := map[string]bool{
 		"--run-id": true, "--report": true, "--report-dir": true, "--script": true,
-		"--provider": true, "--model": true, "--base-url": true,
+		"--provider": true, "--model": true, "--base-url": true, "--environment-id": true, "--attempts": true,
 	}
 	booleanFlags := map[string]bool{"--live": true, "--require-resolved": true}
 	var target string

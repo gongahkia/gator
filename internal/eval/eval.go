@@ -331,6 +331,9 @@ func ValidateRunID(runID string) error {
 // error. Re-using RunID against a previous report file is the caller's
 // mistake; this function always executes.
 func Run(ctx context.Context, options Options) (Report, error) {
+	if len(options.Spec.Score) > 0 && options.Spec.ScoreTimeoutSeconds < 1 {
+		options.Spec.ScoreTimeoutSeconds = defaultScoreTimeoutSeconds
+	}
 	now := options.Now
 	if now == nil {
 		now = time.Now
@@ -551,7 +554,7 @@ func WriteSuiteReport(path string, report SuiteReport) error {
 // unresolved model outcomes.
 func SummarizeSuite(suite Suite, runID, provider, modelName string, startedAt, finishedAt time.Time, reports []Report) SuiteReport {
 	report := SuiteReport{
-		Version:   suiteVersion,
+		Version:   reportVersion,
 		ID:        suite.ID,
 		RunID:     runID,
 		Provider:  provider,
@@ -570,13 +573,61 @@ func SummarizeSuite(suite Suite, runID, provider, modelName string, startedAt, f
 		default:
 			report.Unresolved++
 		}
+		switch caseReport.ScoreStatus {
+		case "passed":
+			report.ScorePassed++
+		case "failed":
+			report.ScoreFailed++
+		case "error":
+			report.ScoreErrors++
+		default:
+			report.Unscored++
+		}
+		if caseReport.Attempt > report.Attempts {
+			report.Attempts = caseReport.Attempt
+		}
 	}
+	report.CaseSummaries = summarizeCases(reports)
 	if report.Errors > 0 {
 		report.Status = "error"
 	} else if report.Unresolved > 0 || report.Resolved != len(reports) || len(reports) == 0 {
 		report.Status = "unresolved"
 	}
 	return report
+}
+
+func summarizeCases(reports []Report) []CaseSummary {
+	index := make(map[string]int)
+	var summaries []CaseSummary
+	for _, report := range reports {
+		position, found := index[report.ID]
+		if !found {
+			position = len(summaries)
+			index[report.ID] = position
+			summaries = append(summaries, CaseSummary{ID: report.ID})
+		}
+		summary := &summaries[position]
+		summary.Attempts++
+		switch report.Status {
+		case "resolved":
+			summary.Resolved++
+		case "error":
+			summary.Errors++
+		default:
+			summary.Unresolved++
+		}
+		switch report.ScoreStatus {
+		case "passed":
+			summary.ScorePassed++
+		case "failed":
+			summary.ScoreFailed++
+		case "error":
+			summary.ScoreErrors++
+		default:
+			summary.Unscored++
+		}
+	}
+	return summaries
 }
 
 // ScriptedModel is a deterministic offline provider for eval fixtures.
@@ -659,6 +710,68 @@ func copyFile(source, dest string) error {
 		return err
 	}
 	return out.Close()
+}
+
+func digestFixtureDirectory(hash io.Writer, directory, relative string) error {
+	info, err := os.Lstat(directory)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("eval fixture %q must not be a symlink", directory)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("eval fixture %q is not a directory", directory)
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.Name() == ".git" {
+			continue
+		}
+		path := filepath.Join(directory, entry.Name())
+		name := filepath.ToSlash(filepath.Join(relative, entry.Name()))
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("eval fixture contains symlink %q", path)
+		}
+		if info.IsDir() {
+			if _, err := io.WriteString(hash, "d\x00"+name+"\x00"); err != nil {
+				return err
+			}
+			if err := digestFixtureDirectory(hash, path, name); err != nil {
+				return err
+			}
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("eval fixture contains unsupported file %q", path)
+		}
+		if _, err := io.WriteString(hash, "f\x00"+name+"\x00"); err != nil {
+			return err
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(hash, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		if _, err := io.WriteString(hash, "\x00"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func validateSpec(spec Spec) error {
