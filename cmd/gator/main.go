@@ -56,7 +56,8 @@ Usage:
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
-  gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live]
+  gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
+  gator eval suite DIR [--run-id ID] [--report-dir DIR] --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
   gator transcript RUN_RECORD_PATH > transcript.html
   gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
   gator export RUN_RECORD_PATH
@@ -80,7 +81,7 @@ Commands:
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
   resume    select, reopen, or immediately continue a retained local thread
-  eval      run a bounded evaluation fixture and write a JSON report
+  eval      run a bounded headless evaluation fixture or real-model suite
   transcript export one retained private session as local HTML
   review    serve an authenticated loopback browser review for one retained run
   export    write a portable patch for a retained run to standard output
