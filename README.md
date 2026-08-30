@@ -661,15 +661,16 @@ the current run; the tool accepts only port 443, resolves and pins public DNS
 addresses, rejects local/private/reserved targets, does not follow redirects,
 and returns at most 256 KiB of textual content.
 
-The same explicit network grant exposes an ephemeral document browser:
-`browser_navigate`, `browser_snapshot`, `browser_extract`, and `browser_act`.
-It returns bounded visible text and stable link/form references, and every
-navigation or action destination needs approval before a new DNS-pinned
-request. It fetches only the main document, rejects private/reserved targets,
-does not follow redirects, and has no JavaScript, subresources, cookies,
-persistent profile, downloads, arbitrary DOM evaluation, or computer control.
-Actions are limited to link GETs and HTML form GET/POST requests; password and
-file inputs are refused. See [bounded document browser](docs/BROWSER.md).
+For JavaScript applications and visual verification, Gator also has explicit
+local Chromium sessions. Install the pinned runtime with `gator browser
+install`, start or attach a local session, select the exact tab(s) an agent may
+see, approve origins, then pass it to an Execute-mode run with `--network
+allow --browser-session ID`. Every browser mutation needs a fresh approval;
+logins are user-only; screenshots require a separate session grant; uploads
+must be pre-registered; and browser artifacts remain private local files. The
+TUI provides the same lifecycle through `/browser`. This is local browser
+control, not hosted execution or unrestricted computer use. See [local
+controlled browser sessions](docs/BROWSER.md).
 
 Set `BRAVE_SEARCH_API_KEY` to also expose `web_search` through Brave's
 documented Web Search API. Each exact query needs approval unless remembered
@@ -678,9 +679,7 @@ public-DNS-pinned transport, shares the eight-request web-research budget with
 `http_fetch`, and returns at most ten title/URL/snippet records. The key stays
 in the process environment and outgoing request header only: it is not written
 to Gator configuration, events, or tool results. Search results and fetched
-pages remain untrusted data. The bounded document browser is intentionally not
-a full JavaScript browser, authenticated browser profile, screenshot tool, or
-computer-use system. [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get)
+pages remain untrusted data. [Brave Web Search API](https://api-dashboard.search.brave.com/api-reference/web/search/get)
 
 See the source-backed [terminal-harness capability audit](docs/COMPETITIVE_AUDIT.md)
 for the current comparison with Codex CLI, Claude Code, Cursor CLI, Pi, and

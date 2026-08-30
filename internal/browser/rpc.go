@@ -277,6 +277,56 @@ func (client *Client) Artifacts() ([]Artifact, error) {
 	return artifacts, nil
 }
 
+// ExportArtifact copies one private browser artifact to an explicitly chosen
+// new absolute path. It refuses to overwrite an existing file and never lets a
+// model supply the destination: only CLI/TUI developer controls call it.
+func (client *Client) ExportArtifact(id, destination string) error {
+	if len(id) != 32 {
+		return errors.New("browser artifact id is invalid")
+	}
+	if !filepath.IsAbs(destination) || filepath.Clean(destination) != destination {
+		return errors.New("browser artifact export path must be absolute and clean")
+	}
+	artifacts, err := client.Artifacts()
+	if err != nil {
+		return err
+	}
+	var artifact Artifact
+	found := false
+	for _, candidate := range artifacts {
+		if candidate.ID == id {
+			artifact = candidate
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errors.New("browser artifact was not found")
+	}
+	sourcePath := filepath.Join(client.store.Directory(), "artifacts", client.sessionID, artifact.ID+"-"+artifact.Name)
+	sourceInfo, err := os.Lstat(sourcePath)
+	if err != nil || !sourceInfo.Mode().IsRegular() || sourceInfo.Mode().Perm()&0o077 != 0 {
+		return errors.New("browser artifact is unavailable or no longer private")
+	}
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("open browser artifact: %w", err)
+	}
+	defer source.Close()
+	destinationFile, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create browser artifact export: %w", err)
+	}
+	defer destinationFile.Close()
+	if _, err := io.Copy(destinationFile, io.LimitReader(source, maxArtifactBytes+1)); err != nil {
+		return fmt.Errorf("copy browser artifact: %w", err)
+	}
+	if err := destinationFile.Sync(); err != nil {
+		return fmt.Errorf("sync browser artifact export: %w", err)
+	}
+	return nil
+}
+
 func (client *Client) call(ctx context.Context, method string, parameters any, target any) error {
 	token, err := readToken(client.store, client.sessionID)
 	if err != nil {

@@ -71,6 +71,7 @@ func (*fakeBrowserBackend) AllowUpload(string, string) (gatorbrowser.Upload, err
 	return gatorbrowser.Upload{}, nil
 }
 func (*fakeBrowserBackend) Artifacts(string) ([]gatorbrowser.Artifact, error) { return nil, nil }
+func (*fakeBrowserBackend) ExportArtifact(string, string, string) error       { return nil }
 func (*fakeBrowserBackend) Stop(string) (gatorbrowser.Session, error) {
 	return gatorbrowser.Session{}, nil
 }

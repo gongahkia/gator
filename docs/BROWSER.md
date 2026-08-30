@@ -38,6 +38,10 @@ revokes the local token. The TUI exposes the same operations with `/browser`:
 `start`, `attach`, `tabs`, `select`, `use`, `origins`, `visual`, `upload`,
 `artifacts`, `stop`, and `none`.
 
+List capture metadata with `gator browser artifacts SESSION_ID`; copy one to a
+new developer-selected path without overwriting an existing file through
+`gator browser export SESSION_ID ARTIFACT_ID --out /absolute/path`.
+
 ## Agent surface and consent
 
 With a granted session, Execute-mode native runs receive selected-tab tools:

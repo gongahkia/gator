@@ -30,6 +30,7 @@ const browserUsage = `usage:
   gator browser visual SESSION_ID on|off
   gator browser allow-upload SESSION_ID ABSOLUTE_PATH
   gator browser artifacts SESSION_ID
+  gator browser export SESSION_ID ARTIFACT_ID --out ABSOLUTE_PATH
   gator browser stop SESSION_ID`
 
 func browserCommand(arguments []string, out io.Writer) error {
@@ -89,6 +90,8 @@ func browserCommand(arguments []string, out io.Writer) error {
 		return browserAllowUpload(arguments[1:], out, store)
 	case "artifacts":
 		return browserArtifacts(arguments[1:], out, store)
+	case "export":
+		return browserExportArtifact(arguments[1:], out, store)
 	case "stop":
 		if len(arguments) != 2 {
 			return errors.New("usage: gator browser stop SESSION_ID")
@@ -370,6 +373,24 @@ func browserArtifacts(arguments []string, out io.Writer, store *gatorbrowser.Sto
 		}
 	}
 	return nil
+}
+
+func browserExportArtifact(arguments []string, out io.Writer, store *gatorbrowser.Store) error {
+	flags := flag.NewFlagSet("browser export", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	destination := flags.String("out", "", "new absolute output path")
+	if err := flags.Parse(arguments); err != nil || len(flags.Args()) != 2 || strings.TrimSpace(*destination) == "" {
+		return errors.New("usage: gator browser export SESSION_ID ARTIFACT_ID --out ABSOLUTE_PATH")
+	}
+	client, err := gatorbrowser.NewClient(store, flags.Args()[0])
+	if err != nil {
+		return err
+	}
+	if err := client.ExportArtifact(flags.Args()[1], *destination); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(out, "Exported browser artifact to %s\n", *destination)
+	return err
 }
 
 func browserDaemon(arguments []string, store *gatorbrowser.Store, stateDir string) error {
