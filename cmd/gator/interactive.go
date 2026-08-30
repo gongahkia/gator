@@ -107,6 +107,10 @@ func interactiveWithOptions(options interactiveOptions) error {
 	if err != nil {
 		return err
 	}
+	browserBackend, err := newTUIBrowserBackend(stateDir)
+	if err != nil {
+		return fmt.Errorf("configure local browser control: %w", err)
+	}
 	baseURL := strings.TrimSpace(os.Getenv("GATOR_BASE_URL"))
 	if baseURL == "" {
 		baseURL = settings.ProviderEndpoint(provider)
@@ -139,6 +143,7 @@ func interactiveWithOptions(options interactiveOptions) error {
 			return newExecutor(provider, modelName, baseURL)
 		},
 		LSPRegistry: lspRegistry,
+		Browser:     browserBackend,
 		BeginOAuthLogin: func(provider string) (tui.OAuthLogin, error) {
 			return beginTUIOAuthLogin(provider)
 		},

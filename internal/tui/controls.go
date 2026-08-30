@@ -187,6 +187,8 @@ func (m Model) executeSelectedCommand() (tea.Model, tea.Cmd) {
 	case "/agents":
 		m.commandOutput = m.agentsStatus()
 		m.notice = notice{text: "Profiles and role overlays can only narrow policy; role kinds remain fixed.", kind: noticeInfo}
+	case "/browser":
+		return m.browserCommand(strings.Fields(remainder))
 	case "/permissions":
 		m.commandOutput = m.permissionsStatus()
 		m.notice = notice{text: "Verifier, exact allow-command, and literal prefixes may run without a prompt; everything else waits.", kind: noticeInfo}
@@ -913,7 +915,11 @@ func (m Model) sessionStatus() string {
 	if exact, err := parseExactTurnCap(m.runOptions.maxSteps.Value()); err == nil && exact > 0 {
 		effectiveSteps = exact
 	}
-	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\neffort: " + m.effort.label() + "\nmax steps: " + fmt.Sprint(effectiveSteps) + " (base " + fmt.Sprint(m.config.MaxSteps) + ")\n" + m.runOptionsStatus() + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
+	browserSession := "(none)"
+	if m.browserSession != "" {
+		browserSession = m.browserSession
+	}
+	return "repository: " + m.config.RepositoryPath + "\nmode: " + m.runMode.String() + "\nprovider: " + m.provider.Value() + "\nmodel: " + m.model.Value() + "\nruntime: " + runtime + "\nbrowser session: " + browserSession + "\neffort: " + m.effort.label() + "\nmax steps: " + fmt.Sprint(effectiveSteps) + " (base " + fmt.Sprint(m.config.MaxSteps) + ")\n" + m.runOptionsStatus() + "\n" + m.queueSummary() + "\nverification:\n" + verificationText
 }
 
 func (m Model) permissionsStatus() string {

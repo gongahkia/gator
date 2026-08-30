@@ -15,6 +15,7 @@ import (
 	modelprovider "github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -181,6 +182,7 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 		m.screen = composeScreen
 		return m.startFailure(applyErr.Error())
 	}
+	request.BrowserSession = m.browserSession
 
 	if m.forkStatePath != "" {
 		previous, loadErr := journal.LoadSession(m.forkStatePath)
@@ -224,6 +226,13 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			return m.startFailure(executorErr.Error())
 		}
 		executor, executorErr = m.applyExecutorOverrides(executor)
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			return m.startFailure(executorErr.Error())
+		}
+		executor, executorErr = m.applyBrowserSession(executor, &request)
 		if executorErr != nil {
 			cancel()
 			m.execution = nil
@@ -281,15 +290,58 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 			m.screen = composeScreen
 			return m.startFailure(executorErr.Error())
 		}
+		executor, executorErr = m.applyBrowserSession(executor, &request)
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			return m.startFailure(executorErr.Error())
+		}
 		m.beginRunActivity(request.Verification)
 		m.forceCompaction = false
 		go executeResume(ctx, stream, executor, previous, m.resumeStatePath, task, request)
 	} else {
+		var executorErr error
+		executor, executorErr = m.applyBrowserSession(executor, &request)
+		if executorErr != nil {
+			cancel()
+			m.execution = nil
+			m.screen = composeScreen
+			return m.startFailure(executorErr.Error())
+		}
 		m.beginRunActivity(request.Verification)
 		m.forceCompaction = false
 		go executeNew(ctx, stream, executor, request)
 	}
 	return m, waitForExecution(stream)
+}
+
+func (m Model) applyBrowserSession(executor gatorrun.Executor, request *gatorrun.Request) (gatorrun.Executor, error) {
+	if request == nil || strings.TrimSpace(request.BrowserSession) == "" {
+		return executor, nil
+	}
+	if request.Mode != gatorrun.ExecuteMode {
+		return gatorrun.Executor{}, errors.New("browser sessions are unavailable in enforced Plan mode")
+	}
+	if executor.Sandbox.Normalize().Network != sandbox.AllowNetwork {
+		return gatorrun.Executor{}, errors.New("selected browser session requires network allow; open /run and confirm network allow first")
+	}
+	if m.config.Browser == nil {
+		return gatorrun.Executor{}, errors.New("this Gator build does not configure local browser control")
+	}
+	controller, err := m.config.Browser.Controller(request.BrowserSession)
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	session, err := controller.Session(context.Background(), request.BrowserSession)
+	if err != nil {
+		return gatorrun.Executor{}, err
+	}
+	if len(session.SelectedTabs) == 0 {
+		return gatorrun.Executor{}, errors.New("selected browser session has no developer-selected tabs")
+	}
+	executor.Browser = controller
+	return executor, nil
 }
 
 // startDelegatedRun intentionally hands terminal control to the installed
