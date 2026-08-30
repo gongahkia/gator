@@ -28,7 +28,7 @@ func TestStorePersistsSafeSessionMetadataAndStops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectTabs: %v", err)
 	}
-	lookup := resolver{"example.com": {{IP: net.ParseIP("203.0.113.10")}}}
+	lookup := resolver{"example.com": {{IP: net.ParseIP("93.184.216.34")}}}
 	session, err = store.AddOrigin(context.Background(), session.ID, "https://example.com", lookup)
 	if err != nil {
 		t.Fatalf("AddOrigin: %v", err)

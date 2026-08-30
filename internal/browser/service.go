@@ -563,7 +563,24 @@ func readToken(store *Store, sessionID string) ([]byte, error) {
 // ReadToken reads the exact private token created for a local daemon.
 func ReadToken(store *Store, sessionID string) ([]byte, error) { return readToken(store, sessionID) }
 
-func removeToken(store *Store, sessionID string) { _ = os.Remove(tokenPath(store, sessionID)) }
+// RemoveToken revokes the local daemon capability when a session cannot be
+// reached any longer. It is intentionally useful only to the local CLI/TUI
+// lifecycle owner; the token contents are never returned.
+func RemoveToken(store *Store, sessionID string) error {
+	if store == nil {
+		return errors.New("browser store is required")
+	}
+	if err := sessionError(sessionID); err != nil {
+		return err
+	}
+	err := os.Remove(tokenPath(store, sessionID))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove browser session token: %w", err)
+	}
+	return nil
+}
+
+func removeToken(store *Store, sessionID string) { _ = RemoveToken(store, sessionID) }
 
 func sortArtifacts(artifacts []Artifact) {
 	sort.Slice(artifacts, func(left, right int) bool { return artifacts[left].CreatedAt.After(artifacts[right].CreatedAt) })

@@ -53,6 +53,13 @@ func TestResolveOriginRejectsNonLoopbackLocalhostAndPrivatePublicResolution(t *t
 	}
 }
 
+func TestResolveOriginRejectsDocumentationAddress(t *testing.T) {
+	lookup := resolver{"example.com": {{IP: net.ParseIP("203.0.113.10")}}}
+	if _, err := ResolveOrigin(context.Background(), "https://example.com", lookup); err == nil {
+		t.Fatal("documentation address was accepted as a public browser origin")
+	}
+}
+
 func TestAllowsURLEnforcesExactOrigin(t *testing.T) {
 	origins := []Origin{{URL: "https://example.com:443"}, {URL: "http://127.0.0.1:3000"}}
 	for _, test := range []struct {

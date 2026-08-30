@@ -177,8 +177,51 @@ func describeToolCall(call agent.ToolCall) string {
 			}
 		}
 	}
+	if call.Name == "browser_tabs" {
+		return "developer-selected browser tabs"
+	}
 	if call.Name == "browser_snapshot" {
-		return "current bounded document"
+		return "current bounded browser snapshot"
+	}
+	if call.Name == "browser_screenshot" {
+		return "browser screenshot (session visual grant required)"
+	}
+	if call.Name == "browser_click" || call.Name == "browser_download" {
+		var arguments struct {
+			TabID string `json:"tab_id"`
+			Ref   string `json:"ref"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return fmt.Sprintf("tab: %s · ref: %s", arguments.TabID, arguments.Ref)
+		}
+	}
+	if call.Name == "browser_fill" || call.Name == "browser_select" {
+		var arguments struct {
+			TabID string `json:"tab_id"`
+			Ref   string `json:"ref"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return fmt.Sprintf("tab: %s · ref: %s · value hidden", arguments.TabID, arguments.Ref)
+		}
+	}
+	if call.Name == "browser_press" {
+		var arguments struct {
+			TabID string `json:"tab_id"`
+			Key   string `json:"key"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return fmt.Sprintf("tab: %s · key: %s", arguments.TabID, arguments.Key)
+		}
+	}
+	if call.Name == "browser_upload" {
+		var arguments struct {
+			TabID    string `json:"tab_id"`
+			Ref      string `json:"ref"`
+			UploadID string `json:"upload_id"`
+		}
+		if json.Unmarshal(call.Arguments, &arguments) == nil {
+			return fmt.Sprintf("tab: %s · ref: %s · upload: %s", arguments.TabID, arguments.Ref, arguments.UploadID)
+		}
 	}
 	if call.Name == "browser_extract" {
 		var arguments struct {

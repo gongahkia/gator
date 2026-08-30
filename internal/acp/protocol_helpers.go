@@ -96,13 +96,13 @@ func titleFor(value string) string {
 
 func acpToolKind(name string) string {
 	switch name {
-	case "read_file", "list_files", "http_fetch", "browser_snapshot", "browser_extract":
+	case "read_file", "list_files", "http_fetch", "browser_tabs", "browser_snapshot", "browser_screenshot", "browser_extract":
 		return "read"
 	case "search_files":
 		return "search"
 	case "write_file", "apply_patch":
 		return "edit"
-	case "run_command", "terminal_start", "terminal_write", "terminal_stop", "browser_navigate", "browser_act":
+	case "run_command", "terminal_start", "terminal_write", "terminal_stop", "browser_navigate", "browser_click", "browser_fill", "browser_select", "browser_press", "browser_download", "browser_upload", "browser_act":
 		return "execute"
 	default:
 		return "other"
