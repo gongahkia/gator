@@ -10,7 +10,9 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	gatorbrowser "github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/model"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -54,6 +56,7 @@ func runTask(arguments []string, out io.Writer) error {
 	trustCommands := flags.Bool("trust-commands", false, "auto-approve exploratory worktree commands (unsafe; not a sandbox)")
 	sandboxMode := flags.String("sandbox", "", "execution sandbox: strict or off (default from config)")
 	networkMode := flags.String("network", "", "sandbox network mode: deny or allow (default from config)")
+	browserSession := flags.String("browser-session", "", "explicit local browser session ID granted to this run")
 	baseRef := flags.String("base", "", "Git ref or revision used as the new worktree base")
 	copyIgnoredFiles := flags.Bool("copy-ignored", false, "copy files explicitly listed in tracked .gator/worktreeinclude (may expose secrets to the agent)")
 	var setup verificationFlags
@@ -93,7 +96,32 @@ func runTask(arguments []string, out io.Writer) error {
 	if err := executor.Sandbox.Validate(); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  sandbox: %s, network: %s\n  task: %s\n", resolvedProvider, displayModel(resolvedModel), executor.Sandbox.Mode, executor.Sandbox.Network, task); err != nil {
+	if strings.TrimSpace(*browserSession) != "" {
+		if executor.Sandbox.Network != sandbox.AllowNetwork {
+			return errors.New("--browser-session requires --network allow because browser traffic is an explicit run capability")
+		}
+		stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+		if err != nil {
+			return err
+		}
+		store, err := gatorbrowser.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		client, err := gatorbrowser.NewClient(store, *browserSession)
+		if err != nil {
+			return err
+		}
+		session, err := client.Session(context.Background(), *browserSession)
+		if err != nil {
+			return err
+		}
+		if len(session.SelectedTabs) == 0 {
+			return errors.New("--browser-session has no developer-selected tabs; run 'gator browser tabs' then 'gator browser select'")
+		}
+		executor.Browser = client
+	}
+	if _, err := fmt.Fprintf(out, "Gator\n  provider: %s\n  model: %s\n  sandbox: %s, network: %s\n  browser session: %s\n  task: %s\n", resolvedProvider, displayModel(resolvedModel), executor.Sandbox.Mode, executor.Sandbox.Network, valueOrDash(*browserSession), task); err != nil {
 		return err
 	}
 	if err := writePromptAttachmentSummary(out, images, attachments); err != nil {
@@ -115,6 +143,7 @@ func runTask(arguments []string, out io.Writer) error {
 		Setup:                  setup,
 		Images:                 images,
 		Attachments:            attachments,
+		BrowserSession:         *browserSession,
 		Scouts:                 scouts,
 		AllowedCommands:        allowedCommands,
 		AllowedCommandPrefixes: allowedPrefixes,

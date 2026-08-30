@@ -46,6 +46,7 @@ Usage:
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
   gator local list|status|serve|pull|use|remove
+  gator browser install|status|start|attach|tabs|select|origins|visual|allow-upload|artifacts|stop
   gator theme list
   gator theme set gator|contrast|mono
   gator connect PROVIDER [OPTIONS]
@@ -53,7 +54,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
+  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -78,6 +79,7 @@ Commands:
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
   local     install, select, and manage curated Ollama coding models
+  browser   start, attach, and explicitly control a local Playwright/Chromium session
   theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
   run       propose a tested patch in an isolated Git worktree
@@ -163,6 +165,8 @@ func run(args []string, out io.Writer) error {
 		return providerCommand(args[1:], out)
 	case "local":
 		return localCommand(args[1:], out)
+	case "browser":
+		return browserCommand(args[1:], out)
 	case "theme":
 		return themeCommand(args[1:], out)
 	case "run":

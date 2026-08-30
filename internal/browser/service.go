@@ -101,6 +101,9 @@ func (service *Service) Run(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Dir(service.socket), 0o700); err != nil {
 		return fmt.Errorf("create browser socket directory: %w", err)
 	}
+	if err := os.Chmod(filepath.Dir(service.socket), 0o700); err != nil {
+		return fmt.Errorf("protect browser socket directory: %w", err)
+	}
 	_ = os.Remove(service.socket)
 	listener, err := net.Listen("unix", service.socket)
 	if err != nil {
@@ -488,13 +491,27 @@ func safeArtifactName(value string) string {
 
 func socketPath(store *Store, sessionID string) string {
 	digest := sha256.Sum256([]byte(sessionID))
-	return filepath.Join(store.Directory(), "runtime", hex.EncodeToString(digest[:12])+".sock")
+	// Unix-domain socket paths are capped at roughly 104 bytes on macOS and
+	// 108 bytes on Linux. Gator state directories can legitimately be much
+	// longer (for example a test or managed-home path), so use a short,
+	// per-UID 0700 directory. The capability token remains under private Gator
+	// state and authenticates every request independently of this path.
+	return filepath.Join(os.TempDir(), fmt.Sprintf("gator-browser-%d", os.Getuid()), hex.EncodeToString(digest[:12])+".sock")
 }
+
+// SocketPath returns the private per-session Unix socket path. The socket is
+// authenticated separately by a token stored in Gator's private state.
+func SocketPath(store *Store, sessionID string) string { return socketPath(store, sessionID) }
 
 func tokenPath(store *Store, sessionID string) string {
 	digest := sha256.Sum256([]byte(sessionID))
 	return filepath.Join(store.Directory(), "runtime", hex.EncodeToString(digest[:12])+".token")
 }
+
+// TokenPath is intended only for the command parent and its daemon child. The
+// token contents are never displayed, persisted in a session record, or sent
+// to a model provider.
+func TokenPath(store *Store, sessionID string) string { return tokenPath(store, sessionID) }
 
 // CreateToken writes a fresh private session capability for a daemon parent.
 // The token file is removed when the daemon stops; it never enters session
@@ -542,6 +559,9 @@ func readToken(store *Store, sessionID string) ([]byte, error) {
 	}
 	return contents, nil
 }
+
+// ReadToken reads the exact private token created for a local daemon.
+func ReadToken(store *Store, sessionID string) ([]byte, error) { return readToken(store, sessionID) }
 
 func removeToken(store *Store, sessionID string) { _ = os.Remove(tokenPath(store, sessionID)) }
 

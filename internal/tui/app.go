@@ -16,6 +16,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/agent"
+	gatorbrowser "github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
@@ -78,6 +79,9 @@ type Config struct {
 	// the developer's terminal. It is separate from a delegated run because
 	// login and status remain owned by the installed OpenCode CLI.
 	NewOpenCodeCommand func(arguments []string) (*exec.Cmd, error)
+	// Browser owns explicit local browser-session lifecycle and is injected by
+	// the command layer so the TUI never starts a hidden remote service.
+	Browser BrowserBackend
 	// Build identifies this running binary without performing network I/O.
 	Build BuildInfo
 	// CheckForUpdate performs a check-only update lookup. The TUI never
@@ -157,6 +161,24 @@ type ManagementBackend interface {
 
 type DoctorBackend interface {
 	Snapshot(provider string) (DoctorSnapshot, error)
+}
+
+// BrowserBackend is the user-facing local browser control surface. Every
+// operation is local and explicit; the controller returned for a run exposes
+// only tabs selected through this same backend.
+type BrowserBackend interface {
+	Sessions() ([]gatorbrowser.Session, error)
+	Start(headed, visualCapture bool) (gatorbrowser.Session, error)
+	Attach(cdpEndpoint string, visualCapture bool) (gatorbrowser.Session, []gatorbrowser.Tab, error)
+	CandidateTabs(sessionID string) ([]gatorbrowser.Tab, error)
+	SelectTabs(sessionID string, tabIDs []string) (gatorbrowser.Session, error)
+	AddOrigin(sessionID, value string) (gatorbrowser.Session, error)
+	RemoveOrigin(sessionID, value string) (gatorbrowser.Session, error)
+	SetVisualCapture(sessionID string, allowed bool) (gatorbrowser.Session, error)
+	AllowUpload(sessionID, path string) (gatorbrowser.Upload, error)
+	Artifacts(sessionID string) ([]gatorbrowser.Artifact, error)
+	Stop(sessionID string) (gatorbrowser.Session, error)
+	Controller(sessionID string) (gatorbrowser.Controller, error)
 }
 
 type DoctorSnapshot struct {
@@ -688,6 +710,7 @@ type Model struct {
 	oauthCancel         context.CancelFunc
 	oauthProvider       string
 	delegateRuntime     string
+	browserSession      string
 	updateChecking      bool
 	cancelling          bool
 	lastRunCancelled    bool

@@ -32,6 +32,7 @@ func (m Model) extensionSlashCommands() []slashCommand {
 
 var slashCommands = []slashCommand{
 	{name: "/agents", description: "list narrowing project profiles and roles"},
+	{name: "/browser", description: "start, attach, select, and grant an explicit local browser session"},
 	{name: "/clear", description: "clear the current task"},
 	{name: "/clear-queue", description: "remove every queued instruction"},
 	{name: "/clone", description: "duplicate the active retained branch or TARGET [instruction…]"},
