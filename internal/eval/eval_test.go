@@ -61,6 +61,7 @@ func TestLoadSpecRejectsUnsafeHeadlessPolicy(t *testing.T) {
 	tests := []string{
 		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"repository":"../outside"}`,
 		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"allowed_command_prefixes":[["sh"]]}`,
+		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"scopes":["."]}`,
 	}
 	for _, contents := range tests {
 		directory := t.TempDir()
@@ -73,21 +74,32 @@ func TestLoadSpecRejectsUnsafeHeadlessPolicy(t *testing.T) {
 	}
 }
 
+func TestRunRejectsUnversionedSpecBeforeExecution(t *testing.T) {
+	_, err := Run(context.Background(), Options{
+		Spec:       Spec{ID: "x", Task: "x", MaxSteps: 1, Verify: [][]string{{"true"}}},
+		RunID:      "unversioned-001",
+		Repository: t.TempDir(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported eval spec version") {
+		t.Fatalf("unversioned eval spec error = %v", err)
+	}
+}
+
 func TestRunRecordsResolvedOfflineEvaluation(t *testing.T) {
 	repository := greetingRepository(t)
 	spec := Spec{
-		Version:        1,
-		ID:             "greeting-feature",
-		Task:           "Add a Greeting feature with a focused test",
-		MaxSteps:       8,
-		TimeoutSeconds: 60,
-		Verify:         [][]string{{"go", "test", "./..."}},
-		Sandbox:        "off",
-		Network:        "deny",
-		Scopes:         []string{"."},
-		AllowedCommands: [][]string{{"go", "env", "GOMOD"}},
+		Version:                1,
+		ID:                     "greeting-feature",
+		Task:                   "Add a Greeting feature with a focused test",
+		MaxSteps:               8,
+		TimeoutSeconds:         60,
+		Verify:                 [][]string{{"go", "test", "./..."}},
+		Sandbox:                "off",
+		Network:                "deny",
+		Scopes:                 []string{"README.md"},
+		AllowedCommands:        [][]string{{"go", "env", "GOMOD"}},
 		AllowedCommandPrefixes: [][]string{{"go", "test"}},
-		Setup:          [][]string{{"go", "version"}},
+		Setup:                  [][]string{{"go", "version"}},
 	}
 	model := &scriptedModel{turns: greetingTurns(t)}
 	report, err := Run(context.Background(), Options{

@@ -279,6 +279,9 @@ func Run(ctx context.Context, options Options) (Report, error) {
 	if err := ValidateRunID(options.RunID); err != nil {
 		return report, err
 	}
+	if err := validateSpec(options.Spec); err != nil {
+		return report, fmt.Errorf("validate eval spec: %w", err)
+	}
 	if strings.TrimSpace(options.Repository) == "" {
 		return report, errors.New("eval repository is required")
 	}
@@ -458,6 +461,9 @@ func copyFile(source, dest string) error {
 }
 
 func validateSpec(spec Spec) error {
+	if spec.Version != specVersion {
+		return fmt.Errorf("unsupported eval spec version %d", spec.Version)
+	}
 	if !validIdentifier(spec.ID) {
 		return errors.New("eval spec id must be a portable run identifier")
 	}
@@ -485,7 +491,7 @@ func validateSpec(spec Spec) error {
 		}
 	}
 	for _, scope := range spec.Scopes {
-		if !validFixturePath(scope) && filepath.Clean(scope) != "." {
+		if !validFixturePath(scope) {
 			return fmt.Errorf("eval spec scope %q must be repository-relative", scope)
 		}
 	}
