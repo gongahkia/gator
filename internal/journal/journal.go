@@ -36,27 +36,27 @@ type Record struct {
 // run. Unlike events.jsonl, it contains model conversation content and is
 // intentionally written with mode 0600.
 type Session struct {
-	Version             int                   `json:"version"`
-	Repository          string                `json:"repository"`
-	WorktreePath        string                `json:"worktree_path"`
-	BaseCommit          string                `json:"base_commit,omitempty"`
-	Provider            string                `json:"provider"`
-	Model               string                `json:"model"`
-	BaseURL             string                `json:"base_url,omitempty"`
-	Task                string                `json:"task"`
-	MaxSteps            int                   `json:"max_steps"`
-	Verification        [][]string            `json:"verification"`
-	Scopes              []string              `json:"scopes,omitempty"`
-	Profile             string                `json:"profile,omitempty"`
-	ThreadID            string                `json:"thread_id,omitempty"`
-	Mode                string                `json:"mode,omitempty"`
-	HooksHash           string                `json:"hooks_hash,omitempty"`
-	LSPHash             string                `json:"lsp_hash,omitempty"`
-	MCPHash             string                `json:"mcp_hash,omitempty"`
-	Messages            []agent.Message       `json:"messages"`
-	AttachmentManifest  []AttachmentReference `json:"attachment_manifest,omitempty"`
-	ParentStatePath     string                `json:"parent_state_path,omitempty"`
-	ForkedFromStatePath string                `json:"forked_from_state_path,omitempty"`
+	Version                int                   `json:"version"`
+	Repository             string                `json:"repository"`
+	WorktreePath           string                `json:"worktree_path"`
+	BaseCommit             string                `json:"base_commit,omitempty"`
+	Provider               string                `json:"provider"`
+	Model                  string                `json:"model"`
+	BaseURL                string                `json:"base_url,omitempty"`
+	Task                   string                `json:"task"`
+	MaxSteps               int                   `json:"max_steps"`
+	Verification           [][]string            `json:"verification"`
+	Scopes                 []string              `json:"scopes,omitempty"`
+	Profile                string                `json:"profile,omitempty"`
+	ThreadID               string                `json:"thread_id,omitempty"`
+	Mode                   string                `json:"mode,omitempty"`
+	HooksHash              string                `json:"hooks_hash,omitempty"`
+	LSPHash                string                `json:"lsp_hash,omitempty"`
+	MCPHash                string                `json:"mcp_hash,omitempty"`
+	Messages               []agent.Message       `json:"messages"`
+	AttachmentManifest     []AttachmentReference `json:"attachment_manifest,omitempty"`
+	ParentStatePath        string                `json:"parent_state_path,omitempty"`
+	ForkedFromStatePath    string                `json:"forked_from_state_path,omitempty"`
 	AllowedCommands        [][]string            `json:"allowed_commands,omitempty"`
 	AllowedCommandPrefixes [][]string            `json:"allowed_command_prefixes,omitempty"`
 }
