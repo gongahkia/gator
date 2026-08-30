@@ -1,0 +1,44 @@
+diff --git a/parser/list.go b/parser/list.go
+index 4fdbd2e..5a72803 100644
+--- a/parser/list.go
++++ b/parser/list.go
+@@ -1,14 +1,22 @@
+ package parser
+ 
+-import "strings"
++import (
++	"errors"
++	"strings"
++)
+ 
+ // ParseList splits a comma-separated list and normalizes whitespace.
+ func ParseList(input string) ([]string, error) {
++	if strings.TrimSpace(input) == "" {
++		return nil, errors.New("list must contain at least one item")
++	}
+ 	var values []string
+ 	for _, item := range strings.Split(input, ",") {
+-		if item = strings.TrimSpace(item); item != "" {
+-			values = append(values, item)
++		item = strings.TrimSpace(item)
++		if item == "" {
++			return nil, errors.New("list contains an empty item")
+ 		}
++		values = append(values, item)
+ 	}
+ 	return values, nil
+ }
+diff --git a/parser/list_test.go b/parser/list_test.go
+index 13c47a9..0db7b99 100644
+--- a/parser/list_test.go
++++ b/parser/list_test.go
+@@ -14,3 +14,9 @@ func TestParseListTrimsValidItems(t *testing.T) {
+ 		t.Fatalf("ParseList() = %#v, want %#v", got, want)
+ 	}
+ }
++
++func TestParseListRejectsEmptyItems(t *testing.T) {
++	if _, err := ParseList("alpha,,beta"); err == nil {
++		t.Fatal("ParseList accepted an empty item")
++	}
++}

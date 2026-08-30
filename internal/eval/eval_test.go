@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -62,6 +63,47 @@ func TestLoadCheckedInCoreSuiteRequiresStrictHiddenScoring(t *testing.T) {
 		}
 		if spec.Sandbox != string(sandbox.Strict) || len(spec.Score) == 0 || spec.ScoreTimeoutSeconds < 1 || len(spec.Labels) == 0 {
 			t.Fatalf("core spec %q is not a scored strict task: %#v", fixture, spec)
+		}
+	}
+}
+
+func TestCoreSuiteOraclesDistinguishBaselineFromReferenceSolution(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("strict command sandbox is intentionally unavailable on Windows")
+	}
+	suite, err := LoadSuite("testdata/core-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fixtureName := range suite.Cases {
+		fixture := filepath.Join("testdata/core-v1", fixtureName)
+		spec, err := LoadSpec(fixture)
+		if err != nil {
+			t.Fatalf("load %s: %v", fixtureName, err)
+		}
+		repository, err := PrepareRepository(context.Background(), filepath.Join(fixture, "repository"))
+		if err != nil {
+			t.Fatalf("prepare %s: %v", fixtureName, err)
+		}
+		results, status, err := runScore(context.Background(), repository, fixture, spec)
+		if err != nil {
+			t.Fatalf("score baseline %s: %v", fixtureName, err)
+		}
+		if status != "failed" || len(results) != 1 || results[0].ExitCode == 0 {
+			t.Fatalf("baseline %s score = %#v, %q, want one failing oracle", fixtureName, results, status)
+		}
+		patch := exec.Command("git", "apply", filepath.Join(fixture, "oracle.patch"))
+		patch.Dir = repository
+		output, err := patch.CombinedOutput()
+		if err != nil {
+			t.Fatalf("apply oracle %s: %v: %s", fixtureName, err, output)
+		}
+		results, status, err = runScore(context.Background(), repository, fixture, spec)
+		if err != nil {
+			t.Fatalf("score oracle %s: %v", fixtureName, err)
+		}
+		if status != "passed" || len(results) != 1 || results[0].ExitCode != 0 {
+			t.Fatalf("oracle %s score = %#v, %q, want one passing oracle", fixtureName, results, status)
 		}
 	}
 }
@@ -178,6 +220,34 @@ func TestRunScoreFailureDowngradesResolvedAgentOutcome(t *testing.T) {
 	}
 	if report.AgentStatus != "resolved" || report.Status != "unresolved" || report.ScoreStatus != "failed" || len(report.ScoreResults) != 1 {
 		t.Fatalf("scored report = %#v", report)
+	}
+}
+
+func TestRunStrictScoreCanReadFixtureWithoutExposingItToTheAgent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("strict command sandbox is intentionally unavailable on Windows")
+	}
+	spec, err := LoadSpec("testdata/live-greeting")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := greetingRepository(t)
+	turns := greetingTurns(t)[1:]
+	report, err := Run(context.Background(), Options{
+		Spec:        spec,
+		RunID:       "strict-score-001",
+		Provider:    "test",
+		ModelName:   "scripted",
+		StateDir:    t.TempDir(),
+		Repository:  repository,
+		FixturePath: "testdata/live-greeting",
+		Executor:    gatorrun.Executor{Model: &scriptedModel{turns: turns}, Sandbox: PolicyFromSpec(spec)},
+	})
+	if err != nil {
+		t.Fatalf("run strict scorer: %v", err)
+	}
+	if report.Status != "resolved" || report.ScoreStatus != "passed" || len(report.ScoreResults) != 1 {
+		t.Fatalf("strict scored report = %#v", report)
 	}
 }
 

@@ -1,0 +1,33 @@
+diff --git a/catalog/merge.go b/catalog/merge.go
+index 5dc0d41..9b1ae4c 100644
+--- a/catalog/merge.go
++++ b/catalog/merge.go
+@@ -17,6 +17,9 @@ func Apply(entries []Entry, patches []Patch) ([]Entry, error) {
+ 		if patch.Name != nil {
+ 			result[position].Name = *patch.Name
+ 		}
++		if patch.Enabled != nil {
++			result[position].Enabled = *patch.Enabled
++		}
+ 	}
+ 	return result, nil
+ }
+diff --git a/catalog/merge_test.go b/catalog/merge_test.go
+index 1569df7..5f1ff1f 100644
+--- a/catalog/merge_test.go
++++ b/catalog/merge_test.go
+@@ -12,3 +12,14 @@ func TestApplyChangesExplicitName(t *testing.T) {
+ 		t.Fatalf("Apply() = %#v", got)
+ 	}
+ }
++
++func TestApplyChangesExplicitEnabled(t *testing.T) {
++	enabled := false
++	got, err := Apply([]Entry{{ID: "a", Name: "old", Enabled: true}}, []Patch{{ID: "a", Enabled: &enabled}})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if got[0].Enabled {
++		t.Fatalf("Apply() = %#v", got)
++	}
++}

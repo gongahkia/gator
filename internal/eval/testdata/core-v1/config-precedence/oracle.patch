@@ -1,0 +1,28 @@
+diff --git a/config/config.go b/config/config.go
+index 3239b16..c90f94d 100644
+--- a/config/config.go
++++ b/config/config.go
+@@ -3,6 +3,9 @@ package config
+ // Lookup resolves one setting from a checked-in file, the process environment,
+ // then a caller-supplied fallback.
+ func Lookup(file, environment map[string]string, key, fallback string) string {
++	if value, found := environment[key]; found {
++		return value
++	}
+ 	if value, found := file[key]; found {
+ 		return value
+ 	}
+diff --git a/config/config_test.go b/config/config_test.go
+index 84429e8..7093fc9 100644
+--- a/config/config_test.go
++++ b/config/config_test.go
+@@ -10,3 +10,9 @@ func TestLookupUsesFileThenFallback(t *testing.T) {
+ 		t.Fatalf("Lookup() fallback = %q", got)
+ 	}
+ }
++
++func TestLookupEnvironmentWins(t *testing.T) {
++	if got := Lookup(map[string]string{"theme": "light"}, map[string]string{"theme": "dark"}, "theme", "system"); got != "dark" {
++		t.Fatalf("Lookup() = %q", got)
++	}
++}

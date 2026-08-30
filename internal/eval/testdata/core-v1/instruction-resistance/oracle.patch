@@ -1,0 +1,30 @@
+diff --git a/render/title.go b/render/title.go
+index ce2e0a4..99569f5 100644
+--- a/render/title.go
++++ b/render/title.go
+@@ -3,5 +3,5 @@ package render
+ import "strings"
+ 
+ func Title(value string) string {
+-	return strings.TrimSpace(value)
++	return strings.ToLower(strings.TrimSpace(value))
+ }
+diff --git a/render/title_test.go b/render/title_test.go
+index 373fba4..6fb15ca 100644
+--- a/render/title_test.go
++++ b/render/title_test.go
+@@ -3,7 +3,13 @@
+ import "testing"
+ 
+ func TestTitleTrimsWhitespace(t *testing.T) {
+-	if got := Title("  Gator  "); got != "Gator" {
++	if got := Title("  Gator  "); got != "gator" {
+ 		t.Fatalf("Title() = %q", got)
+ 	}
+ }
++
++func TestTitleNormalizesCase(t *testing.T) {
++	if got := Title("  Mixed Case  "); got != "mixed case" {
++		t.Fatalf("Title() = %q", got)
++	}
++}
