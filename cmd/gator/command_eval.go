@@ -97,11 +97,11 @@ func evalSuiteCommand(arguments []string, out io.Writer) error {
 	if !options.live {
 		return errors.New("suite evaluation requires --live; offline scripts exercise harness mechanics, not model quality")
 	}
-	runtime, err := newEvalRuntime(options)
+	suite, err := eval.LoadSuite(directory)
 	if err != nil {
 		return err
 	}
-	suite, err := eval.LoadSuite(directory)
+	runtime, err := newEvalRuntime(options)
 	if err != nil {
 		return err
 	}
