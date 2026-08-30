@@ -1,9 +1,3 @@
-  4. Browser and remote-work gaps remain large.
-
-     Gator’s browser is intentionally text-only: no JavaScript, screenshots, cookies, authenticated profiles, downloads, tabs, or visual testing. It also has no hosted
-     executor, PR/issue workflow, notifications, remote continuation, or durable background writers. Cursor cloud agents run in isolated VMs, can continue after the laptop
-     is closed, create PRs, and attach screenshots/logs/videos. Cursor background agents
-
   5. Extensibility is safer but much narrower than the market.
 
      Gator profiles can only reduce authority; its extension/MCP/LSP model is guarded and pinned. That is a good security choice, but it cannot match the programmable
@@ -17,46 +11,6 @@
       - The current committed tree fails its own CI formatting check: gofmt -l cmd internal reports internal/journal/journal.go. This is a small defect, but it means the
         published CI gate would currently fail.
 
-  ## Competitive position
-
-   Harness               Its clear advantage over Gator                                             Gator’s real advantage
-  ━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   Codex                 Mature CLI/desktop/IDE/cloud surfaces, skills/plugins, cloud handoff,      Model/provider independence, worktree-first execution, explicit apply
-                         richer app server, native Windows sandbox, broader review and delivery     boundary, and a narrower locally auditable trust model.
-                         workflow. Codex also supports parallel custom subagents.
-  ────────────────────  ─────────────────────────────────────────────────────────────────────────  ──────────────────────────────────────────────────────────────────────────
-   Claude Code           More mature custom agents, skills, hooks, MCP scoping, background          Gator’s project extensions cannot silently gain host authority; its
-                         delegation, and ecosystem adoption.                                        child writers are worktree-isolated and never auto-merge.
-  ────────────────────  ─────────────────────────────────────────────────────────────────────────  ──────────────────────────────────────────────────────────────────────────
-   Cursor                Better editor integration and hosted/cloud operations: remote VMs,         Fully local control, no required cloud executor, provider-neutral core,
-                         background work, PRs, artifacts, automation, organization integrations.    and stronger review-first isolation.
-  ────────────────────  ─────────────────────────────────────────────────────────────────────────  ──────────────────────────────────────────────────────────────────────────
-   OpenCode              Flexible agent definitions, configurable permissions, broad provider       Safer defaults and stronger executable-project-content trust boundaries.
-                         ecosystem, arbitrary MCP/custom tooling.                                   OpenCode’s flexibility is useful but requires more configuration
-                                                                                                    discipline.
-  ────────────────────  ─────────────────────────────────────────────────────────────────────────  ──────────────────────────────────────────────────────────────────────────
-   Pi                    Extremely extensible minimal core: TypeScript extensions, packages,        A more integrated, policy-constrained product. Pi explicitly gives
-                         skills, custom providers/models, SDK/RPC.                                  installed packages full system access, so Gator’s restrictions are
-                                                                                                    valuable for security-sensitive use.
-  ────────────────────  ─────────────────────────────────────────────────────────────────────────  ──────────────────────────────────────────────────────────────────────────
-   Gemini CLI / Aider    Gemini has broader sandbox deployment options; Aider has a proven          Gator has richer retained-worktree review and stronger mandatory-
-                         focused workflow around repo maps, lint/test repair, Git commits, and      verifier semantics than a conventional in-place editing loop.
-                         model benchmarks.
-
-  Gator should not try to out-feature these tools. Its best position is: the local, provider-neutral harness for developers who require inspectable, sandboxed, reviewable
-  patches.
-
-  ## Tests and verification
-
-  Passed:
-
-  - go test -count=1 ./...
-  - go test -cover -count=1 ./... plus the remaining core packages explicitly: all passed.
-  - go vet ./...
-  - go build -trimpath -o /dev/null ./cmd/gator
-  - go run ./cmd/gator version
-  - go run ./cmd/gator help
-
   Coverage is meaningful but uneven: agent loop 86.0%, app server 80.1%, run executor 74.3%, terminal 71.9%, tools 69.9%, sandbox 63.7%, TUI 61.8%; CLI entrypoint is only
   45.6% and eval is 39.6%. There are two fuzz targets, both in the app-server HTTP/parser area, and no benchmarks.
 
@@ -68,10 +22,3 @@
   - No broad Linux sandbox-escape regression test—the explicit “cannot write outside worktree” test is macOS-only.
   - No real browser, LSP, MCP, OAuth, or multi-agent dogfood evidence against external systems.
   - No real-model evaluation or comparative benchmark.
-
-  ## Recommendation
-
-  Do not add more features yet. First fix formatting, add a license/security/release provenance baseline, and create a public evaluation and dogfood program with real
-  repositories, multiple languages, strict sandboxing, live providers, failure cases, cost/latency, and reproducible results.
-
-  Until that exists, market Gator as an experimental security-first harness, not as a replacement for established coding-agent products.
