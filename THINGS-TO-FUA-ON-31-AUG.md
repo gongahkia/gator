@@ -1,3 +1,10 @@
+# THINGS TO FOLLOW UP ON
+
+4. a prior default-parallel go test ./... run intermittently failed
+  unchanged internal/appserver terminal timing test; its exact test passed five
+  isolated runs. [Inference] This is an existing test flake unrelated to the browser
+  changes, but normal CI may still reproduce it.
+
   5. Extensibility is safer but much narrower than the market.
 
      Gator profiles can only reduce authority; its extension/MCP/LSP model is guarded and pinned. That is a good security choice, but it cannot match the programmable
@@ -11,10 +18,10 @@
       - The current committed tree fails its own CI formatting check: gofmt -l cmd internal reports internal/journal/journal.go. This is a small defect, but it means the
         published CI gate would currently fail.
 
-  Coverage is meaningful but uneven: agent loop 86.0%, app server 80.1%, run executor 74.3%, terminal 71.9%, tools 69.9%, sandbox 63.7%, TUI 61.8%; CLI entrypoint is only
+7.  Coverage is meaningful but uneven: agent loop 86.0%, app server 80.1%, run executor 74.3%, terminal 71.9%, tools 69.9%, sandbox 63.7%, TUI 61.8%; CLI entrypoint is only
   45.6% and eval is 39.6%. There are two fuzz targets, both in the app-server HTTP/parser area, and no benchmarks.
 
-  Incomplete or missing verification:
+8. These other below scattered issues
 
   - No full race-detector run.
   - No fuzzing campaign.
