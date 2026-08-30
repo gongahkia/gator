@@ -114,6 +114,39 @@ func TestRunnerStopsAtStepLimit(t *testing.T) {
 	}
 }
 
+func TestRunnerAppendsBoundedBrowserObservationAfterToolResult(t *testing.T) {
+	model := &scriptedModel{turns: []Turn{
+		{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}},
+		{Text: "done"},
+	}}
+	tool := &recordingTool{result: ToolResult{
+		Content: `{"ok":true,"artifact":"screen.png"}`,
+		Observations: []Observation{{
+			Content: "Screenshot captured from the selected browser tab.",
+			Images:  []Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}},
+		}},
+	}}
+	result, err := (Runner{Model: model, Tools: []Tool{tool}}).Run(context.Background(), RunOptions{Task: "inspect"})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result.FinalText != "done" || len(model.requests) != 2 {
+		t.Fatalf("result %#v, requests %d", result, len(model.requests))
+	}
+	messages := model.requests[1].Messages
+	if len(messages) != 4 || messages[2].Role != RoleTool || messages[3].Role != RoleUser || len(messages[3].Images) != 1 || !strings.Contains(messages[3].Content, "Untrusted browser observation") {
+		t.Fatalf("continuation messages = %#v", messages)
+	}
+}
+
+func TestRunnerRejectsBrowserObservationForTextOnlyModel(t *testing.T) {
+	model := &textOnlyScriptedModel{scriptedModel: &scriptedModel{turns: []Turn{{ToolCalls: []ToolCall{{ID: "call-1", Name: "read_file", Arguments: json.RawMessage(`{}`)}}}}}}
+	tool := &recordingTool{result: ToolResult{Content: `{"ok":true}`, Observations: []Observation{{Images: []Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}}}}}}
+	if _, err := (Runner{Model: model, Tools: []Tool{tool}}).Run(context.Background(), RunOptions{Task: "inspect"}); err == nil || !strings.Contains(err.Error(), "vision-capable") {
+		t.Fatalf("Run error = %v", err)
+	}
+}
+
 func TestRunnerRecoversFromMalformedToolCallsWithoutExecutingThem(t *testing.T) {
 	model := &scriptedModel{turns: []Turn{
 		{ToolCalls: []ToolCall{
@@ -346,6 +379,14 @@ type scriptedModel struct {
 	requests   []TurnRequest
 	onComplete func(int)
 }
+
+type textOnlyScriptedModel struct{ scriptedModel *scriptedModel }
+
+func (m *textOnlyScriptedModel) Complete(ctx context.Context, request TurnRequest) (Turn, error) {
+	return m.scriptedModel.Complete(ctx, request)
+}
+
+func (*textOnlyScriptedModel) SupportsVisualInput() bool { return false }
 
 func (m *scriptedModel) Complete(_ context.Context, request TurnRequest) (Turn, error) {
 	m.requests = append(m.requests, request)

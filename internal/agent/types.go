@@ -105,8 +105,28 @@ type Tool interface {
 }
 
 // ToolResult is serialized to the model as the result of one named call.
+// Observations are bounded, untrusted visual observations produced by trusted
+// local tools after the matching result. They are deliberately separate from a
+// tool-result wire format because provider APIs commonly accept only text for
+// function outputs.
 type ToolResult struct {
-	Content string `json:"content"`
+	Content      string        `json:"content"`
+	Observations []Observation `json:"-"`
+}
+
+// Observation is local tool output intended for the next model turn. Browser
+// screenshots are the current use case. The runner never journals their raw
+// bytes because they can contain private browser content.
+type Observation struct {
+	Content string  `json:"content"`
+	Images  []Image `json:"images,omitempty"`
+}
+
+// VisualInputModel lets a model explicitly decline browser screenshots while
+// still using text snapshots. Models that do not advertise this interface are
+// treated as vision-capable because Gator's cloud adapters encode images.
+type VisualInputModel interface {
+	SupportsVisualInput() bool
 }
 
 // EventKind names a durable, user-visible occurrence within a run.
