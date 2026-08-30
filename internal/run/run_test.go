@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -383,9 +382,6 @@ func TestExecutorExposesModelInvocableReadOnlyDelegation(t *testing.T) {
 }
 
 func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -436,9 +432,6 @@ func TestExecutorExposesSandboxedPersistentTerminalOnlyInExecuteMode(t *testing.
 }
 
 func TestExecutorRetainsApprovedDetachedTerminalOnlyInInteractiveRegistry(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -479,9 +472,6 @@ func TestExecutorRetainsApprovedDetachedTerminalOnlyInInteractiveRegistry(t *tes
 }
 
 func TestExecutorAttachesDeveloperToExistingTerminalWithoutJournalingRawInput(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")

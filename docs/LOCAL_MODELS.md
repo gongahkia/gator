@@ -96,9 +96,9 @@ was already running.
 `gator doctor` detects the operating system, architecture, total RAM, currently
 available RAM where the platform reports it, and free space in the Ollama model
 filesystem. It reports each reviewed model as enabled or disabled and explains
-the exact blocking condition. Gator recognizes Linux, macOS, and Windows on
-`amd64` and `arm64`; an unrecognized OS or architecture is disabled rather than
-assumed compatible.
+the exact blocking condition. Gator supports Linux and macOS on `amd64` and
+`arm64`; an unrecognized OS or architecture is disabled rather than assumed
+compatible.
 
 The published pull size is the only stable per-model resource fact in this
 catalog. Gator therefore uses a deliberately conservative admission policy,

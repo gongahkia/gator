@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"os/exec"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -18,9 +17,6 @@ import (
 )
 
 func TestManagerRunsInteractiveTaskAndBoundsScrollback(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -68,9 +64,6 @@ func TestManagerRunsInteractiveTaskAndBoundsScrollback(t *testing.T) {
 }
 
 func TestRestartCreatesNewTaskAndPreservesExitedTask(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -101,9 +94,6 @@ func TestRestartCreatesNewTaskAndPreservesExitedTask(t *testing.T) {
 }
 
 func TestManagerMarksDroppedOutputAndCancelsTasksOnClose(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -138,9 +128,6 @@ func TestManagerMarksDroppedOutputAndCancelsTasksOnClose(t *testing.T) {
 }
 
 func TestManagerKeepsExplicitlyDetachedTaskInSessionRegistry(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -208,9 +195,6 @@ func TestManagerKeepsExplicitlyDetachedTaskInSessionRegistry(t *testing.T) {
 }
 
 func TestRegistryCapsDetachedTerminalTasksAcrossManagers(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -241,9 +225,6 @@ func TestRegistryCapsDetachedTerminalTasksAcrossManagers(t *testing.T) {
 }
 
 func TestManagerRecordsDeveloperInputWithoutRetainingIt(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -285,9 +266,6 @@ func TestManagerRecordsDeveloperInputWithoutRetainingIt(t *testing.T) {
 }
 
 func TestManagerProtocolRepliesAreBoundedAndNotDeveloperInput(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -321,9 +299,6 @@ func TestManagerProtocolRepliesAreBoundedAndNotDeveloperInput(t *testing.T) {
 }
 
 func TestManagerAggregatesRawDeveloperInputUntilFlush(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")
@@ -381,9 +356,6 @@ func TestManagerAggregatesRawDeveloperInputUntilFlush(t *testing.T) {
 }
 
 func TestManagerSetsAndResizesPseudoTerminalViewport(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the PTY dependency reports unsupported on Windows")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")

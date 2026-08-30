@@ -114,8 +114,8 @@ func evalSuiteCommand(arguments []string, out io.Writer) error {
 	if options.attempts < 1 || options.attempts > 10 {
 		return errors.New("suite --attempts must be between 1 and 10")
 	}
-	if strings.TrimSpace(options.environmentID) == "" {
-		return errors.New("live suite evaluation requires --environment-id, such as an immutable OCI image digest")
+	if err := eval.ValidateEnvironmentID(options.environmentID); err != nil {
+		return fmt.Errorf("live suite evaluation requires --environment-id as an immutable OCI image digest: %w", err)
 	}
 	if len(options.runID) > 88 {
 		return errors.New("suite --run-id must contain at most 88 characters so case attempt IDs remain portable")

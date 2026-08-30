@@ -21,7 +21,7 @@ Evaluation runner checks:
 ```sh
 go test ./internal/eval
 gator eval DIR --run-id UNIQUE_ID --script DIR/script.json --report DIR/reports/UNIQUE_ID.json --require-resolved
-gator eval suite DIR --live --provider PROVIDER --model MODEL --report-dir DIR/reports/UNIQUE_ID --require-resolved
+gator eval suite DIR --live --provider PROVIDER --model MODEL --environment-id OCI_IMAGE_DIGEST --attempts 3 --report-dir DIR/reports/UNIQUE_ID --require-resolved
 ```
 
 Use a new `--run-id` for every attempt. Reusing an id against a previous
@@ -29,10 +29,11 @@ report file invites cached conclusions; the harness always executes, but
 humans comparing reports will mix attempts if ids collide.
 
 The offline form is a deterministic harness regression only. The suite form
-requires `--live` because it is reserved for model-quality evidence. `--live`
-accepts explicit provider, model, and base-URL overrides and writes no API keys
+requires `--live`, strict scored fixtures, and an immutable `--environment-id`
+because it is reserved for model-quality evidence. `--live` accepts explicit
+provider, model, and base-URL overrides and writes no API keys or raw endpoint
 into the report. See [headless evaluation](EVALUATION.md) for fixture policy,
-container operation, and the evidence threshold.
+container operation, repeated trials, and the evidence threshold.
 
 ## Evaluation report
 
@@ -42,7 +43,8 @@ Each report is `0600` JSON with:
 | --- | --- |
 | `id` | Fixture identity from `eval.json` |
 | `run_id` | This attempt. Must be unique per prediction |
-| `status` | `resolved` (verifier passed), `unresolved` (ran, failed), or `error` (timeout or harness failure) |
+| `status` | Final `resolved`, `unresolved`, or `error`, including the post-run score outcome |
+| `agent_status` | Agent/verifier outcome before hidden post-run scoring |
 | `task` | Exact task string |
 | `provider` / `model` | Adapter used |
 | `max_steps` / `steps` | Budget and actual turns |
@@ -50,7 +52,10 @@ Each report is `0600` JSON with:
 | `verify` | Exact argv list that had to pass |
 | `sandbox` / `network` | Requested fixture execution policy |
 | `base_commit` | Fresh baseline commit created from the copied fixture |
+| fixture/harness/environment provenance | `fixture_sha256`, `harness_version`, `harness_commit`, `environment_id`, plus a hashed provider endpoint |
 | `scopes` / command policy / `setup` | Fixed evaluation authority; do not put secrets in these fields |
+| `score` / `score_status` / `score_results` | Trusted hidden oracle argv and bounded post-run diagnostic evidence |
+| `suite_id` / `attempt` / `labels` | Corpus identity, independent trial, and predeclared category |
 | `duration_ns` | Wall time |
 | `error` | Failure text, never credentials |
 | `state_path` / `worktree_path` | Local artifacts for review |
@@ -100,5 +105,5 @@ keep local notes. Do not commit transcripts, session files, or credentials.
 
 Passing this file does not establish: hosted agents, org governance, detached
 writer teams, full JavaScript/screenshot browser automation, unrestricted
-computer use, Windows strict sandbox, or parity with Codex CLI,
+computer use, support beyond Linux and macOS, or parity with Codex CLI,
 Claude Code, Cursor CLI, Pi, or OpenCode.

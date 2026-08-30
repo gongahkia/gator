@@ -42,6 +42,19 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestSupportedPlatformAllowsOnlyLinuxAndMacOS(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin"} {
+		if !supportedPlatform(goos) {
+			t.Fatalf("supported platform rejected: %s", goos)
+		}
+	}
+	for _, goos := range []string{"freebsd", "plan9"} {
+		if supportedPlatform(goos) {
+			t.Fatalf("unsupported platform accepted: %s", goos)
+		}
+	}
+}
+
 func TestLoginAndLogoutStoreOnlyGatorCredential(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("GATOR_STATE_DIR", stateDir)

@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -38,9 +37,6 @@ func TestCreateServeTokenCreatesPrivateReadableToken(t *testing.T) {
 }
 
 func TestReadServeTokenRejectsSymlinkSwapTargets(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("symlink permission behavior varies on Windows")
-	}
 	directory := t.TempDir()
 	target := filepath.Join(directory, "target-token")
 	if err := os.WriteFile(target, []byte("gator-app-server-test-token-0123456789\n"), 0o600); err != nil {
@@ -73,7 +69,7 @@ func TestServeSignalsIncludeGracefulTermination(t *testing.T) {
 	if len(signals) == 0 || signals[0] != os.Interrupt {
 		t.Fatalf("serve signals = %#v", signals)
 	}
-	if runtime.GOOS != "windows" && len(signals) < 2 {
+	if len(signals) < 2 {
 		t.Fatalf("serve signals omit termination signal: %#v", signals)
 	}
 }
@@ -164,9 +160,6 @@ func TestRequestServeShutdownUsesOnlyTheAuthenticatedLoopbackEndpoint(t *testing
 }
 
 func TestAbortServeProcessTerminatesAReadinessFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the Unix service supervisor uses SIGTERM")
-	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("sh is unavailable")

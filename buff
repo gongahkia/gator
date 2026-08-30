@@ -1,9 +1,3 @@
-3. Windows support is materially incomplete.
-
-     The release workflow builds Windows, and CI runs tests on Windows, but strict sandboxing deliberately fails closed on every non-Linux/non-macOS platform. A Windows user
-     must disable the sandbox to execute agent commands. Codex has native Windows sandboxing, while Gemini CLI offers container-based cross-platform isolation. Codex
-     sandboxing, Gemini CLI sandboxing
-
   4. Browser and remote-work gaps remain large.
 
      Gator’s browser is intentionally text-only: no JavaScript, screenshots, cookies, authenticated profiles, downloads, tabs, or visual testing. It also has no hosted

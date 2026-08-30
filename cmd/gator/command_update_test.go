@@ -69,6 +69,13 @@ func TestReleaseUpdaterRejectsChecksumMismatch(t *testing.T) {
 	}
 }
 
+func TestReleaseUpdaterRejectsUnsupportedPlatform(t *testing.T) {
+	updater := releaseUpdater{GOOS: "freebsd", GOARCH: "amd64"}
+	if err := updater.install(release{}); err == nil || !strings.Contains(err.Error(), "only Linux and macOS") {
+		t.Fatalf("unsupported update platform error = %v", err)
+	}
+}
+
 func TestNewerVersion(t *testing.T) {
 	for _, test := range []struct {
 		current, candidate string

@@ -34,7 +34,10 @@ const (
 	defaultScoreTimeoutSeconds = 120
 )
 
-var identifierPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
+var (
+	identifierPattern    = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
+	environmentIDPattern = regexp.MustCompile(`\A(?:[^\s@]+@)?sha256:[a-f0-9]{64}\z`)
+)
 
 // Spec is the fixed evaluation contract: task, model budget, tool policy, and
 // verifier. Callers must use a unique RunID for every attempt so reports never
@@ -323,6 +326,15 @@ func ValidateRunID(runID string) error {
 	}
 	if !validIdentifier(runID) {
 		return fmt.Errorf("invalid eval run_id %q", runID)
+	}
+	return nil
+}
+
+// ValidateEnvironmentID requires a content-addressed container identity for a
+// live suite. A mutable image tag does not establish a reproducible runtime.
+func ValidateEnvironmentID(environmentID string) error {
+	if !environmentIDPattern.MatchString(strings.TrimSpace(environmentID)) {
+		return errors.New("eval environment_id must be an OCI-style sha256 digest")
 	}
 	return nil
 }

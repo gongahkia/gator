@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 )
 
 // These values are set for release builds with -ldflags. Development builds
@@ -56,8 +57,8 @@ Usage:
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
-  gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
-  gator eval suite DIR [--run-id ID] [--report-dir DIR] --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
+  gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]
+  gator eval suite DIR [--run-id ID] [--report-dir DIR] [--attempts N] --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
   gator transcript RUN_RECORD_PATH > transcript.html
   gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
   gator export RUN_RECORD_PATH
@@ -102,6 +103,9 @@ func main() {
 }
 
 func run(args []string, out io.Writer) error {
+	if !supportedPlatform(runtime.GOOS) {
+		return fmt.Errorf("Gator supports only Linux and macOS; %s is not supported", runtime.GOOS)
+	}
 	if len(args) == 0 || args[0] == "tui" {
 		return interactive()
 	}
@@ -182,4 +186,8 @@ func run(args []string, out io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q; run 'gator help'", args[0])
 	}
+}
+
+func supportedPlatform(goos string) bool {
+	return goos == "linux" || goos == "darwin"
 }
