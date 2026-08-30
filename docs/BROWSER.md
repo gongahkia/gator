@@ -1,70 +1,107 @@
-# Bounded document browser
+# Local controlled browser sessions
 
-Gator's native browser tools are a deliberately small HTTPS document
-automation surface. They are available only in Execute mode when the developer
-has granted network access:
+Gator can control a real local Chromium session for browser-based development
+and visual verification. It is not a hosted browser, a remote executor, or a
+general computer-use surface. A browser is available to an agent only when the
+developer explicitly starts or attaches a local session, selects specific tabs,
+and grants that session to one Execute-mode run with `--network allow`.
 
-- `browser_navigate` loads one approved public HTTPS main document.
-- `browser_snapshot` returns bounded normalized visible text and stable
-  `link-N` / `form-N` references from the current document.
-- `browser_extract` filters text, links, or forms without a network request.
-- `browser_act` follows one link or submits one GET/POST form after a fresh
-  destination-and-method approval.
+## Setup and lifecycle
 
-A narrowing profile or role may omit `browser` while retaining `http_fetch`
-and `web_search`. Omitting `http` removes the complete native web surface.
+Install the pinned Playwright package and Chromium explicitly. Gator never
+downloads a browser while starting a run or opening the TUI:
 
-This is not Chromium, WebKit, computer use, or an authenticated browser profile.
-There is one ephemeral in-memory document per run. Gator does not execute
-JavaScript, load images/styles/scripts or other subresources, register service
-workers, open WebSockets/popups/tabs, follow redirects, use cookies, download
-files, persist storage, take screenshots, or expose arbitrary selectors/DOM
-evaluation.
+```sh
+gator browser install
+gator browser start --visual-capture
+gator browser origins SESSION_ID add http://127.0.0.1:3000
+gator run --network allow --browser-session SESSION_ID --verify 'go test ./...' 'Test the local UI flow'
+```
 
-## Network boundary
+`browser start` creates a headed Chromium window by default with a new,
+temporary profile. It selects its one fresh tab automatically. `--headed=false`
+is useful for local CI or a container that already has Chromium dependencies.
 
-Every transition uses the same transport as `http_fetch`:
+To use an existing Chromium-family browser, start it yourself with a literal
+loopback remote-debugging address, then attach and select tabs deliberately:
 
-1. Parse only `https` URLs without userinfo and with port 443.
-2. Resolve the destination immediately before the request.
-3. Reject the entire DNS answer set if any address is local, private,
-   link-local, reserved, documentation, multicast, or otherwise non-public.
-4. Disable environment proxies and pin the connection dialer to the approved
-   host and resolved addresses.
-5. Do not follow redirects. A redirect is returned as untrusted data and does
-   not replace the current document.
+```sh
+gator browser attach --cdp http://127.0.0.1:9222
+gator browser tabs SESSION_ID
+gator browser select SESSION_ID TAB_ID [TAB_ID...]
+```
 
-Because the document browser never loads subresources or executes script, a
-page cannot create a second hidden request. This narrower design avoids the
-request-interception gaps that full browser engines must close. If Gator later
-adds Playwright/Chromium, every request type—including frames, fetch/XHR,
-images, scripts, WebSockets, and popups—must pass equivalent destination
-validation, and service workers must be blocked. Playwright documents that
-context routing does not see service-worker-intercepted requests unless service
-workers are disabled:
-<https://playwright.dev/docs/api/class-browsercontext#browser-context-route>.
+Attached sessions never expose candidate tabs to the model. The CLI lists them
+only for the developer; agent tools can see only selected tabs. `gator browser
+stop SESSION_ID` closes a managed browser, disconnects an attached browser, and
+revokes the local token. The TUI exposes the same operations with `/browser`:
+`start`, `attach`, `tabs`, `select`, `use`, `origins`, `visual`, `upload`,
+`artifacts`, `stop`, and `none`.
 
-## Approval and action boundary
+## Agent surface and consent
 
-Approval identity is the exact HTTP method plus canonical destination. Browser
-allow-always memory is run-local and separate from local-command memory.
-Approval events never include form values.
+With a granted session, Execute-mode native runs receive selected-tab tools:
 
-Forms expose field names and types, not values from the page. The model must
-supply every submitted value explicitly. Password and file fields are refused,
-request bodies are bounded, and methods other than GET/POST are unsupported.
-This prevents the browser from becoming a credential extractor or arbitrary
-HTTP client. POST is still potentially destructive; the developer must inspect
-the method and destination in the approval prompt.
+- `browser_tabs`, `browser_snapshot`, and `browser_screenshot` read selected
+  browser state. Screenshots need a separate session-level visual-capture
+  grant and become bounded untrusted image observations for vision-capable
+  providers; text-only models cannot request them.
+- `browser_navigate`, `browser_click`, `browser_fill`, `browser_select`, and
+  `browser_press` are remote mutations. Each uses a fresh developer approval;
+  an “allow always” response is intentionally not remembered for browser
+  actions.
+- `browser_download` requires its own approval and writes only to Gator's
+  private session artifact directory. Ordinary clicks reject downloads.
+- `browser_upload` requires both a current approval and a file previously
+  registered by the developer with `gator browser allow-upload`. Models use an
+  opaque upload ID, never a local path.
 
-## Bounds and untrusted content
+Tools operate on short-lived element references from the latest accessibility
+snapshot. Gator does not expose raw selectors, DOM evaluation, cookies,
+storage, CDP endpoints, clipboard operations, browser permissions, extension
+control, or arbitrary filesystem paths. Password, passkey, username,
+one-time-code, autocomplete-sensitive, and file inputs cannot be filled by an
+agent. Use the headed managed window to log in or take over manually.
 
-Browser traffic shares the eight-request web budget with `http_fetch` and
-`web_search`. Responses use the configured 256 KiB default / 512 KiB maximum
-body limit. Snapshot visible text is capped at 32 KiB and link/form metadata at
-24 KiB; references and labels have independent limits. Parsed page text, link
-labels, URLs, and form metadata are untrusted data, never instructions.
+## Network and profile boundary
 
-The state is in memory only and disappears when the run ends. There is no
-restart recovery because there are no credentials, cookies, or browser
-processes to recover.
+Every session begins with no permitted origins. The developer adds exact
+origins through the CLI or TUI. Public origins are HTTPS on port 443;
+`localhost`, `127.0.0.1`, and `::1` may use HTTP or HTTPS on an explicitly
+approved port. Localhost is resolved before approval and must resolve only to
+loopback; other private, link-local, multicast, file, data, and credentialed
+URLs are rejected.
+
+The managed browser blocks service workers and routes navigation, redirects,
+frames, scripts, images, fetch/XHR, and WebSockets through the same exact
+origin policy. It closes popups and rejects unapproved downloads. This follows
+Playwright's documented routing model and its service-worker caveat:
+[network interception](https://playwright.dev/docs/network) and
+[service workers](https://playwright.dev/docs/service-workers).
+
+An attached browser is inherently less isolated: it uses the user's existing
+Chromium profile and existing service workers cannot be disabled without
+changing that profile. Gator applies selected-page routing and never exposes
+unselected tabs, but an attached session is appropriate only for a browser
+profile and origins the developer is willing to share. Managed temporary
+sessions are the recommended authenticated or sensitive workflow.
+
+Managed profile state (cookies, cache, storage, credentials, and temporary
+downloads) is removed when the session stops. Gator never exports attached or
+managed cookies/storage. Screenshot and download artifacts are local `0600`
+files; session journals contain only normal tool-result metadata, not raw image
+bytes, cookies, request headers, request bodies, CDP endpoints, or tokens.
+
+## Runtime and limits
+
+The runtime lockfile pins Playwright 1.56.1 and its Chromium revision under
+Gator's private state directory. Installation requires locally installed Node
+18+ and npm; it uses the checked-in lockfile and Playwright's explicit Chromium
+installer. Gator does not currently bundle Node in release archives.
+
+Snapshots are bounded to 32 KiB of visible text and 128 visible actionable
+elements. Screenshot observations are bounded to 2 MiB PNG; retained local
+browser artifacts and downloads are capped at 8 MiB each, while registered
+uploads are capped at 128 MiB. These bounds are enforcement limits, not a
+claim that browser page content is safe: all page text, accessibility labels,
+console-visible output, and screenshots are untrusted input to a model.

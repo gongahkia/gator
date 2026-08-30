@@ -10,6 +10,7 @@ let context;
 let managed = false;
 let origins = new Set();
 let tabSequence = 0;
+let managedPolicyApplied = false;
 const pageIDs = new WeakMap();
 const pages = new Map();
 const refs = new Map();
@@ -43,6 +44,25 @@ function allowedURL(value) {
 }
 
 async function applyPolicy(page) {
+  if (managed && !managedPolicyApplied) {
+    managedPolicyApplied = true;
+    await context.route('**/*', async route => {
+      if (allowedURL(route.request().url())) return route.continue();
+      return route.abort('blockedbyclient');
+    });
+    if (typeof context.routeWebSocket === 'function') {
+      await context.routeWebSocket('**/*', async route => {
+        if (!allowedURL(route.url())) return route.close();
+        return route.connectToServer();
+      });
+    }
+    // Managed contexts begin with only Gator's initial page. Any new page is
+    // a popup, and is immediately closed rather than becoming agent-visible.
+    context.on('page', candidate => {
+      if (candidate !== page) void candidate.close();
+    });
+    return;
+  }
   if (page.__gatorPolicyApplied) return;
   page.__gatorPolicyApplied = true;
   await page.route('**/*', async route => {
@@ -177,7 +197,19 @@ async function dispatch(method, params = {}) {
       const page = pageFor(params.tab_id);
       await applyPolicy(page);
       const locator = locatorFor(params.tab_id, params.ref);
-      await locator.click({ timeout: 10000 });
+      let unexpectedDownload;
+      const rejectDownload = download => {
+        unexpectedDownload = download;
+        void download.cancel();
+      };
+      page.on('download', rejectDownload);
+      try {
+        await locator.click({ timeout: 10000 });
+        await page.waitForTimeout(100);
+      } finally {
+        page.off('download', rejectDownload);
+      }
+      if (unexpectedDownload) fail('browser click triggered a download; use browser_download so the developer can approve it explicitly');
       return snapshot(params.tab_id);
     }
     case 'fill': {
