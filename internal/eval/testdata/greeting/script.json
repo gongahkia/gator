@@ -1,0 +1,29 @@
+[
+  {
+    "tool_calls": [
+      {
+        "id": "patch",
+        "name": "apply_patch",
+        "arguments": {
+          "patch": "diff --git a/greeting.go b/greeting.go\nnew file mode 100644\n--- /dev/null\n+++ b/greeting.go\n@@ -0,0 +1,5 @@\n+package feature\n+\n+func Greeting(name string) string {\n+\treturn \"Hello, \" + name\n+}\ndiff --git a/greeting_test.go b/greeting_test.go\nnew file mode 100644\n--- /dev/null\n+++ b/greeting_test.go\n@@ -0,0 +1,9 @@\n+package feature\n+\n+import \"testing\"\n+\n+func TestGreeting(t *testing.T) {\n+\tif got := Greeting(\"Ada\"); got != \"Hello, Ada\" {\n+\t\tt.Fatalf(\"Greeting() = %q\", got)\n+\t}\n+}\n"
+        }
+      }
+    ]
+  },
+  {
+    "tool_calls": [
+      {"id": "status", "name": "git_status", "arguments": {}}
+    ]
+  },
+  {
+    "tool_calls": [
+      {"id": "diff", "name": "git_diff", "arguments": {}}
+    ]
+  },
+  {
+    "tool_calls": [
+      {"id": "test", "name": "run_command", "arguments": {"argv": ["go", "test", "./..."]}}
+    ]
+  },
+  {"text": "Added Greeting with its focused test."}
+]

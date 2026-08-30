@@ -13,11 +13,11 @@ tests, and propose the resulting patch.
 
 The runnable milestone includes a Gator-owned native loop, direct cloud-provider
 adapters, worktree-local tools, command policy, durable local run storage, a
-full-screen terminal application, an automation protocol, and an offline
-evaluation harness. See [release evidence](docs/RELEASE_EVIDENCE.md) for the
-automated checks and dogfood checklist. No GitHub release has been published
-yet; real-repository dogfood logs are still the human gate for a daily-driver
-claim.
+full-screen terminal application, an automation protocol, and a headless
+evaluation harness. See [evaluation](docs/EVALUATION.md) and [release
+evidence](docs/RELEASE_EVIDENCE.md) for its limits, the automated checks, and
+the dogfood checklist. No GitHub release has been published yet; real-repository
+dogfood logs are still the human gate for a daily-driver claim.
 
 ## Install and update
 
@@ -51,8 +51,15 @@ make build
 ./bin/gator help
 ./bin/gator doctor
 ./bin/gator version
-# Offline evaluation: unique --run-id per attempt. See docs/RELEASE_EVIDENCE.md.
-# ./bin/gator eval ./internal/eval/testdata/greeting --script ./path/to/script.json
+# Offline evaluation exercises harness mechanics only.
+./bin/gator eval ./internal/eval/testdata/greeting --run-id greeting-script-001 \
+  --report /tmp/gator-eval/greeting-script-001.json --require-resolved
+
+# Real-model evaluation is noninteractive and writes a per-case suite report.
+# See docs/EVALUATION.md for safe container execution and evidence criteria.
+OPENAI_API_KEY=... ./bin/gator eval suite ./internal/eval/testdata \
+  --live --provider openai --model gpt-5.6 \
+  --report-dir /tmp/gator-eval/live-001 --require-resolved
 ./bin/gator config set default-provider anthropic
 ./bin/gator config set default-model claude-sonnet-4-6
 OPENAI_API_KEY=... ./bin/gator run --provider openai --verify 'go test ./...' \

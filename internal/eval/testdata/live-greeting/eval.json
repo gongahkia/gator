@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "live-greeting-feature",
+  "task": "Add a Greeting function with a focused test that Greeting(\"Ada\") returns Hello, Ada. Do not modify the active checkout; Gator uses an isolated worktree.",
+  "max_steps": 8,
+  "timeout_seconds": 120,
+  "verify": [["go", "test", "./..."]],
+  "sandbox": "strict",
+  "network": "deny",
+  "repository": "repository",
+  "allowed_command_prefixes": [["go", "test"]]
+}

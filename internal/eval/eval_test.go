@@ -26,6 +26,27 @@ func TestLoadSpecReadsCheckedInGreetingFixture(t *testing.T) {
 	}
 }
 
+func TestLoadCheckedInLiveSmokeSuite(t *testing.T) {
+	suite, err := LoadSuite("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suite.ID != "gator-live-smoke" || len(suite.Cases) != 1 {
+		t.Fatalf("suite = %#v", suite)
+	}
+	spec, err := LoadSpec("testdata/live-greeting")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Sandbox != "strict" || len(spec.AllowedCommandPrefixes) != 1 {
+		t.Fatalf("live smoke spec = %#v", spec)
+	}
+	turns, err := LoadScript("testdata/greeting")
+	if err != nil || len(turns) != 5 {
+		t.Fatalf("offline fixture script = %#v, %v", turns, err)
+	}
+}
+
 func TestLoadSpecRejectsIncompleteContracts(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.WriteFile(filepath.Join(directory, "eval.json"), []byte(`{"version":1,"id":"x"}`), 0o600); err != nil {
@@ -33,6 +54,22 @@ func TestLoadSpecRejectsIncompleteContracts(t *testing.T) {
 	}
 	if _, err := LoadSpec(directory); err == nil {
 		t.Fatal("incomplete spec was accepted")
+	}
+}
+
+func TestLoadSpecRejectsUnsafeHeadlessPolicy(t *testing.T) {
+	tests := []string{
+		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"repository":"../outside"}`,
+		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"allowed_command_prefixes":[["sh"]]}`,
+	}
+	for _, contents := range tests {
+		directory := t.TempDir()
+		if err := os.WriteFile(filepath.Join(directory, "eval.json"), []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadSpec(directory); err == nil {
+			t.Fatalf("unsafe spec was accepted: %s", contents)
+		}
 	}
 }
 
@@ -47,6 +84,10 @@ func TestRunRecordsResolvedOfflineEvaluation(t *testing.T) {
 		Verify:         [][]string{{"go", "test", "./..."}},
 		Sandbox:        "off",
 		Network:        "deny",
+		Scopes:         []string{"."},
+		AllowedCommands: [][]string{{"go", "env", "GOMOD"}},
+		AllowedCommandPrefixes: [][]string{{"go", "test"}},
+		Setup:          [][]string{{"go", "version"}},
 	}
 	model := &scriptedModel{turns: greetingTurns(t)}
 	report, err := Run(context.Background(), Options{
@@ -61,8 +102,11 @@ func TestRunRecordsResolvedOfflineEvaluation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run eval: %v", err)
 	}
-	if report.Status != "resolved" || report.Steps != 5 || report.Error != "" || report.StatePath == "" {
+	if report.Status != "resolved" || report.Steps != 6 || report.Error != "" || report.StatePath == "" {
 		t.Fatalf("report = %#v", report)
+	}
+	if len(report.AllowedCommands) != 1 || len(report.AllowedCommandPrefixes) != 1 || len(report.Setup) != 1 || len(report.Scopes) != 1 {
+		t.Fatalf("report did not retain evaluation policy: %#v", report)
 	}
 	if _, err := os.Stat(filepath.Join(report.WorktreePath, "greeting.go")); err != nil {
 		t.Fatalf("evaluated worktree missing greeting.go: %v", err)
@@ -121,6 +165,68 @@ func TestWriteReportOmitsSecretsAndRequiresRunID(t *testing.T) {
 	if err := json.Unmarshal(contents, &decoded); err != nil || decoded.RunID != "eval-greeting-001" {
 		t.Fatalf("report = %s, %v", contents, err)
 	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("report mode = %o, want 600", info.Mode().Perm())
+	}
+}
+
+func TestPrepareRepositoryCreatesFreshGitBaseline(t *testing.T) {
+	source := greetingRepository(t)
+	repository, err := PrepareRepository(context.Background(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository == source {
+		t.Fatal("prepared repository reused fixture source")
+	}
+	if output := gitOutput(t, repository, "status", "--porcelain"); output != "" {
+		t.Fatalf("prepared baseline is dirty: %q", output)
+	}
+	if output := gitOutput(t, repository, "log", "-1", "--format=%s"); output != "gator evaluation baseline" {
+		t.Fatalf("prepared baseline commit = %q", output)
+	}
+	if err := os.WriteFile(filepath.Join(repository, "changed.txt"), []byte("isolated\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(source, "changed.txt")); !os.IsNotExist(err) {
+		t.Fatalf("prepared repository changed source fixture: %v", err)
+	}
+}
+
+func TestCopyRepositoryRejectsSymlinks(t *testing.T) {
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "file.txt"), []byte("fixture\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("file.txt", filepath.Join(source, "link.txt")); err != nil {
+		t.Skipf("create symlink: %v", err)
+	}
+	if err := CopyRepository(source, filepath.Join(t.TempDir(), "copy")); err == nil {
+		t.Fatal("copy accepted a fixture symlink")
+	}
+}
+
+func TestLoadAndSummarizeSuite(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "suite.json"), []byte(`{"version":1,"id":"smoke","cases":["feature","bug"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	suite, err := LoadSuite(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
+	report := SummarizeSuite(suite, "smoke-001", "openai", "test-model", started, started.Add(time.Second), []Report{{Status: "resolved"}, {Status: "unresolved"}, {Status: "error"}})
+	if report.Status != "error" || report.Resolved != 1 || report.Unresolved != 1 || report.Errors != 1 || report.Duration != time.Second {
+		t.Fatalf("suite report = %#v", report)
+	}
+	if err := WriteSuiteReport(filepath.Join(directory, "reports", "suite.json"), report); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func greetingRepository(t *testing.T) string {
@@ -174,6 +280,7 @@ func greetingTurns(t *testing.T) []agent.Turn {
 		t.Fatal(err)
 	}
 	return []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "inspect-module", Name: "run_command", Arguments: json.RawMessage(`{"argv":["go","env","GOMOD"]}`)}}},
 		{ToolCalls: []agent.ToolCall{{ID: "patch", Name: "apply_patch", Arguments: encoded}}},
 		{ToolCalls: []agent.ToolCall{{ID: "status", Name: "git_status", Arguments: json.RawMessage(`{}`)}}},
 		{ToolCalls: []agent.ToolCall{{ID: "diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)}}},
@@ -189,6 +296,17 @@ func runGit(t *testing.T, directory string, arguments ...string) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), err, output)
 	}
+}
+
+func gitOutput(t *testing.T, directory string, arguments ...string) string {
+	t.Helper()
+	command := exec.Command("git", arguments...)
+	command.Dir = directory
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s: %v: %s", strings.Join(arguments, " "), err, output)
+	}
+	return strings.TrimSpace(string(output))
 }
 
 type scriptedModel struct {

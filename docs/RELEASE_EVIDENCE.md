@@ -16,18 +16,23 @@ work. It is not a SWE-bench submission and not a claim of model quality.
 - context compaction that summarizes only older history, rejects tool-calling
   summaries, and fail-closes without returning partial history
 
-Offline evaluation:
+Evaluation runner checks:
 
 ```sh
 go test ./internal/eval
-gator eval DIR --run-id UNIQUE_ID --script DIR/script.json --report DIR/reports/UNIQUE_ID.json
+gator eval DIR --run-id UNIQUE_ID --script DIR/script.json --report DIR/reports/UNIQUE_ID.json --require-resolved
+gator eval suite DIR --live --provider PROVIDER --model MODEL --report-dir DIR/reports/UNIQUE_ID --require-resolved
 ```
 
 Use a new `--run-id` for every attempt. Reusing an id against a previous
 report file invites cached conclusions; the harness always executes, but
 humans comparing reports will mix attempts if ids collide.
 
-`--live` uses the configured provider. It writes no API keys into the report.
+The offline form is a deterministic harness regression only. The suite form
+requires `--live` because it is reserved for model-quality evidence. `--live`
+accepts explicit provider, model, and base-URL overrides and writes no API keys
+into the report. See [headless evaluation](EVALUATION.md) for fixture policy,
+container operation, and the evidence threshold.
 
 ## Evaluation report
 
@@ -43,13 +48,16 @@ Each report is `0600` JSON with:
 | `max_steps` / `steps` | Budget and actual turns |
 | `timeout_seconds` | Wall-clock cap |
 | `verify` | Exact argv list that had to pass |
-| `sandbox` / `network` | Effective execution policy |
+| `sandbox` / `network` | Requested fixture execution policy |
+| `base_commit` | Fresh baseline commit created from the copied fixture |
+| `scopes` / command policy / `setup` | Fixed evaluation authority; do not put secrets in these fields |
 | `duration_ns` | Wall time |
 | `error` | Failure text, never credentials |
 | `state_path` / `worktree_path` | Local artifacts for review |
 
 A resolved report is evidence for that fixture, model, policy, budget, and
-time limit only.
+time limit only. It does not make a competitive or agent-quality claim without
+a defined corpus and live results.
 
 ## Dogfood checklist
 
