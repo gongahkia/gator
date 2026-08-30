@@ -18,7 +18,7 @@ type Controller interface {
 	Click(context.Context, string, string, string) (Snapshot, error)
 	Fill(context.Context, string, string, string, string) (Snapshot, error)
 	Select(context.Context, string, string, string, string) (Snapshot, error)
-	Press(context.Context, string, string, string, string) (Snapshot, error)
+	Press(context.Context, string, string, string) (Snapshot, error)
 	Download(context.Context, string, string, string) (Artifact, error)
 	Upload(context.Context, string, string, string, string) (Snapshot, error)
 }
@@ -38,10 +38,10 @@ type Snapshot struct {
 // Element describes one actionable visible element. It intentionally contains
 // no CSS/XPath selector, DOM HTML, field value, or hidden accessibility data.
 type Element struct {
-	Ref      string `json:"ref"`
-	Role     string `json:"role"`
-	Name     string `json:"name,omitempty"`
-	Disabled bool   `json:"disabled,omitempty"`
+	Ref       string `json:"ref"`
+	Role      string `json:"role"`
+	Name      string `json:"name,omitempty"`
+	Disabled  bool   `json:"disabled,omitempty"`
 	Sensitive bool   `json:"sensitive,omitempty"`
 }
 
@@ -59,7 +59,9 @@ var ErrUnavailable = errors.New("browser session controller is unavailable; star
 // controller.
 type UnavailableController struct{}
 
-func (UnavailableController) Session(context.Context, string) (Session, error) { return Session{}, ErrUnavailable }
+func (UnavailableController) Session(context.Context, string) (Session, error) {
+	return Session{}, ErrUnavailable
+}
 func (UnavailableController) Tabs(context.Context, string) ([]Tab, error) { return nil, ErrUnavailable }
 func (UnavailableController) Snapshot(context.Context, string, string) (Snapshot, error) {
 	return Snapshot{}, ErrUnavailable
@@ -79,7 +81,7 @@ func (UnavailableController) Fill(context.Context, string, string, string, strin
 func (UnavailableController) Select(context.Context, string, string, string, string) (Snapshot, error) {
 	return Snapshot{}, ErrUnavailable
 }
-func (UnavailableController) Press(context.Context, string, string, string, string) (Snapshot, error) {
+func (UnavailableController) Press(context.Context, string, string, string) (Snapshot, error) {
 	return Snapshot{}, ErrUnavailable
 }
 func (UnavailableController) Download(context.Context, string, string, string) (Artifact, error) {

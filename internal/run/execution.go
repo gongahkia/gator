@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/instructions"
@@ -312,6 +313,17 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 				webTools = filterBrowserTools(webTools)
 			}
 			runTools = append(runTools, webTools...)
+		}
+		if request.BrowserSession != "" && !profilePolicy.HasOmit(instructions.OmitBrowser) {
+			controller := e.Browser
+			if controller == nil {
+				controller = browser.UnavailableController{}
+			}
+			runTools = append(runTools, tools.BrowserSessionTools(tools.BrowserSessionOptions{
+				SessionID:  request.BrowserSession,
+				Controller: controller,
+				Policy:     commandPolicy,
+			})...)
 		}
 		if !profilePolicy.HasOmit(instructions.OmitDelegateReadOnly) {
 			runTools = append(runTools, readonlyScout)

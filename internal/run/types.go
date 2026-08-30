@@ -6,6 +6,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/extension"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/instructions"
@@ -91,7 +92,10 @@ type Request struct {
 	RolePolicy  instructions.ProfilePolicy
 	Images      []agent.Image
 	Attachments []agent.Attachment
-	Mode        Mode
+	// BrowserSession names an explicit developer-selected local browser
+	// session. It is empty unless the user grants that capability to this run.
+	BrowserSession string
+	Mode           Mode
 }
 
 // Mode controls the native agent tool surface for a turn. Plan mode is
@@ -139,6 +143,9 @@ type Executor struct {
 	MCPCredentials auth.Store
 	// HTTP supplies the bounded native web-research transport. It is normally
 	// zero-valued; tests may inject a deterministic client or resolver.
-	HTTP    tools.HTTPFetchOptions
+	HTTP tools.HTTPFetchOptions
+	// Browser is a private local browser-session controller. A nil controller
+	// fails closed when a request names BrowserSession.
+	Browser browser.Controller
 	Sandbox sandbox.Policy
 }
