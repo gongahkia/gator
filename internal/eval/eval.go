@@ -5,7 +5,9 @@ package eval
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -20,12 +22,16 @@ import (
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 const (
 	specVersion   = 1
 	suiteVersion  = 1
+	reportVersion = 2
 	maxSuiteCases = 64
+	maxScoreCommands = 8
+	defaultScoreTimeoutSeconds = 120
 )
 
 var identifierPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
@@ -54,13 +60,24 @@ type Spec struct {
 	// Setup contains trusted fixture-author commands that run once before the
 	// agent starts. It is never model supplied.
 	Setup [][]string `json:"setup,omitempty"`
+	// Score contains trusted, post-run oracle commands. They are never exposed
+	// to the model. {{fixture}} and {{worktree}} expand only for the scorer.
+	Score               [][]string `json:"score,omitempty"`
+	ScoreTimeoutSeconds int        `json:"score_timeout_seconds,omitempty"`
+	// Labels let suites publish stratified results without inferring categories
+	// from an issue title after the fact.
+	Labels []string `json:"labels,omitempty"`
 }
 
 // Report is the durable outcome of one evaluation attempt.
 type Report struct {
+	Version                int           `json:"version"`
 	ID                     string        `json:"id"`
 	RunID                  string        `json:"run_id"`
+	SuiteID                string        `json:"suite_id,omitempty"`
+	Attempt                int           `json:"attempt,omitempty"`
 	Status                 string        `json:"status"`
+	AgentStatus            string        `json:"agent_status"`
 	Task                   string        `json:"task"`
 	Provider               string        `json:"provider"`
 	Model                  string        `json:"model"`
@@ -71,16 +88,35 @@ type Report struct {
 	Sandbox                string        `json:"sandbox"`
 	Network                string        `json:"network"`
 	BaseCommit             string        `json:"base_commit,omitempty"`
+	FixtureSHA256          string        `json:"fixture_sha256,omitempty"`
+	HarnessVersion         string        `json:"harness_version,omitempty"`
+	HarnessCommit          string        `json:"harness_commit,omitempty"`
+	EnvironmentID          string        `json:"environment_id,omitempty"`
+	ProviderEndpointSHA256 string        `json:"provider_endpoint_sha256,omitempty"`
 	Scopes                 []string      `json:"scopes,omitempty"`
 	AllowedCommands        [][]string    `json:"allowed_commands,omitempty"`
 	AllowedCommandPrefixes [][]string    `json:"allowed_command_prefixes,omitempty"`
 	Setup                  [][]string    `json:"setup,omitempty"`
+	Score                  [][]string    `json:"score,omitempty"`
+	ScoreStatus            string        `json:"score_status"`
+	ScoreResults           []CheckResult `json:"score_results,omitempty"`
+	Labels                 []string      `json:"labels,omitempty"`
 	Duration               time.Duration `json:"duration_ns"`
 	Error                  string        `json:"error,omitempty"`
 	FinalText              string        `json:"final_text,omitempty"`
 	StatePath              string        `json:"state_path,omitempty"`
 	WorktreePath           string        `json:"worktree_path,omitempty"`
 	StartedAt              time.Time     `json:"started_at"`
+}
+
+// CheckResult is bounded post-run scoring evidence. Its output is retained
+// because a failing oracle without its diagnostic is not independently useful.
+type CheckResult struct {
+	Argv      []string `json:"argv"`
+	ExitCode  int      `json:"exit_code"`
+	Output    string   `json:"output,omitempty"`
+	Truncated bool     `json:"truncated,omitempty"`
+	TimedOut  bool     `json:"timed_out,omitempty"`
 }
 
 // Suite is a versioned, serial collection of fixture-relative case
@@ -105,7 +141,27 @@ type SuiteReport struct {
 	Resolved   int           `json:"resolved"`
 	Unresolved int           `json:"unresolved"`
 	Errors     int           `json:"errors"`
+	ScorePassed int           `json:"score_passed"`
+	ScoreFailed int           `json:"score_failed"`
+	ScoreErrors int           `json:"score_errors"`
+	Unscored    int           `json:"unscored"`
+	Attempts    int           `json:"attempts"`
 	Cases      []Report      `json:"cases"`
+	CaseSummaries []CaseSummary `json:"case_summaries"`
+}
+
+// CaseSummary aggregates repeated trials of one fixture without erasing the
+// attempt-level records needed to investigate model variance.
+type CaseSummary struct {
+	ID          string `json:"id"`
+	Attempts    int    `json:"attempts"`
+	Resolved    int    `json:"resolved"`
+	Unresolved  int    `json:"unresolved"`
+	Errors      int    `json:"errors"`
+	ScorePassed int    `json:"score_passed"`
+	ScoreFailed int    `json:"score_failed"`
+	ScoreErrors int    `json:"score_errors"`
+	Unscored    int    `json:"unscored"`
 }
 
 // Options configures one evaluation. Model is required; live providers are
@@ -118,6 +174,14 @@ type Options struct {
 	StateDir   string
 	Repository string
 	Executor   gatorrun.Executor
+	FixturePath             string
+	FixtureSHA256           string
+	HarnessVersion          string
+	HarnessCommit           string
+	EnvironmentID           string
+	ProviderEndpoint        string
+	SuiteID                 string
+	Attempt                 int
 	Now        func() time.Time
 }
 
@@ -136,6 +200,9 @@ func LoadSpec(directory string) (Spec, error) {
 	}
 	if spec.TimeoutSeconds < 1 {
 		spec.TimeoutSeconds = 120
+	}
+	if len(spec.Score) > 0 && spec.ScoreTimeoutSeconds < 1 {
+		spec.ScoreTimeoutSeconds = defaultScoreTimeoutSeconds
 	}
 	if err := validateSpec(spec); err != nil {
 		return Spec{}, err
@@ -206,6 +273,17 @@ func CopyRepository(source, dest string) error {
 	return copyDir(source, dest)
 }
 
+// FixtureSHA256 returns a stable digest of every regular fixture file except
+// Git metadata. It gives results a content identity independent of the fresh
+// baseline commit that PrepareRepository creates for each attempt.
+func FixtureSHA256(directory string) (string, error) {
+	hash := sha256.New()
+	if err := digestFixtureDirectory(hash, directory, "."); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
 // PrepareRepository makes a private, freshly initialized Git baseline from a
 // read-only fixture tree. The returned path and its retained worktrees are
 // intentionally left for report-driven inspection; callers own later cleanup.
@@ -259,8 +337,11 @@ func Run(ctx context.Context, options Options) (Report, error) {
 	}
 	started := now()
 	report := Report{
+		Version:                reportVersion,
 		ID:                     options.Spec.ID,
 		RunID:                  options.RunID,
+		SuiteID:                options.SuiteID,
+		Attempt:                options.Attempt,
 		Task:                   options.Spec.Task,
 		Provider:               options.Provider,
 		Model:                  options.ModelName,
@@ -269,10 +350,18 @@ func Run(ctx context.Context, options Options) (Report, error) {
 		Verify:                 options.Spec.Verify,
 		Sandbox:                string(options.Executor.Sandbox.Normalize().Mode),
 		Network:                string(options.Executor.Sandbox.Normalize().Network),
+		FixtureSHA256:          options.FixtureSHA256,
+		HarnessVersion:         options.HarnessVersion,
+		HarnessCommit:          options.HarnessCommit,
+		EnvironmentID:          options.EnvironmentID,
+		ProviderEndpointSHA256: stringSHA256(options.ProviderEndpoint),
 		Scopes:                 cloneStrings(options.Spec.Scopes),
 		AllowedCommands:        cloneArgvLists(options.Spec.AllowedCommands),
 		AllowedCommandPrefixes: cloneArgvLists(options.Spec.AllowedCommandPrefixes),
 		Setup:                  cloneArgvLists(options.Spec.Setup),
+		Score:                  cloneArgvLists(options.Spec.Score),
+		ScoreStatus:            "not_requested",
+		Labels:                 cloneStrings(options.Spec.Labels),
 		StartedAt:              started,
 		Status:                 "error",
 	}
@@ -304,29 +393,141 @@ func Run(ctx context.Context, options Options) (Report, error) {
 		DisableWriterDelegation: true,
 		Mode:                    gatorrun.ExecuteMode,
 	})
-	report.Duration = now().Sub(started)
 	report.StatePath = outcome.StatePath
 	report.WorktreePath = outcome.Worktree.Path
 	report.BaseCommit = outcome.Worktree.BaseCommit
 	report.Steps = outcome.Result.Steps
 	report.FinalText = outcome.Result.FinalText
+	agentStatus := "resolved"
 	if err != nil {
 		report.Error = err.Error()
 		if runCtx.Err() != nil {
-			report.Status = "error"
+			agentStatus = "error"
 			report.Error = "eval exceeded timeout_seconds: " + err.Error()
 		} else {
-			report.Status = "unresolved"
+			agentStatus = "unresolved"
 		}
-		return report, nil
 	}
-	report.Status = "resolved"
+	report.AgentStatus = agentStatus
+	report.Status = agentStatus
+	if len(options.Spec.Score) > 0 {
+		if outcome.Worktree.Path == "" {
+			report.ScoreStatus = "error"
+			report.Status = "error"
+			report.Error = joinErrors(report.Error, "post-run scorer has no retained worktree")
+		} else {
+			results, scoreStatus, scoreErr := runScore(ctx, outcome.Worktree.Path, options.FixturePath, options.Spec)
+			report.ScoreResults = results
+			report.ScoreStatus = scoreStatus
+			if scoreErr != nil {
+				report.Status = "error"
+				report.Error = joinErrors(report.Error, "post-run scorer: "+scoreErr.Error())
+			} else if scoreStatus != "passed" && report.Status == "resolved" {
+				report.Status = "unresolved"
+				report.Error = joinErrors(report.Error, "post-run scorer did not pass")
+			}
+		}
+	}
+	report.Duration = now().Sub(started)
 	return report, nil
 }
 
 func PolicyFromSpec(spec Spec) sandbox.Policy {
 	policy := sandbox.Policy{Mode: sandbox.Mode(spec.Sandbox), Network: sandbox.Network(spec.Network)}
 	return policy.Normalize()
+}
+
+func runScore(ctx context.Context, worktreePath, fixturePath string, spec Spec) ([]CheckResult, string, error) {
+	if strings.TrimSpace(fixturePath) == "" {
+		return nil, "error", errors.New("eval scorer requires fixture_path")
+	}
+	fixture, err := filepath.Abs(fixturePath)
+	if err != nil {
+		return nil, "error", fmt.Errorf("resolve scorer fixture path: %w", err)
+	}
+	info, err := os.Stat(fixture)
+	if err != nil {
+		return nil, "error", fmt.Errorf("stat scorer fixture path: %w", err)
+	}
+	if !info.IsDir() {
+		return nil, "error", errors.New("eval scorer fixture path is not a directory")
+	}
+	root, err := workspace.Open(worktreePath)
+	if err != nil {
+		return nil, "error", fmt.Errorf("open scoring worktree: %w", err)
+	}
+	timeout := time.Duration(spec.ScoreTimeoutSeconds) * time.Second
+	scoreCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	policy := PolicyFromSpec(spec)
+	policy.ReadOnlyRoots = append(policy.ReadOnlyRoots, fixture)
+	results := make([]CheckResult, 0, len(spec.Score))
+	for _, command := range spec.Score {
+		argv, err := expandScoreCommand(command, fixture, root.Path())
+		if err != nil {
+			return results, "error", err
+		}
+		result, err := tools.RunDeveloperSetup(scoreCtx, root, tools.CommandPolicy{
+			Sandbox:        policy,
+			Timeout:        timeout,
+			MaxOutputBytes: 128 * 1024,
+		}, argv)
+		if err != nil {
+			return results, "error", err
+		}
+		results = append(results, CheckResult{
+			Argv:      append([]string(nil), result.Argv...),
+			ExitCode:  result.ExitCode,
+			Output:    result.Output,
+			Truncated: result.Truncated,
+			TimedOut:  result.TimedOut,
+		})
+		if result.TimedOut {
+			return results, "error", fmt.Errorf("scorer command timed out: %s", strings.Join(argv, " "))
+		}
+		if result.ExitCode != 0 {
+			return results, "failed", nil
+		}
+	}
+	return results, "passed", nil
+}
+
+func expandScoreCommand(command []string, fixture, worktree string) ([]string, error) {
+	result := make([]string, len(command))
+	for index, token := range command {
+		if err := validateScoreTemplate(token); err != nil {
+			return nil, err
+		}
+		token = strings.ReplaceAll(token, "{{fixture}}", fixture)
+		result[index] = strings.ReplaceAll(token, "{{worktree}}", worktree)
+	}
+	return result, nil
+}
+
+func validateScoreTemplate(token string) error {
+	remaining := strings.ReplaceAll(strings.ReplaceAll(token, "{{fixture}}", ""), "{{worktree}}", "")
+	if strings.Contains(remaining, "{{") || strings.Contains(remaining, "}}") {
+		return fmt.Errorf("eval scorer token %q has an unknown template", token)
+	}
+	return nil
+}
+
+func joinErrors(left, right string) string {
+	if strings.TrimSpace(left) == "" {
+		return right
+	}
+	if strings.TrimSpace(right) == "" {
+		return left
+	}
+	return left + "; " + right
+}
+
+func stringSHA256(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }
 
 func WriteReport(path string, report Report) error {
@@ -484,6 +685,27 @@ func validateSpec(spec Spec) error {
 	}
 	if err := validateArgvLists("setup", spec.Setup, 8); err != nil {
 		return err
+	}
+	if err := validateArgvLists("score", spec.Score, maxScoreCommands); err != nil {
+		return err
+	}
+	if len(spec.Score) == 0 && spec.ScoreTimeoutSeconds != 0 {
+		return errors.New("eval spec score_timeout_seconds requires score commands")
+	}
+	if len(spec.Score) > 0 && spec.ScoreTimeoutSeconds < 1 {
+		return errors.New("eval spec score_timeout_seconds must be positive")
+	}
+	for _, label := range spec.Labels {
+		if !validIdentifier(label) {
+			return fmt.Errorf("eval spec label %q must be a portable identifier", label)
+		}
+	}
+	for _, command := range spec.Score {
+		for _, token := range command {
+			if err := validateScoreTemplate(token); err != nil {
+				return err
+			}
+		}
 	}
 	for _, prefix := range spec.AllowedCommandPrefixes {
 		if err := tools.ValidateCommandPrefix(prefix); err != nil {
