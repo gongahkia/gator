@@ -92,7 +92,11 @@ func TestCoreSuiteOraclesDistinguishBaselineFromReferenceSolution(t *testing.T) 
 		if status != "failed" || len(results) != 1 || results[0].ExitCode == 0 {
 			t.Fatalf("baseline %s score = %#v, %q, want one failing oracle", fixtureName, results, status)
 		}
-		patch := exec.Command("git", "apply", filepath.Join(fixture, "oracle.patch"))
+		oraclePatch, err := filepath.Abs(filepath.Join(fixture, "oracle.patch"))
+		if err != nil {
+			t.Fatalf("resolve oracle %s: %v", fixtureName, err)
+		}
+		patch := exec.Command("git", "apply", oraclePatch)
 		patch.Dir = repository
 		output, err := patch.CombinedOutput()
 		if err != nil {
