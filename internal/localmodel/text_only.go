@@ -13,6 +13,10 @@ type TextOnlyModel struct {
 	Backend agent.Model
 }
 
+// SupportsVisualInput prevents a browser screenshot from reaching a locally
+// documented text-only model on its next turn.
+func (TextOnlyModel) SupportsVisualInput() bool { return false }
+
 // Complete implements agent.Model.
 func (m TextOnlyModel) Complete(ctx context.Context, request agent.TurnRequest) (agent.Turn, error) {
 	for _, message := range request.Messages {
