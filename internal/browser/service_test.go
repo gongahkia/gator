@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -67,6 +68,16 @@ func TestServiceAuthenticatesAndRestrictsControllerToSelectedTabs(t *testing.T) 
 	artifacts, err := client.Artifacts()
 	if err != nil || len(artifacts) != 1 || artifacts[0].Name != "screenshot.png" {
 		t.Fatalf("Artifacts = %#v, %v", artifacts, err)
+	}
+	exported := filepath.Join(t.TempDir(), "screenshot.png")
+	if err := client.ExportArtifact(artifacts[0].ID, exported); err != nil {
+		t.Fatalf("ExportArtifact: %v", err)
+	}
+	if contents, err := os.ReadFile(exported); err != nil || string(contents) != "png" {
+		t.Fatalf("exported artifact = %q, %v", contents, err)
+	}
+	if err := client.ExportArtifact(artifacts[0].ID, exported); err == nil {
+		t.Fatal("ExportArtifact overwrote an existing file")
 	}
 	if _, err := client.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop: %v", err)

@@ -102,7 +102,7 @@ func (driver *sidecar) Screenshot(ctx context.Context, tabID string) ([]byte, er
 		TabID string `json:"tab_id"`
 	}{tabID}, &result)
 	if err == nil && (len(result.PNG) == 0 || len(result.PNG) > 2*1024*1024) {
-		err = errors.New("browser screenshot must contain 1-2 MiB")
+		err = errors.New("browser screenshot must contain 1 byte-2 MiB")
 	}
 	return result.PNG, err
 }

@@ -138,6 +138,16 @@ func (m Model) browserCommand(arguments []string) (tea.Model, tea.Cmd) {
 		}
 		m.commandOutput = browserArtifactList(artifacts)
 		m.notice = notice{text: "Browser artifacts remain private local files.", kind: noticeInfo}
+	case "export":
+		if len(arguments) != 4 {
+			return m.browserUsage()
+		}
+		if err := m.config.Browser.ExportArtifact(arguments[1], arguments[2], arguments[3]); err != nil {
+			m.notice = notice{text: err.Error(), kind: noticeError}
+			return m, nil
+		}
+		m.commandOutput = "Exported browser artifact to " + arguments[3]
+		m.notice = notice{text: "Browser artifact exported to the developer-selected path.", kind: noticeSuccess}
 	case "stop":
 		if len(arguments) != 2 {
 			return m.browserUsage()
@@ -204,7 +214,7 @@ func (m Model) browserOrigins(arguments []string) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) browserUsage() (tea.Model, tea.Cmd) {
-	m.commandOutput = "Browser commands:\n  /browser status\n  /browser start [visual]\n  /browser attach http://127.0.0.1:PORT [visual]\n  /browser tabs SESSION\n  /browser select SESSION TAB_ID [TAB_ID...]\n  /browser use SESSION | /browser none\n  /browser origins SESSION list|add URL|remove URL\n  /browser visual SESSION on|off\n  /browser upload SESSION /absolute/file\n  /browser artifacts SESSION\n  /browser stop SESSION"
+	m.commandOutput = "Browser commands:\n  /browser status\n  /browser start [visual]\n  /browser attach http://127.0.0.1:PORT [visual]\n  /browser tabs SESSION\n  /browser select SESSION TAB_ID [TAB_ID...]\n  /browser use SESSION | /browser none\n  /browser origins SESSION list|add URL|remove URL\n  /browser visual SESSION on|off\n  /browser upload SESSION /absolute/file\n  /browser artifacts SESSION\n  /browser export SESSION ARTIFACT_ID /absolute/file\n  /browser stop SESSION"
 	m.notice = notice{text: "Browser sessions are local and explicit; all site mutations still need per-action approval.", kind: noticeInfo}
 	return m, nil
 }

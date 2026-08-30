@@ -156,6 +156,14 @@ func (backend *tuiBrowserBackend) Artifacts(sessionID string) ([]gatorbrowser.Ar
 	return client.Artifacts()
 }
 
+func (backend *tuiBrowserBackend) ExportArtifact(sessionID, artifactID, destination string) error {
+	client, err := backend.client(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.ExportArtifact(artifactID, destination)
+}
+
 func (backend *tuiBrowserBackend) Stop(sessionID string) (gatorbrowser.Session, error) {
 	client, err := backend.client(sessionID)
 	if err != nil {

@@ -46,7 +46,7 @@ Usage:
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
   gator local list|status|serve|pull|use|remove
-  gator browser install|status|start|attach|tabs|select|origins|visual|allow-upload|artifacts|stop
+  gator browser install|status|start|attach|tabs|select|origins|visual|allow-upload|artifacts|export|stop
   gator theme list
   gator theme set gator|contrast|mono
   gator connect PROVIDER [OPTIONS]

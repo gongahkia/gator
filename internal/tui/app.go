@@ -177,6 +177,7 @@ type BrowserBackend interface {
 	SetVisualCapture(sessionID string, allowed bool) (gatorbrowser.Session, error)
 	AllowUpload(sessionID, path string) (gatorbrowser.Upload, error)
 	Artifacts(sessionID string) ([]gatorbrowser.Artifact, error)
+	ExportArtifact(sessionID, artifactID, destination string) error
 	Stop(sessionID string) (gatorbrowser.Session, error)
 	Controller(sessionID string) (gatorbrowser.Controller, error)
 }
