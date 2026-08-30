@@ -47,6 +47,25 @@ func TestLoadCheckedInLiveSmokeSuite(t *testing.T) {
 	}
 }
 
+func TestLoadCheckedInCoreSuiteRequiresStrictHiddenScoring(t *testing.T) {
+	suite, err := LoadSuite("testdata/core-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if suite.ID != "gator-core-v1" || len(suite.Cases) != 4 {
+		t.Fatalf("suite = %#v", suite)
+	}
+	for _, fixture := range suite.Cases {
+		spec, err := LoadSpec(filepath.Join("testdata/core-v1", fixture))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if spec.Sandbox != string(sandbox.Strict) || len(spec.Score) == 0 || spec.ScoreTimeoutSeconds < 1 || len(spec.Labels) == 0 {
+			t.Fatalf("core spec %q is not a scored strict task: %#v", fixture, spec)
+		}
+	}
+}
+
 func TestLoadSpecRejectsIncompleteContracts(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.WriteFile(filepath.Join(directory, "eval.json"), []byte(`{"version":1,"id":"x"}`), 0o600); err != nil {
@@ -62,6 +81,7 @@ func TestLoadSpecRejectsUnsafeHeadlessPolicy(t *testing.T) {
 		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"repository":"../outside"}`,
 		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"allowed_command_prefixes":[["sh"]]}`,
 		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"scopes":["."]}`,
+		`{"version":1,"id":"x","task":"x","max_steps":1,"verify":[["true"]],"score":[["true","{{unknown}}"]]}`,
 	}
 	for _, contents := range tests {
 		directory := t.TempDir()
@@ -100,21 +120,23 @@ func TestRunRecordsResolvedOfflineEvaluation(t *testing.T) {
 		AllowedCommands:        [][]string{{"go", "env", "GOMOD"}},
 		AllowedCommandPrefixes: [][]string{{"go", "test"}},
 		Setup:                  [][]string{{"go", "version"}},
+		Score:                  [][]string{{"go", "version"}},
 	}
 	model := &scriptedModel{turns: greetingTurns(t)}
 	report, err := Run(context.Background(), Options{
-		Spec:       spec,
-		RunID:      "eval-greeting-001",
-		Provider:   "test",
-		ModelName:  "scripted",
-		StateDir:   t.TempDir(),
-		Repository: repository,
-		Executor:   gatorrun.Executor{Model: model, Sandbox: PolicyFromSpec(spec), Now: func() time.Time { return time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC) }},
+		Spec:        spec,
+		RunID:       "eval-greeting-001",
+		Provider:    "test",
+		ModelName:   "scripted",
+		StateDir:    t.TempDir(),
+		Repository:  repository,
+		FixturePath: t.TempDir(),
+		Executor:    gatorrun.Executor{Model: model, Sandbox: PolicyFromSpec(spec), Now: func() time.Time { return time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC) }},
 	})
 	if err != nil {
 		t.Fatalf("run eval: %v", err)
 	}
-	if report.Status != "resolved" || report.Steps != 6 || report.Error != "" || report.StatePath == "" {
+	if report.Status != "resolved" || report.AgentStatus != "resolved" || report.ScoreStatus != "passed" || len(report.ScoreResults) != 1 || report.Steps != 6 || report.Error != "" || report.StatePath == "" {
 		t.Fatalf("report = %#v", report)
 	}
 	if len(report.AllowedCommands) != 1 || len(report.AllowedCommandPrefixes) != 1 || len(report.Setup) != 1 || len(report.Scopes) != 1 {
@@ -125,6 +147,65 @@ func TestRunRecordsResolvedOfflineEvaluation(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repository, "greeting.go")); !os.IsNotExist(err) {
 		t.Fatalf("eval mutated the fixture checkout: %v", err)
+	}
+}
+
+func TestRunScoreFailureDowngradesResolvedAgentOutcome(t *testing.T) {
+	repository := greetingRepository(t)
+	fixture := t.TempDir()
+	spec := Spec{
+		Version:        1,
+		ID:             "score-failure",
+		Task:           "Add a Greeting feature with a focused test",
+		MaxSteps:       8,
+		TimeoutSeconds: 60,
+		Verify:         [][]string{{"go", "test", "./..."}},
+		Sandbox:        "off",
+		Score:          [][]string{{"go", "tool", "not-a-real-tool"}},
+	}
+	report, err := Run(context.Background(), Options{
+		Spec:        spec,
+		RunID:       "score-failure-001",
+		Provider:    "test",
+		ModelName:   "scripted",
+		StateDir:    t.TempDir(),
+		Repository:  repository,
+		FixturePath: fixture,
+		Executor:    gatorrun.Executor{Model: &scriptedModel{turns: greetingTurns(t)}, Sandbox: PolicyFromSpec(spec)},
+	})
+	if err != nil {
+		t.Fatalf("run eval: %v", err)
+	}
+	if report.AgentStatus != "resolved" || report.Status != "unresolved" || report.ScoreStatus != "failed" || len(report.ScoreResults) != 1 {
+		t.Fatalf("scored report = %#v", report)
+	}
+}
+
+func TestFixtureSHA256ChangesOnlyWhenFixtureContentChanges(t *testing.T) {
+	fixture := t.TempDir()
+	if err := os.WriteFile(filepath.Join(fixture, "case.txt"), []byte("one\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first, err := FixtureSHA256(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(fixture, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fixture, ".git", "ignored"), []byte("ignored\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second, err := FixtureSHA256(fixture)
+	if err != nil || second != first {
+		t.Fatalf("Git metadata changed fixture digest: %q, %v", second, err)
+	}
+	if err := os.WriteFile(filepath.Join(fixture, "case.txt"), []byte("two\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	third, err := FixtureSHA256(fixture)
+	if err != nil || third == first {
+		t.Fatalf("fixture content did not change digest: %q, %v", third, err)
 	}
 }
 
@@ -232,8 +313,8 @@ func TestLoadAndSummarizeSuite(t *testing.T) {
 		t.Fatal(err)
 	}
 	started := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
-	report := SummarizeSuite(suite, "smoke-001", "openai", "test-model", started, started.Add(time.Second), []Report{{Status: "resolved"}, {Status: "unresolved"}, {Status: "error"}})
-	if report.Status != "error" || report.Resolved != 1 || report.Unresolved != 1 || report.Errors != 1 || report.Duration != time.Second {
+	report := SummarizeSuite(suite, "smoke-001", "openai", "test-model", started, started.Add(time.Second), []Report{{ID: "feature", Attempt: 1, Status: "resolved", ScoreStatus: "passed"}, {ID: "feature", Attempt: 2, Status: "unresolved", ScoreStatus: "failed"}, {ID: "bug", Attempt: 1, Status: "error", ScoreStatus: "error"}})
+	if report.Status != "error" || report.Resolved != 1 || report.Unresolved != 1 || report.Errors != 1 || report.ScorePassed != 1 || report.ScoreFailed != 1 || report.ScoreErrors != 1 || report.Attempts != 2 || len(report.CaseSummaries) != 2 || report.Duration != time.Second {
 		t.Fatalf("suite report = %#v", report)
 	}
 	if err := WriteSuiteReport(filepath.Join(directory, "reports", "suite.json"), report); err != nil {

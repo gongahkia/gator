@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "list-validation",
+  "task": "Harden parser.ParseList: reject blank input and empty comma-separated items, while preserving valid items after surrounding whitespace is trimmed. Add a focused regression test.",
+  "max_steps": 18,
+  "timeout_seconds": 180,
+  "verify": [["go", "test", "./..."]],
+  "sandbox": "strict",
+  "network": "deny",
+  "repository": "repository",
+  "scopes": ["parser"],
+  "allowed_command_prefixes": [["go", "test"]],
+  "score": [["go", "run", "{{fixture}}/score/main.go", "--", "{{worktree}}"]],
+  "score_timeout_seconds": 120,
+  "labels": ["bugfix", "go", "parsing", "hidden-score"]
+}

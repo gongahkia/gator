@@ -8,5 +8,8 @@
   "sandbox": "strict",
   "network": "deny",
   "repository": "repository",
-  "allowed_command_prefixes": [["go", "test"]]
+  "allowed_command_prefixes": [["go", "test"]],
+  "score": [["go", "run", "{{fixture}}/score/main.go", "--", "{{worktree}}"]],
+  "score_timeout_seconds": 120,
+  "labels": ["feature", "go", "hidden-score", "smoke"]
 }

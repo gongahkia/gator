@@ -6,8 +6,8 @@ package eval
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -26,11 +26,11 @@ import (
 )
 
 const (
-	specVersion   = 1
-	suiteVersion  = 1
-	reportVersion = 2
-	maxSuiteCases = 64
-	maxScoreCommands = 8
+	specVersion                = 1
+	suiteVersion               = 1
+	reportVersion              = 2
+	maxSuiteCases              = 64
+	maxScoreCommands           = 8
 	defaultScoreTimeoutSeconds = 120
 )
 
@@ -130,23 +130,23 @@ type Suite struct {
 
 // SuiteReport aggregates durable reports from one suite invocation.
 type SuiteReport struct {
-	Version    int           `json:"version"`
-	ID         string        `json:"id"`
-	RunID      string        `json:"run_id"`
-	Status     string        `json:"status"`
-	Provider   string        `json:"provider"`
-	Model      string        `json:"model"`
-	StartedAt  time.Time     `json:"started_at"`
-	Duration   time.Duration `json:"duration_ns"`
-	Resolved   int           `json:"resolved"`
-	Unresolved int           `json:"unresolved"`
-	Errors     int           `json:"errors"`
-	ScorePassed int           `json:"score_passed"`
-	ScoreFailed int           `json:"score_failed"`
-	ScoreErrors int           `json:"score_errors"`
-	Unscored    int           `json:"unscored"`
-	Attempts    int           `json:"attempts"`
-	Cases      []Report      `json:"cases"`
+	Version       int           `json:"version"`
+	ID            string        `json:"id"`
+	RunID         string        `json:"run_id"`
+	Status        string        `json:"status"`
+	Provider      string        `json:"provider"`
+	Model         string        `json:"model"`
+	StartedAt     time.Time     `json:"started_at"`
+	Duration      time.Duration `json:"duration_ns"`
+	Resolved      int           `json:"resolved"`
+	Unresolved    int           `json:"unresolved"`
+	Errors        int           `json:"errors"`
+	ScorePassed   int           `json:"score_passed"`
+	ScoreFailed   int           `json:"score_failed"`
+	ScoreErrors   int           `json:"score_errors"`
+	Unscored      int           `json:"unscored"`
+	Attempts      int           `json:"attempts"`
+	Cases         []Report      `json:"cases"`
 	CaseSummaries []CaseSummary `json:"case_summaries"`
 }
 
@@ -167,22 +167,22 @@ type CaseSummary struct {
 // Options configures one evaluation. Model is required; live providers are
 // injected by the command layer so this package never reads credentials.
 type Options struct {
-	Spec       Spec
-	RunID      string
-	Provider   string
-	ModelName  string
-	StateDir   string
-	Repository string
-	Executor   gatorrun.Executor
-	FixturePath             string
-	FixtureSHA256           string
-	HarnessVersion          string
-	HarnessCommit           string
-	EnvironmentID           string
-	ProviderEndpoint        string
-	SuiteID                 string
-	Attempt                 int
-	Now        func() time.Time
+	Spec             Spec
+	RunID            string
+	Provider         string
+	ModelName        string
+	StateDir         string
+	Repository       string
+	Executor         gatorrun.Executor
+	FixturePath      string
+	FixtureSHA256    string
+	HarnessVersion   string
+	HarnessCommit    string
+	EnvironmentID    string
+	ProviderEndpoint string
+	SuiteID          string
+	Attempt          int
+	Now              func() time.Time
 }
 
 // LoadSpec reads eval.json from directory.

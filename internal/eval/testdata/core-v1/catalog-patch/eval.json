@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "catalog-patch",
+  "task": "Finish catalog.Apply so a Patch updates every field that is explicitly set, without changing unset fields or entry order. Preserve its unknown-ID error behavior and add a focused test.",
+  "max_steps": 24,
+  "timeout_seconds": 240,
+  "verify": [["go", "test", "./..."]],
+  "sandbox": "strict",
+  "network": "deny",
+  "repository": "repository",
+  "scopes": ["catalog"],
+  "allowed_command_prefixes": [["go", "test"]],
+  "score": [["go", "run", "{{fixture}}/score/main.go", "--", "{{worktree}}"]],
+  "score_timeout_seconds": 120,
+  "labels": ["feature", "go", "multi-file", "hidden-score"]
+}
