@@ -17,11 +17,11 @@ func TestEvalCommandRequiresFixtureDirectory(t *testing.T) {
 }
 
 func TestParseEvalArgumentsAcceptsFixtureBeforeFlags(t *testing.T) {
-	directory, options, err := parseEvalArguments("eval", []string{"fixture", "--run-id", "headless-001", "--report=report.json", "--require-resolved"}, false)
+	directory, options, err := parseEvalArguments("eval", []string{"fixture", "--run-id", "headless-001", "--report=report.json", "--environment-id", "image@sha256:abc", "--attempts", "3", "--require-resolved"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !filepath.IsAbs(directory) || options.runID != "headless-001" || options.reportPath != "report.json" || !options.requireResolved {
+	if !filepath.IsAbs(directory) || options.runID != "headless-001" || options.reportPath != "report.json" || options.environmentID != "image@sha256:abc" || options.attempts != 3 || !options.requireResolved {
 		t.Fatalf("parsed eval options = directory=%q options=%#v", directory, options)
 	}
 }
@@ -54,5 +54,13 @@ func TestEvalCommandWritesReportBeforeRequireResolvedFailure(t *testing.T) {
 	}
 	if !strings.Contains(string(contents), `"status": "unresolved"`) || !strings.Contains(output.String(), "status=unresolved") {
 		t.Fatalf("output=%q report=%s", output.String(), contents)
+	}
+}
+
+func TestEvalSuiteRequiresEnvironmentIdentityBeforeProviderSetup(t *testing.T) {
+	var output bytes.Buffer
+	err := evalCommand([]string{"suite", filepath.Join("..", "..", "internal", "eval", "testdata", "core-v1"), "--live"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "--environment-id") {
+		t.Fatalf("suite error = %v", err)
 	}
 }

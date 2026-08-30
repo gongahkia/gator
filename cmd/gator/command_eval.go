@@ -59,6 +59,9 @@ func evalFixtureCommand(arguments []string, out io.Writer) error {
 	if options.live && strings.TrimSpace(options.scriptPath) != "" {
 		return errors.New("--script and --live cannot be used together")
 	}
+	if options.attempts != 1 {
+		return errors.New("--attempts is available only with 'gator eval suite'")
+	}
 	runtime, err := newEvalRuntime(options)
 	if err != nil {
 		return err
@@ -67,7 +70,7 @@ func evalFixtureCommand(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	report, err := runEvalFixture(context.Background(), directory, options, runtime, stateDir, "")
+	report, err := runEvalFixture(context.Background(), directory, options, runtime, stateDir, "", 1)
 	if err != nil {
 		return err
 	}
@@ -105,15 +108,17 @@ func evalSuiteCommand(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	runtime, err := newEvalRuntime(options)
-	if err != nil {
-		return err
-	}
 	if strings.TrimSpace(options.runID) == "" {
 		options.runID = suite.ID + "-" + time.Now().UTC().Format("20060102T150405Z")
 	}
-	if len(options.runID) > 92 {
-		return errors.New("suite --run-id must contain at most 92 characters so case run IDs remain portable")
+	if options.attempts < 1 || options.attempts > 10 {
+		return errors.New("suite --attempts must be between 1 and 10")
+	}
+	if strings.TrimSpace(options.environmentID) == "" {
+		return errors.New("live suite evaluation requires --environment-id, such as an immutable OCI image digest")
+	}
+	if len(options.runID) > 88 {
+		return errors.New("suite --run-id must contain at most 88 characters so case attempt IDs remain portable")
 	}
 	if err := eval.ValidateRunID(options.runID); err != nil {
 		return err
@@ -121,37 +126,45 @@ func evalSuiteCommand(arguments []string, out io.Writer) error {
 	if strings.TrimSpace(options.reportDirectory) == "" {
 		options.reportDirectory = filepath.Join(directory, "reports", options.runID)
 	}
+	runtime, err := newEvalRuntime(options)
+	if err != nil {
+		return err
+	}
 	stateDir, err := evaluationStateDir()
 	if err != nil {
 		return err
 	}
 	startedAt := time.Now()
-	reports := make([]eval.Report, 0, len(suite.Cases))
+	reports := make([]eval.Report, 0, len(suite.Cases)*options.attempts)
 	seenIDs := make(map[string]struct{}, len(suite.Cases))
 	for index, fixture := range suite.Cases {
 		caseDirectory := filepath.Join(directory, fixture)
-		caseOptions := options
-		caseOptions.runID = fmt.Sprintf("%s-%02d", options.runID, index+1)
-		report, err := runEvalFixture(context.Background(), caseDirectory, caseOptions, runtime, stateDir, "")
-		if err != nil {
-			return err
+		for attempt := 1; attempt <= options.attempts; attempt++ {
+			caseOptions := options
+			caseOptions.runID = fmt.Sprintf("%s-c%02d-a%02d", options.runID, index+1, attempt)
+			report, err := runEvalFixture(context.Background(), caseDirectory, caseOptions, runtime, stateDir, suite.ID, attempt)
+			if err != nil {
+				return err
+			}
+			if attempt == 1 {
+				if _, exists := seenIDs[report.ID]; exists {
+					return fmt.Errorf("eval suite repeats fixture id %q", report.ID)
+				}
+				seenIDs[report.ID] = struct{}{}
+			}
+			caseReportPath := filepath.Join(options.reportDirectory, report.ID, fmt.Sprintf("attempt-%02d.json", attempt))
+			if err := eval.WriteReport(caseReportPath, report); err != nil {
+				return err
+			}
+			reports = append(reports, report)
 		}
-		if _, exists := seenIDs[report.ID]; exists {
-			return fmt.Errorf("eval suite repeats fixture id %q", report.ID)
-		}
-		seenIDs[report.ID] = struct{}{}
-		caseReportPath := filepath.Join(options.reportDirectory, report.ID+".json")
-		if err := eval.WriteReport(caseReportPath, report); err != nil {
-			return err
-		}
-		reports = append(reports, report)
 	}
 	summary := eval.SummarizeSuite(suite, options.runID, runtime.provider, runtime.model, startedAt, time.Now(), reports)
 	summaryPath := filepath.Join(options.reportDirectory, "suite.json")
 	if err := eval.WriteSuiteReport(summaryPath, summary); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "eval suite %s status=%s resolved=%d unresolved=%d errors=%d report=%s\n", summary.ID, summary.Status, summary.Resolved, summary.Unresolved, summary.Errors, summaryPath); err != nil {
+	if _, err := fmt.Fprintf(out, "eval suite %s status=%s resolved=%d unresolved=%d errors=%d score_passed=%d score_failed=%d attempts=%d report=%s\n", summary.ID, summary.Status, summary.Resolved, summary.Unresolved, summary.Errors, summary.ScorePassed, summary.ScoreFailed, summary.Attempts, summaryPath); err != nil {
 		return err
 	}
 	if options.requireResolved && summary.Status != "resolved" {
@@ -279,13 +292,19 @@ func newEvalRuntime(options evalFlags) (evalRuntime, error) {
 	executor.HookTrusts = nil
 	executor.LSPTrusts = nil
 	executor.MCPTrusts = nil
-	return evalRuntime{live: true, provider: providerName, model: modelName, executor: executor}, nil
+	return evalRuntime{live: true, provider: providerName, model: modelName, baseURL: baseURL, executor: executor}, nil
 }
 
-func runEvalFixture(ctx context.Context, directory string, options evalFlags, runtime evalRuntime, stateDir, scriptOverride string) (eval.Report, error) {
+func runEvalFixture(ctx context.Context, directory string, options evalFlags, runtime evalRuntime, stateDir, suiteID string, attempt int) (eval.Report, error) {
 	spec, err := eval.LoadSpec(directory)
 	if err != nil {
 		return eval.Report{}, err
+	}
+	if runtime.live && len(spec.Score) == 0 {
+		return eval.Report{}, fmt.Errorf("live suite fixture %q requires at least one hidden score command", spec.ID)
+	}
+	if runtime.live && eval.PolicyFromSpec(spec).Mode != sandbox.Strict {
+		return eval.Report{}, fmt.Errorf("live suite fixture %q must use sandbox strict", spec.ID)
 	}
 	runID := options.runID
 	if strings.TrimSpace(runID) == "" {
@@ -293,6 +312,10 @@ func runEvalFixture(ctx context.Context, directory string, options evalFlags, ru
 	}
 	if err := eval.ValidateRunID(runID); err != nil {
 		return eval.Report{}, err
+	}
+	fixtureSHA256, err := eval.FixtureSHA256(directory)
+	if err != nil {
+		return eval.Report{}, fmt.Errorf("digest eval fixture: %w", err)
 	}
 	source, err := evalRepositoryPath(directory, spec)
 	if err != nil {
@@ -305,10 +328,7 @@ func runEvalFixture(ctx context.Context, directory string, options evalFlags, ru
 	executor := runtime.executor
 	executor.Sandbox = eval.PolicyFromSpec(spec)
 	if !runtime.live {
-		scriptPath := scriptOverride
-		if strings.TrimSpace(scriptPath) == "" {
-			scriptPath = options.scriptPath
-		}
+		scriptPath := options.scriptPath
 		if strings.TrimSpace(scriptPath) == "" {
 			scriptPath = filepath.Join(directory, "script.json")
 		}
@@ -322,13 +342,21 @@ func runEvalFixture(ctx context.Context, directory string, options evalFlags, ru
 		executor.Model = &eval.ScriptedModel{Turns: turns}
 	}
 	return eval.Run(ctx, eval.Options{
-		Spec:       spec,
-		RunID:      runID,
-		Provider:   runtime.provider,
-		ModelName:  runtime.model,
-		StateDir:   stateDir,
-		Repository: repository,
-		Executor:   executor,
+		Spec:             spec,
+		RunID:            runID,
+		Provider:         runtime.provider,
+		ModelName:        runtime.model,
+		StateDir:         stateDir,
+		Repository:       repository,
+		Executor:         executor,
+		FixturePath:      directory,
+		FixtureSHA256:    fixtureSHA256,
+		HarnessVersion:   version,
+		HarnessCommit:    commit,
+		EnvironmentID:    options.environmentID,
+		ProviderEndpoint: runtime.baseURL,
+		SuiteID:          suiteID,
+		Attempt:          attempt,
 	})
 }
 

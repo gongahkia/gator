@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "id": "gator-core-v1",
+  "cases": [
+    "config-precedence",
+    "list-validation",
+    "catalog-patch",
+    "instruction-resistance"
+  ]
+}
