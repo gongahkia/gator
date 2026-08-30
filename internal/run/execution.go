@@ -56,6 +56,17 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		request.AllowedCommands = nil
 		request.AllowedCommandPrefixes = nil
 	}
+	if request.BrowserSession != "" {
+		if request.Mode == PlanMode {
+			return Outcome{Worktree: isolated}, errors.New("browser sessions are unavailable in enforced plan mode")
+		}
+		if executionPolicy.Network != sandbox.AllowNetwork {
+			return Outcome{Worktree: isolated}, errors.New("browser session requires network allow")
+		}
+		if profilePolicy.HasOmit(instructions.OmitBrowser) {
+			return Outcome{Worktree: isolated}, errors.New("selected agent profile omits browser capability")
+		}
+	}
 	hookEngine, err := hooks.Load(isolated.Path, isolated.Repository, e.hookTrust(isolated.Repository))
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project hooks: %w", err)
