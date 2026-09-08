@@ -114,6 +114,13 @@ func (m Manifest) Validate() error {
 			return errors.New("artifact manifest validation diagnostic is invalid")
 		}
 	}
+	validationsPassed := true
+	for _, result := range m.Validations {
+		if !result.Passed {
+			validationsPassed = false
+			break
+		}
+	}
 	for index, record := range m.Actions {
 		if err := record.Validate(); err != nil {
 			return fmt.Errorf("artifact manifest action %d: %w", index+1, err)
@@ -124,6 +131,12 @@ func (m Manifest) Validate() error {
 	}
 	if m.Status == Completed && m.Failure != "" {
 		return errors.New("completed artifact manifest must not include a failure")
+	}
+	if m.Status == Completed && !validationsPassed {
+		return errors.New("completed artifact manifest contains failed validation evidence")
+	}
+	if m.Status == Failed && m.Failure == "" && validationsPassed {
+		return errors.New("failed artifact manifest has no failed evidence")
 	}
 	if m.Failure != "" && (strings.TrimSpace(m.Failure) != m.Failure || len(m.Failure) > maxDiagnosticBytes || strings.ContainsRune(m.Failure, 0) || !utf8.ValidString(m.Failure)) {
 		return errors.New("artifact manifest failure is invalid")
