@@ -28,6 +28,7 @@ const (
 type ReadFile struct {
 	Root            workspace.Root
 	AdditionalRoots []workspace.Root
+	NamedRoots      []workspace.NamedRoot
 	MaxBytes        int
 	MaxLines        int
 }
@@ -35,8 +36,8 @@ type ReadFile struct {
 func (t ReadFile) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "read_file",
-		Description: "Read a bounded line range from a text file in the primary workspace or an approved read-only external root.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Primary-worktree-relative path or an approved external-root absolute path"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`),
+		Description: "Read a bounded line range from a UTF-8 file in the workspace. Named mounts such as source/... and output/... are shown when available.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","description":"Workspace-relative path, named-mount path, or explicitly approved external-root absolute path"},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`),
 	}
 }
 
@@ -49,7 +50,10 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	roots := workspace.NewRootSet(t.Root, t.AdditionalRoots)
+	roots, err := workspace.NewNamedRootSet(t.Root, t.AdditionalRoots, t.NamedRoots)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
 	path, err := roots.ResolveFile(arguments.Path)
 	if err != nil {
 		return agent.ToolResult{}, err
@@ -122,14 +126,15 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 type ListFiles struct {
 	Root            workspace.Root
 	AdditionalRoots []workspace.Root
+	NamedRoots      []workspace.NamedRoot
 	MaxResults      int
 }
 
 func (t ListFiles) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "list_files",
-		Description: "List files below a primary-worktree-relative directory or an approved read-only external-root absolute directory. Use this before guessing paths.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","description":"Primary-worktree-relative path or an approved external-root absolute path"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
+		Description: "List files below a workspace directory, including a named mount such as source or output. Use this before guessing paths.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","description":"Workspace-relative directory, named mount, or explicitly approved external-root absolute directory"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
 	}
 }
 
@@ -141,7 +146,10 @@ func (t ListFiles) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRe
 	if err := decodeArguments(raw, &arguments); err != nil {
 		return agent.ToolResult{}, err
 	}
-	roots := workspace.NewRootSet(t.Root, t.AdditionalRoots)
+	roots, err := workspace.NewNamedRootSet(t.Root, t.AdditionalRoots, t.NamedRoots)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
 	directory, err := resolveDirectory(roots, arguments.Path)
 	if err != nil {
 		return agent.ToolResult{}, err
@@ -165,14 +173,15 @@ func (t ListFiles) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRe
 type SearchFiles struct {
 	Root            workspace.Root
 	AdditionalRoots []workspace.Root
+	NamedRoots      []workspace.NamedRoot
 	MaxResults      int
 }
 
 func (t SearchFiles) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{
 		Name:        "search_files",
-		Description: "Search literal text in primary-worktree or approved read-only external-root files and return matching lines with paths and line numbers.",
-		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1},"path":{"type":"string","description":"Primary-worktree-relative path or an approved external-root absolute path"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
+		Description: "Search literal text in workspace files and return matching lines with paths and line numbers. Named mounts such as source and output are supported.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["query"],"properties":{"query":{"type":"string","minLength":1},"path":{"type":"string","description":"Workspace-relative directory, named mount, or explicitly approved external-root absolute directory"},"max_results":{"type":"integer","minimum":1,"maximum":500}}}`),
 	}
 }
 
@@ -188,7 +197,10 @@ func (t SearchFiles) Execute(_ context.Context, raw json.RawMessage) (agent.Tool
 	if strings.TrimSpace(arguments.Query) == "" {
 		return agent.ToolResult{}, errors.New("search query is required")
 	}
-	roots := workspace.NewRootSet(t.Root, t.AdditionalRoots)
+	roots, err := workspace.NewNamedRootSet(t.Root, t.AdditionalRoots, t.NamedRoots)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
 	directory, err := resolveDirectory(roots, arguments.Path)
 	if err != nil {
 		return agent.ToolResult{}, err
