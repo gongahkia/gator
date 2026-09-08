@@ -89,6 +89,7 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 		RunID:          options.RunID,
 		Workflow:       "work",
 		Objective:      objective,
+		Contract:       contract.Normalize(),
 		ContractSHA256: digest,
 		Source: Source{
 			Kind:           "directory",

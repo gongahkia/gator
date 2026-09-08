@@ -148,3 +148,30 @@ func TestSealRecordsExecutionFailureEvenWhenArtifactsPass(t *testing.T) {
 		t.Fatalf("manifest = %#v", manifest)
 	}
 }
+
+func TestManifestBindsReviewableContractToDigest(t *testing.T) {
+	t.Parallel()
+
+	source, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDirectory := t.TempDir()
+	writeArtifact(t, outputDirectory, "report.md", "finished report\n")
+	output, err := workspace.Open(outputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	manifest, err := Seal(output, DefaultContract("report.md"), SealOptions{
+		RunID: "work-contract", Objective: "Prepare the report", Source: source,
+		StartedAt: now, FinishedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest.Contract.Artifacts[0].Path = "different.md"
+	if err := manifest.Validate(); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("tampered contract error = %v", err)
+	}
+}
