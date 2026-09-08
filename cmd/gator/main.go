@@ -55,6 +55,7 @@ Usage:
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
   gator work [--source DIRECTORY] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
+  gator code [coding options] --verify 'argv ...' TASK
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -84,7 +85,8 @@ Commands:
   theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
   work      turn a read-only folder into validated artifacts in isolated output
-  run       propose a tested patch in an isolated Git worktree
+  code      propose a tested patch in an isolated Git worktree
+  run       compatibility alias for code
   resume    select, reopen, or immediately continue a retained local thread
   eval      run a bounded headless evaluation fixture or real-model suite
   transcript export one retained private session as local HTML
@@ -173,7 +175,7 @@ func run(args []string, out io.Writer) error {
 		return themeCommand(args[1:], out)
 	case "work":
 		return workTask(args[1:], out)
-	case "run":
+	case "code", "run":
 		return runTask(args[1:], out)
 	case "resume":
 		return resumeTask(args[1:], out)
