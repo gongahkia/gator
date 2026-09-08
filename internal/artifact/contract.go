@@ -93,6 +93,18 @@ func DefaultContract(paths ...string) Contract {
 	}
 }
 
+// InspectionContract represents an analysis-only run with no required
+// deliverables. It still produces a sealed manifest and forbids external
+// actions, but completion is carried by the conversation rather than a file.
+func InspectionContract() Contract {
+	return Contract{
+		Version:          ContractVersion,
+		MaxArtifactBytes: DefaultMaxArtifactBytes,
+		MaxTotalBytes:    DefaultMaxTotalBytes,
+		ExternalActions:  action.Forbid,
+	}
+}
+
 // Normalize fills optional limits and policy with conservative defaults and
 // returns independent slices safe for a caller to modify.
 func (c Contract) Normalize() Contract {
@@ -116,8 +128,8 @@ func (c Contract) Validate() error {
 	if c.Version != ContractVersion {
 		return fmt.Errorf("unsupported artifact contract version %d", c.Version)
 	}
-	if len(c.Artifacts) == 0 || len(c.Artifacts) > maxRequirements {
-		return fmt.Errorf("artifact contract requires 1-%d artifacts", maxRequirements)
+	if len(c.Artifacts) > maxRequirements {
+		return fmt.Errorf("artifact contract permits at most %d artifacts", maxRequirements)
 	}
 	if c.MaxArtifactBytes < 1 || c.MaxArtifactBytes > maximumArtifactBytes {
 		return fmt.Errorf("artifact byte limit must be between 1 and %d", maximumArtifactBytes)

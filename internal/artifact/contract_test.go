@@ -48,6 +48,18 @@ func TestContractDigestUsesNormalizedDefaults(t *testing.T) {
 	}
 }
 
+func TestInspectionContractHasNoDeliverablesOrExternalActions(t *testing.T) {
+	t.Parallel()
+
+	contract := InspectionContract()
+	if err := contract.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if len(contract.Artifacts) != 0 || contract.ExternalActions != action.Forbid {
+		t.Fatalf("inspection contract = %#v", contract)
+	}
+}
+
 func TestContractRejectsUnsafeOrAmbiguousRequirements(t *testing.T) {
 	t.Parallel()
 
