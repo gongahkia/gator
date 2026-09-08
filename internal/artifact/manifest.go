@@ -1,6 +1,12 @@
 package artifact
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -36,7 +42,8 @@ type Manifest struct {
 // snapshot mode.
 type Source struct {
 	Kind           string `json:"kind"`
-	Path           string `json:"path"`
+	Name           string `json:"name"`
+	IdentitySHA256 string `json:"identity_sha256"`
 	SnapshotSHA256 string `json:"snapshot_sha256,omitempty"`
 }
 
@@ -55,4 +62,66 @@ type ValidationResult struct {
 	Kind       ValidationKind `json:"kind"`
 	Passed     bool           `json:"passed"`
 	Diagnostic string         `json:"diagnostic,omitempty"`
+}
+
+// Validate checks the portable manifest envelope before it is written or
+// exported. It intentionally does not touch artifact bytes; Seal is the only
+// constructor that establishes their evidence.
+func (m Manifest) Validate() error {
+	if m.Version != ManifestVersion || m.Workflow != "work" {
+		return errors.New("artifact manifest has an unsupported version or workflow")
+	}
+	if !runIDPattern.MatchString(m.RunID) || strings.TrimSpace(m.Objective) == "" || len(m.Objective) > 64*1024 || strings.ContainsRune(m.Objective, 0) {
+		return errors.New("artifact manifest identity is invalid")
+	}
+	if !validSHA256(m.ContractSHA256) {
+		return errors.New("artifact manifest contract digest is invalid")
+	}
+	if m.Source.Kind != "directory" || strings.TrimSpace(m.Source.Name) == "" || filepath.Base(m.Source.Name) != m.Source.Name || !validSHA256(m.Source.IdentitySHA256) {
+		return errors.New("artifact manifest source is invalid")
+	}
+	if m.Source.SnapshotSHA256 != "" && !validSHA256(m.Source.SnapshotSHA256) {
+		return errors.New("artifact manifest source snapshot digest is invalid")
+	}
+	seen := make(map[string]struct{}, len(m.Artifacts))
+	for _, file := range m.Artifacts {
+		if err := validateArtifactPath(file.Path); err != nil || strings.TrimSpace(file.MediaType) == "" || file.Bytes < 0 || !validSHA256(file.SHA256) {
+			return fmt.Errorf("artifact manifest file %q is invalid", file.Path)
+		}
+		if _, duplicate := seen[file.Path]; duplicate {
+			return fmt.Errorf("artifact manifest repeats file %q", file.Path)
+		}
+		seen[file.Path] = struct{}{}
+	}
+	for _, result := range m.Validations {
+		if err := validateArtifactPath(result.Path); err != nil {
+			return fmt.Errorf("artifact manifest validation path %q is invalid", result.Path)
+		}
+		if _, known := validationKinds[result.Kind]; !known {
+			return fmt.Errorf("artifact manifest validation kind %q is invalid", result.Kind)
+		}
+		if len(result.Diagnostic) > maxDiagnosticBytes || strings.ContainsRune(result.Diagnostic, 0) || (result.Passed && result.Diagnostic != "") {
+			return errors.New("artifact manifest validation diagnostic is invalid")
+		}
+	}
+	for index, record := range m.Actions {
+		if err := record.Validate(); err != nil {
+			return fmt.Errorf("artifact manifest action %d: %w", index+1, err)
+		}
+	}
+	if m.Status != Completed && m.Status != Failed {
+		return fmt.Errorf("artifact manifest status %q is invalid", m.Status)
+	}
+	if m.StartedAt.IsZero() || m.FinishedAt.IsZero() || m.FinishedAt.Before(m.StartedAt) {
+		return errors.New("artifact manifest timestamps are invalid")
+	}
+	return nil
+}
+
+func validSHA256(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }

@@ -56,10 +56,11 @@ const (
 	JSON           ValidationKind = "json"
 	CSV            ValidationKind = "csv"
 	Contains       ValidationKind = "contains"
+	MediaType      ValidationKind = "media_type"
 )
 
 var validationKinds = map[ValidationKind]struct{}{
-	ArtifactExists: {}, NonEmpty: {}, UTF8: {}, JSON: {}, CSV: {}, Contains: {},
+	ArtifactExists: {}, NonEmpty: {}, UTF8: {}, JSON: {}, CSV: {}, Contains: {}, MediaType: {},
 }
 
 // Validation configures one deterministic check. Value is accepted only by
@@ -214,6 +215,9 @@ func validateValidation(validation Validation) error {
 			return errors.New("contains validation requires a bounded non-empty value")
 		}
 		return nil
+	}
+	if validation.Kind == MediaType {
+		return errors.New("media_type validation is derived from the artifact's allowed media types")
 	}
 	if validation.Value != "" {
 		return fmt.Errorf("artifact validation %q does not accept a value", validation.Kind)

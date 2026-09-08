@@ -205,3 +205,24 @@ type Record struct {
 	Status   Status   `json:"status"`
 	Error    string   `json:"error,omitempty"`
 }
+
+// Validate checks a durable action result without requiring access to the
+// connector payload that produced it.
+func (r Record) Validate() error {
+	if err := r.Proposal.Validate(); err != nil {
+		return err
+	}
+	switch r.Status {
+	case Pending, Executed, Denied:
+		if r.Error != "" {
+			return fmt.Errorf("action status %q must not include an error", r.Status)
+		}
+	case Failed:
+		if strings.TrimSpace(r.Error) == "" || len(r.Error) > 512 || strings.ContainsRune(r.Error, 0) {
+			return errors.New("failed action requires a bounded error")
+		}
+	default:
+		return fmt.Errorf("unknown action status %q", r.Status)
+	}
+	return nil
+}
