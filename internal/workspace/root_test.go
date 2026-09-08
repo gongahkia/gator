@@ -83,6 +83,65 @@ func TestRootSetSeparatesPrimaryAndAdditionalRoots(t *testing.T) {
 	}
 }
 
+func TestNamedRootSetUsesStableVirtualPaths(t *testing.T) {
+	primaryPath := t.TempDir()
+	sourcePath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(primaryPath, "report.md"), []byte("output"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourcePath, "notes.txt"), []byte("source"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	primary, err := Open(primaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := Open(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots, err := NewNamedRootSet(primary, nil, []NamedRoot{{Name: "source", Root: source}, {Name: "output", Root: primary}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resolvedSource, err := roots.ResolveFile("source/notes.txt")
+	if err != nil || roots.DisplayPath(resolvedSource) != "source/notes.txt" || roots.IsPrimary(resolvedSource) {
+		t.Fatalf("source resolution = %q, %v", resolvedSource, err)
+	}
+	resolvedOutput, err := roots.ResolveFile("output/report.md")
+	if err != nil || roots.DisplayPath(resolvedOutput) != "output/report.md" || !roots.IsPrimary(resolvedOutput) {
+		t.Fatalf("output resolution = %q, %v", resolvedOutput, err)
+	}
+	resolvedDirectory, err := roots.ResolveDirectory("source")
+	if err != nil || resolvedDirectory != source.Path() {
+		t.Fatalf("source directory resolution = %q, %v", resolvedDirectory, err)
+	}
+	if _, err := roots.ResolveFile("source"); err == nil {
+		t.Fatal("named directory was resolved as a file")
+	}
+	if got := roots.Paths(); len(got) != 2 || got[0] != primary.Path() || got[1] != source.Path() {
+		t.Fatalf("named root paths = %#v", got)
+	}
+}
+
+func TestNamedRootSetRejectsAmbiguousNames(t *testing.T) {
+	root, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, named := range [][]NamedRoot{
+		{{Name: "Source", Root: root}},
+		{{Name: "source/path", Root: root}},
+		{{Name: "source", Root: root}, {Name: "source", Root: root}},
+		{{Name: "source", Root: Root{}}},
+	} {
+		if _, err := NewNamedRootSet(root, nil, named); err == nil {
+			t.Fatalf("invalid named roots were accepted: %#v", named)
+		}
+	}
+}
+
 func TestRootRejectsSymlinkOutsideWorkspace(t *testing.T) {
 	directory := t.TempDir()
 	external := t.TempDir()

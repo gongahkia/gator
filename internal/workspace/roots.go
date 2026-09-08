@@ -16,14 +16,30 @@ import (
 type RootSet struct {
 	primary    Root
 	additional []Root
+	named      []NamedRoot
+}
+
+// NamedRoot exposes a root through a stable virtual path such as source/... or
+// output/.... Naming affects resolution and display only; the tool that uses a
+// RootSet still decides whether an operation is read-only or writable.
+type NamedRoot struct {
+	Name string
+	Root Root
 }
 
 // NewRootSet creates a stable boundary around a primary workspace and already
 // canonicalized additional roots. Duplicate roots and the primary root are
 // ignored. The caller is responsible for deciding which host paths to grant.
 func NewRootSet(primary Root, additional []Root) RootSet {
+	result, _ := NewNamedRootSet(primary, additional, nil)
+	return result
+}
+
+// NewNamedRootSet adds stable virtual names without exposing canonical host
+// paths to a model. Names are validated and sorted for deterministic display.
+func NewNamedRootSet(primary Root, additional []Root, named []NamedRoot) (RootSet, error) {
 	seen := map[string]struct{}{primary.Path(): {}}
-	result := RootSet{primary: primary, additional: make([]Root, 0, len(additional))}
+	result := RootSet{primary: primary, additional: make([]Root, 0, len(additional)), named: make([]NamedRoot, 0, len(named))}
 	for _, root := range additional {
 		if root.Path() == "" {
 			continue
@@ -37,7 +53,27 @@ func NewRootSet(primary Root, additional []Root) RootSet {
 	sort.Slice(result.additional, func(first, second int) bool {
 		return result.additional[first].Path() < result.additional[second].Path()
 	})
-	return result
+	seenNames := make(map[string]struct{}, len(named))
+	for _, item := range named {
+		if !validRootName(item.Name) {
+			return RootSet{}, fmt.Errorf("invalid named workspace root %q", item.Name)
+		}
+		if item.Root.Path() == "" {
+			return RootSet{}, fmt.Errorf("named workspace root %q is not initialized", item.Name)
+		}
+		if _, duplicate := seenNames[item.Name]; duplicate {
+			return RootSet{}, fmt.Errorf("named workspace root %q is repeated", item.Name)
+		}
+		seenNames[item.Name] = struct{}{}
+		result.named = append(result.named, item)
+	}
+	sort.Slice(result.named, func(first, second int) bool {
+		if len(result.named[first].Root.Path()) != len(result.named[second].Root.Path()) {
+			return len(result.named[first].Root.Path()) > len(result.named[second].Root.Path())
+		}
+		return result.named[first].Name < result.named[second].Name
+	})
+	return result, nil
 }
 
 // OpenAdditionalRoots validates and canonicalizes absolute existing
@@ -74,15 +110,29 @@ func (r RootSet) Primary() Root { return r.primary }
 // Additional returns an independent copy of the read-only roots.
 func (r RootSet) Additional() []Root { return append([]Root(nil), r.additional...) }
 
+// Named returns an independent copy of virtual workspace roots.
+func (r RootSet) Named() []NamedRoot { return append([]NamedRoot(nil), r.named...) }
+
 // Paths returns the primary root followed by canonical additional roots. It
 // is intended for protocol workspace-folder lists and cache identities.
 func (r RootSet) Paths() []string {
-	result := make([]string, 0, len(r.additional)+1)
+	result := make([]string, 0, len(r.additional)+len(r.named)+1)
+	seen := make(map[string]struct{}, len(r.additional)+len(r.named)+1)
 	if r.primary.Path() != "" {
 		result = append(result, r.primary.Path())
+		seen[r.primary.Path()] = struct{}{}
 	}
 	for _, root := range r.additional {
-		result = append(result, root.Path())
+		if _, duplicate := seen[root.Path()]; !duplicate {
+			result = append(result, root.Path())
+			seen[root.Path()] = struct{}{}
+		}
+	}
+	for _, item := range r.named {
+		if _, duplicate := seen[item.Root.Path()]; !duplicate {
+			result = append(result, item.Root.Path())
+			seen[item.Root.Path()] = struct{}{}
+		}
 	}
 	return result
 }
@@ -90,6 +140,12 @@ func (r RootSet) Paths() []string {
 // ResolveFile resolves a primary-relative or additional-root absolute path.
 func (r RootSet) ResolveFile(path string) (string, error) {
 	if !filepath.IsAbs(path) {
+		if root, relative, found := r.namedFor(path); found {
+			if relative == "." {
+				return "", fmt.Errorf("named workspace path %q identifies a directory, not a file", path)
+			}
+			return root.ResolveFile(relative)
+		}
 		return r.primary.ResolveFile(path)
 	}
 	root, relative, found := r.additionalFor(path, false)
@@ -104,6 +160,14 @@ func (r RootSet) ResolveFile(path string) (string, error) {
 func (r RootSet) ResolveDirectory(path string) (string, error) {
 	if path == "" || path == "." {
 		return r.primary.Path(), nil
+	}
+	if !filepath.IsAbs(path) {
+		if root, relative, found := r.namedFor(path); found {
+			if relative == "." {
+				return root.Path(), nil
+			}
+			return root.ResolveFile(relative)
+		}
 	}
 	if filepath.IsAbs(path) {
 		root, relative, found := r.additionalFor(path, false)
@@ -135,10 +199,48 @@ func (r RootSet) ResolveReturnedFile(path string) (string, error) {
 // DisplayPath preserves the established relative convention for the primary
 // worktree and uses a canonical absolute path for an additional root.
 func (r RootSet) DisplayPath(path string) string {
+	for _, item := range r.named {
+		if relative, inside := relativeToRoot(item.Root, path); inside {
+			if relative == "." {
+				return item.Name
+			}
+			return filepath.ToSlash(filepath.Join(item.Name, relative))
+		}
+	}
 	if relative, inside := relativeToRoot(r.primary, path); inside {
 		return filepath.ToSlash(relative)
 	}
 	return path
+}
+
+func (r RootSet) namedFor(value string) (Root, string, bool) {
+	clean := filepath.Clean(value)
+	if clean == "." || filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return Root{}, "", false
+	}
+	for _, item := range r.named {
+		if clean == item.Name {
+			return item.Root, ".", true
+		}
+		prefix := item.Name + string(filepath.Separator)
+		if strings.HasPrefix(clean, prefix) {
+			return item.Root, strings.TrimPrefix(clean, prefix), true
+		}
+	}
+	return Root{}, "", false
+}
+
+func validRootName(value string) bool {
+	if len(value) == 0 || len(value) > 32 {
+		return false
+	}
+	for index, character := range value {
+		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' && index > 0 || (character == '-' || character == '_') && index > 0 {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // IsPrimary reports whether a resolved path is within the writable primary
