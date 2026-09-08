@@ -25,6 +25,7 @@ type SealOptions struct {
 	Objective  string
 	Source     workspace.Root
 	Actions    []action.Record
+	Failure    string
 	StartedAt  time.Time
 	FinishedAt time.Time
 }
@@ -45,6 +46,10 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 	}
 	if options.StartedAt.IsZero() || options.FinishedAt.IsZero() || options.FinishedAt.Before(options.StartedAt) {
 		return Manifest{}, errors.New("work manifest timestamps are invalid")
+	}
+	failure := boundedDiagnostic(strings.TrimSpace(options.Failure))
+	if strings.ContainsRune(failure, 0) {
+		return Manifest{}, errors.New("work failure contains a NUL byte")
 	}
 	for index, record := range options.Actions {
 		if err := record.Validate(); err != nil {
@@ -75,6 +80,9 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 	if !inspection.Passed {
 		status = Failed
 	}
+	if failure != "" {
+		status = Failed
+	}
 	sourceDigest := sha256.Sum256([]byte(options.Source.Path()))
 	manifest := Manifest{
 		Version:        ManifestVersion,
@@ -91,6 +99,7 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 		Validations: inspection.Validations,
 		Actions:     append([]action.Record(nil), options.Actions...),
 		Status:      status,
+		Failure:     failure,
 		StartedAt:   options.StartedAt,
 		FinishedAt:  options.FinishedAt,
 	}

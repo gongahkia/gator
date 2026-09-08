@@ -122,3 +122,29 @@ func TestSealRetainsFailedValidationEvidence(t *testing.T) {
 		t.Fatalf("failed manifest = %#v", manifest)
 	}
 }
+
+func TestSealRecordsExecutionFailureEvenWhenArtifactsPass(t *testing.T) {
+	t.Parallel()
+
+	source, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDirectory := t.TempDir()
+	writeArtifact(t, outputDirectory, "report.md", "finished report\n")
+	output, err := workspace.Open(outputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	manifest, err := Seal(output, DefaultContract("report.md"), SealOptions{
+		RunID: "work-failed", Objective: "Prepare the report", Source: source,
+		Failure: "agent reached its step limit", StartedAt: now, FinishedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Status != Failed || manifest.Failure != "agent reached its step limit" {
+		t.Fatalf("manifest = %#v", manifest)
+	}
+}

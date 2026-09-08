@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
 )
@@ -33,6 +34,7 @@ type Manifest struct {
 	Validations    []ValidationResult `json:"validations"`
 	Actions        []action.Record    `json:"actions,omitempty"`
 	Status         Status             `json:"status"`
+	Failure        string             `json:"failure,omitempty"`
 	StartedAt      time.Time          `json:"started_at"`
 	FinishedAt     time.Time          `json:"finished_at"`
 }
@@ -111,6 +113,12 @@ func (m Manifest) Validate() error {
 	}
 	if m.Status != Completed && m.Status != Failed {
 		return fmt.Errorf("artifact manifest status %q is invalid", m.Status)
+	}
+	if m.Status == Completed && m.Failure != "" {
+		return errors.New("completed artifact manifest must not include a failure")
+	}
+	if m.Failure != "" && (strings.TrimSpace(m.Failure) != m.Failure || len(m.Failure) > maxDiagnosticBytes || strings.ContainsRune(m.Failure, 0) || !utf8.ValidString(m.Failure)) {
+		return errors.New("artifact manifest failure is invalid")
 	}
 	if m.StartedAt.IsZero() || m.FinishedAt.IsZero() || m.FinishedAt.Before(m.StartedAt) {
 		return errors.New("artifact manifest timestamps are invalid")
