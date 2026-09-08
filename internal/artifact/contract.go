@@ -185,6 +185,12 @@ func validateArtifactPath(value string) error {
 	return nil
 }
 
+// ValidateOutputPath checks that a model- or connector-supplied artifact path
+// is portable, normalized, and relative to the isolated output root.
+func ValidateOutputPath(value string) error {
+	return validateArtifactPath(value)
+}
+
 func validateMediaTypes(values []string) error {
 	if len(values) > 8 {
 		return errors.New("artifact has more than 8 allowed media types")
