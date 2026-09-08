@@ -1,0 +1,96 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/artifact"
+)
+
+func TestWorkCommandCreatesDefaultValidatedReport(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "notes.txt"), []byte("reference\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	model := &workScriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"# Report\\n"}`)}}},
+		{Text: "The report is ready."},
+	}}
+	var output bytes.Buffer
+	err := runWorkTask([]string{"--source", source, "--max-steps", "3", "prepare", "a", "report"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) {
+		return model, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Status: completed") || !strings.Contains(output.String(), "report.md (text/markdown") {
+		t.Fatalf("work output = %q", output.String())
+	}
+}
+
+func TestWorkCommandReadsObjectiveFromStdinAndEmitsJSON(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	model := &workScriptedModel{turns: []agent.Turn{{Text: "Inspected."}}}
+	var output bytes.Buffer
+	err := runWorkTask([]string{"--source", t.TempDir(), "--mode", "inspect", "--json"}, strings.NewReader("inspect these notes\n"), &output, func(_, _, _ string) (agent.Model, error) {
+		return model, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+		t.Fatalf("JSON output = %q: %v", output.String(), err)
+	}
+	if result["status"] != "completed" || result["final_text"] != "Inspected." {
+		t.Fatalf("JSON result = %#v", result)
+	}
+}
+
+func TestWorkContractInfersStructuredValidators(t *testing.T) {
+	contract, err := workContract(action.Draft, artifactFlags{"data/results.csv", "summary.json"}, containsFlags{"summary.json=answer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contract.Artifacts[0].MediaTypes[0] != "text/csv" || contract.Artifacts[1].MediaTypes[0] != "application/json" {
+		t.Fatalf("contract = %#v", contract)
+	}
+	if got := contract.Artifacts[1].Validations[len(contract.Artifacts[1].Validations)-1]; got.Kind != artifact.Contains || got.Value != "answer" {
+		t.Fatalf("contains validation = %#v", got)
+	}
+}
+
+func TestWorkContractRejectsInspectArtifactsAndUnknownContainsTarget(t *testing.T) {
+	if _, err := workContract(action.Inspect, artifactFlags{"report.md"}, nil); err == nil {
+		t.Fatal("inspect artifact was accepted")
+	}
+	if _, err := workContract(action.Draft, artifactFlags{"report.md"}, containsFlags{"other.md=marker"}); err == nil {
+		t.Fatal("unknown contains target was accepted")
+	}
+}
+
+type workScriptedModel struct {
+	turns []agent.Turn
+}
+
+func (m *workScriptedModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+	if len(m.turns) == 0 {
+		return agent.Turn{}, errors.New("unexpected model call")
+	}
+	turn := m.turns[0]
+	m.turns = m.turns[1:]
+	return turn, nil
+}
