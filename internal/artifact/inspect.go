@@ -30,9 +30,9 @@ const (
 // contract. Validation failures are represented as results rather than Go
 // errors so callers can persist useful evidence for an unsuccessful run.
 type Inspection struct {
-	Files       []File
-	Validations []ValidationResult
-	Passed      bool
+	Files       []File             `json:"files"`
+	Validations []ValidationResult `json:"validations"`
+	Passed      bool               `json:"passed"`
 }
 
 // Inspect walks the complete bounded output root, records regular artifacts,
