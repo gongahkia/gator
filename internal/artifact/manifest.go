@@ -28,6 +28,7 @@ type Manifest struct {
 	RunID          string             `json:"run_id"`
 	Workflow       string             `json:"workflow"`
 	Objective      string             `json:"objective"`
+	Contract       Contract           `json:"contract"`
 	ContractSHA256 string             `json:"contract_sha256"`
 	Source         Source             `json:"source"`
 	Artifacts      []File             `json:"artifacts"`
@@ -78,6 +79,13 @@ func (m Manifest) Validate() error {
 	}
 	if !validSHA256(m.ContractSHA256) {
 		return errors.New("artifact manifest contract digest is invalid")
+	}
+	if err := m.Contract.Validate(); err != nil {
+		return fmt.Errorf("artifact manifest contract: %w", err)
+	}
+	digest, err := m.Contract.Digest()
+	if err != nil || digest != m.ContractSHA256 {
+		return errors.New("artifact manifest contract does not match its digest")
 	}
 	if m.Source.Kind != "directory" || strings.TrimSpace(m.Source.Name) == "" || filepath.Base(m.Source.Name) != m.Source.Name || !validSHA256(m.Source.IdentitySHA256) {
 		return errors.New("artifact manifest source is invalid")
