@@ -42,6 +42,16 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestCodeAndRunShareTheCodingEntryPoint(t *testing.T) {
+	for _, command := range []string{"code", "run"} {
+		var output bytes.Buffer
+		err := run([]string{command, "task without verification"}, &output)
+		if err == nil || !strings.Contains(err.Error(), "--verify") {
+			t.Fatalf("%s entry point error = %v", command, err)
+		}
+	}
+}
+
 func TestSupportedPlatformAllowsOnlyLinuxAndMacOS(t *testing.T) {
 	for _, goos := range []string{"linux", "darwin"} {
 		if !supportedPlatform(goos) {
