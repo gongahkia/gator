@@ -255,10 +255,13 @@ func validationResult(path string, kind ValidationKind, passed bool, diagnostic 
 }
 
 func boundedDiagnostic(value string) string {
-	if len(value) <= maxDiagnosticBytes {
-		return value
+	if len(value) > maxDiagnosticBytes {
+		value = value[:maxDiagnosticBytes]
 	}
-	return value[:maxDiagnosticBytes]
+	for !utf8.ValidString(value) {
+		value = value[:len(value)-1]
+	}
+	return value
 }
 
 func fileNamed(files []File, path string) (File, bool) {
