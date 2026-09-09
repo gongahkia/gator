@@ -203,7 +203,8 @@ Scheduled work is intentionally a later service. It will require a durable job
 definition, an authenticated local supervisor, missed-run policy, concurrency
 limits, credential availability checks, immutable run history, notification
 routing, and safe shutdown. The existing process-local terminal registry is not
-a scheduler and must not be stretched into one.
+a scheduler and must not be stretched into one. The concrete trust model,
+schema, lifecycle, and release gates are defined in [Durable jobs](JOBS.md).
 
 ## CLI direction
 
@@ -217,7 +218,7 @@ gator review RUN                  inspect artifacts, evidence, and actions
 gator export RUN                  export a sealed artifact bundle
 gator apply RUN                   copy reviewed artifacts to explicit targets
 gator connector ...               manage connected sources and authentication
-gator job ...                     manage scheduled work (later)
+gator job ...                     manage scheduled work (planned; see JOBS.md)
 ```
 
 The existing `gator run` command remains an alias for `gator code` during a
