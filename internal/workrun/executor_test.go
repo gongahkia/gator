@@ -113,7 +113,7 @@ func TestExecutorPassesPromptAttachmentsOnlyToTheUserFacingManager(t *testing.T)
 	_, err := (Executor{Model: model, StateDir: t.TempDir()}).Execute(context.Background(), Request{
 		SourcePath: t.TempDir(), Objective: "Inspect the screenshot", RunID: "work-attachment", Mode: action.Inspect,
 		Contract: artifact.InspectionContract(), MaxSteps: 1,
-		Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}},
+		Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}}},
 	})
 	if err != nil {
 		t.Fatal(err)

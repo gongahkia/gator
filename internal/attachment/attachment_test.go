@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -67,6 +68,29 @@ func TestLoadInputsSharesImageAndDocumentLimits(t *testing.T) {
 	}
 	if _, _, err := LoadInputs(root, []Input{{Path: "../outside.png", Kind: ImageInput}}); err == nil || !strings.Contains(err.Error(), "escapes the workspace") {
 		t.Fatalf("escaping input error = %v", err)
+	}
+}
+
+func TestValidateLoadedEnforcesProgrammaticInputBoundary(t *testing.T) {
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}
+	if err := ValidateLoaded(
+		[]agent.Image{{Name: "screen.png", MediaType: "image/png", Data: png}},
+		[]agent.Attachment{{Name: "notes.txt", MediaType: "text/plain", Data: []byte("notes")}},
+	); err != nil {
+		t.Fatalf("valid loaded inputs: %v", err)
+	}
+	if err := ValidateLoaded(
+		[]agent.Image{{Name: "same", MediaType: "image/png", Data: png}},
+		[]agent.Attachment{{Name: "same", MediaType: "text/plain", Data: []byte("notes")}},
+	); err == nil || !strings.Contains(err.Error(), "more than once") {
+		t.Fatalf("duplicate loaded input error = %v", err)
+	}
+	if err := ValidateLoaded([]agent.Image{{Name: "fake.png", MediaType: "image/png", Data: []byte("not an image")}}, nil); err == nil || !strings.Contains(err.Error(), "mismatched") {
+		t.Fatalf("mismatched image error = %v", err)
+	}
+	tooMany := make([]agent.Attachment, MaxInputs+1)
+	if err := ValidateLoaded(nil, tooMany); err == nil || !strings.Contains(err.Error(), "at most") {
+		t.Fatalf("input count error = %v", err)
 	}
 }
 
