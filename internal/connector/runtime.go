@@ -18,7 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 )
 
-const maxHTTPJSONBytes = 4 * 1024 * 1024
+const maxHTTPJSONBytes = 256 * 1024
 
 // Runtime invokes user-configured connectors under a work-mode capability
 // ceiling. Credentials are resolved only through a descriptor's resource-bound
@@ -108,7 +108,7 @@ func (r Runtime) fetchHTTPJSON(ctx context.Context, descriptor Descriptor) (Resu
 		return Result{}, fmt.Errorf("read connector %q response: %w", descriptor.ID, err)
 	}
 	if len(contents) > maxHTTPJSONBytes {
-		return Result{}, fmt.Errorf("connector %q response exceeds 4 MiB", descriptor.ID)
+		return Result{}, fmt.Errorf("connector %q response exceeds 256 KiB", descriptor.ID)
 	}
 	if err := validateSingleJSON(contents); err != nil {
 		return Result{}, fmt.Errorf("connector %q returned invalid JSON: %w", descriptor.ID, err)
