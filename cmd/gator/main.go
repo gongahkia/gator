@@ -40,6 +40,7 @@ Usage:
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
+  gator connector list|add|status|login|logout|test|remove
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list|status
   gator extension install [--replace] DIRECTORY
@@ -54,7 +55,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator work [--source DIRECTORY] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
+  gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
   gator code [coding options] --verify 'argv ...' TASK
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -81,6 +82,7 @@ Commands:
   agent     list project-defined profiles and capability-bounded roles
 	 child     inspect durable manifests for retained isolated writer children
   lsp       trust and inspect local Language Server Protocol diagnostics
+  connector configure explicit connected sources and resource-bound authentication
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
   local     install, select, and manage curated Ollama coding models
@@ -166,6 +168,8 @@ func run(args []string, out io.Writer) error {
 		return lspCommand(args[1:], out)
 	case "mcp":
 		return mcpCommand(args[1:], out)
+	case "connector":
+		return connectorCommand(args[1:], out)
 	case "worktree":
 		return worktreeCommand(args[1:], out)
 	case "provider":

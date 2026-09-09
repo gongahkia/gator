@@ -129,6 +129,16 @@ func reviewWorkBundle(out io.Writer, bundle artifact.Bundle, jsonOutput, include
 			return err
 		}
 	}
+	if len(manifest.ConnectedSources) > 0 {
+		if _, err := fmt.Fprintln(out, "\nConnected sources:"); err != nil {
+			return err
+		}
+		for _, source := range manifest.ConnectedSources {
+			if _, err := fmt.Fprintf(out, "  ✓ %s/%s  %d bytes  sha256:%s  %s\n", source.ConnectorID, source.Operation, source.Bytes, source.SHA256[:12], source.Resource); err != nil {
+				return err
+			}
+		}
+	}
 	if _, err := fmt.Fprintln(out, "\nArtifacts:"); err != nil {
 		return err
 	}

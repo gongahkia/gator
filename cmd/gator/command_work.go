@@ -14,6 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -55,6 +56,8 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	flags.Var(&artifacts, "artifact", "required output-relative artifact path (repeatable; default report.md)")
 	var contains containsFlags
 	flags.Var(&contains, "require-contains", "required literal as ARTIFACT=TEXT (repeatable)")
+	var selectedConnectors connectorFlags
+	flags.Var(&selectedConnectors, "connector", "configured connected source ID (repeatable)")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -82,8 +85,20 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if err != nil {
 		return err
 	}
+	settings, err := loadSettings()
+	if err != nil {
+		return err
+	}
+	registry, err := connector.NewRegistry(settings.Connectors)
+	if err != nil {
+		return err
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		return err
+	}
 	if !*jsonOutput {
-		if _, err := fmt.Fprintf(out, "Gator Work\n  provider: %s\n  model: %s\n  mode: %s\n  source: %s\n  objective: %s\n", resolvedProvider, displayModel(resolvedModel), mode, *sourcePath, objective); err != nil {
+		if _, err := fmt.Fprintf(out, "Gator Work\n  provider: %s\n  model: %s\n  mode: %s\n  source: %s\n  connectors: %s\n  objective: %s\n", resolvedProvider, displayModel(resolvedModel), mode, *sourcePath, valueOrDash(strings.Join(selectedConnectors, ", ")), objective); err != nil {
 			return err
 		}
 	}
@@ -92,15 +107,16 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		printer := &eventPrinter{out: out}
 		sink = printer.Print
 	}
-	executor := workrun.Executor{Model: backend, StateDir: stateDir}
+	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
 	outcome, runErr := executor.Execute(context.Background(), workrun.Request{
-		SourcePath: *sourcePath,
-		Objective:  objective,
-		RunID:      *runID,
-		MaxSteps:   *maxSteps,
-		Mode:       mode,
-		Contract:   contract,
-		OnEvent:    sink,
+		SourcePath:   *sourcePath,
+		Objective:    objective,
+		RunID:        *runID,
+		MaxSteps:     *maxSteps,
+		Mode:         mode,
+		Contract:     contract,
+		OnEvent:      sink,
+		ConnectorIDs: selectedConnectors,
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
@@ -266,6 +282,19 @@ func (f *containsFlags) String() string { return strings.Join(*f, ", ") }
 func (f *containsFlags) Set(value string) error {
 	if len(value) > 8*1024 || strings.ContainsRune(value, 0) {
 		return errors.New("artifact literal requirement is invalid")
+	}
+	*f = append(*f, value)
+	return nil
+}
+
+type connectorFlags []string
+
+func (f *connectorFlags) String() string { return strings.Join(*f, ", ") }
+
+func (f *connectorFlags) Set(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, "\x00\r\n") {
+		return errors.New("connector ID is invalid")
 	}
 	*f = append(*f, value)
 	return nil

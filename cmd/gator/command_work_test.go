@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,15 +84,56 @@ func TestWorkContractRejectsInspectArtifactsAndUnknownContainsTarget(t *testing.
 	}
 }
 
-type workScriptedModel struct {
-	turns []agent.Turn
+func TestWorkCommandUsesOnlyExplicitlySelectedConnector(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"metric":9}`))
+	}))
+	defer server.Close()
+	if err := connectorCommandWithIO([]string{"add", "metrics", "--url", server.URL}, strings.NewReader(""), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	model := &workScriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "fetch-1", Name: "connector_metrics_fetch", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"Metric: 9\\n"}`)}}},
+		{Text: "Created report.md."},
+	}}
+	var output bytes.Buffer
+	err := runWorkTask([]string{"--source", t.TempDir(), "--connector", "metrics", "--max-steps", "4", "prepare", "metrics"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) {
+		return model, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.requests) == 0 || !hasDefinition(model.requests[0].Tools, "connector_metrics_fetch") || !strings.Contains(output.String(), "connectors: metrics") {
+		t.Fatalf("request=%#v output=%q", model.requests, output.String())
+	}
 }
 
-func (m *workScriptedModel) Complete(_ context.Context, _ agent.TurnRequest) (agent.Turn, error) {
+type workScriptedModel struct {
+	turns    []agent.Turn
+	requests []agent.TurnRequest
+}
+
+func (m *workScriptedModel) Complete(_ context.Context, request agent.TurnRequest) (agent.Turn, error) {
+	m.requests = append(m.requests, request)
 	if len(m.turns) == 0 {
 		return agent.Turn{}, errors.New("unexpected model call")
 	}
 	turn := m.turns[0]
 	m.turns = m.turns[1:]
 	return turn, nil
+}
+
+func hasDefinition(definitions []agent.ToolDefinition, name string) bool {
+	for _, definition := range definitions {
+		if definition.Name == name {
+			return true
+		}
+	}
+	return false
 }
