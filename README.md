@@ -214,6 +214,12 @@ GEMINI_API_KEY=... ./bin/gator run --provider gemini \
   --model gemini-3.5-flash --verify 'go test ./...' \
   'Add a focused feature with tests'
 
+# Direct API providers can be connected from an existing environment variable
+# or through a hidden terminal prompt when the variable is absent.
+./bin/gator connect openai
+./bin/gator connect anthropic
+./bin/gator connect gemini
+
 # `connect` is the no-registration subscription route when a vendor CLI offers
 # a public login. Credentials stay in that CLI's credential store.
 ./bin/gator connect codex            # first-party Codex browser login

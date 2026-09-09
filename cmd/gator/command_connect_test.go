@@ -65,3 +65,28 @@ func TestConnectXAIUsesOpenCodeAndClaudeStoresAPIKey(t *testing.T) {
 		t.Fatalf("Claude connect credential = %#v, found=%v, err=%v", credential, found, err)
 	}
 }
+
+func TestConnectDirectAPIKeyProvidersFromEnvironment(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "openai-connect-key")
+	t.Setenv("GEMINI_API_KEY", "gemini-connect-key")
+	var output bytes.Buffer
+	for _, provider := range []string{"openai", "gemini"} {
+		if err := connect([]string{provider}, &output); err != nil {
+			t.Fatalf("connect %s: %v", provider, err)
+		}
+	}
+	credentials, err := gatorCredentials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for provider, expected := range map[string]string{"openai": "openai-connect-key", "gemini": "gemini-connect-key"} {
+		credential, found, err := credentials.Read(provider)
+		if err != nil || !found || credential.Key != expected {
+			t.Fatalf("%s credential = %#v, found=%v, err=%v", provider, credential, found, err)
+		}
+	}
+	if strings.Contains(output.String(), "openai-connect-key") || strings.Contains(output.String(), "gemini-connect-key") {
+		t.Fatalf("connect output leaked a key: %q", output.String())
+	}
+}

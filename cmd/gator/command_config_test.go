@@ -72,3 +72,21 @@ func TestConfiguredDefaultsPreservesEnvironmentOverride(t *testing.T) {
 		t.Fatalf("provider/model = %q/%q", provider, modelFromEnvironment(provider))
 	}
 }
+
+func TestSelectWorkOnboardingProviderPersistsProviderAndDefaultModel(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	if err := selectWorkOnboardingProvider("openai"); err != nil {
+		t.Fatal(err)
+	}
+	store, err := config.DefaultStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := store.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settings.Defaults.Provider != "openai" || settings.Defaults.Model == "" {
+		t.Fatalf("Work defaults = %#v", settings.Defaults)
+	}
+}

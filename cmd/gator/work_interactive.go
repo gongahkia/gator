@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/journal"
@@ -91,6 +92,7 @@ func workInteractiveConversation(startConversationID string) error {
 			command.Stderr = os.Stderr
 			return command
 		},
+		CompleteSetup: selectWorkOnboardingProvider,
 		Run: func(source, conversationID, prompt string) worktui.RunResult {
 			return runInteractiveWork(source, conversationID, prompt, stateDir)
 		},
@@ -187,6 +189,34 @@ func workInteractiveConversation(startConversationID string) error {
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	_, err = program.Run()
 	return err
+}
+
+func selectWorkOnboardingProvider(providerName string) error {
+	providerName = strings.ToLower(strings.TrimSpace(providerName))
+	if providerName == "claude" {
+		providerName = "anthropic"
+	}
+	provider, modelName, err := resolveConfiguredProvider(providerName, "")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(modelName) == "" {
+		return fmt.Errorf("provider %q needs an explicit model; configure it from the full model screen", provider)
+	}
+	store, err := config.DefaultStore()
+	if err != nil {
+		return err
+	}
+	settings, err := store.Load()
+	if err != nil {
+		return err
+	}
+	settings.Defaults.Provider = provider
+	settings.Defaults.Model = modelName
+	if err := store.Save(settings); err != nil {
+		return fmt.Errorf("save selected Work provider: %w", err)
+	}
+	return nil
 }
 
 func runInteractiveWork(source, conversationID, prompt, stateDir string) worktui.RunResult {

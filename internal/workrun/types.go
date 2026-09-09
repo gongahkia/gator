@@ -12,9 +12,48 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
 )
+
+const (
+	CodeCapabilityLSP       = "lsp"
+	CodeCapabilityMCP       = "mcp"
+	CodeCapabilityExtension = "extension"
+	CodeCapabilityHTTP      = "http"
+	CodeCapabilityBrowser   = "browser"
+	CodeCapabilityTerminal  = "terminal"
+)
+
+// CodePolicy is the user-owned capability envelope for Gator's internal Code
+// specialist. The Work manager can decide whether to delegate, but it cannot
+// widen this policy. Empty policies deliberately resolve to strict, offline
+// execution with only the built-in patch tools and verifier commands.
+type CodePolicy struct {
+	MaxSteps               int
+	Verification            [][]string
+	Scopes                  []string
+	Profile                 string
+	Setup                   [][]string
+	AllowedCommands         [][]string
+	AllowedCommandPrefixes  [][]string
+	Sandbox                 sandbox.Policy
+	Capabilities            []string
+	BrowserSession          string
+}
+
+// HasCapability reports an explicit per-Work-run grant. Configuration and
+// project trust remain necessary but are never sufficient by themselves.
+func (p CodePolicy) HasCapability(name string) bool {
+	for _, capability := range p.Capabilities {
+		if capability == name {
+			return true
+		}
+	}
+	return false
+}
 
 // Request describes one bounded local work session.
 type Request struct {
@@ -38,6 +77,14 @@ type Request struct {
 	ConnectorPermissions connector.PermissionSet
 	SnapshotOptions      snapshot.Options
 	OnSnapshot           func(snapshot.Manifest)
+	Images               []agent.Image
+	Attachments          []agent.Attachment
+	// RequireCode is used by the compatibility `gator code` route. It keeps the
+	// main Work manager user-facing while requiring concrete Code-specialist
+	// evidence before the run may complete.
+	RequireCode        bool
+	Code               CodePolicy
+	ApproveCodeCommand func(context.Context, []string) (tools.CommandDecision, error)
 }
 
 // Outcome retains staged files and trusted evidence even when model execution
@@ -63,6 +110,8 @@ type CodeRequest struct {
 	Task        string
 	ParentRunID string
 	MaxSteps    int
+	Policy      CodePolicy
+	Approve     func(context.Context, []string) (tools.CommandDecision, error)
 }
 
 // CodeResult is the bounded handoff from Gator Code back to Gator Work.
