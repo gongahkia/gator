@@ -1,4 +1,4 @@
-# Gator Work orchestration
+# Gator orchestration
 
 ## Decision
 
@@ -26,7 +26,7 @@ logging, and evidence without adding a capability Gator currently lacks.
 user objective
       |
       v
-Gator Work manager ───────────────> final answer + sealed artifacts
+Gator manager ────────────────────> final answer + sealed artifacts
       |
       +── delegate_agents (bounded budget, up to 3 parallel tasks)
               |
@@ -48,10 +48,15 @@ Specialists cannot recursively delegate or inherit connector or publish access.
 | `artifact_reviewer` | Staged output needs independent contract review | Read frozen source, prior output, and staged output; call `artifact_status` | Prioritized defects and validation evidence |
 | `code` | The Work objective contains a bounded implementation task | Run Gator Code against a private Git repository copied from the exact source snapshot | Summary, changed paths, and a retained `.patch` artifact |
 
-The Code specialist never edits the user's source. Its writer delegation,
-network, browser, terminal, MCP, LSP, and extension surfaces are disabled for
-this nested run. The parent manager can inspect the patch but cannot silently
-apply it to the selected source.
+The Code specialist never edits the user's source and is not directly
+user-facing. Strict sandboxing, denied network, no recursive writer/scout
+delegation, and `git diff --check` are invariant defaults. The user may add
+project verifiers, scopes, a profile, setup commands, exact command grants, or
+literal command-prefix grants. LSP, MCP, extensions, HTTP research, browser,
+and terminal access remain absent unless explicitly granted for that Work run;
+project trust and stored configuration are still required underneath the
+grant. The manager receives this envelope as read-only host policy and cannot
+widen it through `delegate_agents`.
 
 ## Bounds and evidence
 

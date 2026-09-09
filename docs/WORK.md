@@ -45,10 +45,10 @@ first supported workflows are:
 2. clean, compare, and summarize CSV or spreadsheet data; and
 3. research a bounded subject and produce a source-backed deliverable.
 
-Coding remains a first-class workflow, but it is no longer the root abstraction.
-The existing Git-worktree executor becomes the `code` workflow. General work
-uses an ordinary directory as a read-only source and a private, isolated output
-workspace.
+Coding remains a first-class capability, but it is not a second user-facing
+workflow. Gator owns the conversation and delegates bounded implementation to
+its internal Git-worktree Code specialist. General work uses an ordinary
+directory as a read-only source and a private, isolated output workspace.
 
 Gator now includes durable local conversations, immutable local-source
 snapshots, document/workbook renderers, connected services, and a manual
@@ -230,7 +230,7 @@ The command hierarchy is:
 ```text
 gator work [DIRECTORY] TASK       run a general local work task
 gator inspect [DIRECTORY] TASK    produce analysis without artifacts
-gator code TASK                   run the existing Git coding workflow
+gator code TASK                   compatibility route requiring an internal Code patch
 gator review RUN                  inspect artifacts, evidence, and actions
 gator export RUN                  export a sealed artifact bundle
 gator apply RUN                   copy reviewed artifacts to explicit targets
@@ -240,9 +240,9 @@ gator inbox                       inspect completed and attention-needed jobs
 gator snapshot ...                inspect or collect unreferenced snapshots
 ```
 
-The existing `gator run` command remains an alias for `gator code` during a
-documented compatibility period. RPC and ACP gain explicit workflow and outcome
-contract fields rather than changing the meaning of existing version-1 fields.
+`gator code` and `gator run` are compatibility routes through the same Gator
+manager. They require Code-specialist evidence but never open a separate Code
+TUI. RPC and ACP retain explicit workflow and outcome-contract fields.
 
 Headless operation is a primary product surface. Structured output, stable exit
 codes, stdin-compatible task input, and immutable manifests make Gator useful in
@@ -264,7 +264,8 @@ The implementation is split around durable concepts:
 - `internal/snapshot`, `internal/worksession`, `internal/jobs`, and
   `internal/inbox`: immutable Work inputs, revision history, schedules, and
   result routing; and
-- `internal/run`: the retained coding workflow surfaced as `gator code`.
+- `internal/run`: the backend-only isolated coding executor used by Gator's
+  Code specialist and protocol integrations.
 
 Gator Work can call the retained coding workflow as a narrowly scoped `code`
 specialist. It receives the exact immutable Work source snapshot, runs in a
@@ -278,7 +279,9 @@ adapters.
 
 ## Compatibility and state
 
-`gator run` remains an alias for `gator code`. Work conversations and coding
-threads use separate versioned stores: old run records are never silently
-reinterpreted as Work sessions. Snapshot collection is explicit and does not
-delete data; `gator snapshot gc --yes` is the only snapshot reclamation path.
+`gator run` remains an alias for the `gator code` compatibility route. New
+coding requests use Work conversations and revisions. Historical Code run
+records remain readable for review/export compatibility but are never silently
+reinterpreted as Gator conversations. Snapshot collection is explicit and does
+not delete data; `gator snapshot gc --yes` is the only snapshot reclamation
+path.
