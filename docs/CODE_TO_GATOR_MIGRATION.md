@@ -54,6 +54,8 @@ user controls + objective
 | Attached interactive terminal UX | Retire from Code frontend | Terminal can be an explicitly granted internal tool, but has no child-facing UI |
 | Vim composer mode, mouse-heavy diff controls, Code-only drawers and control center | Retire | They do not improve the single, conversation-first Gator surface enough to justify a second UI state machine |
 | Vendor-harness chooser inside Code | Keep as root boundary, not child convenience | Explicit `gator delegate`; never selected silently by Gator or Code |
+| Extension prompt commands and declarative Code UI cards | Retire from the product surface | Bundle metadata remains readable for compatibility, but only explicitly granted backend tools are active |
+| JSONL RPC, ACP, and app-server transports | Keep as machine-facing backend compatibility | They remain non-TUI integration surfaces around the retained engine; a future incompatible Work-native protocol must use Work conversations and capability envelopes |
 
 ## Delegation invariants
 

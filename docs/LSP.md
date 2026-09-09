@@ -12,9 +12,10 @@ regular files in that worktree; Gator never executes a server-provided command,
 applies an LSP edit automatically, or follows resource operations such as
 create, rename, or delete. The native agent can turn a returned edit into an
 ordinary reviewable `apply_patch` call. Gator does not expose a persistent
-cross-process server or on-disk index. Within one native TUI or `gator serve`
-session, it can retain a trusted server across compatible resumed runs of the
-same retained worktree.
+cross-process server or on-disk index. The authenticated legacy `gator serve`
+machine-integration process can retain a trusted server across compatible
+resumed runs of the same retained worktree. Main-TUI Work delegations are
+one-shot and do not retain a child LSP process between revisions.
 
 Create `.gator/lsp.json` in the repository:
 
@@ -62,18 +63,13 @@ allow-always, or deny approval using an argv-shaped record such as
 path or symbol query. Only after approval does Gator start the server. The
 server runs in Gator's strict sandbox by default with its configured network
 mode. The first approved lookup lazily starts it; later approved lookups reuse
-that same server within the current run. The native TUI and authenticated
-`gator serve` additionally keep at most eight idle trusted managers in memory,
-keyed by the canonical retained-worktree path and exact trusted bundle hash.
-That lets a later compatible resume reuse its server index. When a later native
-run observes a removed manifest, changed executable or manifest hash, or lost
-explicit trust, it retires the old manager; an in-flight run releases it before
-it is stopped.
-Gator shuts every cached manager down when that TUI or app-server process exits
-and discards an unhealthy client after a transport failure. Requests sharing a
-manager are serialized over its JSON-RPC transport. This cache is intentionally
-process-local: it preserves a compatible live server index for a retained
-worktree but does not write an index or resurrect a process after restart.
+that same server within the current run. The authenticated `gator serve`
+compatibility surface additionally keeps at most eight idle trusted managers
+in memory, keyed by canonical retained-worktree path and exact trusted bundle
+hash. A changed manifest, executable, trust record, or root set retires the old
+manager. Gator shuts every cached manager down when the app-server process
+exits and discards unhealthy clients after transport failure. This cache is
+process-local; it writes no index and resurrects no process after restart.
 
 When a server advertises `textDocumentSync`, Gator synchronizes each
 file-targeted lookup from its current on-disk snapshot: it sends `didOpen` once,
