@@ -1,12 +1,23 @@
 # Release evidence
 
 This is the acceptance record for calling a Gator build useful for daily
-work. It is not a SWE-bench submission and not a claim of model quality.
+general work or coding work. It is not a benchmark submission and not a claim
+of model quality.
 
 ## Automated evidence
 
 `go test ./...` covers:
 
+- non-Git source isolation, named read-only/write-only roots, symlink escape
+  rejection, and descriptor-rooted regular-file reads;
+- typed text, JSON, and CSV writers with per-file and aggregate limits;
+- deterministic outcome contracts, artifact inspection, hashes, manifests,
+  media-aware previews, portable export, and conflict-aware apply;
+- selected connected JSON sources with URL-bound credentials and sealed
+  provenance;
+- webhook proposals bound to an exact target, escaped JSON preview, and
+  payload digest, including draft-only behavior, fresh approval, denial,
+  definite failure, and uncertain remote outcomes;
 - the bounded tool loop, policy denials, and state transitions
 - disposable-repository feature, failing-verifier, and resume/interrupt runs
 - provider history replay (function-call correlation and opaque provider data)
@@ -83,27 +94,46 @@ Record one row per session. Do not silently skip a failed item.
 | Usability issues | |
 | Fixes landed or follow-ups | issue ids or “none” |
 
+For Work sessions also record:
+
+| Field | Fill in |
+| --- | --- |
+| Source folder (name only) | |
+| Outcome contract | artifact paths, validators, external-action disposition |
+| Bundle ID | |
+| Review verification | pass/fail |
+| Export/apply | not attempted / check only / applied |
+| Connected sources | IDs only, or “none” |
+| External actions | none / pending / denied / executed / failed / unknown |
+
 Copy the table into `docs/dogfood/` as `YYYY-MM-DD-<short-sha>.md` if you
 keep local notes. Do not commit transcripts, session files, or credentials.
 
 ### Minimum dogfood set before calling a release daily-driver
 
-1. New Execute run with `--verify` on a real repo; review worktree; do not
+1. Run `gator inspect` on a real non-Git folder and confirm no source byte or
+   external state changes.
+2. Produce Markdown plus JSON or CSV from a real folder; verify the bundle and
+   preview it by ID.
+3. Export that bundle, run apply preflight against an existing directory, then
+   apply only after reviewing conflicts; confirm the source remains unchanged.
+4. Use an authenticated connected JSON source and confirm the manifest records
+   resource, retrieval time, byte count, and digest without a credential.
+5. Create a webhook proposal with `--actions draft`; confirm no request is sent
+   and the review shows escaped exact JSON plus its digest.
+6. In an isolated test endpoint, deny one act-mode proposal and approve another;
+   confirm only the approved payload is sent and each decision is requested.
+7. New code Execute run with `--verify` on a real repo; review worktree; do not
    apply until `--check` is clean.
-2. Plan then Execute on the same retained thread.
-3. Resume `--last` with a continuation instruction.
-4. Fork or clone an earlier turn and confirm the source thread is unchanged.
-5. Deny an exploratory command, then allow-once, then confirm the worktree
-   still matches intent.
-6. `/doctor` inspect-only; `/manage` trust status without mutating unless
-   intended.
-7. Browser review on loopback (`gator review PATH` or TUI `b`); confirm the
-   checkout is untouched.
-8. Cancel a running turn and confirm the worktree is retained.
+8. Plan then Execute on the same retained coding thread.
+9. Resume `--last`, then fork an earlier turn and confirm the source thread is
+   unchanged.
+10. Cancel a running turn and confirm retained evidence is reviewable.
 
 ## Remaining non-evidence
 
-Passing this file does not establish: hosted agents, org governance, detached
-writer teams, full JavaScript/screenshot browser automation, unrestricted
-computer use, support beyond Linux and macOS, or parity with Codex CLI,
-Claude Code, Cursor CLI, Pi, or OpenCode.
+Passing this file does not establish: built-in persistent jobs, hosted agents,
+organization governance, general DOCX/XLSX/PDF generation, unrestricted
+computer use, support beyond Linux and macOS, or parity with ChatGPT Work,
+Claude Cowork, Codex, Claude Code, Cursor, Pi, or OpenCode. See
+[Durable jobs](JOBS.md) for why scheduling remains a separate release gate.
