@@ -90,7 +90,7 @@ func prepareCodeSnapshotRepository(ctx context.Context, source, scratch, id stri
 	}
 	for _, arguments := range [][]string{
 		{"init", "--quiet"},
-		{"add", "--all"},
+		{"add", "--all", "--force"},
 		{"-c", "user.name=Gator", "-c", "user.email=gator@invalid", "commit", "--quiet", "--allow-empty", "--message", "frozen Work source"},
 	} {
 		command := exec.CommandContext(ctx, "git", arguments...)

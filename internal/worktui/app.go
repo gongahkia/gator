@@ -48,30 +48,33 @@ type setupDone struct {
 }
 
 type Model struct {
-	config       Config
-	width        int
-	height       int
-	home         bool
-	launcher     bool
-	selected     int
-	entries      []entry
-	source       string
-	conversation string
-	title        string
-	input        string
-	messages     []message
-	running      bool
-	status       string
-	onboarding   bool
-	scroll       int
+	config        Config
+	width         int
+	height        int
+	home          bool
+	launcher      bool
+	selected      int
+	entries       []entry
+	source        string
+	conversation  string
+	title         string
+	input         string
+	messages      []message
+	running       bool
+	status        string
+	onboarding    bool
+	firstRun      bool
+	pendingPrompt string
+	scroll        int
 }
 
 func New(config Config) Model {
 	model := Model{
-		config: config,
-		home:   true,
-		source: config.CurrentFolder,
-		title:  "Work in " + filepath.Base(config.CurrentFolder),
+		config:   config,
+		home:     true,
+		firstRun: config.FirstRun,
+		source:   config.CurrentFolder,
+		title:    "Work in " + filepath.Base(config.CurrentFolder),
 	}
 	if config.FirstRun {
 		model.entries = append(model.entries, entry{title: "Start guided setup", subtitle: "Connect a model, then begin your first task", kind: "onboarding", source: config.CurrentFolder})
@@ -132,11 +135,27 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.onboarding = false
+		m.firstRun = false
 		m.home = true
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
 		m.messages = nil
 		m.status = "Connected to " + value.provider
+		if m.pendingPrompt != "" {
+			prompt := m.pendingPrompt
+			m.pendingPrompt = ""
+			m.home = false
+			m.messages = append(m.messages, message{role: "You", text: prompt})
+			m.running = true
+			m.status = "Working from an immutable snapshot…"
+			if m.config.Run == nil {
+				m.running = false
+				m.messages = append(m.messages, message{role: "Gator", text: "Work execution is unavailable in this build."})
+				return m, nil
+			}
+			source, conversation := m.source, m.conversation
+			return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt)) }
+		}
 	case tea.KeyMsg:
 		if value.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -220,6 +239,14 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.input = ""
+		if m.firstRun {
+			m.home = false
+			m.onboarding = true
+			m.pendingPrompt = prompt
+			m.title = "Welcome to Gator"
+			m.messages = []message{{role: "Gator", text: "Before I start, which model provider do you want to use? Try anthropic, openai, copilot, gemini, or openrouter."}}
+			return m, nil
+		}
 		m.home = false
 		m.messages = append(m.messages, message{role: "You", text: prompt})
 		m.running = true
@@ -419,7 +446,7 @@ func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string 
 		context = "current folder"
 	}
 	hint := context + "  ·  ctrl+p menu"
-	if m.config.FirstRun {
+	if m.firstRun {
 		hint = "connect a model from ctrl+p  ·  " + hint
 	} else if m.status != "" {
 		hint = m.status + "  ·  " + hint
