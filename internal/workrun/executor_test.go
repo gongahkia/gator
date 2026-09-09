@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 )
 
 func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
@@ -114,6 +117,42 @@ func TestExecutorRejectsModeContractEscalationBeforeCreatingWorkspace(t *testing
 	})
 	if err == nil || !strings.Contains(err.Error(), "draft mode") {
 		t.Fatalf("escalation error = %v", err)
+	}
+}
+
+func TestExecutorSealsExplicitConnectorProvenance(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"revenue_growth":12}`))
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{
+		Version: connector.DescriptorVersion, ID: "metrics", Name: "Metrics",
+		Kind: connector.KindHTTPJSON, Resource: server.URL, Authentication: connector.AuthNone,
+	}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "source-1", Name: "connector_metrics_fetch", Arguments: json.RawMessage(`{}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"Revenue grew 12%."}`)}}},
+		{Text: "Created report.md from the connected source."},
+	}}
+	outcome, err := (Executor{
+		Model: model, StateDir: t.TempDir(), Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()},
+	}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Prepare a metrics report", RunID: "work-connector",
+		Contract: artifact.DefaultContract("report.md"), ConnectorIDs: []string{"metrics"}, MaxSteps: 4,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outcome.Manifest.ConnectedSources) != 1 || outcome.Manifest.ConnectedSources[0].ConnectorID != "metrics" {
+		t.Fatalf("connected provenance = %#v", outcome.Manifest.ConnectedSources)
+	}
+	if !strings.Contains(model.requests[0].System, "Explicitly selected connected sources: metrics") {
+		t.Fatalf("system prompt = %q", model.requests[0].System)
 	}
 }
 

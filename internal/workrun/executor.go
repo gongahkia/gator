@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -46,6 +47,14 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if err != nil {
 		return outcome, err
 	}
+	connectedSources := make([]connector.Provenance, 0, len(request.ConnectorIDs))
+	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.Mode, request.ConnectorIDs, func(source connector.Provenance) {
+		connectedSources = append(connectedSources, source)
+	})
+	if err != nil {
+		return outcome, err
+	}
+	surface = append(surface, connectorSurface...)
 	events := make([]agent.Event, 0, 32)
 	emit := func(event agent.Event) {
 		events = append(events, event)
@@ -75,7 +84,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
 		RunID: request.RunID, Objective: request.Objective, Source: work.Source,
-		Failure: failure, StartedAt: startedAt, FinishedAt: now(),
+		Failure: failure, ConnectedSources: connectedSources, StartedAt: startedAt, FinishedAt: now(),
 	})
 	if sealErr != nil {
 		if runErr != nil {
@@ -140,6 +149,9 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	request.StateDir = stateDir
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
+	}
+	if _, err := tools.ConnectorTools(e.Connectors, request.Mode, request.ConnectorIDs, nil); err != nil {
+		return Request{}, fmt.Errorf("select work connectors: %w", err)
 	}
 	return request, nil
 }
