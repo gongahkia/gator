@@ -123,17 +123,20 @@ keep local notes. Do not commit transcripts, session files, or credentials.
    and the review shows escaped exact JSON plus its digest.
 6. In an isolated test endpoint, deny one act-mode proposal and approve another;
    confirm only the approved payload is sent and each decision is requested.
-7. New code Execute run with `--verify` on a real repo; review worktree; do not
-   apply until `--check` is clean.
-8. Plan then Execute on the same retained coding thread.
-9. Resume `--last`, then fork an earlier turn and confirm the source thread is
-   unchanged.
-10. Cancel a running turn and confirm retained evidence is reviewable.
+7. Run `gator code --verify ...` on a real repo and confirm it enters the main
+   Gator orchestration path, retains internal Code patch evidence, and leaves
+   the source unchanged.
+8. Give ordinary Gator one mixed research-and-implementation prompt; confirm
+   the manager delegates Code only for the bounded implementation portion.
+9. Resume a Work conversation, branch from an earlier revision, and confirm the
+   original revision and source snapshot remain unchanged.
+10. Queue a second main-TUI prompt, force the active run to fail, and confirm
+    the queue pauses rather than executing unattended.
 
 ## Remaining non-evidence
 
-Passing this file does not establish: built-in persistent jobs, hosted agents,
-organization governance, general DOCX/XLSX/PDF generation, unrestricted
-computer use, support beyond Linux and macOS, or parity with ChatGPT Work,
-Claude Cowork, Codex, Claude Code, Cursor, Pi, or OpenCode. See
-[Durable jobs](JOBS.md) for why scheduling remains a separate release gate.
+Passing this file does not establish: an installed always-on job service,
+hosted agents, organization governance, broad native-office fidelity,
+unrestricted computer use, support beyond Linux and macOS, or parity with
+ChatGPT Work, Claude Cowork, Codex, Claude Code, Cursor, Pi, or OpenCode. See
+[Durable jobs](JOBS.md) for the foreground supervisor's exact boundary.
