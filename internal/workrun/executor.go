@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
@@ -324,6 +325,9 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
+	if err := validatePromptInputs(request.Images, request.Attachments); err != nil {
+		return Request{}, err
+	}
 	request.Code.Sandbox = request.Code.Sandbox.Normalize()
 	if err := request.Code.Sandbox.Validate(); err != nil {
 		return Request{}, fmt.Errorf("validate Code specialist sandbox: %w", err)
@@ -358,6 +362,53 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		return Request{}, fmt.Errorf("select work connectors: %w", err)
 	}
 	return request, nil
+}
+
+func validatePromptInputs(images []agent.Image, attachments []agent.Attachment) error {
+	if len(images)+len(attachments) > attachment.MaxInputs {
+		return fmt.Errorf("attach at most %d files per task", attachment.MaxInputs)
+	}
+	seen := make(map[string]struct{}, len(images)+len(attachments))
+	totalBytes := 0
+	validate := func(name, mediaType string, data []byte, maxBytes int, allowedMediaTypes ...string) error {
+		name = strings.TrimSpace(name)
+		if name == "" || strings.ContainsRune(name, 0) {
+			return errors.New("attachment name is missing or invalid")
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return fmt.Errorf("attachment %q was supplied more than once", name)
+		}
+		seen[name] = struct{}{}
+		if len(data) == 0 || len(data) > maxBytes {
+			return fmt.Errorf("attachment %q has an invalid size", name)
+		}
+		validMediaType := false
+		for _, allowed := range allowedMediaTypes {
+			if mediaType == allowed {
+				validMediaType = true
+				break
+			}
+		}
+		if !validMediaType {
+			return fmt.Errorf("attachment %q has unsupported media type %q", name, mediaType)
+		}
+		totalBytes += len(data)
+		if totalBytes > attachment.MaxTotalBytes {
+			return fmt.Errorf("attached files exceed the %d MiB total limit", attachment.MaxTotalBytes/(1024*1024))
+		}
+		return nil
+	}
+	for _, image := range images {
+		if err := validate(image.Name, image.MediaType, image.Data, attachment.MaxImageBytes, "image/png", "image/jpeg", "image/webp"); err != nil {
+			return err
+		}
+	}
+	for _, item := range attachments {
+		if err := validate(item.Name, item.MediaType, item.Data, attachment.MaxDocumentBytes, "text/plain", attachment.PDFMediaType); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func outcomeCompletionCheck(root workspace.Root, contract artifact.Contract, codeReady func() bool) func([]agent.Message) error {
