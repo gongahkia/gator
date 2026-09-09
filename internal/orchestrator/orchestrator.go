@@ -44,6 +44,8 @@ type Invocation struct {
 // Result is the bounded information returned from a specialist to its manager.
 // Artifact fields are optional trusted evidence supplied by the host.
 type Result struct {
+	BaselineSHA256 string
+	Usage          agent.Usage
 	Summary        string
 	Steps          int
 	ArtifactPath   string
@@ -53,6 +55,7 @@ type Result struct {
 // Specialist describes one capability visible to the manager. Run must start
 // from fresh context and return only the information needed by the manager.
 type Specialist struct {
+	Configuration RoleConfiguration
 	Name        string
 	Description string
 	Run         func(context.Context, Invocation) (Result, error)
@@ -60,6 +63,8 @@ type Specialist struct {
 
 // Record is trusted orchestration evidence for one specialist invocation.
 type Record struct {
+	BaselineSHA256 string
+	Usage          agent.Usage
 	ID             string
 	Agent          string
 	TaskSHA256     string
@@ -74,6 +79,7 @@ type Record struct {
 
 // Options configures one manager's bounded delegation surface.
 type Options struct {
+	Limits         agent.Limits
 	StatePath      string
 	ParentRun      string
 	Source         string
@@ -84,6 +90,12 @@ type Options struct {
 	Now            func() time.Time
 	OnEvent        agent.EventSink
 	OnRecord       func(Record)
+}
+
+type RoleConfiguration struct {
+	Version  int    `json:"version"`
+	Provider string `json:"provider"`
+	MaxSteps int    `json:"max_steps"`
 }
 
 // Tools returns the model-callable delegation surface for a small specialist

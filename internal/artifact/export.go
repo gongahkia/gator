@@ -81,7 +81,12 @@ func WriteArchive(destination io.Writer, bundle Bundle) error {
 			return err
 		}
 	}
+	exportedEvidence := map[string]bool{}
 	for _, source := range bundle.Manifest.Evidence {
+		if exportedEvidence[source.SnapshotPath] {
+			continue
+		}
+		exportedEvidence[source.SnapshotPath] = true
 		if source.SnapshotPath == "" {
 			continue
 		}

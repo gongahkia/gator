@@ -56,19 +56,25 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 		}
 	}
 
-	specialists = append(specialists, orchestrator.LLMSpecialist("claim_verifier", "Independently review exact claim quotations and explicitly distinguish citation integrity from semantic support.", e.roleModel("claim_verifier"), request.catalog.tools(), "Verify claims against selected evidence. Use check_claims and read_evidence. Report unsupported and conflicting claims; quotation matching alone does not establish entailment.", steps, e.Now))
-	specialists = append(specialists, orchestrator.LLMSpecialist("connected_researcher", "Read retained selected connected/web evidence without mutation authority.", e.roleModel("connected_researcher"), request.researchTools, "Research only selected evidence and permitted web origins; retain evidence IDs and disclose missing sources. No mutation or delegation.", steps, e.Now))
-	specialists = append(specialists, orchestrator.LLMSpecialist("spreadsheet_analyst", "Inspect frozen table cells and document extraction without writing or publishing.", e.roleModel("spreadsheet_analyst"), []agent.Tool{tools.InspectTable{Root: work.Source}, tools.ExtractDocument{Root: work.Source}}, "Inspect tables and return row/cell evidence. Delegate arithmetic to deterministic tools; report schema, duplicate and missing-value problems.", steps, e.Now))
+	specialists = append(specialists, orchestrator.LLMSpecialist("claim_verifier", "Independently review exact claim quotations and explicitly distinguish citation integrity from semantic support.", e.roleModel("claim_verifier"), request.catalog.tools(), "Verify claims against selected evidence. Use check_claims and read_evidence. Report unsupported and conflicting claims; quotation matching alone does not establish entailment.", e.roleSteps("claim_verifier", steps), e.Now))
+	specialists = append(specialists, orchestrator.LLMSpecialist("connected_researcher", "Read retained selected connected/web evidence without mutation authority.", e.roleModel("connected_researcher"), request.researchTools, "Research only selected evidence and permitted web origins; retain evidence IDs and disclose missing sources. No mutation or delegation.", e.roleSteps("connected_researcher", steps), e.Now))
+	specialists = append(specialists, orchestrator.LLMSpecialist("spreadsheet_analyst", "Inspect frozen table cells and document extraction without writing or publishing.", e.roleModel("spreadsheet_analyst"), []agent.Tool{tools.InspectTable{Root: work.Source}, tools.ExtractDocument{Root: work.Source}}, "Inspect tables and return row/cell evidence. Delegate arithmetic to deterministic tools; report schema, duplicate and missing-value problems.", e.roleSteps("spreadsheet_analyst", steps), e.Now))
+	for i := range specialists {
+		specialists[i].Configuration = request.RoleConfiguration[specialists[i].Name]
+	}
 	digest, err := PolicyDigest(request)
 	if err != nil {
 		return nil, nil, err
 	}
-	options := orchestrator.Options{MaxDelegations: 8, MaxParallel: 3, Now: e.Now, OnEvent: onEvent, OnRecord: onRecord, StatePath: filepath.Join(request.StateDir, "gator", "tasks", request.RunID), ParentRun: request.RunID, Source: work.Source.Path(), PolicySHA256: digest}
+	options := orchestrator.Options{Limits: request.Limits, MaxDelegations: 8, MaxParallel: 3, Now: e.Now, OnEvent: onEvent, OnRecord: onRecord, StatePath: filepath.Join(request.StateDir, "gator", "tasks", request.RunID), ParentRun: request.RunID, Source: work.Source.Path(), PolicySHA256: digest}
 	supervisor, err := orchestrator.NewSupervisor(ctx, specialists, options)
 	if err != nil {
 		return nil, nil, err
 	}
 	options.Supervisor = supervisor
+	if request.OnSupervisor != nil {
+		request.OnSupervisor(supervisor)
+	}
 	batch, err := orchestrator.Tools(specialists, options)
 	if err != nil {
 		supervisor.Close()
@@ -87,12 +93,12 @@ func (e Executor) codeSpecialist(request Request, work workspace.Work) orchestra
 				return orchestrator.Result{}, err
 			}
 			result, err := e.Code(ctx, CodeRequest{
-				Baseline: baseline, Budget: request.Budget,
+				Baseline: baseline, Budget: request.Budget, OnEvent: invocation.OnEvent,
 				ID: invocation.ID, SourcePath: work.Source.Path(), ScratchPath: work.Scratch.Path(),
 				Task: invocation.Task, ParentRunID: request.RunID, MaxSteps: request.MaxSteps,
 				Project: request.Project, Policy: request.Code, Approve: request.ApproveCodeCommand,
 			})
-			orchestrated := orchestrator.Result{Summary: strings.TrimSpace(result.Summary), Steps: result.Steps}
+			orchestrated := orchestrator.Result{BaselineSHA256: result.BaselineSHA256, Usage: result.Usage, Summary: strings.TrimSpace(result.Summary), Steps: result.Steps}
 			if len(result.Patch) > 0 {
 				path := filepath.ToSlash(filepath.Join("code", request.RunID+"-"+invocation.ID+".patch"))
 				if writeErr := artifact.WriteBinary(work.Output, request.Contract, path, result.Patch); writeErr != nil {
@@ -121,7 +127,7 @@ func (e Executor) codeSpecialist(request Request, work workspace.Work) orchestra
 }
 
 func subagentEvidence(record orchestrator.Record) artifact.SubagentEvidence {
-	return artifact.SubagentEvidence{
+	return artifact.SubagentEvidence{BaselineSHA256: record.BaselineSHA256, Usage: record.Usage,
 		ID: record.ID, Agent: record.Agent, TaskSHA256: record.TaskSHA256, OutputSHA256: record.OutputSHA256,
 		Status: record.Status, Steps: record.Steps, ArtifactPath: record.ArtifactPath, ArtifactSHA256: record.ArtifactSHA256,
 		StartedAt: record.StartedAt, FinishedAt: record.FinishedAt,

@@ -15,13 +15,23 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/tools"
 )
 
 // Service is the typed application boundary shared by foreground and unattended Work.
-type Service struct{ Executor Executor }
+type Service struct {
+	Executor Executor
+	Defaults *Request
+}
 
 func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) {
+	if s.Defaults != nil {
+		request.Provider = s.Defaults.Provider
+		request.ConnectorPermissions = s.Defaults.ConnectorPermissions
+		request.SnapshotOptions = s.Defaults.SnapshotOptions
+		request.OTLPEndpoint = s.Defaults.OTLPEndpoint
+	}
 	resolved, err := s.Executor.normalizeAndValidate(request)
 	if err != nil {
 		return Outcome{}, err
@@ -31,22 +41,27 @@ func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) 
 
 // PolicyDigest includes the complete effective contract and domain-specific grants.
 func PolicyDigest(request Request) (string, error) {
-	data, err := json.Marshal(struct {
-		Contract    artifact.Contract
-		Mode        action.Mode
-		Code        CodePolicy
-		Connectors  []string
-		Permissions any
-		WebOrigins  []string
-		Limits      agent.Limits
-		MaxSteps    int
-		Provider    string
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.Limits, request.MaxSteps, request.Provider})
+	data, err := json.Marshal(effectiveConfiguration(request))
 	if err != nil {
 		return "", err
 	}
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
+}
+
+func effectiveConfiguration(request Request) any {
+ return struct {
+  Contract artifact.Contract
+  Mode action.Mode
+  Code CodePolicy
+  Connectors []string
+  Permissions any
+  WebOrigins []string
+  Limits agent.Limits
+  MaxSteps int
+  Provider string
+  Roles map[string]orchestrator.RoleConfiguration
+ }{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration}
 }
 
 type Interaction struct {
@@ -59,6 +74,7 @@ type Completion struct {
 	Err     error
 }
 type Operation struct {
+	tasks        *orchestrator.Supervisor
 	Events       <-chan agent.Event
 	Interactions <-chan Interaction
 	Done         <-chan Completion
@@ -150,6 +166,7 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 			return false, ctx.Err()
 		}
 	}
+	request.OnSupervisor = func(supervisor *orchestrator.Supervisor) { o.mu.Lock(); o.tasks = supervisor; o.mu.Unlock() }
 	request.Steering = o.steering
 	sink := request.OnEvent
 	request.OnEvent = func(event agent.Event) {
@@ -194,4 +211,23 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 		close(done)
 	}()
 	return o
+}
+
+func (o *Operation) InspectTask(id string) (orchestrator.Task, error) {
+	o.mu.Lock()
+	tasks := o.tasks
+	o.mu.Unlock()
+	if tasks == nil {
+		return orchestrator.Task{}, errors.New("specialists are not started")
+	}
+	return tasks.Inspect(id)
+}
+func (o *Operation) CancelTask(id string) error {
+	o.mu.Lock()
+	tasks := o.tasks
+	o.mu.Unlock()
+	if tasks == nil {
+		return errors.New("specialists are not started")
+	}
+	return tasks.Cancel(id)
 }

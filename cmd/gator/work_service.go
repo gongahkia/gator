@@ -5,6 +5,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
+"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 	"os"
@@ -54,7 +55,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	if err := configureWorkRoles(&executor, settings, stateDir); err != nil {
 		return workrun.Service{}, err
 	}
-	return workrun.Service{Executor: executor}, nil
+	return workrun.Service{Executor: executor, Defaults: request}, nil
 }
 
 func executeConfiguredWork(ctx context.Context, provider, modelName, stateDir string, request workrun.Request) (workrun.Outcome, error) {
@@ -66,10 +67,14 @@ func executeConfiguredWork(ctx context.Context, provider, modelName, stateDir st
 }
 
 func configureWorkRoles(executor *workrun.Executor, settings config.Settings, state string) error {
+	executor.RoleConfiguration = map[string]orchestrator.RoleConfiguration{}
 	executor.RoleModels = map[string]agent.Model{}
 	executor.RoleSteps = map[string]int{}
 	for _, role := range settings.WorkRoles {
 		executor.RoleSteps[role.Name] = role.MaxSteps
+		configuration := orchestrator.RoleConfiguration{Version: role.Version, MaxSteps: role.MaxSteps}
+		if role.Provider != "" { configuration.Provider = role.Provider + "/" + role.Model }
+		executor.RoleConfiguration[role.Name] = configuration
 		if role.Provider == "" {
 			continue
 		}

@@ -2,9 +2,14 @@ package workrun
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/tools"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -63,5 +68,51 @@ func TestServiceSteersAndCancelsRunningOperation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestServiceApprovalIsPendingUntilExplicitResponse(t *testing.T) {
+	state := t.TempDir()
+	model := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "child", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"approval"}]}`)}}}, {ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"approval resolved"}`)}}}, {Text: "done"}}}
+	executed := make(chan struct{})
+	service := Service{Executor: Executor{Model: model, StateDir: state, Code: func(ctx context.Context, request CodeRequest) (CodeResult, error) {
+		decision, err := request.Approve(ctx, []string{"reviewed-command"})
+		if err != nil {
+			return CodeResult{}, err
+		}
+		if decision != tools.CommandAllowOnce {
+			return CodeResult{}, errors.New("denied")
+		}
+		close(executed)
+		return CodeResult{Summary: "Approved command received"}, nil
+	}}}
+	operation := service.Start(context.Background(), Request{RunID: "approval-run", SourcePath: t.TempDir(), Objective: "prepare", Contract: artifact.DefaultContract("report.md")})
+	defer operation.Cancel()
+	interaction := <-operation.Interactions
+	select {
+	case <-executed:
+		t.Fatal("ran before approval")
+	default:
+	}
+	payload, err := os.ReadFile(filepath.Join(state, "gator", "interactions", "approval-run", "1.json"))
+	if err != nil || !strings.Contains(string(payload), "pending") {
+		t.Fatalf("pending state: %s %v", payload, err)
+	}
+	if err := operation.Respond(interaction.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	for range operation.Events {
+	}
+	result := <-operation.Done
+	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	select {
+	case <-executed:
+	default:
+		t.Fatal("approved command not released")
+	}
+	if err := operation.Respond(interaction.ID, true); err == nil {
+		t.Fatal("approval replay accepted")
 	}
 }

@@ -233,7 +233,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 	}
 	actions := make([]action.Record, 0, 4)
-	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
+	connectorPolicy := tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
 		Permissions: request.ConnectorPermissions,
 		OnContent: func(result connector.Result) error {
@@ -250,12 +250,22 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 			return nil
 		},
 		OnAction: func(record action.Record) { stateMu.Lock(); defer stateMu.Unlock(); actions = append(actions, record) },
-	})
+	}
+	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, connectorPolicy)
 	if err != nil {
 		return outcome, err
 	}
 	surface = append(surface, connectorSurface...)
 	request.researchTools = append(catalog.tools(), webTools...)
+	readPolicy := connectorPolicy
+	readPolicy.Mode = action.Inspect
+	readPolicy.ExternalActions = action.Forbid
+	readPolicy.Approve = nil
+	connectedReads, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, readPolicy)
+	if err != nil {
+		return outcome, err
+	}
+	request.researchTools = append(request.researchTools, connectedReads...)
 	events := make([]agent.Event, 0, 32)
 	emit := func(event agent.Event) {
 		eventMu.Lock()
@@ -365,12 +375,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 		return outcome, fmt.Errorf("write work manifest: %w", err)
 	}
-	configuration, _ := json.Marshal(struct {
-		Contract   artifact.Contract
-		Code       CodePolicy
-		Mode       action.Mode
-		Connectors []string
-	}{request.Contract, request.Code, request.Mode, request.ConnectorIDs})
+	configuration, _ := json.Marshal(effectiveConfiguration(request))
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
 		AcceptedCode: integration.accepted,
 		Project:      request.Project,
@@ -511,6 +516,17 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
+	request.RoleConfiguration = make(map[string]orchestrator.RoleConfiguration)
+	for _, name := range []string{"source_researcher", "artifact_reviewer", "claim_verifier", "connected_researcher", "spreadsheet_analyst", "code"} {
+		maximum := maxWorkSpecialistSteps
+		if name == "code" { maximum = request.Code.MaxSteps }
+		configuration := e.RoleConfiguration[name]
+		configuration.Version = 1
+		if configuration.Provider == "" { configuration.Provider = request.Provider }
+		configuration.MaxSteps = e.roleSteps(name, maximum)
+		request.RoleConfiguration[name] = configuration
+	}
+	request.Code.MaxSteps = request.RoleConfiguration["code"].MaxSteps
 	if err := attachment.ValidateLoaded(request.Images, request.Attachments); err != nil {
 		return Request{}, err
 	}
@@ -528,7 +544,7 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		}
 		seenCapabilities[capability] = struct{}{}
 		switch capability {
-		case CodeCapabilityLSP, CodeCapabilityMCP, CodeCapabilityExtension, CodeCapabilityHTTP, CodeCapabilityBrowser, CodeCapabilityTerminal:
+		case CodeCapabilityLSP, CodeCapabilityMCP, CodeCapabilityExtension, CodeCapabilityHTTP, CodeCapabilityBrowser, CodeCapabilityTerminal, CodeCapabilityHooks:
 		default:
 			return Request{}, fmt.Errorf("unknown Code specialist capability %q", capability)
 		}
