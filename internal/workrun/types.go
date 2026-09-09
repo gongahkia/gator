@@ -15,17 +15,18 @@ import (
 
 // Request describes one bounded local work session.
 type Request struct {
-	SourcePath   string
-	Objective    string
-	RunID        string
-	MaxSteps     int
-	Mode         action.Mode
-	Contract     artifact.Contract
-	StateDir     string
-	System       string
-	OnEvent      agent.EventSink
-	Steering     <-chan string
-	ConnectorIDs []string
+	SourcePath    string
+	Objective     string
+	RunID         string
+	MaxSteps      int
+	Mode          action.Mode
+	Contract      artifact.Contract
+	StateDir      string
+	System        string
+	OnEvent       agent.EventSink
+	Steering      <-chan string
+	ConnectorIDs  []string
+	ApproveAction action.Approver
 }
 
 // Outcome retains staged files and trusted evidence even when model execution

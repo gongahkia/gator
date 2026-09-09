@@ -136,6 +136,13 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("artifact manifest action %d: %w", index+1, err)
 		}
 	}
+	actionsPassed := true
+	for _, record := range m.Actions {
+		if record.Status == action.Failed || record.Status == action.Unknown {
+			actionsPassed = false
+			break
+		}
+	}
 	if m.Status != Completed && m.Status != Failed {
 		return fmt.Errorf("artifact manifest status %q is invalid", m.Status)
 	}
@@ -145,7 +152,10 @@ func (m Manifest) Validate() error {
 	if m.Status == Completed && !validationsPassed {
 		return errors.New("completed artifact manifest contains failed validation evidence")
 	}
-	if m.Status == Failed && m.Failure == "" && validationsPassed {
+	if m.Status == Completed && !actionsPassed {
+		return errors.New("completed artifact manifest contains failed external action evidence")
+	}
+	if m.Status == Failed && m.Failure == "" && validationsPassed && actionsPassed {
 		return errors.New("failed artifact manifest has no failed evidence")
 	}
 	if m.Failure != "" && (strings.TrimSpace(m.Failure) != m.Failure || len(m.Failure) > maxDiagnosticBytes || strings.ContainsRune(m.Failure, 0) || !utf8.ValidString(m.Failure)) {

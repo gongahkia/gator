@@ -48,8 +48,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		return outcome, err
 	}
 	connectedSources := make([]connector.Provenance, 0, len(request.ConnectorIDs))
-	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.Mode, request.ConnectorIDs, func(source connector.Provenance) {
-		connectedSources = append(connectedSources, source)
+	actions := make([]action.Record, 0, 4)
+	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
+		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
+		OnSource: func(source connector.Provenance) { connectedSources = append(connectedSources, source) },
+		OnAction: func(record action.Record) { actions = append(actions, record) },
 	})
 	if err != nil {
 		return outcome, err
@@ -84,7 +87,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
 		RunID: request.RunID, Objective: request.Objective, Source: work.Source,
-		Failure: failure, ConnectedSources: connectedSources, StartedAt: startedAt, FinishedAt: now(),
+		Failure: failure, Actions: actions, ConnectedSources: connectedSources, StartedAt: startedAt, FinishedAt: now(),
 	})
 	if sealErr != nil {
 		if runErr != nil {
@@ -150,7 +153,9 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
-	if _, err := tools.ConnectorTools(e.Connectors, request.Mode, request.ConnectorIDs, nil); err != nil {
+	if _, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
+		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
+	}); err != nil {
 		return Request{}, fmt.Errorf("select work connectors: %w", err)
 	}
 	return request, nil

@@ -100,6 +100,40 @@ func TestSealEnforcesExternalActionDisposition(t *testing.T) {
 	}
 }
 
+func TestSealFailsRunWithFailedOrUncertainActionEvidence(t *testing.T) {
+	t.Parallel()
+	source, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDirectory := t.TempDir()
+	writeArtifact(t, outputDirectory, "report.md", "finished report\n")
+	output, err := workspace.Open(outputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proposal, err := action.NewProposal("publish-1", action.Publish, "release", "publish", "https://example.com/hook", "Publish release", []byte("payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract := DefaultContract("report.md")
+	contract.ExternalActions = action.Approve
+	for _, status := range []action.Status{action.Failed, action.Unknown} {
+		now := time.Now()
+		manifest, err := Seal(output, contract, SealOptions{
+			RunID: "work-action-evidence", Objective: "Publish the report", Source: source,
+			Actions:   []action.Record{{Proposal: proposal, Status: status, Error: "remote result unavailable"}},
+			StartedAt: now, FinishedAt: now,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if manifest.Status != Failed {
+			t.Fatalf("action status %q produced manifest status %q", status, manifest.Status)
+		}
+	}
+}
+
 func TestSealRetainsFailedValidationEvidence(t *testing.T) {
 	t.Parallel()
 

@@ -90,6 +90,12 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 	if !inspection.Passed {
 		status = Failed
 	}
+	for _, record := range options.Actions {
+		if record.Status == action.Failed || record.Status == action.Unknown {
+			status = Failed
+			break
+		}
+	}
 	if failure != "" {
 		status = Failed
 	}
