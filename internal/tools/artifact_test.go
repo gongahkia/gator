@@ -68,7 +68,7 @@ func TestWorkFilesInspectModeHasNoMutationTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tool := range surface {
-		if name := tool.Definition().Name; name == "write_artifact" || name == "artifact_status" {
+		if name := tool.Definition().Name; strings.HasPrefix(name, "write_") || name == "artifact_status" {
 			t.Fatalf("inspect mode exposed %q", name)
 		}
 	}
@@ -82,5 +82,32 @@ func TestWriteArtifactRejectsEscapingPath(t *testing.T) {
 	tool := WriteArtifact{Root: root, Contract: artifact.DefaultContract("report.md")}
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"path":"../report.md","content":"bad"}`)); err == nil {
 		t.Fatal("escaping artifact path was accepted")
+	}
+}
+
+func TestTypedArtifactToolsProduceValidStructuredFiles(t *testing.T) {
+	root, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonContract := artifact.DefaultContract("summary.json")
+	executeTool(t, WriteJSONArtifact{Root: root, Contract: jsonContract}, `{"path":"summary.json","value":{"answer":42}}`)
+	jsonStatus := executeTool(t, ArtifactStatus{Root: root, Contract: artifact.Contract{
+		Version: artifact.ContractVersion, Artifacts: []artifact.Requirement{{Path: "summary.json", Validations: []artifact.Validation{{Kind: artifact.JSON}}}},
+		MaxArtifactBytes: artifact.DefaultMaxArtifactBytes, MaxTotalBytes: artifact.DefaultMaxTotalBytes, ExternalActions: "forbid",
+	}}, `{}`)
+	if !strings.Contains(jsonStatus, `"passed":true`) {
+		t.Fatalf("JSON status = %s", jsonStatus)
+	}
+	if err := os.Remove(filepath.Join(root.Path(), "summary.json")); err != nil {
+		t.Fatal(err)
+	}
+	result := executeTool(t, WriteTableArtifact{Root: root, Contract: artifact.DefaultContract("table.csv")}, `{"path":"table.csv","headers":["name","value"],"rows":[["north","10"],["south, east","20"]]}`)
+	if !strings.Contains(result, `"rows":2`) || !strings.Contains(result, `"columns":2`) {
+		t.Fatalf("table result = %s", result)
+	}
+	contents, err := os.ReadFile(filepath.Join(root.Path(), "table.csv"))
+	if err != nil || !strings.Contains(string(contents), `"south, east",20`) {
+		t.Fatalf("table contents = %q, %v", contents, err)
 	}
 }
