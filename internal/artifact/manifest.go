@@ -73,7 +73,7 @@ type ValidationResult struct {
 // exported. It intentionally does not touch artifact bytes; Seal is the only
 // constructor that establishes their evidence.
 func (m Manifest) Validate() error {
-	if m.Version != ManifestVersion || m.Workflow != "work" {
+	if (m.Version != 1 && m.Version != ManifestVersion) || m.Workflow != "work" {
 		return errors.New("artifact manifest has an unsupported version or workflow")
 	}
 	if !runIDPattern.MatchString(m.RunID) || strings.TrimSpace(m.Objective) == "" || len(m.Objective) > 64*1024 || strings.ContainsRune(m.Objective, 0) {
@@ -94,6 +94,9 @@ func (m Manifest) Validate() error {
 	}
 	if m.Source.SnapshotSHA256 != "" && !validSHA256(m.Source.SnapshotSHA256) {
 		return errors.New("artifact manifest source snapshot digest is invalid")
+	}
+	if m.Version >= 2 && !validSHA256(m.Source.SnapshotSHA256) {
+		return errors.New("artifact manifest v2 requires a source snapshot digest")
 	}
 	if len(m.ConnectedSources) > 128 {
 		return errors.New("artifact manifest has too many connected sources")

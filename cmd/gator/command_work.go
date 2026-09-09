@@ -19,6 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/workrun"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 const maxStdinObjectiveBytes = 64 * 1024
@@ -26,6 +27,9 @@ const maxStdinObjectiveBytes = 64 * 1024
 type workModelFactory func(provider, modelName, baseURL string) (agent.Model, error)
 
 func workTask(arguments []string, out io.Writer) error {
+	if len(arguments) > 0 && isWorkSessionCommand(arguments[0]) {
+		return workSessionCommand(arguments, os.Stdin, out, nativeWorkModel)
+	}
 	return runWorkTask(arguments, os.Stdin, out, nativeWorkModel)
 }
 
@@ -65,6 +69,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
 	runID := flags.String("run-id", "", "stable run identifier")
+	conversationID := flags.String("conversation", "", "continue a retained Work conversation")
+	parentRevisionID := flags.String("parent", "", "branch from a retained Work revision")
+	refreshSource := flags.Bool("refresh-source", false, "capture a new immutable source snapshot")
 	jsonOutput := flags.Bool("json", false, "emit one machine-readable result")
 	var artifacts artifactFlags
 	flags.Var(&artifacts, "artifact", "required output-relative artifact path (repeatable; default report.md)")
@@ -103,6 +110,17 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(*conversationID) != "" {
+		sessions, err := worksession.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		conversation, err := sessions.Load(strings.TrimSpace(*conversationID))
+		if err != nil {
+			return fmt.Errorf("load Work conversation: %w", err)
+		}
+		*sourcePath = conversation.SourcePath
+	}
 	settings, err := loadSettings()
 	if err != nil {
 		return err
@@ -140,6 +158,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		OnEvent:       sink,
 		ConnectorIDs:  selectedConnectors,
 		ApproveAction: approve,
+		ConversationID: strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
@@ -250,7 +269,7 @@ func workContract(mode action.Mode, disposition action.Disposition, paths artifa
 }
 
 func writeWorkSummary(out io.Writer, outcome workrun.Outcome) error {
-	if _, err := fmt.Fprintf(out, "\nWork: %s\nStaged output: %s\nManifest: %s\nStatus: %s\n", outcome.Work.ID, outcome.Work.Output.Path(), outcome.Work.ManifestPath, outcome.Manifest.Status); err != nil {
+	if _, err := fmt.Fprintf(out, "\nWork: %s\nConversation: %s\nRevision: %s\nSnapshot: %s\nStaged output: %s\nManifest: %s\nStatus: %s\n", outcome.Work.ID, outcome.ConversationID, outcome.RevisionID, outcome.SnapshotID, outcome.Work.Output.Path(), outcome.Work.ManifestPath, outcome.Manifest.Status); err != nil {
 		return err
 	}
 	for _, file := range outcome.Manifest.Artifacts {
@@ -281,11 +300,15 @@ func writeWorkJSON(out io.Writer, outcome workrun.Outcome, runErr error) error {
 		Actions      []action.Record             `json:"actions,omitempty"`
 		FinalText    string                      `json:"final_text,omitempty"`
 		Error        string                      `json:"error,omitempty"`
+		ConversationID string                    `json:"conversation_id,omitempty"`
+		RevisionID string                        `json:"revision_id,omitempty"`
+		SnapshotID string                        `json:"snapshot_id,omitempty"`
 	}
 	result := response{
 		RunID: outcome.Work.ID, Status: outcome.Manifest.Status,
 		ManifestPath: outcome.Work.ManifestPath, Artifacts: outcome.Manifest.Artifacts,
 		Validations: outcome.Manifest.Validations, Actions: outcome.Manifest.Actions, FinalText: outcome.Result.FinalText,
+		ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID,
 	}
 	if outcome.Work.Output.Path() != "" {
 		result.OutputPath = outcome.Work.Output.Path()
