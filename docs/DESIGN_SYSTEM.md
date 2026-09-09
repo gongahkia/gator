@@ -17,9 +17,9 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 
 | State | Primary content | Composer | Secondary navigation |
 | --- | --- | --- | --- |
-| Home | Gator mark and one outcome question | Centered, at most 72 columns | Hidden behind `Ctrl+P` |
-| Drafting | Selected folder and a quiet empty transcript | Docked after the first typed character | Hidden behind `Ctrl+P` |
-| Conversation | Transcript and current run status | Docked below the transcript | Hidden behind `Ctrl+P` |
+| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Hidden behind `Ctrl+P` |
+| Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Hidden behind `Ctrl+P` |
+| Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Hidden behind `Ctrl+P` |
 | Command palette | Sources, conversations, inbox, jobs, setup, and Code | Hidden | Centered, keyboard-selectable list |
 
 Typing the first character docks the composer; deleting the draft recenters it.
@@ -30,6 +30,8 @@ palette entry and one subdued home hint.
 ## Visual language
 
 - Use one green accent (`ANSI 42`) for identity, focus, and active work.
+- Use the same `🐊 Gator` wordmark as Gator Code. Center it only on the empty
+  home state; keep it at the top-left everywhere after composition begins.
 - Use neutral foreground (`ANSI 255`), muted metadata (`ANSI 242`), and a dark
   selection surface (`ANSI 236`).
 - Use rounded one-cell borders only around an input or a selected surface.
