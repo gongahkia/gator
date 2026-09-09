@@ -56,6 +56,7 @@ Usage:
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
   gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
+  gator inspect [--source DIRECTORY] [--connector ID] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
   gator code [coding options] --verify 'argv ...' TASK
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
@@ -90,6 +91,7 @@ Commands:
   theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
   work      turn a read-only folder into validated artifacts in isolated output
+  inspect   analyze a folder without files, processes, or external actions
   code      propose a tested patch in an isolated Git worktree
   run       compatibility alias for code
   resume    select, reopen, or immediately continue a retained local thread
@@ -182,6 +184,8 @@ func run(args []string, out io.Writer) error {
 		return themeCommand(args[1:], out)
 	case "work":
 		return workTask(args[1:], out)
+	case "inspect":
+		return inspectTask(args[1:], out)
 	case "code", "run":
 		return runTask(args[1:], out)
 	case "resume":

@@ -63,6 +63,25 @@ func TestWorkCommandReadsObjectiveFromStdinAndEmitsJSON(t *testing.T) {
 	}
 }
 
+func TestInspectCommandForcesInspectionMode(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	model := &workScriptedModel{turns: []agent.Turn{{Text: "Inspected."}}}
+	var output bytes.Buffer
+	if err := runInspectTask([]string{"--source", t.TempDir(), "--json", "inspect", "these", "notes"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) { return model, nil }); err != nil {
+		t.Fatal(err)
+	}
+	if len(model.requests) != 1 || strings.Contains(output.String(), "report.md") {
+		t.Fatalf("inspect request=%#v output=%q", model.requests, output.String())
+	}
+	for _, definition := range model.requests[0].Tools {
+		if strings.HasPrefix(definition.Name, "write_") || definition.Name == "artifact_status" {
+			t.Fatalf("inspect exposed %q", definition.Name)
+		}
+	}
+}
+
 func TestWorkContractInfersStructuredValidators(t *testing.T) {
 	contract, err := workContract(action.Draft, action.Forbid, artifactFlags{"data/results.csv", "summary.json"}, containsFlags{"summary.json=answer"})
 	if err != nil {

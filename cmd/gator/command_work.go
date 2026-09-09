@@ -29,6 +29,17 @@ func workTask(arguments []string, out io.Writer) error {
 	return runWorkTask(arguments, os.Stdin, out, nativeWorkModel)
 }
 
+func inspectTask(arguments []string, out io.Writer) error {
+	return runInspectTask(arguments, os.Stdin, out, nativeWorkModel)
+}
+
+func runInspectTask(arguments []string, in io.Reader, out io.Writer, modelFactory workModelFactory) error {
+	forwarded := make([]string, 0, len(arguments)+2)
+	forwarded = append(forwarded, "--mode", string(action.Inspect))
+	forwarded = append(forwarded, arguments...)
+	return runWorkTask(forwarded, in, out, modelFactory)
+}
+
 func nativeWorkModel(provider, modelName, baseURL string) (agent.Model, error) {
 	executor, err := newExecutor(provider, modelName, baseURL)
 	if err != nil {
