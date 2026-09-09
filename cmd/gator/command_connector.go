@@ -98,17 +98,27 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("connector add", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	name := flags.String("name", id, "display name")
-	resource := flags.String("url", "", "exact JSON resource URL")
+	kindName := flags.String("kind", "json", "connector kind: json or webhook")
+	resource := flags.String("url", "", "exact resource URL")
 	authentication := flags.String("auth", connector.AuthNone, "authentication: none or bearer")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator connector add ID --url URL [--name NAME] [--auth none|bearer]")
+		return errors.New("usage: gator connector add ID --kind json|webhook --url URL [--name NAME] [--auth none|bearer]")
+	}
+	kind := ""
+	switch strings.ToLower(strings.TrimSpace(*kindName)) {
+	case "json", "http-json", connector.KindHTTPJSON:
+		kind = connector.KindHTTPJSON
+	case "webhook", connector.KindHTTPWebhook:
+		kind = connector.KindHTTPWebhook
+	default:
+		return fmt.Errorf("unknown connector kind %q; expected json or webhook", *kindName)
 	}
 	descriptor := connector.Descriptor{
 		Version: connector.DescriptorVersion, ID: id, Name: strings.TrimSpace(*name),
-		Kind: connector.KindHTTPJSON, Resource: strings.TrimSpace(*resource), Authentication: strings.TrimSpace(*authentication),
+		Kind: kind, Resource: strings.TrimSpace(*resource), Authentication: strings.TrimSpace(*authentication),
 	}
 	if err := descriptor.Validate(); err != nil {
 		return err
@@ -146,8 +156,15 @@ func connectorStatus(id string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(out, "Connector %s\n  name: %s\n  kind: %s\n  resource: %s\n  capability: %s\n  authentication: %s\n", descriptor.ID, descriptor.Name, descriptor.Kind, descriptor.Resource, descriptor.Operations()[0].Capability, status)
-	return err
+	if _, err = fmt.Fprintf(out, "Connector %s\n  name: %s\n  kind: %s\n  resource: %s\n  authentication: %s\n  operations:\n", descriptor.ID, descriptor.Name, descriptor.Kind, descriptor.Resource, status); err != nil {
+		return err
+	}
+	for _, operation := range descriptor.Operations() {
+		if _, err := fmt.Fprintf(out, "    %s: %s\n", operation.ID, operation.Capability); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) error {
@@ -226,8 +243,12 @@ func testConnector(id string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if _, found := registry.Get(id); !found {
+	descriptor, found := registry.Get(id)
+	if !found {
 		return fmt.Errorf("connector %q is not configured", id)
+	}
+	if descriptor.Kind != connector.KindHTTPJSON {
+		return fmt.Errorf("connector %q is an action endpoint; test it through a --actions draft work run, which does not send", id)
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {

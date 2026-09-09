@@ -55,7 +55,7 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
+  gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
   gator code [coding options] --verify 'argv ...' TASK
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
   gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]

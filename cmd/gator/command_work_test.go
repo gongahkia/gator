@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -63,7 +64,7 @@ func TestWorkCommandReadsObjectiveFromStdinAndEmitsJSON(t *testing.T) {
 }
 
 func TestWorkContractInfersStructuredValidators(t *testing.T) {
-	contract, err := workContract(action.Draft, artifactFlags{"data/results.csv", "summary.json"}, containsFlags{"summary.json=answer"})
+	contract, err := workContract(action.Draft, action.Forbid, artifactFlags{"data/results.csv", "summary.json"}, containsFlags{"summary.json=answer"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +77,59 @@ func TestWorkContractInfersStructuredValidators(t *testing.T) {
 }
 
 func TestWorkContractRejectsInspectArtifactsAndUnknownContainsTarget(t *testing.T) {
-	if _, err := workContract(action.Inspect, artifactFlags{"report.md"}, nil); err == nil {
+	if _, err := workContract(action.Inspect, action.Forbid, artifactFlags{"report.md"}, nil); err == nil {
 		t.Fatal("inspect artifact was accepted")
 	}
-	if _, err := workContract(action.Draft, artifactFlags{"report.md"}, containsFlags{"other.md=marker"}); err == nil {
+	if _, err := workContract(action.Draft, action.Forbid, artifactFlags{"report.md"}, containsFlags{"other.md=marker"}); err == nil {
 		t.Fatal("unknown contains target was accepted")
+	}
+	if _, err := workContract(action.Draft, action.Approve, nil, nil); err == nil {
+		t.Fatal("draft mode approved external actions")
+	}
+}
+
+func TestWorkCommandPublishesOnlyAfterExactInteractiveApproval(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests.Add(1)
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	if err := connectorCommandWithIO([]string{"add", "release", "--kind", "webhook", "--url", server.URL}, strings.NewReader(""), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	model := &workScriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "publish-1", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"receipt.md","content":"Published v1.\n"}`)}}},
+		{Text: "Published v1 and created receipt.md."},
+	}}
+	var output bytes.Buffer
+	err := runWorkTask([]string{
+		"--source", t.TempDir(), "--mode", "act", "--actions", "approve", "--connector", "release",
+		"--artifact", "receipt.md", "--max-steps", "4", "publish", "release", "v1",
+	}, strings.NewReader("y\n"), &output, func(_, _, _ string) (agent.Model, error) { return model, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests.Load() != 1 || !strings.Contains(output.String(), "External action approval") || !strings.Contains(output.String(), "exact JSON (escaped)") || !strings.Contains(output.String(), "release/publish: executed") {
+		t.Fatalf("requests=%d output=%q", requests.Load(), output.String())
+	}
+}
+
+func TestWorkCommandKeepsApprovalOutOfJSONMode(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	err := runWorkTask([]string{"--source", t.TempDir(), "--mode", "act", "--actions", "approve", "--json", "publish"}, strings.NewReader("y\n"), &bytes.Buffer{}, func(_, _, _ string) (agent.Model, error) {
+		t.Fatal("model factory called for invalid interactive JSON run")
+		return nil, nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "--json") {
+		t.Fatalf("JSON approval error = %v", err)
 	}
 }
 
