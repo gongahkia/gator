@@ -314,6 +314,11 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.running = true
 			m.status = "Working from an immutable snapshot…"
 			run := m.config.Run
+			if run == nil {
+				m.running = false
+				m.messages = append(m.messages, message{role: "Gator", text: "Work execution is unavailable in this build."})
+				return m, nil
+			}
 			source, conversation := m.source, m.conversation
 			options := cloneRunOptions(m.options)
 			m.options.Attachments = nil
