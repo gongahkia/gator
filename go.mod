@@ -14,7 +14,10 @@ require (
 	github.com/gitpod-io/xterm-go v0.0.0-20260814130527-da33d8e27c30
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/rivo/uniseg v0.4.7
+	github.com/signintech/gopdf v0.38.0
+	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/net v0.58.0
+	golang.org/x/image v0.45.0
 	golang.org/x/sys v0.47.0
 )
 

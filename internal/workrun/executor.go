@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -13,7 +16,9 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -37,11 +42,57 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 	}
 	startedAt := now()
-	work, err := workspace.CreateWork(request.SourcePath, request.StateDir, request.RunID, startedAt)
+	sessions, err := worksession.Open(request.StateDir)
 	if err != nil {
 		return Outcome{}, err
 	}
-	outcome := Outcome{Work: work}
+	var conversation worksession.Conversation
+	var sourceSnapshot snapshot.Manifest
+	if request.ConversationID != "" {
+		conversation, err = sessions.Load(request.ConversationID)
+		if err != nil {
+			return Outcome{}, fmt.Errorf("load Work conversation: %w", err)
+		}
+		if request.ParentRevisionID == "" {
+			request.ParentRevisionID = conversation.HeadRevision
+		}
+		if request.RefreshSource {
+			sourceSnapshot, err = snapshot.Create(conversation.SourcePath, request.StateDir, snapshot.Options{Now: now})
+		} else {
+			snapshotID := request.SnapshotID
+			if snapshotID == "" {
+				snapshotID = conversation.SnapshotID
+			}
+			sourceSnapshot, err = snapshot.Open(request.StateDir, snapshotID)
+		}
+	} else if request.SnapshotID != "" {
+		sourceSnapshot, err = snapshot.Open(request.StateDir, request.SnapshotID)
+	} else {
+		sourceSnapshot, err = snapshot.Create(request.SourcePath, request.StateDir, snapshot.Options{Now: now})
+	}
+	if err != nil {
+		return Outcome{}, err
+	}
+	if conversation.ID == "" {
+		conversation, err = sessions.Create(conversationTitle(request.Objective), sourceSnapshot.SourcePath, sourceSnapshot.ID, startedAt)
+		if err != nil {
+			return Outcome{}, err
+		}
+	}
+	work, err := workspace.CreateWork(sourceSnapshot.Materialized, request.StateDir, request.RunID, startedAt)
+	if err != nil {
+		return Outcome{}, err
+	}
+	outcome := Outcome{Work: work, ConversationID: conversation.ID, RevisionID: request.RunID, SnapshotID: sourceSnapshot.ID}
+	if request.ParentRevisionID != "" {
+		parent, loadErr := sessions.LoadRevision(conversation.ID, request.ParentRevisionID)
+		if loadErr != nil {
+			return outcome, fmt.Errorf("load parent Work revision: %w", loadErr)
+		}
+		if copyErr := seedPreviousArtifacts(filepath.Join(parent.BundlePath, "output"), work.Output, request.Contract.MaxArtifactBytes); copyErr != nil {
+			return outcome, fmt.Errorf("seed parent Work artifacts: %w", copyErr)
+		}
+	}
 
 	surface, err := tools.WorkFiles(work.Source, work.Output, request.Contract, request.Mode != action.Inspect)
 	if err != nil {
@@ -86,7 +137,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		failure = runErr.Error()
 	}
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
-		RunID: request.RunID, Objective: request.Objective, Source: work.Source,
+		RunID: request.RunID, Objective: request.Objective, Source: work.Source, SourceName: sourceSnapshot.SourceName, SnapshotSHA256: sourceSnapshot.SHA256,
 		Failure: failure, Actions: actions, ConnectedSources: connectedSources, StartedAt: startedAt, FinishedAt: now(),
 	})
 	if sealErr != nil {
@@ -102,6 +153,15 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 		return outcome, fmt.Errorf("write work manifest: %w", err)
 	}
+	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
+		ID: request.RunID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID,
+		Objective: request.Objective, BundlePath: work.Path, Status: string(manifest.Status), FinalText: result.FinalText, CreatedAt: now(),
+	}); err != nil {
+		if runErr != nil {
+			return outcome, fmt.Errorf("work execution failed: %v; retain revision: %w", runErr, err)
+		}
+		return outcome, fmt.Errorf("retain Work revision: %w", err)
+	}
 	if runErr != nil {
 		return outcome, runErr
 	}
@@ -109,6 +169,54 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		return outcome, errors.New("work outcome contract did not pass")
 	}
 	return outcome, nil
+}
+
+func conversationTitle(objective string) string {
+	title := strings.TrimSpace(objective)
+	if line, _, found := strings.Cut(title, "\n"); found {
+		title = line
+	}
+	if len(title) > 80 {
+		title = strings.TrimSpace(title[:80]) + "…"
+	}
+	return title
+}
+
+func seedPreviousArtifacts(source string, destination workspace.Root, maxFileBytes int64) error {
+	info, err := os.Stat(source)
+	if err != nil || !info.IsDir() {
+		return errors.New("parent Work output is missing")
+	}
+	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("parent output contains symlink %q", path)
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return fmt.Errorf("parent output contains non-regular file %q", path)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Size() > maxFileBytes {
+			return fmt.Errorf("parent artifact %q exceeds the current contract limit", path)
+		}
+		contents, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		return destination.WriteRegularFileAtomic(relative, contents, maxFileBytes)
+	})
 }
 
 func (e Executor) normalizeAndValidate(request Request) (Request, error) {

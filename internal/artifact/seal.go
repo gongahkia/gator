@@ -25,6 +25,8 @@ type SealOptions struct {
 	RunID            string
 	Objective        string
 	Source           workspace.Root
+	SourceName       string
+	SnapshotSHA256   string
 	Actions          []action.Record
 	ConnectedSources []connector.Provenance
 	Failure          string
@@ -100,8 +102,22 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 		status = Failed
 	}
 	sourceDigest := sha256.Sum256([]byte(options.Source.Path()))
+	sourceName := strings.TrimSpace(options.SourceName)
+	if sourceName == "" {
+		sourceName = filepath.Base(options.Source.Path())
+	}
+	if filepath.Base(sourceName) != sourceName || sourceName == "." {
+		return Manifest{}, errors.New("work source name is invalid")
+	}
+	manifestVersion := 1
+	if options.SnapshotSHA256 != "" {
+		if len(options.SnapshotSHA256) != sha256.Size*2 {
+			return Manifest{}, errors.New("work source snapshot digest is invalid")
+		}
+		manifestVersion = ManifestVersion
+	}
 	manifest := Manifest{
-		Version:        ManifestVersion,
+		Version:        manifestVersion,
 		RunID:          options.RunID,
 		Workflow:       "work",
 		Objective:      objective,
@@ -109,8 +125,9 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 		ContractSHA256: digest,
 		Source: Source{
 			Kind:           "directory",
-			Name:           filepath.Base(options.Source.Path()),
+			Name:           sourceName,
 			IdentitySHA256: hex.EncodeToString(sourceDigest[:]),
+			SnapshotSHA256: options.SnapshotSHA256,
 		},
 		ConnectedSources: append([]connector.Provenance(nil), options.ConnectedSources...),
 		Artifacts:        inspection.Files,

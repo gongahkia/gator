@@ -15,27 +15,34 @@ import (
 
 // Request describes one bounded local work session.
 type Request struct {
-	SourcePath    string
-	Objective     string
-	RunID         string
-	MaxSteps      int
-	Mode          action.Mode
-	Contract      artifact.Contract
-	StateDir      string
-	System        string
-	OnEvent       agent.EventSink
-	Steering      <-chan string
-	ConnectorIDs  []string
-	ApproveAction action.Approver
+	SourcePath       string
+	Objective        string
+	RunID            string
+	MaxSteps         int
+	Mode             action.Mode
+	Contract         artifact.Contract
+	StateDir         string
+	System           string
+	OnEvent          agent.EventSink
+	Steering         <-chan string
+	ConnectorIDs     []string
+	ApproveAction    action.Approver
+	ConversationID   string
+	ParentRevisionID string
+	SnapshotID       string
+	RefreshSource    bool
 }
 
 // Outcome retains staged files and trusted evidence even when model execution
 // fails. Source is never modified by the executor.
 type Outcome struct {
-	Work     workspace.Work
-	Manifest artifact.Manifest
-	Result   agent.Result
-	Events   []agent.Event
+	Work           workspace.Work
+	Manifest       artifact.Manifest
+	Result         agent.Result
+	Events         []agent.Event
+	ConversationID string
+	RevisionID     string
+	SnapshotID     string
 }
 
 // Executor combines a provider-independent model with private workspace
