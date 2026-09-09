@@ -204,7 +204,8 @@ func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.
 	if err := decoder.Decode(&input); err != nil {
 		return agent.ToolResult{}, fmt.Errorf("decode delegate_agents arguments: %w", err)
 	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		if err == nil {
 			return agent.ToolResult{}, errors.New("decode delegate_agents arguments: multiple JSON values")
 		}
