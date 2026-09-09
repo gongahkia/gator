@@ -14,6 +14,8 @@ import (
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
+const gatorWordmark = "🐊 Gator"
+
 type RunResult struct {
 	ConversationID string
 	RevisionID     string
@@ -421,9 +423,12 @@ func (m Model) View() string {
 		return m.renderHome(width, height, accent, dim)
 	}
 	var view strings.Builder
-	view.WriteString(accent.Render(m.title))
+	view.WriteString(accent.Render(gatorWordmark))
+	if m.title != "" {
+		view.WriteString(dim.Render("  " + m.title))
+	}
 	if m.status != "" {
-		view.WriteString(dim.Render("  " + m.status))
+		view.WriteString(dim.Render(" · " + m.status))
 	}
 	view.WriteString("\n\n")
 	var transcript strings.Builder
@@ -450,7 +455,7 @@ func (m Model) View() string {
 }
 
 func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string {
-	title := accent.Copy().Bold(true).Render("GATOR")
+	title := accent.Copy().Bold(true).Render(gatorWordmark)
 	question := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render("What do you want to accomplish?")
 	body := title + "\n\n" + question + "\n\n" + m.renderComposer(width, true)
 	context := filepath.Base(m.source)

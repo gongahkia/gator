@@ -73,7 +73,7 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	model.width = 100
 	model.height = 30
 	view := model.View()
-	if !model.home || model.launcher || !strings.Contains(view, "What do you want to accomplish?") || !strings.Contains(view, "Ask Gator to work on something") {
+	if !model.home || model.launcher || !strings.Contains(view, gatorWordmark) || !strings.Contains(view, "What do you want to accomplish?") || !strings.Contains(view, "Ask Gator to work on something") {
 		t.Fatalf("initial view = %q", view)
 	}
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
@@ -81,7 +81,7 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	}
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	typingView := typing.(Model).View()
-	if strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, "Work in reports") {
+	if strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || !strings.Contains(typingView, "Work in reports") {
 		t.Fatalf("composer did not dock after typing: %q", typingView)
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
