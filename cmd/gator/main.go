@@ -64,7 +64,6 @@ Usage:
   gator extension install [--replace] DIRECTORY
   gator provider list
   gator provider add ID --base-url URL --model MODEL [--model MODEL...] [--api-key-env NAME]
-  gator local list|status|serve|pull|use|remove
   gator browser install|status|start|attach|tabs|select|origins|visual|allow-upload|artifacts|export|stop
   gator theme list
   gator theme set gator|contrast|mono
@@ -109,7 +108,6 @@ Commands:
   snapshot  inspect or explicitly collect immutable source snapshots
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
-  local     install, select, and manage curated Ollama coding models
   browser   start, attach, and explicitly control a local Playwright/Chromium session
   theme     list or choose Gator's terminal theme
   doctor    report local prerequisites and suggested verification commands
@@ -234,7 +232,7 @@ func run(args []string, out io.Writer) error {
 	case "provider":
 		return providerCommand(args[1:], out)
 	case "local":
-		return localCommand(args[1:], out)
+		return errors.New("local model management is available in the TUI; start gator, open /model, and choose Local")
 	case "browser":
 		return browserCommand(args[1:], out)
 	case "theme":

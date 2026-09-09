@@ -24,8 +24,7 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)
 	defer server.Close()
-	var output bytes.Buffer
-	if err := localCommand([]string{"use", "qwen2.5-coder-7b", "--url", server.URL}, &output); err != nil {
+	if _, err := testLocalManager(t, server.URL).Use(context.Background(), "qwen2.5-coder-7b"); err != nil {
 		t.Fatalf("local use: %v", err)
 	}
 	store, err := config.DefaultStore()
@@ -57,34 +56,31 @@ func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) 
 	if err != nil || turn.Text != "local result" {
 		t.Fatalf("local Chat Completions turn = %#v, err = %v", turn, err)
 	}
-	if !strings.Contains(output.String(), "Native TUI, run, resume") {
-		t.Fatalf("local use output = %q", output.String())
-	}
-	output.Reset()
+	var output bytes.Buffer
 	if err := doctor([]string{"--provider", localmodel.ProviderID}, &output); err != nil {
 		t.Fatalf("doctor local provider: %v", err)
 	}
-	if got := output.String(); !strings.Contains(got, "Authentication (no API key): not required") || !strings.Contains(got, "gator local status") {
+	if got := output.String(); !strings.Contains(got, "Authentication (no API key): not required") || !strings.Contains(got, "/model") {
 		t.Fatalf("local doctor output = %q", got)
 	}
 }
 
-func TestLocalPullRequiresConfirmationAndUsesCuratedTag(t *testing.T) {
-	useGenerousLocalModelHost(t)
-	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
-	server := newLocalModelServer(t)
-	defer server.Close()
-	var output bytes.Buffer
-	err := localCommand([]string{"pull", "qwen3-coder-30b", "--url", server.URL}, &output)
-	if err == nil || !strings.Contains(err.Error(), "--yes") || !strings.Contains(err.Error(), "19 GB") {
-		t.Fatalf("unconfirmed local pull = %v", err)
+func TestLocalCLIIsRetiredWithoutStartingModelOperations(t *testing.T) {
+	for _, action := range []string{"list", "status", "serve", "pull", "use", "remove"} {
+		err := run([]string{"local", action, "qwen3-coder-30b", "--yes"}, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "/model") {
+			t.Fatalf("local %s: %v", action, err)
+		}
 	}
-	if err := localCommand([]string{"pull", "qwen3-coder-30b", "--yes", "--url", server.URL}, &output); err != nil {
-		t.Fatalf("confirmed local pull: %v", err)
+}
+
+func testLocalManager(t *testing.T, runtimeURL string) *localModelManager {
+	t.Helper()
+	store, err := config.DefaultStore()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := output.String(); !strings.Contains(got, "qwen3-coder:30b") || !strings.Contains(got, "pulling layers (50%)") {
-		t.Fatalf("local pull output = %q", got)
-	}
+	return &localModelManager{store: store, runtimeURL: runtimeURL}
 }
 
 func TestLocalRemoveUpdatesSelectedProviderConfiguration(t *testing.T) {
@@ -92,11 +88,10 @@ func TestLocalRemoveUpdatesSelectedProviderConfiguration(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	server := newLocalModelServer(t)
 	defer server.Close()
-	var output bytes.Buffer
-	if err := localCommand([]string{"use", "qwen2.5-coder-7b", "--url", server.URL}, &output); err != nil {
+	if _, err := testLocalManager(t, server.URL).Use(context.Background(), "qwen2.5-coder-7b"); err != nil {
 		t.Fatal(err)
 	}
-	if err := localCommand([]string{"remove", "qwen2.5-coder-7b", "--yes", "--url", server.URL}, &output); err != nil {
+	if _, err := testLocalManager(t, server.URL).Remove(context.Background(), "qwen2.5-coder-7b"); err != nil {
 		t.Fatalf("local remove: %v", err)
 	}
 	store, err := config.DefaultStore()
@@ -114,7 +109,7 @@ func TestLocalRemoveUpdatesSelectedProviderConfiguration(t *testing.T) {
 
 func TestLocalRejectsRemoteRuntimeURL(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
-	err := localCommand([]string{"list", "--url", "http://models.example.com:11434"}, io.Discard)
+	_, err := testLocalManager(t, "http://models.example.com:11434").Status(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "loopback") {
 		t.Fatalf("remote local runtime error = %v", err)
 	}
@@ -136,11 +131,10 @@ func TestLocalEligibilityBlocksPullUseAndManagedExecution(t *testing.T) {
 
 	server := newLocalModelServer(t)
 	defer server.Close()
-	var output bytes.Buffer
-	if err := localCommand([]string{"pull", "qwen2.5-coder-7b", "--yes", "--url", server.URL}, &output); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
+	if _, err := testLocalManager(t, server.URL).Pull(context.Background(), "qwen2.5-coder-7b", nil); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
 		t.Fatalf("blocked local pull error = %v", err)
 	}
-	if err := localCommand([]string{"use", "qwen2.5-coder-7b", "--url", server.URL}, &output); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
+	if _, err := testLocalManager(t, server.URL).Use(context.Background(), "qwen2.5-coder-7b"); err == nil || !strings.Contains(err.Error(), "disabled on this host") {
 		t.Fatalf("blocked local use error = %v", err)
 	}
 	store, err := config.DefaultStore()
@@ -236,6 +230,9 @@ func TestLocalModelManagerStopsOnlyTheRuntimeItStarts(t *testing.T) {
 	case <-runtime.done:
 	case <-time.After(time.Second):
 		t.Fatal("managed runtime was not reaped")
+	}
+	if _, err := manager.startRuntime("ignored"); err == nil {
+		t.Fatal("closed TUI session started another runtime")
 	}
 	manager.runtimeMu.Lock()
 	defer manager.runtimeMu.Unlock()

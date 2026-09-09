@@ -176,21 +176,29 @@ func (m Model) attachmentConfirmView() string {
 
 func (m Model) localModelsView() string {
 	sections := []string{m.header("models")}
-	sections = append(sections, m.inline(dimStyle.Render("Effort: "+m.effort.label()+" · intent-level turn budget. Ctrl+S or /effort changes it; this screen controls exact models and logins.")))
+	if !m.catalogOnly {
+		sections = append(sections, m.inline(dimStyle.Render("Effort: "+m.effort.label()+" · intent-level turn budget. Ctrl+S or /effort changes it; this screen controls exact models and logins.")))
+	} else {
+		sections = append(sections, m.inline(dimStyle.Render("Tab: Cloud / Local · F1: all controls · Esc: Work")))
+	}
 	if m.localModels.manager == nil {
 		sections = append(sections, m.panel(errorStyle.Render("Model management was not configured for this TUI session.")), m.noticeView(), m.footer("esc return"))
 		return strings.Join(sections, "\n")
 	}
 
+	var catalog []string
 	if m.localModels.section == cloudModelSection {
-		sections = append(sections, m.cloudModelsView())
-		sections = append(sections, m.inline(dimStyle.Render(m.localModelsSummary())))
+		catalog = append(catalog, m.cloudModelsView())
+		catalog = append(catalog, m.inline(dimStyle.Render(m.localModelsSummary())))
 	} else {
-		sections = append(sections, m.localRuntimeView(), m.localCatalogView())
+		catalog = append(catalog, m.localRuntimeView(), m.localCatalogView())
 		if m.localModels.dependencyHelp {
 			sections = append(sections, m.localDependencyHelpView())
 		}
-		sections = append(sections, m.inline(dimStyle.Render("Cloud provider readiness is available under the Cloud section.")))
+		catalog = append(catalog, m.inline(dimStyle.Render("Cloud provider readiness is available under the Cloud section.")))
+	}
+	if !m.catalogOnly {
+		sections = append(sections, catalog...)
 	}
 
 	if m.localModels.action != localModelIdle {
@@ -245,6 +253,10 @@ func (m Model) localModelsView() string {
 		sections = append(sections, m.noticeView(), m.footer("up/down choose", "u/enter use", "c configure", "n new provider", "g discover", "d remove credential", "x remove provider", "l sign in", "e rename", "tab local", "r refresh", "esc composer", "f1 shortcuts"))
 	} else {
 		sections = append(sections, m.noticeView(), m.footer("up/down choose", "p pull", "u/enter use", "x remove", "e rename", "s start Ollama", "i install help", "tab cloud", "r refresh", "esc composer", "f1 shortcuts"))
+	}
+	if m.catalogOnly {
+		// keep pending decisions and progress visible in short terminals.
+		sections = append(sections, catalog...)
 	}
 	return strings.Join(sections, "\n")
 }
@@ -333,7 +345,7 @@ func (m Model) localRuntimeView() string {
 		if m.ollamaMissing() {
 			runtime += "\n" + dimStyle.Render("Install Ollama, then press r to refresh.")
 		} else {
-			runtime += "\n" + dimStyle.Render("Start it with 'ollama serve' or 'gator local serve', then press r.")
+			runtime += "\n" + dimStyle.Render("Press s to start Ollama with Gator, or r to refresh.")
 		}
 	} else if m.localModels.catalog.RuntimeVersion != "" {
 		runtime += "\n" + okStyle.Render("Connected · Ollama "+m.localModels.catalog.RuntimeVersion)

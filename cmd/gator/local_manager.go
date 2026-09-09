@@ -17,8 +17,8 @@ import (
 	"github.com/gongahkia/gator/internal/tui"
 )
 
-// localModelManager is the shared application layer behind the native local
-// CLI and TUI. It keeps the UI independent of Ollama's HTTP API while using
+// localModelManager is the application layer behind TUI model management.
+// It keeps the UI independent of Ollama's HTTP API while using
 // the same curated catalog, loopback validation, and provider configuration.
 type localModelManager struct {
 	store      config.Store
@@ -26,6 +26,7 @@ type localModelManager struct {
 	host       func() localmodel.Host
 	runtimeMu  sync.Mutex
 	runtime    *managedLocalRuntime
+	closed     bool
 	command    func(string, ...string) *exec.Cmd
 	lookPath   func(string) (string, error)
 }
@@ -89,7 +90,7 @@ func (manager *localModelManager) Start(ctx context.Context) (tui.LocalModelCata
 	}
 	binary, err := manager.ollamaPath()
 	if err != nil {
-		return tui.LocalModelCatalog{}, errors.New("Ollama executable was not found; run 'gator doctor' for installation help or visit https://ollama.com/download")
+		return tui.LocalModelCatalog{}, errors.New("Ollama executable was not found; open installation help with i in /model's Local section")
 	}
 	runtime, err := manager.startRuntime(binary)
 	if err != nil {
@@ -110,6 +111,7 @@ func (manager *localModelManager) Close() error {
 	manager.runtimeMu.Lock()
 	runtime := manager.runtime
 	manager.runtime = nil
+	manager.closed = true
 	manager.runtimeMu.Unlock()
 	return manager.stopRuntime(runtime)
 }
@@ -144,6 +146,9 @@ func (manager *localModelManager) ollamaPath() (string, error) {
 func (manager *localModelManager) startRuntime(binary string) (*managedLocalRuntime, error) {
 	manager.runtimeMu.Lock()
 	defer manager.runtimeMu.Unlock()
+	if manager.closed {
+		return nil, errors.New("local model management session is closed")
+	}
 	if manager.runtime != nil {
 		return manager.runtime, nil
 	}

@@ -1,99 +1,70 @@
-# Curated local coding models
+# Local models in the Work TUI
 
-`gator local` provides first-class management for a small reviewed catalog of
-local coding models. It uses an already-installed [Ollama](https://ollama.com/)
-runtime at its documented loopback address and its OpenAI-compatible Chat
-Completions API. Gator still owns the agent loop, tools, worktree, sandbox,
-approvals, verifier, sessions, TUI, JSONL RPC, app server, and ACP server.
-Only inference moves to the selected local model.
+Start `gator`, enter `/model`, then press Tab for **Local**. The same screen is
+available from the command palette and first-run model selection. All local model
+management happens here; the former `gator local` CLI commands are retired and
+return directions to this screen. Automation and headless Work can still use the
+persisted model selection.
 
-## Start
+Gator uses the existing Ollama runtime and its loopback Chat Completions API.
+Its Work service, tools, specialist boundaries, evidence, and approvals still
+own execution. The current catalog is text-only; unsupported image/PDF inputs
+are reported explicitly. No model-quality claim follows from being in the catalog.
 
-Install Ollama from its official download page, then start its local server if
-your platform did not already start it as a service:
+## Download, select, and delete
 
-```sh
-ollama serve
-# equivalent foreground helper; it does not create an unsupervised daemon
-gator local serve
-```
+1. Choose a model with ↑/↓. The screen shows installed state, source, approximate
+   size, and host eligibility.
+2. Press `p` to review its download source and size, then Enter or `y` to confirm.
+   Progress appears while the UI remains responsive. Esc or Ctrl+C requests
+   cancellation; a later pull uses Ollama's resumable download behavior.
+3. Press `u` or Enter to select an installed model. The selection is saved for
+   the next Work run and later sessions. Press `e` to edit its display name.
+4. Press `x` to review deletion, then Enter or `y` to confirm, or `n`/Esc to
+   decline. Deletion updates the selected provider; deleting its last configured
+   model clears that selection. Model files belong to the selected Ollama runtime,
+   so deletion also affects other clients using the same runtime.
+5. Press Esc to return to the same conversation or draft. First-run setup keeps
+   the pending prompt in the composer; press Enter to start it after selection.
 
-Gator detects missing prerequisites and offers checked-in installation guidance
-in `gator doctor` and the native TUI. On Fedora, for example, doctor can point
-to the package needed for Git or Bubblewrap; it links Ollama to its official
-download page. Gator intentionally does not download and execute an
-operating-system installer, package-manager command, or remote install script.
-That would require a separate provenance, checksum, privilege, and upgrade
-policy. It does manage model packages through the loopback runtime:
+`r` refreshes inventory, `i` opens prerequisite help, and F1 shows shortcuts.
+Model management waits until active Work has finished or been cancelled, so a
+model being used by that run cannot be deleted from this screen mid-run.
+Download and deletion always require their own TUI confirmation.
 
-```sh
-gator doctor
-gator local status
-gator local list
-gator local pull qwen2.5-coder-7b --yes
-gator local use qwen2.5-coder-7b
-gator doctor --provider gator-local
+## Runtime setup
 
-# The selected model is now the persisted default for every native interface.
-gator run --verify 'go test ./...' 'Add a focused feature with tests'
-```
+If Ollama is installed but stopped, the Local screen offers **Start with Gator**.
+Enter or `y` starts `ollama serve` as a child of the Work TUI. It remains running
+when the model screen closes and stops when Gator exits. Gator does not adopt or
+stop a runtime that was already running. Press `s` to revisit runtime startup.
+Closing the TUI cancels a pending model operation or sign-in.
 
-`pull` shows the package source and approximate download size, then requires
-`--yes`; interrupted Ollama pulls resume through Ollama. `remove` likewise
-requires `--yes` and removes the selected model from Gator's local provider
-catalog. Use a normal custom provider for a self-hosted model or endpoint that
-is not listed here.
+If the Ollama executable is missing, the screen offers installation help with the
+[official download source](https://ollama.com/download) and platform guidance.
+Installing the operating-system runtime remains a prerequisite: Gator does not
+run privileged package installers or remote installation scripts. Once installed,
+refresh from the Local screen; model downloads, selection, deletion and runtime
+startup require no separate Gator CLI commands.
 
-## Native TUI
+## Cloud and custom models
 
-The terminal UI has one model-management command: start `gator`, then enter
-`/model` in the composer. Its Cloud section shows direct/cloud provider
-readiness from local credential/configuration evidence. It lists the complete
-checked-in OpenCode Zen and Go gateway model catalogs, plus one stable default
-for every other direct provider; it does not claim to discover every model
-enabled by an account. Press `c` to configure the selected built-in cloud
-provider: model, masked credential where applicable, endpoint, and provider
-metadata. The form includes Azure endpoint/version, Bedrock region/profile,
-Vertex project/location/ADC path, Cloudflare account/gateway metadata, and
-Radius gateway routing. Press `l` to start an eligible provider sign-in and
-`u` or Enter to select a configured cloud model. The separate Claude Code entry
-uses `c` to record an Anthropic API key for the delegated harness; it never
-reuses a Claude.ai or Claude Code subscription credential.
+Tab switches back to Cloud. Press `c` to configure a provider/model with masked
+credential entry and provider-specific endpoint fields, `l` for an available
+native OAuth sign-in, and `u`/Enter to select a model. The selection is persisted
+for Work. The screen reports credential/configuration readiness, not a live
+account entitlement check. Sign-ins requiring an unconfigured OAuth client are
+reported as unavailable.
 
-Press Tab to open the Local section. It checks the loopback runtime and shows
-the same reviewed catalog and installed state as `gator local status`. It also
-shows the detected host and marks models that Gator has disabled because they
-do not satisfy its local admission guardrail.
-
-- `↑`/`↓` chooses a catalog model; `p` shows the source and approximate size,
-  then `y` or Enter confirms its download. A native animated spinner and
-  bounded Ollama progress update while it downloads.
-- `u` or Enter selects an installed model and immediately updates the current
-  TUI's provider and model for the next task. `Esc` returns to the composer;
-  use `/verify` to edit the verification allowlist, then send the task as
-  normal.
-- `e` assigns a persistent local display label to either cloud or local model
-  entries; it does not change the identifier sent to the provider. An empty
-  label restores the original label. `x` requires a second confirmation before
-  removing local model data; `r` refreshes runtime and inventory state.
-
-When the Local section finds that the Ollama executable is missing, it asks to
-open installation help. Press Enter or `y` for the default choice to see the
-official source and platform guidance, or press `n` or Esc to install it
-yourself. Press `i` at any time in the Local section to review all detected
-missing local prerequisites. Gator does not execute those installers.
-
-When the executable is installed but its loopback runtime is unavailable, the
-TUI instead asks how to start it. Press Enter or `y` for the default **Start
-with Gator** choice: Gator starts `ollama serve` as a child of that TUI session,
-waits for its loopback API, and stops only that child when Gator exits. Press
-`n` or Esc to start it yourself with `ollama serve` or `gator local serve`,
-then press `r` to refresh. Gator never adopts or stops an Ollama service that
-was already running.
+Press `n` to add a custom Chat Completions endpoint, `g` to preview model discovery,
+`e` to rename an entry, `d` to remove a stored Gator credential, and `x` to remove a
+custom provider. The reserved `gator-local` entry is managed from Local. This
+screen reuses the retained model-management component; it does not reopen the
+historical Code composer or read/write its draft state.
 
 ## Host eligibility guardrail
 
-`gator doctor` detects the operating system, architecture, total RAM, currently
+The Local model screen detects the operating system, architecture, total RAM, currently
 available RAM where the platform reports it, and free space in the Ollama model
 filesystem. It reports each reviewed model as enabled or disabled and explains
 the exact blocking condition. Gator supports Linux and macOS on `amd64` and
@@ -117,7 +88,7 @@ headroom for the pull. The current catalog evaluates to:
 | `devstral-24b` | 26.1 GiB | 15.6 GiB |
 | `qwen3-coder-30b` | 35.4 GiB | 21.2 GiB |
 
-Gator blocks `local pull`, `local use`, TUI download/selection, and every
+Gator blocks TUI download/selection and every
 managed-local executor setup (including a previously selected model) when the
 host fails this policy. It leaves rename and removal available, so a disabled
 model can be removed to reclaim disk. This is intentionally a capacity safety
@@ -132,8 +103,7 @@ environment setup.
 
 GPU compatibility, available VRAM, context length, quantization, and parallel
 requests are not safely derivable from a generic laptop inspection. Ollama
-chooses its runtime backend; after a model is loaded, run `ollama ps` to see
-whether it is using CPU, GPU, or both. Larger context and parallel requests can
+chooses its runtime backend; the model-management screen does not currently report CPU/GPU placement. Larger context and parallel requests can
 raise memory use beyond Gator's guardrail, so keep them conservative on a
 resource-constrained machine.
 
@@ -166,14 +136,14 @@ catalog entry. Review the upstream model card and license before downloading.
 
 ## Runtime boundary
 
-Management commands accept `--url` only for `http://localhost`, `127.0.0.1`,
-or another literal loopback address. The chosen URL is persisted only when
-`gator local use` selects a model, as the `gator-local` provider's
-`/v1/chat/completions` endpoint. No API key is stored or sent.
+The manager uses a loopback Ollama runtime. Selecting a model persists the
+`gator-local` provider and its `/v1/chat/completions` endpoint. Existing configured
+loopback endpoints remain readable; remote addresses are rejected. No API key is
+stored or sent to the managed local runtime.
 
 This restriction is deliberate. A remote or shared endpoint belongs to the
-existing `gator provider add` flow, where its authentication and data-handling
-contract can be declared explicitly. `gator local` never enables Ollama's
+Cloud section’s custom-provider form (`n`), where its authentication and data-handling
+contract can be declared explicitly. Gator never enables Ollama's
 insecure pull option and never uploads models.
 
 Ollama documents Chat Completions streaming and tool support, which is why the
@@ -181,3 +151,31 @@ catalog can retain Gator's tool loop rather than delegating to another harness.
 The selected coding models are text models, so do not use `--image` with them;
 text attachments retain the normal OpenAI-compatible provider behavior while
 PDF inputs remain unavailable on that generic protocol.
+
+## Verification of the Work TUI integration
+
+September 10, 2026: `GOTOOLCHAIN=go1.25.13 make check` passed all 52 packages,
+formatting, vet and build. Race checks passed for `internal/localmodel`,
+`internal/tui`, `internal/worktui`, and `cmd/gator`. Darwin arm64 cross-compilation
+passed; macOS runtime behavior was not exercised locally. Browser code did not
+change, so the Chromium integration was not repeated for this change.
+
+The assembled Bubble Tea test uses local HTTP fixtures to exercise download
+confirmation, progress, cancellation, a completed download, persistent selection,
+an actual Work-service artifact run, declined deletion, confirmed deletion, and
+clearing the last selected model. Other regressions cover short-terminal
+confirmations, preserving conversations and historical Code drafts, cancelled
+refreshes, stale panel responses, active-run exclusion and runtime shutdown.
+An initial race run exposed test synchronization against streamed text rather
+than terminal completion; the corrected test passed three race-enabled repeats
+and the final full race group. The initial UI text assertion was also updated to
+the actual confirmation label before passing verification.
+
+A separate real-terminal smoke check started the installed Ollama executable
+from Work, listed installed models, selected `qwen2.5-coder:0.5b`, and cancelled a
+live Work task. Its retained manifest reports four requests, 8,861 input tokens,
+130 output tokens, and no completed artifact before cancellation on turn four.
+The Ollama server and runner were absent after Gator exited. This verifies the
+runtime lifecycle and cancellation, not successful live task quality. No existing
+model weights were downloaded or deleted in that smoke check; those operations
+were verified with local HTTP fixtures.

@@ -318,7 +318,7 @@ func TestLocalModelsShowsUnavailableRuntimeWithoutHidingCatalog(t *testing.T) {
 		t.Fatalf("unavailable local model view = %q", view)
 	}
 	next, command := updated.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
-	if command != nil || next.(Model).localModels.confirmation != localModelNoConfirmation || !next.(Model).localModels.startDismissed || !strings.Contains(next.(Model).notice.text, "Start Ollama yourself") {
+	if command != nil || next.(Model).localModels.confirmation != localModelNoConfirmation || !next.(Model).localModels.startDismissed || !strings.Contains(next.(Model).notice.text, "Runtime start declined") {
 		t.Fatalf("manual local runtime choice = confirmation:%v dismissed:%t notice:%q command:%#v", next.(Model).localModels.confirmation, next.(Model).localModels.startDismissed, next.(Model).notice.text, command)
 	}
 }

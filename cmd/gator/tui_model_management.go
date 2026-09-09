@@ -103,7 +103,7 @@ func (backend *tuiModelManagementBackend) SaveCustomProvider(setup tui.CustomPro
 func (backend *tuiModelManagementBackend) RemoveCustomProvider(id string) ([]config.CustomProvider, error) {
 	id = strings.TrimSpace(id)
 	if id == localmodel.ProviderID {
-		return nil, fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
+		return nil, fmt.Errorf("custom provider ID %q is reserved for the Local section of /model", id)
 	}
 	settings, err := backend.settings.Load()
 	if err != nil {
@@ -123,7 +123,7 @@ func (backend *tuiModelManagementBackend) RemoveCustomProvider(id string) ([]con
 func (backend *tuiModelManagementBackend) DiscoverCustomProvider(id string) (tui.CustomProviderDiscovery, error) {
 	id = strings.TrimSpace(id)
 	if id == localmodel.ProviderID {
-		return tui.CustomProviderDiscovery{}, fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
+		return tui.CustomProviderDiscovery{}, fmt.Errorf("custom provider ID %q is reserved for the Local section of /model", id)
 	}
 	settings, err := backend.settings.Load()
 	if err != nil {
@@ -150,7 +150,7 @@ func (backend *tuiModelManagementBackend) DiscoverCustomProvider(id string) (tui
 func (backend *tuiModelManagementBackend) ApplyCustomProviderDiscovery(id string, models []string) ([]config.CustomProvider, error) {
 	id = strings.TrimSpace(id)
 	if id == localmodel.ProviderID {
-		return nil, fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
+		return nil, fmt.Errorf("custom provider ID %q is reserved for the Local section of /model", id)
 	}
 	settings, err := backend.settings.Load()
 	if err != nil {

@@ -5,7 +5,7 @@ package localmodel
 import "strings"
 
 const (
-	// ProviderID is the Gator-owned custom provider created by `gator local use`.
+	// ProviderID is the Gator-owned custom provider selected through the TUI.
 	// Keeping it separate from a user-defined provider avoids overwriting a
 	// manually configured local endpoint.
 	ProviderID = "gator-local"

@@ -248,7 +248,7 @@ func (v *stringList) Set(value string) error {
 func reservedCustomProviderIDError(id string) error {
 	id = strings.TrimSpace(id)
 	if id == localmodel.ProviderID {
-		return fmt.Errorf("custom provider ID %q is reserved for 'gator local use'", id)
+		return fmt.Errorf("custom provider ID %q is reserved for the Local section of /model", id)
 	}
 	if _, err := model.ParseProvider(id); err == nil {
 		return fmt.Errorf("custom provider ID %q conflicts with Gator's built-in provider; choose another ID", id)
