@@ -98,3 +98,17 @@ func TestBearerTokenCredentialExpiry(t *testing.T) {
 		t.Fatal("non-expiring bearer token was treated as expired")
 	}
 }
+
+func TestNewBearerTokenValidatesAndTracksExpiry(t *testing.T) {
+	expiry := time.Now().Add(time.Hour).Truncate(time.Millisecond)
+	credential, err := NewBearerToken("  secret-token  ", expiry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !credential.IsBearerToken() || credential.Access != "secret-token" || credential.Expires != expiry.UnixMilli() {
+		t.Fatalf("credential = %#v", credential)
+	}
+	if _, err := NewBearerToken("   ", time.Time{}); err == nil {
+		t.Fatal("empty bearer token was accepted")
+	}
+}
