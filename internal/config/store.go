@@ -18,7 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/sandbox"
 )
 
-const version = 2
+const version = 3
 
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
@@ -43,6 +43,7 @@ type Settings struct {
 	LSPTrusts       []lsp.Trust            `json:"lsp_trusts,omitempty"`
 	MCPTrusts       []mcp.Trust            `json:"mcp_trusts,omitempty"`
 	Connectors      []connector.Descriptor `json:"connectors,omitempty"`
+	ConnectorPermissions []connector.PermissionRule `json:"connector_permissions,omitempty"`
 	Execution       sandbox.Policy         `json:"execution"`
 }
 
@@ -191,6 +192,9 @@ func (s Store) Load() (Settings, error) {
 	settings := Default()
 	if err := json.Unmarshal(contents, &settings); err != nil {
 		return Settings{}, fmt.Errorf("decode configuration file: %w", err)
+	}
+	if settings.Version == 2 {
+		settings.Version = version
 	}
 	if err := validate(settings); err != nil {
 		return Settings{}, err
@@ -409,6 +413,14 @@ func validate(settings Settings) error {
 	}
 	if _, err := connector.NewRegistry(settings.Connectors); err != nil {
 		return fmt.Errorf("invalid connector configuration: %w", err)
+	}
+	if len(settings.ConnectorPermissions) > 512 {
+		return errors.New("configuration has too many connector permission rules")
+	}
+	for index, rule := range settings.ConnectorPermissions {
+		if err := rule.Validate(); err != nil {
+			return fmt.Errorf("connector permission rule %d: %w", index+1, err)
+		}
 	}
 	return nil
 }

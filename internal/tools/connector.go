@@ -23,6 +23,7 @@ type ConnectorPolicy struct {
 	Approve         action.Approver
 	OnSource        func(connector.Provenance)
 	OnAction        func(action.Record)
+	Permissions     connector.PermissionSet
 }
 
 // ConnectorTools exposes only the connectors explicitly selected for one run.
@@ -58,7 +59,8 @@ func ConnectorTools(runtime connector.Runtime, selected []string, policy Connect
 		}
 		for _, operation := range descriptor.Operations() {
 			highRisk := action.RequiresFreshApproval(operation.Capability)
-			if highRisk && policy.ExternalActions == action.Forbid || !highRisk && !policy.Mode.Allows(operation.Capability) {
+			permission := policy.Permissions.Resolve(descriptor.ID, operation.ID, operation.Capability)
+			if permission == connector.PermissionDeny || highRisk && policy.ExternalActions == action.Forbid || !highRisk && (!policy.Mode.Allows(operation.Capability) || permission != connector.PermissionAllow) {
 				continue
 			}
 			result = append(result, connectorTool{
@@ -120,8 +122,12 @@ func (t connectorTool) executeAction(ctx context.Context, arguments json.RawMess
 		t.budget.release()
 		return agent.ToolResult{}, err
 	}
+	disposition := t.policy.ExternalActions
+	if t.policy.Permissions.Resolve(t.descriptor.ID, t.operation.ID, t.operation.Capability) == connector.PermissionDraft {
+		disposition = action.Propose
+	}
 	record, err := (action.Broker{Approve: t.policy.Approve}).Resolve(
-		ctx, t.policy.Mode, t.policy.ExternalActions, prepared.Proposal,
+		ctx, t.policy.Mode, disposition, prepared.Proposal,
 		func(executionContext context.Context) error {
 			return t.runtime.ExecutePrepared(executionContext, t.policy.Mode, prepared)
 		},

@@ -31,6 +31,7 @@ type Request struct {
 	ParentRevisionID string
 	SnapshotID       string
 	RefreshSource    bool
+	ConnectorPermissions connector.PermissionSet
 }
 
 // Outcome retains staged files and trusted evidence even when model execution

@@ -168,7 +168,7 @@ func RenderDOCX(spec Spec) ([]byte, Preview, error) {
 		if err != nil {
 			return nil, Preview{}, err
 		}
-		if _, err := io.WriteString(writer, files[name]); err != nil {
+		if _, err := io.WriteString(writer, strings.ReplaceAll(files[name], `\"`, `"`)); err != nil {
 			return nil, Preview{}, err
 		}
 	}
