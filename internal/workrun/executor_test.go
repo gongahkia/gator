@@ -54,6 +54,55 @@ func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
 	}
 }
 
+func TestExecutorDelegatesCodeAgainstFrozenSourceAndSealsPatchEvidence(t *testing.T) {
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "main.go"), []byte("package main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "delegate-1", Name: "delegate_agents", Arguments: json.RawMessage(`{"tasks":[{"agent":"code","task":"Add a greeting"}]}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"Code patch prepared for review."}`)}}},
+		{Text: "Prepared the report and a reviewable code patch."},
+	}}
+	var delegated CodeRequest
+	patchContents := []byte("diff --git a/main.go b/main.go\n")
+	outcome, err := (Executor{
+		Model: model, StateDir: t.TempDir(),
+		Code: func(_ context.Context, request CodeRequest) (CodeResult, error) {
+			delegated = request
+			contents, readErr := os.ReadFile(filepath.Join(request.SourcePath, "main.go"))
+			if readErr != nil || string(contents) != "package main\n" {
+				return CodeResult{}, errors.New("delegated source did not match frozen input")
+			}
+			return CodeResult{Summary: "Added greeting", Patch: patchContents, ChangedPaths: []string{"main.go"}, Steps: 4}, nil
+		},
+	}).Execute(context.Background(), Request{
+		SourcePath: source, Objective: "Prepare a report and implement a greeting", RunID: "work-code-specialist",
+		Contract: artifact.DefaultContract("report.md"), MaxSteps: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if delegated.ID != "subagent-001" || delegated.SourcePath == source || delegated.ParentRunID != "work-code-specialist" {
+		t.Fatalf("delegated request = %#v", delegated)
+	}
+	if len(outcome.Manifest.Subagents) != 1 {
+		t.Fatalf("subagent evidence = %#v", outcome.Manifest.Subagents)
+	}
+	evidence := outcome.Manifest.Subagents[0]
+	if evidence.Agent != "code" || evidence.Status != "completed" || evidence.ArtifactPath != "code/subagent-001.patch" || evidence.ArtifactSHA256 == "" {
+		t.Fatalf("subagent evidence = %#v", evidence)
+	}
+	retained, err := os.ReadFile(filepath.Join(outcome.Work.Output.Path(), filepath.FromSlash(evidence.ArtifactPath)))
+	if err != nil || string(retained) != string(patchContents) {
+		t.Fatalf("retained patch = %q, %v", retained, err)
+	}
+	original, err := os.ReadFile(filepath.Join(source, "main.go"))
+	if err != nil || string(original) != "package main\n" {
+		t.Fatalf("live source changed: %q, %v", original, err)
+	}
+}
+
 func TestExecutorContinuationSeedsArtifactsAndRetainsParent(t *testing.T) {
 	source, state := t.TempDir(), t.TempDir()
 	firstModel := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"one"}`)}}}, {Text: "first"}}}
