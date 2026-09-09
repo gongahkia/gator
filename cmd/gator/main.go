@@ -40,7 +40,9 @@ Usage:
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
-  gator connector list|add|status|login|logout|test|remove
+  gator connector list
+  gator connector add ID --kind json|webhook --url URL [--name NAME] [--auth none|bearer]
+  gator connector status|login|logout|test|remove ID [OPTIONS]
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list|status
   gator extension install [--replace] DIRECTORY
@@ -81,9 +83,9 @@ Commands:
   serve     run the authenticated loopback HTTP/SSE app-server bridge
   acp       run a local Agent Client Protocol v1 stdio agent for an editor
   agent     list project-defined profiles and capability-bounded roles
-	 child     inspect durable manifests for retained isolated writer children
+  child     inspect durable manifests for retained isolated writer children
   lsp       trust and inspect local Language Server Protocol diagnostics
-  connector configure explicit connected sources and resource-bound authentication
+  connector configure connected sources/actions and resource-bound authentication
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
   local     install, select, and manage curated Ollama coding models
@@ -97,9 +99,9 @@ Commands:
   resume    select, reopen, or immediately continue a retained local thread
   eval      run a bounded headless evaluation fixture or real-model suite
   transcript export one retained private session as local HTML
-  review    serve an authenticated loopback browser review for one retained run
-  export    write a portable patch for a retained run to standard output
-  apply     explicitly apply a retained patch to this clean checkout
+  review    verify and inspect a Work bundle or retained coding run
+  export    archive a Work bundle or write a retained coding patch
+  apply     explicitly transfer verified artifacts or a retained coding patch
 
 Cloud providers resolve credentials in this order: --api-key, Gator's private
 local auth file, then the provider environment variable. Native runs keep
