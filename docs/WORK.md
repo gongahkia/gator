@@ -260,7 +260,7 @@ The implementation is split around durable concepts:
   evidence;
 - `internal/action`: capability classification and external-action approval;
 - `internal/connector`: connector registry, schemas, provenance, and auth
-  references; and
+  references;
 - `internal/snapshot`, `internal/worksession`, `internal/jobs`, and
   `internal/inbox`: immutable Work inputs, revision history, schedules, and
   result routing; and

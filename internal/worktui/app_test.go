@@ -79,6 +79,11 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
 	}
+	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	typingView := typing.(Model).View()
+	if strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, "Work in reports") {
+		t.Fatalf("composer did not dock after typing: %q", typingView)
+	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()
 	if !strings.Contains(view, "Inbox") || !strings.Contains(view, "Scheduled jobs") {
@@ -100,7 +105,7 @@ func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	}
 	updated, command = model.Update(setupDone{provider: "openai"})
 	model = updated.(Model)
-	if command == nil || !model.running || model.firstRun {
+	if command == nil || !model.running || model.firstRun || len(model.entries) == 0 || model.entries[0].kind == "onboarding" {
 		t.Fatalf("post-setup state = %#v", model)
 	}
 	updated, _ = model.Update(command())
