@@ -153,10 +153,11 @@ func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
 		found := false
 		for _, line := range lines {
 			if index := strings.Index(line, command); index >= 0 {
+				column := ansi.StringWidth(line[:index])
 				if position < 0 {
-					position = index
-				} else if index != position {
-					t.Fatalf("%s starts at column %d, want %d\n%s", command, index, position, ansi.Strip(model.View()))
+					position = column
+				} else if column != position {
+					t.Fatalf("%s starts at column %d, want %d\n%s", command, column, position, ansi.Strip(model.View()))
 				}
 				found = true
 				break
