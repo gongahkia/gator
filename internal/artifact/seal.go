@@ -31,6 +31,7 @@ type SealOptions struct {
 	Actions          []action.Record
 	ConnectedSources []connector.Provenance
 	Renderers        []RendererEvidence
+	Subagents        []SubagentEvidence
 	Failure          string
 	StartedAt        time.Time
 	FinishedAt       time.Time
@@ -137,6 +138,7 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 		},
 		ConnectedSources: append([]connector.Provenance(nil), options.ConnectedSources...),
 		Renderers:        append([]RendererEvidence(nil), options.Renderers...),
+		Subagents:        append([]SubagentEvidence(nil), options.Subagents...),
 		Artifacts:        inspection.Files,
 		Validations:      inspection.Validations,
 		Actions:          append([]action.Record(nil), options.Actions...),
