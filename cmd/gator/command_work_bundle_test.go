@@ -1,7 +1,10 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +47,37 @@ func TestResolveWorkBundleAcceptsManifestPathAndRejectsTampering(t *testing.T) {
 func TestTerminalSafeRemovesControlSequences(t *testing.T) {
 	if got := terminalSafe("hello\x1b[31m\rworld\x00"); strings.ContainsAny(got, "\x1b\x00\r") || !strings.Contains(got, "world") {
 		t.Fatalf("safe terminal text = %q", got)
+	}
+}
+
+func TestExportCommandWritesVerifiedArchiveWithoutOverwriting(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	work := createCLIWorkBundle(t, stateDir, "export-work")
+	destination := filepath.Join(t.TempDir(), "bundle.tar.gz")
+	var output bytes.Buffer
+	if err := exportPatch([]string{work.ID, "--to", destination}, &output); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	gzipReader, err := gzip.NewReader(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tarReader := tar.NewReader(gzipReader)
+	header, err := tarReader.Next()
+	if err != nil || header.Name != "manifest.json" {
+		t.Fatalf("first archive entry = %#v, %v", header, err)
+	}
+	if _, err := io.Copy(io.Discard, tarReader); err != nil {
+		t.Fatal(err)
+	}
+	if err := exportPatch([]string{work.ID, "--to", destination}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("overwrite error = %v", err)
 	}
 }
 
