@@ -130,6 +130,34 @@ boundary. The internal Code specialist is strict and offline by default.
 --verify, --scope, --profile, --setup, --allow-command,
 --allow-command-prefix, and --code-capability configure its bounded delegation.`
 
+const codeUsage = `Gator coding — one Gator manager with an internal Code specialist
+
+Usage:
+  gator code [CODE POLICY] TASK
+  gator run [CODE POLICY] TASK
+
+Both commands use the main Gator orchestration path and require retained Code
+patch evidence. They never open a standalone Code session or TUI.
+
+Code policy:
+  --code-max-steps N
+  --verify 'argv ...'
+  --scope PATH
+  --profile NAME
+  --setup 'argv ...'
+  --allow-command 'argv ...'
+  --allow-command-prefix 'argv ...'
+  --sandbox strict|off
+  --network deny|allow
+  --code-capability lsp|mcp|extension|http|browser|terminal
+  --browser-session ID
+  --image PATH
+  --attach PATH
+
+Defaults are a strict sandbox, denied process network, no integration grants,
+and git diff --check verification. Use gator resume and Work revision history
+for continuation and branching.`
+
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "gator:", err)
@@ -218,11 +246,19 @@ func run(args []string, out io.Writer) error {
 		if len(args) == 1 || len(args) == 2 && args[1] == "--tui" {
 			return workInteractive()
 		}
+		if len(args) == 2 && isHelpArgument(args[1]) {
+			_, err := fmt.Fprintln(out, codeUsage)
+			return err
+		}
 		if args[1] == "resume" || args[1] == "fork" || args[1] == "clone" {
 			return errors.New("standalone Code sessions are retired; use 'gator resume CONVERSATION' and Gator revision history")
 		}
 		return runWorkTask(append([]string{"--require-code"}, args[1:]...), os.Stdin, out, nativeWorkModel)
 	case "run":
+		if len(args) == 2 && isHelpArgument(args[1]) {
+			_, err := fmt.Fprintln(out, codeUsage)
+			return err
+		}
 		return runWorkTask(append([]string{"--require-code"}, args[1:]...), os.Stdin, out, nativeWorkModel)
 	case "resume":
 		return unifiedResume(args[1:], out)
@@ -247,4 +283,8 @@ func run(args []string, out io.Writer) error {
 
 func supportedPlatform(goos string) bool {
 	return goos == "linux" || goos == "darwin"
+}
+
+func isHelpArgument(value string) bool {
+	return value == "--help" || value == "-h" || value == "help"
 }

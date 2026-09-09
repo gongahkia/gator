@@ -60,6 +60,20 @@ func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
 	}
 }
 
+func TestCodeCompatibilityRoutesExplainTheManagerOwnedWorkflow(t *testing.T) {
+	for _, command := range []string{"code", "run"} {
+		var output bytes.Buffer
+		if err := run([]string{command, "--help"}, &output); err != nil {
+			t.Fatalf("%s help: %v", command, err)
+		}
+		for _, expected := range []string{"main Gator orchestration path", "internal Code specialist", "--code-capability", "strict sandbox"} {
+			if !strings.Contains(output.String(), expected) {
+				t.Fatalf("%s help is missing %q: %s", command, expected, output.String())
+			}
+		}
+	}
+}
+
 func TestStandaloneCodeConversationCommandsAreRetired(t *testing.T) {
 	for _, command := range []string{"resume", "fork", "clone"} {
 		var output bytes.Buffer

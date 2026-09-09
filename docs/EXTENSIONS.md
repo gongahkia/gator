@@ -93,27 +93,23 @@ Extension tools are available only in Execute mode and appear to the model as
 `extension_<extension-id>_<tool-name>`. Their declared parameter schema is
 passed through to the direct model adapter.
 
-An extension command appears in the terminal palette as
-`/extension-id:command-name`. Selecting it loads its declared prompt file into
-the composer for review and editing; it never sends a run automatically. This
-is the standard prompt-template interface for packages and keeps user control
-visible at the send boundary.
+Legacy extension-command prompt metadata is still parsed for installed-bundle
+compatibility, but the main Gator TUI does not add extension-specific commands
+to its composer. A future Work-native prompt template must enter through the
+same visible main-Gator send boundary; it must not revive a Code-only palette.
 
-## Declarative native UI cards
+## Retired Code UI metadata
 
-An extension can contribute up to sixteen static native TUI cards through the
-`ui` manifest field. A card has an ID, `composer` or `review` slot, title, and
-description. It may name one `.md` or `.txt` prompt resource. Gator verifies
-the same installed or hash-pinned project bundle before reading it, renders the
-card with its own native layout and theme, and exposes it through
-`/extensions` in the composer or `x` in review.
+The extension schema may contain up to sixteen static `ui` cards for backward
+compatibility with the retired Code frontend. The main Gator TUI deliberately
+does not render those cards or expose the old `/extensions` and review-panel
+entry points. Installed bundles therefore cannot add user-facing UI today.
 
-Selecting a card with a prompt fills the composer; it does not send a run.
-Cards without a prompt are informational. This is deliberately not a plugin
-webview API: manifests cannot supply JavaScript, CSS, arbitrary key handlers,
-HTTP routes, subprocesses, or dynamic rendering code. Executable behavior
-continues to require an explicit `tools` declaration and the existing
-sandboxed, approval-gated sidecar boundary.
+This remains deliberately unlike a plugin webview API: manifests cannot supply
+JavaScript, CSS, arbitrary key handlers, HTTP routes, subprocesses, or dynamic
+rendering code. Executable behavior continues to require an explicit `tools`
+declaration, existing bundle trust, a per-run `extension` grant to internal
+Code, and the sandboxed, approval-gated sidecar boundary.
 
 ## Sidecar tool protocol
 
