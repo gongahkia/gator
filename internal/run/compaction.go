@@ -72,3 +72,8 @@ func contextBytes(messages []agent.Message) int {
 	}
 	return bytes
 }
+
+// CompactContext shares the retained Code context policy with Work continuations.
+func CompactContext(ctx context.Context, model agent.Model, messages []agent.Message) ([]agent.Message, string, bool, error) {
+	return compactMessages(ctx, model, messages, false)
+}

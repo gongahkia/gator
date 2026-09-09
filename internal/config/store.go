@@ -19,14 +19,23 @@ import (
 	"github.com/gongahkia/gator/internal/snapshot"
 )
 
-const version = 3
+const version = 4
 
 // Settings is the single user-owned configuration document. Credentials do
 // not belong here; they remain in Gator's private auth store.
+type WorkRole struct {
+	Version  int    `json:"version"`
+	Name     string `json:"name"`
+	Provider string `json:"provider,omitempty"`
+	Model    string `json:"model,omitempty"`
+	MaxSteps int    `json:"max_steps,omitempty"`
+}
+
 type Settings struct {
-	Version  int      `json:"version"`
-	Defaults Defaults `json:"defaults"`
-	Theme    string   `json:"theme,omitempty"`
+	WorkRoles []WorkRole `json:"work_roles,omitempty"`
+	Version   int        `json:"version"`
+	Defaults  Defaults   `json:"defaults"`
+	Theme     string     `json:"theme,omitempty"`
 	// ProviderEndpoints stores explicit non-secret endpoint overrides by
 	// provider ID. Credentials remain exclusively in Gator's auth store.
 	ProviderEndpoints map[string]string `json:"provider_endpoints,omitempty"`
@@ -214,7 +223,7 @@ func (s Store) Load() (Settings, error) {
 	if err := json.Unmarshal(contents, &settings); err != nil {
 		return Settings{}, fmt.Errorf("decode configuration file: %w", err)
 	}
-	if settings.Version == 2 {
+	if settings.Version == 2 || settings.Version == 3 {
 		settings.Version = version
 	}
 	if err := validate(settings); err != nil {
@@ -267,6 +276,21 @@ func (s Store) Save(settings Settings) error {
 }
 
 func validate(settings Settings) error {
+	seenRoles := map[string]bool{}
+	for _, role := range settings.WorkRoles {
+		if role.Version != 1 || seenRoles[role.Name] || role.MaxSteps < 0 || role.MaxSteps > 32 {
+			return errors.New("invalid Work role configuration")
+		}
+		seenRoles[role.Name] = true
+		switch role.Name {
+		case "source_researcher", "artifact_reviewer", "connected_researcher", "spreadsheet_analyst", "claim_verifier", "code":
+		default:
+			return errors.New("unknown Work role")
+		}
+		if (role.Provider == "") != (role.Model == "") {
+			return errors.New("Work role provider and model must be selected together")
+		}
+	}
 	if settings.Version != version {
 		return fmt.Errorf("unsupported configuration version %d", settings.Version)
 	}

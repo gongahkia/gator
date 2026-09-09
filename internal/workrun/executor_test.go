@@ -57,6 +57,12 @@ func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
 
 func TestExecutorDelegatesCodeAgainstFrozenSourceAndSealsPatchEvidence(t *testing.T) {
 	source := t.TempDir()
+	if err := os.Mkdir(filepath.Join(source, ".gator"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, ".gator", "agents.json"), []byte(`{"version":1,"profiles":[{"name":"implementer","instructions":"Implement bounded tasks"}]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(source, "main.go"), []byte("package main\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +101,7 @@ func TestExecutorDelegatesCodeAgainstFrozenSourceAndSealsPatchEvidence(t *testin
 		t.Fatalf("subagent evidence = %#v", outcome.Manifest.Subagents)
 	}
 	evidence := outcome.Manifest.Subagents[0]
-	if evidence.Agent != "code" || evidence.Status != "completed" || evidence.ArtifactPath != "code/subagent-001.patch" || evidence.ArtifactSHA256 == "" {
+	if evidence.Agent != "code" || evidence.Status != "completed" || evidence.ArtifactPath != "code/work-code-specialist-subagent-001.patch" || evidence.ArtifactSHA256 == "" {
 		t.Fatalf("subagent evidence = %#v", evidence)
 	}
 	retained, err := os.ReadFile(filepath.Join(outcome.Work.Output.Path(), filepath.FromSlash(evidence.ArtifactPath)))

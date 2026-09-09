@@ -17,7 +17,8 @@ const maxPatchBytes = 512 * 1024
 // ApplyPatch applies one unified diff inside the isolated run worktree. Git
 // itself rejects paths outside the working tree; no unsafe-path option is used.
 type ApplyPatch struct {
-	Root workspace.Root
+	AllowedPaths []string
+	Root         workspace.Root
 }
 
 func (t ApplyPatch) Definition() agent.ToolDefinition {
@@ -40,6 +41,34 @@ func (t ApplyPatch) Execute(ctx context.Context, raw json.RawMessage) (agent.Too
 	}
 	if len(arguments.Patch) > maxPatchBytes {
 		return agent.ToolResult{}, fmt.Errorf("patch exceeds the %d-byte limit", maxPatchBytes)
+	}
+	if len(t.AllowedPaths) > 0 {
+		command := exec.CommandContext(ctx, "git", "apply", "--numstat", "-z", "-")
+		command.Dir = t.Root.Path()
+		command.Stdin = strings.NewReader(arguments.Patch)
+		data, err := command.Output()
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		for _, entry := range strings.Split(string(data), "\x00") {
+			if entry == "" {
+				continue
+			}
+			fields := strings.SplitN(entry, "\t", 3)
+			if len(fields) != 3 || fields[2] == "" {
+				return agent.ToolResult{}, errors.New("scoped patches cannot rename paths")
+			}
+			path := fields[2]
+			allowed := false
+			for _, scope := range t.AllowedPaths {
+				if path == scope || strings.HasPrefix(path, strings.TrimSuffix(scope, "/")+"/") {
+					allowed = true
+				}
+			}
+			if !allowed {
+				return agent.ToolResult{}, fmt.Errorf("patch path %q is outside the assigned write envelope", path)
+			}
+		}
 	}
 	if err := runGitApply(ctx, t.Root.Path(), "--check", arguments.Patch); err != nil {
 		return agent.ToolResult{}, fmt.Errorf("patch check failed: %w", err)

@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const Version = 1
+const Version = 2
 
 const (
 	DefaultMaxFiles     = 50_000
@@ -77,6 +77,7 @@ type Exclusion struct {
 type Manifest struct {
 	Version      int         `json:"version"`
 	ID           string      `json:"id"`
+	TreeID       string      `json:"tree_id,omitempty"`
 	SourceName   string      `json:"source_name"`
 	SourcePath   string      `json:"source_path"`
 	CreatedAt    time.Time   `json:"created_at"`
@@ -215,8 +216,9 @@ func Create(source, stateDir string, options Options) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	manifest.ID = "snap-" + manifest.SHA256[:24]
-	manifest.Materialized = filepath.Join(store, "trees", manifest.ID)
+	manifest.ID = "snap-" + randomSuffix() + randomSuffix()
+	manifest.TreeID = "snap-" + manifest.SHA256[:24]
+	manifest.Materialized = filepath.Join(store, "trees", manifest.TreeID)
 	if err := materialize(manifest, store); err != nil {
 		return Manifest{}, err
 	}
@@ -243,10 +245,16 @@ func Open(stateDir, id string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("decode snapshot: %w", err)
 	}
 	digest, err := identity(manifest.Entries)
-	if err != nil || manifest.Version != Version || manifest.ID != id || digest != manifest.SHA256 || manifest.Files != len(manifest.Entries) {
+	if err != nil || (manifest.Version != 1 && manifest.Version != Version) || manifest.ID != id || digest != manifest.SHA256 || manifest.Files != len(manifest.Entries) {
 		return Manifest{}, errors.New("snapshot manifest is invalid")
 	}
-	manifest.Materialized = filepath.Join(store, "trees", manifest.ID)
+	if manifest.Version == 1 {
+		manifest.TreeID = manifest.ID
+	}
+	if manifest.TreeID != "snap-"+manifest.SHA256[:24] {
+		return Manifest{}, errors.New("snapshot tree identity is invalid")
+	}
+	manifest.Materialized = filepath.Join(store, "trees", manifest.TreeID)
 	if info, err := os.Stat(manifest.Materialized); err != nil || !info.IsDir() {
 		return Manifest{}, errors.New("snapshot materialized tree is missing")
 	}
@@ -285,11 +293,22 @@ func GC(stateDir string, referenced map[string]struct{}) (snapshotsRemoved, blob
 		return 0, 0, err
 	}
 	store := filepath.Join(stateDir, "gator", "snapshots")
+	liveTrees := make(map[string]bool)
+	for _, m := range manifests {
+		if _, keep := referenced[m.ID]; keep {
+			liveTrees[m.TreeID] = true
+		}
+	}
 	for _, manifest := range manifests {
 		if _, keep := referenced[manifest.ID]; keep {
 			continue
 		}
-		if err := os.RemoveAll(filepath.Join(store, "trees", manifest.ID)); err != nil {
+		if err := func() error {
+			if liveTrees[manifest.TreeID] {
+				return nil
+			}
+			return os.RemoveAll(manifest.Materialized)
+		}(); err != nil {
 			return snapshotsRemoved, blobsRemoved, err
 		}
 		if err := os.Remove(filepath.Join(store, "manifests", manifest.ID+".json")); err != nil {
@@ -369,7 +388,7 @@ func retainBlob(source, blobDir string, max int64) (string, error) {
 }
 
 func materialize(manifest Manifest, store string) error {
-	destination := filepath.Join(store, "trees", manifest.ID)
+	destination := manifest.Materialized
 	if info, err := os.Stat(destination); err == nil && info.IsDir() {
 		return nil
 	}
@@ -383,7 +402,11 @@ func materialize(manifest Manifest, store string) error {
 		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
 			return err
 		}
-		if err := os.Link(filepath.Join(store, "blobs", entry.SHA256), target); err != nil {
+		contents, err := os.ReadFile(filepath.Join(store, "blobs", entry.SHA256))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, contents, 0400|os.FileMode(entry.Mode)&0111); err != nil {
 			return err
 		}
 	}

@@ -1,0 +1,65 @@
+Gator product-depth assessment verification
+
+Audited commit: 70adf39b57e7bd5469d792e3674ca7f331f5512e
+Date: 2026-09-09, Asia/Singapore
+go version go1.26.7-X:nodwarf5 linux/amd64
+Manifest and CI Go version: 1.25.13
+
+Full suite: go test -json ./...
+Exit code: 0
+Package terminal events: {"pass": 50}
+Test/subtest terminal events: {"pass": 1066, "skip": 2}
+
+Skipped test diagnostics:
+    sidecar_integration_test.go:21: set GATOR_BROWSER_INTEGRATION=1 to run Chromium integration
+    sandbox_test.go:61: Seatbelt boundary test runs on macOS
+
+Browser integration subsequently passed in an explicit opt-in run:
+Command: GATOR_BROWSER_INTEGRATION=1 go test -count=1 -v -run ^TestSidecarManagedBrowserIntegration$ ./internal/browser
+=== RUN   TestSidecarManagedBrowserIntegration
+--- PASS: TestSidecarManagedBrowserIntegration (32.28s)
+PASS
+ok  	github.com/gongahkia/gator/internal/browser	32.288s
+
+Vet: go vet ./... -> exit 0
+Build: go build -o /tmp/gator-audit ./cmd/gator -> exit 0
+Formatting: gofmt -l cmd internal rpc -> no files reported
+
+Race check command:
+go test -race ./internal/agent ./internal/orchestrator ./internal/workrun ./internal/worksession ./internal/jobs ./internal/rpc ./internal/appserver
+ok  	github.com/gongahkia/gator/internal/agent	1.193s
+ok  	github.com/gongahkia/gator/internal/orchestrator	1.121s
+ok  	github.com/gongahkia/gator/internal/workrun	1.242s
+ok  	github.com/gongahkia/gator/internal/worksession	1.049s
+ok  	github.com/gongahkia/gator/internal/jobs	1.047s
+ok  	github.com/gongahkia/gator/internal/rpc	1.367s
+ok  	github.com/gongahkia/gator/internal/appserver	1.541s
+
+Diagnostic command (temporary copy of audited commit):
+go test -v -run TestAudit ./internal/workrun ./internal/snapshot ./cmd/gator
+These tests assert the current defects. Passing means reproduced, not corrected.
+=== RUN   TestAuditContinuationReceivesOnlyLatestTask
+    product_audit_test.go:29: reproduced: continuation model input contains only the latest objective
+--- PASS: TestAuditContinuationReceivesOnlyLatestTask (0.00s)
+=== RUN   TestAuditExplicitParentUsesHeadSnapshot
+    product_audit_test.go:44: reproduced: branching with explicit old parent uses the newer head source snapshot
+--- PASS: TestAuditExplicitParentUsesHeadSnapshot (0.00s)
+PASS
+ok  	github.com/gongahkia/gator/internal/workrun	0.016s
+=== RUN   TestAuditSameContentOverwritesSourceIdentity
+    product_audit_test.go:17: reproduced: opening first snapshot now reports the second source directory
+--- PASS: TestAuditSameContentOverwritesSourceIdentity (0.00s)
+=== RUN   TestAuditSnapshotOmitsCodeConfiguration
+    product_audit_test.go:26: reproduced: source snapshots exclude .gator project configuration
+--- PASS: TestAuditSnapshotOmitsCodeConfiguration (0.00s)
+PASS
+ok  	github.com/gongahkia/gator/internal/snapshot	0.005s
+=== RUN   TestAuditWorkWrapperHidesOptionalInterfaces
+    product_audit_test.go:19: reproduced: Work wrapper hides streaming and visual-input capability interfaces
+--- PASS: TestAuditWorkWrapperHidesOptionalInterfaces (0.00s)
+PASS
+ok  	github.com/gongahkia/gator/cmd/gator	0.019s
+
+Not verified: exact Go 1.25.13 toolchain, macOS/Seatbelt, live model quality or provider credentials, real SaaS connector operations, hosted LangSmith/Langfuse ingestion.
+The browser integration uses a local fixture with a managed Chromium instance.
+No application source changed in the audited working tree.

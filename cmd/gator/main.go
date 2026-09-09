@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -238,6 +239,8 @@ func run(args []string, out io.Writer) error {
 		return browserCommand(args[1:], out)
 	case "theme":
 		return themeCommand(args[1:], out)
+	case "work-rpc":
+		return workHeadless(context.Background(), os.Stdin, out)
 	case "work":
 		return workTask(args[1:], out)
 	case "inspect":

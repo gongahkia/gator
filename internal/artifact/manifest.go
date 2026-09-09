@@ -12,7 +12,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/patch"
 )
 
 var specialistNamePattern = regexp.MustCompile(`\A[a-z][a-z0-9_]{0,63}\z`)
@@ -27,7 +29,19 @@ const (
 
 // Manifest is trusted, machine-readable evidence about one work run. It is
 // generated from filesystem and validator state after model execution.
+type Evidence struct {
+	ID           string    `json:"id"`
+	Locator      string    `json:"locator"`
+	SHA256       string    `json:"sha256"`
+	SnapshotPath string    `json:"snapshot_path,omitempty"`
+	RetrievedAt  time.Time `json:"retrieved_at"`
+}
+
 type Manifest struct {
+	Usage            agent.Usage            `json:"usage"`
+	Evidence         []Evidence             `json:"evidence,omitempty"`
+	PolicySHA256     string                 `json:"policy_sha256,omitempty"`
+	Candidates       []patch.Candidate      `json:"code_candidates,omitempty"`
 	Version          int                    `json:"version"`
 	RunID            string                 `json:"run_id"`
 	Workflow         string                 `json:"workflow"`
@@ -105,7 +119,7 @@ type ValidationResult struct {
 // exported. It intentionally does not touch artifact bytes; Seal is the only
 // constructor that establishes their evidence.
 func (m Manifest) Validate() error {
-	if (m.Version != 1 && m.Version != ManifestVersion) || m.Workflow != "work" {
+	if (m.Version < 1 || m.Version > ManifestVersion) || m.Workflow != "work" {
 		return errors.New("artifact manifest has an unsupported version or workflow")
 	}
 	if !runIDPattern.MatchString(m.RunID) || strings.TrimSpace(m.Objective) == "" || len(m.Objective) > 64*1024 || strings.ContainsRune(m.Objective, 0) {

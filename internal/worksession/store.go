@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/projectcapture"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,7 +16,7 @@ import (
 	"time"
 )
 
-const Version = 1
+const Version = 2
 
 type Conversation struct {
 	Version      int       `json:"version"`
@@ -27,17 +29,29 @@ type Conversation struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type ReplayState struct {
+	Version           int             `json:"version"`
+	Provider          string          `json:"provider,omitempty"`
+	Messages          []agent.Message `json:"messages,omitempty"`
+	Configuration     json.RawMessage `json:"configuration,omitempty"`
+	CompactionVersion int             `json:"compaction_version,omitempty"`
+	Summary           string          `json:"summary,omitempty"`
+}
+
 type Revision struct {
-	Version          int       `json:"version"`
-	ID               string    `json:"id"`
-	ConversationID   string    `json:"conversation_id"`
-	ParentRevisionID string    `json:"parent_revision_id,omitempty"`
-	SnapshotID       string    `json:"snapshot_id"`
-	Objective        string    `json:"objective"`
-	BundlePath       string    `json:"bundle_path"`
-	Status           string    `json:"status"`
-	FinalText        string    `json:"final_text,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
+	AcceptedCode     map[string]string      `json:"accepted_code,omitempty"`
+	Project          *projectcapture.Bundle `json:"project_configuration,omitempty"`
+	Replay           *ReplayState           `json:"replay,omitempty"`
+	Version          int                    `json:"version"`
+	ID               string                 `json:"id"`
+	ConversationID   string                 `json:"conversation_id"`
+	ParentRevisionID string                 `json:"parent_revision_id,omitempty"`
+	SnapshotID       string                 `json:"snapshot_id"`
+	Objective        string                 `json:"objective"`
+	BundlePath       string                 `json:"bundle_path"`
+	Status           string                 `json:"status"`
+	FinalText        string                 `json:"final_text,omitempty"`
+	CreatedAt        time.Time              `json:"created_at"`
 }
 
 type Store struct{ root string }
@@ -89,7 +103,7 @@ func (s Store) Load(id string) (Conversation, error) {
 	if err := readJSON(filepath.Join(s.root, id, "conversation.json"), &conversation); err != nil {
 		return Conversation{}, err
 	}
-	if conversation.Version != Version || conversation.ID != id {
+	if (conversation.Version != 1 && conversation.Version != Version) || conversation.ID != id {
 		return Conversation{}, errors.New("conversation metadata is invalid")
 	}
 	return conversation, nil
@@ -239,7 +253,7 @@ func (s Store) writeConversation(conversation Conversation) error {
 func (s Store) revisionsPath(id string) string { return filepath.Join(s.root, id, "revisions") }
 
 func validateRevision(revision Revision) error {
-	if revision.Version != Version || validID(revision.ID) != nil || validID(revision.ConversationID) != nil || !strings.HasPrefix(revision.SnapshotID, "snap-") || strings.TrimSpace(revision.Objective) == "" || strings.TrimSpace(revision.BundlePath) == "" || strings.TrimSpace(revision.Status) == "" {
+	if (revision.Version != 1 && revision.Version != Version) || validID(revision.ID) != nil || validID(revision.ConversationID) != nil || !strings.HasPrefix(revision.SnapshotID, "snap-") || strings.TrimSpace(revision.Objective) == "" || strings.TrimSpace(revision.BundlePath) == "" || strings.TrimSpace(revision.Status) == "" {
 		return errors.New("revision metadata is invalid")
 	}
 	if revision.ParentRevisionID != "" && validID(revision.ParentRevisionID) != nil {

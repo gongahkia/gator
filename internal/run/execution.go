@@ -27,6 +27,7 @@ import (
 
 func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string, runInitialScouts bool) (Outcome, error) {
 	executionPolicy := e.Sandbox.Normalize()
+	executionPolicy.WritablePaths = append([]string(nil), request.WritePaths...)
 	if err := executionPolicy.Validate(); err != nil {
 		return Outcome{Worktree: isolated, ThreadID: request.ThreadID}, fmt.Errorf("validate execution policy: %w", err)
 	}
@@ -67,16 +68,20 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 			return Outcome{Worktree: isolated}, errors.New("selected agent profile omits browser capability")
 		}
 	}
-	hookEngine, err := hooks.Load(isolated.Path, isolated.Repository, e.hookTrust(isolated.Repository))
+	trustIdentity := isolated.Repository
+	if request.TrustIdentity != "" {
+		trustIdentity = request.TrustIdentity
+	}
+	hookEngine, err := hooks.Load(isolated.Path, trustIdentity, e.hookTrust(trustIdentity))
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project hooks: %w", err)
 	}
-	mcpSet, err := mcp.LoadWithCredentials(ctx, isolated.Path, e.mcpTrust(isolated.Repository), e.MCPCredentials)
+	mcpSet, err := mcp.LoadWithCredentials(ctx, isolated.Path, e.mcpTrust(trustIdentity), e.MCPCredentials)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project MCP servers: %w", err)
 	}
 	defer mcpSet.Close()
-	lspSet, err := lsp.Load(isolated.Path, e.lspTrust(isolated.Repository))
+	lspSet, err := lsp.Load(isolated.Path, e.lspTrust(trustIdentity))
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load project LSP servers: %w", err)
 	}
@@ -93,7 +98,7 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		}
 	}
 	defer releaseLSP()
-	extensions, err := e.Extensions.Load(isolated.Repository)
+	extensions, err := e.Extensions.LoadCaptured(isolated.Repository, trustIdentity)
 	if err != nil {
 		return Outcome{Worktree: isolated}, fmt.Errorf("load extensions: %w", err)
 	}
@@ -188,6 +193,12 @@ func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, reque
 		},
 	}
 	runTools := tools.Default(isolated.Root, commandPolicy, request.AdditionalReadOnlyRoots...)
+	for i, tool := range runTools {
+		if writer, ok := tool.(tools.ApplyPatch); ok {
+			writer.AllowedPaths = append([]string(nil), request.WritePaths...)
+			runTools[i] = writer
+		}
+	}
 	if profilePolicy.HasOmit(instructions.OmitApplyPatch) || profilePolicy.HasOmit(instructions.OmitRunCommand) {
 		runTools = filterTools(runTools, profilePolicy)
 	}

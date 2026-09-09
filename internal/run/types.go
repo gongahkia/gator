@@ -22,6 +22,9 @@ import (
 // Request configures a single coding task. Every listed verification argv is
 // both exposed to the agent and required to succeed before completion.
 type Request struct {
+	WritePaths []string
+	// TrustIdentity is host-supplied original identity for frozen project configuration.
+	TrustIdentity  string
 	RepositoryPath string
 	Task           string
 	Provider       string

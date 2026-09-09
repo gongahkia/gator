@@ -42,6 +42,9 @@ type evalRuntime struct {
 }
 
 func evalCommand(arguments []string, out io.Writer) error {
+	if len(arguments) > 0 && arguments[0] == "work" {
+		return workEvalCommand(arguments[1:], out)
+	}
 	if len(arguments) > 0 && arguments[0] == "suite" {
 		return evalSuiteCommand(arguments[1:], out)
 	}

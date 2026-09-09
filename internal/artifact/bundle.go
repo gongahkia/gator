@@ -81,6 +81,20 @@ func VerifyBundle(bundle Bundle) error {
 	if !equalValidations(inspection.Validations, bundle.Manifest.Validations) {
 		return errors.New("artifact validation evidence does not match the sealed manifest")
 	}
+
+	for _, source := range bundle.Manifest.Evidence {
+		if source.SnapshotPath == "" {
+			continue
+		}
+		data, err := bundle.Root.ReadRegularFile(source.SnapshotPath, 512*1024)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(data)
+		if hex.EncodeToString(sum[:]) != source.SHA256 {
+			return errors.New("selected evidence digest mismatch")
+		}
+	}
 	for _, source := range bundle.Manifest.ConnectedSources {
 		if source.SnapshotPath == "" {
 			continue

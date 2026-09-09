@@ -380,6 +380,11 @@ func NewResolver(store Store, settings config.Settings) Resolver {
 // Load resolves extensions for repository. Installed extensions are enabled
 // only when config says so; repository extensions require explicit trust.
 func (r Resolver) Load(repository string) (Set, error) {
+	return r.LoadCaptured(repository, "")
+}
+
+// LoadCaptured reads frozen bytes while matching original canonical trust identity.
+func (r Resolver) LoadCaptured(repository, identity string) (Set, error) {
 	if r.store.path == "" {
 		return Set{}, nil
 	}
@@ -397,7 +402,11 @@ func (r Resolver) Load(repository string) (Set, error) {
 	if err != nil {
 		return Set{}, err
 	}
-	expectedHash := r.trusted[canonical]
+	trustIdentity := canonical
+	if identity != "" {
+		trustIdentity = identity
+	}
+	expectedHash := r.trusted[trustIdentity]
 	if expectedHash == "" {
 		return Set{extensions: loaded}, nil
 	}

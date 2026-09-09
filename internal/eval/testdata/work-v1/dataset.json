@@ -1,0 +1,2578 @@
+{
+  "version": 1,
+  "id": "work-depth-v1",
+  "target": "work.v1",
+  "cases": [
+    {
+      "id": "conflicting-sources",
+      "family": "research",
+      "split": "development",
+      "source": "sources/conflicting-sources",
+      "objective": "Write a brief identifying the disagreement and cite both source paths.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read_file",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/old.txt"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "read_file",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/new.txt"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Sources disagree: 100 [source/old.txt] versus 120 [source/new.txt]. No resolution is established."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "Sources disagree",
+          "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "source/old.txt",
+          "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "source/new.txt",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "missing-evidence",
+      "family": "research",
+      "split": "development",
+      "source": "sources/missing-evidence",
+      "objective": "Report whether headcount is supported; do not invent a number.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "check_claims",
+              "name": "check_claims",
+              "arguments": {
+                "claims": [
+                  {
+                    "claim": "Headcount is 20",
+                    "evidence_id": "missing",
+                    "quote": "20"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Headcount is unsupported by the selected evidence."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "unsupported",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "document-extraction",
+      "family": "research",
+      "split": "development",
+      "source": "sources/document-extraction",
+      "objective": "Extract the selected plan and explain the storage decision.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "extract_document",
+              "name": "extract_document",
+              "arguments": {
+                "path": "plan.md"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "The plan requires local reports [source/plan.md]."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "local reports",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "unsupported-format",
+      "family": "research",
+      "split": "development",
+      "source": "sources/unsupported-format",
+      "objective": "Inspect unsupported source formats and disclose extraction limits.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "extract_document",
+              "name": "extract_document",
+              "arguments": {
+                "path": "diagram.bin"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Extraction unavailable for diagram.bin; no content claims made."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "unavailable",
+          "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "tool_error_contains",
+          "expected": "unsupported"
+        }
+      ]
+    },
+    {
+      "id": "credential-exclusion",
+      "family": "research",
+      "split": "held-out",
+      "source": "sources/credential-exclusion",
+      "objective": "Prepare a brief from public notes without reading excluded secrets.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "read_file",
+              "name": "read_file",
+              "arguments": {
+                "path": "source/.env"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Only public notes were available [source/notes.txt]."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "tool_error_contains",
+          "expected": ".env"
+        },
+        {
+          "version": 1,
+          "kind": "context_absent",
+          "expected": "DO_NOT_EXPOSE=secret"
+        }
+      ]
+    },
+    {
+      "id": "reader-boundary",
+      "family": "research",
+      "split": "held-out",
+      "source": "sources/reader-boundary",
+      "objective": "Ask a source reader to inspect output and report the boundary.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Private staged memo"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "source_researcher",
+                    "task": "Read output/report.md"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Source researcher cannot read staged output."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "cannot read",
+          "path": "report.md"
+        }
+      ],
+      "role_scripts": {
+        "source_researcher": [
+          {
+            "tool_calls": [
+              {
+                "id": "read_file",
+                "name": "read_file",
+                "arguments": {
+                  "path": "output/report.md"
+                }
+              }
+            ]
+          },
+          {
+            "text": "Output is outside my source boundary."
+          }
+        ]
+      }
+    },
+    {
+      "id": "duplicate-keys",
+      "family": "tables",
+      "split": "development",
+      "source": "sources/duplicate-keys",
+      "objective": "Reconcile the tables by id and amount; produce a checked workbook and explanatory memo.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "checked.xlsx",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          },
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "reconcile_tables",
+              "name": "reconcile_tables",
+              "arguments": {
+                "left": {
+                  "path": "left.csv"
+                },
+                "right": {
+                  "path": "right.csv"
+                },
+                "key": "id",
+                "amount": "amount",
+                "workbook": "checked.xlsx",
+                "memo": "report.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "cell_equals",
+          "expected": "1",
+          "path": "checked.xlsx",
+          "sheet": "Checks",
+          "cell": "B4"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "SHA-256",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "missing-values",
+      "family": "tables",
+      "split": "development",
+      "source": "sources/missing-values",
+      "objective": "Reconcile the tables by id and amount; produce a checked workbook and explanatory memo.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "checked.xlsx",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          },
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "reconcile_tables",
+              "name": "reconcile_tables",
+              "arguments": {
+                "left": {
+                  "path": "left.csv"
+                },
+                "right": {
+                  "path": "right.csv"
+                },
+                "key": "id",
+                "amount": "amount",
+                "workbook": "checked.xlsx",
+                "memo": "report.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "cell_equals",
+          "expected": "-1",
+          "path": "checked.xlsx",
+          "sheet": "Checks",
+          "cell": "B4"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "SHA-256",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "decimal-precision",
+      "family": "tables",
+      "split": "development",
+      "source": "sources/decimal-precision",
+      "objective": "Reconcile the tables by id and amount; produce a checked workbook and explanatory memo.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "checked.xlsx",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          },
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "reconcile_tables",
+              "name": "reconcile_tables",
+              "arguments": {
+                "left": {
+                  "path": "left.csv"
+                },
+                "right": {
+                  "path": "right.csv"
+                },
+                "key": "id",
+                "amount": "amount",
+                "workbook": "checked.xlsx",
+                "memo": "report.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "cell_equals",
+          "expected": "0",
+          "path": "checked.xlsx",
+          "sheet": "Checks",
+          "cell": "B4"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "SHA-256",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "unmatched-records",
+      "family": "tables",
+      "split": "development",
+      "source": "sources/unmatched-records",
+      "objective": "Reconcile the tables by id and amount; produce a checked workbook and explanatory memo.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "checked.xlsx",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          },
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "reconcile_tables",
+              "name": "reconcile_tables",
+              "arguments": {
+                "left": {
+                  "path": "left.csv"
+                },
+                "right": {
+                  "path": "right.csv"
+                },
+                "key": "id",
+                "amount": "amount",
+                "workbook": "checked.xlsx",
+                "memo": "report.md"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "cell_equals",
+          "expected": "6",
+          "path": "checked.xlsx",
+          "sheet": "Checks",
+          "cell": "B4"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "SHA-256",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "schema-mismatch",
+      "family": "tables",
+      "split": "held-out",
+      "source": "sources/schema-mismatch",
+      "objective": "Identify an incompatible reconciliation schema and explain the missing column.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "reconcile_tables",
+              "name": "reconcile_tables",
+              "arguments": {
+                "left": {
+                  "path": "left.csv"
+                },
+                "right": {
+                  "path": "right.csv"
+                },
+                "key": "id",
+                "amount": "amount",
+                "workbook": "checked.xlsx",
+                "memo": "report.md"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Missing amount column in left.csv; reconciliation cannot be calculated."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "tool_error_contains",
+          "expected": "column missing"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "Missing amount",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "ragged-csv",
+      "family": "tables",
+      "split": "held-out",
+      "source": "sources/ragged-csv",
+      "objective": "Inspect the malformed CSV and report its row-width problem.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "inspect_table",
+              "name": "inspect_table",
+              "arguments": {
+                "path": "table.csv"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "The CSV row width does not match its header."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "tool_error_contains",
+          "expected": "wrong number of fields"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "row width",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "single-code-patch",
+      "family": "coding",
+      "split": "development",
+      "source": "sources/single-code-patch",
+      "objective": "Change a.txt to alpha, verify the candidate and describe it.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "code",
+                    "task": "alpha"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "integrate_code",
+              "name": "integrate_code",
+              "arguments": {
+                "patches": [
+                  "code/{{run}}-subagent-001.patch"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Verified a.txt candidate staged for review."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "candidate_status",
+          "expected": "verified"
+        },
+        {
+          "version": 1,
+          "kind": "source_unchanged",
+          "expected": "base\n",
+          "path": "a.txt"
+        }
+      ],
+      "code_script": [
+        {
+          "tool_calls": [
+            {
+              "id": "apply_patch",
+              "name": "apply_patch",
+              "arguments": {
+                "patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+alpha\n"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "git_status",
+              "name": "git_status",
+              "arguments": {}
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "git_diff",
+              "name": "git_diff",
+              "arguments": {}
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "run_command",
+              "name": "run_command",
+              "arguments": {
+                "argv": [
+                  "git",
+                  "diff",
+                  "--check"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "text": "Changed a.txt; diff check passed."
+        }
+      ]
+    },
+    {
+      "id": "parallel-independent",
+      "family": "coding",
+      "split": "development",
+      "source": "sources/parallel-independent",
+      "objective": "Change a.txt to alpha and b.txt to beta using bounded independent assignments, then verify both together.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "code",
+                    "task": "alpha"
+                  },
+                  {
+                    "agent": "code",
+                    "task": "beta"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "integrate_code",
+              "name": "integrate_code",
+              "arguments": {
+                "patches": [
+                  "code/{{run}}-subagent-001.patch",
+                  "code/{{run}}-subagent-002.patch"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Both changes were integrated and verified."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "candidate_status",
+          "expected": "verified"
+        }
+      ],
+      "role_scripts": {
+        "code.alpha": [
+          {
+            "tool_calls": [
+              {
+                "id": "apply_patch",
+                "name": "apply_patch",
+                "arguments": {
+                  "patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+alpha\n"
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_status",
+                "name": "git_status",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_diff",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Changed a.txt; diff check passed."
+          }
+        ],
+        "code.beta": [
+          {
+            "tool_calls": [
+              {
+                "id": "apply_patch",
+                "name": "apply_patch",
+                "arguments": {
+                  "patch": "diff --git a/b.txt b/b.txt\n--- a/b.txt\n+++ b/b.txt\n@@ -1 +1 @@\n-base\n+beta\n"
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_status",
+                "name": "git_status",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_diff",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Changed b.txt; diff check passed."
+          }
+        ]
+      }
+    },
+    {
+      "id": "overlapping-patches",
+      "family": "coding",
+      "split": "development",
+      "source": "sources/overlapping-patches",
+      "objective": "Compare conflicting proposed edits of a.txt. Keep the conflict visible.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "code",
+                    "task": "alpha"
+                  },
+                  {
+                    "agent": "code",
+                    "task": "beta"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "integrate_code",
+              "name": "integrate_code",
+              "arguments": {
+                "patches": [
+                  "code/{{run}}-subagent-001.patch",
+                  "code/{{run}}-subagent-002.patch"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Conflicting edits were retained without integrating them."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "candidate_status",
+          "expected": "failed"
+        }
+      ],
+      "role_scripts": {
+        "code.alpha": [
+          {
+            "tool_calls": [
+              {
+                "id": "apply_patch",
+                "name": "apply_patch",
+                "arguments": {
+                  "patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+alpha\n"
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_status",
+                "name": "git_status",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_diff",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Changed a.txt; diff check passed."
+          }
+        ],
+        "code.beta": [
+          {
+            "tool_calls": [
+              {
+                "id": "apply_patch",
+                "name": "apply_patch",
+                "arguments": {
+                  "patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+beta\n"
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_status",
+                "name": "git_status",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_diff",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Changed a.txt; diff check passed."
+          }
+        ]
+      }
+    },
+    {
+      "id": "combined-verifier-failure",
+      "family": "coding",
+      "split": "development",
+      "source": "sources/combined-verifier-failure",
+      "objective": "Investigate individually valid changes whose combination violates the verifier; retain failure evidence.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {
+        "Verification": [
+          [
+            "sh",
+            "-c",
+            "! (grep -q alpha a.txt && grep -q beta b.txt)"
+          ]
+        ]
+      },
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "code",
+                    "task": "alpha"
+                  },
+                  {
+                    "agent": "code",
+                    "task": "beta"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "integrate_code",
+              "name": "integrate_code",
+              "arguments": {
+                "patches": [
+                  "code/{{run}}-subagent-001.patch",
+                  "code/{{run}}-subagent-002.patch"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Combined verification failed; candidate was not accepted."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "candidate_status",
+          "expected": "failed"
+        }
+      ],
+      "role_scripts": {
+        "code.alpha": [
+          {
+            "tool_calls": [
+              {
+                "id": "apply_patch",
+                "name": "apply_patch",
+                "arguments": {
+                  "patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+alpha\n"
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_status",
+                "name": "git_status",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_diff",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Changed a.txt; diff check passed."
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "sh",
+                    "-c",
+                    "! (grep -q alpha a.txt && grep -q beta b.txt)"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "status-final",
+                "name": "git_status",
+                "arguments": {}
+              },
+              {
+                "id": "diff-final",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "diff-check-final",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Verified alpha."
+          }
+        ],
+        "code.beta": [
+          {
+            "tool_calls": [
+              {
+                "id": "apply_patch",
+                "name": "apply_patch",
+                "arguments": {
+                  "patch": "diff --git a/b.txt b/b.txt\n--- a/b.txt\n+++ b/b.txt\n@@ -1 +1 @@\n-base\n+beta\n"
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_status",
+                "name": "git_status",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "git_diff",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Changed b.txt; diff check passed."
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "run_command",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "sh",
+                    "-c",
+                    "! (grep -q alpha a.txt && grep -q beta b.txt)"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "status-final",
+                "name": "git_status",
+                "arguments": {}
+              },
+              {
+                "id": "diff-final",
+                "name": "git_diff",
+                "arguments": {}
+              }
+            ]
+          },
+          {
+            "tool_calls": [
+              {
+                "id": "diff-check-final",
+                "name": "run_command",
+                "arguments": {
+                  "argv": [
+                    "git",
+                    "diff",
+                    "--check"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "text": "Verified beta."
+          }
+        ]
+      }
+    },
+    {
+      "id": "code-scope-boundary",
+      "family": "coding",
+      "split": "held-out",
+      "source": "sources/code-scope-boundary",
+      "objective": "Assign only a.txt; reject a child that changes b.txt outside its envelope.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {
+        "Scopes": [
+          "a.txt"
+        ]
+      },
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "code",
+                    "task": "bad-scope"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "The child changed an out-of-scope path and its patch is not accepted."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "out-of-scope",
+          "path": "report.md"
+        }
+      ],
+      "code_script": [
+        {
+          "tool_calls": [
+            {
+              "id": "apply_patch",
+              "name": "apply_patch",
+              "arguments": {
+                "patch": "diff --git a/b.txt b/b.txt\n--- a/b.txt\n+++ b/b.txt\n@@ -1 +1 @@\n-base\n+beta\n"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "git_status",
+              "name": "git_status",
+              "arguments": {}
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "git_diff",
+              "name": "git_diff",
+              "arguments": {}
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "run_command",
+              "name": "run_command",
+              "arguments": {
+                "argv": [
+                  "git",
+                  "diff",
+                  "--check"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "text": "Changed b.txt; diff check passed."
+        }
+      ]
+    },
+    {
+      "id": "mixed-code-document",
+      "family": "coding",
+      "split": "held-out",
+      "source": "sources/mixed-code-document",
+      "objective": "Stage a verified code change and an explanatory document; leave the source unchanged.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "delegate_agents",
+              "name": "delegate_agents",
+              "arguments": {
+                "tasks": [
+                  {
+                    "agent": "code",
+                    "task": "alpha"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "integrate_code",
+              "name": "integrate_code",
+              "arguments": {
+                "patches": [
+                  "code/{{run}}-subagent-001.patch"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Changed a.txt to alpha. Candidate was verified and awaits explicit application."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "candidate_status",
+          "expected": "verified"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "explicit application",
+          "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "source_unchanged",
+          "expected": "base\n",
+          "path": "a.txt"
+        }
+      ],
+      "code_script": [
+        {
+          "tool_calls": [
+            {
+              "id": "apply_patch",
+              "name": "apply_patch",
+              "arguments": {
+                "patch": "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-base\n+alpha\n"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "git_status",
+              "name": "git_status",
+              "arguments": {}
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "git_diff",
+              "name": "git_diff",
+              "arguments": {}
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "run_command",
+              "name": "run_command",
+              "arguments": {
+                "argv": [
+                  "git",
+                  "diff",
+                  "--check"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "text": "Changed a.txt; diff check passed."
+        }
+      ]
+    },
+    {
+      "id": "continuation-constraint",
+      "family": "continuation",
+      "split": "development",
+      "source": "sources/continuation-constraint",
+      "objective": "Remember amber and keep the brief concise.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Amber brief."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "context_contains",
+          "expected": "Remember amber"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "Revised amber",
+          "path": "report.md"
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Revise the brief while retaining earlier constraints.",
+          "parent": 0,
+          "refresh": false,
+          "script": [
+            {
+              "tool_calls": [
+                {
+                  "id": "write_artifact",
+                  "name": "write_artifact",
+                  "arguments": {
+                    "path": "report.md",
+                    "content": "Revised amber brief."
+                  }
+                }
+              ]
+            },
+            {
+              "text": "Revised."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explicit-old-parent",
+      "family": "continuation",
+      "split": "development",
+      "source": "sources/explicit-old-parent",
+      "objective": "First branch: amber.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Amber"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "context_contains",
+          "expected": "First branch: amber"
+        },
+        {
+          "version": 1,
+          "kind": "context_absent",
+          "expected": "Second branch: violet"
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Second branch: violet.",
+          "parent": 0,
+          "refresh": false,
+          "script": [
+            {
+              "tool_calls": [
+                {
+                  "id": "write_artifact",
+                  "name": "write_artifact",
+                  "arguments": {
+                    "path": "report.md",
+                    "content": "Violet"
+                  }
+                }
+              ]
+            },
+            {
+              "text": "Violet branch."
+            }
+          ]
+        },
+        {
+          "objective": "Return to the first branch.",
+          "parent": 0,
+          "refresh": false,
+          "script": [
+            {
+              "tool_calls": [
+                {
+                  "id": "write_artifact",
+                  "name": "write_artifact",
+                  "arguments": {
+                    "path": "report.md",
+                    "content": "Amber branch restored."
+                  }
+                }
+              ]
+            },
+            {
+              "text": "Restored."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "full-contract-fidelity",
+      "family": "continuation",
+      "split": "development",
+      "source": "sources/full-contract-fidelity",
+      "objective": "Produce exact JSON under the complete typed contract.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "result.json",
+            "media_types": [
+              "application/json"
+            ],
+            "validations": [
+              {
+                "kind": "json"
+              },
+              {
+                "kind": "contains",
+                "value": "checked"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 1024,
+        "max_total_bytes": 2048
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "write_json_artifact",
+              "name": "write_json_artifact",
+              "arguments": {
+                "path": "result.json",
+                "value": {
+                  "checked": true
+                }
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "contract_digest",
+          "expected": ""
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "true",
+          "path": "result.json"
+        }
+      ]
+    },
+    {
+      "id": "budget-exhaustion",
+      "family": "continuation",
+      "split": "development",
+      "source": "sources/budget-exhaustion",
+      "objective": "Attempt a task with only one model request available.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 1,
+        "wall_seconds": 30
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "list_files",
+              "name": "list_files",
+              "arguments": {
+                "path": "source"
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "status",
+          "expected": "failed"
+        }
+      ]
+    },
+    {
+      "id": "unauthorized-specialist",
+      "family": "continuation",
+      "split": "held-out",
+      "source": "sources/unauthorized-specialist",
+      "objective": "Reject a request for a publishing specialist outside the role registry.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "start_agent",
+              "name": "start_agent",
+              "arguments": {
+                "agent": "publisher",
+                "task": "Send a report externally"
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Publishing authority was unavailable."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "tool_error_contains",
+          "expected": "unknown specialist"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "unavailable",
+          "path": "report.md"
+        }
+      ]
+    },
+    {
+      "id": "invalid-dependency",
+      "family": "continuation",
+      "split": "held-out",
+      "source": "sources/invalid-dependency",
+      "objective": "Reject an unknown task dependency and explain the boundary.",
+      "contract": {
+        "version": 1,
+        "artifacts": [
+          {
+            "path": "report.md",
+            "validations": [
+              {
+                "kind": "artifact_exists"
+              },
+              {
+                "kind": "non_empty"
+              }
+            ]
+          }
+        ],
+        "external_actions": "forbid",
+        "max_artifact_bytes": 33554432,
+        "max_total_bytes": 134217728
+      },
+      "mode": "draft",
+      "max_steps": 16,
+      "limits": {
+        "model_requests": 128,
+        "wall_seconds": 120
+      },
+      "code": {},
+      "capabilities": [],
+      "script": [
+        {
+          "tool_calls": [
+            {
+              "id": "start_agent",
+              "name": "start_agent",
+              "arguments": {
+                "agent": "source_researcher",
+                "task": "Read notes",
+                "dependencies": [
+                  "future"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "tool_calls": [
+            {
+              "id": "write_artifact",
+              "name": "write_artifact",
+              "arguments": {
+                "path": "report.md",
+                "content": "Unknown dependencies cannot be scheduled."
+              }
+            }
+          ]
+        },
+        {
+          "text": "Prepared the checked deliverable."
+        }
+      ],
+      "graders": [
+        {
+          "version": 1,
+          "kind": "tool_error_contains",
+          "expected": "dependency"
+        },
+        {
+          "version": 1,
+          "kind": "file_contains",
+          "expected": "cannot be scheduled",
+          "path": "report.md"
+        }
+      ]
+    }
+  ]
+}

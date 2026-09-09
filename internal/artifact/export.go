@@ -81,6 +81,20 @@ func WriteArchive(destination io.Writer, bundle Bundle) error {
 			return err
 		}
 	}
+	for _, source := range bundle.Manifest.Evidence {
+		if source.SnapshotPath == "" {
+			continue
+		}
+		data, err := bundle.Root.ReadRegularFile(source.SnapshotPath, 512*1024)
+		if err != nil {
+			_ = closeWriters()
+			return err
+		}
+		if err := writeTarFile(tarWriter, source.SnapshotPath, data); err != nil {
+			_ = closeWriters()
+			return err
+		}
+	}
 	return closeWriters()
 }
 

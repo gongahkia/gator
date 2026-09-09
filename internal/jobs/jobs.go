@@ -16,31 +16,37 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/projectcapture"
+	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/robfig/cron/v3"
 )
 
-const Version = 1
+const Version = 2
 
 type Definition struct {
-	Version         int               `json:"version"`
-	ID              string            `json:"id"`
-	Name            string            `json:"name"`
-	Enabled         bool              `json:"enabled"`
-	Schedule        string            `json:"schedule"`
-	Timezone        string            `json:"timezone"`
-	Missed          string            `json:"missed"`
-	SourcePath      string            `json:"source_path"`
-	RefreshSnapshot bool              `json:"refresh_snapshot"`
-	Objective       string            `json:"objective"`
-	Provider        string            `json:"provider,omitempty"`
-	Model           string            `json:"model,omitempty"`
-	Mode            action.Mode       `json:"mode"`
-	Contract        artifact.Contract `json:"contract"`
-	ConnectorIDs    []string          `json:"connector_ids,omitempty"`
-	MaxSteps        int               `json:"max_steps"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
-	LastScheduledAt time.Time         `json:"last_scheduled_at,omitempty"`
+	Project         *projectcapture.Bundle `json:"project_configuration,omitempty"`
+	SnapshotID      string                 `json:"snapshot_id,omitempty"`
+	Code            workrun.CodePolicy     `json:"code_policy,omitempty"`
+	Version         int                    `json:"version"`
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Enabled         bool                   `json:"enabled"`
+	Schedule        string                 `json:"schedule"`
+	Timezone        string                 `json:"timezone"`
+	Missed          string                 `json:"missed"`
+	SourcePath      string                 `json:"source_path"`
+	RefreshSnapshot bool                   `json:"refresh_snapshot"`
+	Objective       string                 `json:"objective"`
+	Provider        string                 `json:"provider,omitempty"`
+	Model           string                 `json:"model,omitempty"`
+	Mode            action.Mode            `json:"mode"`
+	Contract        artifact.Contract      `json:"contract"`
+	ConnectorIDs    []string               `json:"connector_ids,omitempty"`
+	MaxSteps        int                    `json:"max_steps"`
+	CreatedAt       time.Time              `json:"created_at"`
+	UpdatedAt       time.Time              `json:"updated_at"`
+	LastScheduledAt time.Time              `json:"last_scheduled_at,omitempty"`
 }
 
 type Attempt struct {
@@ -127,6 +133,18 @@ func (s Store) Save(definition Definition) (Definition, error) {
 	if err := definition.Validate(); err != nil {
 		return Definition{}, err
 	}
+	if !definition.RefreshSnapshot && definition.SnapshotID == "" {
+		source, err := snapshot.Create(definition.SourcePath, filepath.Dir(filepath.Dir(s.root)), snapshot.Options{})
+		if err != nil {
+			return Definition{}, err
+		}
+		definition.SnapshotID = source.ID
+		project, err := projectcapture.Capture(definition.SourcePath, definition.Code.Scopes, definition.Code.Profile, definition.Code.Capabilities)
+		if err != nil {
+			return Definition{}, err
+		}
+		definition.Project = &project
+	}
 	if err := writeJSON(filepath.Join(s.root, "definitions", definition.ID+".json"), definition); err != nil {
 		return Definition{}, err
 	}
@@ -134,7 +152,7 @@ func (s Store) Save(definition Definition) (Definition, error) {
 }
 
 func (d Definition) Validate() error {
-	if d.Version != Version || invalidID(d.ID) || strings.TrimSpace(d.Name) == "" || len(d.Name) > 128 || strings.ContainsAny(d.Name, "\x00\r\n") || strings.TrimSpace(d.SourcePath) == "" || !filepath.IsAbs(d.SourcePath) || filepath.Clean(d.SourcePath) != d.SourcePath || strings.ContainsRune(d.SourcePath, 0) || strings.TrimSpace(d.Objective) == "" || len(d.Objective) > 64*1024 || strings.ContainsRune(d.Objective, 0) {
+	if (d.Version != 1 && d.Version != Version) || invalidID(d.ID) || strings.TrimSpace(d.Name) == "" || len(d.Name) > 128 || strings.ContainsAny(d.Name, "\x00\r\n") || strings.TrimSpace(d.SourcePath) == "" || !filepath.IsAbs(d.SourcePath) || filepath.Clean(d.SourcePath) != d.SourcePath || strings.ContainsRune(d.SourcePath, 0) || strings.TrimSpace(d.Objective) == "" || len(d.Objective) > 64*1024 || strings.ContainsRune(d.Objective, 0) {
 		return errors.New("job identity is invalid")
 	}
 	if d.CreatedAt.IsZero() || d.UpdatedAt.IsZero() || d.UpdatedAt.Before(d.CreatedAt) || len(d.Schedule) > 256 || len(d.Provider) > 128 || len(d.Model) > 512 || strings.ContainsAny(d.Provider+d.Model, "\x00\r\n") {
@@ -512,4 +530,63 @@ func syncDirectory(path string) error {
 	}
 	defer directory.Close()
 	return directory.Sync()
+}
+
+// ClaimBegin retains intent before moving the schedule watermark. The foreground
+// supervisor holds the store's single-owner lock. A recovered intent claims its slot.
+func (s Store) ClaimBegin(id string, scheduled time.Time) (Definition, Attempt, bool, error) {
+	definition, err := s.Load(id)
+	if err != nil {
+		return Definition{}, Attempt{}, false, err
+	}
+	scheduled = scheduled.UTC().Truncate(time.Minute)
+	if !definition.LastScheduledAt.Before(scheduled) {
+		return definition, Attempt{}, false, nil
+	}
+	history, err := s.History(id, 0)
+	if err != nil {
+		return definition, Attempt{}, false, err
+	}
+	for _, attempt := range history {
+		if attempt.ScheduledAt.Equal(scheduled) {
+			definition.LastScheduledAt = scheduled
+			_, err = s.Save(definition)
+			return definition, attempt, false, err
+		}
+	}
+	attempt, err := s.Begin(definition, scheduled)
+	if err != nil {
+		return definition, attempt, false, err
+	}
+	definition.LastScheduledAt = scheduled
+	definition, err = s.Save(definition)
+	return definition, attempt, err == nil, err
+}
+
+// Reconcile marks attempts owned by an interrupted supervisor without replaying effects.
+func (s Store) Reconcile() ([]Attempt, error) {
+	definitions, err := s.List()
+	if err != nil {
+		return nil, err
+	}
+	var interrupted []Attempt
+	for _, definition := range definitions {
+		history, err := s.History(definition.ID, 0)
+		if err != nil {
+			return nil, err
+		}
+		for _, attempt := range history {
+			if attempt.Status != "running" {
+				continue
+			}
+			attempt.Status = "interrupted"
+			attempt.Error = "previous supervisor stopped; inspect retained work before retry"
+			attempt.FinishedAt = time.Now().UTC()
+			if err := s.Record(attempt); err != nil {
+				return nil, err
+			}
+			interrupted = append(interrupted, attempt)
+		}
+	}
+	return interrupted, nil
 }

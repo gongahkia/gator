@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/worksession"
@@ -60,6 +61,19 @@ func snapshotCommand(arguments []string, out io.Writer) error {
 			}
 			for _, revision := range revisions {
 				referenced[revision.SnapshotID] = struct{}{}
+			}
+		}
+		jobStore, err := jobs.Open(stateDir)
+		if err != nil {
+			return err
+		}
+		definitions, err := jobStore.List()
+		if err != nil {
+			return err
+		}
+		for _, definition := range definitions {
+			if definition.SnapshotID != "" {
+				referenced[definition.SnapshotID] = struct{}{}
 			}
 		}
 		snapshots, blobs, err := snapshot.GC(stateDir, referenced)

@@ -263,6 +263,10 @@ func partFunctionResponse(id, name, result string) json.RawMessage {
 }
 
 type response struct {
+	Usage *struct {
+		Input  int64 `json:"promptTokenCount"`
+		Output int64 `json:"candidatesTokenCount"`
+	} `json:"usageMetadata"`
 	Candidates []struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"candidates"`
@@ -281,6 +285,9 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 		return agent.Turn{}, fmt.Errorf("decode Gemini candidate content: %w", err)
 	}
 	turn := agent.Turn{ProviderData: append(json.RawMessage(nil), payload.Candidates[0].Content...)}
+	if payload.Usage != nil {
+		turn.Usage = agent.Usage{Reported: true, InputTokens: payload.Usage.Input, OutputTokens: payload.Usage.Output}
+	}
 	var text strings.Builder
 	for _, rawPart := range candidate.Parts {
 		var part struct {

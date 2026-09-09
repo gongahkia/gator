@@ -81,6 +81,7 @@ type TurnRequest struct {
 // Turn is a completed model response. Text may accompany tool calls; the loop
 // records it, invokes calls, then requests another turn.
 type Turn struct {
+	Usage        Usage           `json:"usage,omitempty"`
 	Text         string          `json:"text"`
 	ToolCalls    []ToolCall      `json:"tool_calls"`
 	ProviderData json.RawMessage `json:"provider_data,omitempty"`
@@ -153,6 +154,7 @@ const (
 // Event is intentionally structured so the UI, journal, and tests observe the
 // same behavior. Details is never used for unbounded raw model transcripts.
 type Event struct {
+	TaskID     string    `json:"task_id,omitempty"`
 	Kind       EventKind `json:"kind"`
 	At         time.Time `json:"at"`
 	Step       int       `json:"step"`
