@@ -139,7 +139,66 @@ func LoadInputs(root workspace.Root, inputs []Input) ([]agent.Image, []agent.Att
 			return nil, nil, fmt.Errorf("attachment @%s has an unsupported input kind", input.Path)
 		}
 	}
+	if err := ValidateLoaded(images, attachments); err != nil {
+		return nil, nil, err
+	}
 	return images, attachments, nil
+}
+
+// ValidateLoaded enforces the prompt-input boundary for callers that already
+// have in-memory provider inputs. File-loading callers pass through this same
+// check before returning, so CLI and programmatic Work requests cannot drift.
+func ValidateLoaded(images []agent.Image, attachments []agent.Attachment) error {
+	if len(images)+len(attachments) > MaxInputs {
+		return fmt.Errorf("attach at most %d files per task", MaxInputs)
+	}
+	seen := make(map[string]struct{}, len(images)+len(attachments))
+	totalBytes := 0
+	validate := func(name, mediaType string, data []byte, maxBytes int) error {
+		name = strings.TrimSpace(name)
+		if name == "" || strings.ContainsRune(name, 0) {
+			return errors.New("attachment name is missing or invalid")
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return fmt.Errorf("attachment %q was supplied more than once", name)
+		}
+		seen[name] = struct{}{}
+		if len(data) == 0 || len(data) > maxBytes {
+			return fmt.Errorf("attachment %q has an invalid size", name)
+		}
+		totalBytes += len(data)
+		if totalBytes > MaxTotalBytes {
+			return fmt.Errorf("attached files exceed the %d MiB total limit", MaxTotalBytes/(1024*1024))
+		}
+		return nil
+	}
+	for _, image := range images {
+		if err := validate(image.Name, image.MediaType, image.Data, MaxImageBytes); err != nil {
+			return err
+		}
+		detected := http.DetectContentType(image.Data)
+		if !supportedImageMediaType(image.MediaType) || detected != image.MediaType {
+			return fmt.Errorf("attachment %q has unsupported or mismatched media type %q", image.Name, image.MediaType)
+		}
+	}
+	for _, item := range attachments {
+		if err := validate(item.Name, item.MediaType, item.Data, MaxDocumentBytes); err != nil {
+			return err
+		}
+		switch item.MediaType {
+		case PDFMediaType:
+			if !bytes.HasPrefix(item.Data, []byte("%PDF-")) {
+				return fmt.Errorf("attachment %q is not a PDF", item.Name)
+			}
+		case "text/plain":
+			if !utf8.Valid(item.Data) {
+				return fmt.Errorf("attachment %q is not valid UTF-8 text", item.Name)
+			}
+		default:
+			return fmt.Errorf("attachment %q has unsupported media type %q", item.Name, item.MediaType)
+		}
+	}
+	return nil
 }
 
 // IsSupported reports whether a path can become an explicit attachment. Other
