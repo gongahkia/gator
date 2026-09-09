@@ -153,6 +153,21 @@ func TestBrokerRecordsDenialAndBoundedFailure(t *testing.T) {
 	}
 }
 
+func TestBrokerPreservesUncertainExecutionOutcome(t *testing.T) {
+	t.Parallel()
+	proposal, err := NewProposal("action-1", Publish, "release", "publish", "https://example.com/hook", "Publish release", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := (Broker{Approve: func(context.Context, Proposal) (Decision, error) { return Allow, nil }}).
+		Resolve(context.Background(), Act, Approve, proposal, func(context.Context) error {
+			return MarkUncertain(errors.New("connection closed while awaiting response"))
+		})
+	if err != nil || record.Status != Unknown || record.Error == "" {
+		t.Fatalf("uncertain record = %#v, err = %v", record, err)
+	}
+}
+
 func TestBrokerRejectsAuthorityGaps(t *testing.T) {
 	t.Parallel()
 	proposal, err := NewProposal("action-1", Publish, "release", "publish", "https://example.com/hook", "Publish release", []byte(`{}`))
