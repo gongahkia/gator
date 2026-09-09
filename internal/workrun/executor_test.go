@@ -212,7 +212,7 @@ func TestExecutorRejectsModeContractEscalationBeforeCreatingWorkspace(t *testing
 func TestExecutorRejectsUnownedCodeCapabilityEscalation(t *testing.T) {
 	base := Request{SourcePath: t.TempDir(), Objective: "Prepare work", Contract: artifact.DefaultContract("report.md"), MaxSteps: 1}
 	for name, policy := range map[string]CodePolicy{
-		"unknown capability": {Capabilities: []string{"host-admin"}},
+		"unknown capability":    {Capabilities: []string{"host-admin"}},
 		"browser without grant": {BrowserSession: "browser-one"},
 	} {
 		t.Run(name, func(t *testing.T) {

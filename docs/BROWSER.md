@@ -15,7 +15,7 @@ downloads a browser while starting a run or opening the TUI:
 gator browser install
 gator browser start --visual-capture
 gator browser origins SESSION_ID add http://127.0.0.1:3000
-gator run --network allow --browser-session SESSION_ID --verify 'go test ./...' 'Test the local UI flow'
+gator run --network allow --code-capability browser --browser-session SESSION_ID --verify 'go test ./...' 'Test the local UI flow'
 ```
 
 `browser start` creates a headed Chromium window by default with a new,

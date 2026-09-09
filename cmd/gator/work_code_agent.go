@@ -40,13 +40,16 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		code.Sandbox = request.Policy.Sandbox.Normalize()
 		verification := mergeCodeVerification(request.Policy.Verification)
 		omitted := []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
-		for capability, omit := range map[string]string{
-			workrun.CodeCapabilityLSP: instructions.OmitLSP, workrun.CodeCapabilityMCP: instructions.OmitMCP,
-			workrun.CodeCapabilityExtension: instructions.OmitExtension, workrun.CodeCapabilityHTTP: instructions.OmitHTTP,
-			workrun.CodeCapabilityBrowser: instructions.OmitBrowser, workrun.CodeCapabilityTerminal: instructions.OmitTerminal,
+		for _, capability := range []struct{ name, omit string }{
+			{workrun.CodeCapabilityLSP, instructions.OmitLSP},
+			{workrun.CodeCapabilityMCP, instructions.OmitMCP},
+			{workrun.CodeCapabilityExtension, instructions.OmitExtension},
+			{workrun.CodeCapabilityHTTP, instructions.OmitHTTP},
+			{workrun.CodeCapabilityBrowser, instructions.OmitBrowser},
+			{workrun.CodeCapabilityTerminal, instructions.OmitTerminal},
 		} {
-			if !request.Policy.HasCapability(capability) {
-				omitted = append(omitted, omit)
+			if !request.Policy.HasCapability(capability.name) {
+				omitted = append(omitted, capability.omit)
 			}
 		}
 		outcome, runErr := code.Execute(ctx, gatorrun.Request{

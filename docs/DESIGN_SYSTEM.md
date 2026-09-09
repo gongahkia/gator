@@ -4,7 +4,7 @@
 
 Gator should feel like a quiet work surface, not an operations dashboard. The
 first screen asks for an outcome and postpones navigation, history, jobs, inbox,
-and the coding workflow until the user asks for them. Evidence and controls
+and specialist controls until the user asks for them. Evidence and controls
 remain available, but they appear at the point where they become relevant.
 
 The interaction model is informed by the official [OpenCode TUI
@@ -20,7 +20,7 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Hidden behind `Ctrl+P` |
 | Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Hidden behind `Ctrl+P` |
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Hidden behind `Ctrl+P` |
-| Command palette | Sources, conversations, inbox, jobs, setup, and Code | Hidden | Centered, keyboard-selectable list |
+| Command palette | Sources, conversations, inbox, jobs, and setup | Hidden | Centered, keyboard-selectable list |
 
 Typing the first character docks the composer; deleting the draft recenters it.
 Submitting the prompt starts a conversation. Merely opening Gator must not show
@@ -36,7 +36,7 @@ native Work providers because Gator does not import another CLI's credentials.
 ## Visual language
 
 - Use one green accent (`ANSI 42`) for identity, focus, and active work.
-- Use the same `🐊 Gator` wordmark as Gator Code. Center it only on the empty
+- Use the `🐊 Gator` wordmark consistently. Center it only on the empty
   home state; keep it at the top-left everywhere after composition begins.
 - Use neutral foreground (`ANSI 255`), muted metadata (`ANSI 242`), and a dark
   selection surface (`ANSI 236`).
