@@ -207,6 +207,7 @@ const (
 	Executed Status = "executed"
 	Denied   Status = "denied"
 	Failed   Status = "failed"
+	Unknown  Status = "unknown"
 )
 
 // Record is safe to persist in a work manifest. It contains the bounded
@@ -280,7 +281,12 @@ func (b Broker) Resolve(ctx context.Context, mode Mode, disposition Disposition,
 				return Record{}, errors.New("approved external action has no executor")
 			}
 			if err := execute(ctx); err != nil {
-				return Record{Proposal: proposal, Status: Failed, Error: boundedError(err)}, nil
+				status := Failed
+				var uncertain interface{ OutcomeUncertain() bool }
+				if errors.As(err, &uncertain) && uncertain.OutcomeUncertain() {
+					status = Unknown
+				}
+				return Record{Proposal: proposal, Status: status, Error: boundedError(err)}, nil
 			}
 			return Record{Proposal: proposal, Status: Executed}, nil
 		default:
@@ -302,14 +308,30 @@ func (r Record) Validate() error {
 		if r.Error != "" {
 			return fmt.Errorf("action status %q must not include an error", r.Status)
 		}
-	case Failed:
+	case Failed, Unknown:
 		if strings.TrimSpace(r.Error) == "" || len(r.Error) > 512 || strings.ContainsRune(r.Error, 0) {
-			return errors.New("failed action requires a bounded error")
+			return fmt.Errorf("%s action requires a bounded error", r.Status)
 		}
 	default:
 		return fmt.Errorf("unknown action status %q", r.Status)
 	}
 	return nil
+}
+
+type uncertainExecutionError struct{ err error }
+
+func (e uncertainExecutionError) Error() string          { return e.err.Error() }
+func (e uncertainExecutionError) Unwrap() error          { return e.err }
+func (e uncertainExecutionError) OutcomeUncertain() bool { return true }
+
+// MarkUncertain identifies an execution error that occurred after a remote
+// service may have accepted the action. Reviewers must reconcile it before a
+// retry; treating it as a definite failure could duplicate a side effect.
+func MarkUncertain(err error) error {
+	if err == nil {
+		return nil
+	}
+	return uncertainExecutionError{err: err}
 }
 
 func boundedError(err error) string {
