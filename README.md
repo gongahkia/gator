@@ -61,6 +61,13 @@ Providers can also be connected explicitly:
 ./bin/gator connect gemini
 ```
 
+The main TUI exposes the same lifecycle through `/connect`, `/login`, and
+`/logout`. Run any command without a provider to open its searchable provider
+picker. `/connect` chooses the closest supported setup route, `/login` stores a
+native Gator credential (using a hidden prompt for API keys), and `/logout`
+removes that stored credential. `/model` connects and selects the provider used
+for Gator runs.
+
 Credentials live in Gator's private auth store, never `config.json`. Direct
 model requests resolve credentials in this order: an explicit run key, Gator's
 credential store, then the provider environment variable.
@@ -76,7 +83,10 @@ opens scheduled jobs. Terminals encode `Ctrl+I` and Tab as the same key.
 Useful local commands are:
 
 ```text
-/model                         connect or switch the default model
+/model [PROVIDER]              connect and select the default provider
+/connect [PROVIDER]            start the closest supported setup flow
+/login [PROVIDER]              store a native Gator credential
+/logout [PROVIDER]             remove a stored Gator credential
 /effort low|standard|high      set manager and internal Code budgets
 /attach PATH                   attach a source-relative file to the next prompt
 /detach PATH|all               clear pending attachments

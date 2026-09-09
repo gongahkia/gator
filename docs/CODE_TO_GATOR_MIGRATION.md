@@ -29,7 +29,7 @@ user controls + objective
 | --- | --- | --- |
 | Provider, model, credentials, endpoint overrides, provider options, custom providers | Promote unchanged | Shared configuration and model factory used by the Gator manager and Code backend |
 | Centered composer and dock-after-typing layout | Promote | Main `internal/worktui` home and conversation views |
-| Cloud/provider onboarding | Promote and simplify | Main `/model`, first-run setup, and root `gator connect` commands |
+| Cloud/provider onboarding and credential lifecycle | Promote and simplify | Main `/model`, `/connect`, `/login`, `/logout`, first-run setup, and their root CLI equivalents |
 | Effort presets and exact turn budgets | Promote | Main `/effort`; separate manager and Code budgets |
 | Prompt image/PDF/Office/text attachments | Promote | Main `/attach`, `--image`, and `--attach`; bytes go to the manager, not silently to a child |
 | Prompt queue | Promote | Main 16-item, in-memory FIFO queue; each item captures its own options |

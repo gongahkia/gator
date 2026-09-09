@@ -68,7 +68,7 @@ Usage:
   gator theme list
   gator theme set gator|contrast|mono
   gator connect PROVIDER [OPTIONS]
-  gator login PROVIDER [--subscription | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
+  gator login PROVIDER [--subscription | --prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
