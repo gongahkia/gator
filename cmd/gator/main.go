@@ -65,6 +65,7 @@ Usage:
   gator transcript RUN_RECORD_PATH > transcript.html
   gator review WORK_BUNDLE [--preview] [--json]
   gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
+  gator export WORK_BUNDLE [--to ARCHIVE] [--replace]
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH
 
