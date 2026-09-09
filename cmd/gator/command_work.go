@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -150,20 +150,25 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
 	var approve action.Approver
+	var approveRead func(context.Context, string, string, json.RawMessage) (bool, error)
+	if !*jsonOutput {
+		approveRead = workConnectorReadApprover(in, out)
+	}
 	if disposition == action.Approve {
 		approve = workActionApprover(in, out)
 	}
 	outcome, runErr := executor.Execute(context.Background(), workrun.Request{
-		SourcePath:     *sourcePath,
-		Objective:      objective,
-		RunID:          *runID,
-		MaxSteps:       *maxSteps,
-		Mode:           mode,
-		Contract:       contract,
-		OnEvent:        sink,
-		ConnectorIDs:   selectedConnectors,
-		ApproveAction:  approve,
-		ConversationID: strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
+		SourcePath:           *sourcePath,
+		Objective:            objective,
+		RunID:                *runID,
+		MaxSteps:             *maxSteps,
+		Mode:                 mode,
+		Contract:             contract,
+		OnEvent:              sink,
+		ConnectorIDs:         selectedConnectors,
+		ApproveAction:        approve,
+		ApproveConnectorRead: approveRead,
+		ConversationID:       strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
 		ConnectorPermissions: connector.PermissionSet(settings.ConnectorPermissions),
 		SnapshotOptions:      snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes},
 		OnSnapshot:           snapshotSink,
@@ -339,7 +344,6 @@ func writeWorkJSON(out io.Writer, outcome workrun.Outcome, runErr error) error {
 }
 
 func workActionApprover(in io.Reader, out io.Writer) action.Approver {
-	input := bufio.NewReader(io.LimitReader(in, 64*1024))
 	return func(ctx context.Context, proposal action.Proposal) (action.Decision, error) {
 		select {
 		case <-ctx.Done():
@@ -349,7 +353,7 @@ func workActionApprover(in io.Reader, out io.Writer) action.Approver {
 		if _, err := fmt.Fprintf(out, "\nExternal action approval\n  connector: %s\n  operation: %s (%s)\n  target: %s\n  payload sha256: %s\n  exact JSON (escaped): %s\nApprove this one action? [y/N] ", proposal.ConnectorID, proposal.Operation, proposal.Capability, proposal.Target, proposal.PayloadSHA256, strconv.QuoteToASCII(proposal.Preview)); err != nil {
 			return action.Deny, err
 		}
-		line, err := input.ReadString('\n')
+		line, err := readApprovalLine(in)
 		if errors.Is(err, io.EOF) && line == "" {
 			return action.Deny, nil
 		}
@@ -361,6 +365,46 @@ func workActionApprover(in io.Reader, out io.Writer) action.Approver {
 		}
 		return action.Deny, nil
 	}
+}
+
+func workConnectorReadApprover(in io.Reader, out io.Writer) func(context.Context, string, string, json.RawMessage) (bool, error) {
+	return func(ctx context.Context, connectorID, operation string, arguments json.RawMessage) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+		}
+		digest := sha256.Sum256(arguments)
+		if _, err := fmt.Fprintf(out, "\nConnected read approval\n  connector: %s\n  operation: %s\n  request sha256: %x\n  exact JSON (escaped): %s\nAllow this one read? [y/N] ", connectorID, operation, digest, strconv.QuoteToASCII(string(arguments))); err != nil {
+			return false, err
+		}
+		line, err := readApprovalLine(in)
+		if errors.Is(err, io.EOF) && line == "" {
+			return false, nil
+		}
+		if err != nil && !(errors.Is(err, io.EOF) && line != "") {
+			return false, err
+		}
+		return strings.EqualFold(strings.TrimSpace(line), "y") || strings.EqualFold(strings.TrimSpace(line), "yes"), nil
+	}
+}
+
+func readApprovalLine(in io.Reader) (string, error) {
+	var line strings.Builder
+	var one [1]byte
+	for line.Len() < 4096 {
+		count, err := in.Read(one[:])
+		if count == 1 {
+			if one[0] == '\n' {
+				return line.String(), nil
+			}
+			line.WriteByte(one[0])
+		}
+		if err != nil {
+			return line.String(), err
+		}
+	}
+	return line.String(), errors.New("approval response is too long")
 }
 
 type artifactFlags []string

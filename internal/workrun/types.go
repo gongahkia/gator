@@ -4,6 +4,8 @@
 package workrun
 
 import (
+	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -28,6 +30,7 @@ type Request struct {
 	Steering             <-chan string
 	ConnectorIDs         []string
 	ApproveAction        action.Approver
+	ApproveConnectorRead func(context.Context, string, string, json.RawMessage) (bool, error)
 	ConversationID       string
 	ParentRevisionID     string
 	SnapshotID           string

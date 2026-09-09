@@ -105,6 +105,15 @@ func InvokeRemoteTool(ctx context.Context, endpoint, token, serverName, toolName
 	if len(result) > maxToolOutput {
 		return nil, errors.New("MCP tool response exceeds 64 KiB")
 	}
+	var envelope struct {
+		IsError bool `json:"isError"`
+	}
+	if err := json.Unmarshal(result, &envelope); err != nil {
+		return nil, errors.New("MCP tool returned an invalid result")
+	}
+	if envelope.IsError {
+		return nil, fmt.Errorf("MCP server %q reported that mapped tool %q failed", serverName, toolName)
+	}
 	return result, nil
 }
 

@@ -37,7 +37,7 @@ taken. Model prose alone is never completion evidence.
 
 ## Product boundary
 
-The initial product handles substantial local work that turns folders,
+The current product handles substantial local work that turns folders,
 documents, structured data, and bounded web research into finished files. Its
 first supported workflows are:
 
@@ -197,6 +197,12 @@ resource, permission, provenance, and exact-action-approval boundary. Connected
 read responses are retained inside the Work bundle and verified against their
 provenance digest.
 
+Authentication supports resource-bound bearer tokens and developer-owned
+public OAuth 2.0 apps using authorization code + PKCE, a registered loopback
+redirect, bounded scopes, and refresh-token rotation. Gator never borrows a
+vendor CLI's OAuth client identity. Services that require a confidential client
+secret should use a separately minted bearer access token in this version.
+
 ## Lifecycle and scheduling
 
 The foreground lifecycle is:
@@ -215,9 +221,9 @@ single-instance locking, bounded retries, immutable attempts, an inbox, and an
 authenticated loopback control endpoint. Jobs can inspect or draft but can
 never approve external actions. See [Durable jobs](JOBS.md).
 
-## CLI direction
+## CLI
 
-The intended command hierarchy is:
+The command hierarchy is:
 
 ```text
 gator work [DIRECTORY] TASK       run a general local work task
@@ -242,7 +248,7 @@ shell pipelines and CI without weakening interactive approvals.
 
 ## Package boundaries
 
-The migration introduces packages around durable concepts:
+The implementation is split around durable concepts:
 
 - `internal/workspace`: canonical filesystem roots and non-Git work isolation;
 - `internal/artifact`: contracts, artifact inspection, validation, manifests,
@@ -254,30 +260,16 @@ The migration introduces packages around durable concepts:
 - `internal/snapshot`, `internal/worksession`, `internal/jobs`, and
   `internal/inbox`: immutable Work inputs, revision history, schedules, and
   result routing; and
-- `internal/run`: the retained coding workflow, eventually surfaced as
-  `gator code`.
+- `internal/run`: the retained coding workflow surfaced as `gator code`.
 
 Provider adapters, the agent runner, sandbox, journal transport, terminal
 manager, browser controller, attachment parser, and event stream remain shared.
 Format-specific artifact code must not leak into the agent runner or provider
 adapters.
 
-## Migration sequence
+## Compatibility and state
 
-1. Add the workspace, outcome-contract, validation, and manifest domain types
-   with no behavior change to coding runs.
-2. Add a non-Git isolated output workspace and bounded artifact inspection.
-3. Add a general `work` executor with staged output tools and deterministic
-   completion checks.
-4. Add artifact review, export, and conflict-aware apply.
-5. Introduce the capability/action taxonomy and adapt browser, MCP, extensions,
-   and approvals without widening existing authority.
-6. Add a connector registry and one end-to-end connector workflow.
-7. Move the current coding entry point to `gator code`, retain `run` as an
-   alias, and update TUI/RPC/ACP terminology.
-8. Replace coding-only evaluation fixtures with a mixed corpus whose hidden
-   scorers validate artifact semantics and action safety.
-
-Each step must leave the existing coding workflow buildable and tested. Stored
-session formats are versioned and migrated explicitly; old run records are never
-silently reinterpreted as work sessions.
+`gator run` remains an alias for `gator code`. Work conversations and coding
+threads use separate versioned stores: old run records are never silently
+reinterpreted as Work sessions. Snapshot collection is explicit and does not
+delete data; `gator snapshot gc --yes` is the only snapshot reclamation path.

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -159,5 +160,38 @@ func TestConnectorToolsHideForbiddenActions(t *testing.T) {
 	surface, err := ConnectorTools(connector.Runtime{Registry: registry}, []string{descriptor.ID}, ConnectorPolicy{Mode: action.Act, ExternalActions: action.Forbid})
 	if err != nil || len(surface) != 0 {
 		t.Fatalf("forbidden action surface = %#v, err = %v", surface, err)
+	}
+}
+
+func TestConnectorReadAskRequiresAndUsesFreshApproval(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{Version: connector.DescriptorVersion, ID: "source", Name: "Source", Kind: connector.KindHTTPJSON, Resource: server.URL, Authentication: connector.AuthNone}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	permissions := connector.PermissionSet{{ConnectorID: descriptor.ID, Operation: "fetch", Read: connector.PermissionAsk}}
+	withoutApproval, err := ConnectorTools(connector.Runtime{Registry: registry}, []string{descriptor.ID}, ConnectorPolicy{Mode: action.Inspect, ExternalActions: action.Forbid, Permissions: permissions})
+	if err != nil || len(withoutApproval) != 0 {
+		t.Fatalf("asked read without approver = %#v, %v", withoutApproval, err)
+	}
+	approvals := 0
+	withApproval, err := ConnectorTools(connector.Runtime{Registry: registry, HTTPClient: server.Client()}, []string{descriptor.ID}, ConnectorPolicy{
+		Mode: action.Inspect, ExternalActions: action.Forbid, Permissions: permissions,
+		ApproveRead: func(_ context.Context, connectorID, operation string, arguments json.RawMessage) (bool, error) {
+			approvals++
+			return connectorID == descriptor.ID && operation == "fetch" && string(arguments) == `{}`, nil
+		},
+	})
+	if err != nil || len(withApproval) != 1 {
+		t.Fatalf("asked read with approver = %#v, %v", withApproval, err)
+	}
+	if result := executeTool(t, withApproval[0], `{}`); approvals != 1 || !strings.Contains(result, `"ok":true`) {
+		t.Fatalf("result = %s, approvals = %d", result, approvals)
 	}
 }

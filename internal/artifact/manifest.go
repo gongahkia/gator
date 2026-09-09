@@ -33,6 +33,7 @@ type Manifest struct {
 	ContractSHA256   string                 `json:"contract_sha256"`
 	Source           Source                 `json:"source"`
 	ConnectedSources []connector.Provenance `json:"connected_sources,omitempty"`
+	Renderers        []RendererEvidence     `json:"renderers,omitempty"`
 	Artifacts        []File                 `json:"artifacts"`
 	Validations      []ValidationResult     `json:"validations"`
 	Actions          []action.Record        `json:"actions,omitempty"`
@@ -42,9 +43,8 @@ type Manifest struct {
 	FinishedAt       time.Time              `json:"finished_at"`
 }
 
-// Source identifies the developer-selected input without claiming that every
-// byte was snapshotted. SnapshotSHA256 is set only by a future explicit source
-// snapshot mode.
+// Source identifies the developer-selected input and its immutable snapshot.
+// Version-1 manifests predate SnapshotSHA256 and remain readable.
 type Source struct {
 	Kind           string `json:"kind"`
 	Name           string `json:"name"`
@@ -58,6 +58,17 @@ type File struct {
 	MediaType string `json:"media_type"`
 	Bytes     int64  `json:"bytes"`
 	SHA256    string `json:"sha256"`
+}
+
+// RendererEvidence binds semantic input and an optional frozen template to
+// the exact bytes emitted by a trusted rich-artifact renderer.
+type RendererEvidence struct {
+	Path           string `json:"path"`
+	Format         string `json:"format"`
+	Renderer       string `json:"renderer"`
+	ArtifactSHA256 string `json:"artifact_sha256"`
+	SpecSHA256     string `json:"spec_sha256"`
+	TemplateSHA256 string `json:"template_sha256,omitempty"`
 }
 
 // ValidationResult is one trusted deterministic check. Diagnostic is bounded
@@ -107,6 +118,7 @@ func (m Manifest) Validate() error {
 		}
 	}
 	seen := make(map[string]struct{}, len(m.Artifacts))
+	artifactDigests := make(map[string]string, len(m.Artifacts))
 	for _, file := range m.Artifacts {
 		if err := validateArtifactPath(file.Path); err != nil || strings.TrimSpace(file.MediaType) == "" || file.Bytes < 0 || !validSHA256(file.SHA256) {
 			return fmt.Errorf("artifact manifest file %q is invalid", file.Path)
@@ -115,6 +127,20 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("artifact manifest repeats file %q", file.Path)
 		}
 		seen[file.Path] = struct{}{}
+		artifactDigests[file.Path] = file.SHA256
+	}
+	seenRenderers := make(map[string]struct{}, len(m.Renderers))
+	for _, renderer := range m.Renderers {
+		if err := renderer.Validate(); err != nil {
+			return fmt.Errorf("artifact renderer evidence: %w", err)
+		}
+		if digest, ok := artifactDigests[renderer.Path]; !ok || digest != renderer.ArtifactSHA256 {
+			return fmt.Errorf("artifact renderer evidence for %q does not match output", renderer.Path)
+		}
+		if _, duplicate := seenRenderers[renderer.Path]; duplicate {
+			return fmt.Errorf("artifact manifest repeats renderer evidence for %q", renderer.Path)
+		}
+		seenRenderers[renderer.Path] = struct{}{}
 	}
 	for _, result := range m.Validations {
 		if err := validateArtifactPath(result.Path); err != nil {
@@ -166,6 +192,22 @@ func (m Manifest) Validate() error {
 	}
 	if m.StartedAt.IsZero() || m.FinishedAt.IsZero() || m.FinishedAt.Before(m.StartedAt) {
 		return errors.New("artifact manifest timestamps are invalid")
+	}
+	return nil
+}
+
+func (e RendererEvidence) Validate() error {
+	if err := validateArtifactPath(e.Path); err != nil {
+		return err
+	}
+	if e.Format != "docx" && e.Format != "pdf" && e.Format != "xlsx" {
+		return errors.New("renderer format is invalid")
+	}
+	if e.Renderer != "gator.document.v1" && e.Renderer != "gator.workbook.v1" {
+		return errors.New("renderer identity is invalid")
+	}
+	if !validSHA256(e.ArtifactSHA256) || !validSHA256(e.SpecSHA256) || e.TemplateSHA256 != "" && !validSHA256(e.TemplateSHA256) {
+		return errors.New("renderer digest is invalid")
 	}
 	return nil
 }

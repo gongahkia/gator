@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/connector"
 )
 
 func TestConnectorCommandAddsAuthenticatesAndRemovesResourceBoundSource(t *testing.T) {
@@ -71,6 +73,25 @@ func TestConnectorCommandTestsConfiguredJSONSourceWithoutPrintingData(t *testing
 	}
 	if !strings.Contains(output.String(), "is reachable") || !strings.Contains(output.String(), "sha256:") || strings.Contains(output.String(), "payload") {
 		t.Fatalf("connector test output = %q", output.String())
+	}
+}
+
+func TestConnectorTestInvocationUsesMappedRemoteMCPReadOperation(t *testing.T) {
+	tests := []struct {
+		name       string
+		descriptor connector.Descriptor
+		operation  string
+	}{
+		{name: "search preferred", descriptor: connector.Descriptor{Kind: connector.KindRemoteMCP, SearchTool: "search_issues", ReadTool: "get_issue"}, operation: "search"},
+		{name: "read fallback", descriptor: connector.Descriptor{Kind: connector.KindRemoteMCP, ReadTool: "get_issue"}, operation: "read"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			operation, input := connectorTestInvocation(test.descriptor)
+			if operation != test.operation || string(input) != `{"arguments":{}}` {
+				t.Fatalf("invocation = %q, %s", operation, input)
+			}
+		})
 	}
 }
 

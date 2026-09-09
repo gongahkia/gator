@@ -24,17 +24,19 @@ type RunResult struct {
 }
 
 type Config struct {
-	CurrentFolder string
-	Conversations []worksession.Conversation
-	Jobs          []jobs.Definition
-	Inbox         []inbox.Entry
-	Run           func(source, conversationID, prompt string) RunResult
-	MoveBack      func(conversationID string) (string, error)
-	MoveForward   func(conversationID string) (string, error)
-	History       func(conversationID string) (string, error)
-	CodeCommand   func() *exec.Cmd
-	FirstRun      bool
-	SetupCommand  func(provider string) *exec.Cmd
+	CurrentFolder       string
+	Conversations       []worksession.Conversation
+	StartConversationID string
+	Jobs                []jobs.Definition
+	Inbox               []inbox.Entry
+	Run                 func(source, conversationID, prompt string) RunResult
+	MoveBack            func(conversationID string) (string, error)
+	MoveForward         func(conversationID string) (string, error)
+	MoveToRevision      func(conversationID, revisionID string) (string, error)
+	History             func(conversationID string) (string, error)
+	CodeCommand         func() *exec.Cmd
+	FirstRun            bool
+	SetupCommand        func(provider string) *exec.Cmd
 }
 
 type entry struct{ title, subtitle, kind, id, source string }
@@ -60,6 +62,7 @@ type Model struct {
 	running      bool
 	status       string
 	onboarding   bool
+	scroll       int
 }
 
 func New(config Config) Model {
@@ -76,6 +79,18 @@ func New(config Config) Model {
 		entry{title: "Scheduled jobs", subtitle: fmt.Sprintf("%d configured", len(config.Jobs)), kind: "jobs"},
 		entry{title: "Code", subtitle: "Open the isolated coding workflow", kind: "code"},
 	)
+	if config.StartConversationID != "" {
+		for _, conversation := range config.Conversations {
+			if conversation.ID == config.StartConversationID {
+				model.launcher = false
+				model.source = conversation.SourcePath
+				model.conversation = conversation.ID
+				model.title = conversation.Title
+				model.messages = []message{{role: "Gator", text: "Welcome back. Continue here, or type /back, /forward, or /history to move through revisions without deleting them."}}
+				break
+			}
+		}
+	}
 	return model
 }
 
@@ -87,7 +102,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = value.Width, value.Height
 	case runDone:
 		m.running = false
-		m.conversation = value.ConversationID
+		if value.ConversationID != "" {
+			m.conversation = value.ConversationID
+		}
 		if value.Error != "" {
 			m.messages = append(m.messages, message{role: "Gator", text: "I couldn't finish that run: " + value.Error})
 		} else {
@@ -100,7 +117,10 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.messages = append(m.messages, message{role: "Gator", text: text})
 		}
-		m.status = "Revision " + value.RevisionID + " · snapshot " + value.SnapshotID
+		if value.RevisionID != "" || value.SnapshotID != "" {
+			m.status = "Revision " + value.RevisionID + " · snapshot " + value.SnapshotID
+		}
+		m.scroll = 0
 	case setupDone:
 		if value.err != nil {
 			m.messages = append(m.messages, message{role: "Gator", text: "Setup did not finish: " + value.err.Error() + "\nYou can try another provider name."})
@@ -121,6 +141,17 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.launcher {
 			return m.updateLauncher(value)
+		}
+		switch value.String() {
+		case "pgup":
+			m.scroll += max(1, m.height/2)
+			return m, nil
+		case "pgdown":
+			m.scroll -= max(1, m.height/2)
+			if m.scroll < 0 {
+				m.scroll = 0
+			}
+			return m, nil
 		}
 		if m.running {
 			return m, nil
@@ -183,10 +214,16 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		selected := m.entries[m.selected]
 		switch selected.kind {
 		case "source", "conversation":
+			switching := m.source != selected.source || m.conversation != selected.id
 			m.launcher = false
 			m.source = selected.source
 			m.conversation = selected.id
 			m.title = selected.title
+			m.scroll = 0
+			if switching {
+				m.messages = nil
+				m.status = ""
+			}
 			if len(m.messages) == 0 {
 				greeting := "What would you like to get done? I’ll work from a private, frozen copy of this folder and keep every revision undoable."
 				if selected.kind == "conversation" {
@@ -196,6 +233,8 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case "inbox":
 			m.launcher = false
+			m.source = ""
+			m.conversation = ""
 			m.title = "Inbox"
 			m.messages = nil
 			if len(m.config.Inbox) == 0 {
@@ -206,6 +245,8 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case "jobs":
 			m.launcher = false
+			m.source = ""
+			m.conversation = ""
 			m.title = "Scheduled jobs"
 			m.messages = nil
 			if len(m.config.Jobs) == 0 {
@@ -241,6 +282,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	}
 	var result string
 	var err error
+	fields := strings.Fields(command)
 	switch command {
 	case "/back":
 		result, err = m.config.MoveBack(m.conversation)
@@ -249,12 +291,17 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	case "/history":
 		result, err = m.config.History(m.conversation)
 	default:
-		err = fmt.Errorf("unknown command %s", command)
+		if len(fields) == 2 && fields[0] == "/forward" && m.config.MoveToRevision != nil {
+			result, err = m.config.MoveToRevision(m.conversation, fields[1])
+		} else {
+			err = fmt.Errorf("unknown command %s", command)
+		}
 	}
 	if err != nil {
 		result = err.Error()
 	}
 	m.messages = append(m.messages, message{role: "Gator", text: result})
+	m.scroll = 0
 	return m, nil
 }
 
@@ -285,18 +332,26 @@ func (m Model) View() string {
 		view.WriteString(dim.Render(m.status) + "\n")
 	}
 	view.WriteString("\n")
+	var transcript strings.Builder
+	messageStyle := lipgloss.NewStyle().Width(max(20, width-3))
 	for _, item := range m.messages {
-		text := item.text
-		if len(text) > width*8 {
-			text = text[:width*8] + "…"
-		}
-		view.WriteString(accent.Render(item.role+":") + " " + text + "\n\n")
+		transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
+		transcript.WriteString("\n\n")
+	}
+	lines := strings.Split(strings.TrimSuffix(transcript.String(), "\n"), "\n")
+	available := max(4, m.height-9)
+	maxScroll := max(0, len(lines)-available)
+	scroll := min(m.scroll, maxScroll)
+	end := len(lines) - scroll
+	start := max(0, end-available)
+	if len(lines) > 0 && lines[0] != "" {
+		view.WriteString(strings.Join(lines[start:end], "\n") + "\n")
 	}
 	if m.running {
 		view.WriteString(accent.Render("● Working…") + "\n")
 	} else {
 		view.WriteString("❯ " + m.input + "█\n")
 	}
-	view.WriteString(dim.Render("enter send · ctrl+p projects/inbox/jobs · /back /forward /history · ctrl+c quit"))
+	view.WriteString(dim.Render("enter send · pgup/pgdown scroll · ctrl+p palette · /back /forward [revision] /history · ctrl+c quit"))
 	return view.String()
 }

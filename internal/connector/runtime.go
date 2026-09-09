@@ -136,7 +136,7 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 		return r.publishHTTPJSON(ctx, descriptor, prepared.payload)
 	}
 	if prepared.descriptor.Kind == KindRemoteMCP {
-		token, tokenErr := r.bearerToken(descriptor)
+		token, tokenErr := r.bearerToken(ctx, descriptor)
 		if tokenErr != nil {
 			return tokenErr
 		}
@@ -170,7 +170,7 @@ func (r Runtime) invokeRemoteMCP(ctx context.Context, descriptor Descriptor, ope
 	if operation.ID == "read" {
 		tool = descriptor.ReadTool
 	}
-	token, err := r.bearerToken(descriptor)
+	token, err := r.bearerToken(ctx, descriptor)
 	if err != nil {
 		return Result{}, err
 	}
@@ -208,14 +208,6 @@ func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, opera
 
 func serviceRead(descriptor Descriptor, operation string, input serviceInput) (string, string, []byte, error) {
 	query := url.Values{}
-	if input.Cursor != "" {
-		query.Set("cursor", input.Cursor)
-		query.Set("pageToken", input.Cursor)
-	}
-	if input.Limit > 0 {
-		query.Set("limit", fmt.Sprint(input.Limit))
-		query.Set("pageSize", fmt.Sprint(input.Limit))
-	}
 	path := ""
 	method := http.MethodGet
 	var body []byte
@@ -228,44 +220,87 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 		}
 		path = "/search.messages"
 		query.Set("query", input.Query)
+		if input.Limit > 0 {
+			query.Set("count", fmt.Sprint(input.Limit))
+		}
 	case KindSlack + "/history":
 		if input.ResourceID == "" {
 			return "", "", nil, errors.New("Slack history requires resource_id channel")
 		}
 		path = "/conversations.history"
 		query.Set("channel", input.ResourceID)
+		if input.Limit > 0 {
+			query.Set("limit", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("cursor", input.Cursor)
+		}
 	case KindGoogle + "/drive_search":
 		path = "/drive/v3/files"
 		query.Set("q", input.Query)
+		if input.Limit > 0 {
+			query.Set("pageSize", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
 	case KindGoogle + "/drive_get":
 		path = "/drive/v3/files/" + url.PathEscape(input.ResourceID)
 	case KindGoogle + "/docs_get":
-		path = "/docs/v1/documents/" + url.PathEscape(input.ResourceID)
+		path = "/v1/documents/" + url.PathEscape(input.ResourceID)
 	case KindGoogle + "/sheets_get":
 		path = "/v4/spreadsheets/" + url.PathEscape(input.ResourceID)
 	case KindAtlassian + "/jira_search":
 		path = "/rest/api/3/search/jql"
 		query.Set("jql", input.Query)
+		if input.Limit > 0 {
+			query.Set("maxResults", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("nextPageToken", input.Cursor)
+		}
 	case KindAtlassian + "/jira_get":
 		path = "/rest/api/3/issue/" + url.PathEscape(input.ResourceID)
 	case KindAtlassian + "/confluence_search":
 		path = "/wiki/rest/api/search"
 		query.Set("cql", input.Query)
+		if input.Limit > 0 {
+			query.Set("limit", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("cursor", input.Cursor)
+		}
 	case KindNotion + "/search":
 		path = "/search"
 		method = http.MethodPost
-		body, _ = json.Marshal(map[string]any{"query": input.Query, "page_size": input.Limit, "start_cursor": input.Cursor})
+		parameters := map[string]any{}
+		if input.Query != "" {
+			parameters["query"] = input.Query
+		}
+		if input.Limit > 0 {
+			parameters["page_size"] = input.Limit
+		}
+		if input.Cursor != "" {
+			parameters["start_cursor"] = input.Cursor
+		}
+		body, _ = json.Marshal(parameters)
 	case KindNotion + "/page_get":
 		path = "/pages/" + url.PathEscape(input.ResourceID)
 	case KindNotion + "/block_children":
 		path = "/blocks/" + url.PathEscape(input.ResourceID) + "/children"
+		if input.Limit > 0 {
+			query.Set("page_size", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("start_cursor", input.Cursor)
+		}
 	default:
 		return "", "", nil, fmt.Errorf("connector operation %s/%s has no read runtime", descriptor.ID, operation)
 	}
 	if strings.Contains(path, "//") || strings.HasSuffix(path, "/") && input.ResourceID == "" && operation != "drive_search" {
 		return "", "", nil, errors.New("connector operation requires resource_id")
 	}
-	endpoint := strings.TrimRight(descriptor.Resource, "/") + path
+	endpoint := serviceBase(descriptor, operation) + path
 	if encoded := query.Encode(); encoded != "" {
 		endpoint += "?" + encoded
 	}
@@ -280,7 +315,7 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 	case KindSlack + "/update_message":
 		path = "/chat.update"
 	case KindGoogle + "/docs_create":
-		path = "/docs/v1/documents"
+		path = "/v1/documents"
 	case KindGoogle + "/sheets_create":
 		path = "/v4/spreadsheets"
 	case KindAtlassian + "/jira_create":
@@ -306,7 +341,21 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 	default:
 		return "", nil, fmt.Errorf("connector operation %s/%s has no action runtime", descriptor.ID, operation)
 	}
-	return strings.TrimRight(descriptor.Resource, "/") + path, payload, nil
+	return serviceBase(descriptor, operation) + path, payload, nil
+}
+
+func serviceBase(descriptor Descriptor, operation string) string {
+	base := strings.TrimRight(descriptor.Resource, "/")
+	if descriptor.Kind != KindGoogle || base != "https://www.googleapis.com" {
+		return base
+	}
+	if strings.HasPrefix(operation, "docs_") {
+		return "https://docs.googleapis.com"
+	}
+	if strings.HasPrefix(operation, "sheets_") {
+		return "https://sheets.googleapis.com"
+	}
+	return base
 }
 
 func extractResourceID(payload []byte) (string, []byte, error) {
@@ -328,7 +377,7 @@ func isServiceKind(kind string) bool {
 }
 
 func (r Runtime) requestJSON(ctx context.Context, descriptor Descriptor, operation, method, endpoint string, body []byte, uncertain bool) (Result, error) {
-	token, err := r.bearerToken(descriptor)
+	token, err := r.bearerToken(ctx, descriptor)
 	if err != nil {
 		return Result{}, err
 	}
@@ -357,6 +406,9 @@ func (r Runtime) requestJSON(ctx context.Context, descriptor Descriptor, operati
 	defer response.Body.Close()
 	contents, readErr := io.ReadAll(io.LimitReader(response.Body, maxHTTPJSONBytes+1))
 	if readErr != nil {
+		if uncertain {
+			return Result{}, action.MarkUncertain(readErr)
+		}
 		return Result{}, readErr
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
@@ -370,7 +422,23 @@ func (r Runtime) requestJSON(ctx context.Context, descriptor Descriptor, operati
 		contents = []byte(`{}`)
 	}
 	if len(contents) > maxHTTPJSONBytes || !json.Valid(contents) {
+		if uncertain {
+			return Result{}, action.MarkUncertain(errors.New("connector returned invalid or oversized JSON after action"))
+		}
 		return Result{}, errors.New("connector returned invalid or oversized JSON")
+	}
+	if descriptor.Kind == KindSlack {
+		var slack struct {
+			OK    *bool  `json:"ok"`
+			Error string `json:"error"`
+		}
+		if err := json.Unmarshal(contents, &slack); err == nil && slack.OK != nil && !*slack.OK {
+			message := strings.TrimSpace(slack.Error)
+			if message == "" {
+				message = "unknown_error"
+			}
+			return Result{}, fmt.Errorf("Slack connector %q rejected %s: %s", descriptor.ID, operation, message)
+		}
 	}
 	digest := sha256.Sum256(contents)
 	return Result{Data: append(json.RawMessage(nil), contents...), Provenance: Provenance{ConnectorID: descriptor.ID, Operation: operation, Resource: endpoint, RetrievedAt: r.now(), Bytes: int64(len(contents)), SHA256: hex.EncodeToString(digest[:])}}, nil
@@ -380,7 +448,7 @@ func (r Runtime) fetchHTTPJSON(ctx context.Context, descriptor Descriptor) (Resu
 	if err := descriptor.Validate(); err != nil {
 		return Result{}, err
 	}
-	token, err := r.bearerToken(descriptor)
+	token, err := r.bearerToken(ctx, descriptor)
 	if err != nil {
 		return Result{}, err
 	}
@@ -429,7 +497,7 @@ func (r Runtime) publishHTTPJSON(ctx context.Context, descriptor Descriptor, pay
 	if err := descriptor.Validate(); err != nil {
 		return err
 	}
-	token, err := r.bearerToken(descriptor)
+	token, err := r.bearerToken(ctx, descriptor)
 	if err != nil {
 		return err
 	}
@@ -511,8 +579,8 @@ func actionInput(payload []byte) json.RawMessage {
 	return result
 }
 
-func (r Runtime) bearerToken(descriptor Descriptor) (string, error) {
-	if descriptor.Authentication != AuthBearer {
+func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
+	if descriptor.Authentication != AuthBearer && descriptor.Authentication != AuthOAuth {
 		return "", nil
 	}
 	credential, found, err := r.Credentials.Read(descriptor.CredentialRef())
@@ -523,7 +591,18 @@ func (r Runtime) bearerToken(descriptor Descriptor) (string, error) {
 		return "", fmt.Errorf("connector %q is not authenticated", descriptor.ID)
 	}
 	if credential.Expired(r.now()) {
-		return "", fmt.Errorf("connector %q credential has expired", descriptor.ID)
+		if descriptor.Authentication != AuthOAuth || !credential.IsOAuth() || credential.Refresh == "" {
+			return "", fmt.Errorf("connector %q credential has expired", descriptor.ID)
+		}
+		flow := auth.BrowserFlow{ClientID: descriptor.OAuthClientID, TokenURL: descriptor.OAuthTokenURL, AllowMissingExpiry: true, RequireBearerToken: true, HTTPClient: r.HTTPClient}
+		refreshed, refreshErr := flow.Refresh(ctx, credential)
+		if refreshErr != nil {
+			return "", fmt.Errorf("refresh connector %q credential: %w", descriptor.ID, refreshErr)
+		}
+		if err := r.Credentials.Put(descriptor.CredentialRef(), refreshed); err != nil {
+			return "", fmt.Errorf("store refreshed connector credential: %w", err)
+		}
+		credential = refreshed
 	}
 	if !credential.IsBearerToken() && !credential.IsOAuth() {
 		return "", fmt.Errorf("connector %q requires a bearer credential", descriptor.ID)

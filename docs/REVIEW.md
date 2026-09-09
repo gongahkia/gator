@@ -63,7 +63,7 @@ without the credential. The browser page provides the same all/unstaged/staged
 file and hunk navigation, raw file patches, explicit stage/unstage
 confirmations, and range-scoped feedback. Browser feedback is saved beside the
 retained run and returns the exact constrained continuation text for review and
-copying; use `gator resume RUN_RECORD_PATH` when no native TUI is already
+copying; use `gator code resume RUN_RECORD_PATH` when no native TUI is already
 attached to send it.
 
 This is intentionally not `gator serve` and not an RPC client. `gator serve`

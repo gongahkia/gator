@@ -33,34 +33,40 @@ Interactive approval is deliberately non-transferable:
 ## Durable model
 
 A job definition is developer-owned configuration, written atomically as a
-private file. The first schema should contain:
+private file. Its version-1 shape includes:
 
 ```json
 {
   "version": 1,
-  "id": "weekly-metrics",
+  "id": "job-...",
+  "name": "weekly-metrics",
   "enabled": true,
+  "schedule": "0 9 * * 1",
+  "timezone": "Asia/Singapore",
+  "missed": "run_once",
+  "source_path": "/absolute/canonical/source",
+  "refresh_snapshot": true,
   "objective": "Prepare the weekly metrics brief.",
-  "source": "/absolute/canonical/source",
   "mode": "draft",
-  "external_actions": "draft",
-  "artifacts": ["brief.md", "metrics.csv"],
-  "connectors": ["metrics"],
-  "schedule": {
-    "cron": "0 9 * * 1",
-    "timezone": "Asia/Singapore",
-    "missed_runs": "run_once"
+  "contract": {
+    "version": 1,
+    "external_actions": "draft",
+    "artifacts": [
+      {"path": "brief.md"},
+      {"path": "metrics.csv"}
+    ]
   },
-  "concurrency": "forbid",
+  "connector_ids": ["metrics"],
+  "max_steps": 24,
   "created_at": "2026-09-09T00:00:00Z",
   "updated_at": "2026-09-09T00:00:00Z"
 }
 ```
 
-The stored definition also needs the full normalized outcome contract, provider
-selection, maximum turns, and a non-secret connector identity digest. Secrets
-remain in Gator's credential store. A definition must never embed an API key,
-bearer token, approval, model-generated prompt, or mutable remote tool schema.
+The stored definition includes the normalized outcome contract, optional
+provider/model selection, maximum turns, and connector IDs. Secrets remain in
+Gator's credential store. A definition never embeds an API key, bearer token,
+or approval.
 
 Each invocation creates an immutable `intent.json` before model work starts,
 appends lifecycle events to `events.jsonl`, and publishes one terminal
@@ -69,24 +75,26 @@ appends lifecycle events to `events.jsonl`, and publishes one terminal
 ```json
 {
   "version": 1,
-  "execution_id": "jobrun-...",
+  "id": "attempt-...",
   "job_id": "weekly-metrics",
   "definition_sha256": "...",
-  "scheduled_for": "2026-09-14T01:00:00Z",
+  "scheduled_at": "2026-09-14T01:00:00Z",
   "started_at": "2026-09-14T01:00:03Z",
   "finished_at": "2026-09-14T01:04:12Z",
   "status": "completed",
-  "work_id": "work-...",
-  "manifest_sha256": "...",
-  "attempt": 1
+  "conversation_id": "workconv-...",
+  "revision_id": "workrev-...",
+  "bundle_path": "/private/.../work-...",
+  "try": 1
 }
 ```
 
 The result points to a normal sealed Work bundle; it does not create a second
 artifact format. Status transitions in the event log are append-only (`queued`,
-`running`, then one terminal state). A supervisor restart reconciles any
-orphaned `running` execution by appending `interrupted` before scheduling
-another attempt; it never rewrites history.
+`running`, then one terminal state). A terminal `result.json` is created once
+and never overwritten. If the foreground process is killed mid-run, its intent
+and running events remain available for inspection; automatic interrupted-run
+reconciliation is not yet implemented.
 
 ## State and ownership
 
@@ -98,15 +106,16 @@ gator/jobs/
   history/<job-id>/<execution-id>/intent.json
   history/<job-id>/<execution-id>/events.jsonl
   history/<job-id>/<execution-id>/result.json
-  supervisor/identity.json
-  supervisor/events.jsonl
+  supervisor.json
+  supervisor.token
+  supervisor.lock
 ```
 
-Definitions and records are `0600`; directories are `0700`; publication uses
-write, sync, rename, and parent-directory sync. IDs and directory entries are
-bounded. Symlinks and non-regular state files are rejected. A single OS-level
-exclusive lock owns the store. PID files alone are not process identity and
-must never authorize stop or mutation.
+Definitions and records are `0600`; directories are `0700`; definition
+publication uses write, sync, rename, and parent-directory sync. IDs are
+bounded, and state reads reject symlinks and non-regular files. A private
+exclusive-create lock prevents two supervisors from owning the store. A stale
+lock is removed only after its recorded PID is no longer live.
 
 The supervisor exposes an authenticated literal-loopback control socket with a
 random private token and an instance nonce. CLI status/stop requests verify the
@@ -115,23 +124,21 @@ with the app server, but it is a different lifecycle and state owner.
 
 ## Scheduling semantics
 
-- Cron is evaluated in an explicit IANA timezone and stores the next UTC fire
-  time. Daylight-saving transitions are tested as product behavior.
-- `missed_runs` is either `skip` or `run_once`; replaying every missed interval
+- Cron is evaluated in an explicit IANA timezone and claimed in UTC.
+- `missed` is either `skip` or `run_once`; replaying every missed interval
   is intentionally unsupported in the first version.
-- `concurrency: forbid` is the only initial policy. If a previous execution is
-  still live, the next occurrence becomes a recorded `skipped_overlap` event.
-- Retries are opt-in, bounded, and use exponential backoff. `unknown` external
-  action evidence is never automatically retried.
+- Runs execute sequentially in one supervisor, so they do not overlap.
+- A run retries transient failures at most three times with bounded backoff.
+  Errors reporting an unknown or uncertain outcome are never retried.
 - Definition edits affect only future executions. Every execution binds the
   exact definition digest it used.
 - Disabling or deleting a definition does not delete its run history or Work
   bundles. Retention is a separate explicit policy.
 
-Before each run the supervisor revalidates the source root, outcome contract,
-provider configuration, connector descriptors, and credential availability.
-A failed preflight produces a durable failure record without invoking a model.
-Remote response content and credentials are never written to scheduler logs.
+Each run starts a normal `gator work --json` subprocess, which revalidates the
+source root, outcome contract, provider configuration, connector descriptors,
+and credential availability. Remote response content and credentials are not
+written to scheduler lifecycle events.
 
 ## CLI
 
@@ -148,6 +155,7 @@ gator job supervisor [--notify=false]
 gator job status
 gator job stop
 gator inbox [--unread]
+gator inbox read ENTRY_ID
 gator job remove ID --yes        # keeps immutable history by default
 ```
 
@@ -156,20 +164,10 @@ missed-run behavior; `run_once` catches up once. Runs are non-overlapping,
 retry transient pre-action failures at most three times, and never execute a
 connected mutation or publish operation.
 
-## Release gates
+## Operational boundary
 
-Scheduled Work is usable only when all of the following are demonstrated:
-
-1. schema round-trip and forward-version rejection;
-2. atomic concurrent definition updates and single-supervisor ownership;
-3. restart recovery for every non-terminal execution state;
-4. timezone and missed-run fixtures, including DST boundaries;
-5. overlap suppression and bounded retry fixtures;
-6. missing/expired credential preflight with no model invocation;
-7. immutable links from execution records to verified Work manifests;
-8. safe stop during model work and during artifact sealing;
-9. no path from a job definition to unattended `approve`; and
-10. install, upgrade, log rotation, and uninstall behavior on macOS and Linux.
-
-Until these gates pass, Gator should be explicit that it supports foreground
-Work and externally supervised headless runs—not built-in persistent jobs.
+The supervisor is intentionally foreground-only: it does not install a launchd
+unit, systemd unit, login item, or background daemon. `gator job stop` verifies
+the private bearer token, literal loopback endpoint, PID, and instance nonce
+before requesting shutdown. Stop waits for the active Work subprocess because
+mid-run cancellation and restart reconciliation are deliberately deferred.

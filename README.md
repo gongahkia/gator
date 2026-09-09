@@ -147,6 +147,15 @@ operation:
 printf '%s' "$SLACK_TOKEN" | ./bin/gator connector login team-slack --token-stdin
 ./bin/gator connector permission team-slack post_message write draft
 
+# A BYO public OAuth/PKCE app can be configured instead of pasting a token.
+./bin/gator connector add team-google --kind google --auth oauth \
+  --oauth-client-id "$GOOGLE_CLIENT_ID" \
+  --oauth-authorize-url 'https://accounts.google.com/o/oauth2/v2/auth' \
+  --oauth-token-url 'https://oauth2.googleapis.com/token' \
+  --oauth-redirect-url 'http://127.0.0.1:1457/oauth/callback' \
+  --oauth-scopes 'openid https://www.googleapis.com/auth/drive.readonly'
+./bin/gator connector login team-google
+
 ./bin/gator connector add linear --kind mcp --url 'https://mcp.example.com' \
   --search-tool search_issues --read-tool get_issue --action-tool create_issue
 ```
@@ -245,26 +254,27 @@ GATOR_RADIUS_OAUTH_CLIENT_ID=... ./bin/gator login radius --subscription
 ./bin/gator delegate claude run --verify 'go test ./...' \
   'Add a focused feature with tests'
 
-# Open a project-scoped retained-thread picker, continue the latest thread,
-# or target an ID directly. The task is optional: without it, Gator opens the
-# resumed conversation in the TUI.
+# Open the Work launcher, or continue a Work conversation by ID and task.
 ./bin/gator resume
-./bin/gator resume --last
-./bin/gator resume --last --compact
-./bin/gator resume thread-identifier
-./bin/gator resume --all
-OPENAI_API_KEY=... ./bin/gator resume --last \
+./bin/gator resume WORK_CONVERSATION_ID 'Revise the brief'
+
+# Coding conversations remain under the explicit code workflow.
+./bin/gator code resume --last
+./bin/gator code resume --last --compact
+./bin/gator code resume thread-identifier
+./bin/gator code resume --all
+OPENAI_API_KEY=... ./bin/gator code resume --last \
   --image regression.png --attach browser-log.txt \
   'Address the failing verification and finish the patch'
 
 # The original raw run-record form remains supported.
-OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
+OPENAI_API_KEY=... ./bin/gator code resume /path/to/run-record \
   'Address the failing verification and finish the patch'
 
 # Fork a selected retained turn into a separate worktree, or clone the current
 # retained head. Both retain the original source thread unchanged.
-./bin/gator fork --last 'Try the smaller implementation instead'
-./bin/gator clone --last 'Repeat the active direction with another constraint'
+./bin/gator code fork --last 'Try the smaller implementation instead'
+./bin/gator code clone --last 'Repeat the active direction with another constraint'
 
 # Save a portable patch or apply it explicitly to a clean compatible checkout.
 ./bin/gator export /path/to/run-record > gator-review.patch
@@ -275,7 +285,7 @@ OPENAI_API_KEY=... ./bin/gator resume /path/to/run-record \
 ./bin/gator transcript /path/to/run-record > gator-transcript.html
 ```
 
-`gator` opens a conversation-first terminal application when run from a Git
+`gator code` opens the isolated coding terminal application when run from a Git
 checkout and a real terminal. Type a task and press `Enter` to send it; the
 same prompt accepts follow-up instructions after the run completes. `Ctrl+R`
 also sends in every input mode. The live
@@ -348,9 +358,9 @@ opens the same navigator from review. Press `f` on an earlier turn to start an
 alternate branch in a fresh isolated worktree; `/clone` branches from the
 current retained head. Neither operation modifies the source thread.
 
-Gator automatically summarizes older retained context once it exceeds its
+The coding workflow automatically summarizes older retained context once it exceeds its
 local threshold, retaining the newest messages and recording a visible
-`context_compacted` event. Use `/compact` (or `gator resume --compact`) to
+`context_compacted` event. Use `/compact` (or `gator code resume --compact`) to
 request that summary before the next retained turn. The original private run
 records remain intact for inspection and forking.
 
@@ -384,8 +394,8 @@ an explicit confirmation.
 
 Use `@mock.png`, `@screenshot.jpg`, or `@design.webp` to attach images, and
 `@report.pdf` to attach a PDF, to a direct-provider task. The non-interactive
-equivalents are `--image PATH` and `--attach PATH` on `run`, `resume`, `fork`,
-and `clone`; paths are always relative to the relevant repository. Gator also accepts
+equivalents are `--image PATH` and `--attach PATH` on `run`, `code resume`,
+`code fork`, and `code clone`; paths are always relative to the relevant repository. Gator also accepts
 `@` references to UTF-8 text/data documents (`.txt`, Markdown, CSV, JSON,
 YAML, TOML, XML, HTML, logs, and common config files) plus `.docx`, `.odt`,
 and `.xlsx`. Office files are extracted locally into plain text; PDFs retain
@@ -421,7 +431,7 @@ The review screen deliberately does not modify the active checkout. To hand off
 reviewed work, `gator export RUN_RECORD_PATH` emits a binary-safe patch to
 standard output. `gator apply --check RUN_RECORD_PATH` verifies that the current
 checkout is clean and compatible; omitting `--check` applies the patch. Gator
-does not stage, commit, or push the result. The existing `run` and `resume`
+does not stage, commit, or push the result. The existing `run` and `code resume`
 commands remain available for scripts and CI-like usage.
 
 `gator connect` is the shortest compliant onboarding path for subscription
@@ -437,7 +447,7 @@ harness creates.
 creates and retains the same Git worktree, then executes Gator's required
 verification commands after the delegated agent exits. The delegated CLI owns
 its own tool policy, sandbox, approvals, session history, and credentials, so
-delegated runs do not support Gator steering or `gator resume`. Copilot's
+delegated runs do not support Gator steering or `gator code resume`. Copilot's
 non-interactive delegate grants its own tools but does not disable its path or
 URL approval controls. Claude delegation passes either `ANTHROPIC_API_KEY` or
 Gator's stored Anthropic API key to `claude --bare`, which prevents reuse of
@@ -822,7 +832,7 @@ Runs leave code changes in a sibling `*-gator-runs/` worktree, never in the
 active checkout. The printed run-record path defaults to
 `$XDG_STATE_HOME/gator/` (or `~/.local/state/gator/`) and contains a
 metadata-only event journal, final result, a portable patch snapshot, and a
-private `0600` session file for `gator resume`. `gator resume --last` selects the newest retained thread
+private `0600` session file for `gator code resume`. `gator code resume --last` selects the newest retained thread
 for the current repository; `--all` expands selection to the local state root.
 The event log intentionally omits prompts, source text,
 tool arguments, tool output, and raw attachment bytes; the worktree is the

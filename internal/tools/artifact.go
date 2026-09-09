@@ -14,6 +14,16 @@ import (
 // is readable through source/...; output is independently readable through
 // output/.... Only the dedicated writer can change staged output.
 func WorkFiles(source, output workspace.Root, contract artifact.Contract, writable bool, previous ...workspace.Root) ([]agent.Tool, error) {
+	var previousRoot workspace.Root
+	if len(previous) > 0 {
+		previousRoot = previous[0]
+	}
+	return WorkFilesWithRendererEvidence(source, output, contract, writable, previousRoot, nil)
+}
+
+// WorkFilesWithRendererEvidence additionally reports trusted semantic writer
+// evidence to the Work manifest builder.
+func WorkFilesWithRendererEvidence(source, output workspace.Root, contract artifact.Contract, writable bool, previous workspace.Root, onRenderer func(artifact.RendererEvidence)) ([]agent.Tool, error) {
 	contract = contract.Normalize()
 	if err := contract.Validate(); err != nil {
 		return nil, fmt.Errorf("validate artifact contract: %w", err)
@@ -22,8 +32,8 @@ func WorkFiles(source, output workspace.Root, contract artifact.Contract, writab
 		{Name: "source", Root: source},
 		{Name: "output", Root: output},
 	}
-	if len(previous) > 0 && previous[0].Path() != "" {
-		named = append(named, workspace.NamedRoot{Name: "previous", Root: previous[0]})
+	if previous.Path() != "" {
+		named = append(named, workspace.NamedRoot{Name: "previous", Root: previous})
 	}
 	if _, err := workspace.NewNamedRootSet(output, nil, named); err != nil {
 		return nil, err
@@ -38,8 +48,8 @@ func WorkFiles(source, output workspace.Root, contract artifact.Contract, writab
 			WriteArtifact{Root: output, Contract: contract},
 			WriteJSONArtifact{Root: output, Contract: contract},
 			WriteTableArtifact{Root: output, Contract: contract},
-			WriteDocumentArtifact{Root: output, Source: source, Contract: contract},
-			WriteWorkbookArtifact{Root: output, Source: source, Contract: contract},
+			WriteDocumentArtifact{Root: output, Source: source, Contract: contract, OnRenderer: onRenderer},
+			WriteWorkbookArtifact{Root: output, Source: source, Contract: contract, OnRenderer: onRenderer},
 			ArtifactStatus{Root: output, Contract: contract},
 		)
 	}
