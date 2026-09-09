@@ -6,11 +6,13 @@
 package action
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 // Capability describes the kind of authority an operation consumes.
@@ -215,6 +217,80 @@ type Record struct {
 	Error    string   `json:"error,omitempty"`
 }
 
+// Decision is a one-shot human decision for one exact proposal. Decisions are
+// intentionally not reusable: Broker calls its approver for every proposal it
+// is asked to execute.
+type Decision string
+
+const (
+	Allow Decision = "allow"
+	Deny  Decision = "deny"
+)
+
+// Approver obtains a fresh decision for the proposal shown to the developer.
+// It must not receive or persist connector credentials.
+type Approver func(context.Context, Proposal) (Decision, error)
+
+// Broker enforces the contract disposition between a prepared external action
+// and its side effect. Preparation is safe to perform before this boundary;
+// execute must contain the first externally mutating operation.
+type Broker struct {
+	Approve Approver
+}
+
+// Resolve records a draft, denial, execution, or bounded execution failure.
+// Approval failures are returned because no developer decision was obtained.
+func (b Broker) Resolve(ctx context.Context, mode Mode, disposition Disposition, proposal Proposal, execute func(context.Context) error) (Record, error) {
+	if err := mode.Validate(); err != nil {
+		return Record{}, err
+	}
+	if err := disposition.Validate(); err != nil {
+		return Record{}, err
+	}
+	if err := proposal.Validate(); err != nil {
+		return Record{}, err
+	}
+	if !RequiresFreshApproval(proposal.Capability) {
+		return Record{}, errors.New("external action does not require fresh approval")
+	}
+	switch disposition {
+	case Forbid:
+		return Record{}, errors.New("outcome contract forbids external actions")
+	case Propose:
+		if mode == Inspect {
+			return Record{}, errors.New("inspect mode cannot propose external actions")
+		}
+		return Record{Proposal: proposal, Status: Pending}, nil
+	case Approve:
+		if mode != Act {
+			return Record{}, errors.New("external action execution requires act mode")
+		}
+		if b.Approve == nil {
+			return Record{}, errors.New("external action requires fresh developer approval")
+		}
+		decision, err := b.Approve(ctx, proposal)
+		if err != nil {
+			return Record{}, fmt.Errorf("request external action approval: %w", err)
+		}
+		switch decision {
+		case Deny:
+			return Record{Proposal: proposal, Status: Denied}, nil
+		case Allow:
+			if execute == nil {
+				return Record{}, errors.New("approved external action has no executor")
+			}
+			if err := execute(ctx); err != nil {
+				return Record{Proposal: proposal, Status: Failed, Error: boundedError(err)}, nil
+			}
+			return Record{Proposal: proposal, Status: Executed}, nil
+		default:
+			return Record{}, fmt.Errorf("unknown external action decision %q", decision)
+		}
+	default:
+		panic("validated external action disposition was not handled")
+	}
+}
+
 // Validate checks a durable action result without requiring access to the
 // connector payload that produced it.
 func (r Record) Validate() error {
@@ -234,4 +310,20 @@ func (r Record) Validate() error {
 		return fmt.Errorf("unknown action status %q", r.Status)
 	}
 	return nil
+}
+
+func boundedError(err error) string {
+	message := "external action failed"
+	if err != nil {
+		message = strings.TrimSpace(strings.ToValidUTF8(err.Error(), "�"))
+		message = strings.ReplaceAll(message, "\x00", "�")
+		if message == "" {
+			message = "external action failed"
+		}
+	}
+	for len(message) > 512 {
+		_, size := utf8.DecodeLastRuneInString(message)
+		message = message[:len(message)-size]
+	}
+	return message
 }
