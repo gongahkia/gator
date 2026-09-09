@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -157,6 +158,27 @@ func pathInside(parent, candidate string) bool {
 }
 
 func applyPatch(arguments []string, out io.Writer) error {
+	if options, eligible, err := parseWorkApplyOptions(arguments); err != nil {
+		return err
+	} else if eligible {
+		stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+		if err != nil {
+			return err
+		}
+		bundle, found, err := resolveWorkBundle(options.reference, stateDir)
+		if err != nil {
+			return err
+		}
+		if found {
+			if options.destination == "" {
+				return errors.New("applying a work bundle requires an explicit --to DIRECTORY")
+			}
+			return applyWorkBundle(out, bundle, options)
+		}
+		if options.destination != "" || options.replace || options.json {
+			return fmt.Errorf("work bundle %q was not found", options.reference)
+		}
+	}
 	flags := flag.NewFlagSet("apply", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	checkOnly := flags.Bool("check", false, "verify that the patch applies without modifying this checkout")
@@ -193,4 +215,94 @@ func applyPatch(arguments []string, out io.Writer) error {
 		_, err = fmt.Fprintf(out, "Applied retained patch to this checkout (%d bytes). Review and commit the resulting changes.\n", result.Bytes)
 	}
 	return err
+}
+
+type workApplyOptions struct {
+	reference   string
+	destination string
+	replace     bool
+	check       bool
+	json        bool
+}
+
+func parseWorkApplyOptions(arguments []string) (workApplyOptions, bool, error) {
+	options := workApplyOptions{}
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		switch {
+		case argument == "--replace":
+			options.replace = true
+		case argument == "--check":
+			options.check = true
+		case argument == "--json":
+			options.json = true
+		case strings.HasPrefix(argument, "--to="):
+			options.destination = strings.TrimSpace(strings.TrimPrefix(argument, "--to="))
+		case argument == "--to":
+			if index+1 >= len(arguments) {
+				return workApplyOptions{}, false, errors.New("--to requires a target directory")
+			}
+			index++
+			options.destination = strings.TrimSpace(arguments[index])
+		case strings.HasPrefix(argument, "-"):
+			return workApplyOptions{}, false, nil
+		default:
+			if options.reference != "" {
+				return workApplyOptions{}, false, nil
+			}
+			options.reference = argument
+		}
+	}
+	if options.destination == "" && (options.replace || options.json) {
+		return workApplyOptions{}, false, errors.New("--replace and --json require --to DIRECTORY for work apply")
+	}
+	return options, options.reference != "", nil
+}
+
+func applyWorkBundle(out io.Writer, bundle artifact.Bundle, options workApplyOptions) error {
+	var plan artifact.ApplyPlan
+	var applyErr error
+	if options.check {
+		plan, applyErr = artifact.PlanApply(bundle, options.destination, options.replace)
+		if applyErr == nil {
+			for _, operation := range plan.Operations {
+				if operation.Disposition == artifact.ApplyConflict {
+					applyErr = errors.New("apply preflight found conflicts; pass --replace only after reviewing them")
+					break
+				}
+			}
+		}
+	} else {
+		plan, applyErr = artifact.Apply(bundle, options.destination, options.replace)
+	}
+	if options.json {
+		type response struct {
+			Applied bool               `json:"applied"`
+			Plan    artifact.ApplyPlan `json:"plan"`
+			Error   string             `json:"error,omitempty"`
+		}
+		result := response{Applied: applyErr == nil && !options.check, Plan: plan}
+		if applyErr != nil {
+			result.Error = applyErr.Error()
+		}
+		if err := json.NewEncoder(out).Encode(result); err != nil {
+			return err
+		}
+		return applyErr
+	}
+	heading := "Apply preflight"
+	if !options.check && applyErr != nil {
+		heading = "Apply blocked"
+	} else if !options.check {
+		heading = "Applied verified work bundle"
+	}
+	if _, err := fmt.Fprintf(out, "%s\n  target: %s\n", heading, plan.Target); err != nil {
+		return err
+	}
+	for _, operation := range plan.Operations {
+		if _, err := fmt.Fprintf(out, "  %s %s\n", operation.Disposition, operation.Path); err != nil {
+			return err
+		}
+	}
+	return applyErr
 }

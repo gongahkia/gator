@@ -67,6 +67,7 @@ Usage:
   gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
   gator export WORK_BUNDLE [--to ARCHIVE] [--replace]
   gator export RUN_RECORD_PATH
+  gator apply WORK_BUNDLE --to DIRECTORY [--check] [--replace] [--json]
   gator apply [--check] RUN_RECORD_PATH
 
 Commands:

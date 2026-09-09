@@ -81,6 +81,34 @@ func TestExportCommandWritesVerifiedArchiveWithoutOverwriting(t *testing.T) {
 	}
 }
 
+func TestApplyCommandPreflightsConflictsAndRequiresReplace(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("GATOR_STATE_DIR", stateDir)
+	work := createCLIWorkBundle(t, stateDir, "apply-work")
+	target := t.TempDir()
+	targetFile := filepath.Join(target, "report.md")
+	if err := os.WriteFile(targetFile, []byte("keep me\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	err := applyPatch([]string{work.ID, "--to", target, "--check"}, &output)
+	if err == nil || !strings.Contains(output.String(), "conflict report.md") {
+		t.Fatalf("preflight output = %q, err=%v", output.String(), err)
+	}
+	contents, readErr := os.ReadFile(targetFile)
+	if readErr != nil || string(contents) != "keep me\n" {
+		t.Fatalf("check changed target = %q, %v", contents, readErr)
+	}
+	output.Reset()
+	if err := applyPatch([]string{work.ID, "--to", target, "--replace"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	contents, readErr = os.ReadFile(targetFile)
+	if readErr != nil || string(contents) != "# CLI report\n" {
+		t.Fatalf("applied target = %q, %v", contents, readErr)
+	}
+}
+
 func createCLIWorkBundle(t *testing.T, stateDir, id string) workspace.Work {
 	t.Helper()
 	source := t.TempDir()
