@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -153,6 +154,87 @@ func TestExecutorSealsExplicitConnectorProvenance(t *testing.T) {
 	}
 	if !strings.Contains(model.requests[0].System, "Explicitly selected connected sources: metrics") {
 		t.Fatalf("system prompt = %q", model.requests[0].System)
+	}
+}
+
+func TestExecutorSealsPendingExternalActionWithoutExecuting(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests.Add(1) }))
+	defer server.Close()
+	descriptor := connector.Descriptor{
+		Version: connector.DescriptorVersion, ID: "release", Name: "Release",
+		Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone,
+	}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "action-1", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"Release proposal ready."}`)}}},
+		{Text: "Created report.md and one pending release proposal."},
+	}}
+	contract := artifact.DefaultContract("report.md")
+	contract.ExternalActions = action.Propose
+	outcome, err := (Executor{
+		Model: model, StateDir: t.TempDir(), Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()},
+	}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Draft a release publication", RunID: "work-action-draft",
+		Mode: action.Draft, Contract: contract, ConnectorIDs: []string{descriptor.ID}, MaxSteps: 4,
+		ApproveAction: func(context.Context, action.Proposal) (action.Decision, error) {
+			t.Fatal("draft work requested action approval")
+			return action.Allow, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests.Load() != 0 || len(outcome.Manifest.Actions) != 1 || outcome.Manifest.Actions[0].Status != action.Pending {
+		t.Fatalf("requests=%d actions=%#v", requests.Load(), outcome.Manifest.Actions)
+	}
+}
+
+func TestExecutorExecutesExternalActionAfterApproval(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	descriptor := connector.Descriptor{
+		Version: connector.DescriptorVersion, ID: "release", Name: "Release",
+		Kind: connector.KindHTTPWebhook, Resource: server.URL, Authentication: connector.AuthNone,
+	}
+	registry, err := connector.NewRegistry([]connector.Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := &scriptedModel{turns: []agent.Turn{
+		{ToolCalls: []agent.ToolCall{{ID: "action-1", Name: "connector_release_publish", Arguments: json.RawMessage(`{"payload":{"version":"v1"}}`)}}},
+		{ToolCalls: []agent.ToolCall{{ID: "write-1", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"receipt.md","content":"Release action completed."}`)}}},
+		{Text: "Created receipt.md after the approved action executed."},
+	}}
+	contract := artifact.DefaultContract("receipt.md")
+	contract.ExternalActions = action.Approve
+	approvals := 0
+	outcome, err := (Executor{
+		Model: model, StateDir: t.TempDir(), Connectors: connector.Runtime{Registry: registry, HTTPClient: server.Client()},
+	}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Publish a release", RunID: "work-action-act",
+		Mode: action.Act, Contract: contract, ConnectorIDs: []string{descriptor.ID}, MaxSteps: 4,
+		ApproveAction: func(_ context.Context, proposal action.Proposal) (action.Decision, error) {
+			approvals++
+			if proposal.Target != server.URL {
+				t.Fatalf("approval target = %q", proposal.Target)
+			}
+			return action.Allow, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approvals != 1 || requests.Load() != 1 || len(outcome.Manifest.Actions) != 1 || outcome.Manifest.Actions[0].Status != action.Executed {
+		t.Fatalf("approvals=%d requests=%d actions=%#v", approvals, requests.Load(), outcome.Manifest.Actions)
 	}
 }
 

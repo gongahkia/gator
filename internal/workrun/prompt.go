@@ -14,6 +14,12 @@ func systemPrompt(request Request) string {
 	if request.Mode != action.Inspect {
 		modeRules = `Create finished deliverables with write_artifact, write_json_artifact, or write_table_artifact as appropriate. Prefer typed JSON/table writers for structured data. Before completing, call artifact_status and repair every failed validation. The host independently re-runs the outcome contract, so never claim completion based only on your own prose.`
 	}
+	if request.Contract.ExternalActions == action.Propose {
+		modeRules += ` Selected connected actions may create reviewable proposals, but the host will not execute them. Describe every pending proposal accurately.`
+	}
+	if request.Contract.ExternalActions == action.Approve {
+		modeRules += ` Selected connected actions pause for a fresh developer approval bound to the exact target and JSON payload. Never claim an action succeeded unless its tool result says executed; an unknown outcome must be reconciled before retrying.`
+	}
 	parts := []string{
 		`You are Gator Work, a terminal-native agent for producing reviewable work from local source material.`,
 		`Workspace boundaries:
