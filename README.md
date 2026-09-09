@@ -70,8 +70,8 @@ credential store, then the provider environment variable.
 The initial screen contains only the `🐊 Gator` wordmark and centered composer.
 Typing docks the composer below the conversation. `Ctrl+P` opens a searchable
 universal palette containing the slash-command surface. Navigation is separate:
-`Ctrl+X L` opens retained conversations, `Ctrl+X I` opens the inbox, and
-`Ctrl+X J` opens scheduled jobs.
+`Ctrl+X` opens retained conversations, `Ctrl+I` opens the inbox, and `Ctrl+J`
+opens scheduled jobs. Terminals encode `Ctrl+I` and Tab as the same key.
 
 Useful local commands are:
 

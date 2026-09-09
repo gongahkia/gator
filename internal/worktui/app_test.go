@@ -81,7 +81,7 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
 	}
-	if !strings.Contains(view, "ctrl+p commands") || !strings.Contains(view, "ctrl+x  l conversations") || !strings.Contains(view, "i inbox") || !strings.Contains(view, "j jobs") {
+	if !strings.Contains(view, "ctrl+p commands") || !strings.Contains(view, "ctrl+x conversations") || !strings.Contains(view, "ctrl+i inbox") || !strings.Contains(view, "ctrl+j jobs") {
 		t.Fatalf("initial view omits direct navigation: %q", view)
 	}
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -169,7 +169,7 @@ func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
 	}
 }
 
-func TestLeaderShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
+func TestDirectShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 	model := New(Config{
 		CurrentFolder: "/work",
 		Conversations: []worksession.Conversation{{ID: "work-one", Title: "Quarterly plan", SourcePath: "/source"}},
@@ -178,19 +178,16 @@ func TestLeaderShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 		updated, _ := model.Update(key)
 		model = updated.(Model)
 	}
-	press(tea.KeyMsg{Type: tea.KeyCtrlX})
-	press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	press(tea.KeyMsg{Type: tea.KeyCtrlI})
 	if model.section != "inbox" || !strings.Contains(model.View(), "Inbox") || model.launcher {
 		t.Fatalf("inbox shortcut state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyEsc})
-	press(tea.KeyMsg{Type: tea.KeyCtrlX})
-	press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	press(tea.KeyMsg{Type: tea.KeyCtrlJ})
 	if model.section != "jobs" || !strings.Contains(model.View(), "Scheduled jobs") {
 		t.Fatalf("jobs shortcut state = %#v", model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlX})
-	press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	if !model.launcher || model.launcherMode != "conversations" || !strings.Contains(model.View(), "Quarterly plan") {
 		t.Fatalf("conversation shortcut state = %#v", model)
 	}
