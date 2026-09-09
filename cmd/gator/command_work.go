@@ -16,10 +16,13 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	gatorbrowser "github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/journal"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -78,6 +81,8 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	modeName := flags.String("mode", string(action.Draft), "work mode: inspect, draft, or act")
 	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
+	codeMaxSteps := flags.Int("code-max-steps", 0, "maximum internal Code specialist turns")
+	requireCode := flags.Bool("require-code", false, "require an internal Code specialist patch")
 	runID := flags.String("run-id", "", "stable run identifier")
 	conversationID := flags.String("conversation", "", "continue a retained Work conversation")
 	parentRevisionID := flags.String("parent", "", "branch from a retained Work revision")
@@ -89,8 +94,33 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	flags.Var(&contains, "require-contains", "required literal as ARTIFACT=TEXT (repeatable)")
 	var selectedConnectors connectorFlags
 	flags.Var(&selectedConnectors, "connector", "configured connected source ID (repeatable)")
+	var imagePaths attachmentFlags
+	flags.Var(&imagePaths, "image", "source-relative PNG, JPEG, or WebP image to include in the initial prompt (repeatable)")
+	var documentPaths attachmentFlags
+	flags.Var(&documentPaths, "attach", "source-relative PDF or supported document/text file to include in the initial prompt (repeatable)")
+	var codeVerification verificationFlags
+	flags.Var(&codeVerification, "verify", "Code specialist verification argv (repeatable)")
+	var codeScopes stringFlags
+	flags.Var(&codeScopes, "scope", "Code specialist project-instruction scope (repeatable)")
+	codeProfile := flags.String("profile", "", "Code specialist project profile")
+	var codeSetup verificationFlags
+	flags.Var(&codeSetup, "setup", "Code specialist worktree setup argv (repeatable)")
+	var codeAllowed verificationFlags
+	flags.Var(&codeAllowed, "allow-command", "pre-approve an exact Code specialist argv (repeatable)")
+	var codePrefixes verificationFlags
+	flags.Var(&codePrefixes, "allow-command-prefix", "pre-approve a literal Code specialist argv prefix (repeatable)")
+	codeSandbox := flags.String("sandbox", string(sandbox.Strict), "Code specialist sandbox: strict or off")
+	codeNetwork := flags.String("network", string(sandbox.DenyNetwork), "Code specialist network: deny or allow")
+	var codeCapabilities stringFlags
+	flags.Var(&codeCapabilities, "code-capability", "explicit Code grant: lsp, mcp, extension, http, browser, or terminal")
+	codeBrowserSession := flags.String("browser-session", "", "explicit browser session granted to the Code specialist")
+	legacyBase := flags.String("base", "", "removed Code worktree base override")
+	legacyCopyIgnored := flags.Bool("copy-ignored", false, "removed Code ignored-file copy mode")
 	if err := flags.Parse(arguments); err != nil {
 		return err
+	}
+	if strings.TrimSpace(*legacyBase) != "" || *legacyCopyIgnored {
+		return errors.New("--base and --copy-ignored belonged to the standalone Code frontend; Gator now delegates against its immutable source snapshot")
 	}
 	objective, err := workObjective(flags.Args(), in)
 	if err != nil {
@@ -131,6 +161,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 		*sourcePath = conversation.SourcePath
 	}
+	images, attachments, err := loadPromptAttachments(*sourcePath, imagePaths, documentPaths)
+	if err != nil {
+		return err
+	}
 	settings, err := loadSettings()
 	if err != nil {
 		return err
@@ -147,6 +181,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		if _, err := fmt.Fprintf(out, "Gator Work\n  provider: %s\n  model: %s\n  mode: %s\n  external actions: %s\n  source: %s\n  connectors: %s\n  objective: %s\n", resolvedProvider, displayModel(resolvedModel), mode, disposition, *sourcePath, valueOrDash(strings.Join(selectedConnectors, ", ")), objective); err != nil {
 			return err
 		}
+		if err := writePromptAttachmentSummary(out, images, attachments); err != nil {
+			return err
+		}
 	}
 	var sink agent.EventSink
 	var snapshotSink func(snapshot.Manifest)
@@ -159,7 +196,34 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
 	if native, ok := backend.(*nativeWorkBackend); ok {
+		if strings.TrimSpace(*codeBrowserSession) != "" {
+			if sandbox.Network(*codeNetwork) != sandbox.AllowNetwork {
+				return errors.New("--browser-session requires --network allow for the internal Code specialist")
+			}
+			if !containsString(codeCapabilities, workrun.CodeCapabilityBrowser) {
+				return errors.New("--browser-session requires --code-capability browser")
+			}
+			store, err := gatorbrowser.Open(stateDir)
+			if err != nil {
+				return err
+			}
+			client, err := gatorbrowser.NewClient(store, *codeBrowserSession)
+			if err != nil {
+				return err
+			}
+			session, err := client.Session(context.Background(), *codeBrowserSession)
+			if err != nil {
+				return err
+			}
+			if len(session.SelectedTabs) == 0 {
+				return errors.New("--browser-session has no developer-selected tabs")
+			}
+			native.code.Browser = client
+		}
 		executor.Code = native.codeDelegate(stateDir)
+	}
+	if len(codeVerification) == 0 {
+		codeVerification = parseSuggestedVerification(suggestedVerificationCommands(*sourcePath))
 	}
 	var approve action.Approver
 	var approveRead func(context.Context, string, string, json.RawMessage) (bool, error)
@@ -184,6 +248,16 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ConnectorPermissions: connector.PermissionSet(settings.ConnectorPermissions),
 		SnapshotOptions:      snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes},
 		OnSnapshot:           snapshotSink,
+		Images:               images,
+		Attachments:          attachments,
+		RequireCode:          *requireCode,
+		Code: workrun.CodePolicy{
+			MaxSteps: *codeMaxSteps, Verification: codeVerification, Scopes: codeScopes, Profile: strings.TrimSpace(*codeProfile),
+			Setup: codeSetup, AllowedCommands: codeAllowed, AllowedCommandPrefixes: codePrefixes,
+			Sandbox: sandbox.Policy{Mode: sandbox.Mode(*codeSandbox), Network: sandbox.Network(*codeNetwork)},
+			Capabilities: append([]string(nil), codeCapabilities...), BrowserSession: strings.TrimSpace(*codeBrowserSession),
+		},
+		ApproveCodeCommand: codeCommandApprover(*jsonOutput, in, out),
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
@@ -417,6 +491,46 @@ func readApprovalLine(in io.Reader) (string, error) {
 		}
 	}
 	return line.String(), errors.New("approval response is too long")
+}
+
+func codeCommandApprover(jsonOutput bool, in io.Reader, out io.Writer) func(context.Context, []string) (tools.CommandDecision, error) {
+	if jsonOutput {
+		return nil
+	}
+	return func(ctx context.Context, argv []string) (tools.CommandDecision, error) {
+		select {
+		case <-ctx.Done():
+			return tools.CommandDeny, ctx.Err()
+		default:
+		}
+		if _, err := fmt.Fprintf(out, "\nInternal Code command approval\n  argv: %s\nAllow this command? [y once/a always/N] ", strings.Join(argv, " ")); err != nil {
+			return tools.CommandDeny, err
+		}
+		line, err := readApprovalLine(in)
+		if errors.Is(err, io.EOF) && line == "" {
+			return tools.CommandDeny, nil
+		}
+		if err != nil && !(errors.Is(err, io.EOF) && line != "") {
+			return tools.CommandDeny, err
+		}
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes":
+			return tools.CommandAllowOnce, nil
+		case "a", "always":
+			return tools.CommandAllowAlways, nil
+		default:
+			return tools.CommandDeny, nil
+		}
+	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 type artifactFlags []string

@@ -19,7 +19,7 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
-const maxCodeSubagentSteps = 16
+const maxCodeSubagentSteps = 32
 
 func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 	return func(ctx context.Context, request workrun.CodeRequest) (workrun.CodeResult, error) {
@@ -27,13 +27,28 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		if err != nil {
 			return workrun.CodeResult{}, err
 		}
-		steps := request.MaxSteps
+		steps := request.Policy.MaxSteps
+		if steps <= 0 {
+			steps = request.MaxSteps
+		}
 		if steps <= 0 || steps > maxCodeSubagentSteps {
 			steps = maxCodeSubagentSteps
 		}
 		digest := sha256.Sum256([]byte(request.ParentRunID + "\x00" + request.ID))
 		runID := "code-" + hex.EncodeToString(digest[:8])
 		code := b.code
+		code.Sandbox = request.Policy.Sandbox.Normalize()
+		verification := mergeCodeVerification(request.Policy.Verification)
+		omitted := []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
+		for capability, omit := range map[string]string{
+			workrun.CodeCapabilityLSP: instructions.OmitLSP, workrun.CodeCapabilityMCP: instructions.OmitMCP,
+			workrun.CodeCapabilityExtension: instructions.OmitExtension, workrun.CodeCapabilityHTTP: instructions.OmitHTTP,
+			workrun.CodeCapabilityBrowser: instructions.OmitBrowser, workrun.CodeCapabilityTerminal: instructions.OmitTerminal,
+		} {
+			if !request.Policy.HasCapability(capability) {
+				omitted = append(omitted, omit)
+			}
+		}
 		outcome, runErr := code.Execute(ctx, gatorrun.Request{
 			RepositoryPath:          repository,
 			Task:                    request.Task,
@@ -44,18 +59,20 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			ThreadID:                runID,
 			StateDir:                stateDir,
 			MaxSteps:                steps,
-			Verification:            [][]string{{"git", "diff", "--check"}},
+			Verification:            verification,
+			Scopes:                  append([]string(nil), request.Policy.Scopes...),
+			Profile:                 request.Policy.Profile,
+			Setup:                   cloneCodeCommands(request.Policy.Setup),
+			AllowedCommands:         cloneCodeCommands(request.Policy.AllowedCommands),
+			AllowedCommandPrefixes: cloneCodeCommands(request.Policy.AllowedCommandPrefixes),
+			Approve:                 request.Approve,
+			BrowserSession:          request.Policy.BrowserSession,
 			Mode:                    gatorrun.ExecuteMode,
 			DisableWriterDelegation: true,
 			RolePolicy: instructions.ProfilePolicy{
-				Sandbox: "strict", Network: "deny", MaxSteps: steps,
-				Omit: []string{
-					instructions.OmitLSP, instructions.OmitMCP, instructions.OmitExtension,
-					instructions.OmitHTTP, instructions.OmitBrowser, instructions.OmitTerminal,
-					instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly,
-				},
+				MaxSteps: steps, Omit: omitted,
 			},
-			System: `You are the Gator Code specialist called by Gator Work. Implement only the bounded coding assignment against an isolated checkout of the parent's frozen source snapshot. The user-facing manager receives your summary and patch, not your full context. Do not broaden the task, access live source, use network services, or claim the patch was applied. Inspect the final diff and report exact changed paths and verification evidence.`,
+			System: `You are the internal Gator Code specialist called by the user-facing Gator manager. Implement only the bounded coding assignment against an isolated checkout of the parent's frozen source snapshot. The manager receives your summary and patch, not your full context. Never broaden the task, access live source, or claim the patch was applied. Use only capabilities explicitly present in this delegation and report exact changed paths and verification evidence.`,
 		})
 		result := workrun.CodeResult{Summary: strings.TrimSpace(outcome.Result.FinalText), Steps: outcome.Result.Steps}
 		if outcome.Worktree.Path != "" {
@@ -75,6 +92,28 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		}
 		return result, nil
 	}
+}
+
+func mergeCodeVerification(configured [][]string) [][]string {
+	result := [][]string{{"git", "diff", "--check"}}
+	seen := map[string]struct{}{strings.Join(result[0], "\x00"): {}}
+	for _, command := range configured {
+		key := strings.Join(command, "\x00")
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, append([]string(nil), command...))
+	}
+	return result
+}
+
+func cloneCodeCommands(commands [][]string) [][]string {
+	result := make([][]string, 0, len(commands))
+	for _, command := range commands {
+		result = append(result, append([]string(nil), command...))
+	}
+	return result
 }
 
 func prepareCodeSnapshotRepository(ctx context.Context, source, scratch, id string) (string, error) {

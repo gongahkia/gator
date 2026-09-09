@@ -259,14 +259,15 @@ func unifiedResume(arguments []string, out io.Writer) error {
 		return err
 	}
 	store, err := worksession.Open(stateDir)
-	if err == nil {
-		if _, loadErr := store.Load(arguments[0]); loadErr == nil {
-			if len(arguments) == 1 {
-				return workInteractiveConversation(arguments[0])
-			}
-			forwarded := append([]string{"resume", arguments[0]}, arguments[1:]...)
-			return workSessionCommand(forwarded, os.Stdin, out, nativeWorkModel)
-		}
+	if err != nil {
+		return err
 	}
-	return resumeTask(arguments, out)
+	if _, err := store.Load(arguments[0]); err != nil {
+		return fmt.Errorf("load Gator conversation %q: %w", arguments[0], err)
+	}
+	if len(arguments) == 1 {
+		return workInteractiveConversation(arguments[0])
+	}
+	forwarded := append([]string{"resume", arguments[0]}, arguments[1:]...)
+	return workSessionCommand(forwarded, os.Stdin, out, nativeWorkModel)
 }
