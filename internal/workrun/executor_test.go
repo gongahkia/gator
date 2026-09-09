@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/sandbox"
 )
 
 func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
@@ -78,13 +79,17 @@ func TestExecutorDelegatesCodeAgainstFrozenSourceAndSealsPatchEvidence(t *testin
 		},
 	}).Execute(context.Background(), Request{
 		SourcePath: source, Objective: "Prepare a report and implement a greeting", RunID: "work-code-specialist",
-		Contract: artifact.DefaultContract("report.md"), MaxSteps: 5,
+		Contract: artifact.DefaultContract("report.md"), MaxSteps: 5, RequireCode: true,
+		Code: CodePolicy{MaxSteps: 9, Verification: [][]string{{"go", "test", "./..."}}, Scopes: []string{"internal/greeting"}, Profile: "implementer", Sandbox: sandbox.DefaultPolicy(), Capabilities: []string{CodeCapabilityLSP}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if delegated.ID != "subagent-001" || delegated.SourcePath == source || delegated.ParentRunID != "work-code-specialist" {
 		t.Fatalf("delegated request = %#v", delegated)
+	}
+	if delegated.Policy.MaxSteps != 9 || delegated.Policy.Profile != "implementer" || len(delegated.Policy.Verification) != 1 || !delegated.Policy.HasCapability(CodeCapabilityLSP) {
+		t.Fatalf("delegated Code policy = %#v", delegated.Policy)
 	}
 	if len(outcome.Manifest.Subagents) != 1 {
 		t.Fatalf("subagent evidence = %#v", outcome.Manifest.Subagents)
@@ -100,6 +105,21 @@ func TestExecutorDelegatesCodeAgainstFrozenSourceAndSealsPatchEvidence(t *testin
 	original, err := os.ReadFile(filepath.Join(source, "main.go"))
 	if err != nil || string(original) != "package main\n" {
 		t.Fatalf("live source changed: %q, %v", original, err)
+	}
+}
+
+func TestExecutorPassesPromptAttachmentsOnlyToTheUserFacingManager(t *testing.T) {
+	model := &scriptedModel{turns: []agent.Turn{{Text: "Inspected the supplied image."}}}
+	_, err := (Executor{Model: model, StateDir: t.TempDir()}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Inspect the screenshot", RunID: "work-attachment", Mode: action.Inspect,
+		Contract: artifact.InspectionContract(), MaxSteps: 1,
+		Images: []agent.Image{{Name: "screen.png", MediaType: "image/png", Data: []byte("png")}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(model.requests) != 1 || len(model.requests[0].Messages) != 1 || len(model.requests[0].Messages[0].Images) != 1 {
+		t.Fatalf("manager request = %#v", model.requests)
 	}
 }
 
@@ -186,6 +206,23 @@ func TestExecutorRejectsModeContractEscalationBeforeCreatingWorkspace(t *testing
 	})
 	if err == nil || !strings.Contains(err.Error(), "draft mode") {
 		t.Fatalf("escalation error = %v", err)
+	}
+}
+
+func TestExecutorRejectsUnownedCodeCapabilityEscalation(t *testing.T) {
+	base := Request{SourcePath: t.TempDir(), Objective: "Prepare work", Contract: artifact.DefaultContract("report.md"), MaxSteps: 1}
+	for name, policy := range map[string]CodePolicy{
+		"unknown capability": {Capabilities: []string{"host-admin"}},
+		"browser without grant": {BrowserSession: "browser-one"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			request := base
+			request.Code = policy
+			_, err := (Executor{Model: &scriptedModel{}, StateDir: t.TempDir()}).Execute(context.Background(), request)
+			if err == nil {
+				t.Fatalf("policy was accepted: %#v", policy)
+			}
+		})
 	}
 }
 

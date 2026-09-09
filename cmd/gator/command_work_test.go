@@ -63,6 +63,39 @@ func TestWorkCommandReadsObjectiveFromStdinAndEmitsJSON(t *testing.T) {
 	}
 }
 
+func TestWorkCommandSendsExplicitAttachmentsToTheMainManager(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	source := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "brief.txt"), []byte("private reference"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	model := &workScriptedModel{turns: []agent.Turn{{Text: "Inspected the attachment."}}}
+	var output bytes.Buffer
+	if err := runWorkTask([]string{"--source", source, "--mode", "inspect", "--attach", "brief.txt", "inspect"}, strings.NewReader(""), &output, func(_, _, _ string) (agent.Model, error) {
+		return model, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(model.requests) != 1 || len(model.requests[0].Messages) != 1 || len(model.requests[0].Messages[0].Attachments) != 1 || !strings.Contains(output.String(), "brief.txt") {
+		t.Fatalf("request=%#v output=%q", model.requests, output.String())
+	}
+}
+
+func TestWorkCommandRejectsRetiredStandaloneSnapshotControls(t *testing.T) {
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("GATOR_PROVIDER", "openai")
+	t.Setenv("GATOR_MODEL", "test-model")
+	err := runWorkTask([]string{"--source", t.TempDir(), "--base", "main", "task"}, strings.NewReader(""), &bytes.Buffer{}, func(_, _, _ string) (agent.Model, error) {
+		t.Fatal("model factory called for retired standalone option")
+		return nil, nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "immutable source snapshot") {
+		t.Fatalf("retired option error = %v", err)
+	}
+}
+
 func TestInspectCommandForcesInspectionMode(t *testing.T) {
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
 	t.Setenv("GATOR_PROVIDER", "openai")
