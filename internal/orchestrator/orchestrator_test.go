@@ -16,6 +16,8 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 	var active, maximum atomic.Int32
 	var records []Record
 	var events []agent.Event
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
 	specialist := Specialist{Name: "research", Description: "inspect one bounded question", Run: func(_ context.Context, invocation Invocation) (Result, error) {
 		current := active.Add(1)
 		defer active.Add(-1)
@@ -25,6 +27,8 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 				break
 			}
 		}
+		started <- struct{}{}
+		<-release
 		return Result{Summary: "found " + invocation.Task, Steps: 2}, nil
 	}}
 	tools, err := Tools([]Specialist{specialist}, Options{
@@ -35,15 +39,28 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := tools[0].Execute(context.Background(), json.RawMessage(`{"tasks":[{"agent":"research","task":"alpha"},{"agent":"research","task":"beta"}]}`))
+	type execution struct {
+		result agent.ToolResult
+		err    error
+	}
+	done := make(chan execution, 1)
+	go func() {
+		result, executeErr := tools[0].Execute(context.Background(), json.RawMessage(`{"tasks":[{"agent":"research","task":"alpha"},{"agent":"research","task":"beta"}]}`))
+		done <- execution{result: result, err: executeErr}
+	}()
+	<-started
+	<-started
+	close(release)
+	executed := <-done
+	result, err := executed.result, executed.err
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(result.Content, "found alpha") || len(records) != 2 || records[0].TaskSHA256 == "" || records[0].OutputSHA256 == "" || len(events) != 2 {
 		t.Fatalf("result=%s records=%#v events=%#v", result.Content, records, events)
 	}
-	if maximum.Load() < 1 {
-		t.Fatal("specialists did not execute")
+	if maximum.Load() != 2 {
+		t.Fatalf("maximum concurrent specialists = %d", maximum.Load())
 	}
 }
 
@@ -69,6 +86,18 @@ func TestLLMSpecialistStartsWithFreshContext(t *testing.T) {
 	result, err := specialist.Run(context.Background(), Invocation{ID: "subagent-001", Task: "inspect this"})
 	if err != nil || result.Summary != "fresh" || len(model.request.Messages) != 1 || model.request.Messages[0].Content != "inspect this" {
 		t.Fatalf("result=%#v err=%v request=%#v", result, err, model.request)
+	}
+}
+
+func TestDelegationRejectsTrailingJSON(t *testing.T) {
+	tools, err := Tools([]Specialist{{Name: "research", Description: "read", Run: func(context.Context, Invocation) (Result, error) {
+		return Result{Summary: "unused"}, nil
+	}}}, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tools[0].Execute(context.Background(), json.RawMessage(`{"tasks":[{"agent":"research","task":"one"}]} {"extra":true}`)); err == nil || !strings.Contains(err.Error(), "multiple JSON values") {
+		t.Fatalf("trailing JSON error = %v", err)
 	}
 }
 
