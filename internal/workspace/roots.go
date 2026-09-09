@@ -3,7 +3,9 @@ package workspace
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -25,6 +27,16 @@ type RootSet struct {
 type NamedRoot struct {
 	Name string
 	Root Root
+}
+
+// FileRef is one regular file discovered through a descriptor-rooted walk.
+// Relative is suitable for Root.ReadRegularFile; Path is the stable path to
+// show a model or developer.
+type FileRef struct {
+	Root     Root
+	Relative string
+	Path     string
+	Size     int64
 }
 
 // NewRootSet creates a stable boundary around a primary workspace and already
@@ -155,6 +167,77 @@ func (r RootSet) ResolveFile(path string) (string, error) {
 	return root.ResolveFile(relative)
 }
 
+// ReadRegularFile reads through the selected descriptor-rooted workspace and
+// returns the stable display path. It avoids reopening a previously resolved
+// host path, closing a symlink replacement race in file-oriented tools.
+func (r RootSet) ReadRegularFile(value string, maxBytes int64) ([]byte, string, error) {
+	root, relative, display, err := r.selectFile(value)
+	if err != nil {
+		return nil, "", err
+	}
+	contents, err := root.ReadRegularFile(relative, maxBytes)
+	if err != nil {
+		return nil, "", err
+	}
+	return contents, display, nil
+}
+
+// WalkRegularFiles traverses one selected workspace directory without
+// following symlinks. All opens remain rooted beneath the selected descriptor.
+func (r RootSet) WalkRegularFiles(value string, skipDirectory func(string) bool, visit func(FileRef) error) error {
+	if visit == nil {
+		return errors.New("workspace file visitor is required")
+	}
+	root, relative, prefix, err := r.selectDirectory(value)
+	if err != nil {
+		return err
+	}
+	descriptor, err := os.OpenRoot(root.Path())
+	if err != nil {
+		return fmt.Errorf("open workspace root: %w", err)
+	}
+	defer descriptor.Close()
+	directory, err := descriptor.OpenRoot(relative)
+	if err != nil {
+		return fmt.Errorf("open workspace directory %q: %w", value, err)
+	}
+	defer directory.Close()
+	err = fs.WalkDir(directory.FS(), ".", func(current string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			if current != "." && skipDirectory != nil && skipDirectory(entry.Name()) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		fullRelative := path.Join(filepath.ToSlash(relative), current)
+		if relative == "." {
+			fullRelative = current
+		}
+		display := fullRelative
+		if prefix != "" {
+			display = path.Join(prefix, fullRelative)
+		}
+		return visit(FileRef{Root: root, Relative: filepath.FromSlash(fullRelative), Path: display, Size: info.Size()})
+	})
+	if errors.Is(err, fs.SkipAll) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("walk workspace files: %w", err)
+	}
+	return nil
+}
+
 // ResolveDirectory resolves a list/search directory. An empty path denotes
 // the primary workspace; an additional root itself may be named absolutely.
 func (r RootSet) ResolveDirectory(path string) (string, error) {
@@ -228,6 +311,54 @@ func (r RootSet) namedFor(value string) (Root, string, bool) {
 		}
 	}
 	return Root{}, "", false
+}
+
+func (r RootSet) selectFile(value string) (Root, string, string, error) {
+	if !filepath.IsAbs(value) {
+		if root, relative, found := r.namedFor(value); found {
+			if relative == "." {
+				return Root{}, "", "", fmt.Errorf("named workspace path %q identifies a directory, not a file", value)
+			}
+			clean := filepath.Clean(value)
+			return root, relative, filepath.ToSlash(clean), nil
+		}
+		clean, err := cleanRelativePath(value)
+		if err != nil {
+			return Root{}, "", "", err
+		}
+		return r.primary, clean, filepath.ToSlash(clean), nil
+	}
+	root, relative, found := r.additionalFor(value, false)
+	if !found || relative == "." {
+		return Root{}, "", "", fmt.Errorf("absolute path %q is outside the read-only workspace roots", value)
+	}
+	display := filepath.Join(root.Path(), relative)
+	return root, relative, display, nil
+}
+
+func (r RootSet) selectDirectory(value string) (Root, string, string, error) {
+	if value == "" || value == "." {
+		return r.primary, ".", "", nil
+	}
+	if !filepath.IsAbs(value) {
+		if root, relative, found := r.namedFor(value); found {
+			prefix := filepath.ToSlash(filepath.Clean(value))
+			if relative != "." {
+				prefix = strings.TrimSuffix(prefix, "/"+filepath.ToSlash(relative))
+			}
+			return root, relative, prefix, nil
+		}
+		clean, err := cleanRelativePath(value)
+		if err != nil {
+			return Root{}, "", "", err
+		}
+		return r.primary, clean, "", nil
+	}
+	root, relative, found := r.additionalFor(value, false)
+	if !found {
+		return Root{}, "", "", fmt.Errorf("absolute path %q is outside the read-only workspace roots", value)
+	}
+	return root, relative, filepath.ToSlash(root.Path()), nil
 }
 
 func validRootName(value string) bool {

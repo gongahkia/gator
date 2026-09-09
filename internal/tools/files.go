@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -54,22 +52,8 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	path, err := roots.ResolveFile(arguments.Path)
-	if err != nil {
-		return agent.ToolResult{}, err
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return agent.ToolResult{}, fmt.Errorf("stat %q: %w", arguments.Path, err)
-	}
-	if !info.Mode().IsRegular() {
-		return agent.ToolResult{}, fmt.Errorf("path %q is not a regular file", arguments.Path)
-	}
 	maxBytes := positiveOr(t.MaxBytes, defaultMaxReadBytes)
-	if info.Size() > int64(maxBytes*16) {
-		return agent.ToolResult{}, fmt.Errorf("file %q is too large to read safely", arguments.Path)
-	}
-	contents, err := os.ReadFile(path)
+	contents, displayPath, err := roots.ReadRegularFile(arguments.Path, int64(maxBytes)*16)
 	if err != nil {
 		return agent.ToolResult{}, fmt.Errorf("read %q: %w", arguments.Path, err)
 	}
@@ -110,7 +94,7 @@ func (t ReadFile) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRes
 		Content   string `json:"content"`
 		Truncated bool   `json:"truncated"`
 	}{
-		Path:      roots.DisplayPath(path),
+		Path:      displayPath,
 		StartLine: start,
 		EndLine:   end,
 		Content:   selected,
@@ -150,12 +134,8 @@ func (t ListFiles) Execute(_ context.Context, raw json.RawMessage) (agent.ToolRe
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	directory, err := resolveDirectory(roots, arguments.Path)
-	if err != nil {
-		return agent.ToolResult{}, err
-	}
 	maxResults := boundedResultLimit(arguments.MaxResults, t.MaxResults)
-	files, truncated, err := walkFiles(roots, directory, maxResults, func(_ string, _ fs.DirEntry) bool { return true })
+	files, truncated, err := walkFiles(roots, arguments.Path, maxResults, func(_ workspace.FileRef) bool { return true })
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
@@ -201,10 +181,6 @@ func (t SearchFiles) Execute(_ context.Context, raw json.RawMessage) (agent.Tool
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	directory, err := resolveDirectory(roots, arguments.Path)
-	if err != nil {
-		return agent.ToolResult{}, err
-	}
 	maxResults := boundedResultLimit(arguments.MaxResults, t.MaxResults)
 	type match struct {
 		Path string `json:"path"`
@@ -213,24 +189,11 @@ func (t SearchFiles) Execute(_ context.Context, raw json.RawMessage) (agent.Tool
 	}
 	matches := make([]match, 0)
 	truncated := false
-	err = filepath.WalkDir(directory, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			if path != directory && ignoredDirectory(entry.Name()) {
-				return filepath.SkipDir
-			}
+	err = roots.WalkRegularFiles(arguments.Path, ignoredDirectory, func(file workspace.FileRef) error {
+		if file.Size > maxSearchFileBytes {
 			return nil
 		}
-		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil || info.Size() > maxSearchFileBytes {
-			return nil
-		}
-		contents, err := os.ReadFile(path)
+		contents, err := file.Root.ReadRegularFile(file.Relative, maxSearchFileBytes)
 		if err != nil || !utf8.Valid(contents) || bytesContainNUL(contents) {
 			return nil
 		}
@@ -238,7 +201,7 @@ func (t SearchFiles) Execute(_ context.Context, raw json.RawMessage) (agent.Tool
 			if !strings.Contains(line, arguments.Query) {
 				continue
 			}
-			matches = append(matches, match{Path: roots.DisplayPath(path), Line: index + 1, Text: line})
+			matches = append(matches, match{Path: file.Path, Line: index + 1, Text: line})
 			if len(matches) >= maxResults {
 				truncated = true
 				return fs.SkipAll
@@ -263,43 +226,16 @@ func schema(value string) json.RawMessage {
 	return json.RawMessage(value)
 }
 
-func resolveDirectory(roots workspace.RootSet, path string) (string, error) {
-	directory, err := roots.ResolveDirectory(path)
-	if err != nil {
-		return "", err
-	}
-	info, err := os.Stat(directory)
-	if err != nil {
-		return "", fmt.Errorf("stat directory %q: %w", path, err)
-	}
-	if !info.IsDir() {
-		return "", fmt.Errorf("path %q is not a directory", path)
-	}
-	return directory, nil
-}
-
-func walkFiles(roots workspace.RootSet, directory string, maxResults int, keep func(string, fs.DirEntry) bool) ([]string, bool, error) {
+func walkFiles(roots workspace.RootSet, directory string, maxResults int, keep func(workspace.FileRef) bool) ([]string, bool, error) {
 	var files []string
 	truncated := false
-	err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			if path != directory && ignoredDirectory(entry.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
-			return nil
-		}
+	err := roots.WalkRegularFiles(directory, ignoredDirectory, func(file workspace.FileRef) error {
 		if len(files) >= maxResults {
 			truncated = true
 			return fs.SkipAll
 		}
-		if keep(path, entry) {
-			files = append(files, roots.DisplayPath(path))
+		if keep(file) {
+			files = append(files, file.Path)
 		}
 		return nil
 	})

@@ -142,6 +142,34 @@ func TestNamedRootSetRejectsAmbiguousNames(t *testing.T) {
 	}
 }
 
+func TestRootSetDescriptorWalkSkipsOutsideSymlinks(t *testing.T) {
+	primaryPath := t.TempDir()
+	externalPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(primaryPath, "inside.txt"), []byte("inside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(externalPath, "secret.txt"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(externalPath, filepath.Join(primaryPath, "outside")); err != nil {
+		t.Fatal(err)
+	}
+	root, err := Open(primaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	if err := NewRootSet(root, nil).WalkRegularFiles(".", nil, func(file FileRef) error {
+		paths = append(paths, file.Path)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || paths[0] != "inside.txt" {
+		t.Fatalf("walked paths = %#v", paths)
+	}
+}
+
 func TestRootRejectsSymlinkOutsideWorkspace(t *testing.T) {
 	directory := t.TempDir()
 	external := t.TempDir()
