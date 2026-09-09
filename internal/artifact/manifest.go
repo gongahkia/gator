@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,6 +14,8 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/connector"
 )
+
+var specialistNamePattern = regexp.MustCompile(`\A[a-z][a-z0-9_]{0,63}\z`)
 
 // Status is the terminal state represented by a sealed artifact manifest.
 type Status string

@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worksession"
@@ -140,6 +141,14 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 			request.OnEvent(event)
 		}
 	}
+	subagents := make([]artifact.SubagentEvidence, 0, 8)
+	delegationSurface, err := e.subagentTools(request, work, previousRoot, emit, func(record orchestrator.Record) {
+		subagents = append(subagents, subagentEvidence(record))
+	})
+	if err != nil {
+		return outcome, fmt.Errorf("configure Work specialists: %w", err)
+	}
+	surface = append(surface, delegationSurface...)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var check func([]agent.Message) error
 	if request.Mode != action.Inspect {
@@ -160,9 +169,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if runErr != nil {
 		failure = runErr.Error()
 	}
+	sortSubagentEvidence(subagents)
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
 		RunID: request.RunID, Objective: request.Objective, Source: work.Source, SourceName: sourceSnapshot.SourceName, SourceIdentity: sourceSnapshot.SourcePath, SnapshotSHA256: sourceSnapshot.SHA256,
-		Failure: failure, Actions: actions, ConnectedSources: connectedSources, Renderers: rendererEvidence(renderers), StartedAt: startedAt, FinishedAt: now(),
+		Failure: failure, Actions: actions, ConnectedSources: connectedSources, Renderers: rendererEvidence(renderers), Subagents: subagents, StartedAt: startedAt, FinishedAt: now(),
 	})
 	if sealErr != nil {
 		if runErr != nil {

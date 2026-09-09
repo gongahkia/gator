@@ -30,6 +30,7 @@ func systemPrompt(request Request) string {
 		modeRules,
 		"Developer-owned outcome contract (you cannot weaken it):\n" + string(contract),
 		`Use list_files before guessing source paths, read only the material needed for the objective, and make the final response concise. Name each produced artifact and summarize the host validation evidence.`,
+		`You own the user-facing answer. delegate_agents can run bounded fresh-context specialists when source research, independent artifact review, or an isolated coding implementation would materially help. Delegate focused tasks, pass only the context each specialist needs, and verify material results before using them. The code specialist returns a patch artifact and never changes the selected source.`,
 	}
 	if extra := strings.TrimSpace(request.System); extra != "" {
 		parts = append(parts, "Additional developer instructions:\n"+extra)

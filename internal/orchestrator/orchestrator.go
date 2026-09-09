@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strings"
@@ -203,8 +204,11 @@ func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.
 	if err := decoder.Decode(&input); err != nil {
 		return agent.ToolResult{}, fmt.Errorf("decode delegate_agents arguments: %w", err)
 	}
-	if err := decoder.Decode(&struct{}{}); err == nil {
-		return agent.ToolResult{}, errors.New("decode delegate_agents arguments: multiple JSON values")
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return agent.ToolResult{}, errors.New("decode delegate_agents arguments: multiple JSON values")
+		}
+		return agent.ToolResult{}, fmt.Errorf("decode delegate_agents arguments: %w", err)
 	}
 	if len(input.Tasks) < 1 || len(input.Tasks) > t.parallel {
 		return agent.ToolResult{}, fmt.Errorf("delegate_agents requires between 1 and %d tasks", t.parallel)
@@ -270,14 +274,13 @@ func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.
 	}
 	wait.Wait()
 	completed := 0
-	for index, record := range records {
+	for _, record := range records {
 		if record.Status == "completed" {
 			completed++
 		}
 		if t.onRecord != nil {
 			t.onRecord(record)
 		}
-		_ = index
 	}
 	t.emit(fmt.Sprintf("completed %d of %d specialist task(s)", completed, len(assignments)))
 	payload, err := json.Marshal(struct {

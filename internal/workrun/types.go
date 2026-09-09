@@ -53,6 +53,29 @@ type Outcome struct {
 	SourceSnapshot snapshot.Manifest
 }
 
+// CodeRequest asks the existing Gator Code engine to work against the exact
+// frozen source selected by a Work run. The implementation must isolate all
+// writes and return a reviewable patch rather than mutate SourcePath.
+type CodeRequest struct {
+	ID          string
+	SourcePath  string
+	ScratchPath string
+	Task        string
+	ParentRunID string
+	MaxSteps    int
+}
+
+// CodeResult is the bounded handoff from Gator Code back to Gator Work.
+type CodeResult struct {
+	Summary      string
+	Patch        []byte
+	ChangedPaths []string
+	Steps        int
+}
+
+// CodeDelegate adapts Gator's isolated coding workflow into a Work specialist.
+type CodeDelegate func(context.Context, CodeRequest) (CodeResult, error)
+
 // Executor combines a provider-independent model with private workspace
 // allocation and artifact sealing.
 type Executor struct {
@@ -60,4 +83,5 @@ type Executor struct {
 	Now        func() time.Time
 	StateDir   string
 	Connectors connector.Runtime
+	Code       CodeDelegate
 }

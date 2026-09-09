@@ -51,6 +51,7 @@ type Model struct {
 	config       Config
 	width        int
 	height       int
+	home         bool
 	launcher     bool
 	selected     int
 	entries      []entry
@@ -66,7 +67,12 @@ type Model struct {
 }
 
 func New(config Config) Model {
-	model := Model{config: config, launcher: true}
+	model := Model{
+		config: config,
+		home:   true,
+		source: config.CurrentFolder,
+		title:  "Work in " + filepath.Base(config.CurrentFolder),
+	}
 	if config.FirstRun {
 		model.entries = append(model.entries, entry{title: "Start guided setup", subtitle: "Connect a model, then begin your first task", kind: "onboarding", source: config.CurrentFolder})
 	}
@@ -82,11 +88,10 @@ func New(config Config) Model {
 	if config.StartConversationID != "" {
 		for _, conversation := range config.Conversations {
 			if conversation.ID == config.StartConversationID {
-				model.launcher = false
+				model.home = false
 				model.source = conversation.SourcePath
 				model.conversation = conversation.ID
 				model.title = conversation.Title
-				model.messages = []message{{role: "Gator", text: "Welcome back. Continue here, or type /back, /forward, or /history to move through revisions without deleting them."}}
 				break
 			}
 		}
@@ -127,9 +132,11 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.onboarding = false
+		m.home = true
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
-		m.messages = append(m.messages, message{role: "Gator", text: "You’re connected to " + value.provider + ". What would you like to get done in this folder? I’ll freeze the selected files before I begin."})
+		m.messages = nil
+		m.status = "Connected to " + value.provider
 	case tea.KeyMsg:
 		if value.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -141,6 +148,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.launcher {
 			return m.updateLauncher(value)
+		}
+		if m.home {
+			return m.updateHome(value)
 		}
 		switch value.String() {
 		case "pgup":
@@ -176,6 +186,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 				return m.runLocalCommand(prompt)
 			}
 			m.messages = append(m.messages, message{role: "You", text: prompt})
+			m.home = false
 			m.running = true
 			m.status = "Working from an immutable snapshot…"
 			run := m.config.Run
@@ -198,6 +209,45 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.running {
+		return m, nil
+	}
+	switch key.String() {
+	case "enter":
+		prompt := strings.TrimSpace(m.input)
+		if prompt == "" {
+			return m, nil
+		}
+		m.input = ""
+		m.home = false
+		m.messages = append(m.messages, message{role: "You", text: prompt})
+		m.running = true
+		m.status = "Working from an immutable snapshot…"
+		run := m.config.Run
+		if run == nil {
+			m.running = false
+			m.messages = append(m.messages, message{role: "Gator", text: "Work execution is unavailable in this build."})
+			return m, nil
+		}
+		source, conversation := m.source, m.conversation
+		return m, func() tea.Msg { return runDone(run(source, conversation, prompt)) }
+	case "backspace":
+		runes := []rune(m.input)
+		if len(runes) > 0 {
+			m.input = string(runes[:len(runes)-1])
+		}
+	case "esc":
+		m.launcher = true
+		m.selected = 0
+	default:
+		if key.Type == tea.KeyRunes || key.String() == " " {
+			m.input += key.String()
+		}
+	}
+	return m, nil
+}
+
 func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch key.String() {
 	case "up", "k":
@@ -213,9 +263,21 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		selected := m.entries[m.selected]
 		switch selected.kind {
-		case "source", "conversation":
+		case "source":
+			m.launcher = false
+			m.home = true
+			m.onboarding = false
+			m.source = selected.source
+			m.conversation = ""
+			m.title = selected.title
+			m.messages = nil
+			m.status = ""
+			m.scroll = 0
+		case "conversation":
 			switching := m.source != selected.source || m.conversation != selected.id
 			m.launcher = false
+			m.home = false
+			m.onboarding = false
 			m.source = selected.source
 			m.conversation = selected.id
 			m.title = selected.title
@@ -224,15 +286,9 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.messages = nil
 				m.status = ""
 			}
-			if len(m.messages) == 0 {
-				greeting := "What would you like to get done? I’ll work from a private, frozen copy of this folder and keep every revision undoable."
-				if selected.kind == "conversation" {
-					greeting = "Welcome back. Continue here, or type /back, /forward, or /history to move through revisions without deleting them."
-				}
-				m.messages = append(m.messages, message{role: "Gator", text: greeting})
-			}
 		case "inbox":
 			m.launcher = false
+			m.home = false
 			m.source = ""
 			m.conversation = ""
 			m.title = "Inbox"
@@ -245,6 +301,7 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		case "jobs":
 			m.launcher = false
+			m.home = false
 			m.source = ""
 			m.conversation = ""
 			m.title = "Scheduled jobs"
@@ -266,6 +323,7 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.ExecProcess(m.config.CodeCommand(), func(error) tea.Msg { return tea.Quit() })
 		case "onboarding":
 			m.launcher = false
+			m.home = false
 			m.onboarding = true
 			m.source = selected.source
 			m.title = "Welcome to Gator"
@@ -307,39 +365,36 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	width := m.width
-	if width < 40 {
+	if width <= 0 {
 		width = 80
 	}
-	accent := lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("230")).Background(lipgloss.Color("24")).Bold(true)
-	var view strings.Builder
-	view.WriteString(accent.Render("Gator Work") + dim.Render("  local-first work in your terminal") + "\n\n")
+	height := m.height
+	if height <= 0 {
+		height = 24
+	}
+	accent := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("236"))
 	if m.launcher {
-		view.WriteString("Open\n")
-		for index, item := range m.entries {
-			line := fmt.Sprintf("  %-28s %s", item.title, dim.Render(item.subtitle))
-			if index == m.selected {
-				line = selectedStyle.Render("› " + fmt.Sprintf("%-28s %s", item.title, item.subtitle))
-			}
-			view.WriteString(line + "\n")
-		}
-		view.WriteString("\n" + dim.Render("↑/↓ choose · enter open · ctrl+p palette · ctrl+c quit"))
-		return view.String()
+		return m.renderPalette(width, height, accent, dim, selectedStyle)
 	}
-	view.WriteString(accent.Render(m.title) + "\n")
+	if m.home {
+		return m.renderHome(width, height, accent, dim)
+	}
+	var view strings.Builder
+	view.WriteString(accent.Render(m.title))
 	if m.status != "" {
-		view.WriteString(dim.Render(m.status) + "\n")
+		view.WriteString(dim.Render("  " + m.status))
 	}
-	view.WriteString("\n")
+	view.WriteString("\n\n")
 	var transcript strings.Builder
-	messageStyle := lipgloss.NewStyle().Width(max(20, width-3))
+	messageStyle := lipgloss.NewStyle().Width(max(20, width-4))
 	for _, item := range m.messages {
 		transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
 		transcript.WriteString("\n\n")
 	}
 	lines := strings.Split(strings.TrimSuffix(transcript.String(), "\n"), "\n")
-	available := max(4, m.height-9)
+	available := max(4, height-10)
 	maxScroll := max(0, len(lines)-available)
 	scroll := min(m.scroll, maxScroll)
 	end := len(lines) - scroll
@@ -348,10 +403,74 @@ func (m Model) View() string {
 		view.WriteString(strings.Join(lines[start:end], "\n") + "\n")
 	}
 	if m.running {
-		view.WriteString(accent.Render("● Working…") + "\n")
-	} else {
-		view.WriteString("❯ " + m.input + "█\n")
+		view.WriteString(accent.Render("● Working…") + "\n\n")
 	}
-	view.WriteString(dim.Render("enter send · pgup/pgdown scroll · ctrl+p palette · /back /forward [revision] /history · ctrl+c quit"))
+	view.WriteString(m.renderComposer(width, !m.running))
+	view.WriteString("\n" + dim.Render("enter send  ·  ctrl+p menu  ·  pgup/pgdown scroll"))
 	return view.String()
+}
+
+func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string {
+	title := accent.Copy().Bold(true).Render("GATOR")
+	question := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render("What do you want to accomplish?")
+	body := title + "\n\n" + question + "\n\n" + m.renderComposer(width, true)
+	context := filepath.Base(m.source)
+	if context == "." || context == "" {
+		context = "current folder"
+	}
+	hint := context + "  ·  ctrl+p menu"
+	if m.config.FirstRun {
+		hint = "connect a model from ctrl+p  ·  " + hint
+	} else if m.status != "" {
+		hint = m.status + "  ·  " + hint
+	}
+	body += "\n" + dim.Render(hint)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
+}
+
+func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
+	panelWidth := min(76, max(36, width-8))
+	var panel strings.Builder
+	panel.WriteString(accent.Render("Open") + "\n\n")
+	for index, item := range m.entries {
+		title := truncate(item.title, 27)
+		subtitle := truncate(item.subtitle, max(0, panelWidth-33))
+		line := fmt.Sprintf("  %-28s %s", title, dim.Render(subtitle))
+		if index == m.selected {
+			line = selectedStyle.Width(panelWidth).Render("› " + fmt.Sprintf("%-28s %s", title, subtitle))
+		}
+		panel.WriteString(line + "\n")
+	}
+	panel.WriteString("\n" + dim.Render("↑/↓ choose  ·  enter open  ·  esc close"))
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel.String())
+}
+
+func (m Model) renderComposer(width int, focused bool) string {
+	composerWidth := min(72, max(28, width-8))
+	border := lipgloss.Color("238")
+	if focused {
+		border = lipgloss.Color("42")
+	}
+	value := m.input
+	if value == "" {
+		value = lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Render("Ask Gator to work on something…")
+	}
+	if focused {
+		value += lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("█")
+	}
+	return lipgloss.NewStyle().Width(composerWidth).Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(border).Render(value)
+}
+
+func truncate(value string, maximum int) string {
+	if maximum <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= maximum {
+		return value
+	}
+	if maximum == 1 {
+		return "…"
+	}
+	return string(runes[:maximum-1]) + "…"
 }

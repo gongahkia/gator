@@ -18,6 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/journal"
+	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
@@ -50,7 +51,15 @@ func nativeWorkModel(provider, modelName, baseURL string) (agent.Model, error) {
 	if err != nil {
 		return nil, err
 	}
-	return executor.Model, nil
+	return &nativeWorkBackend{Model: executor.Model, code: executor, provider: provider, model: modelName, baseURL: baseURL}, nil
+}
+
+type nativeWorkBackend struct {
+	agent.Model
+	code     gatorrun.Executor
+	provider string
+	model    string
+	baseURL  string
 }
 
 func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory workModelFactory) error {
@@ -149,6 +158,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 	}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
+	if native, ok := backend.(*nativeWorkBackend); ok {
+		executor.Code = native.codeDelegate(stateDir)
+	}
 	var approve action.Approver
 	var approveRead func(context.Context, string, string, json.RawMessage) (bool, error)
 	if !*jsonOutput {
