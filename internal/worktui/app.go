@@ -1066,11 +1066,12 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 		}
 		panel.WriteString(dim.Render(empty) + "\n")
 	}
+	rowStyle := lipgloss.NewStyle().Width(panelWidth)
 	for index := start; index < end; index++ {
 		item := visible[index]
 		title := truncate(item.title, titleWidth)
 		subtitle := truncate(item.subtitle, subtitleWidth)
-		line := fmt.Sprintf("  %-*s %s", titleWidth, title, dim.Render(subtitle))
+		line := rowStyle.Render(fmt.Sprintf("  %-*s %s", titleWidth, title, dim.Render(subtitle)))
 		if index == selected {
 			line = selectedStyle.Width(panelWidth).Render("› " + fmt.Sprintf("%-*s %s", titleWidth, title, subtitle))
 		}
