@@ -310,6 +310,9 @@ func workActionApprover(in io.Reader, out io.Writer) action.Approver {
 			return action.Deny, err
 		}
 		line, err := input.ReadString('\n')
+		if errors.Is(err, io.EOF) && line == "" {
+			return action.Deny, nil
+		}
 		if err != nil && !(errors.Is(err, io.EOF) && line != "") {
 			return action.Deny, err
 		}
