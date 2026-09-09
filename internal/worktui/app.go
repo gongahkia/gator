@@ -514,12 +514,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			result = "Effort set to " + effortName(m.options.MaxSteps) + "."
 		}
 	case "/attach":
-		if len(fields) != 2 {
+		value := commandRemainder(command, fields[:1])
+		if value == "" {
 			result = "Usage: /attach SOURCE_RELATIVE_PATH\nPending: " + valueOrNone(strings.Join(m.options.Attachments, ", "))
 			break
 		}
-		path := filepath.ToSlash(filepath.Clean(fields[1]))
-		if filepath.IsAbs(fields[1]) || path == ".." || strings.HasPrefix(path, "../") {
+		path := filepath.ToSlash(filepath.Clean(value))
+		if filepath.IsAbs(value) || path == ".." || strings.HasPrefix(path, "../") {
 			err = fmt.Errorf("attachment path must stay inside the selected source")
 			break
 		}
@@ -528,16 +529,17 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		result = "Attached for the next prompt: " + path
 	case "/detach":
-		if len(fields) != 2 {
+		value := commandRemainder(command, fields[:1])
+		if value == "" {
 			err = fmt.Errorf("usage: /detach SOURCE_RELATIVE_PATH|all")
 			break
 		}
-		if fields[1] == "all" {
+		if value == "all" {
 			m.options.Attachments = nil
 			result = "Cleared pending attachments."
 			break
 		}
-		m.options.Attachments = removeString(m.options.Attachments, filepath.ToSlash(filepath.Clean(fields[1])))
+		m.options.Attachments = removeString(m.options.Attachments, filepath.ToSlash(filepath.Clean(value)))
 		result = "Removed the pending attachment when present."
 	case "/code":
 		result, err = m.configureCode(fields, command)
@@ -633,7 +635,7 @@ func (m *Model) configureCode(fields []string, raw string) (string, error) {
 		return m.codeStatus(), nil
 	}
 	action := strings.ToLower(fields[1])
-	value := strings.TrimSpace(strings.TrimPrefix(raw, fields[0]+" "+fields[1]))
+	value := commandRemainder(raw, fields[:2])
 	requireValue := func() error {
 		if value == "" {
 			return fmt.Errorf("/code %s requires a value", action)
@@ -713,6 +715,17 @@ func (m *Model) configureCode(fields []string, raw string) (string, error) {
 		return "", fmt.Errorf("unknown /code setting %q; use /code status", action)
 	}
 	return m.codeStatus(), nil
+}
+
+func commandRemainder(raw string, consumed []string) string {
+	remainder := strings.TrimSpace(raw)
+	for _, field := range consumed {
+		if !strings.HasPrefix(remainder, field) {
+			return ""
+		}
+		remainder = strings.TrimSpace(strings.TrimPrefix(remainder, field))
+	}
+	return remainder
 }
 
 func (m Model) codeStatus() string {

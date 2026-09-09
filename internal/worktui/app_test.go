@@ -125,6 +125,29 @@ func TestMainComposerOwnsEffortAttachmentsAndCodePolicy(t *testing.T) {
 	}
 }
 
+func TestComposerCommandsAcceptPathsAndValuesWithFlexibleWhitespace(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	for _, command := range []string{
+		"/attach product briefs/q3 plan.pdf",
+		"/code   verify   go test ./...",
+	} {
+		model.input = command
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		model = updated.(Model)
+	}
+	if len(model.options.Attachments) != 1 || model.options.Attachments[0] != "product briefs/q3 plan.pdf" {
+		t.Fatalf("attachments = %#v", model.options.Attachments)
+	}
+	if len(model.options.Code.Verification) != 1 || model.options.Code.Verification[0] != "go test ./..." {
+		t.Fatalf("verification = %#v", model.options.Code.Verification)
+	}
+	model.input = "/detach product briefs/q3 plan.pdf"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if len(updated.(Model).options.Attachments) != 0 {
+		t.Fatalf("attachment was not removed: %#v", updated.(Model).options.Attachments)
+	}
+}
+
 func TestPromptsTypedDuringRunExecuteSequentially(t *testing.T) {
 	var prompts []string
 	model := New(Config{CurrentFolder: "/work", Run: func(_, _, prompt string, _ RunOptions) RunResult {
@@ -149,6 +172,25 @@ func TestPromptsTypedDuringRunExecuteSequentially(t *testing.T) {
 	updated, _ = model.Update(second())
 	model = updated.(Model)
 	if strings.Join(prompts, ",") != "first,second" || model.running || len(model.queue) != 0 {
+		t.Fatalf("prompts=%#v model=%#v", prompts, model)
+	}
+}
+
+func TestQueuedPromptsPauseAfterFailure(t *testing.T) {
+	var prompts []string
+	model := New(Config{CurrentFolder: "/work", Run: func(_, _, prompt string, _ RunOptions) RunResult {
+		prompts = append(prompts, prompt)
+		return RunResult{Error: "failed"}
+	}})
+	model.input = "first"
+	updated, first := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	model.input = "second"
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	updated, next := model.Update(first())
+	model = updated.(Model)
+	if next != nil || model.running || len(model.queue) != 1 || strings.Join(prompts, ",") != "first" || !strings.Contains(model.status, "paused") {
 		t.Fatalf("prompts=%#v model=%#v", prompts, model)
 	}
 }
@@ -179,6 +221,19 @@ func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	model = updated.(Model)
 	if called != "prepare the brief" || model.running || !strings.Contains(model.View(), "done") {
 		t.Fatalf("called=%q state=%#v", called, model)
+	}
+}
+
+func TestFirstRunStillStartsSetupAfterLocalCommand(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work", FirstRun: true})
+	model.input = "/help"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	model.input = "prepare the brief"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || !model.onboarding || model.pendingPrompt != "prepare the brief" {
+		t.Fatalf("setup state = %#v", model)
 	}
 }
 
