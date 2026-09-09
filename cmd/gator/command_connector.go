@@ -103,6 +103,9 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	kindName := flags.String("kind", "json", "connector kind: json, webhook, slack, google, atlassian, or notion")
 	resource := flags.String("url", "", "exact resource URL")
 	authentication := flags.String("auth", "", "authentication: none or bearer")
+	searchTool := flags.String("search-tool", "", "remote MCP tool mapped to search")
+	readTool := flags.String("read-tool", "", "remote MCP tool mapped to read")
+	actionTool := flags.String("action-tool", "", "remote MCP tool mapped to an approved action")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -123,6 +126,8 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		kind = connector.KindAtlassian
 	case connector.KindNotion:
 		kind = connector.KindNotion
+	case "mcp", connector.KindRemoteMCP:
+		kind = connector.KindRemoteMCP
 	default:
 		return fmt.Errorf("unknown connector kind %q", *kindName)
 	}
@@ -145,6 +150,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	descriptor := connector.Descriptor{
 		Version: connector.DescriptorVersion, ID: id, Name: strings.TrimSpace(*name),
 		Kind: kind, Resource: strings.TrimSpace(*resource), Authentication: strings.TrimSpace(*authentication),
+		SearchTool: strings.TrimSpace(*searchTool), ReadTool: strings.TrimSpace(*readTool), ActionTool: strings.TrimSpace(*actionTool),
 	}
 	if err := descriptor.Validate(); err != nil {
 		return err

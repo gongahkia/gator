@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/config"
@@ -61,8 +62,37 @@ func configure(arguments []string, out io.Writer) error {
 		if err := settings.Execution.Validate(); err != nil {
 			return err
 		}
+	case "snapshot-max-files":
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			return errors.New("snapshot-max-files requires an integer")
+		}
+		settings.Snapshots.MaxFiles = parsed
+	case "snapshot-max-total-mib":
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || parsed < 1 {
+			return errors.New("snapshot-max-total-mib requires a positive integer")
+		}
+		settings.Snapshots.MaxTotalBytes = parsed * 1024 * 1024
+	case "snapshot-max-file-mib":
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil || parsed < 1 {
+			return errors.New("snapshot-max-file-mib requires a positive integer")
+		}
+		settings.Snapshots.MaxFileBytes = parsed * 1024 * 1024
+	case "snapshot-exclude":
+		settings.Snapshots.Excludes = append(settings.Snapshots.Excludes, value)
+	case "desktop-notifications":
+		if value != "on" && value != "off" {
+			return errors.New("desktop-notifications must be on or off")
+		}
+		settings.Notifications.Desktop = value == "on"
+	case "job-timezone":
+		settings.JobDefaults.Timezone = value
+	case "job-missed":
+		settings.JobDefaults.Missed = value
 	default:
-		return fmt.Errorf("unknown configuration key %q; choose default-provider, default-model, sandbox, or network", arguments[1])
+		return fmt.Errorf("unknown configuration key %q", arguments[1])
 	}
 	if err := store.Save(settings); err != nil {
 		return err

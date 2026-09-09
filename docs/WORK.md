@@ -50,10 +50,10 @@ The existing Git-worktree executor becomes the `code` workflow. General work
 uses an ordinary directory as a read-only source and a private, isolated output
 workspace.
 
-The first release does not promise cloud execution, cross-device continuation,
-unattended scheduling, arbitrary desktop control, or every office file format.
-Those require separate trust and lifecycle designs. A foreground local run must
-be excellent before a persistent daemon or hosted control plane is introduced.
+Gator now includes durable local conversations, immutable local-source
+snapshots, document/workbook renderers, connected services, and a manual
+foreground scheduler. Cloud execution, cross-device continuation, and arbitrary
+desktop control remain outside the local-first boundary.
 
 ## Domain model
 
@@ -61,8 +61,9 @@ be excellent before a persistent daemon or hosted control plane is introduced.
 
 A workspace is not assumed to be a Git repository. It has four explicit roots:
 
-- `source`: one canonical developer-selected directory, exposed read-only;
+- `source`: one immutable snapshot of the selected directory, exposed read-only;
 - `output`: a private run directory and the only default writable root;
+- `previous`: the sealed parent revision's output on a continuation, read-only;
 - `scratch`: private ephemeral process state, never included in a deliverable;
 - `state`: private durable metadata, conversation, manifests, and evidence.
 
@@ -71,11 +72,16 @@ creates deliverables under `output/...`. The source and output roots must never
 overlap. Symlinks and concurrent replacement are checked at the descriptor
 boundary using the existing `workspace.Root` primitives.
 
-The initial implementation references the source root read-only rather than
-copying an entire folder. A future reproducible snapshot mode may copy a bounded
-source set and record all source digests. Snapshotting must be explicit because
-silently copying a large or secret-bearing directory is both surprising and
-expensive.
+Before model execution, Gator copies the selected, bounded source set into a
+private content-addressed store. It records every path, byte count, mode,
+modification time, and SHA-256 digest. Symlinks, VCS state, dependency/build
+caches, known credential files, and `.gatorignore` patterns are excluded and
+reported. Refreshing a source creates a new snapshot; it never changes an old
+revision's evidence.
+
+Work conversations form an immutable revision tree. Back and Forward move a
+small head pointer; they do not delete revisions. Sending from an older revision
+creates a branch automatically and seeds the new output copy-on-write.
 
 ### Outcome contract
 
@@ -99,11 +105,13 @@ The first validators are deliberately small and reliable:
 - `utf8`: the artifact is valid UTF-8 without NUL bytes;
 - `json`: the artifact is one complete JSON value;
 - `csv`: the artifact is parseable CSV with a stable, non-empty header; and
-- `contains`: a bounded text artifact contains a required literal marker.
+- `contains`: a bounded text artifact contains a required literal marker;
+- `docx` and `xlsx`: the artifact is a structurally complete OOXML package; and
+- `pdf`: the artifact has a complete PDF envelope.
 
-Later format-specific validators may inspect XLSX sheet names, DOCX structure,
-PDF rendering, or presentation slide counts. They should validate durable
-properties rather than prescribe a particular model-generated layout.
+DOCX/PDF use a shared semantic document specification, while XLSX uses a
+semantic workbook specification. This keeps provider prompts and artifact
+contracts independent of renderer libraries. See [rich artifacts](ARTIFACT_FORMATS.md).
 
 ### Artifact bundle
 
@@ -183,9 +191,11 @@ are separate operations. Repository content cannot add a connector, redirect a
 stored credential, or promote a read action to a mutation. Every connector
 result is untrusted source data and carries a provenance record.
 
-The first polished connector should be chosen from a real workflow, not from
-catalog breadth. A single excellent source-to-artifact flow is more valuable
-than many nominal integrations.
+First-party adapters cover Slack, Google Drive/Docs/Sheets, Jira/Confluence,
+and Notion. A typed remote-MCP mapping brings other services through the same
+resource, permission, provenance, and exact-action-approval boundary. Connected
+read responses are retained inside the Work bundle and verified against their
+provenance digest.
 
 ## Lifecycle and scheduling
 
@@ -199,12 +209,11 @@ The foreground lifecycle is:
 6. present the review surface; and
 7. explicitly export, apply, or approve an external action.
 
-Scheduled work is intentionally a later service. It will require a durable job
-definition, an authenticated local supervisor, missed-run policy, concurrency
-limits, credential availability checks, immutable run history, notification
-routing, and safe shutdown. The existing process-local terminal registry is not
-a scheduler and must not be stretched into one. The concrete trust model,
-schema, lifecycle, and release gates are defined in [Durable jobs](JOBS.md).
+Scheduled work uses a separate manually started foreground supervisor. It owns
+durable job definitions, timezone-aware cron evaluation, missed-run policy,
+single-instance locking, bounded retries, immutable attempts, an inbox, and an
+authenticated loopback control endpoint. Jobs can inspect or draft but can
+never approve external actions. See [Durable jobs](JOBS.md).
 
 ## CLI direction
 
@@ -218,7 +227,9 @@ gator review RUN                  inspect artifacts, evidence, and actions
 gator export RUN                  export a sealed artifact bundle
 gator apply RUN                   copy reviewed artifacts to explicit targets
 gator connector ...               manage connected sources and authentication
-gator job ...                     manage scheduled work (planned; see JOBS.md)
+gator job ...                     manage scheduled work and its supervisor
+gator inbox                       inspect completed and attention-needed jobs
+gator snapshot ...                inspect or collect unreferenced snapshots
 ```
 
 The existing `gator run` command remains an alias for `gator code` during a
@@ -240,6 +251,9 @@ The migration introduces packages around durable concepts:
 - `internal/action`: capability classification and external-action approval;
 - `internal/connector`: connector registry, schemas, provenance, and auth
   references; and
+- `internal/snapshot`, `internal/worksession`, `internal/jobs`, and
+  `internal/inbox`: immutable Work inputs, revision history, schedules, and
+  result routing; and
 - `internal/run`: the retained coding workflow, eventually surfaced as
   `gator code`.
 

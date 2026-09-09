@@ -10,6 +10,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -32,6 +33,7 @@ type Request struct {
 	SnapshotID           string
 	RefreshSource        bool
 	ConnectorPermissions connector.PermissionSet
+	SnapshotOptions      snapshot.Options
 }
 
 // Outcome retains staged files and trusted evidence even when model execution

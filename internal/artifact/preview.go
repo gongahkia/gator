@@ -1,10 +1,12 @@
 package artifact
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -42,6 +44,48 @@ func PreviewBundle(bundle Bundle) ([]Preview, error) {
 
 func previewFile(file File, contents []byte) Preview {
 	preview := Preview{Path: file.Path, Kind: "binary", Summary: fmt.Sprintf("%s, %d bytes", file.MediaType, file.Bytes)}
+	switch file.MediaType {
+	case "application/pdf":
+		pages := bytes.Count(contents, []byte("/Type /Page")) - bytes.Count(contents, []byte("/Type /Pages"))
+		preview.Kind = "document"
+		preview.Summary = fmt.Sprintf("PDF document, %d pages, %d bytes", max(1, pages), file.Bytes)
+		return preview
+	case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		preview.Kind = "document"
+		preview.Summary = fmt.Sprintf("DOCX document, %d bytes", file.Bytes)
+		if part := zipPart(contents, "word/document.xml"); len(part) > 0 {
+			text := strings.NewReplacer("</w:p>", "\n", "<w:tab/>", "\t").Replace(string(part))
+			var plain strings.Builder
+			inside := false
+			for _, character := range text {
+				if character == '<' {
+					inside = true
+					continue
+				}
+				if character == '>' {
+					inside = false
+					continue
+				}
+				if !inside {
+					plain.WriteRune(character)
+				}
+			}
+			preview.Content, preview.Truncated = boundedSafeText(plain.String())
+		}
+		return preview
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		preview.Kind = "workbook"
+		sheets := 0
+		if archive, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents))); err == nil {
+			for _, part := range archive.File {
+				if strings.HasPrefix(part.Name, "xl/worksheets/sheet") && strings.HasSuffix(part.Name, ".xml") {
+					sheets++
+				}
+			}
+		}
+		preview.Summary = fmt.Sprintf("XLSX workbook, %d sheets, %d bytes", sheets, file.Bytes)
+		return preview
+	}
 	if !utf8.Valid(contents) || bytes.IndexByte(contents, 0) >= 0 {
 		return preview
 	}
@@ -83,6 +127,25 @@ func previewFile(file File, contents []byte) Preview {
 		preview.Content, preview.Truncated = boundedSafeText(string(contents))
 	}
 	return preview
+}
+
+func zipPart(contents []byte, name string) []byte {
+	archive, err := zip.NewReader(bytes.NewReader(contents), int64(len(contents)))
+	if err != nil {
+		return nil
+	}
+	for _, part := range archive.File {
+		if part.Name == name {
+			reader, err := part.Open()
+			if err != nil {
+				return nil
+			}
+			defer reader.Close()
+			data, _ := io.ReadAll(io.LimitReader(reader, maxPreviewBytes*4))
+			return data
+		}
+	}
+	return nil
 }
 
 func boundedSafeText(value string) (string, bool) {

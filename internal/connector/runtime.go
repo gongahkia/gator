@@ -17,6 +17,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/mcp"
 )
 
 const maxHTTPJSONBytes = 256 * 1024
@@ -63,6 +64,8 @@ func (r Runtime) Invoke(ctx context.Context, mode action.Mode, connectorID, oper
 		return r.fetchHTTPJSON(ctx, descriptor)
 	case isServiceKind(descriptor.Kind):
 		return r.invokeService(ctx, descriptor, operation, input)
+	case descriptor.Kind == KindRemoteMCP:
+		return r.invokeRemoteMCP(ctx, descriptor, operation, input)
 	default:
 		return Result{}, fmt.Errorf("connector operation %s/%s has no runtime", descriptor.ID, operation.ID)
 	}
@@ -79,7 +82,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	if !action.RequiresFreshApproval(operation.Capability) {
 		return PreparedAction{}, fmt.Errorf("connector operation %s/%s is not an external action", descriptor.ID, operation.ID)
 	}
-	if descriptor.Kind != KindHTTPWebhook && !isServiceKind(descriptor.Kind) {
+	if descriptor.Kind != KindHTTPWebhook && !isServiceKind(descriptor.Kind) && descriptor.Kind != KindRemoteMCP {
 		return PreparedAction{}, fmt.Errorf("connector operation %s/%s has no action runtime", descriptor.ID, operation.ID)
 	}
 	payload, err := decodeActionInput(input)
@@ -92,6 +95,8 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 		if err != nil {
 			return PreparedAction{}, err
 		}
+	} else if descriptor.Kind == KindRemoteMCP {
+		target = descriptor.Resource + "#tool=" + descriptor.ActionTool
 	}
 	digest := sha256.Sum256(append([]byte(descriptor.ID+"\x00"+operation.ID+"\x00"+target+"\x00"), payload...))
 	proposal, err := action.NewProposal(
@@ -130,6 +135,17 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 	if prepared.descriptor.Kind == KindHTTPWebhook {
 		return r.publishHTTPJSON(ctx, descriptor, prepared.payload)
 	}
+	if prepared.descriptor.Kind == KindRemoteMCP {
+		token, tokenErr := r.bearerToken(descriptor)
+		if tokenErr != nil {
+			return tokenErr
+		}
+		_, callErr := mcp.InvokeRemoteTool(ctx, descriptor.Resource, token, descriptor.ID, descriptor.ActionTool, prepared.payload)
+		if callErr != nil {
+			return action.MarkUncertain(callErr)
+		}
+		return nil
+	}
 	method := http.MethodPost
 	if descriptor.Kind == KindNotion && operation.ID == "page_update" || descriptor.Kind == KindSlack && operation.ID == "update_message" {
 		method = http.MethodPatch
@@ -139,6 +155,31 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 	}
 	_, err = r.requestJSON(ctx, descriptor, operation.ID, method, prepared.Proposal.Target, prepared.payload, true)
 	return err
+}
+
+func (r Runtime) invokeRemoteMCP(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
+	var input struct {
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil || !json.Valid(input.Arguments) {
+		return Result{}, errors.New("remote MCP connector requires one arguments object")
+	}
+	tool := descriptor.SearchTool
+	if operation.ID == "read" {
+		tool = descriptor.ReadTool
+	}
+	token, err := r.bearerToken(descriptor)
+	if err != nil {
+		return Result{}, err
+	}
+	result, err := mcp.InvokeRemoteTool(ctx, descriptor.Resource, token, descriptor.ID, tool, input.Arguments)
+	if err != nil {
+		return Result{}, err
+	}
+	digest := sha256.Sum256(result)
+	return Result{Data: result, Provenance: Provenance{ConnectorID: descriptor.ID, Operation: operation.ID, Resource: descriptor.Resource, RetrievedAt: r.now(), Bytes: int64(len(result)), SHA256: hex.EncodeToString(digest[:])}}, nil
 }
 
 type serviceInput struct {

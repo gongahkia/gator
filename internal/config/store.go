@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
 	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/snapshot"
 )
 
 const version = 3
@@ -45,6 +46,25 @@ type Settings struct {
 	Connectors           []connector.Descriptor     `json:"connectors,omitempty"`
 	ConnectorPermissions []connector.PermissionRule `json:"connector_permissions,omitempty"`
 	Execution            sandbox.Policy             `json:"execution"`
+	Snapshots            SnapshotSettings           `json:"snapshots"`
+	Notifications        NotificationSettings       `json:"notifications"`
+	JobDefaults          JobDefaults                `json:"job_defaults"`
+}
+
+type SnapshotSettings struct {
+	MaxFiles      int      `json:"max_files"`
+	MaxTotalBytes int64    `json:"max_total_bytes"`
+	MaxFileBytes  int64    `json:"max_file_bytes"`
+	Excludes      []string `json:"excludes,omitempty"`
+}
+
+type NotificationSettings struct {
+	Desktop bool `json:"desktop"`
+}
+
+type JobDefaults struct {
+	Timezone string `json:"timezone"`
+	Missed   string `json:"missed"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -98,7 +118,8 @@ type Store struct {
 
 // Default returns usable settings without requiring a file on disk.
 func Default() Settings {
-	return Settings{Version: version, Execution: sandbox.DefaultPolicy()}
+	limits := snapshot.DefaultLimits()
+	return Settings{Version: version, Execution: sandbox.DefaultPolicy(), Snapshots: SnapshotSettings{MaxFiles: limits.MaxFiles, MaxTotalBytes: limits.MaxTotal, MaxFileBytes: limits.MaxFileBytes}, Notifications: NotificationSettings{Desktop: true}, JobDefaults: JobDefaults{Timezone: "Local", Missed: "skip"}}
 }
 
 // ProviderEndpoint returns a persisted non-secret endpoint override for one
@@ -257,6 +278,17 @@ func validate(settings Settings) error {
 	}
 	if err := settings.Execution.Validate(); err != nil {
 		return fmt.Errorf("invalid execution policy: %w", err)
+	}
+	if settings.Snapshots.MaxFiles < 1 || settings.Snapshots.MaxFiles > 1_000_000 || settings.Snapshots.MaxTotalBytes < 1 || settings.Snapshots.MaxFileBytes < 1 || settings.Snapshots.MaxFileBytes > settings.Snapshots.MaxTotalBytes || len(settings.Snapshots.Excludes) > 512 {
+		return errors.New("invalid source snapshot settings")
+	}
+	for _, pattern := range settings.Snapshots.Excludes {
+		if strings.TrimSpace(pattern) == "" || len(pattern) > 4096 || strings.ContainsRune(pattern, 0) {
+			return errors.New("invalid source snapshot exclude")
+		}
+	}
+	if settings.JobDefaults.Timezone == "" || settings.JobDefaults.Missed != "skip" && settings.JobDefaults.Missed != "run_once" {
+		return errors.New("invalid job defaults")
 	}
 	if len(settings.Extensions) > 256 {
 		return errors.New("configuration has too many extensions")

@@ -27,6 +27,7 @@ type SealOptions struct {
 	Source           workspace.Root
 	SourceName       string
 	SnapshotSHA256   string
+	SourceIdentity   string
 	Actions          []action.Record
 	ConnectedSources []connector.Provenance
 	Failure          string
@@ -101,7 +102,11 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 	if failure != "" {
 		status = Failed
 	}
-	sourceDigest := sha256.Sum256([]byte(options.Source.Path()))
+	identity := strings.TrimSpace(options.SourceIdentity)
+	if identity == "" {
+		identity = options.Source.Path()
+	}
+	sourceDigest := sha256.Sum256([]byte(identity))
 	sourceName := strings.TrimSpace(options.SourceName)
 	if sourceName == "" {
 		sourceName = filepath.Base(options.Source.Path())

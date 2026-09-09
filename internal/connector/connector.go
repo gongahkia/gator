@@ -26,6 +26,7 @@ const (
 	KindGoogle        = "google_workspace"
 	KindAtlassian     = "atlassian"
 	KindNotion        = "notion"
+	KindRemoteMCP     = "remote_mcp"
 	AuthNone          = "none"
 	AuthBearer        = "bearer"
 	maxConnectors     = 128
@@ -43,6 +44,9 @@ type Descriptor struct {
 	Kind           string `json:"kind"`
 	Resource       string `json:"resource"`
 	Authentication string `json:"authentication"`
+	SearchTool     string `json:"search_tool,omitempty"`
+	ReadTool       string `json:"read_tool,omitempty"`
+	ActionTool     string `json:"action_tool,omitempty"`
 }
 
 // Operation is a connector action surfaced to the product and model. Schemas
@@ -57,12 +61,13 @@ type Operation struct {
 
 // Provenance binds returned untrusted data to the exact configured source.
 type Provenance struct {
-	ConnectorID string    `json:"connector_id"`
-	Operation   string    `json:"operation"`
-	Resource    string    `json:"resource"`
-	RetrievedAt time.Time `json:"retrieved_at"`
-	Bytes       int64     `json:"bytes"`
-	SHA256      string    `json:"sha256"`
+	ConnectorID  string    `json:"connector_id"`
+	Operation    string    `json:"operation"`
+	Resource     string    `json:"resource"`
+	RetrievedAt  time.Time `json:"retrieved_at"`
+	Bytes        int64     `json:"bytes"`
+	SHA256       string    `json:"sha256"`
+	SnapshotPath string    `json:"snapshot_path,omitempty"`
 }
 
 // Result keeps connector data explicitly untrusted and separately attributed.
@@ -86,6 +91,9 @@ func (p Provenance) Validate() error {
 	if _, err := hex.DecodeString(p.SHA256); err != nil {
 		return errors.New("connector provenance digest is invalid")
 	}
+	if p.SnapshotPath != "" && (!strings.HasPrefix(p.SnapshotPath, "connected/") || strings.Contains(p.SnapshotPath, "..") || strings.ContainsAny(p.SnapshotPath, "\\\x00\r\n")) {
+		return errors.New("connector provenance snapshot path is invalid")
+	}
 	return nil
 }
 
@@ -96,7 +104,7 @@ func (d Descriptor) Validate() error {
 	if strings.TrimSpace(d.Name) != d.Name || d.Name == "" || len(d.Name) > 128 || strings.ContainsAny(d.Name, "\x00\r\n") {
 		return errors.New("connector display name is invalid")
 	}
-	if d.Kind != KindHTTPJSON && d.Kind != KindHTTPWebhook && d.Kind != KindSlack && d.Kind != KindGoogle && d.Kind != KindAtlassian && d.Kind != KindNotion {
+	if d.Kind != KindHTTPJSON && d.Kind != KindHTTPWebhook && d.Kind != KindSlack && d.Kind != KindGoogle && d.Kind != KindAtlassian && d.Kind != KindNotion && d.Kind != KindRemoteMCP {
 		return fmt.Errorf("unsupported connector kind %q", d.Kind)
 	}
 	resource, err := url.Parse(d.Resource)
@@ -111,6 +119,18 @@ func (d Descriptor) Validate() error {
 	}
 	if d.Authentication != AuthNone && d.Authentication != AuthBearer {
 		return fmt.Errorf("unsupported connector authentication %q", d.Authentication)
+	}
+	if d.Kind == KindRemoteMCP {
+		if d.SearchTool == "" && d.ReadTool == "" {
+			return errors.New("remote MCP connector requires a search or read tool mapping")
+		}
+		for _, tool := range []string{d.SearchTool, d.ReadTool, d.ActionTool} {
+			if tool != "" && !idPattern.MatchString(strings.ReplaceAll(tool, "_", "-")) {
+				return errors.New("remote MCP connector tool mapping is invalid")
+			}
+		}
+	} else if d.SearchTool != "" || d.ReadTool != "" || d.ActionTool != "" {
+		return errors.New("MCP tool mappings are valid only for remote MCP connectors")
 	}
 	return nil
 }
@@ -179,6 +199,19 @@ func (d Descriptor) Operations() []Operation {
 			{"page_create", "Prepare creation of a Notion page for exact approval.", action.ConnectedMutate},
 			{"page_update", "Prepare an update to a Notion page for exact approval.", action.ConnectedMutate},
 		})
+	case KindRemoteMCP:
+		var operations []Operation
+		readSchema := json.RawMessage(`{"type":"object","required":["arguments"],"properties":{"arguments":{"type":"object"}},"additionalProperties":false}`)
+		if d.SearchTool != "" {
+			operations = append(operations, Operation{ID: "search", Description: "Search through the mapped trusted MCP service.", Capability: action.ConnectedRead, InputSchema: readSchema, OutputSchema: json.RawMessage(`{"type":"object"}`)})
+		}
+		if d.ReadTool != "" {
+			operations = append(operations, Operation{ID: "read", Description: "Read through the mapped trusted MCP service.", Capability: action.ConnectedRead, InputSchema: readSchema, OutputSchema: json.RawMessage(`{"type":"object"}`)})
+		}
+		if d.ActionTool != "" {
+			operations = append(operations, Operation{ID: "action", Description: "Prepare a mapped MCP action for exact approval.", Capability: action.ConnectedMutate, InputSchema: json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`), OutputSchema: json.RawMessage(`{"type":"object"}`)})
+		}
+		return operations
 	default:
 		return nil
 	}

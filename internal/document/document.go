@@ -178,6 +178,130 @@ func RenderDOCX(spec Spec) ([]byte, Preview, error) {
 	return output.Bytes(), spec.Preview(), nil
 }
 
+// RenderDOCXTemplate fills explicit gator:title and gator:body placeholders or
+// tagged content controls while preserving the rest of a safe macro-free DOCX.
+func RenderDOCXTemplate(spec Spec, template io.Reader) ([]byte, Preview, error) {
+	spec = spec.Normalize()
+	if err := spec.Validate(); err != nil {
+		return nil, Preview{}, err
+	}
+	payload, err := io.ReadAll(io.LimitReader(template, 64*1024*1024+1))
+	if err != nil || len(payload) > 64*1024*1024 {
+		return nil, Preview{}, errors.New("DOCX template is unreadable or exceeds 64 MiB")
+	}
+	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return nil, Preview{}, errors.New("DOCX template is not a valid archive")
+	}
+	var output bytes.Buffer
+	writer := zip.NewWriter(&output)
+	found := false
+	for _, file := range archive.File {
+		lower := strings.ToLower(file.Name)
+		if strings.Contains(lower, "vbaproject") || strings.HasSuffix(lower, ".bin") {
+			return nil, Preview{}, errors.New("macro-enabled DOCX templates are not allowed")
+		}
+		reader, err := file.Open()
+		if err != nil {
+			return nil, Preview{}, err
+		}
+		contents, err := io.ReadAll(io.LimitReader(reader, 16*1024*1024+1))
+		_ = reader.Close()
+		if err != nil || len(contents) > 16*1024*1024 {
+			return nil, Preview{}, errors.New("DOCX template part exceeds 16 MiB")
+		}
+		if strings.HasSuffix(lower, ".rels") && bytes.Contains(contents, []byte(`TargetMode="External"`)) {
+			return nil, Preview{}, errors.New("DOCX templates with external relationships are not allowed")
+		}
+		if file.Name == "word/document.xml" {
+			documentXML := string(contents)
+			title := xmlTextRun(spec.Title)
+			body := templateBodyXML(spec)
+			var replaced bool
+			documentXML, replaced = replaceMarker(documentXML, "gator:title", title)
+			found = found || replaced
+			documentXML, replaced = replaceMarker(documentXML, "gator:body", body)
+			found = found || replaced
+			contents = []byte(documentXML)
+		}
+		header := file.FileHeader
+		header.SetMode(0o600)
+		target, err := writer.CreateHeader(&header)
+		if err != nil {
+			return nil, Preview{}, err
+		}
+		if _, err := target.Write(contents); err != nil {
+			return nil, Preview{}, err
+		}
+	}
+	if !found {
+		return nil, Preview{}, errors.New("DOCX template requires a gator:title or gator:body placeholder/content control")
+	}
+	if err := writer.Close(); err != nil {
+		return nil, Preview{}, err
+	}
+	return output.Bytes(), spec.Preview(), nil
+}
+
+func replaceMarker(documentXML, marker, replacement string) (string, bool) {
+	placeholder := "{{" + marker + "}}"
+	if strings.Contains(documentXML, placeholder) {
+		return strings.ReplaceAll(documentXML, placeholder, replacement), true
+	}
+	needle := `w:val="` + marker + `"`
+	position := strings.Index(documentXML, needle)
+	if position < 0 {
+		return documentXML, false
+	}
+	start := strings.LastIndex(documentXML[:position], "<w:sdt>")
+	endRelative := strings.Index(documentXML[position:], "</w:sdt>")
+	if start < 0 || endRelative < 0 {
+		return documentXML, false
+	}
+	end := position + endRelative + len("</w:sdt>")
+	contentStartRelative := strings.Index(documentXML[start:end], "<w:sdtContent>")
+	contentEndRelative := strings.Index(documentXML[start:end], "</w:sdtContent>")
+	if contentStartRelative < 0 || contentEndRelative < 0 {
+		return documentXML, false
+	}
+	contentStart := start + contentStartRelative + len("<w:sdtContent>")
+	contentEnd := start + contentEndRelative
+	return documentXML[:contentStart] + replacement + documentXML[contentEnd:], true
+}
+
+func xmlTextRun(value string) string {
+	var escaped bytes.Buffer
+	_ = xml.EscapeText(&escaped, []byte(value))
+	return escaped.String()
+}
+
+func templateBodyXML(spec Spec) string {
+	var result strings.Builder
+	for _, block := range spec.Blocks {
+		switch block.Kind {
+		case "heading":
+			result.WriteString(paragraphXML(block.Text, fmt.Sprintf("Heading%d", block.Level), false))
+		case "paragraph":
+			result.WriteString(paragraphXML(block.Text, "Normal", false))
+		case "callout":
+			result.WriteString(paragraphXML(block.Text, "Quote", false))
+		case "bullet_list", "numbered_list":
+			for index, item := range block.Items {
+				prefix := "• "
+				if block.Kind == "numbered_list" {
+					prefix = fmt.Sprintf("%d. ", index+1)
+				}
+				result.WriteString(paragraphXML(prefix+item, "ListParagraph", false))
+			}
+		case "table":
+			result.WriteString(tableXML(block.Headers, block.Rows))
+		case "page_break":
+			result.WriteString(`<w:p><w:r><w:br w:type="page"/></w:r></w:p>`)
+		}
+	}
+	return strings.ReplaceAll(result.String(), `\"`, `"`)
+}
+
 func paragraphXML(text, style string, bold bool) string {
 	var escaped bytes.Buffer
 	_ = xml.EscapeText(&escaped, []byte(text))

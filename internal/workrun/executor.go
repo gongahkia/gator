@@ -57,7 +57,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 			request.ParentRevisionID = conversation.HeadRevision
 		}
 		if request.RefreshSource {
-			sourceSnapshot, err = snapshot.Create(conversation.SourcePath, request.StateDir, snapshot.Options{Now: now})
+			options := request.SnapshotOptions
+			options.Now = now
+			sourceSnapshot, err = snapshot.Create(conversation.SourcePath, request.StateDir, options)
 		} else {
 			snapshotID := request.SnapshotID
 			if snapshotID == "" {
@@ -68,7 +70,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	} else if request.SnapshotID != "" {
 		sourceSnapshot, err = snapshot.Open(request.StateDir, request.SnapshotID)
 	} else {
-		sourceSnapshot, err = snapshot.Create(request.SourcePath, request.StateDir, snapshot.Options{Now: now})
+		options := request.SnapshotOptions
+		options.Now = now
+		sourceSnapshot, err = snapshot.Create(request.SourcePath, request.StateDir, options)
 	}
 	if err != nil {
 		return Outcome{}, err
@@ -84,6 +88,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		return Outcome{}, err
 	}
 	outcome := Outcome{Work: work, ConversationID: conversation.ID, RevisionID: request.RunID, SnapshotID: sourceSnapshot.ID}
+	var previousRoot workspace.Root
 	if request.ParentRevisionID != "" {
 		parent, loadErr := sessions.LoadRevision(conversation.ID, request.ParentRevisionID)
 		if loadErr != nil {
@@ -92,9 +97,13 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		if copyErr := seedPreviousArtifacts(filepath.Join(parent.BundlePath, "output"), work.Output, request.Contract.MaxArtifactBytes); copyErr != nil {
 			return outcome, fmt.Errorf("seed parent Work artifacts: %w", copyErr)
 		}
+		previousRoot, err = workspace.Open(filepath.Join(parent.BundlePath, "output"))
+		if err != nil {
+			return outcome, fmt.Errorf("open parent Work artifacts: %w", err)
+		}
 	}
 
-	surface, err := tools.WorkFiles(work.Source, work.Output, request.Contract, request.Mode != action.Inspect)
+	surface, err := tools.WorkFiles(work.Source, work.Output, request.Contract, request.Mode != action.Inspect, previousRoot)
 	if err != nil {
 		return outcome, err
 	}
@@ -103,8 +112,15 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
 		Permissions: request.ConnectorPermissions,
-		OnSource:    func(source connector.Provenance) { connectedSources = append(connectedSources, source) },
-		OnAction:    func(record action.Record) { actions = append(actions, record) },
+		OnContent: func(result connector.Result) error {
+			source, err := persistConnectedSnapshot(work.Path, result)
+			if err != nil {
+				return err
+			}
+			connectedSources = append(connectedSources, source)
+			return nil
+		},
+		OnAction: func(record action.Record) { actions = append(actions, record) },
 	})
 	if err != nil {
 		return outcome, err
@@ -138,7 +154,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		failure = runErr.Error()
 	}
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
-		RunID: request.RunID, Objective: request.Objective, Source: work.Source, SourceName: sourceSnapshot.SourceName, SnapshotSHA256: sourceSnapshot.SHA256,
+		RunID: request.RunID, Objective: request.Objective, Source: work.Source, SourceName: sourceSnapshot.SourceName, SourceIdentity: sourceSnapshot.SourcePath, SnapshotSHA256: sourceSnapshot.SHA256,
 		Failure: failure, Actions: actions, ConnectedSources: connectedSources, StartedAt: startedAt, FinishedAt: now(),
 	})
 	if sealErr != nil {
@@ -170,6 +186,20 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		return outcome, errors.New("work outcome contract did not pass")
 	}
 	return outcome, nil
+}
+
+func persistConnectedSnapshot(workPath string, result connector.Result) (connector.Provenance, error) {
+	directory := filepath.Join(workPath, "connected")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		return connector.Provenance{}, err
+	}
+	name := result.Provenance.ConnectorID + "-" + strings.ReplaceAll(result.Provenance.Operation, "_", "-") + "-" + result.Provenance.SHA256[:16] + ".json"
+	path := filepath.Join(directory, name)
+	if err := os.WriteFile(path, result.Data, 0o600); err != nil {
+		return connector.Provenance{}, err
+	}
+	result.Provenance.SnapshotPath = filepath.ToSlash(filepath.Join("connected", name))
+	return result.Provenance, nil
 }
 
 func conversationTitle(objective string) string {
