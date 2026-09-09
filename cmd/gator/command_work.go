@@ -254,7 +254,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		Code: workrun.CodePolicy{
 			MaxSteps: *codeMaxSteps, Verification: codeVerification, Scopes: codeScopes, Profile: strings.TrimSpace(*codeProfile),
 			Setup: codeSetup, AllowedCommands: codeAllowed, AllowedCommandPrefixes: codePrefixes,
-			Sandbox: sandbox.Policy{Mode: sandbox.Mode(*codeSandbox), Network: sandbox.Network(*codeNetwork)},
+			Sandbox:      sandbox.Policy{Mode: sandbox.Mode(*codeSandbox), Network: sandbox.Network(*codeNetwork)},
 			Capabilities: append([]string(nil), codeCapabilities...), BrowserSession: strings.TrimSpace(*codeBrowserSession),
 		},
 		ApproveCodeCommand: codeCommandApprover(*jsonOutput, in, out),

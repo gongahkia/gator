@@ -5,14 +5,15 @@ folder, give it an outcome, and it returns validated files in isolated output
 with a reviewable evidence manifest. Source material is read-only; model prose
 alone is never treated as proof that work finished.
 
-Plain `gator` opens a quiet, centered Work composer. Retained conversations,
-sources, scheduled jobs, inbox, setup, and Code stay behind the `Ctrl+P` command
-palette until they are needed. The product has two explicit workflows:
+Plain `gator` opens a quiet, centered composer. Retained conversations,
+sources, scheduled jobs, inbox, and setup stay behind the `Ctrl+P` command
+palette until they are needed. Gator is the only user-facing agent:
 
 - `gator work` turns folders and connected data into reports, JSON, CSV, and
   other bounded artifacts;
-- `gator code` retains the original isolated-Git workflow for producing tested
-  patches (`gator run` is its compatibility alias).
+- coding requests are delegated by Gator to an internal isolated Code
+  specialist that returns a tested patch artifact. `gator code` and `gator run`
+  are compatibility routes into that same manager, not separate applications.
 
 The design centers on **proof-carrying work**: artifact hashes, deterministic
 validations, source provenance, and any proposed or executed external actions
@@ -26,7 +27,7 @@ The current source includes immutable source snapshots, undoable Work
 conversations, bounded fresh-context Work specialists, DOCX/XLSX/PDF
 generation, first-party Slack/Google
 Workspace/Atlassian/Notion adapters, typed remote MCP mappings, configurable
-connector permissions, a local scheduler and inbox, the isolated coding TUI,
+connector permissions, a local scheduler and inbox, an internal isolated coding specialist,
 and a headless evaluation harness. No GitHub release has been published yet. The
 [release evidence](docs/RELEASE_EVIDENCE.md) checklist remains the human gate
 for a daily-driver claim.

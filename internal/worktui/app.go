@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,7 +36,7 @@ type RunOptions struct {
 }
 
 type CodeOptions struct {
-	MaxSteps              int
+	MaxSteps               int
 	Verification           []string
 	Scopes                 []string
 	Profile                string
@@ -335,6 +336,9 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.input = ""
+		if strings.HasPrefix(prompt, "/") {
+			return m.runLocalCommand(prompt)
+		}
 		if m.firstRun {
 			m.home = false
 			m.onboarding = true
@@ -454,26 +458,152 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
-	if m.conversation == "" {
-		m.messages = append(m.messages, message{role: "Gator", text: "Start or resume a conversation before using revision history."})
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
 		return m, nil
 	}
+	m.home = false
 	var result string
 	var err error
-	fields := strings.Fields(command)
-	switch command {
-	case "/back":
-		result, err = m.config.MoveBack(m.conversation)
-	case "/forward":
-		result, err = m.config.MoveForward(m.conversation)
-	case "/history":
-		result, err = m.config.History(m.conversation)
-	default:
-		if len(fields) == 2 && fields[0] == "/forward" && m.config.MoveToRevision != nil {
-			result, err = m.config.MoveToRevision(m.conversation, fields[1])
-		} else {
-			err = fmt.Errorf("unknown command %s", command)
+	switch fields[0] {
+	case "/help", "/?":
+		result = workHelp()
+	case "/new":
+		m.home, m.onboarding, m.conversation = true, false, ""
+		m.source = m.config.CurrentFolder
+		m.title = "Work in " + filepath.Base(m.source)
+		m.messages, m.status, m.queue = nil, "", nil
+		return m, nil
+	case "/model":
+		m.onboarding = true
+		m.pendingPrompt = ""
+		m.title = "Choose a model provider"
+		m.messages = []message{{role: "Gator", text: "Which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."}}
+		return m, nil
+	case "/effort":
+		if len(fields) != 2 {
+			result = "Usage: /effort low|standard|high\nCurrent: " + effortName(m.options.MaxSteps)
+			break
 		}
+		switch strings.ToLower(fields[1]) {
+		case "low":
+			m.options.MaxSteps, m.options.Code.MaxSteps = 12, 8
+		case "standard":
+			m.options.MaxSteps, m.options.Code.MaxSteps = 24, 16
+		case "high":
+			m.options.MaxSteps, m.options.Code.MaxSteps = 48, 32
+		default:
+			err = fmt.Errorf("unknown effort %q; use low, standard, or high", fields[1])
+		}
+		if err == nil {
+			result = "Effort set to " + effortName(m.options.MaxSteps) + "."
+		}
+	case "/attach":
+		if len(fields) != 2 {
+			result = "Usage: /attach SOURCE_RELATIVE_PATH\nPending: " + valueOrNone(strings.Join(m.options.Attachments, ", "))
+			break
+		}
+		path := filepath.ToSlash(filepath.Clean(fields[1]))
+		if filepath.IsAbs(fields[1]) || path == ".." || strings.HasPrefix(path, "../") {
+			err = fmt.Errorf("attachment path must stay inside the selected source")
+			break
+		}
+		if !sliceContains(m.options.Attachments, path) {
+			m.options.Attachments = append(m.options.Attachments, path)
+		}
+		result = "Attached for the next prompt: " + path
+	case "/detach":
+		if len(fields) != 2 {
+			err = fmt.Errorf("usage: /detach SOURCE_RELATIVE_PATH|all")
+			break
+		}
+		if fields[1] == "all" {
+			m.options.Attachments = nil
+			result = "Cleared pending attachments."
+			break
+		}
+		m.options.Attachments = removeString(m.options.Attachments, filepath.ToSlash(filepath.Clean(fields[1])))
+		result = "Removed the pending attachment when present."
+	case "/code":
+		result, err = m.configureCode(fields, command)
+	case "/status":
+		result = m.workStatus()
+	case "/permissions":
+		result = m.codeStatus()
+	case "/doctor", "/agents", "/settings":
+		if m.config.Inspect == nil {
+			err = errorsUnavailable(fields[0])
+		} else {
+			result, err = m.config.Inspect(strings.TrimPrefix(fields[0], "/"))
+		}
+	case "/theme":
+		if len(fields) != 2 || m.config.SetTheme == nil {
+			err = fmt.Errorf("usage: /theme gator|contrast|mono")
+			break
+		}
+		name := normalizeTheme(fields[1])
+		if name != strings.ToLower(fields[1]) {
+			err = fmt.Errorf("usage: /theme gator|contrast|mono")
+			break
+		}
+		err = m.config.SetTheme(name)
+		if err == nil {
+			m.theme, result = name, "Theme set to "+name+"."
+		}
+	case "/copy":
+		if m.config.Copy == nil {
+			err = errorsUnavailable("copy")
+			break
+		}
+		text := m.latestGatorMessage()
+		if text == "" {
+			err = fmt.Errorf("there is no Gator response to copy")
+		} else if err = m.config.Copy(text); err == nil {
+			result = "Copied the latest Gator response."
+		}
+	case "/queue":
+		result = m.queueStatus()
+	case "/dequeue":
+		if len(m.queue) == 0 {
+			result = "The prompt queue is empty."
+		} else {
+			m.queue = m.queue[1:]
+			result = m.queueStatus()
+		}
+	case "/clear-queue":
+		m.queue = nil
+		result = "Cleared the prompt queue."
+	case "/review":
+		if m.lastOutput == "" {
+			result = "No completed Work output is available yet."
+		} else {
+			result = "Latest staged output: " + m.lastOutput + "\nUse `gator review " + filepath.Dir(m.lastOutput) + " --preview` for verified artifact and Code-patch evidence."
+		}
+	case "/back", "/forward", "/history":
+		if m.conversation == "" {
+			err = fmt.Errorf("start or resume a conversation before using revision history")
+			break
+		}
+		switch fields[0] {
+		case "/back":
+			if m.config.MoveBack != nil {
+				result, err = m.config.MoveBack(m.conversation)
+			}
+		case "/history":
+			if m.config.History != nil {
+				result, err = m.config.History(m.conversation)
+			}
+		case "/forward":
+			if len(fields) == 2 && m.config.MoveToRevision != nil {
+				result, err = m.config.MoveToRevision(m.conversation, fields[1])
+			} else if m.config.MoveForward != nil {
+				result, err = m.config.MoveForward(m.conversation)
+			}
+		}
+	case "/quit":
+		return m, tea.Quit
+	default:
+		err = fmt.Errorf("unknown command %s; use /help", fields[0])
 	}
 	if err != nil {
 		result = err.Error()
@@ -481,6 +611,225 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	m.messages = append(m.messages, message{role: "Gator", text: result})
 	m.scroll = 0
 	return m, nil
+}
+
+func (m *Model) configureCode(fields []string, raw string) (string, error) {
+	if len(fields) == 1 || fields[1] == "status" {
+		return m.codeStatus(), nil
+	}
+	action := strings.ToLower(fields[1])
+	value := strings.TrimSpace(strings.TrimPrefix(raw, fields[0]+" "+fields[1]))
+	requireValue := func() error {
+		if value == "" {
+			return fmt.Errorf("/code %s requires a value", action)
+		}
+		return nil
+	}
+	switch action {
+	case "reset":
+		m.options.Code = CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}
+		return "Reset the internal Code specialist to strict, offline defaults.", nil
+	case "verify":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.Verification = appendUnique(m.options.Code.Verification, value)
+	case "scope":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.Scopes = appendUnique(m.options.Code.Scopes, value)
+	case "profile":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.Profile = value
+	case "setup":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.Setup = appendUnique(m.options.Code.Setup, value)
+	case "allow":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.AllowedCommands = appendUnique(m.options.Code.AllowedCommands, value)
+	case "allow-prefix":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.AllowedCommandPrefixes = appendUnique(m.options.Code.AllowedCommandPrefixes, value)
+	case "sandbox":
+		if value != "strict" && value != "off" {
+			return "", fmt.Errorf("/code sandbox accepts strict or off")
+		}
+		m.options.Code.Sandbox = value
+	case "network":
+		if value != "deny" && value != "allow" {
+			return "", fmt.Errorf("/code network accepts deny or allow")
+		}
+		m.options.Code.Network = value
+	case "max-steps":
+		steps, err := strconv.Atoi(value)
+		if err != nil || steps < 1 || steps > 32 {
+			return "", fmt.Errorf("/code max-steps requires an integer from 1 to 32")
+		}
+		m.options.Code.MaxSteps = steps
+	case "grant", "revoke":
+		capability := normalizeCodeCapability(value)
+		if capability == "" {
+			return "", fmt.Errorf("Code capability must be lsp, mcp, extension, http, browser, or terminal")
+		}
+		if action == "grant" {
+			m.options.Code.Capabilities = appendUnique(m.options.Code.Capabilities, capability)
+		} else {
+			m.options.Code.Capabilities = removeString(m.options.Code.Capabilities, capability)
+			if capability == "browser" {
+				m.options.Code.BrowserSession = ""
+			}
+		}
+	case "browser":
+		if err := requireValue(); err != nil {
+			return "", err
+		}
+		m.options.Code.BrowserSession = value
+		m.options.Code.Capabilities = appendUnique(m.options.Code.Capabilities, "browser")
+	default:
+		return "", fmt.Errorf("unknown /code setting %q; use /code status", action)
+	}
+	return m.codeStatus(), nil
+}
+
+func (m Model) codeStatus() string {
+	code := m.options.Code
+	return fmt.Sprintf("Internal Code specialist\n  effort: %d steps\n  sandbox/network: %s/%s\n  profile: %s\n  scopes: %s\n  verification: %s\n  setup: %s\n  exact command grants: %s\n  prefix grants: %s\n  capabilities: %s\n  browser session: %s",
+		code.MaxSteps, valueOrNone(code.Sandbox), valueOrNone(code.Network), valueOrNone(code.Profile), valueOrNone(strings.Join(code.Scopes, ", ")),
+		valueOrNone(strings.Join(code.Verification, "; ")), valueOrNone(strings.Join(code.Setup, "; ")), valueOrNone(strings.Join(code.AllowedCommands, "; ")),
+		valueOrNone(strings.Join(code.AllowedCommandPrefixes, "; ")), valueOrNone(strings.Join(code.Capabilities, ", ")), valueOrNone(code.BrowserSession))
+}
+
+func (m Model) workStatus() string {
+	return fmt.Sprintf("Gator orchestration\n  source: %s\n  conversation: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n\n%s",
+		valueOrNone(m.source), valueOrNone(m.conversation), effortName(m.options.MaxSteps), m.options.MaxSteps,
+		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue), m.codeStatus())
+}
+
+func (m Model) queueStatus() string {
+	if len(m.queue) == 0 {
+		return "The prompt queue is empty."
+	}
+	lines := make([]string, 0, len(m.queue)+1)
+	lines = append(lines, fmt.Sprintf("%d queued prompt(s):", len(m.queue)))
+	for index, item := range m.queue {
+		lines = append(lines, fmt.Sprintf("  %d. %s", index+1, truncate(item.prompt, 80)))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) latestGatorMessage() string {
+	for index := len(m.messages) - 1; index >= 0; index-- {
+		if m.messages[index].role == "Gator" {
+			return m.messages[index].text
+		}
+	}
+	return ""
+}
+
+func cloneRunOptions(options RunOptions) RunOptions {
+	result := options
+	result.Attachments = append([]string(nil), options.Attachments...)
+	result.Code.Verification = append([]string(nil), options.Code.Verification...)
+	result.Code.Scopes = append([]string(nil), options.Code.Scopes...)
+	result.Code.Setup = append([]string(nil), options.Code.Setup...)
+	result.Code.AllowedCommands = append([]string(nil), options.Code.AllowedCommands...)
+	result.Code.AllowedCommandPrefixes = append([]string(nil), options.Code.AllowedCommandPrefixes...)
+	result.Code.Capabilities = append([]string(nil), options.Code.Capabilities...)
+	return result
+}
+
+func appendUnique(values []string, value string) []string {
+	if !sliceContains(values, value) {
+		return append(values, value)
+	}
+	return values
+}
+
+func removeString(values []string, target string) []string {
+	result := values[:0]
+	for _, value := range values {
+		if value != target {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func sliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeCodeCapability(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "lsp", "mcp", "http", "browser", "terminal":
+		return strings.ToLower(strings.TrimSpace(value))
+	case "extension", "extensions":
+		return "extension"
+	case "web", "research":
+		return "http"
+	default:
+		return ""
+	}
+}
+
+func effortName(steps int) string {
+	if steps <= 12 {
+		return "low"
+	}
+	if steps >= 48 {
+		return "high"
+	}
+	return "standard"
+}
+
+func valueOrNone(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "none"
+	}
+	return value
+}
+
+func errorsUnavailable(name string) error {
+	return fmt.Errorf("%s is unavailable in this Gator build", strings.TrimPrefix(name, "/"))
+}
+
+func workHelp() string {
+	return `Gator commands
+  /model                         connect or switch the default model
+  /effort low|standard|high      set manager and Code turn budgets
+  /attach PATH                   send one source file with the next prompt
+  /detach PATH|all               remove pending attachments
+  /code status                   inspect the internal Code envelope
+  /code verify COMMAND           add required project verification
+  /code scope PATH               add a project-instruction scope
+  /code profile NAME             select a project profile
+  /code setup COMMAND            add an explicit setup command
+  /code allow COMMAND            pre-approve one exact argv
+  /code allow-prefix PREFIX      pre-approve a literal argv prefix
+  /code grant CAPABILITY         grant lsp/mcp/extension/http/browser/terminal
+  /code sandbox strict|off       set the child process boundary
+  /code network deny|allow       set child network access
+  /code browser SESSION          select an already controlled browser session
+  /code reset                    restore strict, offline Code defaults
+  /status · /permissions         inspect the active orchestration envelope
+  /doctor · /agents · /settings inspect local configuration
+  /history · /back · /forward   navigate retained Gator revisions
+  /queue · /dequeue · /clear-queue
+  /review · /copy · /theme · /new · /quit`
 }
 
 func (m Model) View() string {
@@ -496,9 +845,7 @@ func (m Model) View() string {
 	} else if height < 8 {
 		height = 8
 	}
-	accent := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
-	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("236"))
+	accent, dim, selectedStyle := workStyles(m.theme)
 	if m.launcher {
 		return m.renderPalette(width, height, accent, dim, selectedStyle)
 	}
@@ -533,7 +880,11 @@ func (m Model) View() string {
 		view.WriteString(accent.Render("● Working…") + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
-	view.WriteString("\n" + dim.Render("enter send  ·  ctrl+p menu  ·  pgup/pgdown scroll"))
+	footer := "enter send  ·  ctrl+p menu  ·  /help  ·  pgup/pgdown scroll"
+	if len(m.queue) > 0 {
+		footer = fmt.Sprintf("%d queued  ·  ", len(m.queue)) + footer
+	}
+	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
 }
 
@@ -577,17 +928,49 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 func (m Model) renderComposer(width int, focused bool) string {
 	composerWidth := min(68, max(12, width-8))
 	border := lipgloss.Color("238")
+	cursor := lipgloss.Color("42")
+	if m.theme == "contrast" {
+		border, cursor = lipgloss.Color("250"), lipgloss.Color("46")
+	} else if m.theme == "mono" {
+		border, cursor = lipgloss.Color("245"), lipgloss.Color("255")
+	}
 	if focused {
-		border = lipgloss.Color("42")
+		border = cursor
 	}
 	value := m.input
 	if value == "" {
 		value = lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Render("Ask Gator to work on something…")
 	}
 	if focused {
-		value += lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("█")
+		value += lipgloss.NewStyle().Foreground(cursor).Render("█")
 	}
 	return lipgloss.NewStyle().Width(composerWidth).Padding(0, 1).Border(lipgloss.RoundedBorder()).BorderForeground(border).Render(value)
+}
+
+func normalizeTheme(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "contrast":
+		return "contrast"
+	case "mono":
+		return "mono"
+	default:
+		return "gator"
+	}
+}
+
+func workStyles(theme string) (lipgloss.Style, lipgloss.Style, lipgloss.Style) {
+	switch normalizeTheme(theme) {
+	case "contrast":
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("250")),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("226"))
+	case "mono":
+		return lipgloss.NewStyle().Bold(true), lipgloss.NewStyle().Faint(true), lipgloss.NewStyle().Reverse(true)
+	default:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("242")),
+			lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color("236"))
+	}
 }
 
 func truncate(value string, maximum int) string {

@@ -33,15 +33,15 @@ const (
 // execution with only the built-in patch tools and verifier commands.
 type CodePolicy struct {
 	MaxSteps               int
-	Verification            [][]string
-	Scopes                  []string
-	Profile                 string
-	Setup                   [][]string
-	AllowedCommands         [][]string
-	AllowedCommandPrefixes  [][]string
-	Sandbox                 sandbox.Policy
-	Capabilities            []string
-	BrowserSession          string
+	Verification           [][]string
+	Scopes                 []string
+	Profile                string
+	Setup                  [][]string
+	AllowedCommands        [][]string
+	AllowedCommandPrefixes [][]string
+	Sandbox                sandbox.Policy
+	Capabilities           []string
+	BrowserSession         string
 }
 
 // HasCapability reports an explicit per-Work-run grant. Configuration and

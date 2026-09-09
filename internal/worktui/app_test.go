@@ -10,7 +10,7 @@ import (
 )
 
 func TestHomeComposerStartsConversationAndRetainsResult(t *testing.T) {
-	model := New(Config{CurrentFolder: "/work/reports", Run: func(source, conversation, prompt string) RunResult {
+	model := New(Config{CurrentFolder: "/work/reports", Run: func(source, conversation, prompt string, _ RunOptions) RunResult {
 		if source != "/work/reports" || conversation != "" || prompt != "draft" {
 			t.Fatalf("run input = %q %q %q", source, conversation, prompt)
 		}
@@ -90,6 +90,67 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	if !strings.Contains(view, "Inbox") || !strings.Contains(view, "Scheduled jobs") {
 		t.Fatalf("palette did not reveal secondary navigation: %q", view)
 	}
+	if strings.Contains(view, "Open the isolated coding workflow") {
+		t.Fatalf("palette still exposes the retired Code frontend: %q", view)
+	}
+}
+
+func TestMainComposerOwnsEffortAttachmentsAndCodePolicy(t *testing.T) {
+	var received RunOptions
+	model := New(Config{CurrentFolder: "/work", Run: func(_, _, _ string, options RunOptions) RunResult {
+		received = options
+		return RunResult{FinalText: "done"}
+	}})
+	for _, command := range []string{
+		"/effort high", "/attach design.png", "/code verify go test ./...", "/code scope internal/parser",
+		"/code profile implementer", "/code allow go test ./...", "/code grant lsp",
+	} {
+		model.input = command
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		model = updated.(Model)
+	}
+	model.input = "implement the parser"
+	updated, run := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if run == nil {
+		t.Fatal("configured prompt did not start")
+	}
+	updated, _ = model.Update(run())
+	model = updated.(Model)
+	if received.MaxSteps != 48 || received.Code.MaxSteps != 32 || received.Code.Profile != "implementer" || len(received.Attachments) != 1 || len(received.Code.Verification) != 1 || len(received.Code.Scopes) != 1 || len(received.Code.AllowedCommands) != 1 || !sliceContains(received.Code.Capabilities, "lsp") {
+		t.Fatalf("received options = %#v", received)
+	}
+	if len(model.options.Attachments) != 0 {
+		t.Fatalf("per-send attachments were retained: %#v", model.options.Attachments)
+	}
+}
+
+func TestPromptsTypedDuringRunExecuteSequentially(t *testing.T) {
+	var prompts []string
+	model := New(Config{CurrentFolder: "/work", Run: func(_, _, prompt string, _ RunOptions) RunResult {
+		prompts = append(prompts, prompt)
+		return RunResult{ConversationID: "conversation-one", FinalText: "done " + prompt}
+	}})
+	model.input = "first"
+	updated, first := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("second")})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if len(model.queue) != 1 {
+		t.Fatalf("queue = %#v", model.queue)
+	}
+	updated, second := model.Update(first())
+	model = updated.(Model)
+	if second == nil || !model.running {
+		t.Fatalf("queued run did not start: %#v", model)
+	}
+	updated, _ = model.Update(second())
+	model = updated.(Model)
+	if strings.Join(prompts, ",") != "first,second" || model.running || len(model.queue) != 0 {
+		t.Fatalf("prompts=%#v model=%#v", prompts, model)
+	}
 }
 
 func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
@@ -98,7 +159,7 @@ func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	model := New(Config{
 		CurrentFolder: "/work", FirstRun: true,
 		CompleteSetup: func(provider string) error { selectedProvider = provider; return nil },
-		Run: func(_, _, prompt string) RunResult {
+		Run: func(_, _, prompt string, _ RunOptions) RunResult {
 			called = prompt
 			return RunResult{FinalText: "done"}
 		},

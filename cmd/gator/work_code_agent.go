@@ -64,7 +64,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			Profile:                 request.Policy.Profile,
 			Setup:                   cloneCodeCommands(request.Policy.Setup),
 			AllowedCommands:         cloneCodeCommands(request.Policy.AllowedCommands),
-			AllowedCommandPrefixes: cloneCodeCommands(request.Policy.AllowedCommandPrefixes),
+			AllowedCommandPrefixes:  cloneCodeCommands(request.Policy.AllowedCommandPrefixes),
 			Approve:                 request.Approve,
 			BrowserSession:          request.Policy.BrowserSession,
 			Mode:                    gatorrun.ExecuteMode,

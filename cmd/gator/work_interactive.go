@@ -10,7 +10,9 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
@@ -93,8 +95,8 @@ func workInteractiveConversation(startConversationID string) error {
 			return command
 		},
 		CompleteSetup: selectWorkOnboardingProvider,
-		Run: func(source, conversationID, prompt string) worktui.RunResult {
-			return runInteractiveWork(source, conversationID, prompt, stateDir)
+		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
+			return runInteractiveWork(source, conversationID, prompt, stateDir, options)
 		},
 		MoveBack: func(conversationID string) (string, error) {
 			conversation, err := sessions.Load(conversationID)
@@ -178,13 +180,10 @@ func workInteractiveConversation(startConversationID string) error {
 			}
 			return strings.Join(lines, "\n"), nil
 		},
-		CodeCommand: func() *exec.Cmd {
-			command := exec.Command(os.Args[0], "code", "--tui")
-			command.Stdin = os.Stdin
-			command.Stdout = os.Stdout
-			command.Stderr = os.Stderr
-			return command
-		},
+		Inspect:  inspectWorkTUITopic,
+		Copy:     clipboard.WriteAll,
+		Theme:    settings.Theme,
+		SetTheme: saveTheme,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	_, err = program.Run()
@@ -219,12 +218,50 @@ func selectWorkOnboardingProvider(providerName string) error {
 	return nil
 }
 
-func runInteractiveWork(source, conversationID, prompt, stateDir string) worktui.RunResult {
+func runInteractiveWork(source, conversationID, prompt, stateDir string, options worktui.RunOptions) worktui.RunResult {
 	arguments := []string{"work", "--json"}
 	if conversationID != "" {
 		arguments = append(arguments, "--conversation", conversationID)
 	} else {
 		arguments = append(arguments, "--source", source)
+	}
+	if options.MaxSteps > 0 {
+		arguments = append(arguments, "--max-steps", fmt.Sprint(options.MaxSteps))
+	}
+	if options.Code.MaxSteps > 0 {
+		arguments = append(arguments, "--code-max-steps", fmt.Sprint(options.Code.MaxSteps))
+	}
+	for _, path := range options.Attachments {
+		flag := "--attach"
+		if attachment.IsImage(path) {
+			flag = "--image"
+		}
+		arguments = append(arguments, flag, path)
+	}
+	for _, value := range options.Code.Verification {
+		arguments = append(arguments, "--verify", value)
+	}
+	for _, value := range options.Code.Scopes {
+		arguments = append(arguments, "--scope", value)
+	}
+	if options.Code.Profile != "" {
+		arguments = append(arguments, "--profile", options.Code.Profile)
+	}
+	for _, value := range options.Code.Setup {
+		arguments = append(arguments, "--setup", value)
+	}
+	for _, value := range options.Code.AllowedCommands {
+		arguments = append(arguments, "--allow-command", value)
+	}
+	for _, value := range options.Code.AllowedCommandPrefixes {
+		arguments = append(arguments, "--allow-command-prefix", value)
+	}
+	arguments = append(arguments, "--sandbox", options.Code.Sandbox, "--network", options.Code.Network)
+	for _, value := range options.Code.Capabilities {
+		arguments = append(arguments, "--code-capability", value)
+	}
+	if options.Code.BrowserSession != "" {
+		arguments = append(arguments, "--browser-session", options.Code.BrowserSession)
 	}
 	arguments = append(arguments, "--", prompt)
 	command := exec.Command(os.Args[0], arguments...)
@@ -248,6 +285,22 @@ func runInteractiveWork(source, conversationID, prompt, stateDir string) worktui
 		response.Error = fmt.Sprintf("%v: %s", runErr, stderr.String())
 	}
 	return worktui.RunResult{ConversationID: response.ConversationID, RevisionID: response.RevisionID, SnapshotID: response.SnapshotID, FinalText: response.FinalText, OutputPath: response.OutputPath, Error: response.Error}
+}
+
+func inspectWorkTUITopic(topic string) (string, error) {
+	var output bytes.Buffer
+	var err error
+	switch topic {
+	case "doctor":
+		err = doctor(nil, &output)
+	case "agents":
+		err = agentCommand([]string{"list"}, &output)
+	case "settings":
+		err = configure([]string{"show"}, &output)
+	default:
+		err = fmt.Errorf("unknown inspection topic %q", topic)
+	}
+	return strings.TrimSpace(output.String()), err
 }
 
 func unifiedResume(arguments []string, out io.Writer) error {

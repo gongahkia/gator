@@ -47,12 +47,25 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestCodeAndRunShareTheCodingEntryPoint(t *testing.T) {
+func TestCodeAndRunRouteThroughTheMainOrchestrationEntryPoint(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	t.Setenv("OPENAI_API_KEY", "")
 	for _, command := range []string{"code", "run"} {
 		var output bytes.Buffer
 		err := run([]string{command, "task without verification"}, &output)
-		if err == nil || !strings.Contains(err.Error(), "--verify") {
+		if err == nil || strings.Contains(err.Error(), "--verify") || !strings.Contains(err.Error(), "OPENAI_API_KEY") {
 			t.Fatalf("%s entry point error = %v", command, err)
+		}
+	}
+}
+
+func TestStandaloneCodeConversationCommandsAreRetired(t *testing.T) {
+	for _, command := range []string{"resume", "fork", "clone"} {
+		var output bytes.Buffer
+		err := run([]string{"code", command, "legacy-id"}, &output)
+		if err == nil || !strings.Contains(err.Error(), "standalone Code sessions are retired") {
+			t.Fatalf("code %s error = %v", command, err)
 		}
 	}
 }
