@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/xuri/excelize/v2"
 )
@@ -30,22 +31,24 @@ type WorkDataset struct {
 	Cases   []WorkCase `json:"cases"`
 }
 type WorkCase struct {
-	ID           string                  `json:"id"`
-	Family       string                  `json:"family"`
-	Split        string                  `json:"split"`
-	Source       string                  `json:"source"`
-	Objective    string                  `json:"objective"`
-	Contract     artifact.Contract       `json:"contract"`
-	Mode         action.Mode             `json:"mode"`
-	MaxSteps     int                     `json:"max_steps"`
-	Limits       agent.Limits            `json:"limits"`
-	Code         workrun.CodePolicy      `json:"code"`
-	Capabilities []string                `json:"capabilities"`
-	Turns        []agent.Turn            `json:"script"`
-	CodeTurns    []agent.Turn            `json:"code_script,omitempty"`
-	RoleTurns    map[string][]agent.Turn `json:"role_scripts,omitempty"`
-	Followups    []WorkFollowup          `json:"followups,omitempty"`
-	Graders      []WorkGrader            `json:"graders"`
+	FixtureSHA256 string                  `json:"fixture_sha256,omitempty"`
+	WebOrigins    []string                `json:"web_origins,omitempty"`
+	ID            string                  `json:"id"`
+	Family        string                  `json:"family"`
+	Split         string                  `json:"split"`
+	Source        string                  `json:"source"`
+	Objective     string                  `json:"objective"`
+	Contract      artifact.Contract       `json:"contract"`
+	Mode          action.Mode             `json:"mode"`
+	MaxSteps      int                     `json:"max_steps"`
+	Limits        agent.Limits            `json:"limits"`
+	Code          workrun.CodePolicy      `json:"code"`
+	Capabilities  []string                `json:"capabilities"`
+	Turns         []agent.Turn            `json:"script"`
+	CodeTurns     []agent.Turn            `json:"code_script,omitempty"`
+	RoleTurns     map[string][]agent.Turn `json:"role_scripts,omitempty"`
+	Followups     []WorkFollowup          `json:"followups,omitempty"`
+	Graders       []WorkGrader            `json:"graders"`
 }
 type WorkFollowup struct {
 	Objective string       `json:"objective"`
@@ -54,6 +57,8 @@ type WorkFollowup struct {
 	Turns     []agent.Turn `json:"script"`
 }
 type WorkGrader struct {
+	Locator  string `json:"locator,omitempty"`
+	Quote    string `json:"quote,omitempty"`
 	Version  int    `json:"version"`
 	Kind     string `json:"kind"`
 	Path     string `json:"path,omitempty"`
@@ -68,28 +73,33 @@ type Grade struct {
 	Error    string `json:"error,omitempty"`
 }
 type WorkTrial struct {
-	Version        int         `json:"version"`
-	ID             string      `json:"id"`
-	CaseID         string      `json:"case_id"`
-	CaseSHA256     string      `json:"case_sha256"`
-	Split          string      `json:"split"`
-	Family         string      `json:"family"`
-	Trial          int         `json:"trial"`
-	Status         string      `json:"status"`
-	Category       string      `json:"category"`
-	Error          string      `json:"error,omitempty"`
-	Grades         []Grade     `json:"grades"`
-	ConversationID string      `json:"conversation_id"`
-	RevisionID     string      `json:"revision_id"`
-	SnapshotID     string      `json:"snapshot_id"`
-	ContractSHA256 string      `json:"contract_sha256"`
-	PolicySHA256   string      `json:"policy_sha256"`
-	SourceSHA256   string      `json:"source_sha256"`
-	BundlePath     string      `json:"bundle_path"`
-	Usage          agent.Usage `json:"usage"`
-	DurationMS     int64       `json:"duration_ms"`
+	Metrics           WorkMetrics      `json:"metrics"`
+	ExecutionCategory string           `json:"execution_category"`
+	TracePath         string           `json:"trace_path,omitempty"`
+	Spans             []telemetry.Span `json:"spans,omitempty"`
+	Version           int              `json:"version"`
+	ID                string           `json:"id"`
+	CaseID            string           `json:"case_id"`
+	CaseSHA256        string           `json:"case_sha256"`
+	Split             string           `json:"split"`
+	Family            string           `json:"family"`
+	Trial             int              `json:"trial"`
+	Status            string           `json:"status"`
+	Category          string           `json:"category"`
+	Error             string           `json:"error,omitempty"`
+	Grades            []Grade          `json:"grades"`
+	ConversationID    string           `json:"conversation_id"`
+	RevisionID        string           `json:"revision_id"`
+	SnapshotID        string           `json:"snapshot_id"`
+	ContractSHA256    string           `json:"contract_sha256"`
+	PolicySHA256      string           `json:"policy_sha256"`
+	SourceSHA256      string           `json:"source_sha256"`
+	BundlePath        string           `json:"bundle_path"`
+	Usage             agent.Usage      `json:"usage"`
+	DurationMS        int64            `json:"duration_ms"`
 }
 type WorkExperiment struct {
+	Outcomes        map[string]int `json:"outcomes"`
 	Version         int            `json:"version"`
 	ID              string         `json:"id"`
 	Dataset         string         `json:"dataset"`
@@ -134,7 +144,7 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 		return dataset, errors.New("invalid Work dataset")
 	}
 	seen := map[string]bool{}
-	for _, c := range dataset.Cases {
+	for index, c := range dataset.Cases {
 		if !identifierPattern.MatchString(c.ID) || seen[c.ID] || (c.Split != "development" && c.Split != "held-out") || c.Objective == "" || c.MaxSteps < 1 || c.MaxSteps > 128 || len(c.Graders) == 0 {
 			return dataset, fmt.Errorf("invalid case %q", c.ID)
 		}
@@ -157,6 +167,14 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 		if !strings.HasPrefix(root, base+string(filepath.Separator)) {
 			return dataset, errors.New("fixture source escapes dataset")
 		}
+		fixture, err := fixtureDigest(root)
+		if err != nil {
+			return dataset, err
+		}
+		if c.FixtureSHA256 != "" && c.FixtureSHA256 != fixture {
+			return dataset, errors.New("fixture content does not match manifest digest")
+		}
+		dataset.Cases[index].FixtureSHA256 = fixture
 		if err := c.Contract.Validate(); err != nil {
 			return dataset, fmt.Errorf("case %s contract: %w", c.ID, err)
 		}
@@ -165,7 +183,7 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 				return dataset, errors.New("unsupported grader version")
 			}
 			switch g.Kind {
-			case "file_equals", "file_contains", "cell_equals", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest":
+			case "evidence_reference", "file_equals", "file_contains", "cell_equals", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest":
 			default:
 				return dataset, fmt.Errorf("unknown grader %q", g.Kind)
 			}
@@ -190,7 +208,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	if err := os.Mkdir(options.ReportDir, 0700); err != nil {
 		return WorkExperiment{}, fmt.Errorf("create new experiment directory: %w", err)
 	}
-	report := WorkExperiment{Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}}
+	report := WorkExperiment{Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
 	var budget *agent.Budget
 	if options.MaxRequests > 0 {
 		budget = &agent.Budget{Limits: agent.Limits{ModelRequests: options.MaxRequests}}
@@ -211,7 +229,7 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			evaluated.ID = item.ID
 			service, setupErr := factory(evaluated, state)
 			source := filepath.Join(filepath.Dir(datasetPath), c.Source)
-			request := workrun.Request{RunID: item.ID, Budget: budget, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, Limits: c.Limits, DisableDelegation: !options.Delegation}
+			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, Limits: c.Limits, DisableDelegation: !options.Delegation}
 			var outcome workrun.Outcome
 			var runErr error
 			if setupErr != nil {
@@ -219,6 +237,8 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				runErr = setupErr
 			} else {
 				outcome, runErr = service.Execute(ctx, request)
+				item.Metrics.observe(outcome)
+				usageAdd(&item.Usage, outcome.Manifest.Usage)
 				revisions := []string{outcome.RevisionID}
 				for followIndex, follow := range c.Followups {
 					request.RunID = fmt.Sprintf("%s-rev%d", item.ID, followIndex+1)
@@ -233,6 +253,8 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 						service.Executor.Model = &ScriptedModel{Turns: append([]agent.Turn(nil), follow.Turns...)}
 					}
 					outcome, runErr = service.Execute(ctx, request)
+					item.Metrics.observe(outcome)
+					usageAdd(&item.Usage, outcome.Manifest.Usage)
 					revisions = append(revisions, outcome.RevisionID)
 				}
 				if runErr != nil {
@@ -246,6 +268,10 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 					case errors.Is(runErr, context.Canceled):
 						item.Category = "cancelled"
 					}
+				}
+				item.ExecutionCategory = item.Category
+				if runErr == nil {
+					item.ExecutionCategory = "completed"
 				}
 				all := true
 				for _, grader := range c.Graders {
@@ -273,10 +299,21 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			item.PolicySHA256 = outcome.Manifest.PolicySHA256
 			item.SourceSHA256 = outcome.SourceSnapshot.SHA256
 			item.BundlePath = outcome.Work.Path
-			item.Usage = outcome.Manifest.Usage
+			if item.ExecutionCategory == "" {
+				item.ExecutionCategory = item.Category
+			}
+			item.TracePath = filepath.Join(state, "gator", "traces", outcome.RevisionID, "trace.json")
+			if data, err := os.ReadFile(item.TracePath); err == nil {
+				var trace telemetry.Trace
+				if err := json.Unmarshal(data, &trace); err != nil {
+					return report, err
+				}
+				item.Spans = trace.Spans
+			}
 			item.DurationMS = time.Since(started).Milliseconds()
 			report.Trials = append(report.Trials, item)
 			report.Categories[item.Category]++
+			report.Outcomes[item.ExecutionCategory]++
 			report.Total++
 			if err := writeJSON(filepath.Join(options.ReportDir, item.ID+".json"), item, "Work trial"); err != nil {
 				return report, err
@@ -289,6 +326,9 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			report.CasesAll++
 		}
 	}
+	if err := os.WriteFile(filepath.Join(options.ReportDir, "report.txt"), []byte(WorkSummary(report)), 0600); err != nil {
+		return report, err
+	}
 	return report, writeJSON(filepath.Join(options.ReportDir, "experiment.json"), report, "Work experiment")
 }
 func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract artifact.Contract) Grade {
@@ -296,6 +336,36 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 	actual := ""
 	var err error
 	switch g.Kind {
+	case "evidence_reference":
+		contents, readErr := outcome.Work.Output.ReadRegularFile(g.Path, 512*1024)
+		if readErr != nil {
+			grade.Error = readErr.Error()
+			return grade
+		}
+		for _, evidence := range outcome.Manifest.Evidence {
+			if evidence.Locator != g.Locator {
+				continue
+			}
+			if !strings.Contains(string(contents), evidence.Locator) && !strings.Contains(string(contents), evidence.ID) {
+				continue
+			}
+			var source []byte
+			if evidence.SnapshotPath != "" {
+				root, openErr := artifact.OpenBundle(outcome.Work.Path)
+				if openErr != nil {
+					grade.Error = openErr.Error()
+					return grade
+				}
+				source, err = root.Root.ReadRegularFile(evidence.SnapshotPath, 512*1024)
+			} else if strings.HasPrefix(evidence.Locator, "source/") {
+				source, err = outcome.Work.Source.ReadRegularFile(strings.TrimPrefix(evidence.Locator, "source/"), 512*1024)
+			}
+			grade.Passed = err == nil && g.Quote != "" && strings.Contains(string(source), g.Quote) && strings.Contains(string(contents), g.Quote)
+			grade.Evidence = "citation locator and exact quotation checked against frozen source; semantic entailment ungraded"
+			return grade
+		}
+		grade.Evidence = "citation has no selected source reference"
+		return grade
 	case "status":
 		actual = string(outcome.Manifest.Status)
 		if actual == "" && runErr != nil {
@@ -364,7 +434,7 @@ func LoadWorkExperiment(path string) (WorkExperiment, error) {
 	return report, err
 }
 func CompareWork(a, b WorkExperiment) (string, error) {
-	if a.DatasetSHA256 != b.DatasetSHA256 || a.Attempts != b.Attempts {
+	if a.DatasetSHA256 != b.DatasetSHA256 || a.Attempts != b.Attempts || a.Total != b.Total || a.Scripted != b.Scripted {
 		return "", errors.New("comparison requires identical dataset and trial counts")
 	}
 	scores := map[string][2]int{}
@@ -388,7 +458,8 @@ func CompareWork(a, b WorkExperiment) (string, error) {
 	}
 	sort.Strings(keys)
 	var output strings.Builder
-	fmt.Fprintf(&output, "%s: %d/%d; %s: %d/%d\n", a.ID, a.Passed, a.Total, b.ID, b.Passed, b.Total)
+	output.WriteString(WorkSummary(a))
+	output.WriteString(WorkSummary(b))
 	for _, key := range keys {
 		score := scores[key]
 		fmt.Fprintf(&output, "%s: %d -> %d of %d trials\n", key, score[0], score[1], a.Attempts)

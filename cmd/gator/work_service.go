@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
+	"io"
 	"os"
 )
 
@@ -89,6 +92,24 @@ func configureWorkRoles(executor *workrun.Executor, settings config.Settings, st
 		} else {
 			executor.RoleModels[role.Name] = model
 		}
+	}
+	return nil
+}
+
+func readWorkJSON(path string, value any) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(io.LimitReader(file, 1024*1024+1))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("expected one bounded JSON document")
 	}
 	return nil
 }

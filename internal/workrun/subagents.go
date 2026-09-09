@@ -67,6 +67,16 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 		return nil, nil, err
 	}
 	options := orchestrator.Options{Limits: request.Limits, MaxDelegations: 8, MaxParallel: 3, Now: e.Now, OnEvent: onEvent, OnRecord: onRecord, StatePath: filepath.Join(request.StateDir, "gator", "tasks", request.RunID), ParentRun: request.RunID, Source: work.Source.Path(), PolicySHA256: digest}
+	if request.ParentRevisionID != "" {
+		tasks, err := orchestrator.ReadTasks(filepath.Join(request.StateDir, "gator", "tasks", request.ParentRevisionID))
+		if err != nil {
+			return nil, nil, err
+		}
+		options.Retained = map[string]orchestrator.Task{}
+		for _, task := range tasks {
+			options.Retained[task.GlobalID] = task
+		}
+	}
 	supervisor, err := orchestrator.NewSupervisor(ctx, specialists, options)
 	if err != nil {
 		return nil, nil, err

@@ -64,6 +64,7 @@ turnLoop:
 		var turn Turn
 		var err error
 		for attempt := 1; attempt <= maxTransientAttempts; attempt++ {
+			r.emit(options.OnEvent, Event{Kind: EventModelAttemptStarted, At: now(), Step: step, Attempt: attempt})
 			streamedText = false
 			if model, ok := r.Model.(StreamingModel); ok {
 				turn, err = model.CompleteStream(ctx, request, func(delta string) {
@@ -76,6 +77,8 @@ turnLoop:
 			} else {
 				turn, err = r.Model.Complete(ctx, request)
 			}
+			usage := turn.Usage
+			r.emit(options.OnEvent, Event{Kind: EventModelAttemptFinished, At: now(), Step: step, Attempt: attempt, Usage: &usage})
 			if err == nil {
 				break
 			}

@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/tools"
+	"github.com/gongahkia/gator/internal/workspace"
 )
 
 // Service is the typed application boundary shared by foreground and unattended Work.
@@ -83,12 +84,18 @@ type Operation struct {
 	mu           sync.Mutex
 	next         int
 	pending      map[int]chan bool
+	stopped      <-chan struct{}
 }
 
 func (o *Operation) Cancel() { o.cancel() }
 func (o *Operation) Steer(text string) error {
 	if text == "" || len(text) > 64*1024 {
 		return errors.New("invalid steering text")
+	}
+	select {
+	case <-o.stopped:
+		return errors.New("operation has stopped")
+	default:
 	}
 	select {
 	case o.steering <- text:
@@ -125,12 +132,16 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(interactionDir, fmt.Sprintf("%d.json", id)), data, 0600)
+		root, err := workspace.Open(interactionDir)
+		if err != nil {
+			return err
+		}
+		return root.WriteRegularFileAtomic(fmt.Sprintf("%d.json", id), data, 1024*1024)
 	}
 	events := make(chan agent.Event, 128)
 	interactions := make(chan Interaction, 8)
 	done := make(chan Completion, 1)
-	o := &Operation{Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]chan bool{}}
+	o := &Operation{Events: events, Interactions: interactions, Done: done, cancel: cancel, steering: make(chan string, 16), pending: map[int]chan bool{}, stopped: ctx.Done()}
 	ask := func(ctx context.Context, kind string, preview any) (bool, error) {
 		o.mu.Lock()
 		o.next++

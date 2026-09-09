@@ -134,6 +134,8 @@ type VisualInputModel interface {
 type EventKind string
 
 const (
+	EventModelAttemptStarted      EventKind = "model_attempt_started"
+	EventModelAttemptFinished     EventKind = "model_attempt_finished"
 	EventTurnStarted              EventKind = "turn_started"
 	EventTextDelta                EventKind = "text_delta"
 	EventText                     EventKind = "text"
@@ -154,6 +156,8 @@ const (
 // Event is intentionally structured so the UI, journal, and tests observe the
 // same behavior. Details is never used for unbounded raw model transcripts.
 type Event struct {
+	Attempt    int       `json:"attempt,omitempty"`
+	Usage      *Usage    `json:"usage,omitempty"`
 	TaskID     string    `json:"task_id,omitempty"`
 	Kind       EventKind `json:"kind"`
 	At         time.Time `json:"at"`

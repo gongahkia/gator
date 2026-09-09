@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
@@ -94,6 +96,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	modeName := flags.String("mode", string(action.Draft), "work mode: inspect, draft, or act")
 	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
+	contractPath := flags.String("contract", "", "complete outcome contract JSON")
+	requests := flags.Int("max-model-requests", 256, "aggregate manager and child requests")
+	tokens := flags.Int64("max-tokens", 0, "reported token limit; zero disables")
+	seconds := flags.Int("timeout-seconds", 1800, "aggregate wall time")
 	codeMaxSteps := flags.Int("code-max-steps", 0, "maximum internal Code specialist turns")
 	requireCode := flags.Bool("require-code", false, "require an internal Code specialist patch")
 	runID := flags.String("run-id", "", "stable run identifier")
@@ -127,7 +133,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	codeSandbox := flags.String("sandbox", string(sandbox.Strict), "Code specialist sandbox: strict or off")
 	codeNetwork := flags.String("network", string(sandbox.DenyNetwork), "Code specialist network: deny or allow")
 	var codeCapabilities stringFlags
-	flags.Var(&codeCapabilities, "code-capability", "explicit Code grant: lsp, mcp, extension, http, browser, or terminal")
+	flags.Var(&codeCapabilities, "code-capability", "explicit Code grant: hooks, lsp, mcp, extension, http, browser, or terminal")
 	codeBrowserSession := flags.String("browser-session", "", "explicit browser session granted to the Code specialist")
 	legacyBase := flags.String("base", "", "removed Code worktree base override")
 	legacyCopyIgnored := flags.Bool("copy-ignored", false, "removed Code ignored-file copy mode")
@@ -149,6 +155,12 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	contract, err := workContract(mode, disposition, artifacts, contains)
 	if err != nil {
 		return err
+	}
+	if *contractPath != "" {
+		if err := readWorkJSON(*contractPath, &contract); err != nil {
+			return err
+		}
+		disposition = contract.ExternalActions
 	}
 	if *jsonOutput && disposition == action.Approve {
 		return errors.New("--json cannot request interactive action approval; use --actions draft or an interactive run")
@@ -251,7 +263,10 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if disposition == action.Approve {
 		approve = workActionApprover(in, out)
 	}
-	outcome, runErr := (workrun.Service{Executor: executor}).Execute(context.Background(), workrun.Request{
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	outcome, runErr := (workrun.Service{Executor: executor}).Execute(ctx, workrun.Request{
+		Limits:               agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds},
 		OTLPEndpoint:         os.Getenv("GATOR_OTLP_ENDPOINT"),
 		WebOrigins:           webOrigins,
 		SourcePath:           *sourcePath,

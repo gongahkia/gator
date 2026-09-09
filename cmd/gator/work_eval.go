@@ -40,7 +40,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(out, "%s (%s): %d/%d trials pass; at least one succeeds on %d cases; all trials succeed on %d cases.\nCategories: %v\n", report.ID, report.Target, report.Passed, report.Total, report.CasesAtLeastOne, report.CasesAll, report.Categories)
+		_, err = io.WriteString(out, eval.WorkSummary(report))
 		return err
 	}
 	if action == "compare" {

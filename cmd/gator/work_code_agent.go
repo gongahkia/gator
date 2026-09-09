@@ -64,6 +64,12 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		digest := sha256.Sum256([]byte(request.ParentRunID + "\x00" + request.ID))
 		runID := "code-" + hex.EncodeToString(digest[:8])
 		code := b.code
+		if !request.Policy.HasCapability(workrun.CodeCapabilityHooks) {
+			code.HookTrusts = nil
+		}
+		if !request.Policy.HasCapability(workrun.CodeCapabilityMCP) {
+			code.MCPTrusts = nil
+		}
 		usage := &agent.Budget{Limits: agent.Limits{ModelRequests: 4096}}
 		code.Model = agent.WithBudget(agent.WithBudget(code.Model, request.Budget), usage)
 		code.Sandbox = request.Policy.Sandbox.Normalize()
