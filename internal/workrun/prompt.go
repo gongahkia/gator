@@ -12,7 +12,7 @@ func systemPrompt(request Request) string {
 	contract, _ := json.MarshalIndent(request.Contract, "", "  ")
 	modeRules := "You may read source material but cannot create files or perform external actions. Return the requested analysis in your final response."
 	if request.Mode != action.Inspect {
-		modeRules = `Create finished deliverables with write_artifact. Before completing, call artifact_status and repair every failed validation. The host independently re-runs the outcome contract, so never claim completion based only on your own prose.`
+		modeRules = `Create finished deliverables with write_artifact, write_json_artifact, or write_table_artifact as appropriate. Prefer typed JSON/table writers for structured data. Before completing, call artifact_status and repair every failed validation. The host independently re-runs the outcome contract, so never claim completion based only on your own prose.`
 	}
 	parts := []string{
 		`You are Gator Work, a terminal-native agent for producing reviewable work from local source material.`,

@@ -33,10 +33,91 @@ func WorkFiles(source, output workspace.Root, contract artifact.Contract, writab
 	if writable {
 		result = append(result,
 			WriteArtifact{Root: output, Contract: contract},
+			WriteJSONArtifact{Root: output, Contract: contract},
+			WriteTableArtifact{Root: output, Contract: contract},
 			ArtifactStatus{Root: output, Contract: contract},
 		)
 	}
 	return result, nil
+}
+
+// WriteJSONArtifact stages one syntactically valid, consistently formatted
+// JSON deliverable without asking the model to escape an entire file string.
+type WriteJSONArtifact struct {
+	Root     workspace.Root
+	Contract artifact.Contract
+}
+
+func (t WriteJSONArtifact) Definition() agent.ToolDefinition {
+	return agent.ToolDefinition{
+		Name:        "write_json_artifact",
+		Description: "Create or replace a formatted JSON deliverable in isolated output. The value is validated as exactly one JSON value before the file changes.",
+		Parameters:  schema(`{"type":"object","additionalProperties":false,"required":["path","value"],"properties":{"path":{"type":"string","minLength":1,"description":"Portable output-relative .json artifact path"},"value":{}}}`),
+	}
+}
+
+func (t WriteJSONArtifact) Execute(_ context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+	var arguments struct {
+		Path  string          `json:"path"`
+		Value json.RawMessage `json:"value"`
+	}
+	if err := decodeArguments(raw, &arguments); err != nil {
+		return agent.ToolResult{}, err
+	}
+	if len(arguments.Value) == 0 {
+		return agent.ToolResult{}, fmt.Errorf("JSON artifact value is required")
+	}
+	if err := artifact.WriteJSON(t.Root, t.Contract, arguments.Path, arguments.Value); err != nil {
+		return agent.ToolResult{}, err
+	}
+	content, err := success(struct {
+		Path string `json:"path"`
+	}{Path: arguments.Path})
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	return agent.ToolResult{Content: content}, nil
+}
+
+// WriteTableArtifact turns bounded rectangular values into valid CSV.
+type WriteTableArtifact struct {
+	Root     workspace.Root
+	Contract artifact.Contract
+}
+
+func (t WriteTableArtifact) Definition() agent.ToolDefinition {
+	return agent.ToolDefinition{
+		Name:        "write_table_artifact",
+		Description: "Create or replace a rectangular CSV deliverable in isolated output. Gator handles quoting and rejects duplicate headers or ragged rows.",
+		Parameters: schema(`{"type":"object","additionalProperties":false,"required":["path","headers","rows"],"properties":{
+"path":{"type":"string","minLength":1,"description":"Portable output-relative .csv artifact path"},
+"headers":{"type":"array","minItems":1,"maxItems":256,"items":{"type":"string","maxLength":65536}},
+"rows":{"type":"array","maxItems":10000,"items":{"type":"array","maxItems":256,"items":{"type":"string","maxLength":65536}}}
+}}`),
+	}
+}
+
+func (t WriteTableArtifact) Execute(_ context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+	var arguments struct {
+		Path    string     `json:"path"`
+		Headers []string   `json:"headers"`
+		Rows    [][]string `json:"rows"`
+	}
+	if err := decodeArguments(raw, &arguments); err != nil {
+		return agent.ToolResult{}, err
+	}
+	if err := artifact.WriteTable(t.Root, t.Contract, arguments.Path, arguments.Headers, arguments.Rows); err != nil {
+		return agent.ToolResult{}, err
+	}
+	content, err := success(struct {
+		Path    string `json:"path"`
+		Rows    int    `json:"rows"`
+		Columns int    `json:"columns"`
+	}{Path: arguments.Path, Rows: len(arguments.Rows), Columns: len(arguments.Headers)})
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	return agent.ToolResult{Content: content}, nil
 }
 
 // WriteArtifact stages one text deliverable under the isolated output root.
