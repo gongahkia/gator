@@ -85,3 +85,27 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 		t.Fatalf("palette did not reveal secondary navigation: %q", view)
 	}
 }
+
+func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
+	called := ""
+	model := New(Config{CurrentFolder: "/work", FirstRun: true, Run: func(_, _, prompt string) RunResult {
+		called = prompt
+		return RunResult{FinalText: "done"}
+	}})
+	model.input = "prepare the brief"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || !model.onboarding || model.pendingPrompt != "prepare the brief" || called != "" {
+		t.Fatalf("setup state = %#v called=%q", model, called)
+	}
+	updated, command = model.Update(setupDone{provider: "openai"})
+	model = updated.(Model)
+	if command == nil || !model.running || model.firstRun {
+		t.Fatalf("post-setup state = %#v", model)
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if called != "prepare the brief" || model.running || !strings.Contains(model.View(), "done") {
+		t.Fatalf("called=%q state=%#v", called, model)
+	}
+}

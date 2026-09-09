@@ -15,6 +15,12 @@ func TestPrepareCodeSnapshotRepositoryCreatesIndependentCleanGitSource(t *testin
 	if err := os.WriteFile(path, []byte("#!/bin/sh\necho source\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(source, ".gitignore"), []byte("ignored.txt\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "ignored.txt"), []byte("frozen input\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	repository, err := prepareCodeSnapshotRepository(context.Background(), source, scratch, "subagent-001")
 	if err != nil {
 		t.Fatal(err)
@@ -29,6 +35,14 @@ func TestPrepareCodeSnapshotRepositoryCreatesIndependentCleanGitSource(t *testin
 	info, err := os.Stat(filepath.Join(repository, "script.sh"))
 	if err != nil || info.Mode().Perm()&0o100 == 0 {
 		t.Fatalf("snapshot mode = %v, %v", info, err)
+	}
+	if contents, err := os.ReadFile(filepath.Join(repository, "ignored.txt")); err != nil || string(contents) != "frozen input\n" {
+		t.Fatalf("ignored snapshot input = %q, %v", contents, err)
+	}
+	tracked := exec.Command("git", "ls-files", "--error-unmatch", "ignored.txt")
+	tracked.Dir = repository
+	if output, err := tracked.CombinedOutput(); err != nil {
+		t.Fatalf("ignored snapshot input was not committed: %q, %v", output, err)
 	}
 	command := exec.Command("git", "status", "--porcelain")
 	command.Dir = repository
