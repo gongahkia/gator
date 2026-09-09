@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/snapshot"
@@ -25,6 +26,8 @@ import (
 const Version = 2
 
 type Definition struct {
+	Limits          agent.Limits           `json:"limits"`
+	WebOrigins      []string               `json:"web_origins,omitempty"`
 	Project         *projectcapture.Bundle `json:"project_configuration,omitempty"`
 	SnapshotID      string                 `json:"snapshot_id,omitempty"`
 	Code            workrun.CodePolicy     `json:"code_policy,omitempty"`
@@ -50,19 +53,37 @@ type Definition struct {
 }
 
 type Attempt struct {
-	Version          int       `json:"version"`
-	ID               string    `json:"id"`
-	JobID            string    `json:"job_id"`
-	DefinitionSHA256 string    `json:"definition_sha256"`
-	ScheduledAt      time.Time `json:"scheduled_at"`
-	StartedAt        time.Time `json:"started_at"`
-	FinishedAt       time.Time `json:"finished_at"`
-	Try              int       `json:"try"`
-	Status           string    `json:"status"`
-	Conversation     string    `json:"conversation_id,omitempty"`
-	Revision         string    `json:"revision_id,omitempty"`
-	BundlePath       string    `json:"bundle_path,omitempty"`
-	Error            string    `json:"error,omitempty"`
+	Runs             []RunReference `json:"runs,omitempty"`
+	Version          int            `json:"version"`
+	ID               string         `json:"id"`
+	JobID            string         `json:"job_id"`
+	DefinitionSHA256 string         `json:"definition_sha256"`
+	ScheduledAt      time.Time      `json:"scheduled_at"`
+	StartedAt        time.Time      `json:"started_at"`
+	FinishedAt       time.Time      `json:"finished_at"`
+	Try              int            `json:"try"`
+	Status           string         `json:"status"`
+	Conversation     string         `json:"conversation_id,omitempty"`
+	Revision         string         `json:"revision_id,omitempty"`
+	BundlePath       string         `json:"bundle_path,omitempty"`
+	Error            string         `json:"error,omitempty"`
+}
+
+type RunReference struct {
+	Try          int    `json:"try"`
+	RunID        string `json:"run_id"`
+	Conversation string `json:"conversation_id,omitempty"`
+	Revision     string `json:"revision_id,omitempty"`
+	BundlePath   string `json:"bundle_path,omitempty"`
+	Error        string `json:"error,omitempty"`
+}
+
+// RecordRun retains each retry's stable Work identity before and after execution.
+func (s Store) RecordRun(attempt Attempt, run RunReference) error {
+	if invalidID(attempt.ID) || invalidID(attempt.JobID) || invalidID(run.RunID) || run.Try < 1 || run.Try > 3 {
+		return errors.New("invalid job run reference")
+	}
+	return writeJSON(filepath.Join(s.root, "history", attempt.JobID, attempt.ID, fmt.Sprintf("try-%d.json", run.Try)), run)
 }
 
 type intent struct {
@@ -346,7 +367,20 @@ func (s Store) History(id string, limit int) ([]Attempt, error) {
 			if err := readJSON(filepath.Join(s.root, "history", id, entry.Name(), "intent.json"), &started); err != nil {
 				return nil, err
 			}
-			attempts = append(attempts, Attempt{Version: Version, ID: started.ExecutionID, JobID: id, DefinitionSHA256: started.DefinitionSHA256, ScheduledAt: started.ScheduledAt, StartedAt: started.StartedAt, Try: 1, Status: "running"})
+			recovered := Attempt{Version: Version, ID: started.ExecutionID, JobID: id, DefinitionSHA256: started.DefinitionSHA256, ScheduledAt: started.ScheduledAt, StartedAt: started.StartedAt, Try: 1, Status: "running"}
+			for try := 1; try <= 3; try++ {
+				var run RunReference
+				readErr := readJSON(filepath.Join(s.root, "history", id, entry.Name(), fmt.Sprintf("try-%d.json", try)), &run)
+				if errors.Is(readErr, os.ErrNotExist) {
+					continue
+				}
+				if readErr != nil {
+					return nil, readErr
+				}
+				recovered.Runs = append(recovered.Runs, run)
+				recovered.Try = try
+			}
+			attempts = append(attempts, recovered)
 			continue
 		}
 		return nil, fmt.Errorf("read job attempt %s: %w", entry.Name(), err)

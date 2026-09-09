@@ -79,6 +79,7 @@ type Record struct {
 
 // Options configures one manager's bounded delegation surface.
 type Options struct {
+	Retained       map[string]Task
 	Limits         agent.Limits
 	StatePath      string
 	ParentRun      string
@@ -239,14 +240,15 @@ func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.
 	}
 
 	if t.supervisor != nil {
-		tasks := make([]Task, 0, len(input.Tasks))
+		requests := make([]StartRequest, 0, len(input.Tasks))
 		for _, item := range input.Tasks {
-			task, err := t.supervisor.Start(StartRequest{Agent: item.Agent, Task: item.Task, Baseline: item.Baseline})
-			if err != nil {
-				return agent.ToolResult{}, err
-			}
-			tasks = append(tasks, task)
+			requests = append(requests, StartRequest{Agent: item.Agent, Task: item.Task, Baseline: item.Baseline})
 		}
+		tasks, err := t.supervisor.StartBatch(requests)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+
 		ok := true
 		for i, task := range tasks {
 			var err error

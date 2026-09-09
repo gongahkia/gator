@@ -34,7 +34,7 @@ import (
 // and seals a filesystem-backed manifest on both success and ordinary agent
 // failure. The retained output can therefore be reviewed after an interrupted
 // or unsuccessful attempt.
-func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error) {
+func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Outcome, finalErr error) {
 	now := e.Now
 	if now == nil {
 		now = time.Now
@@ -64,6 +64,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if request.Budget == nil {
 		request.Budget = &agent.Budget{Limits: request.Limits}
 	}
+	usageBefore := request.Budget.Usage()
 	e.Model = agent.WithBudget(e.Model, request.Budget)
 	roles := make(map[string]agent.Model, len(e.RoleModels))
 	for role, model := range e.RoleModels {
@@ -72,7 +73,11 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	e.RoleModels = roles
 	startedAt := now()
 	trace := telemetry.New(request.RunID, startedAt)
-	defer trace.Finish(filepath.Join(request.StateDir, "gator", "traces", request.RunID), request.OTLPEndpoint)
+	defer func() {
+		if err := trace.Finish(filepath.Join(request.StateDir, "gator", "traces", request.RunID), request.OTLPEndpoint); err != nil {
+			finalErr = errors.Join(finalErr, fmt.Errorf("retain local telemetry: %w", err))
+		}
+	}()
 	sessions, err := worksession.Open(request.StateDir)
 	if err != nil {
 		return Outcome{}, err
@@ -188,6 +193,18 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		return outcome, err
 	}
 	catalog := newCatalog(work, sourceSnapshot)
+	for _, a := range request.Attachments {
+		if a.MediaType == "text/plain" && len(a.Data) <= 512*1024 {
+			if _, err := catalog.retain("attachment/"+a.Name, a.Data, startedAt); err != nil {
+				return outcome, err
+			}
+		} else {
+			catalog.privateAttachment(a.Name, a.Data, startedAt)
+		}
+	}
+	for _, a := range request.Images {
+		catalog.privateAttachment(a.Name, a.Data, startedAt)
+	}
 	request.catalog = catalog
 	surface = append(surface, tools.ExtractDocument{Root: work.Source}, tools.InspectTable{Root: work.Source})
 	surface = append(surface, catalog.tools()...)
@@ -366,6 +383,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	manifest.PolicySHA256, _ = PolicyDigest(request)
 	manifest.Usage = request.Budget.Usage()
+	manifest.Usage.ModelRequests -= usageBefore.ModelRequests
+	manifest.Usage.UnknownRequests -= usageBefore.UnknownRequests
+	manifest.Usage.InputTokens -= usageBefore.InputTokens
+	manifest.Usage.OutputTokens -= usageBefore.OutputTokens
 	manifest.Candidates = integration.records
 	manifest.Evidence = catalog.list()
 	outcome.Manifest = manifest

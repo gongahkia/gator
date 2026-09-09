@@ -41,8 +41,8 @@ func TestRunnerCompletesToolUseLoop(t *testing.T) {
 		t.Fatalf("tool arguments = %s", got)
 	}
 	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{
-		EventTurnStarted, EventText, EventToolCalled, EventToolFinished,
-		EventTurnStarted, EventText, EventRunFinished,
+		EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventText, EventToolCalled, EventToolFinished,
+		EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventText, EventRunFinished,
 	}) {
 		t.Fatalf("event kinds = %v", got)
 	}
@@ -287,7 +287,7 @@ func TestRunnerAddsPendingSteeringBeforeTheNextModelTurn(t *testing.T) {
 	if len(messages) != 3 || messages[1].Role != RoleUser || !strings.Contains(messages[1].Content, "failing verification") || !strings.Contains(messages[2].Content, "public APIs") {
 		t.Fatalf("request messages = %#v", messages)
 	}
-	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventSteeringApplied, EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventText, EventRunFinished}) {
 		t.Fatalf("event kinds = %v", got)
 	}
 }
@@ -312,7 +312,7 @@ func TestRunnerSupersedesACompletedResponseWhenSteeredDuringModelGeneration(t *t
 	if result.FinalText != "Adjusted response." {
 		t.Fatalf("result = %#v", result)
 	}
-	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventSteeringApplied, EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventText, EventRunFinished}) {
 		t.Fatalf("event kinds = %v", got)
 	}
 	messages := model.requests[1].Messages
@@ -347,7 +347,7 @@ func TestRunnerSkipsPendingToolCallsBeforeApplyingSteering(t *testing.T) {
 	if result.FinalText != "Adjusted plan complete." || tool.calls != 1 {
 		t.Fatalf("result = %#v, tool calls = %d", result, tool.calls)
 	}
-	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventToolCalled, EventToolFinished, EventToolFinished, EventSteeringApplied, EventTurnStarted, EventText, EventRunFinished}) {
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventToolCalled, EventToolFinished, EventToolFinished, EventSteeringApplied, EventTurnStarted, EventModelAttemptStarted, EventModelAttemptFinished, EventText, EventRunFinished}) {
 		t.Fatalf("event kinds = %v", got)
 	}
 	messages := model.requests[1].Messages
@@ -368,7 +368,7 @@ func TestRunnerForwardsStreamingTextWithoutDuplicateFinalEvent(t *testing.T) {
 	if result.FinalText != "hello world" {
 		t.Fatalf("result = %#v", result)
 	}
-	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventTextDelta, EventTextDelta, EventRunFinished}) {
+	if got := eventKinds(events); !reflect.DeepEqual(got, []EventKind{EventTurnStarted, EventModelAttemptStarted, EventTextDelta, EventTextDelta, EventModelAttemptFinished, EventRunFinished}) {
 		t.Fatalf("event kinds = %v", got)
 	}
 }

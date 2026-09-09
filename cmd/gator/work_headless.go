@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/workrun"
@@ -24,6 +26,10 @@ type workFrame struct {
 	Approved      bool       `json:"approved,omitempty"`
 }
 type workInput struct {
+	Limits           agent.Limits       `json:"limits"`
+	WebOrigins       []string           `json:"web_origins,omitempty"`
+	Images           []agent.Image      `json:"images,omitempty"`
+	Attachments      []agent.Attachment `json:"attachments,omitempty"`
 	Source           string             `json:"source"`
 	Objective        string             `json:"objective"`
 	Provider         string             `json:"provider,omitempty"`
@@ -39,7 +45,12 @@ type workInput struct {
 	Connectors       []string           `json:"connectors,omitempty"`
 }
 
-func workHeadless(ctx context.Context, in io.Reader, out io.Writer) error {
+func workHeadless(ctx context.Context, in io.Reader, out io.Writer) (resultErr error) {
+	defer func() {
+		if resultErr != nil {
+			_ = sendWorkFrame(out, "result", map[string]any{"status": "failed", "category": "setup", "error": resultErr.Error(), "conversation_id": "", "revision_id": ""})
+		}
+	}()
 	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
@@ -50,14 +61,14 @@ func workHeadless(ctx context.Context, in io.Reader, out io.Writer) error {
 		return errors.New("Work protocol requires a start frame")
 	}
 	var first workFrame
-	if err := json.Unmarshal(scanner.Bytes(), &first); err != nil {
+	if err := decodeWorkFrame(scanner.Bytes(), &first); err != nil {
 		return err
 	}
 	if first.Version != 1 || first.Type != "start" || first.Request == nil {
 		return errors.New("expected Work v1 start frame")
 	}
 	input := first.Request
-	request := workrun.Request{SourcePath: input.Source, Objective: input.Objective, ConversationID: input.ConversationID, ParentRevisionID: input.ParentRevisionID, SnapshotID: input.SnapshotID, RefreshSource: input.Refresh, Mode: input.Mode, Contract: input.Contract, Code: input.Code, MaxSteps: input.MaxSteps, ConnectorIDs: input.Connectors}
+	request := workrun.Request{Limits: input.Limits, WebOrigins: input.WebOrigins, Images: input.Images, Attachments: input.Attachments, SourcePath: input.Source, Objective: input.Objective, ConversationID: input.ConversationID, ParentRevisionID: input.ParentRevisionID, SnapshotID: input.SnapshotID, RefreshSource: input.Refresh, Mode: input.Mode, Contract: input.Contract, Code: input.Code, MaxSteps: input.MaxSteps, ConnectorIDs: input.Connectors}
 	service, err := configuredWorkService(input.Provider, input.Model, stateDir, &request)
 	if err != nil {
 		return err
@@ -65,15 +76,17 @@ func workHeadless(ctx context.Context, in io.Reader, out io.Writer) error {
 	return serveWorkOperation(ctx, service, request, scanner, out)
 }
 func serveWorkOperation(ctx context.Context, service workrun.Service, request workrun.Request, scanner *bufio.Scanner, out io.Writer) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	operation := service.Start(ctx, request)
-	defer operation.Cancel()
+	defer func() { operation.Cancel(); <-operation.Done }()
 	frames := make(chan workFrame, 16)
 	inputErrors := make(chan error, 1)
 	go func() {
 		defer close(frames)
 		for scanner.Scan() {
 			var frame workFrame
-			if err := json.Unmarshal(scanner.Bytes(), &frame); err != nil {
+			if err := decodeWorkFrame(scanner.Bytes(), &frame); err != nil {
 				inputErrors <- err
 				return
 			}
@@ -87,13 +100,8 @@ func serveWorkOperation(ctx context.Context, service workrun.Service, request wo
 			inputErrors <- err
 		}
 	}()
-	encoder := json.NewEncoder(out)
 	send := func(kind string, payload any) error {
-		return encoder.Encode(struct {
-			Version int    `json:"version"`
-			Type    string `json:"type"`
-			Data    any    `json:"data"`
-		}{1, kind, payload})
+		return sendWorkFrame(out, kind, payload)
 	}
 	events, interactions := operation.Events, operation.Interactions
 	for {
@@ -171,4 +179,25 @@ func serveWorkOperation(ctx context.Context, service workrun.Service, request wo
 			return send("result", result)
 		}
 	}
+}
+
+func sendWorkFrame(out io.Writer, kind string, payload any) error {
+	return json.NewEncoder(out).Encode(struct {
+		Version int    `json:"version"`
+		Type    string `json:"type"`
+		Data    any    `json:"data"`
+	}{1, kind, payload})
+}
+
+func decodeWorkFrame(data []byte, frame *workFrame) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(frame); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("expected one Work frame per line")
+	}
+	return nil
 }

@@ -170,11 +170,23 @@ func (s *Supervisor) persist(task Task) error {
 	if err = file.Close(); err != nil {
 		return err
 	}
-	return os.Rename(file.Name(), filepath.Join(s.options.StatePath, task.ID+".json"))
+	if err := os.Rename(file.Name(), filepath.Join(s.options.StatePath, task.ID+".json")); err != nil {
+		return err
+	}
+	directory, err := os.Open(s.options.StatePath)
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
 }
 func (s *Supervisor) Start(request StartRequest) (Task, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.startLocked(request)
+}
+
+func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	if s.closed {
 		return Task{}, errors.New("supervisor closed")
 	}
@@ -194,6 +206,14 @@ func (s *Supervisor) Start(request StartRequest) (Task, error) {
 	attempt := 1
 	if request.Continue != "" {
 		prior, ok := s.tasks[request.Continue]
+		if !ok {
+			if retained, exists := s.options.Retained[request.Continue]; exists {
+				done := make(chan struct{})
+				close(done)
+				prior = &taskExecution{task: retained, done: done}
+				ok = true
+			}
+		}
 		if !ok || prior.task.Role != request.Agent {
 			return Task{}, errors.New("invalid continuation role/task")
 		}
@@ -202,7 +222,7 @@ func (s *Supervisor) Start(request StartRequest) (Task, error) {
 		default:
 			return Task{}, errors.New("cannot continue active task")
 		}
-		if prior.task.Status == "interrupted" {
+		if prior.task.Status == "interrupted" || prior.task.Status == "running" || prior.task.Status == "queued" {
 			return Task{}, errors.New("interrupted outcome requires reconciliation; start a fresh inspected assignment")
 		}
 		attempt = prior.task.Attempt + 1
@@ -436,4 +456,63 @@ func decodeTask(raw []byte, value any) error {
 }
 func (s *Supervisor) Tools() []agent.Tool {
 	return []agent.Tool{taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "cancel_agent"}}
+}
+
+// StartBatch validates the complete fresh-context batch before any child starts.
+func (s *Supervisor) StartBatch(requests []StartRequest) ([]Task, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(requests) < 1 || len(requests) > s.options.MaxParallel || s.used+len(requests) > s.options.MaxDelegations {
+		return nil, errors.New("invalid batch or aggregate invocation budget exhausted")
+	}
+	for _, request := range requests {
+		if _, ok := s.registry[request.Agent]; !ok {
+			return nil, errors.New("unknown specialist")
+		}
+		if strings.TrimSpace(request.Task) == "" || len(request.Task) > maxTaskBytes || strings.ContainsRune(request.Task, 0) {
+			return nil, errors.New("invalid task input")
+		}
+		if len(request.Dependencies) != 0 || request.Parent != "" || request.Continue != "" {
+			return nil, errors.New("batch accepts fresh independent tasks only")
+		}
+	}
+	var tasks []Task
+	for _, request := range requests {
+		task, err := s.startLocked(request)
+		if err != nil {
+			for _, prior := range tasks {
+				s.tasks[prior.ID].cancel()
+			}
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
+
+// ReadTasks inspects checkpoints without acquiring ownership or repeating effects.
+func ReadTasks(directory string) ([]Task, error) {
+	entries, err := os.ReadDir(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var tasks []Task
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			return nil, err
+		}
+		var task Task
+		if err := json.Unmarshal(data, &task); err != nil || task.Version != TaskVersion || task.ID+".json" != entry.Name() {
+			return nil, errors.New("invalid retained task checkpoint")
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
 }

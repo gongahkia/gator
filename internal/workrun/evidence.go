@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
@@ -75,6 +76,9 @@ func (c *evidenceCatalog) read(id string) (artifact.Evidence, []byte, error) {
 	c.mu.Unlock()
 	if !ok {
 		return entry, nil, errors.New("unknown selected evidence")
+	}
+	if entry.SnapshotPath == "" && strings.HasPrefix(entry.Locator, "attachment/") {
+		return entry, nil, errors.New("binary or large attachment is available only in private model replay; textual extraction is unavailable")
 	}
 	var data []byte
 	var err error
@@ -143,6 +147,9 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 		entry, data, err := t.catalog.read(input.ID)
 		if err != nil {
 			return agent.ToolResult{}, err
+		}
+		if !utf8.Valid(data) || strings.ContainsRune(string(data), 0) {
+			return agent.ToolResult{}, errors.New("binary evidence requires a supported extraction or table tool")
 		}
 		retained, err := t.catalog.retain(entry.Locator, data, entry.RetrievedAt)
 		if err != nil {
@@ -241,4 +248,11 @@ func (c *evidenceCatalog) web(origins []string, options tools.HTTPFetchOptions) 
 	}}
 	surface := tools.HTTPTools(policy, options)
 	return []agent.Tool{webEvidenceTool{surface[0], c}}, nil
+}
+
+func (c *evidenceCatalog) privateAttachment(name string, data []byte, at time.Time) {
+	sum := sha256.Sum256(data)
+	digest := hex.EncodeToString(sum[:])
+	id := "attachment-" + digest[:24]
+	c.entries[id] = artifact.Evidence{ID: id, Locator: "attachment/" + name, SHA256: digest, RetrievedAt: at}
 }

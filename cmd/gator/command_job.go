@@ -122,6 +122,14 @@ func addJob(arguments []string, out io.Writer) error {
 	timezone := flags.String("timezone", settings.JobDefaults.Timezone, "IANA timezone")
 	missed := flags.String("missed", settings.JobDefaults.Missed, "skip or run_once")
 	source := flags.String("source", ".", "local source directory")
+	refresh := flags.Bool("refresh-snapshot", true, "capture current source for each attempt; false freezes at creation")
+	contractPath := flags.String("contract", "", "complete outcome contract JSON")
+	codePath := flags.String("code-policy", "", "complete Code policy JSON")
+	requests := flags.Int("max-model-requests", 256, "aggregate request bound")
+	tokens := flags.Int64("max-tokens", 0, "reported token bound; zero disables")
+	seconds := flags.Int("timeout-seconds", 1800, "run wall bound")
+	var webOrigins connectorFlags
+	flags.Var(&webOrigins, "web-origin", "permitted HTTPS origin")
 	provider := flags.String("provider", "", "model provider")
 	model := flags.String("model", "", "model")
 	modeName := flags.String("mode", string(action.Draft), "inspect or draft")
@@ -146,6 +154,17 @@ func addJob(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if *contractPath != "" {
+		if err := readWorkJSON(*contractPath, &contract); err != nil {
+			return err
+		}
+	}
+	var codePolicy workrun.CodePolicy
+	if *codePath != "" {
+		if err := readWorkJSON(*codePath, &codePolicy); err != nil {
+			return err
+		}
+	}
 	absolute, err := filepath.Abs(*source)
 	if err != nil {
 		return err
@@ -160,7 +179,7 @@ func addJob(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: true, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
+	definition, err := store.Save(jobs.Definition{Name: name, Enabled: true, Schedule: *schedule, Timezone: *timezone, Missed: *missed, SourcePath: absolute, RefreshSnapshot: *refresh, Code: codePolicy, Limits: agent.Limits{ModelRequests: *requests, Tokens: *tokens, WallSeconds: *seconds}, WebOrigins: webOrigins, Objective: objective, Provider: *provider, Model: *model, Mode: mode, Contract: contract, ConnectorIDs: connectors, MaxSteps: *maxSteps})
 	if err != nil {
 		return err
 	}
@@ -295,9 +314,27 @@ func executeJob(definition jobs.Definition, attempt jobs.Attempt, stateDir strin
 func executeJobContext(ctx context.Context, definition jobs.Definition, attempt jobs.Attempt, stateDir string, notify bool) jobs.Attempt {
 	var result jobResult
 	var runErr error
-	for try := 1; try <= 3; try++ {
+	store, runErr := jobs.Open(stateDir)
+	for try := 1; runErr == nil && try <= 3; try++ {
 		attempt.Try = try
-		result, runErr = runJobProcessContext(ctx, definition, stateDir)
+		reference := jobs.RunReference{Try: try, RunID: attempt.ID + "-try-" + strconv.Itoa(try)}
+		if err := store.RecordRun(attempt, reference); err != nil {
+			runErr = err
+			break
+		}
+		result, runErr = runJobProcessContext(ctx, definition, stateDir, reference.RunID)
+		reference.Conversation, reference.Revision = result.ConversationID, result.RevisionID
+		if result.ManifestPath != "" {
+			reference.BundlePath = filepath.Dir(result.ManifestPath)
+		}
+		if runErr != nil {
+			reference.Error = boundedJobError(runErr.Error())
+		}
+		attempt.Runs = append(attempt.Runs, reference)
+		if err := store.RecordRun(attempt, reference); err != nil {
+			runErr = err
+			break
+		}
 		if runErr == nil {
 			break
 		}
@@ -307,6 +344,7 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 		if try < 3 {
 			select {
 			case <-time.After(time.Duration(try) * time.Second):
+				runErr = nil
 			case <-ctx.Done():
 				runErr = ctx.Err()
 				try = 3
@@ -337,10 +375,18 @@ func executeJobContext(ctx context.Context, definition jobs.Definition, attempt 
 func runJobProcess(definition jobs.Definition, stateDir string) (jobResult, error) {
 	return runJobProcessContext(context.Background(), definition, stateDir)
 }
-func runJobProcessContext(ctx context.Context, definition jobs.Definition, stateDir string) (jobResult, error) {
-	request := workrun.Request{Project: definition.Project, SourcePath: definition.SourcePath, SnapshotID: definition.SnapshotID, Objective: definition.Objective, Mode: definition.Mode, Contract: definition.Contract, Code: definition.Code, MaxSteps: definition.MaxSteps, ConnectorIDs: definition.ConnectorIDs}
+func jobWorkRequest(definition jobs.Definition) workrun.Request {
+	request := workrun.Request{Limits: definition.Limits, WebOrigins: definition.WebOrigins, Project: definition.Project, SourcePath: definition.SourcePath, SnapshotID: definition.SnapshotID, Objective: definition.Objective, Mode: definition.Mode, Contract: definition.Contract, Code: definition.Code, MaxSteps: definition.MaxSteps, ConnectorIDs: definition.ConnectorIDs}
 	if definition.RefreshSnapshot {
 		request.SnapshotID = ""
+	}
+	return request
+}
+
+func runJobProcessContext(ctx context.Context, definition jobs.Definition, stateDir string, runIDs ...string) (jobResult, error) {
+	request := jobWorkRequest(definition)
+	if len(runIDs) > 0 {
+		request.RunID = runIDs[0]
 	}
 	outcome, err := executeConfiguredWork(ctx, definition.Provider, definition.Model, stateDir, request)
 	return jobResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, ManifestPath: outcome.Work.ManifestPath, Status: string(outcome.Manifest.Status)}, err

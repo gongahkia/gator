@@ -21,13 +21,15 @@ import (
 )
 
 type Span struct {
-	ID     string    `json:"id"`
-	Parent string    `json:"parent,omitempty"`
-	Name   string    `json:"name"`
-	Start  time.Time `json:"start"`
-	End    time.Time `json:"end"`
-	Task   string    `json:"task,omitempty"`
-	Step   int       `json:"step,omitempty"`
+	ID      string       `json:"id"`
+	Parent  string       `json:"parent,omitempty"`
+	Name    string       `json:"name"`
+	Start   time.Time    `json:"start"`
+	End     time.Time    `json:"end"`
+	Task    string       `json:"task,omitempty"`
+	Step    int          `json:"step,omitempty"`
+	Attempt int          `json:"attempt,omitempty"`
+	Usage   *agent.Usage `json:"usage,omitempty"`
 }
 type Trace struct {
 	Version     int    `json:"version"`
@@ -36,6 +38,7 @@ type Trace struct {
 	Dropped     int    `json:"dropped"`
 	ExportError string `json:"export_error,omitempty"`
 	mu          sync.Mutex
+	open        map[string]int
 }
 
 func ID(value string, n int) string {
@@ -44,7 +47,7 @@ func ID(value string, n int) string {
 }
 func New(run string, at time.Time) *Trace {
 	id := ID(run, 32)
-	return &Trace{Version: 1, ID: id, Spans: []Span{{ID: ID(run+"/work", 16), Name: "work", Start: at}}}
+	return &Trace{Version: 1, ID: id, Spans: []Span{{ID: ID(run+"/work", 16), Name: "work", Start: at}}, open: map[string]int{}}
 }
 func (t *Trace) Record(event agent.Event) {
 	switch event.Kind {
@@ -53,7 +56,19 @@ func (t *Trace) Record(event agent.Event) {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(t.Spans) >= 512 {
+	key := fmt.Sprintf("%s/%d/%d", event.TaskID, event.Step, event.Attempt)
+	if event.ToolCall != nil {
+		key += "/" + event.ToolCall.ID
+	}
+	if event.Kind == agent.EventModelAttemptFinished || event.Kind == agent.EventToolFinished {
+		if index, ok := t.open[key]; ok {
+			t.Spans[index].End = event.At
+			t.Spans[index].Usage = event.Usage
+			delete(t.open, key)
+			return
+		}
+	}
+	if len(t.Spans) >= 511 {
 		t.Dropped++
 		return
 	}
@@ -61,18 +76,27 @@ func (t *Trace) Record(event agent.Event) {
 	if event.TaskID != "" {
 		parent = ID(event.TaskID, 16)
 		found := false
-		for _, span := range t.Spans {
-			found = found || span.ID == parent
+		for i, span := range t.Spans {
+			if span.ID == parent {
+				found = true
+				t.Spans[i].End = event.At
+			}
 		}
 		if !found {
 			t.Spans = append(t.Spans, Span{ID: parent, Parent: t.Spans[0].ID, Name: "specialist", Task: event.TaskID, Start: event.At, End: event.At})
 		}
 	}
 	name := string(event.Kind)
+	if event.Kind == agent.EventModelAttemptStarted {
+		name = "model_attempt"
+	}
 	if event.ToolCall != nil {
 		name = "tool/" + event.ToolCall.Name
 	}
-	t.Spans = append(t.Spans, Span{ID: ID(fmt.Sprintf("%s/%d", t.ID, len(t.Spans)), 16), Parent: parent, Name: name, Start: event.At, End: event.At, Task: event.TaskID, Step: event.Step})
+	if event.Kind == agent.EventToolCalled || event.Kind == agent.EventModelAttemptStarted {
+		t.open[key] = len(t.Spans)
+	}
+	t.Spans = append(t.Spans, Span{ID: ID(fmt.Sprintf("%s/%d", t.ID, len(t.Spans)), 16), Parent: parent, Name: name, Start: event.At, End: event.At, Task: event.TaskID, Step: event.Step, Attempt: event.Attempt})
 }
 func (t *Trace) Finish(directory, endpoint string) error {
 	t.mu.Lock()

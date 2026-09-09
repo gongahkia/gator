@@ -1154,7 +1154,7 @@ func workHelp() string {
   /code setup COMMAND            add an explicit setup command
   /code allow COMMAND            pre-approve one exact argv
   /code allow-prefix PREFIX      pre-approve a literal argv prefix
-  /code grant CAPABILITY         grant lsp/mcp/extension/http/browser/terminal
+  /code grant CAPABILITY         grant hooks/lsp/mcp/extension/http/browser/terminal
   /code sandbox strict|off       set the child process boundary
   /code network deny|allow       set child network access
   /code max-steps N              set the child turn budget
@@ -1164,6 +1164,10 @@ func workHelp() string {
   /status · /permissions         inspect the active orchestration envelope
   /doctor · /agents · /settings inspect local configuration
   /history · /back · /forward   navigate retained Gator revisions
+  /steer TEXT                    steer the running task
+  /tasks · /cancel-task ID        inspect or cancel active specialists
+  /approve · /deny                respond to the displayed exact request
+  /cancel                        cancel and retain the running outcome
   /queue · /dequeue · /clear-queue
   /review · /copy · /theme · /new · /quit
 
