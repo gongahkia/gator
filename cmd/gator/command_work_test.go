@@ -152,6 +152,18 @@ func TestWorkCommandKeepsApprovalOutOfJSONMode(t *testing.T) {
 	}
 }
 
+func TestWorkActionApproverTreatsClosedInputAsDenial(t *testing.T) {
+	var output bytes.Buffer
+	proposal, err := action.NewProposal("action-1", action.Publish, "release", "publish", "https://example.com/hook", `{"version":"v1"}`, []byte(`{"version":"v1"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision, err := workActionApprover(strings.NewReader(""), &output)(context.Background(), proposal)
+	if err != nil || decision != action.Deny || !strings.Contains(output.String(), "Approve this one action?") {
+		t.Fatalf("decision=%q err=%v output=%q", decision, err, output.String())
+	}
+}
+
 func TestWorkCommandUsesOnlyExplicitlySelectedConnector(t *testing.T) {
 	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
 	t.Setenv("GATOR_STATE_DIR", t.TempDir())
