@@ -330,8 +330,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 				m.input = string(runes[:len(runes)-1])
 			}
 		case "esc":
-			m.launcher = true
-			m.selected = 0
+			m.openCommandPalette()
 		default:
 			if value.Type == tea.KeyRunes || value.String() == " " {
 				m.input += value.String()
@@ -383,8 +382,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.input = string(runes[:len(runes)-1])
 		}
 	case "esc":
-		m.launcher = true
-		m.selected = 0
+		m.openCommandPalette()
 	default:
 		if key.Type == tea.KeyRunes || key.String() == " " {
 			m.input += key.String()
@@ -394,33 +392,50 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	visible := m.filteredEntries()
 	switch key.String() {
-	case "up", "k":
+	case "up":
 		if m.selected > 0 {
 			m.selected--
 		}
-	case "down", "j":
-		if m.selected+1 < len(m.entries) {
+	case "down":
+		if m.selected+1 < len(visible) {
 			m.selected++
 		}
 	case "esc":
 		m.launcher = false
-	case "enter":
-		selected := m.entries[m.selected]
-		switch selected.kind {
-		case "source":
+		m.paletteQuery = ""
+	case "backspace":
+		runes := []rune(m.paletteQuery)
+		if len(runes) > 0 {
+			m.paletteQuery = string(runes[:len(runes)-1])
+			m.selected = 0
+		} else {
 			m.launcher = false
-			m.home = true
-			m.onboarding = false
-			m.source = selected.source
-			m.conversation = ""
-			m.title = selected.title
-			m.messages = nil
-			m.status = ""
-			m.scroll = 0
+		}
+	case "ctrl+u":
+		m.paletteQuery = ""
+		m.selected = 0
+	case "enter":
+		if len(visible) == 0 {
+			return m, nil
+		}
+		selected := visible[min(m.selected, len(visible)-1)]
+		switch selected.kind {
+		case "command":
+			m.launcher = false
+			m.paletteQuery = ""
+			return m.runLocalCommand(selected.command)
+		case "command-input":
+			m.launcher = false
+			m.paletteQuery = ""
+			m.section = ""
+			m.input = selected.command + " "
 		case "conversation":
 			switching := m.source != selected.source || m.conversation != selected.id
 			m.launcher = false
+			m.paletteQuery = ""
+			m.section = ""
 			m.home = false
 			m.onboarding = false
 			m.source = selected.source
@@ -431,46 +446,110 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.messages = nil
 				m.status = ""
 			}
-		case "inbox":
-			m.launcher = false
-			m.home = false
-			m.source = ""
-			m.conversation = ""
-			m.title = "Inbox"
-			m.messages = nil
-			if len(m.config.Inbox) == 0 {
-				m.messages = append(m.messages, message{role: "Gator", text: "Your inbox is empty."})
-			}
-			for _, item := range m.config.Inbox {
-				m.messages = append(m.messages, message{role: item.Status, text: item.Title + "\n" + item.Summary})
-			}
-		case "jobs":
-			m.launcher = false
-			m.home = false
-			m.source = ""
-			m.conversation = ""
-			m.title = "Scheduled jobs"
-			m.messages = nil
-			if len(m.config.Jobs) == 0 {
-				m.messages = append(m.messages, message{role: "Gator", text: "No jobs yet. Create one with `gator job add`."})
-			}
-			for _, job := range m.config.Jobs {
-				state := "disabled"
-				if job.Enabled {
-					state = "enabled"
-				}
-				m.messages = append(m.messages, message{role: state, text: job.Name + "\n" + job.Schedule + " · " + job.Timezone})
-			}
-		case "onboarding":
-			m.launcher = false
-			m.home = false
-			m.onboarding = true
-			m.source = selected.source
-			m.title = "Welcome to Gator"
-			m.messages = []message{{role: "Gator", text: "Hi — I’ll help you set up Gator. Which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."}}
+		}
+	default:
+		if key.Type == tea.KeyRunes || key.String() == " " {
+			m.paletteQuery += key.String()
+			m.selected = 0
 		}
 	}
 	return m, nil
+}
+
+func (m *Model) openCommandPalette() {
+	m.launcher = true
+	m.launcherMode = "commands"
+	m.entries = commandPaletteEntries()
+	m.paletteQuery = ""
+	m.selected = 0
+	m.leader = false
+}
+
+func (m *Model) openConversationPicker() {
+	m.launcher = true
+	m.launcherMode = "conversations"
+	m.entries = make([]entry, 0, len(m.config.Conversations))
+	for _, conversation := range m.config.Conversations {
+		m.entries = append(m.entries, entry{
+			title: conversation.Title, subtitle: conversation.SourcePath,
+			kind: "conversation", id: conversation.ID, source: conversation.SourcePath,
+		})
+	}
+	m.paletteQuery = ""
+	m.selected = 0
+	m.leader = false
+}
+
+func (m Model) updateLeader(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.leader = false
+	switch strings.ToLower(key.String()) {
+	case "l":
+		m.openConversationPicker()
+	case "i":
+		m.launcher = false
+		m.section = "inbox"
+	case "j":
+		m.launcher = false
+		m.section = "jobs"
+	case "esc", "ctrl+x":
+		// Cancel the leader without disturbing the composer or current view.
+	}
+	return m, nil
+}
+
+func (m Model) filteredEntries() []entry {
+	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
+	if query == "" {
+		return m.entries
+	}
+	result := make([]entry, 0, len(m.entries))
+	for _, item := range m.entries {
+		searchable := strings.ToLower(item.title + " " + item.subtitle)
+		if strings.Contains(searchable, query) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func commandPaletteEntries() []entry {
+	return []entry{
+		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
+		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
+		{title: "/model", subtitle: "Connect or switch model provider", kind: "command", command: "/model"},
+		{title: "/effort", subtitle: "Set low, standard, or high effort", kind: "command-input", command: "/effort"},
+		{title: "/attach", subtitle: "Attach a source file to the next prompt", kind: "command-input", command: "/attach"},
+		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
+		{title: "/status", subtitle: "Inspect Gator orchestration", kind: "command", command: "/status"},
+		{title: "/permissions", subtitle: "Inspect the Code capability envelope", kind: "command", command: "/permissions"},
+		{title: "/doctor", subtitle: "Inspect local prerequisites", kind: "command", command: "/doctor"},
+		{title: "/agents", subtitle: "Inspect project profiles and roles", kind: "command", command: "/agents"},
+		{title: "/settings", subtitle: "Inspect current settings", kind: "command", command: "/settings"},
+		{title: "/theme", subtitle: "Choose gator, contrast, or mono", kind: "command-input", command: "/theme"},
+		{title: "/history", subtitle: "Show revisions in this conversation", kind: "command", command: "/history"},
+		{title: "/back", subtitle: "Move to the parent revision", kind: "command", command: "/back"},
+		{title: "/forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/forward"},
+		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
+		{title: "/copy", subtitle: "Copy the latest Gator response", kind: "command", command: "/copy"},
+		{title: "/queue", subtitle: "Inspect queued prompts", kind: "command", command: "/queue"},
+		{title: "/dequeue", subtitle: "Remove the next queued prompt", kind: "command", command: "/dequeue"},
+		{title: "/clear-queue", subtitle: "Remove every queued prompt", kind: "command", command: "/clear-queue"},
+		{title: "/code status", subtitle: "Inspect internal Code settings", kind: "command", command: "/code status"},
+		{title: "/code verify", subtitle: "Add a project verifier", kind: "command-input", command: "/code verify"},
+		{title: "/code scope", subtitle: "Add a project-instruction scope", kind: "command-input", command: "/code scope"},
+		{title: "/code profile", subtitle: "Select a project profile", kind: "command-input", command: "/code profile"},
+		{title: "/code setup", subtitle: "Add an explicit setup command", kind: "command-input", command: "/code setup"},
+		{title: "/code allow", subtitle: "Pre-approve one exact command", kind: "command-input", command: "/code allow"},
+		{title: "/code allow-prefix", subtitle: "Pre-approve a literal command prefix", kind: "command-input", command: "/code allow-prefix"},
+		{title: "/code sandbox", subtitle: "Set strict or off", kind: "command-input", command: "/code sandbox"},
+		{title: "/code network", subtitle: "Set deny or allow", kind: "command-input", command: "/code network"},
+		{title: "/code max-steps", subtitle: "Set the child turn budget", kind: "command-input", command: "/code max-steps"},
+		{title: "/code grant", subtitle: "Grant an integration capability", kind: "command-input", command: "/code grant"},
+		{title: "/code revoke", subtitle: "Revoke an integration capability", kind: "command-input", command: "/code revoke"},
+		{title: "/code browser", subtitle: "Select a controlled browser session", kind: "command-input", command: "/code browser"},
+		{title: "/code reset", subtitle: "Restore strict, offline Code defaults", kind: "command", command: "/code reset"},
+		{title: "/quit", subtitle: "Exit Gator", kind: "command", command: "/quit"},
+	}
 }
 
 func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
@@ -479,6 +558,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.home = false
+	m.section = ""
 	var result string
 	var err error
 	switch fields[0] {
@@ -486,6 +566,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		result = workHelp()
 	case "/new":
 		m.home, m.onboarding, m.conversation = true, false, ""
+		m.section, m.paletteQuery, m.launcherMode = "", "", ""
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
 		m.messages, m.status, m.queue = nil, "", nil
@@ -852,13 +933,21 @@ func workHelp() string {
   /code grant CAPABILITY         grant lsp/mcp/extension/http/browser/terminal
   /code sandbox strict|off       set the child process boundary
   /code network deny|allow       set child network access
+  /code max-steps N              set the child turn budget
+  /code revoke CAPABILITY        remove a child integration grant
   /code browser SESSION          select an already controlled browser session
   /code reset                    restore strict, offline Code defaults
   /status · /permissions         inspect the active orchestration envelope
   /doctor · /agents · /settings inspect local configuration
   /history · /back · /forward   navigate retained Gator revisions
   /queue · /dequeue · /clear-queue
-  /review · /copy · /theme · /new · /quit`
+  /review · /copy · /theme · /new · /quit
+
+Navigation
+  ctrl+x l  retained conversations
+  ctrl+x i  inbox
+  ctrl+x j  scheduled jobs
+  ctrl+p    searchable command palette`
 }
 
 func (m Model) View() string {
@@ -877,6 +966,9 @@ func (m Model) View() string {
 	accent, dim, selectedStyle := workStyles(m.theme)
 	if m.launcher {
 		return m.renderPalette(width, height, accent, dim, selectedStyle)
+	}
+	if m.section != "" {
+		return m.renderSection(width, accent, dim)
 	}
 	if m.home && m.input == "" {
 		return m.renderHome(width, height, accent, dim)
@@ -909,7 +1001,10 @@ func (m Model) View() string {
 		view.WriteString(accent.Render("● Working…") + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
-	footer := "enter send  ·  ctrl+p menu  ·  /help  ·  pgup/pgdown scroll"
+	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x navigation  ·  /help  ·  pgup/pgdown scroll"
+	if m.leader {
+		footer = "ctrl+x  l conversations  ·  i inbox  ·  j jobs  ·  esc cancel"
+	}
 	if len(m.queue) > 0 {
 		footer = fmt.Sprintf("%d queued  ·  ", len(m.queue)) + footer
 	}
@@ -925,13 +1020,19 @@ func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string 
 	if context == "." || context == "" {
 		context = "current folder"
 	}
-	hint := context + "  ·  ctrl+p menu"
+	hint := context + "  ·  ctrl+p commands"
 	if m.firstRun {
-		hint = "connect a model from ctrl+p  ·  " + hint
+		hint = "submit to connect  ·  " + hint
 	} else if m.status != "" {
 		hint = m.status + "  ·  " + hint
 	}
-	body += "\n" + dim.Render(hint)
+	if m.leader {
+		hint = "ctrl+x  l conversations  ·  i inbox  ·  j jobs  ·  esc cancel"
+		body += "\n" + dim.Render(hint)
+	} else {
+		body += "\n" + dim.Render(hint)
+		body += "\n" + dim.Render("ctrl+x  l conversations  ·  i inbox  ·  j jobs")
+	}
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
 
@@ -939,19 +1040,81 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	panelWidth := min(76, max(16, width-4))
 	titleWidth := min(28, max(8, panelWidth/2-1))
 	subtitleWidth := max(0, panelWidth-titleWidth-3)
+	visible := m.filteredEntries()
+	selected := min(m.selected, max(0, len(visible)-1))
+	maximum := max(1, height-9)
+	start := 0
+	if selected >= maximum {
+		start = selected - maximum + 1
+	}
+	end := min(len(visible), start+maximum)
 	var panel strings.Builder
-	panel.WriteString(accent.Render("Open") + "\n\n")
-	for index, item := range m.entries {
+	title := "Commands"
+	if m.launcherMode == "conversations" {
+		title = "Conversations"
+	}
+	panel.WriteString(accent.Render(title) + "\n")
+	query := m.paletteQuery
+	if query == "" {
+		query = dim.Render("type to filter")
+	}
+	panel.WriteString("Search  " + query + accent.Render("█") + "\n\n")
+	if len(visible) == 0 {
+		empty := "No matching commands."
+		if m.launcherMode == "conversations" && m.paletteQuery == "" {
+			empty = "No retained conversations yet."
+		}
+		panel.WriteString(dim.Render(empty) + "\n")
+	}
+	for index := start; index < end; index++ {
+		item := visible[index]
 		title := truncate(item.title, titleWidth)
 		subtitle := truncate(item.subtitle, subtitleWidth)
 		line := fmt.Sprintf("  %-*s %s", titleWidth, title, dim.Render(subtitle))
-		if index == m.selected {
+		if index == selected {
 			line = selectedStyle.Width(panelWidth).Render("› " + fmt.Sprintf("%-*s %s", titleWidth, title, subtitle))
 		}
 		panel.WriteString(line + "\n")
 	}
-	panel.WriteString("\n" + dim.Render("↑/↓ choose  ·  enter open  ·  esc close"))
+	panel.WriteString("\n" + dim.Render("type filter  ·  ↑/↓ choose  ·  enter run  ·  esc close"))
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, panel.String())
+}
+
+func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
+	var view strings.Builder
+	title := "Inbox"
+	if m.section == "jobs" {
+		title = "Scheduled jobs"
+	}
+	view.WriteString(accent.Render(gatorWordmark) + dim.Render("  "+title) + "\n\n")
+	messageStyle := lipgloss.NewStyle().Width(max(20, width-4))
+	if m.section == "inbox" {
+		if len(m.config.Inbox) == 0 {
+			view.WriteString(dim.Render("No recent results.") + "\n")
+		}
+		for _, item := range m.config.Inbox {
+			view.WriteString(messageStyle.Render(accent.Render(item.Status+":") + " " + item.Title + "\n" + item.Summary))
+			view.WriteString("\n\n")
+		}
+	} else {
+		if len(m.config.Jobs) == 0 {
+			view.WriteString(dim.Render("No scheduled jobs. Create one with `gator job add`.") + "\n")
+		}
+		for _, job := range m.config.Jobs {
+			state := "disabled"
+			if job.Enabled {
+				state = "enabled"
+			}
+			view.WriteString(messageStyle.Render(accent.Render(state+":") + " " + job.Name + "\n" + job.Schedule + " · " + job.Timezone))
+			view.WriteString("\n\n")
+		}
+	}
+	footer := "esc back  ·  ctrl+p commands  ·  ctrl+x navigation"
+	if m.leader {
+		footer = "ctrl+x  l conversations  ·  i inbox  ·  j jobs  ·  esc cancel"
+	}
+	view.WriteString("\n" + dim.Render(footer))
+	return view.String()
 }
 
 func (m Model) renderComposer(width int, focused bool) string {

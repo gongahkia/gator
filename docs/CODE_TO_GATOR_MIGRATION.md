@@ -46,7 +46,7 @@ user controls + objective
 | Git isolation, repository instructions, journaling, final diff/status, patch export | Keep in backend | `internal/run`, invoked only through `work_code_agent.go` for product use |
 | Initial static scouts and dynamic reader/writer children | Reframe | Gator owns source research, artifact review, and Code delegation; Code cannot recursively delegate |
 | Code thread resume/fork/clone | Replace | Gator Work conversations and immutable revision branches |
-| Code recent-run picker and thread tree | Replace | Main `Ctrl+P` conversation list plus `/history`, `/back`, and `/forward` |
+| Code recent-run picker and thread tree | Replace | `Ctrl+X L` conversation picker plus `/history`, `/back`, and `/forward`; `Ctrl+P` is reserved for actions |
 | Code diff/review/transcript UI | Replace at product boundary | Sealed Work bundle, subagent patch evidence, root `gator review`, `export`, and historical read compatibility |
 | Base-ref selection | Retire for managed delegation | Code always receives the exact frozen Work source snapshot |
 | Copy ignored files into a worktree | Retire for managed delegation | Snapshot inclusion/exclusion is explicit, bounded, and recorded before delegation |
