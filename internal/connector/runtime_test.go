@@ -3,6 +3,8 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -92,5 +94,103 @@ func TestRuntimeRequiresConfiguredCredential(t *testing.T) {
 	_, err = (Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, "private", "fetch", json.RawMessage(`{}`))
 	if err == nil || !strings.Contains(err.Error(), "not authenticated") {
 		t.Fatalf("credential error = %v", err)
+	}
+}
+
+func TestRuntimePreparesAndPublishesExactApprovedJSON(t *testing.T) {
+	t.Parallel()
+	const token = "private-token"
+	var received []byte
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.Header.Get("Authorization") != "Bearer "+token || request.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("request = %s auth=%q content-type=%q", request.Method, request.Header.Get("Authorization"), request.Header.Get("Content-Type"))
+		}
+		var err error
+		received, err = io.ReadAll(request.Body)
+		if err != nil {
+			t.Error(err)
+		}
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "release-hook", Name: "Release hook", Kind: KindHTTPWebhook, Resource: server.URL, Authentication: AuthBearer}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	credentials, err := auth.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := credentials.Put(descriptor.CredentialRef(), auth.Credential{Type: "bearer_token", Access: token}); err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, Credentials: credentials, HTTPClient: server.Client()}
+	prepared, err := runtime.PrepareAction(descriptor.ID, "publish", json.RawMessage(`{"payload": {"title": "v1", "ready": true}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prepared.Proposal.Target != server.URL || prepared.Proposal.Preview != `{"title":"v1","ready":true}` || prepared.Proposal.PayloadSHA256 == "" {
+		t.Fatalf("proposal = %#v", prepared.Proposal)
+	}
+	if err := runtime.ExecutePrepared(context.Background(), action.Draft, prepared); err == nil {
+		t.Fatal("draft mode executed a prepared action")
+	}
+	if received != nil {
+		t.Fatal("request was sent before act-mode execution")
+	}
+	if err := runtime.ExecutePrepared(context.Background(), action.Act, prepared); err != nil {
+		t.Fatal(err)
+	}
+	if string(received) != prepared.Proposal.Preview {
+		t.Fatalf("received payload = %q", received)
+	}
+}
+
+func TestRuntimeRejectsTamperedPreparedActionAndMarksRemoteErrorUncertain(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "hook", Name: "Hook", Kind: KindHTTPWebhook, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client()}
+	prepared, err := runtime.PrepareAction(descriptor.ID, "publish", json.RawMessage(`{"payload":{"message":"hello"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tampered := prepared
+	tampered.Proposal.PayloadSHA256 = strings.Repeat("0", 64)
+	if err := runtime.ExecutePrepared(context.Background(), action.Act, tampered); err == nil || strings.Contains(err.Error(), "HTTP") {
+		t.Fatalf("tampered proposal reached network: %v", err)
+	}
+	err = runtime.ExecutePrepared(context.Background(), action.Act, prepared)
+	var uncertain interface{ OutcomeUncertain() bool }
+	if err == nil || !errors.As(err, &uncertain) || !uncertain.OutcomeUncertain() {
+		t.Fatalf("remote action error = %v", err)
+	}
+}
+
+func TestRuntimeRejectsUnboundedOrRedirectableActionInput(t *testing.T) {
+	t.Parallel()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "hook", Name: "Hook", Kind: KindHTTPWebhook, Resource: "https://example.com/hook", Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry}
+	for _, input := range []string{
+		`{}`,
+		`{"payload":"text"}`,
+		`{"payload":{},"url":"https://attacker.example"}`,
+		`{"payload":{},"extra":true}`,
+	} {
+		if _, err := runtime.PrepareAction(descriptor.ID, "publish", json.RawMessage(input)); err == nil {
+			t.Fatalf("unsafe action input accepted: %s", input)
+		}
 	}
 }
