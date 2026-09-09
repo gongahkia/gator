@@ -1,6 +1,6 @@
-# Terminal-harness capability audit
+# Product capability audit
 
-This is a source-backed product audit as of 2026-08-27, not a model-quality
+This is a source-backed product audit as of 2026-09-09, not a model-quality
 benchmark. It compares the committed Gator architecture and tests with public
 primary documentation. A documented competitor capability is not evidence that
 it is reliable in every environment; it is the feature bar users can reasonably
@@ -8,23 +8,28 @@ expect.
 
 ## Conclusion
 
-Gator is a credible local, cross-provider coding-agent core: isolated
-worktrees, a strict OS process sandbox, typed tools with approvals and
-verification, resumable runs, trusted hooks/MCP/LSP, ACP plus a loopback
-control plane, and a TUI that covers native configuration, one-run policy
-overrides, retained-thread targeting, and loopback browser review.
+Gator now has a distinct product thesis beyond a generic coding harness: local
+folders and explicitly connected data become validated, reviewable artifact
+bundles. The source is read-only, output is isolated, completion is checked by
+a developer-owned contract, and external actions are independently proposed
+and approved. The existing isolated coding workflow remains available under
+`gator code`.
 
-It is not a full replacement for Codex CLI, Claude Code, Cursor CLI, Pi, or
-OpenCode. Gator supports Linux and macOS only. The largest remaining
-local-product gaps are detached writer lifecycle, broader configurable agent
-types, a full JavaScript/screenshot browser, and durable code intelligence.
-Hosted agents, organization governance, and cloud handoff are separate
-services, not omissions that a local Go binary can honestly claim to solve.
+This is a credible Work CLI foundation, not yet a full replacement for ChatGPT
+Work or Claude Cowork. It lacks a conversation-oriented Work TUI, format-native
+DOCX/XLSX/PDF generation, rich service-specific connectors, built-in persistent
+jobs, and cloud continuation. The coding workflow likewise does not claim full
+parity with Codex CLI, Claude Code, Cursor CLI, Pi, or OpenCode. Hosted agents,
+organization governance, and cross-device handoff remain separate services.
 
 ## Capability map
 
 | Surface | Gator evidence | Comparative assessment |
 | --- | --- | --- |
+| General Work isolation and outcomes | `gator work` accepts an ordinary folder as read-only `source/...`, writes only inside private `output/...`, and seals an embedded outcome contract with file media types, sizes, hashes, and deterministic JSON/CSV/text validations. `gator inspect` removes artifact and action authority entirely. | This matches the source-to-deliverable shape documented for ChatGPT Work while making local boundaries and completion evidence unusually explicit. It is currently CLI-only and supports fewer document formats and no cloud workspace. [OpenAI Work guide](https://learn.chatgpt.com/docs/get-started-with-work), [OpenAI Work use cases](https://learn.chatgpt.com/use-cases) |
+| Artifact review and transfer | A verified Work bundle can be reviewed by run ID with safe previews, exported as deterministic `tar.gz`, or applied to an explicit existing directory after conflict preflight. The source folder is never an implicit destination. | Strong local review semantics and shell composability. Claude Cowork emphasizes finished files and connected workflows; Gator is narrower but makes artifact integrity and transfer boundaries directly inspectable. [Claude Cowork](https://claude.com/product/cowork) |
+| Connected data and external actions | User-owned connector descriptors expose only per-run selected operations. JSON reads carry URL, time, byte count, and SHA-256 provenance. Webhook actions pin the exact endpoint and JSON digest; draft never sends, act requires a fresh one-shot approval, and ambiguous remote outcomes are recorded as `unknown` rather than safe-to-retry. | The capability/action split is a differentiator, but the catalog is intentionally tiny. Rich email, calendar, Drive, CRM, and project-management workflows still require service-specific schema, authentication, and semantics rather than generic webhook branding. |
+| Persistent jobs | No built-in scheduler is claimed. `docs/JOBS.md` specifies a separate private supervisor, immutable execution history, missed-run policy, overlap control, credential preflight, and a prohibition on unattended approval. | Honest gap versus products with scheduled tasks. Existing launchd/systemd/CI can supervise headless `gator work`; a background goroutine or detached terminal would not meet the durability bar. [OpenAI Work use cases](https://learn.chatgpt.com/use-cases) |
 | Process isolation and approvals | `run_command` uses strict Seatbelt on macOS and Bubblewrap on Linux, fails closed elsewhere, filters environment, bounds output, and denies network by default. Worktrees remain a review boundary, not the only security boundary. | Substantive local parity with Codex's documented sandbox/approval model; platform coverage and sandbox regression testing must remain a release gate. [Codex sandboxing](https://learn.chatgpt.com/docs/sandboxing) |
 | Isolated changes, resume, and review | New runs use a retained Git worktree; the original checkout is untouched. A developer can select an immutable base, copy only explicitly listed ignored files, and run exact sandboxed `--setup` argv before scouts or the model. Session threads can resume, fork from a recorded patch snapshot, inspect a diff, or export/apply a patch. | Competitive for a local review-first flow. Cursor documents similarly isolated worktrees and cleanup; Gator still has no shared dependency-cache or project-authored setup-script mechanism. [Cursor worktrees](https://cursor.com/docs/configuration/worktrees) |
 | MCP and credentials | Explicitly trusted stdio and Streamable HTTP servers; per-tool approval; resource-bound OAuth discovery, PKCE, DCR or pre-registered public clients, and private credential storage. | Stronger default trust posture than automatic project-server connection. It is intentionally narrower than broad plugin ecosystems. [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization), [OpenCode MCP](https://opencode.ai/v2/docs/mcp-servers) |
@@ -38,6 +43,14 @@ services, not omissions that a local Go binary can honestly claim to solve.
 
 ## Deliberate non-equivalences
 
+- An artifact bundle is not an office suite. Markdown, text, JSON, CSV, and
+  safe previews are real current formats; DOCX, XLSX, slides, and rendered PDFs
+  remain future format-specific writers and validators.
+- A generic authenticated JSON source or webhook is not branded as a complete
+  SaaS integration. Service-specific connectors must add bounded resource
+  selection, typed operations, OAuth scopes, idempotency, and useful errors.
+- `--actions approve` is interactive by design. Headless and scheduled work may
+  draft an exact action proposal but cannot inherit or synthesize approval.
 - Gator's trust model rejects changed project hooks, LSP servers, and MCP
   bundles until a developer pins the new hash. This is friction by design, not
   a missing auto-connect feature.
@@ -58,16 +71,18 @@ services, not omissions that a local Go binary can honestly claim to solve.
 
 ## Recommended build order
 
-1. **Detached writer lifecycle.** Build explicit start/status/cancel/collect on
-   the durable foreground manifest contract; do not add auto-merge.
-2. **Browser hardening and evidence.** Keep managed sessions ephemeral, test
-   origin routing/SSRF boundaries against Chromium, and retain computer use
-   outside the default tool surface.
-3. **Control-plane hardening.** Keep the loopback HTTP/SSE bridge small and
-   prove reconnect, overload, and credential-file behavior in release
-   testing. Keep remote execution separate.
-4. **Delivery integrations.** Trusted OAuth MCP for GitHub/GitLab, then
-   decide whether a first-party client is justified.
+1. **Work conversation lifecycle.** Add a Work-native retained session and TUI
+   around the existing bundle contract without merging it into Git run state.
+2. **Format-native deliverables.** Add one excellent DOCX or XLSX writer with
+   structural validation and preview before expanding format breadth.
+3. **One complete connected workflow.** Pick a real source-to-artifact use case
+   and add service-specific resource selection, OAuth scopes, and typed errors;
+   retain generic JSON/webhook as infrastructure.
+4. **Foreground product evidence.** Dogfood non-Git folder, structured-data,
+   connector, draft-action, approval, review, export, and apply flows before
+   claiming a daily driver.
+5. **Durable jobs, later.** Implement `job run` and immutable execution records
+   first, then ship a supervisor only after every gate in `docs/JOBS.md` passes.
 
 The implementation decisions and exact test evidence belong in the source and
 release notes; this audit intentionally remains a current capability map rather
