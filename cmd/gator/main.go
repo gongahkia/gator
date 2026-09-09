@@ -63,6 +63,7 @@ Usage:
   gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]
   gator eval suite DIR [--run-id ID] [--report-dir DIR] [--attempts N] --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
   gator transcript RUN_RECORD_PATH > transcript.html
+  gator review WORK_BUNDLE [--preview] [--json]
   gator review RUN_RECORD_PATH [--listen 127.0.0.1:PORT] [--open]
   gator export RUN_RECORD_PATH
   gator apply [--check] RUN_RECORD_PATH

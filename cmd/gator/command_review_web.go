@@ -8,10 +8,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/signal"
 	"strings"
 	"time"
 
+	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/reviewweb"
 )
 
@@ -22,6 +24,19 @@ type reviewWebOptions struct {
 }
 
 func reviewCommand(arguments []string, out io.Writer) error {
+	if options, eligible := parseWorkReviewOptions(arguments); eligible {
+		stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+		if err != nil {
+			return err
+		}
+		bundle, found, err := resolveWorkBundle(options.reference, stateDir)
+		if err != nil {
+			return err
+		}
+		if found {
+			return reviewWorkBundle(out, bundle, options.json, options.preview)
+		}
+	}
 	options, err := parseReviewWebOptions(arguments)
 	if err != nil {
 		return err
