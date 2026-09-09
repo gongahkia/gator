@@ -28,6 +28,25 @@ func TestRegistryClassifiesStableHTTPJSONOperation(t *testing.T) {
 	}
 }
 
+func TestRegistryClassifiesWebhookAsPublish(t *testing.T) {
+	t.Parallel()
+	descriptor := Descriptor{
+		Version: DescriptorVersion, ID: "release-hook", Name: "Release hook",
+		Kind: KindHTTPWebhook, Resource: "https://example.com/releases", Authentication: AuthBearer,
+	}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, operation, err := registry.Operation(descriptor.ID, "publish")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if operation.Capability != action.Publish || !action.RequiresFreshApproval(operation.Capability) {
+		t.Fatalf("webhook operation = %#v", operation)
+	}
+}
+
 func TestRegistrySortsAndRejectsUnsafeDescriptors(t *testing.T) {
 	valid := func(id, resource string) Descriptor {
 		return Descriptor{Version: DescriptorVersion, ID: id, Name: id, Kind: KindHTTPJSON, Resource: resource, Authentication: AuthNone}

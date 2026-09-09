@@ -21,6 +21,7 @@ import (
 const (
 	DescriptorVersion = 1
 	KindHTTPJSON      = "http_json"
+	KindHTTPWebhook   = "http_webhook"
 	AuthNone          = "none"
 	AuthBearer        = "bearer"
 	maxConnectors     = 128
@@ -91,7 +92,7 @@ func (d Descriptor) Validate() error {
 	if strings.TrimSpace(d.Name) != d.Name || d.Name == "" || len(d.Name) > 128 || strings.ContainsAny(d.Name, "\x00\r\n") {
 		return errors.New("connector display name is invalid")
 	}
-	if d.Kind != KindHTTPJSON {
+	if d.Kind != KindHTTPJSON && d.Kind != KindHTTPWebhook {
 		return fmt.Errorf("unsupported connector kind %q", d.Kind)
 	}
 	resource, err := url.Parse(d.Resource)
@@ -119,18 +120,30 @@ func (d Descriptor) CredentialRef() string {
 
 // Operations returns independent, Gator-owned operation metadata.
 func (d Descriptor) Operations() []Operation {
-	if d.Kind != KindHTTPJSON {
+	switch d.Kind {
+	case KindHTTPJSON:
+		return []Operation{{
+			ID:          "fetch",
+			Description: "Fetch the exact configured JSON resource as untrusted connected source data.",
+			Capability:  action.ConnectedRead,
+			InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`),
+			OutputSchema: json.RawMessage(
+				`{"type":"object","required":["data","provenance"],"properties":{"data":{},"provenance":{"type":"object"}}}`,
+			),
+		}}
+	case KindHTTPWebhook:
+		return []Operation{{
+			ID:          "publish",
+			Description: "Prepare JSON for the exact configured endpoint. Draft mode records a proposal; act mode still requires fresh approval before POSTing.",
+			Capability:  action.Publish,
+			InputSchema: json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`),
+			OutputSchema: json.RawMessage(
+				`{"type":"object","required":["proposal","status"],"properties":{"proposal":{"type":"object"},"status":{"type":"string"}}}`,
+			),
+		}}
+	default:
 		return nil
 	}
-	return []Operation{{
-		ID:          "fetch",
-		Description: "Fetch the exact configured JSON resource as untrusted connected source data.",
-		Capability:  action.ConnectedRead,
-		InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false}`),
-		OutputSchema: json.RawMessage(
-			`{"type":"object","required":["data","provenance"],"properties":{"data":{},"provenance":{"type":"object"}}}`,
-		),
-	}}
 }
 
 // Registry is an immutable, deterministic view of configured connectors.
