@@ -56,9 +56,9 @@ type Result struct {
 // from fresh context and return only the information needed by the manager.
 type Specialist struct {
 	Configuration RoleConfiguration
-	Name        string
-	Description string
-	Run         func(context.Context, Invocation) (Result, error)
+	Name          string
+	Description   string
+	Run           func(context.Context, Invocation) (Result, error)
 }
 
 // Record is trusted orchestration evidence for one specialist invocation.
@@ -146,10 +146,11 @@ func LLMSpecialist(name, description string, model agent.Model, tools []agent.To
 	return Specialist{
 		Name: name, Description: description,
 		Run: func(ctx context.Context, invocation Invocation) (Result, error) {
-			result, err := (agent.Runner{Model: model, Tools: tools, Now: now}).Run(ctx, agent.RunOptions{
+			usage := &agent.Budget{Limits: agent.Limits{ModelRequests: 4096}}
+			result, err := (agent.Runner{Model: agent.WithBudget(model, usage), Tools: tools, Now: now}).Run(ctx, agent.RunOptions{
 				Task: invocation.Task, System: system, MaxSteps: maxSteps, OnEvent: invocation.OnEvent,
 			})
-			return Result{Summary: result.FinalText, Steps: result.Steps}, err
+			return Result{Summary: result.FinalText, Steps: result.Steps, Usage: usage.Usage()}, err
 		},
 	}
 }

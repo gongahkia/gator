@@ -94,18 +94,18 @@ type RendererEvidence struct {
 // private transcript. Code specialists can additionally bind a patch artifact
 // to its exact output bytes.
 type SubagentEvidence struct {
-	BaselineSHA256 string `json:"baseline_sha256,omitempty"`
+	BaselineSHA256 string      `json:"baseline_sha256,omitempty"`
 	Usage          agent.Usage `json:"usage"`
-	ID             string    `json:"id"`
-	Agent          string    `json:"agent"`
-	TaskSHA256     string    `json:"task_sha256"`
-	OutputSHA256   string    `json:"output_sha256"`
-	Status         string    `json:"status"`
-	Steps          int       `json:"steps,omitempty"`
-	ArtifactPath   string    `json:"artifact_path,omitempty"`
-	ArtifactSHA256 string    `json:"artifact_sha256,omitempty"`
-	StartedAt      time.Time `json:"started_at"`
-	FinishedAt     time.Time `json:"finished_at"`
+	ID             string      `json:"id"`
+	Agent          string      `json:"agent"`
+	TaskSHA256     string      `json:"task_sha256"`
+	OutputSHA256   string      `json:"output_sha256"`
+	Status         string      `json:"status"`
+	Steps          int         `json:"steps,omitempty"`
+	ArtifactPath   string      `json:"artifact_path,omitempty"`
+	ArtifactSHA256 string      `json:"artifact_sha256,omitempty"`
+	StartedAt      time.Time   `json:"started_at"`
+	FinishedAt     time.Time   `json:"finished_at"`
 }
 
 // ValidationResult is one trusted deterministic check. Diagnostic is bounded

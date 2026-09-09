@@ -21,29 +21,29 @@ const TaskVersion = 1
 
 type Task struct {
 	Configuration RoleConfiguration `json:"configuration"`
-	Limits       agent.Limits `json:"limits"`
-	SelectedInput string `json:"selected_input,omitempty"`
-	Baseline     string `json:"baseline_patch,omitempty"`
-	Version      int       `json:"version"`
-	ID           string    `json:"id"`
-	GlobalID     string    `json:"global_id"`
-	ParentRun    string    `json:"parent_run"`
-	ParentTask   string    `json:"parent_task,omitempty"`
-	Role         string    `json:"role"`
-	RoleVersion  int       `json:"role_version"`
-	Source       string    `json:"source"`
-	PolicySHA256 string    `json:"policy_sha256"`
-	InputSHA256  string    `json:"input_sha256"`
-	Dependencies []string  `json:"dependencies,omitempty"`
-	Attempt      int       `json:"attempt"`
-	Previous     string    `json:"previous,omitempty"`
-	Status       string    `json:"status"`
-	Category     string    `json:"error_category,omitempty"`
-	Error        string    `json:"error,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	StartedAt    time.Time `json:"started_at,omitempty"`
-	FinishedAt   time.Time `json:"finished_at,omitempty"`
-	Result       Result    `json:"result"`
+	Limits        agent.Limits      `json:"limits"`
+	SelectedInput string            `json:"selected_input,omitempty"`
+	Baseline      string            `json:"baseline_patch,omitempty"`
+	Version       int               `json:"version"`
+	ID            string            `json:"id"`
+	GlobalID      string            `json:"global_id"`
+	ParentRun     string            `json:"parent_run"`
+	ParentTask    string            `json:"parent_task,omitempty"`
+	Role          string            `json:"role"`
+	RoleVersion   int               `json:"role_version"`
+	Source        string            `json:"source"`
+	PolicySHA256  string            `json:"policy_sha256"`
+	InputSHA256   string            `json:"input_sha256"`
+	Dependencies  []string          `json:"dependencies,omitempty"`
+	Attempt       int               `json:"attempt"`
+	Previous      string            `json:"previous,omitempty"`
+	Status        string            `json:"status"`
+	Category      string            `json:"error_category,omitempty"`
+	Error         string            `json:"error,omitempty"`
+	CreatedAt     time.Time         `json:"created_at"`
+	StartedAt     time.Time         `json:"started_at,omitempty"`
+	FinishedAt    time.Time         `json:"finished_at,omitempty"`
+	Result        Result            `json:"result"`
 }
 type StartRequest struct {
 	Baseline     string   `json:"baseline_patch,omitempty"`

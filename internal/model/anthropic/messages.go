@@ -298,6 +298,7 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 	blocks := make(map[int]contentBlock)
 	var order []int
 	stopped := false
+	usage := agent.Usage{}
 	flush := func() error {
 		if len(dataLines) == 0 {
 			eventType = ""
@@ -306,6 +307,15 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 		data := strings.Join(dataLines, "\n")
 		dataLines = nil
 		var event struct {
+			Message struct {
+				Usage *struct {
+					Input  int64 `json:"input_tokens"`
+					Output int64 `json:"output_tokens"`
+				} `json:"usage"`
+			} `json:"message"`
+			Usage *struct {
+				Output int64 `json:"output_tokens"`
+			} `json:"usage"`
 			Type         string       `json:"type"`
 			Index        int          `json:"index"`
 			ContentBlock contentBlock `json:"content_block"`
@@ -325,6 +335,16 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 			event.Type = eventType
 		}
 		switch event.Type {
+		case "message_start":
+			if event.Message.Usage != nil {
+				usage.Reported = true
+				usage.InputTokens = event.Message.Usage.Input
+				usage.OutputTokens = event.Message.Usage.Output
+			}
+		case "message_delta":
+			if event.Usage != nil {
+				usage.OutputTokens = event.Usage.Output
+			}
 		case "content_block_start":
 			block := event.ContentBlock
 			// Anthropic starts streamed tool-use blocks with an empty object and
@@ -384,7 +404,9 @@ func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {
 	for _, index := range order {
 		content = append(content, blocks[index])
 	}
-	return turnFromBlocks(content)
+	turn, err := turnFromBlocks(content)
+	turn.Usage = usage
+	return turn, err
 }
 
 func describeAPIError(status int, contents []byte) error {
