@@ -34,6 +34,7 @@ type Manifest struct {
 	Source           Source                 `json:"source"`
 	ConnectedSources []connector.Provenance `json:"connected_sources,omitempty"`
 	Renderers        []RendererEvidence     `json:"renderers,omitempty"`
+	Subagents        []SubagentEvidence     `json:"subagents,omitempty"`
 	Artifacts        []File                 `json:"artifacts"`
 	Validations      []ValidationResult     `json:"validations"`
 	Actions          []action.Record        `json:"actions,omitempty"`
@@ -69,6 +70,23 @@ type RendererEvidence struct {
 	ArtifactSHA256 string `json:"artifact_sha256"`
 	SpecSHA256     string `json:"spec_sha256"`
 	TemplateSHA256 string `json:"template_sha256,omitempty"`
+}
+
+// SubagentEvidence records a bounded fresh-context specialist invocation. It
+// contains digests and lifecycle metadata rather than the specialist's full
+// private transcript. Code specialists can additionally bind a patch artifact
+// to its exact output bytes.
+type SubagentEvidence struct {
+	ID             string    `json:"id"`
+	Agent          string    `json:"agent"`
+	TaskSHA256     string    `json:"task_sha256"`
+	OutputSHA256   string    `json:"output_sha256"`
+	Status         string    `json:"status"`
+	Steps          int       `json:"steps,omitempty"`
+	ArtifactPath   string    `json:"artifact_path,omitempty"`
+	ArtifactSHA256 string    `json:"artifact_sha256,omitempty"`
+	StartedAt      time.Time `json:"started_at"`
+	FinishedAt     time.Time `json:"finished_at"`
 }
 
 // ValidationResult is one trusted deterministic check. Diagnostic is bounded
@@ -142,6 +160,24 @@ func (m Manifest) Validate() error {
 		}
 		seenRenderers[renderer.Path] = struct{}{}
 	}
+	if len(m.Subagents) > 64 {
+		return errors.New("artifact manifest has too many subagent records")
+	}
+	seenSubagents := make(map[string]struct{}, len(m.Subagents))
+	for _, subagent := range m.Subagents {
+		if err := subagent.Validate(); err != nil {
+			return fmt.Errorf("artifact subagent evidence: %w", err)
+		}
+		if subagent.ArtifactPath != "" {
+			if digest, ok := artifactDigests[subagent.ArtifactPath]; !ok || digest != subagent.ArtifactSHA256 {
+				return fmt.Errorf("artifact subagent evidence for %q does not match output", subagent.ArtifactPath)
+			}
+		}
+		if _, duplicate := seenSubagents[subagent.ID]; duplicate {
+			return fmt.Errorf("artifact manifest repeats subagent evidence for %q", subagent.ID)
+		}
+		seenSubagents[subagent.ID] = struct{}{}
+	}
 	for _, result := range m.Validations {
 		if err := validateArtifactPath(result.Path); err != nil {
 			return fmt.Errorf("artifact manifest validation path %q is invalid", result.Path)
@@ -208,6 +244,34 @@ func (e RendererEvidence) Validate() error {
 	}
 	if !validSHA256(e.ArtifactSHA256) || !validSHA256(e.SpecSHA256) || e.TemplateSHA256 != "" && !validSHA256(e.TemplateSHA256) {
 		return errors.New("renderer digest is invalid")
+	}
+	return nil
+}
+
+// Validate checks the portable, bounded subagent evidence envelope.
+func (e SubagentEvidence) Validate() error {
+	if !runIDPattern.MatchString(e.ID) || !specialistNamePattern.MatchString(e.Agent) {
+		return errors.New("subagent identity is invalid")
+	}
+	if !validSHA256(e.TaskSHA256) || !validSHA256(e.OutputSHA256) {
+		return errors.New("subagent digest is invalid")
+	}
+	if e.Status != "completed" && e.Status != "failed" {
+		return errors.New("subagent status is invalid")
+	}
+	if e.Steps < 0 || e.Steps > 1024 {
+		return errors.New("subagent step count is invalid")
+	}
+	if (e.ArtifactPath == "") != (e.ArtifactSHA256 == "") {
+		return errors.New("subagent artifact evidence is incomplete")
+	}
+	if e.ArtifactPath != "" {
+		if err := validateArtifactPath(e.ArtifactPath); err != nil || !validSHA256(e.ArtifactSHA256) {
+			return errors.New("subagent artifact evidence is invalid")
+		}
+	}
+	if e.StartedAt.IsZero() || e.FinishedAt.IsZero() || e.FinishedAt.Before(e.StartedAt) {
+		return errors.New("subagent timestamps are invalid")
 	}
 	return nil
 }
