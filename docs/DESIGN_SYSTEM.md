@@ -20,7 +20,7 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | State | Primary content | Composer | Secondary navigation |
 | --- | --- | --- | --- |
 | Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X`, `Ctrl+I`, and `Ctrl+J` hints |
-| Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Available through direct shortcuts |
+| Drafting | Centered `🐊 Gator` wordmark and outcome question | Centered and growing with wrapped input | Available through direct shortcuts |
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
 | Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
 | Provider picker | Providers valid for the selected `/model`, `/connect`, `/login`, or `/logout` action | Hidden | Type to filter, arrows to choose, `Esc` to return |
@@ -28,8 +28,8 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+I` (also reported as Tab by terminals) |
 | Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+J` |
 
-Typing the first character docks the composer; deleting the draft recenters it.
-Submitting the prompt starts a conversation. Merely opening Gator must not show
+Typing keeps the growing composer centered. Submitting the first prompt docks
+the composer and starts a conversation. Merely opening Gator must not show
 cards, counters, setup prose, or a navigation rail. First-run setup begins only
 after the first submitted prompt, or explicitly through `/model`.
 
