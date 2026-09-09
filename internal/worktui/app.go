@@ -1078,7 +1078,7 @@ func (m Model) View() string {
 	if m.section != "" {
 		return m.renderSection(width, accent, dim)
 	}
-	if m.home && m.input == "" {
+	if m.home {
 		return m.renderHome(width, height, accent, dim)
 	}
 	var view strings.Builder

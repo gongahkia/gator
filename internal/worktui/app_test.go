@@ -86,9 +86,15 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 		t.Fatalf("initial view omits direct navigation: %q", view)
 	}
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
-	typingView := typing.(Model).View()
-	if strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || !strings.Contains(typingView, "Work in reports") {
-		t.Fatalf("composer did not dock after typing: %q", typingView)
+	typingModel := typing.(Model)
+	typingView := typingModel.View()
+	if !typingModel.home || !strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || strings.Contains(typingView, "Work in reports") {
+		t.Fatalf("composer did not stay centered while drafting: %q", typingView)
+	}
+	submitted, _ := typingModel.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	submittedModel := submitted.(Model)
+	if submittedModel.home || strings.Contains(submittedModel.View(), "What do you want to accomplish?") || !strings.Contains(submittedModel.View(), "Work in reports") {
+		t.Fatalf("composer did not dock after submission: %q", submittedModel.View())
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()
@@ -100,6 +106,16 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	}
 	if strings.Contains(view, "Open the isolated coding workflow") {
 		t.Fatalf("palette still exposes the retired Code frontend: %q", view)
+	}
+}
+
+func TestCenteredHomeComposerGrowsForWrappedDrafts(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work/reports"})
+	model.width, model.height = 60, 30
+	model.input = strings.Repeat("draft ", 30)
+	view := ansi.Strip(model.View())
+	if !strings.Contains(view, "What do you want to accomplish?") || strings.Count(view, "│") <= 2 {
+		t.Fatalf("centered composer did not grow across wrapped rows: %q", view)
 	}
 }
 
