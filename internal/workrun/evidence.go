@@ -45,7 +45,8 @@ func (c *evidenceCatalog) retain(locator string, data []byte, at time.Time) (art
 	}
 	sum := sha256.Sum256(data)
 	digest := hex.EncodeToString(sum[:])
-	id := "evidence-" + digest[:24]
+	identity := sha256.Sum256([]byte(locator + "\x00" + at.UTC().Format(time.RFC3339Nano) + "\x00" + digest))
+	id := "evidence-" + hex.EncodeToString(identity[:])[:24]
 	entry := artifact.Evidence{ID: id, Locator: locator, SHA256: digest, RetrievedAt: at, SnapshotPath: "evidence/" + digest + ".txt"}
 	if err := os.MkdirAll(filepath.Join(c.work.Path, "evidence"), 0700); err != nil {
 		return entry, err
@@ -102,7 +103,7 @@ type evidenceTool struct {
 }
 
 func (t evidenceTool) Definition() agent.ToolDefinition {
-	schema := `{"type":"object","additionalProperties":false,"properties":{}}`
+	schema := `{"type":"object","additionalProperties":false,"properties":{"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":100}}}`
 	if t.name == "read_evidence" {
 		schema = `{"type":"object","additionalProperties":false,"required":["id"],"properties":{"id":{"type":"string"}}}`
 	}
@@ -115,7 +116,23 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 	var value any
 	switch t.name {
 	case "list_evidence":
-		value = t.catalog.list()
+		var input struct {
+			Offset int `json:"offset"`
+			Limit  int `json:"limit"`
+		}
+		if err := json.Unmarshal(raw, &input); err != nil {
+			return agent.ToolResult{}, err
+		}
+		if input.Limit == 0 {
+			input.Limit = 100
+		}
+		if input.Offset < 0 || input.Limit < 1 || input.Limit > 100 {
+			return agent.ToolResult{}, errors.New("invalid evidence page")
+		}
+		entries := t.catalog.list()
+		start := min(input.Offset, len(entries))
+		end := min(start+input.Limit, len(entries))
+		value = map[string]any{"entries": entries[start:end], "total": len(entries), "next_offset": end}
 	case "read_evidence":
 		var input struct {
 			ID string `json:"id"`

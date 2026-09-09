@@ -11,9 +11,11 @@ import (
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
+	"os"
 )
 
 type workFrame struct {
+	TaskID        string     `json:"task_id,omitempty"`
 	Version       int        `json:"version"`
 	Type          string     `json:"type"`
 	Request       *workInput `json:"request,omitempty"`
@@ -38,7 +40,7 @@ type workInput struct {
 }
 
 func workHeadless(ctx context.Context, in io.Reader, out io.Writer) error {
-	stateDir, err := journal.ResolveStateDir("")
+	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
 	if err != nil {
 		return err
 	}
@@ -106,6 +108,16 @@ func serveWorkOperation(ctx context.Context, service workrun.Service, request wo
 				err = errors.New("unsupported Work protocol version")
 			} else {
 				switch frame.Type {
+				case "inspect_task":
+					task, inspectErr := operation.InspectTask(frame.TaskID)
+					err = inspectErr
+					if err == nil {
+						if sendErr := send("task", task); sendErr != nil {
+							return sendErr
+						}
+					}
+				case "cancel_task":
+					err = operation.CancelTask(frame.TaskID)
 				case "cancel":
 					operation.Cancel()
 				case "steer":

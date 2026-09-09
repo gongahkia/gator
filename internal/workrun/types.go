@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
@@ -26,6 +27,7 @@ const (
 	CodeCapabilityHTTP      = "http"
 	CodeCapabilityBrowser   = "browser"
 	CodeCapabilityTerminal  = "terminal"
+	CodeCapabilityHooks     = "hooks"
 )
 
 // CodePolicy is the user-owned capability envelope for Gator's internal Code
@@ -58,6 +60,8 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	RoleConfiguration    map[string]orchestrator.RoleConfiguration
+	OnSupervisor         func(*orchestrator.Supervisor)
 	OTLPEndpoint         string
 	Limits               agent.Limits
 	Budget               *agent.Budget
@@ -115,6 +119,7 @@ type Outcome struct {
 // frozen source selected by a Work run. The implementation must isolate all
 // writes and return a reviewable patch rather than mutate SourcePath.
 type CodeRequest struct {
+	OnEvent     agent.EventSink
 	Budget      *agent.Budget
 	Baseline    []byte
 	Project     *projectcapture.Bundle
@@ -130,6 +135,8 @@ type CodeRequest struct {
 
 // CodeResult is the bounded handoff from Gator Code back to Gator Work.
 type CodeResult struct {
+	BaselineSHA256 string
+	Usage        agent.Usage
 	Summary      string
 	Patch        []byte
 	ChangedPaths []string
@@ -142,6 +149,7 @@ type CodeDelegate func(context.Context, CodeRequest) (CodeResult, error)
 // Executor combines a provider-independent model with private workspace
 // allocation and artifact sealing.
 type Executor struct {
+	RoleConfiguration map[string]orchestrator.RoleConfiguration
 	RoleSteps  map[string]int
 	HTTP       tools.HTTPFetchOptions
 	RoleModels map[string]agent.Model

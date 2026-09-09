@@ -94,6 +94,8 @@ type RendererEvidence struct {
 // private transcript. Code specialists can additionally bind a patch artifact
 // to its exact output bytes.
 type SubagentEvidence struct {
+	BaselineSHA256 string `json:"baseline_sha256,omitempty"`
+	Usage          agent.Usage `json:"usage"`
 	ID             string    `json:"id"`
 	Agent          string    `json:"agent"`
 	TaskSHA256     string    `json:"task_sha256"`
@@ -165,6 +167,32 @@ func (m Manifest) Validate() error {
 		artifactDigests[file.Path] = file.SHA256
 	}
 	seenRenderers := make(map[string]struct{}, len(m.Renderers))
+	if m.PolicySHA256 != "" && !validSHA256(m.PolicySHA256) {
+		return errors.New("artifact policy digest is invalid")
+	}
+	for _, candidate := range m.Candidates {
+		if candidate.Version != 1 || (candidate.Status != "verified" && candidate.Status != "failed") {
+			return errors.New("invalid code candidate version or status")
+		}
+		if candidate.SHA256 != "" && artifactDigests[candidate.PatchPath] != candidate.SHA256 {
+			return errors.New("code candidate patch does not match retained output")
+		}
+		if candidate.Status == "verified" {
+			if !validSHA256(candidate.SHA256) || candidate.Error != "" || len(candidate.Verification) == 0 {
+				return errors.New("verified code candidate lacks verification evidence")
+			}
+			for _, check := range candidate.Verification {
+				if !check.Passed || len(check.Argv) == 0 {
+					return errors.New("verified code candidate contains failed verification")
+				}
+			}
+			for _, path := range candidate.ChangedPaths {
+				if err := validateArtifactPath(path); err != nil || (candidate.Before[path] != "absent" && !validSHA256(candidate.Before[path])) {
+					return errors.New("code candidate changed-path baseline is invalid")
+				}
+			}
+		}
+	}
 	for _, renderer := range m.Renderers {
 		if err := renderer.Validate(); err != nil {
 			return fmt.Errorf("artifact renderer evidence: %w", err)
@@ -273,7 +301,7 @@ func (e SubagentEvidence) Validate() error {
 	if !validSHA256(e.TaskSHA256) || !validSHA256(e.OutputSHA256) {
 		return errors.New("subagent digest is invalid")
 	}
-	if e.Status != "completed" && e.Status != "failed" {
+	if e.Status != "completed" && e.Status != "failed" && e.Status != "cancelled" {
 		return errors.New("subagent status is invalid")
 	}
 	if e.Steps < 0 || e.Steps > 1024 {
@@ -287,7 +315,7 @@ func (e SubagentEvidence) Validate() error {
 			return errors.New("subagent artifact evidence is invalid")
 		}
 	}
-	if e.StartedAt.IsZero() || e.FinishedAt.IsZero() || e.FinishedAt.Before(e.StartedAt) {
+	if (e.StartedAt.IsZero() && e.Status != "cancelled") || e.FinishedAt.IsZero() || e.FinishedAt.Before(e.StartedAt) {
 		return errors.New("subagent timestamps are invalid")
 	}
 	return nil

@@ -58,7 +58,8 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		digest := sha256.Sum256([]byte(request.ParentRunID + "\x00" + request.ID))
 		runID := "code-" + hex.EncodeToString(digest[:8])
 		code := b.code
-		code.Model = agent.WithBudget(code.Model, request.Budget)
+		usage := &agent.Budget{Limits: agent.Limits{ModelRequests: 4096}}
+		code.Model = agent.WithBudget(agent.WithBudget(code.Model, request.Budget), usage)
 		code.Sandbox = request.Policy.Sandbox.Normalize()
 		verification := mergeCodeVerification(request.Policy.Verification)
 		omitted := []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
@@ -76,6 +77,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		}
 		outcome, runErr := code.Execute(ctx, gatorrun.Request{
 			RepositoryPath: repository,
+			OnEvent: request.OnEvent,
 			TrustIdentity: func() string {
 				if request.Project != nil {
 					return request.Project.Origin
@@ -106,7 +108,8 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			},
 			System: `You are the internal Gator Code specialist called by the user-facing Gator manager. Implement only the bounded coding assignment against an isolated checkout of the parent's frozen source snapshot. The manager receives your summary and patch, not your full context. Never broaden the task, access live source, or claim the patch was applied. Use only capabilities explicitly present in this delegation and report exact changed paths and verification evidence.`,
 		})
-		result := workrun.CodeResult{Summary: strings.TrimSpace(outcome.Result.FinalText), Steps: outcome.Result.Steps}
+		baseline := sha256.Sum256(append([]byte(request.SourcePath + "\x00"), request.Baseline...))
+		result := workrun.CodeResult{BaselineSHA256: hex.EncodeToString(baseline[:]), Usage: usage.Usage(), Summary: strings.TrimSpace(outcome.Result.FinalText), Steps: outcome.Result.Steps}
 		if outcome.Worktree.Path != "" {
 			result.Patch, err = patch.Export(ctx, outcome.Worktree.Path, strings.TrimSpace(string(original)))
 			if err == nil {

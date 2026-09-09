@@ -9,6 +9,7 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -97,6 +98,8 @@ type queuedRun struct {
 }
 
 type Model struct {
+	tasks         map[string]string
+	quitting      bool
 	live          <-chan tea.Msg
 	cancel        context.CancelFunc
 	operation     *workrun.Operation
@@ -162,6 +165,20 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = value.Width, value.Height
 	case agent.Event:
+		if value.Kind == agent.EventSubagent && value.TaskID != "" {
+			var task struct{ ID, Role, Status, Error string }
+			if json.Unmarshal([]byte(value.Text), &task) == nil {
+				if m.tasks == nil {
+					m.tasks = map[string]string{}
+				}
+				m.tasks[task.ID] = task.Role + ": " + task.Status
+				m.status = task.ID + " " + m.tasks[task.ID]
+				if task.Error != "" {
+					m.messages = append(m.messages, message{role: "Specialist", text: task.ID + ": " + task.Error})
+				}
+				return m, waitWorkEvent(m.live)
+			}
+		}
 		if value.Kind == agent.EventTextDelta {
 			m.status = "Working: " + value.Text
 		} else if value.Text != "" {
@@ -186,6 +203,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		m.interaction = nil
 		m.live = nil
 		m.running = false
+		if m.quitting {
+			return m, tea.Quit
+		}
 		if value.ConversationID != "" {
 			m.conversation = value.ConversationID
 		}
@@ -329,6 +349,28 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.input = ""
+				if prompt == "/quit" && m.cancel != nil {
+					m.quitting = true
+					m.cancel()
+					m.status = "Cancelling before exit…"
+					return m, nil
+				}
+				if prompt == "/tasks" {
+					var lines []string
+					for id, status := range m.tasks {
+						lines = append(lines, id+" "+status)
+					}
+					sort.Strings(lines)
+					m.messages = append(m.messages, message{role: "Specialists", text: strings.Join(lines, "\n")})
+					return m, nil
+				}
+				if strings.HasPrefix(prompt, "/cancel-task ") && m.operation != nil {
+					err := m.operation.CancelTask(strings.TrimSpace(strings.TrimPrefix(prompt, "/cancel-task ")))
+					if err != nil {
+						m.status = err.Error()
+					}
+					return m, nil
+				}
 				if strings.HasPrefix(prompt, "/steer ") && m.operation != nil {
 					err := m.operation.Steer(strings.TrimSpace(strings.TrimPrefix(prompt, "/steer ")))
 					if err != nil {

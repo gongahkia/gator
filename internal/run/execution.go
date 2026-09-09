@@ -27,7 +27,9 @@ import (
 
 func (e Executor) execute(ctx context.Context, isolated worktree.Worktree, request Request, initialMessages []agent.Message, parentStatePath string, runInitialScouts bool) (Outcome, error) {
 	executionPolicy := e.Sandbox.Normalize()
-	executionPolicy.WritablePaths = append([]string(nil), request.WritePaths...)
+	if request.WritePaths != nil {
+		executionPolicy.WritablePaths = append([]string(nil), request.WritePaths...)
+	}
 	if err := executionPolicy.Validate(); err != nil {
 		return Outcome{Worktree: isolated, ThreadID: request.ThreadID}, fmt.Errorf("validate execution policy: %w", err)
 	}

@@ -35,6 +35,8 @@ func systemPrompt(request Request) string {
 	if request.RequireCode {
 		parts = append(parts, `This request entered through the coding compatibility route. You must delegate the implementation to the Code specialist and incorporate its retained patch evidence before completing.`)
 	}
+	parts = append(parts, `Use start_agent, inspect_agent, await_agent and cancel_agent for independently tracked work; delegate_agents is a bounded start-and-wait convenience. Select a retained result explicitly with continue; default child context is fresh. For coding, integrate_code takes selected patch artifact paths and verifies the combined candidate. Only a verified candidate may be selected as baseline_patch for a later Code assignment. Failed/conflicting candidates remain evidence and must not be described as integrated. Never apply code to live source during execution.
+Use extract_document and inspect_table for bounded local extraction. reconcile_tables calculates exact values, checks the workbook, and writes a memo with source rows. Use list_evidence/read_evidence for retained citation references. check_claims checks quotations, not semantic entailment; ask claim_verifier to examine support and disclose unresolved/conflicting claims.`)
 	parts = append(parts, codePolicyPrompt(request.Code))
 	if extra := strings.TrimSpace(request.System); extra != "" {
 		parts = append(parts, "Additional developer instructions:\n"+extra)

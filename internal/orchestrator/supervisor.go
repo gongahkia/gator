@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +20,10 @@ import (
 const TaskVersion = 1
 
 type Task struct {
+	Configuration RoleConfiguration `json:"configuration"`
+	Limits       agent.Limits `json:"limits"`
+	SelectedInput string `json:"selected_input,omitempty"`
+	Baseline     string `json:"baseline_patch,omitempty"`
 	Version      int       `json:"version"`
 	ID           string    `json:"id"`
 	GlobalID     string    `json:"global_id"`
@@ -117,7 +124,14 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 			cancel()
 			return nil, errors.New("retained task authority/source mismatch")
 		}
-		s.next++
+		number, err := strconv.Atoi(strings.TrimPrefix(task.ID, "subagent-"))
+		if err != nil || number < 1 {
+			cancel()
+			return nil, errors.New("invalid retained task ID")
+		}
+		if number > s.next {
+			s.next = number
+		}
 		s.used++
 		if task.Status == "running" || task.Status == "queued" {
 			task.Status = "interrupted"
@@ -209,6 +223,8 @@ func (s *Supervisor) Start(request StartRequest) (Task, error) {
 	id := fmt.Sprintf("subagent-%03d", s.next)
 	ctx, cancel := context.WithCancel(s.ctx)
 	task := Task{Version: TaskVersion, ID: id, GlobalID: s.options.ParentRun + "/" + id, ParentRun: s.options.ParentRun, ParentTask: request.Parent, Role: request.Agent, RoleVersion: 1, Source: s.options.Source, PolicySHA256: s.options.PolicySHA256, InputSHA256: digest(selected), Dependencies: append([]string(nil), request.Dependencies...), Attempt: attempt, Previous: request.Continue, Status: "queued", CreatedAt: s.options.Now().UTC()}
+	task.Configuration = s.registry[request.Agent].Configuration
+	task.Limits, task.SelectedInput, task.Baseline = s.options.Limits, selected, request.Baseline
 	if err := s.persist(task); err != nil {
 		cancel()
 		return Task{}, err
@@ -265,6 +281,11 @@ func (s *Supervisor) run(ctx context.Context, execution *taskExecution, input, b
 	if errors.Is(err, context.DeadlineExceeded) {
 		category = "timeout"
 	}
+	if errors.Is(err, agent.ErrBudget) {
+		category = "budget"
+	} else if agent.IsTransient(err) {
+		category = "provider"
+	}
 	s.finish(execution, result, err, category)
 }
 func (s *Supervisor) finish(execution *taskExecution, result Result, runErr error, category string) {
@@ -289,7 +310,7 @@ func (s *Supervisor) finish(execution *taskExecution, result Result, runErr erro
 	task := execution.task
 	s.mu.Unlock()
 	if s.options.OnRecord != nil {
-		s.options.OnRecord(Record{ID: task.ID, Agent: task.Role, TaskSHA256: task.InputSHA256, OutputSHA256: digest(result.Summary), Status: task.Status, Steps: result.Steps, ArtifactPath: result.ArtifactPath, ArtifactSHA256: result.ArtifactSHA256, StartedAt: task.StartedAt, FinishedAt: task.FinishedAt})
+		s.options.OnRecord(Record{BaselineSHA256: result.BaselineSHA256, Usage: result.Usage, ID: task.ID, Agent: task.Role, TaskSHA256: task.InputSHA256, OutputSHA256: digest(result.Summary), Status: task.Status, Steps: result.Steps, ArtifactPath: result.ArtifactPath, ArtifactSHA256: result.ArtifactSHA256, StartedAt: task.StartedAt, FinishedAt: task.FinishedAt})
 	}
 	s.emit(task)
 }
@@ -404,7 +425,14 @@ func (t taskTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolR
 func decodeTask(raw []byte, value any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(value)
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return errors.New("task arguments require one JSON value")
+	}
+	return nil
 }
 func (s *Supervisor) Tools() []agent.Tool {
 	return []agent.Tool{taskTool{s, "start_agent"}, taskTool{s, "inspect_agent"}, taskTool{s, "await_agent"}, taskTool{s, "cancel_agent"}}
