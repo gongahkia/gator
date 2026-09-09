@@ -19,13 +19,13 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 
 | State | Primary content | Composer | Secondary navigation |
 | --- | --- | --- | --- |
-| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X`, `Ctrl+I`, and `Ctrl+J` hints |
+| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X`, `Ctrl+B`, and `Ctrl+J` hints |
 | Drafting | Centered `🐊 Gator` wordmark and outcome question | Centered and growing with wrapped input | Available through direct shortcuts |
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
 | Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
 | Provider picker | Providers valid for the selected `/model`, `/connect`, `/login`, or `/logout` action | Hidden | Type to filter, arrows to choose, `Esc` to return |
 | Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
-| Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+I` (also reported as Tab by terminals) |
+| Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+B` |
 | Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+J` |
 
 Typing keeps the growing composer centered. Submitting the first prompt docks
@@ -38,6 +38,9 @@ Provider lifecycle commands use progressive disclosure: `/model`, `/connect`,
 argument, while their `[PROVIDER]` forms remain fast and script-like. Secret
 values never enter the composer or command palette; API-key entry temporarily
 suspends the alternate screen for a hidden terminal prompt.
+When no default exists, a successful `/login` or `/connect` also selects that
+provider and resumes any task retained by first-run setup; it must not ask for
+the provider a second time.
 
 When a first task requires setup, `openai`, `anthropic`, and `gemini` open a
 hidden API-key prompt if their normal environment variable is absent. A
@@ -66,9 +69,9 @@ native Work providers because Gator does not import another CLI's credentials.
 2. `Enter` submits; an empty submission does nothing.
 3. `Ctrl+P` opens the searchable command palette from every state; it never
    mixes folders, conversations, inbox entries, or jobs into the action list.
-4. `Ctrl+X` opens conversations, `Ctrl+I` opens inbox, and `Ctrl+J` opens jobs.
-   `Esc` returns from a destination or closes a picker. Because terminal input
-   encodes `Ctrl+I` as horizontal tab, Tab opens inbox too.
+4. `Ctrl+X` opens conversations, `Ctrl+B` opens inbox, and `Ctrl+J` opens jobs.
+   `Esc` returns from a destination or closes a picker. `Ctrl+I`/Tab remains
+   available for future focus navigation instead of doubling as Inbox.
 5. Opening a retained conversation goes directly to its session state. `/new`
    returns to the clean home state for the current folder.
 6. Long-running work replaces input focus with a single active status; internal

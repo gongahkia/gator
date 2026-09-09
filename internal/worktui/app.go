@@ -187,13 +187,24 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, value.err)})
 			return m, nil
 		}
+		selectedDefault := false
 		if value.action != "setup" {
-			m.status = providerActionSuccess(value.action, value.provider)
-			m.messages = append(m.messages, message{role: "Gator", text: m.status})
-			m.scroll = 0
-			return m, nil
+			if m.firstRun && (value.action == "login" || value.action == "connect") && m.config.CompleteSetup != nil {
+				if err := m.config.CompleteSetup(value.provider); err != nil {
+					m.status = providerActionSuccess(value.action, value.provider)
+					m.messages = append(m.messages, message{role: "Gator", text: m.status + "\nGator could not select it as the default: " + err.Error() + "\nChoose a default with /model."})
+					m.scroll = 0
+					return m, nil
+				}
+				selectedDefault = true
+			} else {
+				m.status = providerActionSuccess(value.action, value.provider)
+				m.messages = append(m.messages, message{role: "Gator", text: m.status})
+				m.scroll = 0
+				return m, nil
+			}
 		}
-		if m.config.CompleteSetup != nil {
+		if !selectedDefault && m.config.CompleteSetup != nil {
 			if err := m.config.CompleteSetup(value.provider); err != nil {
 				m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, err)})
 				return m, nil
@@ -232,7 +243,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.openConversationPicker()
 			return m, nil
 		}
-		if value.Type == tea.KeyCtrlI && !m.running {
+		if value.Type == tea.KeyCtrlB && !m.running {
 			m.launcher = false
 			m.section = "inbox"
 			return m, nil
@@ -306,13 +317,13 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.input = ""
+			if strings.HasPrefix(prompt, "/") {
+				return m.runLocalCommand(prompt)
+			}
 			if m.onboarding {
 				provider := strings.ToLower(strings.TrimSpace(prompt))
 				m.messages = append(m.messages, message{role: "You", text: provider})
 				return m.startProviderAction("setup", provider)
-			}
-			if strings.HasPrefix(prompt, "/") {
-				return m.runLocalCommand(prompt)
 			}
 			if m.firstRun {
 				m.onboarding = true
@@ -1053,7 +1064,7 @@ func workHelp() string {
 
 Navigation
   ctrl+x    retained conversations
-  ctrl+i    inbox (the same terminal key as tab)
+	  ctrl+b    inbox
   ctrl+j    scheduled jobs
   ctrl+p    searchable command palette`
 }
@@ -1109,7 +1120,7 @@ func (m Model) View() string {
 		view.WriteString(accent.Render("● Working…") + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
-	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+i inbox  ·  ctrl+j jobs"
+	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs"
 	if len(m.queue) > 0 {
 		footer = fmt.Sprintf("%d queued  ·  ", len(m.queue)) + footer
 	}
@@ -1132,7 +1143,7 @@ func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string 
 		hint = m.status + "  ·  " + hint
 	}
 	body += "\n" + dim.Render(hint)
-	body += "\n" + dim.Render("ctrl+x conversations  ·  ctrl+i inbox  ·  ctrl+j jobs")
+	body += "\n" + dim.Render("ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs")
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
 
@@ -1220,7 +1231,7 @@ func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
 			view.WriteString("\n\n")
 		}
 	}
-	footer := "esc back  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+i inbox  ·  ctrl+j jobs"
+	footer := "esc back  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs"
 	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
 }
