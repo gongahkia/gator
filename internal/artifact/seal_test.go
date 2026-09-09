@@ -240,3 +240,48 @@ func TestSealRetainsConnectedSourceProvenance(t *testing.T) {
 		t.Fatalf("connected sources = %#v", manifest.ConnectedSources)
 	}
 }
+
+func TestSealBindsSubagentPatchEvidenceToOutputBytes(t *testing.T) {
+	t.Parallel()
+	source, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDirectory := t.TempDir()
+	writeArtifact(t, outputDirectory, "report.md", "finished report\n")
+	writeArtifact(t, outputDirectory, "code/subagent-001.patch", "diff --git a/a b/a\n")
+	output, err := workspace.Open(outputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	base, err := Seal(output, DefaultContract("report.md"), SealOptions{
+		RunID: "work-subagent-base", Objective: "Prepare a report and patch", Source: source,
+		StartedAt: now, FinishedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	patchDigest := ""
+	for _, file := range base.Artifacts {
+		if file.Path == "code/subagent-001.patch" {
+			patchDigest = file.SHA256
+		}
+	}
+	evidence := SubagentEvidence{
+		ID: "subagent-001", Agent: "code", TaskSHA256: strings.Repeat("a", 64), OutputSHA256: strings.Repeat("b", 64),
+		Status: "completed", Steps: 4, ArtifactPath: "code/subagent-001.patch", ArtifactSHA256: patchDigest,
+		StartedAt: now, FinishedAt: now,
+	}
+	manifest, err := Seal(output, DefaultContract("report.md"), SealOptions{
+		RunID: "work-subagent", Objective: "Prepare a report and patch", Source: source,
+		Subagents: []SubagentEvidence{evidence}, StartedAt: now, FinishedAt: now,
+	})
+	if err != nil || len(manifest.Subagents) != 1 {
+		t.Fatalf("manifest=%#v err=%v", manifest, err)
+	}
+	manifest.Subagents[0].ArtifactSHA256 = strings.Repeat("f", 64)
+	if err := manifest.Validate(); err == nil || !strings.Contains(err.Error(), "does not match output") {
+		t.Fatalf("tampered subagent evidence error = %v", err)
+	}
+}
