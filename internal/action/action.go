@@ -31,6 +31,15 @@ var capabilities = map[Capability]struct{}{
 	ConnectedRead: {}, ConnectedMutate: {}, Publish: {},
 }
 
+// Validate rejects unknown capabilities at configuration and connector
+// boundaries before a tool can be exposed to a model.
+func (c Capability) Validate() error {
+	if _, known := capabilities[c]; !known {
+		return fmt.Errorf("unknown work capability %q", c)
+	}
+	return nil
+}
+
 // Mode is a monotonic ceiling on authority for one work run.
 type Mode string
 
