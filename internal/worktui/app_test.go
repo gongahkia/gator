@@ -82,7 +82,7 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
 	}
-	if !strings.Contains(view, "ctrl+p commands") || !strings.Contains(view, "ctrl+x conversations") || !strings.Contains(view, "ctrl+i inbox") || !strings.Contains(view, "ctrl+j jobs") {
+	if !strings.Contains(view, "ctrl+p commands") || !strings.Contains(view, "ctrl+x conversations") || !strings.Contains(view, "ctrl+b inbox") || !strings.Contains(view, "ctrl+j jobs") {
 		t.Fatalf("initial view omits direct navigation: %q", view)
 	}
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
@@ -258,6 +258,10 @@ func TestDirectShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
 		model = updated.(Model)
 	}
 	press(tea.KeyMsg{Type: tea.KeyCtrlI})
+	if model.section != "" {
+		t.Fatalf("ctrl+i should remain unbound, state = %#v", model)
+	}
+	press(tea.KeyMsg{Type: tea.KeyCtrlB})
 	if model.section != "inbox" || !strings.Contains(model.View(), "Inbox") || model.launcher {
 		t.Fatalf("inbox shortcut state = %#v", model)
 	}
@@ -402,6 +406,51 @@ func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	model = updated.(Model)
 	if called != "prepare the brief" || model.running || !strings.Contains(model.View(), "done") {
 		t.Fatalf("called=%q state=%#v", called, model)
+	}
+}
+
+func TestFirstRunLoginSelectsProviderAndResumesPendingTask(t *testing.T) {
+	calledAction := ""
+	selectedProvider := ""
+	runPrompt := ""
+	model := New(Config{
+		CurrentFolder: "/work", FirstRun: true,
+		ProviderCommand: func(action, provider string) *exec.Cmd {
+			calledAction = action + "/" + provider
+			return exec.Command("true")
+		},
+		CompleteSetup: func(provider string) error {
+			selectedProvider = provider
+			return nil
+		},
+		Run: func(_, _, prompt string, _ RunOptions) RunResult {
+			runPrompt = prompt
+			return RunResult{FinalText: "done"}
+		},
+	})
+	model.input = "test"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if !model.onboarding || model.pendingPrompt != "test" {
+		t.Fatalf("initial setup state = %#v", model)
+	}
+
+	model.input = "/login gemini"
+	updated, external := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if external == nil || calledAction != "login/gemini" {
+		t.Fatalf("login was treated as a provider name: state=%#v action=%q", model, calledAction)
+	}
+
+	updated, run := model.Update(providerActionDone{action: "login", provider: "gemini"})
+	model = updated.(Model)
+	if run == nil || model.firstRun || model.onboarding || !model.running || selectedProvider != "gemini" {
+		t.Fatalf("post-login setup state = %#v selected=%q", model, selectedProvider)
+	}
+	updated, _ = model.Update(run())
+	model = updated.(Model)
+	if runPrompt != "test" || model.running || !strings.Contains(model.View(), "done") {
+		t.Fatalf("pending task did not resume: prompt=%q state=%#v", runPrompt, model)
 	}
 }
 
