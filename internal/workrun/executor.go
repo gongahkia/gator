@@ -35,6 +35,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if err != nil {
 		return Outcome{}, err
 	}
+	if request.OnSnapshot != nil { request.OnSnapshot(sourceSnapshot) }
 	if request.RunID == "" {
 		request.RunID, err = newID(now())
 		if err != nil {
@@ -87,7 +88,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if err != nil {
 		return Outcome{}, err
 	}
-	outcome := Outcome{Work: work, ConversationID: conversation.ID, RevisionID: request.RunID, SnapshotID: sourceSnapshot.ID}
+	outcome := Outcome{Work: work, ConversationID: conversation.ID, RevisionID: request.RunID, SnapshotID: sourceSnapshot.ID, SourceSnapshot: sourceSnapshot}
 	var previousRoot workspace.Root
 	if request.ParentRevisionID != "" {
 		parent, loadErr := sessions.LoadRevision(conversation.ID, request.ParentRevisionID)

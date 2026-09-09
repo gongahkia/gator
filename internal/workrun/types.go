@@ -34,6 +34,7 @@ type Request struct {
 	RefreshSource        bool
 	ConnectorPermissions connector.PermissionSet
 	SnapshotOptions      snapshot.Options
+	OnSnapshot           func(snapshot.Manifest)
 }
 
 // Outcome retains staged files and trusted evidence even when model execution
@@ -46,6 +47,7 @@ type Outcome struct {
 	ConversationID string
 	RevisionID     string
 	SnapshotID     string
+	SourceSnapshot snapshot.Manifest
 }
 
 // Executor combines a provider-independent model with private workspace

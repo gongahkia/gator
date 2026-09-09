@@ -140,9 +140,11 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 	}
 	var sink agent.EventSink
+	var snapshotSink func(snapshot.Manifest)
 	if !*jsonOutput {
 		printer := &eventPrinter{out: out}
 		sink = printer.Print
+		snapshotSink = func(manifest snapshot.Manifest) { _, _ = fmt.Fprintf(out, "  snapshot: %s (%d files, %d bytes, %d exclusions)\n", manifest.ID, manifest.Files, manifest.Bytes, len(manifest.Exclusions)) }
 	}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
 	var approve action.Approver
@@ -162,6 +164,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ConversationID: strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
 		ConnectorPermissions: connector.PermissionSet(settings.ConnectorPermissions),
 		SnapshotOptions:      snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes},
+		OnSnapshot:           snapshotSink,
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {

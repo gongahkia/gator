@@ -164,6 +164,12 @@ func TestExecutorSealsExplicitConnectorProvenance(t *testing.T) {
 	if len(outcome.Manifest.ConnectedSources) != 1 || outcome.Manifest.ConnectedSources[0].ConnectorID != "metrics" {
 		t.Fatalf("connected provenance = %#v", outcome.Manifest.ConnectedSources)
 	}
+	if outcome.Manifest.ConnectedSources[0].SnapshotPath == "" {
+		t.Fatal("connected source bytes were not retained in the Work bundle")
+	}
+	if _, err := os.Stat(filepath.Join(outcome.Work.Path, filepath.FromSlash(outcome.Manifest.ConnectedSources[0].SnapshotPath))); err != nil {
+		t.Fatalf("connected snapshot missing: %v", err)
+	}
 	if !strings.Contains(model.requests[0].System, "Explicitly selected connected sources: metrics") {
 		t.Fatalf("system prompt = %q", model.requests[0].System)
 	}
