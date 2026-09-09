@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/workspace"
 )
@@ -47,6 +48,46 @@ func TestResolveWorkBundleAcceptsManifestPathAndRejectsTampering(t *testing.T) {
 func TestTerminalSafeRemovesControlSequences(t *testing.T) {
 	if got := terminalSafe("hello\x1b[31m\rworld\x00"); strings.ContainsAny(got, "\x1b\x00\r") || !strings.Contains(got, "world") {
 		t.Fatalf("safe terminal text = %q", got)
+	}
+}
+
+func TestWorkReviewEscapesActionPayloadForTerminal(t *testing.T) {
+	stateDir := t.TempDir()
+	work, err := workspace.CreateWork(t.TempDir(), stateDir, "review-action", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract := artifact.DefaultContract("report.md")
+	contract.ExternalActions = action.Propose
+	if err := artifact.WriteText(work.Output, contract, "report.md", "ready\n"); err != nil {
+		t.Fatal(err)
+	}
+	preview := "{\"title\":\"safe\u202eeman\"}"
+	proposal, err := action.NewProposal("action-1", action.Publish, "release", "publish", "https://example.com/hook", preview, []byte(preview))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := artifact.Seal(work.Output, contract, artifact.SealOptions{
+		RunID: work.ID, Objective: "Draft release", Source: work.Source,
+		Actions:   []action.Record{{Proposal: proposal, Status: action.Pending}},
+		StartedAt: work.CreatedAt, FinishedAt: work.CreatedAt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := artifact.OpenBundle(work.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := reviewWorkBundle(&output, bundle, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.ContainsRune(output.String(), '\u202e') || !strings.Contains(output.String(), `\u202e`) || !strings.Contains(output.String(), "payload sha256:") {
+		t.Fatalf("action review output = %q", output.String())
 	}
 }
 

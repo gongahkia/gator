@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -178,8 +179,13 @@ func reviewWorkBundle(out io.Writer, bundle artifact.Bundle, jsonOutput, include
 			return err
 		}
 		for _, record := range manifest.Actions {
-			if _, err := fmt.Fprintf(out, "  %s %s/%s → %s — %s\n", record.Status, record.Proposal.ConnectorID, record.Proposal.Operation, terminalSafe(record.Proposal.Target), terminalSafe(record.Proposal.Preview)); err != nil {
+			if _, err := fmt.Fprintf(out, "  %s %s/%s → %s\n    payload sha256:%s\n    exact JSON (escaped): %s\n", record.Status, record.Proposal.ConnectorID, record.Proposal.Operation, terminalSafe(record.Proposal.Target), record.Proposal.PayloadSHA256, strconv.QuoteToASCII(record.Proposal.Preview)); err != nil {
 				return err
+			}
+			if record.Error != "" {
+				if _, err := fmt.Fprintf(out, "    error: %s\n", terminalSafe(record.Error)); err != nil {
+					return err
+				}
 			}
 		}
 	}
