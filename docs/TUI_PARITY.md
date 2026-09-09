@@ -1,4 +1,9 @@
-# TUI capability map
+# Historical Code TUI capability map
+
+> This document records the retired standalone Code interface for migration
+> and regression archaeology. It is not a current product contract. Gator's
+> active terminal surface is `internal/worktui`; see
+> [Code-to-Gator product migration](CODE_TO_GATOR_MIGRATION.md).
 
 This document maps the public CLI in `cmd/gator/main.go` to the interactive
 TUI. It is intentionally a capability audit, not a promise that every

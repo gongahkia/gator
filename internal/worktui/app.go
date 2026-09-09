@@ -172,7 +172,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Revision " + value.RevisionID + " · snapshot " + value.SnapshotID
 		}
 		m.scroll = 0
-		if len(m.queue) > 0 && m.config.Run != nil {
+		if value.Error == "" && len(m.queue) > 0 && m.config.Run != nil {
 			next := m.queue[0]
 			m.queue = m.queue[1:]
 			m.messages = append(m.messages, message{role: "You", text: next.prompt})
@@ -180,6 +180,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
 			source, conversation, run := m.source, m.conversation, m.config.Run
 			return m, func() tea.Msg { return runDone(run(source, conversation, next.prompt, next.options)) }
+		}
+		if value.Error != "" && len(m.queue) > 0 {
+			m.status = fmt.Sprintf("Run stopped · %d queued prompt(s) paused", len(m.queue))
 		}
 	case setupDone:
 		if value.err != nil {
@@ -298,6 +301,13 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if strings.HasPrefix(prompt, "/") {
 				return m.runLocalCommand(prompt)
+			}
+			if m.firstRun {
+				m.onboarding = true
+				m.pendingPrompt = prompt
+				m.title = "Welcome to Gator"
+				m.messages = append(m.messages, message{role: "Gator", text: "Before I start, which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."})
+				return m, nil
 			}
 			m.messages = append(m.messages, message{role: "You", text: prompt})
 			m.home = false
