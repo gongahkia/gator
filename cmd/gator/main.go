@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -71,18 +72,15 @@ Usage:
   gator logout PROVIDER
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
-  gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
+  gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--image PATH] [--attach PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [CODE POLICY] [--json] TASK
   gator work list
   gator work show|history|back CONVERSATION
   gator work forward CONVERSATION [REVISION]
   gator work resume [--refresh-source] [--parent REVISION] CONVERSATION TASK
   gator inspect [--source DIRECTORY] [--connector ID] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
-  gator code [coding options] --verify 'argv ...' TASK
-  gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
+  gator code [CODE POLICY] TASK
+  gator run [CODE POLICY] TASK
   gator resume [WORK_CONVERSATION_ID TASK]
-  gator code resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
-  gator code fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
-  gator code clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]
   gator eval suite DIR [--run-id ID] [--report-dir DIR] [--attempts N] --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
   gator transcript RUN_RECORD_PATH > transcript.html
@@ -116,9 +114,9 @@ Commands:
   doctor    report local prerequisites and suggested verification commands
   work      turn a read-only folder into validated artifacts in isolated output
   inspect   analyze a folder without files, processes, or external actions
-  code      propose a tested patch in an isolated Git worktree
-  run       compatibility alias for code
-  resume    reopen Work or continue a retained Work conversation by ID
+  code      route a coding request through Gator and its internal Code specialist
+  run       compatibility alias for the same Gator orchestration route
+  resume    reopen or continue a retained Gator conversation by ID
   eval      run a bounded headless evaluation fixture or real-model suite
   transcript export one retained private session as local HTML
   review    verify and inspect a Work bundle or retained coding run
@@ -127,10 +125,10 @@ Commands:
 
 Cloud providers resolve credentials in this order: --api-key, Gator's private
 local auth file, then the provider environment variable. Native runs keep
-Gator's tool loop; gator delegate is an explicit installed-harness boundary.
---verify is repeatable and every listed command must pass before Gator accepts
-completion. Exploratory worktree commands wait for approval unless listed with
---allow-command, --allow-command-prefix, or auto-approved with --trust-commands (unsafe; not a sandbox).`
+Gator's orchestration loop; gator delegate is an explicit installed-harness
+boundary. The internal Code specialist is strict and offline by default.
+--verify, --scope, --profile, --setup, --allow-command,
+--allow-command-prefix, and --code-capability configure its bounded delegation.`
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
@@ -218,26 +216,20 @@ func run(args []string, out io.Writer) error {
 		return inspectTask(args[1:], out)
 	case "code":
 		if len(args) == 1 || len(args) == 2 && args[1] == "--tui" {
-			return interactive()
+			return workInteractive()
 		}
-		if args[1] == "resume" {
-			return resumeTask(args[2:], out)
+		if args[1] == "resume" || args[1] == "fork" || args[1] == "clone" {
+			return errors.New("standalone Code sessions are retired; use 'gator resume CONVERSATION' and Gator revision history")
 		}
-		if args[1] == "fork" {
-			return forkTask(args[2:], out)
-		}
-		if args[1] == "clone" {
-			return cloneTask(args[2:], out)
-		}
-		return runTask(args[1:], out)
+		return runWorkTask(append([]string{"--require-code"}, args[1:]...), os.Stdin, out, nativeWorkModel)
 	case "run":
-		return runTask(args[1:], out)
+		return runWorkTask(append([]string{"--require-code"}, args[1:]...), os.Stdin, out, nativeWorkModel)
 	case "resume":
 		return unifiedResume(args[1:], out)
 	case "fork":
-		return forkTask(args[1:], out)
+		return errors.New("standalone Code forks are retired; branch a Gator conversation with 'gator work resume --parent REVISION CONVERSATION TASK'")
 	case "clone":
-		return cloneTask(args[1:], out)
+		return errors.New("standalone Code clones are retired; continue or branch a retained Gator conversation instead")
 	case "eval":
 		return evalCommand(args[1:], out)
 	case "transcript":

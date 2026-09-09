@@ -25,21 +25,47 @@ type RunResult struct {
 	Error          string
 }
 
+// RunOptions contains the user-selected orchestration controls that accompany
+// one prompt. They configure Gator and bound its internal Code specialist;
+// they are never editable by the manager model itself.
+type RunOptions struct {
+	MaxSteps    int
+	Attachments []string
+	Code        CodeOptions
+}
+
+type CodeOptions struct {
+	MaxSteps              int
+	Verification           []string
+	Scopes                 []string
+	Profile                string
+	Setup                  []string
+	AllowedCommands        []string
+	AllowedCommandPrefixes []string
+	Sandbox                string
+	Network                string
+	Capabilities           []string
+	BrowserSession         string
+}
+
 type Config struct {
 	CurrentFolder       string
 	Conversations       []worksession.Conversation
 	StartConversationID string
 	Jobs                []jobs.Definition
 	Inbox               []inbox.Entry
-	Run                 func(source, conversationID, prompt string) RunResult
+	Run                 func(source, conversationID, prompt string, options RunOptions) RunResult
 	MoveBack            func(conversationID string) (string, error)
 	MoveForward         func(conversationID string) (string, error)
 	MoveToRevision      func(conversationID, revisionID string) (string, error)
 	History             func(conversationID string) (string, error)
-	CodeCommand         func() *exec.Cmd
 	FirstRun            bool
 	SetupCommand        func(provider string) *exec.Cmd
 	CompleteSetup       func(provider string) error
+	Inspect             func(topic string) (string, error)
+	Copy                func(text string) error
+	Theme               string
+	SetTheme            func(name string) error
 }
 
 type entry struct{ title, subtitle, kind, id, source string }
@@ -48,6 +74,11 @@ type runDone RunResult
 type setupDone struct {
 	provider string
 	err      error
+}
+
+type queuedRun struct {
+	prompt  string
+	options RunOptions
 }
 
 type Model struct {
@@ -69,6 +100,10 @@ type Model struct {
 	firstRun      bool
 	pendingPrompt string
 	scroll        int
+	options       RunOptions
+	queue         []queuedRun
+	lastOutput    string
+	theme         string
 }
 
 func New(config Config) Model {
@@ -78,6 +113,10 @@ func New(config Config) Model {
 		firstRun: config.FirstRun,
 		source:   config.CurrentFolder,
 		title:    "Work in " + filepath.Base(config.CurrentFolder),
+		theme:    normalizeTheme(config.Theme),
+		options: RunOptions{MaxSteps: 24, Code: CodeOptions{
+			MaxSteps: 16, Sandbox: "strict", Network: "deny",
+		}},
 	}
 	if config.FirstRun {
 		model.entries = append(model.entries, entry{title: "Start guided setup", subtitle: "Connect a model, then begin your first task", kind: "onboarding", source: config.CurrentFolder})
@@ -89,7 +128,6 @@ func New(config Config) Model {
 	model.entries = append(model.entries,
 		entry{title: "Inbox", subtitle: fmt.Sprintf("%d recent results", len(config.Inbox)), kind: "inbox"},
 		entry{title: "Scheduled jobs", subtitle: fmt.Sprintf("%d configured", len(config.Jobs)), kind: "jobs"},
-		entry{title: "Code", subtitle: "Open the isolated coding workflow", kind: "code"},
 	)
 	if config.StartConversationID != "" {
 		for _, conversation := range config.Conversations {
@@ -128,10 +166,20 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.messages = append(m.messages, message{role: "Gator", text: text})
 		}
+		m.lastOutput = value.OutputPath
 		if value.RevisionID != "" || value.SnapshotID != "" {
 			m.status = "Revision " + value.RevisionID + " · snapshot " + value.SnapshotID
 		}
 		m.scroll = 0
+		if len(m.queue) > 0 && m.config.Run != nil {
+			next := m.queue[0]
+			m.queue = m.queue[1:]
+			m.messages = append(m.messages, message{role: "You", text: next.prompt})
+			m.running = true
+			m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
+			source, conversation, run := m.source, m.conversation, m.config.Run
+			return m, func() tea.Msg { return runDone(run(source, conversation, next.prompt, next.options)) }
+		}
 	case setupDone:
 		if value.err != nil {
 			m.messages = append(m.messages, message{role: "Gator", text: "Setup did not finish: " + value.err.Error() + "\nYou can try another provider name."})
@@ -171,7 +219,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			source, conversation := m.source, m.conversation
-			return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt)) }
+			options := cloneRunOptions(m.options)
+			m.options.Attachments = nil
+			return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
 		}
 	case tea.KeyMsg:
 		if value.String() == "ctrl+c" {
@@ -200,6 +250,33 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.running {
+			switch value.String() {
+			case "enter":
+				prompt := strings.TrimSpace(m.input)
+				if prompt == "" {
+					return m, nil
+				}
+				m.input = ""
+				if strings.HasPrefix(prompt, "/") {
+					return m.runLocalCommand(prompt)
+				}
+				if len(m.queue) >= 16 {
+					m.messages = append(m.messages, message{role: "Gator", text: "The local queue is full (16 prompts)."})
+					return m, nil
+				}
+				m.queue = append(m.queue, queuedRun{prompt: prompt, options: cloneRunOptions(m.options)})
+				m.options.Attachments = nil
+				m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
+			case "backspace":
+				runes := []rune(m.input)
+				if len(runes) > 0 {
+					m.input = string(runes[:len(runes)-1])
+				}
+			default:
+				if value.Type == tea.KeyRunes || value.String() == " " {
+					m.input += value.String()
+				}
+			}
 			return m, nil
 		}
 		switch value.String() {
@@ -227,7 +304,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Working from an immutable snapshot…"
 			run := m.config.Run
 			source, conversation := m.source, m.conversation
-			return m, func() tea.Msg { return runDone(run(source, conversation, prompt)) }
+			options := cloneRunOptions(m.options)
+			m.options.Attachments = nil
+			return m, func() tea.Msg { return runDone(run(source, conversation, prompt, options)) }
 		case "backspace":
 			runes := []rune(m.input)
 			if len(runes) > 0 {
@@ -275,7 +354,9 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		source, conversation := m.source, m.conversation
-		return m, func() tea.Msg { return runDone(run(source, conversation, prompt)) }
+		options := cloneRunOptions(m.options)
+		m.options.Attachments = nil
+		return m, func() tea.Msg { return runDone(run(source, conversation, prompt, options)) }
 	case "backspace":
 		runes := []rune(m.input)
 		if len(runes) > 0 {
@@ -360,11 +441,6 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				m.messages = append(m.messages, message{role: state, text: job.Name + "\n" + job.Schedule + " · " + job.Timezone})
 			}
-		case "code":
-			if m.config.CodeCommand == nil {
-				return m, nil
-			}
-			return m, tea.ExecProcess(m.config.CodeCommand(), func(error) tea.Msg { return tea.Quit() })
 		case "onboarding":
 			m.launcher = false
 			m.home = false
