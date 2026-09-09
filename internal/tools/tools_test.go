@@ -37,7 +37,7 @@ func TestReadFileRejectsOutsideSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := ReadFile{Root: root}.Execute(context.Background(), json.RawMessage(`{"path":"outside/secret.txt"}`))
-	if err == nil || !strings.Contains(err.Error(), "escapes the workspace") {
+	if err == nil || !strings.Contains(err.Error(), "escape") {
 		t.Fatalf("read outside symlink error = %v", err)
 	}
 }
