@@ -1,15 +1,15 @@
 # Durable jobs design
 
-## Decision
+## Implemented boundary
 
 Gator does not turn the process-local terminal registry, TUI queue, or app
 server into a scheduler. Those components own live resources in one process;
 they do not provide durable ownership, missed-run policy, or restart safety.
 
-Scheduled Work will ship only as a separate local supervisor backed by
-versioned job definitions and immutable execution records. Until that service
-meets the gates below, automation should invoke `gator work` from an existing
-supervisor such as launchd, systemd, or CI and retain the emitted bundle ID.
+Scheduled Work runs through a separate local supervisor backed by versioned job
+definitions and immutable attempt records. The user starts it in a foreground
+terminal with `gator job supervisor`; Gator deliberately does not install an OS
+service or stretch its process-local TUI queue into a scheduler.
 
 This is a product boundary, not a missing alias. A command that merely sleeps
 in the background would look persistent while losing jobs on logout, upgrade,
@@ -133,23 +133,28 @@ provider configuration, connector descriptors, and credential availability.
 A failed preflight produces a durable failure record without invoking a model.
 Remote response content and credentials are never written to scheduler logs.
 
-## Intended CLI
+## CLI
 
 ```text
-gator job add ID --file job.json
+gator job add NAME --schedule '0 9 * * 1' --timezone Asia/Singapore \
+  --source ./briefing --artifact brief.docx -- 'Prepare the weekly brief'
 gator job list
 gator job show ID
+gator job edit ID --schedule '30 9 * * 1'
 gator job enable|disable ID
-gator job run ID                 # foreground, creates normal execution record
+gator job run ID
 gator job history ID
-gator job supervisor start|status|stop
+gator job supervisor [--notify=false]
+gator job status
+gator job stop
+gator inbox [--unread]
 gator job remove ID --yes        # keeps immutable history by default
 ```
 
-`job run` is the first implementation slice because it proves definition
-validation and execution records without pretending a daemon exists. The
-supervisor comes only after restart, lock, time, and shutdown behavior is
-tested.
+Cron uses five fields and an explicit IANA timezone. `skip` is the default
+missed-run behavior; `run_once` catches up once. Runs are non-overlapping,
+retry transient pre-action failures at most three times, and never execute a
+connected mutation or publish operation.
 
 ## Release gates
 

@@ -5,7 +5,10 @@ folder, give it an outcome, and it returns validated files in isolated output
 with a reviewable evidence manifest. Source material is read-only; model prose
 alone is never treated as proof that work finished.
 
-The product has two explicit workflows:
+Plain `gator` opens a conversation-first Work TUI with the current folder,
+recent projects, retained conversations, scheduled jobs, and inbox in one
+command palette. First use is a guided chat. The product has two explicit
+workflows:
 
 - `gator work` turns folders and connected data into reports, JSON, CSV, and
   other bounded artifacts;
@@ -18,10 +21,11 @@ travel together in a sealed bundle. See [the Work architecture](docs/WORK.md).
 
 ## Status
 
-The current source includes the general Work CLI, isolated artifact bundles,
-artifact review/export/apply, explicit connected JSON sources, review-bound
-webhook actions, the original coding TUI, direct cloud-provider adapters, and a
-headless evaluation harness. No GitHub release has been published yet. The
+The current source includes immutable source snapshots, undoable Work
+conversations, DOCX/XLSX/PDF generation, first-party Slack/Google
+Workspace/Atlassian/Notion adapters, typed remote MCP mappings, configurable
+connector permissions, a local scheduler and inbox, the isolated coding TUI,
+and a headless evaluation harness. No GitHub release has been published yet. The
 [release evidence](docs/RELEASE_EVIDENCE.md) checklist remains the human gate
 for a daily-driver claim.
 
@@ -88,6 +92,26 @@ Structured paths select typed writers and validators automatically:
   'Normalize the table and write summary statistics with data-quality caveats.'
 ```
 
+DOCX, XLSX, and PDF paths expose semantic rich-artifact writers:
+
+```sh
+./bin/gator work --source ./quarterly-inputs \
+  --artifact board-report.docx --artifact metrics.xlsx --artifact summary.pdf \
+  'Prepare a polished board pack and a formula-backed metrics workbook.'
+```
+
+Every new conversation freezes a bounded source snapshot. Continue, branch,
+or inspect the history without changing sealed revisions:
+
+```sh
+./bin/gator work list
+./bin/gator work history WORK_CONVERSATION_ID
+./bin/gator work resume WORK_CONVERSATION_ID 'Make the executive summary shorter'
+./bin/gator work back WORK_CONVERSATION_ID
+./bin/gator work forward WORK_CONVERSATION_ID
+./bin/gator snapshot list
+```
+
 Connected sources are configured by the developer, selected per run, and
 treated as untrusted data. Credentials are stored separately and bound to the
 exact configured URL:
@@ -114,6 +138,30 @@ Execution requires both `--mode act --actions approve` and a fresh yes/no
 decision for every payload. There is deliberately no reusable “always allow”
 choice. JSON/headless mode cannot request interactive execution; use
 `--actions draft` and review the proposal instead.
+
+Service connectors use the same exact approval boundary and can be narrowed per
+operation:
+
+```sh
+./bin/gator connector add team-slack --kind slack
+printf '%s' "$SLACK_TOKEN" | ./bin/gator connector login team-slack --token-stdin
+./bin/gator connector permission team-slack post_message write draft
+
+./bin/gator connector add linear --kind mcp --url 'https://mcp.example.com' \
+  --search-tool search_issues --read-tool get_issue --action-tool create_issue
+```
+
+Run recurring inspect/draft work with the manual foreground supervisor:
+
+```sh
+./bin/gator job add weekly-brief --schedule '0 9 * * 1' \
+  --timezone Asia/Singapore --source ./briefing --artifact brief.docx -- \
+  'Prepare the weekly operating brief'
+./bin/gator job supervisor
+# From another terminal:
+./bin/gator job status
+./bin/gator inbox --unread
+```
 
 ## Development
 

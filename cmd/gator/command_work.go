@@ -18,6 +18,7 @@ import (
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
@@ -160,6 +161,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ApproveAction:  approve,
 		ConversationID: strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
 		ConnectorPermissions: connector.PermissionSet(settings.ConnectorPermissions),
+		SnapshotOptions:      snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes},
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {

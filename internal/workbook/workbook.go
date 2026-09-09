@@ -2,6 +2,7 @@
 package workbook
 
 import (
+	"archive/zip"
 	"bytes"
 	"errors"
 	"fmt"
@@ -142,7 +143,14 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 	var file *excelize.File
 	var err error
 	if template != nil {
-		file, err = excelize.OpenReader(template)
+		payload, readErr := io.ReadAll(io.LimitReader(template, 64*1024*1024+1))
+		if readErr != nil || len(payload) > 64*1024*1024 {
+			return nil, Preview{}, errors.New("XLSX template is unreadable or exceeds 64 MiB")
+		}
+		if unsafeTemplate(payload) {
+			return nil, Preview{}, errors.New("macro-enabled or externally linked XLSX templates are not allowed")
+		}
+		file, err = excelize.OpenReader(bytes.NewReader(payload))
 	} else {
 		file = excelize.NewFile()
 	}
@@ -241,6 +249,31 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 		return nil, Preview{}, err
 	}
 	return output.Bytes(), spec.Preview(), nil
+}
+
+func unsafeTemplate(payload []byte) bool {
+	archive, err := zip.NewReader(bytes.NewReader(payload), int64(len(payload)))
+	if err != nil {
+		return true
+	}
+	for _, file := range archive.File {
+		lower := strings.ToLower(file.Name)
+		if strings.Contains(lower, "vbaproject") || strings.Contains(lower, "externallinks/") || strings.HasSuffix(lower, ".bin") {
+			return true
+		}
+		if strings.HasSuffix(lower, ".rels") {
+			reader, err := file.Open()
+			if err != nil {
+				return true
+			}
+			contents, _ := io.ReadAll(io.LimitReader(reader, 2*1024*1024))
+			_ = reader.Close()
+			if bytes.Contains(contents, []byte(`TargetMode="External"`)) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func chartType(value string) *excelize.ChartType {

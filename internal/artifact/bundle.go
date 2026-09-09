@@ -2,6 +2,8 @@ package artifact
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +20,7 @@ const maxManifestBytes = 8 * 1024 * 1024
 // available; source identity in the manifest is provenance, not authority.
 type Bundle struct {
 	Path     string
+	Root     workspace.Root
 	Output   workspace.Root
 	Manifest Manifest
 }
@@ -59,7 +62,7 @@ func OpenBundle(path string) (Bundle, error) {
 	if err != nil {
 		return Bundle{}, fmt.Errorf("open artifact output: %w", err)
 	}
-	return Bundle{Path: root.Path(), Output: output, Manifest: manifest}, nil
+	return Bundle{Path: root.Path(), Root: root, Output: output, Manifest: manifest}, nil
 }
 
 // VerifyBundle re-runs the embedded contract and requires every observed
@@ -77,6 +80,19 @@ func VerifyBundle(bundle Bundle) error {
 	}
 	if !equalValidations(inspection.Validations, bundle.Manifest.Validations) {
 		return errors.New("artifact validation evidence does not match the sealed manifest")
+	}
+	for _, source := range bundle.Manifest.ConnectedSources {
+		if source.SnapshotPath == "" {
+			continue
+		}
+		contents, err := bundle.Root.ReadRegularFile(filepath.FromSlash(source.SnapshotPath), 256*1024)
+		if err != nil {
+			return fmt.Errorf("read connected source snapshot: %w", err)
+		}
+		digest := sha256.Sum256(contents)
+		if int64(len(contents)) != source.Bytes || hex.EncodeToString(digest[:]) != source.SHA256 {
+			return errors.New("connected source snapshot does not match its provenance")
+		}
 	}
 	expected := Completed
 	if !inspection.Passed || bundle.Manifest.Failure != "" {

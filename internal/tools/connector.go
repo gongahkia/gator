@@ -22,6 +22,7 @@ type ConnectorPolicy struct {
 	ExternalActions action.Disposition
 	Approve         action.Approver
 	OnSource        func(connector.Provenance)
+	OnContent       func(connector.Result) error
 	OnAction        func(action.Record)
 	Permissions     connector.PermissionSet
 }
@@ -112,6 +113,11 @@ func (t connectorTool) Execute(ctx context.Context, arguments json.RawMessage) (
 	}
 	if t.policy.OnSource != nil {
 		t.policy.OnSource(result.Provenance)
+	}
+	if t.policy.OnContent != nil {
+		if err := t.policy.OnContent(result); err != nil {
+			return agent.ToolResult{}, err
+		}
 	}
 	return agent.ToolResult{Content: content}, nil
 }

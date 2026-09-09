@@ -43,6 +43,12 @@ Usage:
   gator connector list
   gator connector add ID --kind json|webhook --url URL [--name NAME] [--auth none|bearer]
   gator connector status|login|logout|test|remove ID [OPTIONS]
+	gator connector permission ID OPERATION read|write allow|ask|deny|draft
+	gator job add|list|show|edit|enable|disable|run|history|remove
+	gator job supervisor [--notify=true|false]
+	gator job status|stop
+	gator inbox [--unread]
+	gator snapshot list|show ID|gc --yes
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list|status
   gator extension install [--replace] DIRECTORY
@@ -122,7 +128,7 @@ func run(args []string, out io.Writer) error {
 		return fmt.Errorf("Gator supports only Linux and macOS; %s is not supported", runtime.GOOS)
 	}
 	if len(args) == 0 || args[0] == "tui" {
-		return interactive()
+		return workInteractive()
 	}
 	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
 		_, err := fmt.Fprintln(out, usage)
@@ -174,6 +180,12 @@ func run(args []string, out io.Writer) error {
 		return mcpCommand(args[1:], out)
 	case "connector":
 		return connectorCommand(args[1:], out)
+	case "job":
+		return jobCommand(args[1:], out)
+	case "inbox":
+		return inboxCommand(args[1:], out)
+	case "snapshot":
+		return snapshotCommand(args[1:], out)
 	case "worktree":
 		return worktreeCommand(args[1:], out)
 	case "provider":
@@ -188,10 +200,24 @@ func run(args []string, out io.Writer) error {
 		return workTask(args[1:], out)
 	case "inspect":
 		return inspectTask(args[1:], out)
-	case "code", "run":
+	case "code":
+		if len(args) == 1 || len(args) == 2 && args[1] == "--tui" {
+			return interactive()
+		}
+		if args[1] == "resume" {
+			return resumeTask(args[2:], out)
+		}
+		if args[1] == "fork" {
+			return forkTask(args[2:], out)
+		}
+		if args[1] == "clone" {
+			return cloneTask(args[2:], out)
+		}
+		return runTask(args[1:], out)
+	case "run":
 		return runTask(args[1:], out)
 	case "resume":
-		return resumeTask(args[1:], out)
+		return unifiedResume(args[1:], out)
 	case "fork":
 		return forkTask(args[1:], out)
 	case "clone":

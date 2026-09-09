@@ -78,6 +78,36 @@ type loadedServer struct {
 	tools  []toolDescription
 }
 
+// InvokeRemoteTool performs one bounded call against an explicitly configured
+// Streamable HTTP MCP endpoint. Connector policy and approvals remain owned by
+// the caller; this function only handles the protocol transport.
+func InvokeRemoteTool(ctx context.Context, endpoint, token, serverName, toolName string, arguments json.RawMessage) (json.RawMessage, error) {
+	if !namePattern.MatchString(serverName) || !namePattern.MatchString(toolName) || !json.Valid(arguments) {
+		return nil, errors.New("remote MCP call identity or arguments are invalid")
+	}
+	client := newAuthorizedHTTPClient(endpoint, token, serverName, token != "")
+	defer client.Close()
+	tools, err := listTools(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	found := false
+	for _, tool := range tools {
+		found = found || tool.Name == toolName
+	}
+	if !found {
+		return nil, fmt.Errorf("MCP server %q does not expose mapped tool %q", serverName, toolName)
+	}
+	result, err := client.Call(ctx, "tools/call", map[string]any{"name": toolName, "arguments": arguments})
+	if err != nil {
+		return nil, err
+	}
+	if len(result) > maxToolOutput {
+		return nil, errors.New("MCP tool response exceeds 64 KiB")
+	}
+	return result, nil
+}
+
 // Set owns connected trusted MCP clients. Always call Close when a run ends.
 type Set struct {
 	configuredHash string

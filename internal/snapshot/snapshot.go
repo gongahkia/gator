@@ -253,6 +253,81 @@ func Open(stateDir, id string) (Manifest, error) {
 	return manifest, nil
 }
 
+// List returns retained snapshot manifests in newest-first order.
+func List(stateDir string) ([]Manifest, error) {
+	directory := filepath.Join(stateDir, "gator", "snapshots", "manifests")
+	files, err := os.ReadDir(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var manifests []Manifest
+	for _, file := range files {
+		if file.IsDir() || filepath.Ext(file.Name()) != ".json" {
+			continue
+		}
+		manifest, err := Open(stateDir, strings.TrimSuffix(file.Name(), ".json"))
+		if err != nil {
+			return nil, err
+		}
+		manifests = append(manifests, manifest)
+	}
+	sort.Slice(manifests, func(i, j int) bool { return manifests[i].CreatedAt.After(manifests[j].CreatedAt) })
+	return manifests, nil
+}
+
+// GC removes snapshots not present in referenced, then removes unreachable blobs.
+func GC(stateDir string, referenced map[string]struct{}) (snapshotsRemoved, blobsRemoved int, err error) {
+	manifests, err := List(stateDir)
+	if err != nil {
+		return 0, 0, err
+	}
+	store := filepath.Join(stateDir, "gator", "snapshots")
+	for _, manifest := range manifests {
+		if _, keep := referenced[manifest.ID]; keep {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(store, "trees", manifest.ID)); err != nil {
+			return snapshotsRemoved, blobsRemoved, err
+		}
+		if err := os.Remove(filepath.Join(store, "manifests", manifest.ID+".json")); err != nil {
+			return snapshotsRemoved, blobsRemoved, err
+		}
+		snapshotsRemoved++
+	}
+	remaining, err := List(stateDir)
+	if err != nil {
+		return snapshotsRemoved, blobsRemoved, err
+	}
+	live := make(map[string]struct{})
+	for _, manifest := range remaining {
+		for _, entry := range manifest.Entries {
+			live[entry.SHA256] = struct{}{}
+		}
+	}
+	blobs, err := os.ReadDir(filepath.Join(store, "blobs"))
+	if errors.Is(err, os.ErrNotExist) {
+		return snapshotsRemoved, 0, nil
+	}
+	if err != nil {
+		return snapshotsRemoved, 0, err
+	}
+	for _, blob := range blobs {
+		if blob.IsDir() {
+			continue
+		}
+		if _, keep := live[blob.Name()]; !keep {
+			if err := os.Remove(filepath.Join(store, "blobs", blob.Name())); err != nil {
+				return snapshotsRemoved, blobsRemoved, err
+			}
+			blobsRemoved++
+		}
+	}
+	return snapshotsRemoved, blobsRemoved, nil
+}
+
 func retainBlob(source, blobDir string, max int64) (string, error) {
 	file, err := os.Open(source)
 	if err != nil {
@@ -324,7 +399,8 @@ func materialize(manifest Manifest, store string) error {
 func identity(entries []Entry) (string, error) {
 	hash := sha256.New()
 	for _, entry := range entries {
-		if entry.Path == "" || filepath.IsAbs(entry.Path) || strings.Contains(entry.Path, "..") || len(entry.SHA256) != 64 || entry.Bytes < 0 {
+		clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(entry.Path)))
+		if entry.Path == "" || filepath.IsAbs(entry.Path) || clean != entry.Path || clean == ".." || strings.HasPrefix(clean, "../") || len(entry.SHA256) != 64 || entry.Bytes < 0 {
 			return "", errors.New("snapshot entry is invalid")
 		}
 		fmt.Fprintf(hash, "%s\x00%d\x00%d\x00%s\n", entry.Path, entry.Bytes, entry.Mode, entry.SHA256)
