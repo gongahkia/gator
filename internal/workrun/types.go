@@ -9,21 +9,23 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
 // Request describes one bounded local work session.
 type Request struct {
-	SourcePath string
-	Objective  string
-	RunID      string
-	MaxSteps   int
-	Mode       action.Mode
-	Contract   artifact.Contract
-	StateDir   string
-	System     string
-	OnEvent    agent.EventSink
-	Steering   <-chan string
+	SourcePath   string
+	Objective    string
+	RunID        string
+	MaxSteps     int
+	Mode         action.Mode
+	Contract     artifact.Contract
+	StateDir     string
+	System       string
+	OnEvent      agent.EventSink
+	Steering     <-chan string
+	ConnectorIDs []string
 }
 
 // Outcome retains staged files and trusted evidence even when model execution
@@ -38,7 +40,8 @@ type Outcome struct {
 // Executor combines a provider-independent model with private workspace
 // allocation and artifact sealing.
 type Executor struct {
-	Model    agent.Model
-	Now      func() time.Time
-	StateDir string
+	Model      agent.Model
+	Now        func() time.Time
+	StateDir   string
+	Connectors connector.Runtime
 }
