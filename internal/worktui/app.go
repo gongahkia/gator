@@ -61,7 +61,8 @@ type Config struct {
 	MoveToRevision      func(conversationID, revisionID string) (string, error)
 	History             func(conversationID string) (string, error)
 	FirstRun            bool
-	SetupCommand        func(provider string) *exec.Cmd
+	ProviderCommand     func(action, provider string) *exec.Cmd
+	ProviderChoices     func(action string) []string
 	CompleteSetup       func(provider string) error
 	Inspect             func(topic string) (string, error)
 	Copy                func(text string) error
@@ -74,7 +75,9 @@ type entry struct {
 }
 type message struct{ role, text string }
 type runDone RunResult
-type setupDone struct {
+
+type providerActionDone struct {
+	action   string
 	provider string
 	err      error
 }
@@ -179,14 +182,20 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.Error != "" && len(m.queue) > 0 {
 			m.status = fmt.Sprintf("Run stopped · %d queued prompt(s) paused", len(m.queue))
 		}
-	case setupDone:
+	case providerActionDone:
 		if value.err != nil {
-			m.messages = append(m.messages, message{role: "Gator", text: "Setup did not finish: " + value.err.Error() + "\nYou can try another provider name."})
+			m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, value.err)})
+			return m, nil
+		}
+		if value.action != "setup" {
+			m.status = providerActionSuccess(value.action, value.provider)
+			m.messages = append(m.messages, message{role: "Gator", text: m.status})
+			m.scroll = 0
 			return m, nil
 		}
 		if m.config.CompleteSetup != nil {
 			if err := m.config.CompleteSetup(value.provider); err != nil {
-				m.messages = append(m.messages, message{role: "Gator", text: "Setup did not finish: " + err.Error() + "\nYou can try another provider name."})
+				m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, err)})
 				return m, nil
 			}
 		}
@@ -298,13 +307,9 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.input = ""
 			if m.onboarding {
-				if m.config.SetupCommand == nil {
-					m.messages = append(m.messages, message{role: "Gator", text: "Setup is unavailable in this build."})
-					return m, nil
-				}
-				provider := strings.ToLower(prompt)
+				provider := strings.ToLower(strings.TrimSpace(prompt))
 				m.messages = append(m.messages, message{role: "You", text: provider})
-				return m, tea.ExecProcess(m.config.SetupCommand(provider), func(err error) tea.Msg { return setupDone{provider: provider, err: err} })
+				return m.startProviderAction("setup", provider)
 			}
 			if strings.HasPrefix(prompt, "/") {
 				return m.runLocalCommand(prompt)
@@ -437,6 +442,10 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.paletteQuery = ""
 			m.section = ""
 			m.input = selected.command + " "
+		case "provider":
+			m.launcher = false
+			m.paletteQuery = ""
+			return m.startProviderAction(selected.command, selected.id)
 		case "conversation":
 			switching := m.source != selected.source || m.conversation != selected.id
 			m.launcher = false
@@ -484,6 +493,28 @@ func (m *Model) openConversationPicker() {
 	m.selected = 0
 }
 
+func (m *Model) openProviderPicker(action string) bool {
+	if m.config.ProviderChoices == nil {
+		return false
+	}
+	providers := m.config.ProviderChoices(action)
+	if len(providers) == 0 {
+		return false
+	}
+	m.launcher = true
+	m.launcherMode = action
+	m.entries = make([]entry, 0, len(providers))
+	for _, provider := range providers {
+		m.entries = append(m.entries, entry{
+			title: provider, subtitle: providerActionDescription(action),
+			kind: "provider", id: provider, command: action,
+		})
+	}
+	m.paletteQuery = ""
+	m.selected = 0
+	return true
+}
+
 func (m Model) filteredEntries() []entry {
 	query := strings.ToLower(strings.TrimSpace(m.paletteQuery))
 	if query == "" {
@@ -504,6 +535,9 @@ func commandPaletteEntries() []entry {
 		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
 		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
 		{title: "/model", subtitle: "Connect or switch model provider", kind: "command", command: "/model"},
+		{title: "/connect", subtitle: "Start guided provider setup", kind: "command", command: "/connect"},
+		{title: "/login", subtitle: "Store a native Gator credential", kind: "command", command: "/login"},
+		{title: "/logout", subtitle: "Remove a stored Gator credential", kind: "command", command: "/logout"},
 		{title: "/effort", subtitle: "Set low, standard, or high effort", kind: "command-input", command: "/effort"},
 		{title: "/attach", subtitle: "Attach a source file to the next prompt", kind: "command-input", command: "/attach"},
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
@@ -558,12 +592,27 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.title = "Work in " + filepath.Base(m.source)
 		m.messages, m.status, m.queue = nil, "", nil
 		return m, nil
-	case "/model":
-		m.onboarding = true
-		m.pendingPrompt = ""
-		m.title = "Choose a model provider"
-		m.messages = []message{{role: "Gator", text: "Which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."}}
-		return m, nil
+	case "/model", "/connect", "/login", "/logout":
+		action := strings.TrimPrefix(fields[0], "/")
+		if action == "model" {
+			action = "setup"
+		}
+		if len(fields) > 2 {
+			result = fmt.Sprintf("Usage: %s [PROVIDER]", fields[0])
+			break
+		}
+		if len(fields) == 1 {
+			if m.openProviderPicker(action) {
+				return m, nil
+			}
+			result = fmt.Sprintf("No providers are available for %s in this build.", fields[0])
+			break
+		}
+		provider := strings.ToLower(strings.TrimSpace(fields[1]))
+		if action == "setup" {
+			m.pendingPrompt = ""
+		}
+		return m.startProviderAction(action, provider)
 	case "/effort":
 		if len(fields) != 2 {
 			result = "Usage: /effort low|standard|high\nCurrent: " + effortName(m.options.MaxSteps)
@@ -797,6 +846,75 @@ func commandRemainder(raw string, consumed []string) string {
 	return remainder
 }
 
+func (m Model) startProviderAction(action, provider string) (tea.Model, tea.Cmd) {
+	action = strings.ToLower(strings.TrimSpace(action))
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if action != "setup" && action != "connect" && action != "login" && action != "logout" {
+		m.messages = append(m.messages, message{role: "Gator", text: "Unknown provider action: " + action})
+		return m, nil
+	}
+	if provider == "" {
+		m.messages = append(m.messages, message{role: "Gator", text: "Choose a provider first."})
+		return m, nil
+	}
+	if m.config.ProviderCommand == nil {
+		m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(action, errorsUnavailable(action))})
+		return m, nil
+	}
+	command := m.config.ProviderCommand(action, provider)
+	if command == nil {
+		m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(action, errorsUnavailable(action))})
+		return m, nil
+	}
+	if action == "setup" {
+		m.onboarding = true
+		m.title = "Choose a model provider"
+	}
+	return m, tea.ExecProcess(command, func(err error) tea.Msg {
+		return providerActionDone{action: action, provider: provider, err: err}
+	})
+}
+
+func providerActionDescription(action string) string {
+	switch action {
+	case "setup":
+		return "Connect and use as Gator's default"
+	case "connect":
+		return "Start the closest supported setup flow"
+	case "login":
+		return "Store a native Gator credential"
+	case "logout":
+		return "Remove Gator's stored credential"
+	default:
+		return "Provider action"
+	}
+}
+
+func providerActionFailure(action string, err error) string {
+	label := action
+	if action == "setup" {
+		label = "model setup"
+	}
+	command := "/" + action
+	if action == "setup" {
+		command = "/model"
+	}
+	return strings.ToUpper(label[:1]) + label[1:] + " did not finish: " + err.Error() + "\nTry another provider with " + command + "."
+}
+
+func providerActionSuccess(action, provider string) string {
+	switch action {
+	case "connect":
+		return "Connection finished for " + provider + ". Use /model " + provider + " to make it Gator's default."
+	case "login":
+		return "Login finished for " + provider + "."
+	case "logout":
+		return "Logout finished for " + provider + "."
+	default:
+		return "Provider action finished for " + provider + "."
+	}
+}
+
 func (m Model) codeStatus() string {
 	code := m.options.Code
 	return fmt.Sprintf("Internal Code specialist\n  effort: %d steps\n  sandbox/network: %s/%s\n  profile: %s\n  scopes: %s\n  verification: %s\n  setup: %s\n  exact command grants: %s\n  prefix grants: %s\n  capabilities: %s\n  browser session: %s",
@@ -906,7 +1024,10 @@ func errorsUnavailable(name string) error {
 
 func workHelp() string {
 	return `Gator commands
-  /model                         connect or switch the default model
+  /model [PROVIDER]              connect and select the default provider
+  /connect [PROVIDER]            start the closest supported setup flow
+  /login [PROVIDER]              store a native Gator credential
+  /logout [PROVIDER]             remove a stored Gator credential
   /effort low|standard|high      set manager and Code turn budgets
   /attach PATH                   send one source file with the next prompt
   /detach PATH|all               remove pending attachments
@@ -1031,6 +1152,14 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 	title := "Commands"
 	if m.launcherMode == "conversations" {
 		title = "Conversations"
+	} else if m.launcherMode == "setup" {
+		title = "Choose default provider"
+	} else if m.launcherMode == "connect" {
+		title = "Connect provider"
+	} else if m.launcherMode == "login" {
+		title = "Log in to provider"
+	} else if m.launcherMode == "logout" {
+		title = "Log out of provider"
 	}
 	panel.WriteString(accent.Render(title) + "\n")
 	query := m.paletteQuery
@@ -1042,6 +1171,8 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 		empty := "No matching commands."
 		if m.launcherMode == "conversations" && m.paletteQuery == "" {
 			empty = "No retained conversations yet."
+		} else if m.launcherMode != "commands" {
+			empty = "No matching providers."
 		}
 		panel.WriteString(dim.Render(empty) + "\n")
 	}
