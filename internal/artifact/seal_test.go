@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -173,5 +174,35 @@ func TestManifestBindsReviewableContractToDigest(t *testing.T) {
 	manifest.Contract.Artifacts[0].Path = "different.md"
 	if err := manifest.Validate(); err == nil || !strings.Contains(err.Error(), "does not match") {
 		t.Fatalf("tampered contract error = %v", err)
+	}
+}
+
+func TestSealRetainsConnectedSourceProvenance(t *testing.T) {
+	t.Parallel()
+
+	source, err := workspace.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDirectory := t.TempDir()
+	writeArtifact(t, outputDirectory, "report.md", "connected report\n")
+	output, err := workspace.Open(outputDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	provenance := connector.Provenance{
+		ConnectorID: "metrics", Operation: "fetch", Resource: "https://example.com/metrics.json",
+		RetrievedAt: now, Bytes: 12, SHA256: strings.Repeat("a", 64),
+	}
+	manifest, err := Seal(output, DefaultContract("report.md"), SealOptions{
+		RunID: "work-connected", Objective: "Prepare a connected report", Source: source,
+		ConnectedSources: []connector.Provenance{provenance}, StartedAt: now, FinishedAt: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(manifest.ConnectedSources) != 1 || manifest.ConnectedSources[0] != provenance {
+		t.Fatalf("connected sources = %#v", manifest.ConnectedSources)
 	}
 }

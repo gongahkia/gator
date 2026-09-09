@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -21,13 +22,14 @@ var runIDPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}\z`)
 // SealOptions supplies trusted run identity and action outcomes. Artifact
 // evidence is always collected directly from outputRoot by Seal.
 type SealOptions struct {
-	RunID      string
-	Objective  string
-	Source     workspace.Root
-	Actions    []action.Record
-	Failure    string
-	StartedAt  time.Time
-	FinishedAt time.Time
+	RunID            string
+	Objective        string
+	Source           workspace.Root
+	Actions          []action.Record
+	ConnectedSources []connector.Provenance
+	Failure          string
+	StartedAt        time.Time
+	FinishedAt       time.Time
 }
 
 // Seal creates a manifest from fresh filesystem inspection. A failed
@@ -54,6 +56,14 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 	for index, record := range options.Actions {
 		if err := record.Validate(); err != nil {
 			return Manifest{}, fmt.Errorf("action record %d: %w", index+1, err)
+		}
+	}
+	if len(options.ConnectedSources) > 128 {
+		return Manifest{}, errors.New("work run has too many connected source records")
+	}
+	for index, source := range options.ConnectedSources {
+		if err := source.Validate(); err != nil {
+			return Manifest{}, fmt.Errorf("connected source %d: %w", index+1, err)
 		}
 	}
 	switch contract.Normalize().ExternalActions {
@@ -96,13 +106,14 @@ func Seal(outputRoot workspace.Root, contract Contract, options SealOptions) (Ma
 			Name:           filepath.Base(options.Source.Path()),
 			IdentitySHA256: hex.EncodeToString(sourceDigest[:]),
 		},
-		Artifacts:   inspection.Files,
-		Validations: inspection.Validations,
-		Actions:     append([]action.Record(nil), options.Actions...),
-		Status:      status,
-		Failure:     failure,
-		StartedAt:   options.StartedAt,
-		FinishedAt:  options.FinishedAt,
+		ConnectedSources: append([]connector.Provenance(nil), options.ConnectedSources...),
+		Artifacts:        inspection.Files,
+		Validations:      inspection.Validations,
+		Actions:          append([]action.Record(nil), options.Actions...),
+		Status:           status,
+		Failure:          failure,
+		StartedAt:        options.StartedAt,
+		FinishedAt:       options.FinishedAt,
 	}
 	if err := manifest.Validate(); err != nil {
 		return Manifest{}, err
