@@ -136,11 +136,11 @@ type CodeRequest struct {
 // CodeResult is the bounded handoff from Gator Code back to Gator Work.
 type CodeResult struct {
 	BaselineSHA256 string
-	Usage        agent.Usage
-	Summary      string
-	Patch        []byte
-	ChangedPaths []string
-	Steps        int
+	Usage          agent.Usage
+	Summary        string
+	Patch          []byte
+	ChangedPaths   []string
+	Steps          int
 }
 
 // CodeDelegate adapts Gator's isolated coding workflow into a Work specialist.
@@ -150,12 +150,12 @@ type CodeDelegate func(context.Context, CodeRequest) (CodeResult, error)
 // allocation and artifact sealing.
 type Executor struct {
 	RoleConfiguration map[string]orchestrator.RoleConfiguration
-	RoleSteps  map[string]int
-	HTTP       tools.HTTPFetchOptions
-	RoleModels map[string]agent.Model
-	Model      agent.Model
-	Now        func() time.Time
-	StateDir   string
-	Connectors connector.Runtime
-	Code       CodeDelegate
+	RoleSteps         map[string]int
+	HTTP              tools.HTTPFetchOptions
+	RoleModels        map[string]agent.Model
+	Model             agent.Model
+	Now               func() time.Time
+	StateDir          string
+	Connectors        connector.Runtime
+	Code              CodeDelegate
 }

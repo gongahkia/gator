@@ -7,12 +7,13 @@ import (
 )
 
 type Usage struct {
-	ModelRequests int      `json:"model_requests"`
-	InputTokens   int64    `json:"input_tokens"`
-	OutputTokens  int64    `json:"output_tokens"`
-	Reported      bool     `json:"reported"`
-	Estimated     bool     `json:"estimated"`
-	KnownCost     *float64 `json:"known_cost,omitempty"`
+	UnknownRequests int      `json:"unknown_requests"`
+	ModelRequests   int      `json:"model_requests"`
+	InputTokens     int64    `json:"input_tokens"`
+	OutputTokens    int64    `json:"output_tokens"`
+	Reported        bool     `json:"reported"`
+	Estimated       bool     `json:"estimated"`
+	KnownCost       *float64 `json:"known_cost,omitempty"`
 }
 type Limits struct {
 	ModelRequests int   `json:"model_requests"`
@@ -34,11 +35,15 @@ func (b *Budget) reserve() error {
 		return ErrBudget
 	}
 	b.usage.ModelRequests++
+	b.usage.UnknownRequests++
 	return nil
 }
 func (b *Budget) record(usage Usage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if usage.Reported || usage.Estimated {
+		b.usage.UnknownRequests--
+	}
 	b.usage.InputTokens += usage.InputTokens
 	b.usage.OutputTokens += usage.OutputTokens
 	b.usage.Reported = b.usage.Reported || usage.Reported

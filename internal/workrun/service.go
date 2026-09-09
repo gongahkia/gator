@@ -50,18 +50,18 @@ func PolicyDigest(request Request) (string, error) {
 }
 
 func effectiveConfiguration(request Request) any {
- return struct {
-  Contract artifact.Contract
-  Mode action.Mode
-  Code CodePolicy
-  Connectors []string
-  Permissions any
-  WebOrigins []string
-  Limits agent.Limits
-  MaxSteps int
-  Provider string
-  Roles map[string]orchestrator.RoleConfiguration
- }{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration}
+	return struct {
+		Contract    artifact.Contract
+		Mode        action.Mode
+		Code        CodePolicy
+		Connectors  []string
+		Permissions any
+		WebOrigins  []string
+		Limits      agent.Limits
+		MaxSteps    int
+		Provider    string
+		Roles       map[string]orchestrator.RoleConfiguration
+	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration}
 }
 
 type Interaction struct {

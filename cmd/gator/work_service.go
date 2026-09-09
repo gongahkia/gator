@@ -5,7 +5,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
-"github.com/gongahkia/gator/internal/orchestrator"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/workrun"
 	"os"
@@ -73,7 +73,9 @@ func configureWorkRoles(executor *workrun.Executor, settings config.Settings, st
 	for _, role := range settings.WorkRoles {
 		executor.RoleSteps[role.Name] = role.MaxSteps
 		configuration := orchestrator.RoleConfiguration{Version: role.Version, MaxSteps: role.MaxSteps}
-		if role.Provider != "" { configuration.Provider = role.Provider + "/" + role.Model }
+		if role.Provider != "" {
+			configuration.Provider = role.Provider + "/" + role.Model
+		}
 		executor.RoleConfiguration[role.Name] = configuration
 		if role.Provider == "" {
 			continue

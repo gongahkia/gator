@@ -519,10 +519,14 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	request.RoleConfiguration = make(map[string]orchestrator.RoleConfiguration)
 	for _, name := range []string{"source_researcher", "artifact_reviewer", "claim_verifier", "connected_researcher", "spreadsheet_analyst", "code"} {
 		maximum := maxWorkSpecialistSteps
-		if name == "code" { maximum = request.Code.MaxSteps }
+		if name == "code" {
+			maximum = request.Code.MaxSteps
+		}
 		configuration := e.RoleConfiguration[name]
 		configuration.Version = 1
-		if configuration.Provider == "" { configuration.Provider = request.Provider }
+		if configuration.Provider == "" {
+			configuration.Provider = request.Provider
+		}
 		configuration.MaxSteps = e.roleSteps(name, maximum)
 		request.RoleConfiguration[name] = configuration
 	}
