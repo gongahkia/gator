@@ -3,29 +3,34 @@
 ## Product posture
 
 Gator should feel like a quiet work surface, not an operations dashboard. The
-first screen asks for an outcome and postpones navigation, history, jobs, inbox,
-and specialist controls until the user asks for them. Evidence and controls
-remain available, but they appear at the point where they become relevant.
+first screen asks for an outcome and postpones history, jobs, inbox, and
+specialist controls until the user asks for them. Commands and destinations are
+separate concepts: `Ctrl+P` searches actions, while a small `Ctrl+X` navigation
+chord opens conversations, inbox, or jobs directly.
 
 The interaction model is informed by the official [OpenCode TUI
-documentation](https://opencode.ai/docs/tui/) and its current open-source TUI:
-a centered first prompt, a bottom-docked session prompt, keyboard-first command
-access, and resumable sessions. Gator does not copy OpenCode's branding or
+documentation](https://opencode.ai/docs/tui/) and
+[keybinding model](https://opencode.ai/docs/keybinds): a centered first prompt,
+a bottom-docked session prompt, a searchable `Ctrl+P` command list, leader-key
+navigation, and resumable sessions. Gator does not copy OpenCode's branding or
 screen treatment; it adopts the underlying progressive-disclosure pattern.
 
 ## Screen states
 
 | State | Primary content | Composer | Secondary navigation |
 | --- | --- | --- | --- |
-| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Hidden behind `Ctrl+P` |
-| Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Hidden behind `Ctrl+P` |
-| Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Hidden behind `Ctrl+P` |
-| Command palette | Sources, conversations, inbox, jobs, and setup | Hidden | Centered, keyboard-selectable list |
+| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X L/I/J` hints |
+| Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Available through the leader chord |
+| Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through the leader chord |
+| Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
+| Conversations | Retained Work conversations only | Hidden | `Ctrl+X L` |
+| Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+X I` |
+| Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+X J` |
 
 Typing the first character docks the composer; deleting the draft recenters it.
 Submitting the prompt starts a conversation. Merely opening Gator must not show
-cards, counters, setup prose, or a navigation rail. First-run setup is one
-palette entry and one subdued home hint.
+cards, counters, setup prose, or a navigation rail. First-run setup begins only
+after the first submitted prompt, or explicitly through `/model`.
 
 When a first task requires setup, `openai`, `anthropic`, and `gemini` open a
 hidden API-key prompt if their normal environment variable is absent. A
@@ -52,13 +57,16 @@ native Work providers because Gator does not import another CLI's credentials.
 
 1. Typing is always directed to the visible composer.
 2. `Enter` submits; an empty submission does nothing.
-3. `Ctrl+P` opens the palette from every state; `Esc` closes it.
-4. Opening a folder returns to the clean home state. Opening a retained
-   conversation goes directly to its session state.
-5. Long-running work replaces input focus with a single active status; internal
+3. `Ctrl+P` opens the searchable command palette from every state; it never
+   mixes folders, conversations, inbox entries, or jobs into the action list.
+4. `Ctrl+X` is the navigation leader: `L` opens conversations, `I` opens inbox,
+   and `J` opens jobs. `Esc` returns from a destination or closes a picker.
+5. Opening a retained conversation goes directly to its session state. `/new`
+   returns to the clean home state for the current folder.
+6. Long-running work replaces input focus with a single active status; internal
    tool and specialist detail belongs in events and evidence, not permanent
    chrome.
-6. Revision commands remain available, but are discoverable through help and
+7. Revision commands remain available, but are discoverable through help and
    the palette instead of occupying the default footer.
 
 ## Accessibility and terminal behavior
@@ -73,8 +81,9 @@ motion and must not be required to understand run state.
 
 OpenCode is the primary interaction reference because its official docs cover
 prompting, sessions, command navigation, and customization as one terminal
-system. [Claude Code's feature overview](https://code.claude.com/docs/en/features-overview)
-is a secondary reference for keeping advanced capabilities available without
-putting them all on the starting screen. Any future redesign should preserve
-Gator's own identity: proof-carrying artifacts, local snapshots, explicit
-authority, and restrained green accents.
+system. Claude Code's [command discovery](https://code.claude.com/docs/en/commands)
+and [contextual keybindings](https://code.claude.com/docs/en/keybindings) are
+secondary references for separating searchable actions from navigation and
+focused views. Any future redesign should preserve Gator's own identity:
+proof-carrying artifacts, local snapshots, explicit authority, and restrained
+green accents.

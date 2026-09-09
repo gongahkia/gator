@@ -68,8 +68,10 @@ credential store, then the provider environment variable.
 ## Main terminal UI
 
 The initial screen contains only the `🐊 Gator` wordmark and centered composer.
-Typing docks the composer below the conversation. `Ctrl+P` opens sources,
-retained conversations, inbox, jobs, and setup.
+Typing docks the composer below the conversation. `Ctrl+P` opens a searchable
+universal palette containing the slash-command surface. Navigation is separate:
+`Ctrl+X L` opens retained conversations, `Ctrl+X I` opens the inbox, and
+`Ctrl+X J` opens scheduled jobs.
 
 Useful local commands are:
 
@@ -86,8 +88,10 @@ Useful local commands are:
 /code allow COMMAND            pre-approve one exact child argv
 /code allow-prefix PREFIX      pre-approve a literal argv prefix
 /code grant CAPABILITY         grant lsp/mcp/extension/http/browser/terminal
+/code revoke CAPABILITY        revoke one child capability
 /code sandbox strict|off       set the child process sandbox
 /code network deny|allow       set child process network access
+/code max-steps N              set the child turn budget
 /code browser SESSION          select a controlled browser session
 /code reset                    restore strict, offline child defaults
 /status · /permissions         inspect the active orchestration envelope

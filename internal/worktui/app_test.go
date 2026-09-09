@@ -80,6 +80,9 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	if strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") || strings.Contains(view, "local-first work") {
 		t.Fatalf("initial view exposes launcher clutter: %q", view)
 	}
+	if !strings.Contains(view, "ctrl+p commands") || !strings.Contains(view, "ctrl+x  l conversations") || !strings.Contains(view, "i inbox") || !strings.Contains(view, "j jobs") {
+		t.Fatalf("initial view omits direct navigation: %q", view)
+	}
 	typing, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
 	typingView := typing.(Model).View()
 	if strings.Contains(typingView, "What do you want to accomplish?") || !strings.Contains(typingView, gatorWordmark) || !strings.Contains(typingView, "Work in reports") {
@@ -87,11 +90,75 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 	}
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	view = updated.(Model).View()
-	if !strings.Contains(view, "Inbox") || !strings.Contains(view, "Scheduled jobs") {
-		t.Fatalf("palette did not reveal secondary navigation: %q", view)
+	if !strings.Contains(view, "Commands") || !strings.Contains(view, "/attach") || !strings.Contains(view, "/status") {
+		t.Fatalf("palette did not reveal universal commands: %q", view)
+	}
+	if strings.Contains(view, "Work in reports") || strings.Contains(view, "Inbox") || strings.Contains(view, "Scheduled jobs") {
+		t.Fatalf("command palette still mixes destinations with actions: %q", view)
 	}
 	if strings.Contains(view, "Open the isolated coding workflow") {
 		t.Fatalf("palette still exposes the retired Code frontend: %q", view)
+	}
+}
+
+func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
+	model = updated.(Model)
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("sandbox")})
+	model = updated.(Model)
+	view := model.View()
+	if !strings.Contains(view, "/code sandbox") || strings.Contains(view, "/help") {
+		t.Fatalf("filtered palette = %q", view)
+	}
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || model.launcher || model.input != "/code sandbox " {
+		t.Fatalf("selected command state = %#v", model)
+	}
+}
+
+func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.openCommandPalette()
+	if len(model.entries) < 30 {
+		t.Fatalf("command palette is incomplete: %d entries", len(model.entries))
+	}
+	for _, item := range model.entries {
+		if !strings.HasPrefix(item.title, "/") || item.kind != "command" && item.kind != "command-input" {
+			t.Fatalf("non-command entry in palette: %#v", item)
+		}
+	}
+}
+
+func TestLeaderShortcutsOpenConversationsInboxAndJobs(t *testing.T) {
+	model := New(Config{
+		CurrentFolder: "/work",
+		Conversations: []worksession.Conversation{{ID: "work-one", Title: "Quarterly plan", SourcePath: "/source"}},
+	})
+	press := func(key tea.KeyMsg) {
+		updated, _ := model.Update(key)
+		model = updated.(Model)
+	}
+	press(tea.KeyMsg{Type: tea.KeyCtrlX})
+	press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if model.section != "inbox" || !strings.Contains(model.View(), "Inbox") || model.launcher {
+		t.Fatalf("inbox shortcut state = %#v", model)
+	}
+	press(tea.KeyMsg{Type: tea.KeyEsc})
+	press(tea.KeyMsg{Type: tea.KeyCtrlX})
+	press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if model.section != "jobs" || !strings.Contains(model.View(), "Scheduled jobs") {
+		t.Fatalf("jobs shortcut state = %#v", model)
+	}
+	press(tea.KeyMsg{Type: tea.KeyCtrlX})
+	press(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if !model.launcher || model.launcherMode != "conversations" || !strings.Contains(model.View(), "Quarterly plan") {
+		t.Fatalf("conversation shortcut state = %#v", model)
+	}
+	press(tea.KeyMsg{Type: tea.KeyEnter})
+	if model.launcher || model.section != "" || model.conversation != "work-one" || model.source != "/source" {
+		t.Fatalf("selected conversation state = %#v", model)
 	}
 }
 
