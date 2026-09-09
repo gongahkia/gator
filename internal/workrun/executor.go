@@ -102,6 +102,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	actions := make([]action.Record, 0, 4)
 	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
+		Permissions: request.ConnectorPermissions,
 		OnSource: func(source connector.Provenance) { connectedSources = append(connectedSources, source) },
 		OnAction: func(record action.Record) { actions = append(actions, record) },
 	})
@@ -263,6 +264,7 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	}
 	if _, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
+		Permissions: request.ConnectorPermissions,
 	}); err != nil {
 		return Request{}, fmt.Errorf("select work connectors: %w", err)
 	}

@@ -159,6 +159,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		ConnectorIDs:   selectedConnectors,
 		ApproveAction:  approve,
 		ConversationID: strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
+		ConnectorPermissions: connector.PermissionSet(settings.ConnectorPermissions),
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
