@@ -5,10 +5,9 @@ folder, give it an outcome, and it returns validated files in isolated output
 with a reviewable evidence manifest. Source material is read-only; model prose
 alone is never treated as proof that work finished.
 
-Plain `gator` opens a conversation-first Work TUI with the current folder,
-recent projects, retained conversations, scheduled jobs, and inbox in one
-command palette. First use is a guided chat. The product has two explicit
-workflows:
+Plain `gator` opens a quiet, centered Work composer. Retained conversations,
+sources, scheduled jobs, inbox, setup, and Code stay behind the `Ctrl+P` command
+palette until they are needed. The product has two explicit workflows:
 
 - `gator work` turns folders and connected data into reports, JSON, CSV, and
   other bounded artifacts;
@@ -18,11 +17,14 @@ workflows:
 The design centers on **proof-carrying work**: artifact hashes, deterministic
 validations, source provenance, and any proposed or executed external actions
 travel together in a sealed bundle. See [the Work architecture](docs/WORK.md).
+The interaction rules are in the [terminal design system](docs/DESIGN_SYSTEM.md),
+and the manager/specialist model is in [Work orchestration](docs/ORCHESTRATION.md).
 
 ## Status
 
 The current source includes immutable source snapshots, undoable Work
-conversations, DOCX/XLSX/PDF generation, first-party Slack/Google
+conversations, bounded fresh-context Work specialists, DOCX/XLSX/PDF
+generation, first-party Slack/Google
 Workspace/Atlassian/Notion adapters, typed remote MCP mappings, configurable
 connector permissions, a local scheduler and inbox, the isolated coding TUI,
 and a headless evaluation harness. No GitHub release has been published yet. The
