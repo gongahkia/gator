@@ -99,3 +99,27 @@ func TestConnectorLoginReadsTokenFromStdin(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestConnectorCommandConfiguresWebhookWithoutTestingItsSideEffect(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests++ }))
+	defer server.Close()
+	var output bytes.Buffer
+	if err := connectorCommandWithIO([]string{"add", "release", "--kind", "webhook", "--url", server.URL}, strings.NewReader(""), &output); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if err := connectorCommandWithIO([]string{"status", "release"}, strings.NewReader(""), &output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "http_webhook") || !strings.Contains(output.String(), "publish: publish") {
+		t.Fatalf("webhook status = %q", output.String())
+	}
+	output.Reset()
+	err := connectorCommandWithIO([]string{"test", "release"}, strings.NewReader(""), &output)
+	if err == nil || !strings.Contains(err.Error(), "--actions draft") || requests != 0 {
+		t.Fatalf("webhook test error=%v requests=%d", err, requests)
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -49,6 +51,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	baseURL := flags.String("base-url", os.Getenv("GATOR_BASE_URL"), "provider API base URL override")
 	sourcePath := flags.String("source", ".", "read-only source directory")
 	modeName := flags.String("mode", string(action.Draft), "work mode: inspect, draft, or act")
+	actionDisposition := flags.String("actions", string(action.Forbid), "external actions: forbid, draft, or approve")
 	maxSteps := flags.Int("max-steps", 24, "maximum model turns")
 	runID := flags.String("run-id", "", "stable run identifier")
 	jsonOutput := flags.Bool("json", false, "emit one machine-readable result")
@@ -69,9 +72,13 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if err := mode.Validate(); err != nil {
 		return err
 	}
-	contract, err := workContract(mode, artifacts, contains)
+	disposition := action.Disposition(strings.ToLower(strings.TrimSpace(*actionDisposition)))
+	contract, err := workContract(mode, disposition, artifacts, contains)
 	if err != nil {
 		return err
+	}
+	if *jsonOutput && disposition == action.Approve {
+		return errors.New("--json cannot request interactive action approval; use --actions draft or an interactive run")
 	}
 	resolvedProvider, resolvedModel, err := resolveConfiguredProvider(*providerName, *modelName)
 	if err != nil {
@@ -98,7 +105,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		return err
 	}
 	if !*jsonOutput {
-		if _, err := fmt.Fprintf(out, "Gator Work\n  provider: %s\n  model: %s\n  mode: %s\n  source: %s\n  connectors: %s\n  objective: %s\n", resolvedProvider, displayModel(resolvedModel), mode, *sourcePath, valueOrDash(strings.Join(selectedConnectors, ", ")), objective); err != nil {
+		if _, err := fmt.Fprintf(out, "Gator Work\n  provider: %s\n  model: %s\n  mode: %s\n  external actions: %s\n  source: %s\n  connectors: %s\n  objective: %s\n", resolvedProvider, displayModel(resolvedModel), mode, disposition, *sourcePath, valueOrDash(strings.Join(selectedConnectors, ", ")), objective); err != nil {
 			return err
 		}
 	}
@@ -108,15 +115,20 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		sink = printer.Print
 	}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
+	var approve action.Approver
+	if disposition == action.Approve {
+		approve = workActionApprover(in, out)
+	}
 	outcome, runErr := executor.Execute(context.Background(), workrun.Request{
-		SourcePath:   *sourcePath,
-		Objective:    objective,
-		RunID:        *runID,
-		MaxSteps:     *maxSteps,
-		Mode:         mode,
-		Contract:     contract,
-		OnEvent:      sink,
-		ConnectorIDs: selectedConnectors,
+		SourcePath:    *sourcePath,
+		Objective:     objective,
+		RunID:         *runID,
+		MaxSteps:      *maxSteps,
+		Mode:          mode,
+		Contract:      contract,
+		OnEvent:       sink,
+		ConnectorIDs:  selectedConnectors,
+		ApproveAction: approve,
 	})
 	if *jsonOutput {
 		if err := writeWorkJSON(out, outcome, runErr); err != nil {
@@ -149,12 +161,18 @@ func workObjective(arguments []string, in io.Reader) (string, error) {
 	return objective, nil
 }
 
-func workContract(mode action.Mode, paths artifactFlags, contains containsFlags) (artifact.Contract, error) {
+func workContract(mode action.Mode, disposition action.Disposition, paths artifactFlags, contains containsFlags) (artifact.Contract, error) {
+	if err := disposition.Validate(); err != nil {
+		return artifact.Contract{}, err
+	}
 	if mode == action.Inspect {
-		if len(paths) > 0 || len(contains) > 0 {
-			return artifact.Contract{}, errors.New("inspect mode does not accept artifact requirements")
+		if len(paths) > 0 || len(contains) > 0 || disposition != action.Forbid {
+			return artifact.Contract{}, errors.New("inspect mode does not accept artifact requirements or external actions")
 		}
 		return artifact.InspectionContract(), nil
+	}
+	if mode == action.Draft && disposition == action.Approve {
+		return artifact.Contract{}, errors.New("draft mode cannot approve external actions; use --actions draft or --mode act")
 	}
 	if len(paths) == 0 {
 		paths = artifactFlags{"report.md"}
@@ -212,7 +230,7 @@ func workContract(mode action.Mode, paths artifactFlags, contains containsFlags)
 		Artifacts:        requirements,
 		MaxArtifactBytes: artifact.DefaultMaxArtifactBytes,
 		MaxTotalBytes:    artifact.DefaultMaxTotalBytes,
-		ExternalActions:  action.Forbid,
+		ExternalActions:  disposition,
 	}
 	if err := contract.Validate(); err != nil {
 		return artifact.Contract{}, err
@@ -226,6 +244,11 @@ func writeWorkSummary(out io.Writer, outcome workrun.Outcome) error {
 	}
 	for _, file := range outcome.Manifest.Artifacts {
 		if _, err := fmt.Fprintf(out, "  ✓ %s (%s, %d bytes, sha256:%s)\n", file.Path, file.MediaType, file.Bytes, file.SHA256[:12]); err != nil {
+			return err
+		}
+	}
+	for _, record := range outcome.Manifest.Actions {
+		if _, err := fmt.Fprintf(out, "  → %s/%s: %s (%s, sha256:%s)\n", record.Proposal.ConnectorID, record.Proposal.Operation, record.Status, record.Proposal.Target, record.Proposal.PayloadSHA256[:12]); err != nil {
 			return err
 		}
 	}
@@ -244,13 +267,14 @@ func writeWorkJSON(out io.Writer, outcome workrun.Outcome, runErr error) error {
 		ManifestPath string                      `json:"manifest_path,omitempty"`
 		Artifacts    []artifact.File             `json:"artifacts,omitempty"`
 		Validations  []artifact.ValidationResult `json:"validations,omitempty"`
+		Actions      []action.Record             `json:"actions,omitempty"`
 		FinalText    string                      `json:"final_text,omitempty"`
 		Error        string                      `json:"error,omitempty"`
 	}
 	result := response{
 		RunID: outcome.Work.ID, Status: outcome.Manifest.Status,
 		ManifestPath: outcome.Work.ManifestPath, Artifacts: outcome.Manifest.Artifacts,
-		Validations: outcome.Manifest.Validations, FinalText: outcome.Result.FinalText,
+		Validations: outcome.Manifest.Validations, Actions: outcome.Manifest.Actions, FinalText: outcome.Result.FinalText,
 	}
 	if outcome.Work.Output.Path() != "" {
 		result.OutputPath = outcome.Work.Output.Path()
@@ -261,6 +285,28 @@ func writeWorkJSON(out io.Writer, outcome workrun.Outcome, runErr error) error {
 	encoder := json.NewEncoder(out)
 	encoder.SetEscapeHTML(false)
 	return encoder.Encode(result)
+}
+
+func workActionApprover(in io.Reader, out io.Writer) action.Approver {
+	input := bufio.NewReader(io.LimitReader(in, 64*1024))
+	return func(ctx context.Context, proposal action.Proposal) (action.Decision, error) {
+		select {
+		case <-ctx.Done():
+			return action.Deny, ctx.Err()
+		default:
+		}
+		if _, err := fmt.Fprintf(out, "\nExternal action approval\n  connector: %s\n  operation: %s (%s)\n  target: %s\n  payload sha256: %s\n  exact JSON (escaped): %s\nApprove this one action? [y/N] ", proposal.ConnectorID, proposal.Operation, proposal.Capability, proposal.Target, proposal.PayloadSHA256, strconv.QuoteToASCII(proposal.Preview)); err != nil {
+			return action.Deny, err
+		}
+		line, err := input.ReadString('\n')
+		if err != nil && !(errors.Is(err, io.EOF) && line != "") {
+			return action.Deny, err
+		}
+		if strings.EqualFold(strings.TrimSpace(line), "y") || strings.EqualFold(strings.TrimSpace(line), "yes") {
+			return action.Allow, nil
+		}
+		return action.Deny, nil
+	}
 }
 
 type artifactFlags []string
