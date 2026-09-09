@@ -66,6 +66,24 @@ type Result struct {
 	Provenance Provenance      `json:"provenance"`
 }
 
+// Validate checks the safe provenance envelope without contacting its source.
+func (p Provenance) Validate() error {
+	if !idPattern.MatchString(p.ConnectorID) || p.Operation != "fetch" {
+		return errors.New("connector provenance identity is invalid")
+	}
+	resource, err := url.Parse(p.Resource)
+	if err != nil || resource.Scheme == "" || resource.Host == "" || resource.User != nil || resource.Fragment != "" || resource.String() != p.Resource {
+		return errors.New("connector provenance resource is invalid")
+	}
+	if p.RetrievedAt.IsZero() || p.Bytes < 0 || len(p.SHA256) != sha256.Size*2 {
+		return errors.New("connector provenance evidence is invalid")
+	}
+	if _, err := hex.DecodeString(p.SHA256); err != nil {
+		return errors.New("connector provenance digest is invalid")
+	}
+	return nil
+}
+
 func (d Descriptor) Validate() error {
 	if d.Version != DescriptorVersion || !idPattern.MatchString(d.ID) {
 		return errors.New("connector version or ID is invalid")

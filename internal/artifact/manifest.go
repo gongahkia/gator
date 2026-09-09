@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/connector"
 )
 
 // Status is the terminal state represented by a sealed artifact manifest.
@@ -24,20 +25,21 @@ const (
 // Manifest is trusted, machine-readable evidence about one work run. It is
 // generated from filesystem and validator state after model execution.
 type Manifest struct {
-	Version        int                `json:"version"`
-	RunID          string             `json:"run_id"`
-	Workflow       string             `json:"workflow"`
-	Objective      string             `json:"objective"`
-	Contract       Contract           `json:"contract"`
-	ContractSHA256 string             `json:"contract_sha256"`
-	Source         Source             `json:"source"`
-	Artifacts      []File             `json:"artifacts"`
-	Validations    []ValidationResult `json:"validations"`
-	Actions        []action.Record    `json:"actions,omitempty"`
-	Status         Status             `json:"status"`
-	Failure        string             `json:"failure,omitempty"`
-	StartedAt      time.Time          `json:"started_at"`
-	FinishedAt     time.Time          `json:"finished_at"`
+	Version          int                    `json:"version"`
+	RunID            string                 `json:"run_id"`
+	Workflow         string                 `json:"workflow"`
+	Objective        string                 `json:"objective"`
+	Contract         Contract               `json:"contract"`
+	ContractSHA256   string                 `json:"contract_sha256"`
+	Source           Source                 `json:"source"`
+	ConnectedSources []connector.Provenance `json:"connected_sources,omitempty"`
+	Artifacts        []File                 `json:"artifacts"`
+	Validations      []ValidationResult     `json:"validations"`
+	Actions          []action.Record        `json:"actions,omitempty"`
+	Status           Status                 `json:"status"`
+	Failure          string                 `json:"failure,omitempty"`
+	StartedAt        time.Time              `json:"started_at"`
+	FinishedAt       time.Time              `json:"finished_at"`
 }
 
 // Source identifies the developer-selected input without claiming that every
@@ -92,6 +94,14 @@ func (m Manifest) Validate() error {
 	}
 	if m.Source.SnapshotSHA256 != "" && !validSHA256(m.Source.SnapshotSHA256) {
 		return errors.New("artifact manifest source snapshot digest is invalid")
+	}
+	if len(m.ConnectedSources) > 128 {
+		return errors.New("artifact manifest has too many connected sources")
+	}
+	for index, source := range m.ConnectedSources {
+		if err := source.Validate(); err != nil {
+			return fmt.Errorf("artifact manifest connected source %d: %w", index+1, err)
+		}
 	}
 	seen := make(map[string]struct{}, len(m.Artifacts))
 	for _, file := range m.Artifacts {
