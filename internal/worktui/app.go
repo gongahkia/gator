@@ -402,10 +402,14 @@ func (m Model) View() string {
 	width := m.width
 	if width <= 0 {
 		width = 80
+	} else if width < 20 {
+		width = 20
 	}
 	height := m.height
 	if height <= 0 {
 		height = 24
+	} else if height < 8 {
+		height = 8
 	}
 	accent := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
@@ -464,15 +468,17 @@ func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string 
 }
 
 func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgloss.Style) string {
-	panelWidth := min(76, max(36, width-8))
+	panelWidth := min(76, max(16, width-4))
+	titleWidth := min(28, max(8, panelWidth/2-1))
+	subtitleWidth := max(0, panelWidth-titleWidth-3)
 	var panel strings.Builder
 	panel.WriteString(accent.Render("Open") + "\n\n")
 	for index, item := range m.entries {
-		title := truncate(item.title, 27)
-		subtitle := truncate(item.subtitle, max(0, panelWidth-33))
-		line := fmt.Sprintf("  %-28s %s", title, dim.Render(subtitle))
+		title := truncate(item.title, titleWidth)
+		subtitle := truncate(item.subtitle, subtitleWidth)
+		line := fmt.Sprintf("  %-*s %s", titleWidth, title, dim.Render(subtitle))
 		if index == m.selected {
-			line = selectedStyle.Width(panelWidth).Render("› " + fmt.Sprintf("%-28s %s", title, subtitle))
+			line = selectedStyle.Width(panelWidth).Render("› " + fmt.Sprintf("%-*s %s", titleWidth, title, subtitle))
 		}
 		panel.WriteString(line + "\n")
 	}
@@ -481,7 +487,7 @@ func (m Model) renderPalette(width, height int, accent, dim, selectedStyle lipgl
 }
 
 func (m Model) renderComposer(width int, focused bool) string {
-	composerWidth := min(72, max(28, width-8))
+	composerWidth := min(68, max(12, width-8))
 	border := lipgloss.Color("238")
 	if focused {
 		border = lipgloss.Color("42")
