@@ -33,8 +33,8 @@ palette entry and one subdued home hint.
 - Use neutral foreground (`ANSI 255`), muted metadata (`ANSI 242`), and a dark
   selection surface (`ANSI 236`).
 - Use rounded one-cell borders only around an input or a selected surface.
-- Keep the composer at 72 columns or the available width minus eight columns,
-  whichever is smaller.
+- Keep the bordered composer at no more than 72 columns and leave at least two
+  columns of margin on each side.
 - Prefer whitespace over dividers. Do not repeat the product name, tagline, and
   folder name on every screen.
 - Status belongs next to the conversation title. Controls belong in one short,
