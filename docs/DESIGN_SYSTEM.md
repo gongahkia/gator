@@ -18,12 +18,14 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | State | Primary content | Composer | Secondary navigation |
 | --- | --- | --- | --- |
 | Home | Gator mark and one outcome question | Centered, at most 72 columns | Hidden behind `Ctrl+P` |
+| Drafting | Selected folder and a quiet empty transcript | Docked after the first typed character | Hidden behind `Ctrl+P` |
 | Conversation | Transcript and current run status | Docked below the transcript | Hidden behind `Ctrl+P` |
 | Command palette | Sources, conversations, inbox, jobs, setup, and Code | Hidden | Centered, keyboard-selectable list |
 
-Submitting the first prompt starts a conversation and moves the composer to the
-bottom. Merely opening Gator must not show cards, counters, setup prose, or a
-navigation rail. First-run setup is one palette entry and one subdued home hint.
+Typing the first character docks the composer; deleting the draft recenters it.
+Submitting the prompt starts a conversation. Merely opening Gator must not show
+cards, counters, setup prose, or a navigation rail. First-run setup is one
+palette entry and one subdued home hint.
 
 ## Visual language
 

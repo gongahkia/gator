@@ -136,6 +136,14 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.onboarding = false
 		m.firstRun = false
+		entries := m.entries[:0]
+		for _, item := range m.entries {
+			if item.kind != "onboarding" {
+				entries = append(entries, item)
+			}
+		}
+		m.entries = entries
+		m.selected = 0
 		m.home = true
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
@@ -405,7 +413,7 @@ func (m Model) View() string {
 	if m.launcher {
 		return m.renderPalette(width, height, accent, dim, selectedStyle)
 	}
-	if m.home {
+	if m.home && m.input == "" {
 		return m.renderHome(width, height, accent, dim)
 	}
 	var view strings.Builder
