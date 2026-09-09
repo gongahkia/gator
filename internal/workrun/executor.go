@@ -103,8 +103,8 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
 		Permissions: request.ConnectorPermissions,
-		OnSource: func(source connector.Provenance) { connectedSources = append(connectedSources, source) },
-		OnAction: func(record action.Record) { actions = append(actions, record) },
+		OnSource:    func(source connector.Provenance) { connectedSources = append(connectedSources, source) },
+		OnAction:    func(record action.Record) { actions = append(actions, record) },
 	})
 	if err != nil {
 		return outcome, err

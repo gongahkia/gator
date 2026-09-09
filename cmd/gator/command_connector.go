@@ -57,6 +57,8 @@ func connectorCommandWithIO(arguments []string, in io.Reader, out io.Writer) err
 		return testConnector(id, out)
 	case "remove":
 		return removeConnector(id, arguments[2:], out)
+	case "permission":
+		return setConnectorPermission(id, arguments[2:], out)
 	default:
 		return fmt.Errorf("unknown connector action %q", actionName)
 	}
@@ -98,9 +100,9 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("connector add", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	name := flags.String("name", id, "display name")
-	kindName := flags.String("kind", "json", "connector kind: json or webhook")
+	kindName := flags.String("kind", "json", "connector kind: json, webhook, slack, google, atlassian, or notion")
 	resource := flags.String("url", "", "exact resource URL")
-	authentication := flags.String("auth", connector.AuthNone, "authentication: none or bearer")
+	authentication := flags.String("auth", "", "authentication: none or bearer")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -113,8 +115,32 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		kind = connector.KindHTTPJSON
 	case "webhook", connector.KindHTTPWebhook:
 		kind = connector.KindHTTPWebhook
+	case connector.KindSlack:
+		kind = connector.KindSlack
+	case "google", "google-workspace", connector.KindGoogle:
+		kind = connector.KindGoogle
+	case connector.KindAtlassian, "jira":
+		kind = connector.KindAtlassian
+	case connector.KindNotion:
+		kind = connector.KindNotion
 	default:
-		return fmt.Errorf("unknown connector kind %q; expected json or webhook", *kindName)
+		return fmt.Errorf("unknown connector kind %q", *kindName)
+	}
+	if strings.TrimSpace(*resource) == "" {
+		switch kind {
+		case connector.KindSlack:
+			*resource = "https://slack.com/api"
+		case connector.KindGoogle:
+			*resource = "https://www.googleapis.com"
+		case connector.KindNotion:
+			*resource = "https://api.notion.com/v1"
+		}
+	}
+	if strings.TrimSpace(*authentication) == "" {
+		*authentication = connector.AuthNone
+		if kind != connector.KindHTTPJSON && kind != connector.KindHTTPWebhook {
+			*authentication = connector.AuthBearer
+		}
 	}
 	descriptor := connector.Descriptor{
 		Version: connector.DescriptorVersion, ID: id, Name: strings.TrimSpace(*name),
@@ -247,18 +273,78 @@ func testConnector(id string, out io.Writer) error {
 	if !found {
 		return fmt.Errorf("connector %q is not configured", id)
 	}
-	if descriptor.Kind != connector.KindHTTPJSON {
+	if descriptor.Kind == connector.KindHTTPWebhook {
 		return fmt.Errorf("connector %q is an action endpoint; test it through a --actions draft work run, which does not send", id)
 	}
 	credentials, err := gatorCredentials()
 	if err != nil {
 		return err
 	}
-	result, err := (connector.Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, id, "fetch", []byte(`{}`))
+	operation := "fetch"
+	if descriptor.Kind == connector.KindSlack {
+		operation = "whoami"
+	}
+	if descriptor.Kind == connector.KindGoogle {
+		operation = "drive_search"
+	}
+	if descriptor.Kind == connector.KindAtlassian {
+		operation = "jira_search"
+	}
+	if descriptor.Kind == connector.KindNotion {
+		operation = "search"
+	}
+	result, err := (connector.Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, id, operation, []byte(`{}`))
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Connector %s is reachable: %d bytes, sha256:%s\n", id, result.Provenance.Bytes, result.Provenance.SHA256[:12])
+	return err
+}
+
+func setConnectorPermission(id string, arguments []string, out io.Writer) error {
+	if len(arguments) != 3 || (arguments[1] != "read" && arguments[1] != "write") {
+		return errors.New("usage: gator connector permission ID OPERATION read|write allow|ask|deny|draft")
+	}
+	descriptor, _, err := configuredConnector(id)
+	if err != nil {
+		return err
+	}
+	operation := arguments[0]
+	found := false
+	for _, candidate := range descriptor.Operations() {
+		found = found || candidate.ID == operation
+	}
+	if !found {
+		return fmt.Errorf("connector %q has no operation %q", id, operation)
+	}
+	permission := connector.Permission(arguments[2])
+	rule := connector.PermissionRule{ConnectorID: id, Operation: operation}
+	if arguments[1] == "read" {
+		rule.Read = permission
+	} else {
+		rule.Write = permission
+	}
+	if err := rule.Validate(); err != nil {
+		return err
+	}
+	store, settings, err := connectorSettings()
+	if err != nil {
+		return err
+	}
+	filtered := settings.ConnectorPermissions[:0]
+	for _, existing := range settings.ConnectorPermissions {
+		replaceRead := arguments[1] == "read" && existing.Read != ""
+		replaceWrite := arguments[1] == "write" && existing.Write != ""
+		if existing.ConnectorID == id && existing.Operation == operation && (replaceRead || replaceWrite) {
+			continue
+		}
+		filtered = append(filtered, existing)
+	}
+	settings.ConnectorPermissions = append(filtered, rule)
+	if err := store.Save(settings); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(out, "Set %s/%s %s permission to %s.\n", id, operation, arguments[1], permission)
 	return err
 }
 
