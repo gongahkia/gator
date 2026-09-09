@@ -39,6 +39,10 @@ func ReadTable(root workspace.Root, source TableSource) (Table, error) {
 	if err != nil {
 		return Table{}, err
 	}
+	return decodeTable(source, data)
+}
+
+func decodeTable(source TableSource, data []byte) (Table, error) {
 	sum := sha256.Sum256(data)
 	table := Table{Source: source, SHA256: hex.EncodeToString(sum[:])}
 	switch strings.ToLower(filepath.Ext(source.Path)) {
@@ -115,7 +119,10 @@ func ReadTable(root workspace.Root, source TableSource) (Table, error) {
 	return table, nil
 }
 
-type InspectTable struct{ Root workspace.Root }
+type InspectTable struct {
+	Root       workspace.Root
+	NamedRoots []workspace.NamedRoot
+}
 
 func (t InspectTable) Definition() agent.ToolDefinition {
 	return agent.ToolDefinition{Name: "inspect_table", Description: "Read a bounded CSV or selected XLSX sheet with exact row/cell coordinates and a content digest. Missing cells remain empty.", Parameters: schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string"},"sheet":{"type":"string"}}}`)}
@@ -125,7 +132,19 @@ func (t InspectTable) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 	if err := decodeArguments(raw, &source); err != nil {
 		return agent.ToolResult{}, err
 	}
-	table, err := ReadTable(t.Root, source)
+	roots, err := workspace.NewNamedRootSet(t.Root, nil, t.NamedRoots)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	if len(t.NamedRoots) == 0 {
+		source.Path = strings.TrimPrefix(source.Path, "source/")
+	}
+	payload, display, err := roots.ReadRegularFile(source.Path, 4*1024*1024)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	source.Path = display
+	table, err := decodeTable(source, payload)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}

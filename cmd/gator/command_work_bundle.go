@@ -130,6 +130,35 @@ func reviewWorkBundle(out io.Writer, bundle artifact.Bundle, jsonOutput, include
 			return err
 		}
 	}
+	if _, err := fmt.Fprintf(out, "  effective policy: %s\n  model requests: %d (%d without token usage); cost unknown\n", manifest.PolicySHA256, manifest.Usage.ModelRequests, manifest.Usage.UnknownRequests); err != nil {
+		return err
+	}
+	for _, candidate := range manifest.Candidates {
+		if _, err := fmt.Fprintf(out, "\nCode candidate %s: %s\n  baseline tree: %s\n  selected patches: %s\n  changed paths: %s\n  patch artifact: %s\n", terminalSafe(candidate.ID), candidate.Status, terminalSafe(candidate.Baseline), terminalSafe(strings.Join(candidate.Patches, ", ")), terminalSafe(strings.Join(candidate.ChangedPaths, ", ")), terminalSafe(candidate.PatchPath)); err != nil {
+			return err
+		}
+		for _, check := range candidate.Verification {
+			argv, _ := json.Marshal(check.Argv)
+			if _, err := fmt.Fprintf(out, "  verifier %s: passed=%t %s\n", terminalSafe(string(argv)), check.Passed, terminalSafe(check.Diagnostic)); err != nil {
+				return err
+			}
+		}
+		if candidate.Error != "" {
+			if _, err := fmt.Fprintf(out, "  failure: %s\n", terminalSafe(candidate.Error)); err != nil {
+				return err
+			}
+		}
+	}
+	if len(manifest.Evidence) > 0 {
+		if _, err := fmt.Fprintln(out, "\nSelected evidence:"); err != nil {
+			return err
+		}
+		for _, entry := range manifest.Evidence {
+			if _, err := fmt.Fprintf(out, "  %s  %s  sha256:%s\n", terminalSafe(entry.ID), terminalSafe(entry.Locator), entry.SHA256); err != nil {
+				return err
+			}
+		}
+	}
 	if len(manifest.ConnectedSources) > 0 {
 		if _, err := fmt.Fprintln(out, "\nConnected sources:"); err != nil {
 			return err

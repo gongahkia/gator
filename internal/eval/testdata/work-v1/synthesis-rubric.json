@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "id": "work-synthesis-v1",
+  "criteria": [
+    {
+      "id": "evidence",
+      "description": "Does the synthesis distinguish evidence, conflicting sources, and unsupported claims?",
+      "anchors": ["No supporting evidence or unsupported core conclusion.", "Mentions sources but key claims are unsupported.", "Supports the main claim but omits material uncertainty.", "Supports material claims and describes uncertainty.", "Supports material claims, addresses conflicts, and makes the evidence limits explicit."]
+    },
+    {
+      "id": "usefulness",
+      "description": "Does the deliverable give a clear, actionable answer within the supplied evidence?",
+      "anchors": ["No usable answer.", "Mostly disconnected facts.", "A readable answer with material omissions.", "A clear, relevant answer with supported implications.", "A concise synthesis with supported implications, priorities, and explicit remaining questions."]
+    }
+  ]
+}

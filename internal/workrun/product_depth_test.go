@@ -2,6 +2,8 @@ package workrun
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/gongahkia/gator/internal/worksession"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,5 +69,71 @@ func TestExplicitParentSelectsItsOwnSnapshot(t *testing.T) {
 	}
 	if c.SnapshotID == b.SnapshotID || c.SnapshotID != a.SnapshotID {
 		t.Fatal("unexpected snapshot selection")
+	}
+}
+
+func TestLegacyReplayProviderChangeAndHeadNavigation(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	model := &auditRecordingModel{}
+	executor := Executor{Model: model, StateDir: state}
+	request := Request{SourcePath: source, Objective: "Remember amber", Provider: "old/model", Mode: action.Inspect, Contract: artifact.InspectionContract()}
+	first, err := executor.Execute(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := worksession.Open(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := sessions.LoadRevision(first.ConversationID, first.RevisionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent.Version = 1
+	parent.Replay = nil
+	payload, _ := json.Marshal(parent)
+	path := filepath.Join(state, "gator", "conversations", first.ConversationID, "revisions", first.RevisionID+".json")
+	if err := os.WriteFile(path, payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	request.ConversationID = first.ConversationID
+	request.Objective = "Legacy followup"
+	request.Provider = "new/model"
+	second, err := executor.Execute(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := model.requests[len(model.requests)-1].Messages
+	if len(messages) != 3 || messages[0].Content != "Remember amber" || messages[1].Content != "Inspection done." {
+		t.Fatalf("legacy replay: %+v", messages)
+	}
+	if _, err := sessions.MoveHead(first.ConversationID, first.RevisionID); err != nil {
+		t.Fatal(err)
+	}
+	request.Objective = "Back branch"
+	branch, err := executor.Execute(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision, _ := sessions.LoadRevision(first.ConversationID, branch.RevisionID)
+	if revision.ParentRevisionID != first.RevisionID {
+		t.Fatal("back selected wrong parent")
+	}
+	if _, err := sessions.MoveHead(first.ConversationID, second.RevisionID); err != nil {
+		t.Fatal(err)
+	}
+	request.Objective = "Forward continuation"
+	_, err = executor.Execute(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// opaque provider state is cleared when changing adapters, with normalized calls retained.
+	retained := worksession.Revision{Replay: &worksession.ReplayState{Version: 1, Provider: "old/model", Messages: []agent.Message{{Role: agent.RoleAgent, ProviderData: json.RawMessage(`{"opaque":"private"}`), ToolCalls: []agent.ToolCall{{ID: "logical", ProviderID: "provider-specific", Name: "read_file", Arguments: json.RawMessage(`{}`)}}}}}}
+	replay, err := replayMessages(sessions, retained, "new/model")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(replay[0].ProviderData) != 0 || replay[0].ToolCalls[0].ProviderID != "" || replay[0].ToolCalls[0].ID != "logical" {
+		t.Fatal("provider state was not normalized")
 	}
 }

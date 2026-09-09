@@ -151,7 +151,7 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 		if !utf8.Valid(data) || strings.ContainsRune(string(data), 0) {
 			return agent.ToolResult{}, errors.New("binary evidence requires a supported extraction or table tool")
 		}
-		retained, err := t.catalog.retain(entry.Locator, data, entry.RetrievedAt)
+		retained, err := t.catalog.retainEntry(entry, data)
 		if err != nil {
 			return agent.ToolResult{}, err
 		}
@@ -172,7 +172,10 @@ func (t evidenceTool) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 		}
 		checks := []map[string]any{}
 		for _, claim := range input.Claims {
-			_, data, err := t.catalog.read(claim.ID)
+			entry, data, err := t.catalog.read(claim.ID)
+			if err == nil {
+				_, err = t.catalog.retainEntry(entry, data)
+			}
 			matched := err == nil && len(claim.Quote) > 0 && strings.Contains(string(data), claim.Quote)
 			checks = append(checks, map[string]any{"claim": claim.Claim, "evidence_id": claim.ID, "quote_match": matched, "semantic_entailment": "ungraded"})
 		}
@@ -255,4 +258,63 @@ func (c *evidenceCatalog) privateAttachment(name string, data []byte, at time.Ti
 	digest := hex.EncodeToString(sum[:])
 	id := "attachment-" + digest[:24]
 	c.entries[id] = artifact.Evidence{ID: id, Locator: "attachment/" + name, SHA256: digest, RetrievedAt: at}
+}
+
+func (c *evidenceCatalog) retainEntry(entry artifact.Evidence, data []byte) (artifact.Evidence, error) {
+	retained, err := c.retain(entry.Locator, data, entry.RetrievedAt)
+	if err != nil {
+		return entry, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, retained.ID)
+	retained.ID = entry.ID
+	c.entries[retained.ID] = retained
+	return retained, nil
+}
+func (c *evidenceCatalog) selected() []artifact.Evidence {
+	var result []artifact.Evidence
+	for _, entry := range c.list() {
+		if entry.SnapshotPath != "" || strings.HasPrefix(entry.Locator, "attachment/") {
+			result = append(result, entry)
+		}
+	}
+	return result
+}
+
+type cataloguedTool struct {
+	agent.Tool
+	catalog *evidenceCatalog
+}
+
+func (t cataloguedTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+	result, err := t.Tool.Execute(ctx, raw)
+	if err != nil {
+		return result, err
+	}
+	var input struct {
+		Path string `json:"path"`
+	}
+	if json.Unmarshal(raw, &input) != nil {
+		return result, nil
+	}
+	if input.Path == "" || strings.HasPrefix(input.Path, "output/") || strings.HasPrefix(input.Path, "previous/") {
+		return result, nil
+	}
+	locator := "source/" + strings.TrimPrefix(input.Path, "source/")
+	for _, entry := range t.catalog.list() {
+		if entry.Locator != locator {
+			continue
+		}
+		_, data, readErr := t.catalog.read(entry.ID)
+		if readErr != nil {
+			return agent.ToolResult{}, readErr
+		}
+		_, retainErr := t.catalog.retainEntry(entry, data)
+		if retainErr != nil {
+			return agent.ToolResult{}, retainErr
+		}
+		break
+	}
+	return result, nil
 }

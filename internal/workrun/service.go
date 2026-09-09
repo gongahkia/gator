@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -24,6 +25,19 @@ import (
 type Service struct {
 	Executor Executor
 	Defaults *Request
+}
+
+var workRoleNames = []string{"source_researcher", "artifact_reviewer", "claim_verifier", "connected_researcher", "spreadsheet_analyst", "code"}
+
+func ValidateDisabledRoles(roles []string) error {
+	seen := map[string]bool{}
+	for _, role := range roles {
+		if !slices.Contains(workRoleNames, role) || seen[role] {
+			return fmt.Errorf("invalid or repeated disabled role %q", role)
+		}
+		seen[role] = true
+	}
+	return nil
 }
 
 func (s Service) Execute(ctx context.Context, request Request) (Outcome, error) {
@@ -52,17 +66,25 @@ func PolicyDigest(request Request) (string, error) {
 
 func effectiveConfiguration(request Request) any {
 	return struct {
-		Contract    artifact.Contract
-		Mode        action.Mode
-		Code        CodePolicy
-		Connectors  []string
-		Permissions any
-		WebOrigins  []string
-		Limits      agent.Limits
-		MaxSteps    int
-		Provider    string
-		Roles       map[string]orchestrator.RoleConfiguration
-	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration}
+		Contract          artifact.Contract
+		Mode              action.Mode
+		Code              CodePolicy
+		Connectors        []string
+		Permissions       any
+		WebOrigins        []string
+		Limits            agent.Limits
+		MaxSteps          int
+		Provider          string
+		Roles             map[string]orchestrator.RoleConfiguration
+		ProjectSHA256     string
+		DisableDelegation bool
+		DisabledRoles     []string
+	}{request.Contract, request.Mode, request.Code, request.ConnectorIDs, request.ConnectorPermissions, request.WebOrigins, request.Limits, request.MaxSteps, request.Provider, request.RoleConfiguration, func() string {
+		if request.Project != nil {
+			return request.Project.SHA256
+		}
+		return ""
+	}(), request.DisableDelegation, request.DisabledRoles}
 }
 
 type Interaction struct {
@@ -120,8 +142,9 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	if request.StateDir == "" {
 		request.StateDir = s.Executor.StateDir
 	}
+	var initializationErr error
 	if request.RunID == "" {
-		request.RunID, _ = newID(time.Now())
+		request.RunID, initializationErr = newID(time.Now())
 	}
 	interactionDir := filepath.Join(request.StateDir, "gator", "interactions", request.RunID)
 	persistInteraction := func(value any, id int) error {
@@ -215,7 +238,11 @@ func (s Service) Start(ctx context.Context, request Request) *Operation {
 	}
 	go func() {
 		defer cancel()
-		outcome, err := s.Execute(ctx, request)
+		var outcome Outcome
+		err := initializationErr
+		if err == nil {
+			outcome, err = s.Execute(ctx, request)
+		}
 		close(events)
 		close(interactions)
 		done <- Completion{outcome, err}

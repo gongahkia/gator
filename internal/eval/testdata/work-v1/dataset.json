@@ -93,6 +93,22 @@
           "kind": "file_contains",
           "expected": "source/new.txt",
           "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "evidence_reference",
+          "path": "report.md",
+          "locator": "source/old.txt",
+          "quote": "100",
+          "expected": ""
+        },
+        {
+          "version": 1,
+          "kind": "evidence_reference",
+          "path": "report.md",
+          "locator": "source/new.txt",
+          "quote": "120",
+          "expected": ""
         }
       ]
     },
@@ -169,6 +185,11 @@
           "kind": "file_contains",
           "expected": "unsupported",
           "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "unsupported_quote",
+          "expected": "\"quote_match\":false"
         }
       ]
     },
@@ -475,6 +496,11 @@
           "kind": "file_contains",
           "expected": "cannot read",
           "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "child_tool_error_contains",
+          "expected": "output/report.md"
         }
       ],
       "role_scripts": {
@@ -579,6 +605,35 @@
           "kind": "file_contains",
           "expected": "SHA-256",
           "path": "report.md"
+        },
+        {
+          "version": 1,
+          "kind": "context_contains",
+          "expected": "previous/checked.xlsx"
+        }
+      ],
+      "followups": [
+        {
+          "objective": "Inspect the prior checked workbook and retain its evidence in a concise followup.",
+          "parent": 0,
+          "refresh": false,
+          "script": [
+            {
+              "tool_calls": [
+                {
+                  "id": "inspect-prior",
+                  "name": "inspect_table",
+                  "arguments": {
+                    "path": "previous/checked.xlsx",
+                    "sheet": "Checks"
+                  }
+                }
+              ]
+            },
+            {
+              "text": "The retained workbook Checks sheet still balances. The memo retains source SHA-256 references."
+            }
+          ]
         }
       ]
     },

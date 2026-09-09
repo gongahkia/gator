@@ -24,6 +24,9 @@ func workEvalCommand(args []string, out io.Writer) error {
 		return errors.New("usage: gator eval work validate|run|show|compare DATASET_OR_REPORT [options]")
 	}
 	action, path := args[0], args[1]
+	if action == "judge-rubric" || action == "calibrate-rubric" {
+		return workRubricCommand(action, path, args[2:], out)
+	}
 	if action == "export-langsmith" {
 		report, err := eval.LoadWorkExperiment(path)
 		if err != nil {
@@ -79,6 +82,8 @@ func workEvalCommand(args []string, out io.Writer) error {
 	id := flags.String("id", "work-eval", "experiment ID")
 	attempts := flags.Int("attempts", 1, "independent trials per case (1-10)")
 	delegation := flags.Bool("delegation", true, "enable specialists")
+	var disabledRoles stringFlags
+	flags.Var(&disabledRoles, "disable-role", "omit one specialist role for a matched ablation")
 	live := flags.Bool("live", false, "use real provider models")
 	provider := flags.String("provider", "", "live provider")
 	model := flags.String("model", "", "live model")
@@ -103,7 +108,7 @@ func workEvalCommand(args []string, out io.Writer) error {
 		ctx, cancel = context.WithTimeout(ctx, time.Duration(*seconds)*time.Second)
 		defer cancel()
 	}
-	options := eval.WorkEvalOptions{ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, MaxRequests: *requests}
+	options := eval.WorkEvalOptions{DisabledRoles: disabledRoles, ID: *id, Harness: commit, Provider: *provider, Model: *model, ReportDir: absolute, Attempts: *attempts, Delegation: *delegation, Live: *live, MaxRequests: *requests}
 	report, err := eval.RunWorkExperiment(ctx, path, dataset, options, func(c eval.WorkCase, state string) (workrun.Service, error) {
 		if *live {
 			request := workrun.Request{}

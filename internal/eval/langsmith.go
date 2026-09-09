@@ -59,6 +59,33 @@ func ExportLangSmith(ctx context.Context, client *http.Client, endpoint, key str
 		if err := post("/runs", run, nil); err != nil {
 			return err
 		}
+		spanIDs := map[string]string{}
+		for _, span := range trial.Spans {
+			spanIDs[span.ID] = telemetry.ID(id+"/"+span.ID, 32)
+		}
+		for _, span := range trial.Spans {
+			parent := id
+			if span.Parent != "" {
+				parent = spanIDs[span.Parent]
+				if parent == "" {
+					return errors.New("trace has unknown parent span")
+				}
+			}
+			end := span.End
+			if end.IsZero() {
+				end = span.Start
+			}
+			kind := "chain"
+			if span.Name == "model_attempt" {
+				kind = "llm"
+			} else if strings.HasPrefix(span.Name, "tool/") {
+				kind = "tool"
+			}
+			mapped := map[string]any{"id": spanIDs[span.ID], "parent_run_id": parent, "name": span.Name, "run_type": kind, "start_time": span.Start, "end_time": end, "session_id": session.ID, "reference_example_id": examples[trial.CaseID], "inputs": map[string]any{}, "outputs": map[string]any{"step": span.Step, "attempt": span.Attempt, "usage": span.Usage}}
+			if err := post("/runs", mapped, nil); err != nil {
+				return err
+			}
+		}
 		child := map[string]any{"id": telemetry.ID(id+"/grading", 32), "parent_run_id": id, "name": "independent grading", "run_type": "chain", "start_time": time.Now().UTC(), "end_time": time.Now().UTC(), "session_id": session.ID, "reference_example_id": examples[trial.CaseID], "inputs": map[string]any{}, "outputs": map[string]any{"grader_count": len(trial.Grades)}}
 		if err := post("/runs", child, nil); err != nil {
 			return err

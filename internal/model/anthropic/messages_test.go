@@ -134,3 +134,11 @@ type requestBodyView struct {
 	Tools    []functionTool `json:"tools"`
 	Stream   bool           `json:"stream"`
 }
+
+func TestStreamNormalizesReportedUsage(t *testing.T) {
+	payload := "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":12,\"output_tokens\":1}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"complete\"}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"usage\":{\"output_tokens\":7}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+	turn, err := decodeSSE(strings.NewReader(payload), nil)
+	if err != nil || !turn.Usage.Reported || turn.Usage.InputTokens != 12 || turn.Usage.OutputTokens != 7 {
+		t.Fatalf("stream usage: %+v %v", turn.Usage, err)
+	}
+}

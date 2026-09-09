@@ -154,6 +154,16 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("artifact manifest connected source %d: %w", index+1, err)
 		}
 	}
+	seenEvidence := map[string]bool{}
+	for _, entry := range m.Evidence {
+		if entry.ID == "" || len(entry.ID) > 128 || strings.ContainsAny(entry.ID, "\x00\r\n") || seenEvidence[entry.ID] || !validSHA256(entry.SHA256) || entry.Locator == "" || len(entry.Locator) > 8192 || strings.ContainsAny(entry.Locator, "\x00\r\n") || entry.RetrievedAt.IsZero() {
+			return errors.New("invalid selected evidence metadata")
+		}
+		seenEvidence[entry.ID] = true
+		if entry.SnapshotPath != "" && entry.SnapshotPath != "evidence/"+entry.SHA256+".txt" {
+			return errors.New("selected evidence path does not match digest")
+		}
+	}
 	seen := make(map[string]struct{}, len(m.Artifacts))
 	artifactDigests := make(map[string]string, len(m.Artifacts))
 	for _, file := range m.Artifacts {

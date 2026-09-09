@@ -21,6 +21,7 @@ type Limits struct {
 	WallSeconds   int   `json:"wall_seconds"`
 }
 type Budget struct {
+	Parent *Budget
 	mu     sync.Mutex
 	Limits Limits
 	usage  Usage
@@ -34,10 +35,25 @@ func (b *Budget) reserve() error {
 	if b.usage.ModelRequests >= b.Limits.ModelRequests || (b.Limits.Tokens > 0 && b.usage.InputTokens+b.usage.OutputTokens >= b.Limits.Tokens) {
 		return ErrBudget
 	}
+	if b.Parent != nil {
+		if err := b.Parent.reserve(); err != nil {
+			return err
+		}
+	}
 	b.usage.ModelRequests++
 	b.usage.UnknownRequests++
 	return nil
 }
+func (b *Budget) release() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.usage.ModelRequests--
+	b.usage.UnknownRequests--
+	if b.Parent != nil {
+		b.Parent.release()
+	}
+}
+
 func (b *Budget) record(usage Usage) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -48,6 +64,9 @@ func (b *Budget) record(usage Usage) {
 	b.usage.OutputTokens += usage.OutputTokens
 	b.usage.Reported = b.usage.Reported || usage.Reported
 	b.usage.Estimated = b.usage.Estimated || usage.Estimated
+	if b.Parent != nil {
+		b.Parent.record(usage)
+	}
 }
 func (b *Budget) Usage() Usage { b.mu.Lock(); defer b.mu.Unlock(); return b.usage }
 
@@ -70,7 +89,11 @@ func (m *budgetModel) Complete(ctx context.Context, request TurnRequest) (Turn, 
 		return Turn{}, err
 	}
 	turn, err := m.model.Complete(ctx, request)
-	m.budget.record(turn.Usage)
+	if errors.Is(err, ErrBudget) {
+		m.budget.release()
+	} else {
+		m.budget.record(turn.Usage)
+	}
 	return turn, err
 }
 func (m *budgetModel) CompleteStream(ctx context.Context, request TurnRequest, delta func(string)) (Turn, error) {
@@ -82,7 +105,11 @@ func (m *budgetModel) CompleteStream(ctx context.Context, request TurnRequest, d
 			return Turn{}, err
 		}
 		turn, err := model.CompleteStream(ctx, request, delta)
-		m.budget.record(turn.Usage)
+		if errors.Is(err, ErrBudget) {
+			m.budget.release()
+		} else {
+			m.budget.record(turn.Usage)
+		}
 		return turn, err
 	}
 	return m.Complete(ctx, request)

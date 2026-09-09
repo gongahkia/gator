@@ -1,5 +1,7 @@
 # Release evidence
 
+Recorded verification for the Work depth iteration: [PRODUCT_DEPTH_VERIFICATION.md](PRODUCT_DEPTH_VERIFICATION.md).
+
 This is the acceptance record for calling a Gator build useful for daily
 general work or coding work. It is not a benchmark submission and not a claim
 of model quality.

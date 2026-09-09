@@ -99,6 +99,7 @@ type WorkTrial struct {
 	DurationMS        int64            `json:"duration_ms"`
 }
 type WorkExperiment struct {
+	DisabledRoles   []string       `json:"disabled_roles,omitempty"`
 	Outcomes        map[string]int `json:"outcomes"`
 	Version         int            `json:"version"`
 	ID              string         `json:"id"`
@@ -119,6 +120,7 @@ type WorkExperiment struct {
 	CasesAll        int            `json:"cases_all"`
 }
 type WorkEvalOptions struct {
+	DisabledRoles                           []string
 	MaxRequests                             int
 	ID, Harness, Provider, Model, ReportDir string
 	Attempts                                int
@@ -175,6 +177,12 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 			return dataset, errors.New("fixture content does not match manifest digest")
 		}
 		dataset.Cases[index].FixtureSHA256 = fixture
+		if len(c.Capabilities) > 0 {
+			if len(c.Code.Capabilities) > 0 && workHash(c.Code.Capabilities) != workHash(c.Capabilities) {
+				return dataset, errors.New("conflicting case capability declarations")
+			}
+			dataset.Cases[index].Code.Capabilities = append([]string(nil), c.Capabilities...)
+		}
 		if err := c.Contract.Validate(); err != nil {
 			return dataset, fmt.Errorf("case %s contract: %w", c.ID, err)
 		}
@@ -183,7 +191,7 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 				return dataset, errors.New("unsupported grader version")
 			}
 			switch g.Kind {
-			case "evidence_reference", "file_equals", "file_contains", "cell_equals", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest":
+			case "child_tool_error_contains", "unsupported_quote", "evidence_reference", "file_equals", "file_contains", "cell_equals", "context_contains", "context_absent", "status", "tool_error_contains", "candidate_status", "source_unchanged", "contract_digest":
 			default:
 				return dataset, fmt.Errorf("unknown grader %q", g.Kind)
 			}
@@ -205,20 +213,23 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 	if options.Attempts < 1 || options.Attempts > 10 || !identifierPattern.MatchString(options.ID) || options.ReportDir == "" || factory == nil {
 		return WorkExperiment{}, errors.New("invalid Work experiment options")
 	}
+	if err := workrun.ValidateDisabledRoles(options.DisabledRoles); err != nil {
+		return WorkExperiment{}, err
+	}
 	if err := os.Mkdir(options.ReportDir, 0700); err != nil {
 		return WorkExperiment{}, fmt.Errorf("create new experiment directory: %w", err)
 	}
-	report := WorkExperiment{Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
+	report := WorkExperiment{DisabledRoles: append([]string(nil), options.DisabledRoles...), Version: 1, ID: options.ID, Dataset: dataset.ID, DatasetSHA256: workHash(dataset), Target: dataset.Target, Harness: options.Harness, Provider: options.Provider, Model: options.Model, Scripted: !options.Live, Delegation: options.Delegation, Attempts: options.Attempts, Categories: map[string]int{}, Outcomes: map[string]int{}}
 	var budget *agent.Budget
 	if options.MaxRequests > 0 {
 		budget = &agent.Budget{Limits: agent.Limits{ModelRequests: options.MaxRequests}}
 	}
+	if err := writeJSON(filepath.Join(options.ReportDir, "dataset.json"), dataset, "retained dataset"); err != nil {
+		return report, err
+	}
 	for _, c := range dataset.Cases {
 		passes := 0
 		for trial := 1; trial <= options.Attempts; trial++ {
-			if err := ctx.Err(); err != nil {
-				return report, err
-			}
 			item := WorkTrial{Version: 1, ID: fmt.Sprintf("%s-%s-%02d", options.ID, c.ID, trial), CaseID: c.ID, CaseSHA256: workHash(c), Split: c.Split, Family: c.Family, Trial: trial, Status: "failed", Category: "task"}
 			started := time.Now()
 			state, err := os.MkdirTemp(options.ReportDir, "state-")
@@ -229,11 +240,27 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			evaluated.ID = item.ID
 			service, setupErr := factory(evaluated, state)
 			source := filepath.Join(filepath.Dir(datasetPath), c.Source)
-			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, Limits: c.Limits, DisableDelegation: !options.Delegation}
+			request := workrun.Request{RunID: item.ID, Budget: budget, Provider: options.Provider + "/" + options.Model, WebOrigins: c.WebOrigins, SourcePath: source, Objective: c.Objective, MaxSteps: c.MaxSteps, Contract: c.Contract, Mode: c.Mode, Code: c.Code, Limits: c.Limits, DisableDelegation: !options.Delegation, DisabledRoles: options.DisabledRoles}
 			var outcome workrun.Outcome
 			var runErr error
+			fixture, fixtureErr := fixtureDigest(source)
+			if ctx.Err() != nil {
+				setupErr = ctx.Err()
+			}
+			if fixtureErr != nil || (c.FixtureSHA256 != "" && c.FixtureSHA256 != fixture) {
+				setupErr = errors.New("fixture bytes changed or cannot be read")
+				item.Category = "fixture"
+			}
 			if setupErr != nil {
-				item.Category = "setup"
+				if item.Category != "fixture" {
+					item.Category = "setup"
+				}
+				if errors.Is(setupErr, context.Canceled) {
+					item.Category = "cancelled"
+				}
+				if errors.Is(setupErr, context.DeadlineExceeded) {
+					item.Category = "timeout"
+				}
 				runErr = setupErr
 			} else {
 				outcome, runErr = service.Execute(ctx, request)
@@ -259,6 +286,8 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				}
 				if runErr != nil {
 					switch {
+					case strings.Contains(runErr.Error(), "sandbox"):
+						item.Category = "sandbox"
 					case errors.Is(runErr, agent.ErrBudget):
 						item.Category = "budget"
 					case errors.Is(runErr, context.DeadlineExceeded):
@@ -273,7 +302,10 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 				if runErr == nil {
 					item.ExecutionCategory = "completed"
 				}
-				all := true
+				after, integrityErr := fixtureDigest(source)
+				integrity := Grade{Kind: "source_integrity", Passed: integrityErr == nil && after == fixture, Evidence: "live fixture tree digest before and after execution"}
+				item.Grades = append(item.Grades, integrity)
+				all := integrity.Passed
 				for _, grader := range c.Graders {
 					grade := gradeWork(grader, outcome, runErr, c.Contract)
 					item.Grades = append(item.Grades, grade)
@@ -316,6 +348,9 @@ func RunWorkExperiment(ctx context.Context, datasetPath string, dataset WorkData
 			report.Outcomes[item.ExecutionCategory]++
 			report.Total++
 			if err := writeJSON(filepath.Join(options.ReportDir, item.ID+".json"), item, "Work trial"); err != nil {
+				return report, err
+			}
+			if err := writeJSON(filepath.Join(options.ReportDir, "experiment.json"), report, "Work experiment checkpoint"); err != nil {
 				return report, err
 			}
 		}
@@ -397,6 +432,18 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 		for _, message := range outcome.Result.Messages {
 			actual += message.Content + "\n"
 		}
+	case "unsupported_quote":
+		for _, event := range outcome.Events {
+			if event.ToolCall != nil && event.ToolCall.Name == "check_claims" {
+				actual += event.ToolResult
+			}
+		}
+	case "child_tool_error_contains":
+		for _, event := range outcome.Events {
+			if event.TaskID != "" {
+				actual += event.ToolError + "\n"
+			}
+		}
 	case "tool_error_contains":
 		for _, event := range outcome.Events {
 			actual += event.ToolError + "\n"
@@ -407,11 +454,15 @@ func gradeWork(g WorkGrader, outcome workrun.Outcome, runErr error, contract art
 		}
 	}
 	if err != nil {
-		grade.Error = err.Error()
+		if errors.Is(err, os.ErrNotExist) {
+			grade.Evidence = "required output is absent"
+		} else {
+			grade.Error = err.Error()
+		}
 		return grade
 	}
 	switch g.Kind {
-	case "file_contains", "context_contains", "tool_error_contains", "candidate_status":
+	case "child_tool_error_contains", "unsupported_quote", "file_contains", "context_contains", "tool_error_contains", "candidate_status":
 		grade.Passed = strings.Contains(actual, g.Expected)
 	case "context_absent":
 		grade.Passed = !strings.Contains(actual, g.Expected)

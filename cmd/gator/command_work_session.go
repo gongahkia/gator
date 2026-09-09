@@ -5,8 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/gongahkia/gator/internal/orchestrator"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gongahkia/gator/internal/journal"
@@ -15,7 +17,7 @@ import (
 
 func isWorkSessionCommand(value string) bool {
 	switch value {
-	case "list", "show", "history", "resume", "back", "forward":
+	case "list", "show", "history", "resume", "back", "forward", "tasks":
 		return true
 	default:
 		return false
@@ -32,6 +34,27 @@ func workSessionCommand(arguments []string, in io.Reader, out io.Writer, modelFa
 		return err
 	}
 	switch arguments[0] {
+	case "tasks":
+		if len(arguments) < 2 || len(arguments) > 3 {
+			return errors.New("usage: gator work tasks RUN_ID [TASK_ID]")
+		}
+		run := arguments[1]
+		if run == "." || run == ".." || run == "" || strings.ContainsAny(run, "/\\") {
+			return errors.New("invalid Work run ID")
+		}
+		tasks, err := orchestrator.ReadTasks(filepath.Join(stateDir, "gator", "tasks", run))
+		if err != nil {
+			return err
+		}
+		if len(arguments) == 3 {
+			for _, task := range tasks {
+				if task.ID == arguments[2] {
+					return json.NewEncoder(out).Encode(task)
+				}
+			}
+			return errors.New("retained task not found")
+		}
+		return json.NewEncoder(out).Encode(tasks)
 	case "list":
 		conversations, err := store.List(50)
 		if err != nil {

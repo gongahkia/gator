@@ -94,3 +94,43 @@ func TestRunOnceCatchesScheduleMissedSinceCreation(t *testing.T) {
 		t.Fatalf("Due = %v, %v, %v", due, ok, err)
 	}
 }
+
+func TestClaimIntentCrashBoundaryAndRetryReferences(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := store.Save(Definition{Name: "Recover", Enabled: true, Schedule: "* * * * *", Timezone: "UTC", SourcePath: t.TempDir(), Objective: "Inspect", Mode: action.Inspect, Contract: artifact.InspectionContract()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slot := time.Now().UTC().Truncate(time.Minute)
+	intent, err := store.Begin(definition, slot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordRun(intent, RunReference{Try: 1, RunID: "attempt-work"}); err != nil {
+		t.Fatal(err)
+	}
+	// crash after durable intent, before advancing the schedule watermark.
+	updated, attempt, claimed, err := store.ClaimBegin(definition.ID, slot)
+	if err != nil || claimed || attempt.ID != intent.ID || !updated.LastScheduledAt.Equal(slot) {
+		t.Fatalf("duplicate claim: %+v %t %v", attempt, claimed, err)
+	}
+	recovered, err := store.Reconcile()
+	if err != nil || len(recovered) != 1 || recovered[0].Status != "interrupted" || len(recovered[0].Runs) != 1 {
+		t.Fatalf("recovery: %+v %v", recovered, err)
+	}
+	again, err := store.Reconcile()
+	if err != nil || len(again) != 0 {
+		t.Fatalf("repeated recovery: %+v %v", again, err)
+	}
+	_, _, claimed, err = store.ClaimBegin(definition.ID, slot)
+	if err != nil || claimed {
+		t.Fatal("reexecuted interrupted slot")
+	}
+	_, _, claimed, err = store.ClaimBegin(definition.ID, slot.Add(time.Minute))
+	if err != nil || !claimed {
+		t.Fatal("independent later slot blocked")
+	}
+}

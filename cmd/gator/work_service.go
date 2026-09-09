@@ -102,6 +102,13 @@ func readWorkJSON(path string, value any) error {
 		return err
 	}
 	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() > 1024*1024 {
+		return errors.New("Work JSON document exceeds 1 MiB")
+	}
 	decoder := json.NewDecoder(io.LimitReader(file, 1024*1024+1))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {

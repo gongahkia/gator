@@ -60,6 +60,7 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	DisabledRoles        []string
 	RoleConfiguration    map[string]orchestrator.RoleConfiguration
 	OnSupervisor         func(*orchestrator.Supervisor)
 	OTLPEndpoint         string

@@ -33,7 +33,7 @@ Interactive approval is deliberately non-transferable:
 ## Durable model
 
 A job definition is developer-owned configuration, written atomically as a
-private file. Its version-1 shape includes:
+private file. Its version-2 shape extends the following legacy example with `snapshot_id`, captured project configuration, complete `code_policy`, `limits`, and `web_origins`:
 
 ```json
 {
@@ -93,8 +93,9 @@ The result points to a normal sealed Work bundle; it does not create a second
 artifact format. Status transitions in the event log are append-only (`queued`,
 `running`, then one terminal state). A terminal `result.json` is created once
 and never overwritten. If the foreground process is killed mid-run, its intent
-and running events remain available for inspection; automatic interrupted-run
-reconciliation is not yet implemented.
+and running events remain available for inspection. Supervisor startup marks
+interrupted attempts and publishes their history/inbox result without repeating
+unknown effects.
 
 ## State and ownership
 
@@ -135,7 +136,7 @@ with the app server, but it is a different lifecycle and state owner.
 - Disabling or deleting a definition does not delete its run history or Work
   bundles. Retention is a separate explicit policy.
 
-Each run starts a normal `gator work --json` subprocess, which revalidates the
+Each run calls the typed Work service directly, which revalidates the
 source root, outcome contract, provider configuration, connector descriptors,
 and credential availability. Remote response content and credentials are not
 written to scheduler lifecycle events.
@@ -169,5 +170,24 @@ connected mutation or publish operation.
 The supervisor is intentionally foreground-only: it does not install a launchd
 unit, systemd unit, login item, or background daemon. `gator job stop` verifies
 the private bearer token, literal loopback endpoint, PID, and instance nonce
-before requesting shutdown. Stop waits for the active Work subprocess because
-mid-run cancellation and restart reconciliation are deliberately deferred.
+before requesting shutdown. Stop cancels the active Work context and joins its
+children. Startup reconciliation marks interrupted attempts for inspection; it
+does not automatically repeat their effects.
+
+## Frozen inputs and recoverable attempts
+
+`job add --refresh-snapshot=false` captures source and selected project
+configuration at creation. The default refreshes for each attempt. `--contract`
+accepts the entire contract JSON; `--code-policy` accepts complete Code policy
+JSON. Model request, token and wall limits and repeatable `--web-origin` grants
+are retained. These values reach Work without a CLI-flag round trip.
+
+`job edit ID --source PATH` captures the explicitly selected source again for a
+frozen job, including when PATH is unchanged. Other edits preserve its capture.
+
+The supervisor persists schedule intent before advancing its watermark. Each
+bounded retry has a stable Work run reference retained before execution. Only
+transient provider failures are retried (at most three attempts); policy, task,
+validation and cancellation failures are not blindly retried. Completed or
+interrupted attempts remain in history and inbox. See [state recovery and
+migration](WORK_DEPTH_MIGRATIONS.md) for the crash boundary and old-state semantics.

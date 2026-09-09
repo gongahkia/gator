@@ -70,6 +70,10 @@ func (c *codeIntegration) Execute(ctx context.Context, raw json.RawMessage) (age
 	}
 	name := "code/" + c.request.RunID + "-" + candidate.ID + ".patch"
 	candidate.PatchPath = name
+	if len(candidate.Patch) == 0 {
+		candidate.PatchPath = ""
+		name = ""
+	}
 	if len(candidate.Patch) > 0 {
 		if err := artifact.WriteBinary(c.work.Output, c.request.Contract, name, candidate.Patch); err != nil {
 			return agent.ToolResult{}, err
