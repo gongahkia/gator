@@ -149,15 +149,15 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		approve = workActionApprover(in, out)
 	}
 	outcome, runErr := executor.Execute(context.Background(), workrun.Request{
-		SourcePath:    *sourcePath,
-		Objective:     objective,
-		RunID:         *runID,
-		MaxSteps:      *maxSteps,
-		Mode:          mode,
-		Contract:      contract,
-		OnEvent:       sink,
-		ConnectorIDs:  selectedConnectors,
-		ApproveAction: approve,
+		SourcePath:     *sourcePath,
+		Objective:      objective,
+		RunID:          *runID,
+		MaxSteps:       *maxSteps,
+		Mode:           mode,
+		Contract:       contract,
+		OnEvent:        sink,
+		ConnectorIDs:   selectedConnectors,
+		ApproveAction:  approve,
 		ConversationID: strings.TrimSpace(*conversationID), ParentRevisionID: strings.TrimSpace(*parentRevisionID), RefreshSource: *refreshSource,
 	})
 	if *jsonOutput {
@@ -237,6 +237,15 @@ func workContract(mode action.Mode, disposition action.Disposition, paths artifa
 		case ".yaml", ".yml":
 			requirement.MediaTypes = []string{"application/yaml"}
 			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.UTF8})
+		case ".docx":
+			requirement.MediaTypes = []string{"application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.DOCX})
+		case ".xlsx":
+			requirement.MediaTypes = []string{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.XLSX})
+		case ".pdf":
+			requirement.MediaTypes = []string{"application/pdf"}
+			requirement.Validations = append(requirement.Validations, artifact.Validation{Kind: artifact.PDF})
 		}
 		requirements = append(requirements, requirement)
 	}
@@ -291,18 +300,18 @@ func writeWorkSummary(out io.Writer, outcome workrun.Outcome) error {
 
 func writeWorkJSON(out io.Writer, outcome workrun.Outcome, runErr error) error {
 	type response struct {
-		RunID        string                      `json:"run_id,omitempty"`
-		Status       artifact.Status             `json:"status,omitempty"`
-		OutputPath   string                      `json:"output_path,omitempty"`
-		ManifestPath string                      `json:"manifest_path,omitempty"`
-		Artifacts    []artifact.File             `json:"artifacts,omitempty"`
-		Validations  []artifact.ValidationResult `json:"validations,omitempty"`
-		Actions      []action.Record             `json:"actions,omitempty"`
-		FinalText    string                      `json:"final_text,omitempty"`
-		Error        string                      `json:"error,omitempty"`
-		ConversationID string                    `json:"conversation_id,omitempty"`
-		RevisionID string                        `json:"revision_id,omitempty"`
-		SnapshotID string                        `json:"snapshot_id,omitempty"`
+		RunID          string                      `json:"run_id,omitempty"`
+		Status         artifact.Status             `json:"status,omitempty"`
+		OutputPath     string                      `json:"output_path,omitempty"`
+		ManifestPath   string                      `json:"manifest_path,omitempty"`
+		Artifacts      []artifact.File             `json:"artifacts,omitempty"`
+		Validations    []artifact.ValidationResult `json:"validations,omitempty"`
+		Actions        []action.Record             `json:"actions,omitempty"`
+		FinalText      string                      `json:"final_text,omitempty"`
+		Error          string                      `json:"error,omitempty"`
+		ConversationID string                      `json:"conversation_id,omitempty"`
+		RevisionID     string                      `json:"revision_id,omitempty"`
+		SnapshotID     string                      `json:"snapshot_id,omitempty"`
 	}
 	result := response{
 		RunID: outcome.Work.ID, Status: outcome.Manifest.Status,

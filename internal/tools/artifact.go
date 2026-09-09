@@ -35,6 +35,8 @@ func WorkFiles(source, output workspace.Root, contract artifact.Contract, writab
 			WriteArtifact{Root: output, Contract: contract},
 			WriteJSONArtifact{Root: output, Contract: contract},
 			WriteTableArtifact{Root: output, Contract: contract},
+			WriteDocumentArtifact{Root: output, Contract: contract},
+			WriteWorkbookArtifact{Root: output, Contract: contract},
 			ArtifactStatus{Root: output, Contract: contract},
 		)
 	}

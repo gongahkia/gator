@@ -9,6 +9,18 @@ import (
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
+// WriteBinary stages one bounded binary artifact produced by trusted Gator renderers.
+func WriteBinary(root workspace.Root, contract Contract, path string, content []byte) error {
+	contract = contract.Normalize()
+	if err := contract.Validate(); err != nil {
+		return fmt.Errorf("validate artifact contract: %w", err)
+	}
+	if err := ValidateOutputPath(path); err != nil {
+		return err
+	}
+	return root.WriteRegularFileAtomic(filepath.FromSlash(path), content, contract.MaxArtifactBytes)
+}
+
 // WriteText stages one portable UTF-8 artifact under an isolated output root.
 // It enforces the contract's per-artifact limit at every write; the complete
 // bundle and total-size limit are checked by Inspect before completion.
