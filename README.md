@@ -1,23 +1,29 @@
 # Gator
 
-Gator is a native, terminal-first coding agent for developers who want an
-inspectable route from a task to a tested patch.
+Gator is a terminal-native, local-first work agent. Point it at an ordinary
+folder, give it an outcome, and it returns validated files in isolated output
+with a reviewable evidence manifest. Source material is read-only; model prose
+alone is never treated as proof that work finished.
 
-It runs an agent inside an isolated Git worktree, streams the exact actions it
-takes, and leaves the developer with a diff and verification evidence to
-review. Feature work is a primary workflow: Gator is intended to explore an
-unfamiliar repository, implement a bounded multi-file change, add or update
-tests, and propose the resulting patch.
+The product has two explicit workflows:
+
+- `gator work` turns folders and connected data into reports, JSON, CSV, and
+  other bounded artifacts;
+- `gator code` retains the original isolated-Git workflow for producing tested
+  patches (`gator run` is its compatibility alias).
+
+The design centers on **proof-carrying work**: artifact hashes, deterministic
+validations, source provenance, and any proposed or executed external actions
+travel together in a sealed bundle. See [the Work architecture](docs/WORK.md).
 
 ## Status
 
-The runnable milestone includes a Gator-owned native loop, direct cloud-provider
-adapters, worktree-local tools, command policy, durable local run storage, a
-full-screen terminal application, an automation protocol, and a headless
-evaluation harness. See [evaluation](docs/EVALUATION.md) and [release
-evidence](docs/RELEASE_EVIDENCE.md) for its limits, the automated checks, and
-the dogfood checklist. No GitHub release has been published yet; real-repository
-dogfood logs are still the human gate for a daily-driver claim.
+The current source includes the general Work CLI, isolated artifact bundles,
+artifact review/export/apply, explicit connected JSON sources, review-bound
+webhook actions, the original coding TUI, direct cloud-provider adapters, and a
+headless evaluation harness. No GitHub release has been published yet. The
+[release evidence](docs/RELEASE_EVIDENCE.md) checklist remains the human gate
+for a daily-driver claim.
 
 ## Install and update
 
@@ -40,6 +46,74 @@ gator update
 
 Use `gator update --check` to inspect a published update without changing the
 binary.
+
+## Work quickstart
+
+Configure a model once, then turn any local folder into a validated report:
+
+```sh
+./bin/gator config set default-provider openai
+./bin/gator config set default-model gpt-5.6
+export OPENAI_API_KEY=...
+
+./bin/gator work --source ./customer-notes \
+  --artifact findings.md \
+  --require-contains 'findings.md=# Findings' \
+  'Synthesize the recurring problems, cite the source filenames, and recommend the three highest-leverage fixes.'
+```
+
+Gator prints the private output directory, manifest, validation evidence, and
+run ID. The selected source folder is never modified. Review or transfer the
+result explicitly:
+
+```sh
+./bin/gator review WORK_ID --preview
+./bin/gator export WORK_ID --to findings.tar.gz
+mkdir -p ./approved-deliverables
+./bin/gator apply WORK_ID --to ./approved-deliverables --check
+./bin/gator apply WORK_ID --to ./approved-deliverables
+```
+
+For analysis without generated files, processes, or external actions:
+
+```sh
+./bin/gator inspect --source ./research 'Identify contradictions and missing evidence.'
+```
+
+Structured paths select typed writers and validators automatically:
+
+```sh
+./bin/gator work --source ./raw-data \
+  --artifact cleaned.csv --artifact summary.json \
+  'Normalize the table and write summary statistics with data-quality caveats.'
+```
+
+Connected sources are configured by the developer, selected per run, and
+treated as untrusted data. Credentials are stored separately and bound to the
+exact configured URL:
+
+```sh
+./bin/gator connector add metrics --kind json \
+  --url 'https://api.example.com/metrics/current' --auth bearer
+printf '%s' "$METRICS_TOKEN" | ./bin/gator connector login metrics --token-stdin
+./bin/gator work --source ./briefing --connector metrics \
+  'Create a metrics brief with a limitations section.'
+```
+
+An action endpoint is separate from a data source. Drafting records an exact
+target, escaped JSON preview, and payload digest without sending anything:
+
+```sh
+./bin/gator connector add release --kind webhook \
+  --url 'https://hooks.example.com/releases' --auth bearer
+./bin/gator work --source ./release-notes --connector release \
+  --actions draft 'Prepare the release payload and a release brief.'
+```
+
+Execution requires both `--mode act --actions approve` and a fresh yes/no
+decision for every payload. There is deliberately no reusable “always allow”
+choice. JSON/headless mode cannot request interactive execution; use
+`--actions draft` and review the proposal instead.
 
 ## Development
 
