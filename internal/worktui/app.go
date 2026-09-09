@@ -92,7 +92,6 @@ type Model struct {
 	launcher      bool
 	launcherMode  string
 	paletteQuery  string
-	leader        bool
 	section       string
 	selected      int
 	entries       []entry
@@ -220,11 +219,18 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if m.leader {
-			return m.updateLeader(value)
+		if value.Type == tea.KeyCtrlX && !m.running {
+			m.openConversationPicker()
+			return m, nil
 		}
-		if value.String() == "ctrl+x" && !m.running {
-			m.leader = true
+		if value.Type == tea.KeyCtrlI && !m.running {
+			m.launcher = false
+			m.section = "inbox"
+			return m, nil
+		}
+		if value.Type == tea.KeyCtrlJ && !m.running {
+			m.launcher = false
+			m.section = "jobs"
 			return m, nil
 		}
 		if value.String() == "ctrl+p" {
@@ -462,7 +468,6 @@ func (m *Model) openCommandPalette() {
 	m.entries = commandPaletteEntries()
 	m.paletteQuery = ""
 	m.selected = 0
-	m.leader = false
 }
 
 func (m *Model) openConversationPicker() {
@@ -477,24 +482,6 @@ func (m *Model) openConversationPicker() {
 	}
 	m.paletteQuery = ""
 	m.selected = 0
-	m.leader = false
-}
-
-func (m Model) updateLeader(key tea.KeyMsg) (tea.Model, tea.Cmd) {
-	m.leader = false
-	switch strings.ToLower(key.String()) {
-	case "l":
-		m.openConversationPicker()
-	case "i":
-		m.launcher = false
-		m.section = "inbox"
-	case "j":
-		m.launcher = false
-		m.section = "jobs"
-	case "esc", "ctrl+x":
-		// Cancel the leader without disturbing the composer or current view.
-	}
-	return m, nil
 }
 
 func (m Model) filteredEntries() []entry {
@@ -944,9 +931,9 @@ func workHelp() string {
   /review · /copy · /theme · /new · /quit
 
 Navigation
-  ctrl+x l  retained conversations
-  ctrl+x i  inbox
-  ctrl+x j  scheduled jobs
+  ctrl+x    retained conversations
+  ctrl+i    inbox (the same terminal key as tab)
+  ctrl+j    scheduled jobs
   ctrl+p    searchable command palette`
 }
 
@@ -1001,10 +988,7 @@ func (m Model) View() string {
 		view.WriteString(accent.Render("● Working…") + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
-	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x navigation  ·  /help  ·  pgup/pgdown scroll"
-	if m.leader {
-		footer = "ctrl+x  l conversations  ·  i inbox  ·  j jobs  ·  esc cancel"
-	}
+	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+i inbox  ·  ctrl+j jobs"
 	if len(m.queue) > 0 {
 		footer = fmt.Sprintf("%d queued  ·  ", len(m.queue)) + footer
 	}
@@ -1026,13 +1010,8 @@ func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string 
 	} else if m.status != "" {
 		hint = m.status + "  ·  " + hint
 	}
-	if m.leader {
-		hint = "ctrl+x  l conversations  ·  i inbox  ·  j jobs  ·  esc cancel"
-		body += "\n" + dim.Render(hint)
-	} else {
-		body += "\n" + dim.Render(hint)
-		body += "\n" + dim.Render("ctrl+x  l conversations  ·  i inbox  ·  j jobs")
-	}
+	body += "\n" + dim.Render(hint)
+	body += "\n" + dim.Render("ctrl+x conversations  ·  ctrl+i inbox  ·  ctrl+j jobs")
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
 
@@ -1110,10 +1089,7 @@ func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
 			view.WriteString("\n\n")
 		}
 	}
-	footer := "esc back  ·  ctrl+p commands  ·  ctrl+x navigation"
-	if m.leader {
-		footer = "ctrl+x  l conversations  ·  i inbox  ·  j jobs  ·  esc cancel"
-	}
+	footer := "esc back  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+i inbox  ·  ctrl+j jobs"
 	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
 }

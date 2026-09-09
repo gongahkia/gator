@@ -5,27 +5,27 @@
 Gator should feel like a quiet work surface, not an operations dashboard. The
 first screen asks for an outcome and postpones history, jobs, inbox, and
 specialist controls until the user asks for them. Commands and destinations are
-separate concepts: `Ctrl+P` searches actions, while a small `Ctrl+X` navigation
-chord opens conversations, inbox, or jobs directly.
+separate concepts: `Ctrl+P` searches actions, while direct control-key bindings
+open conversations, inbox, or jobs.
 
 The interaction model is informed by the official [OpenCode TUI
 documentation](https://opencode.ai/docs/tui/) and
 [keybinding model](https://opencode.ai/docs/keybinds): a centered first prompt,
-a bottom-docked session prompt, a searchable `Ctrl+P` command list, leader-key
-navigation, and resumable sessions. Gator does not copy OpenCode's branding or
+a bottom-docked session prompt, a searchable `Ctrl+P` command list,
+keyboard-first navigation, and resumable sessions. Gator does not copy OpenCode's branding or
 screen treatment; it adopts the underlying progressive-disclosure pattern.
 
 ## Screen states
 
 | State | Primary content | Composer | Secondary navigation |
 | --- | --- | --- | --- |
-| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X L/I/J` hints |
-| Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Available through the leader chord |
-| Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through the leader chord |
+| Home | Centered `🐊 Gator` wordmark and one outcome question | Centered, at most 72 columns | Direct `Ctrl+X`, `Ctrl+I`, and `Ctrl+J` hints |
+| Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Available through direct shortcuts |
+| Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
 | Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
-| Conversations | Retained Work conversations only | Hidden | `Ctrl+X L` |
-| Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+X I` |
-| Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+X J` |
+| Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
+| Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+I` (also reported as Tab by terminals) |
+| Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+J` |
 
 Typing the first character docks the composer; deleting the draft recenters it.
 Submitting the prompt starts a conversation. Merely opening Gator must not show
@@ -59,8 +59,9 @@ native Work providers because Gator does not import another CLI's credentials.
 2. `Enter` submits; an empty submission does nothing.
 3. `Ctrl+P` opens the searchable command palette from every state; it never
    mixes folders, conversations, inbox entries, or jobs into the action list.
-4. `Ctrl+X` is the navigation leader: `L` opens conversations, `I` opens inbox,
-   and `J` opens jobs. `Esc` returns from a destination or closes a picker.
+4. `Ctrl+X` opens conversations, `Ctrl+I` opens inbox, and `Ctrl+J` opens jobs.
+   `Esc` returns from a destination or closes a picker. Because terminal input
+   encodes `Ctrl+I` as horizontal tab, Tab opens inbox too.
 5. Opening a retained conversation goes directly to its session state. `/new`
    returns to the clean home state for the current folder.
 6. Long-running work replaces input focus with a single active status; internal
