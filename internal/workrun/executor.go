@@ -63,6 +63,8 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	defer cancel()
 	if request.Budget == nil {
 		request.Budget = &agent.Budget{Limits: request.Limits}
+	} else {
+		request.Budget = &agent.Budget{Limits: request.Limits, Parent: request.Budget}
 	}
 	usageBefore := request.Budget.Usage()
 	e.Model = agent.WithBudget(e.Model, request.Budget)
@@ -152,6 +154,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			request.Project = &bundle
 		}
 	}
+	request.SnapshotID = sourceSnapshot.ID
 	if request.OnSnapshot != nil {
 		request.OnSnapshot(sourceSnapshot)
 	}
@@ -206,7 +209,17 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		catalog.privateAttachment(a.Name, a.Data, startedAt)
 	}
 	request.catalog = catalog
-	surface = append(surface, tools.ExtractDocument{Root: work.Source}, tools.InspectTable{Root: work.Source})
+	tableRoots := []workspace.NamedRoot{{Name: "source", Root: work.Source}, {Name: "output", Root: work.Output}}
+	if previousRoot.Path() != "" {
+		tableRoots = append(tableRoots, workspace.NamedRoot{Name: "previous", Root: previousRoot})
+	}
+	surface = append(surface, tools.ExtractDocument{Root: work.Source}, tools.InspectTable{Root: work.Source, NamedRoots: tableRoots})
+	for i, tool := range surface {
+		switch tool.Definition().Name {
+		case "read_file", "extract_document", "inspect_table":
+			surface[i] = cataloguedTool{Tool: tool, catalog: catalog}
+		}
+	}
 	surface = append(surface, catalog.tools()...)
 	webTools, err := catalog.web(request.WebOrigins, e.HTTP)
 	if err != nil {
@@ -233,7 +246,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 			if err != nil {
 				return outcome, err
 			}
-			if _, err := catalog.retain(entry.Locator, data, entry.RetrievedAt); err != nil {
+			if _, err := catalog.retainEntry(entry, data); err != nil {
 				return outcome, err
 			}
 		}
@@ -288,7 +301,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 		eventMu.Lock()
 		defer eventMu.Unlock()
 		trace.Record(event)
-		events = append(events, event)
+		if event.Kind != agent.EventTextDelta {
+			events = append(events, event)
+		}
 		if request.OnEvent != nil {
 			request.OnEvent(event)
 		}
@@ -388,7 +403,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	manifest.Usage.InputTokens -= usageBefore.InputTokens
 	manifest.Usage.OutputTokens -= usageBefore.OutputTokens
 	manifest.Candidates = integration.records
-	manifest.Evidence = catalog.list()
+	manifest.Evidence = catalog.selected()
 	outcome.Manifest = manifest
 	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
 		if runErr != nil {
@@ -538,8 +553,8 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
 	request.RoleConfiguration = make(map[string]orchestrator.RoleConfiguration)
-	for _, name := range []string{"source_researcher", "artifact_reviewer", "claim_verifier", "connected_researcher", "spreadsheet_analyst", "code"} {
-		maximum := maxWorkSpecialistSteps
+	for _, name := range workRoleNames {
+		maximum := min(maxWorkSpecialistSteps, request.MaxSteps)
 		if name == "code" {
 			maximum = request.Code.MaxSteps
 		}
@@ -551,11 +566,30 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		configuration.MaxSteps = e.roleSteps(name, maximum)
 		request.RoleConfiguration[name] = configuration
 	}
+	if err := ValidateDisabledRoles(request.DisabledRoles); err != nil {
+		return Request{}, err
+	}
 	request.Code.MaxSteps = request.RoleConfiguration["code"].MaxSteps
 	if err := attachment.ValidateLoaded(request.Images, request.Attachments); err != nil {
 		return Request{}, err
 	}
 	request.Code.Sandbox = request.Code.Sandbox.Normalize()
+	if len(request.Code.Sandbox.WritablePaths) > 0 {
+		if len(request.Code.Scopes) == 0 {
+			request.Code.Scopes = append([]string(nil), request.Code.Sandbox.WritablePaths...)
+		} else {
+			for _, path := range request.Code.Scopes {
+				allowed := false
+				for _, scope := range request.Code.Sandbox.WritablePaths {
+					allowed = allowed || path == scope || strings.HasPrefix(path, strings.TrimSuffix(scope, "/")+"/")
+				}
+				if !allowed {
+					return Request{}, errors.New("Code scope widens the sandbox write envelope")
+				}
+			}
+		}
+	}
+	request.Code.Sandbox.WritablePaths = append([]string(nil), request.Code.Scopes...)
 	if err := request.Code.Sandbox.Validate(); err != nil {
 		return Request{}, fmt.Errorf("validate Code specialist sandbox: %w", err)
 	}

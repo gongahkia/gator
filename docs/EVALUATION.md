@@ -1,5 +1,7 @@
 # Headless evaluation
 
+Full Work experiments, independent grading, comparisons and optional export: [WORK_EVALUATION.md](WORK_EVALUATION.md).
+
 `gator eval` is a noninteractive, bounded runner for measuring real Gator
 model runs. It never opens the TUI or asks a person to approve a command. It
 is one foreground process, intended for a CI job, container, or scheduler;

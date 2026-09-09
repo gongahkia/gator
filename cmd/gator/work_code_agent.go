@@ -14,10 +14,12 @@ import (
 	"strings"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/patch"
 	"github.com/gongahkia/gator/internal/projectcapture"
 	gatorrun "github.com/gongahkia/gator/internal/run"
+	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/workrun"
 )
 
@@ -25,6 +27,12 @@ const maxCodeSubagentSteps = 32
 
 func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 	return func(ctx context.Context, request workrun.CodeRequest) (workrun.CodeResult, error) {
+		policy := request.Policy.Sandbox.Normalize()
+		policy.WritablePaths = append([]string(nil), request.Policy.Scopes...)
+		if err := policy.Validate(); err != nil {
+			return workrun.CodeResult{}, err
+		}
+		ctx = sandbox.WithEnvelope(ctx, policy)
 		repository, err := prepareCodeSnapshotRepository(ctx, request.SourcePath, request.ScratchPath, request.ID, request.Project)
 		if err != nil {
 			return workrun.CodeResult{}, err
@@ -64,6 +72,27 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		digest := sha256.Sum256([]byte(request.ParentRunID + "\x00" + request.ID))
 		runID := "code-" + hex.EncodeToString(digest[:8])
 		code := b.code
+		if request.Policy.BrowserSession != "" {
+			if !request.Policy.HasCapability(workrun.CodeCapabilityBrowser) || request.Policy.Sandbox.Normalize().Network != sandbox.AllowNetwork {
+				return workrun.CodeResult{}, errors.New("Code browser session requires explicit browser and network grants")
+			}
+			store, err := browser.Open(stateDir)
+			if err != nil {
+				return workrun.CodeResult{}, err
+			}
+			client, err := browser.NewClient(store, request.Policy.BrowserSession)
+			if err != nil {
+				return workrun.CodeResult{}, err
+			}
+			session, err := client.Session(ctx, request.Policy.BrowserSession)
+			if err != nil {
+				return workrun.CodeResult{}, err
+			}
+			if len(session.SelectedTabs) == 0 {
+				return workrun.CodeResult{}, errors.New("Code browser session has no selected tabs")
+			}
+			code.Browser = client
+		}
 		if !request.Policy.HasCapability(workrun.CodeCapabilityHooks) {
 			code.HookTrusts = nil
 		}

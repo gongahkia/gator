@@ -1,5 +1,7 @@
 # Review surfaces
 
+Current Work candidate review and explicit code application: [WORK_DEPTH.md](WORK_DEPTH.md).
+
 Gator reviews only a retained run worktree. Staging, feedback, and browser
 review never write to the checkout from which the run was started. Export and
 apply remain the explicit handoff to that checkout.
@@ -77,3 +79,20 @@ loopback port; do not expose it with a public reverse proxy.
 The page is a review and index-management surface, not a remote executor. It
 does not expose provider credentials, the app-server bearer token, a generic
 agent API, or a way to apply the retained patch to the active checkout.
+
+## Work code application
+
+`gator review RUN_ID --preview` verifies the Work bundle and displays selected
+Code candidates, their baseline tree and patches, changed paths, and aggregate
+verification results. Failed integration evidence remains visible.
+
+```sh
+gator apply RUN_ID --code-patch code/SELECTED.patch --to ./target --check
+gator apply RUN_ID --code-patch code/SELECTED.patch --to ./target
+```
+
+Only the explicitly selected verified candidate is applied. Preflight checks the
+sealed digest, clean target, and original changed-file hashes; a changed target
+is a conflict. Ordinary document export/apply retains its file-copy behavior.
+The browser/index review described above belongs to retained Code compatibility
+records; it is not a new Work patch application endpoint.

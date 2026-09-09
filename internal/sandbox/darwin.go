@@ -109,7 +109,7 @@ func uniqueExistingRoots(values []string) []string {
 	for _, value := range values {
 		clean := filepath.Clean(value)
 		info, err := osStat(clean)
-		if err != nil || !info.IsDir() {
+		if err != nil || (!info.IsDir() && !info.Mode().IsRegular()) {
 			continue
 		}
 		if _, exists := seen[clean]; exists {

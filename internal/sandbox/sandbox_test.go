@@ -93,3 +93,38 @@ func TestDarwinProfileEscapesPaths(t *testing.T) {
 		t.Fatalf("profile = %s", profile)
 	}
 }
+
+func TestWorkEnvelopeAppliesToNestedIntegrationProcesses(t *testing.T) {
+	ctx := WithEnvelope(context.Background(), Policy{Mode: Strict, Network: DenyNetwork, WritablePaths: []string{"allowed"}})
+	policy, err := EffectivePolicy(ctx, Policy{Mode: Off, Network: AllowNetwork})
+	if err != nil || policy.Mode != Strict || policy.Network != DenyNetwork || len(policy.WritablePaths) != 1 {
+		t.Fatalf("nested policy: %+v %v", policy, err)
+	}
+	if _, err := EffectivePolicy(ctx, Policy{WritablePaths: []string{"outside"}}); err == nil {
+		t.Fatal("nested write escalation accepted")
+	}
+	root := t.TempDir()
+	for _, name := range []string{"allowed", "outside"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("original"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"allowed", "outside"} {
+		prepared, err := Prepare(ctx, Request{Dir: root, Argv: []string{"sh", "-c", "printf changed > " + name}, Policy: DefaultPolicy()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		output, runErr := prepared.Command.CombinedOutput()
+		prepared.Cleanup()
+		if name == "allowed" && runErr != nil {
+			t.Fatalf("permitted write: %s %v", output, runErr)
+		}
+		if name == "outside" && runErr == nil {
+			t.Fatal("out-of-scope write succeeded")
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(root, "outside"))
+	if err != nil || string(data) != "original" {
+		t.Fatal("outside file changed")
+	}
+}

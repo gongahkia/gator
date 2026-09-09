@@ -74,8 +74,8 @@ func TestRunnerLetsModelRecoverFromToolFailure(t *testing.T) {
 	if got := model.requests[1].Messages[len(model.requests[1].Messages)-1].Content; got != `{"ok":false,"error":"tool \"read_file\": path must be inside the worktree"}` {
 		t.Fatalf("tool failure message = %q", got)
 	}
-	if events[2].ToolError != "tool \"read_file\": path must be inside the worktree" {
-		t.Fatalf("tool error event = %q", events[2].ToolError)
+	if events[4].ToolError != "tool \"read_file\": path must be inside the worktree" {
+		t.Fatalf("tool error event = %q", events[4].ToolError)
 	}
 }
 
@@ -241,8 +241,8 @@ func TestRunnerRequiresCompletionEvidence(t *testing.T) {
 	if result.Steps != 3 || result.FinalText != "The feature is done and reviewed." {
 		t.Fatalf("result = %#v", result)
 	}
-	if events[2].Kind != EventCompletionBlocked || !strings.Contains(events[2].Text, "inspect the changed files") {
-		t.Fatalf("completion-block event = %#v", events[2])
+	if events[4].Kind != EventCompletionBlocked || !strings.Contains(events[4].Text, "inspect the changed files") {
+		t.Fatalf("completion-block event = %#v", events[4])
 	}
 }
 

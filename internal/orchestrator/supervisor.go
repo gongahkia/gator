@@ -20,6 +20,7 @@ import (
 const TaskVersion = 1
 
 type Task struct {
+	SourceCapture string            `json:"source_capture,omitempty"`
 	Configuration RoleConfiguration `json:"configuration"`
 	Limits        agent.Limits      `json:"limits"`
 	SelectedInput string            `json:"selected_input,omitempty"`
@@ -125,7 +126,7 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 			return nil, errors.New("retained task authority/source mismatch")
 		}
 		number, err := strconv.Atoi(strings.TrimPrefix(task.ID, "subagent-"))
-		if err != nil || number < 1 {
+		if err != nil || number < 1 || number > 32 || task.ID != fmt.Sprintf("subagent-%03d", number) || task.GlobalID != options.ParentRun+"/"+task.ID {
 			cancel()
 			return nil, errors.New("invalid retained task ID")
 		}
@@ -243,6 +244,7 @@ func (s *Supervisor) startLocked(request StartRequest) (Task, error) {
 	id := fmt.Sprintf("subagent-%03d", s.next)
 	ctx, cancel := context.WithCancel(s.ctx)
 	task := Task{Version: TaskVersion, ID: id, GlobalID: s.options.ParentRun + "/" + id, ParentRun: s.options.ParentRun, ParentTask: request.Parent, Role: request.Agent, RoleVersion: 1, Source: s.options.Source, PolicySHA256: s.options.PolicySHA256, InputSHA256: digest(selected), Dependencies: append([]string(nil), request.Dependencies...), Attempt: attempt, Previous: request.Continue, Status: "queued", CreatedAt: s.options.Now().UTC()}
+	task.SourceCapture = s.options.SourceCapture
 	task.Configuration = s.registry[request.Agent].Configuration
 	task.Limits, task.SelectedInput, task.Baseline = s.options.Limits, selected, request.Baseline
 	if err := s.persist(task); err != nil {

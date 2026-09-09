@@ -1,0 +1,62 @@
+name: Budgeted Work live evaluation
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        type: choice
+        options: [openai, anthropic, gemini]
+        required: true
+      model:
+        type: string
+        required: true
+      model_requests:
+        type: number
+        default: 128
+        required: true
+      timeout_seconds:
+        type: number
+        default: 900
+        required: true
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    if: vars.WORK_LIVE_EVAL_ENABLED == 'true'
+    environment: work-live-eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.13'
+      - name: Install strict process sandbox
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Build
+        run: make build
+      - name: Run bounded live Work corpus
+        env:
+          GATOR_PROVIDER: ${{ inputs.provider }}
+          GATOR_MODEL: ${{ inputs.model }}
+          WORK_MODEL_REQUESTS: ${{ inputs.model_requests }}
+          WORK_TIMEOUT_SECONDS: ${{ inputs.timeout_seconds }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          [[ "$WORK_MODEL_REQUESTS" =~ ^[0-9]+$ && "$WORK_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]]
+          (( WORK_MODEL_REQUESTS >= 1 && WORK_MODEL_REQUESTS <= 512 ))
+          (( WORK_TIMEOUT_SECONDS >= 1 && WORK_TIMEOUT_SECONDS <= 1800 ))
+          ./bin/gator eval work run internal/eval/testdata/work-v1/dataset.json \
+            --id "live-${GITHUB_RUN_ID}" --live --provider "$GATOR_PROVIDER" --model "$GATOR_MODEL" \
+            --max-model-requests "$WORK_MODEL_REQUESTS" --timeout-seconds "$WORK_TIMEOUT_SECONDS" \
+            --report-dir "$RUNNER_TEMP/work-eval"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: work-live-evaluation
+          path: |
+            ${{ runner.temp }}/work-eval/experiment.json
+            ${{ runner.temp }}/work-eval/report.txt
+            ${{ runner.temp }}/work-eval/dataset.json
+          retention-days: 7

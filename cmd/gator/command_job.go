@@ -291,6 +291,8 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 				return errors.New("job source must be a directory")
 			}
 			definition.SourcePath = absolute
+			definition.SnapshotID = ""
+			definition.Project = nil
 		}
 		if *objective != "" {
 			definition.Objective = *objective

@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.25.13"
+      - name: Install strict process sandbox
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - name: Test release source
         run: go test ./...
       - name: Build archive

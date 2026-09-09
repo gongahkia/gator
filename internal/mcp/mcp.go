@@ -326,6 +326,13 @@ func executableHash(root workspace.Root, relative string) (string, error) {
 
 func connect(ctx context.Context, root workspace.Root, specification server, credentials auth.Store) (client, error) {
 	if specification.Transport == "streamable_http" {
+		policy, err := sandbox.EffectivePolicy(ctx, sandbox.Policy{Network: sandbox.AllowNetwork})
+		if err != nil {
+			return nil, err
+		}
+		if policy.Network != sandbox.AllowNetwork {
+			return nil, errors.New("Work policy denies remote MCP network access")
+		}
 		token, configured, err := accessToken(ctx, credentials, specification.URL, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("load OAuth credential for MCP server %q: %w", specification.Name, err)

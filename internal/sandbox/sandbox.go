@@ -151,6 +151,48 @@ type Prepared struct {
 	Cleanup func()
 }
 
+type envelopeKey struct{}
+
+// WithEnvelope carries the host's Work policy through trusted integration adapters.
+func WithEnvelope(ctx context.Context, policy Policy) context.Context {
+	return context.WithValue(ctx, envelopeKey{}, policy.Normalize())
+}
+
+func EffectivePolicy(ctx context.Context, requested Policy) (Policy, error) {
+	policy := requested.Normalize()
+	host, ok := ctx.Value(envelopeKey{}).(Policy)
+	if !ok {
+		return policy, policy.Validate()
+	}
+	if host.Mode == Strict {
+		policy.Mode = Strict
+	}
+	if host.Network == DenyNetwork {
+		policy.Network = DenyNetwork
+	}
+	if len(host.WritablePaths) > 0 {
+		if len(policy.WritableRoots) > 0 {
+			return Policy{}, errors.New("additional writable roots are incompatible with the Work path envelope")
+		}
+		if len(policy.WritablePaths) == 0 {
+			policy.WritablePaths = append([]string(nil), host.WritablePaths...)
+		} else {
+			for _, path := range policy.WritablePaths {
+				allowed := false
+				for _, scope := range host.WritablePaths {
+					if path == scope || strings.HasPrefix(path, strings.TrimSuffix(scope, "/")+"/") {
+						allowed = true
+					}
+				}
+				if !allowed {
+					return Policy{}, errors.New("integration requested writes outside the Work path envelope")
+				}
+			}
+		}
+	}
+	return policy, policy.Validate()
+}
+
 // Prepare creates a constrained process command. Strict mode has native
 // implementations on macOS and Linux. Other platforms fail closed until a
 // comparably strong implementation is available.
@@ -172,8 +214,8 @@ func Prepare(ctx context.Context, request Request) (Prepared, error) {
 	if !info.IsDir() {
 		return Prepared{}, errors.New("sandbox worktree must be a directory")
 	}
-	policy := request.Policy.Normalize()
-	if err := policy.Validate(); err != nil {
+	policy, err := EffectivePolicy(ctx, request.Policy)
+	if err != nil {
 		return Prepared{}, err
 	}
 	environment, scratch, cleanup, err := processEnvironment(policy)

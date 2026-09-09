@@ -3,11 +3,13 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"github.com/gongahkia/gator/internal/telemetry"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLangSmithAssociationsRedactionAndErrors(t *testing.T) {
@@ -46,11 +48,11 @@ func TestLangSmithAssociationsRedactionAndErrors(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	report := WorkExperiment{Version: 1, ID: "experiment", Dataset: "corpus", Scripted: true, Trials: []WorkTrial{{ID: "trial", CaseID: "case", CaseSHA256: "digest", Status: "passed", Error: "SECRET_ERROR", Grades: []Grade{{Kind: "file_equals", Passed: true, Evidence: "SECRET_ORACLE"}}}}}
+	report := WorkExperiment{Version: 1, ID: "experiment", Dataset: "corpus", Scripted: true, Trials: []WorkTrial{{ID: "trial", CaseID: "case", CaseSHA256: "digest", Status: "passed", Error: "SECRET_ERROR", Spans: []telemetry.Span{{ID: "root", Name: "work", Start: time.Now(), End: time.Now()}, {ID: "child", Parent: "root", Name: "specialist", Start: time.Now(), End: time.Now()}}, Grades: []Grade{{Kind: "file_equals", Passed: true, Evidence: "SECRET_ORACLE"}}}}}
 	if err := ExportLangSmith(context.Background(), server.Client(), server.URL, "test-key", report); err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 6 {
+	if len(calls) != 8 {
 		t.Fatal(calls)
 	}
 	bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(401) }))

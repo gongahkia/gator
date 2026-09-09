@@ -26,8 +26,14 @@ jobs:
         run: |
           files="$(gofmt -l cmd internal)"
           test -z "$files" || { printf '%s\n' "$files"; exit 1; }
+      - name: Install strict process sandbox
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - name: Test
         run: go test ./...
+      - name: Race-check Work lifecycle
+        if: runner.os == 'Linux'
+        run: go test -race ./internal/agent ./internal/orchestrator ./internal/workrun ./internal/worksession ./internal/jobs ./internal/worktui ./internal/telemetry ./cmd/gator
       - name: Vet
         run: go vet ./...
       - name: Build

@@ -98,37 +98,38 @@ type queuedRun struct {
 }
 
 type Model struct {
-	tasks         map[string]string
-	quitting      bool
-	live          <-chan tea.Msg
-	cancel        context.CancelFunc
-	operation     *workrun.Operation
-	interaction   *workrun.Interaction
-	config        Config
-	width         int
-	height        int
-	home          bool
-	launcher      bool
-	launcherMode  string
-	paletteQuery  string
-	section       string
-	selected      int
-	entries       []entry
-	source        string
-	conversation  string
-	title         string
-	input         string
-	messages      []message
-	running       bool
-	status        string
-	onboarding    bool
-	firstRun      bool
-	pendingPrompt string
-	scroll        int
-	options       RunOptions
-	queue         []queuedRun
-	lastOutput    string
-	theme         string
+	tasks               map[string]string
+	quitting            bool
+	live                <-chan tea.Msg
+	cancel              context.CancelFunc
+	operation           *workrun.Operation
+	interaction         *workrun.Interaction
+	pendingInteractions []workrun.Interaction
+	config              Config
+	width               int
+	height              int
+	home                bool
+	launcher            bool
+	launcherMode        string
+	paletteQuery        string
+	section             string
+	selected            int
+	entries             []entry
+	source              string
+	conversation        string
+	title               string
+	input               string
+	messages            []message
+	running             bool
+	status              string
+	onboarding          bool
+	firstRun            bool
+	pendingPrompt       string
+	scroll              int
+	options             RunOptions
+	queue               []queuedRun
+	lastOutput          string
+	theme               string
 }
 
 func New(config Config) Model {
@@ -191,6 +192,10 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		m.operation = value
 		return m, waitWorkEvent(m.live)
 	case workrun.Interaction:
+		if m.interaction != nil {
+			m.pendingInteractions = append(m.pendingInteractions, value)
+			return m, waitWorkEvent(m.live)
+		}
 		m.interaction = &value
 		preview, _ := json.Marshal(value.Preview)
 		m.messages = append(m.messages, message{role: "Approval", text: string(preview) + "\nUse /approve or /deny."})
@@ -201,6 +206,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.operation = nil
 		m.interaction = nil
+		m.pendingInteractions = nil
 		m.live = nil
 		m.running = false
 		if m.quitting {
@@ -386,6 +392,13 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 						m.status = err.Error()
 					}
 					m.interaction = nil
+					if len(m.pendingInteractions) > 0 {
+						next := m.pendingInteractions[0]
+						m.pendingInteractions = m.pendingInteractions[1:]
+						m.interaction = &next
+						preview, _ := json.Marshal(next.Preview)
+						m.messages = append(m.messages, message{role: "Approval", text: string(preview) + "\nUse /approve or /deny."})
+					}
 					return m, nil
 				}
 				if prompt == "/cancel" && m.cancel != nil {
@@ -1420,6 +1433,7 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 	ctx, cancel := context.WithCancel(context.Background())
 	events := make(chan tea.Msg, 128)
 	m.cancel = cancel
+	m.tasks = map[string]string{}
 	m.live = events
 	send := func(value tea.Msg) {
 		select {

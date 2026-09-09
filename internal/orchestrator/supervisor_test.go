@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -122,5 +123,61 @@ func TestSupervisorBudgetDependenciesAndSubtreeCancellation(t *testing.T) {
 	}
 	if _, err := s.Await(context.Background(), child.ID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSupervisorCrashRecoveryExplicitContinuationAndAtomicBatchValidation(t *testing.T) {
+	options := Options{StatePath: t.TempDir(), ParentRun: "old", Source: "frozen", PolicySHA256: "policy"}
+	role := Specialist{Name: "reader", Run: func(_ context.Context, i Invocation) (Result, error) { return Result{Summary: i.Task}, nil }}
+	supervisor, err := NewSupervisor(context.Background(), []Specialist{role}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := supervisor.StartBatch([]StartRequest{{Agent: "reader", Task: "allowed"}, {Agent: "publisher", Task: "invalid"}}); err == nil {
+		t.Fatal("invalid batch accepted")
+	}
+	if tasks, err := ReadTasks(options.StatePath); err != nil || len(tasks) != 0 {
+		t.Fatalf("partial invalid batch: %+v %v", tasks, err)
+	}
+	original, err := supervisor.Start(StartRequest{Agent: "reader", Task: "amber retained finding"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := supervisor.Await(context.Background(), original.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor.Close()
+	nextOptions := Options{StatePath: t.TempDir(), ParentRun: "new", Source: "frozen", PolicySHA256: "policy", Retained: map[string]Task{completed.GlobalID: completed}}
+	next, err := NewSupervisor(context.Background(), []Specialist{role}, nextOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer next.Close()
+	continued, err := next.Start(StartRequest{Agent: "reader", Task: "followup", Continue: completed.GlobalID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := next.Await(context.Background(), continued.ID)
+	if err != nil || !strings.Contains(result.Result.Summary, "amber retained finding") || result.Attempt != 2 {
+		t.Fatalf("retained continuation: %+v %v", result, err)
+	}
+	completed.Status = "running"
+	completed.FinishedAt = time.Time{}
+	payload, _ := json.Marshal(completed)
+	if err := os.WriteFile(filepath.Join(options.StatePath, completed.ID+".json"), payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	recovered, err := NewSupervisor(context.Background(), []Specialist{role}, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recovered.Close()
+	task, err := recovered.Inspect(completed.ID)
+	if err != nil || task.Status != "interrupted" {
+		t.Fatalf("crash reconciliation: %+v %v", task, err)
+	}
+	if _, err := recovered.Start(StartRequest{Agent: "reader", Task: "repeat unknown effect", Continue: completed.ID}); err == nil {
+		t.Fatal("interrupted effect silently repeated")
 	}
 }

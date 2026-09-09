@@ -14,6 +14,8 @@ import (
 	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 type workFrame struct {
@@ -73,6 +75,8 @@ func workHeadless(ctx context.Context, in io.Reader, out io.Writer) (resultErr e
 	if err != nil {
 		return err
 	}
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 	return serveWorkOperation(ctx, service, request, scanner, out)
 }
 func serveWorkOperation(ctx context.Context, service workrun.Service, request workrun.Request, scanner *bufio.Scanner, out io.Writer) error {

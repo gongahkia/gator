@@ -1,5 +1,7 @@
 # Gator Work architecture
 
+Current execution, continuity, evidence, Code candidates and bounds: [WORK_DEPTH.md](WORK_DEPTH.md).
+
 ## Product contract
 
 Gator is a terminal-native, local-first work agent. A work run accepts a clear

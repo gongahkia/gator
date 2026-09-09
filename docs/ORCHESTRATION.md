@@ -37,8 +37,9 @@ Gator manager ────────────────────> fina
 
 The manager owns the conversation, decides whether delegation is useful,
 receives only bounded results, verifies material claims, and remains responsible
-for the final answer. Every language-model specialist starts with fresh context.
-Specialists cannot recursively delegate or inherit connector or publish access.
+for the final answer. Specialists start with fresh context unless the manager explicitly selects a
+retained result using `continue`. Only the connected researcher receives selected
+read-only service tools. Specialists cannot recursively delegate or publish.
 
 ## Current specialists
 
@@ -75,33 +76,27 @@ guide](https://developers.openai.com/api/docs/guides/latest-model): give
 subagents narrow responsibilities, explicit tools, and clear completion
 conditions instead of treating delegation as unconstrained autonomy.
 
-## Candidate specialists
+## Durable tasks and additional roles
 
-Add a specialist only when it has a distinct context or authority boundary and
-can return a bounded, verifiable result. Useful next candidates are:
+`start_agent`, `inspect_agent`, `await_agent`, and `cancel_agent` expose the same
+supervisor used by `delegate_agents`. Each task has a global run/task ID,
+parentage, role configuration, selected input, source/policy hashes, dependencies,
+budget, attempt, timestamps, typed failure category, and retained result. Records
+are written at lifecycle transitions, independently of other children finishing.
+Dependencies name existing tasks only; forward references and cycles are rejected.
+Cancellation includes dependent subtrees; waits have explicit deadlines.
 
-1. `connected_researcher`: search only explicitly selected service connectors,
-   retaining source provenance without mutation authority.
-2. `spreadsheet_analyst`: profile tables, propose formulas, and return a compact
-   analysis specification for the trusted XLSX writer.
-3. `document_designer`: turn approved content into a semantic document spec,
-   leaving DOCX/PDF rendering to trusted code.
-4. `claim_verifier`: independently map material claims to local or connected
-   evidence and flag unsupported statements before sealing.
-5. `automation_designer`: draft a job definition and missed-run/retry policy;
-   the user still installs or enables the job explicitly.
-6. `publication_previewer`: prepare the exact target, audience, and payload for
-   a connected action without gaining permission to send it.
+The registry also includes `connected_researcher` (selected evidence/web/service
+reads only), `spreadsheet_analyst` (bounded source table/extraction inspection),
+and `claim_verifier` (selected evidence and quotation checks). Exact quotation
+checks are distinct from semantic support. No document-design persona was added
+without a measured need.
 
-Browser research should be added only after Gator can retain URL, retrieval
-time, content digest, and citation evidence in the same manifest. A generic
-"do anything" specialist would recreate the cluttered harness this product is
-moving away from and is intentionally excluded.
-
-## Reassessment criteria
-
-Reconsider an external orchestration runtime only if Gator needs durable
-distributed graphs, cross-process checkpoints, or interoperability with a
-runtime-specific agent ecosystem that cannot be expressed through the current
-tool contract. A framework change must preserve provider neutrality, exact
-authority narrowing, local evidence, and resumable state before it is adopted.
+Settings `work_roles` version-1 entries select per-role provider/model pairs and
+narrow step limits. Configured routing is recorded in effective policy and task
+evidence. A shared request/token/wall budget covers the entire tree and retries.
+TUI and Work headless controls inspect the same live tasks. `gator work tasks RUN`
+inspects retained records without taking ownership. Completed parent-revision
+tasks can be explicitly continued by global ID; interrupted outcomes require
+inspection. See [current bounds](WORK_DEPTH.md), [migration/recovery](WORK_DEPTH_MIGRATIONS.md),
+and [matched evaluation](WORK_EVALUATION.md).

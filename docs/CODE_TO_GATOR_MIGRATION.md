@@ -48,7 +48,7 @@ user controls + objective
 | Code thread resume/fork/clone | Replace | Gator Work conversations and immutable revision branches |
 | Code recent-run picker and thread tree | Replace | `Ctrl+X` conversation picker plus `/history`, `/back`, and `/forward`; `Ctrl+P` is reserved for actions |
 | Code diff/review/transcript UI | Replace at product boundary | Sealed Work bundle, subagent patch evidence, root `gator review`, `export`, and historical read compatibility |
-| Base-ref selection | Retire for managed delegation | Code always receives the exact frozen Work source snapshot |
+| Base-ref selection | Retire for managed delegation | Code receives frozen source plus an explicitly selected accepted candidate |
 | Copy ignored files into a worktree | Retire for managed delegation | Snapshot inclusion/exclusion is explicit, bounded, and recorded before delegation |
 | Sandbox-off/network confirmation modal | Replace | The user must type the explicit root flag or `/code` setting; the manager cannot choose it |
 | Attached interactive terminal UX | Retire from Code frontend | Terminal can be an explicitly granted internal tool, but has no child-facing UI |
@@ -74,16 +74,17 @@ user controls + objective
 - The child never applies its patch to live source. Review and transfer stay at
   the Gator product boundary.
 
-## Intentionally deferred UX
+## Current port and remaining UX
 
-The old Code UI included live mid-turn steering, cancellation, a full diff
-browser, terminal attachment, model catalogs, extension installation, and
-trust mutation. Root CLI commands continue to cover model/provider, browser,
-extension, MCP/LSP/hook trust, review, and transfer operations. They should
-only gain richer main-TUI views when those views operate on Work conversations
-and bundles; none should be restored as a Code frontend.
+Work now uses normalized private conversation replay and Code context compaction,
+forwards model streaming/visual declarations, captures approved project
+configuration with original trust identity, and offers live steering,
+cancellation, and exact approval responses. Code candidates support selected
+baselines, integration, independent frozen review, and explicit target apply.
+See [state migrations](WORK_DEPTH_MIGRATIONS.md) and [current behavior](WORK_DEPTH.md).
 
-The highest-value remaining main-TUI additions are event streaming with
-cancel/steer support, a Work-bundle review/apply view that understands Code
-patch artifacts, and a consolidated model/connector/settings screen. Those are
-Gator features, not reasons to revive the child application.
+The standalone Code frontend remains retired. Historical Code journals, direct
+Code evaluation fixtures, RPC, ACP, app-server, and legacy review remain readable
+compatibility surfaces. A full historical diff browser and terminal attachment
+are not reintroduced into the Work TUI. Root management commands continue to
+manage providers, browser sessions, integration installation, and project trust.

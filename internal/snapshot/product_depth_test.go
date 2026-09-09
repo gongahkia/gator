@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,5 +31,38 @@ func TestSameContentRetainsDistinctOriginsAndSharedTree(t *testing.T) {
 	}
 	if z.SourcePath != a {
 		t.Fatal("unexpected origin")
+	}
+}
+
+func TestVersionOneCaptureRemainsReadableAndSharedTreeSurvivesGC(t *testing.T) {
+	state, source := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "notes.txt"), []byte("legacy bytes"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	current, err := Create(source, state, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := current
+	legacy.Version = 1
+	legacy.ID = current.TreeID
+	legacy.TreeID = ""
+	data, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(state, "gator", "snapshots", "manifests", legacy.ID+".json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	opened, err := Open(state, legacy.ID)
+	if err != nil || opened.SourcePath != source || opened.Materialized != current.Materialized {
+		t.Fatalf("legacy open: %+v %v", opened, err)
+	}
+	if _, _, err := GC(state, map[string]struct{}{legacy.ID: {}}); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile(filepath.Join(opened.Materialized, "notes.txt"))
+	if err != nil || string(payload) != "legacy bytes" {
+		t.Fatalf("shared tree GC: %s %v", payload, err)
 	}
 }

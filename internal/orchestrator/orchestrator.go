@@ -79,6 +79,7 @@ type Record struct {
 
 // Options configures one manager's bounded delegation surface.
 type Options struct {
+	SourceCapture  string
 	Retained       map[string]Task
 	Limits         agent.Limits
 	StatePath      string
