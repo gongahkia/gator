@@ -58,12 +58,19 @@ func TestExecutorContinuationSeedsArtifactsAndRetainsParent(t *testing.T) {
 	source, state := t.TempDir(), t.TempDir()
 	firstModel := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"one"}`)}}}, {Text: "first"}}}
 	first, err := (Executor{Model: firstModel, StateDir: state}).Execute(context.Background(), Request{SourcePath: source, Objective: "First report", RunID: "revision-one", Contract: artifact.DefaultContract("report.md"), MaxSteps: 3})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	secondModel := &scriptedModel{turns: []agent.Turn{{ToolCalls: []agent.ToolCall{{ID: "read", Name: "read_file", Arguments: json.RawMessage(`{"path":"previous/report.md"}`)}}}, {ToolCalls: []agent.ToolCall{{ID: "write", Name: "write_artifact", Arguments: json.RawMessage(`{"path":"report.md","content":"two"}`)}}}, {Text: "second"}}}
 	second, err := (Executor{Model: secondModel, StateDir: state}).Execute(context.Background(), Request{SourcePath: source, Objective: "Revise report", RunID: "revision-two", ConversationID: first.ConversationID, Contract: artifact.DefaultContract("report.md"), MaxSteps: 4})
-	if err != nil { t.Fatal(err) }
-	parent, _ := os.ReadFile(filepath.Join(first.Work.Output.Path(), "report.md")); child, _ := os.ReadFile(filepath.Join(second.Work.Output.Path(), "report.md"))
-	if string(parent) != "one" || string(child) != "two" || first.SnapshotID != second.SnapshotID { t.Fatalf("parent=%q child=%q snapshots=%q/%q", parent, child, first.SnapshotID, second.SnapshotID) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, _ := os.ReadFile(filepath.Join(first.Work.Output.Path(), "report.md"))
+	child, _ := os.ReadFile(filepath.Join(second.Work.Output.Path(), "report.md"))
+	if string(parent) != "one" || string(child) != "two" || first.SnapshotID != second.SnapshotID {
+		t.Fatalf("parent=%q child=%q snapshots=%q/%q", parent, child, first.SnapshotID, second.SnapshotID)
+	}
 }
 
 func TestExecutorBlocksPrematureCompletionUntilContractPasses(t *testing.T) {

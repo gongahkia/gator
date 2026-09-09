@@ -35,7 +35,6 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	if err != nil {
 		return Outcome{}, err
 	}
-	if request.OnSnapshot != nil { request.OnSnapshot(sourceSnapshot) }
 	if request.RunID == "" {
 		request.RunID, err = newID(now())
 		if err != nil {
@@ -77,6 +76,9 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	if err != nil {
 		return Outcome{}, err
+	}
+	if request.OnSnapshot != nil {
+		request.OnSnapshot(sourceSnapshot)
 	}
 	if conversation.ID == "" {
 		conversation, err = sessions.Create(conversationTitle(request.Objective), sourceSnapshot.SourcePath, sourceSnapshot.ID, startedAt)

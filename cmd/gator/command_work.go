@@ -144,7 +144,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if !*jsonOutput {
 		printer := &eventPrinter{out: out}
 		sink = printer.Print
-		snapshotSink = func(manifest snapshot.Manifest) { _, _ = fmt.Fprintf(out, "  snapshot: %s (%d files, %d bytes, %d exclusions)\n", manifest.ID, manifest.Files, manifest.Bytes, len(manifest.Exclusions)) }
+		snapshotSink = func(manifest snapshot.Manifest) {
+			_, _ = fmt.Fprintf(out, "  snapshot: %s (%d files, %d bytes, %d exclusions)\n", manifest.ID, manifest.Files, manifest.Bytes, len(manifest.Exclusions))
+		}
 	}
 	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
 	var approve action.Approver

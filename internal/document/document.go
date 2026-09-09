@@ -152,15 +152,26 @@ func RenderDOCX(spec Spec) ([]byte, Preview, error) {
 		}
 	}
 	headerReference, footerReference := "", ""
-	if spec.Header != "" { headerReference = `<w:headerReference w:type="default" r:id="rId2"/>` }
-	if spec.Footer != "" { footerReference = `<w:footerReference w:type="default" r:id="rId3"/>` }
+	if spec.Header != "" {
+		headerReference = `<w:headerReference w:type="default" r:id="rId2"/>`
+	}
+	if spec.Footer != "" {
+		footerReference = `<w:footerReference w:type="default" r:id="rId3"/>`
+	}
 	document.WriteString(`<w:sectPr xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` + headerReference + footerReference + `<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`)
 	styles := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="22"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:color w:val="17365D"/><w:sz w:val="40"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:color w:val="17365D"/><w:sz w:val="32"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:color w:val="275D8C"/><w:sz w:val="28"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="480"/></w:pPr><w:rPr><w:i/><w:color w:val="555555"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="360"/></w:pPr></w:style></w:styles>`
 	contentTypes := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>`
 	rels := `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`
-	if spec.Header != "" { contentTypes += `<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`; rels += `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>` }
-	if spec.Footer != "" { contentTypes += `<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`; rels += `<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>` }
-	contentTypes += `</Types>`; rels += `</Relationships>`
+	if spec.Header != "" {
+		contentTypes += `<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`
+		rels += `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>`
+	}
+	if spec.Footer != "" {
+		contentTypes += `<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`
+		rels += `<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>`
+	}
+	contentTypes += `</Types>`
+	rels += `</Relationships>`
 	files := map[string]string{
 		"[Content_Types].xml":          contentTypes,
 		"_rels/.rels":                  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
@@ -168,13 +179,21 @@ func RenderDOCX(spec Spec) ([]byte, Preview, error) {
 		"word/styles.xml":              styles,
 		"word/_rels/document.xml.rels": rels,
 	}
-	if spec.Header != "" { files["word/header1.xml"] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` + paragraphXML(spec.Header, "Normal", false) + `</w:hdr>` }
-	if spec.Footer != "" { files["word/footer1.xml"] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` + paragraphXML(spec.Footer, "Normal", false) + `</w:ftr>` }
+	if spec.Header != "" {
+		files["word/header1.xml"] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` + paragraphXML(spec.Header, "Normal", false) + `</w:hdr>`
+	}
+	if spec.Footer != "" {
+		files["word/footer1.xml"] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` + paragraphXML(spec.Footer, "Normal", false) + `</w:ftr>`
+	}
 	var output bytes.Buffer
 	archive := zip.NewWriter(&output)
 	names := []string{"[Content_Types].xml", "_rels/.rels", "word/document.xml", "word/styles.xml", "word/_rels/document.xml.rels"}
-	if spec.Header != "" { names = append(names, "word/header1.xml") }
-	if spec.Footer != "" { names = append(names, "word/footer1.xml") }
+	if spec.Header != "" {
+		names = append(names, "word/header1.xml")
+	}
+	if spec.Footer != "" {
+		names = append(names, "word/footer1.xml")
+	}
 	for _, name := range names {
 		header := &zip.FileHeader{Name: name, Method: zip.Deflate, Modified: time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)}
 		writer, err := archive.CreateHeader(header)
@@ -263,7 +282,10 @@ func replaceMarker(documentXML, marker, replacement string) (string, bool) {
 			position := strings.Index(documentXML, placeholder)
 			start := strings.LastIndex(documentXML[:position], "<w:p")
 			endRelative := strings.Index(documentXML[position:], "</w:p>")
-			if start >= 0 && endRelative >= 0 { end := position + endRelative + len("</w:p>"); return documentXML[:start] + replacement + documentXML[end:], true }
+			if start >= 0 && endRelative >= 0 {
+				end := position + endRelative + len("</w:p>")
+				return documentXML[:start] + replacement + documentXML[end:], true
+			}
 		}
 		return strings.ReplaceAll(documentXML, placeholder, replacement), true
 	}
@@ -371,8 +393,16 @@ func RenderPDF(spec Spec) ([]byte, Preview, error) {
 	newPage := func() {
 		pdf.AddPage()
 		y = top
-		if spec.Header != "" { _ = pdf.SetFont("regular", "", 8); pdf.SetXY(left, 28); _ = pdf.Cell(&gopdf.Rect{W: width, H: 10}, spec.Header) }
-		if spec.Footer != "" { _ = pdf.SetFont("regular", "", 8); pdf.SetXY(left, 810); _ = pdf.Cell(&gopdf.Rect{W: width, H: 10}, spec.Footer) }
+		if spec.Header != "" {
+			_ = pdf.SetFont("regular", "", 8)
+			pdf.SetXY(left, 28)
+			_ = pdf.Cell(&gopdf.Rect{W: width, H: 10}, spec.Header)
+		}
+		if spec.Footer != "" {
+			_ = pdf.SetFont("regular", "", 8)
+			pdf.SetXY(left, 810)
+			_ = pdf.Cell(&gopdf.Rect{W: width, H: 10}, spec.Footer)
+		}
 	}
 	newPage()
 	write := func(text, font string, size, lineHeight float64) error {
