@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -121,12 +122,48 @@ func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
 func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
-	if len(model.entries) < 30 {
-		t.Fatalf("command palette is incomplete: %d entries", len(model.entries))
+	expected := []string{
+		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/status", "/permissions",
+		"/doctor", "/agents", "/settings", "/theme", "/history", "/back", "/forward", "/review",
+		"/copy", "/queue", "/dequeue", "/clear-queue", "/code status", "/code verify", "/code scope",
+		"/code profile", "/code setup", "/code allow", "/code allow-prefix", "/code sandbox",
+		"/code network", "/code max-steps", "/code grant", "/code revoke", "/code browser",
+		"/code reset", "/quit",
 	}
-	for _, item := range model.entries {
+	if len(model.entries) != len(expected) {
+		t.Fatalf("command palette has %d entries, want %d", len(model.entries), len(expected))
+	}
+	for index, item := range model.entries {
 		if !strings.HasPrefix(item.title, "/") || item.kind != "command" && item.kind != "command-input" {
 			t.Fatalf("non-command entry in palette: %#v", item)
+		}
+		if item.title != expected[index] {
+			t.Fatalf("command %d = %q, want %q", index, item.title, expected[index])
+		}
+	}
+}
+
+func TestCommandPaletteRowsShareOneLeftColumn(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.width, model.height = 100, 60
+	model.openCommandPalette()
+	lines := strings.Split(ansi.Strip(model.View()), "\n")
+	position := -1
+	for _, command := range []string{"/help", "/new", "/permissions", "/code grant", "/quit"} {
+		found := false
+		for _, line := range lines {
+			if index := strings.Index(line, command); index >= 0 {
+				if position < 0 {
+					position = index
+				} else if index != position {
+					t.Fatalf("%s starts at column %d, want %d\n%s", command, index, position, ansi.Strip(model.View()))
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("palette omitted %s", command)
 		}
 	}
 }
