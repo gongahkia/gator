@@ -143,6 +143,7 @@ type localModelsState struct {
 	action         localModelAction
 	confirmation   localModelConfirmation
 	operation      *localModelOperation
+	statusCancel   context.CancelFunc
 	progress       LocalModelProgress
 	spinner        spinner.Model
 	err            error

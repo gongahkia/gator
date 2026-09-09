@@ -88,7 +88,18 @@ func workInteractiveConversation(startConversationID string) error {
 	if err != nil {
 		return err
 	}
+	settingsStore, err := config.DefaultStore()
+	if err != nil {
+		return err
+	}
+	localModels := newLocalModelManager(settingsStore)
+	defer localModels.Close()
 	application := worktui.New(worktui.Config{
+		Models: workModelPanel(settingsStore, stateDir, workingDirectory, localModels),
+		SelectedModel: func() (string, string, error) {
+			current, err := settingsStore.Load()
+			return current.Defaults.Provider, current.Defaults.Model, err
+		},
 		Live:          true,
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, Inbox: inboxEntries,
 		StartConversationID: startConversationID,
@@ -187,7 +198,10 @@ func workInteractiveConversation(startConversationID string) error {
 		SetTheme: saveTheme,
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
-	_, err = program.Run()
+	final, err := program.Run()
+	if application, ok := final.(worktui.Model); ok {
+		application.Close()
+	}
 	return err
 }
 

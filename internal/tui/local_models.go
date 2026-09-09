@@ -42,7 +42,9 @@ func (m Model) beginLocalStatus() (tea.Model, tea.Cmd) {
 	m.localModels.generation++
 	m.localModels.action = localModelRefreshing
 	m.localModels.err = nil
-	commands := []tea.Cmd{m.localModels.spinner.Tick, loadLocalModelStatus(m.localModels.manager, m.localModels.generation)}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	m.localModels.statusCancel = cancel
+	commands := []tea.Cmd{m.localModels.spinner.Tick, loadLocalModelStatus(ctx, cancel, m.localModels.manager, m.localModels.generation)}
 	if m.config.ModelManagement != nil {
 		commands = append(commands, loadCredentialStatuses(m.config.ModelManagement))
 	}
@@ -56,9 +58,8 @@ func loadCredentialStatuses(backend ModelManagementBackend) tea.Cmd {
 	}
 }
 
-func loadLocalModelStatus(manager LocalModelManager, generation uint64) tea.Cmd {
+func loadLocalModelStatus(ctx context.Context, cancel context.CancelFunc, manager LocalModelManager, generation uint64) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		catalog, err := manager.Status(ctx)
 		return localModelStatusMsg{generation: generation, catalog: catalog, err: err}
@@ -66,6 +67,10 @@ func loadLocalModelStatus(manager LocalModelManager, generation uint64) tea.Cmd 
 }
 
 func (m *Model) cancelLocalOperation() {
+	if m.localModels.statusCancel != nil {
+		m.localModels.statusCancel()
+		m.localModels.statusCancel = nil
+	}
 	if m.localModels.operation != nil {
 		m.localModels.operation.cancel()
 		m.localModels.operation = nil
@@ -269,7 +274,7 @@ func (m Model) updateLocalModelConfirmation(message tea.KeyMsg) (tea.Model, tea.
 		case "esc", "n", "ctrl+c":
 			m.localModels.confirmation = localModelNoConfirmation
 			m.localModels.startDismissed = true
-			m.notice = notice{text: "Start Ollama yourself with 'ollama serve' or 'gator local serve', then press r to refresh.", kind: noticeInfo}
+			m.notice = notice{text: "Runtime start declined. Press s to start it with Gator later, or r to refresh.", kind: noticeInfo}
 			return m, nil
 		case "enter", "y":
 			m.localModels.confirmation = localModelNoConfirmation
@@ -447,6 +452,7 @@ func startLocalModelOperation(run func(context.Context, func(LocalModelProgress)
 		done:     make(chan localModelOperationDone, 1),
 	}
 	go func() {
+		defer cancel()
 		defer close(operation.progress)
 		done := run(ctx, func(update LocalModelProgress) {
 			select {
@@ -490,6 +496,9 @@ func (m Model) cloudModels() []cloudModelEntry {
 			continue
 		}
 		if provider == modelprovider.Claude {
+			if m.catalogOnly {
+				continue
+			}
 			entries = append(entries, claudeCodeHarnessEntry(credentialStore, credentialStoreErr, m.localModels.credentials))
 			continue
 		}
@@ -662,8 +671,14 @@ func (m Model) useCloudModel(cloud cloudModelEntry) (tea.Model, tea.Cmd) {
 			m.notice = notice{text: "Claude Code is a harness. Press l to provide an Anthropic API key, then send a task through the Claude Code harness.", kind: noticeInfo}
 			return m, nil
 		}
-		m.notice = notice{text: "This provider requires an account-specific deployment or model ID. Use the provider field to enter it before a run.", kind: noticeInfo}
+		m.notice = notice{text: "This provider requires an account-specific deployment or model ID. Press c to configure it.", kind: noticeInfo}
 		return m, nil
+	}
+	if m.config.SaveModelSelection != nil {
+		if err := m.config.SaveModelSelection(cloud.provider, cloud.model); err != nil {
+			m.notice = notice{text: "Select model: " + err.Error(), kind: noticeError}
+			return m, nil
+		}
 	}
 	m.provider.SetValue(cloud.provider)
 	m.model.SetValue(cloud.model)

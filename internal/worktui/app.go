@@ -59,6 +59,8 @@ type CodeOptions struct {
 }
 
 type Config struct {
+	Models              func() (ModelPanel, error)
+	SelectedModel       func() (provider, model string, err error)
 	Live                bool
 	CurrentFolder       string
 	Conversations       []worksession.Conversation
@@ -80,6 +82,12 @@ type Config struct {
 	SetTheme            func(name string) error
 }
 
+type ModelPanel interface {
+	tea.Model
+	Closed() bool
+	Close()
+}
+
 type entry struct {
 	title, subtitle, kind, id, source, command string
 }
@@ -98,6 +106,7 @@ type queuedRun struct {
 }
 
 type Model struct {
+	models              ModelPanel
 	tasks               map[string]string
 	quitting            bool
 	live                <-chan tea.Msg
@@ -162,6 +171,35 @@ func New(config Config) Model {
 func (m Model) Init() tea.Cmd { return nil }
 
 func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
+	if m.models != nil {
+		if size, ok := messageValue.(tea.WindowSizeMsg); ok {
+			m.width, m.height = size.Width, size.Height
+		}
+		next, command := m.models.Update(messageValue)
+		m.models = next.(ModelPanel)
+		if m.models.Closed() {
+			m.models.Close()
+			m.models = nil
+			m.onboarding = false
+			if m.config.SelectedModel != nil {
+				provider, model, err := m.config.SelectedModel()
+				if err != nil {
+					m.status = "Read model selection: " + err.Error()
+				} else {
+					m.firstRun = provider == ""
+					m.status = "Selected model: " + provider + " / " + model
+					if m.firstRun {
+						m.status = "Choose a model with /model before starting work."
+					}
+				}
+			}
+			if m.pendingPrompt != "" {
+				m.input, m.pendingPrompt = m.pendingPrompt, ""
+			}
+			return m, nil
+		}
+		return m, command
+	}
 	switch value := messageValue.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = value.Width, value.Height
@@ -444,6 +482,10 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 				return m.startProviderAction("setup", provider)
 			}
 			if m.firstRun {
+				if m.config.Models != nil {
+					m.pendingPrompt = prompt
+					return m.openModels()
+				}
 				m.onboarding = true
 				m.pendingPrompt = prompt
 				m.title = "Welcome to Gator"
@@ -495,6 +537,10 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.runLocalCommand(prompt)
 		}
 		if m.firstRun {
+			if m.config.Models != nil {
+				m.pendingPrompt = prompt
+				return m.openModels()
+			}
 			m.home = false
 			m.onboarding = true
 			m.pendingPrompt = prompt
@@ -663,7 +709,7 @@ func commandPaletteEntries() []entry {
 	return []entry{
 		{title: "/help", subtitle: "Show Gator commands", kind: "command", command: "/help"},
 		{title: "/new", subtitle: "Start a clean Gator conversation", kind: "command", command: "/new"},
-		{title: "/model", subtitle: "Connect or switch model provider", kind: "command", command: "/model"},
+		{title: "/model", subtitle: "Cloud and local models · download, select, rename, delete", kind: "command", command: "/model"},
 		{title: "/connect", subtitle: "Start guided provider setup", kind: "command", command: "/connect"},
 		{title: "/login", subtitle: "Store a native Gator credential", kind: "command", command: "/login"},
 		{title: "/logout", subtitle: "Remove a stored Gator credential", kind: "command", command: "/logout"},
@@ -722,6 +768,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.messages, m.status, m.queue = nil, "", nil
 		return m, nil
 	case "/model", "/connect", "/login", "/logout":
+		if fields[0] == "/model" && m.config.Models != nil {
+			if len(fields) != 1 {
+				result = "Use /model to select and manage cloud or local models."
+				break
+			}
+			return m.openModels()
+		}
 		action := strings.TrimPrefix(fields[0], "/")
 		if action == "model" {
 			action = "setup"
@@ -1153,7 +1206,7 @@ func errorsUnavailable(name string) error {
 
 func workHelp() string {
 	return `Gator commands
-  /model [PROVIDER]              connect and select the default provider
+  /model                         manage cloud/local models, downloads and deletion
   /connect [PROVIDER]            start the closest supported setup flow
   /login [PROVIDER]              store a native Gator credential
   /logout [PROVIDER]             remove a stored Gator credential
@@ -1192,6 +1245,9 @@ Navigation
 }
 
 func (m Model) View() string {
+	if m.models != nil {
+		return m.models.View()
+	}
 	width := m.width
 	if width <= 0 {
 		width = 80

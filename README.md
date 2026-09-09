@@ -20,7 +20,10 @@ GOTOOLCHAIN=go1.25.13 make build
 ./bin/gator
 ```
 
-Configure a provider with `gator model` or the main `/model` command. Native
+Configure a provider inside the TUI with `/model`. Press Tab for Local to
+download, select, rename, or delete Ollama models, with progress and explicit
+confirmation. The TUI can start an installed Ollama runtime and keeps it alive
+until Gator exits. Native
 credentials stay in the private credential store. See [local models](docs/LOCAL_MODELS.md),
 [custom providers](docs/CUSTOM_PROVIDERS.md), and [Work](docs/WORK.md).
 

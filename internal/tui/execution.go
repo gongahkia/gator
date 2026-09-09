@@ -643,7 +643,7 @@ func (m *Model) returnToComposer() {
 // in the repository or exposing it in the event journal. Continuations use a
 // private run session instead, so they do not overwrite the new-run draft.
 func (m *Model) persistDraft() {
-	if m.resumeStatePath != "" || m.forkStatePath != "" || strings.TrimSpace(m.config.StateDir) == "" {
+	if m.catalogOnly || m.resumeStatePath != "" || m.forkStatePath != "" || strings.TrimSpace(m.config.StateDir) == "" {
 		return
 	}
 	extras := m.draftRunOptions()

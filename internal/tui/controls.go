@@ -296,6 +296,10 @@ func (m Model) startOAuthLogin(providerName string) (tea.Model, tea.Cmd) {
 		clientIDEnvironment := oauthClientIDEnvironment(string(provider))
 		useVendorConnection := provider == modelprovider.Claude || (clientIDEnvironment != "" && strings.TrimSpace(os.Getenv(clientIDEnvironment)) == "")
 		if useVendorConnection {
+			if m.catalogOnly {
+				m.notice = notice{text: "This sign-in requires Gator's OAuth client configuration. Select a provider with an available sign-in, or press c to configure an API credential.", kind: noticeInfo}
+				return m, nil
+			}
 			if m.config.NewConnectCommand != nil {
 				process, processErr := m.config.NewConnectCommand(string(provider))
 				if processErr != nil {

@@ -84,7 +84,7 @@ func doctor(arguments []string, out io.Writer) error {
 		return err
 	}
 	if customProvider && custom.ID == localmodel.ProviderID {
-		if _, err := fmt.Fprintln(out, "Local runtime: run 'gator local status' to verify the selected loopback Ollama server and model inventory."); err != nil {
+		if _, err := fmt.Fprintln(out, "Local runtime: open /model → Local in the TUI to inspect the Ollama server and model inventory."); err != nil {
 			return err
 		}
 	}

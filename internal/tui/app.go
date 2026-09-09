@@ -94,8 +94,9 @@ type Config struct {
 	OpenBrowser func(string) error
 	// SaveCloudModel persists a cloud model's non-secret configuration and, when
 	// supplied, its masked credential in Gator's private auth store.
-	SaveCloudModel func(CloudModelSetup) error
-	SetTheme       func(name string) error
+	SaveCloudModel     func(CloudModelSetup) error
+	SaveModelSelection func(provider, model string) error
+	SetTheme           func(name string) error
 	// LocalModels manages Gator's reviewed, loopback-only local model catalog.
 	// It is injected from the command layer so the UI does not own runtime
 	// configuration or make network requests on its event loop.
@@ -648,7 +649,8 @@ type activityTickMsg struct{}
 
 // Model is the Bubble Tea state model for Gator's terminal experience.
 type Model struct {
-	config Config
+	config      Config
+	catalogOnly bool
 
 	screen              screen
 	focus               field
@@ -812,6 +814,10 @@ func applyTheme(name string) string {
 
 // New creates a terminal model in task-composition mode.
 func New(config Config) Model {
+	return newModel(config, false)
+}
+
+func newModel(config Config, catalogOnly bool) Model {
 	config.Theme = applyTheme(config.Theme)
 	if strings.TrimSpace(config.RepositoryPath) == "" {
 		config.RepositoryPath = "."
@@ -893,6 +899,7 @@ func New(config Config) Model {
 
 	application := Model{
 		config:           config,
+		catalogOnly:      catalogOnly,
 		screen:           composeScreen,
 		recentAll:        config.RecentAll,
 		task:             task,
@@ -922,7 +929,7 @@ func New(config Config) Model {
 		},
 	}
 	application.appendChat(chatEntry{author: chatSystem, text: "New isolated thread. Gator works in a separate Git worktree; use /permissions for the active policy."})
-	if strings.TrimSpace(config.StateDir) != "" {
+	if !catalogOnly && strings.TrimSpace(config.StateDir) != "" {
 		if draft, found, err := journal.LoadDraft(config.StateDir, config.RepositoryPath); err != nil {
 			application.draftErr = err
 			application.notice = notice{text: "Draft recovery unavailable: " + err.Error(), kind: noticeError}
