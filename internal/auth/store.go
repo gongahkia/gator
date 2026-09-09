@@ -35,6 +35,19 @@ type Credential struct {
 	Extra   map[string]string `json:"extra,omitempty"`
 }
 
+// NewBearerToken creates a validated, user-supplied bearer credential. A zero
+// expiry means the issuing service did not provide a local expiration time.
+func NewBearerToken(value string, expiry time.Time) (Credential, error) {
+	credential := Credential{Type: bearerTokenType, Access: strings.TrimSpace(value)}
+	if !expiry.IsZero() {
+		credential.Expires = expiry.UnixMilli()
+	}
+	if err := validateCredential(credential); err != nil {
+		return Credential{}, err
+	}
+	return credential, nil
+}
+
 // IsOAuth reports whether this credential contains OAuth token material.
 func (c Credential) IsOAuth() bool {
 	return c.Type == oauthType
