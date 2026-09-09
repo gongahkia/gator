@@ -34,6 +34,22 @@ func TestLoginRejectsMixedCredentialModes(t *testing.T) {
 	}
 }
 
+func TestLoginRejectsPromptCombinedWithAnotherCredentialMode(t *testing.T) {
+	var output bytes.Buffer
+	err := login([]string{"openai", "--prompt", "--api-key", "api-key"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "only one") {
+		t.Fatalf("mixed prompt login modes error = %v", err)
+	}
+}
+
+func TestOAuthLoginRejectsPromptMode(t *testing.T) {
+	var output bytes.Buffer
+	err := login([]string{"codex", "--prompt"}, &output)
+	if err == nil || !strings.Contains(err.Error(), "subscription OAuth") || !strings.Contains(err.Error(), "--prompt") {
+		t.Fatalf("OAuth prompt error = %v", err)
+	}
+}
+
 func TestLoginRejectsClaudeAISubscriptionOAuth(t *testing.T) {
 	var output bytes.Buffer
 	err := login([]string{"claude"}, &output)

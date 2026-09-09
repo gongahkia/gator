@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/tui"
@@ -17,7 +18,7 @@ import (
 
 func login(arguments []string, out io.Writer) error {
 	if len(arguments) == 0 {
-		return errors.New("usage: gator login PROVIDER [--api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
+		return errors.New("usage: gator login PROVIDER [--prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
 	}
 	providerName := arguments[0]
 	flags := flag.NewFlagSet("login", flag.ContinueOnError)
@@ -26,15 +27,20 @@ func login(arguments []string, out io.Writer) error {
 	bearerToken := flags.String("bearer-token", "", "bearer token to store (visible to the current process)")
 	bearerTokenFromEnvironment := flags.String("bearer-token-from-env", "", "environment variable containing a bearer token")
 	fromEnvironment := flags.String("from-env", "", "environment variable containing the API key")
+	prompt := flags.Bool("prompt", false, "read an API key from a hidden terminal prompt")
 	subscription := flags.Bool("subscription", false, "use the provider subscription OAuth flow")
 	if err := flags.Parse(arguments[1:]); err != nil {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator login PROVIDER [--api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
+		return errors.New("usage: gator login PROVIDER [--prompt | --api-key KEY | --from-env NAME | --bearer-token TOKEN | --bearer-token-from-env NAME]")
 	}
-	if countNonEmpty(*apiKey, *bearerToken, *bearerTokenFromEnvironment, *fromEnvironment) > 1 {
-		return errors.New("use only one of --api-key, --from-env, --bearer-token, or --bearer-token-from-env")
+	credentialModes := countNonEmpty(*apiKey, *bearerToken, *bearerTokenFromEnvironment, *fromEnvironment)
+	if *prompt {
+		credentialModes++
+	}
+	if credentialModes > 1 {
+		return errors.New("use only one of --prompt, --api-key, --from-env, --bearer-token, or --bearer-token-from-env")
 	}
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
@@ -47,8 +53,8 @@ func login(arguments []string, out io.Writer) error {
 		return fmt.Errorf("provider %q has no direct Gator API integration", provider)
 	}
 	if model.RequiresOAuthLogin(provider) || *subscription {
-		if strings.TrimSpace(*apiKey) != "" || strings.TrimSpace(*fromEnvironment) != "" {
-			return fmt.Errorf("provider %q uses subscription OAuth; do not pass an API key", provider)
+		if credentialModes != 0 {
+			return fmt.Errorf("provider %q uses subscription OAuth; do not pass an API key, bearer token, environment source, or --prompt", provider)
 		}
 		if !model.SupportsOAuthLogin(provider) {
 			return fmt.Errorf("provider %q has no supported Gator OAuth flow", provider)
@@ -74,7 +80,28 @@ func login(arguments []string, out io.Writer) error {
 	}
 	key := strings.TrimSpace(*apiKey)
 	source := "--api-key"
-	if environment := strings.TrimSpace(*fromEnvironment); environment != "" {
+	if *prompt {
+		if !term.IsTerminal(os.Stdin.Fd()) {
+			return errors.New("--prompt requires an interactive terminal")
+		}
+		if _, err := fmt.Fprintf(out, "Enter the %s API key (input hidden): ", provider); err != nil {
+			return err
+		}
+		secret, err := term.ReadPassword(os.Stdin.Fd())
+		_, newlineErr := fmt.Fprintln(out)
+		if err != nil {
+			return fmt.Errorf("read %s API key: %w", provider, err)
+		}
+		key = strings.TrimSpace(string(secret))
+		clear(secret)
+		if newlineErr != nil {
+			return newlineErr
+		}
+		if key == "" {
+			return errors.New("API key cannot be empty")
+		}
+		source = "interactive prompt"
+	} else if environment := strings.TrimSpace(*fromEnvironment); environment != "" {
 		key = strings.TrimSpace(os.Getenv(environment))
 		source = environment
 	} else if key == "" {

@@ -17,6 +17,7 @@ import (
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/model"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/worktui"
 )
@@ -87,14 +88,9 @@ func workInteractiveConversation(startConversationID string) error {
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, Inbox: inboxEntries,
 		StartConversationID: startConversationID,
 		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
-		SetupCommand: func(provider string) *exec.Cmd {
-			command := exec.Command(os.Args[0], "connect", provider)
-			command.Stdin = os.Stdin
-			command.Stdout = os.Stdout
-			command.Stderr = os.Stderr
-			return command
-		},
-		CompleteSetup: selectWorkOnboardingProvider,
+		ProviderCommand:     workTUIProviderCommand,
+		ProviderChoices:     workTUIProviderChoices,
+		CompleteSetup:       selectWorkOnboardingProvider,
 		Run: func(source, conversationID, prompt string, options worktui.RunOptions) worktui.RunResult {
 			return runInteractiveWork(source, conversationID, prompt, stateDir, options)
 		},
@@ -188,6 +184,53 @@ func workInteractiveConversation(startConversationID string) error {
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	_, err = program.Run()
 	return err
+}
+
+func workTUIProviderCommand(action, provider string) *exec.Cmd {
+	arguments := []string{action, provider}
+	if action == "setup" {
+		arguments[0] = "connect"
+	} else if action == "login" {
+		parsed, err := model.ParseProvider(provider)
+		if err == nil && model.SupportsAPIKeyLogin(parsed) {
+			arguments = append(arguments, "--prompt")
+		}
+	}
+	command := exec.Command(os.Args[0], arguments...)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command
+}
+
+func workTUIProviderChoices(action string) []string {
+	if action == "setup" {
+		return []string{"openai", "anthropic", "gemini"}
+	}
+	choices := make([]string, 0, len(model.Names()))
+	for _, name := range model.Names() {
+		provider, err := model.ParseProvider(name)
+		if err != nil {
+			continue
+		}
+		include := false
+		switch action {
+		case "connect":
+			include = model.SupportsAPIKeyLogin(provider) && model.APIKeyEnvironment(provider) != ""
+			switch provider {
+			case model.Codex, model.Claude, model.Copilot, model.KimiCoding, model.XAI, model.OpenRouter, model.Radius:
+				include = true
+			}
+		case "login":
+			include = provider != model.Claude && (model.RequiresOAuthLogin(provider) || model.SupportsOAuthLogin(provider) || model.SupportsAPIKeyLogin(provider))
+		case "logout":
+			include = true
+		}
+		if include {
+			choices = append(choices, name)
+		}
+	}
+	return choices
 }
 
 func selectWorkOnboardingProvider(providerName string) error {

@@ -23,6 +23,7 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | Drafting | Top-left `🐊 Gator` wordmark, selected folder, and a quiet empty transcript | Docked after the first typed character | Available through direct shortcuts |
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
 | Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
+| Provider picker | Providers valid for the selected `/model`, `/connect`, `/login`, or `/logout` action | Hidden | Type to filter, arrows to choose, `Esc` to return |
 | Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
 | Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+I` (also reported as Tab by terminals) |
 | Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+J` |
@@ -31,6 +32,12 @@ Typing the first character docks the composer; deleting the draft recenters it.
 Submitting the prompt starts a conversation. Merely opening Gator must not show
 cards, counters, setup prose, or a navigation rail. First-run setup begins only
 after the first submitted prompt, or explicitly through `/model`.
+
+Provider lifecycle commands use progressive disclosure: `/model`, `/connect`,
+`/login`, and `/logout` open focused provider pickers when invoked without an
+argument, while their `[PROVIDER]` forms remain fast and script-like. Secret
+values never enter the composer or command palette; API-key entry temporarily
+suspends the alternate screen for a hidden terminal prompt.
 
 When a first task requires setup, `openai`, `anthropic`, and `gemini` open a
 hidden API-key prompt if their normal environment variable is absent. A

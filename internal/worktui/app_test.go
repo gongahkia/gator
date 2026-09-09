@@ -2,6 +2,7 @@ package worktui
 
 import (
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -123,7 +124,7 @@ func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/effort", "/attach", "/detach", "/status", "/permissions",
+		"/help", "/new", "/model", "/connect", "/login", "/logout", "/effort", "/attach", "/detach", "/status", "/permissions",
 		"/doctor", "/agents", "/settings", "/theme", "/history", "/back", "/forward", "/review",
 		"/copy", "/queue", "/dequeue", "/clear-queue", "/code status", "/code verify", "/code scope",
 		"/code profile", "/code setup", "/code allow", "/code allow-prefix", "/code sandbox",
@@ -140,6 +141,68 @@ func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
 		if item.title != expected[index] {
 			t.Fatalf("command %d = %q, want %q", index, item.title, expected[index])
 		}
+	}
+}
+
+func TestProviderCommandsOpenPickerAndRunSelectedAction(t *testing.T) {
+	called := ""
+	model := New(Config{
+		CurrentFolder: "/work",
+		ProviderChoices: func(action string) []string {
+			if action != "login" {
+				t.Fatalf("provider choices action = %q", action)
+			}
+			return []string{"openai", "anthropic"}
+		},
+		ProviderCommand: func(action, provider string) *exec.Cmd {
+			called = action + "/" + provider
+			return exec.Command("true")
+		},
+	})
+	model.input = "/login"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || !model.launcher || model.launcherMode != "login" || !strings.Contains(model.View(), "Log in to provider") || !strings.Contains(model.View(), "anthropic") {
+		t.Fatalf("login picker state = %#v\n%s", model, model.View())
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil || model.launcher || called != "login/openai" {
+		t.Fatalf("selected provider state = %#v called=%q", model, called)
+	}
+	updated, _ = model.Update(providerActionDone{action: "login", provider: "openai"})
+	model = updated.(Model)
+	if !strings.Contains(model.View(), "Login finished for openai") {
+		t.Fatalf("login completion view = %s", model.View())
+	}
+}
+
+func TestProviderCommandsAcceptAnExplicitProvider(t *testing.T) {
+	for _, test := range []struct {
+		command string
+		want    string
+	}{
+		{command: "/model OpenAI", want: "setup/openai"},
+		{command: "/connect Anthropic", want: "connect/anthropic"},
+		{command: "/login Gemini", want: "login/gemini"},
+		{command: "/logout OpenAI", want: "logout/openai"},
+	} {
+		t.Run(test.command, func(t *testing.T) {
+			called := ""
+			model := New(Config{
+				CurrentFolder: "/work",
+				ProviderCommand: func(action, provider string) *exec.Cmd {
+					called = action + "/" + provider
+					return exec.Command("true")
+				},
+			})
+			model.input = test.command
+			updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			model = updated.(Model)
+			if command == nil || called != test.want {
+				t.Fatalf("explicit provider state = %#v called=%q, want %q", model, called, test.want)
+			}
+		})
 	}
 }
 
@@ -314,7 +377,7 @@ func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	if command != nil || !model.onboarding || model.pendingPrompt != "prepare the brief" || called != "" {
 		t.Fatalf("setup state = %#v called=%q", model, called)
 	}
-	updated, command = model.Update(setupDone{provider: "openai"})
+	updated, command = model.Update(providerActionDone{action: "setup", provider: "openai"})
 	model = updated.(Model)
 	if command == nil || !model.running || model.firstRun || selectedProvider != "openai" || len(model.entries) == 0 || model.entries[0].kind == "onboarding" {
 		t.Fatalf("post-setup state = %#v", model)
@@ -347,7 +410,7 @@ func TestFirstRunRetainsSetupStateWhenProviderSelectionCannotBeSaved(t *testing.
 	model.home = false
 	model.onboarding = true
 	model.messages = []message{{role: "You", text: "openai"}}
-	updated, command := model.Update(setupDone{provider: "openai"})
+	updated, command := model.Update(providerActionDone{action: "setup", provider: "openai"})
 	model = updated.(Model)
 	if command != nil || !model.onboarding || !model.firstRun || !strings.Contains(model.View(), "save failed") {
 		t.Fatalf("failed setup state = %#v", model)

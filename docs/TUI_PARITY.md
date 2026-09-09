@@ -82,11 +82,9 @@ package manager.
 | `local serve` | Recovery prompt can start Ollama as a TUI child | complete | CLI `serve` remains useful when no TUI is running. |
 | `local pull/use/remove` | Curated pull/use/remove with confirmation | complete | The per-command `--url` override has no TUI editor. |
 | `theme list/set` | `/theme` | complete | — |
-| `connect codex/copilot/kimi` | `/model` → Cloud → `l` runs the provider-owned sign-in flow | partial | CLI-only flags such as Codex device auth and Copilot host override are not exposed. |
-| `connect xai/openrouter/radius` | `/model` → Cloud → `c` exposes endpoint/advanced settings and `l` starts the supported sign-in flow | complete | xAI's vendor-owned sign-in selects the OpenCode harness afterwards. |
-| `connect claude` | `/model` → Cloud → `c` configures the masked Anthropic key and selects the Claude Code harness | complete | `gator connect claude` remains a CLI alternative for scripted onboarding. |
-| `login PROVIDER` | `/model` → Cloud → `c` configures every built-in direct provider; `l` starts supported OAuth | complete | CLI remains preferable for scripted onboarding and environment-variable management. |
-| `logout PROVIDER` | `/model` → Cloud → `d` confirms removal of the stored Gator credential and reports remaining ambient sources | complete | Environment variables, AWS/ADC, and vendor CLI logins are never unset from the TUI. |
+| `connect PROVIDER` | Main `/connect [PROVIDER]`; the no-argument form opens a searchable provider picker | complete | Provider-specific CLI flags remain CLI-only. |
+| `login PROVIDER` | Main `/login [PROVIDER]`; API keys use a hidden terminal prompt and OAuth uses the native browser/device flow | complete | Re-running `/login` replaces the existing native Gator credential. |
+| `logout PROVIDER` | Main `/logout [PROVIDER]`; the no-argument form opens a searchable provider picker | complete | Environment variables, AWS/ADC, and vendor CLI logins are never unset from the TUI. |
 | `delegate codex/copilot/claude/kimi run` | `/model` selects the matching harness; send a task to run it in an isolated worktree | partial | Login options and exact one-shot CLI flags are absent. |
 | `delegate opencode login/status/run` | `/opencode` runs status/login in the vendor CLI and selects `PROVIDER/MODEL` for the next task | complete | Gator keeps the isolated-worktree and verification boundary; OpenCode keeps credentials, tools, approvals, and session state. |
 | `delegate external run` | None | CLI only | Arbitrary command execution belongs to the explicit CLI boundary. |
