@@ -42,6 +42,8 @@ const (
 // filesystem roots and environment variables are opt-in because both are
 // capability grants to code produced by an agent.
 type Policy struct {
+	// WritablePaths narrows writes within the worktree; empty retains full private-root access.
+	WritablePaths []string `json:"writable_paths,omitempty"`
 	Mode          Mode     `json:"mode,omitempty"`
 	Network       Network  `json:"network,omitempty"`
 	Environment   []string `json:"environment,omitempty"`
@@ -69,6 +71,7 @@ func (p Policy) Normalize() Policy {
 	if p.Network == "" {
 		p.Network = DenyNetwork
 	}
+	p.WritablePaths = append([]string(nil), p.WritablePaths...)
 	p.Environment = append([]string(nil), p.Environment...)
 	p.ReadOnlyRoots = append([]string(nil), p.ReadOnlyRoots...)
 	p.WritableRoots = append([]string(nil), p.WritableRoots...)
@@ -83,6 +86,14 @@ func (p Policy) Validate() error {
 	}
 	if p.Network != DenyNetwork && p.Network != AllowNetwork {
 		return fmt.Errorf("unknown sandbox network mode %q", p.Network)
+	}
+	for _, path := range p.WritablePaths {
+		if filepath.IsAbs(path) || filepath.Clean(path) != path || path == "." || path == ".." || strings.HasPrefix(path, ".."+string(filepath.Separator)) {
+			return errors.New("invalid worktree writable path")
+		}
+	}
+	if len(p.WritablePaths) > 0 && p.Mode != Strict {
+		return errors.New("a bounded write envelope requires strict sandboxing")
 	}
 	if len(p.Environment) > 128 {
 		return errors.New("sandbox policy has too many environment variables")

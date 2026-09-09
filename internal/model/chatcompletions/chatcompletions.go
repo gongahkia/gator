@@ -285,6 +285,10 @@ type chatImageURL struct {
 }
 
 type response struct {
+	Usage *struct {
+		Input  int64 `json:"prompt_tokens"`
+		Output int64 `json:"completion_tokens"`
+	} `json:"usage"`
 	Choices []struct {
 		Message struct {
 			Content          *string         `json:"content"`
@@ -304,6 +308,9 @@ func decodeResponse(contents []byte, provider string) (agent.Turn, error) {
 	}
 	message := payload.Choices[0].Message
 	turn := agent.Turn{}
+	if payload.Usage != nil {
+		turn.Usage = agent.Usage{Reported: true, InputTokens: payload.Usage.Input, OutputTokens: payload.Usage.Output}
+	}
 	if message.Content != nil {
 		turn.Text = *message.Content
 	}

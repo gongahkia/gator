@@ -35,8 +35,10 @@ var specialistNamePattern = regexp.MustCompile(`\A[a-z][a-z0-9_]{0,63}\z`)
 
 // Invocation is the isolated assignment passed to one specialist.
 type Invocation struct {
-	ID   string
-	Task string
+	Baseline string
+	OnEvent  agent.EventSink
+	ID       string
+	Task     string
 }
 
 // Result is the bounded information returned from a specialist to its manager.
@@ -72,6 +74,11 @@ type Record struct {
 
 // Options configures one manager's bounded delegation surface.
 type Options struct {
+	StatePath      string
+	ParentRun      string
+	Source         string
+	PolicySHA256   string
+	Supervisor     *Supervisor
 	MaxDelegations int
 	MaxParallel    int
 	Now            func() time.Time
@@ -117,7 +124,7 @@ func Tools(specialists []Specialist, options Options) ([]agent.Tool, error) {
 	}
 	return []agent.Tool{&delegateTool{
 		registry: registry, ordered: ordered, remaining: budget, parallel: parallel,
-		now: now, onEvent: options.OnEvent, onRecord: options.OnRecord,
+		supervisor: options.Supervisor, now: now, onEvent: options.OnEvent, onRecord: options.OnRecord,
 	}}, nil
 }
 
@@ -128,7 +135,7 @@ func LLMSpecialist(name, description string, model agent.Model, tools []agent.To
 		Name: name, Description: description,
 		Run: func(ctx context.Context, invocation Invocation) (Result, error) {
 			result, err := (agent.Runner{Model: model, Tools: tools, Now: now}).Run(ctx, agent.RunOptions{
-				Task: invocation.Task, System: system, MaxSteps: maxSteps,
+				Task: invocation.Task, System: system, MaxSteps: maxSteps, OnEvent: invocation.OnEvent,
 			})
 			return Result{Summary: result.FinalText, Steps: result.Steps}, err
 		},
@@ -136,15 +143,16 @@ func LLMSpecialist(name, description string, model agent.Model, tools []agent.To
 }
 
 type delegateTool struct {
-	mu        sync.Mutex
-	registry  map[string]Specialist
-	ordered   []Specialist
-	remaining int
-	nextID    int
-	parallel  int
-	now       func() time.Time
-	onEvent   agent.EventSink
-	onRecord  func(Record)
+	supervisor *Supervisor
+	mu         sync.Mutex
+	registry   map[string]Specialist
+	ordered    []Specialist
+	remaining  int
+	nextID     int
+	parallel   int
+	now        func() time.Time
+	onEvent    agent.EventSink
+	onRecord   func(Record)
 }
 
 func (t *delegateTool) Definition() agent.ToolDefinition {
@@ -161,8 +169,9 @@ func (t *delegateTool) Definition() agent.ToolDefinition {
 			"items": map[string]any{
 				"type": "object", "additionalProperties": false, "required": []string{"agent", "task"},
 				"properties": map[string]any{
-					"agent": map[string]any{"type": "string", "enum": names},
-					"task":  map[string]any{"type": "string", "minLength": 1, "maxLength": maxTaskBytes},
+					"agent":          map[string]any{"type": "string", "enum": names},
+					"baseline_patch": map[string]any{"type": "string"},
+					"task":           map[string]any{"type": "string", "minLength": 1, "maxLength": maxTaskBytes},
 				},
 			},
 		}},
@@ -195,8 +204,9 @@ type delegatedResult struct {
 func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var input struct {
 		Tasks []struct {
-			Agent string `json:"agent"`
-			Task  string `json:"task"`
+			Agent    string `json:"agent"`
+			Task     string `json:"task"`
+			Baseline string `json:"baseline_patch,omitempty"`
 		} `json:"tasks"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -215,6 +225,30 @@ func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.
 		return agent.ToolResult{}, fmt.Errorf("delegate_agents requires between 1 and %d tasks", t.parallel)
 	}
 
+	if t.supervisor != nil {
+		tasks := make([]Task, 0, len(input.Tasks))
+		for _, item := range input.Tasks {
+			task, err := t.supervisor.Start(StartRequest{Agent: item.Agent, Task: item.Task, Baseline: item.Baseline})
+			if err != nil {
+				return agent.ToolResult{}, err
+			}
+			tasks = append(tasks, task)
+		}
+		ok := true
+		for i, task := range tasks {
+			var err error
+			tasks[i], err = t.supervisor.Await(ctx, task.ID)
+			if err != nil {
+				return agent.ToolResult{}, err
+			}
+			ok = ok && tasks[i].Status == "completed"
+		}
+		data, err := json.Marshal(struct {
+			OK      bool   `json:"ok"`
+			Results []Task `json:"results"`
+		}{ok, tasks})
+		return agent.ToolResult{Content: string(data)}, err
+	}
 	t.mu.Lock()
 	if len(input.Tasks) > t.remaining {
 		t.mu.Unlock()

@@ -65,6 +65,19 @@ type nativeWorkBackend struct {
 	baseURL  string
 }
 
+func (b *nativeWorkBackend) CompleteStream(ctx context.Context, request agent.TurnRequest, delta func(string)) (agent.Turn, error) {
+	if streaming, ok := b.Model.(agent.StreamingModel); ok {
+		return streaming.CompleteStream(ctx, request, delta)
+	}
+	return b.Model.Complete(ctx, request)
+}
+func (b *nativeWorkBackend) SupportsVisualInput() bool {
+	if visual, ok := b.Model.(agent.VisualInputModel); ok {
+		return visual.SupportsVisualInput()
+	}
+	return true
+}
+
 func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory workModelFactory) error {
 	flags := flag.NewFlagSet("work", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
@@ -92,6 +105,8 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	flags.Var(&artifacts, "artifact", "required output-relative artifact path (repeatable; default report.md)")
 	var contains containsFlags
 	flags.Var(&contains, "require-contains", "required literal as ARTIFACT=TEXT (repeatable)")
+	var webOrigins stringFlags
+	flags.Var(&webOrigins, "web-origin", "explicitly permitted HTTPS research origin (repeatable)")
 	var selectedConnectors connectorFlags
 	flags.Var(&selectedConnectors, "connector", "configured connected source ID (repeatable)")
 	var imagePaths attachmentFlags
@@ -222,6 +237,9 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 		}
 		executor.Code = native.codeDelegate(stateDir)
 	}
+	if err := configureWorkRoles(&executor, settings, stateDir); err != nil {
+		return err
+	}
 	if len(codeVerification) == 0 {
 		codeVerification = parseSuggestedVerification(suggestedVerificationCommands(*sourcePath))
 	}
@@ -233,8 +251,11 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 	if disposition == action.Approve {
 		approve = workActionApprover(in, out)
 	}
-	outcome, runErr := executor.Execute(context.Background(), workrun.Request{
+	outcome, runErr := (workrun.Service{Executor: executor}).Execute(context.Background(), workrun.Request{
+		OTLPEndpoint:         os.Getenv("GATOR_OTLP_ENDPOINT"),
+		WebOrigins:           webOrigins,
 		SourcePath:           *sourcePath,
+		Provider:             resolvedProvider + "/" + resolvedModel,
 		Objective:            objective,
 		RunID:                *runID,
 		MaxSteps:             *maxSteps,

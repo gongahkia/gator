@@ -15,7 +15,7 @@ func TestStoreAndScheduleDue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := store.Save(Definition{Name: "Daily brief", Enabled: true, Schedule: "0 9 * * *", Timezone: "Asia/Singapore", SourcePath: "/source", Objective: "Write brief", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md")})
+	definition, err := store.Save(Definition{Name: "Daily brief", Enabled: true, Schedule: "0 9 * * *", Timezone: "Asia/Singapore", SourcePath: t.TempDir(), Objective: "Write brief", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestAttemptPersistsImmutableIntentEventsAndResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := store.Save(Definition{Name: "Daily brief", Enabled: true, Schedule: "0 9 * * *", Timezone: "UTC", SourcePath: "/source", Objective: "Write brief", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md")})
+	definition, err := store.Save(Definition{Name: "Daily brief", Enabled: true, Schedule: "0 9 * * *", Timezone: "UTC", SourcePath: t.TempDir(), Objective: "Write brief", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestAttemptPersistsImmutableIntentEventsAndResult(t *testing.T) {
 func TestJobsCannotApproveActions(t *testing.T) {
 	contract := artifact.DefaultContract("brief.md")
 	contract.ExternalActions = action.Approve
-	definition := Definition{Version: 1, ID: "job-test", Name: "unsafe", Schedule: "* * * * *", Timezone: "UTC", SourcePath: "/source", Objective: "send", Mode: action.Draft, Contract: contract, MaxSteps: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()}
+	definition := Definition{Version: 1, ID: "job-test", Name: "unsafe", Schedule: "* * * * *", Timezone: "UTC", SourcePath: t.TempDir(), Objective: "send", Mode: action.Draft, Contract: contract, MaxSteps: 1, CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	if err := definition.Validate(); err == nil {
 		t.Fatal("approved scheduled action accepted")
 	}
@@ -88,7 +88,7 @@ func TestJobsCannotApproveActions(t *testing.T) {
 
 func TestRunOnceCatchesScheduleMissedSinceCreation(t *testing.T) {
 	created := time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC)
-	definition := Definition{Version: 1, ID: "job-catchup", Name: "Catch up", Enabled: true, Schedule: "0 1 * * *", Timezone: "UTC", Missed: "run_once", SourcePath: "/source", Objective: "Write", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md"), MaxSteps: 1, CreatedAt: created, UpdatedAt: created}
+	definition := Definition{Version: 1, ID: "job-catchup", Name: "Catch up", Enabled: true, Schedule: "0 1 * * *", Timezone: "UTC", Missed: "run_once", SourcePath: t.TempDir(), Objective: "Write", Mode: action.Draft, Contract: artifact.DefaultContract("brief.md"), MaxSteps: 1, CreatedAt: created, UpdatedAt: created}
 	due, ok, err := Due(definition, time.Date(2026, 9, 9, 3, 0, 0, 0, time.UTC))
 	if err != nil || !ok || !due.Equal(time.Date(2026, 9, 9, 1, 0, 0, 0, time.UTC)) {
 		t.Fatalf("Due = %v, %v, %v", due, ok, err)

@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/gongahkia/gator/internal/workspace"
 	"io"
 	"os"
 	"path/filepath"
@@ -218,6 +221,7 @@ func applyPatch(arguments []string, out io.Writer) error {
 }
 
 type workApplyOptions struct {
+	codePatch   string
 	reference   string
 	destination string
 	replace     bool
@@ -230,6 +234,12 @@ func parseWorkApplyOptions(arguments []string) (workApplyOptions, bool, error) {
 	for index := 0; index < len(arguments); index++ {
 		argument := arguments[index]
 		switch {
+		case argument == "--code-patch":
+			if index+1 >= len(arguments) {
+				return workApplyOptions{}, false, errors.New("--code-patch requires one verified candidate patch path")
+			}
+			index++
+			options.codePatch = arguments[index]
 		case argument == "--replace":
 			options.replace = true
 		case argument == "--check":
@@ -260,6 +270,39 @@ func parseWorkApplyOptions(arguments []string) (workApplyOptions, bool, error) {
 }
 
 func applyWorkBundle(out io.Writer, bundle artifact.Bundle, options workApplyOptions) error {
+	if options.codePatch != "" {
+		var selected *patch.Candidate
+		for i := range bundle.Manifest.Candidates {
+			candidate := &bundle.Manifest.Candidates[i]
+			if candidate.PatchPath == options.codePatch && candidate.Status == "verified" {
+				selected = candidate
+			}
+		}
+		if selected == nil {
+			return errors.New("select a verified code candidate retained by this bundle")
+		}
+		if err := artifact.VerifyBundle(bundle); err != nil {
+			return err
+		}
+		root, err := workspace.Open(bundle.Output.Path())
+		if err != nil {
+			return err
+		}
+		payload, err := root.ReadRegularFile(options.codePatch, 16*1024*1024)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(payload)
+		if hex.EncodeToString(sum[:]) != selected.SHA256 {
+			return errors.New("candidate patch digest mismatch")
+		}
+		if err := patch.ApplyCandidate(context.Background(), options.destination, *selected, payload, options.check); err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(out, "Code candidate %s: %s\nChanged paths: %s\n", selected.ID, map[bool]string{true: "preflight passed", false: "applied"}[options.check], strings.Join(selected.ChangedPaths, ", "))
+		return err
+	}
+
 	var plan artifact.ApplyPlan
 	var applyErr error
 	if options.check {

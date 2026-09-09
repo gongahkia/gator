@@ -4,13 +4,16 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	gatorrun "github.com/gongahkia/gator/internal/run"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
@@ -19,7 +22,9 @@ import (
 	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/orchestrator"
+	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/snapshot"
+	"github.com/gongahkia/gator/internal/telemetry"
 	"github.com/gongahkia/gator/internal/tools"
 	"github.com/gongahkia/gator/internal/worksession"
 	"github.com/gongahkia/gator/internal/workspace"
@@ -44,11 +49,36 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 			return Outcome{}, err
 		}
 	}
+
+	if request.Limits.ModelRequests == 0 {
+		request.Limits.ModelRequests = 256
+	}
+	if request.Limits.WallSeconds == 0 {
+		request.Limits.WallSeconds = 1800
+	}
+	if request.Limits.ModelRequests < 1 || request.Limits.ModelRequests > 4096 || request.Limits.WallSeconds < 1 || request.Limits.WallSeconds > 86400 || request.Limits.Tokens < 0 {
+		return Outcome{}, errors.New("invalid aggregate budget")
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(request.Limits.WallSeconds)*time.Second)
+	defer cancel()
+	if request.Budget == nil {
+		request.Budget = &agent.Budget{Limits: request.Limits}
+	}
+	e.Model = agent.WithBudget(e.Model, request.Budget)
+	roles := make(map[string]agent.Model, len(e.RoleModels))
+	for role, model := range e.RoleModels {
+		roles[role] = agent.WithBudget(model, request.Budget)
+	}
+	e.RoleModels = roles
 	startedAt := now()
+	trace := telemetry.New(request.RunID, startedAt)
+	defer trace.Finish(filepath.Join(request.StateDir, "gator", "traces", request.RunID), request.OTLPEndpoint)
 	sessions, err := worksession.Open(request.StateDir)
 	if err != nil {
 		return Outcome{}, err
 	}
+	var parent worksession.Revision
+	var initial []agent.Message
 	var conversation worksession.Conversation
 	var sourceSnapshot snapshot.Manifest
 	if request.ConversationID != "" {
@@ -59,14 +89,39 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		if request.ParentRevisionID == "" {
 			request.ParentRevisionID = conversation.HeadRevision
 		}
+
+		if request.ParentRevisionID != "" {
+			parent, err = sessions.LoadRevision(conversation.ID, request.ParentRevisionID)
+			if err != nil {
+				return Outcome{}, fmt.Errorf("load parent Work revision: %w", err)
+			}
+			initial, err = replayMessages(sessions, parent, request.Provider)
+			if err != nil {
+				return Outcome{}, err
+			}
+		}
 		if request.RefreshSource {
 			options := request.SnapshotOptions
 			options.Now = now
-			sourceSnapshot, err = snapshot.Create(conversation.SourcePath, request.StateDir, options)
+			source := conversation.SourcePath
+			if parent.SnapshotID != "" {
+				previous, openErr := snapshot.Open(request.StateDir, parent.SnapshotID)
+				if openErr != nil {
+					return Outcome{}, openErr
+				}
+				source = previous.SourcePath
+			}
+			if request.SourcePath != "" && request.SourcePath != "." {
+				source = request.SourcePath
+			}
+			sourceSnapshot, err = snapshot.Create(source, request.StateDir, options)
 		} else {
 			snapshotID := request.SnapshotID
 			if snapshotID == "" {
-				snapshotID = conversation.SnapshotID
+				snapshotID = parent.SnapshotID
+				if snapshotID == "" {
+					snapshotID = conversation.SnapshotID
+				}
 			}
 			sourceSnapshot, err = snapshot.Open(request.StateDir, snapshotID)
 		}
@@ -79,6 +134,18 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	if err != nil {
 		return Outcome{}, err
+	}
+
+	if request.Project == nil {
+		if parent.ID != "" && !request.RefreshSource {
+			request.Project = parent.Project
+		} else if request.SnapshotID == "" {
+			bundle, captureErr := projectcapture.Capture(sourceSnapshot.SourcePath, request.Code.Scopes, request.Code.Profile, request.Code.Capabilities)
+			if captureErr != nil {
+				return Outcome{}, fmt.Errorf("capture Code configuration: %w", captureErr)
+			}
+			request.Project = &bundle
+		}
 	}
 	if request.OnSnapshot != nil {
 		request.OnSnapshot(sourceSnapshot)
@@ -109,14 +176,62 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 	}
 
+	var stateMu sync.Mutex
+	var eventMu sync.Mutex
 	renderers := make(map[string]artifact.RendererEvidence)
 	surface, err := tools.WorkFilesWithRendererEvidence(work.Source, work.Output, request.Contract, request.Mode != action.Inspect, previousRoot, func(evidence artifact.RendererEvidence) {
+		stateMu.Lock()
+		defer stateMu.Unlock()
 		renderers[evidence.Path] = evidence
 	})
 	if err != nil {
 		return outcome, err
 	}
+	catalog := newCatalog(work, sourceSnapshot)
+	request.catalog = catalog
+	surface = append(surface, tools.ExtractDocument{Root: work.Source}, tools.InspectTable{Root: work.Source})
+	surface = append(surface, catalog.tools()...)
+	webTools, err := catalog.web(request.WebOrigins, e.HTTP)
+	if err != nil {
+		return outcome, err
+	}
+	surface = append(surface, webTools...)
+	if request.Mode != action.Inspect {
+		surface = append(surface, tools.ReconcileTables{Source: work.Source, Output: work.Output, Contract: request.Contract})
+	}
 	connectedSources := make([]connector.Provenance, 0, len(request.ConnectorIDs))
+	if parent.ID != "" {
+		bundle, err := artifact.OpenBundle(parent.BundlePath)
+		if err != nil {
+			return outcome, err
+		}
+		if err := artifact.VerifyBundle(bundle); err != nil {
+			return outcome, err
+		}
+		for _, entry := range bundle.Manifest.Evidence {
+			if entry.SnapshotPath == "" {
+				continue
+			}
+			data, err := bundle.Root.ReadRegularFile(entry.SnapshotPath, 512*1024)
+			if err != nil {
+				return outcome, err
+			}
+			if _, err := catalog.retain(entry.Locator, data, entry.RetrievedAt); err != nil {
+				return outcome, err
+			}
+		}
+		for _, entry := range bundle.Manifest.ConnectedSources {
+			data, err := bundle.Root.ReadRegularFile(entry.SnapshotPath, 256*1024)
+			if err != nil {
+				return outcome, err
+			}
+			retained, err := persistConnectedSnapshot(work.Path, connector.Result{Data: data, Provenance: entry})
+			if err != nil {
+				return outcome, err
+			}
+			connectedSources = append(connectedSources, retained)
+		}
+	}
 	actions := make([]action.Record, 0, 4)
 	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
@@ -126,34 +241,56 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 			if err != nil {
 				return err
 			}
+			stateMu.Lock()
+			defer stateMu.Unlock()
+			if _, err := catalog.retain("connector:"+source.ConnectorID+"/"+source.Operation, result.Data, now()); err != nil {
+				return err
+			}
 			connectedSources = append(connectedSources, source)
 			return nil
 		},
-		OnAction: func(record action.Record) { actions = append(actions, record) },
+		OnAction: func(record action.Record) { stateMu.Lock(); defer stateMu.Unlock(); actions = append(actions, record) },
 	})
 	if err != nil {
 		return outcome, err
 	}
 	surface = append(surface, connectorSurface...)
+	request.researchTools = append(catalog.tools(), webTools...)
 	events := make([]agent.Event, 0, 32)
 	emit := func(event agent.Event) {
+		eventMu.Lock()
+		defer eventMu.Unlock()
+		trace.Record(event)
 		events = append(events, event)
 		if request.OnEvent != nil {
 			request.OnEvent(event)
 		}
 	}
 	subagents := make([]artifact.SubagentEvidence, 0, 8)
-	delegationSurface, err := e.subagentTools(request, work, previousRoot, emit, func(record orchestrator.Record) {
+	integration := &codeIntegration{request: request, work: work, patches: map[string]string{}, accepted: map[string]string{}}
+	for path, hash := range parent.AcceptedCode {
+		integration.accepted[path] = hash
+	}
+	request.integration = integration
+	if request.Mode != action.Inspect && e.Code != nil {
+		surface = append(surface, integration)
+	}
+	delegationSurface, closeSpecialists, err := e.subagentTools(ctx, request, work, previousRoot, emit, func(record orchestrator.Record) {
+		stateMu.Lock()
+		defer stateMu.Unlock()
 		subagents = append(subagents, subagentEvidence(record))
 	})
 	if err != nil {
 		return outcome, fmt.Errorf("configure Work specialists: %w", err)
 	}
+	defer closeSpecialists()
 	surface = append(surface, delegationSurface...)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var check func([]agent.Message) error
 	if request.Mode != action.Inspect {
 		check = outcomeCompletionCheck(work.Output, request.Contract, func() bool {
+			stateMu.Lock()
+			defer stateMu.Unlock()
 			if !request.RequireCode {
 				return true
 			}
@@ -165,7 +302,29 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 			return false
 		})
 	}
+
+	initial, summary, compacted, compactErr := gatorrun.CompactContext(ctx, e.Model, initial)
+	if compactErr != nil {
+		return outcome, compactErr
+	}
+	if compacted {
+		emit(agent.Event{Kind: agent.EventContextCompacted, At: now(), Text: "Compacted retained Work context."})
+	}
+	initial = append(initial, agent.Message{Role: agent.RoleUser, Content: request.Objective, Images: request.Images, Attachments: request.Attachments})
+	if visual, ok := e.Model.(agent.VisualInputModel); ok && !visual.SupportsVisualInput() {
+		for _, message := range initial {
+			if len(message.Images) > 0 {
+				return outcome, errors.New("selected model does not support retained or selected images")
+			}
+			for _, a := range message.Attachments {
+				if a.MediaType == "application/pdf" {
+					return outcome, errors.New("selected model does not support PDF attachments")
+				}
+			}
+		}
+	}
 	result, runErr := runner.Run(ctx, agent.RunOptions{
+		InitialMessages: initial,
 		Task:            request.Objective,
 		Images:          request.Images,
 		Attachments:     request.Attachments,
@@ -175,6 +334,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		Steering:        request.Steering,
 		CompletionCheck: check,
 	})
+	closeSpecialists()
 	outcome.Result = result
 	outcome.Events = append([]agent.Event(nil), events...)
 
@@ -183,6 +343,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		failure = runErr.Error()
 	}
 	sortSubagentEvidence(subagents)
+	trace.Record(agent.Event{Kind: "artifact_seal", At: now()})
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
 		RunID: request.RunID, Objective: request.Objective, Source: work.Source, SourceName: sourceSnapshot.SourceName, SourceIdentity: sourceSnapshot.SourcePath, SnapshotSHA256: sourceSnapshot.SHA256,
 		Failure: failure, Actions: actions, ConnectedSources: connectedSources, Renderers: rendererEvidence(renderers), Subagents: subagents, StartedAt: startedAt, FinishedAt: now(),
@@ -193,6 +354,10 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 		return outcome, fmt.Errorf("seal work artifacts: %w", sealErr)
 	}
+	manifest.PolicySHA256, _ = PolicyDigest(request)
+	manifest.Usage = request.Budget.Usage()
+	manifest.Candidates = integration.records
+	manifest.Evidence = catalog.list()
 	outcome.Manifest = manifest
 	if err := artifact.WriteManifest(work.ManifestPath, manifest); err != nil {
 		if runErr != nil {
@@ -200,8 +365,17 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 		return outcome, fmt.Errorf("write work manifest: %w", err)
 	}
+	configuration, _ := json.Marshal(struct {
+		Contract   artifact.Contract
+		Code       CodePolicy
+		Mode       action.Mode
+		Connectors []string
+	}{request.Contract, request.Code, request.Mode, request.ConnectorIDs})
 	if _, err := sessions.AddRevision(conversation.ID, worksession.Revision{
-		ID: request.RunID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID,
+		AcceptedCode: integration.accepted,
+		Project:      request.Project,
+		Replay:       &worksession.ReplayState{Version: 1, Provider: request.Provider, Messages: result.Messages, Configuration: configuration, CompactionVersion: 1, Summary: summary},
+		ID:           request.RunID, ParentRevisionID: request.ParentRevisionID, SnapshotID: sourceSnapshot.ID,
 		Objective: request.Objective, BundlePath: work.Path, Status: string(manifest.Status), FinalText: result.FinalText, CreatedAt: now(),
 	}); err != nil {
 		if runErr != nil {
@@ -322,6 +496,18 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		return Request{}, errors.New("work state directory is required")
 	}
 	request.StateDir = stateDir
+	if request.MaxSteps == 0 {
+		request.MaxSteps = 24
+	}
+	if request.Code.MaxSteps == 0 || request.Code.MaxSteps > 32 {
+		request.Code.MaxSteps = 32
+	}
+	if request.Limits.ModelRequests == 0 {
+		request.Limits.ModelRequests = 256
+	}
+	if request.Limits.WallSeconds == 0 {
+		request.Limits.WallSeconds = 1800
+	}
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
@@ -416,4 +602,46 @@ func newID(now time.Time) (string, error) {
 		return "", fmt.Errorf("generate work id: %w", err)
 	}
 	return "work-" + now.UTC().Format("20060102T150405") + "-" + hex.EncodeToString(entropy), nil
+}
+
+func replayMessages(store worksession.Store, revision worksession.Revision, provider string) ([]agent.Message, error) {
+	if revision.Replay != nil {
+		if revision.Replay.Version != 1 {
+			return nil, errors.New("unsupported Work replay version")
+		}
+		payload, err := json.Marshal(revision.Replay.Messages)
+		if err != nil {
+			return nil, err
+		}
+		var messages []agent.Message
+		if err := json.Unmarshal(payload, &messages); err != nil {
+			return nil, err
+		}
+		if provider != revision.Replay.Provider {
+			for i := range messages {
+				messages[i].ProviderData = nil
+				for j := range messages[i].ToolCalls {
+					messages[i].ToolCalls[j].ProviderID = ""
+				}
+			}
+		}
+		return messages, nil
+	}
+	// legacy revisions retain only objective and final text; never invent tool history.
+	var messages []agent.Message
+	if revision.ParentRevisionID != "" {
+		parent, err := store.LoadRevision(revision.ConversationID, revision.ParentRevisionID)
+		if err != nil {
+			return nil, err
+		}
+		messages, err = replayMessages(store, parent, provider)
+		if err != nil {
+			return nil, err
+		}
+	}
+	messages = append(messages, agent.Message{Role: agent.RoleUser, Content: revision.Objective})
+	if revision.FinalText != "" {
+		messages = append(messages, agent.Message{Role: agent.RoleAgent, Content: revision.FinalText})
+	}
+	return messages, nil
 }

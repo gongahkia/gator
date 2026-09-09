@@ -290,6 +290,10 @@ func imageDataURL(image agent.Image) string {
 }
 
 type responsePayload struct {
+	Usage *struct {
+		Input  int64 `json:"input_tokens"`
+		Output int64 `json:"output_tokens"`
+	} `json:"usage"`
 	Output []responseOutputItem `json:"output"`
 }
 
@@ -335,7 +339,11 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 	if text.Len() == 0 && len(calls) == 0 {
 		return agent.Turn{}, errors.New("OpenAI response contained no output text or function calls")
 	}
-	return agent.Turn{Text: text.String(), ToolCalls: calls}, nil
+	turn := agent.Turn{Text: text.String(), ToolCalls: calls}
+	if payload.Usage != nil {
+		turn.Usage = agent.Usage{Reported: true, InputTokens: payload.Usage.Input, OutputTokens: payload.Usage.Output}
+	}
+	return turn, nil
 }
 
 func decodeSSE(reader io.Reader, onDelta func(string)) (agent.Turn, error) {

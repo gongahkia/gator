@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -9,6 +8,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"net"
 	"net/http"
@@ -24,7 +25,6 @@ import (
 	"time"
 
 	"github.com/gongahkia/gator/internal/action"
-	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
 	"github.com/gongahkia/gator/internal/journal"
@@ -290,19 +290,27 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 }
 
 func executeJob(definition jobs.Definition, attempt jobs.Attempt, stateDir string, notify bool) jobs.Attempt {
+	return executeJobContext(context.Background(), definition, attempt, stateDir, notify)
+}
+func executeJobContext(ctx context.Context, definition jobs.Definition, attempt jobs.Attempt, stateDir string, notify bool) jobs.Attempt {
 	var result jobResult
 	var runErr error
 	for try := 1; try <= 3; try++ {
 		attempt.Try = try
-		result, runErr = runJobProcess(definition, stateDir)
+		result, runErr = runJobProcessContext(ctx, definition, stateDir)
 		if runErr == nil {
 			break
 		}
-		if strings.Contains(strings.ToLower(runErr.Error()), "outcome uncertain") || strings.Contains(strings.ToLower(runErr.Error()), "unknown") {
+		if !agent.IsTransient(runErr) {
 			break
 		}
 		if try < 3 {
-			time.Sleep(time.Duration(try) * time.Second)
+			select {
+			case <-time.After(time.Duration(try) * time.Second):
+			case <-ctx.Done():
+				runErr = ctx.Err()
+				try = 3
+			}
 		}
 	}
 	attempt.FinishedAt = time.Now().UTC()
@@ -327,50 +335,15 @@ func executeJob(definition jobs.Definition, attempt jobs.Attempt, stateDir strin
 }
 
 func runJobProcess(definition jobs.Definition, stateDir string) (jobResult, error) {
-	arguments := []string{"work", "--json", "--source", definition.SourcePath, "--mode", string(definition.Mode), "--actions", string(definition.Contract.ExternalActions), "--max-steps", strconv.Itoa(definition.MaxSteps)}
-	if definition.Provider != "" {
-		arguments = append(arguments, "--provider", definition.Provider)
+	return runJobProcessContext(context.Background(), definition, stateDir)
+}
+func runJobProcessContext(ctx context.Context, definition jobs.Definition, stateDir string) (jobResult, error) {
+	request := workrun.Request{Project: definition.Project, SourcePath: definition.SourcePath, SnapshotID: definition.SnapshotID, Objective: definition.Objective, Mode: definition.Mode, Contract: definition.Contract, Code: definition.Code, MaxSteps: definition.MaxSteps, ConnectorIDs: definition.ConnectorIDs}
+	if definition.RefreshSnapshot {
+		request.SnapshotID = ""
 	}
-	if definition.Model != "" {
-		arguments = append(arguments, "--model", definition.Model)
-	}
-	for _, requirement := range definition.Contract.Artifacts {
-		arguments = append(arguments, "--artifact", requirement.Path)
-		for _, validation := range requirement.Validations {
-			if validation.Kind == artifact.Contains {
-				arguments = append(arguments, "--require-contains", requirement.Path+"="+validation.Value)
-			}
-		}
-	}
-	for _, connectorID := range definition.ConnectorIDs {
-		arguments = append(arguments, "--connector", connectorID)
-	}
-	arguments = append(arguments, "--", definition.Objective)
-	executable, err := os.Executable()
-	if err != nil {
-		return jobResult{}, err
-	}
-	command := exec.Command(executable, arguments...)
-	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
-	var output bytes.Buffer
-	command.Stdout = &output
-	command.Stderr = &output
-	runErr := command.Run()
-	var result jobResult
-	decodeErr := json.Unmarshal(output.Bytes(), &result)
-	if runErr != nil {
-		if result.Error != "" {
-			return result, errors.New(result.Error)
-		}
-		return result, fmt.Errorf("scheduled Work process: %w: %s", runErr, boundedJobError(output.String()))
-	}
-	if decodeErr != nil {
-		return result, fmt.Errorf("decode scheduled Work result: %w", decodeErr)
-	}
-	if result.Error != "" {
-		return result, errors.New(result.Error)
-	}
-	return result, nil
+	outcome, err := executeConfiguredWork(ctx, definition.Provider, definition.Model, stateDir, request)
+	return jobResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, ManifestPath: outcome.Work.ManifestPath, Status: string(outcome.Manifest.Status)}, err
 }
 
 func runJobSupervisor(arguments []string, out io.Writer) error {
@@ -396,6 +369,16 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 		return err
 	}
 	defer os.Remove(lockPath)
+	interrupted, err := store.Reconcile()
+	if err != nil {
+		return err
+	}
+	for _, attempt := range interrupted {
+		definition, err := store.Load(attempt.JobID)
+		if err == nil {
+			_, _ = recordJobInbox(stateDir, definition, attempt)
+		}
+	}
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return err
@@ -448,7 +431,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 	defer os.Remove(filepath.Join(store.Root(), "supervisor.json"))
 	defer os.Remove(filepath.Join(store.Root(), "supervisor.token"))
 	fmt.Fprintf(out, "Gator job supervisor running at %s (PID %d). Keep this terminal open.\n", state.URL, state.PID)
-	runDueJobs(store, stateDir, *notify, time.Now())
+	runDueJobsContext(ctx, store, stateDir, *notify, time.Now())
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -459,7 +442,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 			_ = server.Shutdown(shutdown)
 			return nil
 		case now := <-ticker.C:
-			runDueJobs(store, stateDir, *notify, now)
+			runDueJobsContext(ctx, store, stateDir, *notify, now)
 		}
 	}
 }
@@ -489,6 +472,9 @@ func acquireSupervisorLock(path string) error {
 }
 
 func runDueJobs(store jobs.Store, stateDir string, notify bool, now time.Time) {
+	runDueJobsContext(context.Background(), store, stateDir, notify, now)
+}
+func runDueJobsContext(ctx context.Context, store jobs.Store, stateDir string, notify bool, now time.Time) {
 	definitions, err := store.List()
 	if err != nil {
 		return
@@ -501,15 +487,11 @@ func runDueJobs(store jobs.Store, stateDir string, notify bool, now time.Time) {
 		if err != nil || !due {
 			continue
 		}
-		claimed, ok, err := store.Claim(definition.ID, scheduled)
+		claimed, attempt, ok, err := store.ClaimBegin(definition.ID, scheduled)
 		if err != nil || !ok {
 			continue
 		}
-		attempt, err := store.Begin(claimed, scheduled)
-		if err != nil {
-			continue
-		}
-		attempt = executeJob(claimed, attempt, stateDir, notify)
+		attempt = executeJobContext(ctx, claimed, attempt, stateDir, notify)
 		if err := store.Record(attempt); err != nil {
 			continue
 		}

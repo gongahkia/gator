@@ -12,6 +12,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/projectcapture"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/snapshot"
 	"github.com/gongahkia/gator/internal/tools"
@@ -57,6 +58,16 @@ func (p CodePolicy) HasCapability(name string) bool {
 
 // Request describes one bounded local work session.
 type Request struct {
+	OTLPEndpoint         string
+	Limits               agent.Limits
+	Budget               *agent.Budget
+	WebOrigins           []string
+	catalog              *evidenceCatalog
+	researchTools        []agent.Tool
+	DisableDelegation    bool
+	integration          *codeIntegration
+	Project              *projectcapture.Bundle
+	Provider             string
 	SourcePath           string
 	Objective            string
 	RunID                string
@@ -104,6 +115,9 @@ type Outcome struct {
 // frozen source selected by a Work run. The implementation must isolate all
 // writes and return a reviewable patch rather than mutate SourcePath.
 type CodeRequest struct {
+	Budget      *agent.Budget
+	Baseline    []byte
+	Project     *projectcapture.Bundle
 	ID          string
 	SourcePath  string
 	ScratchPath string
@@ -128,6 +142,9 @@ type CodeDelegate func(context.Context, CodeRequest) (CodeResult, error)
 // Executor combines a provider-independent model with private workspace
 // allocation and artifact sealing.
 type Executor struct {
+	RoleSteps  map[string]int
+	HTTP       tools.HTTPFetchOptions
+	RoleModels map[string]agent.Model
 	Model      agent.Model
 	Now        func() time.Time
 	StateDir   string

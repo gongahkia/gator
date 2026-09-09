@@ -2,7 +2,11 @@
 package worktui
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/workrun"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -30,6 +34,10 @@ type RunResult struct {
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
+	Context     context.Context
+	OnEvent     agent.EventSink
+	Steering    <-chan string
+	OnOperation func(*workrun.Operation)
 	MaxSteps    int
 	Attachments []string
 	Code        CodeOptions
@@ -50,6 +58,7 @@ type CodeOptions struct {
 }
 
 type Config struct {
+	Live                bool
 	CurrentFolder       string
 	Conversations       []worksession.Conversation
 	StartConversationID string
@@ -88,6 +97,10 @@ type queuedRun struct {
 }
 
 type Model struct {
+	live          <-chan tea.Msg
+	cancel        context.CancelFunc
+	operation     *workrun.Operation
+	interaction   *workrun.Interaction
 	config        Config
 	width         int
 	height        int
@@ -148,7 +161,30 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = value.Width, value.Height
+	case agent.Event:
+		if value.Kind == agent.EventTextDelta {
+			m.status = "Working: " + value.Text
+		} else if value.Text != "" {
+			m.status = value.Text
+		} else {
+			m.status = string(value.Kind)
+		}
+		return m, waitWorkEvent(m.live)
+	case *workrun.Operation:
+		m.operation = value
+		return m, waitWorkEvent(m.live)
+	case workrun.Interaction:
+		m.interaction = &value
+		preview, _ := json.Marshal(value.Preview)
+		m.messages = append(m.messages, message{role: "Approval", text: string(preview) + "\nUse /approve or /deny."})
+		return m, waitWorkEvent(m.live)
 	case runDone:
+		if m.cancel != nil {
+			m.cancel()
+		}
+		m.operation = nil
+		m.interaction = nil
+		m.live = nil
 		m.running = false
 		if value.ConversationID != "" {
 			m.conversation = value.ConversationID
@@ -176,8 +212,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			m.messages = append(m.messages, message{role: "You", text: next.prompt})
 			m.running = true
 			m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
-			source, conversation, run := m.source, m.conversation, m.config.Run
-			return m, func() tea.Msg { return runDone(run(source, conversation, next.prompt, next.options)) }
+			source, conversation := m.source, m.conversation
+			return m.startWork(source, conversation, next.prompt, next.options)
 		}
 		if value.Error != "" && len(m.queue) > 0 {
 			m.status = fmt.Sprintf("Run stopped · %d queued prompt(s) paused", len(m.queue))
@@ -233,10 +269,15 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			source, conversation := m.source, m.conversation
 			options := cloneRunOptions(m.options)
 			m.options.Attachments = nil
-			return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
+			return m.startWork(source, conversation, prompt, options)
 		}
 	case tea.KeyMsg:
 		if value.String() == "ctrl+c" {
+			if m.running && m.cancel != nil {
+				m.cancel()
+				m.status = "Cancelling; retaining evidence…"
+				return m, nil
+			}
 			return m, tea.Quit
 		}
 		if value.Type == tea.KeyCtrlX && !m.running {
@@ -288,6 +329,28 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				m.input = ""
+				if strings.HasPrefix(prompt, "/steer ") && m.operation != nil {
+					err := m.operation.Steer(strings.TrimSpace(strings.TrimPrefix(prompt, "/steer ")))
+					if err != nil {
+						m.status = err.Error()
+					} else {
+						m.status = "Steering submitted to current task"
+					}
+					return m, nil
+				}
+				if (prompt == "/approve" || prompt == "/deny") && m.operation != nil && m.interaction != nil {
+					err := m.operation.Respond(m.interaction.ID, prompt == "/approve")
+					if err != nil {
+						m.status = err.Error()
+					}
+					m.interaction = nil
+					return m, nil
+				}
+				if prompt == "/cancel" && m.cancel != nil {
+					m.cancel()
+					m.status = "Cancelling…"
+					return m, nil
+				}
 				if strings.HasPrefix(prompt, "/") {
 					return m.runLocalCommand(prompt)
 				}
@@ -345,7 +408,7 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			source, conversation := m.source, m.conversation
 			options := cloneRunOptions(m.options)
 			m.options.Attachments = nil
-			return m, func() tea.Msg { return runDone(run(source, conversation, prompt, options)) }
+			return m.startWork(source, conversation, prompt, options)
 		case "backspace":
 			runes := []rune(m.input)
 			if len(runes) > 0 {
@@ -397,7 +460,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		source, conversation := m.source, m.conversation
 		options := cloneRunOptions(m.options)
 		m.options.Attachments = nil
-		return m, func() tea.Msg { return runDone(run(source, conversation, prompt, options)) }
+		return m.startWork(source, conversation, prompt, options)
 	case "backspace":
 		runes := []rune(m.input)
 		if len(runes) > 0 {
@@ -1296,4 +1359,42 @@ func truncate(value string, maximum int) string {
 		return "…"
 	}
 	return string(runes[:maximum-1]) + "…"
+}
+
+func waitWorkEvent(events <-chan tea.Msg) tea.Cmd {
+	if events == nil {
+		return nil
+	}
+	return func() tea.Msg { return <-events }
+}
+func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
+	if !m.config.Live {
+		return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	events := make(chan tea.Msg, 128)
+	m.cancel = cancel
+	m.live = events
+	send := func(value tea.Msg) {
+		select {
+		case events <- value:
+		case <-ctx.Done():
+		}
+	}
+	options.Context = ctx
+	options.OnEvent = func(event agent.Event) { send(event) }
+	options.OnOperation = func(operation *workrun.Operation) {
+		send(operation)
+		go func() {
+			for interaction := range operation.Interactions {
+				send(interaction)
+			}
+		}()
+	}
+	run := m.config.Run
+	return m, tea.Batch(func() tea.Msg {
+		result := run(source, conversation, prompt, options)
+		events <- runDone(result)
+		return nil
+	}, waitWorkEvent(events))
 }

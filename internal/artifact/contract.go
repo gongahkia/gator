@@ -17,7 +17,7 @@ import (
 
 const (
 	ContractVersion = 1
-	ManifestVersion = 2
+	ManifestVersion = 3
 
 	DefaultMaxArtifactBytes int64 = 32 * 1024 * 1024
 	DefaultMaxTotalBytes    int64 = 128 * 1024 * 1024

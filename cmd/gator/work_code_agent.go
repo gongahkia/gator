@@ -13,8 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/instructions"
 	"github.com/gongahkia/gator/internal/patch"
+	"github.com/gongahkia/gator/internal/projectcapture"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/workrun"
 )
@@ -23,9 +25,28 @@ const maxCodeSubagentSteps = 32
 
 func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 	return func(ctx context.Context, request workrun.CodeRequest) (workrun.CodeResult, error) {
-		repository, err := prepareCodeSnapshotRepository(ctx, request.SourcePath, request.ScratchPath, request.ID)
+		repository, err := prepareCodeSnapshotRepository(ctx, request.SourcePath, request.ScratchPath, request.ID, request.Project)
 		if err != nil {
 			return workrun.CodeResult{}, err
+		}
+
+		originalCommand := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
+		originalCommand.Dir = repository
+		original, err := originalCommand.Output()
+		if err != nil {
+			return workrun.CodeResult{}, err
+		}
+		if len(request.Baseline) > 0 {
+			if err := patch.ApplySnapshot(ctx, repository, request.Baseline); err != nil {
+				return workrun.CodeResult{}, err
+			}
+			for _, args := range [][]string{{"add", "--all"}, {"-c", "user.name=Gator", "-c", "user.email=gator@invalid", "commit", "--quiet", "--allow-empty", "-m", "selected staged candidate"}} {
+				command := exec.CommandContext(ctx, "git", args...)
+				command.Dir = repository
+				if output, err := command.CombinedOutput(); err != nil {
+					return workrun.CodeResult{}, fmt.Errorf("stage baseline: %w: %s", err, output)
+				}
+			}
 		}
 		steps := request.Policy.MaxSteps
 		if steps <= 0 {
@@ -37,6 +58,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		digest := sha256.Sum256([]byte(request.ParentRunID + "\x00" + request.ID))
 		runID := "code-" + hex.EncodeToString(digest[:8])
 		code := b.code
+		code.Model = agent.WithBudget(code.Model, request.Budget)
 		code.Sandbox = request.Policy.Sandbox.Normalize()
 		verification := mergeCodeVerification(request.Policy.Verification)
 		omitted := []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
@@ -53,7 +75,13 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			}
 		}
 		outcome, runErr := code.Execute(ctx, gatorrun.Request{
-			RepositoryPath:          repository,
+			RepositoryPath: repository,
+			TrustIdentity: func() string {
+				if request.Project != nil {
+					return request.Project.Origin
+				}
+				return ""
+			}(),
 			Task:                    request.Task,
 			Provider:                b.provider,
 			Model:                   b.model,
@@ -64,6 +92,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			MaxSteps:                steps,
 			Verification:            verification,
 			Scopes:                  append([]string(nil), request.Policy.Scopes...),
+			WritePaths:              append([]string(nil), request.Policy.Scopes...),
 			Profile:                 request.Policy.Profile,
 			Setup:                   cloneCodeCommands(request.Policy.Setup),
 			AllowedCommands:         cloneCodeCommands(request.Policy.AllowedCommands),
@@ -79,9 +108,24 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		})
 		result := workrun.CodeResult{Summary: strings.TrimSpace(outcome.Result.FinalText), Steps: outcome.Result.Steps}
 		if outcome.Worktree.Path != "" {
-			result.Patch, err = patch.Export(ctx, outcome.Worktree.Path, outcome.Worktree.BaseCommit)
+			result.Patch, err = patch.Export(ctx, outcome.Worktree.Path, strings.TrimSpace(string(original)))
 			if err == nil {
 				result.ChangedPaths, err = patch.Paths(ctx, outcome.Worktree.Path, outcome.Worktree.BaseCommit)
+			}
+		}
+
+		if len(request.Policy.Scopes) > 0 {
+			for _, path := range result.ChangedPaths {
+				allowed := false
+				for _, scope := range request.Policy.Scopes {
+					scope = strings.TrimSuffix(filepath.ToSlash(filepath.Clean(scope)), "/")
+					if path == scope || strings.HasPrefix(path, scope+"/") {
+						allowed = true
+					}
+				}
+				if !allowed {
+					runErr = fmt.Errorf("Code changed path %q outside the assigned path envelope", path)
+				}
 			}
 		}
 		if err != nil && runErr != nil {
@@ -119,7 +163,7 @@ func cloneCodeCommands(commands [][]string) [][]string {
 	return result
 }
 
-func prepareCodeSnapshotRepository(ctx context.Context, source, scratch, id string) (string, error) {
+func prepareCodeSnapshotRepository(ctx context.Context, source, scratch, id string, configuration ...*projectcapture.Bundle) (string, error) {
 	if strings.TrimSpace(source) == "" || strings.TrimSpace(scratch) == "" || strings.TrimSpace(id) == "" || strings.ContainsAny(id, `/\\`) {
 		return "", errors.New("code specialist snapshot paths are invalid")
 	}
@@ -129,6 +173,11 @@ func prepareCodeSnapshotRepository(ctx context.Context, source, scratch, id stri
 	}
 	if err := copyCodeSnapshot(source, repository); err != nil {
 		return "", err
+	}
+	if len(configuration) > 0 && configuration[0] != nil {
+		if err := configuration[0].Install(repository); err != nil {
+			return "", err
+		}
 	}
 	for _, arguments := range [][]string{
 		{"init", "--quiet"},

@@ -250,6 +250,10 @@ func appendMessage(messages *[]message, role string, blocks []contentBlock) {
 }
 
 type response struct {
+	Usage *struct {
+		Input  int64 `json:"input_tokens"`
+		Output int64 `json:"output_tokens"`
+	} `json:"usage"`
 	Content []contentBlock `json:"content"`
 }
 
@@ -258,7 +262,11 @@ func decodeResponse(contents []byte) (agent.Turn, error) {
 	if err := json.Unmarshal(contents, &payload); err != nil {
 		return agent.Turn{}, fmt.Errorf("decode Anthropic response: %w", err)
 	}
-	return turnFromBlocks(payload.Content)
+	turn, err := turnFromBlocks(payload.Content)
+	if payload.Usage != nil {
+		turn.Usage = agent.Usage{Reported: true, InputTokens: payload.Usage.Input, OutputTokens: payload.Usage.Output}
+	}
+	return turn, err
 }
 
 func turnFromBlocks(blocks []contentBlock) (agent.Turn, error) {

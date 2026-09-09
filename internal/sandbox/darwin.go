@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -72,6 +73,24 @@ func sandboxRoots(root, scratch string, policy Policy) ([]string, []string, erro
 		readRoots = append(readRoots, moduleCache)
 	}
 	writeRoots := []string{root, scratch}
+	if len(policy.WritablePaths) > 0 {
+		writeRoots = []string{scratch}
+		for _, path := range policy.WritablePaths {
+			candidate := filepath.Join(root, path)
+			resolved, err := filepath.EvalSymlinks(candidate)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+			relative, err := filepath.Rel(root, resolved)
+			if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+				return nil, nil, errors.New("writable path escapes worktree")
+			}
+			writeRoots = append(writeRoots, resolved)
+		}
+	}
 	gitRead, gitWrite, err := gitMetadataRoots(root)
 	if err != nil {
 		return nil, nil, err

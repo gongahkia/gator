@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
+	"github.com/gongahkia/gator/internal/action"
+	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/sandbox"
+	"github.com/gongahkia/gator/internal/workrun"
 	"io"
 	"os"
 	"os/exec"
@@ -85,6 +89,7 @@ func workInteractiveConversation(startConversationID string) error {
 		return err
 	}
 	application := worktui.New(worktui.Config{
+		Live:          true,
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, Inbox: inboxEntries,
 		StartConversationID: startConversationID,
 		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
@@ -262,72 +267,66 @@ func selectWorkOnboardingProvider(providerName string) error {
 }
 
 func runInteractiveWork(source, conversationID, prompt, stateDir string, options worktui.RunOptions) worktui.RunResult {
-	arguments := []string{"work", "--json"}
-	if conversationID != "" {
-		arguments = append(arguments, "--conversation", conversationID)
-	} else {
-		arguments = append(arguments, "--source", source)
+	ctx := options.Context
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	if options.MaxSteps > 0 {
-		arguments = append(arguments, "--max-steps", fmt.Sprint(options.MaxSteps))
-	}
-	if options.Code.MaxSteps > 0 {
-		arguments = append(arguments, "--code-max-steps", fmt.Sprint(options.Code.MaxSteps))
-	}
-	for _, path := range options.Attachments {
-		flag := "--attach"
-		if attachment.IsImage(path) {
-			flag = "--image"
+	request := workrun.Request{SourcePath: source, ConversationID: conversationID, Objective: prompt, MaxSteps: options.MaxSteps, Mode: action.Draft, Contract: artifact.DefaultContract("report.md"), OnEvent: options.OnEvent, Steering: options.Steering}
+	parse := func(values []string) ([][]string, error) {
+		var result verificationFlags
+		for _, v := range values {
+			if err := result.Set(v); err != nil {
+				return nil, err
+			}
 		}
-		arguments = append(arguments, flag, path)
+		return result, nil
 	}
-	for _, value := range options.Code.Verification {
-		arguments = append(arguments, "--verify", value)
+	var err error
+	request.Code = workrun.CodePolicy{MaxSteps: options.Code.MaxSteps, Scopes: options.Code.Scopes, Profile: options.Code.Profile, Sandbox: sandbox.Policy{Mode: sandbox.Mode(options.Code.Sandbox), Network: sandbox.Network(options.Code.Network)}, Capabilities: options.Code.Capabilities, BrowserSession: options.Code.BrowserSession}
+	for _, pair := range []struct {
+		values []string
+		target *[][]string
+	}{{options.Code.Verification, &request.Code.Verification}, {options.Code.Setup, &request.Code.Setup}, {options.Code.AllowedCommands, &request.Code.AllowedCommands}, {options.Code.AllowedCommandPrefixes, &request.Code.AllowedCommandPrefixes}} {
+		*pair.target, err = parse(pair.values)
+		if err != nil {
+			return worktui.RunResult{Error: err.Error()}
+		}
 	}
-	for _, value := range options.Code.Scopes {
-		arguments = append(arguments, "--scope", value)
+	if len(request.Code.Verification) == 0 {
+		request.Code.Verification = parseSuggestedVerification(suggestedVerificationCommands(source))
 	}
-	if options.Code.Profile != "" {
-		arguments = append(arguments, "--profile", options.Code.Profile)
+	var images, documents attachmentFlags
+	for _, path := range options.Attachments {
+		if attachment.IsImage(path) {
+			images = append(images, path)
+		} else {
+			documents = append(documents, path)
+		}
 	}
-	for _, value := range options.Code.Setup {
-		arguments = append(arguments, "--setup", value)
+	request.Images, request.Attachments, err = loadPromptAttachments(source, images, documents)
+	if err != nil {
+		return worktui.RunResult{Error: err.Error()}
 	}
-	for _, value := range options.Code.AllowedCommands {
-		arguments = append(arguments, "--allow-command", value)
+	service, err := configuredWorkService("", "", stateDir, &request)
+	if err != nil {
+		return worktui.RunResult{Error: err.Error()}
 	}
-	for _, value := range options.Code.AllowedCommandPrefixes {
-		arguments = append(arguments, "--allow-command-prefix", value)
+	var outcome workrun.Outcome
+	if options.OnOperation != nil {
+		operation := service.Start(ctx, request)
+		options.OnOperation(operation)
+		for range operation.Events {
+		} // events also arrive through the caller's sink.
+		completion := <-operation.Done
+		outcome, err = completion.Outcome, completion.Err
+	} else {
+		outcome, err = service.Execute(ctx, request)
 	}
-	arguments = append(arguments, "--sandbox", options.Code.Sandbox, "--network", options.Code.Network)
-	for _, value := range options.Code.Capabilities {
-		arguments = append(arguments, "--code-capability", value)
+	result := worktui.RunResult{ConversationID: outcome.ConversationID, RevisionID: outcome.RevisionID, SnapshotID: outcome.SnapshotID, FinalText: outcome.Result.FinalText, OutputPath: outcome.Work.Output.Path()}
+	if err != nil {
+		result.Error = err.Error()
 	}
-	if options.Code.BrowserSession != "" {
-		arguments = append(arguments, "--browser-session", options.Code.BrowserSession)
-	}
-	arguments = append(arguments, "--", prompt)
-	command := exec.Command(os.Args[0], arguments...)
-	command.Env = append(os.Environ(), "GATOR_STATE_DIR="+stateDir)
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	runErr := command.Run()
-	var response struct {
-		ConversationID string `json:"conversation_id"`
-		RevisionID     string `json:"revision_id"`
-		SnapshotID     string `json:"snapshot_id"`
-		FinalText      string `json:"final_text"`
-		OutputPath     string `json:"output_path"`
-		Error          string `json:"error"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
-		return worktui.RunResult{Error: strings.TrimSpace(stderr.String() + " " + stdout.String())}
-	}
-	if runErr != nil && response.Error == "" {
-		response.Error = fmt.Sprintf("%v: %s", runErr, stderr.String())
-	}
-	return worktui.RunResult{ConversationID: response.ConversationID, RevisionID: response.RevisionID, SnapshotID: response.SnapshotID, FinalText: response.FinalText, OutputPath: response.OutputPath, Error: response.Error}
+	return result
 }
 
 func inspectWorkTUITopic(topic string) (string, error) {
