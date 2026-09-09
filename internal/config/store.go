@@ -37,14 +37,14 @@ type Settings struct {
 	CustomProviders []CustomProvider             `json:"custom_providers,omitempty"`
 	// ModelAliases changes only a model's local display label. Its key is the
 	// stable provider:model identity; Gator always sends the real model ID.
-	ModelAliases    map[string]string      `json:"model_aliases,omitempty"`
-	ExtensionTrusts []ExtensionTrust       `json:"extension_trusts,omitempty"`
-	HookTrusts      []hooks.Trust          `json:"hook_trusts,omitempty"`
-	LSPTrusts       []lsp.Trust            `json:"lsp_trusts,omitempty"`
-	MCPTrusts       []mcp.Trust            `json:"mcp_trusts,omitempty"`
-	Connectors      []connector.Descriptor `json:"connectors,omitempty"`
+	ModelAliases         map[string]string          `json:"model_aliases,omitempty"`
+	ExtensionTrusts      []ExtensionTrust           `json:"extension_trusts,omitempty"`
+	HookTrusts           []hooks.Trust              `json:"hook_trusts,omitempty"`
+	LSPTrusts            []lsp.Trust                `json:"lsp_trusts,omitempty"`
+	MCPTrusts            []mcp.Trust                `json:"mcp_trusts,omitempty"`
+	Connectors           []connector.Descriptor     `json:"connectors,omitempty"`
 	ConnectorPermissions []connector.PermissionRule `json:"connector_permissions,omitempty"`
-	Execution       sandbox.Policy         `json:"execution"`
+	Execution            sandbox.Policy             `json:"execution"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name

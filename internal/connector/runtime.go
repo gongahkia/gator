@@ -11,6 +11,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -54,12 +55,14 @@ func (r Runtime) Invoke(ctx context.Context, mode action.Mode, connectorID, oper
 	if !mode.Allows(operation.Capability) {
 		return Result{}, fmt.Errorf("work mode %q does not allow capability %q", mode, operation.Capability)
 	}
-	if err := decodeEmptyInput(input); err != nil {
-		return Result{}, err
-	}
 	switch {
 	case descriptor.Kind == KindHTTPJSON && operation.ID == "fetch":
+		if err := decodeEmptyInput(input); err != nil {
+			return Result{}, err
+		}
 		return r.fetchHTTPJSON(ctx, descriptor)
+	case isServiceKind(descriptor.Kind):
+		return r.invokeService(ctx, descriptor, operation, input)
 	default:
 		return Result{}, fmt.Errorf("connector operation %s/%s has no runtime", descriptor.ID, operation.ID)
 	}
@@ -76,17 +79,24 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	if !action.RequiresFreshApproval(operation.Capability) {
 		return PreparedAction{}, fmt.Errorf("connector operation %s/%s is not an external action", descriptor.ID, operation.ID)
 	}
-	if descriptor.Kind != KindHTTPWebhook || operation.ID != "publish" {
+	if descriptor.Kind != KindHTTPWebhook && !isServiceKind(descriptor.Kind) {
 		return PreparedAction{}, fmt.Errorf("connector operation %s/%s has no action runtime", descriptor.ID, operation.ID)
 	}
 	payload, err := decodeActionInput(input)
 	if err != nil {
 		return PreparedAction{}, err
 	}
-	digest := sha256.Sum256(append([]byte(descriptor.ID+"\x00"+operation.ID+"\x00"), payload...))
+	target := descriptor.Resource
+	if isServiceKind(descriptor.Kind) {
+		target, payload, err = serviceAction(descriptor, operation.ID, payload)
+		if err != nil {
+			return PreparedAction{}, err
+		}
+	}
+	digest := sha256.Sum256(append([]byte(descriptor.ID+"\x00"+operation.ID+"\x00"+target+"\x00"), payload...))
 	proposal, err := action.NewProposal(
 		"action-"+hex.EncodeToString(digest[:8]), operation.Capability,
-		descriptor.ID, operation.ID, descriptor.Resource, string(payload), payload,
+		descriptor.ID, operation.ID, target, string(payload), payload,
 	)
 	if err != nil {
 		return PreparedAction{}, err
@@ -113,14 +123,216 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 	if descriptor != prepared.descriptor || operation.ID != prepared.operation.ID || operation.Capability != prepared.operation.Capability {
 		return errors.New("prepared connector action no longer matches the configured operation")
 	}
-	rebuilt, err := r.PrepareAction(descriptor.ID, operation.ID, actionInput(prepared.payload))
-	if err != nil {
-		return err
-	}
-	if rebuilt.Proposal != prepared.Proposal {
+	payloadDigest := sha256.Sum256(prepared.payload)
+	if hex.EncodeToString(payloadDigest[:]) != prepared.Proposal.PayloadSHA256 {
 		return errors.New("prepared connector action payload does not match its proposal")
 	}
-	return r.publishHTTPJSON(ctx, descriptor, prepared.payload)
+	if prepared.descriptor.Kind == KindHTTPWebhook {
+		return r.publishHTTPJSON(ctx, descriptor, prepared.payload)
+	}
+	method := http.MethodPost
+	if descriptor.Kind == KindNotion && operation.ID == "page_update" || descriptor.Kind == KindSlack && operation.ID == "update_message" {
+		method = http.MethodPatch
+		if descriptor.Kind == KindSlack {
+			method = http.MethodPost
+		}
+	}
+	_, err = r.requestJSON(ctx, descriptor, operation.ID, method, prepared.Proposal.Target, prepared.payload, true)
+	return err
+}
+
+type serviceInput struct {
+	Query      string `json:"query,omitempty"`
+	ResourceID string `json:"resource_id,omitempty"`
+	Cursor     string `json:"cursor,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+}
+
+func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
+	var input serviceInput
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		return Result{}, fmt.Errorf("decode connector operation input: %w", err)
+	}
+	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 {
+		return Result{}, errors.New("connector operation input exceeds its limits")
+	}
+	endpoint, method, body, err := serviceRead(descriptor, operation.ID, input)
+	if err != nil {
+		return Result{}, err
+	}
+	return r.requestJSON(ctx, descriptor, operation.ID, method, endpoint, body, false)
+}
+
+func serviceRead(descriptor Descriptor, operation string, input serviceInput) (string, string, []byte, error) {
+	query := url.Values{}
+	if input.Cursor != "" {
+		query.Set("cursor", input.Cursor)
+		query.Set("pageToken", input.Cursor)
+	}
+	if input.Limit > 0 {
+		query.Set("limit", fmt.Sprint(input.Limit))
+		query.Set("pageSize", fmt.Sprint(input.Limit))
+	}
+	path := ""
+	method := http.MethodGet
+	var body []byte
+	switch descriptor.Kind + "/" + operation {
+	case KindSlack + "/whoami":
+		path = "/auth.test"
+	case KindSlack + "/search":
+		if input.Query == "" {
+			return "", "", nil, errors.New("Slack search requires query")
+		}
+		path = "/search.messages"
+		query.Set("query", input.Query)
+	case KindSlack + "/history":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Slack history requires resource_id channel")
+		}
+		path = "/conversations.history"
+		query.Set("channel", input.ResourceID)
+	case KindGoogle + "/drive_search":
+		path = "/drive/v3/files"
+		query.Set("q", input.Query)
+	case KindGoogle + "/drive_get":
+		path = "/drive/v3/files/" + url.PathEscape(input.ResourceID)
+	case KindGoogle + "/docs_get":
+		path = "/docs/v1/documents/" + url.PathEscape(input.ResourceID)
+	case KindGoogle + "/sheets_get":
+		path = "/v4/spreadsheets/" + url.PathEscape(input.ResourceID)
+	case KindAtlassian + "/jira_search":
+		path = "/rest/api/3/search/jql"
+		query.Set("jql", input.Query)
+	case KindAtlassian + "/jira_get":
+		path = "/rest/api/3/issue/" + url.PathEscape(input.ResourceID)
+	case KindAtlassian + "/confluence_search":
+		path = "/wiki/rest/api/search"
+		query.Set("cql", input.Query)
+	case KindNotion + "/search":
+		path = "/search"
+		method = http.MethodPost
+		body, _ = json.Marshal(map[string]any{"query": input.Query, "page_size": input.Limit, "start_cursor": input.Cursor})
+	case KindNotion + "/page_get":
+		path = "/pages/" + url.PathEscape(input.ResourceID)
+	case KindNotion + "/block_children":
+		path = "/blocks/" + url.PathEscape(input.ResourceID) + "/children"
+	default:
+		return "", "", nil, fmt.Errorf("connector operation %s/%s has no read runtime", descriptor.ID, operation)
+	}
+	if strings.Contains(path, "//") || strings.HasSuffix(path, "/") && input.ResourceID == "" && operation != "drive_search" {
+		return "", "", nil, errors.New("connector operation requires resource_id")
+	}
+	endpoint := strings.TrimRight(descriptor.Resource, "/") + path
+	if encoded := query.Encode(); encoded != "" {
+		endpoint += "?" + encoded
+	}
+	return endpoint, method, body, nil
+}
+
+func serviceAction(descriptor Descriptor, operation string, payload []byte) (string, []byte, error) {
+	path := ""
+	switch descriptor.Kind + "/" + operation {
+	case KindSlack + "/post_message":
+		path = "/chat.postMessage"
+	case KindSlack + "/update_message":
+		path = "/chat.update"
+	case KindGoogle + "/docs_create":
+		path = "/docs/v1/documents"
+	case KindGoogle + "/sheets_create":
+		path = "/v4/spreadsheets"
+	case KindAtlassian + "/jira_create":
+		path = "/rest/api/3/issue"
+	case KindAtlassian + "/confluence_create":
+		path = "/wiki/api/v2/pages"
+	case KindAtlassian + "/jira_comment":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path = "/rest/api/3/issue/" + url.PathEscape(id) + "/comment"
+		payload = sanitized
+	case KindNotion + "/page_create":
+		path = "/pages"
+	case KindNotion + "/page_update":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path = "/pages/" + url.PathEscape(id)
+		payload = sanitized
+	default:
+		return "", nil, fmt.Errorf("connector operation %s/%s has no action runtime", descriptor.ID, operation)
+	}
+	return strings.TrimRight(descriptor.Resource, "/") + path, payload, nil
+}
+
+func extractResourceID(payload []byte) (string, []byte, error) {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &object); err != nil {
+		return "", nil, err
+	}
+	var id string
+	if err := json.Unmarshal(object["resource_id"], &id); err != nil || strings.TrimSpace(id) == "" {
+		return "", nil, errors.New("connector action payload requires resource_id")
+	}
+	delete(object, "resource_id")
+	result, err := json.Marshal(object)
+	return id, result, err
+}
+
+func isServiceKind(kind string) bool {
+	return kind == KindSlack || kind == KindGoogle || kind == KindAtlassian || kind == KindNotion
+}
+
+func (r Runtime) requestJSON(ctx context.Context, descriptor Descriptor, operation, method, endpoint string, body []byte, uncertain bool) (Result, error) {
+	token, err := r.bearerToken(descriptor)
+	if err != nil {
+		return Result{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return Result{}, err
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("User-Agent", "gator-work/2")
+	if len(body) > 0 {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	if descriptor.Kind == KindNotion {
+		request.Header.Set("Notion-Version", "2026-03-11")
+	}
+	response, err := r.httpClient().Do(request)
+	if err != nil {
+		if uncertain {
+			return Result{}, action.MarkUncertain(fmt.Errorf("invoke connector %q: %w", descriptor.ID, err))
+		}
+		return Result{}, fmt.Errorf("invoke connector %q: %w", descriptor.ID, err)
+	}
+	defer response.Body.Close()
+	contents, readErr := io.ReadAll(io.LimitReader(response.Body, maxHTTPJSONBytes+1))
+	if readErr != nil {
+		return Result{}, readErr
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		err := fmt.Errorf("connector %q returned HTTP %d", descriptor.ID, response.StatusCode)
+		if uncertain {
+			return Result{}, action.MarkUncertain(err)
+		}
+		return Result{}, err
+	}
+	if len(contents) == 0 {
+		contents = []byte(`{}`)
+	}
+	if len(contents) > maxHTTPJSONBytes || !json.Valid(contents) {
+		return Result{}, errors.New("connector returned invalid or oversized JSON")
+	}
+	digest := sha256.Sum256(contents)
+	return Result{Data: append(json.RawMessage(nil), contents...), Provenance: Provenance{ConnectorID: descriptor.ID, Operation: operation, Resource: endpoint, RetrievedAt: r.now(), Bytes: int64(len(contents)), SHA256: hex.EncodeToString(digest[:])}}, nil
 }
 
 func (r Runtime) fetchHTTPJSON(ctx context.Context, descriptor Descriptor) (Result, error) {

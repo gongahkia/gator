@@ -22,6 +22,10 @@ const (
 	DescriptorVersion = 1
 	KindHTTPJSON      = "http_json"
 	KindHTTPWebhook   = "http_webhook"
+	KindSlack         = "slack"
+	KindGoogle        = "google_workspace"
+	KindAtlassian     = "atlassian"
+	KindNotion        = "notion"
 	AuthNone          = "none"
 	AuthBearer        = "bearer"
 	maxConnectors     = 128
@@ -69,7 +73,7 @@ type Result struct {
 
 // Validate checks the safe provenance envelope without contacting its source.
 func (p Provenance) Validate() error {
-	if !idPattern.MatchString(p.ConnectorID) || p.Operation != "fetch" {
+	if !idPattern.MatchString(p.ConnectorID) || !idPattern.MatchString(strings.ReplaceAll(p.Operation, "_", "-")) {
 		return errors.New("connector provenance identity is invalid")
 	}
 	resource, err := url.Parse(p.Resource)
@@ -92,7 +96,7 @@ func (d Descriptor) Validate() error {
 	if strings.TrimSpace(d.Name) != d.Name || d.Name == "" || len(d.Name) > 128 || strings.ContainsAny(d.Name, "\x00\r\n") {
 		return errors.New("connector display name is invalid")
 	}
-	if d.Kind != KindHTTPJSON && d.Kind != KindHTTPWebhook {
+	if d.Kind != KindHTTPJSON && d.Kind != KindHTTPWebhook && d.Kind != KindSlack && d.Kind != KindGoogle && d.Kind != KindAtlassian && d.Kind != KindNotion {
 		return fmt.Errorf("unsupported connector kind %q", d.Kind)
 	}
 	resource, err := url.Parse(d.Resource)
@@ -141,9 +145,61 @@ func (d Descriptor) Operations() []Operation {
 				`{"type":"object","required":["proposal","status"],"properties":{"proposal":{"type":"object"},"status":{"type":"string"}}}`,
 			),
 		}}
+	case KindSlack:
+		return serviceOperations([]serviceOperation{
+			{"whoami", "Verify the Slack app identity and granted token.", action.ConnectedRead},
+			{"search", "Search Slack messages available to the configured app.", action.ConnectedRead},
+			{"history", "Read one Slack channel's message history.", action.ConnectedRead},
+			{"post_message", "Prepare a Slack message for exact approval before posting.", action.Publish},
+			{"update_message", "Prepare an update to one Slack message for exact approval.", action.ConnectedMutate},
+		})
+	case KindGoogle:
+		return serviceOperations([]serviceOperation{
+			{"drive_search", "Search files visible through Google Drive.", action.ConnectedRead},
+			{"drive_get", "Read one Google Drive file or exported document.", action.ConnectedRead},
+			{"docs_get", "Read one Google Doc.", action.ConnectedRead},
+			{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
+			{"docs_create", "Prepare creation of a Google Doc for exact approval.", action.ConnectedMutate},
+			{"sheets_create", "Prepare creation of a Google Sheet for exact approval.", action.ConnectedMutate},
+		})
+	case KindAtlassian:
+		return serviceOperations([]serviceOperation{
+			{"jira_search", "Search Jira issues with JQL.", action.ConnectedRead},
+			{"jira_get", "Read one Jira issue.", action.ConnectedRead},
+			{"confluence_search", "Search Confluence content with CQL.", action.ConnectedRead},
+			{"jira_create", "Prepare creation of a Jira issue for exact approval.", action.ConnectedMutate},
+			{"jira_comment", "Prepare a Jira comment for exact approval.", action.Publish},
+			{"confluence_create", "Prepare creation of a Confluence page for exact approval.", action.ConnectedMutate},
+		})
+	case KindNotion:
+		return serviceOperations([]serviceOperation{
+			{"search", "Search pages and databases shared with the Notion integration.", action.ConnectedRead},
+			{"page_get", "Read one Notion page.", action.ConnectedRead},
+			{"block_children", "Read the child blocks of a Notion block.", action.ConnectedRead},
+			{"page_create", "Prepare creation of a Notion page for exact approval.", action.ConnectedMutate},
+			{"page_update", "Prepare an update to a Notion page for exact approval.", action.ConnectedMutate},
+		})
 	default:
 		return nil
 	}
+}
+
+type serviceOperation struct {
+	id          string
+	description string
+	capability  action.Capability
+}
+
+func serviceOperations(specifications []serviceOperation) []Operation {
+	operations := make([]Operation, 0, len(specifications))
+	for _, specification := range specifications {
+		input := json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"resource_id":{"type":"string"},"cursor":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":100}}}`)
+		if action.RequiresFreshApproval(specification.capability) {
+			input = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`)
+		}
+		operations = append(operations, Operation{ID: specification.id, Description: specification.description, Capability: specification.capability, InputSchema: input, OutputSchema: json.RawMessage(`{"type":"object"}`)})
+	}
+	return operations
 }
 
 // Registry is an immutable, deterministic view of configured connectors.
