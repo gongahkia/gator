@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gongahkia/gator/internal/connector"
 	"github.com/gongahkia/gator/internal/hooks"
 	"github.com/gongahkia/gator/internal/lsp"
 	"github.com/gongahkia/gator/internal/mcp"
@@ -36,12 +37,13 @@ type Settings struct {
 	CustomProviders []CustomProvider             `json:"custom_providers,omitempty"`
 	// ModelAliases changes only a model's local display label. Its key is the
 	// stable provider:model identity; Gator always sends the real model ID.
-	ModelAliases    map[string]string `json:"model_aliases,omitempty"`
-	ExtensionTrusts []ExtensionTrust  `json:"extension_trusts,omitempty"`
-	HookTrusts      []hooks.Trust     `json:"hook_trusts,omitempty"`
-	LSPTrusts       []lsp.Trust       `json:"lsp_trusts,omitempty"`
-	MCPTrusts       []mcp.Trust       `json:"mcp_trusts,omitempty"`
-	Execution       sandbox.Policy    `json:"execution"`
+	ModelAliases    map[string]string      `json:"model_aliases,omitempty"`
+	ExtensionTrusts []ExtensionTrust       `json:"extension_trusts,omitempty"`
+	HookTrusts      []hooks.Trust          `json:"hook_trusts,omitempty"`
+	LSPTrusts       []lsp.Trust            `json:"lsp_trusts,omitempty"`
+	MCPTrusts       []mcp.Trust            `json:"mcp_trusts,omitempty"`
+	Connectors      []connector.Descriptor `json:"connectors,omitempty"`
+	Execution       sandbox.Policy         `json:"execution"`
 }
 
 // Defaults applies when an interactive session or scripted run does not name
@@ -404,6 +406,9 @@ func validate(settings Settings) error {
 			return fmt.Errorf("repository %q has more than one LSP trust record", trust.Repository)
 		}
 		trustedLSP[trust.Repository] = struct{}{}
+	}
+	if _, err := connector.NewRegistry(settings.Connectors); err != nil {
+		return fmt.Errorf("invalid connector configuration: %w", err)
 	}
 	return nil
 }

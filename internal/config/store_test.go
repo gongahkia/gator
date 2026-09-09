@@ -4,7 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/connector"
 )
 
 func TestStoreReturnsDefaultsUntilConfigured(t *testing.T) {
@@ -122,5 +125,48 @@ func TestStorePersistsNonSecretProviderOptions(t *testing.T) {
 	}
 	if got := loaded.OptionsForProvider("google-vertex"); got["project"] != "project-123" || got["location"] != "us-central1" {
 		t.Fatalf("provider options = %#v", got)
+	}
+}
+
+func TestStorePersistsNonSecretConnectorDescriptors(t *testing.T) {
+	root := t.TempDir()
+	store, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := Default()
+	settings.Connectors = []connector.Descriptor{{
+		Version: connector.DescriptorVersion, ID: "metrics", Name: "Metrics",
+		Kind: connector.KindHTTPJSON, Resource: "https://example.com/metrics.json", Authentication: connector.AuthBearer,
+	}}
+	if err := store.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.Load()
+	if err != nil || !reflect.DeepEqual(loaded.Connectors, settings.Connectors) {
+		t.Fatalf("loaded connectors = %#v, %v", loaded.Connectors, err)
+	}
+	contents, err := os.ReadFile(store.Path())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(contents), "token") || strings.Contains(string(contents), "secret") {
+		t.Fatalf("connector config contains credential material: %s", contents)
+	}
+}
+
+func TestStoreRejectsDuplicateConnectors(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := connector.Descriptor{
+		Version: connector.DescriptorVersion, ID: "metrics", Name: "Metrics",
+		Kind: connector.KindHTTPJSON, Resource: "https://example.com/metrics.json", Authentication: connector.AuthNone,
+	}
+	settings := Default()
+	settings.Connectors = []connector.Descriptor{descriptor, descriptor}
+	if err := store.Save(settings); err == nil {
+		t.Fatal("duplicate connectors were saved")
 	}
 }
