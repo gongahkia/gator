@@ -28,8 +28,8 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 		return Result{Summary: "found " + invocation.Task, Steps: 2}, nil
 	}}
 	tools, err := Tools([]Specialist{specialist}, Options{
-		Now: func() time.Time { return time.Date(2026, 9, 9, 1, 0, 0, 0, time.UTC) },
-		OnEvent: func(event agent.Event) { events = append(events, event) },
+		Now:      func() time.Time { return time.Date(2026, 9, 9, 1, 0, 0, 0, time.UTC) },
+		OnEvent:  func(event agent.Event) { events = append(events, event) },
 		OnRecord: func(record Record) { records = append(records, record) },
 	})
 	if err != nil {

@@ -35,17 +35,17 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		runID := "code-" + hex.EncodeToString(digest[:8])
 		code := b.code
 		outcome, runErr := code.Execute(ctx, gatorrun.Request{
-			RepositoryPath: repository,
-			Task:           request.Task,
-			Provider:       b.provider,
-			Model:          b.model,
-			BaseURL:        b.baseURL,
-			RunID:          runID,
-			ThreadID:       runID,
-			StateDir:       stateDir,
-			MaxSteps:       steps,
-			Verification:   [][]string{{"git", "diff", "--check"}},
-			Mode:           gatorrun.ExecuteMode,
+			RepositoryPath:          repository,
+			Task:                    request.Task,
+			Provider:                b.provider,
+			Model:                   b.model,
+			BaseURL:                 b.baseURL,
+			RunID:                   runID,
+			ThreadID:                runID,
+			StateDir:                stateDir,
+			MaxSteps:                steps,
+			Verification:            [][]string{{"git", "diff", "--check"}},
+			Mode:                    gatorrun.ExecuteMode,
 			DisableWriterDelegation: true,
 			RolePolicy: instructions.ProfilePolicy{
 				Sandbox: "strict", Network: "deny", MaxSteps: steps,

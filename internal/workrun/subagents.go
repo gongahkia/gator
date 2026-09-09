@@ -59,7 +59,7 @@ func (e Executor) subagentTools(request Request, work workspace.Work, previous w
 
 func (e Executor) codeSpecialist(request Request, work workspace.Work) orchestrator.Specialist {
 	return orchestrator.Specialist{
-		Name: "code",
+		Name:        "code",
 		Description: "Use Gator Code in an isolated Git worktree to implement a bounded coding task from the frozen source and return a reviewable patch artifact.",
 		Run: func(ctx context.Context, invocation orchestrator.Invocation) (orchestrator.Result, error) {
 			result, err := e.Code(ctx, CodeRequest{
