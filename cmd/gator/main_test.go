@@ -19,6 +19,11 @@ func TestRunHelp(t *testing.T) {
 	if !strings.Contains(output.String(), "Usage:") {
 		t.Fatalf("help output = %q, want usage", output.String())
 	}
+	for _, value := range []string{"gator work", "gator inspect", "--actions forbid|draft|approve", "--kind json|webhook", "verify and inspect a Work bundle"} {
+		if !strings.Contains(output.String(), value) {
+			t.Fatalf("help output is missing %q", value)
+		}
+	}
 	if strings.Contains(output.String(), "allow-external-cli") {
 		t.Fatalf("help still exposes delegated CLI approval: %q", output.String())
 	}
