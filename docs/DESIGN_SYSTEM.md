@@ -27,6 +27,12 @@ Submitting the prompt starts a conversation. Merely opening Gator must not show
 cards, counters, setup prose, or a navigation rail. First-run setup is one
 palette entry and one subdued home hint.
 
+When a first task requires setup, `openai`, `anthropic`, and `gemini` open a
+hidden API-key prompt if their normal environment variable is absent. A
+successful setup persists both the selected provider and its stable default
+model before resuming the retained task. Vendor-CLI logins are not presented as
+native Work providers because Gator does not import another CLI's credentials.
+
 ## Visual language
 
 - Use one green accent (`ANSI 42`) for identity, focus, and active work.

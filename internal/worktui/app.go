@@ -39,6 +39,7 @@ type Config struct {
 	CodeCommand         func() *exec.Cmd
 	FirstRun            bool
 	SetupCommand        func(provider string) *exec.Cmd
+	CompleteSetup       func(provider string) error
 }
 
 type entry struct{ title, subtitle, kind, id, source string }
@@ -135,6 +136,12 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.err != nil {
 			m.messages = append(m.messages, message{role: "Gator", text: "Setup did not finish: " + value.err.Error() + "\nYou can try another provider name."})
 			return m, nil
+		}
+		if m.config.CompleteSetup != nil {
+			if err := m.config.CompleteSetup(value.provider); err != nil {
+				m.messages = append(m.messages, message{role: "Gator", text: "Setup did not finish: " + err.Error() + "\nYou can try another provider name."})
+				return m, nil
+			}
 		}
 		m.onboarding = false
 		m.firstRun = false
@@ -254,7 +261,7 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.onboarding = true
 			m.pendingPrompt = prompt
 			m.title = "Welcome to Gator"
-			m.messages = []message{{role: "Gator", text: "Before I start, which model provider do you want to use? Try anthropic, openai, copilot, gemini, or openrouter."}}
+			m.messages = []message{{role: "Gator", text: "Before I start, which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."}}
 			return m, nil
 		}
 		m.home = false
@@ -364,7 +371,7 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.onboarding = true
 			m.source = selected.source
 			m.title = "Welcome to Gator"
-			m.messages = []message{{role: "Gator", text: "Hi — I’ll help you set up Gator. Which model provider do you want to use? Type a provider such as anthropic, openai, copilot, gemini, or openrouter. The provider’s secure sign-in flow will open next."}}
+			m.messages = []message{{role: "Gator", text: "Hi — I’ll help you set up Gator. Which model provider do you want to use? Try openai, anthropic, or gemini. API-key entry is hidden."}}
 		}
 	}
 	return m, nil

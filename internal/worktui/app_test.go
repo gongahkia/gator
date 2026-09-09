@@ -1,6 +1,7 @@
 package worktui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -93,10 +94,15 @@ func TestInitialViewIsADeclutteredCenteredComposer(t *testing.T) {
 
 func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	called := ""
-	model := New(Config{CurrentFolder: "/work", FirstRun: true, Run: func(_, _, prompt string) RunResult {
-		called = prompt
-		return RunResult{FinalText: "done"}
-	}})
+	selectedProvider := ""
+	model := New(Config{
+		CurrentFolder: "/work", FirstRun: true,
+		CompleteSetup: func(provider string) error { selectedProvider = provider; return nil },
+		Run: func(_, _, prompt string) RunResult {
+			called = prompt
+			return RunResult{FinalText: "done"}
+		},
+	})
 	model.input = "prepare the brief"
 	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model = updated.(Model)
@@ -105,12 +111,27 @@ func TestFirstRunRetainsInitialTaskThroughGuidedSetup(t *testing.T) {
 	}
 	updated, command = model.Update(setupDone{provider: "openai"})
 	model = updated.(Model)
-	if command == nil || !model.running || model.firstRun || len(model.entries) == 0 || model.entries[0].kind == "onboarding" {
+	if command == nil || !model.running || model.firstRun || selectedProvider != "openai" || len(model.entries) == 0 || model.entries[0].kind == "onboarding" {
 		t.Fatalf("post-setup state = %#v", model)
 	}
 	updated, _ = model.Update(command())
 	model = updated.(Model)
 	if called != "prepare the brief" || model.running || !strings.Contains(model.View(), "done") {
 		t.Fatalf("called=%q state=%#v", called, model)
+	}
+}
+
+func TestFirstRunRetainsSetupStateWhenProviderSelectionCannotBeSaved(t *testing.T) {
+	model := New(Config{
+		CurrentFolder: "/work", FirstRun: true,
+		CompleteSetup: func(string) error { return errors.New("save failed") },
+	})
+	model.home = false
+	model.onboarding = true
+	model.messages = []message{{role: "You", text: "openai"}}
+	updated, command := model.Update(setupDone{provider: "openai"})
+	model = updated.(Model)
+	if command != nil || !model.onboarding || !model.firstRun || !strings.Contains(model.View(), "save failed") {
+		t.Fatalf("failed setup state = %#v", model)
 	}
 }

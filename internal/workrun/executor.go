@@ -152,10 +152,22 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	runner := agent.Runner{Model: e.Model, Tools: surface, Now: now}
 	var check func([]agent.Message) error
 	if request.Mode != action.Inspect {
-		check = outcomeCompletionCheck(work.Output, request.Contract)
+		check = outcomeCompletionCheck(work.Output, request.Contract, func() bool {
+			if !request.RequireCode {
+				return true
+			}
+			for _, record := range subagents {
+				if record.Agent == "code" && record.Status == "completed" && record.ArtifactPath != "" {
+					return true
+				}
+			}
+			return false
+		})
 	}
 	result, runErr := runner.Run(ctx, agent.RunOptions{
 		Task:            request.Objective,
+		Images:          request.Images,
+		Attachments:     request.Attachments,
 		System:          systemPrompt(request),
 		MaxSteps:        request.MaxSteps,
 		OnEvent:         emit,
@@ -292,6 +304,9 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		if len(request.Contract.Artifacts) != 0 || request.Contract.ExternalActions != action.Forbid {
 			return Request{}, errors.New("inspect mode requires an inspection-only contract")
 		}
+		if request.RequireCode {
+			return Request{}, errors.New("a required Code implementation is unavailable in inspect mode")
+		}
 	} else if len(request.Contract.Artifacts) == 0 {
 		return Request{}, errors.New("draft and act modes require at least one artifact")
 	}
@@ -309,6 +324,33 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	if request.MaxSteps < 0 {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
+	request.Code.Sandbox = request.Code.Sandbox.Normalize()
+	if err := request.Code.Sandbox.Validate(); err != nil {
+		return Request{}, fmt.Errorf("validate Code specialist sandbox: %w", err)
+	}
+	if request.Code.MaxSteps < 0 {
+		return Request{}, errors.New("Code specialist max steps must not be negative")
+	}
+	seenCapabilities := make(map[string]struct{}, len(request.Code.Capabilities))
+	for _, capability := range request.Code.Capabilities {
+		if _, duplicate := seenCapabilities[capability]; duplicate {
+			return Request{}, fmt.Errorf("Code specialist capability %q is repeated", capability)
+		}
+		seenCapabilities[capability] = struct{}{}
+		switch capability {
+		case CodeCapabilityLSP, CodeCapabilityMCP, CodeCapabilityExtension, CodeCapabilityHTTP, CodeCapabilityBrowser, CodeCapabilityTerminal:
+		default:
+			return Request{}, fmt.Errorf("unknown Code specialist capability %q", capability)
+		}
+	}
+	if request.Code.BrowserSession != "" && !request.Code.HasCapability(CodeCapabilityBrowser) {
+		return Request{}, errors.New("a Code browser session requires an explicit browser capability grant")
+	}
+	for _, prefix := range request.Code.AllowedCommandPrefixes {
+		if err := tools.ValidateCommandPrefix(prefix); err != nil {
+			return Request{}, fmt.Errorf("validate Code command prefix: %w", err)
+		}
+	}
 	if _, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
 		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
 		Permissions: request.ConnectorPermissions,
@@ -318,8 +360,11 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 	return request, nil
 }
 
-func outcomeCompletionCheck(root workspace.Root, contract artifact.Contract) func([]agent.Message) error {
+func outcomeCompletionCheck(root workspace.Root, contract artifact.Contract, codeReady func() bool) func([]agent.Message) error {
 	return func(_ []agent.Message) error {
+		if codeReady != nil && !codeReady() {
+			return errors.New("delegate the coding implementation to the Code specialist and retain its patch evidence")
+		}
 		inspection, err := artifact.Inspect(root, contract)
 		if err != nil {
 			return fmt.Errorf("inspect staged artifacts: %w", err)

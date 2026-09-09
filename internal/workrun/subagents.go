@@ -65,6 +65,7 @@ func (e Executor) codeSpecialist(request Request, work workspace.Work) orchestra
 			result, err := e.Code(ctx, CodeRequest{
 				ID: invocation.ID, SourcePath: work.Source.Path(), ScratchPath: work.Scratch.Path(),
 				Task: invocation.Task, ParentRunID: request.RunID, MaxSteps: request.MaxSteps,
+				Policy: request.Code, Approve: request.ApproveCodeCommand,
 			})
 			orchestrated := orchestrator.Result{Summary: strings.TrimSpace(result.Summary), Steps: result.Steps}
 			if len(result.Patch) > 0 {
