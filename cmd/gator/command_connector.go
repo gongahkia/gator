@@ -100,17 +100,22 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	flags := flag.NewFlagSet("connector add", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	name := flags.String("name", id, "display name")
-	kindName := flags.String("kind", "json", "connector kind: json, webhook, slack, google, atlassian, or notion")
+	kindName := flags.String("kind", "json", "connector kind: json, webhook, slack, google, atlassian, notion, or mcp")
 	resource := flags.String("url", "", "exact resource URL")
-	authentication := flags.String("auth", "", "authentication: none or bearer")
+	authentication := flags.String("auth", "", "authentication: none, bearer, or oauth")
 	searchTool := flags.String("search-tool", "", "remote MCP tool mapped to search")
 	readTool := flags.String("read-tool", "", "remote MCP tool mapped to read")
 	actionTool := flags.String("action-tool", "", "remote MCP tool mapped to an approved action")
+	oauthClientID := flags.String("oauth-client-id", "", "public OAuth app client ID")
+	oauthAuthorizeURL := flags.String("oauth-authorize-url", "", "OAuth authorization endpoint")
+	oauthTokenURL := flags.String("oauth-token-url", "", "OAuth token endpoint")
+	oauthRedirectURL := flags.String("oauth-redirect-url", "", "registered HTTP loopback callback URL")
+	oauthScopes := flags.String("oauth-scopes", "", "space-separated OAuth scopes")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
 	if len(flags.Args()) != 0 {
-		return errors.New("usage: gator connector add ID --kind json|webhook --url URL [--name NAME] [--auth none|bearer]")
+		return errors.New("usage: gator connector add ID --kind json|webhook|slack|google|atlassian|notion|mcp [--url URL] [--auth none|bearer|oauth]")
 	}
 	kind := ""
 	switch strings.ToLower(strings.TrimSpace(*kindName)) {
@@ -151,6 +156,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		Version: connector.DescriptorVersion, ID: id, Name: strings.TrimSpace(*name),
 		Kind: kind, Resource: strings.TrimSpace(*resource), Authentication: strings.TrimSpace(*authentication),
 		SearchTool: strings.TrimSpace(*searchTool), ReadTool: strings.TrimSpace(*readTool), ActionTool: strings.TrimSpace(*actionTool),
+		OAuthClientID: strings.TrimSpace(*oauthClientID), OAuthAuthorizeURL: strings.TrimSpace(*oauthAuthorizeURL), OAuthTokenURL: strings.TrimSpace(*oauthTokenURL), OAuthRedirectURL: strings.TrimSpace(*oauthRedirectURL), OAuthScopes: strings.TrimSpace(*oauthScopes),
 	}
 	if err := descriptor.Validate(); err != nil {
 		return err
@@ -174,6 +180,10 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	}
 	if descriptor.Authentication == connector.AuthBearer {
 		_, err = fmt.Fprintf(out, "Authenticate it with: gator connector login %s --from-env TOKEN_ENV\n", descriptor.ID)
+		return err
+	}
+	if descriptor.Authentication == connector.AuthOAuth {
+		_, err = fmt.Fprintf(out, "Authenticate the BYO public OAuth app with: gator connector login %s\n", descriptor.ID)
 		return err
 	}
 	return nil
@@ -207,6 +217,10 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
+	descriptor, credentials, err := configuredConnector(id)
+	if err != nil {
+		return err
+	}
 	credentialSources := 0
 	if *fromEnvironment != "" {
 		credentialSources++
@@ -214,15 +228,20 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	if *fromStdin {
 		credentialSources++
 	}
-	if len(flags.Args()) != 0 || credentialSources != 1 {
-		return errors.New("connector login requires exactly one of --from-env NAME or --token-stdin")
+	if len(flags.Args()) != 0 {
+		return errors.New("connector login received unexpected arguments")
 	}
-	descriptor, credentials, err := configuredConnector(id)
-	if err != nil {
-		return err
+	if descriptor.Authentication == connector.AuthOAuth {
+		if credentialSources != 0 {
+			return errors.New("OAuth connector login does not accept bearer-token flags")
+		}
+		return loginConnectorOAuth(descriptor, credentials, out)
 	}
 	if descriptor.Authentication != connector.AuthBearer {
 		return fmt.Errorf("connector %q is configured without bearer authentication", id)
+	}
+	if credentialSources != 1 {
+		return errors.New("bearer connector login requires exactly one of --from-env NAME or --token-stdin")
 	}
 	token := ""
 	if *fromEnvironment != "" {
@@ -251,6 +270,41 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Stored a resource-bound bearer credential for connector %s.\n", id)
+	return err
+}
+
+func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store, out io.Writer) error {
+	flow := auth.BrowserFlow{
+		ClientID: descriptor.OAuthClientID, AuthorizationURL: descriptor.OAuthAuthorizeURL,
+		TokenURL: descriptor.OAuthTokenURL, RedirectURL: descriptor.OAuthRedirectURL,
+		Scopes: strings.Fields(descriptor.OAuthScopes), AllowMissingExpiry: true, RequireBearerToken: true,
+	}
+	attempt, err := auth.BeginBrowserFlow(flow)
+	if err != nil {
+		return fmt.Errorf("start connector OAuth login: %w", err)
+	}
+	callback, err := attempt.StartCallback()
+	if err != nil {
+		return fmt.Errorf("start connector OAuth callback: %w", err)
+	}
+	defer callback.Close()
+	if _, err := fmt.Fprintf(out, "Open this URL to authenticate connector %s with your OAuth app:\n%s\n\nWaiting for the local callback...\n", descriptor.ID, attempt.AuthorizationURL()); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	code, err := callback.Wait(ctx)
+	if err != nil {
+		return fmt.Errorf("complete connector OAuth login: %w", err)
+	}
+	credential, err := attempt.Exchange(ctx, code)
+	if err != nil {
+		return fmt.Errorf("exchange connector OAuth credential: %w", err)
+	}
+	if err := credentials.Put(descriptor.CredentialRef(), credential); err != nil {
+		return fmt.Errorf("store connector OAuth credential: %w", err)
+	}
+	_, err = fmt.Fprintf(out, "Stored a resource-bound OAuth credential for connector %s.\n", descriptor.ID)
 	return err
 }
 
@@ -286,25 +340,34 @@ func testConnector(id string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	operation := "fetch"
-	if descriptor.Kind == connector.KindSlack {
-		operation = "whoami"
-	}
-	if descriptor.Kind == connector.KindGoogle {
-		operation = "drive_search"
-	}
-	if descriptor.Kind == connector.KindAtlassian {
-		operation = "jira_search"
-	}
-	if descriptor.Kind == connector.KindNotion {
-		operation = "search"
-	}
-	result, err := (connector.Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, id, operation, []byte(`{}`))
+	operation, input := connectorTestInvocation(descriptor)
+	result, err := (connector.Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, id, operation, input)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(out, "Connector %s is reachable: %d bytes, sha256:%s\n", id, result.Provenance.Bytes, result.Provenance.SHA256[:12])
 	return err
+}
+
+func connectorTestInvocation(descriptor connector.Descriptor) (string, []byte) {
+	switch descriptor.Kind {
+	case connector.KindSlack:
+		return "whoami", []byte(`{}`)
+	case connector.KindGoogle:
+		return "drive_search", []byte(`{}`)
+	case connector.KindAtlassian:
+		return "jira_search", []byte(`{}`)
+	case connector.KindNotion:
+		return "search", []byte(`{}`)
+	case connector.KindRemoteMCP:
+		operation := "search"
+		if descriptor.SearchTool == "" {
+			operation = "read"
+		}
+		return operation, []byte(`{"arguments":{}}`)
+	default:
+		return "fetch", []byte(`{}`)
+	}
 }
 
 func setConnectorPermission(id string, arguments []string, out io.Writer) error {

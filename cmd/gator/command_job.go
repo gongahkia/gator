@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -41,7 +42,14 @@ type supervisorState struct {
 	Version   int       `json:"version"`
 	PID       int       `json:"pid"`
 	URL       string    `json:"url"`
+	Nonce     string    `json:"nonce"`
 	StartedAt time.Time `json:"started_at"`
+}
+
+type supervisorHealth struct {
+	OK    bool   `json:"ok"`
+	PID   int    `json:"pid"`
+	Nonce string `json:"nonce"`
 }
 
 func jobCommand(arguments []string, out io.Writer) error {
@@ -142,6 +150,12 @@ func addJob(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if info, err := os.Stat(absolute); err != nil || !info.IsDir() {
+		if err != nil {
+			return fmt.Errorf("inspect job source: %w", err)
+		}
+		return errors.New("job source must be a directory")
+	}
 	store, _, err := jobStore()
 	if err != nil {
 		return err
@@ -198,8 +212,14 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		attempt := executeJob(definition, time.Now().UTC(), stateDir, true)
-		_ = store.Record(attempt)
+		attempt, err := store.Begin(definition, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		attempt = executeJob(definition, attempt, stateDir, true)
+		if err := store.Record(attempt); err != nil {
+			return err
+		}
 		_, _ = recordJobInbox(stateDir, definition, attempt)
 		encoder := json.NewEncoder(out)
 		return encoder.Encode(attempt)
@@ -241,7 +261,17 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 			definition.Timezone = *timezone
 		}
 		if *source != "" {
-			definition.SourcePath, _ = filepath.Abs(*source)
+			absolute, err := filepath.Abs(*source)
+			if err != nil {
+				return err
+			}
+			if info, err := os.Stat(absolute); err != nil || !info.IsDir() {
+				if err != nil {
+					return fmt.Errorf("inspect job source: %w", err)
+				}
+				return errors.New("job source must be a directory")
+			}
+			definition.SourcePath = absolute
 		}
 		if *objective != "" {
 			definition.Objective = *objective
@@ -259,8 +289,7 @@ func manageJob(command, id string, arguments []string, out io.Writer) error {
 	return errors.New("unsupported job command")
 }
 
-func executeJob(definition jobs.Definition, scheduledAt time.Time, stateDir string, notify bool) jobs.Attempt {
-	attempt := jobs.Attempt{Version: jobs.Version, JobID: definition.ID, ScheduledAt: scheduledAt, StartedAt: time.Now().UTC()}
+func executeJob(definition jobs.Definition, attempt jobs.Attempt, stateDir string, notify bool) jobs.Attempt {
 	var result jobResult
 	var runErr error
 	for try := 1; try <= 3; try++ {
@@ -372,6 +401,11 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 		return err
 	}
 	token := hex.EncodeToString(tokenBytes)
+	nonceBytes := make([]byte, 16)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return err
+	}
+	nonce := hex.EncodeToString(nonceBytes)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
@@ -389,9 +423,13 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 			handler(writer, request)
 		}
 	}
-	mux.HandleFunc("/health", authorized(func(writer http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/health", authorized(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodGet {
+			http.Error(writer, "method", http.StatusMethodNotAllowed)
+			return
+		}
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(writer, `{"ok":true}`)
+		_ = json.NewEncoder(writer).Encode(supervisorHealth{OK: true, PID: os.Getpid(), Nonce: nonce})
 	}))
 	mux.HandleFunc("/stop", authorized(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost {
@@ -403,7 +441,7 @@ func runJobSupervisor(arguments []string, out io.Writer) error {
 	}))
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	go func() { _ = server.Serve(listener) }()
-	state := supervisorState{Version: 1, PID: os.Getpid(), URL: "http://" + listener.Addr().String(), StartedAt: time.Now().UTC()}
+	state := supervisorState{Version: 1, PID: os.Getpid(), URL: "http://" + listener.Addr().String(), Nonce: nonce, StartedAt: time.Now().UTC()}
 	if err := writePrivateSupervisorFiles(store.Root(), state, token); err != nil {
 		return err
 	}
@@ -467,8 +505,14 @@ func runDueJobs(store jobs.Store, stateDir string, notify bool, now time.Time) {
 		if err != nil || !ok {
 			continue
 		}
-		attempt := executeJob(claimed, scheduled, stateDir, notify)
-		_ = store.Record(attempt)
+		attempt, err := store.Begin(claimed, scheduled)
+		if err != nil {
+			continue
+		}
+		attempt = executeJob(claimed, attempt, stateDir, notify)
+		if err := store.Record(attempt); err != nil {
+			continue
+		}
 		_, _ = recordJobInbox(stateDir, claimed, attempt)
 	}
 }
@@ -494,11 +538,18 @@ func inboxCommand(arguments []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if len(arguments) == 2 && arguments[0] == "read" {
+		if err := store.MarkRead(arguments[1], time.Now()); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintf(out, "Marked inbox entry %s read.\n", arguments[1])
+		return err
+	}
 	unread := false
 	if len(arguments) == 1 && arguments[0] == "--unread" {
 		unread = true
 	} else if len(arguments) != 0 {
-		return errors.New("usage: gator inbox [--unread]")
+		return errors.New("usage: gator inbox [--unread] | gator inbox read ENTRY_ID")
 	}
 	entries, err := store.List(unread, 100)
 	if err != nil {
@@ -524,31 +575,44 @@ func jobSupervisorRequest(actionName string, out io.Writer) error {
 	if err != nil {
 		return errors.New("job supervisor is not running")
 	}
-	if json.Unmarshal(payload, &state) != nil {
+	if json.Unmarshal(payload, &state) != nil || state.Version != 1 || state.PID < 1 || state.Nonce == "" {
 		return errors.New("job supervisor state is invalid")
+	}
+	parsed, err := url.Parse(state.URL)
+	if err != nil || parsed.Scheme != "http" || parsed.Hostname() != "127.0.0.1" || parsed.Port() == "" || parsed.User != nil || parsed.Path != "" {
+		return errors.New("job supervisor endpoint is not a literal loopback address")
 	}
 	tokenBytes, err := os.ReadFile(filepath.Join(store.Root(), "supervisor.token"))
 	if err != nil {
 		return errors.New("job supervisor token is missing")
 	}
-	method := http.MethodGet
-	if actionName == "stop" {
-		method = http.MethodPost
-	}
-	request, _ := http.NewRequest(method, state.URL+"/"+actionName, nil)
-	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(tokenBytes)))
 	client := &http.Client{Timeout: 5 * time.Second}
-	response, err := client.Do(request)
+	token := strings.TrimSpace(string(tokenBytes))
+	healthRequest, _ := http.NewRequest(http.MethodGet, state.URL+"/health", nil)
+	healthRequest.Header.Set("Authorization", "Bearer "+token)
+	healthResponse, err := client.Do(healthRequest)
 	if err != nil {
 		return errors.New("job supervisor state is stale or unreachable")
 	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("job supervisor returned HTTP %d", response.StatusCode)
+	var health supervisorHealth
+	decodeErr := json.NewDecoder(healthResponse.Body).Decode(&health)
+	_ = healthResponse.Body.Close()
+	if healthResponse.StatusCode != http.StatusOK || decodeErr != nil || !health.OK || health.PID != state.PID || health.Nonce != state.Nonce {
+		return errors.New("job supervisor identity verification failed")
 	}
 	if actionName == "health" {
 		_, err = fmt.Fprintf(out, "Job supervisor running (PID %d, since %s).\n", state.PID, state.StartedAt.Format(time.RFC3339))
 	} else {
+		request, _ := http.NewRequest(http.MethodPost, state.URL+"/stop", nil)
+		request.Header.Set("Authorization", "Bearer "+token)
+		response, requestErr := client.Do(request)
+		if requestErr != nil {
+			return errors.New("job supervisor became unreachable before stop")
+		}
+		_ = response.Body.Close()
+		if response.StatusCode != http.StatusAccepted {
+			return fmt.Errorf("job supervisor returned HTTP %d", response.StatusCode)
+		}
 		_, err = fmt.Fprintln(out, "Job supervisor stop requested.")
 	}
 	return err
@@ -557,11 +621,44 @@ func jobSupervisorRequest(actionName string, out io.Writer) error {
 func writePrivateSupervisorFiles(root string, state supervisorState, token string) error {
 	payload, _ := json.MarshalIndent(state, "", "  ")
 	for path, contents := range map[string][]byte{filepath.Join(root, "supervisor.json"): append(payload, '\n'), filepath.Join(root, "supervisor.token"): []byte(token + "\n")} {
-		if err := os.WriteFile(path, contents, 0o600); err != nil {
+		if err := writePrivateFileAtomic(path, contents); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func writePrivateFileAtomic(path string, contents []byte) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".supervisor-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(contents); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return err
+	}
+	directory, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
 }
 
 func desktopNotification(name, status string) {

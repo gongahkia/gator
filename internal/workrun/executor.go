@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -106,14 +107,17 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 		}
 	}
 
-	surface, err := tools.WorkFiles(work.Source, work.Output, request.Contract, request.Mode != action.Inspect, previousRoot)
+	renderers := make(map[string]artifact.RendererEvidence)
+	surface, err := tools.WorkFilesWithRendererEvidence(work.Source, work.Output, request.Contract, request.Mode != action.Inspect, previousRoot, func(evidence artifact.RendererEvidence) {
+		renderers[evidence.Path] = evidence
+	})
 	if err != nil {
 		return outcome, err
 	}
 	connectedSources := make([]connector.Provenance, 0, len(request.ConnectorIDs))
 	actions := make([]action.Record, 0, 4)
 	connectorSurface, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
-		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
+		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
 		Permissions: request.ConnectorPermissions,
 		OnContent: func(result connector.Result) error {
 			source, err := persistConnectedSnapshot(work.Path, result)
@@ -158,7 +162,7 @@ func (e Executor) Execute(ctx context.Context, request Request) (Outcome, error)
 	}
 	manifest, sealErr := artifact.Seal(work.Output, request.Contract, artifact.SealOptions{
 		RunID: request.RunID, Objective: request.Objective, Source: work.Source, SourceName: sourceSnapshot.SourceName, SourceIdentity: sourceSnapshot.SourcePath, SnapshotSHA256: sourceSnapshot.SHA256,
-		Failure: failure, Actions: actions, ConnectedSources: connectedSources, StartedAt: startedAt, FinishedAt: now(),
+		Failure: failure, Actions: actions, ConnectedSources: connectedSources, Renderers: rendererEvidence(renderers), StartedAt: startedAt, FinishedAt: now(),
 	})
 	if sealErr != nil {
 		if runErr != nil {
@@ -296,7 +300,7 @@ func (e Executor) normalizeAndValidate(request Request) (Request, error) {
 		return Request{}, errors.New("work max steps must not be negative")
 	}
 	if _, err := tools.ConnectorTools(e.Connectors, request.ConnectorIDs, tools.ConnectorPolicy{
-		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction,
+		Mode: request.Mode, ExternalActions: request.Contract.ExternalActions, Approve: request.ApproveAction, ApproveRead: request.ApproveConnectorRead,
 		Permissions: request.ConnectorPermissions,
 	}); err != nil {
 		return Request{}, fmt.Errorf("select work connectors: %w", err)
@@ -332,6 +336,19 @@ func outcomeCompletionCheck(root workspace.Root, contract artifact.Contract) fun
 		}
 		return errors.New(strings.Join(failures, "; "))
 	}
+}
+
+func rendererEvidence(values map[string]artifact.RendererEvidence) []artifact.RendererEvidence {
+	paths := make([]string, 0, len(values))
+	for path := range values {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	result := make([]artifact.RendererEvidence, 0, len(paths))
+	for _, path := range paths {
+		result = append(result, values[path])
+	}
+	return result
 }
 
 func newID(now time.Time) (string, error) {

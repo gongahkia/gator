@@ -29,6 +29,7 @@ const (
 	KindRemoteMCP     = "remote_mcp"
 	AuthNone          = "none"
 	AuthBearer        = "bearer"
+	AuthOAuth         = "oauth"
 	maxConnectors     = 128
 )
 
@@ -38,15 +39,20 @@ var idPattern = regexp.MustCompile(`\A[a-z][a-z0-9-]{0,63}\z`)
 // exact and immutable for one credential identity; URLs supplied by source
 // data or model output never redirect it.
 type Descriptor struct {
-	Version        int    `json:"version"`
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Kind           string `json:"kind"`
-	Resource       string `json:"resource"`
-	Authentication string `json:"authentication"`
-	SearchTool     string `json:"search_tool,omitempty"`
-	ReadTool       string `json:"read_tool,omitempty"`
-	ActionTool     string `json:"action_tool,omitempty"`
+	Version           int    `json:"version"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	Kind              string `json:"kind"`
+	Resource          string `json:"resource"`
+	Authentication    string `json:"authentication"`
+	SearchTool        string `json:"search_tool,omitempty"`
+	ReadTool          string `json:"read_tool,omitempty"`
+	ActionTool        string `json:"action_tool,omitempty"`
+	OAuthClientID     string `json:"oauth_client_id,omitempty"`
+	OAuthAuthorizeURL string `json:"oauth_authorize_url,omitempty"`
+	OAuthTokenURL     string `json:"oauth_token_url,omitempty"`
+	OAuthRedirectURL  string `json:"oauth_redirect_url,omitempty"`
+	OAuthScopes       string `json:"oauth_scopes,omitempty"`
 }
 
 // Operation is a connector action surfaced to the product and model. Schemas
@@ -117,8 +123,27 @@ func (d Descriptor) Validate() error {
 	if resource.Scheme != "https" && !(resource.Scheme == "http" && isLoopbackHost(resource.Hostname())) {
 		return errors.New("connector resource requires HTTPS except on loopback")
 	}
-	if d.Authentication != AuthNone && d.Authentication != AuthBearer {
+	if d.Authentication != AuthNone && d.Authentication != AuthBearer && d.Authentication != AuthOAuth {
 		return fmt.Errorf("unsupported connector authentication %q", d.Authentication)
+	}
+	if d.Authentication == AuthOAuth {
+		if strings.TrimSpace(d.OAuthClientID) != d.OAuthClientID || d.OAuthClientID == "" || len(d.OAuthClientID) > 512 {
+			return errors.New("OAuth connector requires a bounded public client ID")
+		}
+		if err := validateOAuthEndpoint(d.OAuthAuthorizeURL, false); err != nil {
+			return fmt.Errorf("connector OAuth authorization URL: %w", err)
+		}
+		if err := validateOAuthEndpoint(d.OAuthTokenURL, false); err != nil {
+			return fmt.Errorf("connector OAuth token URL: %w", err)
+		}
+		if err := validateOAuthEndpoint(d.OAuthRedirectURL, true); err != nil {
+			return fmt.Errorf("connector OAuth redirect URL: %w", err)
+		}
+		if len(d.OAuthScopes) > 4096 || strings.ContainsAny(d.OAuthScopes, "\x00\r\n") {
+			return errors.New("connector OAuth scopes are invalid")
+		}
+	} else if d.OAuthClientID != "" || d.OAuthAuthorizeURL != "" || d.OAuthTokenURL != "" || d.OAuthRedirectURL != "" || d.OAuthScopes != "" {
+		return errors.New("connector OAuth settings require --auth oauth")
 	}
 	if d.Kind == KindRemoteMCP {
 		if d.SearchTool == "" && d.ReadTool == "" {
@@ -136,9 +161,14 @@ func (d Descriptor) Validate() error {
 }
 
 // CredentialRef derives a resource-bound key for Gator's private auth store.
-// Changing a connector URL therefore cannot silently redirect an old token.
+// Changing a connector URL or OAuth app therefore cannot silently reuse an old
+// token under a different identity.
 func (d Descriptor) CredentialRef() string {
-	digest := sha256.Sum256([]byte(d.Resource))
+	identity := d.Resource
+	if d.Authentication == AuthOAuth {
+		identity += "\x00" + d.OAuthClientID + "\x00" + d.OAuthTokenURL
+	}
+	digest := sha256.Sum256([]byte(identity))
 	return "connector-" + d.ID + "-" + hex.EncodeToString(digest[:8])
 }
 
@@ -176,7 +206,7 @@ func (d Descriptor) Operations() []Operation {
 	case KindGoogle:
 		return serviceOperations([]serviceOperation{
 			{"drive_search", "Search files visible through Google Drive.", action.ConnectedRead},
-			{"drive_get", "Read one Google Drive file or exported document.", action.ConnectedRead},
+			{"drive_get", "Read metadata for one Google Drive file.", action.ConnectedRead},
 			{"docs_get", "Read one Google Doc.", action.ConnectedRead},
 			{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
 			{"docs_create", "Prepare creation of a Google Doc for exact approval.", action.ConnectedMutate},
@@ -282,4 +312,21 @@ func (r Registry) Operation(connectorID, operationID string) (Descriptor, Operat
 func isLoopbackHost(host string) bool {
 	host = strings.ToLower(strings.TrimSuffix(host, "."))
 	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+func validateOAuthEndpoint(value string, loopback bool) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" || parsed.String() != value {
+		return errors.New("must be a canonical absolute URL without credentials or fragment")
+	}
+	if loopback {
+		if parsed.Scheme != "http" || !isLoopbackHost(parsed.Hostname()) || parsed.Port() == "" || parsed.Path == "" {
+			return errors.New("must be an HTTP loopback URL with a port and path")
+		}
+		return nil
+	}
+	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())) {
+		return errors.New("requires HTTPS except on loopback")
+	}
+	return nil
 }

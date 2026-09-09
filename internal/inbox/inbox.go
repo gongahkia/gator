@@ -8,12 +8,15 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 )
 
 const Version = 1
+
+var idPattern = regexp.MustCompile(`\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}\z`)
 
 type Entry struct {
 	Version        int       `json:"version"`
@@ -52,7 +55,7 @@ func (s Store) Add(entry Entry) (Entry, error) {
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = time.Now().UTC()
 	}
-	if entry.Version != Version || strings.TrimSpace(entry.Title) == "" || strings.TrimSpace(entry.Status) == "" || len(entry.Summary) > 4096 {
+	if entry.Version != Version || !idPattern.MatchString(entry.ID) || strings.TrimSpace(entry.Title) == "" || len(entry.Title) > 256 || strings.TrimSpace(entry.Status) == "" || len(entry.Status) > 64 || len(entry.Summary) > 4096 || strings.ContainsRune(entry.Summary, 0) {
 		return Entry{}, errors.New("inbox entry is invalid")
 	}
 	payload, err := json.MarshalIndent(entry, "", "  ")
@@ -65,8 +68,15 @@ func (s Store) Add(entry Entry) (Entry, error) {
 	}
 	path := temporary.Name()
 	defer os.Remove(path)
-	_ = temporary.Chmod(0o600)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return Entry{}, err
+	}
 	if _, err := temporary.Write(append(payload, '\n')); err != nil {
+		_ = temporary.Close()
+		return Entry{}, err
+	}
+	if err := temporary.Sync(); err != nil {
 		_ = temporary.Close()
 		return Entry{}, err
 	}
@@ -74,6 +84,15 @@ func (s Store) Add(entry Entry) (Entry, error) {
 		return Entry{}, err
 	}
 	if err := os.Rename(path, filepath.Join(s.root, entry.ID+".json")); err != nil {
+		return Entry{}, err
+	}
+	directory, err := os.Open(s.root)
+	if err != nil {
+		return Entry{}, err
+	}
+	err = directory.Sync()
+	_ = directory.Close()
+	if err != nil {
 		return Entry{}, err
 	}
 	return entry, nil
@@ -89,12 +108,23 @@ func (s Store) List(unreadOnly bool, limit int) ([]Entry, error) {
 		if file.IsDir() || filepath.Ext(file.Name()) != ".json" {
 			continue
 		}
-		payload, err := os.ReadFile(filepath.Join(s.root, file.Name()))
+		path := filepath.Join(s.root, file.Name())
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return nil, errors.New("inbox entry is not a regular file")
+		}
+		payload, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err
 		}
 		var entry Entry
-		if json.Unmarshal(payload, &entry) == nil && (!unreadOnly || entry.ReadAt.IsZero()) {
+		if err := json.Unmarshal(payload, &entry); err != nil {
+			return nil, err
+		}
+		if !idPattern.MatchString(entry.ID) || entry.ID+".json" != file.Name() {
+			return nil, errors.New("inbox entry identity does not match its file")
+		}
+		if !unreadOnly || entry.ReadAt.IsZero() {
 			entries = append(entries, entry)
 		}
 	}
@@ -106,7 +136,17 @@ func (s Store) List(unreadOnly bool, limit int) ([]Entry, error) {
 }
 
 func (s Store) MarkRead(entryID string, now time.Time) error {
+	if !idPattern.MatchString(entryID) {
+		return errors.New("invalid inbox entry ID")
+	}
 	path := filepath.Join(s.root, entryID+".json")
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("inbox entry is not a regular file")
+	}
 	payload, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -114,6 +154,9 @@ func (s Store) MarkRead(entryID string, now time.Time) error {
 	var entry Entry
 	if err := json.Unmarshal(payload, &entry); err != nil {
 		return err
+	}
+	if entry.ID != entryID {
+		return errors.New("inbox entry identity does not match")
 	}
 	entry.ReadAt = now.UTC()
 	_, err = s.Add(entry)

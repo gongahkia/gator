@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ type ConnectorPolicy struct {
 	Mode            action.Mode
 	ExternalActions action.Disposition
 	Approve         action.Approver
+	ApproveRead     func(context.Context, string, string, json.RawMessage) (bool, error)
 	OnSource        func(connector.Provenance)
 	OnContent       func(connector.Result) error
 	OnAction        func(action.Record)
@@ -61,7 +63,7 @@ func ConnectorTools(runtime connector.Runtime, selected []string, policy Connect
 		for _, operation := range descriptor.Operations() {
 			highRisk := action.RequiresFreshApproval(operation.Capability)
 			permission := policy.Permissions.Resolve(descriptor.ID, operation.ID, operation.Capability)
-			if permission == connector.PermissionDeny || highRisk && policy.ExternalActions == action.Forbid || !highRisk && (!policy.Mode.Allows(operation.Capability) || permission != connector.PermissionAllow) {
+			if permission == connector.PermissionDeny || highRisk && policy.ExternalActions == action.Forbid || !highRisk && (!policy.Mode.Allows(operation.Capability) || permission == connector.PermissionAsk && policy.ApproveRead == nil) {
 				continue
 			}
 			result = append(result, connectorTool{
@@ -96,6 +98,15 @@ func (t connectorTool) Definition() agent.ToolDefinition {
 }
 
 func (t connectorTool) Execute(ctx context.Context, arguments json.RawMessage) (agent.ToolResult, error) {
+	if !action.RequiresFreshApproval(t.operation.Capability) && t.policy.Permissions.Resolve(t.descriptor.ID, t.operation.ID, t.operation.Capability) == connector.PermissionAsk {
+		approved, err := t.policy.ApproveRead(ctx, t.descriptor.ID, t.operation.ID, append(json.RawMessage(nil), arguments...))
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		if !approved {
+			return agent.ToolResult{}, errors.New("connected read was not approved")
+		}
+	}
 	if t.budget == nil || !t.budget.reserve() {
 		return agent.ToolResult{}, fmt.Errorf("connected source run budget exceeded; at most %d calls are allowed", maxConnectorCallsPerRun)
 	}

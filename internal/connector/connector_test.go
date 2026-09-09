@@ -26,6 +26,15 @@ func TestRegistryClassifiesStableHTTPJSONOperation(t *testing.T) {
 	if descriptor.CredentialRef() == "" || descriptor.CredentialRef() == (Descriptor{ID: descriptor.ID, Resource: "https://other.example/data"}).CredentialRef() {
 		t.Fatal("credential reference is not resource-bound")
 	}
+	oauth := descriptor
+	oauth.Authentication = AuthOAuth
+	oauth.OAuthClientID = "one"
+	oauth.OAuthTokenURL = "https://auth.example/token"
+	changed := oauth
+	changed.OAuthClientID = "two"
+	if oauth.CredentialRef() == changed.CredentialRef() {
+		t.Fatal("OAuth app identity did not change credential reference")
+	}
 }
 
 func TestRegistryClassifiesWebhookAsPublish(t *testing.T) {

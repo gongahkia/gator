@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gongahkia/gator/internal/worksession"
 )
 
 func TestLauncherStartsConversationAndRetainsResult(t *testing.T) {
@@ -44,5 +45,26 @@ func TestRevisionCommandsStayInConversation(t *testing.T) {
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	if !updated.(Model).launcher {
 		t.Fatal("ctrl+p did not reopen launcher")
+	}
+}
+
+func TestStartsRequestedConversationAndSelectsForwardBranch(t *testing.T) {
+	called := ""
+	model := New(Config{
+		CurrentFolder:       "/work",
+		StartConversationID: "work-one",
+		Conversations:       []worksession.Conversation{{ID: "work-one", Title: "Report", SourcePath: "/source"}},
+		MoveToRevision: func(conversationID, revisionID string) (string, error) {
+			called = conversationID + "/" + revisionID
+			return "moved", nil
+		},
+	})
+	if model.launcher || model.conversation != "work-one" || model.source != "/source" {
+		t.Fatalf("model did not open requested conversation: %#v", model)
+	}
+	model.input = "/forward revision-two"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if called != "work-one/revision-two" || !strings.Contains(updated.(Model).View(), "moved") {
+		t.Fatalf("called = %q, view = %s", called, updated.(Model).View())
 	}
 }

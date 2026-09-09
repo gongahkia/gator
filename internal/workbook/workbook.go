@@ -62,6 +62,7 @@ type SheetPreview struct {
 	Rows     int      `json:"rows"`
 	Columns  int      `json:"columns"`
 	Formulas int      `json:"formulas"`
+	Streamed bool     `json:"streamed,omitempty"`
 	Charts   []string `json:"charts,omitempty"`
 }
 
@@ -118,7 +119,7 @@ func (s Spec) Preview() Preview {
 	s = s.Normalize()
 	preview := Preview{Title: s.Title, Theme: s.Theme}
 	for _, sheet := range s.Sheets {
-		item := SheetPreview{Name: sheet.Name, Rows: len(sheet.Rows), Columns: len(sheet.Columns)}
+		item := SheetPreview{Name: sheet.Name, Rows: len(sheet.Rows), Columns: len(sheet.Columns), Streamed: len(sheet.Rows) > 10_000}
 		for _, row := range sheet.Rows {
 			for _, cell := range row {
 				if cell.Formula != "" {
@@ -158,27 +159,24 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 		return nil, Preview{}, fmt.Errorf("open workbook template: %w", err)
 	}
 	defer file.Close()
-	headerStyle, err := file.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Color: "FFFFFF"}, Fill: excelize.Fill{Type: "pattern", Color: []string{"17365D"}, Pattern: 1}, Alignment: &excelize.Alignment{Vertical: "center"}})
+	headerStyle, err := file.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Color: "FFFFFF"}, Fill: excelize.Fill{Type: "pattern", Color: []string{themeColor(spec.Theme)}, Pattern: 1}, Alignment: &excelize.Alignment{Vertical: "center"}})
 	if err != nil {
 		return nil, Preview{}, err
 	}
-	usedDefault := false
 	for sheetIndex, sheet := range spec.Sheets {
 		if index, err := file.GetSheetIndex(sheet.Name); err != nil || index == -1 {
 			if sheetIndex == 0 && template == nil {
 				if err := file.SetSheetName("Sheet1", sheet.Name); err != nil {
 					return nil, Preview{}, err
 				}
-				usedDefault = true
 			} else if _, err := file.NewSheet(sheet.Name); err != nil {
 				return nil, Preview{}, err
 			}
 		}
+		streaming := len(sheet.Rows) > 10_000 && template == nil
+		columnStyles := make([]int, len(sheet.Columns))
 		for columnIndex, column := range sheet.Columns {
 			cell, _ := excelize.CoordinatesToCellName(columnIndex+1, 1)
-			if err := file.SetCellValue(sheet.Name, cell, column.Header); err != nil {
-				return nil, Preview{}, err
-			}
 			name, _ := excelize.ColumnNumberToName(columnIndex + 1)
 			width := column.Width
 			if width == 0 {
@@ -193,25 +191,61 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 				if err != nil {
 					return nil, Preview{}, err
 				}
-				end, _ := excelize.CoordinatesToCellName(columnIndex+1, len(sheet.Rows)+1)
-				if err := file.SetCellStyle(sheet.Name, cell, end, style); err != nil {
-					return nil, Preview{}, err
+				columnStyles[columnIndex] = style
+				if !streaming {
+					end, _ := excelize.CoordinatesToCellName(columnIndex+1, len(sheet.Rows)+1)
+					if err := file.SetCellStyle(sheet.Name, cell, end, style); err != nil {
+						return nil, Preview{}, err
+					}
 				}
 			}
 		}
-		lastHeader, _ := excelize.CoordinatesToCellName(len(sheet.Columns), 1)
-		if err := file.SetCellStyle(sheet.Name, "A1", lastHeader, headerStyle); err != nil {
-			return nil, Preview{}, err
-		}
-		for rowIndex, row := range sheet.Rows {
-			for columnIndex, cellValue := range row {
-				cell, _ := excelize.CoordinatesToCellName(columnIndex+1, rowIndex+2)
-				if cellValue.Formula != "" {
-					if err := file.SetCellFormula(sheet.Name, cell, cellValue.Formula); err != nil {
+		if streaming {
+			writer, err := file.NewStreamWriter(sheet.Name)
+			if err != nil {
+				return nil, Preview{}, err
+			}
+			headers := make([]any, len(sheet.Columns))
+			for index, column := range sheet.Columns {
+				headers[index] = excelize.Cell{StyleID: headerStyle, Value: column.Header}
+			}
+			if err := writer.SetRow("A1", headers); err != nil {
+				return nil, Preview{}, err
+			}
+			for rowIndex, row := range sheet.Rows {
+				values := make([]any, len(row))
+				for columnIndex, cellValue := range row {
+					values[columnIndex] = excelize.Cell{StyleID: columnStyles[columnIndex], Value: cellValue.Value, Formula: cellValue.Formula}
+				}
+				cell, _ := excelize.CoordinatesToCellName(1, rowIndex+2)
+				if err := writer.SetRow(cell, values); err != nil {
+					return nil, Preview{}, err
+				}
+			}
+			if err := writer.Flush(); err != nil {
+				return nil, Preview{}, err
+			}
+		} else {
+			for columnIndex, column := range sheet.Columns {
+				cell, _ := excelize.CoordinatesToCellName(columnIndex+1, 1)
+				if err := file.SetCellValue(sheet.Name, cell, column.Header); err != nil {
+					return nil, Preview{}, err
+				}
+			}
+			lastHeader, _ := excelize.CoordinatesToCellName(len(sheet.Columns), 1)
+			if err := file.SetCellStyle(sheet.Name, "A1", lastHeader, headerStyle); err != nil {
+				return nil, Preview{}, err
+			}
+			for rowIndex, row := range sheet.Rows {
+				for columnIndex, cellValue := range row {
+					cell, _ := excelize.CoordinatesToCellName(columnIndex+1, rowIndex+2)
+					if cellValue.Formula != "" {
+						if err := file.SetCellFormula(sheet.Name, cell, cellValue.Formula); err != nil {
+							return nil, Preview{}, err
+						}
+					} else if err := file.SetCellValue(sheet.Name, cell, cellValue.Value); err != nil {
 						return nil, Preview{}, err
 					}
-				} else if err := file.SetCellValue(sheet.Name, cell, cellValue.Value); err != nil {
-					return nil, Preview{}, err
 				}
 			}
 		}
@@ -243,7 +277,6 @@ func RenderXLSX(spec Spec, template io.Reader) ([]byte, Preview, error) {
 			}
 		}
 	}
-	_ = usedDefault
 	var output bytes.Buffer
 	if _, err := file.WriteTo(&output); err != nil {
 		return nil, Preview{}, err
@@ -296,4 +329,15 @@ func safeTableName(value string) string {
 		}
 	}
 	return result.String()
+}
+
+func themeColor(theme string) string {
+	switch theme {
+	case "minimal":
+		return "333333"
+	case "report":
+		return "6B2636"
+	default:
+		return "17365D"
+	}
 }

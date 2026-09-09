@@ -16,9 +16,10 @@ import (
 )
 
 type WriteDocumentArtifact struct {
-	Root     workspace.Root
-	Source   workspace.Root
-	Contract artifact.Contract
+	Root       workspace.Root
+	Source     workspace.Root
+	Contract   artifact.Contract
+	OnRenderer func(artifact.RendererEvidence)
 }
 
 func (t WriteDocumentArtifact) Definition() agent.ToolDefinition {
@@ -39,6 +40,7 @@ func (t WriteDocumentArtifact) Execute(_ context.Context, raw json.RawMessage) (
 		return agent.ToolResult{}, err
 	}
 	var contents []byte
+	var templateBytes []byte
 	var preview document.Preview
 	var err error
 	switch strings.ToLower(filepath.Ext(arguments.Path)) {
@@ -50,6 +52,7 @@ func (t WriteDocumentArtifact) Execute(_ context.Context, raw json.RawMessage) (
 			if readErr != nil {
 				return agent.ToolResult{}, readErr
 			}
+			templateBytes = template
 			contents, preview, err = document.RenderDOCXTemplate(arguments.Document, bytes.NewReader(template))
 		}
 	case ".pdf":
@@ -66,6 +69,13 @@ func (t WriteDocumentArtifact) Execute(_ context.Context, raw json.RawMessage) (
 	if err := artifact.WriteBinary(t.Root, t.Contract, arguments.Path, contents); err != nil {
 		return agent.ToolResult{}, err
 	}
+	evidence, err := artifact.NewRendererEvidence(arguments.Path, "gator.document.v1", arguments.Document.Normalize(), templateBytes, contents)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	if t.OnRenderer != nil {
+		t.OnRenderer(evidence)
+	}
 	content, err := success(struct {
 		Path    string           `json:"path"`
 		Bytes   int              `json:"bytes"`
@@ -75,9 +85,10 @@ func (t WriteDocumentArtifact) Execute(_ context.Context, raw json.RawMessage) (
 }
 
 type WriteWorkbookArtifact struct {
-	Root     workspace.Root
-	Source   workspace.Root
-	Contract artifact.Contract
+	Root       workspace.Root
+	Source     workspace.Root
+	Contract   artifact.Contract
+	OnRenderer func(artifact.RendererEvidence)
 }
 
 func (t WriteWorkbookArtifact) Definition() agent.ToolDefinition {
@@ -101,11 +112,13 @@ func (t WriteWorkbookArtifact) Execute(_ context.Context, raw json.RawMessage) (
 		return agent.ToolResult{}, errors.New("workbook artifact path must end in .xlsx")
 	}
 	var template *bytes.Reader
+	var templateBytes []byte
 	if arguments.TemplatePath != "" {
 		data, readErr := t.Source.ReadRegularFile(filepath.FromSlash(arguments.TemplatePath), 64*1024*1024)
 		if readErr != nil {
 			return agent.ToolResult{}, readErr
 		}
+		templateBytes = data
 		template = bytes.NewReader(data)
 	}
 	contents, preview, err := workbook.RenderXLSX(arguments.Workbook, template)
@@ -114,6 +127,13 @@ func (t WriteWorkbookArtifact) Execute(_ context.Context, raw json.RawMessage) (
 	}
 	if err := artifact.WriteBinary(t.Root, t.Contract, arguments.Path, contents); err != nil {
 		return agent.ToolResult{}, err
+	}
+	evidence, err := artifact.NewRendererEvidence(arguments.Path, "gator.workbook.v1", arguments.Workbook.Normalize(), templateBytes, contents)
+	if err != nil {
+		return agent.ToolResult{}, err
+	}
+	if t.OnRenderer != nil {
+		t.OnRenderer(evidence)
 	}
 	content, err := success(struct {
 		Path    string           `json:"path"`

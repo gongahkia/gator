@@ -19,6 +19,10 @@ import (
 )
 
 func workInteractive() error {
+	return workInteractiveConversation("")
+}
+
+func workInteractiveConversation(startConversationID string) error {
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		return err
@@ -43,6 +47,19 @@ func workInteractive() error {
 	if err != nil {
 		return err
 	}
+	if startConversationID != "" {
+		found := false
+		for _, conversation := range conversations {
+			found = found || conversation.ID == startConversationID
+		}
+		if !found {
+			conversation, loadErr := sessions.Load(startConversationID)
+			if loadErr != nil {
+				return loadErr
+			}
+			conversations = append([]worksession.Conversation{conversation}, conversations...)
+		}
+	}
 	jobStore, err := jobs.Open(stateDir)
 	if err != nil {
 		return err
@@ -65,7 +82,8 @@ func workInteractive() error {
 	}
 	application := worktui.New(worktui.Config{
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, Inbox: inboxEntries,
-		FirstRun: settings.Defaults.Provider == "" && len(conversations) == 0,
+		StartConversationID: startConversationID,
+		FirstRun:            settings.Defaults.Provider == "" && len(conversations) == 0,
 		SetupCommand: func(provider string) *exec.Cmd {
 			command := exec.Command(os.Args[0], "connect", provider)
 			command.Stdin = os.Stdin
@@ -118,6 +136,26 @@ func workInteractive() error {
 				return "", err
 			}
 			return "Moved forward to " + moved.HeadRevision + ".", nil
+		},
+		MoveToRevision: func(conversationID, revisionID string) (string, error) {
+			conversation, err := sessions.Load(conversationID)
+			if err != nil {
+				return "", err
+			}
+			children, err := sessions.Children(conversationID, conversation.HeadRevision)
+			if err != nil {
+				return "", err
+			}
+			for _, child := range children {
+				if child.ID == revisionID {
+					moved, moveErr := sessions.MoveHead(conversationID, revisionID)
+					if moveErr != nil {
+						return "", moveErr
+					}
+					return "Moved forward to " + moved.HeadRevision + ".", nil
+				}
+			}
+			return "", errors.New("selected revision is not a child of the current head")
 		},
 		History: func(conversationID string) (string, error) {
 			conversation, err := sessions.Load(conversationID)
@@ -194,7 +232,7 @@ func unifiedResume(arguments []string, out io.Writer) error {
 	if err == nil {
 		if _, loadErr := store.Load(arguments[0]); loadErr == nil {
 			if len(arguments) == 1 {
-				return workInteractive()
+				return workInteractiveConversation(arguments[0])
 			}
 			forwarded := append([]string{"resume", arguments[0]}, arguments[1:]...)
 			return workSessionCommand(forwarded, os.Stdin, out, nativeWorkModel)

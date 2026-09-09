@@ -35,20 +35,28 @@ Usage:
   gator config set default-model MODEL
   gator config set sandbox strict|off
   gator config set network deny|allow
+  gator config set snapshot-max-files N
+  gator config set snapshot-max-total-mib N
+  gator config set snapshot-max-file-mib N
+  gator config set snapshot-exclude PATTERN
+  gator config set desktop-notifications on|off
+  gator config set job-timezone IANA_TIMEZONE
+  gator config set job-missed skip|run_once
   gator agent list
   gator child list|show|batches|batch RUN_RECORD_PATH [CHILD_RUN_ID|BATCH_ID]
   gator hook status|trust|untrust
   gator lsp status|trust|untrust
   gator mcp status|trust|untrust|login|logout
   gator connector list
-  gator connector add ID --kind json|webhook --url URL [--name NAME] [--auth none|bearer]
+  gator connector add ID --kind json|webhook|slack|google|atlassian|notion|mcp [--url URL] [--name NAME] [--auth none|bearer|oauth]
   gator connector status|login|logout|test|remove ID [OPTIONS]
-	gator connector permission ID OPERATION read|write allow|ask|deny|draft
-	gator job add|list|show|edit|enable|disable|run|history|remove
-	gator job supervisor [--notify=true|false]
-	gator job status|stop
-	gator inbox [--unread]
-	gator snapshot list|show ID|gc --yes
+  gator connector permission ID OPERATION read|write allow|ask|deny|draft
+  gator job add|list|show|edit|enable|disable|run|history|remove
+  gator job supervisor [--notify=true|false]
+  gator job status|stop
+  gator inbox [--unread]
+  gator inbox read ENTRY_ID
+  gator snapshot list|show ID|gc --yes
   gator worktree list|prune|remove RUN_ID --yes
   gator extension list|status
   gator extension install [--replace] DIRECTORY
@@ -64,12 +72,17 @@ Usage:
   gator delegate RUNTIME ACTION [OPTIONS]
   gator doctor [--provider PROVIDER]
   gator work [--source DIRECTORY] [--connector ID] [--artifact PATH] [--require-contains PATH=TEXT] [--mode inspect|draft|act] [--actions forbid|draft|approve] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
+  gator work list
+  gator work show|history|back CONVERSATION
+  gator work forward CONVERSATION [REVISION]
+  gator work resume [--refresh-source] [--parent REVISION] CONVERSATION TASK
   gator inspect [--source DIRECTORY] [--connector ID] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--max-steps N] [--json] TASK
   gator code [coding options] --verify 'argv ...' TASK
   gator run [--provider PROVIDER] [--model MODEL] [--base-url URL] [--image PATH] [--attach PATH] [--browser-session ID] [--max-steps N] [--sandbox strict|off] [--network deny|allow] [--base REF] [--copy-ignored] [--setup 'argv ...'] [--scope PATH] [--scout TASK] --verify 'argv ...' [--allow-command 'argv ...'] [--allow-command-prefix 'argv ...'] [--trust-commands] TASK
-  gator resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
-  gator fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
-  gator clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator resume [WORK_CONVERSATION_ID TASK]
+  gator code resume [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator code fork [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
+  gator code clone [--all] [--last [TASK] | THREAD_ID [TASK] | RUN_RECORD_PATH [TASK]]
   gator eval DIR [--run-id ID] [--report PATH] [--script PATH] [--live] [--provider PROVIDER] [--model MODEL] [--base-url URL] [--environment-id ID] [--require-resolved]
   gator eval suite DIR [--run-id ID] [--report-dir DIR] [--attempts N] --environment-id ID --live [--provider PROVIDER] [--model MODEL] [--base-url URL] [--require-resolved]
   gator transcript RUN_RECORD_PATH > transcript.html
@@ -92,6 +105,9 @@ Commands:
   child     inspect durable manifests for retained isolated writer children
   lsp       trust and inspect local Language Server Protocol diagnostics
   connector configure connected sources/actions and resource-bound authentication
+  job       manage recurring Work and its foreground supervisor
+  inbox     inspect or mark scheduled-work results
+  snapshot  inspect or explicitly collect immutable source snapshots
   extension install, enable, trust, or remove Gator extension bundles
   provider  configure a custom/local Chat Completions provider
   local     install, select, and manage curated Ollama coding models
@@ -102,7 +118,7 @@ Commands:
   inspect   analyze a folder without files, processes, or external actions
   code      propose a tested patch in an isolated Git worktree
   run       compatibility alias for code
-  resume    select, reopen, or immediately continue a retained local thread
+  resume    reopen Work or continue a retained Work conversation by ID
   eval      run a bounded headless evaluation fixture or real-model suite
   transcript export one retained private session as local HTML
   review    verify and inspect a Work bundle or retained coding run
