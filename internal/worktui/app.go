@@ -69,7 +69,9 @@ type Config struct {
 	SetTheme            func(name string) error
 }
 
-type entry struct{ title, subtitle, kind, id, source string }
+type entry struct {
+	title, subtitle, kind, id, source, command string
+}
 type message struct{ role, text string }
 type runDone RunResult
 type setupDone struct {
@@ -88,6 +90,10 @@ type Model struct {
 	height        int
 	home          bool
 	launcher      bool
+	launcherMode  string
+	paletteQuery  string
+	leader        bool
+	section       string
 	selected      int
 	entries       []entry
 	source        string
@@ -119,17 +125,7 @@ func New(config Config) Model {
 			MaxSteps: 16, Sandbox: "strict", Network: "deny",
 		}},
 	}
-	if config.FirstRun {
-		model.entries = append(model.entries, entry{title: "Start guided setup", subtitle: "Connect a model, then begin your first task", kind: "onboarding", source: config.CurrentFolder})
-	}
-	model.entries = append(model.entries, entry{title: "Work in " + filepath.Base(config.CurrentFolder), subtitle: config.CurrentFolder, kind: "source", source: config.CurrentFolder})
-	for _, conversation := range config.Conversations {
-		model.entries = append(model.entries, entry{title: conversation.Title, subtitle: "Resume · " + conversation.SourcePath, kind: "conversation", id: conversation.ID, source: conversation.SourcePath})
-	}
-	model.entries = append(model.entries,
-		entry{title: "Inbox", subtitle: fmt.Sprintf("%d recent results", len(config.Inbox)), kind: "inbox"},
-		entry{title: "Scheduled jobs", subtitle: fmt.Sprintf("%d configured", len(config.Jobs)), kind: "jobs"},
-	)
+	model.entries = commandPaletteEntries()
 	if config.StartConversationID != "" {
 		for _, conversation := range config.Conversations {
 			if conversation.ID == config.StartConversationID {
@@ -197,13 +193,6 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.onboarding = false
 		m.firstRun = false
-		entries := m.entries[:0]
-		for _, item := range m.entries {
-			if item.kind != "onboarding" {
-				entries = append(entries, item)
-			}
-		}
-		m.entries = entries
 		m.selected = 0
 		m.home = true
 		m.source = m.config.CurrentFolder
@@ -231,13 +220,25 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		if value.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		if m.leader {
+			return m.updateLeader(value)
+		}
+		if value.String() == "ctrl+x" && !m.running {
+			m.leader = true
+			return m, nil
+		}
 		if value.String() == "ctrl+p" {
-			m.launcher = true
-			m.selected = 0
+			m.openCommandPalette()
 			return m, nil
 		}
 		if m.launcher {
 			return m.updateLauncher(value)
+		}
+		if m.section != "" {
+			if value.String() == "esc" {
+				m.section = ""
+			}
+			return m, nil
 		}
 		if m.home {
 			return m.updateHome(value)
