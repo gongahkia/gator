@@ -1,6 +1,7 @@
 package artifact
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/sha256"
 	"encoding/csv"
@@ -237,6 +238,15 @@ func validateContents(validation Validation, data []byte) (bool, string) {
 			seen[heading] = struct{}{}
 		}
 		return true, ""
+	case DOCX:
+		return validateZipParts(data, "word/document.xml", "[Content_Types].xml")
+	case XLSX:
+		return validateZipParts(data, "xl/workbook.xml", "[Content_Types].xml")
+	case PDF:
+		if !bytes.HasPrefix(data, []byte("%PDF-")) || !bytes.Contains(data[max(0, len(data)-2048):], []byte("%%EOF")) {
+			return false, "artifact is not a complete PDF document"
+		}
+		return true, ""
 	case Contains:
 		if !bytes.Contains(data, []byte(validation.Value)) {
 			return false, "artifact does not contain the required marker"
@@ -245,6 +255,27 @@ func validateContents(validation Validation, data []byte) (bool, string) {
 	default:
 		return false, fmt.Sprintf("validator %q is unavailable", validation.Kind)
 	}
+}
+
+func validateZipParts(data []byte, required ...string) (bool, string) {
+	archive, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return false, "artifact is not a valid OOXML archive"
+	}
+	found := make(map[string]bool, len(required))
+	for _, file := range archive.File {
+		for _, name := range required {
+			if file.Name == name {
+				found[name] = true
+			}
+		}
+	}
+	for _, name := range required {
+		if !found[name] {
+			return false, "OOXML archive is missing " + name
+		}
+	}
+	return true, ""
 }
 
 func validationResult(path string, kind ValidationKind, passed bool, diagnostic string) ValidationResult {
