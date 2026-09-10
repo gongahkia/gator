@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/gongahkia/gator/internal/journal"
 )
 
@@ -79,6 +80,37 @@ func TestWorkModelConfirmationRemainsVisibleInShortTerminal(t *testing.T) {
 		if !strings.Contains(view, required) {
 			t.Fatalf("confirmation hid %q:\n%s", required, view)
 		}
+	}
+}
+
+func TestWorkModelPanelUsesTheWorkVisualLanguage(t *testing.T) {
+	panel := NewModelCatalogPanel(Config{RepositoryPath: "/work/gator", Provider: "gemini", Model: "gemini-3.5-flash", LocalModels: &fakeLocalModelManager{}})
+	defer panel.Close()
+	panel.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	panel.model.localModels.action = localModelIdle
+	panel.model.localModels.section = cloudModelSection
+	panel.model.notice = notice{}
+
+	view := panel.View()
+	plain := ansi.Strip(view)
+	for _, required := range []string{"Models", "Cloud", "Local", "gemini", "↑/↓ choose", "esc back", "f1 help"} {
+		if !strings.Contains(plain, required) {
+			t.Fatalf("work-native model panel omitted %q:\n%s", required, plain)
+		}
+	}
+	for _, legacy := range []string{"🐊 Gator  models · gator", "Tab: Cloud / Local", "Readiness is credential/configuration state only", "Cloud models"} {
+		if strings.Contains(plain, legacy) {
+			t.Fatalf("work-native model panel retained legacy chrome %q:\n%s", legacy, plain)
+		}
+	}
+	if strings.Contains(view, "38;5;212") {
+		t.Fatalf("work-native model panel retained the old pink accent:\n%q", view)
+	}
+
+	panel.Update(tea.KeyMsg{Type: tea.KeyF1})
+	help := ansi.Strip(panel.View())
+	if !strings.Contains(help, "Browse") || !strings.Contains(help, "Cloud") || !strings.Contains(help, "Local") || strings.Contains(help, "🐊 Gator  models") {
+		t.Fatalf("model help did not use the focused Work layout:\n%s", help)
 	}
 }
 

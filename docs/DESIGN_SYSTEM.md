@@ -24,6 +24,7 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
 | Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
 | Provider picker | Providers valid for the selected `/model`, `/connect`, `/login`, or `/logout` action | Hidden | Type to filter, arrows to choose, `Esc` to return |
+| Models | Centered, constrained cloud/local catalog with one-line readiness states | Hidden | `Tab` changes section; contextual controls stay in a two-line footer |
 | Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
 | Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+B` |
 | Jobs | Configured schedules in a read-only view | Hidden | `Ctrl+J` |
@@ -62,6 +63,10 @@ native Work providers because Gator does not import another CLI's credentials.
   folder name on every screen.
 - Status belongs next to the conversation title. Controls belong in one short,
   muted footer.
+- Work-owned overlays must use the Work palette and constrained centered
+  layout even when their behavior is backed by retained Code-era components.
+  Legacy headers, pink accents, control rails, and explanatory paragraphs must
+  not leak into the Work surface.
 
 ## Interaction rules
 

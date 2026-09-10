@@ -813,13 +813,51 @@ func applyTheme(name string) string {
 	}
 }
 
+// applyWorkSurfaceTheme restyles legacy controls embedded in the Work product
+// without changing the standalone Code TUI's retained themes.
+func applyWorkSurfaceTheme(name string) string {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "contrast":
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("46"))
+		labelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("46"))
+		errorStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
+		okStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("46"))
+		panelStyle = lipgloss.NewStyle()
+		return "contrast"
+	case "mono":
+		headerStyle = lipgloss.NewStyle().Bold(true)
+		labelStyle = lipgloss.NewStyle().Bold(true)
+		dimStyle = lipgloss.NewStyle().Faint(true)
+		keyStyle = lipgloss.NewStyle().Bold(true)
+		errorStyle = lipgloss.NewStyle().Bold(true)
+		okStyle = lipgloss.NewStyle().Bold(true)
+		panelStyle = lipgloss.NewStyle()
+		return "mono"
+	default:
+		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42"))
+		labelStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("255"))
+		dimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+		keyStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42"))
+		errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+		okStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+		panelStyle = lipgloss.NewStyle()
+		return "gator"
+	}
+}
+
 // New creates a terminal model in task-composition mode.
 func New(config Config) Model {
 	return newModel(config, false)
 }
 
 func newModel(config Config, catalogOnly bool) Model {
-	config.Theme = applyTheme(config.Theme)
+	if catalogOnly {
+		config.Theme = applyWorkSurfaceTheme(config.Theme)
+	} else {
+		config.Theme = applyTheme(config.Theme)
+	}
 	if strings.TrimSpace(config.RepositoryPath) == "" {
 		config.RepositoryPath = "."
 	}
