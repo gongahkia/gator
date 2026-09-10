@@ -156,7 +156,11 @@ func (m Model) inlineWidth() int {
 	if m.width <= 0 {
 		return 0
 	}
-	return m.conversationWidth()
+	width := m.conversationWidth()
+	if m.catalogOnly {
+		return min(72, max(16, width-4))
+	}
+	return width
 }
 
 func (m Model) panel(value string) string {
