@@ -5,18 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/workrun"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/inbox"
 	"github.com/gongahkia/gator/internal/jobs"
+	"github.com/gongahkia/gator/internal/rattles"
+	"github.com/gongahkia/gator/internal/workrun"
 	"github.com/gongahkia/gator/internal/worksession"
 )
 
@@ -93,6 +95,7 @@ type entry struct {
 }
 type message struct{ role, text string }
 type runDone RunResult
+type loadingTickMsg struct{ run uint64 }
 
 type providerActionDone struct {
 	action   string
@@ -139,6 +142,8 @@ type Model struct {
 	queue               []queuedRun
 	lastOutput          string
 	theme               string
+	loadingFrame        int
+	loadingRun          uint64
 }
 
 func New(config Config) Model {
@@ -203,6 +208,12 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 	switch value := messageValue.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = value.Width, value.Height
+	case loadingTickMsg:
+		if !m.running || value.run != m.loadingRun {
+			return m, nil
+		}
+		m.loadingFrame = (m.loadingFrame + 1) % len(rattles.BrailleDots.Frames)
+		return m, m.nextLoadingTick()
 	case agent.Event:
 		if value.Kind == agent.EventSubagent && value.TaskID != "" {
 			var task struct{ ID, Role, Status, Error string }
@@ -1295,7 +1306,7 @@ func (m Model) View() string {
 		view.WriteString(strings.Join(lines[start:end], "\n") + "\n")
 	}
 	if m.running {
-		view.WriteString(accent.Render("● Working…") + "\n\n")
+		view.WriteString(accent.Render(rattles.BrailleDots.Frame(m.loadingFrame)+" Working…") + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
 	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs"
@@ -1482,6 +1493,14 @@ func waitWorkEvent(events <-chan tea.Msg) tea.Cmd {
 	}
 	return func() tea.Msg { return <-events }
 }
+
+func (m Model) nextLoadingTick() tea.Cmd {
+	run := m.loadingRun
+	return tea.Tick(rattles.BrailleDots.Interval, func(time.Time) tea.Msg {
+		return loadingTickMsg{run: run}
+	})
+}
+
 func (m Model) startWork(source, conversation, prompt string, options RunOptions) (tea.Model, tea.Cmd) {
 	if !m.config.Live {
 		return m, func() tea.Msg { return runDone(m.config.Run(source, conversation, prompt, options)) }
@@ -1491,6 +1510,8 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 	m.cancel = cancel
 	m.tasks = map[string]string{}
 	m.live = events
+	m.loadingFrame = 0
+	m.loadingRun++
 	send := func(value tea.Msg) {
 		select {
 		case events <- value:
@@ -1512,5 +1533,5 @@ func (m Model) startWork(source, conversation, prompt string, options RunOptions
 		result := run(source, conversation, prompt, options)
 		events <- runDone(result)
 		return nil
-	}, waitWorkEvent(events))
+	}, waitWorkEvent(events), m.nextLoadingTick())
 }

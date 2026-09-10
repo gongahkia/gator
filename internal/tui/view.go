@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gongahkia/gator/internal/journal"
+	"github.com/gongahkia/gator/internal/rattles"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 )
 
@@ -377,7 +378,7 @@ func (m Model) localDependencyHelpView() string {
 
 func (m Model) localCatalogView() string {
 	if len(m.localModels.catalog.Models) == 0 {
-		return m.fieldView("Reviewed local models", "Only reviewed Ollama tags can be downloaded through Gator.", dimStyle.Render("Loading the reviewed catalog…"))
+		return m.fieldView("Reviewed local models", "Only reviewed Ollama tags can be downloaded through Gator.", dimStyle.Render(m.localModels.spinner.View()+" Loading the reviewed catalog…"))
 	}
 	start, end := m.visibleRange(len(m.localModels.catalog.Models), m.localModels.selected, m.localModelLimit())
 	lines := make([]string, 0, end-start)
@@ -651,7 +652,7 @@ func (m Model) activityView() string {
 		phase = "stopping"
 		detail = "waiting for the current operation to stop; the worktree will remain reviewable"
 	}
-	activity := "● " + phase
+	activity := rattles.BrailleDots.FrameAt(time.Now()) + " " + phase
 	if duration := m.activityDuration(time.Now()); duration != "" {
 		activity += " · " + duration
 	}
