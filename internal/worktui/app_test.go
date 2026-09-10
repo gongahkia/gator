@@ -119,6 +119,29 @@ func TestCenteredHomeComposerGrowsForWrappedDrafts(t *testing.T) {
 	}
 }
 
+func TestRunningWorkUsesRattlesLoadingFrames(t *testing.T) {
+	model := New(Config{CurrentFolder: "/work"})
+	model.home = false
+	model.running = true
+	model.loadingRun = 7
+
+	if view := ansi.Strip(model.View()); !strings.Contains(view, "⠋ Working…") {
+		t.Fatalf("initial loading view = %q", view)
+	}
+	updated, command := model.Update(loadingTickMsg{run: 7})
+	model = updated.(Model)
+	if command == nil || model.loadingFrame != 1 {
+		t.Fatalf("loading tick was not scheduled: frame=%d command=%v", model.loadingFrame, command != nil)
+	}
+	if view := ansi.Strip(model.View()); !strings.Contains(view, "⠙ Working…") {
+		t.Fatalf("updated loading view = %q", view)
+	}
+	updated, command = model.Update(loadingTickMsg{run: 6})
+	if command != nil || updated.(Model).loadingFrame != 1 {
+		t.Fatal("a stale run tick must not animate a later run")
+	}
+}
+
 func TestCommandPaletteFiltersAndFillsCommandsThatNeedArguments(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlP})

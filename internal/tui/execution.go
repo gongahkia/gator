@@ -13,6 +13,7 @@ import (
 	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
 	modelprovider "github.com/gongahkia/gator/internal/model"
+	"github.com/gongahkia/gator/internal/rattles"
 	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -498,7 +499,7 @@ func waitForExecution(stream *executionStream) tea.Cmd {
 			return executionDoneMsg{done: <-stream.done}
 		case attachment := <-stream.terminals:
 			return terminalManagerMsg{attachment: attachment}
-		case <-time.After(time.Second):
+		case <-time.After(rattles.BrailleDots.Interval):
 			return activityTickMsg{}
 		}
 	}

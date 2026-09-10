@@ -21,6 +21,7 @@ import (
 	"github.com/gongahkia/gator/internal/diffview"
 	"github.com/gongahkia/gator/internal/journal"
 	"github.com/gongahkia/gator/internal/lsp"
+	"github.com/gongahkia/gator/internal/rattles"
 	"github.com/gongahkia/gator/internal/review"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
@@ -884,7 +885,10 @@ func newModel(config Config, catalogOnly bool) Model {
 	recentTarget.Width = 60
 	recentTarget.Blur()
 
-	localSpinner := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(keyStyle))
+	localSpinner := spinner.New(spinner.WithSpinner(spinner.Spinner{
+		Frames: rattles.BrailleDots.Frames,
+		FPS:    rattles.BrailleDots.Interval,
+	}), spinner.WithStyle(keyStyle))
 	copyToClipboard := config.CopyToClipboard
 	if copyToClipboard == nil {
 		copyToClipboard = clipboard.WriteAll

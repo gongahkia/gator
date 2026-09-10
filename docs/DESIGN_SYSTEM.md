@@ -83,10 +83,13 @@ native Work providers because Gator does not import another CLI's credentials.
 ## Accessibility and terminal behavior
 
 Color is never the only indication of selection or activity: the palette uses
-`›`, and active work uses `●` plus text. Layouts retain usable fallbacks when no
-terminal size has arrived. Labels remain plain text so screen readers and copied
-terminal output keep their meaning. Future animation must respect reduced
-motion and must not be required to understand run state.
+`›`, and active work uses a one-cell Braille spinner plus text. Its frames and
+80 ms cadence come from the MIT-licensed Rattles `BrailleDots` preset, ported
+into Gator's Go renderer; it is not required to understand run state. Layouts
+retain usable fallbacks when no terminal size has arrived. Labels remain plain
+text so screen readers and copied terminal output keep their meaning. Motion is
+limited to active work and model operations, and never changes the surrounding
+layout.
 
 ## Reference boundary
 
