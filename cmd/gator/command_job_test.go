@@ -65,8 +65,12 @@ func TestJobEditRecapturesExplicitFrozenSource(t *testing.T) {
 		if err := jobCommand([]string{"edit", definition.ID, "--source", selected}, &bytes.Buffer{}); err != nil {
 			t.Fatal(err)
 		}
+		canonicalSelected, err := filepath.EvalSymlinks(selected)
+		if err != nil {
+			t.Fatal(err)
+		}
 		updated, err := store.Load(definition.ID)
-		if err != nil || updated.SnapshotID == original || updated.SourcePath != selected || updated.Project == nil || updated.Project.Origin != selected {
+		if err != nil || updated.SnapshotID == original || updated.SourcePath != selected || updated.Project == nil || updated.Project.Origin != canonicalSelected {
 			t.Fatalf("explicit source edit did not recapture source/configuration: %+v, %v", updated, err)
 		}
 		original = updated.SnapshotID

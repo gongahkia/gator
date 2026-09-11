@@ -67,6 +67,9 @@ func darwinProfile(readRoots, writeRoots []string, network Network) string {
 		"(import \"system.sb\")",
 		"(allow process*)",
 	)
+	for _, directory := range ancestorDirectories(append(append([]string(nil), readRoots...), writeRoots...)) {
+		lines = append(lines, "(allow file-read-metadata (literal \""+escapeSBPL(directory)+"\"))")
+	}
 	for _, root := range readRoots {
 		lines = append(lines, "(allow file-read* (subpath \""+escapeSBPL(root)+"\"))")
 	}
@@ -79,6 +82,26 @@ func darwinProfile(readRoots, writeRoots []string, network Network) string {
 		lines = append(lines, "(deny network*)")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// Seatbelt requires metadata access to each parent directory while a process
+// resolves an allowed deep path. Granting only literal ancestor metadata keeps
+// sibling contents unreadable while allowing Git worktree pointers to reach
+// their separately retained common metadata directory.
+func ancestorDirectories(roots []string) []string {
+	seen := map[string]struct{}{}
+	var result []string
+	for _, root := range roots {
+		for parent := filepath.Dir(filepath.Clean(root)); parent != "." && parent != string(filepath.Separator); parent = filepath.Dir(parent) {
+			if _, exists := seen[parent]; exists {
+				continue
+			}
+			seen[parent] = struct{}{}
+			result = append(result, parent)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 
 func escapeSBPL(value string) string {
