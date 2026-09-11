@@ -105,12 +105,12 @@ func TestAttachedTerminalRawKeyboardInputFlushesOnReturnToControls(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var inputs []terminal.DeveloperInput
+	inputs := make(chan terminal.DeveloperInput, 2)
 	manager := terminal.New(terminal.Config{
 		Root:   root,
 		Policy: sandbox.Policy{Mode: sandbox.Off},
 		OnDeveloperInput: func(_ terminal.Task, input terminal.DeveloperInput) {
-			inputs = append(inputs, input)
+			inputs <- input
 		},
 	})
 	defer manager.Close()
@@ -149,8 +149,18 @@ func TestAttachedTerminalRawKeyboardInputFlushesOnReturnToControls(t *testing.T)
 	if output := attached.currentAttachedTerminalOutput(); !strings.Contains(output, "received:Ada") {
 		t.Fatalf("raw keyboard terminal output = %q", output)
 	}
-	if len(inputs) != 1 || !inputs[0].Raw || inputs[0].Bytes != len("Ada\r") {
-		t.Fatalf("raw keyboard journal metadata = %#v", inputs)
+	select {
+	case input := <-inputs:
+		if !input.Raw || input.Bytes != len("Ada\r") {
+			t.Fatalf("raw keyboard journal metadata = %#v", input)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("raw keyboard journal metadata was not delivered")
+	}
+	select {
+	case input := <-inputs:
+		t.Fatalf("unexpected additional raw keyboard metadata = %#v", input)
+	default:
 	}
 }
 

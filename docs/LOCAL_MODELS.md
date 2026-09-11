@@ -59,8 +59,9 @@ reported as unavailable.
 Press `n` to add a custom Chat Completions endpoint, `g` to preview model discovery,
 `e` to rename an entry, `d` to remove a stored Gator credential, and `x` to remove a
 custom provider. The reserved `gator-local` entry is managed from Local. This
-screen reuses the retained model-management component; it does not reopen the
-historical Code composer or read/write its draft state.
+screen is owned by the focused `internal/modelcatalog` component; it does not
+reopen the historical Code composer or read/write its draft state. The legacy
+`internal/tui` constructor is only a compatibility adapter to the same panel.
 
 ## Host eligibility guardrail
 
@@ -154,11 +155,13 @@ PDF inputs remain unavailable on that generic protocol.
 
 ## Verification of the Work TUI integration
 
-September 10, 2026: `GOTOOLCHAIN=go1.25.13 make check` passed all 52 packages,
-formatting, vet and build. Race checks passed for `internal/localmodel`,
-`internal/tui`, `internal/worktui`, and `cmd/gator`. Darwin arm64 cross-compilation
-passed; macOS runtime behavior was not exercised locally. Browser code did not
-change, so the Chromium integration was not repeated for this change.
+September 11, 2026: after extracting the focused model-catalog boundary,
+`GOTOOLCHAIN=go1.25.13 make check` passed all 54 packages, formatting, vet, and
+build. Race checks passed for `internal/modelcatalog`, `internal/tui`,
+`internal/worktui`, and `cmd/gator`. The race pass also found and corrected an
+unsynchronized callback assertion in the historical terminal test harness.
+Browser code did not change, so the Chromium integration was not repeated for
+this change.
 
 The assembled Bubble Tea test uses local HTTP fixtures to exercise download
 confirmation, progress, cancellation, a completed download, persistent selection,
