@@ -24,6 +24,7 @@ screen treatment; it adopts the underlying progressive-disclosure pattern.
 | Conversation | Top-left `🐊 Gator` wordmark, transcript, and current run status | Docked below the transcript | Available through direct shortcuts |
 | Command palette | Searchable slash actions only | Hidden | `Ctrl+P`; type to filter, arrows to choose |
 | Provider picker | Providers valid for the selected `/model`, `/connect`, `/login`, or `/logout` action | Hidden | Type to filter, arrows to choose, `Esc` to return |
+| Status-line editor | Ordered composer-footer items with a live preview | Hidden | `Space` toggles; left/right reorders; `Enter` saves |
 | Models | Centered, constrained cloud/local catalog with one-line readiness states | Hidden | `Tab` changes section; contextual controls stay in a two-line footer |
 | Conversations | Retained Work conversations only | Hidden | `Ctrl+X` |
 | Inbox | Recent scheduled-work results in a read-only view | Hidden | `Ctrl+B` |
@@ -61,8 +62,9 @@ native Work providers because Gator does not import another CLI's credentials.
   columns of margin on each side.
 - Prefer whitespace over dividers. Do not repeat the product name, tagline, and
   folder name on every screen.
-- Status belongs next to the conversation title. Controls belong in one short,
-  muted footer.
+- Status belongs next to the conversation title. Composer controls and optional
+  context belong in a muted footer that packs complete items onto rows and
+  wraps oversized values to the terminal width.
 - Work-owned overlays must use the Work palette and constrained centered
   layout even when their behavior is backed by retained Code-era components.
   Legacy headers, pink accents, control rails, and explanatory paragraphs must
@@ -84,6 +86,27 @@ native Work providers because Gator does not import another CLI's credentials.
    chrome.
 7. Revision commands remain available, but are discoverable through help and
    the palette instead of occupying the default footer.
+8. `/statusline` opens an ordered-item editor. `Space` toggles an item,
+   left/right changes its selected order, `r` restores defaults, and an empty
+   selection hides the footer. The choice is persisted in `config.json` as an
+   ordered `tui.status_line` array; omitting it uses Gator's defaults.
+
+Available status-line identifiers are `queue`, `send`, `commands`,
+`conversations`, `inbox`, `jobs`, `model`, `model-access`, `current-dir`,
+`conversation`, `effort`, `sandbox`, and `status`. Configuration excerpt:
+
+```json
+{
+  "tui": {
+    "status_line": ["model", "model-access", "current-dir", "commands"]
+  }
+}
+```
+
+This ordered-list shape and the empty-list-to-hide behavior follow the official
+[Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+and [sample configuration](https://learn.chatgpt.com/codex/config-file/config-sample),
+adapted to Gator's JSON settings and footer items.
 
 ## Accessibility and terminal behavior
 
