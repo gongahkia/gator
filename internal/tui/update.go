@@ -51,172 +51,25 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case clipboardWriteMsg:
 		return m.applyClipboardWrite(msg), nil
 	case cloudModelSetupSavedMsg:
-		if msg.err != nil {
-			if m.localModels.cloudSetup != nil {
-				m.localModels.cloudSetup.saving = false
-			}
-			m.notice = notice{text: "Save cloud model configuration: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.localModels.cloudSetup = nil
-		m.provider.SetValue(msg.provider)
-		m.model.SetValue(msg.model)
-		m.config.BaseURL = msg.baseURL
-		if m.config.ProviderEndpoints == nil {
-			m.config.ProviderEndpoints = make(map[string]string)
-		}
-		if msg.baseURL == "" {
-			delete(m.config.ProviderEndpoints, msg.provider)
-		} else {
-			m.config.ProviderEndpoints[msg.provider] = msg.baseURL
-		}
-		if m.config.ProviderOptions == nil {
-			m.config.ProviderOptions = make(map[string]map[string]string)
-		}
-		if len(msg.options) == 0 {
-			delete(m.config.ProviderOptions, msg.provider)
-		} else {
-			m.config.ProviderOptions[msg.provider] = cloneProviderOptions(msg.options)
-		}
-		m.delegateRuntime = msg.delegateRuntime
-		m.persistDraft()
-		m.refreshPreflight()
-		m.selectActiveModelCatalogEntry()
-		m.notice = notice{text: "Cloud model configuration saved. The selected model is ready when its provider reports configured.", kind: noticeSuccess}
-		return m, nil
+		return m.updateCloudModelSetupSaved(msg)
 	case credentialStatusesMsg:
-		if msg.err != nil {
-			m.notice = notice{text: "Read stored credentials: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.applyCredentialStatuses(msg.statuses)
-		return m, nil
+		return m.updateCredentialStatuses(msg)
 	case credentialRemovedMsg:
-		if msg.err != nil {
-			m.notice = notice{text: "Remove Gator credential: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		delete(m.localModels.credentials, msg.result.StoreKey)
-		m.notice = notice{text: credentialRemovalNotice(msg.result), kind: noticeSuccess}
-		if m.config.ModelManagement != nil {
-			return m, loadCredentialStatuses(m.config.ModelManagement)
-		}
-		return m, nil
+		return m.updateCredentialRemoved(msg)
 	case customProviderSavedMsg:
-		if m.localModels.customSetup != nil {
-			m.localModels.customSetup.saving = false
-		}
-		if msg.err != nil {
-			m.notice = notice{text: "Save custom provider: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.localModels.customSetup = nil
-		m.localModels.pendingCustom = nil
-		m.applyCustomProviders(msg.providers, msg.id)
-		m.notice = notice{text: "Saved custom provider " + msg.id + ". The API key environment variable was not written to config.json.", kind: noticeSuccess}
-		return m, nil
+		return m.updateCustomProviderSaved(msg)
 	case customProviderRemovedMsg:
-		if msg.err != nil {
-			m.notice = notice{text: "Remove custom provider: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.applyCustomProviders(msg.providers, msg.id)
-		m.notice = notice{text: "Removed custom provider " + msg.id + ". Its API key environment variable was not changed.", kind: noticeSuccess}
-		return m, nil
+		return m.updateCustomProviderRemoved(msg)
 	case customProviderDiscoverMsg:
-		if msg.generation != m.localModels.generation || m.localModels.action != localModelDiscovering {
-			return m, nil
-		}
-		m.localModels.action = localModelIdle
-		if msg.err != nil {
-			m.notice = notice{text: "Discover custom provider models: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		preview := msg.preview
-		m.localModels.discovery = &preview
-		m.localModels.confirmation = localModelConfirmApplyDiscovery
-		m.notice = notice{text: "Discovered model IDs are untrusted server data. Confirm to replace the configured catalog.", kind: noticeInfo}
-		return m, nil
+		return m.updateCustomProviderDiscovered(msg)
 	case customProviderAppliedMsg:
-		if msg.err != nil {
-			m.notice = notice{text: "Apply discovered models: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.localModels.discovery = nil
-		m.applyCustomProviders(msg.providers, msg.id)
-		m.notice = notice{text: "Replaced the model catalog for " + msg.id + " with discovered IDs.", kind: noticeSuccess}
-		return m, nil
+		return m.updateCustomProviderApplied(msg)
 	case localModelStatusMsg:
-		if msg.generation != m.localModels.generation || m.localModels.action != localModelRefreshing {
-			return m, nil
-		}
-		m.localModels.action = localModelIdle
-		m.localModels.operation = nil
-		m.localModels.err = msg.err
-		if msg.err != nil {
-			m.notice = notice{text: "Check local models: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.applyLocalModelCatalog(msg.catalog)
-		section := m.localModels.section
-		m.selectActiveModelCatalogEntry()
-		m.localModels.section = section
-		if msg.catalog.RuntimeError != "" {
-			if m.localModels.section == localModelSection && !m.localModels.startDismissed {
-				m.requestLocalRuntimeRecovery()
-			} else {
-				if m.ollamaMissing() {
-					m.notice = notice{text: "Ollama is not installed. Open the Local section for installation help.", kind: noticeInfo}
-				} else {
-					m.notice = notice{text: "Local runtime is unavailable. Open the Local section to choose whether Gator should start Ollama.", kind: noticeInfo}
-				}
-			}
-		} else {
-			m.localModels.startDismissed = false
-			m.notice = notice{text: "Local model catalog refreshed.", kind: noticeSuccess}
-		}
-		return m, nil
+		return m.updateLocalModelStatus(msg)
 	case localModelProgressMsg:
-		if msg.operation == nil || msg.operation != m.localModels.operation || m.localModels.action == localModelIdle {
-			return m, nil
-		}
-		m.localModels.progress = msg.progress
-		return m, waitForLocalModelOperation(m.localModels.operation)
+		return m.updateLocalModelProgress(msg)
 	case localModelDoneMsg:
-		if msg.operation == nil || msg.operation != m.localModels.operation {
-			return m, nil
-		}
-		m.localModels.operation = nil
-		action := m.localModels.action
-		m.localModels.action = localModelIdle
-		m.localModels.err = msg.done.err
-		if msg.done.err != nil {
-			m.notice = notice{text: "Local model operation stopped: " + msg.done.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		if msg.done.aliases != nil {
-			m.applyModelAliases(msg.done.aliases)
-			m.notice = notice{text: "Model display name saved. Provider model IDs are unchanged.", kind: noticeSuccess}
-			return m, nil
-		}
-		if msg.done.update != nil {
-			m.applyLocalModelUpdate(*msg.done.update)
-			if action == localModelRemoving {
-				m.notice = notice{text: "Local model removed and current configuration updated.", kind: noticeSuccess}
-			} else {
-				m.notice = notice{text: "Local model selected. Return to the composer and send a task to use it.", kind: noticeSuccess}
-			}
-			return m, nil
-		}
-		if msg.done.catalog != nil {
-			m.applyLocalModelCatalog(*msg.done.catalog)
-		}
-		if action == localModelStarting {
-			m.notice = notice{text: "Ollama is running under this Gator session. Choose a local model to download or use.", kind: noticeSuccess}
-		} else {
-			m.notice = notice{text: "Local model download finished. Press u to select it for Gator.", kind: noticeSuccess}
-		}
-		return m, nil
+		return m.updateLocalModelDone(msg)
 	case doctorSnapshotMsg:
 		m.doctor.loading = false
 		m.doctor.err = msg.err
@@ -230,148 +83,15 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyReviewWebStarted(msg)
 		return m, nil
 	case managementSnapshotMsg:
-		m.management.loading = false
-		m.management.err = msg.err
-		if msg.err != nil {
-			m.notice = notice{text: "Refresh management state: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.management.data = msg.snapshot
-		m.config.Execution.Mode = sandbox.Mode(msg.snapshot.Settings.SandboxMode)
-		m.config.Execution.Network = sandbox.Network(msg.snapshot.Settings.Network)
-		if m.management.section == managementRuns && m.management.selectedRunRecord != "" {
-			for index, run := range msg.snapshot.Runs {
-				if run.StatePath == m.management.selectedRunRecord {
-					m.management.index = index
-					break
-				}
-			}
-		}
-		if count := m.managementItemCount(); count == 0 {
-			m.management.index = 0
-		} else if m.management.index >= count {
-			m.management.index = count - 1
-		}
-		return m, nil
+		return m.updateManagementSnapshot(msg)
 	case extensionPreparedMsg:
-		m.management.loading = false
-		if msg.err != nil {
-			m.notice = notice{text: "Stage extension source: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		preview := msg.preview
-		m.management.installPreview = &preview
-		label := "Install extension " + preview.ID + " from the staged bundle sha256:" + preview.Hash
-		replace := ""
-		if preview.AlreadyInstalled {
-			replace = "replace"
-			label = "Replace installed extension " + preview.ID + " with the staged bundle sha256:" + preview.Hash
-		}
-		m.management.confirm = &managementConfirmation{
-			action: "install-extension", id: preview.Token, value: preview.Hash, value2: replace, label: label,
-		}
-		m.notice = notice{text: "Review the staged bundle. Only these exact bytes are installed if you confirm.", kind: noticeInfo}
-		return m, nil
+		return m.updateExtensionPrepared(msg)
 	case mcpLoginDoneMsg:
-		if msg.server != m.management.mcpLoginServer {
-			return m, nil
-		}
-		m.oauthLogin = nil
-		m.oauthCancel = nil
-		m.oauthProvider = ""
-		m.management.mcpLoginServer = ""
-		m.management.mcpLoginURL = ""
-		if msg.err != nil {
-			m.notice = notice{text: "MCP authorization stopped: " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.notice = notice{text: "Stored a Gator OAuth credential bound to MCP server " + msg.server + ". Its tools still require approval.", kind: noticeSuccess}
-		m.management.loading = true
-		return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
+		return m.updateMCPLoginDone(msg)
 	case managementActionMsg:
-		m.management.loading = false
-		if msg.err != nil {
-			m.management.err = msg.err
-			m.management.actionDetail = ""
-			m.notice = notice{text: msg.message + ": " + msg.err.Error(), kind: noticeError}
-			return m, nil
-		}
-		m.management.err = nil
-		m.management.actionDetail = msg.detail
-		if msg.checkedRun != "" {
-			m.management.checkedRunRecord = msg.checkedRun
-		} else if strings.HasPrefix(msg.message, "Applied") || strings.Contains(strings.ToLower(msg.message), "apply retained") {
-			m.management.checkedRunRecord = ""
-		}
-		m.notice = notice{text: msg.message + ".", kind: noticeSuccess}
-		m.management.loading = true
-		return m, loadManagement(m.management.backend, m.management.selectedRunRecord)
+		return m.updateManagementAction(msg)
 	case executionDoneMsg:
-		m.resolvePendingApproval(tools.CommandDeny)
-		wasNewThread := m.resumeStatePath == ""
-		wasCancelling := m.cancelling
-		m.execution = nil
-		if !m.hasBackgroundTerminalTask() {
-			m.setTerminalAttachment(nil)
-		}
-		m.cancelling = false
-		m.lastRunCancelled = wasCancelling
-		m.outcome = &msg.done.outcome
-		m.threadID = msg.done.outcome.ThreadID
-		if msg.done.outcome.StatePath != "" {
-			m.resumeStatePath = msg.done.outcome.StatePath
-			m.forkStatePath = ""
-		}
-		m.runErr = msg.done.err
-		m.finishRunActivity(msg.done.err, wasCancelling)
-		m.appendCompletion(msg.done.outcome, msg.done.err)
-		m.screen = composeScreen
-		m.task.Reset()
-		m.task.Placeholder = "Send a follow-up..."
-		m.focus = taskField
-		_ = m.focusField()
-		m.refreshPreflight()
-		if msg.done.err != nil {
-			m.notice = notice{text: m.runMode.String() + " stopped: " + msg.done.err.Error(), kind: noticeError}
-		} else {
-			if m.runMode == gatorrun.PlanMode {
-				m.notice = notice{text: "Plan ready. Continue this thread in Execute mode when you are ready to make changes.", kind: noticeSuccess}
-			} else if m.hasBackgroundTerminalTask() {
-				m.notice = notice{text: "Run complete. A detached terminal task is still running in this Gator session; press Ctrl+T to attach.", kind: noticeSuccess}
-			} else {
-				m.notice = notice{text: "Run complete. Inspect the diff and evidence before applying anything.", kind: noticeSuccess}
-			}
-		}
-		if msg.done.outcome.StatePath != "" && wasNewThread && strings.TrimSpace(m.config.StateDir) != "" {
-			if err := journal.DeleteDraft(m.config.StateDir, m.config.RepositoryPath); err != nil {
-				m.draftErr = err
-			}
-		}
-		if msg.done.err == nil && !wasCancelling && len(m.queue) > 0 {
-			m.notice = notice{text: "Previous run completed. Starting the next queued instruction...", kind: noticeInfo}
-			queued, command, dispatched := m.dispatchNextQueued()
-			if dispatched {
-				return queued, command
-			}
-			m = queued.(Model)
-		} else if len(m.queue) > 0 {
-			if wasCancelling {
-				m.notice = notice{text: "Run cancelled. " + m.queueSummary() + " retained; use /queue to inspect it.", kind: noticeInfo}
-			} else {
-				m.notice = notice{text: "Run stopped. " + m.queueSummary() + " retained; use /queue to inspect it.", kind: noticeError}
-			}
-		}
-		if m.quitAfterRun && msg.done.err == nil && !wasCancelling && len(m.queue) == 0 {
-			m.quitAfterRun = false
-			return m, tea.Quit
-		}
-		if msg.done.err != nil || wasCancelling {
-			m.quitAfterRun = false
-		}
-		if msg.done.outcome.Worktree.Path == "" {
-			return m, nil
-		}
-		return m, loadReview(msg.done.outcome)
+		return m.updateExecutionDone(msg)
 	case oauthLoginDoneMsg:
 		if msg.provider != m.oauthProvider {
 			return m, nil
