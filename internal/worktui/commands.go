@@ -80,6 +80,7 @@ func commandPaletteEntries() []entry {
 		{title: "/attach", subtitle: "Attach a source file to the next prompt", kind: "command-input", command: "/attach"},
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
 		{title: "/status", subtitle: "Inspect Gator orchestration", kind: "command", command: "/status"},
+		{title: "/statusline", subtitle: "Choose and order composer footer items", kind: "command", command: "/statusline"},
 		{title: "/permissions", subtitle: "Inspect the Code capability envelope", kind: "command", command: "/permissions"},
 		{title: "/doctor", subtitle: "Inspect local prerequisites", kind: "command", command: "/doctor"},
 		{title: "/agents", subtitle: "Inspect project profiles and roles", kind: "command", command: "/agents"},
@@ -208,6 +209,13 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		result, err = m.configureCode(fields, command)
 	case "/status":
 		result = m.workStatus()
+	case "/statusline", "/status-line":
+		if len(fields) != 1 {
+			err = fmt.Errorf("usage: /statusline")
+			break
+		}
+		m.openStatusLineEditor()
+		return m, nil
 	case "/permissions":
 		result = m.codeStatus()
 	case "/doctor", "/agents", "/settings":
@@ -623,6 +631,7 @@ func workHelp() string {
   /code browser SESSION          select an already controlled browser session
   /code reset                    restore strict, offline Code defaults
   /status · /permissions         inspect the active orchestration envelope
+  /statusline                    choose, order, or hide composer footer items
   /doctor · /agents · /settings inspect local configuration
   /history · /back · /forward   navigate retained Gator revisions
   /steer TEXT                    steer the running task
@@ -634,7 +643,7 @@ func workHelp() string {
 
 Navigation
   ctrl+x    retained conversations
-	  ctrl+b    inbox
+  ctrl+b    inbox
   ctrl+j    scheduled jobs
   ctrl+p    searchable command palette`
 }

@@ -163,7 +163,7 @@ func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/connect", "/login", "/logout", "/effort", "/attach", "/detach", "/status", "/permissions",
+		"/help", "/new", "/model", "/connect", "/login", "/logout", "/effort", "/attach", "/detach", "/status", "/statusline", "/permissions",
 		"/doctor", "/agents", "/settings", "/theme", "/history", "/back", "/forward", "/review",
 		"/copy", "/queue", "/dequeue", "/clear-queue", "/code status", "/code verify", "/code scope",
 		"/code profile", "/code setup", "/code allow", "/code allow-prefix", "/code sandbox",

@@ -63,6 +63,7 @@ func (m Model) updateModelPanel(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
+	m.refreshModelStatus()
 	if m.pendingPrompt != "" {
 		m.input, m.pendingPrompt = m.pendingPrompt, ""
 	}
@@ -172,6 +173,7 @@ func (m Model) updateProviderActionDone(value providerActionDone) (tea.Model, te
 				m.status = providerActionSuccess(value.action, value.provider)
 				m.messages = append(m.messages, message{role: "Gator", text: m.status + "\nGator could not select it as the default: " + err.Error() + "\nChoose a default with /model."})
 				m.scroll = 0
+				m.refreshModelStatus()
 				return m, nil
 			}
 			selectedDefault = true
@@ -179,12 +181,14 @@ func (m Model) updateProviderActionDone(value providerActionDone) (tea.Model, te
 			m.status = providerActionSuccess(value.action, value.provider)
 			m.messages = append(m.messages, message{role: "Gator", text: m.status})
 			m.scroll = 0
+			m.refreshModelStatus()
 			return m, nil
 		}
 	}
 	if !selectedDefault && m.config.CompleteSetup != nil {
 		if err := m.config.CompleteSetup(value.provider); err != nil {
 			m.messages = append(m.messages, message{role: "Gator", text: providerActionFailure(value.action, err)})
+			m.refreshModelStatus()
 			return m, nil
 		}
 	}
@@ -196,6 +200,7 @@ func (m Model) updateProviderActionDone(value providerActionDone) (tea.Model, te
 	m.title = "Work in " + filepath.Base(m.source)
 	m.messages = nil
 	m.status = "Connected to " + value.provider
+	m.refreshModelStatus()
 	if m.pendingPrompt == "" {
 		return m, nil
 	}
@@ -474,6 +479,9 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.launcherMode == "status-line" {
+		return m.updateStatusLineEditor(key)
+	}
 	visible := m.filteredEntries()
 	switch key.String() {
 	case "up":

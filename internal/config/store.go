@@ -32,10 +32,11 @@ type WorkRole struct {
 }
 
 type Settings struct {
-	WorkRoles []WorkRole `json:"work_roles,omitempty"`
-	Version   int        `json:"version"`
-	Defaults  Defaults   `json:"defaults"`
-	Theme     string     `json:"theme,omitempty"`
+	WorkRoles []WorkRole  `json:"work_roles,omitempty"`
+	Version   int         `json:"version"`
+	Defaults  Defaults    `json:"defaults"`
+	Theme     string      `json:"theme,omitempty"`
+	TUI       TUISettings `json:"tui,omitzero"`
 	// ProviderEndpoints stores explicit non-secret endpoint overrides by
 	// provider ID. Credentials remain exclusively in Gator's auth store.
 	ProviderEndpoints map[string]string `json:"provider_endpoints,omitempty"`
@@ -58,6 +59,12 @@ type Settings struct {
 	Snapshots            SnapshotSettings           `json:"snapshots"`
 	Notifications        NotificationSettings       `json:"notifications"`
 	JobDefaults          JobDefaults                `json:"job_defaults"`
+}
+
+// TUISettings contains display-only terminal preferences. A nil StatusLine
+// uses Gator's default footer; an explicit empty list hides it.
+type TUISettings struct {
+	StatusLine *[]string `json:"status_line,omitempty"`
 }
 
 type SnapshotSettings struct {
@@ -300,6 +307,21 @@ func validate(settings Settings) error {
 	if settings.Theme != "" && settings.Theme != "gator" && settings.Theme != "contrast" && settings.Theme != "mono" {
 		return fmt.Errorf("unknown theme %q", settings.Theme)
 	}
+	if settings.TUI.StatusLine != nil {
+		if len(*settings.TUI.StatusLine) > 32 {
+			return errors.New("status line has too many items")
+		}
+		seenStatusItems := map[string]bool{}
+		for _, item := range *settings.TUI.StatusLine {
+			if !validStatusLineItem(item) {
+				return fmt.Errorf("unknown status line item %q", item)
+			}
+			if seenStatusItems[item] {
+				return fmt.Errorf("status line item %q is configured more than once", item)
+			}
+			seenStatusItems[item] = true
+		}
+	}
 	if err := settings.Execution.Validate(); err != nil {
 		return fmt.Errorf("invalid execution policy: %w", err)
 	}
@@ -479,6 +501,15 @@ func validate(settings Settings) error {
 		}
 	}
 	return nil
+}
+
+func validStatusLineItem(item string) bool {
+	switch item {
+	case "queue", "send", "commands", "conversations", "inbox", "jobs", "model", "model-access", "current-dir", "conversation", "effort", "sandbox", "status":
+		return true
+	default:
+		return false
+	}
 }
 
 func validSHA256(value string) bool {

@@ -51,6 +51,52 @@ func TestStoreSavesPrivateAtomicSettings(t *testing.T) {
 	}
 }
 
+func TestStorePersistsExplicitEmptyStatusLine(t *testing.T) {
+	root := t.TempDir()
+	store, err := New(root)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	empty := []string{}
+	settings := Default()
+	settings.TUI.StatusLine = &empty
+	if err := store.Save(settings); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, err := store.Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.TUI.StatusLine == nil || len(*loaded.TUI.StatusLine) != 0 {
+		t.Fatalf("loaded status line = %#v, want explicit empty list", loaded.TUI.StatusLine)
+	}
+	contents, err := os.ReadFile(filepath.Join(root, "gator", "config.json"))
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if !strings.Contains(string(contents), `"status_line": []`) {
+		t.Fatalf("config does not retain explicit empty status line: %s", contents)
+	}
+}
+
+func TestStoreRejectsUnknownOrDuplicateStatusLineItems(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	unknown := []string{"model", "mystery"}
+	settings := Default()
+	settings.TUI.StatusLine = &unknown
+	if err := store.Save(settings); err == nil {
+		t.Fatal("saved unknown status line item")
+	}
+	duplicate := []string{"model", "model"}
+	settings.TUI.StatusLine = &duplicate
+	if err := store.Save(settings); err == nil {
+		t.Fatal("saved duplicate status line item")
+	}
+}
+
 func TestStoreRejectsUnknownVersion(t *testing.T) {
 	store, err := New(t.TempDir())
 	if err != nil {

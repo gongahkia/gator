@@ -2,7 +2,6 @@ package worktui
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -27,6 +26,9 @@ func (m Model) View() string {
 	}
 	accent, dim, selectedStyle := workStyles(m.theme)
 	if m.launcher {
+		if m.launcherMode == "status-line" {
+			return m.renderStatusLineEditor(width, height, accent, dim, selectedStyle)
+		}
 		return m.renderPalette(width, height, accent, dim, selectedStyle)
 	}
 	if m.section != "" {
@@ -50,8 +52,13 @@ func (m Model) View() string {
 		transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
 		transcript.WriteString("\n\n")
 	}
+	footer := wrapStatusLine(m.statusLineItems(), width)
+	footerRows := 0
+	if footer != "" {
+		footerRows = strings.Count(footer, "\n") + 1
+	}
 	lines := strings.Split(strings.TrimSuffix(transcript.String(), "\n"), "\n")
-	available := max(4, height-10)
+	available := max(4, height-9-footerRows)
 	maxScroll := max(0, len(lines)-available)
 	scroll := min(m.scroll, maxScroll)
 	end := len(lines) - scroll
@@ -63,11 +70,9 @@ func (m Model) View() string {
 		view.WriteString(accent.Render(rattles.BrailleDots.Frame(m.loadingFrame)+" Working…") + "\n\n")
 	}
 	view.WriteString(m.renderComposer(width, !m.running))
-	footer := "enter send  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs"
-	if len(m.queue) > 0 {
-		footer = fmt.Sprintf("%d queued  ·  ", len(m.queue)) + footer
+	if footer != "" {
+		view.WriteString("\n" + dim.Render(footer))
 	}
-	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
 }
 
@@ -75,18 +80,9 @@ func (m Model) renderHome(width, height int, accent, dim lipgloss.Style) string 
 	title := accent.Copy().Bold(true).Render(gatorWordmark)
 	question := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Render("What do you want to accomplish?")
 	body := title + "\n\n" + question + "\n\n" + m.renderComposer(width, true)
-	context := filepath.Base(m.source)
-	if context == "." || context == "" {
-		context = "current folder"
+	if footer := wrapStatusLine(m.statusLineItems(), width); footer != "" {
+		body += "\n" + dim.Render(footer)
 	}
-	hint := context + "  ·  ctrl+p commands"
-	if m.firstRun {
-		hint = "submit to connect  ·  " + hint
-	} else if m.status != "" {
-		hint = m.status + "  ·  " + hint
-	}
-	body += "\n" + dim.Render(hint)
-	body += "\n" + dim.Render("ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs")
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, body)
 }
 
@@ -174,7 +170,7 @@ func (m Model) renderSection(width int, accent, dim lipgloss.Style) string {
 			view.WriteString("\n\n")
 		}
 	}
-	footer := "esc back  ·  ctrl+p commands  ·  ctrl+x conversations  ·  ctrl+b inbox  ·  ctrl+j jobs"
+	footer := wrapStatusLine([]string{"esc back", "ctrl+p commands", "ctrl+x conversations", "ctrl+b inbox", "ctrl+j jobs"}, width)
 	view.WriteString("\n" + dim.Render(footer))
 	return view.String()
 }

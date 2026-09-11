@@ -84,6 +84,10 @@ type Config struct {
 	Copy                func(text string) error
 	Theme               string
 	SetTheme            func(name string) error
+	// StatusLine follows the Codex-style ordered-item convention. Nil uses
+	// Gator's defaults; a non-nil empty list hides the composer footer.
+	StatusLine    *[]string
+	SetStatusLine func(items *[]string) error
 }
 
 type ModelPanel interface {
@@ -111,41 +115,46 @@ type queuedRun struct {
 }
 
 type Model struct {
-	models              ModelPanel
-	tasks               map[string]string
-	quitting            bool
-	live                <-chan tea.Msg
-	cancel              context.CancelFunc
-	operation           *workrun.Operation
-	interaction         *workrun.Interaction
-	pendingInteractions []workrun.Interaction
-	config              Config
-	width               int
-	height              int
-	home                bool
-	launcher            bool
-	launcherMode        string
-	paletteQuery        string
-	section             string
-	selected            int
-	entries             []entry
-	source              string
-	conversation        string
-	title               string
-	input               string
-	messages            []message
-	running             bool
-	status              string
-	onboarding          bool
-	firstRun            bool
-	pendingPrompt       string
-	scroll              int
-	options             RunOptions
-	queue               []queuedRun
-	lastOutput          string
-	theme               string
-	loadingFrame        int
-	loadingRun          uint64
+	models               ModelPanel
+	tasks                map[string]string
+	quitting             bool
+	live                 <-chan tea.Msg
+	cancel               context.CancelFunc
+	operation            *workrun.Operation
+	interaction          *workrun.Interaction
+	pendingInteractions  []workrun.Interaction
+	config               Config
+	width                int
+	height               int
+	home                 bool
+	launcher             bool
+	launcherMode         string
+	paletteQuery         string
+	section              string
+	selected             int
+	entries              []entry
+	source               string
+	conversation         string
+	title                string
+	input                string
+	messages             []message
+	running              bool
+	status               string
+	onboarding           bool
+	firstRun             bool
+	pendingPrompt        string
+	scroll               int
+	options              RunOptions
+	queue                []queuedRun
+	lastOutput           string
+	theme                string
+	loadingFrame         int
+	loadingRun           uint64
+	modelStatus          ModelStatus
+	statusLine           []string
+	statusLineConfigured bool
+	statusLineDraft      []string
+	statusLineDraftSet   bool
 }
 
 func New(config Config) Model {
@@ -161,6 +170,8 @@ func New(config Config) Model {
 		}},
 	}
 	model.entries = commandPaletteEntries()
+	model.statusLine, model.statusLineConfigured = resolveStatusLine(config.StatusLine)
+	model.refreshModelStatus()
 	if config.StartConversationID != "" {
 		for _, conversation := range config.Conversations {
 			if conversation.ID == config.StartConversationID {

@@ -195,10 +195,12 @@ func workInteractiveConversation(startConversationID string) error {
 			}
 			return strings.Join(lines, "\n"), nil
 		},
-		Inspect:  inspectWorkTUITopic,
-		Copy:     clipboard.WriteAll,
-		Theme:    settings.Theme,
-		SetTheme: saveTheme,
+		Inspect:       inspectWorkTUITopic,
+		Copy:          clipboard.WriteAll,
+		Theme:         settings.Theme,
+		SetTheme:      saveTheme,
+		StatusLine:    settings.TUI.StatusLine,
+		SetStatusLine: saveWorkStatusLine(settingsStore),
 	})
 	program := tea.NewProgram(application, tea.WithAltScreen())
 	final, err := program.Run()
