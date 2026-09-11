@@ -19,16 +19,44 @@ func prepareDarwin(ctx context.Context, root, scratch string, argv, environment 
 	if err != nil {
 		return nil, errors.New("strict sandbox requires sandbox-exec on macOS")
 	}
+	executable, err := darwinExecutable(ctx, argv[0])
+	if err != nil {
+		return nil, err
+	}
 	readRoots, writeRoots, err := sandboxRoots(root, scratch, policy)
 	if err != nil {
 		return nil, err
 	}
 	profile := darwinProfile(readRoots, writeRoots, policy.Network)
-	command := exec.CommandContext(ctx, sandboxExec, "-p", profile, "--", argv[0])
+	command := exec.CommandContext(ctx, sandboxExec, "-p", profile, "--", executable)
 	command.Args = append(command.Args, argv[1:]...)
 	command.Dir = root
 	command.Env = environment
 	return command, nil
+}
+
+// Apple's /usr/bin/git is an xcrun shim. Invoking that shim inside Seatbelt
+// makes xcrun try to update a cache in the user's global temporary directory,
+// which is intentionally outside Gator's sandbox. Resolve the selected
+// developer-tool Git binary before entering the sandbox instead.
+func darwinExecutable(ctx context.Context, name string) (string, error) {
+	executable, err := exec.LookPath(name)
+	if err != nil {
+		return "", err
+	}
+	if executable != "/usr/bin/git" {
+		return executable, nil
+	}
+	command := exec.CommandContext(ctx, "/usr/bin/xcrun", "--find", "git")
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("resolve macOS developer-tool Git: %w", err)
+	}
+	git := strings.TrimSpace(string(output))
+	if git == "" || !filepath.IsAbs(git) {
+		return "", errors.New("xcrun returned an invalid Git executable")
+	}
+	return git, nil
 }
 
 func darwinProfile(readRoots, writeRoots []string, network Network) string {
@@ -68,6 +96,7 @@ func sandboxRoots(root, scratch string, policy Policy) ([]string, []string, erro
 		"/Library/Apple",
 		"/Library/Developer",
 		"/opt/homebrew",
+		"/private/var/select",
 	}
 	if moduleCache := goModuleCache(); moduleCache != "" {
 		readRoots = append(readRoots, moduleCache)

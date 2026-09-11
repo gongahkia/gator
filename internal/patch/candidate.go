@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -157,6 +158,9 @@ func Integrate(ctx context.Context, source, destination string, patches [][]byte
 		}
 		c.Verification = append(c.Verification, Verification{Argv: append([]string(nil), argv...), Passed: err == nil, Diagnostic: diagnostic})
 		if err != nil {
+			if message := strings.TrimSpace(diagnostic); message != "" {
+				return fail(fmt.Errorf("combined verification failed: %w: %s", err, message))
+			}
 			return fail(fmt.Errorf("combined verification failed: %w", err))
 		}
 	}
