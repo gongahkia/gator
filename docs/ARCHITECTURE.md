@@ -26,6 +26,26 @@ terminal UI -> task/session -> selected direct model adapter
                                       diff + verification evidence
 ```
 
+### Terminal UI boundaries
+
+`internal/worktui` is the active Work shell. Its Bubble Tea model coordinates
+navigation and delegates event families to focused update handlers; command
+construction and rendering live in separate files. `internal/modelcatalog`
+owns the reusable cloud, custom-provider, and reviewed-local-model panel plus
+the narrow, display-safe contracts it needs from the command layer. The active
+Work command imports that package directly, so opening Models cannot reach the
+historical Code composer, executor, review state, worktree state, or draft.
+
+`internal/tui` remains the historical Code compatibility surface. Its former
+Work model-panel entry point is now only a small adapter to
+`internal/modelcatalog`; new Work features must not add dependencies on the
+historical package. Provider construction stays in `internal/model`, with an
+explicit exhaustive backend switch, while provider metadata, credentials,
+OpenAI-compatible configuration, and cloud-family configuration are separated
+by concern. LSP manifest/trust management, tool dispatch, edit validation,
+presentation, and wire-client code likewise live in distinct files without
+changing their package-level API.
+
 For every supported cloud provider, the core owns the loop, context selection, tool
 schemas, tool execution, policies, event stream, worktree lifecycle, and run
 outcome. An adapter only converts between the provider protocol and the core's
