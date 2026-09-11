@@ -3,19 +3,18 @@ package main
 import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/modelcatalog"
-	"github.com/gongahkia/gator/internal/tui"
 	"github.com/gongahkia/gator/internal/worktui"
 )
 
-func workModelPanel(store config.Store, stateDir, source string, local modelcatalog.LocalManager) func() (worktui.ModelPanel, error) {
+func workModelPanel(store config.Store, stateDir string, local modelcatalog.LocalManager) func() (worktui.ModelPanel, error) {
 	return func() (worktui.ModelPanel, error) {
 		settings, err := store.Load()
 		if err != nil {
 			return nil, err
 		}
 		defaults := &tuiManagementBackend{settings: store}
-		return tui.NewModelCatalogPanel(tui.Config{
-			RepositoryPath: source, StateDir: stateDir,
+		return modelcatalog.NewModelCatalogPanel(modelcatalog.Config{
+			StateDir: stateDir,
 			Provider: settings.Defaults.Provider, Model: settings.Defaults.Model,
 			CustomProviders: settings.CustomProviders, ModelAliases: settings.ModelAliases,
 			ProviderEndpoints: settings.ProviderEndpoints, ProviderOptions: settings.ProviderOptions,
@@ -23,7 +22,9 @@ func workModelPanel(store config.Store, stateDir, source string, local modelcata
 			SaveModelSelection: defaults.SetDefaults,
 			SaveCloudModel:     saveTUICloudModelConfiguration(store, stateDir),
 			ModelManagement:    newTUIModelManagementBackend(store, stateDir),
-			BeginOAuthLogin:    func(provider string) (tui.OAuthLogin, error) { return beginTUIOAuthLogin(provider) },
+			BeginOAuthLogin: func(provider string) (modelcatalog.OAuthLogin, error) {
+				return beginTUIOAuthLogin(provider)
+			},
 		}), nil
 	}
 }

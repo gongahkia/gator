@@ -104,7 +104,7 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	defer manager.Close()
 	application := worktui.New(worktui.Config{
 		CurrentFolder: source, FirstRun: true, Live: true,
-		Models: workModelPanel(store, state, source, manager),
+		Models: workModelPanel(store, state, manager),
 		SelectedModel: func() (string, string, error) {
 			s, err := store.Load()
 			return s.Defaults.Provider, s.Defaults.Model, err
