@@ -54,6 +54,9 @@ func TestWorkCodeFollowupUsesAcceptedBaselineAndFrozenProfile(t *testing.T) {
 			if !strings.Contains(turn.System, "amber") || strings.Contains(turn.System, "violet") {
 				t.Error("Code did not load frozen profile")
 			}
+			if len(turn.Messages) > 0 {
+				t.Logf("code turn %d last message: %+v", len(turn.Messages), turn.Messages[len(turn.Messages)-1])
+			}
 			return script.Complete(ctx, turn)
 		})}}
 		return backend.codeDelegate(state)(ctx, r)
