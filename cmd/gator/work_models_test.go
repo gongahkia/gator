@@ -165,7 +165,7 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	}
 	key("write a short report")
 	key("enter")
-	waitView("Local model catalog refreshed")
+	waitView("amazon-bedrock")
 	key("tab")
 	waitView("Qwen2.5-Coder 0.5B")
 	key("p")
@@ -196,7 +196,7 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	}
 	key("/model")
 	key("enter")
-	waitView("Local model catalog refreshed")
+	waitView("Qwen2.5-Coder 0.5B")
 	key("x")
 	waitView("Confirm removal")
 	if deletes.Load() != 0 {

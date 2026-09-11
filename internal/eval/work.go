@@ -162,7 +162,11 @@ func LoadWorkDataset(path string) (WorkDataset, error) {
 		if err != nil {
 			return dataset, err
 		}
-		base, err := filepath.Abs(filepath.Dir(path))
+		basePath, err := filepath.Abs(filepath.Dir(path))
+		if err != nil {
+			return dataset, err
+		}
+		base, err := filepath.EvalSymlinks(basePath)
 		if err != nil {
 			return dataset, err
 		}

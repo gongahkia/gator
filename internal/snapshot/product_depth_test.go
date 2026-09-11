@@ -29,7 +29,11 @@ func TestSameContentRetainsDistinctOriginsAndSharedTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if z.SourcePath != a {
+	canonicalA, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if z.SourcePath != canonicalA {
 		t.Fatal("unexpected origin")
 	}
 }
@@ -54,8 +58,12 @@ func TestVersionOneCaptureRemainsReadableAndSharedTreeSurvivesGC(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(state, "gator", "snapshots", "manifests", legacy.ID+".json"), data, 0600); err != nil {
 		t.Fatal(err)
 	}
+	canonicalSource, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		t.Fatal(err)
+	}
 	opened, err := Open(state, legacy.ID)
-	if err != nil || opened.SourcePath != source || opened.Materialized != current.Materialized {
+	if err != nil || opened.SourcePath != canonicalSource || opened.Materialized != current.Materialized {
 		t.Fatalf("legacy open: %+v %v", opened, err)
 	}
 	if _, _, err := GC(state, map[string]struct{}{legacy.ID: {}}); err != nil {
