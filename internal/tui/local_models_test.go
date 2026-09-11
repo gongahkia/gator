@@ -399,6 +399,24 @@ func TestLocalModelsOfferInstallationHelpWhenOllamaIsMissing(t *testing.T) {
 	}
 }
 
+func TestLocalModelRefreshPreservesCatalogSectionChosenWhileLoading(t *testing.T) {
+	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
+		RuntimeVersion: "test",
+		Models:         []LocalModel{{ID: "qwen", Name: "Qwen"}},
+	}}
+	model := New(Config{LocalModels: manager, Provider: "openai", Model: "gpt-5"})
+	model.screen = localModelsScreen
+	model.localModels.action = localModelRefreshing
+	model.localModels.generation = 1
+	model.localModels.section = localModelSection
+
+	next, _ := model.Update(localModelStatusMsg{generation: 1, catalog: manager.catalog})
+	updated := next.(Model)
+	if updated.localModels.section != localModelSection {
+		t.Fatalf("catalog refresh changed section = %d, want local", updated.localModels.section)
+	}
+}
+
 func TestLocalModelsDisableIneligibleCatalogEntriesBeforePullOrUse(t *testing.T) {
 	manager := &fakeLocalModelManager{catalog: LocalModelCatalog{
 		RuntimeURL:     "http://127.0.0.1:11434",
