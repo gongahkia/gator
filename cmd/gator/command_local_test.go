@@ -16,7 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 func TestLocalUseConfiguresNativeProviderForInstalledCuratedModel(t *testing.T) {
@@ -179,8 +179,8 @@ func TestLocalModelManagerSupportsTheTUICatalogLifecycle(t *testing.T) {
 	if err != nil || status.RuntimeVersion != "test" || len(status.Models) == 0 || !installedQwen {
 		t.Fatalf("local manager status = %#v, err = %v", status, err)
 	}
-	var progress []tui.LocalModelProgress
-	if _, err := manager.Pull(context.Background(), "qwen3-coder-30b", func(update tui.LocalModelProgress) {
+	var progress []modelcatalog.LocalProgress
+	if _, err := manager.Pull(context.Background(), "qwen3-coder-30b", func(update modelcatalog.LocalProgress) {
 		progress = append(progress, update)
 	}); err != nil {
 		t.Fatalf("local manager pull: %v", err)

@@ -9,6 +9,7 @@ import (
 	gatorbrowser "github.com/gongahkia/gator/internal/browser"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/lsp"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 	gatorrun "github.com/gongahkia/gator/internal/run"
 	"github.com/gongahkia/gator/internal/sandbox"
 	"github.com/gongahkia/gator/internal/terminal"
@@ -346,64 +347,27 @@ type ExtensionInstallPreview struct {
 
 // ModelManagementBackend is the secret-safe command-layer boundary for /model
 // credential removal and custom OpenAI-compatible provider editing.
-type ModelManagementBackend interface {
-	CredentialStatuses() ([]StoredCredentialStatus, error)
-	RemoveCredential(provider string) (CredentialRemovalResult, error)
-	SaveCustomProvider(CustomProviderSetup) ([]config.CustomProvider, error)
-	RemoveCustomProvider(id string) ([]config.CustomProvider, error)
-	DiscoverCustomProvider(id string) (CustomProviderDiscovery, error)
-	ApplyCustomProviderDiscovery(id string, models []string) ([]config.CustomProvider, error)
-}
+type ModelManagementBackend = modelcatalog.ManagementBackend
 
 // StoredCredentialStatus is display-safe metadata about one Gator auth.json
 // entry. It must never include key, access, or refresh material.
-type StoredCredentialStatus struct {
-	Provider string
-	StoreKey string
-	Present  bool
-	Kind     string
-	Expired  bool
-}
+type StoredCredentialStatus = modelcatalog.StoredCredentialStatus
 
 // CredentialRemovalResult reports whether a Gator-owned credential was deleted
 // and which non-secret ambient sources still exist in this process.
-type CredentialRemovalResult struct {
-	Provider         string
-	StoreKey         string
-	Removed          bool
-	Kind             string
-	RemainingSources []string
-}
+type CredentialRemovalResult = modelcatalog.CredentialRemovalResult
 
 // CustomProviderSetup is non-secret custom-provider metadata. APIKeyEnv is an
 // environment variable name, never a key value.
-type CustomProviderSetup struct {
-	ID           string
-	BaseURL      string
-	APIKeyEnv    string
-	Models       []string
-	DefaultModel string
-}
+type CustomProviderSetup = modelcatalog.CustomProviderSetup
 
 // CustomProviderDiscovery is an untrusted /models catalog preview.
-type CustomProviderDiscovery struct {
-	ID           string
-	Models       []string
-	DefaultModel string
-}
+type CustomProviderDiscovery = modelcatalog.CustomProviderDiscovery
 
 // CloudModelSetup is the secret-safe boundary between the TUI and the command
 // layer. APIKey is populated only while a save is in progress and must never
 // be rendered, copied to a draft, or returned in a completion message.
-type CloudModelSetup struct {
-	Provider        string
-	Model           string
-	BaseURL         string
-	Options         map[string]string
-	APIKey          string
-	CredentialType  string
-	DelegateRuntime string
-}
+type CloudModelSetup = modelcatalog.CloudModelSetup
 
 // ExtensionCommand is a visible prompt template contributed by a trusted or
 // explicitly installed extension. Selecting it only fills the composer.

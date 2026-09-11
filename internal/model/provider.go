@@ -1,3 +1,16 @@
+package model
+
+import (
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+
+	"github.com/gongahkia/gator/internal/model/bedrock"
+	"github.com/gongahkia/gator/internal/model/openai"
+	"github.com/gongahkia/gator/internal/model/vertex"
+)
+
 func ParseProvider(value string) (Provider, error) {
 	provider := Provider(strings.ToLower(strings.TrimSpace(value)))
 	if _, ok := allProviders[provider]; !ok {

@@ -1,3 +1,20 @@
+package model
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/model/vertex"
+)
+
 func key(config Config, provider Provider, environment string) (string, error) {
 	if config.APIKey != "" {
 		return config.APIKey, nil

@@ -2,11 +2,12 @@ package main
 
 import (
 	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 	"github.com/gongahkia/gator/internal/tui"
 	"github.com/gongahkia/gator/internal/worktui"
 )
 
-func workModelPanel(store config.Store, stateDir, source string, local tui.LocalModelManager) func() (worktui.ModelPanel, error) {
+func workModelPanel(store config.Store, stateDir, source string, local modelcatalog.LocalManager) func() (worktui.ModelPanel, error) {
 	return func() (worktui.ModelPanel, error) {
 		settings, err := store.Load()
 		if err != nil {

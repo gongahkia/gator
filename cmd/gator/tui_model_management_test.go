@@ -11,7 +11,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 func TestTUIModelManagementRemovesClaudeCredentialFromAnthropicStore(t *testing.T) {
@@ -81,7 +81,7 @@ func TestTUIModelManagementSavesAndRemovesCustomProviderWithoutKeys(t *testing.T
 		t.Fatal(err)
 	}
 	backend := newTUIModelManagementBackend(settingsStore, filepath.Join(root, "state"))
-	providers, err := backend.SaveCustomProvider(tui.CustomProviderSetup{
+	providers, err := backend.SaveCustomProvider(modelcatalog.CustomProviderSetup{
 		ID: "team-gateway", BaseURL: "https://models.example.com/v1/chat/completions",
 		APIKeyEnv: "TEAM_GATEWAY_API_KEY", Models: []string{"coding-large", "coding-small"}, DefaultModel: "coding-large",
 	})
@@ -95,10 +95,10 @@ func TestTUIModelManagementSavesAndRemovesCustomProviderWithoutKeys(t *testing.T
 	if strings.Contains(string(contents), "sk-") || strings.Contains(string(contents), "TEAM_GATEWAY_API_KEY_VALUE") {
 		t.Fatalf("config.json contained unexpected secret material: %s", contents)
 	}
-	if _, err := backend.SaveCustomProvider(tui.CustomProviderSetup{ID: "openai", BaseURL: "https://example.com/v1/chat/completions", Models: []string{"x"}}); err == nil {
+	if _, err := backend.SaveCustomProvider(modelcatalog.CustomProviderSetup{ID: "openai", BaseURL: "https://example.com/v1/chat/completions", Models: []string{"x"}}); err == nil {
 		t.Fatal("built-in provider ID was accepted")
 	}
-	if _, err := backend.SaveCustomProvider(tui.CustomProviderSetup{ID: "gator-local", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"x"}}); err == nil {
+	if _, err := backend.SaveCustomProvider(modelcatalog.CustomProviderSetup{ID: "gator-local", BaseURL: "http://127.0.0.1:11434/v1/chat/completions", Models: []string{"x"}}); err == nil {
 		t.Fatal("gator-local was accepted")
 	}
 	providers, err = backend.RemoveCustomProvider("team-gateway")
