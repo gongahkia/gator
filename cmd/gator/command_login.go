@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 func login(arguments []string, out io.Writer) error {
@@ -307,7 +307,7 @@ func logout(arguments []string, out io.Writer) error {
 			return fmt.Errorf("remove Gator credential: %w", err)
 		}
 	}
-	result := tui.CredentialRemovalResult{
+	result := modelcatalog.CredentialRemovalResult{
 		Provider:         string(provider),
 		StoreKey:         storeKey,
 		Removed:          found,

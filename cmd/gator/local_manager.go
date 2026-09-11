@@ -14,7 +14,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/dependency"
 	"github.com/gongahkia/gator/internal/localmodel"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 // localModelManager is the application layer behind TUI model management.
@@ -43,14 +43,14 @@ func newLocalModelManager(store config.Store) *localModelManager {
 	return &localModelManager{store: store}
 }
 
-func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCatalog, error) {
+func (manager *localModelManager) Status(ctx context.Context) (modelcatalog.LocalCatalog, error) {
 	settings, err := manager.store.Load()
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	client, err := localClient(manager.runtimeURL, settings)
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	host := manager.localHost()
 	catalog := manager.catalog(settings, client, nil, host)
@@ -76,31 +76,31 @@ func (manager *localModelManager) Status(ctx context.Context) (tui.LocalModelCat
 // confirmation. The child is retained by this interactive Gator session and
 // stopped by Close; an already-running Ollama process is never adopted or
 // stopped.
-func (manager *localModelManager) Start(ctx context.Context) (tui.LocalModelCatalog, error) {
+func (manager *localModelManager) Start(ctx context.Context) (modelcatalog.LocalCatalog, error) {
 	settings, err := manager.store.Load()
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	client, err := localClient(manager.runtimeURL, settings)
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	if runtimeReachable(ctx, client) {
 		return manager.Status(ctx)
 	}
 	binary, err := manager.ollamaPath()
 	if err != nil {
-		return tui.LocalModelCatalog{}, errors.New("Ollama executable was not found; open installation help with i in /model's Local section")
+		return modelcatalog.LocalCatalog{}, errors.New("Ollama executable was not found; open installation help with i in /model's Local section")
 	}
 	runtime, err := manager.startRuntime(binary)
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	readyContext, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := waitForLocalRuntime(readyContext, client, runtime); err != nil {
 		_ = manager.stopRuntime(runtime)
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	return manager.Status(ctx)
 }
@@ -219,62 +219,62 @@ func waitForLocalRuntime(ctx context.Context, client localmodel.Client, runtime 
 	}
 }
 
-func (manager *localModelManager) Pull(ctx context.Context, id string, report func(tui.LocalModelProgress)) (tui.LocalModelCatalog, error) {
+func (manager *localModelManager) Pull(ctx context.Context, id string, report func(modelcatalog.LocalProgress)) (modelcatalog.LocalCatalog, error) {
 	model, found := localmodel.Resolve(id)
 	if !found {
-		return tui.LocalModelCatalog{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
+		return modelcatalog.LocalCatalog{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
 	}
 	if eligibility := localmodel.Assess(model, manager.localHost()); !eligibility.Allowed {
-		return tui.LocalModelCatalog{}, fmt.Errorf("%s is disabled on this host: %s", model.Name, eligibility.Reason)
+		return modelcatalog.LocalCatalog{}, fmt.Errorf("%s is disabled on this host: %s", model.Name, eligibility.Reason)
 	}
 	settings, err := manager.store.Load()
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	client, err := localClient(manager.runtimeURL, settings)
 	if err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	if _, err := client.Version(ctx); err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	if err := client.Pull(ctx, model, func(progress localmodel.Progress) {
 		if report == nil {
 			return
 		}
-		report(tui.LocalModelProgress{
+		report(modelcatalog.LocalProgress{
 			Status:    safeLocalDisplay(progress.Status),
 			Completed: progress.Completed,
 			Total:     progress.Total,
 		})
 	}); err != nil {
-		return tui.LocalModelCatalog{}, err
+		return modelcatalog.LocalCatalog{}, err
 	}
 	return manager.Status(ctx)
 }
 
-func (manager *localModelManager) Use(ctx context.Context, id string) (tui.LocalModelUpdate, error) {
+func (manager *localModelManager) Use(ctx context.Context, id string) (modelcatalog.LocalUpdate, error) {
 	model, found := localmodel.Resolve(id)
 	if !found {
-		return tui.LocalModelUpdate{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
+		return modelcatalog.LocalUpdate{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
 	}
 	if eligibility := localmodel.Assess(model, manager.localHost()); !eligibility.Allowed {
-		return tui.LocalModelUpdate{}, fmt.Errorf("%s is disabled on this host: %s", model.Name, eligibility.Reason)
+		return modelcatalog.LocalUpdate{}, fmt.Errorf("%s is disabled on this host: %s", model.Name, eligibility.Reason)
 	}
 	settings, err := manager.store.Load()
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	client, err := localClient(manager.runtimeURL, settings)
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	installed, err := client.Models(ctx)
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	if !hasInstalledModel(installed, model.OllamaModel) {
-		return tui.LocalModelUpdate{}, fmt.Errorf("%s is not installed; pull it first", model.OllamaModel)
+		return modelcatalog.LocalUpdate{}, fmt.Errorf("%s is not installed; pull it first", model.OllamaModel)
 	}
 	settings.CustomProviders = setCustomProvider(settings.CustomProviders, config.CustomProvider{
 		ID:           localmodel.ProviderID,
@@ -285,13 +285,13 @@ func (manager *localModelManager) Use(ctx context.Context, id string) (tui.Local
 	settings.Defaults.Provider = localmodel.ProviderID
 	settings.Defaults.Model = model.OllamaModel
 	if err := manager.store.Save(settings); err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	catalog, err := manager.Status(ctx)
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
-	return tui.LocalModelUpdate{
+	return modelcatalog.LocalUpdate{
 		Catalog:         catalog,
 		CustomProviders: cloneCustomProviders(settings.CustomProviders),
 		ModelAliases:    cloneModelAliases(settings.ModelAliases),
@@ -300,24 +300,24 @@ func (manager *localModelManager) Use(ctx context.Context, id string) (tui.Local
 	}, nil
 }
 
-func (manager *localModelManager) Remove(ctx context.Context, id string) (tui.LocalModelUpdate, error) {
+func (manager *localModelManager) Remove(ctx context.Context, id string) (modelcatalog.LocalUpdate, error) {
 	model, found := localmodel.Resolve(id)
 	if !found {
-		return tui.LocalModelUpdate{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
+		return modelcatalog.LocalUpdate{}, fmt.Errorf("%q is not in Gator's curated local-model catalog", id)
 	}
 	settings, err := manager.store.Load()
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	client, err := localClient(manager.runtimeURL, settings)
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	if _, err := client.Version(ctx); err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	if err := client.Remove(ctx, model); err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
 	if localProvider, found := configuredCustomProvider(settings, localmodel.ProviderID); found {
 		localProvider.Models = removeLocalProviderModel(localProvider.Models, model.OllamaModel)
@@ -337,14 +337,14 @@ func (manager *localModelManager) Remove(ctx context.Context, id string) (tui.Lo
 			}
 		}
 		if err := manager.store.Save(settings); err != nil {
-			return tui.LocalModelUpdate{}, fmt.Errorf("removed %s but could not update Gator's local provider configuration: %w", model.OllamaModel, err)
+			return modelcatalog.LocalUpdate{}, fmt.Errorf("removed %s but could not update Gator's local provider configuration: %w", model.OllamaModel, err)
 		}
 	}
 	catalog, err := manager.Status(ctx)
 	if err != nil {
-		return tui.LocalModelUpdate{}, err
+		return modelcatalog.LocalUpdate{}, err
 	}
-	return tui.LocalModelUpdate{
+	return modelcatalog.LocalUpdate{
 		Catalog:         catalog,
 		CustomProviders: cloneCustomProviders(settings.CustomProviders),
 		ModelAliases:    cloneModelAliases(settings.ModelAliases),
@@ -382,13 +382,13 @@ func (manager *localModelManager) Rename(ctx context.Context, provider, model, a
 	return cloneModelAliases(settings.ModelAliases), nil
 }
 
-func (manager *localModelManager) catalog(settings config.Settings, client localmodel.Client, installed []localmodel.InstalledModel, host localmodel.Host) tui.LocalModelCatalog {
+func (manager *localModelManager) catalog(settings config.Settings, client localmodel.Client, installed []localmodel.InstalledModel, host localmodel.Host) modelcatalog.LocalCatalog {
 	installedNames := installedModelNames(installed)
-	models := make([]tui.LocalModel, 0, len(localmodel.Catalog()))
+	models := make([]modelcatalog.LocalModel, 0, len(localmodel.Catalog()))
 	for _, model := range localmodel.Catalog() {
 		_, isInstalled := installedNames[model.OllamaModel]
 		eligibility := localmodel.Assess(model, host)
-		models = append(models, tui.LocalModel{
+		models = append(models, modelcatalog.LocalModel{
 			ID:            model.ID,
 			OllamaModel:   model.OllamaModel,
 			Name:          modelDisplayName(settings, localmodel.ProviderID, model.OllamaModel, model.Name),
@@ -403,12 +403,12 @@ func (manager *localModelManager) catalog(settings config.Settings, client local
 		})
 	}
 	hostSummary, hostAdvice := localModelHostSummary(host)
-	return tui.LocalModelCatalog{RuntimeURL: client.BaseURL(), HostSummary: hostSummary, HostAdvice: hostAdvice, Dependencies: localModelDependencies(manager), Models: models}
+	return modelcatalog.LocalCatalog{RuntimeURL: client.BaseURL(), HostSummary: hostSummary, HostAdvice: hostAdvice, Dependencies: localModelDependencies(manager), Models: models}
 }
 
-func localModelDependencies(manager *localModelManager) []tui.LocalDependency {
+func localModelDependencies(manager *localModelManager) []modelcatalog.LocalDependency {
 	statuses := dependency.Detect()
-	dependencies := make([]tui.LocalDependency, 0, len(statuses))
+	dependencies := make([]modelcatalog.LocalDependency, 0, len(statuses))
 	for _, status := range statuses {
 		installed := status.Installed
 		if status.ID == "ollama" {
@@ -419,7 +419,7 @@ func localModelDependencies(manager *localModelManager) []tui.LocalDependency {
 		if status.Instructions != nil {
 			instructions = status.Instructions(runtime.GOOS)
 		}
-		dependencies = append(dependencies, tui.LocalDependency{
+		dependencies = append(dependencies, modelcatalog.LocalDependency{
 			ID:           status.ID,
 			Name:         status.Name,
 			Purpose:      status.Purpose,
@@ -463,4 +463,4 @@ func modelDisplayName(settings config.Settings, provider, model, fallback string
 	return fallback
 }
 
-var _ tui.LocalModelManager = (*localModelManager)(nil)
+var _ modelcatalog.LocalManager = (*localModelManager)(nil)

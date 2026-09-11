@@ -10,7 +10,7 @@ import (
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/localmodel"
 	"github.com/gongahkia/gator/internal/model"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 type tuiModelManagementBackend struct {
@@ -18,11 +18,11 @@ type tuiModelManagementBackend struct {
 	stateDir string
 }
 
-func newTUIModelManagementBackend(settings config.Store, stateDir string) tui.ModelManagementBackend {
+func newTUIModelManagementBackend(settings config.Store, stateDir string) modelcatalog.ManagementBackend {
 	return &tuiModelManagementBackend{settings: settings, stateDir: stateDir}
 }
 
-func (backend *tuiModelManagementBackend) CredentialStatuses() ([]tui.StoredCredentialStatus, error) {
+func (backend *tuiModelManagementBackend) CredentialStatuses() ([]modelcatalog.StoredCredentialStatus, error) {
 	credentials, err := auth.New(backend.stateDir)
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (backend *tuiModelManagementBackend) CredentialStatuses() ([]tui.StoredCred
 		return nil, err
 	}
 	now := time.Now()
-	statuses := make([]tui.StoredCredentialStatus, 0, len(providers))
+	statuses := make([]modelcatalog.StoredCredentialStatus, 0, len(providers))
 	for _, provider := range providers {
 		if strings.HasPrefix(provider, "mcp-") {
 			continue
@@ -49,24 +49,24 @@ func (backend *tuiModelManagementBackend) CredentialStatuses() ([]tui.StoredCred
 	return statuses, nil
 }
 
-func (backend *tuiModelManagementBackend) RemoveCredential(providerName string) (tui.CredentialRemovalResult, error) {
+func (backend *tuiModelManagementBackend) RemoveCredential(providerName string) (modelcatalog.CredentialRemovalResult, error) {
 	provider, err := model.ParseProvider(providerName)
 	if err != nil {
-		return tui.CredentialRemovalResult{}, err
+		return modelcatalog.CredentialRemovalResult{}, err
 	}
 	if !model.SupportsDirect(provider) {
-		return tui.CredentialRemovalResult{}, fmt.Errorf("provider %q has no Gator-managed cloud credential", provider)
+		return modelcatalog.CredentialRemovalResult{}, fmt.Errorf("provider %q has no Gator-managed cloud credential", provider)
 	}
 	storeKey := gatorCredentialStoreKey(provider)
 	credentials, err := auth.New(backend.stateDir)
 	if err != nil {
-		return tui.CredentialRemovalResult{}, err
+		return modelcatalog.CredentialRemovalResult{}, err
 	}
 	existing, found, err := credentials.Read(storeKey)
 	if err != nil {
-		return tui.CredentialRemovalResult{}, err
+		return modelcatalog.CredentialRemovalResult{}, err
 	}
-	result := tui.CredentialRemovalResult{
+	result := modelcatalog.CredentialRemovalResult{
 		Provider:         string(provider),
 		StoreKey:         storeKey,
 		RemainingSources: remainingCredentialSources(provider),
@@ -74,14 +74,14 @@ func (backend *tuiModelManagementBackend) RemoveCredential(providerName string) 
 	if found {
 		result.Kind = credentialKindLabel(existing)
 		if err := credentials.Delete(storeKey); err != nil {
-			return tui.CredentialRemovalResult{}, err
+			return modelcatalog.CredentialRemovalResult{}, err
 		}
 		result.Removed = true
 	}
 	return result, nil
 }
 
-func (backend *tuiModelManagementBackend) SaveCustomProvider(setup tui.CustomProviderSetup) ([]config.CustomProvider, error) {
+func (backend *tuiModelManagementBackend) SaveCustomProvider(setup modelcatalog.CustomProviderSetup) ([]config.CustomProvider, error) {
 	provider, err := customProviderFromSetup(setup)
 	if err != nil {
 		return nil, err
@@ -120,31 +120,31 @@ func (backend *tuiModelManagementBackend) RemoveCustomProvider(id string) ([]con
 	return cloneCustomProviders(settings.CustomProviders), nil
 }
 
-func (backend *tuiModelManagementBackend) DiscoverCustomProvider(id string) (tui.CustomProviderDiscovery, error) {
+func (backend *tuiModelManagementBackend) DiscoverCustomProvider(id string) (modelcatalog.CustomProviderDiscovery, error) {
 	id = strings.TrimSpace(id)
 	if id == localmodel.ProviderID {
-		return tui.CustomProviderDiscovery{}, fmt.Errorf("custom provider ID %q is reserved for the Local section of /model", id)
+		return modelcatalog.CustomProviderDiscovery{}, fmt.Errorf("custom provider ID %q is reserved for the Local section of /model", id)
 	}
 	settings, err := backend.settings.Load()
 	if err != nil {
-		return tui.CustomProviderDiscovery{}, err
+		return modelcatalog.CustomProviderDiscovery{}, err
 	}
 	provider, found := findCustomProvider(settings.CustomProviders, id)
 	if !found {
-		return tui.CustomProviderDiscovery{}, fmt.Errorf("custom provider %q is not configured", id)
+		return modelcatalog.CustomProviderDiscovery{}, fmt.Errorf("custom provider %q is not configured", id)
 	}
 	models, err := discoverModels(provider)
 	if err != nil {
-		return tui.CustomProviderDiscovery{}, err
+		return modelcatalog.CustomProviderDiscovery{}, err
 	}
 	if len(models) == 0 {
-		return tui.CustomProviderDiscovery{}, fmt.Errorf("custom provider %q returned no model IDs", provider.ID)
+		return modelcatalog.CustomProviderDiscovery{}, fmt.Errorf("custom provider %q returned no model IDs", provider.ID)
 	}
 	defaultModel := provider.DefaultModel
 	if !customProviderSupportsModel(config.CustomProvider{Models: models, DefaultModel: defaultModel}, defaultModel) {
 		defaultModel = models[0]
 	}
-	return tui.CustomProviderDiscovery{ID: provider.ID, Models: models, DefaultModel: defaultModel}, nil
+	return modelcatalog.CustomProviderDiscovery{ID: provider.ID, Models: models, DefaultModel: defaultModel}, nil
 }
 
 func (backend *tuiModelManagementBackend) ApplyCustomProviderDiscovery(id string, models []string) ([]config.CustomProvider, error) {
@@ -175,7 +175,7 @@ func (backend *tuiModelManagementBackend) ApplyCustomProviderDiscovery(id string
 	return cloneCustomProviders(settings.CustomProviders), nil
 }
 
-func customProviderFromSetup(setup tui.CustomProviderSetup) (config.CustomProvider, error) {
+func customProviderFromSetup(setup modelcatalog.CustomProviderSetup) (config.CustomProvider, error) {
 	models, err := normalizeCustomProviderModels(setup.Models)
 	if err != nil {
 		return config.CustomProvider{}, err
@@ -235,8 +235,8 @@ func clearDeletedCustomProviderReferences(settings *config.Settings, id string) 
 	}
 }
 
-func storedCredentialStatus(storeKey string, credential auth.Credential, now time.Time) tui.StoredCredentialStatus {
-	return tui.StoredCredentialStatus{
+func storedCredentialStatus(storeKey string, credential auth.Credential, now time.Time) modelcatalog.StoredCredentialStatus {
+	return modelcatalog.StoredCredentialStatus{
 		Provider: storeKey,
 		StoreKey: storeKey,
 		Present:  true,
@@ -316,7 +316,7 @@ func remainingCredentialSources(provider model.Provider) []string {
 	return sources
 }
 
-func describeCredentialRemoval(result tui.CredentialRemovalResult) string {
+func describeCredentialRemoval(result modelcatalog.CredentialRemovalResult) string {
 	if result.Removed {
 		text := "Removed the Gator " + result.Kind + " for " + result.Provider + " from Gator's private credential file."
 		if len(result.RemainingSources) > 0 {

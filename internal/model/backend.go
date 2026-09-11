@@ -3,27 +3,16 @@
 package model
 
 import (
-	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
-	"os"
-	"sort"
 	"strings"
-	"time"
 
-	"github.com/gongahkia/gator/internal/agent"
-	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/model/anthropic"
-	"github.com/gongahkia/gator/internal/model/bedrock"
 	"github.com/gongahkia/gator/internal/model/chatcompletions"
 	"github.com/gongahkia/gator/internal/model/gemini"
 	"github.com/gongahkia/gator/internal/model/openai"
 	"github.com/gongahkia/gator/internal/model/radius"
-	"github.com/gongahkia/gator/internal/model/vertex"
 )
 
 // newBackend contains provider-specific adapter construction after the public
@@ -219,4 +208,3 @@ func newBackend(provider Provider, config Config) (Backend, error) {
 		return Backend{}, fmt.Errorf("unsupported provider %q", provider)
 	}
 }
-

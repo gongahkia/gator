@@ -5,80 +5,34 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/gongahkia/gator/internal/config"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 // LocalModelManager owns the local runtime and persistent settings operations
 // behind the TUI's reviewed local-model catalog. Implementations return a
 // catalog with RuntimeError when the runtime is unavailable so the UI can
 // explain recovery without losing the curated choices.
-type LocalModelManager interface {
-	Status(context.Context) (LocalModelCatalog, error)
-	Start(context.Context) (LocalModelCatalog, error)
-	Pull(context.Context, string, func(LocalModelProgress)) (LocalModelCatalog, error)
-	Use(context.Context, string) (LocalModelUpdate, error)
-	Remove(context.Context, string) (LocalModelUpdate, error)
-	Rename(context.Context, string, string, string) (map[string]string, error)
-}
+type LocalModelManager = modelcatalog.LocalManager
 
 // LocalModelCatalog is the display-safe state of Gator's reviewed catalog.
 // It deliberately contains no model weight, credential, or endpoint secrets.
-type LocalModelCatalog struct {
-	RuntimeURL     string
-	RuntimeVersion string
-	RuntimeError   string
-	Executable     string
-	HostSummary    string
-	HostAdvice     []string
-	Dependencies   []LocalDependency
-	Models         []LocalModel
-}
+type LocalModelCatalog = modelcatalog.LocalCatalog
 
 // LocalDependency is a display-safe prerequisite result supplied by the
 // application layer. Instructions are guidance only; the TUI never runs an
 // operating-system installer or package manager.
-type LocalDependency struct {
-	ID           string
-	Name         string
-	Purpose      string
-	Required     bool
-	Installed    bool
-	HelpURL      string
-	Instructions []string
-}
+type LocalDependency = modelcatalog.LocalDependency
 
 // LocalModel is one selectable reviewed local coding model.
-type LocalModel struct {
-	ID            string
-	OllamaModel   string
-	Name          string
-	DefaultName   string
-	Download      string
-	Context       string
-	Summary       string
-	SourceURL     string
-	Installed     bool
-	Requirement   string
-	BlockedReason string
-}
+type LocalModel = modelcatalog.LocalModel
 
 // LocalModelProgress is a bounded, display-only pull update from the local
 // runtime. It must not be interpreted as an instruction.
-type LocalModelProgress struct {
-	Status    string
-	Completed int64
-	Total     int64
-}
+type LocalModelProgress = modelcatalog.LocalProgress
 
 // LocalModelUpdate returns a fresh catalog plus the configuration that should
 // take effect in the current TUI process after a use or removal operation.
-type LocalModelUpdate struct {
-	Catalog         LocalModelCatalog
-	CustomProviders []config.CustomProvider
-	ModelAliases    map[string]string
-	Provider        string
-	Model           string
-}
+type LocalModelUpdate = modelcatalog.LocalUpdate
 
 type localModelAction uint8
 

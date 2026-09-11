@@ -7,14 +7,14 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/model"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 // saveTUICloudModelConfiguration keeps the UI's secret entry boundary small:
 // the TUI only holds the typed value until this callback stores it in auth.json.
 // Endpoint overrides remain non-secret settings shared by TUI and CLI runs.
-func saveTUICloudModelConfiguration(settingsStore config.Store, stateDir string) func(tui.CloudModelSetup) error {
-	return func(setup tui.CloudModelSetup) error {
+func saveTUICloudModelConfiguration(settingsStore config.Store, stateDir string) func(modelcatalog.CloudModelSetup) error {
+	return func(setup modelcatalog.CloudModelSetup) error {
 		provider, err := model.ParseProvider(setup.Provider)
 		if err != nil {
 			return err

@@ -8,7 +8,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/model"
-	"github.com/gongahkia/gator/internal/tui"
+	"github.com/gongahkia/gator/internal/modelcatalog"
 )
 
 func TestSaveTUICloudModelConfigurationStoresAzureSettingsAndCredential(t *testing.T) {
@@ -19,7 +19,7 @@ func TestSaveTUICloudModelConfigurationStoresAzureSettingsAndCredential(t *testi
 	stateDir := t.TempDir()
 	save := saveTUICloudModelConfiguration(settingsStore, stateDir)
 	endpoint := "https://example-resource.openai.azure.com/openai/deployments/review/chat/completions?api-version=2025-04-01-preview"
-	if err := save(tui.CloudModelSetup{
+	if err := save(modelcatalog.CloudModelSetup{
 		Provider:       "azure-openai",
 		Model:          "review",
 		BaseURL:        endpoint,
@@ -66,7 +66,7 @@ func TestSaveTUICloudModelConfigurationStoresAzureResponsesBearerToken(t *testin
 		t.Fatalf("new settings store: %v", err)
 	}
 	stateDir := t.TempDir()
-	if err := saveTUICloudModelConfiguration(settingsStore, stateDir)(tui.CloudModelSetup{
+	if err := saveTUICloudModelConfiguration(settingsStore, stateDir)(modelcatalog.CloudModelSetup{
 		Provider:       "azure-openai-responses",
 		Model:          "review",
 		BaseURL:        "https://example-resource.openai.azure.com/openai/v1/responses?api-version=v1",
@@ -95,7 +95,7 @@ func TestSaveTUICloudModelConfigurationStoresSpecialProviderCredentialsAndMetada
 	}
 	stateDir := t.TempDir()
 	save := saveTUICloudModelConfiguration(settingsStore, stateDir)
-	for _, setup := range []tui.CloudModelSetup{
+	for _, setup := range []modelcatalog.CloudModelSetup{
 		{Provider: "claude", Model: "claude-sonnet-5", APIKey: "anthropic-key", CredentialType: "api_key", DelegateRuntime: "claude"},
 		{Provider: "amazon-bedrock", Model: "openai.gpt-oss-20b-1:0", APIKey: "bedrock-token", CredentialType: "bearer_token", Options: map[string]string{"region": "eu-west-1", "profile": "engineering"}},
 		{Provider: "google-vertex", Model: "google/gemini-2.0-flash-001", APIKey: "vertex-token", CredentialType: "bearer_token", Options: map[string]string{"project": "project-123", "location": "us-central1", "credentials_path": "/tmp/gator-adc.json"}},
@@ -161,7 +161,7 @@ func TestSaveTUICloudModelConfigurationRejectsTypedCredentialForAccountProviderB
 	if err != nil {
 		t.Fatalf("new settings store: %v", err)
 	}
-	err = saveTUICloudModelConfiguration(settingsStore, t.TempDir())(tui.CloudModelSetup{
+	err = saveTUICloudModelConfiguration(settingsStore, t.TempDir())(modelcatalog.CloudModelSetup{
 		Provider:       "codex",
 		Model:          "gpt-5.6",
 		APIKey:         "must-not-be-persisted",
@@ -194,7 +194,7 @@ func TestSaveTUICloudModelConfigurationSupportsEveryDirectProvider(t *testing.T)
 			if err != nil {
 				t.Fatalf("parse provider: %v", err)
 			}
-			setup := tui.CloudModelSetup{Provider: providerName, Model: "test-model"}
+			setup := modelcatalog.CloudModelSetup{Provider: providerName, Model: "test-model"}
 			switch provider {
 			case model.Codex, model.Copilot:
 				// OAuth is configured by the in-TUI sign-in action, not a text field.
