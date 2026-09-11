@@ -1169,7 +1169,9 @@ func (m Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.applyLocalModelCatalog(msg.catalog)
+		section := m.localModels.section
 		m.selectActiveModelCatalogEntry()
+		m.localModels.section = section
 		if msg.catalog.RuntimeError != "" {
 			if m.localModels.section == localModelSection && !m.localModels.startDismissed {
 				m.requestLocalRuntimeRecovery()
