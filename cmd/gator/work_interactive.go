@@ -95,7 +95,7 @@ func workInteractiveConversation(startConversationID string) error {
 	localModels := newLocalModelManager(settingsStore)
 	defer localModels.Close()
 	application := worktui.New(worktui.Config{
-		Models: workModelPanel(settingsStore, stateDir, workingDirectory, localModels),
+		Models: workModelPanel(settingsStore, stateDir, localModels),
 		SelectedModel: func() (string, string, error) {
 			current, err := settingsStore.Load()
 			return current.Defaults.Provider, current.Defaults.Model, err
