@@ -462,10 +462,42 @@ func providerActionSuccess(action, provider string) string {
 
 func (m Model) codeStatus() string {
 	code := m.options.Code
-	return fmt.Sprintf("Internal Code specialist\n  effort: %d steps\n  sandbox/network: %s/%s\n  profile: %s\n  scopes: %s\n  verification: %s\n  setup: %s\n  exact command grants: %s\n  prefix grants: %s\n  capabilities: %s\n  browser session: %s",
-		code.MaxSteps, valueOrNone(code.Sandbox), valueOrNone(code.Network), valueOrNone(code.Profile), valueOrNone(strings.Join(code.Scopes, ", ")),
+	modelSelection, modelAccess := m.configuredModelStatus()
+	return fmt.Sprintf("Internal Code specialist\n  effort: %d steps\n  model: %s\n  model access: %s\n  sandbox/network: %s/%s\n  profile: %s\n  scopes: %s\n  verification: %s\n  setup: %s\n  exact command grants: %s\n  prefix grants: %s\n  capabilities: %s\n  browser session: %s",
+		code.MaxSteps, modelSelection, modelAccess, valueOrNone(code.Sandbox), valueOrNone(code.Network), valueOrNone(code.Profile), valueOrNone(strings.Join(code.Scopes, ", ")),
 		valueOrNone(strings.Join(code.Verification, "; ")), valueOrNone(strings.Join(code.Setup, "; ")), valueOrNone(strings.Join(code.AllowedCommands, "; ")),
 		valueOrNone(strings.Join(code.AllowedCommandPrefixes, "; ")), valueOrNone(strings.Join(code.Capabilities, ", ")), valueOrNone(code.BrowserSession))
+}
+
+func (m Model) configuredModelStatus() (string, string) {
+	status := ModelStatus{}
+	var err error
+	if m.config.ModelStatus != nil {
+		status, err = m.config.ModelStatus()
+	} else if m.config.SelectedModel != nil {
+		status.Provider, status.Model, err = m.config.SelectedModel()
+	}
+	if err != nil {
+		return "unavailable", "status unavailable: " + singleLine(err.Error())
+	}
+	provider, modelName := singleLine(status.Provider), singleLine(status.Model)
+	selection := valueOrNone(provider)
+	if modelName != "" {
+		selection += " / " + modelName
+	}
+	access := singleLine(status.Access)
+	if access == "" {
+		if provider == "" {
+			access = "not configured"
+		} else {
+			access = "configuration selected; authentication status unavailable"
+		}
+	}
+	return selection, access
+}
+
+func singleLine(value string) string {
+	return strings.Join(strings.Fields(value), " ")
 }
 
 func (m Model) workStatus() string {

@@ -52,9 +52,19 @@ type CodeOptions struct {
 	BrowserSession         string
 }
 
+// ModelStatus is display-safe configuration and authentication state for the
+// currently selected model. Access must describe only the credential source,
+// never credential material.
+type ModelStatus struct {
+	Provider string
+	Model    string
+	Access   string
+}
+
 type Config struct {
 	Models              func() (ModelPanel, error)
 	SelectedModel       func() (provider, model string, err error)
+	ModelStatus         func() (ModelStatus, error)
 	Live                bool
 	CurrentFolder       string
 	Conversations       []worksession.Conversation

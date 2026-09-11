@@ -100,6 +100,9 @@ func workInteractiveConversation(startConversationID string) error {
 			current, err := settingsStore.Load()
 			return current.Defaults.Provider, current.Defaults.Model, err
 		},
+		ModelStatus: func() (worktui.ModelStatus, error) {
+			return currentWorkModelStatus(settingsStore, stateDir)
+		},
 		Live:          true,
 		CurrentFolder: workingDirectory, Conversations: conversations, Jobs: definitions, Inbox: inboxEntries,
 		StartConversationID: startConversationID,

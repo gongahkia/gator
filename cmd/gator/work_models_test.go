@@ -109,6 +109,9 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 			s, err := store.Load()
 			return s.Defaults.Provider, s.Defaults.Model, err
 		},
+		ModelStatus: func() (worktui.ModelStatus, error) {
+			return currentWorkModelStatus(store, state)
+		},
 		Run: func(source, conversation, prompt string, options worktui.RunOptions) worktui.RunResult {
 			return runInteractiveWork(source, conversation, prompt, state, options)
 		},
@@ -194,6 +197,9 @@ func TestWorkTUIManagesLocalModelsAndUsesSelectionThroughService(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatalf("Work model calls = %d", calls.Load())
 	}
+	key("/code")
+	key("enter")
+	waitView("model access: local model configured")
 	key("/model")
 	key("enter")
 	waitView("Qwen2.5-Coder 0.5B")
