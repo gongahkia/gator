@@ -185,7 +185,7 @@ class Runtime:
             if self._gateway_factory is not None
             else GoogleApiClient(credentials)
         )
-        return SyncEngine(self.storage, gateway)
+        return SyncEngine(self.storage, gateway, pull_workers=4)
 
     def connect_account(self, account_id: str) -> OAuthResult:
         return self.authenticator(account_id).connect(account_id)

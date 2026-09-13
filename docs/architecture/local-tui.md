@@ -69,6 +69,8 @@ bounded transactions, a busy timeout, and one writer transaction at a time.
 The sync engine also holds a per-database advisory file lock across remote
 sync and outbox delivery, so another process cannot recover its live `sending`
 rows as interrupted deliveries.
+During pull, up to four independent first-page Google reads may overlap; the
+sync owner alone applies pages, writes cursors, and advances checkpoints.
 Schema upgrades take one SQLite writer transaction and recheck the version
 after obtaining it. A failed upgrade rolls back; simultaneous first-run opens
 retry transient WAL setup contention for up to five seconds.

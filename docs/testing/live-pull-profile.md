@@ -32,13 +32,44 @@ The chosen event page size is 1,000, below that maximum. Larger responses can
 have longer individual latency; this is a single-network observation, not a
 release budget or a guaranteed speedup.
 
-The final near-immediate incremental pulls took 4.56, 4.73, and 4.79 seconds.
+With serial fetching and the larger page sizes, near-immediate incremental
+pulls took 4.56, 4.73, and 4.79 seconds.
 They still needed 16 serial read requests: one task-list request, one for each
 task list, one calendar-list request, and one for each selected calendar. One
 run returned two recently updated tasks in the overlap window, so the three
 incremental results are not a controlled empty-delta comparison. Page size
-cannot remove those one-per-list requests. Whether bounded parallel fetching
-is worthwhile remains open until a user-facing sync target is set.
+cannot remove those one-per-list requests. They motivated the bounded prefetch
+trial below.
+
+## Bounded first-page prefetch
+
+The sync engine now fetches up to four first pages from independent task lists
+or selected calendars concurrently. It holds no more than four outstanding
+pages, applies all returned rows on the sync owner's SQLite connection, and
+uses the existing serial path for later pages and restart checkpoints. The
+real Google client gives every worker request a separate, closing HTTP
+transport, as required by the [client's threading guidance](https://googleapis.github.io/google-api-python-client/docs/thread_safety.html).
+Gateways without an explicit parallel-read capability still use serial pulls.
+
+Two one-worker, two two-worker, and three final four-worker read-only runs used
+the same approximately 900 tasks and 2,100 events. Every run fetched the same
+rows with 42 total Google list requests. Seconds below are medians; the
+one-/two-worker comparisons have two samples each, and four workers have three.
+
+| Pull workers | Initial pull | Near-immediate incremental pull |
+| ---: | ---: | ---: |
+| 1 | 12.06 s | 5.11 s |
+| 2 | 9.31 s | 3.19 s |
+| 4, bounded window | 8.66 s | 2.00 s |
+
+The final four-worker samples ranged from 8.37 to 9.23 seconds initially and
+1.83 to 2.02 seconds incrementally. They were taken on one Fedora machine and
+network, so they do not establish a release budget. The owner-only numeric
+reports are under `~/.local/state/hcb/live-parallel-*.json`. Fake-gateway tests
+cover overlapping requests, main-thread database application, transient retry,
+Calendar `410` recovery, cancellation, bounded outstanding pages, and restart
+from a committed first page. A live multi-page incremental Calendar delta and
+quota/throttling behavior remain unverified.
 
 During review, the incremental Calendar paginator was corrected to send the
 same sync token on every page. This follows

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from datetime import datetime, timedelta
+from functools import partial
+from types import TracebackType
 
 from .errors import GoogleApiError
 from .google_client import Json, Page, rfc3339
@@ -21,7 +24,64 @@ from .sync import (
 )
 
 
+class _FirstPagePrefetch:
+    def __init__(self, requests: dict[str, Callable[[], Page]], workers: int) -> None:
+        self._pending = iter(requests.items())
+        self._workers = min(workers, len(requests))
+        self._executor: ThreadPoolExecutor | None = None
+        self._futures: dict[str, Future[Page]] = {}
+        self._active: Future[Page] | None = None
+
+    def __enter__(self) -> _FirstPagePrefetch:
+        if self._workers > 1:
+            self._executor = ThreadPoolExecutor(
+                max_workers=self._workers, thread_name_prefix="hcb-pull"
+            )
+            self.replenish()
+        return self
+
+    def take(self, scope: str) -> Future[Page] | None:
+        self._active = self._futures.pop(scope, None)
+        return self._active
+
+    def replenish(self) -> None:
+        self._active = None
+        if self._executor is None:
+            return
+        while len(self._futures) < self._workers:
+            try:
+                scope, fetch = next(self._pending)
+            except StopIteration:
+                return
+            self._futures[scope] = self._executor.submit(fetch)
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        if self._executor is not None:
+            if self._active is not None:
+                self._active.cancel()
+            for future in self._futures.values():
+                future.cancel()
+            self._executor.shutdown(wait=True, cancel_futures=True)
+
+
 class PullSyncMixin(_SyncEngineBase):
+    def _prefetch_first_pages(self, requests: dict[str, Callable[[], Page]]) -> _FirstPagePrefetch:
+        workers = self.pull_workers if getattr(self.gateway, "parallel_reads_safe", False) else 0
+        return _FirstPagePrefetch(requests, workers)
+
+    def _task_updated_min(self, account_id: str, remote_list_id: str) -> str | None:
+        cursor = self.storage.get_cursor(account_id, f"tasks:{remote_list_id}")
+        if cursor and cursor.cursor:
+            last = _parse_datetime(cursor.cursor)
+            if last:
+                return rfc3339(last - timedelta(minutes=5))
+        return None
+
     def _paged(
         self,
         account_id: str,
@@ -105,9 +165,29 @@ class PullSyncMixin(_SyncEngineBase):
         )
         report = context.progress
         task_lists = [item for item in self.storage.list_task_lists(account_id) if item.remote_id]
-        for index, task_list in enumerate(task_lists, start=1):
-            report(f"Fetching tasks {index}/{len(task_lists)}")
-            result = result.plus(self.sync_tasks(account_id, task_list, context=context))
+        requests: dict[str, Callable[[], Page]] = {}
+        if self.pull_workers > 1 and getattr(self.gateway, "parallel_reads_safe", False):
+            for task_list in task_lists:
+                assert task_list.remote_id is not None
+                remote_id = task_list.remote_id
+                if self.storage.resumable_checkpoint(account_id, f"tasks:{remote_id}"):
+                    continue
+                updated_min = self._task_updated_min(account_id, remote_id)
+                requests[task_list.id] = partial(
+                    self.gateway.list_tasks, remote_id, updated_min=updated_min
+                )
+        with self._prefetch_first_pages(requests) as prefetch:
+            for index, task_list in enumerate(task_lists, start=1):
+                report(f"Fetching tasks {index}/{len(task_lists)}")
+                result = result.plus(
+                    self.sync_tasks(
+                        account_id,
+                        task_list,
+                        context=context,
+                        first_page=prefetch.take(task_list.id),
+                    )
+                )
+                prefetch.replenish()
         return result
 
     def sync_tasks(
@@ -116,18 +196,23 @@ class PullSyncMixin(_SyncEngineBase):
         task_list: TaskList,
         *,
         context: _RetryContext | None = None,
+        first_page: Future[Page] | None = None,
     ) -> SyncResult:
         context = context or self._retry_context()
         assert task_list.remote_id is not None
         remote_list_id = task_list.remote_id
         scope = f"tasks:{remote_list_id}"
-        cursor = self.storage.get_cursor(account_id, scope)
-        updated_min: str | None = None
-        if cursor and cursor.cursor:
-            last = _parse_datetime(cursor.cursor)
-            if last:
-                updated_min = rfc3339(last - timedelta(minutes=5))
+        updated_min = self._task_updated_min(account_id, remote_list_id)
         completed_at = rfc3339(self.now())
+
+        def fetch(token: str | None) -> Page:
+            nonlocal first_page
+            if token is None and first_page is not None:
+                pending, first_page = first_page, None
+                return pending.result()
+            return self.gateway.list_tasks(
+                remote_list_id, page_token=token, updated_min=updated_min
+            )
 
         def apply(item: Json) -> None:
             existing = self.storage.get_task_by_remote(account_id, str(item["id"]))
@@ -144,9 +229,7 @@ class PullSyncMixin(_SyncEngineBase):
         result = self._paged(
             account_id,
             scope,
-            lambda token: self.gateway.list_tasks(
-                remote_list_id, page_token=token, updated_min=updated_min
-            ),
+            fetch,
             apply,
             context=context,
         )
@@ -206,9 +289,30 @@ class PullSyncMixin(_SyncEngineBase):
             for item in self.storage.list_calendars(account_id)
             if item.remote_id and item.selected
         ]
-        for index, calendar in enumerate(calendars, start=1):
-            report(f"Fetching calendar {index}/{len(calendars)}")
-            result = result.plus(self.sync_events(account_id, calendar, context=context))
+        requests: dict[str, Callable[[], Page]] = {}
+        if self.pull_workers > 1 and getattr(self.gateway, "parallel_reads_safe", False):
+            for calendar in calendars:
+                assert calendar.remote_id is not None
+                remote_id = calendar.remote_id
+                if self.storage.resumable_checkpoint(account_id, f"events:{remote_id}"):
+                    continue
+                cursor = self.storage.get_cursor(account_id, f"events:{remote_id}")
+                sync_token = cursor.cursor if cursor else None
+                requests[calendar.id] = partial(
+                    self.gateway.list_events, remote_id, sync_token=sync_token, single_events=False
+                )
+        with self._prefetch_first_pages(requests) as prefetch:
+            for index, calendar in enumerate(calendars, start=1):
+                report(f"Fetching calendar {index}/{len(calendars)}")
+                result = result.plus(
+                    self.sync_events(
+                        account_id,
+                        calendar,
+                        context=context,
+                        first_page=prefetch.take(calendar.id),
+                    )
+                )
+                prefetch.replenish()
         return result
 
     def sync_events(
@@ -217,6 +321,7 @@ class PullSyncMixin(_SyncEngineBase):
         calendar: Calendar,
         *,
         context: _RetryContext | None = None,
+        first_page: Future[Page] | None = None,
     ) -> SyncResult:
         context = context or self._retry_context()
         assert calendar.remote_id is not None
@@ -261,6 +366,10 @@ class PullSyncMixin(_SyncEngineBase):
             sync_token = cursor.cursor if cursor else None
 
             def fetch(token: str | None, *, initial: str | None = sync_token) -> Page:
+                nonlocal first_page
+                if token is None and first_page is not None:
+                    pending, first_page = first_page, None
+                    return pending.result()
                 return self.gateway.list_events(
                     remote_calendar_id,
                     page_token=token,

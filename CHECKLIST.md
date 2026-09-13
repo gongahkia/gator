@@ -43,6 +43,7 @@ Finish the shared-core and database work, then measure and optimize their slow p
   - [x] Skip URL copying and scanning for ordinary task rows without web links; preserve linked titles and Notes previews, and compare row-building and startup samples.
   - [x] Skip unchanged task-list upserts during pull so an empty incremental sync does not rebuild every child task search row; preserve changed list metadata and compare repeated timings.
   - [x] Request 100 Tasks and 1,000 Calendar events per page, reducing live initial pull requests and comparing stage timings on the same read-only account.
+  - [x] Bound independent first-page Tasks and Calendar reads to four outstanding requests, use a separate HTTP transport per worker, serialize SQLite page application, and verify retry, cancellation, `410`, and restart behavior. Compare one-, two-, and four-worker read-only live samples in the [live pull profile](docs/testing/live-pull-profile.md).
 - [ ] Keep stable core performance regression checks in the local check workflow and any future CI; run hardware-specific benchmarks separately before releases.
 
 ## Restore and develop desktop frontends on the shared core

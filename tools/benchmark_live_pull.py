@@ -13,6 +13,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
+from threading import Lock
 from time import monotonic, perf_counter
 from typing import Any, cast
 
@@ -52,6 +53,8 @@ class ReadOnlyTimedGateway:
         self.client = client
         self.max_requests = max_requests
         self.deadline = deadline
+        self.parallel_reads_safe = getattr(client, "parallel_reads_safe", False)
+        self._lock = Lock()
         self.requests = 0
         self.phase = "initial"
         self.samples: dict[str, dict[str, list[tuple[float, int]]]] = defaultdict(
@@ -59,18 +62,23 @@ class ReadOnlyTimedGateway:
         )
 
     def _call(self, name: str, fetch: Callable[[], Page]) -> Page:
-        if self.requests >= self.max_requests or monotonic() >= self.deadline:
-            raise BenchmarkLimitError("live pull request or time budget exhausted")
-        self.requests += 1
+        with self._lock:
+            if self.requests >= self.max_requests or monotonic() >= self.deadline:
+                raise BenchmarkLimitError("live pull request or time budget exhausted")
+            self.requests += 1
+            request_number = self.requests
+            phase = self.phase
         started = perf_counter()
         try:
             page = fetch()
         except BaseException:
-            self.samples[self.phase][name].append((perf_counter() - started, 0))
+            with self._lock:
+                self.samples[phase][name].append((perf_counter() - started, 0))
             raise
-        self.samples[self.phase][name].append((perf_counter() - started, len(page.items)))
-        if self.requests % 10 == 0:
-            print(f"{self.phase}: {self.requests} read-only requests", file=sys.stderr, flush=True)
+        with self._lock:
+            self.samples[phase][name].append((perf_counter() - started, len(page.items)))
+            if request_number % 10 == 0:
+                print(f"{phase}: {request_number} read-only requests", file=sys.stderr, flush=True)
         return page
 
     def list_task_lists(self, *, page_token: str | None = None) -> Page:
@@ -148,7 +156,9 @@ def measure(args: argparse.Namespace) -> dict[str, Any]:
         TimedStorage(Path(directory) / "pull.sqlite3") as storage,
     ):
         storage.upsert_account(Account(ACCOUNT_ID, "benchmark@example.invalid"))
-        engine = SyncEngine(storage, cast(GoogleGateway, gateway), max_retries=1)
+        engine = SyncEngine(
+            storage, cast(GoogleGateway, gateway), max_retries=1, pull_workers=args.pull_workers
+        )
         stages = {}
         with engine.sync_ownership():
             for phase in ("initial", "incremental"):
@@ -173,6 +183,7 @@ def measure(args: argparse.Namespace) -> dict[str, Any]:
                 "max_requests": args.max_requests,
                 "max_seconds": args.max_seconds,
                 "request_timeout": args.request_timeout,
+                "pull_workers": args.pull_workers,
             },
             "stages": stages,
             "rows": {
@@ -191,6 +202,7 @@ def main() -> int:
     parser.add_argument("--max-requests", type=int, default=300)
     parser.add_argument("--max-seconds", type=int, default=600)
     parser.add_argument("--request-timeout", type=int, default=30)
+    parser.add_argument("--pull-workers", type=int, choices=(1, 2, 3, 4), default=1)
     args = parser.parse_args()
     if min(args.max_requests, args.max_seconds, args.request_timeout) < 1:
         parser.error("all limits must be positive")

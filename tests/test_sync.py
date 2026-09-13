@@ -2,9 +2,10 @@ import select
 import subprocess
 import sys
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
+from threading import Barrier, Lock, Thread, get_ident
 from threading import Event as ThreadEvent
-from threading import Thread
 
 import pytest
 
@@ -34,6 +35,7 @@ from hcb.models import (
 )
 from hcb.storage import Storage
 from hcb.sync import SyncEngine
+from hcb.sync_pull import _FirstPagePrefetch
 
 NOW = datetime(2026, 8, 21, 8, tzinfo=UTC)
 EVENT = {
@@ -629,6 +631,256 @@ def test_paginated_incremental_events_keep_sync_token(store: Storage) -> None:
         ("events", "cal-r", "p2", "previous-events-sync", False),
     ]
     assert store.get_cursor("a", "events:cal-r").cursor == "next-events-sync"
+
+
+def test_parallel_pull_overlaps_reads_and_applies_rows_on_owner_thread(
+    store: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store.upsert_task_list(TaskList("other-list", "a", "Other", remote_id="other-list-r"))
+    store.upsert_calendar(Calendar("other-cal", "a", "Other", remote_id="other-cal-r"))
+    owner_thread = get_ident()
+    task_barrier = Barrier(2)
+    event_barrier = Barrier(2)
+    worker_threads: list[int] = []
+
+    class ParallelGateway(FakeGateway):
+        parallel_reads_safe = True
+
+        def list_tasks(self, task_list_id, *, page_token=None, updated_min=None):
+            worker_threads.append(get_ident())
+            task_barrier.wait(timeout=3)
+            return Page(({"id": f"task-{task_list_id}", "title": task_list_id},))
+
+        def list_events(
+            self,
+            calendar_id,
+            *,
+            page_token=None,
+            sync_token=None,
+            time_min=None,
+            time_max=None,
+            single_events=False,
+        ):
+            worker_threads.append(get_ident())
+            event_barrier.wait(timeout=3)
+            return Page(({**EVENT, "id": f"event-{calendar_id}"},), next_sync_token="next")
+
+    original_task_upsert = store.upsert_task
+    original_event_upsert = store.upsert_event
+
+    def upsert_task_on_owner(item):
+        assert get_ident() == owner_thread
+        original_task_upsert(item)
+
+    def upsert_event_on_owner(item):
+        assert get_ident() == owner_thread
+        original_event_upsert(item)
+
+    monkeypatch.setattr(store, "upsert_task", upsert_task_on_owner)
+    monkeypatch.setattr(store, "upsert_event", upsert_event_on_owner)
+    engine = SyncEngine(store, ParallelGateway(), pull_workers=2)
+
+    task_result = engine.sync_task_lists("a")
+    event_result = engine.sync_calendars("a")
+
+    assert task_result.pulled == 2
+    assert event_result.pulled == 2
+    assert len(store.list_tasks("a")) == 2
+    assert len(store.list_events("a")) == 2
+    assert len(worker_threads) == 4
+    assert all(thread != owner_thread for thread in worker_threads)
+
+
+def test_parallel_first_page_failure_retries_without_replaying_other_lists(
+    store: Storage,
+) -> None:
+    store.upsert_task_list(TaskList("other-list", "a", "Other", remote_id="other-list-r"))
+    calls: list[str] = []
+    lock = Lock()
+    failed = False
+
+    class FlakyGateway(FakeGateway):
+        parallel_reads_safe = True
+
+        def list_tasks(self, task_list_id, *, page_token=None, updated_min=None):
+            nonlocal failed
+            with lock:
+                calls.append(task_list_id)
+                if task_list_id == "list-r" and not failed:
+                    failed = True
+                    raise TransientTransportError("first request interrupted")
+            return Page(({"id": f"task-{task_list_id}", "title": task_list_id},))
+
+    engine = SyncEngine(
+        store, FlakyGateway(), pull_workers=2, max_retries=1, wait_for_retry=lambda *_: True
+    )
+
+    assert engine.sync_task_lists("a").pulled == 2
+    assert calls.count("list-r") == 2
+    assert calls.count("other-list-r") == 1
+    assert len(store.list_tasks("a")) == 2
+
+
+def test_parallel_pull_skips_prefetch_for_resumable_task_page(store: Storage) -> None:
+    for index in (2, 3):
+        store.upsert_task_list(
+            TaskList(f"list-{index}", "a", f"List {index}", remote_id=f"list-{index}-r")
+        )
+    checkpoint = store.start_checkpoint("a", "tasks:list-r")
+    store.save_checkpoint_page(checkpoint, "p2")
+    calls: list[tuple[str, str | None]] = []
+    lock = Lock()
+
+    class ResumeGateway(FakeGateway):
+        parallel_reads_safe = True
+
+        def list_tasks(self, task_list_id, *, page_token=None, updated_min=None):
+            with lock:
+                calls.append((task_list_id, page_token))
+            return Page(({"id": f"task-{task_list_id}", "title": task_list_id},))
+
+    assert SyncEngine(store, ResumeGateway(), pull_workers=2).sync_task_lists("a").pulled == 3
+    assert sorted(calls) == [
+        ("list-2-r", None),
+        ("list-3-r", None),
+        ("list-r", "p2"),
+    ]
+    assert store.resumable_checkpoint("a", "tasks:list-r") is None
+
+
+def test_parallel_calendar_410_resets_only_expired_cursor(store: Storage) -> None:
+    store.upsert_calendar(Calendar("other-cal", "a", "Other", remote_id="other-cal-r"))
+    store.set_cursor(SyncCursor("a", "events:cal-r", "expired"))
+    store.set_cursor(SyncCursor("a", "events:other-cal-r", "current"))
+    calls: list[tuple[str, str | None]] = []
+    lock = Lock()
+
+    class ExpiredGateway(FakeGateway):
+        parallel_reads_safe = True
+
+        def list_events(
+            self,
+            calendar_id,
+            *,
+            page_token=None,
+            sync_token=None,
+            time_min=None,
+            time_max=None,
+            single_events=False,
+        ):
+            with lock:
+                calls.append((calendar_id, sync_token))
+            if calendar_id == "cal-r" and sync_token == "expired":
+                raise GoogleApiError(410, "sync token expired")
+            return Page((), next_sync_token=f"next-{calendar_id}")
+
+    assert SyncEngine(store, ExpiredGateway(), pull_workers=2).sync_calendars("a").pages == 3
+    assert calls.count(("cal-r", "expired")) == 1
+    assert calls.count(("cal-r", None)) == 1
+    assert calls.count(("other-cal-r", "current")) == 1
+    assert store.get_cursor("a", "events:cal-r").cursor == "next-cal-r"
+    assert store.get_cursor("a", "events:other-cal-r").cursor == "next-other-cal-r"
+
+
+def test_parallel_pull_cancellation_leaves_remote_rows_unapplied(store: Storage) -> None:
+    store.upsert_task_list(TaskList("other-list", "a", "Other", remote_id="other-list-r"))
+    cancelled = False
+
+    class ParallelGateway(FakeGateway):
+        parallel_reads_safe = True
+
+        def list_tasks(self, task_list_id, *, page_token=None, updated_min=None):
+            return Page(({"id": f"task-{task_list_id}", "title": task_list_id},))
+
+    def progress(message: str) -> None:
+        nonlocal cancelled
+        if message == "Fetching tasks 1/2":
+            cancelled = True
+
+    engine = SyncEngine(store, ParallelGateway(), pull_workers=2)
+    result = engine.sync("a", progress=progress, cancelled=lambda: cancelled)
+
+    assert result.cancelled
+    assert store.list_tasks("a") == []
+    assert store.get_cursor("a", "tasks:list-r") is None
+
+    completed = engine.sync("a")
+    assert not completed.cancelled
+    assert len(store.list_tasks("a")) == 2
+
+
+def test_prefetched_first_page_checkpoint_resumes_after_database_reopen(tmp_path: Path) -> None:
+    path = tmp_path / "parallel-resume.db"
+    calls: list[tuple[str, str | None]] = []
+    lock = Lock()
+    interrupted = False
+
+    class InterruptedGateway(FakeGateway):
+        parallel_reads_safe = True
+
+        def list_tasks(self, task_list_id, *, page_token=None, updated_min=None):
+            nonlocal interrupted
+            with lock:
+                calls.append((task_list_id, page_token))
+                if task_list_id == "list-r" and page_token == "p2" and not interrupted:
+                    interrupted = True
+                    raise RuntimeError("stopped after prefetched first page")
+            if task_list_id == "list-r" and page_token is None:
+                return Page(({"id": "first", "title": "First"},), next_page_token="p2")
+            if task_list_id == "list-r":
+                return Page(({"id": "second", "title": "Second"},))
+            return Page(({"id": "other", "title": "Other"},))
+
+    gateway = InterruptedGateway()
+    with Storage(path) as first:
+        first.upsert_account(Account("a", "a@example.test"))
+        first.upsert_task_list(TaskList("list", "a", "Inbox", remote_id="list-r"))
+        first.upsert_task_list(TaskList("other-list", "a", "Other", remote_id="other-r"))
+        with pytest.raises(RuntimeError, match="stopped after prefetched first page"):
+            SyncEngine(first, gateway, pull_workers=2).sync_task_lists("a")
+        assert first.get_task("a", "first") is not None
+        assert first.get_task("a", "second") is None
+        assert first.resumable_checkpoint("a", "tasks:list-r")[1] == "p2"
+
+    with Storage(path) as reopened:
+        SyncEngine(reopened, gateway, pull_workers=2).sync_task_lists("a")
+        assert len(reopened.list_tasks("a")) == 3
+        assert reopened.resumable_checkpoint("a", "tasks:list-r") is None
+    assert calls.count(("list-r", None)) == 1
+    assert calls.count(("list-r", "p2")) == 2
+
+
+def test_parallel_prefetch_keeps_only_worker_count_pages_outstanding() -> None:
+    started = ThreadEvent()
+    release = ThreadEvent()
+    first_batch_done = ThreadEvent()
+    lock = Lock()
+    requested: list[int] = []
+
+    def fetch(index: int) -> Page:
+        with lock:
+            requested.append(index)
+            if len(requested) == 4:
+                first_batch_done.set()
+        if index == 0:
+            started.set()
+            assert release.wait(timeout=3)
+        return Page(())
+
+    requests = {str(index): partial(fetch, index) for index in range(8)}
+    try:
+        with _FirstPagePrefetch(requests, 4) as prefetch:
+            assert started.wait(timeout=3)
+            assert first_batch_done.wait(timeout=3)
+            with lock:
+                assert sorted(requested) == [0, 1, 2, 3]
+            release.set()
+            assert prefetch.take("0").result() == Page(())
+            prefetch.replenish()
+            with lock:
+                assert len(requested) <= 5
+    finally:
+        release.set()
 
 
 def test_outbox_restart_and_completed_create_are_not_replayed(tmp_path: Path) -> None:

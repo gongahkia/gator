@@ -9,6 +9,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from threading import current_thread
 from typing import Any, Protocol, cast
 
 from .errors import GoogleApiError, RequestNotSentError, TransientTransportError
@@ -177,13 +178,16 @@ class GoogleApiClient:
         self.tasks = tasks_service
         self.calendar = calendar_service
         self.drive = drive_service
+        self._credentials = credentials
+        self._owner_thread = current_thread()
+        self.parallel_reads_safe = credentials is not None
 
     @staticmethod
-    def _execute(request: Any, *, etag: str | None = None) -> Json:
+    def _execute(request: Any, *, etag: str | None = None, http: Any | None = None) -> Json:
         if etag:
             request.headers["If-Match"] = etag
         try:
-            return cast(Json, request.execute())
+            return cast(Json, request.execute(http=http) if http is not None else request.execute())
         except Exception as exc:
             if hasattr(exc, "resp"):
                 raise _error_from_http(exc) from exc
@@ -199,6 +203,18 @@ class GoogleApiClient:
                 ) from exc
             raise
 
+    def _read_execute(self, request: Any) -> Json:
+        if current_thread() is self._owner_thread or self._credentials is None:
+            return self._execute(request)
+        from google_auth_httplib2 import AuthorizedHttp  # type: ignore[import-untyped]
+        from googleapiclient.http import build_http  # type: ignore[import-untyped]
+
+        http = AuthorizedHttp(self._credentials, http=build_http())
+        try:
+            return self._execute(request, http=http)
+        finally:
+            http.close()
+
     @classmethod
     def _void(cls, request: Any, *, etag: str | None = None) -> None:
         cls._execute(request, etag=etag)
@@ -212,7 +228,7 @@ class GoogleApiClient:
         )
 
     def list_task_lists(self, *, page_token: str | None = None) -> Page:
-        return self._page(self._execute(self.tasks.tasklists().list(pageToken=page_token)))
+        return self._page(self._read_execute(self.tasks.tasklists().list(pageToken=page_token)))
 
     def list_tasks(
         self, task_list_id: str, *, page_token: str | None = None, updated_min: str | None = None
@@ -226,13 +242,13 @@ class GoogleApiClient:
             showDeleted=True,
             showHidden=True,
         )
-        return self._page(self._execute(request))
+        return self._page(self._read_execute(request))
 
     def list_calendars(
         self, *, page_token: str | None = None, sync_token: str | None = None
     ) -> Page:
         return self._page(
-            self._execute(
+            self._read_execute(
                 self.calendar.calendarList().list(
                     pageToken=page_token,
                     syncToken=sync_token,
@@ -254,7 +270,7 @@ class GoogleApiClient:
     ) -> Page:
         if sync_token is not None and (time_min is not None or time_max is not None):
             raise ValueError("Google events syncToken cannot be combined with time bounds")
-        response = self._execute(
+        response = self._read_execute(
             self.calendar.events().list(
                 calendarId=calendar_id,
                 pageToken=page_token,

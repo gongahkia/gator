@@ -1,5 +1,7 @@
 import json
 import socket
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 
@@ -121,6 +123,66 @@ def test_tasks_list_requests_largest_supported_page() -> None:
             "showHidden": True,
         }
     ]
+
+
+def test_parallel_reads_use_distinct_closing_http_transports(monkeypatch):
+    import google_auth_httplib2
+    import googleapiclient.http
+
+    barrier = Barrier(2)
+    authorized = []
+
+    class WorkerRequest(Request):
+        def execute(self, http=None):
+            assert http is not None
+            authorized.append(http)
+            barrier.wait(timeout=2)
+            return {"items": []}
+
+    class WorkerTasksResource:
+        def list(self, **kwargs):
+            return WorkerRequest()
+
+    class WorkerTasksService:
+        def tasks(self):
+            return WorkerTasksResource()
+
+    class WorkerHttp:
+        def __init__(self, credentials, *, http):
+            self.credentials = credentials
+            self.http = http
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(googleapiclient.http, "build_http", object)
+    monkeypatch.setattr(google_auth_httplib2, "AuthorizedHttp", WorkerHttp)
+    credentials = object()
+    client = GoogleApiClient(
+        credentials=credentials,
+        tasks_service=WorkerTasksService(),
+        calendar_service=object(),
+        drive_service=object(),
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(client.list_tasks, ("a", "b")))
+
+    assert results == [Page(()), Page(())]
+    assert len(authorized) == 2
+    assert authorized[0] is not authorized[1]
+    assert all(item.credentials is credentials and item.closed for item in authorized)
+
+
+def test_credential_free_client_keeps_fake_transport_in_background_thread():
+    client, calendar = client_with_calendar_service()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        page = pool.submit(client.list_events, "primary").result()
+
+    assert page.next_sync_token == "next"
+    assert calendar.calls[0][0] == "events.list"
 
 
 @pytest.mark.parametrize("status", [401, 403, 404, 409, 410, 429, 500, 503])

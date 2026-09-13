@@ -275,11 +275,14 @@ class _SyncEngineBase:
         max_retry_delay: float = 32.0,
         random_source: Callable[[], float] = random.random,
         wait_for_retry: Callable[[float, Callable[[], bool]], bool] | None = None,
+        pull_workers: int = 1,
     ) -> None:
         if max_retries < 1:
             raise ValueError("max_retries must be at least one")
         if base_retry_delay <= 0 or max_retry_delay < base_retry_delay:
             raise ValueError("retry delays must be positive and ordered")
+        if not 1 <= pull_workers <= 4:
+            raise ValueError("pull workers must be between one and four")
         self.storage = storage
         self.gateway = gateway
         self.now = now
@@ -289,6 +292,7 @@ class _SyncEngineBase:
         self.max_retry_delay = max_retry_delay
         self.random_source = random_source
         self.wait_for_retry = wait_for_retry or self._wait_for_retry
+        self.pull_workers = pull_workers
         self._sync_guard = RLock()
         self._sync_depth = 0
 
