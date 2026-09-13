@@ -34,6 +34,7 @@ include = [
   "/src/hcb",
   "/tests",
   "/tools/benchmark_python.py",
+  "/tools/benchmark_outbox.py",
   "/tools/calendar_mouse_smoke.py",
   "/docs/testing/local-tui-smoke.md",
   "/docs/testing/live-google-tui-smoke.md",

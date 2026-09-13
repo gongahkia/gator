@@ -6,14 +6,14 @@ sync:
 	uv sync --extra dev
 
 format:
-	uv run ruff format src tests tools/benchmark_python.py tools/calendar_mouse_smoke.py
-	uv run ruff check --fix src tests tools/benchmark_python.py tools/calendar_mouse_smoke.py
+	uv run ruff format src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/calendar_mouse_smoke.py
+	uv run ruff check --fix src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/calendar_mouse_smoke.py
 
 format-check:
-	uv run ruff format --check src tests tools/benchmark_python.py tools/calendar_mouse_smoke.py
+	uv run ruff format --check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/calendar_mouse_smoke.py
 
 lint:
-	uv run ruff check src tests tools/benchmark_python.py tools/calendar_mouse_smoke.py
+	uv run ruff check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/calendar_mouse_smoke.py
 
 typecheck:
 	uv run mypy src

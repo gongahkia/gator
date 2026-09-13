@@ -4,6 +4,9 @@ On the [10,000-task, 2,000-event fixture](performance-baseline.md), a workspace
 snapshot took 138 ms median and 212 ms p95 in the initial 20-run report. A
 five-call `cProfile` run showed that Python model hydration dominated; SQLite
 `execute` calls accounted for 0.029 s of 1.028 s cumulative workspace time.
+That figure excludes row fetching. In a separate unprofiled check on the same
+fixture, raw `SELECT *` plus `fetchall()` took 29 ms for tasks and 9 ms for
+events, versus 87 ms and 59 ms for the corresponding model-list operations.
 
 | Five profiled workspace loads | Before | After empty-array fast path |
 | --- | ---: | ---: |
