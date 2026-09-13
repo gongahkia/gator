@@ -71,7 +71,7 @@ class WorkspaceMixin:
             events=snapshot.events,
             task_lists=tuple((item.id, item.title) for item in snapshot.task_lists),
             calendars=tuple((item.id, item.summary, item.selected) for item in snapshot.calendars),
-            instance_ranges=tuple(self.runtime.storage.list_instance_ranges(self.account_id)),
+            instance_ranges=snapshot.instance_ranges,
             pending=snapshot.pending,
         )
         self._instance_badge_cache.clear()
@@ -428,11 +428,11 @@ class WorkspaceMixin:
         if self.account_id is None:
             return
         cache_updates: dict[str, object] = {
-            "pending": len(self.runtime.storage.pending_mutations(self.account_id))
+            "pending": self.runtime.application.pending_count(self.account_id)
         }
         if event_changed:
-            cache_updates["instance_ranges"] = tuple(
-                self.runtime.storage.list_instance_ranges(self.account_id)
+            cache_updates["instance_ranges"] = self.runtime.application.instance_ranges(
+                self.account_id
             )
         self.cache = replace(self.cache, **cache_updates)
         self._instance_badge_cache.clear()
@@ -763,7 +763,7 @@ class WorkspaceMixin:
             self._instance_badge_cache[cache_key] = "instances: missing"
             return "instances: missing"
         statuses = [
-            self.runtime.storage.instance_cache_status(self.account_id, item_id, start, end)
+            self.runtime.application.instance_cache_status(self.account_id, item_id, start, end)
             for item_id in calendar_ids
         ]
         states = {item["state"] for item in statuses}

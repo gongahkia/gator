@@ -40,6 +40,25 @@ def app(tmp_path: Path):
         yield ApplicationService(storage)
 
 
+def test_workspace_metadata_reads_are_available_through_application(
+    app: ApplicationService,
+) -> None:
+    start = datetime(2026, 8, 21, tzinfo=UTC)
+    end = start.replace(day=28)
+    app.storage.replace_cached_instances("a", "cal", start, end, [])
+    for index in range(101):
+        app.create_task("a", "inbox", f"Task {index}", id=f"task-{index}")
+    conflict_id = app.storage.add_conflict(
+        Conflict(None, "a", EntityType.TASK, "task-0", {"title": "L"}, {"title": "R"})
+    )
+
+    snapshot = app.workspace("a")
+    assert snapshot.pending == app.pending_count("a") == 101
+    assert snapshot.instance_ranges == app.instance_ranges("a")
+    assert app.instance_cache_status("a", "cal", start, end)["state"] == "fresh"
+    assert [conflict.id for conflict in app.list_conflicts("a")] == [conflict_id]
+
+
 def test_task_write_is_optimistic_and_transactional(app: ApplicationService) -> None:
     task = app.create_task(
         "a",

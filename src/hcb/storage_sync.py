@@ -79,6 +79,12 @@ class SyncStateRepository(_StorageCore):
             for row in rows
         ]
 
+    def pending_mutation_count(self, account_id: str) -> int:
+        row = self.connection.execute(
+            "SELECT COUNT(*) FROM outbox WHERE account_id=?", (account_id,)
+        ).fetchone()
+        return int(row[0])
+
     def get_mutation(self, account_id: str, mutation_id: int) -> PendingMutation | None:
         return next(
             (

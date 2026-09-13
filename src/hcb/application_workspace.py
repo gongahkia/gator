@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from .application import TimeSlot, WorkspaceSnapshot, _ApplicationServiceBase
+from .application import Json, TimeSlot, WorkspaceSnapshot, _ApplicationServiceBase
 from .errors import NotFoundError
 from .models import DateTimeKind, Event, EventStatus, NotesProjection, Task
 
@@ -21,8 +21,24 @@ class WorkspaceServiceMixin(_ApplicationServiceBase):
             events=tuple(self.storage.list_events(account_id)),
             task_lists=tuple(self.storage.list_task_lists(account_id)),
             calendars=tuple(self.storage.list_calendars(account_id)),
-            pending=len(self.storage.pending_mutations(account_id)),
+            instance_ranges=tuple(self.storage.list_instance_ranges(account_id)),
+            pending=self.pending_count(account_id),
         )
+
+    def pending_count(self, account_id: str) -> int:
+        return self.storage.pending_mutation_count(account_id)
+
+    def instance_ranges(self, account_id: str) -> tuple[dict[str, str], ...]:
+        return tuple(self.storage.list_instance_ranges(account_id))
+
+    def instance_cache_status(
+        self,
+        account_id: str,
+        calendar_id: str,
+        start: date | datetime,
+        end: date | datetime,
+    ) -> Json:
+        return self.storage.instance_cache_status(account_id, calendar_id, start, end)
 
     def find_time(
         self,

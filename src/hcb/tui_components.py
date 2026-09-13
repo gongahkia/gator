@@ -2498,7 +2498,7 @@ class ConflictScreen(ModalScreen[None]):
         if self.hcb.account_id is None:
             return
         view = self.query_one("#conflict-list", ListView)
-        for conflict in self.hcb.runtime.storage.list_conflicts(self.hcb.account_id):
+        for conflict in self.hcb.runtime.application.list_conflicts(self.hcb.account_id):
             view.append(
                 EntityRow(
                     f"{conflict.id} · {conflict.entity_type.value} · {conflict.entity_id}",
@@ -2520,7 +2520,7 @@ class ConflictScreen(ModalScreen[None]):
             conflict = next(
                 (
                     item
-                    for item in self.hcb.runtime.storage.list_conflicts(self.hcb.account_id)
+                    for item in self.hcb.runtime.application.list_conflicts(self.hcb.account_id)
                     if item.id == self.conflict_id
                 ),
                 None,

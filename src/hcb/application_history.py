@@ -18,6 +18,9 @@ from .models import (
 
 
 class HistoryServiceMixin(_ApplicationServiceBase):
+    def list_conflicts(self, account_id: str) -> tuple[Conflict, ...]:
+        return tuple(self.storage.list_conflicts(account_id))
+
     def resolve_conflict(
         self,
         account_id: str,

@@ -94,6 +94,7 @@ class WorkspaceSnapshot:
     events: tuple[Event, ...]
     task_lists: tuple[TaskList, ...]
     calendars: tuple[Calendar, ...]
+    instance_ranges: tuple[dict[str, str], ...]
     pending: int
 
 
