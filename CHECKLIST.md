@@ -34,10 +34,12 @@ Finish the shared-core and database work, then measure and optimize their slow p
   - [x] Profile large-account workspace loading; record the SQLite-versus-hydration split and before/after results in the [workspace profile](docs/testing/workspace-profile.md).
   - [x] Profile 250, 1,000, and 5,000 queued writes; record the repeated outbox scan and before/after samples in the [outbox profile](docs/testing/outbox-profile.md).
   - [x] Profile synthetic TUI startup and first task frame at 1,000 and 10,000 tasks; retain repeated samples and memory measurements in the [startup profile](docs/testing/tui-startup-profile.md).
+  - [x] Profile synthetic paginated Tasks and Calendar pulls at 1,000/200 and 10,000/2,000 rows; record repeat timings, request counts, page-application time, memory, and restart checks in the [pull profile](docs/testing/pull-profile.md). Live Google request latency remains open.
 - [ ] Apply targeted query/index improvements, incremental updates, caching, or background work only where profiles justify them; compare results against the baseline.
   - [x] Skip JSON decoding for canonical empty event arrays during workspace hydration; preserve decoding of nonempty event fields and compare repeat timings.
   - [x] Fetch each sending outbox mutation by indexed ID and account instead of rescanning pending rows; verify delivery semantics and compare queue-size scaling.
   - [x] Skip URL copying and scanning for ordinary task rows without web links; preserve linked titles and Notes previews, and compare row-building and startup samples.
+  - [x] Skip unchanged task-list upserts during pull so an empty incremental sync does not rebuild every child task search row; preserve changed list metadata and compare repeated timings.
 - [ ] Keep stable core performance regression checks in the local check workflow and any future CI; run hardware-specific benchmarks separately before releases.
 
 ## Restore and develop desktop frontends on the shared core

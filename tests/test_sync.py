@@ -211,8 +211,10 @@ def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Stor
 
     engine.sync_task_lists("a")
     original_document = child_document()
+    original_timestamp = store.get_task_list("a", "list").metadata.local_updated_at
     engine.sync_task_lists("a")
     assert child_document() == original_document
+    assert store.get_task_list("a", "list").metadata.local_updated_at == original_timestamp
 
     gateway.task_list_pages = {
         None: Page(({"id": "list-r", "title": "Renamed", "etag": '"list-2"'},))
@@ -337,6 +339,50 @@ def test_page_checkpoint_resumes_without_replaying_committed_page(store):
     assert attempts == [None, "p2", "p2"]
     assert waits == [1.0]
     assert store.get_task("a", "two") is not None
+
+
+def test_task_page_checkpoint_survives_database_reopen(tmp_path: Path) -> None:
+    path = tmp_path / "task-pages.db"
+    gateway = FakeGateway()
+    gateway.task_pages = {
+        None: Page(
+            tuple({"id": f"task-{index}", "title": f"Task {index}"} for index in range(100)),
+            next_page_token="p2",
+        ),
+        "p2": Page(({"id": "task-100", "title": "Task 100"},)),
+    }
+    original = gateway.list_tasks
+    page_tokens: list[str | None] = []
+    interrupted = False
+
+    def fail_once(task_list_id: str, *, page_token=None, updated_min=None):
+        nonlocal interrupted
+        page_tokens.append(page_token)
+        if page_token == "p2" and not interrupted:
+            interrupted = True
+            raise RuntimeError("stopped between task pages")
+        return original(task_list_id, page_token=page_token, updated_min=updated_min)
+
+    gateway.list_tasks = fail_once
+    with Storage(path) as first:
+        first.upsert_account(Account("a", "a@example.test"))
+        first.upsert_task_list(TaskList("list", "a", "Inbox", remote_id="list-r"))
+        task_list = first.get_task_list("a", "list")
+        assert task_list is not None
+        with pytest.raises(RuntimeError, match="stopped between task pages"):
+            SyncEngine(first, gateway, now=lambda: NOW).sync_tasks("a", task_list)
+        assert len(first.list_tasks("a")) == 100
+        assert first.get_cursor("a", "tasks:list-r") is None
+        assert first.resumable_checkpoint("a", "tasks:list-r")[1] == "p2"
+
+    with Storage(path) as reopened:
+        task_list = reopened.get_task_list("a", "list")
+        assert task_list is not None
+        result = SyncEngine(reopened, gateway, now=lambda: NOW).sync_tasks("a", task_list)
+        assert result.pulled == 1
+        assert len(reopened.list_tasks("a")) == 101
+        assert reopened.get_cursor("a", "tasks:list-r").cursor == "2026-08-21T08:00:00Z"
+    assert page_tokens == [None, "p2", "p2"]
 
 
 def test_calendar_410_resets_only_expired_calendar_cursor(store):
@@ -541,6 +587,8 @@ def test_calendar_page_resume_survives_database_reopen(tmp_path: Path) -> None:
         with pytest.raises(RuntimeError, match="simulated process crash"):
             SyncEngine(first, gateway).sync_events("a", first.get_calendar("a", "cal"))
         assert first.get_event("a", "event-r") is not None
+        assert first.get_cursor("a", "events:cal-r") is None
+        assert first.resumable_checkpoint("a", "events:cal-r")[1] == "p2"
 
     with Storage(path) as reopened:
         SyncEngine(reopened, gateway).sync_events("a", reopened.get_calendar("a", "cal"))

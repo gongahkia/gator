@@ -78,12 +78,23 @@ class PullSyncMixin(_SyncEngineBase):
 
         def apply(item: Json) -> None:
             existing = self.storage.get_task_list_by_remote(account_id, str(item["id"]))
-            if existing is None or not existing.metadata.dirty:
-                self.storage.upsert_task_list(
-                    task_list_from_google(
-                        account_id, item, local_id=existing.id if existing else None
-                    )
+            if existing is not None and existing.metadata.dirty:
+                return
+            incoming = task_list_from_google(
+                account_id, item, local_id=existing.id if existing else None
+            )
+            if existing is not None and (
+                replace(
+                    incoming,
+                    metadata=replace(
+                        incoming.metadata,
+                        local_updated_at=existing.metadata.local_updated_at,
+                    ),
                 )
+                == existing
+            ):
+                return
+            self.storage.upsert_task_list(incoming)
 
         result = self._paged(
             account_id,

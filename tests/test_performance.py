@@ -68,6 +68,51 @@ def test_outbox_benchmark_reports_completed_delivery_across_page_boundary() -> N
         assert item["median_seconds"] > 0
 
 
+def test_pull_benchmark_reports_initial_and_incremental_page_counts() -> None:
+    tool = Path(__file__).resolve().parents[1] / "tools/benchmark_pull.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(tool),
+            "--tasks",
+            "101",
+            "--events",
+            "11",
+            "--task-lists",
+            "1",
+            "--calendars",
+            "1",
+            "--task-page-size",
+            "100",
+            "--event-page-size",
+            "10",
+            "--runs",
+            "2",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    report = json.loads(completed.stdout)
+    assert report["fixture"]["tasks"] == 101
+    assert report["runs"] == 2
+    for sample in report["samples"]:
+        assert sample["rows"] == {"tasks": 101, "events": 11}
+        assert sample["stages"]["initial"]["pages"] == {
+            "task_lists": 1,
+            "tasks": 2,
+            "calendar_list": 1,
+            "events": 2,
+        }
+        assert sample["stages"]["incremental"]["pages"] == {
+            "task_lists": 1,
+            "tasks": 1,
+            "calendar_list": 1,
+            "events": 1,
+        }
+    assert report["timings"]["initial"]["task_seconds"]["runs"] == 2
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="the terminal benchmark requires a Unix PTY")
 def test_tui_startup_benchmark_reaches_a_real_task_frame() -> None:
     tool = Path(__file__).resolve().parents[1] / "tools/benchmark_tui_startup.py"

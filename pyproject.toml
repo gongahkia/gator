@@ -35,6 +35,7 @@ include = [
   "/tests",
   "/tools/benchmark_python.py",
   "/tools/benchmark_outbox.py",
+  "/tools/benchmark_pull.py",
   "/tools/benchmark_tui_startup.py",
   "/tools/calendar_mouse_smoke.py",
   "/docs/testing/local-tui-smoke.md",

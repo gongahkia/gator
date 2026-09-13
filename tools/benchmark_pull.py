@@ -223,6 +223,8 @@ def measure_worker(args: argparse.Namespace) -> dict[str, object]:
                 args.tasks + args.events + args.task_lists + args.calendars
             ):
                 raise RuntimeError("initial pull returned an unexpected item count")
+            if stages["incremental"]["pulled"] != args.task_lists:
+                raise RuntimeError("unchanged incremental pull returned unexpected items")
         return {
             "stages": stages,
             "rows": {"tasks": task_rows, "events": event_rows},
@@ -290,6 +292,7 @@ def main() -> int:
         for stage in ("initial", "incremental")
     }
     memory_samples = [sample["peak_rss_bytes"] for sample in samples]
+    measured_memory = [value for value in memory_samples if value is not None]
     print(
         json.dumps(
             {
@@ -311,7 +314,7 @@ def main() -> int:
                 "timings": timings,
                 "samples": samples,
                 "peak_rss_bytes": {
-                    "median": median(value for value in memory_samples if value is not None),
+                    "median": median(measured_memory) if measured_memory else None,
                     "samples": memory_samples,
                 },
             },
