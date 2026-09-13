@@ -1634,7 +1634,7 @@ def auth_connect(
 ) -> None:
     state = _state(ctx)
     result = state.runtime.authenticator(account_id).connect(
-        account_id, open_browser=not no_browser
+        account_id, expected_email=email, open_browser=not no_browser
     )
     state.runtime.storage.upsert_account(Account(account_id, email))
     _emit(

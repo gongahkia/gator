@@ -187,8 +187,8 @@ class Runtime:
         )
         return SyncEngine(self.storage, gateway, pull_workers=4)
 
-    def connect_account(self, account_id: str) -> OAuthResult:
-        return self.authenticator(account_id).connect(account_id)
+    def connect_account(self, account_id: str, *, expected_email: str) -> OAuthResult:
+        return self.authenticator(account_id).connect(account_id, expected_email=expected_email)
 
     def query_freebusy(self, account_id: str, body: dict[str, Any]) -> dict[str, Any]:
         return self.sync_engine(account_id).gateway.freebusy(body)

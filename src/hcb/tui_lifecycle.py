@@ -244,17 +244,21 @@ class LifecycleMixin:
         if not confirmed or self.account_id is None:
             self.notify("Google connection skipped; local cache remains available")
             return
+        account = self.runtime.storage.get_account(self.account_id)
+        if account is None:
+            self.notify("Google account is not configured", severity="error")
+            return
         self.start_loading("Connecting to Google")
-        self.connect_google()
+        self.connect_google(account.email)
 
     @work(thread=True, exclusive=True, group="auth")
-    def connect_google(self: Any) -> None:
+    def connect_google(self: Any, expected_email: str) -> None:
         if self.account_id is None:
             return
         failure: Exception | None = None
         try:
             self.call_from_thread(self.update_loading, "Waiting for browser approval")
-            self.runtime.connect_account(self.account_id)
+            self.runtime.connect_account(self.account_id, expected_email=expected_email)
         except Exception as exc:
             failure = exc
         else:

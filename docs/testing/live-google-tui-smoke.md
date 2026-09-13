@@ -1,9 +1,9 @@
 # Live Google TUI/CLI smoke
 
-Status for the current validation: **full external gate not executed**. A limited
-read-only preflight is recorded below; it does not pass the disposable-account
-acceptance gate. Update only the redacted attestation section after completing
-every step of the full procedure.
+Status for the current validation: **full external gate not executed**. A read-only
+preflight and a partial disposable-account Fedora smoke are recorded below. Neither
+passes the full Linux/macOS acceptance gate. Update the redacted attestation only
+after completing every step of the full procedure.
 
 Use a disposable Google account and user-owned Cloud project. Never record client
 IDs, client secrets, tokens, authorization codes, account email/subject, remote IDs,
@@ -109,12 +109,41 @@ time, `passed`/`failed` per section, and tester role. Do not paste command outpu
 
 Current result:
 
-- OAuth/credential boundary: **not executed**
-- Tasks/recurrence/outbox: **not executed**
-- Calendar/tokens/rich fields: **not executed**
-- Free-busy/reminders/conflicts/offline: **not executed**
+- OAuth/credential boundary: **incomplete**
+- Tasks/recurrence/outbox: **incomplete**
+- Calendar/tokens/rich fields: **incomplete**
+- Free-busy/reminders/conflicts/offline: **incomplete**
 - Disconnect/reset: **not executed**
 - Overall live gate: **not passed**
+
+## Disposable-account Fedora partial smoke
+
+This automated smoke used a separate Google test user and an isolated owner-only
+credential file, configuration, cache, and SQLite database. It did not open the
+personal HCB profile. Before any Google data writes, Google's UserInfo endpoint
+confirmed the signed-in email matched the intended test account. A local scan
+found no plaintext refresh token in the credential file, configuration, SQLite
+dump, or diagnostics; the test credential file has a different keyring key from
+the personal credential file.
+
+- Candidate commit at live run: `9b99e7f17`; package version: `0.2.0`
+- Platform: Fedora Linux 43, Linux `7.1.12-100.fc43.x86_64`, Python `3.12.13`
+- Completed: `2026-09-13 09:07 UTC`; tester role: automated local smoke
+- Initial pull and identity/credential isolation: **passed**
+- Synthetic task-list create/delete and task create/edit/complete/delete,
+  checked against Google Tasks readback: **passed**
+- Synthetic calendar create/delete and timed event create/edit/delete, including
+  IANA time-zone readback, checked against Google Calendar: **passed**
+- Offline local task create/edit across CLI process restarts, one remote delivery,
+  no repeat send on the second sync, and final empty outbox: **passed**
+- Synthetic task lists, tasks, calendars, and events created by this smoke were
+  removed and the removals checked remotely: **passed**
+- Full recurrence, conflict policies, rich event fields, revocation/reconnect,
+  TUI/manual workflows, and macOS acceptance: **not executed**
+
+The OAuth account-email check added after this run has unit coverage, but its
+browser authorization path has not been repeated live. No invitations or other
+messages were sent to an external attendee.
 
 ## Read-only preflight
 

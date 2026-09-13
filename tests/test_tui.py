@@ -1698,7 +1698,8 @@ def test_onboarding_connect_waits_for_explicit_confirmation(tmp_path: Path) -> N
     calls: list[str] = []
 
     class Authenticator:
-        def connect(self, account_id: str) -> None:
+        def connect(self, account_id: str, *, expected_email: str) -> None:
+            assert expected_email == "google@example.test"
             calls.append(account_id)
 
     runtime.__dict__["authenticator"] = lambda _account: Authenticator()

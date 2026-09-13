@@ -71,6 +71,12 @@ so the temporary loopback callback reaches HCB. `--no-browser` prints the
 authorization URL when automatic browser launch is unavailable; open it in a
 browser on that same computer and do not share it.
 
+After browser approval, HCB checks Google's verified account email against the
+email supplied to `auth connect` before saving the refresh token. Select the
+intended account in Google's account chooser; if they differ, retry with the
+account's primary email. Google documents the verified email field in its
+[OpenID Connect UserInfo response](https://developers.google.com/identity/openid-connect/reference#userinfo_endpoint).
+
 HCB rejects a credential file accessible to group or other users. After
 authorization, it stores an encrypted refresh token in that file and its
 encryption key in the OS keyring; access tokens remain in memory. Keep the

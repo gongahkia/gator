@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -54,6 +57,61 @@ def test_credentials_are_built_without_network() -> None:
     credentials = GoogleAuthenticator(CLIENT_CONFIG, tokens).credentials("account")
     assert credentials.refresh_token == "refresh"
     assert credentials.client_id == "client-id.apps.googleusercontent.com"
+
+
+def test_connect_checks_google_identity_before_storing_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    class FakeFlow:
+        def run_local_server(self, **_kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(refresh_token="refresh", token="access", scopes=("openid",))
+
+    monkeypatch.setattr(
+        InstalledAppFlow, "from_client_config", lambda *_args, **_kwargs: FakeFlow()
+    )
+    tokens = TokenStore(FakeKeyring())
+    auth = GoogleAuthenticator(CLIENT_CONFIG, tokens)
+    monkeypatch.setattr(auth, "_verified_email", lambda _credentials: "other@example.test")
+
+    with pytest.raises(ValueError, match="does not match"):
+        auth.connect("account", expected_email="person@example.test")
+    assert tokens.get("account") is None
+
+    monkeypatch.setattr(auth, "_verified_email", lambda _credentials: "PERSON@example.test")
+    assert auth.connect("account", expected_email="person@example.test").refresh_token == "refresh"
+    assert tokens.get("account") == "refresh"
+
+
+def test_connect_rejects_unverified_userinfo(monkeypatch: pytest.MonkeyPatch) -> None:
+    from google.auth.transport import requests as google_requests
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> dict[str, object]:
+            return {"email": "person@example.test", "email_verified": False}
+
+    class FakeSession:
+        def __init__(self, _credentials: object) -> None:
+            pass
+
+        def __enter__(self) -> FakeSession:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            pass
+
+        def get(self, url: str, *, timeout: int) -> FakeResponse:
+            assert url == "https://openidconnect.googleapis.com/v1/userinfo"
+            assert timeout == 20
+            return FakeResponse()
+
+    monkeypatch.setattr(google_requests, "AuthorizedSession", FakeSession)
+    with pytest.raises(RuntimeError, match="verified account email"):
+        GoogleAuthenticator._verified_email(object())
 
 
 def test_disconnect_retains_cache_and_explicit_reset_removes_it(tmp_path: Path) -> None:

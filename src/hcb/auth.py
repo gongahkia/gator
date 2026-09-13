@@ -104,6 +104,7 @@ class GoogleAuthenticator:
         self,
         account_id: str,
         *,
+        expected_email: str,
         open_browser: bool = True,
         timeout_seconds: int = 180,
     ) -> OAuthResult:
@@ -129,12 +130,32 @@ class GoogleAuthenticator:
             raise RuntimeError(
                 "Google did not return a refresh token; revoke prior consent and try again"
             )
+        actual_email = self._verified_email(credentials)
+        if actual_email.casefold() != expected_email.strip().casefold():
+            raise ValueError(
+                "The Google account selected in the browser does not match the requested email"
+            )
         self.token_store.set(account_id, refresh_token)
         return OAuthResult(
             refresh_token=refresh_token,
             access_token=credentials.token,
             granted_scopes=tuple(credentials.scopes or self.scopes),
         )
+
+    @staticmethod
+    def _verified_email(credentials: Any) -> str:
+        from google.auth.transport.requests import AuthorizedSession
+
+        with AuthorizedSession(credentials) as session:  # type: ignore[no-untyped-call]
+            response = session.get("https://openidconnect.googleapis.com/v1/userinfo", timeout=20)
+            response.raise_for_status()
+            identity = response.json()
+        if not isinstance(identity, dict) or identity.get("email_verified") is not True:
+            raise RuntimeError("Google did not return a verified account email")
+        email = identity.get("email")
+        if not isinstance(email, str) or not email:
+            raise RuntimeError("Google did not return a verified account email")
+        return email
 
     def credentials(self, account_id: str) -> Any:
         """Build refreshable Google credentials without performing network I/O."""
