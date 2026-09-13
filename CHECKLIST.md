@@ -22,7 +22,7 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
 
 ## Build the desktop app on the shared core
 
-- [ ] Define a desktop MVP and a parity map against the existing CLI/TUI: tasks, calendars, search, capture, editing, sync/conflicts, settings, and reminders. Keep later features explicitly deferred.
+- [x] Define a [desktop MVP and CLI/TUI parity map](docs/product/desktop-mvp.md): tasks, calendars, search, capture, editing, sync/conflicts, settings, and reminders, with later features explicitly deferred.
 - [ ] Establish a UI-independent application interface. Move direct storage and Google calls out of the TUI where necessary so the desktop UI can reuse the same operations without copying business logic.
 - [ ] Choose and validate a Linux/macOS desktop toolkit with a small prototype covering a calendar view, a large task list, OAuth callback, and packaging.
 - [ ] Add a separate desktop entry point while preserving the `hcb` CLI/TUI contract. Keep one account model, configuration format, data directory, credential store, and migration path across both entry points.

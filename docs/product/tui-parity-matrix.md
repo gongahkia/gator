@@ -1,8 +1,9 @@
 # Local TUI parity matrix
 
-This document is the **acceptance source of truth** for the completed repository
-pivot from the former React PWA, self-hosted reliability stack, and C++/Qt
-desktop to a **local, offline-first TUI plus a complete non-interactive CLI**.
+This document records the acceptance scope for the completed repository pivot
+from the former React PWA, self-hosted reliability stack, and C++/Qt desktop to
+a **local, offline-first TUI plus a complete non-interactive CLI**. The current
+roadmap and release gates live in the [development checklist](../../CHECKLIST.md).
 
 It is implementation-neutral: it states product behavior, not libraries,
 widgets, or package layout. The delivery is a locally installed Python program;

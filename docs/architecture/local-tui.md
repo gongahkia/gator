@@ -28,7 +28,10 @@ The `hcb` package is divided into:
 - `sync`: Google transport, incremental pull, outbox delivery, and recovery.
 - `application`: operations shared by the CLI, TUI, and scheduler.
 - `cli`: stable commands, machine output, exit codes, and shell completion.
-- `tui`: Textual views and editors. It never calls Google or SQLite directly.
+- `tui`: Textual views and editors. Most mutations use `application`; some
+  cached reads still use `storage` directly, and free/busy, sync, and recurring
+  instance refresh still construct Google-backed operations through `runtime`.
+  These need a shared application boundary before the desktop UI can reuse them.
 - `auth`: loopback OAuth and credential-store access.
 - `scheduler`: explicit local synchronization and reminder service.
 

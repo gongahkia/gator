@@ -1,11 +1,13 @@
 # Documentation
 
-This documentation describes the Python local-first TUI and CLI only.
+This documentation describes the current Python local-first TUI and CLI, plus
+the proposed scope for a future Linux/macOS desktop app.
 
 - [CLI reference](hcb-cli.md)
 - [Installation guide](installation.md)
 - [Bring-your-own Google OAuth setup](oauth-setup.md)
 - [Product requirements](product/prd.md)
+- [Desktop MVP and CLI/TUI parity map](product/desktop-mvp.md)
 - [Local TUI architecture](architecture/local-tui.md)
 - [Ghostty bundled-theme inventory](architecture/ghostty-bundled-themes.md)
 - [Ghostty bundled-theme inventory](architecture/ghostty-bundled-themes.md)
