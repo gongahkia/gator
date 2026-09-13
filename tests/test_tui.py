@@ -31,6 +31,7 @@ from hcb.models import (
     EventDateTime,
     Preferences,
     ReminderOverride,
+    Task,
 )
 from hcb.paths import AppPaths
 from hcb.runtime import Runtime
@@ -646,6 +647,17 @@ def test_links_in_workspace_text_open_only_safe_web_urls(tmp_path: Path) -> None
 
     opened: list[str] = []
     app = HcbApp(seeded_runtime(tmp_path), url_opener=lambda target: opened.append(target) or True)
+    plain_row = app._workspace_task_row(Task("plain", "work", "inbox", "Read offline"), "")
+    assert plain_row.label.plain.endswith("Read offline")
+    assert not any(span.style.link for span in plain_row.label.spans)
+    linked_row = app._workspace_task_row(Task("linked", "work", "inbox", f"Read {url}."), "")
+    assert [span.style.link for span in linked_row.label.spans if span.style.link] == [url]
+    app.surface = "Notes"
+    preview_row = app._workspace_task_row(
+        Task("preview", "work", "inbox", "Reference", notes=f"See {url}.\nSecond line"), ""
+    )
+    assert [span.style.link for span in preview_row.label.spans if span.style.link] == [url]
+    app.surface = "Tasks"
 
     async def assertions(_: object) -> None:
         app.on_click(events.Click(app, 0, 0, 0, 0, 1, False, False, False, style=Style(link=url)))

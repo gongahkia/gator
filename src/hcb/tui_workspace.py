@@ -615,7 +615,9 @@ class WorkspaceMixin:
             label.stylize(style)
             label.stylize(style, title_start, title_end)
             label.stylize(dot_style, dot_start, dot_end)
-        return WorkspaceRow("task", task.id, linkify_urls(label))
+        if "http://" in label.plain or "https://" in label.plain:
+            label = linkify_urls(label)
+        return WorkspaceRow("task", task.id, label)
 
     @staticmethod
     def _workspace_dot_style(color: str) -> Style:
