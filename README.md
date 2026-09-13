@@ -114,31 +114,9 @@ default, `26 May 2026, 7:23pm`), `friendly_24h` (`26 May 2026, 19:23`), or
 
 ## Desktop OAuth setup
 
-1. In Google Cloud Console, create or select a project.
-2. Enable the Google Calendar API, Google Tasks API, and Google Drive API.
-3. Configure the OAuth consent screen and add your Google account as a test user
-   when the app is in testing mode.
-4. Create an OAuth client with application type **Desktop app**.
-5. Create HCB's owner-only default credential file at `~/.config/hcb/personal.env`.
-   Pass `--env-file` or set `HCB_ENV_FILE` to use another local path.
-
-```sh
-credential_file="$HOME/.config/hcb/personal.env"
-mkdir -p "${credential_file%/*}"
-$EDITOR "$credential_file"
-# HCB_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
-# HCB_GOOGLE_CLIENT_SECRET=...  # optional for a Desktop client
-chmod 600 "$credential_file"
-
-hcb --env-file "$credential_file" auth connect personal you@example.com
-hcb sync
-hcb
-```
-
-The file is never read from the repository or `config.json`. On first
-connection HCB adds an encrypted refresh-token value to that same file; its
-per-file encryption key remains in the operating-system keyring. HCB rejects a
-credential file that group or other users can read or write. Do not commit it.
+Follow the [bring-your-own Google OAuth guide](docs/oauth-setup.md) to enable
+the APIs, configure a Desktop client and test user, create the owner-only local
+credential file, connect HCB, and troubleshoot consent or keyring problems.
 
 ## CLI examples
 

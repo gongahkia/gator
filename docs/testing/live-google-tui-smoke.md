@@ -11,6 +11,9 @@ screenshots, or raw logs.
 
 ## Safe setup
 
+Follow the [bring-your-own OAuth setup guide](../oauth-setup.md) before this
+acceptance run; preparing credentials does not itself pass the live gate.
+
 1. Enable Google Tasks, Calendar, and Drive APIs. Create an OAuth **Desktop app**
    client and add the disposable account as a test user when required.
 2. Create an owner-only account `.env` outside the repository with

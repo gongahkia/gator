@@ -12,8 +12,8 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
 
 ## First: establish a reliable baseline
 
-- [x] Restore a green Fedora local baseline with `make local-ci`: format, lint, type check, tests, build, isolated wheel smoke, and terminal mouse smoke. Install the versioned pre-push hook with `make install-hooks` in each clone.
-- [ ] Document bring-your-own OAuth setup for a disposable Google Cloud desktop client and test account: consent screen, test users, API enablement, scopes, and troubleshooting without collecting credentials.
+- [x] Restore a billing-independent Fedora local baseline with `make local-ci`: format, lint, type check, tests, build, isolated wheel smoke, and terminal mouse smoke. Install the versioned pre-push hook with `make install-hooks` in each clone.
+- [x] Document [bring-your-own OAuth setup](docs/oauth-setup.md) for a disposable Google Cloud desktop client and test account: consent screen, test users, API enablement, scopes, and troubleshooting without collecting credentials.
 - [ ] Run and record the [live Google acceptance procedure](docs/testing/live-google-tui-smoke.md) with disposable accounts on both Linux and macOS. Cover initial and incremental pull; offline task and event writes; conflict-policy modes; task lists, notes projection, recurrence, search, and bulk mutations. Check the resulting data in Google Tasks and Calendar after each mutation class.
 - [ ] Exercise expired tokens, revoked access, network loss, quota/retry, stale ETags, invalid Calendar sync tokens, and restart recovery. Preserve a redacted manual acceptance record; incomplete live acceptance blocks release promotion.
 - [ ] Test the CLI/TUI, future desktop app, and optional reminder process running at the same time. Define process-level sync ownership and verify that active outbox deliveries are not mistaken for interrupted ones.

@@ -4,6 +4,7 @@ This documentation describes the Python local-first TUI and CLI only.
 
 - [CLI reference](hcb-cli.md)
 - [Installation guide](installation.md)
+- [Bring-your-own Google OAuth setup](oauth-setup.md)
 - [Product requirements](product/prd.md)
 - [Local TUI architecture](architecture/local-tui.md)
 - [Ghostty bundled-theme inventory](architecture/ghostty-bundled-themes.md)
