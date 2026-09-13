@@ -73,7 +73,7 @@ class CalendarMouseSmokeApp(App[None]):
             fallback_color="#888888",
             selected=None,
         )
-        self._send_status("ready")
+        self.call_after_refresh(self._send_status, "ready")
         self.set_timer(5, lambda: self._finish("timed out waiting for drag"))
 
     def on_calendar_grid_item_changed(self, message: CalendarGrid.ItemChanged) -> None:
@@ -115,12 +115,35 @@ def _set_terminal_size(fd: int) -> None:
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", _HEIGHT, _WIDTH, 0, 0))
 
 
-def _drain(fd: int, output: bytearray) -> None:
+def _drain(fd: int, output: bytearray) -> bool:
     try:
         data = os.read(fd, 65_536)
     except OSError:
-        return
+        return False
     output.extend(data)
+    return bool(data)
+
+
+def _wait_for_child_exit(
+    process: subprocess.Popen[bytes], terminal_fd: int, output: bytearray
+) -> None:
+    deadline = time.monotonic() + _TIMEOUT_SECONDS
+    terminal_open = True
+    while process.poll() is None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _raise_smoke_failure("child did not exit after reporting passed", output)
+        if terminal_open:
+            readable, _, _ = select.select([terminal_fd], [], [], min(0.1, remaining))
+            if readable:
+                terminal_open = _drain(terminal_fd, output)
+        else:
+            try:
+                process.wait(timeout=remaining)
+            except subprocess.TimeoutExpired:
+                _raise_smoke_failure("child did not exit after reporting passed", output)
+    if process.returncode:
+        _raise_smoke_failure(f"child exited {process.returncode}", output)
 
 
 def _wait_for_status(
@@ -222,9 +245,7 @@ def _run_parent() -> int:
         )
         if not statuses or statuses[-1] != "passed":
             _raise_smoke_failure(f"drag did not pass: {statuses!r}", output)
-        process.wait(timeout=2)
-        if process.returncode:
-            _raise_smoke_failure(f"child exited {process.returncode}", output)
+        _wait_for_child_exit(process, terminal_master, output)
     finally:
         if process.poll() is None:
             process.terminate()
