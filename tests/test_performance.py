@@ -6,6 +6,8 @@ from datetime import date
 from pathlib import Path
 from time import perf_counter
 
+import pytest
+
 from hcb.benchmarks import create_large_fixture, measure_large_fixture
 from hcb.models import Account, Calendar, DateTimeKind, Event, EventDateTime, Task, TaskList
 from hcb.paths import AppPaths
@@ -64,6 +66,25 @@ def test_outbox_benchmark_reports_completed_delivery_across_page_boundary() -> N
         assert item["runs"] == 2
         assert len(item["samples_seconds"]) == 2
         assert item["median_seconds"] > 0
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="the terminal benchmark requires a Unix PTY")
+def test_tui_startup_benchmark_reaches_a_real_task_frame() -> None:
+    tool = Path(__file__).resolve().parents[1] / "tools/benchmark_tui_startup.py"
+    completed = subprocess.run(
+        [sys.executable, str(tool), "--counts", "20", "--runs", "1"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    result = json.loads(completed.stdout)["results"][0]
+
+    assert result["tasks"] == 20 and result["events"] == 4
+    for metric in ("import_seconds", "headless_ready_seconds", "terminal_first_task_seconds"):
+        summary = result["timings"][metric]
+        assert summary["runs"] == 1
+        assert summary["median_seconds"] > 0
+    assert result["memory"]["headless_peak_rss_bytes"]["median_bytes"] > 0
 
 
 def test_deterministic_large_fixture_local_performance(tmp_path: Path) -> None:

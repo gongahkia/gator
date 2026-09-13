@@ -43,3 +43,5 @@ The [workspace loading profile](workspace-profile.md) records a measured
 hydration bottleneck and the later comparison after a targeted change.
 The [outbox delivery profile](outbox-profile.md) records queue-size scaling,
 the indexed lookup change, and the before/after samples.
+The [TUI startup profile](tui-startup-profile.md) measures fresh-process
+headless readiness and the first task-bearing terminal frame.
