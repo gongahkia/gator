@@ -212,6 +212,11 @@ class CalendarEventRepository(_StorageCore):
         return EventDateTime(DateTimeKind(kind), parsed, zone)
 
     def _event(self, row: sqlite3.Row) -> Event:
+        # canonical empty arrays need no JSON decoding; nonempty values still parse normally.
+        recurrence = row["recurrence"]
+        reminder_overrides = row["reminder_overrides"]
+        attendees = row["attendees"]
+        attachments = row["attachments"]
         return Event(
             id=row["id"],
             account_id=row["account_id"],
@@ -225,21 +230,25 @@ class CalendarEventRepository(_StorageCore):
             description=row["description"],
             location=row["location"],
             status=EventStatus(row["status"]),
-            recurrence=tuple(json.loads(row["recurrence"])),
+            recurrence=() if recurrence == "[]" else tuple(json.loads(recurrence)),
             derived=bool(row["derived"]),
             metadata=_metadata(row),
             reminder_use_default=bool(row["reminder_use_default"]),
-            reminder_overrides=tuple(
-                ReminderOverride(str(item["method"]), int(item["minutes"]))
-                for item in json.loads(row["reminder_overrides"])
+            reminder_overrides=(
+                ()
+                if reminder_overrides == "[]"
+                else tuple(
+                    ReminderOverride(str(item["method"]), int(item["minutes"]))
+                    for item in json.loads(reminder_overrides)
+                )
             ),
-            attendees=tuple(json.loads(row["attendees"])),
+            attendees=() if attendees == "[]" else tuple(json.loads(attendees)),
             attendee_response=row["attendee_response"],
             event_type=row["event_type"],
             transparency=row["transparency"],
             visibility=row["visibility"],
             color_id=row["color_id"],
-            attachments=tuple(json.loads(row["attachments"])),
+            attachments=() if attachments == "[]" else tuple(json.loads(attachments)),
             conference=json.loads(row["conference"]) if row["conference"] else None,
             guests_can_invite_others=(
                 bool(row["guests_can_invite_others"])

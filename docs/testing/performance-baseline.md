@@ -38,3 +38,6 @@ open database, so they are warm-path timings; the one-shot database-open timing
 also benefits from the operating system's file cache. The benchmark does not
 measure Google network latency, OAuth, real account data, or a desktop UI. Keep
 those separate from this local baseline when setting user-facing budgets.
+
+The [workspace loading profile](workspace-profile.md) records a measured
+hydration bottleneck and the later comparison after a targeted change.
