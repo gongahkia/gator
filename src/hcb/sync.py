@@ -6,8 +6,7 @@ import errno
 import os
 import random
 import time
-from collections.abc import Callable
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -413,6 +412,7 @@ class _SyncEngineBase:
         self,
         account_id: str,
         *,
+        full_tasks: bool = False,
         progress: Callable[[str], None] | None = None,
         cancelled: Callable[[], bool] | None = None,
         cancel_hint: str = "Press Ctrl+C to cancel.",
@@ -420,19 +420,28 @@ class _SyncEngineBase:
         """Synchronize an account and report completed stages when requested."""
         with self.sync_ownership():
             return self._sync_owned(
-                account_id, progress=progress, cancelled=cancelled, cancel_hint=cancel_hint
+                account_id,
+                full_tasks=full_tasks,
+                progress=progress,
+                cancelled=cancelled,
+                cancel_hint=cancel_hint,
             )
 
     def _sync_owned(
         self,
         account_id: str,
         *,
+        full_tasks: bool = False,
         progress: Callable[[str], None] | None = None,
         cancelled: Callable[[], bool] | None = None,
         cancel_hint: str = "Press Ctrl+C to cancel.",
     ) -> SyncResult:
         if self.storage.get_account(account_id) is None:
             raise ValueError(f"unknown account {account_id!r}")
+        if full_tasks:
+            for item in self.storage.list_task_lists(account_id):
+                if item.remote_id:
+                    self.storage.delete_cursor(account_id, f"tasks:{item.remote_id}")
         context = self._retry_context(progress, cancelled, cancel_hint)
         result = SyncResult()
         try:

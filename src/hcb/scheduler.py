@@ -13,6 +13,7 @@ from datetime import time as day_time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .errors import SyncBusyError
 from .models import DateTimeKind, Event, EventStatus, Task, TaskStatus, utc_now
 from .notifications import Notification, NotificationAction, Notifier
 from .storage import Storage
@@ -182,6 +183,8 @@ def run_loop(
             ):
                 sync()
                 last_sync = monotonic
+            failures = 0
+        except SyncBusyError:
             failures = 0
         except Exception:
             failures = min(failures + 1, 6)

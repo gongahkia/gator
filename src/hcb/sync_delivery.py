@@ -94,20 +94,20 @@ class DeliverySyncMixin(_SyncEngineBase):
 
     def _recover_interrupted_deliveries_owned(self, account_id: str) -> int:
         conflicts = 0
-        inflight = self.storage.pending_mutations(
+        while inflight := self.storage.pending_mutations(
             account_id, delivery_state=OutboxDeliveryState.SENDING
-        )
-        for mutation in inflight:
-            assert mutation.id is not None
-            if self._non_idempotent_create(mutation):
-                self._quarantine_uncertain_create(mutation, "process stopped while sending")
-                conflicts += 1
-            else:
-                # Event creates carry a deterministic Google event ID. Updates,
-                # deletes, moves and responses are repeatable against a remote ID.
-                self.storage.reset_mutation_pending(
-                    account_id, mutation.id, "recovering interrupted delivery"
-                )
+        ):
+            for mutation in inflight:
+                assert mutation.id is not None
+                if self._non_idempotent_create(mutation):
+                    self._quarantine_uncertain_create(mutation, "process stopped while sending")
+                    conflicts += 1
+                else:
+                    # Event creates carry a deterministic Google event ID. Updates,
+                    # deletes, moves and responses are repeatable against a remote ID.
+                    self.storage.reset_mutation_pending(
+                        account_id, mutation.id, "recovering interrupted delivery"
+                    )
         return conflicts
 
     def flush_outbox(self, account_id: str, *, context: _RetryContext | None = None) -> SyncResult:

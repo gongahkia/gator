@@ -49,8 +49,15 @@ expansion itself.
 
 `hcb sync` is the explicit synchronization boundary. The optional reminder
 process can perform configured periodic pull or full sync. The TUI and daemon
-may coexist through SQLite WAL, bounded transactions, and single-writer
-coordination.
+may coexist through SQLite WAL and bounded transactions. Remote sync, the
+reminder process's pull-only sync, outbox recovery/delivery, and explicit
+recurring-instance refresh hold a nonblocking advisory lock for the local
+database. A competing sync reports that another sync is active before it
+inspects `sending` rows; local reads and edits do not acquire this lock. The
+lock file remains beside SQLite, and the operating system releases the held
+lock when its owning process exits. This mechanism currently requires a local
+filesystem with POSIX advisory locking. Desktop-process and macOS coexistence
+still require acceptance testing.
 
 Automated tests use fake transports for success and API failures. The live
 Google TUI smoke procedure is separate. It was explicitly waived and not run

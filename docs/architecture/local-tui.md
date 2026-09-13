@@ -66,6 +66,9 @@ without making an implicit network request.
 
 Interactive commands and the optional scheduler may coexist. SQLite uses WAL,
 bounded transactions, a busy timeout, and one writer transaction at a time.
+The sync engine also holds a per-database advisory file lock across remote
+sync and outbox delivery, so another process cannot recover its live `sending`
+rows as interrupted deliveries.
 The scheduler is a visible, separately invokable process; opening the TUI does
 not silently install or start a daemon.
 

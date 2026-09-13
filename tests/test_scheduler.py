@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from hcb.errors import SyncBusyError
 from hcb.models import (
     Account,
     Calendar,
@@ -14,7 +15,7 @@ from hcb.models import (
     TaskList,
 )
 from hcb.notifications import Notification, NotificationAction, NotificationPermissionError
-from hcb.scheduler import ReminderScheduler
+from hcb.scheduler import ReminderScheduler, run_loop
 from hcb.storage import Storage
 from hcb.task_recurrence import TaskReminder, serialize_task_notes
 
@@ -144,3 +145,26 @@ def test_task_marker_and_permission_denial_retry(tmp_path: Path) -> None:
         row = store.reminder_delivery_rows("a")[0]
         assert row["attempts"] == 2
         assert row["last_error"] is None
+
+
+def test_busy_sync_does_not_delay_reminder_scans(tmp_path: Path) -> None:
+    path = tmp_path / "db.sqlite"
+    seed(path)
+    delays: list[float] = []
+
+    def busy_sync() -> None:
+        raise SyncBusyError("another sync is active")
+
+    with Storage(path) as store:
+        run_loop(
+            ReminderScheduler(store, FakeNotifier(), now=lambda: NOW),
+            "a",
+            interval=5,
+            sync=busy_sync,
+            sync_interval=1,
+            jitter=0,
+            random_value=lambda: 0,
+            sleep=delays.append,
+            stop=lambda: len(delays) == 2,
+        )
+    assert delays == [5, 5]

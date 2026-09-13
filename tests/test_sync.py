@@ -1,3 +1,6 @@
+import select
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event as ThreadEvent
@@ -559,6 +562,81 @@ def test_active_delivery_is_not_recovered_by_a_second_sync(tmp_path: Path) -> No
     with Storage(path) as completed:
         assert completed.pending_mutations("a") == []
         assert completed.list_conflicts("a") == []
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX advisory sync lock")
+def test_sync_lock_is_process_wide_and_released_on_exit(tmp_path: Path) -> None:
+    path = tmp_path / "process-sync.db"
+    with Storage(path) as storage:
+        child_code = """
+import sys
+from hcb.storage import Storage
+from hcb.sync import SyncEngine
+
+with Storage(sys.argv[1]) as child_storage:
+    with SyncEngine(child_storage, object()).sync_ownership():
+        print('locked', flush=True)
+        sys.stdin.read(1)
+"""
+        child = subprocess.Popen(
+            [sys.executable, "-c", child_code, str(path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            assert child.stdout is not None
+            assert select.select([child.stdout], [], [], 5)[0]
+            assert child.stdout.readline().strip() == "locked"
+            with pytest.raises(SyncBusyError), SyncEngine(storage, FakeGateway()).sync_ownership():
+                pass
+            child.terminate()
+            child.wait(timeout=5)
+            with SyncEngine(storage, FakeGateway()).sync_ownership():
+                pass
+        finally:
+            if child.poll() is None:
+                child.terminate()
+                child.wait(timeout=5)
+
+
+def test_interrupted_delivery_recovery_covers_every_page(store: Storage) -> None:
+    for index in range(101):
+        store.enqueue(
+            PendingMutation(
+                None,
+                "a",
+                EntityType.TASK,
+                f"task-{index}",
+                MutationOperation.CREATE,
+                {"list_id": "list", "body": {"title": f"Task {index}"}},
+                delivery_state=OutboxDeliveryState.SENDING,
+            )
+        )
+
+    assert SyncEngine(store, FakeGateway()).recover_interrupted_deliveries("a") == 101
+    assert store.pending_mutations("a") == []
+    assert len(store.list_conflicts("a")) == 101
+
+
+def test_full_task_cursor_reset_waits_for_sync_ownership(store: Storage) -> None:
+    store.set_cursor(SyncCursor("a", "tasks:list-r", "watermark", NOW))
+    with Storage(store.path) as competing, SyncEngine(store, FakeGateway()).sync_ownership():
+        with pytest.raises(SyncBusyError):
+            SyncEngine(competing, FakeGateway()).sync("a", full_tasks=True)
+        assert store.get_cursor("a", "tasks:list-r").cursor == "watermark"
+
+
+def test_reminder_pull_mode_respects_sync_ownership(store: Storage) -> None:
+    gateway = FakeGateway()
+    with (
+        Storage(store.path) as competing,
+        SyncEngine(store, FakeGateway()).sync_ownership(),
+        pytest.raises(SyncBusyError),
+    ):
+        SyncEngine(competing, gateway).pull_only("a")
+    assert gateway.calls == []
 
 
 def test_crash_before_request_quarantines_non_idempotent_create_on_restart(

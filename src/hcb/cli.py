@@ -1460,13 +1460,10 @@ def sync(
 ) -> None:
     state = _state(ctx)
     account = _account(ctx)
-    if full_tasks:
-        for item in state.runtime.storage.list_task_lists(account):
-            if item.remote_id:
-                state.runtime.storage.delete_cursor(account, f"tasks:{item.remote_id}")
     try:
         result = state.runtime.sync_engine(account).sync(
             account,
+            full_tasks=full_tasks,
             progress=lambda status: click.echo(status, err=True),
             cancel_hint="Press Ctrl+C to cancel.",
         )
