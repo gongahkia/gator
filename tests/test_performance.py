@@ -1,4 +1,7 @@
 import asyncio
+import json
+import subprocess
+import sys
 from datetime import date
 from pathlib import Path
 from time import perf_counter
@@ -9,6 +12,41 @@ from hcb.paths import AppPaths
 from hcb.runtime import Runtime
 from hcb.storage import Storage
 from hcb.tui import HcbApp, WorkspaceTable
+
+
+def test_benchmark_report_measures_repeated_services_and_large_outbox() -> None:
+    tool = Path(__file__).resolve().parents[1] / "tools/benchmark_python.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(tool),
+            "--tasks",
+            "120",
+            "--events",
+            "10",
+            "--runs",
+            "2",
+            "--outbox-writes",
+            "105",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    report = json.loads(completed.stdout)
+
+    assert report["fixture"]["tasks"] == 120
+    assert report["fixture"]["outbox_writes_per_run"] == 105
+    assert report["service_timings"].keys() == {
+        "cli_startup",
+        "search",
+        "workspace",
+        "outbox_flush",
+    }
+    for summary in report["service_timings"].values():
+        assert summary["runs"] == 2
+        assert len(summary["samples_seconds"]) == 2
+        assert summary["max_seconds"] >= summary["median_seconds"] > 0
 
 
 def test_deterministic_large_fixture_local_performance(tmp_path: Path) -> None:
