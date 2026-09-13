@@ -1,8 +1,9 @@
 # Live Google TUI/CLI smoke
 
-Status for the current validation: **external gate not executed**. A missing
-credential path or disposable account is not a pass. Update only the redacted
-attestation section after completing every step.
+Status for the current validation: **full external gate not executed**. A limited
+read-only preflight is recorded below; it does not pass the disposable-account
+acceptance gate. Update only the redacted attestation section after completing
+every step of the full procedure.
 
 Use a disposable Google account and user-owned Cloud project. Never record client
 IDs, client secrets, tokens, authorization codes, account email/subject, remote IDs,
@@ -113,3 +114,21 @@ Current result:
 - Free-busy/reminders/conflicts/offline: **not executed**
 - Disconnect/reset: **not executed**
 - Overall live gate: **not passed**
+
+## Read-only preflight
+
+This limited run used an existing account that is **not disposable**. No Google
+create, update, delete, revocation, or reset operation was run. Its results do
+not change the full-gate statuses above.
+
+- Candidate commit: `821107ca1`
+- Package version: `0.2.0`
+- Platform: Fedora Linux 43, Linux `7.1.12-100.fc43.x86_64`, Python `3.12.13`
+- Completed: `2026-09-13 05:59 UTC`
+- Tester role: automated local read-only preflight
+- Credential parsing, permissions, keyring decryption, refresh, and requested scopes: **passed**
+- Google Tasks, Calendar, and Drive read-only API reachability: **passed**
+- Isolated initial and incremental pull with no queued writes: **passed**
+- Offline cached task, agenda, search, and TUI Tasks/Agenda reads: **passed**
+- Plaintext credential scan of local config, diagnostics, and SQLite dump: **passed**
+- Disposable-account writes, conflict recovery, revocation, reset, and macOS acceptance: **not executed**
