@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime
 from typing import Any
 
@@ -61,23 +62,24 @@ class SyncStateRepository(_StorageCore):
             ORDER BY id LIMIT ?""",  # noqa: S608
             arguments,
         )
-        return [
-            PendingMutation(
-                row["id"],
-                row["account_id"],
-                EntityType(row["entity_type"]),
-                row["entity_id"],
-                MutationOperation(row["operation"]),
-                json.loads(row["payload"]),
-                datetime.fromisoformat(row["created_at"]),
-                row["attempts"],
-                row["last_error"],
-                OutboxDeliveryState(row["delivery_state"]),
-                row["request_id"],
-                _datetime(row["sending_started_at"]),
-            )
-            for row in rows
-        ]
+        return [self._mutation_from_row(row) for row in rows]
+
+    @staticmethod
+    def _mutation_from_row(row: sqlite3.Row) -> PendingMutation:
+        return PendingMutation(
+            row["id"],
+            row["account_id"],
+            EntityType(row["entity_type"]),
+            row["entity_id"],
+            MutationOperation(row["operation"]),
+            json.loads(row["payload"]),
+            datetime.fromisoformat(row["created_at"]),
+            row["attempts"],
+            row["last_error"],
+            OutboxDeliveryState(row["delivery_state"]),
+            row["request_id"],
+            _datetime(row["sending_started_at"]),
+        )
 
     def pending_mutation_count(self, account_id: str) -> int:
         row = self.connection.execute(
@@ -86,14 +88,10 @@ class SyncStateRepository(_StorageCore):
         return int(row[0])
 
     def get_mutation(self, account_id: str, mutation_id: int) -> PendingMutation | None:
-        return next(
-            (
-                item
-                for item in self.pending_mutations(account_id, limit=1_000_000)
-                if item.id == mutation_id
-            ),
-            None,
-        )
+        row = self.connection.execute(
+            "SELECT * FROM outbox WHERE account_id=? AND id=?", (account_id, mutation_id)
+        ).fetchone()
+        return self._mutation_from_row(row) if row is not None else None
 
     def mark_mutation_sending(
         self,

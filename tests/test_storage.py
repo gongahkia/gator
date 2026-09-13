@@ -14,6 +14,7 @@ from hcb.models import (
     EventDateTime,
     Metadata,
     MutationOperation,
+    OutboxDeliveryState,
     PendingMutation,
     SyncCursor,
     Task,
@@ -171,3 +172,33 @@ def test_outbox_cursor_conflict_reminder_and_transaction(store: Storage) -> None
         store.upsert_task(Task("rolled-back", "a", "list", "No"))
         raise RuntimeError("stop")
     assert store.get_task("a", "rolled-back") is None
+
+
+def test_get_mutation_reads_later_pages_and_preserves_account_and_delivery_state(
+    store: Storage,
+) -> None:
+    seed(store, "a")
+    seed(store, "b")
+    mutation_id = 0
+    for index in range(101):
+        mutation_id = store.enqueue(
+            PendingMutation(
+                None,
+                "a",
+                EntityType.TASK,
+                f"task-{index}",
+                MutationOperation.UPDATE,
+                {"body": {"title": f"Updated {index}"}},
+            )
+        )
+    started_at = datetime.now(UTC)
+    store.mark_mutation_sending("a", mutation_id, request_id="request-101", started_at=started_at)
+
+    mutation = store.get_mutation("a", mutation_id)
+    assert mutation is not None
+    assert mutation == store.pending_mutations("a", limit=101)[-1]
+    assert mutation.delivery_state is OutboxDeliveryState.SENDING
+    assert mutation.request_id == "request-101"
+    assert mutation.sending_started_at == started_at
+    assert store.get_mutation("b", mutation_id) is None
+    assert store.get_mutation("a", mutation_id + 1) is None

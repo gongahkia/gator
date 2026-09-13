@@ -49,6 +49,23 @@ def test_benchmark_report_measures_repeated_services_and_large_outbox() -> None:
         assert summary["max_seconds"] >= summary["median_seconds"] > 0
 
 
+def test_outbox_benchmark_reports_completed_delivery_across_page_boundary() -> None:
+    tool = Path(__file__).resolve().parents[1] / "tools/benchmark_outbox.py"
+    completed = subprocess.run(
+        [sys.executable, str(tool), "--counts", "101", "250", "--runs", "2"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    report = json.loads(completed.stdout)
+
+    assert [item["writes"] for item in report["results"]] == [101, 250]
+    for item in report["results"]:
+        assert item["runs"] == 2
+        assert len(item["samples_seconds"]) == 2
+        assert item["median_seconds"] > 0
+
+
 def test_deterministic_large_fixture_local_performance(tmp_path: Path) -> None:
     database = tmp_path / "large.db"
     create_large_fixture(database)
