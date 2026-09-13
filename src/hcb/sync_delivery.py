@@ -89,6 +89,10 @@ class DeliverySyncMixin(_SyncEngineBase):
 
     def recover_interrupted_deliveries(self, account_id: str) -> int:
         """Recover persisted ``sending`` rows without blindly replaying creates."""
+        with self.sync_ownership():
+            return self._recover_interrupted_deliveries_owned(account_id)
+
+    def _recover_interrupted_deliveries_owned(self, account_id: str) -> int:
         conflicts = 0
         inflight = self.storage.pending_mutations(
             account_id, delivery_state=OutboxDeliveryState.SENDING
@@ -107,6 +111,12 @@ class DeliverySyncMixin(_SyncEngineBase):
         return conflicts
 
     def flush_outbox(self, account_id: str, *, context: _RetryContext | None = None) -> SyncResult:
+        with self.sync_ownership():
+            return self._flush_outbox_owned(account_id, context=context)
+
+    def _flush_outbox_owned(
+        self, account_id: str, *, context: _RetryContext | None = None
+    ) -> SyncResult:
         context = context or self._retry_context()
         pushed = 0
         conflicts = self.recover_interrupted_deliveries(account_id)

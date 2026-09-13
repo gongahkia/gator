@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event as ThreadEvent
+from threading import Thread
 
 import pytest
 
@@ -8,6 +10,7 @@ from hcb.errors import (
     AuthenticationRequired,
     GoogleApiError,
     RequestNotSentError,
+    SyncBusyError,
     TransientTransportError,
 )
 from hcb.google_client import Page
@@ -516,6 +519,46 @@ def _seed_crash_database(path: Path, *, entity_type: EntityType) -> str:
             )
         )
     return "local"
+
+
+def test_active_delivery_is_not_recovered_by_a_second_sync(tmp_path: Path) -> None:
+    path = tmp_path / "overlapping-sync.db"
+    _seed_crash_database(path, entity_type=EntityType.TASK)
+    started = ThreadEvent()
+    release = ThreadEvent()
+    failures: list[BaseException] = []
+
+    class BlockingGateway(FakeGateway):
+        def create_task(self, task_list_id, body):
+            started.set()
+            if not release.wait(5):
+                raise TimeoutError("blocked Google request was not released")
+            return super().create_task(task_list_id, body)
+
+    def deliver() -> None:
+        try:
+            with Storage(path) as active:
+                SyncEngine(active, BlockingGateway()).flush_outbox("a")
+        except BaseException as error:
+            failures.append(error)
+
+    worker = Thread(target=deliver)
+    worker.start()
+    try:
+        assert started.wait(5)
+        with Storage(path) as competing:
+            with pytest.raises(SyncBusyError):
+                SyncEngine(competing, FakeGateway()).flush_outbox("a")
+            assert competing.pending_mutations("a")[0].delivery_state is OutboxDeliveryState.SENDING
+            assert competing.list_conflicts("a") == []
+    finally:
+        release.set()
+        worker.join(5)
+    assert not worker.is_alive()
+    assert failures == []
+    with Storage(path) as completed:
+        assert completed.pending_mutations("a") == []
+        assert completed.list_conflicts("a") == []
 
 
 def test_crash_before_request_quarantines_non_idempotent_create_on_restart(

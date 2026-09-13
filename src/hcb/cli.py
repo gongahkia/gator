@@ -2234,7 +2234,7 @@ def daemon_run(
             if preferences.reminder_sync_mode == "pull":
 
                 def pull_sync() -> object:
-                    return engine.sync_task_lists(account), engine.sync_calendars(account)
+                    return engine.pull_only(account)
 
                 sync_callback = pull_sync
             else:

@@ -48,6 +48,10 @@ class ConflictError(HcbError):
     exit_code = ExitCode.CONFLICT
 
 
+class SyncBusyError(ConflictError):
+    """Another process owns synchronization for this local database."""
+
+
 class StorageError(HcbError):
     exit_code = ExitCode.STORAGE_FAILURE
 

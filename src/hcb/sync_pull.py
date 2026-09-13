@@ -285,6 +285,12 @@ class PullSyncMixin(_SyncEngineBase):
         self, account_id: str, calendar_id: str, start: datetime, end: datetime
     ) -> list[Event]:
         """Fetch an explicit remote range and persist recurring instances locally."""
+        with self.sync_ownership():
+            return self._refresh_occurrences_owned(account_id, calendar_id, start, end)
+
+    def _refresh_occurrences_owned(
+        self, account_id: str, calendar_id: str, start: datetime, end: datetime
+    ) -> list[Event]:
         calendar = self.storage.get_calendar(account_id, calendar_id)
         if calendar is None or calendar.remote_id is None:
             raise ValueError("calendar is not synchronized")

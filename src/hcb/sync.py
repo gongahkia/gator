@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import errno
+import os
 import random
 import time
 from collections.abc import Callable
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
+from threading import RLock
 from typing import TypeVar
 
 from .errors import (
+    ConfigurationError,
     GoogleApiError,
     RequestNotSentError,
+    StorageError,
+    SyncBusyError,
     TransientTransportError,
 )
 from .google_client import GoogleGateway, Json
@@ -282,6 +290,53 @@ class _SyncEngineBase:
         self.max_retry_delay = max_retry_delay
         self.random_source = random_source
         self.wait_for_retry = wait_for_retry or self._wait_for_retry
+        self._sync_guard = RLock()
+        self._sync_depth = 0
+
+    @contextmanager
+    def sync_ownership(self) -> Iterator[None]:
+        """Own this database's sync work across threads and processes."""
+        if not self._sync_guard.acquire(blocking=False):
+            raise SyncBusyError("Another HCB sync is active; try again when it finishes")
+        try:
+            if self._sync_depth:
+                self._sync_depth += 1
+                try:
+                    yield
+                finally:
+                    self._sync_depth -= 1
+                return
+            try:
+                import fcntl
+            except ImportError as error:
+                raise ConfigurationError("Process-level sync locking requires POSIX") from error
+            database_path = self.storage.path.resolve()
+            lock_path = database_path.with_name(database_path.name + ".sync.lock")
+            flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+            flags |= getattr(os, "O_NOFOLLOW", 0)
+            try:
+                descriptor = os.open(lock_path, flags, 0o600)
+            except OSError as error:
+                raise StorageError(f"Cannot open sync lock: {error}") from error
+            try:
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError as error:
+                    if error.errno in {errno.EACCES, errno.EAGAIN}:
+                        raise SyncBusyError(
+                            "Another HCB sync is active; try again when it finishes"
+                        ) from error
+                    raise StorageError(f"Cannot acquire sync lock: {error}") from error
+                self._sync_depth = 1
+                try:
+                    yield
+                finally:
+                    self._sync_depth = 0
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+            finally:
+                os.close(descriptor)
+        finally:
+            self._sync_guard.release()
 
     @staticmethod
     def _wait_for_retry(delay: float, cancelled: Callable[[], bool]) -> bool:
@@ -363,7 +418,19 @@ class _SyncEngineBase:
         cancel_hint: str = "Press Ctrl+C to cancel.",
     ) -> SyncResult:
         """Synchronize an account and report completed stages when requested."""
+        with self.sync_ownership():
+            return self._sync_owned(
+                account_id, progress=progress, cancelled=cancelled, cancel_hint=cancel_hint
+            )
 
+    def _sync_owned(
+        self,
+        account_id: str,
+        *,
+        progress: Callable[[str], None] | None = None,
+        cancelled: Callable[[], bool] | None = None,
+        cancel_hint: str = "Press Ctrl+C to cancel.",
+    ) -> SyncResult:
         if self.storage.get_account(account_id) is None:
             raise ValueError(f"unknown account {account_id!r}")
         context = self._retry_context(progress, cancelled, cancel_hint)
@@ -438,3 +505,8 @@ from .sync_pull import PullSyncMixin  # noqa: E402
 
 class SyncEngine(PullSyncMixin, DeliverySyncMixin):
     """Resumable, account-partitioned synchronization with Google."""
+
+    def pull_only(self, account_id: str) -> tuple[SyncResult, SyncResult]:
+        """Run the reminder process's pull mode under one sync owner."""
+        with self.sync_ownership():
+            return self.sync_task_lists(account_id), self.sync_calendars(account_id)
