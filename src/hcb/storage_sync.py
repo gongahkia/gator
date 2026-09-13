@@ -23,10 +23,11 @@ from .storage import _datetime, _iso, _StorageCore
 class SyncStateRepository(_StorageCore):
     def enqueue(self, mutation: PendingMutation) -> int:
         cursor = self.connection.execute(
-            """INSERT INTO outbox(account_id,entity_type,entity_id,operation,payload,created_at,
+            """INSERT INTO outbox(id,account_id,entity_type,entity_id,operation,payload,created_at,
             attempts,last_error,delivery_state,request_id,sending_started_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
+                mutation.id,
                 mutation.account_id,
                 mutation.entity_type.value,
                 mutation.entity_id,

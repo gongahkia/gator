@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -103,3 +105,50 @@ def test_historical_databases_migrate_to_current_without_data_loss(
     with Storage(path) as repeated:
         assert repeated.connection.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         assert repeated.get_task_list("legacy", "inbox") is not None
+
+
+def test_failed_migration_leaves_original_schema_retryable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "failed-migration.db"
+    _legacy_database(path, 7)
+    monkeypatch.setattr(
+        storage_module,
+        "_MIGRATION_8",
+        storage_module._MIGRATION_8 + "\nSELECT * FROM missing_migration_table;\n",
+    )
+
+    with pytest.raises(sqlite3.OperationalError, match="missing_migration_table"):
+        Storage(path)
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert (
+            connection.execute(
+                "SELECT name FROM sqlite_master WHERE name='workspace_search_documents'"
+            ).fetchone()
+            is None
+        )
+
+
+def test_two_concurrent_openers_can_migrate_one_legacy_database(tmp_path: Path) -> None:
+    path = tmp_path / "concurrent-migration.db"
+    _legacy_database(path, 7)
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA journal_mode = WAL")
+    ready = Barrier(2)
+
+    class ContendedStorage(Storage):
+        def transaction(self):
+            if not getattr(self, "_migration_started", False):
+                self._migration_started = True
+                ready.wait(timeout=5)
+            return super().transaction()
+
+    def open_database() -> int:
+        with ContendedStorage(path) as storage:
+            return int(storage.connection.execute("PRAGMA user_version").fetchone()[0])
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(open_database) for _ in range(2)]
+        assert [future.result(timeout=10) for future in futures] == [SCHEMA_VERSION] * 2

@@ -98,10 +98,12 @@ class HistoryServiceMixin(_ApplicationServiceBase):
         entity_type = EntityType(str(mutation.get("entity_type")))
         entity_id = str(mutation.get("entity_id") or "")
         payload = mutation.get("payload")
+        original_id = mutation.get("id")
         if (
             operation not in {MutationOperation.CREATE, MutationOperation.MOVE}
             or not entity_id
             or not isinstance(payload, dict)
+            or (original_id is not None and (type(original_id) is not int or original_id <= 0))
         ):
             raise ValueError("uncertain-delivery conflict has invalid local intent")
         normalized = action.casefold()
@@ -113,9 +115,16 @@ class HistoryServiceMixin(_ApplicationServiceBase):
         status = ConflictStatus.KEEP_LOCAL if normalized == "retry" else ConflictStatus.KEEP_REMOTE
         with self.storage.transaction():
             if normalized == "retry":
+                if original_id is None:
+                    # Conflicts written before the original ID was recorded still
+                    # need the create ahead of edits that were already queued.
+                    first_id = self.storage.connection.execute(
+                        "SELECT MIN(id) FROM outbox"
+                    ).fetchone()[0]
+                    original_id = first_id - 1 if first_id is not None else None
                 self.storage.enqueue(
                     PendingMutation(
-                        None,
+                        original_id,
                         account_id,
                         entity_type,
                         entity_id,
@@ -131,10 +140,15 @@ class HistoryServiceMixin(_ApplicationServiceBase):
                 }.get(entity_type)
                 if table is None:
                     raise ValueError("delivered reconciliation is unsupported for this entity")
+                later_edit = self.storage.connection.execute(
+                    """SELECT 1 FROM outbox WHERE account_id=? AND entity_type=? AND entity_id=?
+                    LIMIT 1""",
+                    (account_id, entity_type.value, entity_id),
+                ).fetchone()
                 cursor = self.storage.connection.execute(
-                    f"""UPDATE {table} SET remote_id=?,dirty=0
+                    f"""UPDATE {table} SET remote_id=?,dirty=?
                     WHERE account_id=? AND id=?""",  # noqa: S608
-                    (remote_id, account_id, entity_id),
+                    (remote_id, int(later_edit is not None), account_id, entity_id),
                 )
                 if cursor.rowcount != 1:
                     raise NotFoundError(f"{entity_type.value} {entity_id!r} does not exist")

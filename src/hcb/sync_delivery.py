@@ -61,6 +61,7 @@ class DeliverySyncMixin(_SyncEngineBase):
         return {
             "kind": "uncertain-delivery",
             "mutation": {
+                "id": mutation.id,
                 "entity_type": mutation.entity_type.value,
                 "entity_id": mutation.entity_id,
                 "operation": mutation.operation.value,
@@ -127,6 +128,11 @@ class DeliverySyncMixin(_SyncEngineBase):
         context = context or self._retry_context()
         pushed = 0
         conflicts = self.recover_interrupted_deliveries(account_id)
+        if any(
+            conflict.local_payload.get("kind") == "uncertain-delivery"
+            for conflict in self.storage.list_conflicts(account_id)
+        ):
+            return self._uncertain_delivery_pause(pushed, conflicts)
         for mutation in self._pending_outbox(account_id):
             assert mutation.id is not None
             request_id = mutation.request_id
@@ -190,7 +196,7 @@ class DeliverySyncMixin(_SyncEngineBase):
                         sending, "transport ended before Google confirmed delivery"
                     )
                     conflicts += 1
-                    continue
+                    return self._uncertain_delivery_pause(pushed, conflicts)
                 self.storage.fail_mutation(account_id, mutation.id, str(exc))
                 raise
             except GoogleApiError as exc:
@@ -206,7 +212,7 @@ class DeliverySyncMixin(_SyncEngineBase):
                         sending, f"Google returned ambiguous status {exc.status}"
                     )
                     conflicts += 1
-                    continue
+                    return self._uncertain_delivery_pause(pushed, conflicts)
                 elif exc.status in {401, 403} and exc.reason not in RATE_LIMIT_REASONS:
                     self.storage.fail_mutation(account_id, mutation.id, str(exc))
                     raise AuthenticationRequired(
@@ -244,6 +250,18 @@ class DeliverySyncMixin(_SyncEngineBase):
                 self.storage.complete_mutation(account_id, mutation.id)
             pushed += 1
         return SyncResult(pushed=pushed, conflicts=conflicts)
+
+    @staticmethod
+    def _uncertain_delivery_pause(pushed: int, conflicts: int) -> SyncResult:
+        return SyncResult(
+            pushed=pushed,
+            conflicts=conflicts,
+            retry_pending=True,
+            retry_message=(
+                "Sync paused for uncertain Google delivery. Verify the remote result, "
+                "then mark it delivered or choose retry before sending more changes."
+            ),
+        )
 
     def _remote_list(self, account_id: str, value: str) -> str:
         item = self.storage.get_task_list(account_id, value)

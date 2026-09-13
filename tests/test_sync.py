@@ -732,6 +732,42 @@ def test_crash_before_request_quarantines_non_idempotent_create_on_restart(
         assert conflict.local_payload["kind"] == "uncertain-delivery"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX advisory sync lock")
+def test_abrupt_process_exit_releases_owner_and_preserves_uncertain_create(tmp_path: Path) -> None:
+    path = tmp_path / "abrupt-exit.db"
+    _seed_crash_database(path, entity_type=EntityType.TASK)
+    child_code = """
+import os
+import sys
+from hcb.storage import Storage
+from hcb.sync import SyncEngine
+
+def crash(phase, _mutation):
+    if phase == 'before-request':
+        os._exit(17)
+
+with Storage(sys.argv[1]) as storage:
+    SyncEngine(storage, object(), crash_hook=crash).flush_outbox('a')
+"""
+    child = subprocess.run(
+        [sys.executable, "-c", child_code, str(path)],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    assert child.returncode == 17, child.stderr
+
+    gateway = FakeGateway()
+    with Storage(path) as restarted:
+        assert restarted.pending_mutations("a")[0].delivery_state is OutboxDeliveryState.SENDING
+        result = SyncEngine(restarted, gateway).flush_outbox("a")
+        assert result.conflicts == 1 and result.retry_pending
+        assert restarted.pending_mutations("a") == []
+        assert restarted.list_conflicts("a")[0].local_payload["kind"] == "uncertain-delivery"
+    assert not [call for call in gateway.calls if call[0] == "create-task"]
+
+
 def test_crash_after_task_success_does_not_blindly_retry_and_can_mark_delivered(
     tmp_path: Path,
 ) -> None:
@@ -776,6 +812,93 @@ def test_user_can_retry_create_after_verifying_it_was_not_delivered(tmp_path: Pa
         conflict = restarted.list_conflicts("a")[0]
         ApplicationService(restarted).resolve_uncertain_delivery("a", conflict.id, "retry")
         assert len(restarted.pending_mutations("a")) == 1
+        assert SyncEngine(restarted, gateway).flush_outbox("a").pushed == 1
+        assert restarted.pending_mutations("a") == []
+    assert len([call for call in gateway.calls if call[0] == "create-task"]) == 1
+
+
+def test_interrupted_create_holds_later_edits_until_reconciled(tmp_path: Path) -> None:
+    path = tmp_path / "dependent-edits.db"
+    _seed_crash_database(path, entity_type=EntityType.TASK)
+    with Storage(path) as storage:
+        original_create_id = storage.pending_mutations("a")[0].id
+        storage.enqueue(
+            PendingMutation(
+                None,
+                "a",
+                EntityType.TASK,
+                "local",
+                MutationOperation.UPDATE,
+                {"list_id": "list", "body": {"title": "Edited offline"}},
+            )
+        )
+    gateway = FakeGateway()
+    updates: list[tuple[object, ...]] = []
+
+    def update_task(*args: object, **_kwargs: object) -> dict[str, str]:
+        updates.append(args)
+        return {"id": str(args[1])}
+
+    gateway.update_task = update_task
+
+    def crash(phase: str, _mutation: PendingMutation) -> None:
+        if phase == "before-request":
+            raise RuntimeError("stopped before request")
+
+    with Storage(path) as active, pytest.raises(RuntimeError, match="stopped before request"):
+        SyncEngine(active, gateway, crash_hook=crash).flush_outbox("a")
+
+    with Storage(path) as restarted:
+        result = SyncEngine(restarted, gateway).flush_outbox("a")
+        assert result.conflicts == 1
+        assert result.retry_pending
+        assert updates == []
+        assert [row.operation for row in restarted.pending_mutations("a")] == [
+            MutationOperation.UPDATE
+        ]
+        assert SyncEngine(restarted, gateway).flush_outbox("a").retry_pending
+        conflict = restarted.list_conflicts("a")[0]
+        ApplicationService(restarted).resolve_uncertain_delivery("a", conflict.id, "retry")
+        assert [row.id for row in restarted.pending_mutations("a")] == [
+            original_create_id,
+            original_create_id + 1,
+        ]
+        resumed = SyncEngine(restarted, gateway).flush_outbox("a")
+        assert resumed.pushed == 2
+        assert updates == [("list-r", "task-r", {"title": "Edited offline"})]
+        assert restarted.pending_mutations("a") == []
+
+
+def test_delivered_reconciliation_keeps_later_edits_dirty_until_sent(tmp_path: Path) -> None:
+    path = tmp_path / "delivered-then-edited.db"
+    _seed_crash_database(path, entity_type=EntityType.TASK)
+    with Storage(path) as storage:
+        storage.enqueue(
+            PendingMutation(
+                None,
+                "a",
+                EntityType.TASK,
+                "local",
+                MutationOperation.UPDATE,
+                {"list_id": "list", "body": {"title": "Later edit"}},
+            )
+        )
+    gateway = FakeGateway()
+
+    def crash(phase: str, _mutation: PendingMutation) -> None:
+        if phase == "after-remote-success":
+            raise RuntimeError("response not recorded")
+
+    with Storage(path) as active, pytest.raises(RuntimeError, match="response not recorded"):
+        SyncEngine(active, gateway, crash_hook=crash).flush_outbox("a")
+    with Storage(path) as restarted:
+        assert SyncEngine(restarted, gateway).flush_outbox("a").retry_pending
+        conflict = restarted.list_conflicts("a")[0]
+        ApplicationService(restarted).resolve_uncertain_delivery(
+            "a", conflict.id, "delivered", remote_id="task-r"
+        )
+        task = restarted.get_task("a", "local")
+        assert task is not None and task.metadata.dirty
         assert SyncEngine(restarted, gateway).flush_outbox("a").pushed == 1
         assert restarted.pending_mutations("a") == []
     assert len([call for call in gateway.calls if call[0] == "create-task"]) == 1

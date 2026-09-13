@@ -495,10 +495,25 @@ class _StorageCore:
         self.path = target
         self.connection = sqlite3.connect(target, isolation_level=None)
         self.connection.row_factory = sqlite3.Row
-        self.connection.execute("PRAGMA foreign_keys = ON")
-        self.connection.execute("PRAGMA busy_timeout = 5000")
-        self.connection.execute("PRAGMA journal_mode = WAL")
-        self._migrate()
+        try:
+            self.connection.execute("PRAGMA foreign_keys = ON")
+            self.connection.execute("PRAGMA busy_timeout = 5000")
+            self.connection.execute("PRAGMA journal_mode = WAL")
+            self._migrate()
+        except BaseException:
+            self.connection.close()
+            raise
+
+    def _execute_schema_script(self, script: str) -> None:
+        # executescript() commits an open transaction before running the script.
+        statement = ""
+        for line in script.splitlines(keepends=True):
+            statement += line
+            if sqlite3.complete_statement(statement):
+                self.connection.execute(statement)
+                statement = ""
+        if statement.strip():
+            raise ValueError("incomplete migration SQL")
 
     def _migrate(self) -> None:
         version = int(self.connection.execute("PRAGMA user_version").fetchone()[0])
@@ -506,45 +521,29 @@ class _StorageCore:
             raise RuntimeError(
                 f"database schema {version} is newer than supported {SCHEMA_VERSION}"
             )
-        if version == 0:
-            with self.transaction():
-                self.connection.executescript(_SCHEMA)
-                self.connection.execute("PRAGMA user_version = 1")
-            version = 1
-        if version == 1:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_2)
-                self.connection.execute("PRAGMA user_version = 2")
-            version = 2
-        if version == 2:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_3)
-                self.connection.execute("PRAGMA user_version = 3")
-            version = 3
-        if version == 3:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_4)
-                self.connection.execute("PRAGMA user_version = 4")
-            version = 4
-        if version == 4:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_5)
-                self.connection.execute("PRAGMA user_version = 5")
-            version = 5
-        if version == 5:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_6)
-                self.connection.execute("PRAGMA user_version = 6")
-            version = 6
-        if version == 6:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_7)
-                self.connection.execute("PRAGMA user_version = 7")
-            version = 7
-        if version == 7:
-            with self.transaction():
-                self.connection.executescript(_MIGRATION_8)
-                self.connection.execute("PRAGMA user_version = 8")
+        if version == SCHEMA_VERSION:
+            return
+        scripts = (
+            _SCHEMA,
+            _MIGRATION_2,
+            _MIGRATION_3,
+            _MIGRATION_4,
+            _MIGRATION_5,
+            _MIGRATION_6,
+            _MIGRATION_7,
+            _MIGRATION_8,
+        )
+        with self.transaction():
+            # Another process may have completed the migration while we waited
+            # for SQLite's writer lock.
+            version = int(self.connection.execute("PRAGMA user_version").fetchone()[0])
+            if version > SCHEMA_VERSION:
+                raise RuntimeError(
+                    f"database schema {version} is newer than supported {SCHEMA_VERSION}"
+                )
+            for next_version in range(version + 1, SCHEMA_VERSION + 1):
+                self._execute_schema_script(scripts[next_version - 1])
+                self.connection.execute(f"PRAGMA user_version = {next_version}")
 
     def close(self) -> None:
         self.connection.close()
