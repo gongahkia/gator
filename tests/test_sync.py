@@ -194,6 +194,34 @@ def test_initial_and_incremental_task_sync_uses_overlap(store):
     assert gateway.calls[-1][-1] == "2026-08-21T07:55:00Z"
 
 
+def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Storage) -> None:
+    store.upsert_task(Task("child", "a", "list", "Child", remote_id="child-r"))
+    gateway = FakeGateway()
+    gateway.task_list_pages = {
+        None: Page(({"id": "list-r", "title": "Inbox", "etag": '"list-1"'},))
+    }
+    engine = SyncEngine(store, gateway)
+
+    def child_document() -> tuple[int, str]:
+        row = store.connection.execute(
+            """SELECT id,list_name FROM workspace_search_documents
+            WHERE account_id='a' AND kind='task' AND entity_id='child'"""
+        ).fetchone()
+        return row["id"], row["list_name"]
+
+    engine.sync_task_lists("a")
+    original_document = child_document()
+    engine.sync_task_lists("a")
+    assert child_document() == original_document
+
+    gateway.task_list_pages = {
+        None: Page(({"id": "list-r", "title": "Renamed", "etag": '"list-2"'},))
+    }
+    engine.sync_task_lists("a")
+    assert child_document()[1] == "Renamed"
+    assert store.get_task_list("a", "list").metadata.etag == '"list-2"'
+
+
 def test_sync_reports_completed_stages(store):
     stages: list[str] = []
 
