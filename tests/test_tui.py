@@ -1697,11 +1697,18 @@ def test_onboarding_connect_waits_for_explicit_confirmation(tmp_path: Path) -> N
         app.screen.query_one("#onboard-account", Input).value = "google"
         app.screen.query_one("#onboard-email", Input).value = "google@example.test"
         await pilot.click("#onboard-connect")  # type: ignore[attr-defined]
-        await pilot.pause()  # type: ignore[attr-defined]
+        for _ in range(200):
+            if isinstance(app.screen, ConfirmScreen):
+                break
+            await pilot.pause(0.01)  # type: ignore[attr-defined]
         assert calls == []
+        assert isinstance(app.screen, ConfirmScreen)
         assert app.screen.query_one("#confirm", Button).label == "Connect"
         await pilot.press("y")  # type: ignore[attr-defined]
-        await pilot.pause()  # type: ignore[attr-defined]
+        for _ in range(200):
+            if calls:
+                break
+            await pilot.pause(0.01)  # type: ignore[attr-defined]
         assert calls == ["google"]
 
     app_test(app, actions)
