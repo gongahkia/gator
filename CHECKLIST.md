@@ -12,7 +12,7 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
 
 ## First: establish a reliable baseline
 
-- [ ] Restore a green local and CI baseline. The month-grid rendering test currently fails reproducibly; the calendar mouse smoke reports a successful drag but times out while the child process exits.
+- [x] Restore a green Fedora local baseline with `make local-ci`: format, lint, type check, tests, build, isolated wheel smoke, and terminal mouse smoke. Install the versioned pre-push hook with `make install-hooks` in each clone.
 - [ ] Document bring-your-own OAuth setup for a disposable Google Cloud desktop client and test account: consent screen, test users, API enablement, scopes, and troubleshooting without collecting credentials.
 - [ ] Run and record the [live Google acceptance procedure](docs/testing/live-google-tui-smoke.md) with disposable accounts on both Linux and macOS. Cover initial and incremental pull; offline task and event writes; conflict-policy modes; task lists, notes projection, recurrence, search, and bulk mutations. Check the resulting data in Google Tasks and Calendar after each mutation class.
 - [ ] Exercise expired tokens, revoked access, network loss, quota/retry, stale ETags, invalid Calendar sync tokens, and restart recovery. Preserve a redacted manual acceptance record; incomplete live acceptance blocks release promotion.
@@ -31,7 +31,7 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
 
 ## Make Linux and macOS releases dependable
 
-- [ ] Add Linux and macOS CI and installed-artifact smoke coverage, including supported architectures and credential-free checks. Keep platform-specific manual acceptance documented.
+- [ ] Add independently run Linux and macOS CI and installed-artifact smoke coverage, including supported architectures and credential-free checks. The local pre-push gate does not publish a remote check status. Keep platform-specific manual acceptance documented.
 - [ ] Provide desktop reminders and background scheduling on Linux; verify macOS notification and LaunchAgent behavior after the app exits. The current Linux notifier writes to stderr.
 - [ ] Choose Linux distribution format(s) and validate sandbox access to the keyring, local data, OAuth loopback callback, notifications, and file import/export.
 - [ ] Produce versioned, deterministic CLI and desktop artifacts for supported architectures, with checksums and installed-app smoke checks. Verify first launch, download/update, upgrade, downgrade/migration policy, and uninstall/cache behavior.

@@ -913,7 +913,8 @@ class CalendarGrid(ScrollView):
                 step = self._month_slot_minutes if self.surface == "Month" else 30
                 if self._cursor[1] <= current_minute < self._cursor[1] + step:
                     x += 1
-            self._paint(cells, spans, x, "›", Style(bold=True, reverse=True))
+            cursor = cells[x] if x < len(cells) and cells[x] not in (" ", "|") else "›"
+            self._paint(cells, spans, x, cursor, Style(bold=True, reverse=True))
 
     def _render_timed_line(
         self, cells: list[str], spans: list[tuple[int, int, Style]], y: int

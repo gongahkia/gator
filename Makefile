@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: sync format format-check lint typecheck test check build benchmark calendar-mouse-smoke clean
+.PHONY: sync format format-check lint typecheck test check build benchmark calendar-mouse-smoke local-ci install-hooks clean
 
 sync:
 	uv sync --extra dev
@@ -31,6 +31,12 @@ benchmark:
 
 calendar-mouse-smoke:
 	PYTHONDONTWRITEBYTECODE=1 uv run python tools/calendar_mouse_smoke.py
+
+local-ci:
+	./scripts/check-local.sh
+
+install-hooks:
+	git config --local core.hooksPath .githooks
 
 clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache dist

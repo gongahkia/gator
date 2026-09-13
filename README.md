@@ -263,6 +263,11 @@ make build
 make benchmark
 ```
 
+Run `make local-ci` for the locked-dependency checks, build, isolated wheel
+smoke, and Linux terminal mouse smoke. Run `make install-hooks` once per clone
+to run the same checks automatically before each push. This local gate does
+not publish a GitHub check status or require GitHub Actions billing.
+
 See [the development checklist](CHECKLIST.md) for the authoritative roadmap,
 [the documentation index](docs/README.md), the
 [local smoke test](docs/testing/local-tui-smoke.md), and the

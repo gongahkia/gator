@@ -7,6 +7,7 @@ from subprocess import CompletedProcess
 from typing import Any
 
 import pytest
+import typer.completion
 from typer.testing import CliRunner
 
 from hcb import cli
@@ -75,7 +76,9 @@ def seed_calendar(runner: CliRunner) -> str:
     return str(json_data(result, "calendars.create")["id"])
 
 
-def test_help_has_completion_and_full_command_groups(cli_env: tuple[CliRunner, AppPaths]) -> None:
+def test_help_has_completion_and_full_command_groups(
+    cli_env: tuple[CliRunner, AppPaths], monkeypatch: pytest.MonkeyPatch
+) -> None:
     runner, _ = cli_env
     result = invoke(runner, ["--help"])
     for command in (
@@ -97,7 +100,14 @@ def test_help_has_completion_and_full_command_groups(cli_env: tuple[CliRunner, A
         "daemon",
     ):
         assert command in result.stdout
-    assert "--show-completion" in result.stdout
+    monkeypatch.setattr(typer.completion, "_get_shell_name", lambda: "bash")
+    completion_option = runner.invoke(
+        cli.app,
+        ["--show-completion"],
+        prog_name="hcb",
+    )
+    assert completion_option.exit_code == 0, completion_option.output
+    assert "_hcb_completion" in completion_option.stdout
     completion = runner.invoke(
         cli.app,
         [],
