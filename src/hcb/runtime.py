@@ -1,4 +1,4 @@
-"""Lazy construction of CLI application dependencies."""
+"""Shared construction of local and remote application dependencies."""
 
 from __future__ import annotations
 
@@ -187,8 +187,8 @@ class Runtime:
         )
         return SyncEngine(self.storage, gateway)
 
-    def connect_account(self, account_id: str, *, open_browser: bool = True) -> OAuthResult:
-        return self.authenticator(account_id).connect(account_id, open_browser=open_browser)
+    def connect_account(self, account_id: str) -> OAuthResult:
+        return self.authenticator(account_id).connect(account_id)
 
     def query_freebusy(self, account_id: str, body: dict[str, Any]) -> dict[str, Any]:
         return self.sync_engine(account_id).gateway.freebusy(body)

@@ -28,12 +28,15 @@ The `hcb` package is divided into:
 - `sync`: Google transport, incremental pull, outbox delivery, and recovery.
 - `application`: operations shared by the CLI, TUI, and scheduler.
 - `cli`: stable commands, machine output, exit codes, and shell completion.
-- `tui`: Textual views and editors. Most mutations use `application`; some
-  cached reads still use `storage` directly, and free/busy, sync, and recurring
-  instance refresh still construct Google-backed operations through `runtime`.
-  These need a shared application boundary before the desktop UI can reuse them.
+- `tui`: Textual views and editors. Local reads and writes use `application`;
+  OAuth, free/busy, sync, and recurring-instance refresh use UI-independent
+  `runtime` operations. The TUI does not construct storage or Google clients.
 - `auth`: loopback OAuth and credential-store access.
 - `scheduler`: explicit local synchronization and reminder service.
+
+`runtime` owns the credential and Google gateway setup. Interactive sync and
+recurring-instance refresh use a separate SQLite connection for their worker
+thread, while `application` exposes cached workspace data and local mutations.
 
 The Google Calendar mirror stores canonical recurrence masters unchanged. A
 named remote range refresh materializes Google's concrete recurring instances

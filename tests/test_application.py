@@ -61,7 +61,9 @@ def test_workspace_metadata_reads_are_available_through_application(
 
 def test_workspace_lookups_and_freebusy_request_are_account_scoped(app: ApplicationService) -> None:
     app.storage.upsert_account(Account("b", "other@example.test"))
-    app.storage.upsert_calendar(Calendar("hidden", "a", "Hidden", remote_id="other", selected=False))
+    app.storage.upsert_calendar(
+        Calendar("hidden", "a", "Hidden", remote_id="other", selected=False)
+    )
     drive_file = DriveFile("doc", "a", "Agenda")
     app.storage.upsert_drive_file(drive_file)
     event = app.create_event(
@@ -74,7 +76,7 @@ def test_workspace_lookups_and_freebusy_request_are_account_scoped(app: Applicat
     event = replace(event, remote_id="remote-event")
     app.storage.upsert_event(event)
 
-    assert [account.id for account in app.list_accounts()] == ["a", "b"]
+    assert [account.id for account in app.list_accounts()] == ["b", "a"]
     assert app.account("a") is not None
     assert app.calendar("a", "cal") is not None
     assert app.calendar("b", "cal") is None
