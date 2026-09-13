@@ -11,7 +11,7 @@ from types import TracebackType
 
 from .errors import GoogleApiError
 from .google_client import Json, Page, rfc3339
-from .models import Calendar, Event, NotesProjection, SyncCursor, TaskList
+from .models import Calendar, Event, SyncCursor, TaskList
 from .sync import (
     SyncResult,
     _parse_datetime,
@@ -207,9 +207,7 @@ class PullSyncMixin(_SyncEngineBase):
         scope = f"tasks:{remote_list_id}"
         updated_min = self._task_updated_min(account_id, remote_list_id)
         completed_at = rfc3339(self.now())
-        preserve_local_notes = (
-            self.storage.get_notes_projection(account_id) is NotesProjection.DISABLED
-        )
+        private_notes = self.storage.private_task_notes(account_id, task_list.id)
 
         def fetch(token: str | None) -> Page:
             nonlocal first_page
@@ -222,6 +220,8 @@ class PullSyncMixin(_SyncEngineBase):
 
         def apply(item: Json) -> None:
             existing = self.storage.get_task_by_remote(account_id, str(item["id"]))
+            if existing is not None and existing.list_id != task_list.id and item.get("deleted"):
+                return
             if existing is None or not existing.metadata.dirty:
                 incoming = task_from_google(
                     account_id,
@@ -229,8 +229,8 @@ class PullSyncMixin(_SyncEngineBase):
                     item,
                     local_id=existing.id if existing else None,
                 )
-                if preserve_local_notes and existing is not None:
-                    incoming = replace(incoming, notes=existing.notes)
+                if existing is not None and existing.id in private_notes:
+                    incoming = replace(incoming, notes=private_notes[existing.id])
                 self.storage.upsert_task(incoming)
 
         result = self._paged(
@@ -240,7 +240,9 @@ class PullSyncMixin(_SyncEngineBase):
             apply,
             context=context,
         )
-        self.storage.set_cursor(SyncCursor(account_id, scope, completed_at))
+        with self.storage.transaction():
+            self.storage.resolve_task_parent_ids(account_id, task_list.id)
+            self.storage.set_cursor(SyncCursor(account_id, scope, completed_at))
         return result
 
     def sync_calendars(

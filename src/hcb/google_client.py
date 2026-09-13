@@ -50,7 +50,14 @@ class GoogleGateway(Protocol):
         self, task_list_id: str, body: Json, *, etag: str | None = None
     ) -> Json: ...
     def delete_task_list(self, task_list_id: str, *, etag: str | None = None) -> None: ...
-    def create_task(self, task_list_id: str, body: Json) -> Json: ...
+    def create_task(
+        self,
+        task_list_id: str,
+        body: Json,
+        *,
+        parent: str | None = None,
+        previous: str | None = None,
+    ) -> Json: ...
     def update_task(
         self, task_list_id: str, task_id: str, body: Json, *, etag: str | None = None
     ) -> Json: ...
@@ -295,8 +302,19 @@ class GoogleApiClient:
     def delete_task_list(self, task_list_id: str, *, etag: str | None = None) -> None:
         self._void(self.tasks.tasklists().delete(tasklist=task_list_id), etag=etag)
 
-    def create_task(self, task_list_id: str, body: Json) -> Json:
-        return self._execute(self.tasks.tasks().insert(tasklist=task_list_id, body=body))
+    def create_task(
+        self,
+        task_list_id: str,
+        body: Json,
+        *,
+        parent: str | None = None,
+        previous: str | None = None,
+    ) -> Json:
+        return self._execute(
+            self.tasks.tasks().insert(
+                tasklist=task_list_id, body=body, parent=parent, previous=previous
+            )
+        )
 
     def update_task(
         self, task_list_id: str, task_id: str, body: Json, *, etag: str | None = None

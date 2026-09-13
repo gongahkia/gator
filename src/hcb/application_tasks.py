@@ -19,6 +19,7 @@ from .models import (
     EntityType,
     Metadata,
     MutationOperation,
+    NotesProjection,
     Task,
     TaskList,
     TaskPriority,
@@ -185,6 +186,8 @@ class TaskServiceMixin(_ApplicationServiceBase):
         )
         with self.storage.transaction():
             self.storage.upsert_task(task)
+            if self.notes_projection(account_id) is NotesProjection.DISABLED and notes is not None:
+                self.storage.set_private_task_note(account_id, task.id, notes)
             self._enqueue(
                 account_id,
                 EntityType.TASK,
@@ -243,6 +246,10 @@ class TaskServiceMixin(_ApplicationServiceBase):
         with self.storage.transaction():
             before = self._snapshot("tasks", account_id, task_id)
             self.storage.upsert_task(updated)
+            if self.notes_projection(account_id) is NotesProjection.DISABLED and not isinstance(
+                notes, _Unset
+            ):
+                self.storage.set_private_task_note(account_id, task_id, updated.notes)
             self._enqueue(
                 account_id,
                 EntityType.TASK,

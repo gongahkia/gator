@@ -89,6 +89,10 @@ class TasksResource:
         self.calls.append(kwargs)
         return Request({"items": []})
 
+    def insert(self, **kwargs):
+        self.calls.append(kwargs)
+        return Request({"id": "task-r"})
+
 
 class TasksService:
     def __init__(self):
@@ -121,6 +125,23 @@ def test_tasks_list_requests_largest_supported_page() -> None:
             "showCompleted": True,
             "showDeleted": True,
             "showHidden": True,
+        }
+    ]
+
+
+def test_task_insert_sends_parent_and_previous_query_parameters() -> None:
+    tasks = TasksService()
+    client = GoogleApiClient(tasks_service=tasks, calendar_service=object(), drive_service=object())
+
+    assert client.create_task(
+        "list-r", {"title": "Child"}, parent="parent-r", previous="prev-r"
+    ) == {"id": "task-r"}
+    assert tasks._tasks.calls == [
+        {
+            "tasklist": "list-r",
+            "body": {"title": "Child"},
+            "parent": "parent-r",
+            "previous": "prev-r",
         }
     ]
 

@@ -8,7 +8,7 @@ from threading import Barrier
 import pytest
 
 from hcb import storage as storage_module
-from hcb.models import Account, TaskList
+from hcb.models import Account, Task, TaskList
 from hcb.storage import SCHEMA_VERSION, Storage
 
 
@@ -69,6 +69,26 @@ def test_fresh_database_and_repeated_open_are_idempotent(tmp_path: Path) -> None
             assert reopened.get_task_list("fresh", "inbox") is not None
             version = reopened.connection.execute("PRAGMA user_version").fetchone()[0]
             assert version == SCHEMA_VERSION
+
+
+def test_private_notes_migration_preserves_existing_disabled_mode_notes(tmp_path: Path) -> None:
+    path = tmp_path / "disabled-notes-v9.db"
+    with Storage(path) as storage:
+        storage.upsert_account(Account("a", "redacted@example.test"))
+        storage.upsert_task_list(TaskList("inbox", "a", "Inbox"))
+        storage.upsert_task(Task("task", "a", "inbox", "Task", notes="local only"))
+        storage.connection.execute(
+            """INSERT INTO app_settings(account_id,key,value)
+            VALUES ('a','notes_projection','disabled')"""
+        )
+    with sqlite3.connect(path) as connection:
+        connection.execute("DROP TABLE task_private_notes")
+        connection.execute("DROP INDEX tasks_parent_resolution")
+        connection.execute("PRAGMA user_version = 9")
+
+    with Storage(path) as migrated:
+        assert migrated.private_task_notes("a", "inbox") == {"task": "local only"}
+        assert migrated.get_task("a", "task").notes == "local only"
 
 
 @pytest.mark.parametrize("version", [1, 2, 3, 4, 5, 6, 7])

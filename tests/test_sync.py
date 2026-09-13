@@ -199,6 +199,8 @@ def test_initial_and_incremental_task_sync_uses_overlap(store):
 def test_disabled_notes_projection_preserves_local_note_on_remote_pull(store):
     ApplicationService(store).set_notes_projection("a", "disabled")
     store.upsert_task(Task("local", "a", "list", "Local", notes="private", remote_id="task-r"))
+    store.set_private_task_note("a", "local", "private")
+    ApplicationService(store).set_notes_projection("a", "mirrored")
     gateway = FakeGateway()
     gateway.task_pages = {
         None: Page(
@@ -211,6 +213,74 @@ def test_disabled_notes_projection_preserves_local_note_on_remote_pull(store):
     task = store.get_task("a", "local")
     assert task.title == "Remote"
     assert task.notes == "private"
+
+
+def test_private_note_is_released_after_mirrored_google_write(store):
+    app = ApplicationService(store)
+    app.set_notes_projection("a", "disabled")
+    store.upsert_task(Task("local", "a", "list", "Local", notes="private", remote_id="task-r"))
+    store.set_private_task_note("a", "local", "private")
+    app.set_notes_projection("a", "mirrored")
+    app.update_task("a", "local", title="Changed")
+    queued = store.pending_mutations("a")
+    assert queued[0].payload["body"]["notes"] == "private"
+
+    SyncEngine(store, FakeGateway()).flush_outbox("a")
+
+    assert store.private_task_notes("a", "list") == {}
+
+
+def test_new_child_and_sibling_creation_uses_delivered_remote_ids(store):
+    app = ApplicationService(store)
+    parent = app.create_task("a", "list", "Parent")
+    first = app.create_task("a", "list", "First child", parent_id=parent.id)
+    second = app.create_task("a", "list", "Second child", parent_id=parent.id, position=first.id)
+
+    class HierarchyGateway(FakeGateway):
+        def __init__(self):
+            super().__init__()
+            self.inserts = []
+
+        def create_task(self, task_list_id, body, *, parent=None, previous=None):
+            self.inserts.append((task_list_id, body["title"], parent, previous))
+            return {"id": f"remote-{len(self.inserts)}"}
+
+    gateway = HierarchyGateway()
+    assert SyncEngine(store, gateway).flush_outbox("a").pushed == 3
+    assert gateway.inserts == [
+        ("list-r", "Parent", None, None),
+        ("list-r", "First child", "remote-1", None),
+        ("list-r", "Second child", "remote-1", "remote-2"),
+    ]
+    assert store.get_task("a", second.id).remote_id == "remote-3"
+
+
+def test_task_pull_resolves_remote_parent_after_all_pages(store):
+    store.upsert_task(Task("parent-local", "a", "list", "Parent", remote_id="parent-r"))
+    gateway = FakeGateway()
+    gateway.task_pages = {
+        None: Page(
+            ({"id": "child-r", "title": "Child", "parent": "parent-r"},),
+            next_page_token="p2",
+        ),
+        "p2": Page(({"id": "parent-r", "title": "Parent"},)),
+    }
+
+    SyncEngine(store, gateway).sync_tasks("a", store.get_task_list("a", "list"))
+
+    assert store.get_task_by_remote("a", "child-r").parent_id == "parent-local"
+
+
+def test_source_list_tombstone_does_not_undo_cross_list_move(store):
+    store.upsert_task_list(TaskList("dest", "a", "Destination", remote_id="dest-r"))
+    store.upsert_task(Task("local", "a", "dest", "Moved", remote_id="task-r"))
+    gateway = FakeGateway()
+    gateway.task_pages = {None: Page(({"id": "task-r", "deleted": True},))}
+
+    SyncEngine(store, gateway).sync_tasks("a", store.get_task_list("a", "list"))
+
+    task = store.get_task("a", "local")
+    assert task.list_id == "dest" and not task.metadata.deleted
 
 
 def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Storage) -> None:

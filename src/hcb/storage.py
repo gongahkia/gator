@@ -17,7 +17,7 @@ from .models import (
 )
 from .paths import AppPaths
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 @dataclass(frozen=True, slots=True)
@@ -492,6 +492,11 @@ JOIN app_settings s ON s.account_id=t.account_id AND s.key='notes_projection'
 WHERE s.value='disabled' AND t.notes IS NOT NULL;
 """
 
+_MIGRATION_11 = """
+CREATE INDEX tasks_parent_resolution ON tasks(account_id,list_id,parent_id)
+WHERE parent_id IS NOT NULL;
+"""
+
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
@@ -602,6 +607,7 @@ class _StorageCore:
             _MIGRATION_8,
             _MIGRATION_9,
             _MIGRATION_10,
+            _MIGRATION_11,
         )
         with self.transaction():
             # Another process may have completed the migration while we waited

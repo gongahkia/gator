@@ -41,8 +41,9 @@ acceptance run; preparing credentials does not itself pass the live gate.
 ## Tasks, recurrence, and outbox
 
 1. Create/rename/delete a list; create/edit/complete/delete/reorder/reparent tasks;
-   cross-list move a task and verify Google receives one destination create and one
-   source delete.
+   cross-list move a non-recurring task and verify Google's
+   [Tasks move operation](https://developers.google.com/workspace/tasks/reference/rest/v1/tasks/move)
+   places the same remote task in the destination list without a duplicate.
 2. Exercise disabled, notes-only, and mirrored projections with an undated root task.
 3. Create a managed recurring task and exact reminder through HCB. Complete two
    occurrences, verify one successor each, marker preservation in notes, and no
@@ -118,8 +119,9 @@ Current result:
 
 ## Disposable-account Fedora follow-up (partial)
 
-At 2026-09-13 14:28 UTC, automated CLI/API checks used the same isolated
-disposable-account profile. The account identity was checked against Google's
+Through 2026-09-13 15:28 UTC, automated CLI/API checks used the same isolated
+disposable-account profile. The candidate checkout was `7662fe382` plus the
+uncommitted sync and schema follow-up. The account identity was checked against Google's
 UserInfo response before writes. The personal profile was not opened or changed.
 
 - Manual Ask resolution in both directions and automatic Prefer Google and
@@ -136,9 +138,56 @@ UserInfo response before writes. The personal profile was not opened or changed.
   calendar rebuilt, an existing event retained its local ID, and the other
   calendar used its previous incremental token. Synthetic calendars were
   removed; Google returned deleted tombstones and no pending outbox rows.
-- CLI/TUI cross-process UI operation, rich event fields, managed recurrence,
-  notification delivery, OAuth revocation/reconnect, destructive reset, and
-  macOS: **not executed**. No invitations or messages were sent.
+- Managed daily Task recurrence with an exact local reminder: **passed**.
+  Two completions produced one successor each, repeat sync produced no fourth
+  task, and Google Tasks readback showed three markers and two completed tasks.
+- Synthetic task hierarchy insert, top-level reparent, sibling reorder,
+  cross-list move, and task-list rename: **passed** after a pull fix that maps
+  Google parent IDs to local task IDs. The cross-list move retained one remote
+  task ID in the destination; the source list had no active duplicate. Both
+  synthetic lists were removed and no pending outbox row remained.
+- Disabled, Notes-only, and Mirrored projections plus bulk completion:
+  **passed** with remote readback. A first mixed-mode run exposed loss of a
+  local-only Disabled-mode note after switching mode before sync. The local
+  note record added in schema 10 preserved it on the repeat run; Google did
+  not receive the Disabled-mode note. Both synthetic task lists were removed.
+- Timed IANA event, all-day three-instance series, popup and email reminder
+  fields, guest permissions, private visibility, changed and cancelled
+  instances, explicit instance refresh, and remote free/busy: **passed** with
+  Google readback. One test attempt used a derived-instance ID after its cache
+  was replaced; the repeat refreshed the cache before editing. Both synthetic
+  calendars were removed, with Google deletion tombstones and empty outbox
+  verified. No attendees were added or notified.
+- Moving one attendee-free default event between two synthetic calendars:
+  **passed**. Google readback showed it in the destination, no active source
+  copy, and a stable local event after two repeat syncs. Both calendars were
+  removed and the outbox was empty.
+- Creating an attendee-free event with a new Meet conference request:
+  **passed**. Google returned a successful conference request and a video
+  entry point; HCB retained conference data after repeat sync. The synthetic
+  calendar was removed, and no attendee was invited.
+- Injecting response loss after Google accepted an attendee-free event create:
+  **passed**. The next sync reconciled the client-assigned event ID after a
+  duplicate-create response. Google had one active event, and HCB had no
+  pending outbox row or conflict. The synthetic calendar was removed. An
+  earlier inspection attempt used a nonexistent outbox column; after correcting
+  that test harness, the full sequence passed.
+- Cleanup readback for all 11 synthetic calendars recorded in this isolated
+  profile: **passed for calendar-list removal**. Every local fixture was marked
+  deleted, none remained in Google's calendar list, and the outbox and conflict
+  queue were empty. `calendars.get` still returned metadata for the three most
+  recent removed calendars while their `calendarList.get` returned `404` and
+  their event lists were empty. This check does not establish physical purge of
+  Google calendar metadata.
+- Headless TUI startup on the isolated disposable cache: **passed**; the
+  workspace mounted with one cached row and no pending write. Physical terminal
+  interaction and simultaneous CLI/TUI/reminder operation remain untested.
+- CLI/TUI cross-process UI operation, notification delivery,
+  OAuth revocation/reconnect, destructive reset, and
+  macOS: **not executed**. Drive attachment, invitation RSVP, and installed-app
+  checks also remain open. The disposable Drive metadata view contained files,
+  but no file was verified as a synthetic fixture, so none was attached. No
+  invitations or messages were sent.
 
 The `410` run exposed that deleting every clean event on refresh changed local
 IDs used by task-event links and reminders. The candidate implementation

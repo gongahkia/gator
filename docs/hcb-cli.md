@@ -131,6 +131,13 @@ pulling so the Google value can replace the cache. If later edits are queued,
 choosing Google is rejected to preserve them; choosing Local requeues the
 rejected edit ahead of them.
 
+The Notes projection setting controls where undated root tasks appear. In
+`disabled` mode, task notes created or explicitly edited locally are omitted
+from Google writes and retained in a local-only record so later pulls and
+projection changes do not erase them. A later task write in `notes-only` or
+`mirrored` mode includes the note in Google Tasks and clears that local-only
+record after Google accepts the write.
+
 TUI text fields offer standard Rich emoji codes and aliases after `:`; use
 `↑`/`↓` to select and `Tab` or `Enter` to insert the displayed emoji.
 

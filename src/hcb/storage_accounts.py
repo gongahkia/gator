@@ -170,6 +170,23 @@ class AccountTaskRepository(_StorageCore):
         ).fetchone()
         return self._task(row) if row else None
 
+    def resolve_task_parent_ids(self, account_id: str, list_id: str) -> None:
+        """Convert Google parent IDs to stable local task IDs after all pages arrive."""
+        self.connection.execute(
+            """UPDATE tasks SET parent_id=(
+                SELECT parent.id FROM tasks parent
+                WHERE parent.account_id=tasks.account_id AND parent.list_id=tasks.list_id
+                  AND parent.remote_id=tasks.parent_id
+            )
+            WHERE account_id=? AND list_id=? AND dirty=0 AND parent_id IS NOT NULL
+              AND EXISTS (
+                SELECT 1 FROM tasks parent
+                WHERE parent.account_id=tasks.account_id AND parent.list_id=tasks.list_id
+                  AND parent.remote_id=tasks.parent_id AND parent.id!=tasks.parent_id
+              )""",
+            (account_id, list_id),
+        )
+
     def list_tasks(
         self, account_id: str, list_id: str | None = None, *, include_deleted: bool = False
     ) -> list[Task]:

@@ -256,6 +256,7 @@ def test_notes_projection_and_date_only_constraint(app: ApplicationService) -> N
     app.set_notes_projection("a", NotesProjection.DISABLED)
     task = app.create_task("a", "inbox", "Private", notes="secret")
     assert app.storage.get_task("a", task.id).notes == "secret"
+    assert app.storage.private_task_notes("a", "inbox")[task.id] == "secret"
     assert "notes" not in app.storage.pending_mutations("a")[-1].payload["body"]
     with pytest.raises(ValueError, match="date-only"):
         app.create_task("a", "inbox", "Bad due", due=datetime.now(UTC))  # type: ignore[arg-type]

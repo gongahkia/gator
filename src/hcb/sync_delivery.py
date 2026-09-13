@@ -327,6 +327,35 @@ class DeliverySyncMixin(_SyncEngineBase):
             local_list_id = payload.get("list_id") or (task.list_id if task else None)
             list_id = self._remote_list(account_id, _required_remote(local_list_id, "task list"))
             if mutation.operation is MutationOperation.CREATE:
+                parent_local = payload.get("parent")
+                previous_local = payload.get("previous")
+                if parent_local or previous_local:
+                    parent_task = (
+                        self.storage.get_task(account_id, parent_local) if parent_local else None
+                    )
+                    previous_task = (
+                        self.storage.get_task(account_id, previous_local)
+                        if previous_local
+                        else None
+                    )
+                    return self.gateway.create_task(
+                        list_id,
+                        body,
+                        parent=(
+                            _required_remote(
+                                parent_task.remote_id if parent_task else None, "parent task"
+                            )
+                            if parent_local
+                            else None
+                        ),
+                        previous=(
+                            _required_remote(
+                                previous_task.remote_id if previous_task else None, "previous task"
+                            )
+                            if previous_local
+                            else None
+                        ),
+                    )
                 return self.gateway.create_task(list_id, body)
             if mutation.operation is MutationOperation.UPDATE:
                 return self.gateway.update_task(
@@ -462,6 +491,8 @@ class DeliverySyncMixin(_SyncEngineBase):
                         metadata=_metadata(response),
                     )
                 )
+                if "notes" in mutation.payload.get("body", {}):
+                    self.storage.clear_private_task_note(account_id, mutation.entity_id)
         elif mutation.entity_type is EntityType.CALENDAR:
             current_calendar = self.storage.get_calendar(account_id, mutation.entity_id)
             if current_calendar:

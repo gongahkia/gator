@@ -60,21 +60,25 @@ sample. They are not performance budgets.
 
 | Fixture | CLI help | Search | Workspace | Outbox flush | Peak worker RSS |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 1,000 tasks / 200 events / 150 writes | 578 / 602 | 1.2 / 1.7 | 17.5 / 20.4 | 51.5 / 56.0 | 43.5 MiB |
-| 10,000 tasks / 2,000 events / 250 writes | 516 / 596 | 1.7 / 2.4 | 156 / 201 | 74.6 / 101 | 52.6 MiB |
+| 1,000 tasks / 200 events / 150 writes | 432 / 636 | 1.1 / 1.5 | 11.9 / 21.8 | 32.8 / 60.6 | 43.9 MiB |
+| 10,000 tasks / 2,000 events / 250 writes | 409 / 420 | 1.7 / 2.0 | 122 / 169 | 59.3 / 70.4 | 52.9 MiB |
 
-The outbox flush median fell from 129 to 52 ms at 150 writes and from 297 to
-75 ms at 250 writes. CLI help median rose from 461 to 578 ms in the medium
-fixture; no change in this phase targeted imports, so the cause is unverified
-and should be profiled before setting a cold-start budget. Search and workspace
-measurements stayed in the same broad range; warm-cache and CPU-frequency
+The outbox flush median fell from 129 to 33 ms at 150 writes and from 297 to
+59 ms at 250 writes. CLI help, search, and workspace measurements stayed in
+the same broad range; warm-cache and CPU-frequency
 variation limit direct comparisons between runs.
 
 Separate [synthetic pull](baselines/fedora43-phase2-pull-2026-09-13.json) and
 [TUI startup](baselines/fedora43-phase2-tui-2026-09-13.json) reports used five
 repeat runs. At 10,000 tasks and 2,000 events, the paginated fake-gateway
-initial pull spent a median 804 ms in Tasks and 328 ms in Calendar reads and
+initial pull spent a median 589 ms in Tasks and 250 ms in Calendar reads and
 application; the repeated empty incremental pull spent about 1 ms in each.
-At that size, median first task-bearing terminal frame was 944 ms, with 77.2
+At that size, median first task-bearing terminal frame was 1,021 ms, with 77.3
 MiB RSS at that frame. These runs exclude Google network latency and do not
 predict macOS or desktop-app performance.
+
+The final pull rerun includes local-parent normalization and schema 11's
+partial parent-reference index. Before that index, the same empty incremental
+Tasks pull took about 13 ms because it scanned every task in a list; the
+five-run median returned to 1.1 ms with the index. The other phase-two reports
+do not exercise this query and were not repeated after the index change.
