@@ -36,6 +36,7 @@ def test_defaults_are_terminal_minimal_and_valid(tmp_path: Path) -> None:
     assert config.preferences.editor == "nvim"
     assert config.preferences.week_starts_on == 0
     assert config.preferences.date_time_format == "friendly"
+    assert config.preferences.conflict_policy == "ask"
     assert config.theme.loader == DEFAULT_LOADER
     assert config.tui.default_event_duration_minutes == 60
 

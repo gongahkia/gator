@@ -43,7 +43,8 @@
         "default_calendar_id": { "type": ["string", "null"] }, "reminders_enabled": { "type": "boolean" },
         "reminder_catch_up_minutes": { "type": "integer", "minimum": 0 }, "reminder_poll_seconds": { "type": "integer", "minimum": 1 },
         "reminder_jitter_seconds": { "type": "integer", "minimum": 0 }, "reminder_sync_interval_minutes": { "type": "integer", "minimum": 0 },
-        "reminder_sync_mode": { "enum": ["all", "pull", "off"] }, "time_zone": { "type": "string", "minLength": 1 },
+        "reminder_sync_mode": { "enum": ["all", "pull", "off"] }, "conflict_policy": { "enum": ["ask", "prefer-google", "prefer-local"] },
+        "time_zone": { "type": "string", "minLength": 1 },
         "date_time_format": { "enum": ["friendly", "friendly_24h", "iso"] }, "capture": { "$ref": "#/$defs/capture" }
       }
     },

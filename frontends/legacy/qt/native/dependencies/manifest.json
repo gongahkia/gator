@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "artifacts": [
+    {
+      "id": "qt",
+      "version": "6.11.1",
+      "license": "LGPL-3.0-only OR GPL-3.0-only",
+      "source_directory": "qt-everywhere-src-6.11.1",
+      "archive": {
+        "url": "https://download.qt.io/official_releases/qt/6.11/6.11.1/single/qt-everywhere-src-6.11.1.tar.xz",
+        "filename": "qt-everywhere-src-6.11.1.tar.xz",
+        "size_bytes": 1017723080,
+        "hash": {
+          "algorithm": "SHA256",
+          "value": "252acef8c5ae68074d91cadba2ee4a83465051bbb970dd26e8f0daa0f3904e03"
+        }
+      }
+    },
+    {
+      "id": "sqlite",
+      "version": "3.53.3",
+      "license": "public-domain",
+      "source_directory": "sqlite-amalgamation-3530300",
+      "archive": {
+        "url": "https://www.sqlite.org/2026/sqlite-amalgamation-3530300.zip",
+        "filename": "sqlite-amalgamation-3530300.zip",
+        "size_bytes": 2945929,
+        "hash": {
+          "algorithm": "SHA3_256",
+          "value": "d45c688a8cb23f68611a894a756a12d7eb6ab6e9e2468ca70adbeab3808b5ab9"
+        }
+      }
+    }
+  ]
+}

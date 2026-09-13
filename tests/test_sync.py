@@ -196,6 +196,23 @@ def test_initial_and_incremental_task_sync_uses_overlap(store):
     assert gateway.calls[-1][-1] == "2026-08-21T07:55:00Z"
 
 
+def test_disabled_notes_projection_preserves_local_note_on_remote_pull(store):
+    ApplicationService(store).set_notes_projection("a", "disabled")
+    store.upsert_task(Task("local", "a", "list", "Local", notes="private", remote_id="task-r"))
+    gateway = FakeGateway()
+    gateway.task_pages = {
+        None: Page(
+            ({"id": "task-r", "title": "Remote", "status": "needsAction", "notes": "remote"},)
+        )
+    }
+
+    SyncEngine(store, gateway).sync_tasks("a", store.get_task_list("a", "list"))
+
+    task = store.get_task("a", "local")
+    assert task.title == "Remote"
+    assert task.notes == "private"
+
+
 def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Storage) -> None:
     store.upsert_task(Task("child", "a", "list", "Child", remote_id="child-r"))
     gateway = FakeGateway()
@@ -399,6 +416,56 @@ def test_calendar_410_resets_only_expired_calendar_cursor(store):
     assert store.get_cursor("a", "events:other").cursor == "keep"
 
 
+def test_calendar_410_preserves_event_links_and_prunes_missing_rows_after_resume(store):
+    original = {**EVENT, "id": "linked-r"}
+    missing = {**EVENT, "id": "missing-r"}
+    gateway = FakeGateway()
+    gateway.event_pages = {None: Page((original, missing), next_sync_token="old")}
+    engine = SyncEngine(store, gateway)
+    engine.sync_events("a", store.get_calendar("a", "cal"))
+    linked = store.get_event_by_remote("a", "linked-r")
+    vanished = store.get_event_by_remote("a", "missing-r")
+    assert linked is not None and vanished is not None
+    store.connection.execute(
+        "INSERT INTO task_event_links VALUES (?,?,?,?)",
+        ("a", "task", linked.id, NOW.isoformat()),
+    )
+
+    class InterruptedGateway(FakeGateway):
+        def __init__(self):
+            super().__init__()
+            self.fail = GoogleApiError(410, "expired")
+            self.interrupt = True
+            self.event_pages = {
+                None: Page((original,), next_page_token="p2"),
+                "p2": Page((), next_sync_token="new"),
+            }
+
+        def list_events(self, calendar_id, **kwargs):
+            if kwargs.get("page_token") == "p2" and self.interrupt:
+                self.interrupt = False
+                raise ValueError("interrupted after first page")
+            return super().list_events(calendar_id, **kwargs)
+
+    gateway = InterruptedGateway()
+    with pytest.raises(ValueError, match="interrupted"):
+        SyncEngine(store, gateway).sync_events("a", store.get_calendar("a", "cal"))
+    assert store.get_event("a", linked.id) is not None
+    assert store.get_event("a", vanished.id).metadata.deleted
+    assert store.get_cursor("a", "events:cal-r") is None
+
+    SyncEngine(store, gateway).sync_events("a", store.get_calendar("a", "cal"))
+    assert store.get_event_by_remote("a", "linked-r").id == linked.id
+    assert store.get_event("a", vanished.id) is None
+    assert (
+        store.connection.execute(
+            "SELECT event_id FROM task_event_links WHERE account_id='a'"
+        ).fetchone()[0]
+        == linked.id
+    )
+    assert store.get_cursor("a", "events:cal-r").cursor == "new"
+
+
 def test_explicit_instance_refresh_caches_only_recurring_instances(store):
     gateway = FakeGateway()
     gateway.event_pages = {
@@ -486,9 +553,67 @@ def test_outbox_conflicts_are_recorded_without_dropping_later_writes(store, stat
         )
     gateway.fail = GoogleApiError(status, "conflict")
     result = SyncEngine(store, gateway).flush_outbox("a")
-    assert result.conflicts == 1 and result.pushed == 1
+    assert result.conflicts == 1 and result.pushed == 0 and result.retry_pending
     assert len(store.list_conflicts("a")) == 1
+    assert len(store.pending_mutations("a")) == 1
+    assert SyncEngine(store, gateway).flush_outbox("a").retry_pending
+    assert len(store.pending_mutations("a")) == 1
+
+
+@pytest.mark.parametrize("policy", ["ask", "prefer-google", "prefer-local"])
+def test_stale_event_etag_follows_conflict_policy(store, policy):
+    class EtagGateway(FakeGateway):
+        def update_event(self, calendar_id, event_id, body, *, etag=None, **kwargs):
+            self.calls.append(("update-event", etag))
+            if etag:
+                raise GoogleApiError(412, "precondition failed")
+            return {"id": event_id, "etag": '"fresh"', "updated": "2026-08-21T08:00:00Z"}
+
+    point = EventDateTime(DateTimeKind.DATETIME, NOW)
+    store.upsert_event(
+        Event(
+            "event",
+            "a",
+            "cal",
+            "Local",
+            point,
+            point,
+            remote_id="event-r",
+            metadata=Metadata(etag='"stale"', dirty=True),
+        )
+    )
+    store.set_cursor(SyncCursor("a", "events:cal-r", "old-token"))
+    store.enqueue(
+        PendingMutation(
+            None,
+            "a",
+            EntityType.EVENT,
+            "event",
+            MutationOperation.UPDATE,
+            {"calendar_id": "cal", "body": {"summary": "Local"}, "etag": '"stale"'},
+        )
+    )
+    gateway = EtagGateway()
+
+    result = SyncEngine(store, gateway, conflict_policy=policy).flush_outbox("a")
+
     assert store.pending_mutations("a") == []
+    if policy == "ask":
+        assert result.conflicts == 1
+        assert len(store.list_conflicts("a")) == 1
+        assert store.get_event("a", "event").metadata.dirty
+        assert gateway.calls == [("update-event", '"stale"')]
+    elif policy == "prefer-google":
+        assert result.conflicts == 0
+        assert store.list_conflicts("a") == []
+        assert not store.get_event("a", "event").metadata.dirty
+        assert store.get_cursor("a", "events:cal-r") is None
+        assert gateway.calls == [("update-event", '"stale"')]
+    else:
+        assert result.conflicts == 0 and result.pushed == 1
+        assert store.list_conflicts("a") == []
+        assert not store.get_event("a", "event").metadata.dirty
+        assert gateway.calls == [("update-event", '"stale"'), ("update-event", None)]
 
 
 def test_pull_preserves_dirty_local_write_and_accounts_are_isolated(store):

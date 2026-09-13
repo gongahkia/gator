@@ -5,18 +5,23 @@ from pathlib import Path
 import pytest
 
 from hcb.application import ApplicationService
-from hcb.errors import NotFoundError
+from hcb.errors import ConflictError, NotFoundError
 from hcb.models import (
     Account,
     Calendar,
     Conflict,
+    ConflictStatus,
     DateTimeKind,
     DriveFile,
     EntityType,
     Event,
     EventDateTime,
+    Metadata,
+    MutationOperation,
     NotesProjection,
+    PendingMutation,
     ReminderOverride,
+    SyncCursor,
     Task,
     TaskList,
     TaskPriority,
@@ -57,6 +62,133 @@ def test_workspace_metadata_reads_are_available_through_application(
     assert snapshot.instance_ranges == app.instance_ranges("a")
     assert app.instance_cache_status("a", "cal", start, end)["state"] == "fresh"
     assert [conflict.id for conflict in app.list_conflicts("a")] == [conflict_id]
+
+
+def test_keep_remote_releases_dirty_event_and_resets_incremental_cursor(
+    app: ApplicationService,
+) -> None:
+    start = EventDateTime(DateTimeKind.DATE, date(2026, 8, 21))
+    end = EventDateTime(DateTimeKind.DATE, date(2026, 8, 22))
+    app.storage.upsert_event(
+        Event(
+            "event",
+            "a",
+            "cal",
+            "Local",
+            start,
+            end,
+            remote_id="remote-event",
+            metadata=Metadata(dirty=True),
+        )
+    )
+    app.storage.set_cursor(SyncCursor("a", "events:remote-cal", "stale-token"))
+    conflict_id = app.storage.add_conflict(
+        Conflict(
+            None,
+            "a",
+            EntityType.EVENT,
+            "event",
+            {"body": {"summary": "Local"}, "etag": "old"},
+            {"status": 412},
+        )
+    )
+
+    app.resolve_conflict("a", conflict_id, ConflictStatus.KEEP_REMOTE)
+
+    assert not app.storage.get_event("a", "event").metadata.dirty
+    assert app.storage.get_cursor("a", "events:remote-cal") is None
+    assert app.storage.list_conflicts("a") == []
+
+
+def test_keep_local_retries_without_stale_etag(app: ApplicationService) -> None:
+    app.storage.upsert_task(
+        Task("task", "a", "inbox", "Local", remote_id="remote-task", metadata=Metadata(dirty=True))
+    )
+    conflict_id = app.storage.add_conflict(
+        Conflict(
+            None,
+            "a",
+            EntityType.TASK,
+            "task",
+            {"list_id": "inbox", "body": {"title": "Local"}, "etag": "stale"},
+            {"status": 412},
+        )
+    )
+
+    app.resolve_conflict("a", conflict_id, ConflictStatus.KEEP_LOCAL)
+
+    queued = app.storage.pending_mutations("a")
+    assert len(queued) == 1
+    assert queued[0].operation is MutationOperation.UPDATE
+    assert queued[0].payload == {"list_id": "inbox", "body": {"title": "Local"}}
+
+
+def test_keep_local_retry_precedes_later_queued_edit(app: ApplicationService) -> None:
+    app.storage.upsert_task(
+        Task("task", "a", "inbox", "Later", remote_id="remote-task", metadata=Metadata(dirty=True))
+    )
+    original_id = app.storage.enqueue(
+        PendingMutation(
+            None,
+            "a",
+            EntityType.TASK,
+            "task",
+            MutationOperation.UPDATE,
+            {"list_id": "inbox", "body": {"title": "Original"}, "etag": "stale"},
+        )
+    )
+    app.storage.complete_mutation("a", original_id)
+    later_id = app.storage.enqueue(
+        PendingMutation(
+            None,
+            "a",
+            EntityType.TASK,
+            "task",
+            MutationOperation.UPDATE,
+            {"list_id": "inbox", "body": {"title": "Later"}},
+        )
+    )
+    conflict_id = app.storage.add_conflict(
+        Conflict(
+            None,
+            "a",
+            EntityType.TASK,
+            "task",
+            {"list_id": "inbox", "body": {"title": "Original"}, "etag": "stale"},
+            {"status": 412, "mutation_id": original_id},
+        )
+    )
+
+    app.resolve_conflict("a", conflict_id, ConflictStatus.KEEP_LOCAL)
+
+    queued = app.storage.pending_mutations("a")
+    assert [item.id for item in queued] == [original_id, later_id]
+    assert queued[0].payload == {"list_id": "inbox", "body": {"title": "Original"}}
+    assert queued[1].payload["body"]["title"] == "Later"
+
+
+def test_keep_remote_preserves_later_queued_edits(app: ApplicationService) -> None:
+    app.storage.upsert_task(
+        Task("task", "a", "inbox", "Local", remote_id="remote-task", metadata=Metadata(dirty=True))
+    )
+    conflict_id = app.storage.add_conflict(
+        Conflict(None, "a", EntityType.TASK, "task", {"body": {"title": "Local"}}, {"status": 412})
+    )
+    app.storage.enqueue(
+        PendingMutation(
+            None,
+            "a",
+            EntityType.TASK,
+            "task",
+            MutationOperation.UPDATE,
+            {"body": {"title": "Later"}},
+        )
+    )
+
+    with pytest.raises(ConflictError, match="Later queued changes"):
+        app.resolve_conflict("a", conflict_id, ConflictStatus.KEEP_REMOTE)
+    assert app.storage.get_task("a", "task").metadata.dirty
+    assert len(app.storage.list_conflicts("a")) == 1
 
 
 def test_workspace_lookups_and_freebusy_request_are_account_scoped(app: ApplicationService) -> None:

@@ -1915,6 +1915,7 @@ def test_palette_calendar_and_settings_workflows(tmp_path: Path) -> None:
         app.screen.query_one("#setting-reminder-jitter", Input).value = "3"
         app.screen.query_one("#setting-reminder-sync-interval", Input).value = "15"
         app.screen.query_one("#setting-reminder-sync-mode", Select).value = "pull"
+        app.screen.query_one("#setting-conflict-policy", Select).value = "prefer-local"
         await pilot.click("#settings-save")  # type: ignore[attr-defined]
         await pilot.pause()  # type: ignore[attr-defined]
         assert app.has_class("density-compact", "ascii", "no-mouse")
@@ -1933,6 +1934,7 @@ def test_palette_calendar_and_settings_workflows(tmp_path: Path) -> None:
     assert saved.preferences.reminder_jitter_seconds == 3
     assert saved.preferences.reminder_sync_interval_minutes == 15
     assert saved.preferences.reminder_sync_mode == "pull"
+    assert saved.preferences.conflict_policy == "prefer-local"
 
 
 def test_settings_theme_selector_offers_and_applies_detected_theme(tmp_path: Path) -> None:
@@ -2521,8 +2523,14 @@ def test_pointer_marking_and_batch_review_show_exact_task_change(tmp_path: Path)
 
 def test_conflict_resolution_and_explicit_remote_freebusy(tmp_path: Path) -> None:
     runtime = seeded_runtime(tmp_path)
+    task = runtime.storage.list_tasks("work")[0]
+    runtime.storage.connection.execute(
+        "DELETE FROM outbox WHERE account_id=? AND entity_type=? AND entity_id=?",
+        ("work", EntityType.TASK.value, task.id),
+    )
+    runtime.storage.upsert_task(replace(task, remote_id="remote-task"))
     runtime.storage.add_conflict(
-        Conflict(None, "work", EntityType.TASK, "task", {"body": {}}, {"body": {}})
+        Conflict(None, "work", EntityType.TASK, task.id, {"body": {}}, {"body": {}})
     )
     calls: list[dict[str, object]] = []
 

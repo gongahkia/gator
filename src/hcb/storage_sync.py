@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
+from .errors import ConflictError, NotFoundError
 from .models import (
     Conflict,
     ConflictStatus,
@@ -21,6 +22,85 @@ from .storage import _datetime, _iso, _StorageCore
 
 
 class SyncStateRepository(_StorageCore):
+    def has_later_entity_mutations(self, mutation: PendingMutation) -> bool:
+        assert mutation.id is not None
+        return (
+            self.connection.execute(
+                """SELECT 1 FROM outbox WHERE account_id=? AND entity_type=? AND entity_id=?
+            AND id>? LIMIT 1""",
+                (mutation.account_id, mutation.entity_type.value, mutation.entity_id, mutation.id),
+            ).fetchone()
+            is not None
+        )
+
+    def retry_mutation_without_etag(self, mutation: PendingMutation) -> None:
+        assert mutation.id is not None
+        payload = dict(mutation.payload)
+        payload.pop("etag", None)
+        cursor = self.connection.execute(
+            """UPDATE outbox SET payload=?,delivery_state=?,sending_started_at=NULL,
+            attempts=attempts+1,last_error=NULL WHERE account_id=? AND id=? AND delivery_state=?""",
+            (
+                json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                OutboxDeliveryState.PENDING.value,
+                mutation.account_id,
+                mutation.id,
+                OutboxDeliveryState.SENDING.value,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError(f"outbox mutation {mutation.id} is not sending")
+
+    def discard_conflicted_change(
+        self, account_id: str, entity_type: EntityType, entity_id: str
+    ) -> None:
+        """Allow the next pull to replace one rejected local change with Google's version."""
+        later = self.connection.execute(
+            """SELECT 1 FROM outbox WHERE account_id=? AND entity_type=? AND entity_id=?
+            LIMIT 1""",
+            (account_id, entity_type.value, entity_id),
+        ).fetchone()
+        if later is not None:
+            raise ConflictError("Later queued changes must be delivered or resolved first")
+        table = {
+            EntityType.TASK_LIST: "task_lists",
+            EntityType.TASK: "tasks",
+            EntityType.CALENDAR: "calendars",
+            EntityType.EVENT: "events",
+        }.get(entity_type)
+        if table is None:
+            raise ValueError(f"cannot discard a {entity_type.value} conflict")
+        row = self.connection.execute(
+            f"SELECT * FROM {table} WHERE account_id=? AND id=?",  # noqa: S608
+            (account_id, entity_id),
+        ).fetchone()
+        if row is None:
+            raise NotFoundError(f"{entity_type.value} {entity_id!r} does not exist")
+        self.connection.execute(
+            f"UPDATE {table} SET dirty=0 WHERE account_id=? AND id=?",  # noqa: S608
+            (account_id, entity_id),
+        )
+        parent_table, parent_id, prefix = (
+            ("task_lists", row["list_id"], "tasks")
+            if entity_type is EntityType.TASK
+            else ("calendars", row["calendar_id"], "events")
+            if entity_type is EntityType.EVENT
+            else (None, None, None)
+        )
+        if parent_table is not None:
+            parent = self.connection.execute(
+                f"SELECT remote_id FROM {parent_table} WHERE account_id=? AND id=?",  # noqa: S608
+                (account_id, parent_id),
+            ).fetchone()
+            if parent is not None and parent["remote_id"]:
+                scope = f"{prefix}:{parent['remote_id']}"
+                self.delete_cursor(account_id, scope)
+                checkpoint = self.resumable_checkpoint(account_id, scope)
+                if checkpoint is not None:
+                    self.finish_checkpoint(
+                        checkpoint[0], error="conflict resolution requires full pull"
+                    )
+
     def enqueue(self, mutation: PendingMutation) -> int:
         cursor = self.connection.execute(
             """INSERT INTO outbox(id,account_id,entity_type,entity_id,operation,payload,created_at,

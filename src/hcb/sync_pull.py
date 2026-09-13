@@ -11,7 +11,7 @@ from types import TracebackType
 
 from .errors import GoogleApiError
 from .google_client import Json, Page, rfc3339
-from .models import Calendar, Event, SyncCursor, TaskList
+from .models import Calendar, Event, NotesProjection, SyncCursor, TaskList
 from .sync import (
     SyncResult,
     _parse_datetime,
@@ -91,6 +91,7 @@ class PullSyncMixin(_SyncEngineBase):
         *,
         final_cursor_scope: str | None = None,
         context: _RetryContext | None = None,
+        on_complete: Callable[[], None] | None = None,
     ) -> SyncResult:
         context = context or self._retry_context()
         resumed = self.storage.resumable_checkpoint(account_id, scope)
@@ -112,6 +113,8 @@ class PullSyncMixin(_SyncEngineBase):
                     if token is not None:
                         self.storage.save_checkpoint_page(checkpoint, token)
                     else:
+                        if on_complete is not None:
+                            on_complete()
                         if final_cursor_scope is not None:
                             self.storage.set_cursor(
                                 SyncCursor(account_id, final_cursor_scope, page.next_sync_token)
@@ -204,6 +207,9 @@ class PullSyncMixin(_SyncEngineBase):
         scope = f"tasks:{remote_list_id}"
         updated_min = self._task_updated_min(account_id, remote_list_id)
         completed_at = rfc3339(self.now())
+        preserve_local_notes = (
+            self.storage.get_notes_projection(account_id) is NotesProjection.DISABLED
+        )
 
         def fetch(token: str | None) -> Page:
             nonlocal first_page
@@ -217,14 +223,15 @@ class PullSyncMixin(_SyncEngineBase):
         def apply(item: Json) -> None:
             existing = self.storage.get_task_by_remote(account_id, str(item["id"]))
             if existing is None or not existing.metadata.dirty:
-                self.storage.upsert_task(
-                    task_from_google(
-                        account_id,
-                        task_list.id,
-                        item,
-                        local_id=existing.id if existing else None,
-                    )
+                incoming = task_from_google(
+                    account_id,
+                    task_list.id,
+                    item,
+                    local_id=existing.id if existing else None,
                 )
+                if preserve_local_notes and existing is not None:
+                    incoming = replace(incoming, notes=existing.notes)
+                self.storage.upsert_task(incoming)
 
         result = self._paged(
             account_id,
@@ -331,6 +338,8 @@ class PullSyncMixin(_SyncEngineBase):
 
         def apply(item: Json) -> None:
             existing = self.storage.get_event_by_remote(account_id, str(item["id"]))
+            if existing is not None:
+                self.storage.mark_calendar_event_seen(account_id, calendar.id, existing.id)
             affects_instance_cache = bool(
                 item.get("recurrence")
                 or item.get("recurringEventId")
@@ -385,6 +394,9 @@ class PullSyncMixin(_SyncEngineBase):
                     apply,
                     final_cursor_scope=scope,
                     context=context,
+                    on_complete=lambda: self.storage.finish_calendar_refresh(
+                        account_id, calendar.id
+                    ),
                 )
             except GoogleApiError as exc:
                 if exc.status != 410 or reset:

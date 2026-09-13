@@ -3462,6 +3462,17 @@ class SettingsScreen(ModalScreen[dict[str, str] | None]):
                         id="setting-reminder-sync-mode",
                     )
                 with Horizontal(classes="settings-pair"):
+                    yield Select(
+                        (
+                            ("Ask on conflict", "ask"),
+                            ("Prefer Google", "prefer-google"),
+                            ("Prefer local", "prefer-local"),
+                        ),
+                        value=values["conflict_policy"],
+                        allow_blank=False,
+                        prompt="Conflict policy",
+                        id="setting-conflict-policy",
+                    )
                     yield Input(
                         value=values["default_account_id"],
                         placeholder="Default account",
@@ -3639,6 +3650,9 @@ class SettingsScreen(ModalScreen[dict[str, str] | None]):
                 ).value.strip(),
                 "reminder_sync_mode": self._selected_value(
                     "#setting-reminder-sync-mode", "a reminder sync mode"
+                ),
+                "conflict_policy": self._selected_value(
+                    "#setting-conflict-policy", "a conflict policy"
                 ),
                 "default_account_id": self.query_one(
                     "#setting-default-account", Input

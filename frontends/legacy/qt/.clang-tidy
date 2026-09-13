@@ -1,0 +1,10 @@
+---
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  portability-*
+HeaderFilterRegex: '^(native/src|native/tests)/'
+WarningsAsErrors: '*'
+...

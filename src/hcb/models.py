@@ -292,6 +292,7 @@ class Preferences:
     reminder_jitter_seconds: int = 5
     reminder_sync_interval_minutes: int = 0
     reminder_sync_mode: str = "all"
+    conflict_policy: str = "ask"
     time_zone: str = "UTC"
     date_time_format: str = "friendly"
     capture: CapturePreferences = field(default_factory=CapturePreferences)
@@ -311,6 +312,8 @@ class Preferences:
             raise ValueError("reminder_sync_interval_minutes must be non-negative")
         if self.reminder_sync_mode not in {"all", "pull", "off"}:
             raise ValueError("reminder_sync_mode must be all, pull, or off")
+        if self.conflict_policy not in {"ask", "prefer-google", "prefer-local"}:
+            raise ValueError("conflict_policy must be ask, prefer-google, or prefer-local")
         if self.date_time_format not in {"friendly", "friendly_24h", "iso"}:
             raise ValueError("date_time_format must be friendly, friendly_24h, or iso")
         try:

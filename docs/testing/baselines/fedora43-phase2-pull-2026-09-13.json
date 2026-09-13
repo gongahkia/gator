@@ -1,0 +1,327 @@
+{
+  "environment": {
+    "machine": "x86_64",
+    "os": "Linux",
+    "python": "3.12.13",
+    "release": "7.1.12-100.fc43.x86_64"
+  },
+  "fixture": {
+    "calendars": 4,
+    "event_page_size": 250,
+    "events": 2000,
+    "task_lists": 10,
+    "task_page_size": 100,
+    "tasks": 10000
+  },
+  "peak_rss_bytes": {
+    "median": 38535168,
+    "samples": [
+      38498304,
+      38199296,
+      38805504,
+      38535168,
+      38670336
+    ]
+  },
+  "runs": 5,
+  "samples": [
+    {
+      "database_bytes": 8269824,
+      "peak_rss_bytes": 38498304,
+      "rows": {
+        "events": 2000,
+        "tasks": 10000
+      },
+      "stages": {
+        "incremental": {
+          "calendar_seconds": 0.0013574370095739141,
+          "fake_page_generation_seconds": 0.0,
+          "page_apply_seconds": 0.001677219959674403,
+          "pages": {
+            "calendar_list": 1,
+            "events": 4,
+            "task_lists": 1,
+            "tasks": 10
+          },
+          "pulled": 10,
+          "task_seconds": 0.00225982500705868
+        },
+        "initial": {
+          "calendar_seconds": 0.3369939219992375,
+          "fake_page_generation_seconds": 0.012514448957517743,
+          "page_apply_seconds": 0.9135450459725689,
+          "pages": {
+            "calendar_list": 1,
+            "events": 8,
+            "task_lists": 1,
+            "tasks": 100
+          },
+          "pulled": 12014,
+          "task_seconds": 0.5980572529952042
+        }
+      }
+    },
+    {
+      "database_bytes": 8269824,
+      "peak_rss_bytes": 38199296,
+      "rows": {
+        "events": 2000,
+        "tasks": 10000
+      },
+      "stages": {
+        "incremental": {
+          "calendar_seconds": 0.0014296790031949058,
+          "fake_page_generation_seconds": 0.0,
+          "page_apply_seconds": 0.0016071720165200531,
+          "pages": {
+            "calendar_list": 1,
+            "events": 4,
+            "task_lists": 1,
+            "tasks": 10
+          },
+          "pulled": 10,
+          "task_seconds": 0.0019176880014128983
+        },
+        "initial": {
+          "calendar_seconds": 0.3915689720015507,
+          "fake_page_generation_seconds": 0.013500045039108954,
+          "page_apply_seconds": 1.0119855730590643,
+          "pages": {
+            "calendar_list": 1,
+            "events": 8,
+            "task_lists": 1,
+            "tasks": 100
+          },
+          "pulled": 12014,
+          "task_seconds": 0.6446400970016839
+        }
+      }
+    },
+    {
+      "database_bytes": 8269824,
+      "peak_rss_bytes": 38805504,
+      "rows": {
+        "events": 2000,
+        "tasks": 10000
+      },
+      "stages": {
+        "incremental": {
+          "calendar_seconds": 0.0009221070067724213,
+          "fake_page_generation_seconds": 0.0,
+          "page_apply_seconds": 0.0009473010286455974,
+          "pages": {
+            "calendar_list": 1,
+            "events": 4,
+            "task_lists": 1,
+            "tasks": 10
+          },
+          "pulled": 10,
+          "task_seconds": 0.0009500640007900074
+        },
+        "initial": {
+          "calendar_seconds": 0.2645462120126467,
+          "fake_page_generation_seconds": 0.015204996030661277,
+          "page_apply_seconds": 1.0434883749549044,
+          "pages": {
+            "calendar_list": 1,
+            "events": 8,
+            "task_lists": 1,
+            "tasks": 100
+          },
+          "pulled": 12014,
+          "task_seconds": 0.8046097299957182
+        }
+      }
+    },
+    {
+      "database_bytes": 8269824,
+      "peak_rss_bytes": 38535168,
+      "rows": {
+        "events": 2000,
+        "tasks": 10000
+      },
+      "stages": {
+        "incremental": {
+          "calendar_seconds": 0.0009294069895986468,
+          "fake_page_generation_seconds": 0.0,
+          "page_apply_seconds": 0.0009504020272288471,
+          "pages": {
+            "calendar_list": 1,
+            "events": 4,
+            "task_lists": 1,
+            "tasks": 10
+          },
+          "pulled": 10,
+          "task_seconds": 0.0009891009976854548
+        },
+        "initial": {
+          "calendar_seconds": 0.31726830000116024,
+          "fake_page_generation_seconds": 0.015665320010157302,
+          "page_apply_seconds": 1.1611580660101026,
+          "pages": {
+            "calendar_list": 1,
+            "events": 8,
+            "task_lists": 1,
+            "tasks": 100
+          },
+          "pulled": 12014,
+          "task_seconds": 0.8699360040045576
+        }
+      }
+    },
+    {
+      "database_bytes": 8269824,
+      "peak_rss_bytes": 38670336,
+      "rows": {
+        "events": 2000,
+        "tasks": 10000
+      },
+      "stages": {
+        "incremental": {
+          "calendar_seconds": 0.0008499179966747761,
+          "fake_page_generation_seconds": 0.0,
+          "page_apply_seconds": 0.0009069929947145283,
+          "pages": {
+            "calendar_list": 1,
+            "events": 4,
+            "task_lists": 1,
+            "tasks": 10
+          },
+          "pulled": 10,
+          "task_seconds": 0.0010481529898243025
+        },
+        "initial": {
+          "calendar_seconds": 0.3284036699915305,
+          "fake_page_generation_seconds": 0.015134138040593825,
+          "page_apply_seconds": 1.1068349209963344,
+          "pages": {
+            "calendar_list": 1,
+            "events": 8,
+            "task_lists": 1,
+            "tasks": 100
+          },
+          "pulled": 12014,
+          "task_seconds": 0.8044159940036479
+        }
+      }
+    }
+  ],
+  "timings": {
+    "incremental": {
+      "calendar_seconds": {
+        "max_seconds": 0.0014296790031949058,
+        "median_seconds": 0.0009294069895986468,
+        "min_seconds": 0.0008499179966747761,
+        "p95_seconds": 0.0014296790031949058,
+        "runs": 5,
+        "samples_seconds": [
+          0.0013574370095739141,
+          0.0014296790031949058,
+          0.0009221070067724213,
+          0.0009294069895986468,
+          0.0008499179966747761
+        ]
+      },
+      "fake_page_generation_seconds": {
+        "max_seconds": 0.0,
+        "median_seconds": 0.0,
+        "min_seconds": 0.0,
+        "p95_seconds": 0.0,
+        "runs": 5,
+        "samples_seconds": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "page_apply_seconds": {
+        "max_seconds": 0.001677219959674403,
+        "median_seconds": 0.0009504020272288471,
+        "min_seconds": 0.0009069929947145283,
+        "p95_seconds": 0.001677219959674403,
+        "runs": 5,
+        "samples_seconds": [
+          0.001677219959674403,
+          0.0016071720165200531,
+          0.0009473010286455974,
+          0.0009504020272288471,
+          0.0009069929947145283
+        ]
+      },
+      "task_seconds": {
+        "max_seconds": 0.00225982500705868,
+        "median_seconds": 0.0010481529898243025,
+        "min_seconds": 0.0009500640007900074,
+        "p95_seconds": 0.00225982500705868,
+        "runs": 5,
+        "samples_seconds": [
+          0.00225982500705868,
+          0.0019176880014128983,
+          0.0009500640007900074,
+          0.0009891009976854548,
+          0.0010481529898243025
+        ]
+      }
+    },
+    "initial": {
+      "calendar_seconds": {
+        "max_seconds": 0.3915689720015507,
+        "median_seconds": 0.3284036699915305,
+        "min_seconds": 0.2645462120126467,
+        "p95_seconds": 0.3915689720015507,
+        "runs": 5,
+        "samples_seconds": [
+          0.3369939219992375,
+          0.3915689720015507,
+          0.2645462120126467,
+          0.31726830000116024,
+          0.3284036699915305
+        ]
+      },
+      "fake_page_generation_seconds": {
+        "max_seconds": 0.015665320010157302,
+        "median_seconds": 0.015134138040593825,
+        "min_seconds": 0.012514448957517743,
+        "p95_seconds": 0.015665320010157302,
+        "runs": 5,
+        "samples_seconds": [
+          0.012514448957517743,
+          0.013500045039108954,
+          0.015204996030661277,
+          0.015665320010157302,
+          0.015134138040593825
+        ]
+      },
+      "page_apply_seconds": {
+        "max_seconds": 1.1611580660101026,
+        "median_seconds": 1.0434883749549044,
+        "min_seconds": 0.9135450459725689,
+        "p95_seconds": 1.1611580660101026,
+        "runs": 5,
+        "samples_seconds": [
+          0.9135450459725689,
+          1.0119855730590643,
+          1.0434883749549044,
+          1.1611580660101026,
+          1.1068349209963344
+        ]
+      },
+      "task_seconds": {
+        "max_seconds": 0.8699360040045576,
+        "median_seconds": 0.8044159940036479,
+        "min_seconds": 0.5980572529952042,
+        "p95_seconds": 0.8699360040045576,
+        "runs": 5,
+        "samples_seconds": [
+          0.5980572529952042,
+          0.6446400970016839,
+          0.8046097299957182,
+          0.8699360040045576,
+          0.8044159940036479
+        ]
+      }
+    }
+  }
+}

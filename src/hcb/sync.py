@@ -276,6 +276,7 @@ class _SyncEngineBase:
         random_source: Callable[[], float] = random.random,
         wait_for_retry: Callable[[float, Callable[[], bool]], bool] | None = None,
         pull_workers: int = 1,
+        conflict_policy: str = "ask",
     ) -> None:
         if max_retries < 1:
             raise ValueError("max_retries must be at least one")
@@ -283,6 +284,8 @@ class _SyncEngineBase:
             raise ValueError("retry delays must be positive and ordered")
         if not 1 <= pull_workers <= 4:
             raise ValueError("pull workers must be between one and four")
+        if conflict_policy not in {"ask", "prefer-google", "prefer-local"}:
+            raise ValueError("invalid conflict policy")
         self.storage = storage
         self.gateway = gateway
         self.now = now
@@ -293,6 +296,7 @@ class _SyncEngineBase:
         self.random_source = random_source
         self.wait_for_retry = wait_for_retry or self._wait_for_retry
         self.pull_workers = pull_workers
+        self.conflict_policy = conflict_policy
         self._sync_guard = RLock()
         self._sync_depth = 0
 

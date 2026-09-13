@@ -49,3 +49,32 @@ The [paginated pull profile](pull-profile.md) measures synthetic initial and
 unchanged incremental Tasks and Calendar pulls without Google credentials.
 The [read-only live pull profile](live-pull-profile.md) records request latency
 and page-size comparisons without retaining account contents in the repository.
+
+## Fedora follow-up after conflict and sync hardening
+
+On 13 September 2026, the same machine ran the 20-sample Python benchmark
+again after the Qt history build finished. Values below are median / p95 ms;
+the [medium](baselines/fedora43-phase2-medium-2026-09-13.json) and
+[large](baselines/fedora43-phase2-large-2026-09-13.json) reports retain every
+sample. They are not performance budgets.
+
+| Fixture | CLI help | Search | Workspace | Outbox flush | Peak worker RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1,000 tasks / 200 events / 150 writes | 578 / 602 | 1.2 / 1.7 | 17.5 / 20.4 | 51.5 / 56.0 | 43.5 MiB |
+| 10,000 tasks / 2,000 events / 250 writes | 516 / 596 | 1.7 / 2.4 | 156 / 201 | 74.6 / 101 | 52.6 MiB |
+
+The outbox flush median fell from 129 to 52 ms at 150 writes and from 297 to
+75 ms at 250 writes. CLI help median rose from 461 to 578 ms in the medium
+fixture; no change in this phase targeted imports, so the cause is unverified
+and should be profiled before setting a cold-start budget. Search and workspace
+measurements stayed in the same broad range; warm-cache and CPU-frequency
+variation limit direct comparisons between runs.
+
+Separate [synthetic pull](baselines/fedora43-phase2-pull-2026-09-13.json) and
+[TUI startup](baselines/fedora43-phase2-tui-2026-09-13.json) reports used five
+repeat runs. At 10,000 tasks and 2,000 events, the paginated fake-gateway
+initial pull spent a median 804 ms in Tasks and 328 ms in Calendar reads and
+application; the repeated empty incremental pull spent about 1 ms in each.
+At that size, median first task-bearing terminal frame was 944 ms, with 77.2
+MiB RSS at that frame. These runs exclude Google network latency and do not
+predict macOS or desktop-app performance.

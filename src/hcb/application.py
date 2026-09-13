@@ -172,11 +172,7 @@ class _ApplicationServiceBase:
     def notes_projection(self, account_id: str) -> NotesProjection:
         if self._notes_projection is not None:
             return self._notes_projection
-        row = self.storage.connection.execute(
-            "SELECT value FROM app_settings WHERE account_id=? AND key='notes_projection'",
-            (account_id,),
-        ).fetchone()
-        return NotesProjection(row["value"]) if row else NotesProjection.MIRRORED
+        return self.storage.get_notes_projection(account_id)
 
     def set_notes_projection(
         self, account_id: str, projection: NotesProjection | str

@@ -453,13 +453,43 @@ class CalendarEventRepository(_StorageCore):
         }
 
     def clear_calendar_mirror(self, account_id: str, calendar_id: str) -> None:
-        """Clear only server-derived rows, preserving local changes and pending outbox work."""
+        """Hide clean canonical rows until the full pull determines which still exist."""
         self.connection.execute(
-            "DELETE FROM events WHERE account_id=? AND calendar_id=? AND dirty=0",
+            """INSERT OR IGNORE INTO calendar_refresh_candidates
+            SELECT account_id,calendar_id,id FROM events
+            WHERE account_id=? AND calendar_id=? AND dirty=0 AND derived=0""",
+            (account_id, calendar_id),
+        )
+        self.connection.execute(
+            """UPDATE events SET deleted=1
+            WHERE account_id=? AND calendar_id=? AND dirty=0 AND derived=0""",
+            (account_id, calendar_id),
+        )
+        self.connection.execute(
+            "DELETE FROM events WHERE account_id=? AND calendar_id=? AND dirty=0 AND derived=1",
             (account_id, calendar_id),
         )
         self.connection.execute(
             "DELETE FROM event_instance_ranges WHERE account_id=? AND calendar_id=?",
+            (account_id, calendar_id),
+        )
+
+    def mark_calendar_event_seen(self, account_id: str, calendar_id: str, event_id: str) -> None:
+        self.connection.execute(
+            """DELETE FROM calendar_refresh_candidates
+            WHERE account_id=? AND calendar_id=? AND event_id=?""",
+            (account_id, calendar_id, event_id),
+        )
+
+    def finish_calendar_refresh(self, account_id: str, calendar_id: str) -> None:
+        self.connection.execute(
+            """DELETE FROM events WHERE account_id=? AND calendar_id=? AND dirty=0
+            AND id IN (SELECT event_id FROM calendar_refresh_candidates
+                       WHERE account_id=? AND calendar_id=?)""",
+            (account_id, calendar_id, account_id, calendar_id),
+        )
+        self.connection.execute(
+            "DELETE FROM calendar_refresh_candidates WHERE account_id=? AND calendar_id=?",
             (account_id, calendar_id),
         )
 

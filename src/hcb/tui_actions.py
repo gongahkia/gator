@@ -926,6 +926,7 @@ class ActionMixin:
                 config.preferences.reminder_sync_interval_minutes
             ),
             "reminder_sync_mode": config.preferences.reminder_sync_mode,
+            "conflict_policy": config.preferences.conflict_policy,
             "capture_duration": str(config.preferences.capture.default_event_duration_minutes),
             "capture_remove": str(config.preferences.capture.remove_recognized_text).lower(),
             "capture_task_aliases": ", ".join(config.preferences.capture.task_aliases),
@@ -1072,6 +1073,7 @@ class ActionMixin:
                 reminder_jitter_seconds=int(result["reminder_jitter_seconds"]),
                 reminder_sync_interval_minutes=int(result["reminder_sync_interval_minutes"]),
                 reminder_sync_mode=reminder_sync_mode,
+                conflict_policy=result["conflict_policy"],
                 capture=capture,
                 keys=KeyBindings(**keys_data),
                 tui=tui,

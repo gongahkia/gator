@@ -185,7 +185,12 @@ class Runtime:
             if self._gateway_factory is not None
             else GoogleApiClient(credentials)
         )
-        return SyncEngine(self.storage, gateway, pull_workers=4)
+        return SyncEngine(
+            self.storage,
+            gateway,
+            pull_workers=4,
+            conflict_policy=self.config.preferences.conflict_policy,
+        )
 
     def connect_account(self, account_id: str, *, expected_email: str) -> OAuthResult:
         return self.authenticator(account_id).connect(account_id, expected_email=expected_email)
@@ -256,6 +261,7 @@ class Runtime:
         reminder_jitter_seconds: int,
         reminder_sync_interval_minutes: int,
         reminder_sync_mode: str,
+        conflict_policy: str,
         capture: CapturePreferences,
         keys: KeyBindings,
         tui: TuiSettings,
@@ -287,6 +293,7 @@ class Runtime:
                 reminder_jitter_seconds=reminder_jitter_seconds,
                 reminder_sync_interval_minutes=reminder_sync_interval_minutes,
                 reminder_sync_mode=reminder_sync_mode,
+                conflict_policy=conflict_policy,
                 capture=capture,
             ),
             keys=replace(keys, external_editor=external_editor),

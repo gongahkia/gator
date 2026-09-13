@@ -133,8 +133,22 @@ class DeliverySyncMixin(_SyncEngineBase):
             for conflict in self.storage.list_conflicts(account_id)
         ):
             return self._uncertain_delivery_pause(pushed, conflicts)
+        blocked_entities = {
+            (conflict.entity_type, conflict.entity_id)
+            for conflict in self.storage.list_conflicts(account_id)
+        }
         for mutation in self._pending_outbox(account_id):
             assert mutation.id is not None
+            if (mutation.entity_type, mutation.entity_id) in blocked_entities:
+                return SyncResult(
+                    pushed=pushed,
+                    conflicts=conflicts,
+                    retry_pending=True,
+                    retry_message=(
+                        "Sync paused before sending another change to a conflicted item. "
+                        "Resolve the conflict, then sync again."
+                    ),
+                )
             request_id = mutation.request_id
             if (
                 mutation.entity_type is EntityType.EVENT
@@ -218,6 +232,22 @@ class DeliverySyncMixin(_SyncEngineBase):
                     raise AuthenticationRequired(
                         "Google authorization is required", hint="Reconnect this account"
                     ) from exc
+                elif (
+                    exc.status == 412
+                    and self.conflict_policy != "ask"
+                    and sending.operation in {MutationOperation.UPDATE, MutationOperation.DELETE}
+                    and sending.payload.get("etag")
+                    and not self.storage.has_later_entity_mutations(sending)
+                ):
+                    with self.storage.transaction():
+                        if self.conflict_policy == "prefer-google":
+                            self.storage.complete_mutation(account_id, mutation.id)
+                            self.storage.discard_conflicted_change(
+                                account_id, sending.entity_type, sending.entity_id
+                            )
+                        else:
+                            self.storage.retry_mutation_without_etag(sending)
+                    continue
                 elif exc.is_conflict:
                     with self.storage.transaction():
                         self.storage.add_conflict(
@@ -227,11 +257,16 @@ class DeliverySyncMixin(_SyncEngineBase):
                                 mutation.entity_type,
                                 mutation.entity_id,
                                 mutation.payload,
-                                {"status": exc.status, "reason": exc.reason},
+                                {
+                                    "status": exc.status,
+                                    "reason": exc.reason,
+                                    "mutation_id": mutation.id,
+                                },
                             )
                         )
                         self.storage.complete_mutation(account_id, mutation.id)
                     conflicts += 1
+                    blocked_entities.add((mutation.entity_type, mutation.entity_id))
                     continue
                 else:
                     self.storage.fail_mutation(account_id, mutation.id, str(exc))

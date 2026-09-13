@@ -116,6 +116,37 @@ Current result:
 - Disconnect/reset: **not executed**
 - Overall live gate: **not passed**
 
+## Disposable-account Fedora follow-up (partial)
+
+At 2026-09-13 14:28 UTC, automated CLI/API checks used the same isolated
+disposable-account profile. The account identity was checked against Google's
+UserInfo response before writes. The personal profile was not opened or changed.
+
+- Manual Ask resolution in both directions and automatic Prefer Google and
+  Prefer Local handling of stale Calendar ETags: **passed**. Google readback and
+  local dirty/outbox state agreed after each synthetic edit.
+- Abrupt process exit after Google accepted a synthetic Task create: **passed**.
+  Restart showed uncertain delivery; verified `delivered` reconciliation kept
+  one remote task and subsequently delivered a queued edit.
+- Abrupt exit before the create request: **passed**. Google had no task;
+  verified `retry` created one task and then delivered the queued edit.
+- Invalid Calendar sync-token string: Google returned `400`, as distinct from
+  expiry `410`; HCB surfaced the error and retained its cache. An injected
+  `410` followed by real Google full-page reads: **passed**. The affected
+  calendar rebuilt, an existing event retained its local ID, and the other
+  calendar used its previous incremental token. Synthetic calendars were
+  removed; Google returned deleted tombstones and no pending outbox rows.
+- CLI/TUI cross-process UI operation, rich event fields, managed recurrence,
+  notification delivery, OAuth revocation/reconnect, destructive reset, and
+  macOS: **not executed**. No invitations or messages were sent.
+
+The `410` run exposed that deleting every clean event on refresh changed local
+IDs used by task-event links and reminders. The candidate implementation
+preserves clean rows while the full pull runs, retains rows returned by Google,
+and prunes missing rows only when the final page and cursor commit together.
+A fake-gateway test covers an interrupted multi-page restart. This remains a
+partial acceptance record, not release approval.
+
 ## Disposable-account Fedora partial smoke
 
 This automated smoke used a separate Google test user and an isolated owner-only

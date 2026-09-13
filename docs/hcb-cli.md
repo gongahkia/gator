@@ -118,6 +118,19 @@ stylesheet path; an invalid stylesheet falls back to the base UI.
 `preferences.date_time_format` accepts `friendly` (default), `friendly_24h`,
 or `iso`; it controls the dates and times displayed by the TUI.
 
+`preferences.conflict_policy` accepts `ask` (default), `prefer-google`, or
+`prefer-local`; the TUI exposes the same choice in Settings. The policy applies
+to stale-ETag (`412`) task and event updates/deletes. `prefer-google` drops the
+conflicted local mutation and refreshes that list or calendar from Google.
+`prefer-local` retries the mutation without the stale ETag. `ask` leaves an
+open conflict for `hcb conflicts` to resolve. Other conflict responses, and
+updates with later queued edits to the same entity, still require explicit
+resolution. Sync pauses before sending later changes to a conflicted item until
+that conflict is resolved. A remote win clears the local dirty flag before
+pulling so the Google value can replace the cache. If later edits are queued,
+choosing Google is rejected to preserve them; choosing Local requeues the
+rejected edit ahead of them.
+
 TUI text fields offer standard Rich emoji codes and aliases after `:`; use
 `↑`/`↓` to select and `Tab` or `Enter` to insert the displayed emoji.
 

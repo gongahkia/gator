@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.28)
+
+if(NOT DEFINED HCB_SOURCE_DIR OR NOT DEFINED HCB_MANIFEST)
+  message(FATAL_ERROR "HCB_SOURCE_DIR and HCB_MANIFEST are required")
+endif()
+
+include("${HCB_SOURCE_DIR}/cmake/HcbNativeDependencyManifest.cmake")
+hcb_load_native_dependency_manifest("${HCB_MANIFEST}")
+
+if(NOT HCB_NATIVE_QT_VERSION STREQUAL "6.11.1")
+  message(FATAL_ERROR "Expected Qt 6.11.1, got ${HCB_NATIVE_QT_VERSION}")
+endif()
+if(NOT HCB_NATIVE_QT_HASH_ALGORITHM STREQUAL "SHA256")
+  message(FATAL_ERROR "Expected a SHA256 Qt archive hash")
+endif()
+if(NOT HCB_NATIVE_SQLITE_VERSION STREQUAL "3.53.3")
+  message(FATAL_ERROR "Expected SQLite 3.53.3, got ${HCB_NATIVE_SQLITE_VERSION}")
+endif()
+if(NOT HCB_NATIVE_SQLITE_HASH_ALGORITHM STREQUAL "SHA3_256")
+  message(FATAL_ERROR "Expected a SHA3_256 SQLite archive hash")
+endif()

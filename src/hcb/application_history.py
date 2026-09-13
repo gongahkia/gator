@@ -48,23 +48,45 @@ class HistoryServiceMixin(_ApplicationServiceBase):
             raise ValueError(
                 "uncertain delivery requires the explicit retry or delivered reconciliation action"
             )
-        payload = (
-            conflict.local_payload
-            if status is ConflictStatus.KEEP_LOCAL
-            else conflict.remote_payload
-            if status is ConflictStatus.KEEP_REMOTE
-            else merged_payload
-        )
+        payload = conflict.local_payload if status is ConflictStatus.KEEP_LOCAL else merged_payload
         if status is ConflictStatus.MERGED and payload is None:
             raise ValueError("merged conflict resolution requires merged_payload")
         with self.storage.transaction():
             if status in {ConflictStatus.KEEP_LOCAL, ConflictStatus.MERGED}:
-                self._enqueue(
-                    account_id,
-                    conflict.entity_type,
-                    conflict.entity_id,
-                    MutationOperation.UPDATE,
-                    payload or {},
+                retry_payload = dict(payload or {})
+                retry_payload.pop("etag", None)
+                mutation_id = conflict.remote_payload.get("mutation_id")
+                if isinstance(mutation_id, int) and mutation_id > 0:
+                    self.storage.enqueue(
+                        PendingMutation(
+                            mutation_id,
+                            account_id,
+                            conflict.entity_type,
+                            conflict.entity_id,
+                            MutationOperation.UPDATE,
+                            retry_payload,
+                        )
+                    )
+                else:
+                    later = self.storage.connection.execute(
+                        """SELECT 1 FROM outbox WHERE account_id=? AND entity_type=?
+                        AND entity_id=? LIMIT 1""",
+                        (account_id, conflict.entity_type.value, conflict.entity_id),
+                    ).fetchone()
+                    if later is not None:
+                        raise ConflictError(
+                            "Cannot preserve later queued change order for this older conflict"
+                        )
+                    self._enqueue(
+                        account_id,
+                        conflict.entity_type,
+                        conflict.entity_id,
+                        MutationOperation.UPDATE,
+                        retry_payload,
+                    )
+            else:
+                self.storage.discard_conflicted_change(
+                    account_id, conflict.entity_type, conflict.entity_id
                 )
             self.storage.resolve_conflict(account_id, conflict_id, status)
         return replace(conflict, status=status, resolved_at=utc_now())

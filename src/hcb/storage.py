@@ -13,10 +13,11 @@ from typing import Any, cast
 
 from .models import (
     Metadata,
+    NotesProjection,
 )
 from .paths import AppPaths
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -468,6 +469,29 @@ FROM conflicts;
 INSERT INTO workspace_search(workspace_search) VALUES ('rebuild');
 """
 
+_MIGRATION_9 = """
+CREATE TABLE calendar_refresh_candidates (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    calendar_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    PRIMARY KEY(account_id,calendar_id,event_id)
+);
+"""
+
+_MIGRATION_10 = """
+CREATE TABLE task_private_notes (
+    account_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    notes TEXT,
+    PRIMARY KEY(account_id,task_id),
+    FOREIGN KEY(account_id,task_id) REFERENCES tasks(account_id,id) ON DELETE CASCADE
+);
+INSERT INTO task_private_notes(account_id,task_id,notes)
+SELECT t.account_id,t.id,t.notes FROM tasks t
+JOIN app_settings s ON s.account_id=t.account_id AND s.key='notes_projection'
+WHERE s.value='disabled' AND t.notes IS NOT NULL;
+"""
+
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
@@ -504,6 +528,35 @@ class _StorageCore:
         except BaseException:
             self.connection.close()
             raise
+
+    def get_notes_projection(self, account_id: str) -> NotesProjection:
+        row = self.connection.execute(
+            "SELECT value FROM app_settings WHERE account_id=? AND key='notes_projection'",
+            (account_id,),
+        ).fetchone()
+        return NotesProjection(row["value"]) if row else NotesProjection.MIRRORED
+
+    def set_private_task_note(self, account_id: str, task_id: str, notes: str | None) -> None:
+        self.connection.execute(
+            """INSERT INTO task_private_notes(account_id,task_id,notes) VALUES (?,?,?)
+            ON CONFLICT(account_id,task_id) DO UPDATE SET notes=excluded.notes""",
+            (account_id, task_id, notes),
+        )
+
+    def private_task_notes(self, account_id: str, list_id: str) -> dict[str, str | None]:
+        rows = self.connection.execute(
+            """SELECT n.task_id,n.notes FROM task_private_notes n
+            JOIN tasks t ON t.account_id=n.account_id AND t.id=n.task_id
+            WHERE n.account_id=? AND t.list_id=?""",
+            (account_id, list_id),
+        )
+        return {row["task_id"]: row["notes"] for row in rows}
+
+    def clear_private_task_note(self, account_id: str, task_id: str) -> None:
+        self.connection.execute(
+            "DELETE FROM task_private_notes WHERE account_id=? AND task_id=?",
+            (account_id, task_id),
+        )
 
     def _enable_wal(self) -> None:
         deadline = time.monotonic() + 5
@@ -547,6 +600,8 @@ class _StorageCore:
             _MIGRATION_6,
             _MIGRATION_7,
             _MIGRATION_8,
+            _MIGRATION_9,
+            _MIGRATION_10,
         )
         with self.transaction():
             # Another process may have completed the migration while we waited
