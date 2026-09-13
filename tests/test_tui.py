@@ -2113,6 +2113,7 @@ def test_sync_worker_uses_an_isolated_sqlite_connection(tmp_path: Path) -> None:
         pushed = 0
         conflicts = 0
         cancelled = False
+        retry_pending = False
         retry_exhausted = False
 
     class Engine:

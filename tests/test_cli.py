@@ -675,6 +675,33 @@ def test_sync_reports_bounded_retry_exhaustion_with_a_resume_hint(
     assert "hcb sync to resume" in result.stderr
 
 
+def test_sync_reports_uncertain_delivery_with_reconciliation_hint(
+    cli_env: tuple[CliRunner, AppPaths], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner, paths = cli_env
+
+    class Engine:
+        def sync(self, account_id: str, **kwargs: object) -> SyncResult:
+            return SyncResult(
+                retry_pending=True,
+                retry_message="Sync paused for uncertain Google delivery.",
+            )
+
+    class SyncRuntime(Runtime):
+        def sync_engine(self, account_id: str) -> Engine:
+            return Engine()
+
+    monkeypatch.setattr(
+        cli,
+        "_runtime_factory",
+        lambda: SyncRuntime(paths, environ={}, token_store=MemoryTokens()),  # type: ignore[arg-type]
+    )
+    result = runner.invoke(cli.app, ["sync"])
+    assert result.exit_code == 4
+    assert "uncertain Google delivery" in result.stderr
+    assert "hcb conflicts resolve-delivery" in result.stderr
+
+
 def test_expected_not_found_uses_stable_exit_without_traceback(
     cli_env: tuple[CliRunner, AppPaths],
 ) -> None:

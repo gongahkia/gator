@@ -1217,7 +1217,7 @@ class ActionMixin:
                     result.retry_message or "Sync cancelled. Local changes remain queued.",
                     severity="warning",
                 )
-            elif result.retry_exhausted:
+            elif result.retry_pending:
                 self.call_from_thread(
                     self.notify,
                     result.retry_message or "Sync paused. Local changes remain queued.",

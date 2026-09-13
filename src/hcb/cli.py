@@ -21,7 +21,7 @@ from typer import _click as click
 from .application import BatchActionPreview, BatchMovePreview, SearchResult
 from .config import Config, ConfigError, load, loads, profile_path, save
 from .config import schema as config_schema
-from .errors import ConfigurationError, ExitCode, HcbError, OfflineError
+from .errors import ConfigurationError, ConflictError, ExitCode, HcbError, OfflineError
 from .import_export import (
     ImportedEvent,
     ImportedRecord,
@@ -1471,6 +1471,11 @@ def sync(
         raise OfflineError(
             "Sync cancelled. Local changes remain queued.", hint="Run hcb sync to resume."
         ) from exc
+    if result.retry_pending and not result.retry_exhausted:
+        raise ConflictError(
+            result.retry_message or "Sync paused for uncertain delivery.",
+            hint="Check Google, then run hcb conflicts list and hcb conflicts resolve-delivery.",
+        )
     if result.cancelled or result.retry_exhausted:
         raise OfflineError(
             result.retry_message or "Sync paused. Local changes remain queued.",

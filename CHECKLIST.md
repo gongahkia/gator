@@ -20,6 +20,8 @@ Finish the shared-core and database work, then measure and optimize their slow p
 - [ ] Test the CLI/TUI, future desktop app, and optional reminder process running at the same time. Define process-level sync ownership and verify that active outbox deliveries are not mistaken for interrupted ones.
   - [x] Serialize CLI/TUI/reminder sync and explicit recurring-instance refresh per local database with a process-level lock. Verify a second sync leaves an active delivery untouched and a stopped owner's lock is released on Linux.
   - [x] Drain more than 100 pending writes in one explicit sync; `flush_outbox` fetches successive pages until the account's pending outbox is empty.
+  - [x] Make schema migrations atomic across concurrent database opens, including rollback after a failed migration and bounded WAL startup contention.
+  - [x] Pause account sends after an uncertain create, preserve later queued edits and their dirty state, and restore the original queue position on verified retry. Exercise abrupt process exit with a fake gateway.
 - [ ] Decide the OAuth distribution model: retain bring-your-own Google client credentials or pursue a project-owned client and its verification process. Confirm requested scopes, token storage, keyring behavior, and onboarding on both platforms.
 - [ ] Define the first supported Linux distributions, macOS versions, architectures, and terminal environments; record what is outside the initial release target.
 - [ ] Finish the shared-core, SQLite migration, outbox, and multi-process contracts needed by desktop frontends. Verify the CLI/TUI still works with the same accounts, credentials, and database after those changes.

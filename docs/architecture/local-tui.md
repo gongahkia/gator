@@ -69,6 +69,21 @@ bounded transactions, a busy timeout, and one writer transaction at a time.
 The sync engine also holds a per-database advisory file lock across remote
 sync and outbox delivery, so another process cannot recover its live `sending`
 rows as interrupted deliveries.
+Schema upgrades take one SQLite writer transaction and recheck the version
+after obtaining it. A failed upgrade rolls back; simultaneous first-run opens
+retry transient WAL setup contention for up to five seconds.
+
+Each outbox write enters `sending` before a remote request. After an owner stops,
+repeatable writes return to `pending`; a task, task-list, or calendar create and
+a cross-list task move with unknown delivery instead become an open
+`uncertain-delivery` conflict. Outbound sync for that account pauses, including
+later queued edits, until the user verifies Google and marks the mutation
+delivered with its remote ID or explicitly retries it. A retry restores its
+original queue position. Calendar event creates use a deterministic remote ID
+and reconcile an `already exists` response on replay. Full sync also pauses
+before pulling while an uncertain delivery is open; read-only local views remain
+available. These rules have synthetic restart and process tests, while live
+Google acceptance remains a separate release check.
 The scheduler is a visible, separately invokable process; opening the TUI does
 not silently install or start a daemon.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -498,11 +499,25 @@ class _StorageCore:
         try:
             self.connection.execute("PRAGMA foreign_keys = ON")
             self.connection.execute("PRAGMA busy_timeout = 5000")
-            self.connection.execute("PRAGMA journal_mode = WAL")
+            self._enable_wal()
             self._migrate()
         except BaseException:
             self.connection.close()
             raise
+
+    def _enable_wal(self) -> None:
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                self.connection.execute("PRAGMA journal_mode = WAL")
+                return
+            except sqlite3.OperationalError as error:
+                if (
+                    error.sqlite_errorcode not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(0.05)
 
     def _execute_schema_script(self, script: str) -> None:
         # executescript() commits an open transaction before running the script.

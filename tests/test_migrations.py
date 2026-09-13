@@ -152,3 +152,17 @@ def test_two_concurrent_openers_can_migrate_one_legacy_database(tmp_path: Path) 
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [executor.submit(open_database) for _ in range(2)]
         assert [future.result(timeout=10) for future in futures] == [SCHEMA_VERSION] * 2
+
+
+def test_two_concurrent_openers_can_initialize_fresh_databases(tmp_path: Path) -> None:
+    def open_database(path: Path, ready: Barrier) -> int:
+        ready.wait(timeout=5)
+        with Storage(path) as storage:
+            return int(storage.connection.execute("PRAGMA user_version").fetchone()[0])
+
+    for index in range(16):
+        path = tmp_path / f"fresh-concurrent-{index}.db"
+        ready = Barrier(2)
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(open_database, path, ready) for _ in range(2)]
+            assert [future.result(timeout=10) for future in futures] == [SCHEMA_VERSION] * 2

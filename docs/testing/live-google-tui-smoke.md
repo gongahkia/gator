@@ -54,7 +54,8 @@ acceptance run; preparing credentials does not itself pass the live gate.
    surface an **uncertain delivery** action and must not issue another create. Check
    Google manually, then exercise both resolutions: provide the remote ID when the
    object exists, or choose retry only after verifying it does not. The local intent
-   must remain visible throughout.
+   must remain visible throughout. Queue a later edit before the interruption and
+   verify sync leaves it queued until reconciliation, then sends it afterward.
 
 ## Calendar tokens and rich fields
 
