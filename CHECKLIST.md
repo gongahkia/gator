@@ -18,6 +18,7 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
 - [ ] Exercise expired tokens, revoked access, network loss, quota/retry, stale ETags, invalid Calendar sync tokens, and restart recovery. Preserve a redacted manual acceptance record; incomplete live acceptance blocks release promotion.
 - [ ] Test the CLI/TUI, future desktop app, and optional reminder process running at the same time. Define process-level sync ownership and verify that active outbox deliveries are not mistaken for interrupted ones.
   - [x] Serialize CLI/TUI/reminder sync and explicit recurring-instance refresh per local database with a process-level lock. Verify a second sync leaves an active delivery untouched and a stopped owner's lock is released on Linux.
+  - [ ] Drain more than 100 pending writes in one explicit sync; `flush_outbox` still processes one fetched page.
 - [ ] Decide the OAuth distribution model: retain bring-your-own Google client credentials or pursue a project-owned client and its verification process. Confirm requested scopes, token storage, keyring behavior, and onboarding on both platforms.
 - [ ] Define the first supported Linux distributions, macOS versions, architectures, and terminal environments; record what is outside the initial release target.
 
