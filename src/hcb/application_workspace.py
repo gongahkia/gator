@@ -6,10 +6,34 @@ from datetime import date, datetime, timedelta
 
 from .application import Json, TimeSlot, WorkspaceSnapshot, _ApplicationServiceBase
 from .errors import NotFoundError
-from .models import DateTimeKind, Event, EventStatus, NotesProjection, Task
+from .models import (
+    Account,
+    Calendar,
+    DateTimeKind,
+    DriveFile,
+    Event,
+    EventStatus,
+    NotesProjection,
+    Task,
+)
 
 
 class WorkspaceServiceMixin(_ApplicationServiceBase):
+    def list_accounts(self) -> tuple[Account, ...]:
+        return tuple(self.storage.list_accounts())
+
+    def account(self, account_id: str) -> Account | None:
+        return self.storage.get_account(account_id)
+
+    def calendar(self, account_id: str, calendar_id: str) -> Calendar | None:
+        return self.storage.get_calendar(account_id, calendar_id)
+
+    def drive_file(self, account_id: str, file_id: str) -> DriveFile | None:
+        return self.storage.get_drive_file(account_id, file_id)
+
+    def event_by_remote_id(self, account_id: str, remote_id: str) -> Event | None:
+        return self.storage.get_event_by_remote(account_id, remote_id)
+
     def workspace(self, account_id: str) -> WorkspaceSnapshot:
         """Return one local-only snapshot for interactive clients."""
         account = self.storage.get_account(account_id)
@@ -39,6 +63,19 @@ class WorkspaceServiceMixin(_ApplicationServiceBase):
         end: date | datetime,
     ) -> Json:
         return self.storage.instance_cache_status(account_id, calendar_id, start, end)
+
+    def freebusy_request(self, account_id: str, start: datetime, end: datetime) -> Json:
+        """Build an explicit remote availability request from selected cached calendars."""
+        calendars = [
+            {"id": calendar.remote_id}
+            for calendar in self.storage.list_calendars(account_id)
+            if calendar.selected and calendar.remote_id
+        ]
+        return {
+            "timeMin": start.isoformat().replace("+00:00", "Z"),
+            "timeMax": end.isoformat().replace("+00:00", "Z"),
+            "items": calendars,
+        }
 
     def find_time(
         self,

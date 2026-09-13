@@ -269,7 +269,7 @@ class WorkspaceMixin:
             colors = {
                 item_id: stored.color
                 for item_id, _title, _selected in self.cache.calendars
-                if (stored := self.runtime.storage.get_calendar(self.account_id or "", item_id))
+                if (stored := self.runtime.application.calendar(self.account_id or "", item_id))
                 if stored.color and stored.color.startswith("#")
             }
             calendar.set_calendar(
@@ -637,7 +637,7 @@ class WorkspaceMixin:
         suffix = f"  · {' · '.join(extras)}" if extras else ""
         color = event.color_id
         if color is None:
-            calendar = self.runtime.storage.get_calendar(event.account_id, event.calendar_id)
+            calendar = self.runtime.application.calendar(event.account_id, event.calendar_id)
             color = calendar.color if calendar is not None else None
         dot_color = (GOOGLE_EVENT_COLORS.get(color) if color is not None else None) or (
             color if color is not None and color.startswith("#") else None
@@ -954,7 +954,7 @@ class WorkspaceMixin:
             return None
         return cast(
             DriveFile | None,
-            self.runtime.storage.get_drive_file(self.account_id, self.selected[1]),
+            self.runtime.application.drive_file(self.account_id, self.selected[1]),
         )
 
     def search_local(self: Any, query: str) -> tuple[SearchResult, ...]:

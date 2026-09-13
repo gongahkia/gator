@@ -21,7 +21,6 @@ from .config import KeyBindings, RoleStyle, ThemeColors, ThemeRoles, TuiSettings
 from .errors import HcbError
 from .loaders import LOADER_PRESETS
 from .models import CapturePreferences, DateTimeKind, Event, EventDateTime, Task, TaskStatus
-from .storage import Storage
 from .themes import preset, presets
 from .tui import (
     CURRENT_THEME_VALUE,
@@ -383,7 +382,7 @@ class ActionMixin:
             elif scope == "series" and event.is_occurrence:
                 if not event.canonical_id:
                     raise ValueError("the occurrence has no canonical recurring series")
-                target_event = self.runtime.storage.get_event_by_remote(
+                target_event = self.runtime.application.event_by_remote_id(
                     self.account_id, event.canonical_id
                 )
                 if target_event is None:
@@ -1119,21 +1118,14 @@ class ActionMixin:
         day = date.fromisoformat(raw_day)
         start = datetime.combine(day, datetime.min.time(), UTC) + timedelta(hours=int(raw_start))
         end = datetime.combine(day, datetime.min.time(), UTC) + timedelta(hours=int(raw_end))
-        calendars: list[dict[str, str]] = []
-        for item_id, _summary, selected in self.cache.calendars:
-            calendar_item = self.runtime.storage.get_calendar(account_id, item_id)
-            if selected and calendar_item and calendar_item.remote_id:
-                calendars.append({"id": calendar_item.remote_id})
-        return account_id, {
-            "timeMin": start.isoformat().replace("+00:00", "Z"),
-            "timeMax": end.isoformat().replace("+00:00", "Z"),
-            "items": calendars,
-        }
+        return account_id, cast(
+            dict[str, object], self.runtime.application.freebusy_request(account_id, start, end)
+        )
 
     def remote_freebusy(self: Any, raw_day: str, raw_start: str, raw_end: str) -> dict[str, object]:
         """Run the explicit Google request synchronously for non-TUI callers."""
         account_id, body = self._freebusy_request(raw_day, raw_start, raw_end)
-        return cast(dict[str, object], self.runtime.sync_engine(account_id).gateway.freebusy(body))
+        return cast(dict[str, object], self.runtime.query_freebusy(account_id, body))
 
     def request_remote_freebusy(
         self: Any,
@@ -1161,7 +1153,7 @@ class ActionMixin:
         failure: Exception | None = None
         try:
             self.call_from_thread(self.update_loading, "Waiting for Google availability")
-            result = self.runtime.sync_engine(account_id).gateway.freebusy(body)
+            result = self.runtime.query_freebusy(account_id, body)
         except Exception as exc:  # Google failures must not tear down the workspace.
             failure = exc
         else:
@@ -1209,12 +1201,8 @@ class ActionMixin:
         failure: Exception | None = None
         self._sync_cancel.clear()
         self.call_from_thread(lambda: self.start_loading("Preparing Google sync", cancellable=True))
-        worker_storage: Storage | None = None
         try:
-            engine = self.runtime.sync_engine(account_id)
-            worker_storage = Storage(self.runtime.paths.database_file)
-            engine.storage = worker_storage
-            result = engine.sync(
+            result = self.runtime.sync_account(
                 account_id,
                 progress=lambda status: self.call_from_thread(self.update_loading, status),
                 cancelled=self._sync_cancel.is_set,
@@ -1248,8 +1236,6 @@ class ActionMixin:
                     f"Sync complete: {result.pulled} pulled, {result.pushed} pushed",
                 )
         finally:
-            if worker_storage is not None:
-                worker_storage.close()
             self.call_from_thread(self.stop_loading)
             self.call_from_thread(self.refresh_workspace)
             self._sync_lock.release()
@@ -1279,14 +1265,10 @@ class ActionMixin:
         start = datetime.combine(self.selected_date, datetime.min.time(), UTC)
         duration = {"Day": 1, "Week": 7, "Month": 35}.get(self.surface, 14)
         self.call_from_thread(self.start_loading, "Preparing recurring instance refresh")
-        worker_storage: Storage | None = None
         failure: Exception | None = None
         try:
-            engine = self.runtime.sync_engine(account_id)
-            worker_storage = Storage(self.runtime.paths.database_file)
-            engine.storage = worker_storage
             self.call_from_thread(self.update_loading, "Fetching recurring events")
-            events = engine.refresh_occurrences(
+            events = self.runtime.refresh_occurrences(
                 account_id, calendar_id, start, start + timedelta(days=duration)
             )
         except Exception as exc:
@@ -1294,8 +1276,6 @@ class ActionMixin:
         else:
             self.call_from_thread(self.notify, f"Refreshed {len(events)} recurring instances")
         finally:
-            if worker_storage is not None:
-                worker_storage.close()
             self.call_from_thread(self.stop_loading)
             self.call_from_thread(self.refresh_workspace)
         if failure is not None:

@@ -73,7 +73,7 @@ class LifecycleMixin:
             self.account_id = None
         self.refresh_workspace()
         self._apply_column_widths()
-        if self.account_id is None and not self.runtime.storage.list_accounts():
+        if self.account_id is None and not self.runtime.application.list_accounts():
             self.call_after_refresh(
                 lambda: self.push_screen(self._onboarding_screen(), self._onboarding_result)
             )
@@ -253,9 +253,8 @@ class LifecycleMixin:
             return
         failure: Exception | None = None
         try:
-            authenticator = self.runtime.authenticator(self.account_id)
             self.call_from_thread(self.update_loading, "Waiting for browser approval")
-            authenticator.connect(self.account_id)
+            self.runtime.connect_account(self.account_id)
         except Exception as exc:
             failure = exc
         else:
@@ -276,7 +275,7 @@ class LifecycleMixin:
         if account_id is not None and isinstance(
             error, (AuthenticationRequired, ConfigurationError)
         ):
-            account = self.runtime.storage.get_account(account_id)
+            account = self.runtime.application.account(account_id)
             email = account.email if account is not None else "YOUR_GOOGLE_EMAIL"
             self.push_screen(
                 GoogleSetupScreen(

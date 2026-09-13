@@ -59,6 +59,38 @@ def test_workspace_metadata_reads_are_available_through_application(
     assert [conflict.id for conflict in app.list_conflicts("a")] == [conflict_id]
 
 
+def test_workspace_lookups_and_freebusy_request_are_account_scoped(app: ApplicationService) -> None:
+    app.storage.upsert_account(Account("b", "other@example.test"))
+    app.storage.upsert_calendar(Calendar("hidden", "a", "Hidden", remote_id="other", selected=False))
+    drive_file = DriveFile("doc", "a", "Agenda")
+    app.storage.upsert_drive_file(drive_file)
+    event = app.create_event(
+        "a",
+        "cal",
+        "Meeting",
+        EventDateTime(DateTimeKind.DATE, date(2026, 8, 21)),
+        EventDateTime(DateTimeKind.DATE, date(2026, 8, 22)),
+    )
+    event = replace(event, remote_id="remote-event")
+    app.storage.upsert_event(event)
+
+    assert [account.id for account in app.list_accounts()] == ["a", "b"]
+    assert app.account("a") is not None
+    assert app.calendar("a", "cal") is not None
+    assert app.calendar("b", "cal") is None
+    assert app.drive_file("a", "doc") == drive_file
+    assert app.drive_file("b", "doc") is None
+    assert app.event_by_remote_id("a", "remote-event") == event
+    assert app.event_by_remote_id("b", "remote-event") is None
+    assert app.freebusy_request(
+        "a", datetime(2026, 8, 21, 9, tzinfo=UTC), datetime(2026, 8, 21, 10, tzinfo=UTC)
+    ) == {
+        "timeMin": "2026-08-21T09:00:00Z",
+        "timeMax": "2026-08-21T10:00:00Z",
+        "items": [{"id": "remote-cal"}],
+    }
+
+
 def test_task_write_is_optimistic_and_transactional(app: ApplicationService) -> None:
     task = app.create_task(
         "a",

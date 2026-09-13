@@ -5,12 +5,13 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import replace
+from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from typing import Any
 
 from .application import ApplicationService
-from .auth import GoogleAuthenticator, TokenStore
+from .auth import GoogleAuthenticator, OAuthResult, TokenStore
 from .config import (
     Config,
     ConfigError,
@@ -33,10 +34,10 @@ from .credentials import (
 )
 from .errors import AuthenticationRequired, ConfigurationError, NotFoundError, StorageError
 from .google_client import GoogleApiClient, GoogleGateway
-from .models import Account, CapturePreferences
+from .models import Account, CapturePreferences, Event
 from .paths import AppPaths
 from .storage import Storage
-from .sync import SyncEngine
+from .sync import SyncEngine, SyncResult
 from .themes import apply_preset
 
 GatewayFactory = Callable[[Any], GoogleGateway]
@@ -185,6 +186,40 @@ class Runtime:
             else GoogleApiClient(credentials)
         )
         return SyncEngine(self.storage, gateway)
+
+    def connect_account(self, account_id: str, *, open_browser: bool = True) -> OAuthResult:
+        return self.authenticator(account_id).connect(account_id, open_browser=open_browser)
+
+    def query_freebusy(self, account_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        return self.sync_engine(account_id).gateway.freebusy(body)
+
+    def sync_account(
+        self,
+        account_id: str,
+        *,
+        progress: Callable[[str], None] | None = None,
+        cancelled: Callable[[], bool] | None = None,
+        cancel_hint: str = "Press Ctrl+C to cancel.",
+    ) -> SyncResult:
+        """Run interactive sync on an independent SQLite connection."""
+        engine = self.sync_engine(account_id)
+        with Storage(self.paths.database_file) as worker_storage:
+            engine.storage = worker_storage
+            return engine.sync(
+                account_id,
+                progress=progress,
+                cancelled=cancelled,
+                cancel_hint=cancel_hint,
+            )
+
+    def refresh_occurrences(
+        self, account_id: str, calendar_id: str, start: datetime, end: datetime
+    ) -> list[Event]:
+        """Fetch a named range and persist instances on an independent connection."""
+        engine = self.sync_engine(account_id)
+        with Storage(self.paths.database_file) as worker_storage:
+            engine.storage = worker_storage
+            return engine.refresh_occurrences(account_id, calendar_id, start, end)
 
     def disconnect(self, account_id: str, *, reset_local_data: bool = False) -> bool:
         """Remove local credentials without requiring a client configuration to be readable."""

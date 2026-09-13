@@ -2962,7 +2962,7 @@ class ItemViewScreen(ModalScreen[str | None]):
     def _event_color(self, event: Event) -> str | None:
         color = event.color_id
         if color is None:
-            calendar = self.hcb.runtime.storage.get_calendar(event.account_id, event.calendar_id)
+            calendar = self.hcb.runtime.application.calendar(event.account_id, event.calendar_id)
             color = calendar.color if calendar is not None else None
         if color is None:
             return None
