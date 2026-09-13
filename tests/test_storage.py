@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from hcb import storage_sync
 from hcb.models import (
     Account,
     Calendar,
@@ -175,7 +176,7 @@ def test_outbox_cursor_conflict_reminder_and_transaction(store: Storage) -> None
 
 
 def test_get_mutation_reads_later_pages_and_preserves_account_and_delivery_state(
-    store: Storage,
+    store: Storage, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     seed(store, "a")
     seed(store, "b")
@@ -194,7 +195,19 @@ def test_get_mutation_reads_later_pages_and_preserves_account_and_delivery_state
     started_at = datetime.now(UTC)
     store.mark_mutation_sending("a", mutation_id, request_id="request-101", started_at=started_at)
 
-    mutation = store.get_mutation("a", mutation_id)
+    decoded_rows = 0
+    original_loads = storage_sync.json.loads
+
+    def counted_loads(value: str) -> object:
+        nonlocal decoded_rows
+        decoded_rows += 1
+        return original_loads(value)
+
+    with monkeypatch.context() as patcher:
+        patcher.setattr(storage_sync.json, "loads", counted_loads)
+        mutation = store.get_mutation("a", mutation_id)
+
+    assert decoded_rows == 1
     assert mutation is not None
     assert mutation == store.pending_mutations("a", limit=101)[-1]
     assert mutation.delivery_state is OutboxDeliveryState.SENDING
