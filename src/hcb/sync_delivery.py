@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterator
 from dataclasses import replace
 
 from .errors import (
@@ -110,6 +111,12 @@ class DeliverySyncMixin(_SyncEngineBase):
                     )
         return conflicts
 
+    def _pending_outbox(self, account_id: str) -> Iterator[PendingMutation]:
+        while pending := self.storage.pending_mutations(
+            account_id, delivery_state=OutboxDeliveryState.PENDING
+        ):
+            yield from pending
+
     def flush_outbox(self, account_id: str, *, context: _RetryContext | None = None) -> SyncResult:
         with self.sync_ownership():
             return self._flush_outbox_owned(account_id, context=context)
@@ -120,9 +127,7 @@ class DeliverySyncMixin(_SyncEngineBase):
         context = context or self._retry_context()
         pushed = 0
         conflicts = self.recover_interrupted_deliveries(account_id)
-        for mutation in self.storage.pending_mutations(
-            account_id, delivery_state=OutboxDeliveryState.PENDING
-        ):
+        for mutation in self._pending_outbox(account_id):
             assert mutation.id is not None
             request_id = mutation.request_id
             if (

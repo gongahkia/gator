@@ -209,6 +209,35 @@ def test_sync_reports_completed_stages(store):
     ]
 
 
+def test_sync_drains_more_than_two_outbox_pages_before_pull(store: Storage) -> None:
+    gateway = FakeGateway()
+    for index in range(205):
+        task_id = f"task-{index:03}"
+        store.upsert_task(Task(task_id, "a", "list", "Local", remote_id=task_id))
+        store.enqueue(
+            PendingMutation(
+                None,
+                "a",
+                EntityType.TASK,
+                task_id,
+                MutationOperation.UPDATE,
+                {"list_id": "list", "body": {"title": f"Updated {index}"}},
+            )
+        )
+
+    def update_task(task_list_id, task_id, body, *, etag=None):
+        gateway.calls.append(("update-task", task_id))
+        return {"id": task_id}
+
+    gateway.update_task = update_task
+    result = SyncEngine(store, gateway).sync("a")
+
+    assert result.pushed == 205
+    assert gateway.calls[:205] == [("update-task", f"task-{index:03}") for index in range(205)]
+    assert gateway.calls[205] == ("task-lists", None)
+    assert store.pending_mutation_count("a") == 0
+
+
 def test_page_checkpoint_resumes_without_replaying_committed_page(store):
     gateway = FakeGateway()
     gateway.task_pages = {
