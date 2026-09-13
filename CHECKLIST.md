@@ -26,7 +26,7 @@ Finish the shared-core and database work, then measure and optimize their slow p
 ## Optimize the shared core and database before desktop restoration
 
 - [ ] Set user-facing targets for CLI cold start, search, large-account sync, database growth, and memory use on representative Linux and macOS machines.
-- [ ] Extend the existing [benchmark](tools/benchmark_python.py) and performance tests with realistic account sizes and service-level timings; measure repeat runs and tail latency, not just pure calendar geometry.
+- [x] Extend the existing [benchmark](tools/benchmark_python.py) and performance tests with realistic account sizes and service-level timings; measure repeat runs and tail latency, not just pure calendar geometry. Preserve the [initial local baseline](docs/testing/performance-baseline.md).
 - [ ] Profile the measured slow paths in SQLite queries, workspace updates, startup, and Google request handling. Preserve a trace or reproducible fixture for each significant finding.
 - [ ] Apply targeted query/index improvements, incremental updates, caching, or background work only where profiles justify them; compare results against the baseline.
 - [ ] Keep stable core performance regression checks in the local check workflow and any future CI; run hardware-specific benchmarks separately before releases.

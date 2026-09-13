@@ -50,12 +50,13 @@ but does not replace, the automated suite or the live Google procedure.
 
 ## Automated scale check
 
-Run `python tools/benchmark_python.py`. The deterministic fixture contains 10,000
-tasks and 2,000 events. The enforced regression tripwires are 5 seconds each for
-cold database open, 10k local search, one-month agenda query, and interactive cache
-load. It also projects 5,000 timed events and 5,000 due tasks through Week and
-six-week Month geometry, with 2 and 3 second regression tripwires respectively.
-These broad limits are intended to be stable on shared CI, not to advertise latency.
+Run `make benchmark`. The default deterministic fixture contains 10,000 tasks,
+2,000 events, and 250 queued writes. The report includes repeated CLI startup,
+search, workspace, and local outbox timings with median and p95 values, plus
+one-shot database and calendar-layout timings. See the
+[performance baseline](performance-baseline.md) for the measured results and
+their limits. The broad regression tripwires in `tests/test_performance.py`
+are intended to be stable on shared CI, not to advertise latency.
 
 ## Calendar terminal mouse smoke
 

@@ -249,6 +249,7 @@ not publish a GitHub check status or require GitHub Actions billing.
 See [the development checklist](CHECKLIST.md) for the authoritative roadmap,
 [the documentation index](docs/README.md), the
 [local smoke test](docs/testing/local-tui-smoke.md), and the
+[shared-core performance baseline](docs/testing/performance-baseline.md). Run the
 [live Google smoke procedure](docs/testing/live-google-tui-smoke.md).
 
 ## Acceptance status
