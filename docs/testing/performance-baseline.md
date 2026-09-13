@@ -41,3 +41,5 @@ those separate from this local baseline when setting user-facing budgets.
 
 The [workspace loading profile](workspace-profile.md) records a measured
 hydration bottleneck and the later comparison after a targeted change.
+The [outbox delivery profile](outbox-profile.md) records queue-size scaling,
+the indexed lookup change, and the before/after samples.

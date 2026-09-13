@@ -29,8 +29,10 @@ Finish the shared-core and database work, then measure and optimize their slow p
 - [x] Extend the existing [benchmark](tools/benchmark_python.py) and performance tests with realistic account sizes and service-level timings; measure repeat runs and tail latency, not just pure calendar geometry. Preserve the [initial local baseline](docs/testing/performance-baseline.md).
 - [ ] Profile the measured slow paths in SQLite queries, workspace updates, startup, and Google request handling. Preserve a trace or reproducible fixture for each significant finding.
   - [x] Profile large-account workspace loading; record the SQLite-versus-hydration split and before/after results in the [workspace profile](docs/testing/workspace-profile.md).
+  - [x] Profile 250, 1,000, and 5,000 queued writes; record the repeated outbox scan and before/after samples in the [outbox profile](docs/testing/outbox-profile.md).
 - [ ] Apply targeted query/index improvements, incremental updates, caching, or background work only where profiles justify them; compare results against the baseline.
   - [x] Skip JSON decoding for canonical empty event arrays during workspace hydration; preserve decoding of nonempty event fields and compare repeat timings.
+  - [x] Fetch each sending outbox mutation by indexed ID and account instead of rescanning pending rows; verify delivery semantics and compare queue-size scaling.
 - [ ] Keep stable core performance regression checks in the local check workflow and any future CI; run hardware-specific benchmarks separately before releases.
 
 ## Restore and develop desktop frontends on the shared core

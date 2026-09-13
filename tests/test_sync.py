@@ -238,6 +238,45 @@ def test_sync_drains_more_than_two_outbox_pages_before_pull(store: Storage) -> N
     assert store.pending_mutation_count("a") == 0
 
 
+def test_cancellation_after_first_outbox_page_preserves_remaining_writes(store: Storage) -> None:
+    gateway = FakeGateway()
+    for index in range(105):
+        task_id = f"task-{index:03}"
+        store.upsert_task(Task(task_id, "a", "list", "Local", remote_id=task_id))
+        store.enqueue(
+            PendingMutation(
+                None,
+                "a",
+                EntityType.TASK,
+                task_id,
+                MutationOperation.UPDATE,
+                {"list_id": "list", "body": {"title": f"Updated {index}"}},
+            )
+        )
+
+    attempts = 0
+
+    def update_task(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 101:
+            raise GoogleApiError(503, "temporary")
+        return {"id": args[1]}
+
+    gateway.update_task = update_task
+    result = SyncEngine(store, gateway, wait_for_retry=lambda _delay, _: False).flush_outbox("a")
+
+    assert result.pushed == 100 and result.cancelled
+    assert attempts == 101
+    assert store.pending_mutation_count("a") == 5
+    assert all(
+        item.delivery_state is OutboxDeliveryState.PENDING for item in store.pending_mutations("a")
+    )
+    resumed = SyncEngine(store, FakeGateway()).flush_outbox("a")
+    assert resumed.pushed == 5
+    assert store.pending_mutation_count("a") == 0
+
+
 def test_page_checkpoint_resumes_without_replaying_committed_page(store):
     gateway = FakeGateway()
     gateway.task_pages = {
