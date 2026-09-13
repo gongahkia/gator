@@ -1,8 +1,15 @@
 # Apple App
 
-Hot Cross Buns macOS app: a native SwiftUI client for Google Tasks and Google Calendar.
+Restored historical macOS SwiftUI frontend. This is not an active entry point:
+its Google, OAuth, SQLite, and sync services still belong to the old app. The
+current `hcb` CLI/TUI and Python core live under `src/hcb/`; the port will call
+that core through a local bridge. See the [frontend audit](../README.md) and
+[checklist](../../CHECKLIST.md) before running this snapshot against any account.
 
-## Direction
+## Historical app design
+
+The sections below describe the restored app as it was before removal. Its
+storage, sync, and OAuth design must be replaced during Python-core integration.
 
 - Google Tasks and Google Calendar are the source of truth.
 - Local storage is cache, settings, sync checkpoints, and pending offline mutations.
@@ -18,7 +25,7 @@ Hot Cross Buns macOS app: a native SwiftUI client for Google Tasks and Google Ca
 ## Generate The Project
 
 ```bash
-cd apps/apple
+cd frontends/macos
 xcodegen generate
 open HotCrossBuns.xcodeproj
 ```
@@ -32,11 +39,8 @@ xcodebuild -project HotCrossBuns.xcodeproj -scheme HotCrossBunsMac -destination 
 
 ## Package macOS DMG
 
-```bash
-../../scripts/package-macos-dmg.sh
-```
-
-The script creates an unsigned DMG under `build/apple/` by default. If `CODE_SIGN_IDENTITY` is set, it signs the app bundle and DMG. If `NOTARIZE=1` is also set, it submits the DMG with `xcrun notarytool` using `APPLE_ID`, `APPLE_TEAM_ID`, and `APP_SPECIFIC_PASSWORD`, then staples the result.
+The historical package script was not part of this restored source snapshot.
+Packaging, signing, and notarization remain open in the checklist.
 
 ## Google Integration
 
@@ -69,7 +73,7 @@ Source builds can also embed a native Google Sign-In client. Create a Google Clo
 - `GOOGLE_MACOS_CLIENT_ID`
 - `GOOGLE_MACOS_REVERSED_CLIENT_ID`
 
-The committed defaults are intentionally blank in `Configuration/GoogleOAuth.xcconfig`, and that file optionally includes the ignored `Configuration/GoogleOAuth.local.xcconfig` when present. Use `Configuration/GoogleOAuth.example.xcconfig` as the template for your local override and do not commit real OAuth client IDs. You can also pass values directly to `xcodebuild` if you prefer.
+The committed defaults are intentionally blank in `Configuration/GoogleOAuth.xcconfig`, and that file optionally includes the ignored `Configuration/GoogleOAuth.local.xcconfig` when present. Use `Configuration/GoogleOAuth.example.xcconfig` as a guide for your local override and do not commit real OAuth client IDs. You can also pass values directly to `xcodebuild` if you prefer.
 
 Public DMGs are packaged locally. They can ship without embedded OAuth values because users can add a Desktop OAuth client at runtime. Do not upload a public DMG with a private personal embedded OAuth client unless you intend to complete Google's verification path for that client.
 

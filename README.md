@@ -5,6 +5,11 @@ for Google Tasks and Google Calendar. It keeps an SQLite mirror on your device,
 queues offline changes, and keeps a local Google credential file on the local
 machine.
 
+Historical desktop frontend candidates are organized under
+[`frontends/`](frontends/README.md): Swift for macOS, Qt for Linux and a later
+Windows evaluation, and Electron as an alternative. They are review snapshots,
+not installed app entry points; the Python core and `hcb` CLI/TUI remain active.
+
 ## Install
 
 HCB is currently distributed from its canonical Git source, not a package

@@ -1,4 +1,5 @@
 .DS_Store
+frontends/macos/Configuration/GoogleOAuth.local.xcconfig
 .env
 *.log
 AGENTS.md

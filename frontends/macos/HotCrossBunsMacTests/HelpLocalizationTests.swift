@@ -16,7 +16,7 @@ final class HelpLocalizationTests: XCTestCase {
     private static let expectedKnownRegions: Set<String> = expectedLocalizedLanguages.union(["Base", "en"])
 
     func testHelpCopyUsesLocalizedLookups() throws {
-        let source = try String(contentsOf: repoRoot.appending(path: "apps/apple/HotCrossBuns/Features/Help/HelpView.swift"))
+        let source = try String(contentsOf: repoRoot.appending(path: "frontends/macos/HotCrossBuns/Features/Help/HelpView.swift"))
 
         XCTAssertNil(source.range(of: #"HelpSectionData\(\s*title:\s*""#, options: .regularExpression))
         XCTAssertNil(source.range(of: #"\.init\(title:\s*""#, options: .regularExpression))
@@ -25,16 +25,16 @@ final class HelpLocalizationTests: XCTestCase {
     }
 
     func testHelpLocalizedKeysExistForSupportedLanguages() throws {
-        let catalogURL = repoRoot.appending(path: "apps/apple/Resources/Localizable.xcstrings")
+        let catalogURL = repoRoot.appending(path: "frontends/macos/Resources/Localizable.xcstrings")
         let data = try Data(contentsOf: catalogURL)
         let catalog = try JSONDecoder().decode(StringCatalog.self, from: data)
 
         let sourceURLs = [
-            "apps/apple/HotCrossBuns/Features/Help/HelpView.swift",
-            "apps/apple/HotCrossBuns/Features/QuickAdd/NaturalLanguageTaskParser.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/NaturalLanguageEventParser.swift",
-            "apps/apple/HotCrossBuns/App/HCBChord.swift",
-            "apps/apple/HotCrossBuns/App/HCBDeepLinkRouter.swift"
+            "frontends/macos/HotCrossBuns/Features/Help/HelpView.swift",
+            "frontends/macos/HotCrossBuns/Features/QuickAdd/NaturalLanguageTaskParser.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/NaturalLanguageEventParser.swift",
+            "frontends/macos/HotCrossBuns/App/HCBChord.swift",
+            "frontends/macos/HotCrossBuns/App/HCBDeepLinkRouter.swift"
         ].map { repoRoot.appending(path: $0) }
 
         let keys = try sourceURLs.reduce(into: Set<String>()) { partial, url in
@@ -53,7 +53,7 @@ final class HelpLocalizationTests: XCTestCase {
     }
 
     func testStringCatalogIncludesAsiaFirstLanguageBatchForEveryLocalizedKey() throws {
-        let catalogURL = repoRoot.appending(path: "apps/apple/Resources/Localizable.xcstrings")
+        let catalogURL = repoRoot.appending(path: "frontends/macos/Resources/Localizable.xcstrings")
         let data = try Data(contentsOf: catalogURL)
         let catalog = try JSONDecoder().decode(StringCatalog.self, from: data)
 
@@ -67,7 +67,7 @@ final class HelpLocalizationTests: XCTestCase {
     }
 
     func testXcodeProjectKnowsSupportedRegions() throws {
-        let projectURL = repoRoot.appending(path: "apps/apple/HotCrossBuns.xcodeproj/project.pbxproj")
+        let projectURL = repoRoot.appending(path: "frontends/macos/HotCrossBuns.xcodeproj/project.pbxproj")
         let project = try String(contentsOf: projectURL)
         let knownRegions = try XCTUnwrap(Self.knownRegions(in: project))
 

@@ -24,15 +24,15 @@ final class DiscoverabilityTests: XCTestCase {
 
         XCTAssertTrue(decoded.hasSeenFeatureTour)
 
-        let source = try String(contentsOf: repoRoot.appending(path: "apps/apple/HotCrossBuns/App/MacSidebarShell.swift"))
+        let source = try String(contentsOf: repoRoot.appending(path: "frontends/macos/HotCrossBuns/App/MacSidebarShell.swift"))
         XCTAssertTrue(source.contains("presentFeatureTourIfNeeded()"))
         XCTAssertTrue(source.contains("shellChrome.hasSeenFeatureTour == false"))
         XCTAssertTrue(source.contains("model.markFeatureTourSeen()"))
     }
 
     func testQuickAddSheetsExposeInlineGrammarReferences() throws {
-        let taskSource = try String(contentsOf: repoRoot.appending(path: "apps/apple/HotCrossBuns/Features/QuickAdd/QuickAddView.swift"))
-        let eventSource = try String(contentsOf: repoRoot.appending(path: "apps/apple/HotCrossBuns/Features/QuickAdd/QuickAddEventView.swift"))
+        let taskSource = try String(contentsOf: repoRoot.appending(path: "frontends/macos/HotCrossBuns/Features/QuickAdd/QuickAddView.swift"))
+        let eventSource = try String(contentsOf: repoRoot.appending(path: "frontends/macos/HotCrossBuns/Features/QuickAdd/QuickAddEventView.swift"))
 
         XCTAssertTrue(taskSource.contains("NaturalLanguageTaskParser.helpEntries"))
         XCTAssertTrue(eventSource.contains("NaturalLanguageEventParser.helpEntries"))

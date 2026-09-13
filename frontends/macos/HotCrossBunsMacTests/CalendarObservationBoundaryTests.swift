@@ -4,15 +4,15 @@ import XCTest
 final class CalendarObservationBoundaryTests: XCTestCase {
     func testCalendarSurfacesReadSurfaceStoresInsteadOfBroadAppModelData() throws {
         let files = [
-            "apps/apple/HotCrossBuns/Features/Calendar/CalendarHomeView.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/CalendarSidebarFilters.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/DayGridView.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/WeekGridView.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/MonthGridView.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/YearGridView.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/EventContextMenu.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/EventHoverPreview.swift",
-            "apps/apple/HotCrossBuns/Features/Calendar/QuickCreatePopover.swift"
+            "frontends/macos/HotCrossBuns/Features/Calendar/CalendarHomeView.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/CalendarSidebarFilters.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/DayGridView.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/WeekGridView.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/MonthGridView.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/YearGridView.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/EventContextMenu.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/EventHoverPreview.swift",
+            "frontends/macos/HotCrossBuns/Features/Calendar/QuickCreatePopover.swift"
         ]
         let forbiddenReads = [
             "model.calendars",
@@ -66,11 +66,11 @@ final class CalendarObservationBoundaryTests: XCTestCase {
 final class TaskObservationBoundaryTests: XCTestCase {
     func testTaskSurfacesReadTaskStoreInsteadOfBroadAppModelData() throws {
         let files = [
-            "apps/apple/HotCrossBuns/Features/Store/StoreView.swift",
-            "apps/apple/HotCrossBuns/Features/Store/KanbanView.swift",
-            "apps/apple/HotCrossBuns/Features/Tasks/TaskContextMenu.swift",
-            "apps/apple/HotCrossBuns/Features/Tasks/TaskBulkActionBar.swift",
-            "apps/apple/HotCrossBuns/Features/Tasks/TaskInspectorView.swift"
+            "frontends/macos/HotCrossBuns/Features/Store/StoreView.swift",
+            "frontends/macos/HotCrossBuns/Features/Store/KanbanView.swift",
+            "frontends/macos/HotCrossBuns/Features/Tasks/TaskContextMenu.swift",
+            "frontends/macos/HotCrossBuns/Features/Tasks/TaskBulkActionBar.swift",
+            "frontends/macos/HotCrossBuns/Features/Tasks/TaskInspectorView.swift"
         ]
         let forbiddenReads = [
             "model.dataRevision",
@@ -117,7 +117,7 @@ final class TaskObservationBoundaryTests: XCTestCase {
 
 final class ShellMenuObservationBoundaryTests: XCTestCase {
     func testMacSidebarShellReadsNarrowStoresForDisplayState() throws {
-        let file = "apps/apple/HotCrossBuns/App/MacSidebarShell.swift"
+        let file = "frontends/macos/HotCrossBuns/App/MacSidebarShell.swift"
         let source = try uncommentedSource(file)
         let forbiddenReads = [
             "model.settings.",
@@ -138,7 +138,7 @@ final class ShellMenuObservationBoundaryTests: XCTestCase {
     }
 
     func testLeftSidebarUsesOnlyNativeSplitViewToggle() throws {
-        let file = "apps/apple/HotCrossBuns/App/MacSidebarShell.swift"
+        let file = "frontends/macos/HotCrossBuns/App/MacSidebarShell.swift"
         let source = try uncommentedSource(file)
         let modifierStart = try XCTUnwrap(source.range(of: "private struct NavigationSurfaceToggleToolbarModifier")?.lowerBound)
         let modifierEnd = try XCTUnwrap(source.range(of: "private struct ActionCenterDynamicContent")?.lowerBound)
@@ -158,7 +158,7 @@ final class ShellMenuObservationBoundaryTests: XCTestCase {
     }
 
     func testMenuBarSceneReadsMenuBarProjectionInsteadOfRawModelScans() throws {
-        let file = "apps/apple/HotCrossBuns/App/MenuBarExtraScene.swift"
+        let file = "frontends/macos/HotCrossBuns/App/MenuBarExtraScene.swift"
         let source = try uncommentedSource(file)
         let forbiddenReads = [
             "model.settings.",
@@ -182,7 +182,7 @@ final class ShellMenuObservationBoundaryTests: XCTestCase {
     }
 
     func testCommandPaletteDoesNotKeyEntityCachesFromGlobalDataRevision() throws {
-        let file = "apps/apple/HotCrossBuns/App/CommandPaletteView.swift"
+        let file = "frontends/macos/HotCrossBuns/App/CommandPaletteView.swift"
         let source = try uncommentedSource(file)
         XCTAssertFalse(
             source.contains("model.dataRevision"),
