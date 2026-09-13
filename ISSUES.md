@@ -1,8 +1,8 @@
 # Issues
 
-Use GitHub issues for reproducible bugs, platform install problems, feature requests, and documentation gaps.
+Use GitHub issues to report reproducible bugs, platform install problems, feature requests, and documentation gaps. [CHECKLIST.md](CHECKLIST.md) is the single source of truth for accepted work and release criteria; issues are an intake channel, not a second roadmap. Move accepted work into the checklist and close the corresponding issue after triage.
 
-Do not open public issues for security reports. Use [SECURITY.md](SECURITY.md) instead.
+Do not open public issues for security reports. Use the [private security advisory form](https://github.com/gongahkia/hot-cross-buns/security/advisories/new) instead.
 
 ## Before Opening An Issue
 

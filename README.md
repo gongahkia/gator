@@ -263,7 +263,8 @@ make build
 make benchmark
 ```
 
-See [the documentation index](docs/README.md), the
+See [the development checklist](CHECKLIST.md) for the authoritative roadmap,
+[the documentation index](docs/README.md), the
 [local smoke test](docs/testing/local-tui-smoke.md), and the
 [live Google smoke procedure](docs/testing/live-google-tui-smoke.md).
 

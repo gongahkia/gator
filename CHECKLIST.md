@@ -1,14 +1,21 @@
 # Hot Cross Buns development checklist
 
-This checklist is for a release-quality Linux and macOS product with a CLI/TUI and a windowed desktop app in **one repository**, sharing the existing Python application, storage, and sync code. Performance work follows measured user-facing bottlenecks. An unchecked item is work to plan or verify, not a claim that the current implementation is broken.
+This is the repository's single source of truth for planned work and release readiness. It covers a release-quality Linux and macOS product with a CLI/TUI and a windowed desktop app in **one repository**. Performance work follows measured user-facing bottlenecks. An unchecked item is work to plan or verify, not a claim that the current implementation is broken. New work, changes in scope, and completed acceptance criteria belong here rather than in a parallel issue roadmap.
 
-The two open issues, [#423](https://github.com/gongahkia/hot-cross-buns/issues/423) and [#424](https://github.com/gongahkia/hot-cross-buns/issues/424), were written for the retired native wrapper. Their live-account acceptance and distribution requirements remain useful, but their scope needs updating for the Python product and the new Linux/macOS goal.
+The former native-wrapper issues [#423](https://github.com/gongahkia/hot-cross-buns/issues/423) and [#424](https://github.com/gongahkia/hot-cross-buns/issues/424) are superseded by the acceptance and release work below. Their rule that Linux work must wait for macOS acceptance does not apply to this Linux/macOS plan.
+
+## Architecture direction
+
+Keep the local Python domain, accounts, OAuth, SQLite storage and migrations, sync, and application services in a UI-independent shared core. The existing `hcb` CLI/TUI and a desktop app are separate frontends of that core; the CLI is a frontend, not the backend. A hosted service is not required for this local-first design.
+
+Start with one cross-platform Linux/macOS desktop frontend and small platform-specific integrations for credentials, notifications, and packaging. A Windows frontend can use the same core later if platform support is prioritized and verified. Add separate OS-specific frontends only when a concrete product or technical need justifies them. Keep everything in this repository for now; consider a dedicated core repository only once its API, data compatibility policy, and release cadence are stable enough to version independently.
 
 ## First: establish a reliable baseline
 
-- [ ] Re-scope or close and replace [#423](https://github.com/gongahkia/hot-cross-buns/issues/423) and [#424](https://github.com/gongahkia/hot-cross-buns/issues/424). In particular, reconsider #424's rule that Linux parity waits for macOS acceptance.
 - [ ] Restore a green local and CI baseline. The month-grid rendering test currently fails reproducibly; the calendar mouse smoke reports a successful drag but times out while the child process exits.
-- [ ] Run and record the [live Google acceptance procedure](docs/testing/live-google-tui-smoke.md) with disposable accounts on both Linux and macOS. Include initial and incremental sync, offline writes, recurrence, conflicts, OAuth expiry/revocation, retries, and restart recovery.
+- [ ] Document bring-your-own OAuth setup for a disposable Google Cloud desktop client and test account: consent screen, test users, API enablement, scopes, and troubleshooting without collecting credentials.
+- [ ] Run and record the [live Google acceptance procedure](docs/testing/live-google-tui-smoke.md) with disposable accounts on both Linux and macOS. Cover initial and incremental pull; offline task and event writes; conflict-policy modes; task lists, notes projection, recurrence, search, and bulk mutations. Check the resulting data in Google Tasks and Calendar after each mutation class.
+- [ ] Exercise expired tokens, revoked access, network loss, quota/retry, stale ETags, invalid Calendar sync tokens, and restart recovery. Preserve a redacted manual acceptance record; incomplete live acceptance blocks release promotion.
 - [ ] Test the CLI/TUI, future desktop app, and optional reminder process running at the same time. Define process-level sync ownership and verify that active outbox deliveries are not mistaken for interrupted ones.
 - [ ] Decide the OAuth distribution model: retain bring-your-own Google client credentials or pursue a project-owned client and its verification process. Confirm requested scopes, token storage, keyring behavior, and onboarding on both platforms.
 - [ ] Define the first supported Linux distributions, macOS versions, architectures, and terminal environments; record what is outside the initial release target.
@@ -27,10 +34,10 @@ The two open issues, [#423](https://github.com/gongahkia/hot-cross-buns/issues/4
 - [ ] Add Linux and macOS CI and installed-artifact smoke coverage, including supported architectures and credential-free checks. Keep platform-specific manual acceptance documented.
 - [ ] Provide desktop reminders and background scheduling on Linux; verify macOS notification and LaunchAgent behavior after the app exits. The current Linux notifier writes to stderr.
 - [ ] Choose Linux distribution format(s) and validate sandbox access to the keyring, local data, OAuth loopback callback, notifications, and file import/export.
-- [ ] Produce versioned, reproducible CLI and desktop artifacts with checksums, tested first launch, upgrade, downgrade/migration policy, and uninstall behavior.
-- [ ] Sign and notarize macOS desktop artifacts after live-account acceptance, using maintainer-provided credentials; verify first launch and Gatekeeper behavior. Carry forward the relevant criteria from [#424](https://github.com/gongahkia/hot-cross-buns/issues/424).
-- [ ] Decide licensing and security-reporting policy before wider distribution. The checkout has no `LICENSE` or `SECURITY.md`, although [ISSUES.md](ISSUES.md) points security reporters to the latter.
-- [ ] Update installation, platform support, OAuth, limitations, and release documentation to describe the Python CLI/TUI and desktop app accurately.
+- [ ] Produce versioned, deterministic CLI and desktop artifacts for supported architectures, with checksums and installed-app smoke checks. Verify first launch, download/update, upgrade, downgrade/migration policy, and uninstall/cache behavior.
+- [ ] Prepare macOS signing and notarization without embedded credentials; sign and notarize only with maintainer-provided Apple credentials after live-account acceptance. Verify Gatekeeper, Keychain credentials, and the localhost OAuth callback in the installed app.
+- [ ] Decide licensing and security-reporting policy before wider distribution. The checkout has no `LICENSE` or `SECURITY.md`.
+- [ ] Update installation, platform support, OAuth, limitations, and release documentation to describe the Python CLI/TUI and desktop app accurately. Release notes must state bring-your-own OAuth requirements, supported Google functionality, conflict behavior, and remaining limitations.
 
 ## Optimize performance after measuring it
 
