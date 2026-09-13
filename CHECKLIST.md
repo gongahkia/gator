@@ -1,14 +1,14 @@
 # Hot Cross Buns development checklist
 
-This is the repository's single source of truth for planned work and release readiness. It covers a release-quality Linux and macOS product with a CLI/TUI and a windowed desktop app in **one repository**. Performance work follows measured user-facing bottlenecks. An unchecked item is work to plan or verify, not a claim that the current implementation is broken. New work, changes in scope, and completed acceptance criteria belong here rather than in a parallel issue roadmap.
+This is the repository's single source of truth for planned work and release readiness. It covers a release-quality Linux and macOS product with a CLI/TUI and windowed desktop apps, with a Windows port to evaluate, in **one repository**. Performance work follows measured user-facing bottlenecks. An unchecked item is work to plan or verify, not a claim that the current implementation is broken. New work, changes in scope, and completed acceptance criteria belong here rather than in a parallel issue roadmap.
 
 The former native-wrapper issues [#423](https://github.com/gongahkia/hot-cross-buns/issues/423) and [#424](https://github.com/gongahkia/hot-cross-buns/issues/424) are superseded by the acceptance and release work below. Their rule that Linux work must wait for macOS acceptance does not apply to this Linux/macOS plan.
 
 ## Architecture direction
 
-Keep the local Python domain, accounts, OAuth, SQLite storage and migrations, sync, and application services in a UI-independent shared core. The existing `hcb` CLI/TUI and a desktop app are separate frontends of that core; the CLI is a frontend, not the backend. A hosted service is not required for this local-first design.
+Keep the local Python domain, accounts, OAuth, SQLite storage and migrations, sync, and application services in a UI-independent shared core. The existing `hcb` CLI/TUI and future desktop apps are separate frontends of that core; the CLI is a frontend, not the backend. A hosted service is not required for this local-first design.
 
-Start with one cross-platform Linux/macOS desktop frontend and small platform-specific integrations for credentials, notifications, and packaging. A Windows frontend can use the same core later if platform support is prioritized and verified. Add separate OS-specific frontends only when a concrete product or technical need justifies them. Keep everything in this repository for now; consider a dedicated core repository only once its API, data compatibility policy, and release cadence are stable enough to version independently.
+Finish the shared-core and database work, then measure and optimize their slow paths before restoring historical GUI code. Audit the former Swift/Apple, Electron, and Qt frontends for reuse on macOS, Linux, and Windows; choose shared or platform-specific frontends based on working prototypes and maintenance cost. Preserve `hcb` throughout. Keep everything in this repository for now; consider a dedicated core repository only once its API, data compatibility policy, and release cadence are stable enough to version independently.
 
 ## First: establish a reliable baseline
 
@@ -21,17 +21,30 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
   - [ ] Drain more than 100 pending writes in one explicit sync; `flush_outbox` still processes one fetched page.
 - [ ] Decide the OAuth distribution model: retain bring-your-own Google client credentials or pursue a project-owned client and its verification process. Confirm requested scopes, token storage, keyring behavior, and onboarding on both platforms.
 - [ ] Define the first supported Linux distributions, macOS versions, architectures, and terminal environments; record what is outside the initial release target.
+- [ ] Finish the shared-core, SQLite migration, outbox, and multi-process contracts needed by desktop frontends. Verify the CLI/TUI still works with the same accounts, credentials, and database after those changes.
 
-## Build the desktop app on the shared core
+## Optimize the shared core and database before desktop restoration
+
+- [ ] Set user-facing targets for CLI cold start, search, large-account sync, database growth, and memory use on representative Linux and macOS machines.
+- [ ] Extend the existing [benchmark](tools/benchmark_python.py) and performance tests with realistic account sizes and service-level timings; measure repeat runs and tail latency, not just pure calendar geometry.
+- [ ] Profile the measured slow paths in SQLite queries, workspace updates, startup, and Google request handling. Preserve a trace or reproducible fixture for each significant finding.
+- [ ] Apply targeted query/index improvements, incremental updates, caching, or background work only where profiles justify them; compare results against the baseline.
+- [ ] Keep stable core performance regression checks in the local check workflow and any future CI; run hardware-specific benchmarks separately before releases.
+
+## Restore and develop desktop frontends on the shared core
 
 - [x] Define a [desktop MVP and CLI/TUI parity map](docs/product/desktop-mvp.md): tasks, calendars, search, capture, editing, sync/conflicts, settings, and reminders, with later features explicitly deferred.
 - [x] Establish a UI-independent application interface. Move direct storage and Google calls out of the TUI where necessary so the desktop UI can reuse the same operations without copying business logic.
   - [x] Route pending counts, recurring-instance cache metadata, and conflict listing through `ApplicationService`; count the full outbox rather than the first fetched page.
   - [x] Route account, calendar, Drive, and event lookups through `ApplicationService`; route OAuth, free/busy, sync, and recurring-instance refresh through UI-independent `Runtime` operations with separate worker storage where needed.
-- [ ] Choose and validate a Linux/macOS desktop toolkit with a small prototype covering a calendar view, a large task list, OAuth callback, and packaging.
-- [ ] Add a separate desktop entry point while preserving the `hcb` CLI/TUI contract. Keep one account model, configuration format, data directory, credential store, and migration path across both entry points.
+- [ ] After shared-core/database work and measured core optimizations, audit Git history for the Swift/Apple project (`apps/apple/` before `e4f6318ae`), Electron app (`src/main/native/` and `src/renderer/` before `90f34603b`), and Qt app (`native/` before `35604ba0d`). Check whether earlier iOS code exists alongside the confirmed macOS Swift target. Record buildability, dependencies, reusable UI/workflows, and the changes each would need for Windows, macOS, and Linux.
+- [ ] Restore promising historical frontend source from Git into separate subfolders under `frontends/legacy/` (`apple/`, `electron/`, and `qt/` as applicable) for review, preserving commit provenance and excluding old credentials, generated files, and bundled dependencies. Keep `src/hcb/` and the `hcb` CLI/TUI entry point intact.
+- [ ] Prototype the restored candidates against the current Python core with a calendar view, large task list, OAuth callback, and packaging. Choose which frontend to advance for each OS based on compatibility, performance, accessibility, and maintenance cost; use a new toolkit only if the historical options do not fit.
+- [ ] Add desktop entry points for the selected ports while preserving the `hcb` CLI/TUI contract. Keep one account model, configuration format, data directory, credential store, and migration path across the frontends.
 - [ ] Implement the MVP's keyboard and mouse workflows, accessible focus and labels, loading/error states, offline status, and conflict recovery.
 - [ ] Keep long-running sync, search, and calendar layout work responsive in the desktop UI; test cancellation and shutdown during those operations.
+- [ ] Once a desktop port runs, measure view switching, search typing, calendar navigation and drag, rendering, and memory use; optimize measured UI bottlenecks and set regression budgets for each supported frontend.
+- [ ] Validate the chosen macOS and Linux ports against the [desktop MVP](docs/product/desktop-mvp.md). Evaluate a Windows port with the same shared-core and CLI compatibility checks before setting its release target.
 
 ## Make Linux and macOS releases dependable
 
@@ -42,14 +55,6 @@ Start with one cross-platform Linux/macOS desktop frontend and small platform-sp
 - [ ] Prepare macOS signing and notarization without embedded credentials; sign and notarize only with maintainer-provided Apple credentials after live-account acceptance. Verify Gatekeeper, Keychain credentials, and the localhost OAuth callback in the installed app.
 - [ ] Decide licensing and security-reporting policy before wider distribution. The checkout has no `LICENSE` or `SECURITY.md`.
 - [ ] Update installation, platform support, OAuth, limitations, and release documentation to describe the Python CLI/TUI and desktop app accurately. Release notes must state bring-your-own OAuth requirements, supported Google functionality, conflict behavior, and remaining limitations.
-
-## Optimize performance after measuring it
-
-- [ ] Set user-facing targets for cold start, view switching, search typing, calendar navigation and drag, large-account sync, and memory use on representative Linux and macOS machines.
-- [ ] Extend the existing [benchmark](tools/benchmark_python.py) and performance tests with realistic account sizes and end-to-end UI timing; measure repeat runs and tail latency, not just pure calendar geometry.
-- [ ] Profile the measured slow paths in SQLite queries, calendar layout and rendering, workspace updates, startup, and Google request handling. Preserve a trace or reproducible fixture for each significant finding.
-- [ ] Apply targeted changes such as query/index improvements, incremental updates, viewport rendering, caching, or background work only where profiles justify them; compare results against the baseline.
-- [ ] Keep stable performance regression checks in CI and run hardware-specific benchmarks separately before releases.
 
 ## Release gate
 
