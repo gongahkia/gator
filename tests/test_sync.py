@@ -594,8 +594,41 @@ def test_calendar_page_resume_survives_database_reopen(tmp_path: Path) -> None:
         SyncEngine(reopened, gateway).sync_events("a", reopened.get_calendar("a", "cal"))
         assert reopened.get_event("a", "event-second") is not None
         assert reopened.get_cursor("a", "events:cal-r").cursor == "sync-2"
-
     assert attempted_pages == [None, "p2", "p2"]
+
+
+def test_paginated_incremental_calendar_list_keeps_sync_token(store: Storage) -> None:
+    gateway = FakeGateway()
+    gateway.calendar_pages = {
+        None: Page((), next_page_token="p2"),
+        "p2": Page((), next_sync_token="next-calendar-sync"),
+    }
+    store.set_cursor(SyncCursor("a", "calendar-list", "previous-calendar-sync"))
+
+    SyncEngine(store, gateway).sync_calendars("a")
+
+    assert [call for call in gateway.calls if call[0] == "calendars"] == [
+        ("calendars", None, "previous-calendar-sync"),
+        ("calendars", "p2", "previous-calendar-sync"),
+    ]
+    assert store.get_cursor("a", "calendar-list").cursor == "next-calendar-sync"
+
+
+def test_paginated_incremental_events_keep_sync_token(store: Storage) -> None:
+    gateway = FakeGateway()
+    gateway.event_pages = {
+        None: Page((), next_page_token="p2"),
+        "p2": Page((), next_sync_token="next-events-sync"),
+    }
+    store.set_cursor(SyncCursor("a", "events:cal-r", "previous-events-sync"))
+
+    SyncEngine(store, gateway).sync_events("a", store.get_calendar("a", "cal"))
+
+    assert [call for call in gateway.calls if call[0] == "events"] == [
+        ("events", "cal-r", None, "previous-events-sync", False),
+        ("events", "cal-r", "p2", "previous-events-sync", False),
+    ]
+    assert store.get_cursor("a", "events:cal-r").cursor == "next-events-sync"
 
 
 def test_outbox_restart_and_completed_create_are_not_replayed(tmp_path: Path) -> None:

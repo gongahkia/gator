@@ -17,6 +17,7 @@ Finish the shared-core and database work, then measure and optimize their slow p
 - [ ] Run and record the [live Google acceptance procedure](docs/testing/live-google-tui-smoke.md) with disposable accounts on both Linux and macOS. Cover initial and incremental pull; offline task and event writes; conflict-policy modes; task lists, notes projection, recurrence, search, and bulk mutations. Check the resulting data in Google Tasks and Calendar after each mutation class.
   - [x] Complete the [Fedora read-only preflight](docs/testing/live-google-tui-smoke.md#read-only-preflight) with the connected account. Keep all Google writes, revocation, and reset out of scope for this account.
 - [ ] Exercise expired tokens, revoked access, network loss, quota/retry, stale ETags, invalid Calendar sync tokens, and restart recovery. Preserve a redacted manual acceptance record; incomplete live acceptance blocks release promotion.
+  - [x] Keep the original sync token on every page of paginated incremental Calendar list and event pulls; cover the request arguments and final cursor with fake-gateway tests.
 - [ ] Test the CLI/TUI, future desktop app, and optional reminder process running at the same time. Define process-level sync ownership and verify that active outbox deliveries are not mistaken for interrupted ones.
   - [x] Serialize CLI/TUI/reminder sync and explicit recurring-instance refresh per local database with a process-level lock. Verify a second sync leaves an active delivery untouched and a stopped owner's lock is released on Linux.
   - [x] Drain more than 100 pending writes in one explicit sync; `flush_outbox` fetches successive pages until the account's pending outbox is empty.
@@ -35,11 +36,13 @@ Finish the shared-core and database work, then measure and optimize their slow p
   - [x] Profile 250, 1,000, and 5,000 queued writes; record the repeated outbox scan and before/after samples in the [outbox profile](docs/testing/outbox-profile.md).
   - [x] Profile synthetic TUI startup and first task frame at 1,000 and 10,000 tasks; retain repeated samples and memory measurements in the [startup profile](docs/testing/tui-startup-profile.md).
   - [x] Profile synthetic paginated Tasks and Calendar pulls at 1,000/200 and 10,000/2,000 rows; record repeat timings, request counts, page-application time, memory, and restart checks in the [pull profile](docs/testing/pull-profile.md). Live Google request latency remains open.
+  - [x] Measure read-only live Tasks and Calendar page latency in an isolated database, with private numeric reports and a redacted [live pull profile](docs/testing/live-pull-profile.md). No remote writes or Drive account-data requests were made.
 - [ ] Apply targeted query/index improvements, incremental updates, caching, or background work only where profiles justify them; compare results against the baseline.
   - [x] Skip JSON decoding for canonical empty event arrays during workspace hydration; preserve decoding of nonempty event fields and compare repeat timings.
   - [x] Fetch each sending outbox mutation by indexed ID and account instead of rescanning pending rows; verify delivery semantics and compare queue-size scaling.
   - [x] Skip URL copying and scanning for ordinary task rows without web links; preserve linked titles and Notes previews, and compare row-building and startup samples.
   - [x] Skip unchanged task-list upserts during pull so an empty incremental sync does not rebuild every child task search row; preserve changed list metadata and compare repeated timings.
+  - [x] Request 100 Tasks and 1,000 Calendar events per page, reducing live initial pull requests and comparing stage timings on the same read-only account.
 - [ ] Keep stable core performance regression checks in the local check workflow and any future CI; run hardware-specific benchmarks separately before releases.
 
 ## Restore and develop desktop frontends on the shared core

@@ -4,7 +4,7 @@ import socket
 import pytest
 
 from hcb.errors import GoogleApiError, RequestNotSentError, TransientTransportError
-from hcb.google_client import GoogleApiClient
+from hcb.google_client import GoogleApiClient, Page
 
 
 class Response(dict):
@@ -79,11 +79,48 @@ class CalendarService:
         return self._events
 
 
+class TasksResource:
+    def __init__(self):
+        self.calls = []
+
+    def list(self, **kwargs):
+        self.calls.append(kwargs)
+        return Request({"items": []})
+
+
+class TasksService:
+    def __init__(self):
+        self._tasks = TasksResource()
+
+    def tasks(self):
+        return self._tasks
+
+
 def client_with_calendar_service():
     calendar = CalendarService()
     return GoogleApiClient(
         tasks_service=object(), calendar_service=calendar, drive_service=object()
     ), calendar
+
+
+def test_tasks_list_requests_largest_supported_page() -> None:
+    tasks = TasksService()
+    client = GoogleApiClient(tasks_service=tasks, calendar_service=object(), drive_service=object())
+
+    assert client.list_tasks(
+        "list-id", page_token="page-2", updated_min="2026-09-13T00:00:00Z"
+    ) == Page(())
+    assert tasks._tasks.calls == [
+        {
+            "tasklist": "list-id",
+            "pageToken": "page-2",
+            "updatedMin": "2026-09-13T00:00:00Z",
+            "maxResults": 100,
+            "showCompleted": True,
+            "showDeleted": True,
+            "showHidden": True,
+        }
+    ]
 
 
 @pytest.mark.parametrize("status", [401, 403, 404, 409, 410, 429, 500, 503])
@@ -171,6 +208,7 @@ def test_expanded_events_request_uses_google_range_contract():
                 "syncToken": None,
                 "timeMin": "2026-08-21T00:00:00Z",
                 "timeMax": "2026-08-28T00:00:00Z",
+                "maxResults": 1000,
                 "singleEvents": True,
                 "showDeleted": True,
             },

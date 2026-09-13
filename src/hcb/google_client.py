@@ -221,6 +221,7 @@ class GoogleApiClient:
             tasklist=task_list_id,
             pageToken=page_token,
             updatedMin=updated_min,
+            maxResults=100,
             showCompleted=True,
             showDeleted=True,
             showHidden=True,
@@ -260,6 +261,7 @@ class GoogleApiClient:
                 syncToken=sync_token,
                 timeMin=time_min,
                 timeMax=time_max,
+                maxResults=1000,
                 singleEvents=single_events,
                 showDeleted=True,
             )

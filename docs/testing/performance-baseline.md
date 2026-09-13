@@ -47,3 +47,5 @@ The [TUI startup profile](tui-startup-profile.md) measures fresh-process
 headless readiness and the first task-bearing terminal frame.
 The [paginated pull profile](pull-profile.md) measures synthetic initial and
 unchanged incremental Tasks and Calendar pulls without Google credentials.
+The [read-only live pull profile](live-pull-profile.md) records request latency
+and page-size comparisons without retaining account contents in the repository.

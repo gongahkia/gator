@@ -178,9 +178,7 @@ class PullSyncMixin(_SyncEngineBase):
             initial_token = cursor.cursor if cursor else None
 
             def fetch(token: str | None, *, initial: str | None = initial_token) -> Page:
-                return self.gateway.list_calendars(
-                    page_token=token, sync_token=None if token else initial
-                )
+                return self.gateway.list_calendars(page_token=token, sync_token=initial)
 
             try:
                 result = self._paged(
@@ -266,7 +264,7 @@ class PullSyncMixin(_SyncEngineBase):
                 return self.gateway.list_events(
                     remote_calendar_id,
                     page_token=token,
-                    sync_token=None if token else initial,
+                    sync_token=initial,
                     single_events=False,
                 )
 
