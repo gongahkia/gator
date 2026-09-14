@@ -1,0 +1,164 @@
+#include <QtTest/QTest>
+
+#include "core/PythonBridgeClient.h"
+#include "support/MockNetworkAccessManager.h"
+
+#include <QFile>
+#include <QJsonDocument>
+#include <QTemporaryDir>
+#include <QUrlQuery>
+
+#include <chrono>
+#include <future>
+#include <variant>
+
+namespace {
+
+constexpr auto kToken = "test_desktop_bridge_token_123456";
+
+hcb::PythonBridgeConnection connection() {
+  return {.endpoint = QUrl(QStringLiteral("http://127.0.0.1:4242")),
+          .bearerToken = QByteArray(kToken)};
+}
+
+void waitFor(std::future<hcb::PythonBridgeResult>& future) {
+  QTRY_VERIFY_WITH_TIMEOUT(
+      future.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
+}
+
+} // namespace
+
+class PythonBridgeClientTest final : public QObject {
+  Q_OBJECT
+
+private slots:
+  void readsPrivateLoopbackDescriptor();
+  void rejectsUnsafeDescriptor();
+  void requestsWorkspaceAndBoundedPages();
+  void rejectsInvalidRequestsBeforeNetwork();
+  void cancelsBeforeNetwork();
+  void propagatesBridgeErrors();
+};
+
+void PythonBridgeClientTest::readsPrivateLoopbackDescriptor() {
+  QTemporaryDir directory;
+  QVERIFY(directory.isValid());
+  const QString path = directory.filePath(QStringLiteral("bridge.json"));
+  QFile file(path);
+  QVERIFY(file.open(QIODevice::WriteOnly));
+  const QJsonObject descriptor{{QStringLiteral("api_version"), 1},
+                               {QStringLiteral("url"), QStringLiteral("http://127.0.0.1:4242")},
+                               {QStringLiteral("token"), QString::fromLatin1(kToken)}};
+  const QByteArray payload = QJsonDocument(descriptor).toJson(QJsonDocument::Compact);
+  QCOMPARE(file.write(payload), qint64(payload.size()));
+  file.close();
+  QVERIFY(file.setPermissions(QFile::ReadOwner | QFile::WriteOwner));
+
+  const hcb::PythonBridgeConnectionOrError result =
+      hcb::PythonBridgeClient::readConnectionDescriptor(path);
+  QVERIFY(std::holds_alternative<hcb::PythonBridgeConnection>(result));
+  const hcb::PythonBridgeConnection& loaded = std::get<hcb::PythonBridgeConnection>(result);
+  QCOMPARE(loaded.endpoint, QUrl(QStringLiteral("http://127.0.0.1:4242")));
+  QCOMPARE(loaded.bearerToken, QByteArray(kToken));
+}
+
+void PythonBridgeClientTest::rejectsUnsafeDescriptor() {
+  QTemporaryDir directory;
+  QVERIFY(directory.isValid());
+  const QString path = directory.filePath(QStringLiteral("bridge.json"));
+  QFile file(path);
+  QVERIFY(file.open(QIODevice::WriteOnly));
+  QVERIFY(file.write("{}") > 0);
+  file.close();
+  QVERIFY(file.setPermissions(QFile::ReadOwner | QFile::ReadGroup | QFile::WriteOwner));
+
+  const hcb::PythonBridgeConnectionOrError result =
+      hcb::PythonBridgeClient::readConnectionDescriptor(path);
+  QVERIFY(std::holds_alternative<hcb::AppError>(result));
+  QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Configuration);
+}
+
+void PythonBridgeClientTest::requestsWorkspaceAndBoundedPages() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"workspace\":{}}}")});
+  manager.enqueue({.body = QByteArray(
+      "{\"api_version\":1,\"data\":{\"page\":{\"tasks\":[],\"next_cursor\":null}}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"workspace\":{\"events\":[]}}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> workspace = client.workspace(QStringLiteral("work"));
+  waitFor(workspace);
+  QVERIFY(std::holds_alternative<QJsonObject>(workspace.get()));
+
+  std::future<hcb::PythonBridgeResult> tasks = client.taskPage(
+      QStringLiteral("work"), 200, QStringLiteral("djE6MjAw"), QStringLiteral("inbox"));
+  waitFor(tasks);
+  QVERIFY(std::holds_alternative<QJsonObject>(tasks.get()));
+
+  std::future<hcb::PythonBridgeResult> events =
+      client.eventRange(QStringLiteral("work"), QDate(2026, 9, 14), QDate(2026, 9, 15));
+  waitFor(events);
+  QVERIFY(std::holds_alternative<QJsonObject>(events.get()));
+
+  QCOMPARE(manager.requests().size(), 3);
+  QCOMPARE(manager.requests().at(0).request.rawHeader("Authorization"),
+           QByteArray("Bearer ") + QByteArray(kToken));
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/workspace"));
+  const QUrlQuery taskQuery(manager.requests().at(1).request.url());
+  QCOMPARE(taskQuery.queryItemValue(QStringLiteral("limit")), QStringLiteral("200"));
+  QCOMPARE(taskQuery.queryItemValue(QStringLiteral("cursor")), QStringLiteral("djE6MjAw"));
+  QCOMPARE(taskQuery.queryItemValue(QStringLiteral("list_id")), QStringLiteral("inbox"));
+  const QUrlQuery eventQuery(manager.requests().at(2).request.url());
+  QCOMPARE(eventQuery.queryItemValue(QStringLiteral("include")), QStringLiteral("events"));
+  QCOMPARE(eventQuery.queryItemValue(QStringLiteral("start")), QStringLiteral("2026-09-14"));
+  QCOMPARE(eventQuery.queryItemValue(QStringLiteral("end")), QStringLiteral("2026-09-15"));
+}
+
+void PythonBridgeClientTest::rejectsInvalidRequestsBeforeNetwork() {
+  hcb::test::MockNetworkAccessManager manager;
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> future =
+      client.taskPage(QStringLiteral("bad/account"), 0);
+  const hcb::PythonBridgeResult result = future.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(result));
+  QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Validation);
+  QCOMPARE(manager.requests().size(), 0);
+}
+
+void PythonBridgeClientTest::cancelsBeforeNetwork() {
+  hcb::test::MockNetworkAccessManager manager;
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+  hcb::CancellationSource cancellation;
+  QVERIFY(cancellation.requestStop());
+
+  std::future<hcb::PythonBridgeResult> future =
+      client.workspace(QStringLiteral("work"), cancellation.token());
+  const hcb::PythonBridgeResult result = future.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(result));
+  QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Network);
+  QCOMPARE(manager.requests().size(), 0);
+}
+
+void PythonBridgeClientTest::propagatesBridgeErrors() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.status = 401,
+                   .body = QByteArray(
+                       "{\"api_version\":1,\"error\":{\"code\":\"unauthorized\","
+                       "\"message\":\"missing or invalid bridge token\"}}"),
+                   .error = QNetworkReply::AuthenticationRequiredError});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> future = client.workspace(QStringLiteral("work"));
+  waitFor(future);
+  const hcb::PythonBridgeResult result = future.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(result));
+  QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Network);
+  QCOMPARE(std::get<hcb::AppError>(result).message(),
+           QStringLiteral("missing or invalid bridge token"));
+}
+
+QTEST_GUILESS_MAIN(PythonBridgeClientTest)
+
+#include "PythonBridgeClientTest.moc"

@@ -1,5 +1,7 @@
 # Documentation
 
+- [Desktop bridge protocol](architecture/desktop-bridge.md)
+
 This documentation describes the current Python local-first TUI and CLI, plus
 the proposed scope for a future Linux/macOS desktop app.
 

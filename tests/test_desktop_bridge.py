@@ -13,6 +13,7 @@ from pathlib import Path
 from time import perf_counter
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 import pytest
 
@@ -62,11 +63,14 @@ def _request(
     *,
     body: dict[str, object] | None = None,
     token: str | None = "bridge-test-token",
+    idempotency_key: str | None = None,
 ) -> tuple[int, dict[str, object]]:
     data = json.dumps(body).encode() if body is not None else None
     headers: dict[str, str] = {}
     if token is not None:
         headers["Authorization"] = f"Bearer {token}"
+    if method in {"POST", "PATCH", "DELETE"}:
+        headers["Idempotency-Key"] = uuid4().hex if idempotency_key is None else idempotency_key
     if data is not None:
         headers["Content-Type"] = "application/json"
     request = Request(bridge.descriptor.url + path, data=data, headers=headers, method=method)
@@ -225,6 +229,55 @@ def test_task_and_event_mutations_use_the_python_optimistic_core(
         assert storage.get_event("work", str(event_id)).metadata.deleted
         # Two updates plus one create per entity use the same core as the CLI/TUI.
         assert storage.pending_mutation_count("work") == 6
+
+
+def test_mutation_idempotency_is_durable_and_rejects_key_reuse(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    paths, bridge = bridge_env
+    body = {"list_id": "inbox", "title": "Retry-safe task"}
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks",
+        body=body,
+        idempotency_key="retry-safe-task",
+    )
+    assert status == 201
+    first_task = _data(response)["task"]
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks",
+        body=body,
+        idempotency_key="retry-safe-task",
+    )
+    assert status == 201
+    assert _data(response)["task"] == first_task
+    with Storage(paths.database_file) as storage:
+        assert storage.pending_mutation_count("work") == 1
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks",
+        body={"list_id": "inbox", "title": "Different task"},
+        idempotency_key="retry-safe-task",
+    )
+    assert status == 409
+    assert failure["error"]["code"] == "conflict"  # type: ignore[index]
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks",
+        body=body,
+        idempotency_key="",
+    )
+    assert status == 400
+    assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
 
 
 def test_operations_cancel_sync_and_redact_oauth_tokens(tmp_path: Path) -> None:

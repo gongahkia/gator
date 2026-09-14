@@ -8,8 +8,8 @@ and a sync worker without sharing a connection across threads.
 
 from __future__ import annotations
 
-import hmac
 import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -366,10 +366,15 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                             raise ConflictError(
                                 "Idempotency-Key was already used for a different bridge mutation"
                             )
-                        return HTTPStatus(receipt.response_status), json.loads(receipt.response_data)
+                        return HTTPStatus(receipt.response_status), json.loads(
+                            receipt.response_data
+                        )
                     status, data = self._route(method, path, query, body)
                     response_data = json.dumps(
-                        to_primitive(data), ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                        to_primitive(data),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
                     )
                     runtime.storage.save_bridge_mutation_receipt(
                         account_id,
@@ -677,7 +682,11 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
 
 
 def _idempotency_key(value: str | None) -> str:
-    if value is None or not 1 <= len(value) <= 128 or any(character.isspace() for character in value):
+    if (
+        value is None
+        or not 1 <= len(value) <= 128
+        or any(character.isspace() for character in value)
+    ):
         raise ValueError("Idempotency-Key must be a non-empty token of at most 128 characters")
     return value
 

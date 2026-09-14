@@ -85,6 +85,7 @@ def test_private_notes_migration_preserves_existing_disabled_mode_notes(tmp_path
         connection.execute("DROP TABLE task_private_notes")
         connection.execute("DROP INDEX tasks_parent_resolution")
         connection.execute("DROP INDEX tasks_page")
+        connection.execute("DROP TABLE bridge_mutation_receipts")
         connection.execute("PRAGMA user_version = 9")
 
     with Storage(path) as migrated:

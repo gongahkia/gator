@@ -971,9 +971,7 @@ QVariantList AppController::availableFontFamilies() const {
   const QStringList installed = installedFontFamilies();
   families.reserve(installed.size());
   for (const QString& family : installed) {
-    if (isUsableTextFontFamily(family)) {
-      families.append(family);
-    }
+    families.append(family);
   }
   return families;
 }

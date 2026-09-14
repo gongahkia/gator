@@ -172,6 +172,10 @@ set(HCB_NATIVE_SOURCES
   src/core/NativeCapabilityReport.h
   src/core/PkceAuthorization.cpp
   src/core/PkceAuthorization.h
+  src/core/PythonBridgeClient.cpp
+  src/core/PythonBridgeClient.h
+  src/core/PythonBridgeProjection.cpp
+  src/core/PythonBridgeProjection.h
   src/core/QuickCaptureParser.cpp
   src/core/QuickCaptureParser.h
   src/core/RecurrenceExpansionWorker.cpp
@@ -2065,6 +2069,37 @@ if(BUILD_TESTING)
   hcb_enable_warnings(hcb_google_http_client_tests)
   hcb_enable_sanitizers(hcb_google_http_client_tests)
   add_test(NAME hcb_google_http_client_tests COMMAND hcb_google_http_client_tests)
+
+  qt_add_executable(hcb_python_bridge_client_tests
+    tests/PythonBridgeClientTest.cpp
+    tests/support/MockNetworkAccessManager.h
+    src/core/AppError.h
+    src/core/Cancellation.h
+    src/core/PythonBridgeClient.cpp
+    src/core/PythonBridgeClient.h
+  )
+  target_link_libraries(hcb_python_bridge_client_tests PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+  target_include_directories(hcb_python_bridge_client_tests PRIVATE src tests)
+  hcb_enable_warnings(hcb_python_bridge_client_tests)
+  hcb_enable_sanitizers(hcb_python_bridge_client_tests)
+  add_test(NAME hcb_python_bridge_client_tests COMMAND hcb_python_bridge_client_tests)
+
+  qt_add_executable(hcb_python_bridge_projection_tests
+    tests/PythonBridgeProjectionTest.cpp
+    src/core/AppError.h
+    src/core/CalendarReadService.h
+    src/core/PythonBridgeProjection.cpp
+    src/core/PythonBridgeProjection.h
+    src/core/TaskListReadService.h
+    src/core/TaskModel.cpp
+    src/core/TaskModel.h
+    src/core/TaskMutationService.h
+  )
+  target_link_libraries(hcb_python_bridge_projection_tests PRIVATE Qt6::Core Qt6::Test)
+  target_include_directories(hcb_python_bridge_projection_tests PRIVATE src tests)
+  hcb_enable_warnings(hcb_python_bridge_projection_tests)
+  hcb_enable_sanitizers(hcb_python_bridge_projection_tests)
+  add_test(NAME hcb_python_bridge_projection_tests COMMAND hcb_python_bridge_projection_tests)
 
   qt_add_executable(hcb_google_calendar_list_pull_client_tests
     tests/GoogleCalendarListPullClientTest.cpp

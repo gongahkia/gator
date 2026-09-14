@@ -45,6 +45,7 @@ include = [
   "/docs/installation.md",
   "/docs/hcb-cli.md",
   "/docs/architecture/ghostty-bundled-themes.md",
+  "/docs/architecture/desktop-bridge.md",
   "/docs/architecture/ghostty-bundled-themes.md",
   "/scripts/install-hcb.py",
   "/packaging/macos/install-hcb.sh",

@@ -377,14 +377,14 @@ QVariantMap TimelineModel::timedRangeInput(int firstDayIndex,
                                  QTimeZone::UTC);
   const QDateTime requestedEnd(endDate,
                                QTime((lastMinute % kMinutesPerDay) / 60,
-                                     lastMinute % kMinutesPerDay),
+                                     lastMinute % 60),
                                QTimeZone::UTC);
   const QDateTime start = resolvedDateTime(rangeStartDate_.addDays(firstDayIndex),
                                            QTime(firstMinute / 60, firstMinute % 60),
                                            displayTimeZone_);
   QDateTime end = resolvedDateTime(endDate,
                                    QTime((lastMinute % kMinutesPerDay) / 60,
-                                         lastMinute % kMinutesPerDay),
+                                         lastMinute % 60),
                                    displayTimeZone_);
   if (end <= start) {
     end = start.addMSecs(std::max<qint64>(kSnapMinutes * 60'000,
