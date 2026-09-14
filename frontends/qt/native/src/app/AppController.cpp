@@ -23,6 +23,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDesktopServices>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -45,6 +46,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <thread>
 #include <utility>
@@ -95,6 +97,20 @@ constexpr auto kGoogleSyncInterval = std::chrono::minutes(5);
 constexpr int kSearchDebounceMilliseconds = 180;
 constexpr int kMinimumTaskListPaneWidth = 200;
 constexpr int kMaximumTaskListPaneWidth = 480;
+constexpr char kBridgeAcceptanceInitialTaskTitle[] = "Qt bridge interaction task initial";
+constexpr char kBridgeAcceptanceUpdatedTaskTitle[] = "Qt bridge interaction task updated";
+constexpr char kBridgeAcceptanceInitialTaskNotes[] =
+    "Created by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceUpdatedTaskNotes[] =
+    "Updated by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceInitialEventTitle[] = "Qt bridge interaction event initial";
+constexpr char kBridgeAcceptanceUpdatedEventTitle[] = "Qt bridge interaction event updated";
+constexpr char kBridgeAcceptanceInitialEventDescription[] =
+    "Created by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceUpdatedEventDescription[] =
+    "Updated by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceInitialEventLocation[] = "Initial acceptance location";
+constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance location";
 
 [[nodiscard]] std::unique_ptr<OAuthCredentialStore> makeCredentialStore() {
 #if defined(Q_OS_MACOS)
@@ -2189,7 +2205,17 @@ void AppController::cancelBridgeOperation() {
 
 void AppController::completeBridgeReadyProbe() {
   const QString readyPath = qEnvironmentVariable("HCB_BRIDGE_READY_FILE");
-  if (readyPath.isEmpty() || !pythonBridgeTasksReady_ || !pythonBridgeCalendarReady_) {
+  const QString interactionPath = qEnvironmentVariable("HCB_BRIDGE_INTERACTION_ACCEPTANCE_FILE");
+  if ((readyPath.isEmpty() && interactionPath.isEmpty()) || !pythonBridgeTasksReady_ ||
+      !pythonBridgeCalendarReady_) {
+    return;
+  }
+  if (!interactionPath.isEmpty()) {
+    if (bridgeInteractionAcceptanceStarted_) {
+      return;
+    }
+    bridgeInteractionAcceptanceStarted_ = true;
+    runBridgeInteractionAcceptance(interactionPath);
     return;
   }
   QSaveFile readyFile(readyPath);
@@ -2203,6 +2229,210 @@ void AppController::completeBridgeReadyProbe() {
     return;
   }
   QCoreApplication::quit();
+}
+
+void AppController::runBridgeInteractionAcceptance(QString reportPath) {
+  struct State final {
+    QString reportPath;
+    QString taskId;
+    QString eventId;
+    QString eventDate;
+    int stage{0};
+    int initialSearchResults{0};
+    int refreshedSearchResults{0};
+    QElapsedTimer elapsed;
+  };
+
+  const auto state = std::make_shared<State>();
+  state->reportPath = std::move(reportPath);
+  state->eventDate = calendarDate_.addDays(1).toString(Qt::ISODate);
+  state->elapsed.start();
+
+  auto* timer = new QTimer(this);
+  timer->setInterval(20);
+  const auto finish = [this, timer, state](bool success, QString error = {}) {
+    QJsonObject payload{{QStringLiteral("ok"), success},
+                        {QStringLiteral("stage"), state->stage},
+                        {QStringLiteral("task_id"), state->taskId},
+                        {QStringLiteral("event_id"), state->eventId},
+                        {QStringLiteral("event_date"), state->eventDate},
+                        {QStringLiteral("initial_search_results"), state->initialSearchResults},
+                        {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
+    if (!error.isEmpty()) {
+      payload.insert(QStringLiteral("error"), std::move(error));
+      payload.insert(QStringLiteral("status"), statusMessage_);
+    }
+    QSaveFile report(state->reportPath);
+    const QByteArray encoded = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+    const bool wrote = report.open(QIODevice::WriteOnly) && report.write(encoded) == encoded.size() &&
+                       report.commit();
+    timer->stop();
+    timer->deleteLater();
+    QCoreApplication::exit(success && wrote ? 0 : 3);
+  };
+
+  connect(timer, &QTimer::timeout, this, [this, state, finish] {
+    const auto taskById = [this, state]() -> const TaskModelTask* {
+      const auto found = std::find_if(taskProjectionTasks_.cbegin(),
+                                      taskProjectionTasks_.cend(),
+                                      [state](const TaskModelTask& task) {
+                                        return task.id == state->taskId;
+                                      });
+      return found == taskProjectionTasks_.cend() ? nullptr : &*found;
+    };
+    const auto eventById = [this, state]() -> const CalendarEventSummary* {
+      const auto found = std::find_if(pythonBridgeCalendarEvents_.cbegin(),
+                                      pythonBridgeCalendarEvents_.cend(),
+                                      [state](const CalendarEventSummary& event) {
+                                        return event.id == state->eventId;
+                                      });
+      return found == pythonBridgeCalendarEvents_.cend() ? nullptr : &*found;
+    };
+    const auto countSearchTasks = [this](const QString& id = {}) {
+      int matches = 0;
+      SearchResultsModel& model = searchResultsModel();
+      for (int row = 0; row < model.rowCount(); ++row) {
+        const QModelIndex index = model.index(row, 0);
+        if (model.data(index, SearchResultsModel::ResourceRole).toString() ==
+                QStringLiteral("task") &&
+            (id.isEmpty() || model.data(index, SearchResultsModel::IdRole).toString() == id)) {
+          ++matches;
+        }
+      }
+      return matches;
+    };
+    if (state->elapsed.elapsed() > 30'000) {
+      finish(false, QStringLiteral("timed out waiting for Qt bridge interaction stage"));
+      return;
+    }
+
+    switch (state->stage) {
+    case 0:
+      setSearchQuery(QStringLiteral("release-marker"));
+      state->stage = 1;
+      return;
+    case 1:
+      state->initialSearchResults = countSearchTasks();
+      if (state->initialSearchResults == 0) {
+        return;
+      }
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceInitialTaskTitle),
+                         QString::fromLatin1(kBridgeAcceptanceInitialTaskNotes),
+                         state->eventDate,
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 2;
+      return;
+    case 2: {
+      const auto created = std::find_if(taskProjectionTasks_.cbegin(),
+                                        taskProjectionTasks_.cend(),
+                                        [](const TaskModelTask& task) {
+                                          return task.title ==
+                                                 QString::fromLatin1(kBridgeAcceptanceInitialTaskTitle);
+                                        });
+      if (created == taskProjectionTasks_.cend()) {
+        return;
+      }
+      state->taskId = created->id;
+      updateTaskDetailed(state->taskId,
+                         QString::fromLatin1(kBridgeAcceptanceUpdatedTaskTitle),
+                         QString::fromLatin1(kBridgeAcceptanceUpdatedTaskNotes),
+                         state->eventDate,
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 3;
+      return;
+    }
+    case 3: {
+      const TaskModelTask* updated = taskById();
+      if (updated == nullptr ||
+          updated->title != QString::fromLatin1(kBridgeAcceptanceUpdatedTaskTitle) ||
+          updated->notes.value_or(QString()) !=
+              QString::fromLatin1(kBridgeAcceptanceUpdatedTaskNotes)) {
+        return;
+      }
+      setTaskCompleted(state->taskId, true);
+      state->stage = 4;
+      return;
+    }
+    case 4: {
+      const TaskModelTask* completed = taskById();
+      if (completed == nullptr || !completed->completed) {
+        return;
+      }
+      createEvent(QStringLiteral("primary"),
+                  QString::fromLatin1(kBridgeAcceptanceInitialEventTitle),
+                  state->eventDate + QStringLiteral("T09:00:00.000Z"),
+                  state->eventDate + QStringLiteral("T10:00:00.000Z"),
+                  false,
+                  QString::fromLatin1(kBridgeAcceptanceInitialEventDescription),
+                  QString::fromLatin1(kBridgeAcceptanceInitialEventLocation));
+      state->stage = 5;
+      return;
+    }
+    case 5: {
+      const auto created = std::find_if(pythonBridgeCalendarEvents_.cbegin(),
+                                        pythonBridgeCalendarEvents_.cend(),
+                                        [](const CalendarEventSummary& event) {
+                                          return event.title ==
+                                                 QString::fromLatin1(kBridgeAcceptanceInitialEventTitle);
+                                        });
+      if (created == pythonBridgeCalendarEvents_.cend()) {
+        return;
+      }
+      state->eventId = created->id;
+      updateEvent(state->eventId,
+                  QStringLiteral("primary"),
+                  QString::fromLatin1(kBridgeAcceptanceUpdatedEventTitle),
+                  state->eventDate + QStringLiteral("T10:00:00.000Z"),
+                  state->eventDate + QStringLiteral("T11:00:00.000Z"),
+                  false,
+                  QString::fromLatin1(kBridgeAcceptanceUpdatedEventDescription),
+                  QString::fromLatin1(kBridgeAcceptanceUpdatedEventLocation));
+      state->stage = 6;
+      return;
+    }
+    case 6: {
+      const CalendarEventSummary* updated = eventById();
+      if (updated == nullptr ||
+          updated->title != QString::fromLatin1(kBridgeAcceptanceUpdatedEventTitle) ||
+          updated->description.value_or(QString()) !=
+              QString::fromLatin1(kBridgeAcceptanceUpdatedEventDescription) ||
+          updated->location.value_or(QString()) !=
+              QString::fromLatin1(kBridgeAcceptanceUpdatedEventLocation)) {
+        return;
+      }
+      setSearchQuery(QString::fromLatin1(kBridgeAcceptanceUpdatedTaskTitle));
+      state->stage = 7;
+      return;
+    }
+    case 7:
+      state->refreshedSearchResults = countSearchTasks(state->taskId);
+      if (state->refreshedSearchResults == 0) {
+        return;
+      }
+      finish(true);
+      return;
+    default:
+      finish(false, QStringLiteral("invalid Qt bridge interaction stage"));
+      return;
+    }
+  });
+  timer->start();
 }
 
 void AppController::setReminderService(ReminderService* service) {

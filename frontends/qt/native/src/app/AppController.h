@@ -641,6 +641,7 @@ private:
   void pollBridgeOperation(QString operationId);
   void cancelBridgeOperation();
   void completeBridgeReadyProbe();
+  void runBridgeInteractionAcceptance(QString reportPath);
   void refreshUndoStatus();
   void refreshPendingSyncCount();
   void recordExistenceHistory(UndoResourceKind resource,
@@ -861,6 +862,7 @@ private:
   std::uint64_t pythonBridgeRefreshGeneration_{0};
   bool pythonBridgeTasksReady_{false};
   bool pythonBridgeCalendarReady_{false};
+  bool bridgeInteractionAcceptanceStarted_{false};
   QString pythonBridgeOperationId_;
   QString pythonBridgeOperationKind_;
   bool pollScheduled_{false};

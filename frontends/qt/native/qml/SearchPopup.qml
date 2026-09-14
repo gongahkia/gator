@@ -69,7 +69,9 @@ Popup {
                 id: queryField
                 objectName: "searchQuery"
                 Layout.fillWidth: true
-                placeholderText: "Search tasks, events, notes, lists, and calendars"
+                placeholderText: root.bridgeMode
+                                 ? "Search tasks, events, lists, and calendars"
+                                 : "Search tasks, events, notes, lists, and calendars"
                 Accessible.name: placeholderText
                 onTextEdited: root.controllerCall("setSearchQuery", [text])
                 Keys.onPressed: function(event) {
@@ -141,6 +143,14 @@ Popup {
             text: "Searching locally…"
             color: Theme.textSecondary
             Accessible.name: text
+        }
+
+        Label {
+            Layout.fillWidth: true
+            visible: root.bridgeMode
+            text: "Search stays in the local HCB core. Use body:QUERY to search task notes and event details."
+            color: Theme.textSecondary
+            wrapMode: Text.WordWrap
         }
 
         ColumnLayout {

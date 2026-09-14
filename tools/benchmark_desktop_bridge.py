@@ -69,6 +69,10 @@ def main() -> int:
                     _request(bridge, f"/v1/accounts/benchmark/tasks?limit={args.page_size}")
                     for _ in range(args.runs)
                 ],
+                "search": [
+                    _request(bridge, "/v1/accounts/benchmark/search?q=release-marker&limit=50")
+                    for _ in range(args.runs)
+                ],
                 "event_range": [
                     _request(
                         bridge,

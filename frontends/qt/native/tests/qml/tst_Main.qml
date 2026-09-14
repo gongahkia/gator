@@ -543,6 +543,56 @@ TestCase {
         results.destroy()
     }
 
+    function test_bridgeModeSearchRoutesTypedCoreQueriesAndResults() {
+        const component = Qt.createComponent("../../qml/Main.qml")
+        compare(component.status, Component.Ready, component.errorString())
+        const results = Qt.createQmlObject('import QtQml.Models; ListModel {}', testCase)
+        results.append({ id: "bridge-task-1", resource: "task", title: "Bridge release result",
+                         detail: "From the Python core", scheduledAt: "2026-09-15", score: 100 })
+        const calls = []
+        const controller = {
+            bridgeMode: true,
+            googleConnected: true,
+            searchQuery: "",
+            searchErrorMessage: "",
+            searchFilterChips: [],
+            searchLoading: false,
+            savedSearches: [],
+            busy: false,
+            setSearchQuery: function(query) { calls.push(query) }
+        }
+        const mainWindow = component.createObject(null, {
+            navigationCommands: navigationCommands,
+            appController: controller,
+            searchResultsModel: results
+        })
+        verify(mainWindow !== null)
+        let activated = null
+        mainWindow.searchResultActivated.connect(function(resource, resultId) {
+            activated = { resource, resultId }
+        })
+
+        mainWindow.openSearch()
+        tryVerify(function() { return mainWindow.searchPopup.opened && mainWindow.searchQuery.activeFocus })
+        verify(!mainWindow.searchPopup.optionsToggleButton.visible)
+        keyClick(Qt.Key_B)
+        keyClick(Qt.Key_R)
+        keyClick(Qt.Key_I)
+        keyClick(Qt.Key_D)
+        keyClick(Qt.Key_G)
+        keyClick(Qt.Key_E)
+        verify(calls.length > 0)
+        compare(calls[calls.length - 1], "bridge")
+        tryCompare(mainWindow.searchResults, "count", 1)
+        mainWindow.searchResults.currentItem.click()
+        compare(mainWindow.currentPage, "Tasks")
+        compare(activated.resource, "task")
+        compare(activated.resultId, "bridge-task-1")
+        tryVerify(function() { return !mainWindow.searchPopup.opened })
+        mainWindow.destroy()
+        results.destroy()
+    }
+
     function test_settingsSearchMatchesSettingsSections() {
         const component = Qt.createComponent("../../qml/Main.qml")
         compare(component.status, Component.Ready, component.errorString())
