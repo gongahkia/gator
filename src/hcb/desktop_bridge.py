@@ -208,7 +208,8 @@ class DesktopBridge:
     @property
     def descriptor(self) -> BridgeDescriptor:
         host, port = self._server.server_address[:2]
-        return BridgeDescriptor(BRIDGE_API_VERSION, f"http://{host}:{port}", self._token)
+        host_text = host.decode() if isinstance(host, bytes) else host
+        return BridgeDescriptor(BRIDGE_API_VERSION, f"http://{host_text}:{port}", self._token)
 
     def serve_forever(self) -> None:
         self._server.serve_forever(poll_interval=0.2)
@@ -438,7 +439,9 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                     )
                 return summary
 
-            return self._with_application(read)
+            result = self._with_application(read)
+            assert isinstance(result, dict)
+            return result
 
         def _search(self, account_id: str, query: dict[str, list[str]]) -> Any:
             _query_keys(query, {"q", "limit"})
