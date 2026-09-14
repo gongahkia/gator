@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from .application import Json, TimeSlot, WorkspaceSnapshot, _ApplicationServiceBase
+from .application import (
+    Json,
+    TimeSlot,
+    WorkspaceSnapshot,
+    WorkspaceSummary,
+    _ApplicationServiceBase,
+)
 from .errors import NotFoundError
 from .models import (
     Account,
@@ -36,13 +42,24 @@ class WorkspaceServiceMixin(_ApplicationServiceBase):
 
     def workspace(self, account_id: str) -> WorkspaceSnapshot:
         """Return one local-only snapshot for interactive clients."""
+        summary = self.workspace_summary(account_id)
+        return WorkspaceSnapshot(
+            account=summary.account,
+            tasks=tuple(self.storage.list_tasks(account_id)),
+            events=tuple(self.storage.list_events(account_id)),
+            task_lists=summary.task_lists,
+            calendars=summary.calendars,
+            instance_ranges=summary.instance_ranges,
+            pending=summary.pending,
+        )
+
+    def workspace_summary(self, account_id: str) -> WorkspaceSummary:
+        """Return account chrome without hydrating every task and event."""
         account = self.storage.get_account(account_id)
         if account is None:
             raise NotFoundError(f"Account {account_id!r} does not exist")
-        return WorkspaceSnapshot(
+        return WorkspaceSummary(
             account=account,
-            tasks=tuple(self.storage.list_tasks(account_id)),
-            events=tuple(self.storage.list_events(account_id)),
             task_lists=tuple(self.storage.list_task_lists(account_id)),
             calendars=tuple(self.storage.list_calendars(account_id)),
             instance_ranges=tuple(self.storage.list_instance_ranges(account_id)),

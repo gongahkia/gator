@@ -99,6 +99,21 @@ class WorkspaceSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkspaceSummary:
+    """The small, always-needed portion of an account workspace.
+
+    Desktop clients load this before requesting task or calendar-range slices so
+    a large local mirror does not delay basic account and navigation chrome.
+    """
+
+    account: Account
+    task_lists: tuple[TaskList, ...]
+    calendars: tuple[Calendar, ...]
+    instance_ranges: tuple[dict[str, str], ...]
+    pending: int
+
+
+@dataclass(frozen=True, slots=True)
 class TimeSlot:
     start: datetime
     end: datetime
