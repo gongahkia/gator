@@ -94,6 +94,20 @@ void PythonBridgeProjectionTest::rejectsCrossAccountAndMalformedPayloads() {
       hcb::PythonBridgeProjection::workspaceSummary(crossAccount)));
   QVERIFY(std::holds_alternative<hcb::AppError>(hcb::PythonBridgeProjection::taskPage(
       object("{\"page\":{\"tasks\":[{\"id\":\"bad\"}]}}"), {})));
+  QVERIFY(std::holds_alternative<hcb::AppError>(hcb::PythonBridgeProjection::taskPage(
+      object(R"json({"page":{"tasks":[{"id":"task-1","account_id":"work","list_id":"unknown",
+      "title":"Bridge task","notes":null,"parent_id":null,"due":null,"due_time_zone":null,
+      "priority":"none","status":"needsAction"}]}})json"),
+      {{QStringLiteral("inbox"), QStringLiteral("Inbox")}})));
+  QVERIFY(std::holds_alternative<hcb::AppError>(hcb::PythonBridgeProjection::eventRange(object(R"json(
+    {"workspace":{"events":[{"id":"event-1","calendar_id":"primary","remote_id":null,
+      "summary":"Planning","status":"confirmed","description":null,"location":null,
+      "start":{"kind":"dateTime","value":"2026-09-15T09:00:00+00:00","time_zone":"UTC"},
+      "end":{"kind":"dateTime","value":"2026-09-15T10:00:00+00:00","time_zone":"UTC"},
+      "color_id":null,"transparency":null,"visibility":null,"event_type":null,
+      "attendees":{},"reminder_overrides":[],"attachments":[],
+      "metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}]}}
+  )json"))));
 }
 
 QTEST_GUILESS_MAIN(PythonBridgeProjectionTest)

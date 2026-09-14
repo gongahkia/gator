@@ -188,9 +188,9 @@ Focused follow-up command:
 cmake -S frontends/qt -B /tmp/hcb-qt-tests \
   -DHCB_NATIVE_DEPENDENCY_MODE=system -DBUILD_TESTING=ON
 cmake --build /tmp/hcb-qt-tests --target \
-  hcb_python_bridge_client_tests hcb_timeline_model_tests \
+  hcb_python_bridge_client_tests hcb_python_bridge_projection_tests hcb_timeline_model_tests \
   hcb_native hcb_native_qml_shell_smoke -j4
 QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/hcb-qt-tests \
   --output-on-failure \
-  -R '^(hcb_python_bridge_client_tests|hcb_timeline_model_tests|hcb_native_qml_shell_smoke)$'
+  -R '^(hcb_python_bridge_client_tests|hcb_python_bridge_projection_tests|hcb_timeline_model_tests|hcb_native_qml_shell_smoke)$'
 ```

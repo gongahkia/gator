@@ -109,6 +109,7 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
       !isValidOptionalString(object, u"due", 32) ||
       !isValidOptionalString(object, u"due_time_zone", 120) ||
       !isIdentifier(*id) || !isIdentifier(*accountId) || !isIdentifier(*listId) ||
+      !taskListTitles.contains(*listId) ||
       (parentId.has_value() && !isIdentifier(*parentId)) ||
       (status.toString() != QStringLiteral("needsAction") && status.toString() != QStringLiteral("completed"))) {
     return std::nullopt;
@@ -156,6 +157,9 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
   const std::optional<QString> remoteId = optionalString(object, u"remote_id", kMaximumIdLength);
   const std::optional<QString> etag = metadataString(object, u"etag");
   const std::optional<QString> updatedAt = metadataString(object, u"local_updated_at");
+  const QJsonValue attendeesValue = object.value(QStringLiteral("attendees"));
+  const QJsonValue remindersValue = object.value(QStringLiteral("reminder_overrides"));
+  const QJsonValue attachmentsValue = object.value(QStringLiteral("attachments"));
   if (!startKind.has_value() || !startAt.has_value() || !endKind.has_value() || !endAt.has_value() ||
       !isValidOptionalString(start, u"time_zone", 120) ||
       !isValidOptionalString(end, u"time_zone", 120) ||
@@ -169,13 +173,14 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
       (!etag.has_value() && !object.value(QStringLiteral("metadata")).toObject()
                                 .value(QStringLiteral("etag")).isNull()) ||
       !updatedAt.has_value() ||
+      !attendeesValue.isArray() || !remindersValue.isArray() || !attachmentsValue.isArray() ||
       (*startKind != QStringLiteral("date") && *startKind != QStringLiteral("dateTime")) ||
       *startKind != *endKind) {
     return std::nullopt;
   }
-  const QJsonArray attendees = object.value(QStringLiteral("attendees")).toArray();
-  const QJsonArray reminders = object.value(QStringLiteral("reminder_overrides")).toArray();
-  const QJsonArray attachments = object.value(QStringLiteral("attachments")).toArray();
+  const QJsonArray attendees = attendeesValue.toArray();
+  const QJsonArray reminders = remindersValue.toArray();
+  const QJsonArray attachments = attachmentsValue.toArray();
   return CalendarEventSummary{.id = *id,
                               .calendarId = *calendarId,
                               .remoteId = remoteId,
