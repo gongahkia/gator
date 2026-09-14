@@ -464,6 +464,15 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                 email = _string(body["expected_email"], "expected_email")
                 operation = bridge.operations.start_oauth(account_id, email)
                 return HTTPStatus.ACCEPTED, {"operation": operation.snapshot()}
+            if method == "GET" and tail == ("auth",):
+                _no_query(query)
+                return HTTPStatus.OK, {
+                    "authentication": {
+                        "connected": self._with_runtime(
+                            lambda runtime: runtime.has_stored_refresh_token(account_id)
+                        )
+                    }
+                }
             if method == "GET" and tail == ("tasks",):
                 return HTTPStatus.OK, {"page": self._task_page(account_id, query)}
             if method == "POST" and tail == ("tasks",):
@@ -640,11 +649,14 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             )
 
         def _with_application(self, action: Callable[[ApplicationService], Any]) -> Any:
+            return self._with_runtime(lambda runtime: action(runtime.application))
+
+        def _with_runtime(self, action: Callable[[Runtime], Any]) -> Any:
             if self._request_runtime is not None:
-                return action(self._request_runtime.application)
+                return action(self._request_runtime)
             runtime = bridge._runtime_factory()
             try:
-                return action(runtime.application)
+                return action(runtime)
             finally:
                 runtime.close()
 

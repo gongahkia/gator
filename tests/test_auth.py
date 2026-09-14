@@ -269,6 +269,24 @@ def test_encrypted_environment_token_store_keeps_only_a_key_in_keyring(tmp_path:
     assert tokens.get("account") is None
 
 
+def test_runtime_reports_only_a_readable_stored_refresh_token(tmp_path: Path) -> None:
+    credential_file = tmp_path / "account.env"
+    credential_file.write_text("HCB_GOOGLE_CLIENT_ID=client-id.apps.googleusercontent.com\n")
+    os.chmod(credential_file, 0o600)
+    runtime = Runtime(
+        AppPaths(tmp_path / "config", tmp_path / "data", tmp_path / "cache"),
+        environ={},
+        token_store=TokenStore(FakeKeyring()),
+        credential_file=credential_file,
+    )
+    try:
+        assert not runtime.has_stored_refresh_token("account")
+        runtime.token_store_for("account").set("account", "refresh-token")
+        assert runtime.has_stored_refresh_token("account")
+    finally:
+        runtime.close()
+
+
 def test_diagnostics_config_and_sqlite_dump_never_contain_credentials(
     tmp_path: Path,
 ) -> None:

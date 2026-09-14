@@ -35,6 +35,7 @@ private slots:
   void readsPrivateLoopbackDescriptor();
   void rejectsUnsafeDescriptor();
   void requestsWorkspaceAndBoundedPages();
+  void requestsAuthenticationState();
   void sendsIdempotentMutations();
   void rejectsInvalidRequestsBeforeNetwork();
   void cancelsBeforeNetwork();
@@ -114,6 +115,20 @@ void PythonBridgeClientTest::requestsWorkspaceAndBoundedPages() {
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("include")), QStringLiteral("events"));
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("start")), QStringLiteral("2026-09-14"));
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("end")), QStringLiteral("2026-09-15"));
+}
+
+void PythonBridgeClientTest::requestsAuthenticationState() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue(
+      {.body = QByteArray("{\"api_version\":1,\"data\":{\"authentication\":{\"connected\":false}}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> future = client.authenticationState(QStringLiteral("work"));
+  waitFor(future);
+  QVERIFY(std::holds_alternative<QJsonObject>(future.get()));
+  QCOMPARE(manager.requests().size(), 1);
+  QCOMPARE(manager.requests().first().request.url().path(),
+           QStringLiteral("/v1/accounts/work/auth"));
 }
 
 void PythonBridgeClientTest::sendsIdempotentMutations() {

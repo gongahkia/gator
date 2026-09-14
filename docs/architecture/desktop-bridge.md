@@ -67,6 +67,7 @@ snake_case; timed event values are objects such as
 | `POST /v1/accounts/{account}/events`, `PATCH`/`DELETE /events/{id}` | Optimistic event operations through `ApplicationService`. |
 | `POST /v1/accounts/{account}/sync` | Starts an asynchronous sync operation. |
 | `POST /v1/accounts/{account}/oauth` | Starts the existing browser OAuth connection for an already configured account; body is `{"expected_email":"..."}`. |
+| `GET /v1/accounts/{account}/auth` | Reports whether the Python core can read a stored refresh token. It never returns credential material. |
 | `GET`/`DELETE /v1/operations/{id}` | Poll an asynchronous operation or request cancellation. |
 
 Task and event changes require an `Idempotency-Key` header with a frontend-

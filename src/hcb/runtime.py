@@ -105,6 +105,11 @@ class Runtime:
             account_id, self.credential_file(account_id), self.keyring_store
         )
 
+    def has_stored_refresh_token(self, account_id: str) -> bool:
+        """Report whether the core can read a persisted refresh token for an account."""
+
+        return self.token_store_for(account_id).get(account_id) is not None
+
     def account_id(self, explicit: str | None = None) -> str:
         selected = (
             explicit

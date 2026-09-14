@@ -627,6 +627,7 @@ private:
   void pollPending();
   void refreshTasks();
   void initializeBridge();
+  void loadBridgeAuthentication();
   void refreshBridge();
   void loadBridgeTaskPage(std::uint64_t generation,
                           std::optional<QString> cursor,

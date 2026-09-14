@@ -39,6 +39,8 @@ public:
   [[nodiscard]] std::future<PythonBridgeResult>
   workspace(const QString& accountId, CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult>
+  authenticationState(const QString& accountId, CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
   taskPage(const QString& accountId,
            int limit = 200,
            std::optional<QString> cursor = std::nullopt,

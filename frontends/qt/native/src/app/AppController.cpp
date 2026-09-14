@@ -1795,13 +1795,37 @@ void AppController::initializeBridge() {
     setStatus(QStringLiteral("An HCB bridge account is required"));
     return;
   }
-  if (!googleConnected_) {
-    googleConnected_ = true;
+  if (googleConnected_) {
+    googleConnected_ = false;
     emit googleConnectedChanged();
   }
   setSyncStatus(QStringLiteral("managed by HCB core"));
   setReminderStatusMessage(QStringLiteral("Calendar reminders are managed by HCB core"));
+  loadBridgeAuthentication();
   refreshBridge();
+}
+
+void AppController::loadBridgeAuthentication() {
+  if (pythonBridgeClient_ == nullptr || pythonBridgeAccountId_.isEmpty()) {
+    return;
+  }
+  watch(pythonBridgeClient_->authenticationState(pythonBridgeAccountId_), [this](PythonBridgeResult result) {
+    if (std::holds_alternative<AppError>(result)) {
+      setStatus(errorMessage(std::get<AppError>(std::move(result))));
+      return;
+    }
+    const QJsonObject authentication =
+        std::get<QJsonObject>(std::move(result)).value(QStringLiteral("authentication")).toObject();
+    const QJsonValue connected = authentication.value(QStringLiteral("connected"));
+    if (!connected.isBool()) {
+      setStatus(QStringLiteral("HCB bridge returned an invalid authentication state"));
+      return;
+    }
+    if (googleConnected_ != connected.toBool()) {
+      googleConnected_ = connected.toBool();
+      emit googleConnectedChanged();
+    }
+  }, false);
 }
 
 void AppController::reportBridgeUnsupportedAction() {
@@ -2124,6 +2148,10 @@ void AppController::pollBridgeOperation(QString operationId) {
     pythonBridgeOperationKind_.clear();
     emit bridgeOperationChanged();
     if (state == QStringLiteral("succeeded")) {
+      if (kind == QStringLiteral("Google authorization") && !googleConnected_) {
+        googleConnected_ = true;
+        emit googleConnectedChanged();
+      }
       setSyncStatus(kind + QStringLiteral(" complete"));
       setStatus(kind + QStringLiteral(" complete"));
       refreshBridge();

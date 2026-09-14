@@ -178,6 +178,15 @@ PythonBridgeClient::workspace(const QString& accountId, CancellationToken cancel
 }
 
 std::future<PythonBridgeResult>
+PythonBridgeClient::authenticationState(const QString& accountId, CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/auth");
+  if (!path.has_value()) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("account id is invalid"))));
+  }
+  return get(*path, cancellation);
+}
+
+std::future<PythonBridgeResult>
 PythonBridgeClient::taskPage(const QString& accountId,
                              int limit,
                              std::optional<QString> cursor,

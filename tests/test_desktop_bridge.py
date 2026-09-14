@@ -29,6 +29,9 @@ from hcb.sync import SyncResult
 @pytest.fixture
 def bridge_env(tmp_path: Path) -> Iterator[tuple[AppPaths, DesktopBridge]]:
     paths = AppPaths(tmp_path / "config", tmp_path / "data", tmp_path / "cache")
+    credential_file = tmp_path / "test-account.env"
+    credential_file.write_text("HCB_GOOGLE_CLIENT_ID=test-client-id\n")
+    os.chmod(credential_file, 0o600)
     with Storage(paths.database_file) as storage, storage.transaction():
         storage.upsert_account(Account("work", "work@example.test", display_name="Work"))
         storage.upsert_task_list(TaskList("inbox", "work", "Inbox"))
@@ -44,7 +47,10 @@ def bridge_env(tmp_path: Path) -> Iterator[tuple[AppPaths, DesktopBridge]]:
                 EventDateTime(DateTimeKind.DATETIME, datetime(2026, 9, 14, 10, tzinfo=UTC)),
             )
         )
-    bridge = DesktopBridge(lambda: Runtime(paths, environ={}), token="bridge-test-token")
+    bridge = DesktopBridge(
+        lambda: Runtime(paths, environ={}, credential_file=credential_file),
+        token="bridge-test-token",
+    )
     worker = threading.Thread(target=bridge.serve_forever, daemon=True)
     worker.start()
     try:
@@ -140,6 +146,10 @@ def test_workspace_slices_are_account_scoped_and_range_bounded(
     assert workspace["account"]["id"] == "work"  # type: ignore[index]
     assert "tasks" not in workspace and "events" not in workspace
 
+    status, response = _request(bridge, "GET", "/v1/accounts/work/auth")
+    assert status == 200
+    assert _data(response) == {"authentication": {"connected": False}}
+
     status, response = _request(
         bridge,
         "GET",
@@ -160,6 +170,32 @@ def test_workspace_slices_are_account_scoped_and_range_bounded(
     status, failure = _request(bridge, "GET", "/v1/accounts/other/workspace")
     assert status == 404
     assert failure["error"]["code"] == "not_found"  # type: ignore[index]
+
+
+def test_authentication_state_is_reported_without_credential_material(tmp_path: Path) -> None:
+    paths = AppPaths(tmp_path / "config", tmp_path / "data", tmp_path / "cache")
+    with Storage(paths.database_file) as storage, storage.transaction():
+        storage.upsert_account(Account("work", "work@example.test"))
+
+    class AuthenticatedRuntime(Runtime):
+        def has_stored_refresh_token(self, account_id: str) -> bool:
+            assert account_id == "work"
+            return True
+
+    bridge = DesktopBridge(
+        lambda: AuthenticatedRuntime(paths, environ={}), token="bridge-test-token"
+    )
+    worker = threading.Thread(target=bridge.serve_forever, daemon=True)
+    worker.start()
+    try:
+        status, response = _request(bridge, "GET", "/v1/accounts/work/auth")
+        assert status == 200
+        assert _data(response) == {"authentication": {"connected": True}}
+    finally:
+        bridge.shutdown()
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        bridge.close()
 
 
 def test_task_and_event_mutations_use_the_python_optimistic_core(
