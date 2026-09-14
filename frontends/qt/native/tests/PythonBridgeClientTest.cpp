@@ -35,6 +35,7 @@ private slots:
   void readsPrivateLoopbackDescriptor();
   void rejectsUnsafeDescriptor();
   void requestsWorkspaceAndBoundedPages();
+  void sendsIdempotentMutations();
   void rejectsInvalidRequestsBeforeNetwork();
   void cancelsBeforeNetwork();
   void propagatesBridgeErrors();
@@ -113,6 +114,50 @@ void PythonBridgeClientTest::requestsWorkspaceAndBoundedPages() {
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("include")), QStringLiteral("events"));
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("start")), QStringLiteral("2026-09-14"));
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("end")), QStringLiteral("2026-09-15"));
+}
+
+void PythonBridgeClientTest::sendsIdempotentMutations() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"task\":{}}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"event\":{}}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"operation\":{}}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  const QByteArray taskKey("task-request-123");
+  std::future<hcb::PythonBridgeResult> task = client.createTask(
+      QStringLiteral("work"),
+      QJsonObject{{QStringLiteral("list_id"), QStringLiteral("inbox")},
+                  {QStringLiteral("title"), QStringLiteral("Bridge task")}},
+      taskKey);
+  waitFor(task);
+  QVERIFY(std::holds_alternative<QJsonObject>(task.get()));
+
+  const QByteArray eventKey("event-request-456");
+  std::future<hcb::PythonBridgeResult> event = client.deleteEvent(
+      QStringLiteral("work"), QStringLiteral("event-1"), eventKey);
+  waitFor(event);
+  QVERIFY(std::holds_alternative<QJsonObject>(event.get()));
+
+  std::future<hcb::PythonBridgeResult> sync = client.startSync(QStringLiteral("work"));
+  waitFor(sync);
+  QVERIFY(std::holds_alternative<QJsonObject>(sync.get()));
+
+  QCOMPARE(manager.requests().size(), 3);
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks"));
+  QCOMPARE(manager.requests().at(0).request.rawHeader("Idempotency-Key"), taskKey);
+  QCOMPARE(manager.requests().at(0).request.header(QNetworkRequest::ContentTypeHeader).toString(),
+           QStringLiteral("application/json"));
+  QCOMPARE(manager.requests().at(0).body,
+           QByteArray("{\"list_id\":\"inbox\",\"title\":\"Bridge task\"}"));
+  QCOMPARE(manager.requests().at(1).request.url().path(),
+           QStringLiteral("/v1/accounts/work/events/event-1"));
+  QCOMPARE(manager.requests().at(1).request.rawHeader("Idempotency-Key"), eventKey);
+  QVERIFY(manager.requests().at(1).body.isEmpty());
+  QCOMPARE(manager.requests().at(2).request.url().path(),
+           QStringLiteral("/v1/accounts/work/sync"));
+  QVERIFY(manager.requests().at(2).request.rawHeader("Idempotency-Key").isEmpty());
+  QCOMPARE(manager.requests().at(2).body, QByteArray("{}"));
 }
 
 void PythonBridgeClientTest::rejectsInvalidRequestsBeforeNetwork() {

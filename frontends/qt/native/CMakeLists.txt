@@ -45,6 +45,8 @@ set(HCB_NATIVE_SOURCES
   src/app/AppController.h
   src/app/AppPaths.cpp
   src/app/AppPaths.h
+  src/app/PythonBridgeProcessLauncher.cpp
+  src/app/PythonBridgeProcessLauncher.h
   src/app/AppServices.cpp
   src/app/AppServices.h
   ${HCB_DEEP_LINK_SOURCES}
@@ -2083,6 +2085,21 @@ if(BUILD_TESTING)
   hcb_enable_warnings(hcb_python_bridge_client_tests)
   hcb_enable_sanitizers(hcb_python_bridge_client_tests)
   add_test(NAME hcb_python_bridge_client_tests COMMAND hcb_python_bridge_client_tests)
+
+  qt_add_executable(hcb_python_bridge_process_launcher_tests
+    tests/PythonBridgeProcessLauncherTest.cpp
+    src/app/PythonBridgeProcessLauncher.cpp
+    src/app/PythonBridgeProcessLauncher.h
+    src/core/AppError.h
+    src/core/Cancellation.h
+    src/core/PythonBridgeClient.cpp
+    src/core/PythonBridgeClient.h
+  )
+  target_link_libraries(hcb_python_bridge_process_launcher_tests PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+  target_include_directories(hcb_python_bridge_process_launcher_tests PRIVATE src tests)
+  hcb_enable_warnings(hcb_python_bridge_process_launcher_tests)
+  hcb_enable_sanitizers(hcb_python_bridge_process_launcher_tests)
+  add_test(NAME hcb_python_bridge_process_launcher_tests COMMAND hcb_python_bridge_process_launcher_tests)
 
   qt_add_executable(hcb_python_bridge_projection_tests
     tests/PythonBridgeProjectionTest.cpp

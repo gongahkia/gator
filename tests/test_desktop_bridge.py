@@ -302,8 +302,15 @@ def test_operations_cancel_sync_and_redact_oauth_tokens(tmp_path: Path) -> None:
             progress("sync cancelled")
             return SyncResult(cancelled=True)
 
-        def connect_account(self, account_id: str, *, expected_email: str):
+        def connect_account(
+            self,
+            account_id: str,
+            *,
+            expected_email: str,
+            cancelled: Callable[[], bool] | None = None,
+        ):
             assert account_id == "work" and expected_email == "work@example.test"
+            assert cancelled is not None
 
             class Result:
                 refresh_token = "never-expose-refresh-token"

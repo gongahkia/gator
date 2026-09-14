@@ -203,6 +203,13 @@ ApplicationWindow {
     }
 
     function controllerCall(method, args) {
+        if (appController !== null && appController.bridgeMode === true &&
+                ["refresh", "setCalendarDate", "createTaskDetailed", "updateTaskDetailed",
+                 "setTaskCompleted", "deleteTask", "createEvent", "updateEvent",
+                 "createEventDetailed", "updateEventDetailed", "deleteEvent"].indexOf(method) < 0) {
+            appController.reportBridgeUnsupportedAction()
+            return
+        }
         if (appController !== null && typeof appController[method] === "function") {
             appController[method].apply(appController, args)
         }

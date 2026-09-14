@@ -57,11 +57,11 @@ lost response returns that stored result; reusing the key with different method,
 path, or payload returns `409`. Receipts expire after seven days.
 
 `sync` cancellation is passed to the existing sync engine and reaches a
-cancelled state when it stops. [Limit] OAuth can be cancelled before the bridge
-opens the current browser/listener flow. The existing Google authenticator has
-no cancellation hook once that flow is active, so a later cancellation request
-is recorded but cannot interrupt it. A cancellable authenticator API is still
-needed before promising OAuth cancellation in a desktop UI.
+cancelled state when it stops. OAuth cancellation closes HCB's loopback listener
+within 250 ms while it waits for the browser callback, and it checks again before
+exchanging or saving credentials. A cancellation cannot interrupt an already
+in-flight HTTPS token exchange; the operation reports its terminal result after
+that exchange returns.
 
 ## Process and performance model
 

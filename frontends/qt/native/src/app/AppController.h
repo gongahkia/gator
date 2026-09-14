@@ -179,7 +179,7 @@ class AppController final : public QObject {
   Q_PROPERTY(int pendingSyncCount READ pendingSyncCount NOTIFY pendingSyncCountChanged)
   Q_PROPERTY(QString reminderStatusMessage READ reminderStatusMessage NOTIFY reminderStatusMessageChanged)
   Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
-  Q_PROPERTY(bool bridgeReadOnly READ bridgeReadOnly CONSTANT)
+  Q_PROPERTY(bool bridgeMode READ bridgeMode CONSTANT)
 
 public:
   AppController(FilePath databasePath,
@@ -272,11 +272,11 @@ public:
   [[nodiscard]] int pendingSyncCount() const;
   [[nodiscard]] QString reminderStatusMessage() const;
   [[nodiscard]] bool busy() const;
-  [[nodiscard]] bool bridgeReadOnly() const;
+  [[nodiscard]] bool bridgeMode() const;
   [[nodiscard]] SearchResultsModel& searchResultsModel();
 
   Q_INVOKABLE void initialize();
-  Q_INVOKABLE void reportBridgeReadOnlyAction();
+  Q_INVOKABLE void reportBridgeUnsupportedAction();
   void setReminderService(ReminderService* service);
   void setPlatformReminderStatus(QString message);
   Q_INVOKABLE void refresh();
@@ -629,6 +629,8 @@ private:
                           bool firstPageApplied);
   void loadBridgeCalendar(std::uint64_t generation);
   void applyBridgeCalendarEvents(std::uint64_t generation, QList<CalendarEventSummary> events);
+  void applyBridgeTaskResponse(const QJsonObject& data);
+  void applyBridgeEventResponse(const QJsonObject& data);
   void refreshUndoStatus();
   void refreshPendingSyncCount();
   void recordExistenceHistory(UndoResourceKind resource,
@@ -844,6 +846,7 @@ private:
   std::unique_ptr<PythonBridgeClient> pythonBridgeClient_;
   QString pythonBridgeAccountId_;
   QHash<QString, QString> pythonBridgeTaskListTitles_;
+  QList<CalendarEventSummary> pythonBridgeCalendarEvents_;
   std::uint64_t pythonBridgeRefreshGeneration_{0};
   bool pollScheduled_{false};
   std::vector<std::unique_ptr<PendingOperation>> pending_;

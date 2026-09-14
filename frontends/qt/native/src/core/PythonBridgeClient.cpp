@@ -19,6 +19,7 @@ namespace {
 constexpr int kApiVersion = 1;
 constexpr qsizetype kMaximumDescriptorBytes = 16 * 1024;
 constexpr qsizetype kMaximumResponseBytes = 8 * 1024 * 1024;
+constexpr qsizetype kMaximumRequestBytes = 256 * 1024;
 constexpr qsizetype kMaximumAccountIdLength = 256;
 constexpr qsizetype kMaximumCursorLength = 128;
 constexpr qsizetype kMaximumListIdLength = 256;
@@ -66,6 +67,19 @@ void complete(const std::shared_ptr<Completion>& completion, PythonBridgeResult 
   }
   for (const QChar character : value) {
     if (!(character.isLetterOrNumber() || character == u'-' || character == u'_')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] bool isValidIdempotencyKey(const QByteArray& value) {
+  if (value.isEmpty() || value.size() > 128) {
+    return false;
+  }
+  for (const char character : value) {
+    if (character == '\0' || character == ' ' || character == '\t' || character == '\r' ||
+        character == '\n') {
       return false;
     }
   }
@@ -211,28 +225,198 @@ PythonBridgeClient::eventRange(const QString& accountId,
   return get(result, cancellation);
 }
 
+std::future<PythonBridgeResult> PythonBridgeClient::createTask(const QString& accountId,
+                                                                const QJsonObject& task,
+                                                                const QByteArray& idempotencyKey,
+                                                                CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks");
+  if (!path.has_value() || !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("task mutation is invalid"))));
+  }
+  return request("POST", *path, task, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::updateTask(const QString& accountId,
+                                                                const QString& taskId,
+                                                                const QJsonObject& changes,
+                                                                const QByteArray& idempotencyKey,
+                                                                CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/");
+  if (!path.has_value() || !isValidIdentifier(taskId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("task mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(taskId)));
+  return request("PATCH", target, changes, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::completeTask(const QString& accountId,
+                                                                  const QString& taskId,
+                                                                  bool completed,
+                                                                  const QByteArray& idempotencyKey,
+                                                                  CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/");
+  if (!path.has_value() || !isValidIdentifier(taskId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("task mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(taskId)) +
+                 QStringLiteral("/complete"));
+  return request("POST", target, QJsonObject{{QStringLiteral("completed"), completed}},
+                 idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::deleteTask(const QString& accountId,
+                                                                const QString& taskId,
+                                                                const QByteArray& idempotencyKey,
+                                                                CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/");
+  if (!path.has_value() || !isValidIdentifier(taskId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("task mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(taskId)));
+  return request("DELETE", target, std::nullopt, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::createEvent(const QString& accountId,
+                                                                 const QJsonObject& event,
+                                                                 const QByteArray& idempotencyKey,
+                                                                 CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/events");
+  if (!path.has_value() || !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("event mutation is invalid"))));
+  }
+  return request("POST", *path, event, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::updateEvent(const QString& accountId,
+                                                                 const QString& eventId,
+                                                                 const QJsonObject& changes,
+                                                                 const QByteArray& idempotencyKey,
+                                                                 CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/events/");
+  if (!path.has_value() || !isValidIdentifier(eventId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("event mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(eventId)));
+  return request("PATCH", target, changes, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::deleteEvent(const QString& accountId,
+                                                                 const QString& eventId,
+                                                                 const QByteArray& idempotencyKey,
+                                                                 CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/events/");
+  if (!path.has_value() || !isValidIdentifier(eventId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("event mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(eventId)));
+  return request("DELETE", target, std::nullopt, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::startSync(const QString& accountId,
+                                                               CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/sync");
+  if (!path.has_value()) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("account id is invalid"))));
+  }
+  return request("POST", *path, QJsonObject{}, std::nullopt, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::startOAuth(const QString& accountId,
+                                                                const QString& expectedEmail,
+                                                                CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/oauth");
+  if (!path.has_value() || expectedEmail.isEmpty() || expectedEmail != expectedEmail.trimmed() ||
+      expectedEmail.size() > 320) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("OAuth request is invalid"))));
+  }
+  return request("POST", *path, QJsonObject{{QStringLiteral("expected_email"), expectedEmail}},
+                 std::nullopt, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::operation(const QString& operationId,
+                                                               CancellationToken cancellation) {
+  if (!isValidIdentifier(operationId, kMaximumListIdLength)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("operation id is invalid"))));
+  }
+  return get(QUrl(QStringLiteral("/v1/operations/") +
+                  QString::fromLatin1(QUrl::toPercentEncoding(operationId))),
+             cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::cancelOperation(const QString& operationId,
+                                                                     CancellationToken cancellation) {
+  if (!isValidIdentifier(operationId, kMaximumListIdLength)) {
+    return readyFuture(PythonBridgeResult(validationError(QStringLiteral("operation id is invalid"))));
+  }
+  return request("DELETE",
+                 QUrl(QStringLiteral("/v1/operations/") +
+                      QString::fromLatin1(QUrl::toPercentEncoding(operationId))),
+                 std::nullopt, std::nullopt, cancellation);
+}
+
 std::future<PythonBridgeResult> PythonBridgeClient::get(QUrl path, CancellationToken cancellation) {
+  return request("GET", std::move(path), std::nullopt, std::nullopt, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::request(
+    QByteArray method,
+    QUrl path,
+    std::optional<QJsonObject> body,
+    std::optional<QByteArray> idempotencyKey,
+    CancellationToken cancellation) {
   if (cancellation.stop_requested()) {
     return readyFuture(PythonBridgeResult(networkError(QStringLiteral("HCB bridge request was cancelled"))));
   }
-  if (!path.isValid() || !path.path().startsWith(QStringLiteral("/v1/")) ||
-      path.fragment().size() > 0) {
+  if ((method != "GET" && method != "POST" && method != "PATCH" && method != "DELETE") ||
+      !path.isValid() || !path.path().startsWith(QStringLiteral("/v1/")) ||
+      path.query().contains(QChar::Null) || path.fragment().size() > 0 ||
+      (body.has_value() && (method != "POST" && method != "PATCH")) ||
+      (idempotencyKey.has_value() && !isValidIdempotencyKey(*idempotencyKey))) {
     return readyFuture(PythonBridgeResult(validationError(QStringLiteral("HCB bridge path is invalid"))));
+  }
+  const QByteArray encodedBody = body.has_value()
+                                     ? QJsonDocument(*body).toJson(QJsonDocument::Compact)
+                                     : QByteArray{};
+  if (encodedBody.size() > kMaximumRequestBytes) {
+    return readyFuture(PythonBridgeResult(validationError(
+        QStringLiteral("HCB bridge request exceeded the local size limit"))));
   }
   auto completion = std::make_shared<Completion>();
   std::future<PythonBridgeResult> future = completion->promise.get_future();
   if (!QMetaObject::invokeMethod(
           this,
-          [this, path = std::move(path), cancellation, completion] {
+          [this, method = std::move(method), path = std::move(path), encodedBody, idempotencyKey,
+           cancellation, completion] {
             QUrl requestUrl = connection_.endpoint;
             requestUrl.setPath(path.path());
             requestUrl.setQuery(path.query());
             QNetworkRequest request(requestUrl);
             request.setRawHeader("Authorization", "Bearer " + connection_.bearerToken);
             request.setRawHeader("Accept", "application/json");
+            if (idempotencyKey.has_value()) {
+              request.setRawHeader("Idempotency-Key", *idempotencyKey);
+            }
             request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                                  QNetworkRequest::ManualRedirectPolicy);
-            QNetworkReply* reply = manager_->get(request);
+            QNetworkReply* reply = nullptr;
+            if (method == "GET") {
+              reply = manager_->get(request);
+            } else if (method == "DELETE") {
+              reply = manager_->sendCustomRequest(request, method);
+            } else {
+              request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+              reply = manager_->sendCustomRequest(request, method, encodedBody);
+            }
             if (reply == nullptr) {
               complete(completion,
                        PythonBridgeResult(networkError(QStringLiteral("HCB bridge request could not start"))));
@@ -261,12 +445,12 @@ std::future<PythonBridgeResult> PythonBridgeClient::get(QUrl path, CancellationT
             }
             connect(reply, &QNetworkReply::finished, reply, [reply, completion] {
               const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-              const QByteArray body = reply->readAll();
+              const QByteArray responseBody = reply->readAll();
               if (reply->error() != QNetworkReply::NoError && status == 0) {
                 complete(completion,
                          PythonBridgeResult(networkError(QStringLiteral("HCB bridge transport failed"))));
               } else {
-                complete(completion, decodeResponse(status, body));
+                complete(completion, decodeResponse(status, responseBody));
               }
               reply->deleteLater();
             });

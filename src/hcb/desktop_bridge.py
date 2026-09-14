@@ -28,6 +28,7 @@ from typing import Any, Final, Literal
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .application import ApplicationService
+from .auth import OAuthCancelledError
 from .errors import (
     AuthenticationRequired,
     ConfigurationError,
@@ -138,14 +139,17 @@ class BridgeOperations:
 
     def start_oauth(self, account_id: str, expected_email: str) -> _Operation:
         def run(runtime: Runtime, operation: _Operation) -> Json:
-            # GoogleAuthenticator currently has no cancellation hook once it has
-            # opened the browser/listener flow. A cancellation that wins before
-            # that point is honoured; a later one remains visible to the client
-            # but cannot interrupt the provider operation.
             if operation.is_cancelled():
                 return {"cancelled": True}
             operation.add_progress("waiting for browser authorization")
-            result = runtime.connect_account(account_id, expected_email=expected_email)
+            try:
+                result = runtime.connect_account(
+                    account_id,
+                    expected_email=expected_email,
+                    cancelled=operation.is_cancelled,
+                )
+            except OAuthCancelledError:
+                return {"cancelled": True}
             # OAuthResult contains access and refresh tokens. Never cross the bridge.
             return {"connected": True, "granted_scopes": list(result.granted_scopes)}
 

@@ -21,9 +21,11 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <variant>
 
 #include "app/AppPaths.h"
 #include "app/AppController.h"
+#include "app/PythonBridgeProcessLauncher.h"
 #include "app/DeepLinkAdapter.h"
 #include "app/NativeReminderNotifier.h"
 #include "app/SystemTrayAdapter.h"
@@ -34,6 +36,7 @@
 #include "core/MonthGridModel.h"
 #include "core/NativeProcessMemory.h"
 #include "core/NotesModel.h"
+#include "core/PythonBridgeClient.h"
 #include "core/ReminderService.h"
 #include "core/SearchResultsModel.h"
 #include "core/StartupTimingTracker.h"
@@ -48,6 +51,11 @@ namespace {
 constexpr int kMaximumBenchmarkIdleRssDurationMilliseconds = 60'000;
 constexpr int kCommandPaletteBenchmarkTimeoutMilliseconds = 5'000;
 constexpr int kMaximumTimelineProfileEventCount = 100'000;
+
+struct BridgeLaunchOptions final {
+  std::optional<QString> descriptorPath;
+  QString accountId;
+};
 
 #if defined(Q_OS_LINUX)
 constexpr char kReminderServiceName[] = "dev.hotcrossbuns.Reminders";
@@ -118,6 +126,50 @@ private:
     return std::nullopt;
   }
   return std::nullopt;
+}
+
+[[nodiscard]] std::variant<std::monostate, BridgeLaunchOptions, QString>
+bridgeLaunchOptions(const QStringList& arguments) {
+  std::optional<QString> descriptorPath;
+  std::optional<QString> accountId;
+  const auto read = [&arguments](QStringView option,
+                                 std::optional<QString>& destination) -> std::optional<QString> {
+    for (qsizetype index = 1; index < arguments.size(); ++index) {
+      const QString& argument = arguments.at(index);
+      if (argument == option) {
+        if (index + 1 >= arguments.size() || destination.has_value()) {
+          return QStringLiteral("%1 requires exactly one value").arg(option);
+        }
+        destination = arguments.at(++index);
+        continue;
+      }
+      const QString prefix = QString(option) + u'=';
+      if (argument.startsWith(prefix)) {
+        if (destination.has_value()) {
+          return QStringLiteral("%1 must appear at most once").arg(option);
+        }
+        destination = argument.sliced(prefix.size());
+      }
+    }
+    return std::nullopt;
+  };
+  if (const std::optional<QString> error = read(u"--bridge-descriptor", descriptorPath);
+      error.has_value()) {
+    return *error;
+  }
+  if (const std::optional<QString> error = read(u"--bridge-account", accountId); error.has_value()) {
+    return *error;
+  }
+  if (!descriptorPath.has_value() && !accountId.has_value()) {
+    return std::monostate{};
+  }
+  if (!accountId.has_value() || accountId->isEmpty() || *accountId != accountId->trimmed()) {
+    return QStringLiteral("--bridge-account must be provided with a non-empty account id");
+  }
+  if (descriptorPath.has_value() && descriptorPath->isEmpty()) {
+    return QStringLiteral("--bridge-descriptor must not be empty");
+  }
+  return BridgeLaunchOptions{descriptorPath, *accountId};
 }
 
 [[nodiscard]] QDate timelineProfileWeekStart(QDate date) {
@@ -205,6 +257,42 @@ int runApplication(int argc, char* argv[]) {
 
   const std::optional<int> profileEventCount = timelineProfileEventCount(application.arguments());
   const bool timelineProfile = profileEventCount.has_value();
+  const auto bridgeOptions = bridgeLaunchOptions(application.arguments());
+  if (std::holds_alternative<QString>(bridgeOptions)) {
+    QTextStream(stderr) << "Invalid HCB bridge launch arguments: "
+                        << std::get<QString>(bridgeOptions) << Qt::endl;
+    return 2;
+  }
+  if (timelineProfile && !std::holds_alternative<std::monostate>(bridgeOptions)) {
+    QTextStream(stderr) << "Timeline profiling cannot use an HCB bridge" << Qt::endl;
+    return 2;
+  }
+  std::optional<hcb::PythonBridgeConnection> bridgeConnection;
+  std::unique_ptr<hcb::PythonBridgeProcessLauncher> bridgeLauncher;
+  QString bridgeAccountId;
+  if (std::holds_alternative<BridgeLaunchOptions>(bridgeOptions)) {
+    const BridgeLaunchOptions& options = std::get<BridgeLaunchOptions>(bridgeOptions);
+    if (options.descriptorPath.has_value()) {
+      hcb::PythonBridgeConnectionOrError connection =
+          hcb::PythonBridgeClient::readConnectionDescriptor(*options.descriptorPath);
+      if (std::holds_alternative<hcb::AppError>(connection)) {
+        QTextStream(stderr) << "Cannot use HCB bridge descriptor: "
+                            << std::get<hcb::AppError>(connection).message() << Qt::endl;
+        return 2;
+      }
+      bridgeConnection = std::get<hcb::PythonBridgeConnection>(std::move(connection));
+    } else {
+      bridgeLauncher = std::make_unique<hcb::PythonBridgeProcessLauncher>();
+      hcb::PythonBridgeLaunchResult connection = bridgeLauncher->start();
+      if (std::holds_alternative<hcb::AppError>(connection)) {
+        QTextStream(stderr) << "Cannot launch HCB bridge: "
+                            << std::get<hcb::AppError>(connection).message() << Qt::endl;
+        return 2;
+      }
+      bridgeConnection = std::get<hcb::PythonBridgeConnection>(std::move(connection));
+    }
+    bridgeAccountId = options.accountId;
+  }
   std::optional<hcb::FilePath> databasePath;
   if (timelineProfile) {
     databasePath = hcb::FilePath::fromAbsolute(QStringLiteral("/dev/null"));
@@ -245,6 +333,8 @@ int runApplication(int argc, char* argv[]) {
                                    taskListModel,
                                    taskModel,
                                    timelineModel,
+                                   std::move(bridgeConnection),
+                                   std::move(bridgeAccountId),
                                    &application);
 #if defined(Q_OS_LINUX)
   LinuxReminderDaemonClient reminderClient(
@@ -304,11 +394,13 @@ int runApplication(int argc, char* argv[]) {
       qEnvironmentVariable("HCB_BENCHMARK_EXIT_AFTER_LOAD") == QStringLiteral("1");
   if (!timelineProfile && !exitAfterLoad) {
     appController.initialize();
+    if (!appController.bridgeMode()) {
 #if defined(Q_OS_LINUX)
-    reminderClient.start();
+      reminderClient.start();
 #else
-    QTimer::singleShot(0, &reminderService, &hcb::ReminderService::start);
+      QTimer::singleShot(0, &reminderService, &hcb::ReminderService::start);
 #endif
+    }
   }
 
   QObject* rootObject = engine.rootObjects().constFirst();

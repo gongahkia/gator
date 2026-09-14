@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any, Protocol, cast
+from urllib.parse import urlsplit
+from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
+from wsgiref.util import request_uri
 
 DEFAULT_SCOPES = (
     "openid",
@@ -13,6 +18,46 @@ DEFAULT_SCOPES = (
     "https://www.googleapis.com/auth/drive.metadata.readonly",
 )
 KEYRING_SERVICE = "hot-cross-buns"
+
+
+class OAuthCancelledError(RuntimeError):
+    """Raised when the user cancels before the OAuth callback is exchanged."""
+
+
+class _LoopbackOAuthHandler(WSGIRequestHandler):
+    """Do not log the authorization-code callback URL to stderr."""
+
+    def log_message(self, _format: str, *_args: object) -> None:
+        return
+
+
+class _LoopbackOAuthServer(WSGIServer):
+    allow_reuse_address = False
+
+
+class _OAuthCallbackApplication:
+    """Capture one loopback callback without exposing its query string in logs."""
+
+    def __init__(self, success_message: str) -> None:
+        self.success_message = success_message
+        self.last_request_uri: str | None = None
+
+    def __call__(self, environ: dict[str, Any], start_response: Callable[..., Any]) -> list[bytes]:
+        if environ.get("REQUEST_METHOD") != "GET":
+            start_response("405 Method Not Allowed", [("Content-Type", "text/plain")])
+            return [b"Method not allowed"]
+        self.last_request_uri = request_uri(environ)
+        payload = self.success_message.encode("utf-8")
+        start_response(
+            "200 OK",
+            [
+                ("Content-Type", "text/plain; charset=utf-8"),
+                ("Content-Length", str(len(payload))),
+                ("Cache-Control", "no-store"),
+                ("X-Content-Type-Options", "nosniff"),
+            ],
+        )
+        return [payload]
 
 
 class KeyringLike(Protocol):
@@ -107,7 +152,10 @@ class GoogleAuthenticator:
         expected_email: str,
         open_browser: bool = True,
         timeout_seconds: int = 180,
+        cancelled: Callable[[], bool] | None = None,
     ) -> OAuthResult:
+        if cancelled is not None and cancelled():
+            raise OAuthCancelledError("OAuth authorization was cancelled")
         from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore[import-untyped]
 
         flow = InstalledAppFlow.from_client_config(
@@ -115,16 +163,26 @@ class GoogleAuthenticator:
             scopes=self.scopes,
             autogenerate_code_verifier=True,
         )
-        credentials = flow.run_local_server(
-            host="127.0.0.1",
-            port=0,
-            open_browser=open_browser,
-            authorization_prompt_message="Open this URL to authorize HCB:\n{url}",
-            success_message="HCB authorization complete. You may close this window.",
-            timeout_seconds=timeout_seconds,
-            access_type="offline",
-            prompt="consent",
-        )
+        if cancelled is None:
+            credentials = flow.run_local_server(
+                host="127.0.0.1",
+                port=0,
+                open_browser=open_browser,
+                authorization_prompt_message="Open this URL to authorize HCB:\n{url}",
+                success_message="HCB authorization complete. You may close this window.",
+                timeout_seconds=timeout_seconds,
+                access_type="offline",
+                prompt="consent",
+            )
+        else:
+            credentials = self._run_cancellable_local_server(
+                flow,
+                open_browser=open_browser,
+                timeout_seconds=timeout_seconds,
+                cancelled=cancelled,
+            )
+        if cancelled is not None and cancelled():
+            raise OAuthCancelledError("OAuth authorization was cancelled")
         refresh_token = credentials.refresh_token
         if not refresh_token:
             raise RuntimeError(
@@ -141,6 +199,61 @@ class GoogleAuthenticator:
             access_token=credentials.token,
             granted_scopes=tuple(credentials.scopes or self.scopes),
         )
+
+    @staticmethod
+    def _run_cancellable_local_server(
+        flow: Any,
+        *,
+        open_browser: bool,
+        timeout_seconds: int,
+        cancelled: Callable[[], bool],
+    ) -> Any:
+        """Wait for one loopback callback in short intervals so desktop cancel is prompt.
+
+        ``InstalledAppFlow.run_local_server`` owns a blocking server request and has no
+        cancellation hook. This keeps the same PKCE flow and loopback redirect shape while
+        closing the listener before a cancelled operation returns.
+        """
+        if timeout_seconds <= 0:
+            raise ValueError("OAuth timeout must be positive")
+        callback = _OAuthCallbackApplication(
+            "HCB authorization complete. You may close this window."
+        )
+        server = make_server(
+            "127.0.0.1",
+            0,
+            callback,
+            server_class=_LoopbackOAuthServer,
+            handler_class=_LoopbackOAuthHandler,
+        )
+        try:
+            flow.redirect_uri = f"http://127.0.0.1:{server.server_port}/"
+            authorization_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+            if open_browser:
+                import webbrowser
+
+                webbrowser.open(authorization_url, new=1, autoraise=True)
+            print(f"Open this URL to authorize HCB:\n{authorization_url}")
+            deadline = monotonic() + timeout_seconds
+            while callback.last_request_uri is None:
+                if cancelled():
+                    raise OAuthCancelledError("OAuth authorization was cancelled")
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("Timed out waiting for response from authorization server")
+                server.timeout = min(0.25, remaining)
+                server.handle_request()
+            if cancelled():
+                raise OAuthCancelledError("OAuth authorization was cancelled")
+            parsed = urlsplit(callback.last_request_uri)
+            if parsed.scheme != "http" or parsed.hostname != "127.0.0.1":
+                raise RuntimeError("OAuth callback did not use the loopback listener")
+            flow.fetch_token(
+                authorization_response=callback.last_request_uri.replace("http", "https", 1)
+            )
+        finally:
+            server.server_close()
+        return flow.credentials
 
     @staticmethod
     def _verified_email(credentials: Any) -> str:

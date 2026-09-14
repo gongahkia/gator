@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hcb.auth import GoogleAuthenticator, TokenStore
+from hcb.auth import GoogleAuthenticator, OAuthCancelledError, TokenStore
 from hcb.credentials import EncryptedFileTokenStore, create_credential_template, load_client_config
 from hcb.models import Account
 from hcb.paths import AppPaths
@@ -82,6 +82,51 @@ def test_connect_checks_google_identity_before_storing_token(
     monkeypatch.setattr(auth, "_verified_email", lambda _credentials: "PERSON@example.test")
     assert auth.connect("account", expected_email="person@example.test").refresh_token == "refresh"
     assert tokens.get("account") == "refresh"
+
+
+def test_connect_cancels_while_waiting_for_loopback_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hcb.auth as auth_module
+    from google_auth_oauthlib.flow import InstalledAppFlow
+
+    cancelled = False
+
+    class FakeFlow:
+        credentials = SimpleNamespace(refresh_token="refresh", token="access", scopes=("openid",))
+
+        def authorization_url(self, **_kwargs: object) -> tuple[str, str]:
+            return "https://accounts.example.test/authorize", "state"
+
+        def fetch_token(self, **_kwargs: object) -> None:
+            raise AssertionError("a cancelled callback must not exchange a token")
+
+    class FakeServer:
+        server_port = 4242
+        timeout = 0.0
+        closed = False
+
+        def handle_request(self) -> None:
+            nonlocal cancelled
+            cancelled = True
+
+        def server_close(self) -> None:
+            self.closed = True
+
+    server = FakeServer()
+    monkeypatch.setattr(
+        InstalledAppFlow, "from_client_config", lambda *_args, **_kwargs: FakeFlow()
+    )
+    monkeypatch.setattr(auth_module, "make_server", lambda *_args, **_kwargs: server)
+
+    with pytest.raises(OAuthCancelledError, match="cancelled"):
+        GoogleAuthenticator(CLIENT_CONFIG, TokenStore(FakeKeyring())).connect(
+            "account",
+            expected_email="person@example.test",
+            open_browser=False,
+            cancelled=lambda: cancelled,
+        )
+    assert server.closed
 
 
 def test_connect_rejects_unverified_userinfo(monkeypatch: pytest.MonkeyPatch) -> None:

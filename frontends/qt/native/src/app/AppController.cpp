@@ -536,6 +536,39 @@ eventRemindersFromVariantList(bool useDefault, const QVariantList& values) {
                             : std::nullopt;
 }
 
+[[nodiscard]] std::optional<QString> bridgeDueDate(const std::optional<QString>& due) {
+  if (!due.has_value()) {
+    return std::optional<QString>{};
+  }
+  const QDateTime dateTime = QDateTime::fromString(*due, Qt::ISODate);
+  if (!dateTime.isValid()) {
+    return std::nullopt;
+  }
+  return dateTime.date().toString(Qt::ISODate);
+}
+
+[[nodiscard]] std::optional<QJsonObject>
+bridgeEventTime(const QString& value, bool allDay, const QString& timeZone) {
+  if (allDay) {
+    const QDate date = QDate::fromString(value, Qt::ISODate);
+    if (!date.isValid()) {
+      return std::nullopt;
+    }
+    return QJsonObject{{QStringLiteral("kind"), QStringLiteral("date")},
+                       {QStringLiteral("value"), date.toString(Qt::ISODate)}};
+  }
+  const QDateTime dateTime = QDateTime::fromString(value, Qt::ISODate);
+  if (!dateTime.isValid() || dateTime.timeSpec() == Qt::LocalTime) {
+    return std::nullopt;
+  }
+  QJsonObject result{{QStringLiteral("kind"), QStringLiteral("dateTime")},
+                     {QStringLiteral("value"), dateTime.toUTC().toString(Qt::ISODateWithMs)}};
+  if (!timeZone.trimmed().isEmpty()) {
+    result.insert(QStringLiteral("time_zone"), timeZone.trimmed());
+  }
+  return result;
+}
+
 [[nodiscard]] QString bulkTaskSummaryMessage(const TaskBulkMutationSummary& summary) {
   return QStringLiteral("%1 selected · %2 eligible · applied %3 · queued %4 · conflicted %5 · "
                         "failed %6 · skipped %7. Remote sync pending.")
@@ -1137,12 +1170,12 @@ QString AppController::reminderStatusMessage() const { return reminderStatusMess
 
 bool AppController::busy() const { return busy_; }
 
-bool AppController::bridgeReadOnly() const { return pythonBridgeClient_ != nullptr; }
+bool AppController::bridgeMode() const { return pythonBridgeClient_ != nullptr; }
 
 SearchResultsModel& AppController::searchResultsModel() { return *searchResultsModelPointer_; }
 
 void AppController::initialize() {
-  if (bridgeReadOnly()) {
+  if (bridgeMode()) {
     initializeBridge();
     return;
   }
@@ -1751,6 +1784,269 @@ void AppController::initialize() {
   refresh();
 }
 
+void AppController::initializeBridge() {
+  if (pythonBridgeAccountId_.isEmpty()) {
+    setStatus(QStringLiteral("An HCB bridge account is required"));
+    return;
+  }
+  if (!googleConnected_) {
+    googleConnected_ = true;
+    emit googleConnectedChanged();
+  }
+  setSyncStatus(QStringLiteral("managed by HCB core"));
+  setReminderStatusMessage(QStringLiteral("Calendar reminders are managed by HCB core"));
+  refreshBridge();
+}
+
+void AppController::reportBridgeUnsupportedAction() {
+  setStatus(QStringLiteral("This action is not implemented in the HCB bridge preview"));
+}
+
+void AppController::refreshBridge() {
+  if (pythonBridgeClient_ == nullptr || pythonBridgeAccountId_.isEmpty()) {
+    setStatus(QStringLiteral("An HCB bridge account is required"));
+    return;
+  }
+  const std::uint64_t generation = ++pythonBridgeRefreshGeneration_;
+  setStatus(QStringLiteral("Loading HCB core bridge"));
+  watch(pythonBridgeClient_->workspace(pythonBridgeAccountId_), [this, generation](PythonBridgeResult result) {
+    if (generation != pythonBridgeRefreshGeneration_) {
+      return;
+    }
+    if (std::holds_alternative<AppError>(result)) {
+      const QString message = errorMessage(std::get<AppError>(std::move(result)));
+      setStatus(message);
+      setTaskListError(message);
+      return;
+    }
+    PythonBridgeWorkspaceSummaryOrError decoded =
+        PythonBridgeProjection::workspaceSummary(std::get<QJsonObject>(std::move(result)));
+    if (std::holds_alternative<AppError>(decoded)) {
+      const QString message = errorMessage(std::get<AppError>(std::move(decoded)));
+      setStatus(message);
+      setTaskListError(message);
+      return;
+    }
+    PythonBridgeWorkspaceSummary summary =
+        std::get<PythonBridgeWorkspaceSummary>(std::move(decoded));
+    if (summary.accountId != pythonBridgeAccountId_) {
+      setStatus(QStringLiteral("HCB bridge returned a different account"));
+      setTaskListError(statusMessage_);
+      return;
+    }
+    setTaskListError({});
+    pythonBridgeTaskListTitles_ = PythonBridgeProjection::taskListTitles(summary);
+    taskListModel_.setTaskLists(std::move(summary.taskLists));
+    QList<CalendarSummary> calendars = std::move(summary.calendars);
+    QStringList visibleIds;
+    QVariantList managementRows;
+    managementRows.reserve(calendars.size());
+    for (const CalendarSummary& calendar : calendars) {
+      if (calendar.selected && !calendar.hidden) {
+        visibleIds.append(calendar.id);
+      }
+      managementRows.append(QVariantMap{{QStringLiteral("id"), calendar.id},
+                                        {QStringLiteral("title"), calendar.title},
+                                        {QStringLiteral("description"),
+                                         calendar.description.value_or(QString())},
+                                        {QStringLiteral("timeZone"),
+                                         calendar.timeZone.value_or(QString())},
+                                        {QStringLiteral("colorId"),
+                                         calendar.colorId.value_or(QString())},
+                                        {QStringLiteral("backgroundColor"),
+                                         calendar.backgroundColor.value_or(QString())},
+                                        {QStringLiteral("accessRole"), QString()},
+                                        {QStringLiteral("selected"), calendar.selected},
+                                        {QStringLiteral("hidden"), calendar.hidden},
+                                        {QStringLiteral("primary"), calendar.primary}});
+    }
+    calendarSourceModel_.setCalendars(std::move(calendars));
+    monthGridModel_.setVisibleCalendarIds(visibleIds);
+    visibleCalendarIds_.clear();
+    visibleCalendarIds_.reserve(visibleIds.size());
+    for (const QString& id : visibleIds) {
+      visibleCalendarIds_.append(id);
+    }
+    calendarVisibilityConfigured_ = true;
+    emit visibleCalendarIdsChanged();
+    emit calendarVisibilityConfiguredChanged();
+    setCalendarManagementRows(std::move(managementRows));
+    loadBridgeTaskPage(generation, std::nullopt, {}, false);
+    loadBridgeCalendar(generation);
+  });
+}
+
+void AppController::loadBridgeTaskPage(std::uint64_t generation,
+                                       std::optional<QString> cursor,
+                                       QList<TaskModelTask> accumulated,
+                                       bool firstPageApplied) {
+  if (generation != pythonBridgeRefreshGeneration_ || pythonBridgeClient_ == nullptr) {
+    return;
+  }
+  watch(pythonBridgeClient_->taskPage(pythonBridgeAccountId_, 500, std::move(cursor)),
+        [this, generation, accumulated = std::move(accumulated), firstPageApplied](
+            PythonBridgeResult result) mutable {
+          if (generation != pythonBridgeRefreshGeneration_) {
+            return;
+          }
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            return;
+          }
+          PythonBridgeTaskPageOrError decoded = PythonBridgeProjection::taskPage(
+              std::get<QJsonObject>(std::move(result)), pythonBridgeTaskListTitles_);
+          if (std::holds_alternative<AppError>(decoded)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(decoded))));
+            return;
+          }
+          PythonBridgeTaskPage page = std::get<PythonBridgeTaskPage>(std::move(decoded));
+          accumulated.append(std::move(page.tasks));
+          const bool applyNow = !firstPageApplied || !page.nextCursor.has_value();
+          if (applyNow) {
+            applyTaskProjections(accumulated);
+          }
+          if (page.nextCursor.has_value()) {
+            setStatus(QStringLiteral("Loading HCB core tasks (%1 loaded)").arg(accumulated.size()));
+            loadBridgeTaskPage(
+                generation, std::move(page.nextCursor), std::move(accumulated), true);
+            return;
+          }
+          setStatus(QStringLiteral("HCB core bridge loaded %1 tasks").arg(accumulated.size()));
+        });
+}
+
+void AppController::loadBridgeCalendar(std::uint64_t generation) {
+  if (generation != pythonBridgeRefreshGeneration_ || pythonBridgeClient_ == nullptr) {
+    return;
+  }
+  const QDate rangeStart = monthGridStart(calendarDate_, weekStartDay_);
+  const QDate rangeEnd = rangeStart.addDays(42);
+  watch(pythonBridgeClient_->eventRange(pythonBridgeAccountId_, rangeStart, rangeEnd),
+        [this, generation](PythonBridgeResult result) {
+          if (generation != pythonBridgeRefreshGeneration_) {
+            return;
+          }
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            return;
+          }
+          PythonBridgeEventRangeOrError decoded =
+              PythonBridgeProjection::eventRange(std::get<QJsonObject>(std::move(result)));
+          if (std::holds_alternative<AppError>(decoded)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(decoded))));
+            return;
+          }
+          applyBridgeCalendarEvents(
+              generation, std::get<QList<CalendarEventSummary>>(std::move(decoded)));
+        });
+}
+
+void AppController::applyBridgeCalendarEvents(std::uint64_t generation,
+                                              QList<CalendarEventSummary> events) {
+  if (generation != pythonBridgeRefreshGeneration_) {
+    return;
+  }
+  const QDate date = calendarDate_;
+  const QTimeZone displayTimeZone(displayTimeZone_.toUtf8());
+  const int firstDay = weekStartDay_;
+  pythonBridgeCalendarEvents_ = events;
+  watch(std::async(std::launch::async,
+                   [date, events = std::move(events), displayTimeZone, firstDay]() mutable {
+                     return buildCalendarViewLayouts(
+                         date, std::move(events), displayTimeZone, firstDay);
+                   }),
+        [this, generation](CalendarViewLayouts layouts) {
+          if (generation != pythonBridgeRefreshGeneration_) {
+            return;
+          }
+          agendaModel_.setEvents(std::move(layouts.agendaEvents));
+          timelineModel_.applyLayout(std::move(layouts.timeline));
+          monthGridModel_.applyLayout(std::move(layouts.month));
+        });
+}
+
+void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
+  const QJsonObject task = data.value(QStringLiteral("task")).toObject();
+  if (task.isEmpty()) {
+    setStatus(QStringLiteral("HCB bridge mutation returned an invalid task"));
+    return;
+  }
+  const QString id = task.value(QStringLiteral("id")).toString();
+  const bool deleted = task.value(QStringLiteral("metadata"))
+                           .toObject()
+                           .value(QStringLiteral("deleted"))
+                           .toBool();
+  const auto existing = std::find_if(taskProjectionTasks_.begin(),
+                                     taskProjectionTasks_.end(),
+                                     [&id](const TaskModelTask& candidate) {
+                                       return candidate.id == id;
+                                     });
+  if (deleted) {
+    if (existing != taskProjectionTasks_.end()) {
+      taskProjectionTasks_.erase(existing);
+      applyTaskProjections(taskProjectionTasks_);
+    }
+    return;
+  }
+  QJsonObject page{{QStringLiteral("tasks"), QJsonArray{task}},
+                   {QStringLiteral("next_cursor"), QJsonValue::Null}};
+  const PythonBridgeTaskPageOrError decoded = PythonBridgeProjection::taskPage(
+      QJsonObject{{QStringLiteral("page"), page}}, pythonBridgeTaskListTitles_);
+  if (std::holds_alternative<AppError>(decoded)) {
+    setStatus(errorMessage(std::get<AppError>(decoded)));
+    return;
+  }
+  TaskModelTask projected = std::get<PythonBridgeTaskPage>(decoded).tasks.first();
+  if (existing == taskProjectionTasks_.end()) {
+    projected.sortOrder = taskProjectionTasks_.size();
+    taskProjectionTasks_.append(std::move(projected));
+  } else {
+    projected.sortOrder = existing->sortOrder;
+    *existing = std::move(projected);
+  }
+  applyTaskProjections(taskProjectionTasks_);
+}
+
+void AppController::applyBridgeEventResponse(const QJsonObject& data) {
+  const QJsonObject event = data.value(QStringLiteral("event")).toObject();
+  if (event.isEmpty()) {
+    setStatus(QStringLiteral("HCB bridge mutation returned an invalid event"));
+    return;
+  }
+  const QString id = event.value(QStringLiteral("id")).toString();
+  const bool deleted = event.value(QStringLiteral("metadata"))
+                           .toObject()
+                           .value(QStringLiteral("deleted"))
+                           .toBool();
+  const auto existing = std::find_if(pythonBridgeCalendarEvents_.begin(),
+                                     pythonBridgeCalendarEvents_.end(),
+                                     [&id](const CalendarEventSummary& candidate) {
+                                       return candidate.id == id;
+                                     });
+  if (deleted) {
+    if (existing != pythonBridgeCalendarEvents_.end()) {
+      pythonBridgeCalendarEvents_.erase(existing);
+      applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
+    }
+    return;
+  }
+  QJsonObject workspace;
+  workspace.insert(QStringLiteral("events"), QJsonArray{event});
+  const PythonBridgeEventRangeOrError decoded =
+      PythonBridgeProjection::eventRange(QJsonObject{{QStringLiteral("workspace"), workspace}});
+  if (std::holds_alternative<AppError>(decoded)) {
+    setStatus(errorMessage(std::get<AppError>(decoded)));
+    return;
+  }
+  CalendarEventSummary projected = std::get<QList<CalendarEventSummary>>(decoded).first();
+  if (existing == pythonBridgeCalendarEvents_.end()) {
+    pythonBridgeCalendarEvents_.append(std::move(projected));
+  } else {
+    *existing = std::move(projected);
+  }
+  applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
+}
+
 void AppController::setReminderService(ReminderService* service) {
   if (reminderService_ == service) {
     return;
@@ -1774,7 +2070,7 @@ void AppController::setPlatformReminderStatus(QString message) {
 }
 
 void AppController::refresh() {
-  if (bridgeReadOnly()) {
+  if (bridgeMode()) {
     refreshBridge();
     return;
   }
@@ -1794,6 +2090,10 @@ void AppController::setCalendarDate(QString date) {
   calendarDate_ = parsed;
   emit calendarDateChanged();
   emit calendarLabelsChanged();
+  if (bridgeMode()) {
+    refreshBridge();
+    return;
+  }
   refreshCalendar();
 }
 
@@ -3930,6 +4230,39 @@ void AppController::createTaskDetailed(QString taskListId,
     setStatus(QStringLiteral("Task creation input is invalid"));
     return;
   }
+  if (bridgeMode()) {
+    if (managedRecurrence || pythonBridgeClient_ == nullptr) {
+      setStatus(QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
+      return;
+    }
+    const std::optional<QString> due = bridgeDueDate(normalizedDue);
+    if (!due.has_value() && normalizedDue.has_value()) {
+      setStatus(QStringLiteral("Task due date is invalid"));
+      return;
+    }
+    QJsonObject request{{QStringLiteral("list_id"), taskListId},
+                        {QStringLiteral("title"), title.trimmed()},
+                        {QStringLiteral("notes"), notes},
+                        {QStringLiteral("priority"), priorityText(*parsedPriority)}};
+    if (due.has_value()) {
+      request.insert(QStringLiteral("due"), *due);
+      if (!dueTimeZone.trimmed().isEmpty()) {
+        request.insert(QStringLiteral("due_time_zone"), dueTimeZone.trimmed());
+      }
+    }
+    watch(pythonBridgeClient_->createTask(pythonBridgeAccountId_,
+                                          request,
+                                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Task saved in HCB core"));
+          });
+    return;
+  }
   TaskCreateInput input{.taskListId = std::move(taskListId),
                         .parentTaskId = parentTaskId.isEmpty()
                                             ? std::optional<QString>{}
@@ -4196,6 +4529,35 @@ void AppController::updateTaskDetailed(QString taskId,
     setStatus(QStringLiteral("Task recurrence dates must be unique ISO dates"));
     return;
   }
+  if (bridgeMode()) {
+    if (managedRecurrence || pythonBridgeClient_ == nullptr) {
+      setStatus(QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
+      return;
+    }
+    const std::optional<QString> due = bridgeDueDate(normalizedDue);
+    if (!due.has_value() && normalizedDue.has_value()) {
+      setStatus(QStringLiteral("Task due date is invalid"));
+      return;
+    }
+    QJsonObject request{{QStringLiteral("title"), title.trimmed()},
+                        {QStringLiteral("notes"), notes},
+                        {QStringLiteral("priority"), priorityText(*parsedPriority)},
+                        {QStringLiteral("due"),
+                         due.has_value() ? QJsonValue(*due) : QJsonValue::Null}};
+    watch(pythonBridgeClient_->updateTask(pythonBridgeAccountId_,
+                                          taskId,
+                                          request,
+                                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Task saved in HCB core"));
+          });
+    return;
+  }
   const QString selectedRule = managedRecurrence
                                    ? (recurrenceRule.trimmed().isEmpty() ? recurrence->defaultRule
                                                                          : recurrenceRule.trimmed())
@@ -4237,6 +4599,26 @@ void AppController::updateTaskDetailed(QString taskId,
 }
 
 void AppController::setTaskCompleted(QString taskId, bool completed) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->completeTask(
+              pythonBridgeAccountId_,
+              taskId,
+              completed,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Task saved in HCB core"));
+          });
+    return;
+  }
   watch(taskMutationService_.setCompleted(std::move(taskId), completed),
         [this](TaskMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
@@ -4277,6 +4659,24 @@ void AppController::splitTaskRecurrence(QString taskId) {
 }
 
 void AppController::deleteTask(QString taskId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->deleteTask(pythonBridgeAccountId_,
+                                          taskId,
+                                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Task deleted in HCB core"));
+          });
+    return;
+  }
   watch(taskMutationService_.inspect({taskId}), [this, taskId = std::move(taskId)](
             TaskMutationSnapshotResult inspection) {
     if (std::holds_alternative<AppError>(inspection) ||
@@ -4542,6 +4942,38 @@ void AppController::createEvent(QString calendarId,
                                 bool allDay,
                                 QString description,
                                 QString location) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const std::optional<QJsonObject> start = bridgeEventTime(startAt, allDay, {});
+    const std::optional<QJsonObject> end = bridgeEventTime(endAt, allDay, {});
+    if (!start.has_value() || !end.has_value()) {
+      setStatus(QStringLiteral("Calendar event times are invalid"));
+      return;
+    }
+    QJsonObject request{{QStringLiteral("calendar_id"), calendarId},
+                        {QStringLiteral("summary"), title.trimmed()},
+                        {QStringLiteral("start"), *start},
+                        {QStringLiteral("end"), *end},
+                        {QStringLiteral("description"),
+                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+                        {QStringLiteral("location"),
+                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    watch(pythonBridgeClient_->createEvent(pythonBridgeAccountId_,
+                                           request,
+                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Event saved in HCB core"));
+          });
+    return;
+  }
   watch(calendarMutationService_.create(
             {.calendarId = std::move(calendarId),
              .title = std::move(title),
@@ -4576,6 +5008,38 @@ void AppController::updateEvent(QString eventId,
                                 bool allDay,
                                 QString description,
                                 QString location) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const std::optional<QJsonObject> start = bridgeEventTime(startAt, allDay, {});
+    const std::optional<QJsonObject> end = bridgeEventTime(endAt, allDay, {});
+    if (!start.has_value() || !end.has_value()) {
+      setStatus(QStringLiteral("Calendar event times are invalid"));
+      return;
+    }
+    QJsonObject request{{QStringLiteral("summary"), title.trimmed()},
+                        {QStringLiteral("start"), *start},
+                        {QStringLiteral("end"), *end},
+                        {QStringLiteral("description"),
+                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+                        {QStringLiteral("location"),
+                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    watch(pythonBridgeClient_->updateEvent(pythonBridgeAccountId_,
+                                           eventId,
+                                           request,
+                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Event saved in HCB core"));
+          });
+    return;
+  }
   watch(calendarMutationService_.update(
             {.eventId = std::move(eventId),
              .calendarId = std::move(calendarId),
@@ -4625,6 +5089,51 @@ void AppController::createEventDetailed(QString calendarId,
       eventRemindersFromVariantList(remindersUseDefault, reminders);
   if (!parsedAttendees.has_value() || !parsedReminders.has_value()) {
     setStatus(QStringLiteral("Calendar event metadata is invalid"));
+    return;
+  }
+  if (bridgeMode()) {
+    const bool unsupported = !colorId.trimmed().isEmpty() || !available ||
+                             !visibility.trimmed().isEmpty() || !attendees.isEmpty() ||
+                             !remindersUseDefault || !reminders.isEmpty() || createGoogleMeet ||
+                             (!attachmentsJson.trimmed().isEmpty() && attachmentsJson.trimmed() != "{}") ||
+                             (!guestPermissionsJson.trimmed().isEmpty() &&
+                              guestPermissionsJson.trimmed() != "{}") ||
+                             (!eventType.trimmed().isEmpty() && eventType.trimmed() != "default") ||
+                             (!statusPropertiesJson.trimmed().isEmpty() &&
+                              statusPropertiesJson.trimmed() != "{}") ||
+                             (!sendUpdates.trimmed().isEmpty() && sendUpdates.trimmed() != "all");
+    if (unsupported || pythonBridgeClient_ == nullptr) {
+      setStatus(QStringLiteral("This event metadata is not supported by the HCB bridge preview"));
+      return;
+    }
+    const std::optional<QJsonObject> start = bridgeEventTime(startAt, allDay, timeZone);
+    const std::optional<QJsonObject> end = bridgeEventTime(endAt, allDay, timeZone);
+    if (!start.has_value() || !end.has_value()) {
+      setStatus(QStringLiteral("Calendar event times are invalid"));
+      return;
+    }
+    QJsonObject request{{QStringLiteral("calendar_id"), calendarId},
+                        {QStringLiteral("summary"), title.trimmed()},
+                        {QStringLiteral("start"), *start},
+                        {QStringLiteral("end"), *end},
+                        {QStringLiteral("description"),
+                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+                        {QStringLiteral("location"),
+                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    if (!recurrenceRule.trimmed().isEmpty()) {
+      request.insert(QStringLiteral("recurrence"), QJsonArray{recurrenceRule.trimmed()});
+    }
+    watch(pythonBridgeClient_->createEvent(pythonBridgeAccountId_,
+                                           request,
+                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Event saved in HCB core"));
+          });
     return;
   }
   const std::optional<QString> eventTimeZone = timeZone.trimmed().isEmpty()
@@ -4705,6 +5214,54 @@ void AppController::updateEventDetailed(QString eventId,
     setStatus(QStringLiteral("Calendar event metadata is invalid"));
     return;
   }
+  if (bridgeMode()) {
+    const bool unsupported = !colorId.trimmed().isEmpty() || !available ||
+                             !visibility.trimmed().isEmpty() || !attendees.isEmpty() ||
+                             !remindersUseDefault || !reminders.isEmpty() ||
+                             !recurrenceRule.trimmed().isEmpty() || createGoogleMeet ||
+                             (!attachmentsJson.trimmed().isEmpty() && attachmentsJson.trimmed() != "{}") ||
+                             (!guestPermissionsJson.trimmed().isEmpty() &&
+                              guestPermissionsJson.trimmed() != "{}") ||
+                             (!statusPropertiesJson.trimmed().isEmpty() &&
+                              statusPropertiesJson.trimmed() != "{}") ||
+                             (!sendUpdates.trimmed().isEmpty() && sendUpdates.trimmed() != "all") ||
+                             recurrenceScope != 2;
+    const auto existing = std::find_if(
+        pythonBridgeCalendarEvents_.cbegin(),
+        pythonBridgeCalendarEvents_.cend(),
+        [&eventId](const CalendarEventSummary& event) { return event.id == eventId; });
+    if (unsupported || pythonBridgeClient_ == nullptr ||
+        existing == pythonBridgeCalendarEvents_.cend() || existing->calendarId != calendarId) {
+      setStatus(QStringLiteral("This event edit is not supported by the HCB bridge preview"));
+      return;
+    }
+    const std::optional<QJsonObject> start = bridgeEventTime(startAt, allDay, timeZone);
+    const std::optional<QJsonObject> end = bridgeEventTime(endAt, allDay, timeZone);
+    if (!start.has_value() || !end.has_value()) {
+      setStatus(QStringLiteral("Calendar event times are invalid"));
+      return;
+    }
+    QJsonObject request{{QStringLiteral("summary"), title.trimmed()},
+                        {QStringLiteral("start"), *start},
+                        {QStringLiteral("end"), *end},
+                        {QStringLiteral("description"),
+                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+                        {QStringLiteral("location"),
+                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    watch(pythonBridgeClient_->updateEvent(pythonBridgeAccountId_,
+                                           eventId,
+                                           request,
+                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Event saved in HCB core"));
+          });
+    return;
+  }
   const std::optional<QString> eventTimeZone = timeZone.trimmed().isEmpty()
                                                    ? std::optional<QString>{}
                                                    : std::optional<QString>(timeZone.trimmed());
@@ -4759,6 +5316,24 @@ void AppController::updateEventDetailed(QString eventId,
 }
 
 void AppController::deleteEvent(QString eventId, int recurrenceScope) {
+  if (bridgeMode()) {
+    if (recurrenceScope != 2 || pythonBridgeClient_ == nullptr) {
+      setStatus(QStringLiteral("Only full-series event deletion is supported by the HCB bridge preview"));
+      return;
+    }
+    watch(pythonBridgeClient_->deleteEvent(pythonBridgeAccountId_,
+                                           eventId,
+                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Event deleted in HCB core"));
+          });
+    return;
+  }
   if (recurrenceScope < 0 || recurrenceScope > 2) {
     setStatus(QStringLiteral("Calendar recurrence scope is invalid"));
     return;

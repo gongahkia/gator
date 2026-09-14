@@ -50,10 +50,64 @@ public:
              QDate end,
              std::optional<QString> calendarId = std::nullopt,
              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  createTask(const QString& accountId,
+             const QJsonObject& task,
+             const QByteArray& idempotencyKey,
+             CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  updateTask(const QString& accountId,
+             const QString& taskId,
+             const QJsonObject& changes,
+             const QByteArray& idempotencyKey,
+             CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  completeTask(const QString& accountId,
+               const QString& taskId,
+               bool completed,
+               const QByteArray& idempotencyKey,
+               CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  deleteTask(const QString& accountId,
+             const QString& taskId,
+             const QByteArray& idempotencyKey,
+             CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  createEvent(const QString& accountId,
+              const QJsonObject& event,
+              const QByteArray& idempotencyKey,
+              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  updateEvent(const QString& accountId,
+              const QString& eventId,
+              const QJsonObject& changes,
+              const QByteArray& idempotencyKey,
+              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  deleteEvent(const QString& accountId,
+              const QString& eventId,
+              const QByteArray& idempotencyKey,
+              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  startSync(const QString& accountId, CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  startOAuth(const QString& accountId,
+             const QString& expectedEmail,
+             CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  operation(const QString& operationId, CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  cancelOperation(const QString& operationId, CancellationToken cancellation = {});
 
 private:
   [[nodiscard]] std::future<PythonBridgeResult>
   get(QUrl path, CancellationToken cancellation);
+  [[nodiscard]] std::future<PythonBridgeResult>
+  request(QByteArray method,
+          QUrl path,
+          std::optional<QJsonObject> body,
+          std::optional<QByteArray> idempotencyKey,
+          CancellationToken cancellation);
 
   PythonBridgeConnection connection_;
   QNetworkAccessManager* manager_;
