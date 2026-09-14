@@ -60,9 +60,10 @@ namespace {
       }
     } else {
       const int stepResult = sqlite3_step(statement);
-      const auto* journalMode = stepResult == SQLITE_ROW
-                                    ? reinterpret_cast<const char*>(sqlite3_column_text(statement, 0))
-                                    : nullptr;
+      const auto* journalMode =
+          stepResult == SQLITE_ROW
+              ? reinterpret_cast<const char*>(sqlite3_column_text(statement, 0))
+              : nullptr;
       const bool isWal = journalMode != nullptr && QString::fromUtf8(journalMode) == u"wal";
       const int finalizeResult = sqlite3_finalize(statement);
       if (finalizeResult != SQLITE_OK && finalizeResult != SQLITE_BUSY &&
@@ -70,9 +71,10 @@ namespace {
         return configurationError(finalizeResult);
       }
       if (stepResult == SQLITE_ROW && finalizeResult == SQLITE_OK) {
-        return isWal ? std::optional<AppError>{}
-                     : std::optional<AppError>(AppError(
-                           AppErrorCode::Database, QStringLiteral("SQLite journal mode is not WAL")));
+        return isWal
+                   ? std::optional<AppError>{}
+                   : std::optional<AppError>(AppError(
+                         AppErrorCode::Database, QStringLiteral("SQLite journal mode is not WAL")));
       }
       if (stepResult != SQLITE_BUSY && stepResult != SQLITE_LOCKED && finalizeResult == SQLITE_OK) {
         return configurationError(stepResult);

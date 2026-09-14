@@ -37,13 +37,24 @@ _UNSET = _Unset()
 
 class TaskServiceMixin(_ApplicationServiceBase):
     def create_task_list(
-        self, account_id: str, title: str, *, position: int = 0, id: str | None = None
+        self,
+        account_id: str,
+        title: str,
+        *,
+        position: int = 0,
+        selected: bool = True,
+        id: str | None = None,
     ) -> TaskList:
         self._account(account_id)
         if not title.strip():
             raise ValueError("task list title is required")
         item = TaskList(
-            id or _id(), account_id, title.strip(), position=position, metadata=_dirty(Metadata())
+            id or _id(),
+            account_id,
+            title.strip(),
+            position=position,
+            metadata=_dirty(Metadata()),
+            selected=selected,
         )
         with self.storage.transaction():
             self.storage.upsert_task_list(item)
@@ -71,38 +82,43 @@ class TaskServiceMixin(_ApplicationServiceBase):
         *,
         title: str | None = None,
         position: int | None = None,
+        selected: bool | None = None,
     ) -> TaskList:
         current = self._require_task_list(account_id, list_id)
         if title is not None and not title.strip():
             raise ValueError("task list title is required")
+        remote_change = title is not None or position is not None
         updated = replace(
             current,
             title=title.strip() if title is not None else current.title,
             position=position if position is not None else current.position,
-            metadata=_dirty(current.metadata),
+            selected=selected if selected is not None else current.selected,
+            metadata=_dirty(current.metadata) if remote_change else current.metadata,
         )
         with self.storage.transaction():
-            before = self._snapshot("task_lists", account_id, list_id)
+            before = self._snapshot("task_lists", account_id, list_id) if remote_change else None
             self.storage.upsert_task_list(updated)
-            self._enqueue(
-                account_id,
-                EntityType.TASK_LIST,
-                list_id,
-                MutationOperation.UPDATE,
-                {
-                    "body": {"title": updated.title},
-                    "etag": current.metadata.etag,
-                    "remote_id": current.remote_id,
-                },
-            )
-            self._intent(
-                account_id,
-                "update",
-                EntityType.TASK_LIST,
-                list_id,
-                before,
-                self._snapshot("task_lists", account_id, list_id),
-            )
+            if remote_change:
+                assert before is not None
+                self._enqueue(
+                    account_id,
+                    EntityType.TASK_LIST,
+                    list_id,
+                    MutationOperation.UPDATE,
+                    {
+                        "body": {"title": updated.title},
+                        "etag": current.metadata.etag,
+                        "remote_id": current.remote_id,
+                    },
+                )
+                self._intent(
+                    account_id,
+                    "update",
+                    EntityType.TASK_LIST,
+                    list_id,
+                    before,
+                    self._snapshot("task_lists", account_id, list_id),
+                )
         return updated
 
     def delete_task_list(self, account_id: str, list_id: str) -> TaskList:
@@ -132,6 +148,10 @@ class TaskServiceMixin(_ApplicationServiceBase):
                 self._snapshot("task_lists", account_id, list_id),
             )
         return deleted
+
+    def set_task_list_selected(self, account_id: str, list_id: str, *, selected: bool) -> TaskList:
+        """Persist the local HCB visibility preference without creating a Google mutation."""
+        return self.update_task_list(account_id, list_id, selected=selected)
 
     def _require_task_list(self, account_id: str, list_id: str) -> TaskList:
         item = self.storage.get_task_list(account_id, list_id)

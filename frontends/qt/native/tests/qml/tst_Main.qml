@@ -575,6 +575,7 @@ TestCase {
         mainWindow.openSearch()
         tryVerify(function() { return mainWindow.searchPopup.opened && mainWindow.searchQuery.activeFocus })
         verify(!mainWindow.searchPopup.optionsToggleButton.visible)
+        wait(20)
         keyClick(Qt.Key_B)
         keyClick(Qt.Key_R)
         keyClick(Qt.Key_I)
@@ -2316,6 +2317,16 @@ TestCase {
                 calls.push({ method: "setTaskCompleted", taskId: taskId, completed: completed })
             },
             deleteTask: function(taskId) { calls.push({ method: "deleteTask", taskId: taskId }) },
+            createTaskList: function(title) { calls.push({ method: "createTaskList", title: title }) },
+            renameTaskList: function(taskListId, title) {
+                calls.push({ method: "renameTaskList", taskListId: taskListId, title: title })
+            },
+            setTaskListSelected: function(taskListId, selected) {
+                calls.push({ method: "setTaskListSelected", taskListId: taskListId, selected: selected })
+            },
+            deleteTaskList: function(taskListId) {
+                calls.push({ method: "deleteTaskList", taskListId: taskListId })
+            },
             createEvent: function(calendarId, title) {
                 calls.push({ method: "createEvent", calendarId: calendarId, title: title })
             },
@@ -2329,6 +2340,27 @@ TestCase {
             deleteEvent: function(eventId, recurrenceScope) {
                 calls.push({ method: "deleteEvent", eventId: eventId,
                              recurrenceScope: recurrenceScope })
+            },
+            createGoogleCalendar: function(title) {
+                calls.push({ method: "createGoogleCalendar", title: title })
+            },
+            subscribeGoogleCalendar: function(calendarId) {
+                calls.push({ method: "subscribeGoogleCalendar", calendarId: calendarId })
+            },
+            updateGoogleCalendar: function(calendarId, title) {
+                calls.push({ method: "updateGoogleCalendar", calendarId: calendarId, title: title })
+            },
+            deleteGoogleCalendar: function(calendarId) {
+                calls.push({ method: "deleteGoogleCalendar", calendarId: calendarId })
+            },
+            updateGoogleCalendarListEntry: function(calendarId) {
+                calls.push({ method: "updateGoogleCalendarListEntry", calendarId: calendarId })
+            },
+            saveGoogleCalendarSettings: function(calendarId, title) {
+                calls.push({ method: "saveGoogleCalendarSettings", calendarId: calendarId, title: title })
+            },
+            unsubscribeGoogleCalendar: function(calendarId) {
+                calls.push({ method: "unsubscribeGoogleCalendar", calendarId: calendarId })
             },
             connectGoogle: function() { calls.push({ method: "connectGoogle" }) },
             syncGoogle: function() { calls.push({ method: "syncGoogle" }) },
@@ -2354,9 +2386,20 @@ TestCase {
         mainWindow.eventDeleteDialog.eventDeleteRequested("event-1", 2)
         mainWindow.controllerCall("connectGoogle", [])
         mainWindow.controllerCall("syncGoogle", [])
-        mainWindow.controllerCall("createTaskList", ["Blocked legacy mutation"])
+        mainWindow.controllerCall("createTaskList", ["HCB list"])
+        mainWindow.controllerCall("renameTaskList", ["list-inbox", "Renamed HCB list"])
+        mainWindow.controllerCall("setTaskListSelected", ["list-inbox", false])
+        mainWindow.controllerCall("deleteTaskList", ["list-inbox"])
+        mainWindow.controllerCall("createGoogleCalendar", ["HCB calendar"])
+        mainWindow.controllerCall("subscribeGoogleCalendar", ["calendar@example.test"])
+        mainWindow.controllerCall("updateGoogleCalendar", ["calendar-1", "Renamed HCB calendar"])
+        mainWindow.controllerCall("deleteGoogleCalendar", ["calendar-1"])
+        mainWindow.controllerCall("updateGoogleCalendarListEntry", ["calendar-1", false, true, "#123456"])
+        mainWindow.controllerCall("saveGoogleCalendarSettings", ["calendar-1", "HCB calendar"])
+        mainWindow.controllerCall("unsubscribeGoogleCalendar", ["calendar-1"])
+        mainWindow.controllerCall("moveTask", ["task-1", "list-inbox"])
 
-        compare(calls.length, 11)
+        compare(calls.length, 22)
         compare(calls[0].method, "createTaskDetailed")
         compare(calls[0].taskListId, "list-inbox")
         compare(calls[1].method, "updateTaskDetailed")
@@ -2369,7 +2412,11 @@ TestCase {
         compare(calls[7].recurrenceScope, 2)
         compare(calls[8].method, "connectGoogle")
         compare(calls[9].method, "syncGoogle")
-        compare(calls[10].method, "unsupported")
+        compare(calls[10].method, "createTaskList")
+        compare(calls[12].method, "setTaskListSelected")
+        compare(calls[14].method, "createGoogleCalendar")
+        compare(calls[19].method, "saveGoogleCalendarSettings")
+        compare(calls[21].method, "unsupported")
         mainWindow.destroy()
     }
 

@@ -17,7 +17,7 @@ from .models import (
 )
 from .paths import AppPaths
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 
 @dataclass(frozen=True, slots=True)
@@ -516,6 +516,10 @@ CREATE TABLE bridge_mutation_receipts (
 CREATE INDEX bridge_mutation_receipts_expiry ON bridge_mutation_receipts(created_at);
 """
 
+_MIGRATION_14 = """
+ALTER TABLE task_lists ADD COLUMN selected INTEGER NOT NULL DEFAULT 1;
+"""
+
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
@@ -629,6 +633,7 @@ class _StorageCore:
             _MIGRATION_11,
             _MIGRATION_12,
             _MIGRATION_13,
+            _MIGRATION_14,
         )
         with self.transaction():
             # Another process may have completed the migration while we waited

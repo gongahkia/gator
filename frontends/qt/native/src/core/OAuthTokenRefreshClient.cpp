@@ -66,8 +66,7 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
     return std::nullopt;
   }
   const QString code = document.object().value(QStringLiteral("error")).toString();
-  static const QRegularExpression validCode(
-      QStringLiteral("^[A-Za-z][A-Za-z0-9_-]{0,79}$"));
+  static const QRegularExpression validCode(QStringLiteral("^[A-Za-z][A-Za-z0-9_-]{0,79}$"));
   return validCode.match(code).hasMatch() ? std::optional<QString>(code) : std::nullopt;
 }
 
@@ -76,7 +75,8 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
   if (!document.isObject()) {
     return std::nullopt;
   }
-  const QString description = document.object().value(QStringLiteral("error_description")).toString();
+  const QString description =
+      document.object().value(QStringLiteral("error_description")).toString();
   if (description.isEmpty() || description.size() > 500 || description.contains(QChar::Null)) {
     return std::nullopt;
   }
@@ -84,9 +84,8 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
   return safeDescription.isEmpty() ? std::nullopt : std::optional<QString>(safeDescription);
 }
 
-[[nodiscard]] QString tokenRefreshFailureMessage(const QNetworkReply& reply,
-                                                 int status,
-                                                 const QByteArray& responseBody) {
+[[nodiscard]] QString
+tokenRefreshFailureMessage(const QNetworkReply& reply, int status, const QByteArray& responseBody) {
   if (status >= 100 && status <= 599) {
     const std::optional<QString> code = oauthErrorCode(responseBody);
     const std::optional<QString> description = oauthErrorDescription(responseBody);

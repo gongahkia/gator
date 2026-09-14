@@ -74,9 +74,11 @@ void MockedOAuthTransportTest::exchangesAuthorizationCodeThroughMock() {
 
 void MockedOAuthTransportTest::reportsTokenExchangeHttpErrorCode() {
   MockNetworkAccessManager manager;
-  manager.enqueue({.status = 400,
-                   .body = QByteArray("{\"error\":\"invalid_grant\",\"error_description\":\"Code verifier is required\"}"),
-                   .error = QNetworkReply::ContentAccessDenied});
+  manager.enqueue(
+      {.status = 400,
+       .body = QByteArray(
+           "{\"error\":\"invalid_grant\",\"error_description\":\"Code verifier is required\"}"),
+       .error = QNetworkReply::ContentAccessDenied});
   hcb::OAuthTokenExchangeClient client(
       nullptr, hcb::OAuthTokenExchangeClient::defaultTokenEndpoint(), &manager);
 
@@ -90,9 +92,10 @@ void MockedOAuthTransportTest::reportsTokenExchangeHttpErrorCode() {
       future.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
   const hcb::OAuthTokenExchangeResult result = future.get();
   QVERIFY(std::holds_alternative<hcb::AppError>(result));
-  QCOMPARE(std::get<hcb::AppError>(result).message(),
-           QStringLiteral(
-               "OAuth token exchange failed (HTTP 400: invalid_grant — Code verifier is required)"));
+  QCOMPARE(
+      std::get<hcb::AppError>(result).message(),
+      QStringLiteral(
+          "OAuth token exchange failed (HTTP 400: invalid_grant — Code verifier is required)"));
 }
 
 void MockedOAuthTransportTest::refreshesAccessTokenThroughMock() {
@@ -119,9 +122,11 @@ void MockedOAuthTransportTest::refreshesAccessTokenThroughMock() {
 
 void MockedOAuthTransportTest::reportsTokenRefreshHttpErrorCode() {
   MockNetworkAccessManager manager;
-  manager.enqueue({.status = 400,
-                   .body = QByteArray("{\"error\":\"invalid_client\",\"error_description\":\"Client secret is invalid\"}"),
-                   .error = QNetworkReply::ContentAccessDenied});
+  manager.enqueue(
+      {.status = 400,
+       .body = QByteArray(
+           "{\"error\":\"invalid_client\",\"error_description\":\"Client secret is invalid\"}"),
+       .error = QNetworkReply::ContentAccessDenied});
   hcb::OAuthTokenRefreshClient client(nullptr, &manager);
 
   std::future<hcb::OAuthTokenRefreshResult> future = client.refresh(

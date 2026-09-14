@@ -44,8 +44,8 @@ struct ReminderState final {
 };
 
 [[nodiscard]] QDateTime now(const Clock& clock) {
-  const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-      clock.wallNow().time_since_epoch());
+  const auto milliseconds =
+      std::chrono::duration_cast<std::chrono::milliseconds>(clock.wallNow().time_since_epoch());
   return QDateTime::fromMSecsSinceEpoch(milliseconds.count(), QTimeZone::UTC);
 }
 
@@ -91,12 +91,10 @@ reminderStartAt(const QString& startAt,
 }
 
 [[nodiscard]] QString identifierFor(const QString& eventId, const QDateTime& triggerAt) {
-  const QByteArray source = eventId.toUtf8() + '\0' +
-                            triggerAt.toUTC().toString(Qt::ISODateWithMs).toUtf8();
+  const QByteArray source =
+      eventId.toUtf8() + '\0' + triggerAt.toUTC().toString(Qt::ISODateWithMs).toUtf8();
   return QStringLiteral("hcb.reminder.") +
-         QString::fromLatin1(QCryptographicHash::hash(source,
-                                                        QCryptographicHash::Sha256)
-                                    .toHex());
+         QString::fromLatin1(QCryptographicHash::hash(source, QCryptographicHash::Sha256).toHex());
 }
 
 [[nodiscard]] QList<int> reminderMinutes(const QString& json) {
@@ -130,14 +128,18 @@ reminderStartAt(const QString& startAt,
 }
 
 [[nodiscard]] std::optional<ReminderState> readState(sqlite3* handle, const QString& identifier) {
-  constexpr char sql[] = "SELECT snoozed_until, dismissed_at FROM local_reminder_state WHERE identifier = ?1";
+  constexpr char sql[] =
+      "SELECT snoozed_until, dismissed_at FROM local_reminder_state WHERE identifier = ?1";
   sqlite3_stmt* statement = nullptr;
-  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) !=
+      SQLITE_OK) {
     sqlite3_finalize(statement);
     return std::nullopt;
   }
   const QByteArray utf8 = identifier.toUtf8();
-  if (sqlite3_bind_text(statement, 1, utf8.constData(), static_cast<int>(utf8.size()), SQLITE_TRANSIENT) != SQLITE_OK) {
+  if (sqlite3_bind_text(
+          statement, 1, utf8.constData(), static_cast<int>(utf8.size()), SQLITE_TRANSIENT) !=
+      SQLITE_OK) {
     sqlite3_finalize(statement);
     return std::nullopt;
   }
@@ -168,9 +170,8 @@ reminderStartAt(const QString& startAt,
   return done ? std::optional<ReminderState>(std::move(state)) : std::nullopt;
 }
 
-[[nodiscard]] bool saveCandidateState(sqlite3* handle,
-                                      const ReminderCandidate& candidate,
-                                      const QDateTime& current) {
+[[nodiscard]] bool
+saveCandidateState(sqlite3* handle, const ReminderCandidate& candidate, const QDateTime& current) {
   constexpr char sql[] = R"(
 INSERT INTO local_reminder_state(identifier, event_id, trigger_at, updated_at)
 VALUES(?1, ?2, ?3, ?4)
@@ -178,11 +179,13 @@ ON CONFLICT(identifier) DO UPDATE SET
   event_id = excluded.event_id, trigger_at = excluded.trigger_at, updated_at = excluded.updated_at
 )";
   sqlite3_stmt* statement = nullptr;
-  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) !=
+      SQLITE_OK) {
     sqlite3_finalize(statement);
     return false;
   }
-  const QList<QByteArray> values{candidate.identifier.toUtf8(), candidate.eventId.toUtf8(),
+  const QList<QByteArray> values{candidate.identifier.toUtf8(),
+                                 candidate.eventId.toUtf8(),
                                  candidate.triggerAt.toUTC().toString(Qt::ISODateWithMs).toUtf8(),
                                  current.toUTC().toString(Qt::ISODateWithMs).toUtf8()};
   for (int index = 0; index < values.size(); ++index) {
@@ -202,7 +205,8 @@ ON CONFLICT(identifier) DO UPDATE SET
 [[nodiscard]] QList<QString> activeStateIdentifiers(sqlite3* handle) {
   constexpr char sql[] = "SELECT identifier FROM local_reminder_state WHERE dismissed_at IS NULL";
   sqlite3_stmt* statement = nullptr;
-  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) !=
+      SQLITE_OK) {
     sqlite3_finalize(statement);
     return {};
   }
@@ -230,26 +234,42 @@ SET snoozed_until = ?2, dismissed_at = ?3, updated_at = ?4
 WHERE identifier = ?1
 )";
   sqlite3_stmt* statement = nullptr;
-  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) !=
+      SQLITE_OK) {
     sqlite3_finalize(statement);
     return false;
   }
   const QByteArray identifierUtf8 = identifier.toUtf8();
   const QByteArray snoozeUtf8 = snoozedUntil.has_value()
-                                     ? snoozedUntil->toUTC().toString(Qt::ISODateWithMs).toUtf8()
-                                     : QByteArray();
+                                    ? snoozedUntil->toUTC().toString(Qt::ISODateWithMs).toUtf8()
+                                    : QByteArray();
   const QByteArray dismissedUtf8 = current.toUTC().toString(Qt::ISODateWithMs).toUtf8();
   const QByteArray currentUtf8 = current.toUTC().toString(Qt::ISODateWithMs).toUtf8();
-  const bool bound = sqlite3_bind_text(statement, 1, identifierUtf8.constData(), static_cast<int>(identifierUtf8.size()),
-                                       SQLITE_TRANSIENT) == SQLITE_OK &&
-                     (snoozedUntil.has_value()
-                          ? sqlite3_bind_text(statement, 2, snoozeUtf8.constData(), static_cast<int>(snoozeUtf8.size()), SQLITE_TRANSIENT)
-                          : sqlite3_bind_null(statement, 2)) == SQLITE_OK &&
-                     (dismissed
-                          ? sqlite3_bind_text(statement, 3, dismissedUtf8.constData(), static_cast<int>(dismissedUtf8.size()), SQLITE_TRANSIENT)
-                          : sqlite3_bind_null(statement, 3)) == SQLITE_OK &&
-                     sqlite3_bind_text(statement, 4, currentUtf8.constData(), static_cast<int>(currentUtf8.size()), SQLITE_TRANSIENT) == SQLITE_OK;
-  const bool updated = bound && sqlite3_step(statement) == SQLITE_DONE && sqlite3_changes(handle) == 1;
+  const bool bound =
+      sqlite3_bind_text(statement,
+                        1,
+                        identifierUtf8.constData(),
+                        static_cast<int>(identifierUtf8.size()),
+                        SQLITE_TRANSIENT) == SQLITE_OK &&
+      (snoozedUntil.has_value() ? sqlite3_bind_text(statement,
+                                                    2,
+                                                    snoozeUtf8.constData(),
+                                                    static_cast<int>(snoozeUtf8.size()),
+                                                    SQLITE_TRANSIENT)
+                                : sqlite3_bind_null(statement, 2)) == SQLITE_OK &&
+      (dismissed ? sqlite3_bind_text(statement,
+                                     3,
+                                     dismissedUtf8.constData(),
+                                     static_cast<int>(dismissedUtf8.size()),
+                                     SQLITE_TRANSIENT)
+                 : sqlite3_bind_null(statement, 3)) == SQLITE_OK &&
+      sqlite3_bind_text(statement,
+                        4,
+                        currentUtf8.constData(),
+                        static_cast<int>(currentUtf8.size()),
+                        SQLITE_TRANSIENT) == SQLITE_OK;
+  const bool updated =
+      bound && sqlite3_step(statement) == SQLITE_DONE && sqlite3_changes(handle) == 1;
   return sqlite3_finalize(statement) == SQLITE_OK && updated;
 }
 
@@ -263,10 +283,10 @@ ReminderService::ReminderService(FilePath databasePath,
   refreshTimer_ = new QTimer(this);
   refreshTimer_->setInterval(kRefreshIntervalMilliseconds);
   QObject::connect(refreshTimer_, &QTimer::timeout, this, &ReminderService::refresh);
-  QObject::connect(&notifier_, &NativeReminderNotifier::actionRequested, this,
-                   &ReminderService::handleAction);
-  QObject::connect(&notifier_, &NativeReminderNotifier::statusChanged, this,
-                   &ReminderService::setStatusMessage);
+  QObject::connect(
+      &notifier_, &NativeReminderNotifier::actionRequested, this, &ReminderService::handleAction);
+  QObject::connect(
+      &notifier_, &NativeReminderNotifier::statusChanged, this, &ReminderService::setStatusMessage);
 }
 
 ReminderService::~ReminderService() = default;
@@ -306,15 +326,20 @@ WHERE events.deleted_at IS NULL AND events.status != 'cancelled'
   AND events.start_at >= ?1 AND events.start_at <= ?2
 )";
   sqlite3_stmt* statement = nullptr;
-  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v3(handle, sql, -1, SQLITE_PREPARE_PERSISTENT, &statement, nullptr) !=
+      SQLITE_OK) {
     sqlite3_finalize(statement);
     setStatusMessage(QStringLiteral("Calendar reminders could not read local events"));
     return;
   }
   const QByteArray lower = current.addDays(-1).toUTC().toString(Qt::ISODateWithMs).toUtf8();
   const QByteArray upper = upperBound.toUTC().toString(Qt::ISODateWithMs).toUtf8();
-  if (sqlite3_bind_text(statement, 1, lower.constData(), static_cast<int>(lower.size()), SQLITE_TRANSIENT) != SQLITE_OK ||
-      sqlite3_bind_text(statement, 2, upper.constData(), static_cast<int>(upper.size()), SQLITE_TRANSIENT) != SQLITE_OK) {
+  if (sqlite3_bind_text(
+          statement, 1, lower.constData(), static_cast<int>(lower.size()), SQLITE_TRANSIENT) !=
+          SQLITE_OK ||
+      sqlite3_bind_text(
+          statement, 2, upper.constData(), static_cast<int>(upper.size()), SQLITE_TRANSIENT) !=
+          SQLITE_OK) {
     sqlite3_finalize(statement);
     setStatusMessage(QStringLiteral("Calendar reminders could not read local events"));
     return;
@@ -330,13 +355,12 @@ WHERE events.deleted_at IS NULL AND events.status != 'cancelled'
     const std::optional<QString> calendarTimeZone = textColumn(statement, 7);
     const std::optional<QString> defaults = textColumn(statement, 8);
     const std::optional<QDateTime> start =
-        startAt.has_value() ? reminderStartAt(*startAt,
-                                               sqlite3_column_int(statement, 4) != 0,
-                                               eventTimeZone,
-                                               calendarTimeZone)
-                            : std::nullopt;
-    if (!eventId.has_value() || !title.has_value() || !overrides.has_value() || !defaults.has_value() ||
-        !start.has_value()) {
+        startAt.has_value()
+            ? reminderStartAt(
+                  *startAt, sqlite3_column_int(statement, 4) != 0, eventTimeZone, calendarTimeZone)
+            : std::nullopt;
+    if (!eventId.has_value() || !title.has_value() || !overrides.has_value() ||
+        !defaults.has_value() || !start.has_value()) {
       valid = false;
       break;
     }
@@ -346,11 +370,13 @@ WHERE events.deleted_at IS NULL AND events.status != 'cancelled'
       if (triggerAt > upperBound) {
         continue;
       }
-      candidates.append({.identifier = identifierFor(*eventId, triggerAt),
-                         .eventId = *eventId,
-                         .title = *title,
-                         .body = QStringLiteral("Starts %1").arg(QLocale().toString(start->toLocalTime(), QLocale::ShortFormat)),
-                         .triggerAt = triggerAt});
+      candidates.append(
+          {.identifier = identifierFor(*eventId, triggerAt),
+           .eventId = *eventId,
+           .title = *title,
+           .body = QStringLiteral("Starts %1")
+                       .arg(QLocale().toString(start->toLocalTime(), QLocale::ShortFormat)),
+           .triggerAt = triggerAt});
     }
   }
   valid = sqlite3_finalize(statement) == SQLITE_OK && valid;
@@ -388,8 +414,9 @@ WHERE events.deleted_at IS NULL AND events.status != 'cancelled'
       static_cast<void>(updateState(handle, identifier, std::nullopt, true, current));
     }
   }
-  setStatusMessage(scheduled == 0 ? QStringLiteral("No upcoming desktop calendar reminders")
-                                  : QStringLiteral("%1 upcoming desktop calendar reminder(s)").arg(scheduled));
+  setStatusMessage(scheduled == 0
+                       ? QStringLiteral("No upcoming desktop calendar reminders")
+                       : QStringLiteral("%1 upcoming desktop calendar reminder(s)").arg(scheduled));
 }
 
 void ReminderService::dismiss(QString identifier) {
@@ -419,7 +446,8 @@ void ReminderService::snooze(QString identifier, int minutes) {
   }
   const QDateTime current = now(clock_);
   SqliteConnection connection = std::move(std::get<SqliteConnection>(opened));
-  if (updateState(connection.nativeHandle(), identifier, current.addSecs(minutes * 60), false, current)) {
+  if (updateState(
+          connection.nativeHandle(), identifier, current.addSecs(minutes * 60), false, current)) {
     notifier_.cancel(identifier);
     setStatusMessage(QStringLiteral("Calendar reminder snoozed for %1 minutes").arg(minutes));
     refresh();

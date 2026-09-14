@@ -37,7 +37,9 @@ struct LocalSearchRankedResult final {
 class UnifiedLocalSearchRanker final {
 public:
   [[nodiscard]] QList<LocalSearchRankedResult>
-  rank(QString query, QList<LocalSearchCandidate> candidates, int limit = 50) const; // non-positive returns all
+  rank(QString query,
+       QList<LocalSearchCandidate> candidates,
+       int limit = 50) const; // non-positive returns all
 };
 
 } // namespace hcb

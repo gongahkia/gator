@@ -146,6 +146,9 @@ class PullSyncMixin(_SyncEngineBase):
             incoming = task_list_from_google(
                 account_id, item, local_id=existing.id if existing else None
             )
+            if existing is not None:
+                # Visibility is an HCB-local preference; a Google pull must not reset it.
+                incoming = replace(incoming, selected=existing.selected)
             if existing is not None and (
                 replace(
                     incoming,

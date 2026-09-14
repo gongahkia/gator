@@ -38,6 +38,7 @@ private slots:
   void requestsBoundedSearch();
   void requestsAuthenticationState();
   void sendsIdempotentMutations();
+  void sendsTaskListAndCalendarManagementMutations();
   void rejectsInvalidRequestsBeforeNetwork();
   void cancelsBeforeNetwork();
   void propagatesBridgeErrors();
@@ -84,9 +85,11 @@ void PythonBridgeClientTest::rejectsUnsafeDescriptor() {
 void PythonBridgeClientTest::requestsWorkspaceAndBoundedPages() {
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"workspace\":{}}}")});
-  manager.enqueue({.body = QByteArray(
-      "{\"api_version\":1,\"data\":{\"page\":{\"tasks\":[],\"next_cursor\":null}}}")});
-  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"workspace\":{\"events\":[]}}}")});
+  manager.enqueue(
+      {.body = QByteArray(
+           "{\"api_version\":1,\"data\":{\"page\":{\"tasks\":[],\"next_cursor\":null}}}")});
+  manager.enqueue(
+      {.body = QByteArray("{\"api_version\":1,\"data\":{\"workspace\":{\"events\":[]}}}")});
   hcb::PythonBridgeClient client(connection(), nullptr, &manager);
 
   std::future<hcb::PythonBridgeResult> workspace = client.workspace(QStringLiteral("work"));
@@ -137,8 +140,8 @@ void PythonBridgeClientTest::requestsBoundedSearch() {
 
 void PythonBridgeClientTest::requestsAuthenticationState() {
   hcb::test::MockNetworkAccessManager manager;
-  manager.enqueue(
-      {.body = QByteArray("{\"api_version\":1,\"data\":{\"authentication\":{\"connected\":false}}}")});
+  manager.enqueue({.body = QByteArray(
+                       "{\"api_version\":1,\"data\":{\"authentication\":{\"connected\":false}}}")});
   hcb::PythonBridgeClient client(connection(), nullptr, &manager);
 
   std::future<hcb::PythonBridgeResult> future = client.authenticationState(QStringLiteral("work"));
@@ -157,17 +160,17 @@ void PythonBridgeClientTest::sendsIdempotentMutations() {
   hcb::PythonBridgeClient client(connection(), nullptr, &manager);
 
   const QByteArray taskKey("task-request-123");
-  std::future<hcb::PythonBridgeResult> task = client.createTask(
-      QStringLiteral("work"),
-      QJsonObject{{QStringLiteral("list_id"), QStringLiteral("inbox")},
-                  {QStringLiteral("title"), QStringLiteral("Bridge task")}},
-      taskKey);
+  std::future<hcb::PythonBridgeResult> task =
+      client.createTask(QStringLiteral("work"),
+                        QJsonObject{{QStringLiteral("list_id"), QStringLiteral("inbox")},
+                                    {QStringLiteral("title"), QStringLiteral("Bridge task")}},
+                        taskKey);
   waitFor(task);
   QVERIFY(std::holds_alternative<QJsonObject>(task.get()));
 
   const QByteArray eventKey("event-request-456");
-  std::future<hcb::PythonBridgeResult> event = client.deleteEvent(
-      QStringLiteral("work"), QStringLiteral("event-1"), eventKey);
+  std::future<hcb::PythonBridgeResult> event =
+      client.deleteEvent(QStringLiteral("work"), QStringLiteral("event-1"), eventKey);
   waitFor(event);
   QVERIFY(std::holds_alternative<QJsonObject>(event.get()));
 
@@ -187,18 +190,101 @@ void PythonBridgeClientTest::sendsIdempotentMutations() {
            QStringLiteral("/v1/accounts/work/events/event-1"));
   QCOMPARE(manager.requests().at(1).request.rawHeader("Idempotency-Key"), eventKey);
   QVERIFY(manager.requests().at(1).body.isEmpty());
-  QCOMPARE(manager.requests().at(2).request.url().path(),
-           QStringLiteral("/v1/accounts/work/sync"));
+  QCOMPARE(manager.requests().at(2).request.url().path(), QStringLiteral("/v1/accounts/work/sync"));
   QVERIFY(manager.requests().at(2).request.rawHeader("Idempotency-Key").isEmpty());
   QCOMPARE(manager.requests().at(2).body, QByteArray("{}"));
+}
+
+void PythonBridgeClientTest::sendsTaskListAndCalendarManagementMutations() {
+  hcb::test::MockNetworkAccessManager manager;
+  for (int index = 0; index < 8; ++index) {
+    manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{}}")});
+  }
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  const QByteArray taskListKey("task-list-request-123");
+  std::future<hcb::PythonBridgeResult> createTaskList =
+      client.createTaskList(QStringLiteral("work"),
+                            QJsonObject{{QStringLiteral("title"), QStringLiteral("Bridge list")}},
+                            taskListKey);
+  waitFor(createTaskList);
+  QVERIFY(std::holds_alternative<QJsonObject>(createTaskList.get()));
+
+  std::future<hcb::PythonBridgeResult> updateTaskList =
+      client.updateTaskList(QStringLiteral("work"),
+                            QStringLiteral("list-1"),
+                            QJsonObject{{QStringLiteral("selected"), false}},
+                            QByteArray("task-list-update-456"));
+  waitFor(updateTaskList);
+  QVERIFY(std::holds_alternative<QJsonObject>(updateTaskList.get()));
+
+  std::future<hcb::PythonBridgeResult> deleteTaskList = client.deleteTaskList(
+      QStringLiteral("work"), QStringLiteral("list-1"), QByteArray("task-list-delete-789"));
+  waitFor(deleteTaskList);
+  QVERIFY(std::holds_alternative<QJsonObject>(deleteTaskList.get()));
+
+  std::future<hcb::PythonBridgeResult> createCalendar = client.createCalendar(
+      QStringLiteral("work"),
+      QJsonObject{{QStringLiteral("summary"), QStringLiteral("Bridge calendar")}},
+      QByteArray("calendar-create-123"));
+  waitFor(createCalendar);
+  QVERIFY(std::holds_alternative<QJsonObject>(createCalendar.get()));
+
+  std::future<hcb::PythonBridgeResult> updateCalendar =
+      client.updateCalendar(QStringLiteral("work"),
+                            QStringLiteral("calendar-1"),
+                            QJsonObject{{QStringLiteral("hidden"), true}},
+                            QByteArray("calendar-update-456"));
+  waitFor(updateCalendar);
+  QVERIFY(std::holds_alternative<QJsonObject>(updateCalendar.get()));
+
+  std::future<hcb::PythonBridgeResult> deleteCalendar = client.deleteCalendar(
+      QStringLiteral("work"), QStringLiteral("calendar-1"), QByteArray("calendar-delete-789"));
+  waitFor(deleteCalendar);
+  QVERIFY(std::holds_alternative<QJsonObject>(deleteCalendar.get()));
+
+  std::future<hcb::PythonBridgeResult> subscribeCalendar = client.subscribeCalendar(
+      QStringLiteral("work"),
+      QJsonObject{{QStringLiteral("remote_calendar_id"), QStringLiteral("synthetic")}},
+      QByteArray("calendar-subscribe-123"));
+  waitFor(subscribeCalendar);
+  QVERIFY(std::holds_alternative<QJsonObject>(subscribeCalendar.get()));
+
+  std::future<hcb::PythonBridgeResult> unsubscribeCalendar = client.unsubscribeCalendar(
+      QStringLiteral("work"), QStringLiteral("calendar-1"), QByteArray("calendar-unsubscribe-456"));
+  waitFor(unsubscribeCalendar);
+  QVERIFY(std::holds_alternative<QJsonObject>(unsubscribeCalendar.get()));
+
+  QCOMPARE(manager.requests().size(), 8);
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/task-lists"));
+  QCOMPARE(manager.requests().at(0).request.rawHeader("Idempotency-Key"), taskListKey);
+  QCOMPARE(manager.requests().at(1).request.url().path(),
+           QStringLiteral("/v1/accounts/work/task-lists/list-1"));
+  QCOMPARE(manager.requests().at(2).request.url().path(),
+           QStringLiteral("/v1/accounts/work/task-lists/list-1"));
+  QCOMPARE(manager.requests().at(3).request.url().path(),
+           QStringLiteral("/v1/accounts/work/calendars"));
+  QCOMPARE(manager.requests().at(4).request.url().path(),
+           QStringLiteral("/v1/accounts/work/calendars/calendar-1"));
+  QCOMPARE(manager.requests().at(5).request.url().path(),
+           QStringLiteral("/v1/accounts/work/calendars/calendar-1"));
+  QCOMPARE(manager.requests().at(6).request.url().path(),
+           QStringLiteral("/v1/accounts/work/calendar-subscriptions"));
+  QCOMPARE(manager.requests().at(7).request.url().path(),
+           QStringLiteral("/v1/accounts/work/calendar-subscriptions/calendar-1"));
+  QCOMPARE(manager.requests().at(1).body, QByteArray("{\"selected\":false}"));
+  QCOMPARE(manager.requests().at(4).body, QByteArray("{\"hidden\":true}"));
+  QVERIFY(manager.requests().at(2).body.isEmpty());
+  QVERIFY(manager.requests().at(5).body.isEmpty());
+  QVERIFY(manager.requests().at(7).body.isEmpty());
 }
 
 void PythonBridgeClientTest::rejectsInvalidRequestsBeforeNetwork() {
   hcb::test::MockNetworkAccessManager manager;
   hcb::PythonBridgeClient client(connection(), nullptr, &manager);
 
-  std::future<hcb::PythonBridgeResult> future =
-      client.taskPage(QStringLiteral("bad/account"), 0);
+  std::future<hcb::PythonBridgeResult> future = client.taskPage(QStringLiteral("bad/account"), 0);
   const hcb::PythonBridgeResult result = future.get();
   QVERIFY(std::holds_alternative<hcb::AppError>(result));
   QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Validation);
@@ -228,9 +314,8 @@ void PythonBridgeClientTest::cancelsBeforeNetwork() {
 void PythonBridgeClientTest::propagatesBridgeErrors() {
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.status = 401,
-                   .body = QByteArray(
-                       "{\"api_version\":1,\"error\":{\"code\":\"unauthorized\","
-                       "\"message\":\"missing or invalid bridge token\"}}"),
+                   .body = QByteArray("{\"api_version\":1,\"error\":{\"code\":\"unauthorized\","
+                                      "\"message\":\"missing or invalid bridge token\"}}"),
                    .error = QNetworkReply::AuthenticationRequiredError});
   hcb::PythonBridgeClient client(connection(), nullptr, &manager);
 

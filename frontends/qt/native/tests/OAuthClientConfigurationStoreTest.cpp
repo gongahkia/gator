@@ -84,9 +84,8 @@ void OAuthClientConfigurationStoreTest::persistsAndClearsClientConfiguration() {
     QVERIFY(std::holds_alternative<std::optional<hcb::OAuthClientConfiguration>>(initialResult));
     QVERIFY(!std::get<std::optional<hcb::OAuthClientConfiguration>>(initialResult).has_value());
 
-    std::future<hcb::OAuthClientConfigurationMutationResultOrError> saved =
-        store.save(QStringLiteral("  %1  ").arg(clientId()),
-                   QStringLiteral("  %1  ").arg(clientSecret()));
+    std::future<hcb::OAuthClientConfigurationMutationResultOrError> saved = store.save(
+        QStringLiteral("  %1  ").arg(clientId()), QStringLiteral("  %1  ").arg(clientSecret()));
     const hcb::OAuthClientConfigurationMutationResultOrError savedResult = awaitResult(saved);
     QVERIFY(std::holds_alternative<hcb::OAuthClientConfigurationMutationResult>(savedResult));
     QCOMPARE(std::get<hcb::OAuthClientConfigurationMutationResult>(savedResult),

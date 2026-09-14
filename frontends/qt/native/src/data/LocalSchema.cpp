@@ -986,56 +986,61 @@ applyCalendarEventMetadataSchema(SqliteConnection& connection) {
       connection, allUndatedNotesSchemaSql, QStringLiteral("SQLite all-undated-notes schema"));
 }
 
-[[nodiscard]] std::optional<AppError> applyTaskRecurrenceClaimsSchema(SqliteConnection& connection) {
+[[nodiscard]] std::optional<AppError>
+applyTaskRecurrenceClaimsSchema(SqliteConnection& connection) {
   return applySchema(connection,
                      taskRecurrenceClaimsSchemaSql,
                      QStringLiteral("SQLite task-recurrence claims schema"));
 }
 
-[[nodiscard]] std::optional<AppError> applyTaskRecurrenceSafetySchema(SqliteConnection& connection) {
+[[nodiscard]] std::optional<AppError>
+applyTaskRecurrenceSafetySchema(SqliteConnection& connection) {
   return applySchema(connection,
                      taskRecurrenceSafetySchemaSql,
                      QStringLiteral("SQLite task-recurrence safety schema"));
 }
 
-[[nodiscard]] std::optional<AppError> applyCalendarInstanceCacheSchema(SqliteConnection& connection) {
+[[nodiscard]] std::optional<AppError>
+applyCalendarInstanceCacheSchema(SqliteConnection& connection) {
   return applySchema(connection,
                      calendarInstanceCacheSchemaSql,
                      QStringLiteral("SQLite calendar-instance cache schema"));
 }
 
-[[nodiscard]] std::optional<AppError> applyCalendarRecurrenceStorageSchema(SqliteConnection& connection) {
+[[nodiscard]] std::optional<AppError>
+applyCalendarRecurrenceStorageSchema(SqliteConnection& connection) {
   return applySchema(connection,
                      calendarRecurrenceStorageSchemaSql,
                      QStringLiteral("SQLite calendar-recurrence storage schema"));
 }
 
-[[nodiscard]] std::optional<AppError> applyCalendarRichEventMetadataSchema(SqliteConnection& connection) {
+[[nodiscard]] std::optional<AppError>
+applyCalendarRichEventMetadataSchema(SqliteConnection& connection) {
   return applySchema(connection,
                      calendarRichEventMetadataSchemaSql,
                      QStringLiteral("SQLite rich calendar-event metadata schema"));
 }
 
-[[nodiscard]] std::optional<AppError> applyCalendarReminderDefaultsSchema(SqliteConnection& connection) {
+[[nodiscard]] std::optional<AppError>
+applyCalendarReminderDefaultsSchema(SqliteConnection& connection) {
   return applySchema(connection,
                      calendarReminderDefaultsSchemaSql,
                      QStringLiteral("SQLite calendar reminder-default schema"));
 }
 
 [[nodiscard]] std::optional<AppError> applyReminderStateSchema(SqliteConnection& connection) {
-  return applySchema(connection, reminderStateSchemaSql, QStringLiteral("SQLite reminder-state schema"));
+  return applySchema(
+      connection, reminderStateSchemaSql, QStringLiteral("SQLite reminder-state schema"));
 }
 
 [[nodiscard]] std::optional<AppError> applyCalendarListColorSchema(SqliteConnection& connection) {
-  return applySchema(connection,
-                     calendarListColorSchemaSql,
-                     QStringLiteral("SQLite calendar-list color schema"));
+  return applySchema(
+      connection, calendarListColorSchemaSql, QStringLiteral("SQLite calendar-list color schema"));
 }
 
 [[nodiscard]] std::optional<AppError> applyMutationTelemetrySchema(SqliteConnection& connection) {
-  return applySchema(connection,
-                     mutationTelemetrySchemaSql,
-                     QStringLiteral("SQLite mutation telemetry schema"));
+  return applySchema(
+      connection, mutationTelemetrySchemaSql, QStringLiteral("SQLite mutation telemetry schema"));
 }
 
 [[nodiscard]] const std::array<SqliteMigration, 25>& migrations() {

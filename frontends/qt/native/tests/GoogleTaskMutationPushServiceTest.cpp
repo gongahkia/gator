@@ -397,7 +397,8 @@ void GoogleTaskMutationPushServiceTest::batchesIndependentTaskCreatesUpdatesMove
 void GoogleTaskMutationPushServiceTest::keepsPartialTaskBatchFailuresRetryable() {
   std::unique_ptr<hcb::test::TemporarySqliteDatabase> database = createDatabase();
   QVERIFY(database != nullptr);
-  if (database == nullptr) return;
+  if (database == nullptr)
+    return;
   FixedClock clock;
   hcb::OptimisticMutationCoordinator coordinator(database->databasePath(), clock);
   verifyReady(coordinator);
@@ -417,26 +418,31 @@ void GoogleTaskMutationPushServiceTest::keepsPartialTaskBatchFailuresRetryable()
        {QStringLiteral("remoteTaskId"), QStringLiteral("remote-two")},
        {QStringLiteral("task"), QJsonObject{{QStringLiteral("title"), QStringLiteral("Two")}}}},
       QStringLiteral("task-two"));
-  const QByteArray batchResponse =
-      QByteArrayLiteral("--batch_response\r\n"
-                        "Content-Type: application/http\r\n"
-                        "Content-ID: <response-item-1>\r\n\r\n"
-                        "HTTP/1.1 503 Service Unavailable\r\n"
-                        "Content-Type: application/json\r\n"
-                        "Retry-After: 3\r\n\r\n"
-                        "{\"error\":{\"message\":\"busy\"}}\r\n"
-                        "--batch_response\r\n"
-                        "Content-Type: application/http\r\n"
-                        "Content-ID: <response-item-0>\r\n\r\n"
-                        "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: application/json\r\n\r\n"
-                        "{}\r\n"
-                        "--batch_response--\r\n");
+  const QByteArray batchResponse = QByteArrayLiteral("--batch_response\r\n"
+                                                     "Content-Type: application/http\r\n"
+                                                     "Content-ID: <response-item-1>\r\n\r\n"
+                                                     "HTTP/1.1 503 Service Unavailable\r\n"
+                                                     "Content-Type: application/json\r\n"
+                                                     "Retry-After: 3\r\n\r\n"
+                                                     "{\"error\":{\"message\":\"busy\"}}\r\n"
+                                                     "--batch_response\r\n"
+                                                     "Content-Type: application/http\r\n"
+                                                     "Content-ID: <response-item-0>\r\n\r\n"
+                                                     "HTTP/1.1 200 OK\r\n"
+                                                     "Content-Type: application/json\r\n\r\n"
+                                                     "{}\r\n"
+                                                     "--batch_response--\r\n");
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.body = batchResponse});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
-  hcb::GoogleTaskMutationPushService service(
-      coordinator, httpClient, clock, hcb::SyncBackoffPolicy{}, nullptr, nullptr, nullptr, &telemetry);
+  hcb::GoogleTaskMutationPushService service(coordinator,
+                                             httpClient,
+                                             clock,
+                                             hcb::SyncBackoffPolicy{},
+                                             nullptr,
+                                             nullptr,
+                                             nullptr,
+                                             &telemetry);
 
   const hcb::GoogleTaskMutationPushResult result = push(service);
   QCOMPARE(result.applied, 1);
@@ -479,13 +485,13 @@ void GoogleTaskMutationPushServiceTest::pushesTaskReorderMove() {
   FixedClock clock;
   hcb::OptimisticMutationCoordinator coordinator(database->databasePath(), clock);
   verifyReady(coordinator);
-  const hcb::PendingMutation moved = enqueue(
-      coordinator,
-      QStringLiteral("task.move"),
-      {{QStringLiteral("taskListId"), QStringLiteral("list-1")},
-       {QStringLiteral("remoteTaskId"), QStringLiteral("remote-task")},
-       {QStringLiteral("parentTaskId"), QStringLiteral("remote-parent")},
-       {QStringLiteral("previousTaskId"), QStringLiteral("remote-previous")}});
+  const hcb::PendingMutation moved =
+      enqueue(coordinator,
+              QStringLiteral("task.move"),
+              {{QStringLiteral("taskListId"), QStringLiteral("list-1")},
+               {QStringLiteral("remoteTaskId"), QStringLiteral("remote-task")},
+               {QStringLiteral("parentTaskId"), QStringLiteral("remote-parent")},
+               {QStringLiteral("previousTaskId"), QStringLiteral("remote-previous")}});
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.body = QByteArray("{}")});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
@@ -538,9 +544,8 @@ void GoogleTaskMutationPushServiceTest::recreatesThenDeletesCrossListTaskMove() 
           "INSERT INTO local_tasks (id, task_list_id, remote_id, etag, title, state, updated_at) "
           "VALUES ('task-source', 'list-source', 'source-task', 'source-etag', 'Move me', "
           "'active', '2026-07-25T00:00:00Z')");
-  std::future<hcb::TaskMutationResult> moved =
-      taskMutations.moveToTaskList(QStringLiteral("task-source"),
-                                   QStringLiteral("list-destination"));
+  std::future<hcb::TaskMutationResult> moved = taskMutations.moveToTaskList(
+      QStringLiteral("task-source"), QStringLiteral("list-destination"));
   const hcb::TaskMutationResult movedResult = awaitResult(moved);
   QVERIFY(std::holds_alternative<hcb::TaskMutationReceipt>(movedResult));
   if (!std::holds_alternative<hcb::TaskMutationReceipt>(movedResult)) {
@@ -832,9 +837,8 @@ void GoogleTaskMutationPushServiceTest::pushesAndReconcilesTaskListMutations() {
           "INSERT INTO local_accounts (id, provider, connection_state, granted_scopes_json, "
           "missing_scopes_json, updated_at) VALUES "
           "('account-a', 'google', 'connected', '[]', '[]', '2026-07-25T00:00:00Z')");
-  std::future<hcb::TaskListMutationResult> created =
-      taskListMutations.create({.accountId = QStringLiteral("account-a"),
-                                .title = QStringLiteral(" Work ")});
+  std::future<hcb::TaskListMutationResult> created = taskListMutations.create(
+      {.accountId = QStringLiteral("account-a"), .title = QStringLiteral(" Work ")});
   const hcb::TaskListMutationResult createdResult = awaitResult(created);
   QVERIFY(std::holds_alternative<hcb::TaskListMutationReceipt>(createdResult));
   if (!std::holds_alternative<hcb::TaskListMutationReceipt>(createdResult)) {
@@ -855,7 +859,8 @@ void GoogleTaskMutationPushServiceTest::pushesAndReconcilesTaskListMutations() {
   QCOMPARE(manager.requests().size(), 1);
   QCOMPARE(manager.requests().constFirst().request.url().path(),
            QStringLiteral("/tasks/v1/users/@me/lists"));
-  const QJsonObject createBody = QJsonDocument::fromJson(manager.requests().constFirst().body).object();
+  const QJsonObject createBody =
+      QJsonDocument::fromJson(manager.requests().constFirst().body).object();
   QCOMPARE(createBody.value(QStringLiteral("title")).toString(), QStringLiteral("Work"));
   QCOMPARE(readTaskListColumn(handle, taskListId, "remote_id"),
            std::optional<QString>(QStringLiteral("remote-list")));
@@ -918,9 +923,8 @@ void GoogleTaskMutationPushServiceTest::pushesNewTaskListBeforeTasksAssignedToIt
           "INSERT INTO local_accounts (id, provider, connection_state, granted_scopes_json, "
           "missing_scopes_json, updated_at) VALUES "
           "('account-a', 'google', 'connected', '[]', '[]', '2026-07-25T00:00:00Z')");
-  std::future<hcb::TaskListMutationResult> createdList =
-      taskListMutations.create({.accountId = QStringLiteral("account-a"),
-                                .title = QStringLiteral("Projects")});
+  std::future<hcb::TaskListMutationResult> createdList = taskListMutations.create(
+      {.accountId = QStringLiteral("account-a"), .title = QStringLiteral("Projects")});
   const hcb::TaskListMutationResult createdListResult = awaitResult(createdList);
   QVERIFY(std::holds_alternative<hcb::TaskListMutationReceipt>(createdListResult));
   if (!std::holds_alternative<hcb::TaskListMutationReceipt>(createdListResult)) {
@@ -936,12 +940,8 @@ void GoogleTaskMutationPushServiceTest::pushesNewTaskListBeforeTasksAssignedToIt
   manager.enqueue({.body = QByteArray(R"({"id":"remote-list","etag":"etag-list"})")});
   manager.enqueue({.body = QByteArray(R"({"id":"remote-task","etag":"etag-task"})")});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
-  hcb::GoogleTaskMutationPushService service(coordinator,
-                                              httpClient,
-                                              clock,
-                                              hcb::SyncBackoffPolicy{},
-                                              &taskMutations,
-                                              &taskListMutations);
+  hcb::GoogleTaskMutationPushService service(
+      coordinator, httpClient, clock, hcb::SyncBackoffPolicy{}, &taskMutations, &taskListMutations);
 
   const hcb::GoogleTaskMutationPushResult result = push(service);
   QCOMPARE(result.applied, 2);
@@ -988,12 +988,8 @@ void GoogleTaskMutationPushServiceTest::defersTaskMutationUntilTaskListHasRemote
   verifyReady(coordinator);
   hcb::test::MockNetworkAccessManager manager;
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
-  hcb::GoogleTaskMutationPushService service(coordinator,
-                                              httpClient,
-                                              clock,
-                                              hcb::SyncBackoffPolicy{},
-                                              &taskMutations,
-                                              &taskListMutations);
+  hcb::GoogleTaskMutationPushService service(
+      coordinator, httpClient, clock, hcb::SyncBackoffPolicy{}, &taskMutations, &taskListMutations);
 
   const hcb::GoogleTaskMutationPushResult result = push(service);
   QCOMPARE(result.applied, 0);

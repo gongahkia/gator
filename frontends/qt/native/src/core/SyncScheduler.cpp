@@ -224,9 +224,8 @@ void SyncScheduler::workerLoop(const std::shared_ptr<State>& state) {
     SyncSchedulerRequest request;
     {
       std::unique_lock<std::mutex> lock(state->mutex);
-      state->workWake.wait(lock, [state] {
-        return state->stopped || (state->online && !state->pending.empty());
-      });
+      state->workWake.wait(
+          lock, [state] { return state->stopped || (state->online && !state->pending.empty()); });
       if (state->stopped) {
         return;
       }

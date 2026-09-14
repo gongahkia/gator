@@ -53,9 +53,8 @@ isValidOptionalString(const QJsonObject& object, QStringView key, qsizetype maxi
          (value.isString() && isText(value.toString(), maximumLength, false));
 }
 
-[[nodiscard]] std::optional<QString> requiredString(const QJsonObject& object,
-                                                     QStringView key,
-                                                     qsizetype maximumLength) {
+[[nodiscard]] std::optional<QString>
+requiredString(const QJsonObject& object, QStringView key, qsizetype maximumLength) {
   const QJsonValue value = object.value(key);
   if (!value.isString() || !isText(value.toString(), maximumLength, true)) {
     return std::nullopt;
@@ -91,13 +90,15 @@ isValidOptionalString(const QJsonObject& object, QStringView key, qsizetype maxi
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<TaskModelTask>
-bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTitles, int sortOrder) {
+[[nodiscard]] std::optional<TaskModelTask> bridgeTask(const QJsonObject& object,
+                                                      const QHash<QString, QString>& taskListTitles,
+                                                      int sortOrder) {
   const std::optional<QString> id = requiredString(object, u"id", kMaximumIdLength);
   const std::optional<QString> accountId = requiredString(object, u"account_id", kMaximumIdLength);
   const std::optional<QString> listId = requiredString(object, u"list_id", kMaximumIdLength);
   const std::optional<QString> title = requiredString(object, u"title", kMaximumTitleLength);
-  const std::optional<TaskPriority> priority = taskPriority(object.value(QStringLiteral("priority")));
+  const std::optional<TaskPriority> priority =
+      taskPriority(object.value(QStringLiteral("priority")));
   const QJsonValue status = object.value(QStringLiteral("status"));
   const std::optional<QString> notes = optionalString(object, u"notes", kMaximumTextLength);
   const std::optional<QString> parentId = optionalString(object, u"parent_id", kMaximumIdLength);
@@ -108,30 +109,31 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
       !isValidOptionalString(object, u"notes", kMaximumTextLength) ||
       !isValidOptionalString(object, u"parent_id", kMaximumIdLength) ||
       !isValidOptionalString(object, u"due", 32) ||
-      !isValidOptionalString(object, u"due_time_zone", 120) ||
-      !isIdentifier(*id) || !isIdentifier(*accountId) || !isIdentifier(*listId) ||
-      !taskListTitles.contains(*listId) ||
+      !isValidOptionalString(object, u"due_time_zone", 120) || !isIdentifier(*id) ||
+      !isIdentifier(*accountId) || !isIdentifier(*listId) || !taskListTitles.contains(*listId) ||
       (parentId.has_value() && !isIdentifier(*parentId)) ||
-      (status.toString() != QStringLiteral("needsAction") && status.toString() != QStringLiteral("completed"))) {
+      (status.toString() != QStringLiteral("needsAction") &&
+       status.toString() != QStringLiteral("completed"))) {
     return std::nullopt;
   }
-  return TaskModelTask{.id = *id,
-                       .taskListId = *listId,
-                       .taskListTitle = taskListTitles.value(*listId),
-                       .parentTaskId = parentId,
-                       .title = *title,
-                       .notes = notes,
-                       .due = due.has_value() ? std::optional<TaskDue>(
-                                                  TaskDue{.at = due, .timeZone = dueTimeZone})
-                                            : std::optional<TaskDue>{},
-                       .priority = *priority,
-                       .completed = status.toString() == QStringLiteral("completed"),
-                       .sortOrder = static_cast<std::int64_t>(sortOrder)};
+  return TaskModelTask{
+      .id = *id,
+      .taskListId = *listId,
+      .taskListTitle = taskListTitles.value(*listId),
+      .parentTaskId = parentId,
+      .title = *title,
+      .notes = notes,
+      .due = due.has_value() ? std::optional<TaskDue>(TaskDue{.at = due, .timeZone = dueTimeZone})
+                             : std::optional<TaskDue>{},
+      .priority = *priority,
+      .completed = status.toString() == QStringLiteral("completed"),
+      .sortOrder = static_cast<std::int64_t>(sortOrder)};
 }
 
 [[nodiscard]] std::optional<CalendarEventSummary> bridgeEvent(const QJsonObject& object) {
   const std::optional<QString> id = requiredString(object, u"id", kMaximumIdLength);
-  const std::optional<QString> calendarId = requiredString(object, u"calendar_id", kMaximumIdLength);
+  const std::optional<QString> calendarId =
+      requiredString(object, u"calendar_id", kMaximumIdLength);
   const std::optional<QString> title = requiredString(object, u"summary", kMaximumTitleLength);
   const std::optional<QString> status = requiredString(object, u"status", 32);
   const QJsonValue startValue = object.value(QStringLiteral("start"));
@@ -149,7 +151,8 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
   const std::optional<QString> endAt = requiredString(end, u"value", 64);
   const std::optional<QString> startZone = optionalString(start, u"time_zone", 120);
   const std::optional<QString> endZone = optionalString(end, u"time_zone", 120);
-  const std::optional<QString> description = optionalString(object, u"description", kMaximumTextLength);
+  const std::optional<QString> description =
+      optionalString(object, u"description", kMaximumTextLength);
   const std::optional<QString> location = optionalString(object, u"location", kMaximumTextLength);
   const std::optional<QString> colorId = optionalString(object, u"color_id", 32);
   const std::optional<QString> transparency = optionalString(object, u"transparency", 32);
@@ -161,8 +164,8 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
   const QJsonValue attendeesValue = object.value(QStringLiteral("attendees"));
   const QJsonValue remindersValue = object.value(QStringLiteral("reminder_overrides"));
   const QJsonValue attachmentsValue = object.value(QStringLiteral("attachments"));
-  if (!startKind.has_value() || !startAt.has_value() || !endKind.has_value() || !endAt.has_value() ||
-      !isValidOptionalString(start, u"time_zone", 120) ||
+  if (!startKind.has_value() || !startAt.has_value() || !endKind.has_value() ||
+      !endAt.has_value() || !isValidOptionalString(start, u"time_zone", 120) ||
       !isValidOptionalString(end, u"time_zone", 120) ||
       !isValidOptionalString(object, u"description", kMaximumTextLength) ||
       !isValidOptionalString(object, u"location", kMaximumTextLength) ||
@@ -171,10 +174,12 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
       !isValidOptionalString(object, u"visibility", 32) ||
       !isValidOptionalString(object, u"event_type", 64) ||
       !isValidOptionalString(object, u"remote_id", kMaximumIdLength) ||
-      (!etag.has_value() && !object.value(QStringLiteral("metadata")).toObject()
-                                .value(QStringLiteral("etag")).isNull()) ||
-      !updatedAt.has_value() ||
-      !attendeesValue.isArray() || !remindersValue.isArray() || !attachmentsValue.isArray() ||
+      (!etag.has_value() && !object.value(QStringLiteral("metadata"))
+                                 .toObject()
+                                 .value(QStringLiteral("etag"))
+                                 .isNull()) ||
+      !updatedAt.has_value() || !attendeesValue.isArray() || !remindersValue.isArray() ||
+      !attachmentsValue.isArray() ||
       (*startKind != QStringLiteral("date") && *startKind != QStringLiteral("dateTime")) ||
       *startKind != *endKind) {
     return std::nullopt;
@@ -182,30 +187,30 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
   const QJsonArray attendees = attendeesValue.toArray();
   const QJsonArray reminders = remindersValue.toArray();
   const QJsonArray attachments = attachmentsValue.toArray();
-  return CalendarEventSummary{.id = *id,
-                              .calendarId = *calendarId,
-                              .remoteId = remoteId,
-                              .status = *status,
-                              .title = *title,
-                              .description = description,
-                              .location = location,
-                              .startAt = *startAt,
-                              .startTimeZone = startZone,
-                              .endAt = *endAt,
-                              .endTimeZone = endZone,
-                              .allDay = *startKind == QStringLiteral("date"),
-                              .colorId = colorId,
-                              .transparency = transparency,
-                              .visibility = visibility,
-                              .eventType = eventType,
-                              .attendeeDetailsJson = QString::fromUtf8(
-                                  QJsonDocument(attendees).toJson(QJsonDocument::Compact)),
-                              .remindersJson = QString::fromUtf8(
-                                  QJsonDocument(reminders).toJson(QJsonDocument::Compact)),
-                              .attachmentsJson = QString::fromUtf8(
-                                  QJsonDocument(attachments).toJson(QJsonDocument::Compact)),
-                              .etag = etag,
-                              .updatedAt = *updatedAt};
+  return CalendarEventSummary{
+      .id = *id,
+      .calendarId = *calendarId,
+      .remoteId = remoteId,
+      .status = *status,
+      .title = *title,
+      .description = description,
+      .location = location,
+      .startAt = *startAt,
+      .startTimeZone = startZone,
+      .endAt = *endAt,
+      .endTimeZone = endZone,
+      .allDay = *startKind == QStringLiteral("date"),
+      .colorId = colorId,
+      .transparency = transparency,
+      .visibility = visibility,
+      .eventType = eventType,
+      .attendeeDetailsJson =
+          QString::fromUtf8(QJsonDocument(attendees).toJson(QJsonDocument::Compact)),
+      .remindersJson = QString::fromUtf8(QJsonDocument(reminders).toJson(QJsonDocument::Compact)),
+      .attachmentsJson =
+          QString::fromUtf8(QJsonDocument(attachments).toJson(QJsonDocument::Compact)),
+      .etag = etag,
+      .updatedAt = *updatedAt};
 }
 
 [[nodiscard]] bool isKnownSearchKind(const QString& kind) {
@@ -281,7 +286,8 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
 
 } // namespace
 
-PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(const QJsonObject& data) {
+PythonBridgeWorkspaceSummaryOrError
+PythonBridgeProjection::workspaceSummary(const QJsonObject& data) {
   const QJsonValue workspaceValue = data.value(QStringLiteral("workspace"));
   if (!workspaceValue.isObject()) {
     return invalidPayload();
@@ -294,8 +300,8 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
   const QJsonValue taskListsValue = workspace.value(QStringLiteral("task_lists"));
   const QJsonValue calendarsValue = workspace.value(QStringLiteral("calendars"));
   if (!accountId.has_value() || !accountEmail.has_value() || !isIdentifier(*accountId) ||
-      !accountEmail->contains(u'@') || !pending.isDouble() ||
-      pending.toInt(-1) < 0 || !taskListsValue.isArray() || !calendarsValue.isArray() ||
+      !accountEmail->contains(u'@') || !pending.isDouble() || pending.toInt(-1) < 0 ||
+      !taskListsValue.isArray() || !calendarsValue.isArray() ||
       taskListsValue.toArray().size() > kMaximumTaskLists ||
       calendarsValue.toArray().size() > kMaximumCalendars) {
     return invalidPayload();
@@ -313,11 +319,15 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
     const std::optional<QString> etag = metadataString(object, u"etag");
     const std::optional<QString> updatedAt = metadataString(object, u"local_updated_at");
     const QJsonValue position = object.value(QStringLiteral("position"));
+    const QJsonValue selected = object.value(QStringLiteral("selected"));
     if (!id.has_value() || !owner.has_value() || !title.has_value() ||
         !isValidOptionalString(object, u"remote_id", kMaximumIdLength) ||
-        (!etag.has_value() && !object.value(QStringLiteral("metadata")).toObject()
-                              .value(QStringLiteral("etag")).isNull()) ||
-        !updatedAt.has_value() || !position.isDouble() || !isIdentifier(*id) || *owner != *accountId) {
+        (!etag.has_value() && !object.value(QStringLiteral("metadata"))
+                                   .toObject()
+                                   .value(QStringLiteral("etag"))
+                                   .isNull()) ||
+        !updatedAt.has_value() || !position.isDouble() || !isIdentifier(*id) ||
+        (!selected.isUndefined() && !selected.isBool()) || *owner != *accountId) {
       return invalidPayload();
     }
     taskLists.append({.id = *id,
@@ -326,7 +336,7 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
                       .title = *title,
                       .etag = etag,
                       .sortOrder = position.toInteger(),
-                      .selected = true,
+                      .selected = selected.isUndefined() ? true : selected.toBool(),
                       .updatedAt = *updatedAt});
   }
   QList<CalendarSummary> calendars;
@@ -339,7 +349,8 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
     const std::optional<QString> owner = requiredString(object, u"account_id", kMaximumIdLength);
     const std::optional<QString> title = requiredString(object, u"summary", kMaximumTitleLength);
     const std::optional<QString> remoteId = optionalString(object, u"remote_id", kMaximumIdLength);
-    const std::optional<QString> description = optionalString(object, u"description", kMaximumTextLength);
+    const std::optional<QString> description =
+        optionalString(object, u"description", kMaximumTextLength);
     const std::optional<QString> timeZone = optionalString(object, u"time_zone", 120);
     const std::optional<QString> color = optionalString(object, u"color", 32);
     const std::optional<QString> etag = metadataString(object, u"etag");
@@ -351,8 +362,10 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
         !isValidOptionalString(object, u"description", kMaximumTextLength) ||
         !isValidOptionalString(object, u"time_zone", 120) ||
         !isValidOptionalString(object, u"color", 32) ||
-        (!etag.has_value() && !object.value(QStringLiteral("metadata")).toObject()
-                              .value(QStringLiteral("etag")).isNull()) ||
+        (!etag.has_value() && !object.value(QStringLiteral("metadata"))
+                                   .toObject()
+                                   .value(QStringLiteral("etag"))
+                                   .isNull()) ||
         !updatedAt.has_value() || !selected.isBool() || !hidden.isBool() || !isIdentifier(*id) ||
         *owner != *accountId) {
       return invalidPayload();
@@ -368,19 +381,18 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
                       .hidden = hidden.toBool(),
                       .updatedAt = *updatedAt});
   }
-  return PythonBridgeWorkspaceSummary{*accountId,
-                                      *accountEmail,
-                                      std::move(taskLists),
-                                      std::move(calendars),
-                                      pending.toInt()};
+  return PythonBridgeWorkspaceSummary{
+      *accountId, *accountEmail, std::move(taskLists), std::move(calendars), pending.toInt()};
 }
 
-PythonBridgeTaskPageOrError PythonBridgeProjection::taskPage(
-    const QJsonObject& data, const QHash<QString, QString>& taskListTitles) {
+PythonBridgeTaskPageOrError
+PythonBridgeProjection::taskPage(const QJsonObject& data,
+                                 const QHash<QString, QString>& taskListTitles) {
   const QJsonObject page = data.value(QStringLiteral("page")).toObject();
   const QJsonValue tasksValue = page.value(QStringLiteral("tasks"));
   const QJsonValue cursorValue = page.value(QStringLiteral("next_cursor"));
-  if (page.isEmpty() || !tasksValue.isArray() || tasksValue.toArray().size() > kMaximumTasksPerPage ||
+  if (page.isEmpty() || !tasksValue.isArray() ||
+      tasksValue.toArray().size() > kMaximumTasksPerPage ||
       (!cursorValue.isNull() && !cursorValue.isString())) {
     return invalidPayload();
   }
@@ -390,15 +402,17 @@ PythonBridgeTaskPageOrError PythonBridgeProjection::taskPage(
     if (!value.isObject()) {
       return invalidPayload();
     }
-    const std::optional<TaskModelTask> task = bridgeTask(value.toObject(), taskListTitles, sortOrder++);
+    const std::optional<TaskModelTask> task =
+        bridgeTask(value.toObject(), taskListTitles, sortOrder++);
     if (!task.has_value()) {
       return invalidPayload();
     }
     tasks.append(*task);
   }
   return PythonBridgeTaskPage{std::move(tasks),
-                              cursorValue.isString() ? std::optional<QString>(cursorValue.toString())
-                                                     : std::optional<QString>{}};
+                              cursorValue.isString()
+                                  ? std::optional<QString>(cursorValue.toString())
+                                  : std::optional<QString>{}};
 }
 
 PythonBridgeEventRangeOrError PythonBridgeProjection::eventRange(const QJsonObject& data) {

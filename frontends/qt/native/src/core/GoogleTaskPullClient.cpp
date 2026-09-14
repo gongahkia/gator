@@ -231,10 +231,9 @@ optionalString(const QJsonObject& object, QStringView key, qsizetype maximumLeng
     const bool hasInvalidUpdatedAt =
         !updatedAt.has_value() && isPresent(item.value(QStringLiteral("updated")));
     if ((parentId.has_value() && !isValidIdentifier(*parentId)) || !title.has_value() ||
-        !status.has_value() || !deleted.has_value() || !hidden.has_value() || !isAssigned.has_value() ||
-        hasInvalidParent ||
-        hasInvalidNotes || hasInvalidPosition || hasInvalidEtag || hasInvalidCompletedAt ||
-        hasInvalidDueAt || hasInvalidUpdatedAt) {
+        !status.has_value() || !deleted.has_value() || !hidden.has_value() ||
+        !isAssigned.has_value() || hasInvalidParent || hasInvalidNotes || hasInvalidPosition ||
+        hasInvalidEtag || hasInvalidCompletedAt || hasInvalidDueAt || hasInvalidUpdatedAt) {
       return invalidPayloadError();
     }
     seenIds.insert(idValue.toString());

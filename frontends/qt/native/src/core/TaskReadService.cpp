@@ -175,41 +175,43 @@ bindText(sqlite3_stmt* statement, int index, const QString& value) {
     const auto recurrenceEndCount = [&recurrence]() {
       return recurrence.marker.has_value() ? recurrence.marker->end.count.value_or(0) : 0;
     };
-    tasks.append({.id = *id,
-                  .taskListId = *taskListId,
-                  .taskListTitle = *taskListTitle,
-                  .parentTaskId = optionalText(statement, 3),
-                  .title = *title,
-                  .notes = storedNotes.has_value() ? std::optional<QString>(recurrence.userNotes)
-                                                   : std::nullopt,
-                  .due = dueAt.has_value() || dueTimeZone.has_value()
-                             ? std::optional<TaskDue>(TaskDue{.at = dueAt, .timeZone = dueTimeZone})
-                             : std::nullopt,
-                  .priority = *decodedPriority,
-                  .completed = *state == QStringLiteral("completed"),
-                  .managedRecurrence = recurrence.state == TaskRecurrenceNotesState::Managed &&
-                                       recurrenceDiagnostic.isEmpty() && assigned == 0,
-                  .recurrenceSummary = recurrence.marker.has_value()
-                                           ? taskRecurrenceSummary(*recurrence.marker)
-                                           : QString(),
-                  .recurrenceSeriesId =
-                      recurrence.marker.has_value() ? recurrence.marker->seriesId : QString(),
-                  .recurrenceOccurrenceId =
-                      recurrence.marker.has_value() ? recurrence.marker->occurrenceId : QString(),
-                  .recurrenceFrequency = recurrenceFrequency(),
-                  .recurrenceInterval = recurrenceInterval(),
-                  .recurrenceEndKind = recurrenceEndKind(),
-                  .recurrenceEndUntil = recurrenceEndUntil(),
-                  .recurrenceEndCount = recurrenceEndCount(),
-                  .recurrenceRule = recurrence.marker.has_value() ? recurrence.marker->recurrenceRule : QString(),
-                  .recurrenceExclusionDates = recurrence.marker.has_value()
-                                                 ? recurrence.marker->exclusionDates.join(QStringLiteral(","))
-                                                 : QString(),
-                  .recurrenceAdditionDates = recurrence.marker.has_value()
-                                                ? recurrence.marker->additionDates.join(QStringLiteral(","))
-                                                : QString(),
-                  .recurrenceDiagnostic = recurrenceDiagnostic,
-                  .sortOrder = sortOrder});
+    tasks.append(
+        {.id = *id,
+         .taskListId = *taskListId,
+         .taskListTitle = *taskListTitle,
+         .parentTaskId = optionalText(statement, 3),
+         .title = *title,
+         .notes =
+             storedNotes.has_value() ? std::optional<QString>(recurrence.userNotes) : std::nullopt,
+         .due = dueAt.has_value() || dueTimeZone.has_value()
+                    ? std::optional<TaskDue>(TaskDue{.at = dueAt, .timeZone = dueTimeZone})
+                    : std::nullopt,
+         .priority = *decodedPriority,
+         .completed = *state == QStringLiteral("completed"),
+         .managedRecurrence = recurrence.state == TaskRecurrenceNotesState::Managed &&
+                              recurrenceDiagnostic.isEmpty() && assigned == 0,
+         .recurrenceSummary =
+             recurrence.marker.has_value() ? taskRecurrenceSummary(*recurrence.marker) : QString(),
+         .recurrenceSeriesId =
+             recurrence.marker.has_value() ? recurrence.marker->seriesId : QString(),
+         .recurrenceOccurrenceId =
+             recurrence.marker.has_value() ? recurrence.marker->occurrenceId : QString(),
+         .recurrenceFrequency = recurrenceFrequency(),
+         .recurrenceInterval = recurrenceInterval(),
+         .recurrenceEndKind = recurrenceEndKind(),
+         .recurrenceEndUntil = recurrenceEndUntil(),
+         .recurrenceEndCount = recurrenceEndCount(),
+         .recurrenceRule =
+             recurrence.marker.has_value() ? recurrence.marker->recurrenceRule : QString(),
+         .recurrenceExclusionDates =
+             recurrence.marker.has_value()
+                 ? recurrence.marker->exclusionDates.join(QStringLiteral(","))
+                 : QString(),
+         .recurrenceAdditionDates = recurrence.marker.has_value()
+                                        ? recurrence.marker->additionDates.join(QStringLiteral(","))
+                                        : QString(),
+         .recurrenceDiagnostic = recurrenceDiagnostic,
+         .sortOrder = sortOrder});
   }
   const int finalizeResult = sqlite3_finalize(statement);
   return finalizeResult == SQLITE_OK

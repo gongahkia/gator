@@ -151,7 +151,8 @@ class AppController final : public QObject {
   Q_PROPERTY(QVariantList availableTimeZones READ availableTimeZones CONSTANT)
   Q_PROPERTY(int workdayStartHour READ workdayStartHour NOTIFY workdayStartHourChanged)
   Q_PROPERTY(int workdayEndHour READ workdayEndHour NOTIFY workdayEndHourChanged)
-  Q_PROPERTY(QVariantList visibleCalendarIds READ visibleCalendarIds NOTIFY visibleCalendarIdsChanged)
+  Q_PROPERTY(
+      QVariantList visibleCalendarIds READ visibleCalendarIds NOTIFY visibleCalendarIdsChanged)
   Q_PROPERTY(bool calendarVisibilityConfigured READ calendarVisibilityConfigured NOTIFY
                  calendarVisibilityConfiguredChanged)
   Q_PROPERTY(QVariantList calendarManagementRows READ calendarManagementRows NOTIFY
@@ -177,7 +178,8 @@ class AppController final : public QObject {
   Q_PROPERTY(bool calendarDragCreateHintSeen READ calendarDragCreateHintSeen NOTIFY
                  calendarDragCreateHintSeenChanged)
   Q_PROPERTY(int pendingSyncCount READ pendingSyncCount NOTIFY pendingSyncCountChanged)
-  Q_PROPERTY(QString reminderStatusMessage READ reminderStatusMessage NOTIFY reminderStatusMessageChanged)
+  Q_PROPERTY(
+      QString reminderStatusMessage READ reminderStatusMessage NOTIFY reminderStatusMessageChanged)
   Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
   Q_PROPERTY(bool bridgeMode READ bridgeMode CONSTANT)
   Q_PROPERTY(bool bridgeOperationActive READ bridgeOperationActive NOTIFY bridgeOperationChanged)
@@ -296,7 +298,9 @@ public:
   Q_INVOKABLE void openExternalLink(QString url);
   Q_INVOKABLE void saveBulkTextRecurrenceScope(int scope);
   Q_INVOKABLE void resetVisualPreferences();
-  Q_INVOKABLE QVariantMap previewQuickCapture(QString text, int kind, QVariantList disabledRecognitionIds) const;
+  Q_INVOKABLE QVariantMap previewQuickCapture(QString text,
+                                              int kind,
+                                              QVariantList disabledRecognitionIds) const;
   Q_INVOKABLE void createQuickCapture(QString text,
                                       int kind,
                                       QString destinationId,
@@ -314,25 +318,17 @@ public:
   Q_INVOKABLE void saveUse24HourTime(bool enabled);
   Q_INVOKABLE void saveDisplayTimeZone(QString timeZone);
   Q_INVOKABLE QVariantMap dateTimeComponents(QString value, QString timeZone) const;
-  Q_INVOKABLE QString dateTimeFromComponents(int year,
-                                             int month,
-                                             int day,
-                                             int hour,
-                                             int minute,
-                                             QString timeZone) const;
+  Q_INVOKABLE QString dateTimeFromComponents(
+      int year, int month, int day, int hour, int minute, QString timeZone) const;
   Q_INVOKABLE void saveWorkdayHours(int startHour, int endHour);
   Q_INVOKABLE void saveCalendarVisibility(QVariantList calendarIds);
   Q_INVOKABLE void createGoogleCalendar(QString title, QString description, QString timeZone);
   Q_INVOKABLE void subscribeGoogleCalendar(QString calendarId);
-  Q_INVOKABLE void updateGoogleCalendar(QString calendarId,
-                                        QString title,
-                                        QString description,
-                                        QString timeZone);
+  Q_INVOKABLE void
+  updateGoogleCalendar(QString calendarId, QString title, QString description, QString timeZone);
   Q_INVOKABLE void deleteGoogleCalendar(QString calendarId);
-  Q_INVOKABLE void updateGoogleCalendarListEntry(QString calendarId,
-                                                 bool selected,
-                                                 bool hidden,
-                                                 QString colorId);
+  Q_INVOKABLE void
+  updateGoogleCalendarListEntry(QString calendarId, bool selected, bool hidden, QString colorId);
   Q_INVOKABLE void saveGoogleCalendarSettings(QString calendarId,
                                               QString title,
                                               QString description,
@@ -422,16 +418,10 @@ public:
   Q_INVOKABLE void saveUndoHistorySettings(int retentionDays, int maximumEntries);
   Q_INVOKABLE void dismissCalendarDragCreateHint();
   Q_INVOKABLE void bulkReparentTasks(QVariantList taskIds, QString parentTaskId);
-  Q_INVOKABLE void bulkReplaceTaskText(QVariantList taskIds,
-                                       QString findText,
-                                       QString replaceText,
-                                       int fields,
-                                       int recurrenceScope);
-  Q_INVOKABLE void previewBulkTaskText(QVariantList taskIds,
-                                       QString findText,
-                                       int fields,
-                                       int recurrenceScope,
-                                       int requestToken);
+  Q_INVOKABLE void bulkReplaceTaskText(
+      QVariantList taskIds, QString findText, QString replaceText, int fields, int recurrenceScope);
+  Q_INVOKABLE void previewBulkTaskText(
+      QVariantList taskIds, QString findText, int fields, int recurrenceScope, int requestToken);
   Q_INVOKABLE void createEvent(QString calendarId,
                                QString title,
                                QString startAt,
@@ -491,14 +481,12 @@ public:
                                        QString statusPropertiesJson,
                                        QString sendUpdates);
   Q_INVOKABLE void deleteEvent(QString eventId, int recurrenceScope = 0);
-  Q_INVOKABLE void respondToEvent(QString eventId, QString responseStatus, QString responseComment = {});
+  Q_INVOKABLE void
+  respondToEvent(QString eventId, QString responseStatus, QString responseComment = {});
   Q_INVOKABLE void moveEvent(QString eventId, QString startAt, QString endAt, bool allDay);
   Q_INVOKABLE void resizeEvent(QString eventId, QString endAt);
-  Q_INVOKABLE void moveEventScoped(QString eventId,
-                                   QString startAt,
-                                   QString endAt,
-                                   bool allDay,
-                                   int recurrenceScope);
+  Q_INVOKABLE void moveEventScoped(
+      QString eventId, QString startAt, QString endAt, bool allDay, int recurrenceScope);
   Q_INVOKABLE void resizeEventScoped(QString eventId, QString endAt, int recurrenceScope);
   Q_INVOKABLE void bulkDeleteEvents(QVariantList eventIds);
   Q_INVOKABLE void bulkMoveEvents(QVariantList eventIds, QString calendarId);
@@ -511,11 +499,8 @@ public:
                                         QString replaceText,
                                         int fields,
                                         int recurrenceScope);
-  Q_INVOKABLE void previewBulkEventText(QVariantList eventIds,
-                                        QString findText,
-                                        int fields,
-                                        int recurrenceScope,
-                                        int requestToken);
+  Q_INVOKABLE void previewBulkEventText(
+      QVariantList eventIds, QString findText, int fields, int recurrenceScope, int requestToken);
 
 signals:
   void clientIdChanged();
@@ -635,8 +620,13 @@ private:
                           bool firstPageApplied);
   void loadBridgeCalendar(std::uint64_t generation);
   void applyBridgeCalendarEvents(std::uint64_t generation, QList<CalendarEventSummary> events);
+  [[nodiscard]] QList<TaskModelTask> visibleBridgeTasks() const;
+  void applyBridgeTaskLists(QList<TaskListSummary> taskLists);
+  void applyBridgeCalendars(QList<CalendarSummary> calendars, bool reloadCalendarRange);
   void applyBridgeTaskResponse(const QJsonObject& data);
   void applyBridgeEventResponse(const QJsonObject& data);
+  void applyBridgeTaskListResponse(const QJsonObject& data);
+  void applyBridgeCalendarResponse(const QJsonObject& data);
   void startBridgeOperation(QString kind, std::future<PythonBridgeResult> future);
   void pollBridgeOperation(QString operationId);
   void cancelBridgeOperation();
@@ -655,9 +645,7 @@ private:
   void replayHistory(UndoAction action);
   void replayHistoryEntry(UndoEntry entry);
   void refreshCalendar();
-  void loadCalendarManagementRows(std::uint64_t generation,
-                                  std::int64_t offset,
-                                  QVariantList rows);
+  void loadCalendarManagementRows(std::uint64_t generation, std::int64_t offset, QVariantList rows);
   void loadImportTaskLists(QString defaultTaskListId,
                            QString defaultCalendarId,
                            std::int64_t offset,
@@ -673,17 +661,15 @@ private:
                      const QList<CalendarSummary>& calendars);
   void refreshCalendarEvents(QList<QString> calendarIds, std::uint64_t generation);
   void refreshInvitations();
-  void refreshCalendarInstanceCache(QList<QString> calendarIds,
-                                    QDate date,
-                                    std::uint64_t generation);
+  void
+  refreshCalendarInstanceCache(QList<QString> calendarIds, QDate date, std::uint64_t generation);
   void runSearch();
   void refreshSearchProjection();
   void applyTaskProjections(QList<TaskModelTask> tasks);
   void ensureNotesSidebarTab();
   void loadSavedSearches();
-  void runBulkTaskMutation(
-      TaskBulkMutationInput input,
-      std::function<void(const TaskBulkMutationSummary&)> onSuccess = {});
+  void runBulkTaskMutation(TaskBulkMutationInput input,
+                           std::function<void(const TaskBulkMutationSummary&)> onSuccess = {});
   void runBulkEventMutation(CalendarEventBulkMutationInput input);
   void previewBulkTaskMutation(TaskBulkMutationInput input, int requestToken);
   void previewBulkEventMutation(CalendarEventBulkMutationInput input, int requestToken);
@@ -715,9 +701,8 @@ private:
   void setParsedImport(ImportParseResult parsed, QString sourceName);
   void setBusy(bool busy);
   [[nodiscard]] QuickCaptureAliases quickCaptureAliasesConfiguration() const;
-  [[nodiscard]] QuickCaptureParseResult quickCaptureParse(QString text,
-                                                           int kind,
-                                                           QVariantList disabledRecognitionIds) const;
+  [[nodiscard]] QuickCaptureParseResult
+  quickCaptureParse(QString text, int kind, QVariantList disabledRecognitionIds) const;
 
   Clock& clock_;
   AgendaModel& agendaModel_;
@@ -814,7 +799,8 @@ private:
   QStringList quickCaptureTaskAliases_{QuickCaptureParser::defaultAliases().task};
   QStringList quickCaptureEventAliases_{QuickCaptureParser::defaultAliases().event};
   QStringList quickCaptureHighPriorityAliases_{QuickCaptureParser::defaultAliases().highPriority};
-  QStringList quickCaptureMediumPriorityAliases_{QuickCaptureParser::defaultAliases().mediumPriority};
+  QStringList quickCaptureMediumPriorityAliases_{
+      QuickCaptureParser::defaultAliases().mediumPriority};
   QStringList quickCaptureLowPriorityAliases_{QuickCaptureParser::defaultAliases().lowPriority};
   int weekStartDay_{0};
   bool use24HourTime_{true};
@@ -858,6 +844,9 @@ private:
   QString pythonBridgeAccountId_;
   QString pythonBridgeExpectedEmail_;
   QHash<QString, QString> pythonBridgeTaskListTitles_;
+  QList<TaskListSummary> pythonBridgeTaskLists_;
+  QList<CalendarSummary> pythonBridgeCalendars_;
+  QList<TaskModelTask> pythonBridgeTasks_;
   QList<CalendarEventSummary> pythonBridgeCalendarEvents_;
   std::uint64_t pythonBridgeRefreshGeneration_{0};
   bool pythonBridgeTasksReady_{false};

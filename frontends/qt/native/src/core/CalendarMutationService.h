@@ -139,7 +139,8 @@ struct CalendarEventMutationSnapshot final {
 };
 
 using CalendarEventMutationResult = std::variant<CalendarEventMutationReceipt, AppError>;
-using CalendarEventBatchMutationResult = std::variant<QList<CalendarEventMutationReceipt>, AppError>;
+using CalendarEventBatchMutationResult =
+    std::variant<QList<CalendarEventMutationReceipt>, AppError>;
 using CalendarEventMutationSnapshotResult =
     std::variant<QList<CalendarEventMutationSnapshot>, AppError>;
 

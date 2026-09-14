@@ -71,12 +71,11 @@ QVariantList TaskListModel::selectedTaskLists() const {
     if (!taskList.selected) {
       continue;
     }
-    selected.append(QVariantMap{{QStringLiteral("id"), taskList.id},
-                                {QStringLiteral("title"), taskList.title},
-                                {QStringLiteral("taskCount"),
-                                 static_cast<qlonglong>(taskList.taskCount)},
-                                {QStringLiteral("activeTaskCount"),
-                                 static_cast<qlonglong>(taskList.activeTaskCount)}});
+    selected.append(QVariantMap{
+        {QStringLiteral("id"), taskList.id},
+        {QStringLiteral("title"), taskList.title},
+        {QStringLiteral("taskCount"), static_cast<qlonglong>(taskList.taskCount)},
+        {QStringLiteral("activeTaskCount"), static_cast<qlonglong>(taskList.activeTaskCount)}});
   }
   return selected;
 }

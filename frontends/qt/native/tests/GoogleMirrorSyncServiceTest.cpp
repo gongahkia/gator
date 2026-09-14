@@ -118,8 +118,7 @@ template <typename Result> [[nodiscard]] Result await(std::future<Result>& futur
 }
 
 [[nodiscard]] std::unique_ptr<hcb::test::TemporarySqliteDatabase> makeDatabase() {
-  hcb::test::TemporarySqliteDatabaseResult result =
-      hcb::test::TemporarySqliteDatabase::create();
+  hcb::test::TemporarySqliteDatabaseResult result = hcb::test::TemporarySqliteDatabase::create();
   if (!std::holds_alternative<std::unique_ptr<hcb::test::TemporarySqliteDatabase>>(result)) {
     return {};
   }
@@ -144,25 +143,23 @@ void GoogleMirrorSyncServiceTest::tasksUsePersistedOverlapWatermark() {
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.status = 429, .body = QByteArray("{\"error\":{\"message\":\"slow\"}}")});
   manager.enqueue({.body = QByteArray("{\"items\":[{\"id\":\"list-1\",\"title\":\"Inbox\"}]}")});
-  manager.enqueue(
-      {.body = QByteArray("{\"items\":[{\"id\":\"task-1\",\"title\":\"One\","
-                           "\"status\":\"needsAction\"}]}"),
-       .headers = {{QByteArray("Date"), QByteArray("Wed, 24 Jul 2024 10:00:00 GMT")}}});
+  manager.enqueue({.body = QByteArray("{\"items\":[{\"id\":\"task-1\",\"title\":\"One\","
+                                      "\"status\":\"needsAction\"}]}"),
+                   .headers = {{QByteArray("Date"), QByteArray("Wed, 24 Jul 2024 10:00:00 GMT")}}});
   manager.enqueue({.body = QByteArray("{\"items\":[{\"id\":\"list-1\",\"title\":\"Inbox\"}]}")});
   manager.enqueue({.body = QByteArray("{\"items\":[]}")});
   hcb::GoogleHttpClient http(nullptr, &manager);
   hcb::GoogleTaskListPullClient listClient(http);
   hcb::GoogleTaskPullClient taskClient(http);
-  hcb::GoogleTaskMirrorSyncService service(
-      listClient,
-      taskClient,
-      mirror,
-      checkpoints,
-      clock,
-      hcb::SyncBackoffPolicy({.baseDelayMilliseconds = 0,
-                              .maximumDelayMilliseconds = 0,
-                              .jitterMilliseconds = 0,
-                              .maximumAttempts = 2}));
+  hcb::GoogleTaskMirrorSyncService service(listClient,
+                                           taskClient,
+                                           mirror,
+                                           checkpoints,
+                                           clock,
+                                           hcb::SyncBackoffPolicy({.baseDelayMilliseconds = 0,
+                                                                   .maximumDelayMilliseconds = 0,
+                                                                   .jitterMilliseconds = 0,
+                                                                   .maximumAttempts = 2}));
 
   std::future<hcb::GoogleTaskMirrorSyncResultOrError> first =
       service.sync(QStringLiteral("google"), QStringLiteral("access-token"));
@@ -192,10 +189,10 @@ void GoogleMirrorSyncServiceTest::tasksUsePersistedOverlapWatermark() {
   QCOMPARE(deltaQuery.queryItemValue(QStringLiteral("showDeleted")), QStringLiteral("true"));
   QCOMPARE(deltaQuery.queryItemValue(QStringLiteral("showHidden")), QStringLiteral("true"));
 
-  std::future<hcb::SyncCheckpointLookupResult> checkpoint = checkpoints.find(
-      {.accountId = QStringLiteral("google"),
-       .resourceType = hcb::SyncCheckpointResourceType::TaskListWatermark,
-       .resourceId = QStringLiteral("list-1")});
+  std::future<hcb::SyncCheckpointLookupResult> checkpoint =
+      checkpoints.find({.accountId = QStringLiteral("google"),
+                        .resourceType = hcb::SyncCheckpointResourceType::TaskListWatermark,
+                        .resourceId = QStringLiteral("list-1")});
   const hcb::SyncCheckpointLookupResult checkpointResult = await(checkpoint);
   QVERIFY(std::holds_alternative<std::optional<hcb::SyncCheckpoint>>(checkpointResult));
   QCOMPARE(std::get<std::optional<hcb::SyncCheckpoint>>(checkpointResult)->syncToken,
@@ -308,17 +305,21 @@ void GoogleMirrorSyncServiceTest::calendarReusesTokensAndRecoversInvalidEventTok
   verifyReady(calendarRead.ready());
 
   hcb::test::MockNetworkAccessManager manager;
-  manager.enqueue({.body = QByteArray(
-      "{\"nextSyncToken\":\"calendar-list-token-1\",\"items\":[{\"id\":\"primary\","
-      "\"summary\":\"Primary\",\"accessRole\":\"owner\",\"selected\":true,"
-      "\"primary\":true}]}")});
-  manager.enqueue({.body = QByteArray(
-      "{\"nextSyncToken\":\"event-token-1\",\"items\":[{\"id\":\"event-1\","
-      "\"status\":\"confirmed\",\"summary\":\"Planning\",\"start\":{\"dateTime\":"
-      "\"2026-07-26T09:00:00Z\"},\"end\":{\"dateTime\":\"2026-07-26T10:00:00Z\"}}]}")});
-  manager.enqueue({.body = QByteArray("{\"nextSyncToken\":\"calendar-list-token-2\",\"items\":[]}")});
+  manager.enqueue(
+      {.body =
+           QByteArray("{\"nextSyncToken\":\"calendar-list-token-1\",\"items\":[{\"id\":\"primary\","
+                      "\"summary\":\"Primary\",\"accessRole\":\"owner\",\"selected\":true,"
+                      "\"primary\":true}]}")});
+  manager.enqueue(
+      {.body = QByteArray(
+           "{\"nextSyncToken\":\"event-token-1\",\"items\":[{\"id\":\"event-1\","
+           "\"status\":\"confirmed\",\"summary\":\"Planning\",\"start\":{\"dateTime\":"
+           "\"2026-07-26T09:00:00Z\"},\"end\":{\"dateTime\":\"2026-07-26T10:00:00Z\"}}]}")});
+  manager.enqueue(
+      {.body = QByteArray("{\"nextSyncToken\":\"calendar-list-token-2\",\"items\":[]}")});
   manager.enqueue({.body = QByteArray("{\"nextSyncToken\":\"event-token-2\",\"items\":[]}")});
-  manager.enqueue({.body = QByteArray("{\"nextSyncToken\":\"calendar-list-token-3\",\"items\":[]}")});
+  manager.enqueue(
+      {.body = QByteArray("{\"nextSyncToken\":\"calendar-list-token-3\",\"items\":[]}")});
   manager.enqueue({.status = 410, .body = QByteArray("{\"error\":{\"message\":\"gone\"}}")});
   manager.enqueue({.body = QByteArray("{\"nextSyncToken\":\"event-token-resync\",\"items\":[]}")});
   hcb::GoogleHttpClient http(nullptr, &manager);
@@ -365,35 +366,34 @@ void GoogleMirrorSyncServiceTest::calendarReusesTokensAndRecoversInvalidEventTok
   QCOMPARE(std::get<hcb::GoogleCalendarMirrorSyncResult>(thirdResult).fullReconciledCalendarCount,
            1);
   QCOMPARE(manager.requests().size(), 7);
-  QCOMPARE(QUrlQuery(manager.requests().at(2).request.url()).queryItemValue(
-               QStringLiteral("syncToken")),
-           QStringLiteral("calendar-list-token-1"));
-  QCOMPARE(QUrlQuery(manager.requests().at(3).request.url()).queryItemValue(
-               QStringLiteral("syncToken")),
-           QStringLiteral("event-token-1"));
-  QCOMPARE(QUrlQuery(manager.requests().at(4).request.url()).queryItemValue(
-               QStringLiteral("syncToken")),
-           QStringLiteral("calendar-list-token-2"));
-  QCOMPARE(QUrlQuery(manager.requests().at(5).request.url()).queryItemValue(
-               QStringLiteral("syncToken")),
-           QStringLiteral("event-token-2"));
-  QVERIFY(!QUrlQuery(manager.requests().at(6).request.url()).hasQueryItem(
-      QStringLiteral("syncToken")));
-  QCOMPARE(count(handle, "SELECT COUNT(*) FROM local_calendar_events WHERE deleted_at IS NULL"),
-           1);
+  QCOMPARE(
+      QUrlQuery(manager.requests().at(2).request.url()).queryItemValue(QStringLiteral("syncToken")),
+      QStringLiteral("calendar-list-token-1"));
+  QCOMPARE(
+      QUrlQuery(manager.requests().at(3).request.url()).queryItemValue(QStringLiteral("syncToken")),
+      QStringLiteral("event-token-1"));
+  QCOMPARE(
+      QUrlQuery(manager.requests().at(4).request.url()).queryItemValue(QStringLiteral("syncToken")),
+      QStringLiteral("calendar-list-token-2"));
+  QCOMPARE(
+      QUrlQuery(manager.requests().at(5).request.url()).queryItemValue(QStringLiteral("syncToken")),
+      QStringLiteral("event-token-2"));
+  QVERIFY(
+      !QUrlQuery(manager.requests().at(6).request.url()).hasQueryItem(QStringLiteral("syncToken")));
+  QCOMPARE(count(handle, "SELECT COUNT(*) FROM local_calendar_events WHERE deleted_at IS NULL"), 1);
 
-  std::future<hcb::SyncCheckpointLookupResult> listCheckpoint = checkpoints.find(
-      {.accountId = QStringLiteral("google"),
-       .resourceType = hcb::SyncCheckpointResourceType::CalendarList,
-       .resourceId = QStringLiteral("calendar-list")});
+  std::future<hcb::SyncCheckpointLookupResult> listCheckpoint =
+      checkpoints.find({.accountId = QStringLiteral("google"),
+                        .resourceType = hcb::SyncCheckpointResourceType::CalendarList,
+                        .resourceId = QStringLiteral("calendar-list")});
   const hcb::SyncCheckpointLookupResult listCheckpointResult = await(listCheckpoint);
   QVERIFY(std::holds_alternative<std::optional<hcb::SyncCheckpoint>>(listCheckpointResult));
   QCOMPARE(std::get<std::optional<hcb::SyncCheckpoint>>(listCheckpointResult)->syncToken,
            QStringLiteral("calendar-list-token-3"));
-  std::future<hcb::SyncCheckpointLookupResult> eventCheckpoint = checkpoints.find(
-      {.accountId = QStringLiteral("google"),
-       .resourceType = hcb::SyncCheckpointResourceType::CalendarEvent,
-       .resourceId = QStringLiteral("primary")});
+  std::future<hcb::SyncCheckpointLookupResult> eventCheckpoint =
+      checkpoints.find({.accountId = QStringLiteral("google"),
+                        .resourceType = hcb::SyncCheckpointResourceType::CalendarEvent,
+                        .resourceId = QStringLiteral("primary")});
   const hcb::SyncCheckpointLookupResult eventCheckpointResult = await(eventCheckpoint);
   QVERIFY(std::holds_alternative<std::optional<hcb::SyncCheckpoint>>(eventCheckpointResult));
   QCOMPARE(std::get<std::optional<hcb::SyncCheckpoint>>(eventCheckpointResult)->syncToken,

@@ -106,6 +106,8 @@ class TaskList:
     remote_id: str | None = None
     position: int = 0
     metadata: Metadata = field(default_factory=Metadata)
+    # This is an HCB-local visibility preference. Google Tasks has no equivalent field.
+    selected: bool = True
 
 
 @dataclass(frozen=True, slots=True)

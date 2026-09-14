@@ -20,7 +20,7 @@ change the installed CLI package.
 | --- | --- | --- | --- |
 | [`macos/`](macos/) | `cc1e7f01abdf0e8bf0d42e3bcbc0d8fce51df5eb` | `apps/apple/` Xcode project, Swift source, tests, and source assets | The project defines a macOS app, macOS tests, and a share extension with macOS 14 deployment target. No iOS/iPadOS target was found in this commit. Xcode build and runtime behavior cannot be verified on Fedora. |
 | [`electron/`](electron/) | `6a98dc8dadba0775f9e09056d6595661b7f06a50` | React renderer, platform adapters, package/build configuration | The original package declared Electron 33, React 18, Node 20+, and Linux/macOS/Windows adapters. This review snapshot omits the old main-process backend, preload, dependency lockfile, and release scripts, so it is not a standalone build. |
-| [`qt/`](qt/) | `24dde3d9bb6b6c956a03634c6de3c0356e3d83d9` | CMake project, native C++/QML source, tests, benchmarks, and source brand assets | CMake configures and the app builds on Fedora with Qt 6.10.3 and SQLite 3.50.2 in system-dependency mode. The repaired timeline test and full-font offscreen smoke pass. A read-only Python-bridge client is tested but not wired into the historical controller; installed-package and current-core integration checks remain open. |
+| [`qt/`](qt/) | `24dde3d9bb6b6c956a03634c6de3c0356e3d83d9` | CMake project, native C++/QML source, tests, benchmarks, and source brand assets | CMake configures and the app builds on Fedora with Qt 6.10.3 and SQLite 3.50.2 in system-dependency mode. Bridge mode uses the Python core for bounded reads, task/event/list/calendar mutations, and queued calendar subscriptions. Focused tests and synthetic restart acceptance pass; installed-package and user-visible OAuth checks remain open. |
 
 The source commits are the parents of the changes that removed each frontend:
 `e4f6318ae` (Apple), `90f34603b` (Electron), and `35604ba0d` (Qt).
@@ -153,9 +153,9 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/hcb-qt-tests \
   -R '^hcb_(calendar_layout_engine|month_grid_model|timeline_model|task_model|task_tree_view|local_search_service|qml)_tests$'
 ```
 
-No port has passed a current-core integration, OAuth callback, accessibility,
-large-account, or installed-package test. Choose a production frontend only
-after those prototypes and platform measurements.
+No port has passed a user-visible OAuth callback, accessibility, large-account,
+or installed-package test. Choose a production frontend only after those
+prototypes and platform measurements.
 
 ## Fedora bridge and repair verification, 2026-09-14
 
@@ -171,16 +171,14 @@ full-host-font environment and a clean CMake build at `/tmp/hcb-qt-tests`.
   inventory in 6.41 seconds. A clean direct offscreen launch with
   `HCB_BENCHMARK_EXIT_AFTER_LOAD=1` exited zero in 2.79 seconds at 144,052 KiB
   maximum RSS. These observations are Fedora-specific and do not establish
-  packaged-app or current-core behavior.
+  packaged-app behavior.
 - **Python bridge client:** `src/core/PythonBridgeClient` validates an owner-only
   loopback descriptor and supports asynchronous workspace-summary, task-page,
-  and date-bounded-event reads with a timeout and cancellation. Its eight Qt
-  tests cover descriptor privacy, endpoint/token validation, request shape,
-  error handling, and invalid inputs. `PythonBridgeProjection` has five more
-  tests that map v1 JSON into existing task-list, calendar, task, and event
-  model records while rejecting cross-account or malformed data. Both are
-  intentionally unconnected to `AppController`, so they cannot mix the
-  historical Qt SQLite/Google state with the Python-owned HCB account.
+  date-bounded-event, task-list, calendar, and subscription operations with a
+  timeout and cancellation. `AppController` uses only those bridge operations
+  in bridge mode, so it does not open the historical Qt SQLite database or
+  Google transport for the selected Python-owned account. Focused C++ and QML
+  tests reject malformed/cross-account data and cover the enabled UI routes.
 
 Focused follow-up command:
 

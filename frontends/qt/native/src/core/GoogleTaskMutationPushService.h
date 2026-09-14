@@ -32,10 +32,10 @@ public:
                                 GoogleHttpClient& httpClient,
                                 const Clock& clock,
                                 SyncBackoffPolicy backoffPolicy,
-                                 TaskMutationService* taskMutationService = nullptr,
-                                 TaskListMutationService* taskListMutationService = nullptr,
-                                 GoogleSyncConflictResolver* conflictResolver = nullptr,
-                                 MutationTelemetryStore* mutationTelemetryStore = nullptr);
+                                TaskMutationService* taskMutationService = nullptr,
+                                TaskListMutationService* taskListMutationService = nullptr,
+                                GoogleSyncConflictResolver* conflictResolver = nullptr,
+                                MutationTelemetryStore* mutationTelemetryStore = nullptr);
 
   [[nodiscard]] std::future<GoogleTaskMutationPushResultOrError> pushDue(QString accessToken,
                                                                          int limit = 25);

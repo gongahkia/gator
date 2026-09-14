@@ -56,8 +56,8 @@ public:
   subscribe(GoogleCalendarSubscribeRequest request, QString accessToken);
   [[nodiscard]] std::future<GoogleCalendarManagementResultOrError>
   update(GoogleCalendarUpdateRequest request, QString accessToken);
-  [[nodiscard]] std::future<GoogleCalendarManagementResultOrError>
-  remove(QString calendarId, QString accessToken);
+  [[nodiscard]] std::future<GoogleCalendarManagementResultOrError> remove(QString calendarId,
+                                                                          QString accessToken);
   [[nodiscard]] std::future<GoogleCalendarManagementResultOrError>
   updateListEntry(GoogleCalendarListUpdateRequest request, QString accessToken);
   [[nodiscard]] std::future<GoogleCalendarManagementResultOrError>

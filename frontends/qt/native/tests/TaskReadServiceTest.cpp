@@ -136,8 +136,7 @@ void TaskReadServiceTest::readsVisibleTasksWithoutAccountFilter() {
   QCOMPARE(tasks.at(0).notes, std::optional<QString>(QStringLiteral("Visible body")));
   QVERIFY(!tasks.at(0).managedRecurrence);
   QCOMPARE(tasks.at(0).recurrenceSeriesId, QStringLiteral("b5c71e7f-2cf6-4f49-9bcd-d46c56574492"));
-  QCOMPARE(tasks.at(0).recurrenceFrequency,
-           static_cast<int>(hcb::TaskRecurrenceFrequency::Daily));
+  QCOMPARE(tasks.at(0).recurrenceFrequency, static_cast<int>(hcb::TaskRecurrenceFrequency::Daily));
   QCOMPARE(tasks.at(0).recurrenceInterval, 1);
   QCOMPARE(tasks.at(0).recurrenceEndKind, static_cast<int>(hcb::TaskRecurrenceEndKind::Never));
   QCOMPARE(tasks.at(0).recurrenceDiagnostic,

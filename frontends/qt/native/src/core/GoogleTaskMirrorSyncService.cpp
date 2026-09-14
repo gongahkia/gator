@@ -100,15 +100,15 @@ template <typename Result, typename Pull>
 }
 
 [[nodiscard]] bool requiresFullReconciliation(const std::optional<SyncCheckpoint>& checkpoint,
-                                               const Clock& clock) {
+                                              const Clock& clock) {
   if (!checkpoint.has_value()) {
     return true;
   }
   const std::optional<QDateTime> previous = parseTimestamp(checkpoint->lastSuccessfulSyncAt);
-  return !previous.has_value() || previous->msecsTo(clockDateTime(clock)) >
-                                     std::chrono::duration_cast<std::chrono::milliseconds>(
-                                         kTaskFullReconciliationInterval)
-                                         .count();
+  return !previous.has_value() ||
+         previous->msecsTo(clockDateTime(clock)) >
+             std::chrono::duration_cast<std::chrono::milliseconds>(kTaskFullReconciliationInterval)
+                 .count();
 }
 
 [[nodiscard]] QString nextWatermark(const std::optional<QString>& serverDate,
@@ -118,148 +118,145 @@ template <typename Result, typename Pull>
       serverDate.has_value() ? parseTimestamp(*serverDate) : std::optional<QDateTime>{};
   const QDateTime candidate =
       parsed.value_or(clockDateTime(clock))
-          .addMSecs(-std::chrono::duration_cast<std::chrono::milliseconds>(kTaskWatermarkOverlap)
-                        .count())
+          .addMSecs(
+              -std::chrono::duration_cast<std::chrono::milliseconds>(kTaskWatermarkOverlap).count())
           .toUTC();
   const std::optional<QDateTime> prior =
       previous.has_value() ? parseTimestamp(previous->syncToken) : std::optional<QDateTime>{};
   return prior.has_value() && *prior > candidate ? prior->toString(Qt::ISODateWithMs)
-                                                   : candidate.toString(Qt::ISODateWithMs);
+                                                 : candidate.toString(Qt::ISODateWithMs);
 }
 
 } // namespace
 
-GoogleTaskMirrorSyncService::GoogleTaskMirrorSyncService(
-    GoogleTaskListPullClient& taskListClient,
-    GoogleTaskPullClient& taskClient,
-    GoogleMirrorStore& mirrorStore,
-    SyncCheckpointStore& checkpointStore,
-    const Clock& clock,
-    TaskMutationService* taskMutationService)
-    : GoogleTaskMirrorSyncService(
-          taskListClient,
-          taskClient,
-          mirrorStore,
-          checkpointStore,
-          clock,
-          mirrorBackoffPolicy(),
-          taskMutationService) {}
+GoogleTaskMirrorSyncService::GoogleTaskMirrorSyncService(GoogleTaskListPullClient& taskListClient,
+                                                         GoogleTaskPullClient& taskClient,
+                                                         GoogleMirrorStore& mirrorStore,
+                                                         SyncCheckpointStore& checkpointStore,
+                                                         const Clock& clock,
+                                                         TaskMutationService* taskMutationService)
+    : GoogleTaskMirrorSyncService(taskListClient,
+                                  taskClient,
+                                  mirrorStore,
+                                  checkpointStore,
+                                  clock,
+                                  mirrorBackoffPolicy(),
+                                  taskMutationService) {}
 
-GoogleTaskMirrorSyncService::GoogleTaskMirrorSyncService(
-    GoogleTaskListPullClient& taskListClient,
-    GoogleTaskPullClient& taskClient,
-    GoogleMirrorStore& mirrorStore,
-    SyncCheckpointStore& checkpointStore,
-    const Clock& clock,
-    SyncBackoffPolicy backoffPolicy,
-    TaskMutationService* taskMutationService)
+GoogleTaskMirrorSyncService::GoogleTaskMirrorSyncService(GoogleTaskListPullClient& taskListClient,
+                                                         GoogleTaskPullClient& taskClient,
+                                                         GoogleMirrorStore& mirrorStore,
+                                                         SyncCheckpointStore& checkpointStore,
+                                                         const Clock& clock,
+                                                         SyncBackoffPolicy backoffPolicy,
+                                                         TaskMutationService* taskMutationService)
     : taskListClient_(taskListClient), taskClient_(taskClient), mirrorStore_(mirrorStore),
       checkpointStore_(checkpointStore), clock_(clock), backoffPolicy_(std::move(backoffPolicy)),
       taskMutationService_(taskMutationService) {}
 
-std::future<GoogleTaskMirrorSyncResultOrError>
-GoogleTaskMirrorSyncService::sync(QString accountId,
-                                  QString accessToken,
-                                  CancellationToken cancellation) {
-  return std::async(std::launch::async,
-                    [this,
-                     accountId = std::move(accountId),
-                     accessToken = std::move(accessToken),
-                     cancellation] {
-    if (!validIdentifier(accountId)) {
-      return GoogleTaskMirrorSyncResultOrError(
-          validationError(QStringLiteral("Google task sync account is invalid")));
-    }
-    if (cancellation.stop_requested()) {
-      return GoogleTaskMirrorSyncResultOrError(cancelledError());
-    }
-    GoogleTaskListPullResultOrError pulledLists = pullWithRetry<GoogleTaskListPullResultOrError>(
-        [&] { return taskListClient_.list(accessToken).get(); }, backoffPolicy_, cancellation);
-    if (cancellation.stop_requested()) {
-      return GoogleTaskMirrorSyncResultOrError(cancelledError());
-    }
-    if (std::holds_alternative<GoogleApiError>(pulledLists)) {
-      return GoogleTaskMirrorSyncResultOrError(std::get<GoogleApiError>(std::move(pulledLists)));
-    }
-    GoogleTaskListPullResult taskLists = std::get<GoogleTaskListPullResult>(std::move(pulledLists));
-    GoogleMirrorWriteResult listWrite =
-        mirrorStore_.mergeTaskLists(accountId, taskLists.taskLists, true).get();
-    if (std::holds_alternative<AppError>(listWrite)) {
-      return GoogleTaskMirrorSyncResultOrError(std::get<AppError>(std::move(listWrite)));
-    }
-    const QJsonObject requestMetadata = taskRequestMetadata();
-    GoogleTaskMirrorSyncResult result{
-        .taskListCount = static_cast<std::int64_t>(taskLists.taskLists.size())};
-    for (const GoogleTaskListMirror& taskList : taskLists.taskLists) {
-      if (cancellation.stop_requested()) {
-        return GoogleTaskMirrorSyncResultOrError(cancelledError());
-      }
-      const SyncCheckpointKey checkpointKey{.accountId = accountId,
-                                            .resourceType =
-                                                SyncCheckpointResourceType::TaskListWatermark,
-                                            .resourceId = taskList.id};
-      SyncCheckpointLookupResult storedCheckpoint = checkpointStore_.find(checkpointKey).get();
-      if (std::holds_alternative<AppError>(storedCheckpoint)) {
-        return GoogleTaskMirrorSyncResultOrError(
-            std::get<AppError>(std::move(storedCheckpoint)));
-      }
-      const std::optional<SyncCheckpoint> checkpoint =
-          std::get<std::optional<SyncCheckpoint>>(std::move(storedCheckpoint));
-      const bool fullReconciliation = requiresFullReconciliation(checkpoint, clock_) ||
-                                      checkpoint->metadata != requestMetadata;
-      GoogleTaskPullResultOrError pulledTasks = pullWithRetry<GoogleTaskPullResultOrError>(
-          [&] {
-            return taskClient_
-                .list({.taskListId = taskList.id,
-                       .updatedMin = fullReconciliation
-                                         ? std::optional<QString>{}
-                                         : std::optional<QString>(checkpoint->syncToken),
-                       .showCompleted = true},
-                      accessToken)
-                .get();
-          },
-          backoffPolicy_,
-          cancellation);
-      if (cancellation.stop_requested()) {
-        return GoogleTaskMirrorSyncResultOrError(cancelledError());
-      }
-      if (std::holds_alternative<GoogleApiError>(pulledTasks)) {
-        return GoogleTaskMirrorSyncResultOrError(
-            std::get<GoogleApiError>(std::move(pulledTasks)));
-      }
-      GoogleTaskPullResult taskPage = std::get<GoogleTaskPullResult>(std::move(pulledTasks));
-      GoogleMirrorWriteResult taskWrite =
-          mirrorStore_
-              .mergeTasks(accountId, taskList.id, taskPage.tasks, fullReconciliation)
-              .get();
-      if (std::holds_alternative<AppError>(taskWrite)) {
-        return GoogleTaskMirrorSyncResultOrError(std::get<AppError>(std::move(taskWrite)));
-      }
-      if (taskMutationService_ != nullptr) {
-        TaskRecurrenceReconciliationResult recurrenceResult =
-            taskMutationService_->reconcileManagedRecurrences(accountId, taskList.id).get();
-        if (std::holds_alternative<AppError>(recurrenceResult)) {
+std::future<GoogleTaskMirrorSyncResultOrError> GoogleTaskMirrorSyncService::sync(
+    QString accountId, QString accessToken, CancellationToken cancellation) {
+  return std::async(
+      std::launch::async,
+      [this, accountId = std::move(accountId), accessToken = std::move(accessToken), cancellation] {
+        if (!validIdentifier(accountId)) {
           return GoogleTaskMirrorSyncResultOrError(
-              std::get<AppError>(std::move(recurrenceResult)));
+              validationError(QStringLiteral("Google task sync account is invalid")));
         }
-        const TaskRecurrenceReconciliation reconciliation =
-            std::get<TaskRecurrenceReconciliation>(std::move(recurrenceResult));
-        result.generatedRecurringTaskCount += reconciliation.createdSuccessorCount;
-        result.removedRecurringTaskDuplicateCount += reconciliation.removedDuplicateCount;
-        result.divergentRecurringTaskDuplicateGroupCount +=
-            reconciliation.divergentDuplicateGroupCount;
-      }
-      const QString watermark = nextWatermark(taskPage.serverDate, checkpoint, clock_);
-      SyncCheckpointSaveResult saved =
-          checkpointStore_.save(checkpointKey, watermark, requestMetadata).get();
-      if (std::holds_alternative<AppError>(saved)) {
-        return GoogleTaskMirrorSyncResultOrError(std::get<AppError>(std::move(saved)));
-      }
-      result.taskCount += static_cast<std::int64_t>(taskPage.tasks.size());
-      result.fullReconciledListCount += fullReconciliation ? 1 : 0;
-    }
-    return GoogleTaskMirrorSyncResultOrError(result);
-  });
+        if (cancellation.stop_requested()) {
+          return GoogleTaskMirrorSyncResultOrError(cancelledError());
+        }
+        GoogleTaskListPullResultOrError pulledLists =
+            pullWithRetry<GoogleTaskListPullResultOrError>(
+                [&] { return taskListClient_.list(accessToken).get(); },
+                backoffPolicy_,
+                cancellation);
+        if (cancellation.stop_requested()) {
+          return GoogleTaskMirrorSyncResultOrError(cancelledError());
+        }
+        if (std::holds_alternative<GoogleApiError>(pulledLists)) {
+          return GoogleTaskMirrorSyncResultOrError(
+              std::get<GoogleApiError>(std::move(pulledLists)));
+        }
+        GoogleTaskListPullResult taskLists =
+            std::get<GoogleTaskListPullResult>(std::move(pulledLists));
+        GoogleMirrorWriteResult listWrite =
+            mirrorStore_.mergeTaskLists(accountId, taskLists.taskLists, true).get();
+        if (std::holds_alternative<AppError>(listWrite)) {
+          return GoogleTaskMirrorSyncResultOrError(std::get<AppError>(std::move(listWrite)));
+        }
+        const QJsonObject requestMetadata = taskRequestMetadata();
+        GoogleTaskMirrorSyncResult result{
+            .taskListCount = static_cast<std::int64_t>(taskLists.taskLists.size())};
+        for (const GoogleTaskListMirror& taskList : taskLists.taskLists) {
+          if (cancellation.stop_requested()) {
+            return GoogleTaskMirrorSyncResultOrError(cancelledError());
+          }
+          const SyncCheckpointKey checkpointKey{.accountId = accountId,
+                                                .resourceType =
+                                                    SyncCheckpointResourceType::TaskListWatermark,
+                                                .resourceId = taskList.id};
+          SyncCheckpointLookupResult storedCheckpoint = checkpointStore_.find(checkpointKey).get();
+          if (std::holds_alternative<AppError>(storedCheckpoint)) {
+            return GoogleTaskMirrorSyncResultOrError(
+                std::get<AppError>(std::move(storedCheckpoint)));
+          }
+          const std::optional<SyncCheckpoint> checkpoint =
+              std::get<std::optional<SyncCheckpoint>>(std::move(storedCheckpoint));
+          const bool fullReconciliation = requiresFullReconciliation(checkpoint, clock_) ||
+                                          checkpoint->metadata != requestMetadata;
+          GoogleTaskPullResultOrError pulledTasks = pullWithRetry<GoogleTaskPullResultOrError>(
+              [&] {
+                return taskClient_
+                    .list({.taskListId = taskList.id,
+                           .updatedMin = fullReconciliation
+                                             ? std::optional<QString>{}
+                                             : std::optional<QString>(checkpoint->syncToken),
+                           .showCompleted = true},
+                          accessToken)
+                    .get();
+              },
+              backoffPolicy_,
+              cancellation);
+          if (cancellation.stop_requested()) {
+            return GoogleTaskMirrorSyncResultOrError(cancelledError());
+          }
+          if (std::holds_alternative<GoogleApiError>(pulledTasks)) {
+            return GoogleTaskMirrorSyncResultOrError(
+                std::get<GoogleApiError>(std::move(pulledTasks)));
+          }
+          GoogleTaskPullResult taskPage = std::get<GoogleTaskPullResult>(std::move(pulledTasks));
+          GoogleMirrorWriteResult taskWrite =
+              mirrorStore_.mergeTasks(accountId, taskList.id, taskPage.tasks, fullReconciliation)
+                  .get();
+          if (std::holds_alternative<AppError>(taskWrite)) {
+            return GoogleTaskMirrorSyncResultOrError(std::get<AppError>(std::move(taskWrite)));
+          }
+          if (taskMutationService_ != nullptr) {
+            TaskRecurrenceReconciliationResult recurrenceResult =
+                taskMutationService_->reconcileManagedRecurrences(accountId, taskList.id).get();
+            if (std::holds_alternative<AppError>(recurrenceResult)) {
+              return GoogleTaskMirrorSyncResultOrError(
+                  std::get<AppError>(std::move(recurrenceResult)));
+            }
+            const TaskRecurrenceReconciliation reconciliation =
+                std::get<TaskRecurrenceReconciliation>(std::move(recurrenceResult));
+            result.generatedRecurringTaskCount += reconciliation.createdSuccessorCount;
+            result.removedRecurringTaskDuplicateCount += reconciliation.removedDuplicateCount;
+            result.divergentRecurringTaskDuplicateGroupCount +=
+                reconciliation.divergentDuplicateGroupCount;
+          }
+          const QString watermark = nextWatermark(taskPage.serverDate, checkpoint, clock_);
+          SyncCheckpointSaveResult saved =
+              checkpointStore_.save(checkpointKey, watermark, requestMetadata).get();
+          if (std::holds_alternative<AppError>(saved)) {
+            return GoogleTaskMirrorSyncResultOrError(std::get<AppError>(std::move(saved)));
+          }
+          result.taskCount += static_cast<std::int64_t>(taskPage.tasks.size());
+          result.fullReconciledListCount += fullReconciliation ? 1 : 0;
+        }
+        return GoogleTaskMirrorSyncResultOrError(result);
+      });
 }
 
 } // namespace hcb

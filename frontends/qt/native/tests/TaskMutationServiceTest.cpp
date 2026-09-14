@@ -267,9 +267,8 @@ LIMIT 1
   return finalizeResult == SQLITE_OK ? successor : std::nullopt;
 }
 
-[[nodiscard]] hcb::TaskRecurrenceMarker recurrenceMarker(const QString& seriesId,
-                                                          std::int32_t ordinal,
-                                                          std::int32_t count = 5) {
+[[nodiscard]] hcb::TaskRecurrenceMarker
+recurrenceMarker(const QString& seriesId, std::int32_t ordinal, std::int32_t count = 5) {
   const QString dueDate =
       QDate(2026, 7, 26).addDays(static_cast<qint64>(ordinal) * 7).toString(Qt::ISODate);
   return {.seriesId = seriesId,
@@ -303,8 +302,7 @@ void insertManagedTask(sqlite3* handle,
       "INSERT INTO local_tasks (id, task_list_id, remote_id, title, notes, state, due_at, "
       "due_time_zone, priority, etag, updated_at) VALUES ('" +
       taskId.toUtf8() + "', 'list-active', '" + remoteId.toUtf8() + "', '" + title.toUtf8() +
-      "', '" + escapedNotes + "', '" + state.toUtf8() + "', '" +
-      marker.templateDueDate.toUtf8() +
+      "', '" + escapedNotes + "', '" + state.toUtf8() + "', '" + marker.templateDueDate.toUtf8() +
       "T00:00:00.000Z', 'Asia/Singapore', 'medium', 'etag-" + remoteId.toUtf8() +
       "', '2026-07-25T00:00:00Z')";
   execute(handle, sql.constData());
@@ -618,7 +616,8 @@ void TaskMutationServiceTest::preservesManagedRecurrenceAcrossOrdinaryEdits() {
   QCOMPARE(reconfiguredNotes.marker->frequency, hcb::TaskRecurrenceFrequency::Monthly);
   QCOMPARE(reconfiguredNotes.marker->interval, 2);
   QCOMPARE(reconfiguredNotes.marker->end.kind, hcb::TaskRecurrenceEndKind::Until);
-  QCOMPARE(reconfiguredNotes.marker->end.untilDate, std::optional<QString>(QStringLiteral("2027-08-02")));
+  QCOMPARE(reconfiguredNotes.marker->end.untilDate,
+           std::optional<QString>(QStringLiteral("2027-08-02")));
 }
 
 void TaskMutationServiceTest::completesManagedRecurrenceAtomicallyAndIdempotently() {
@@ -692,8 +691,7 @@ void TaskMutationServiceTest::completesManagedRecurrenceAtomicallyAndIdempotentl
   QCOMPARE(successor->priority, QStringLiteral("high"));
   QCOMPARE(successor->dueAt, std::optional<QString>(QStringLiteral("2026-08-02T00:00:00.000Z")));
   QCOMPARE(successor->dueTimeZone, std::optional<QString>(QStringLiteral("Asia/Singapore")));
-  const hcb::TaskRecurrenceNotes successorNotes =
-      hcb::parseTaskRecurrenceNotes(*successor->notes);
+  const hcb::TaskRecurrenceNotes successorNotes = hcb::parseTaskRecurrenceNotes(*successor->notes);
   QCOMPARE(successorNotes.state, hcb::TaskRecurrenceNotesState::Managed);
   QVERIFY(successorNotes.marker.has_value());
   if (!successorNotes.marker.has_value()) {
@@ -745,11 +743,17 @@ void TaskMutationServiceTest::stopsAndSplitsManagedRecurrenceSeries() {
   QVERIFY(handle != nullptr);
 
   const QString stoppedSeries = QStringLiteral("b5c71e7f-2cf6-4f49-9bcd-d46c56574492");
-  insertManagedTask(handle, QStringLiteral("stop-0"), QStringLiteral("remote-stop-0"),
+  insertManagedTask(handle,
+                    QStringLiteral("stop-0"),
+                    QStringLiteral("remote-stop-0"),
                     recurrenceMarker(stoppedSeries, 0));
-  insertManagedTask(handle, QStringLiteral("stop-1"), QStringLiteral("remote-stop-1"),
+  insertManagedTask(handle,
+                    QStringLiteral("stop-1"),
+                    QStringLiteral("remote-stop-1"),
                     recurrenceMarker(stoppedSeries, 1));
-  insertManagedTask(handle, QStringLiteral("stop-2"), QStringLiteral("remote-stop-2"),
+  insertManagedTask(handle,
+                    QStringLiteral("stop-2"),
+                    QStringLiteral("remote-stop-2"),
                     recurrenceMarker(stoppedSeries, 2));
   std::future<hcb::TaskMutationResult> stop = service.stopManagedRecurrence(
       QStringLiteral("stop-1"), hcb::TaskRecurrenceScope::ThisAndFollowing);
@@ -760,9 +764,9 @@ void TaskMutationServiceTest::stopsAndSplitsManagedRecurrenceSeries() {
   QVERIFY(stoppedPrevious.has_value());
   QVERIFY(stoppedCurrent.has_value());
   QVERIFY(stoppedFollowing.has_value());
-  if (!stoppedPrevious.has_value() || !stoppedCurrent.has_value() || !stoppedFollowing.has_value() ||
-      !stoppedPrevious->notes.has_value() || !stoppedCurrent->notes.has_value() ||
-      !stoppedFollowing->notes.has_value()) {
+  if (!stoppedPrevious.has_value() || !stoppedCurrent.has_value() ||
+      !stoppedFollowing.has_value() || !stoppedPrevious->notes.has_value() ||
+      !stoppedCurrent->notes.has_value() || !stoppedFollowing->notes.has_value()) {
     return;
   }
   QCOMPARE(hcb::parseTaskRecurrenceNotes(*stoppedPrevious->notes).state,
@@ -810,11 +814,17 @@ void TaskMutationServiceTest::stopsAndSplitsManagedRecurrenceSeries() {
   QCOMPARE(continuingNotes.marker->ordinal, 1);
 
   const QString splitSeries = QStringLiteral("d0c6c909-18a8-4d00-86e0-6d38a5497654");
-  insertManagedTask(handle, QStringLiteral("split-1"), QStringLiteral("remote-split-1"),
+  insertManagedTask(handle,
+                    QStringLiteral("split-1"),
+                    QStringLiteral("remote-split-1"),
                     recurrenceMarker(splitSeries, 1));
-  insertManagedTask(handle, QStringLiteral("split-2"), QStringLiteral("remote-split-2"),
+  insertManagedTask(handle,
+                    QStringLiteral("split-2"),
+                    QStringLiteral("remote-split-2"),
                     recurrenceMarker(splitSeries, 2));
-  insertManagedTask(handle, QStringLiteral("split-3"), QStringLiteral("remote-split-3"),
+  insertManagedTask(handle,
+                    QStringLiteral("split-3"),
+                    QStringLiteral("remote-split-3"),
                     recurrenceMarker(splitSeries, 3));
   std::future<hcb::TaskMutationResult> split =
       service.splitManagedRecurrence(QStringLiteral("split-2"));
@@ -906,20 +916,20 @@ void TaskMutationServiceTest::rejectsUnsafeManagedRecurrenceMutations() {
       {.taskId = QStringLiteral("normal-recurrence"),
        .parentTaskId = std::optional<QString>(QStringLiteral("assigned-recurrence"))});
   QVERIFY(std::holds_alternative<hcb::AppError>(awaitResult(makeSubtask)));
-  std::future<hcb::TaskMutationResult> child = service.create(
-      {.taskListId = QStringLiteral("list-active"),
-       .parentTaskId = QStringLiteral("normal-recurrence"),
-       .title = QStringLiteral("Not allowed")});
+  std::future<hcb::TaskMutationResult> child =
+      service.create({.taskListId = QStringLiteral("list-active"),
+                      .parentTaskId = QStringLiteral("normal-recurrence"),
+                      .title = QStringLiteral("Not allowed")});
   QVERIFY(std::holds_alternative<hcb::AppError>(awaitResult(child)));
 
   execute(handle,
           "INSERT INTO local_tasks (id, task_list_id, remote_id, title, state, is_assigned, "
           "updated_at) VALUES ('assigned-parent', 'list-active', 'remote-assigned-parent', "
           "'Assigned parent', 'active', 1, '2026-07-25T00:00:00Z')");
-  std::future<hcb::TaskMutationResult> assignedChild = service.create(
-      {.taskListId = QStringLiteral("list-active"),
-       .parentTaskId = QStringLiteral("assigned-parent"),
-       .title = QStringLiteral("Also not allowed")});
+  std::future<hcb::TaskMutationResult> assignedChild =
+      service.create({.taskListId = QStringLiteral("list-active"),
+                      .parentTaskId = QStringLiteral("assigned-parent"),
+                      .title = QStringLiteral("Also not allowed")});
   QVERIFY(std::holds_alternative<hcb::AppError>(awaitResult(assignedChild)));
 
   insertManagedTask(handle,
@@ -965,17 +975,29 @@ void TaskMutationServiceTest::reconcilesManagedRecurrenceDuplicatesAfterSync() {
                     QStringLiteral("Generated body"),
                     QStringLiteral("completed"));
   const QString duplicateSeries = QStringLiteral("25d58baa-03cf-49cc-aacb-3c4f521ff471");
-  insertManagedTask(handle, QStringLiteral("duplicate-a"), QStringLiteral("remote-duplicate-a"),
+  insertManagedTask(handle,
+                    QStringLiteral("duplicate-a"),
+                    QStringLiteral("remote-duplicate-a"),
                     recurrenceMarker(duplicateSeries, 0));
-  insertManagedTask(handle, QStringLiteral("duplicate-b"), QStringLiteral("remote-duplicate-b"),
+  insertManagedTask(handle,
+                    QStringLiteral("duplicate-b"),
+                    QStringLiteral("remote-duplicate-b"),
                     recurrenceMarker(duplicateSeries, 0));
   const QString divergentSeries = QStringLiteral("2e6ce198-d89c-4a6b-8f5b-e9c563b42d77");
-  insertManagedTask(handle, QStringLiteral("divergent-a"), QStringLiteral("remote-divergent-a"),
-                    recurrenceMarker(divergentSeries, 0), QStringLiteral("Version A"),
-                    QStringLiteral("Recurring body"), QStringLiteral("completed"));
-  insertManagedTask(handle, QStringLiteral("divergent-b"), QStringLiteral("remote-divergent-b"),
-                    recurrenceMarker(divergentSeries, 0), QStringLiteral("Version B"),
-                    QStringLiteral("Recurring body"), QStringLiteral("completed"));
+  insertManagedTask(handle,
+                    QStringLiteral("divergent-a"),
+                    QStringLiteral("remote-divergent-a"),
+                    recurrenceMarker(divergentSeries, 0),
+                    QStringLiteral("Version A"),
+                    QStringLiteral("Recurring body"),
+                    QStringLiteral("completed"));
+  insertManagedTask(handle,
+                    QStringLiteral("divergent-b"),
+                    QStringLiteral("remote-divergent-b"),
+                    recurrenceMarker(divergentSeries, 0),
+                    QStringLiteral("Version B"),
+                    QStringLiteral("Recurring body"),
+                    QStringLiteral("completed"));
   const QString adoptedSeries = QStringLiteral("301c384d-c1e9-4c4e-9ad7-f64e8aeb7a76");
   insertManagedTask(handle,
                     QStringLiteral("adopted-source"),
@@ -1020,11 +1042,11 @@ void TaskMutationServiceTest::reconcilesManagedRecurrenceDuplicatesAfterSync() {
   QVERIFY(!divergentA->deletedAt.has_value());
   QVERIFY(!divergentB->deletedAt.has_value());
   QCOMPARE(divergentA->recurrenceDiagnostic,
-           std::optional<QString>(
-               QStringLiteral("Managed recurrence has divergent duplicate occurrences in Google Tasks")));
+           std::optional<QString>(QStringLiteral(
+               "Managed recurrence has divergent duplicate occurrences in Google Tasks")));
   QCOMPARE(divergentB->recurrenceDiagnostic,
-           std::optional<QString>(
-               QStringLiteral("Managed recurrence has divergent duplicate occurrences in Google Tasks")));
+           std::optional<QString>(QStringLiteral(
+               "Managed recurrence has divergent duplicate occurrences in Google Tasks")));
   const std::optional<PendingMutationSnapshot> duplicateMutation =
       readPendingTaskMutation(handle, QStringLiteral("duplicate-b"));
   QVERIFY(duplicateMutation.has_value());
@@ -1035,13 +1057,9 @@ void TaskMutationServiceTest::reconcilesManagedRecurrenceDuplicatesAfterSync() {
   const std::optional<QString> generatedSuccessor =
       readRecurrenceSuccessor(handle, generatedSeries, generatedSeries + QStringLiteral(":0"));
   QVERIFY(generatedSuccessor.has_value());
-  QCOMPARE(readRecurrenceSuccessor(handle,
-                                   adoptedSeries,
-                                   adoptedSeries + QStringLiteral(":0")),
+  QCOMPARE(readRecurrenceSuccessor(handle, adoptedSeries, adoptedSeries + QStringLiteral(":0")),
            std::optional<QString>(QStringLiteral("adopted-successor")));
-  QVERIFY(!readRecurrenceSuccessor(handle,
-                                   divergentSeries,
-                                   divergentSeries + QStringLiteral(":0"))
+  QVERIFY(!readRecurrenceSuccessor(handle, divergentSeries, divergentSeries + QStringLiteral(":0"))
                .has_value());
 }
 

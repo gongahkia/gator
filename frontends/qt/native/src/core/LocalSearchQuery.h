@@ -47,7 +47,7 @@ using LocalSearchQueryResult = std::variant<LocalSearchParsedQuery, AppError>;
 class LocalSearchQuery final {
 public:
   [[nodiscard]] static LocalSearchQueryResult parse(QString query,
-                                                     QDate today = QDate::currentDate());
+                                                    QDate today = QDate::currentDate());
 };
 
 } // namespace hcb

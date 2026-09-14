@@ -25,8 +25,9 @@ constexpr qsizetype kMaximumColorIdLength = 32;
 }
 
 [[nodiscard]] GoogleApiError invalidResponse() {
-  return GoogleApiError({.kind = GoogleApiErrorKind::InvalidPayload,
-                         .message = QStringLiteral("Google calendar management response is invalid")});
+  return GoogleApiError(
+      {.kind = GoogleApiErrorKind::InvalidPayload,
+       .message = QStringLiteral("Google calendar management response is invalid")});
 }
 
 [[nodiscard]] bool validRequiredText(const QString& value, qsizetype maximum) {
@@ -39,8 +40,8 @@ constexpr qsizetype kMaximumColorIdLength = 32;
 }
 
 [[nodiscard]] bool validTimeZone(const std::optional<QString>& value) {
-  return !value.has_value() ||
-         (validRequiredText(*value, kMaximumTimeZoneLength) && QTimeZone(value->toUtf8()).isValid());
+  return !value.has_value() || (validRequiredText(*value, kMaximumTimeZoneLength) &&
+                                QTimeZone(value->toUtf8()).isValid());
 }
 
 [[nodiscard]] std::optional<QString> responseId(const GoogleHttpResponse& response) {
@@ -51,7 +52,8 @@ constexpr qsizetype kMaximumColorIdLength = 32;
   }
   const QJsonValue id = document.object().value(QStringLiteral("id"));
   return id.isString() && validRequiredText(id.toString(), kMaximumCalendarIdLength)
-             ? std::optional<QString>(id.toString()) : std::nullopt;
+             ? std::optional<QString>(id.toString())
+             : std::nullopt;
 }
 
 [[nodiscard]] std::future<GoogleCalendarManagementResultOrError>
@@ -62,9 +64,8 @@ readyResult(GoogleCalendarManagementResultOrError result) {
   return future;
 }
 
-[[nodiscard]] GoogleCalendarManagementResultOrError decodeResult(const GoogleHttpResult& response,
-                                                                   const QString& calendarId,
-                                                                   bool expectsBody) {
+[[nodiscard]] GoogleCalendarManagementResultOrError
+decodeResult(const GoogleHttpResult& response, const QString& calendarId, bool expectsBody) {
   if (std::holds_alternative<GoogleApiError>(response)) {
     return std::get<GoogleApiError>(response);
   }
@@ -92,45 +93,46 @@ GoogleCalendarManagementClient::create(GoogleCalendarCreateRequest request, QStr
       !validTimeZone(request.timeZone)) {
     return readyResult(invalidInput());
   }
-  return std::async(std::launch::async,
-                    [this, request = std::move(request), accessToken = std::move(accessToken)] {
-                      QJsonObject body{{QStringLiteral("summary"), request.title}};
-                      if (request.description.has_value()) {
-                        body.insert(QStringLiteral("description"), *request.description);
-                      }
-                      if (request.timeZone.has_value()) {
-                        body.insert(QStringLiteral("timeZone"), *request.timeZone);
-                      }
-                      GoogleHttpRequest httpRequest{.method = GoogleHttpMethod::Post,
-                                                    .path = QStringLiteral("/calendar/v3/calendars"),
-                                                    .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
-                      GoogleHttpResult response = httpClient_.send(std::move(httpRequest), accessToken).get();
-                      return decodeResult(response, QString(), true);
-                    });
+  return std::async(
+      std::launch::async,
+      [this, request = std::move(request), accessToken = std::move(accessToken)] {
+        QJsonObject body{{QStringLiteral("summary"), request.title}};
+        if (request.description.has_value()) {
+          body.insert(QStringLiteral("description"), *request.description);
+        }
+        if (request.timeZone.has_value()) {
+          body.insert(QStringLiteral("timeZone"), *request.timeZone);
+        }
+        GoogleHttpRequest httpRequest{.method = GoogleHttpMethod::Post,
+                                      .path = QStringLiteral("/calendar/v3/calendars"),
+                                      .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
+        GoogleHttpResult response = httpClient_.send(std::move(httpRequest), accessToken).get();
+        return decodeResult(response, QString(), true);
+      });
 }
 
 std::future<GoogleCalendarManagementResultOrError>
 GoogleCalendarManagementClient::subscribe(GoogleCalendarSubscribeRequest request,
-                                           QString accessToken) {
+                                          QString accessToken) {
   if (!validRequiredText(request.calendarId, kMaximumCalendarIdLength) ||
       !validOptionalText(request.colorId, kMaximumColorIdLength)) {
     return readyResult(invalidInput());
   }
-  return std::async(std::launch::async,
-                    [this, request = std::move(request), accessToken = std::move(accessToken)] {
-                      QJsonObject body{{QStringLiteral("id"), request.calendarId},
-                                       {QStringLiteral("selected"), request.selected},
-                                       {QStringLiteral("hidden"), request.hidden}};
-                      if (request.colorId.has_value()) {
-                        body.insert(QStringLiteral("colorId"), *request.colorId);
-                      }
-                      GoogleHttpRequest httpRequest{
-                          .method = GoogleHttpMethod::Post,
-                          .path = QStringLiteral("/calendar/v3/users/me/calendarList"),
-                          .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
-                      GoogleHttpResult response = httpClient_.send(std::move(httpRequest), accessToken).get();
-                      return decodeResult(response, request.calendarId, true);
-                    });
+  return std::async(
+      std::launch::async,
+      [this, request = std::move(request), accessToken = std::move(accessToken)] {
+        QJsonObject body{{QStringLiteral("id"), request.calendarId},
+                         {QStringLiteral("selected"), request.selected},
+                         {QStringLiteral("hidden"), request.hidden}};
+        if (request.colorId.has_value()) {
+          body.insert(QStringLiteral("colorId"), *request.colorId);
+        }
+        GoogleHttpRequest httpRequest{.method = GoogleHttpMethod::Post,
+                                      .path = QStringLiteral("/calendar/v3/users/me/calendarList"),
+                                      .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
+        GoogleHttpResult response = httpClient_.send(std::move(httpRequest), accessToken).get();
+        return decodeResult(response, request.calendarId, true);
+      });
 }
 
 std::future<GoogleCalendarManagementResultOrError>
@@ -142,23 +144,23 @@ GoogleCalendarManagementClient::update(GoogleCalendarUpdateRequest request, QStr
       !validTimeZone(request.timeZone)) {
     return readyResult(invalidInput());
   }
-  return std::async(std::launch::async,
-                    [this, request = std::move(request), accessToken = std::move(accessToken)] {
-                      QJsonObject body{{QStringLiteral("summary"), request.title}};
-                      if (request.description.has_value()) {
-                        body.insert(QStringLiteral("description"), *request.description);
-                      }
-                      if (request.timeZone.has_value()) {
-                        body.insert(QStringLiteral("timeZone"), *request.timeZone);
-                      }
-                      GoogleHttpRequest httpRequest{
-                          .method = GoogleHttpMethod::Patch,
-                          .path = QStringLiteral("/calendar/v3/calendars/") + request.calendarId,
-                          .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
-                      return decodeResult(httpClient_.send(std::move(httpRequest), accessToken).get(),
-                                          request.calendarId,
-                                          true);
-                    });
+  return std::async(
+      std::launch::async,
+      [this, request = std::move(request), accessToken = std::move(accessToken)] {
+        QJsonObject body{{QStringLiteral("summary"), request.title}};
+        if (request.description.has_value()) {
+          body.insert(QStringLiteral("description"), *request.description);
+        }
+        if (request.timeZone.has_value()) {
+          body.insert(QStringLiteral("timeZone"), *request.timeZone);
+        }
+        GoogleHttpRequest httpRequest{.method = GoogleHttpMethod::Patch,
+                                      .path = QStringLiteral("/calendar/v3/calendars/") +
+                                              request.calendarId,
+                                      .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
+        return decodeResult(
+            httpClient_.send(std::move(httpRequest), accessToken).get(), request.calendarId, true);
+      });
 }
 
 std::future<GoogleCalendarManagementResultOrError>
@@ -166,40 +168,38 @@ GoogleCalendarManagementClient::remove(QString calendarId, QString accessToken) 
   if (!validRequiredText(calendarId, kMaximumCalendarIdLength)) {
     return readyResult(invalidInput());
   }
-  return std::async(std::launch::async,
-                    [this, calendarId = std::move(calendarId), accessToken = std::move(accessToken)] {
-                      GoogleHttpRequest request{
-                          .method = GoogleHttpMethod::Delete,
-                          .path = QStringLiteral("/calendar/v3/calendars/") + calendarId};
-                      return decodeResult(httpClient_.send(std::move(request), accessToken).get(),
-                                          calendarId,
-                                          false);
-                    });
+  return std::async(
+      std::launch::async,
+      [this, calendarId = std::move(calendarId), accessToken = std::move(accessToken)] {
+        GoogleHttpRequest request{.method = GoogleHttpMethod::Delete,
+                                  .path = QStringLiteral("/calendar/v3/calendars/") + calendarId};
+        return decodeResult(
+            httpClient_.send(std::move(request), accessToken).get(), calendarId, false);
+      });
 }
 
 std::future<GoogleCalendarManagementResultOrError>
 GoogleCalendarManagementClient::updateListEntry(GoogleCalendarListUpdateRequest request,
-                                                 QString accessToken) {
+                                                QString accessToken) {
   if (!validRequiredText(request.calendarId, kMaximumCalendarIdLength) ||
       !validOptionalText(request.colorId, kMaximumColorIdLength)) {
     return readyResult(invalidInput());
   }
-  return std::async(std::launch::async,
-                    [this, request = std::move(request), accessToken = std::move(accessToken)] {
-                      QJsonObject body{{QStringLiteral("selected"), request.selected},
-                                       {QStringLiteral("hidden"), request.hidden}};
-                      if (request.colorId.has_value()) {
-                        body.insert(QStringLiteral("colorId"), *request.colorId);
-                      }
-                      GoogleHttpRequest httpRequest{
-                          .method = GoogleHttpMethod::Patch,
-                          .path = QStringLiteral("/calendar/v3/users/me/calendarList/") +
-                                  request.calendarId,
-                          .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
-                      return decodeResult(httpClient_.send(std::move(httpRequest), accessToken).get(),
-                                          request.calendarId,
-                                          true);
-                    });
+  return std::async(
+      std::launch::async,
+      [this, request = std::move(request), accessToken = std::move(accessToken)] {
+        QJsonObject body{{QStringLiteral("selected"), request.selected},
+                         {QStringLiteral("hidden"), request.hidden}};
+        if (request.colorId.has_value()) {
+          body.insert(QStringLiteral("colorId"), *request.colorId);
+        }
+        GoogleHttpRequest httpRequest{
+            .method = GoogleHttpMethod::Patch,
+            .path = QStringLiteral("/calendar/v3/users/me/calendarList/") + request.calendarId,
+            .body = QJsonDocument(body).toJson(QJsonDocument::Compact)};
+        return decodeResult(
+            httpClient_.send(std::move(httpRequest), accessToken).get(), request.calendarId, true);
+      });
 }
 
 std::future<GoogleCalendarManagementResultOrError>
@@ -207,15 +207,15 @@ GoogleCalendarManagementClient::removeListEntry(QString calendarId, QString acce
   if (!validRequiredText(calendarId, kMaximumCalendarIdLength)) {
     return readyResult(invalidInput());
   }
-  return std::async(std::launch::async,
-                    [this, calendarId = std::move(calendarId), accessToken = std::move(accessToken)] {
-                      GoogleHttpRequest request{
-                          .method = GoogleHttpMethod::Delete,
-                          .path = QStringLiteral("/calendar/v3/users/me/calendarList/") + calendarId};
-                      return decodeResult(httpClient_.send(std::move(request), accessToken).get(),
-                                          calendarId,
-                                          false);
-                    });
+  return std::async(
+      std::launch::async,
+      [this, calendarId = std::move(calendarId), accessToken = std::move(accessToken)] {
+        GoogleHttpRequest request{.method = GoogleHttpMethod::Delete,
+                                  .path = QStringLiteral("/calendar/v3/users/me/calendarList/") +
+                                          calendarId};
+        return decodeResult(
+            httpClient_.send(std::move(request), accessToken).get(), calendarId, false);
+      });
 }
 
 } // namespace hcb

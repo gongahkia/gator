@@ -47,9 +47,8 @@ public:
 
   [[nodiscard]] std::shared_future<SqliteWriteResult> ready() const;
   [[nodiscard]] std::future<SyncCheckpointLookupResult> find(SyncCheckpointKey key);
-  [[nodiscard]] std::future<SyncCheckpointSaveResult> save(SyncCheckpointKey key,
-                                                           const QString& syncToken,
-                                                           QJsonObject metadata = {});
+  [[nodiscard]] std::future<SyncCheckpointSaveResult>
+  save(SyncCheckpointKey key, const QString& syncToken, QJsonObject metadata = {});
   [[nodiscard]] std::future<SyncCheckpointEraseResult> erase(SyncCheckpointKey key);
 
 private:

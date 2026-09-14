@@ -28,7 +28,8 @@ void GoogleTaskPullClientTest::readsEveryPageAndNormalizesTasks() {
            "{\"nextPageToken\":\"page-2\",\"items\":[{\"id\":\"task-1\",\"title\":\"Write "
            "report\",\"notes\":\"draft\",\"status\":\"completed\",\"due\":\"2024-07-26T23:59:59Z\","
            "\"completed\":\"2024-07-25T12:00:00+02:00\",\"deleted\":false,\"hidden\":true,"
-           "\"parent\":\"parent-1\",\"position\":\"0001\",\"assignmentInfo\":{},\"etag\":\"etag-1\",\"updated\":\"2024-"
+           "\"parent\":\"parent-1\",\"position\":\"0001\",\"assignmentInfo\":{},\"etag\":\"etag-"
+           "1\",\"updated\":\"2024-"
            "07-25T13:00:00Z\"}]}"),
        .headers = {{QByteArray("Date"), QByteArray("Thu, 25 Jul 2024 13:00:00 GMT")}}});
   manager.enqueue({.body = QByteArray(
@@ -71,8 +72,8 @@ void GoogleTaskPullClientTest::readsEveryPageAndNormalizesTasks() {
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("showDeleted")), QStringLiteral("true"));
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("showHidden")), QStringLiteral("true"));
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("maxResults")), QStringLiteral("100"));
-  QVERIFY(firstQuery.queryItemValue(QStringLiteral("fields")).contains(
-      QStringLiteral("assignmentInfo")));
+  QVERIFY(firstQuery.queryItemValue(QStringLiteral("fields"))
+              .contains(QStringLiteral("assignmentInfo")));
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("completedMin")),
            QStringLiteral("2024-07-20T00:00:00Z"));
   QCOMPARE(

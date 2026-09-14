@@ -180,15 +180,15 @@ void MonthGridModelTest::mapsGridCoordinatesAndMovesMultiDayEventsInDisplayTimeZ
            QStringLiteral("2026-10-04T00:00:00.000Z"));
   QCOMPARE(created.value(QStringLiteral("endAt")).toString(),
            QStringLiteral("2026-10-07T00:00:00.000Z"));
-  const QVariantMap moved = model.moveInput(
-      {{QStringLiteral("id"), QStringLiteral("event-a")},
-       {QStringLiteral("allDay"), false},
-       {QStringLiteral("startAt"), QStringLiteral("2026-10-03T13:30:00.000Z")},
-       {QStringLiteral("endAt"), QStringLiteral("2026-10-03T14:30:00.000Z")}},
-      7);
+  const QVariantMap moved =
+      model.moveInput({{QStringLiteral("id"), QStringLiteral("event-a")},
+                       {QStringLiteral("allDay"), false},
+                       {QStringLiteral("startAt"), QStringLiteral("2026-10-03T13:30:00.000Z")},
+                       {QStringLiteral("endAt"), QStringLiteral("2026-10-03T14:30:00.000Z")}},
+                      7);
   QVERIFY(!moved.isEmpty());
-  const QDateTime expected(QDate(2026, 10, 4), QTime(23, 0), zone,
-                           QDateTime::TransitionResolution::PreferAfter);
+  const QDateTime expected(
+      QDate(2026, 10, 4), QTime(23, 0), zone, QDateTime::TransitionResolution::PreferAfter);
   QCOMPARE(moved.value(QStringLiteral("startAt")).toString(),
            expected.toUTC().toString(Qt::ISODateWithMs));
   const QVariantMap resized = model.resizeAllDayRangeInput(

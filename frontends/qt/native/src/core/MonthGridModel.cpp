@@ -95,9 +95,8 @@ namespace {
   return result;
 }
 
-[[nodiscard]] std::optional<QDateTime> mapDateTime(const QVariantMap& event,
-                                                    const QString& key,
-                                                    const QTimeZone& timeZone) {
+[[nodiscard]] std::optional<QDateTime>
+mapDateTime(const QVariantMap& event, const QString& key, const QTimeZone& timeZone) {
   return parseDateTime(event.value(key).toString(), timeZone);
 }
 
@@ -229,12 +228,13 @@ QVariantMap MonthGridModel::allDayRangeInput(int firstDayIndex, int lastDayIndex
   }
   const int first = std::min(firstDayIndex, lastDayIndex);
   const int last = std::max(firstDayIndex, lastDayIndex);
-  return {{QStringLiteral("startAt"),
-           QDateTime(cells_.at(first).date, QTime(0, 0), QTimeZone::UTC).toString(Qt::ISODateWithMs)},
-          {QStringLiteral("endAt"),
-           QDateTime(cells_.at(last).date.addDays(1), QTime(0, 0), QTimeZone::UTC)
-               .toString(Qt::ISODateWithMs)},
-          {QStringLiteral("allDay"), true}};
+  return {
+      {QStringLiteral("startAt"),
+       QDateTime(cells_.at(first).date, QTime(0, 0), QTimeZone::UTC).toString(Qt::ISODateWithMs)},
+      {QStringLiteral("endAt"),
+       QDateTime(cells_.at(last).date.addDays(1), QTime(0, 0), QTimeZone::UTC)
+           .toString(Qt::ISODateWithMs)},
+      {QStringLiteral("allDay"), true}};
 }
 
 QVariantMap MonthGridModel::moveInput(const QVariantMap& event, int targetDayIndex) const {
@@ -248,24 +248,33 @@ QVariantMap MonthGridModel::moveInput(const QVariantMap& event, int targetDayInd
     return {};
   }
   if (allDay) {
-    const QDate source = QDate::fromString(event.value(QStringLiteral("startAt")).toString().left(10), Qt::ISODate);
-    const QDate end = QDate::fromString(event.value(QStringLiteral("endAt")).toString().left(10), Qt::ISODate);
+    const QDate source =
+        QDate::fromString(event.value(QStringLiteral("startAt")).toString().left(10), Qt::ISODate);
+    const QDate end =
+        QDate::fromString(event.value(QStringLiteral("endAt")).toString().left(10), Qt::ISODate);
     if (!source.isValid() || !end.isValid() || end <= source) {
       return {};
     }
     const QDate target = cells_.at(targetDayIndex).date;
     const qint64 duration = source.daysTo(end);
     return {{QStringLiteral("id"), id},
-            {QStringLiteral("startAt"), QDateTime(target, QTime(0, 0), QTimeZone::UTC).toString(Qt::ISODateWithMs)},
-            {QStringLiteral("endAt"), QDateTime(target.addDays(duration), QTime(0, 0), QTimeZone::UTC).toString(Qt::ISODateWithMs)},
+            {QStringLiteral("startAt"),
+             QDateTime(target, QTime(0, 0), QTimeZone::UTC).toString(Qt::ISODateWithMs)},
+            {QStringLiteral("endAt"),
+             QDateTime(target.addDays(duration), QTime(0, 0), QTimeZone::UTC)
+                 .toString(Qt::ISODateWithMs)},
             {QStringLiteral("allDay"), true}};
   }
-  const std::optional<QDateTime> start = mapDateTime(event, QStringLiteral("startAt"), displayTimeZone_);
-  const std::optional<QDateTime> end = mapDateTime(event, QStringLiteral("endAt"), displayTimeZone_);
+  const std::optional<QDateTime> start =
+      mapDateTime(event, QStringLiteral("startAt"), displayTimeZone_);
+  const std::optional<QDateTime> end =
+      mapDateTime(event, QStringLiteral("endAt"), displayTimeZone_);
   if (!start.has_value() || !end.has_value() || *end <= *start) {
     return {};
   }
-  const QDateTime targetStart(cells_.at(targetDayIndex).date, start->time(), displayTimeZone_,
+  const QDateTime targetStart(cells_.at(targetDayIndex).date,
+                              start->time(),
+                              displayTimeZone_,
                               QDateTime::TransitionResolution::PreferAfter);
   const QDateTime targetEnd = targetStart.addMSecs(start->msecsTo(*end));
   if (!targetStart.isValid() || !targetEnd.isValid()) {
@@ -278,8 +287,8 @@ QVariantMap MonthGridModel::moveInput(const QVariantMap& event, int targetDayInd
 }
 
 QVariantMap MonthGridModel::resizeAllDayRangeInput(const QVariantMap& event,
-                                                    int firstDayIndex,
-                                                    int lastDayIndex) const {
+                                                   int firstDayIndex,
+                                                   int lastDayIndex) const {
   const QString id = event.value(QStringLiteral("id")).toString();
   if (id.isEmpty() || !event.value(QStringLiteral("allDay")).toBool()) {
     return {};
@@ -443,7 +452,8 @@ void MonthGridModel::rebuildPresentation(bool notifyViews) {
   }
 
   if (notifyViews && !cells_.isEmpty()) {
-    emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1),
+    emit dataChanged(index(0, 0),
+                     index(rowCount() - 1, columnCount() - 1),
                      {VisibleTimedEventsRole, VisibleAllDayEventsRole, HiddenAllDayCountRole});
   }
   emit presentationChanged();

@@ -77,8 +77,10 @@ constexpr char kQuickCaptureEventDurationSettingsKey[] = "quick_capture_event_du
 constexpr char kQuickCaptureRemoveParsedTextSettingsKey[] = "quick_capture_remove_parsed_text";
 constexpr char kQuickCaptureTaskAliasesSettingsKey[] = "quick_capture_task_aliases";
 constexpr char kQuickCaptureEventAliasesSettingsKey[] = "quick_capture_event_aliases";
-constexpr char kQuickCaptureHighPriorityAliasesSettingsKey[] = "quick_capture_high_priority_aliases";
-constexpr char kQuickCaptureMediumPriorityAliasesSettingsKey[] = "quick_capture_medium_priority_aliases";
+constexpr char kQuickCaptureHighPriorityAliasesSettingsKey[] =
+    "quick_capture_high_priority_aliases";
+constexpr char kQuickCaptureMediumPriorityAliasesSettingsKey[] =
+    "quick_capture_medium_priority_aliases";
 constexpr char kQuickCaptureLowPriorityAliasesSettingsKey[] = "quick_capture_low_priority_aliases";
 constexpr char kWeekStartDaySettingsKey[] = "week_start_day";
 constexpr char kUse24HourTimeSettingsKey[] = "use_24_hour_time";
@@ -99,10 +101,8 @@ constexpr int kMinimumTaskListPaneWidth = 200;
 constexpr int kMaximumTaskListPaneWidth = 480;
 constexpr char kBridgeAcceptanceInitialTaskTitle[] = "Qt bridge interaction task initial";
 constexpr char kBridgeAcceptanceUpdatedTaskTitle[] = "Qt bridge interaction task updated";
-constexpr char kBridgeAcceptanceInitialTaskNotes[] =
-    "Created by the isolated Qt bridge acceptance";
-constexpr char kBridgeAcceptanceUpdatedTaskNotes[] =
-    "Updated by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceInitialTaskNotes[] = "Created by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceUpdatedTaskNotes[] = "Updated by the isolated Qt bridge acceptance";
 constexpr char kBridgeAcceptanceInitialEventTitle[] = "Qt bridge interaction event initial";
 constexpr char kBridgeAcceptanceUpdatedEventTitle[] = "Qt bridge interaction event updated";
 constexpr char kBridgeAcceptanceInitialEventDescription[] =
@@ -111,6 +111,14 @@ constexpr char kBridgeAcceptanceUpdatedEventDescription[] =
     "Updated by the isolated Qt bridge acceptance";
 constexpr char kBridgeAcceptanceInitialEventLocation[] = "Initial acceptance location";
 constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance location";
+constexpr char kBridgeAcceptanceInitialTaskListTitle[] = "Qt bridge acceptance list initial";
+constexpr char kBridgeAcceptanceUpdatedTaskListTitle[] = "Qt bridge acceptance list updated";
+constexpr char kBridgeAcceptanceHiddenTaskTitle[] = "Qt bridge acceptance hidden-list task";
+constexpr char kBridgeAcceptanceInitialCalendarTitle[] = "Qt bridge acceptance calendar initial";
+constexpr char kBridgeAcceptanceUpdatedCalendarTitle[] = "Qt bridge acceptance calendar updated";
+constexpr char kBridgeAcceptanceUpdatedCalendarDescription[] =
+    "Updated by the isolated Qt bridge calendar acceptance";
+constexpr char kBridgeAcceptanceSubscriptionRemoteId[] = "qt-bridge-acceptance-subscription";
 
 [[nodiscard]] std::unique_ptr<OAuthCredentialStore> makeCredentialStore() {
 #if defined(Q_OS_MACOS)
@@ -161,8 +169,7 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
   }
 #if defined(Q_OS_MACOS)
   return QProcess::startDetached(QStringLiteral("/usr/bin/open"),
-                                 {QStringLiteral("-a"), browser,
-                                  url.toString(QUrl::FullyEncoded)});
+                                 {QStringLiteral("-a"), browser, url.toString(QUrl::FullyEncoded)});
 #else
   return QDesktopServices::openUrl(url);
 #endif
@@ -178,8 +185,8 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
 [[nodiscard]] bool isValidQuickCaptureDuration(int value) { return value >= 1 && value <= 1'440; }
 
 [[nodiscard]] bool isValidQuickCaptureDestination(const QString& value) {
-  return value.isEmpty() || (value == value.trimmed() && value.size() <= 256 &&
-                             !value.contains(QChar::Null));
+  return value.isEmpty() ||
+         (value == value.trimmed() && value.size() <= 256 && !value.contains(QChar::Null));
 }
 
 [[nodiscard]] bool isValidQuickCaptureAlias(const QString& value) {
@@ -203,10 +210,10 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
 }
 
 [[nodiscard]] bool quickCaptureAliasesAreDistinct(const QStringList& task,
-                                                   const QStringList& event,
-                                                   const QStringList& high,
-                                                   const QStringList& medium,
-                                                   const QStringList& low) {
+                                                  const QStringList& event,
+                                                  const QStringList& high,
+                                                  const QStringList& medium,
+                                                  const QStringList& low) {
   QSet<QString> seen;
   for (const QStringList* values : {&task, &event, &high, &medium, &low}) {
     for (const QString& value : *values) {
@@ -267,8 +274,8 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
 [[nodiscard]] std::optional<QString> jsonArrayString(const QString& value) {
   QJsonParseError error;
   const QJsonDocument document = QJsonDocument::fromJson(value.toUtf8(), &error);
-  if (error.error != QJsonParseError::NoError || !document.isArray() || document.array().size() != 1 ||
-      !document.array().at(0).isString()) {
+  if (error.error != QJsonParseError::NoError || !document.isArray() ||
+      document.array().size() != 1 || !document.array().at(0).isString()) {
     return std::nullopt;
   }
   return document.array().at(0).toString();
@@ -281,8 +288,8 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
 [[nodiscard]] std::optional<QStringList> jsonStringList(const QString& value) {
   QJsonParseError error;
   const QJsonDocument document = QJsonDocument::fromJson(value.toUtf8(), &error);
-  if (error.error != QJsonParseError::NoError || !document.isArray() || document.array().isEmpty() ||
-      document.array().size() > 32) {
+  if (error.error != QJsonParseError::NoError || !document.isArray() ||
+      document.array().isEmpty() || document.array().size() > 32) {
     return std::nullopt;
   }
   QStringList values;
@@ -363,12 +370,16 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
 }
 
 [[nodiscard]] std::optional<TaskPriority> importPriority(const std::optional<QString>& value) {
-  if (!value.has_value() || value->trimmed().isEmpty() || value->toCaseFolded() == QStringLiteral("none")) {
+  if (!value.has_value() || value->trimmed().isEmpty() ||
+      value->toCaseFolded() == QStringLiteral("none")) {
     return TaskPriority::None;
   }
-  if (value->toCaseFolded() == QStringLiteral("low")) return TaskPriority::Low;
-  if (value->toCaseFolded() == QStringLiteral("medium")) return TaskPriority::Medium;
-  if (value->toCaseFolded() == QStringLiteral("high")) return TaskPriority::High;
+  if (value->toCaseFolded() == QStringLiteral("low"))
+    return TaskPriority::Low;
+  if (value->toCaseFolded() == QStringLiteral("medium"))
+    return TaskPriority::Medium;
+  if (value->toCaseFolded() == QStringLiteral("high"))
+    return TaskPriority::High;
   return std::nullopt;
 }
 
@@ -376,31 +387,34 @@ constexpr char kBridgeAcceptanceUpdatedEventLocation[] = "Updated acceptance loc
   QVariantList rows;
   rows.reserve(parsed.rows.size());
   for (const ImportPreviewRow& row : parsed.rows) {
-    rows.append(QVariantMap{{QStringLiteral("line"), row.sourceLine},
-                            {QStringLiteral("kind"),
-                             row.kind == ImportItemKind::Task ? QStringLiteral("Task")
-                                                              : QStringLiteral("Event")},
-                            {QStringLiteral("title"), row.title},
-                            {QStringLiteral("accepted"), row.accepted},
-                            {QStringLiteral("message"), row.message}});
+    rows.append(QVariantMap{
+        {QStringLiteral("line"), row.sourceLine},
+        {QStringLiteral("kind"),
+         row.kind == ImportItemKind::Task ? QStringLiteral("Task") : QStringLiteral("Event")},
+        {QStringLiteral("title"), row.title},
+        {QStringLiteral("accepted"), row.accepted},
+        {QStringLiteral("message"), row.message}});
   }
   return rows;
 }
 
 template <typename Summary>
 [[nodiscard]] std::optional<QString> resolveImportTarget(const std::optional<QString>& name,
-                                                          const QString& defaultId,
-                                                          const QList<Summary>& candidates) {
+                                                         const QString& defaultId,
+                                                         const QList<Summary>& candidates) {
   if (!name.has_value()) {
-    const auto match = std::find_if(candidates.cbegin(), candidates.cend(), [&defaultId](const Summary& item) {
-      return item.id == defaultId;
-    });
+    const auto match =
+        std::find_if(candidates.cbegin(), candidates.cend(), [&defaultId](const Summary& item) {
+          return item.id == defaultId;
+        });
     return match == candidates.cend() ? std::nullopt : std::optional<QString>(match->id);
   }
   std::optional<QString> found;
   for (const Summary& candidate : candidates) {
-    if (candidate.title != *name) continue;
-    if (found.has_value()) return std::nullopt;
+    if (candidate.title != *name)
+      continue;
+    if (found.has_value())
+      return std::nullopt;
     found = candidate.id;
   }
   return found;
@@ -408,8 +422,10 @@ template <typename Summary>
 
 [[nodiscard]] std::optional<QList<QString>> recurrenceDatesFromText(const QString& value);
 
-[[nodiscard]] std::optional<QList<QString>> importRecurrenceDates(const std::optional<QString>& text) {
-  if (!text.has_value()) return QList<QString>{};
+[[nodiscard]] std::optional<QList<QString>>
+importRecurrenceDates(const std::optional<QString>& text) {
+  if (!text.has_value())
+    return QList<QString>{};
   return recurrenceDatesFromText(*text);
 }
 
@@ -420,12 +436,8 @@ struct ManagedTaskRecurrenceConfiguration final {
   QString defaultRule;
 };
 
-[[nodiscard]] std::optional<ManagedTaskRecurrenceConfiguration>
-managedTaskRecurrenceConfiguration(int frequency,
-                                   int interval,
-                                   int endKind,
-                                   const QString& endUntil,
-                                   int endCount) {
+[[nodiscard]] std::optional<ManagedTaskRecurrenceConfiguration> managedTaskRecurrenceConfiguration(
+    int frequency, int interval, int endKind, const QString& endUntil, int endCount) {
   std::optional<TaskRecurrenceFrequency> parsedFrequency;
   switch (frequency) {
   case 0:
@@ -473,12 +485,14 @@ managedTaskRecurrenceConfiguration(int frequency,
   default:
     return std::nullopt;
   }
-  return ManagedTaskRecurrenceConfiguration{.frequency = *parsedFrequency,
-                                            .interval = static_cast<std::int32_t>(interval),
-                                            .end = std::move(end),
-                                            .defaultRule = frequency == 4
-                                                               ? QStringLiteral("FREQ=DAILY;INTERVAL=%1;BYDAY=MO,TU,WE,TH,FR").arg(interval)
-                                                               : QString()};
+  return ManagedTaskRecurrenceConfiguration{
+      .frequency = *parsedFrequency,
+      .interval = static_cast<std::int32_t>(interval),
+      .end = std::move(end),
+      .defaultRule =
+          frequency == 4
+              ? QStringLiteral("FREQ=DAILY;INTERVAL=%1;BYDAY=MO,TU,WE,TH,FR").arg(interval)
+              : QString()};
 }
 
 [[nodiscard]] std::optional<QList<QString>> recurrenceDatesFromText(const QString& value) {
@@ -742,8 +756,7 @@ struct CalendarViewLayouts final {
   MonthGridModel::Layout month;
 };
 
-[[nodiscard]] QList<CalendarEventSummary>
-calendarPresentation(QList<CalendarEventSummary> events) {
+[[nodiscard]] QList<CalendarEventSummary> calendarPresentation(QList<CalendarEventSummary> events) {
   QList<CalendarEventSummary> presentation;
   for (CalendarEventSummary& event : events) {
     if (event.recurringRemoteId.has_value() && event.originalStartAt.has_value()) {
@@ -755,9 +768,11 @@ calendarPresentation(QList<CalendarEventSummary> events) {
       presentation.append(std::move(event));
     }
   }
-  std::sort(presentation.begin(), presentation.end(),
+  std::sort(presentation.begin(),
+            presentation.end(),
             [](const CalendarEventSummary& left, const CalendarEventSummary& right) {
-              return left.startAt == right.startAt ? left.id < right.id : left.startAt < right.startAt;
+              return left.startAt == right.startAt ? left.id < right.id
+                                                   : left.startAt < right.startAt;
             });
   return presentation;
 }
@@ -767,11 +782,13 @@ calendarPresentation(QList<CalendarEventSummary> events) {
                                                            const QTimeZone& displayTimeZone,
                                                            int firstDay) {
   events = calendarPresentation(std::move(events));
-  return {
-      .agendaEvents = events,
-      .timeline = TimelineModel::buildLayout(
-          weekStart(date, firstDay), kCalendarTimelineDays, events, displayTimeZone, kVisibleAllDayLaneCount),
-      .month = MonthGridModel::buildLayout(date, events, displayTimeZone, firstDay)};
+  return {.agendaEvents = events,
+          .timeline = TimelineModel::buildLayout(weekStart(date, firstDay),
+                                                 kCalendarTimelineDays,
+                                                 events,
+                                                 displayTimeZone,
+                                                 kVisibleAllDayLaneCount),
+          .month = MonthGridModel::buildLayout(date, events, displayTimeZone, firstDay)};
 }
 
 [[nodiscard]] QJsonObject taskDueSnapshot(const TaskMutationSnapshot& task) {
@@ -796,7 +813,7 @@ calendarPresentation(QList<CalendarEventSummary> events) {
 }
 
 [[nodiscard]] std::optional<TaskDue> taskDueFromSnapshot(const QJsonValue& snapshot,
-                                                          const QString& taskId) {
+                                                         const QString& taskId) {
   if (!snapshot.isObject()) {
     return std::nullopt;
   }
@@ -830,7 +847,7 @@ struct EventTiming final {
 };
 
 [[nodiscard]] std::optional<EventTiming> eventTimingFromSnapshot(const QJsonValue& snapshot,
-                                                                  const QString& eventId) {
+                                                                 const QString& eventId) {
   if (!snapshot.isObject()) {
     return std::nullopt;
   }
@@ -862,12 +879,12 @@ AppController::AppController(FilePath databasePath,
     : QObject(parent), clock_(clock), agendaModel_(agendaModel),
       calendarSourceModel_(calendarSourceModel), monthGridModel_(monthGridModel),
       notesModel_(notesModel), taskListModel_(taskListModel), taskModel_(taskModel),
-      timelineModel_(timelineModel), scheduledTaskDateIndex_(this), oauthConfigurationStore_(databasePath, clock),
-      accountStatusService_(databasePath, clock), credentialStore_(makeCredentialStore()),
-      oauthLoopbackListener_(this), oauthTokenExchangeClient_(this), oauthTokenRefreshClient_(this),
-      pkceStateRegistry_(clock), googleHttpClient_(this),
-      googleTaskListPullClient_(googleHttpClient_), googleTaskPullClient_(googleHttpClient_),
-      googleCalendarListPullClient_(googleHttpClient_),
+      timelineModel_(timelineModel), scheduledTaskDateIndex_(this),
+      oauthConfigurationStore_(databasePath, clock), accountStatusService_(databasePath, clock),
+      credentialStore_(makeCredentialStore()), oauthLoopbackListener_(this),
+      oauthTokenExchangeClient_(this), oauthTokenRefreshClient_(this), pkceStateRegistry_(clock),
+      googleHttpClient_(this), googleTaskListPullClient_(googleHttpClient_),
+      googleTaskPullClient_(googleHttpClient_), googleCalendarListPullClient_(googleHttpClient_),
       googleCalendarManagementClient_(googleHttpClient_),
       googleCalendarFreeBusyClient_(googleHttpClient_),
       googleDriveFilePickerClient_(googleHttpClient_),
@@ -903,13 +920,12 @@ AppController::AppController(FilePath databasePath,
       calendarReadService_(databasePath),
       googleCalendarInstanceCacheService_(
           googleCalendarEventPullClient_, calendarReadService_, googleMirrorStore_),
-      localSearchService_(databasePath),
-      googleTaskMirrorSyncService_(googleTaskListPullClient_,
-                                   googleTaskPullClient_,
-                                   googleMirrorStore_,
-                                   syncCheckpointStore_,
-                                   clock,
-                                   &taskMutationService_),
+      localSearchService_(databasePath), googleTaskMirrorSyncService_(googleTaskListPullClient_,
+                                                                      googleTaskPullClient_,
+                                                                      googleMirrorStore_,
+                                                                      syncCheckpointStore_,
+                                                                      clock,
+                                                                      &taskMutationService_),
       googleCalendarMirrorSyncService_(googleCalendarListPullClient_,
                                        googleCalendarEventPullClient_,
                                        calendarReadService_,
@@ -1002,8 +1018,7 @@ QVariantList AppController::calendarWeekLabels() const {
     return labels;
   }
   const int firstQtDay = weekStartDay_ == 0 ? 7 : 1;
-  const QDate start =
-      calendarDate_.addDays(-(calendarDate_.dayOfWeek() - firstQtDay + 7) % 7);
+  const QDate start = calendarDate_.addDays(-(calendarDate_.dayOfWeek() - firstQtDay + 7) % 7);
   labels.reserve(7);
   for (int offset = 0; offset < 7; ++offset) {
     labels.append(localizedCalendarDate(start.addDays(offset), QStringLiteral("ddd d MMM")));
@@ -1037,9 +1052,13 @@ int AppController::fontScale() const { return fontScale_; }
 
 QString AppController::externalBrowser() const { return externalBrowser_; }
 
-QString AppController::quickCaptureDefaultTaskListId() const { return quickCaptureDefaultTaskListId_; }
+QString AppController::quickCaptureDefaultTaskListId() const {
+  return quickCaptureDefaultTaskListId_;
+}
 
-QString AppController::quickCaptureDefaultCalendarId() const { return quickCaptureDefaultCalendarId_; }
+QString AppController::quickCaptureDefaultCalendarId() const {
+  return quickCaptureDefaultCalendarId_;
+}
 
 int AppController::quickCaptureEventDurationMinutes() const {
   return quickCaptureEventDurationMinutes_;
@@ -1121,9 +1140,7 @@ QVariantList AppController::invitations() const { return invitations_; }
 
 int AppController::pendingInvitationCount() const { return static_cast<int>(invitations_.size()); }
 
-QVariantList AppController::scheduledTasks() const {
-  return scheduledTaskRows_;
-}
+QVariantList AppController::scheduledTasks() const { return scheduledTaskRows_; }
 
 QObject* AppController::scheduledTaskDateIndex() { return &scheduledTaskDateIndex_; }
 
@@ -1139,17 +1156,17 @@ namespace {
     if (dueAt.size() < 10) {
       continue;
     }
-    result.append(QVariantMap{{QStringLiteral("id"), task.id},
-                              {QStringLiteral("taskListId"), task.taskListId},
-                              {QStringLiteral("taskListTitle"), task.taskListTitle},
-                              {QStringLiteral("title"), task.title},
-                              {QStringLiteral("notes"), task.notes.value_or(QString())},
-                              {QStringLiteral("dueAt"), dueAt},
-                              {QStringLiteral("dueTimeZone"),
-                               task.due->timeZone.value_or(QString())},
-                              {QStringLiteral("priority"), static_cast<int>(task.priority)},
-                              {QStringLiteral("managedRecurrence"), task.managedRecurrence},
-                              {QStringLiteral("recurrenceSummary"), task.recurrenceSummary}});
+    result.append(
+        QVariantMap{{QStringLiteral("id"), task.id},
+                    {QStringLiteral("taskListId"), task.taskListId},
+                    {QStringLiteral("taskListTitle"), task.taskListTitle},
+                    {QStringLiteral("title"), task.title},
+                    {QStringLiteral("notes"), task.notes.value_or(QString())},
+                    {QStringLiteral("dueAt"), dueAt},
+                    {QStringLiteral("dueTimeZone"), task.due->timeZone.value_or(QString())},
+                    {QStringLiteral("priority"), static_cast<int>(task.priority)},
+                    {QStringLiteral("managedRecurrence"), task.managedRecurrence},
+                    {QStringLiteral("recurrenceSummary"), task.recurrenceSummary}});
   }
   return result;
 }
@@ -1202,42 +1219,47 @@ void AppController::initialize() {
     return;
   }
   loadSavedSearches();
-  watch(undoRecoveryPolicy_.recover(), [this](UndoRecoveryResult result) {
-    if (std::holds_alternative<AppError>(result)) {
-      setStatus(errorMessage(std::get<AppError>(result)));
-      return;
-    }
-    refreshUndoStatus();
-  }, false);
+  watch(
+      undoRecoveryPolicy_.recover(),
+      [this](UndoRecoveryResult result) {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+          return;
+        }
+        refreshUndoStatus();
+      },
+      false);
   const auto loadUndoSetting = [this](const char* key, bool retention) {
-    watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
-                                    QString::fromLatin1(key)),
-          [this, retention](SettingsJsonReadResult result) {
-            if (std::holds_alternative<AppError>(result)) {
-              setStatus(errorMessage(std::get<AppError>(result)));
-              return;
-            }
-            const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
-            if (!stored.has_value()) {
-              return;
-            }
-            bool parsed = false;
-            const int value = stored->toInt(&parsed);
-            const bool valid = retention ? value >= 1 && value <= 3'650
-                                         : value >= 50 && value <= 1'000;
-            if (!parsed || !valid) {
-              setStatus(QStringLiteral("Stored undo history setting is invalid"));
-              return;
-            }
-            if (retention) {
-              undoRetentionDays_ = value;
-            } else {
-              undoMaximumEntries_ = value;
-            }
-            undoRecoveryPolicy_.configure(
-                {.retentionDays = undoRetentionDays_, .maximumEntries = undoMaximumEntries_});
-            emit undoHistorySettingsChanged();
-          }, false);
+    watch(
+        settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
+                                  QString::fromLatin1(key)),
+        [this, retention](SettingsJsonReadResult result) {
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(result)));
+            return;
+          }
+          const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
+          if (!stored.has_value()) {
+            return;
+          }
+          bool parsed = false;
+          const int value = stored->toInt(&parsed);
+          const bool valid =
+              retention ? value >= 1 && value <= 3'650 : value >= 50 && value <= 1'000;
+          if (!parsed || !valid) {
+            setStatus(QStringLiteral("Stored undo history setting is invalid"));
+            return;
+          }
+          if (retention) {
+            undoRetentionDays_ = value;
+          } else {
+            undoMaximumEntries_ = value;
+          }
+          undoRecoveryPolicy_.configure(
+              {.retentionDays = undoRetentionDays_, .maximumEntries = undoMaximumEntries_});
+          emit undoHistorySettingsChanged();
+        },
+        false);
   };
   loadUndoSetting(kUndoRetentionDaysSettingsKey, true);
   loadUndoSetting(kUndoMaximumEntriesSettingsKey, false);
@@ -1381,76 +1403,79 @@ void AppController::initialize() {
             emit externalBrowserChanged();
           }
         });
-  const auto loadPresentationInt = [this](const char* key,
-                                          auto valid,
-                                          auto apply,
-                                          QString invalidMessage) {
-    watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
-                                    QString::fromLatin1(key)),
-          [this, valid, apply, invalidMessage = std::move(invalidMessage)](
-              SettingsJsonReadResult result) mutable {
-            if (std::holds_alternative<AppError>(result)) {
-              setStatus(errorMessage(std::get<AppError>(result)));
-              return;
-            }
-            const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
-            if (!stored.has_value()) {
-              return;
-            }
-            bool parsed = false;
-            const int value = stored->toInt(&parsed);
-            if (!parsed || !valid(value)) {
-              setStatus(std::move(invalidMessage));
-              return;
-            }
-            apply(value);
-          });
-  };
-  loadPresentationInt(kAppearanceModeSettingsKey,
-                      isValidAppearanceMode,
-                      [this](int value) {
-                        if (appearanceMode_ != value) {
-                          appearanceMode_ = value;
-                          emit appearanceModeChanged();
-                        }
-                      },
-                      QStringLiteral("Stored appearance mode is invalid"));
-  loadPresentationInt(kVisualDensitySettingsKey,
-                      isValidVisualDensity,
-                      [this](int value) {
-                        if (visualDensity_ != value) {
-                          visualDensity_ = value;
-                          emit visualDensityChanged();
-                        }
-                      },
-                      QStringLiteral("Stored visual density is invalid"));
-  loadPresentationInt(kPaletteModeSettingsKey,
-                      isValidPaletteMode,
-                      [this](int value) {
-                        if (paletteMode_ != value) {
-                          paletteMode_ = value;
-                          emit paletteModeChanged();
-                        }
-                      },
-                      QStringLiteral("Stored palette is invalid"));
-  loadPresentationInt(kFontScaleSettingsKey,
-                      isValidFontScale,
-                      [this](int value) {
-                        if (fontScale_ != value) {
-                          fontScale_ = value;
-                          emit fontScaleChanged();
-                        }
-                      },
-                      QStringLiteral("Stored font scale is invalid"));
-  loadPresentationInt(kBulkTextRecurrenceScopeSettingsKey,
-                      isValidBulkTextRecurrenceScope,
-                      [this](int value) {
-                        if (bulkTextRecurrenceScope_ != value) {
-                          bulkTextRecurrenceScope_ = value;
-                          emit bulkTextRecurrenceScopeChanged();
-                        }
-                      },
-                      QStringLiteral("Stored bulk text recurrence scope is invalid"));
+  const auto loadPresentationInt =
+      [this](const char* key, auto valid, auto apply, QString invalidMessage) {
+        watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
+                                        QString::fromLatin1(key)),
+              [this, valid, apply, invalidMessage = std::move(invalidMessage)](
+                  SettingsJsonReadResult result) mutable {
+                if (std::holds_alternative<AppError>(result)) {
+                  setStatus(errorMessage(std::get<AppError>(result)));
+                  return;
+                }
+                const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
+                if (!stored.has_value()) {
+                  return;
+                }
+                bool parsed = false;
+                const int value = stored->toInt(&parsed);
+                if (!parsed || !valid(value)) {
+                  setStatus(std::move(invalidMessage));
+                  return;
+                }
+                apply(value);
+              });
+      };
+  loadPresentationInt(
+      kAppearanceModeSettingsKey,
+      isValidAppearanceMode,
+      [this](int value) {
+        if (appearanceMode_ != value) {
+          appearanceMode_ = value;
+          emit appearanceModeChanged();
+        }
+      },
+      QStringLiteral("Stored appearance mode is invalid"));
+  loadPresentationInt(
+      kVisualDensitySettingsKey,
+      isValidVisualDensity,
+      [this](int value) {
+        if (visualDensity_ != value) {
+          visualDensity_ = value;
+          emit visualDensityChanged();
+        }
+      },
+      QStringLiteral("Stored visual density is invalid"));
+  loadPresentationInt(
+      kPaletteModeSettingsKey,
+      isValidPaletteMode,
+      [this](int value) {
+        if (paletteMode_ != value) {
+          paletteMode_ = value;
+          emit paletteModeChanged();
+        }
+      },
+      QStringLiteral("Stored palette is invalid"));
+  loadPresentationInt(
+      kFontScaleSettingsKey,
+      isValidFontScale,
+      [this](int value) {
+        if (fontScale_ != value) {
+          fontScale_ = value;
+          emit fontScaleChanged();
+        }
+      },
+      QStringLiteral("Stored font scale is invalid"));
+  loadPresentationInt(
+      kBulkTextRecurrenceScopeSettingsKey,
+      isValidBulkTextRecurrenceScope,
+      [this](int value) {
+        if (bulkTextRecurrenceScope_ != value) {
+          bulkTextRecurrenceScope_ = value;
+          emit bulkTextRecurrenceScopeChanged();
+        }
+      },
+      QStringLiteral("Stored bulk text recurrence scope is invalid"));
   watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
                                   QString::fromLatin1(kAccentColorSettingsKey)),
         [this](SettingsJsonReadResult result) {
@@ -1486,8 +1511,8 @@ void AppController::initialize() {
           }
           const std::optional<QString> value = jsonArrayString(*stored);
           if (!value.has_value() ||
-              (!value->isEmpty() && (!installedFontFamilies().contains(*value) ||
-                                     !isUsableTextFontFamily(*value)))) {
+              (!value->isEmpty() &&
+               (!installedFontFamilies().contains(*value) || !isUsableTextFontFamily(*value)))) {
             setStatus(QStringLiteral("Stored font family is unavailable"));
             return;
           }
@@ -1496,53 +1521,58 @@ void AppController::initialize() {
             emit fontFamilyChanged();
           }
         });
-  const auto loadQuickCaptureString = [this](const char* key, auto valid, auto apply, QString message) {
-    watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
-                                    QString::fromLatin1(key)),
-          [this, valid, apply, message = std::move(message)](SettingsJsonReadResult result) mutable {
-            if (std::holds_alternative<AppError>(result)) {
-              setStatus(errorMessage(std::get<AppError>(result)));
-              return;
-            }
-            const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
-            if (!stored.has_value()) {
-              return;
-            }
-            const std::optional<QString> value = jsonArrayString(*stored);
-            if (!value.has_value() || !valid(*value)) {
-              setStatus(std::move(message));
-              return;
-            }
-            apply(*value);
-          });
-  };
-  loadQuickCaptureString(kQuickCaptureDefaultTaskListSettingsKey,
-                         isValidQuickCaptureDestination,
-                         [this](const QString& value) {
-                           if (quickCaptureDefaultTaskListId_ != value) {
-                             quickCaptureDefaultTaskListId_ = value;
-                             emit quickCaptureDefaultTaskListIdChanged();
-                           }
-                         },
-                         QStringLiteral("Stored quick capture task list is invalid"));
-  loadQuickCaptureString(kQuickCaptureDefaultCalendarSettingsKey,
-                         isValidQuickCaptureDestination,
-                         [this](const QString& value) {
-                           if (quickCaptureDefaultCalendarId_ != value) {
-                             quickCaptureDefaultCalendarId_ = value;
-                             emit quickCaptureDefaultCalendarIdChanged();
-                           }
-                         },
-                         QStringLiteral("Stored quick capture calendar is invalid"));
-  loadPresentationInt(kQuickCaptureEventDurationSettingsKey,
-                      isValidQuickCaptureDuration,
-                      [this](int value) {
-                        if (quickCaptureEventDurationMinutes_ != value) {
-                          quickCaptureEventDurationMinutes_ = value;
-                          emit quickCaptureEventDurationMinutesChanged();
-                        }
-                      },
-                      QStringLiteral("Stored quick capture event duration is invalid"));
+  const auto loadQuickCaptureString =
+      [this](const char* key, auto valid, auto apply, QString message) {
+        watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
+                                        QString::fromLatin1(key)),
+              [this, valid, apply, message = std::move(message)](
+                  SettingsJsonReadResult result) mutable {
+                if (std::holds_alternative<AppError>(result)) {
+                  setStatus(errorMessage(std::get<AppError>(result)));
+                  return;
+                }
+                const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
+                if (!stored.has_value()) {
+                  return;
+                }
+                const std::optional<QString> value = jsonArrayString(*stored);
+                if (!value.has_value() || !valid(*value)) {
+                  setStatus(std::move(message));
+                  return;
+                }
+                apply(*value);
+              });
+      };
+  loadQuickCaptureString(
+      kQuickCaptureDefaultTaskListSettingsKey,
+      isValidQuickCaptureDestination,
+      [this](const QString& value) {
+        if (quickCaptureDefaultTaskListId_ != value) {
+          quickCaptureDefaultTaskListId_ = value;
+          emit quickCaptureDefaultTaskListIdChanged();
+        }
+      },
+      QStringLiteral("Stored quick capture task list is invalid"));
+  loadQuickCaptureString(
+      kQuickCaptureDefaultCalendarSettingsKey,
+      isValidQuickCaptureDestination,
+      [this](const QString& value) {
+        if (quickCaptureDefaultCalendarId_ != value) {
+          quickCaptureDefaultCalendarId_ = value;
+          emit quickCaptureDefaultCalendarIdChanged();
+        }
+      },
+      QStringLiteral("Stored quick capture calendar is invalid"));
+  loadPresentationInt(
+      kQuickCaptureEventDurationSettingsKey,
+      isValidQuickCaptureDuration,
+      [this](int value) {
+        if (quickCaptureEventDurationMinutes_ != value) {
+          quickCaptureEventDurationMinutes_ = value;
+          emit quickCaptureEventDurationMinutesChanged();
+        }
+      },
+      QStringLiteral("Stored quick capture event duration is invalid"));
   watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
                                   QString::fromLatin1(kQuickCaptureRemoveParsedTextSettingsKey)),
         [this](SettingsJsonReadResult result) {
@@ -1554,9 +1584,10 @@ void AppController::initialize() {
           if (!stored.has_value()) {
             return;
           }
-          const std::optional<bool> value = *stored == QStringLiteral("true") ? std::optional<bool>(true)
-                                            : *stored == QStringLiteral("false") ? std::optional<bool>(false)
-                                                                                     : std::nullopt;
+          const std::optional<bool> value =
+              *stored == QStringLiteral("true")    ? std::optional<bool>(true)
+              : *stored == QStringLiteral("false") ? std::optional<bool>(false)
+                                                   : std::nullopt;
           if (!value.has_value()) {
             setStatus(QStringLiteral("Stored quick capture parsed-text preference is invalid"));
           } else if (quickCaptureRemoveParsedText_ != *value) {
@@ -1593,60 +1624,68 @@ void AppController::initialize() {
       emit quickCaptureAliasesChanged();
     }
   };
-  loadQuickCaptureAliases(kQuickCaptureTaskAliasesSettingsKey,
-                          [this, aliasesChanged](const QStringList& values) mutable {
-                            aliasesChanged(values, quickCaptureTaskAliases_);
-                          },
-                          QStringLiteral("Stored quick capture task aliases are invalid"));
-  loadQuickCaptureAliases(kQuickCaptureEventAliasesSettingsKey,
-                          [this, aliasesChanged](const QStringList& values) mutable {
-                            aliasesChanged(values, quickCaptureEventAliases_);
-                          },
-                          QStringLiteral("Stored quick capture event aliases are invalid"));
-  loadQuickCaptureAliases(kQuickCaptureHighPriorityAliasesSettingsKey,
-                          [this, aliasesChanged](const QStringList& values) mutable {
-                            aliasesChanged(values, quickCaptureHighPriorityAliases_);
-                          },
-                          QStringLiteral("Stored quick capture high-priority aliases are invalid"));
-  loadQuickCaptureAliases(kQuickCaptureMediumPriorityAliasesSettingsKey,
-                          [this, aliasesChanged](const QStringList& values) mutable {
-                            aliasesChanged(values, quickCaptureMediumPriorityAliases_);
-                          },
-                          QStringLiteral("Stored quick capture medium-priority aliases are invalid"));
-  loadQuickCaptureAliases(kQuickCaptureLowPriorityAliasesSettingsKey,
-                          [this, aliasesChanged](const QStringList& values) mutable {
-                            aliasesChanged(values, quickCaptureLowPriorityAliases_);
-                          },
-                          QStringLiteral("Stored quick capture low-priority aliases are invalid"));
-  loadPresentationInt(kWeekStartDaySettingsKey,
-                      isValidWeekStartDay,
-                      [this](int value) {
-                        if (weekStartDay_ != value) {
-                          weekStartDay_ = value;
-                          emit weekStartDayChanged();
-                          emit calendarLabelsChanged();
-                          refreshCalendar();
-                        }
-                      },
-                      QStringLiteral("Stored week start is invalid"));
-  loadPresentationInt(kWorkdayStartHourSettingsKey,
-                      [](int value) { return value >= 0 && value <= 23; },
-                      [this](int value) {
-                        if (isValidWorkdayHours(value, workdayEndHour_) && workdayStartHour_ != value) {
-                          workdayStartHour_ = value;
-                          emit workdayStartHourChanged();
-                        }
-                      },
-                      QStringLiteral("Stored workday start is invalid"));
-  loadPresentationInt(kWorkdayEndHourSettingsKey,
-                      [](int value) { return value >= 1 && value <= 24; },
-                      [this](int value) {
-                        if (isValidWorkdayHours(workdayStartHour_, value) && workdayEndHour_ != value) {
-                          workdayEndHour_ = value;
-                          emit workdayEndHourChanged();
-                        }
-                      },
-                      QStringLiteral("Stored workday end is invalid"));
+  loadQuickCaptureAliases(
+      kQuickCaptureTaskAliasesSettingsKey,
+      [this, aliasesChanged](const QStringList& values) mutable {
+        aliasesChanged(values, quickCaptureTaskAliases_);
+      },
+      QStringLiteral("Stored quick capture task aliases are invalid"));
+  loadQuickCaptureAliases(
+      kQuickCaptureEventAliasesSettingsKey,
+      [this, aliasesChanged](const QStringList& values) mutable {
+        aliasesChanged(values, quickCaptureEventAliases_);
+      },
+      QStringLiteral("Stored quick capture event aliases are invalid"));
+  loadQuickCaptureAliases(
+      kQuickCaptureHighPriorityAliasesSettingsKey,
+      [this, aliasesChanged](const QStringList& values) mutable {
+        aliasesChanged(values, quickCaptureHighPriorityAliases_);
+      },
+      QStringLiteral("Stored quick capture high-priority aliases are invalid"));
+  loadQuickCaptureAliases(
+      kQuickCaptureMediumPriorityAliasesSettingsKey,
+      [this, aliasesChanged](const QStringList& values) mutable {
+        aliasesChanged(values, quickCaptureMediumPriorityAliases_);
+      },
+      QStringLiteral("Stored quick capture medium-priority aliases are invalid"));
+  loadQuickCaptureAliases(
+      kQuickCaptureLowPriorityAliasesSettingsKey,
+      [this, aliasesChanged](const QStringList& values) mutable {
+        aliasesChanged(values, quickCaptureLowPriorityAliases_);
+      },
+      QStringLiteral("Stored quick capture low-priority aliases are invalid"));
+  loadPresentationInt(
+      kWeekStartDaySettingsKey,
+      isValidWeekStartDay,
+      [this](int value) {
+        if (weekStartDay_ != value) {
+          weekStartDay_ = value;
+          emit weekStartDayChanged();
+          emit calendarLabelsChanged();
+          refreshCalendar();
+        }
+      },
+      QStringLiteral("Stored week start is invalid"));
+  loadPresentationInt(
+      kWorkdayStartHourSettingsKey,
+      [](int value) { return value >= 0 && value <= 23; },
+      [this](int value) {
+        if (isValidWorkdayHours(value, workdayEndHour_) && workdayStartHour_ != value) {
+          workdayStartHour_ = value;
+          emit workdayStartHourChanged();
+        }
+      },
+      QStringLiteral("Stored workday start is invalid"));
+  loadPresentationInt(
+      kWorkdayEndHourSettingsKey,
+      [](int value) { return value >= 1 && value <= 24; },
+      [this](int value) {
+        if (isValidWorkdayHours(workdayStartHour_, value) && workdayEndHour_ != value) {
+          workdayEndHour_ = value;
+          emit workdayEndHourChanged();
+        }
+      },
+      QStringLiteral("Stored workday end is invalid"));
   watch(settingsService_.readJson(QString::fromLatin1(kPresentationSettingsScope),
                                   QString::fromLatin1(kUse24HourTimeSettingsKey)),
         [this](SettingsJsonReadResult result) {
@@ -1655,10 +1694,11 @@ void AppController::initialize() {
             return;
           }
           const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
-          const std::optional<bool> value = !stored.has_value() ? std::optional<bool>{}
-              : *stored == QStringLiteral("true") ? std::optional<bool>(true)
+          const std::optional<bool> value =
+              !stored.has_value()                  ? std::optional<bool>{}
+              : *stored == QStringLiteral("true")  ? std::optional<bool>(true)
               : *stored == QStringLiteral("false") ? std::optional<bool>(false)
-                                                 : std::nullopt;
+                                                   : std::nullopt;
           if (!value.has_value() && stored.has_value()) {
             setStatus(QStringLiteral("Stored time format is invalid"));
           } else if (value.has_value() && use24HourTime_ != *value) {
@@ -1825,23 +1865,27 @@ void AppController::loadBridgeAuthentication() {
   if (pythonBridgeClient_ == nullptr || pythonBridgeAccountId_.isEmpty()) {
     return;
   }
-  watch(pythonBridgeClient_->authenticationState(pythonBridgeAccountId_), [this](PythonBridgeResult result) {
-    if (std::holds_alternative<AppError>(result)) {
-      setStatus(errorMessage(std::get<AppError>(std::move(result))));
-      return;
-    }
-    const QJsonObject authentication =
-        std::get<QJsonObject>(std::move(result)).value(QStringLiteral("authentication")).toObject();
-    const QJsonValue connected = authentication.value(QStringLiteral("connected"));
-    if (!connected.isBool()) {
-      setStatus(QStringLiteral("HCB bridge returned an invalid authentication state"));
-      return;
-    }
-    if (googleConnected_ != connected.toBool()) {
-      googleConnected_ = connected.toBool();
-      emit googleConnectedChanged();
-    }
-  }, false);
+  watch(
+      pythonBridgeClient_->authenticationState(pythonBridgeAccountId_),
+      [this](PythonBridgeResult result) {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        const QJsonObject authentication = std::get<QJsonObject>(std::move(result))
+                                               .value(QStringLiteral("authentication"))
+                                               .toObject();
+        const QJsonValue connected = authentication.value(QStringLiteral("connected"));
+        if (!connected.isBool()) {
+          setStatus(QStringLiteral("HCB bridge returned an invalid authentication state"));
+          return;
+        }
+        if (googleConnected_ != connected.toBool()) {
+          googleConnected_ = connected.toBool();
+          emit googleConnectedChanged();
+        }
+      },
+      false);
 }
 
 void AppController::reportBridgeUnsupportedAction() {
@@ -1857,72 +1901,39 @@ void AppController::refreshBridge() {
   pythonBridgeTasksReady_ = false;
   pythonBridgeCalendarReady_ = false;
   setStatus(QStringLiteral("Loading HCB core bridge"));
-  watch(pythonBridgeClient_->workspace(pythonBridgeAccountId_), [this, generation](PythonBridgeResult result) {
-    if (generation != pythonBridgeRefreshGeneration_) {
-      return;
-    }
-    if (std::holds_alternative<AppError>(result)) {
-      const QString message = errorMessage(std::get<AppError>(std::move(result)));
-      setStatus(message);
-      setTaskListError(message);
-      return;
-    }
-    PythonBridgeWorkspaceSummaryOrError decoded =
-        PythonBridgeProjection::workspaceSummary(std::get<QJsonObject>(std::move(result)));
-    if (std::holds_alternative<AppError>(decoded)) {
-      const QString message = errorMessage(std::get<AppError>(std::move(decoded)));
-      setStatus(message);
-      setTaskListError(message);
-      return;
-    }
-    PythonBridgeWorkspaceSummary summary =
-        std::get<PythonBridgeWorkspaceSummary>(std::move(decoded));
-    if (summary.accountId != pythonBridgeAccountId_) {
-      setStatus(QStringLiteral("HCB bridge returned a different account"));
-      setTaskListError(statusMessage_);
-      return;
-    }
-    pythonBridgeExpectedEmail_ = summary.accountEmail;
-    setTaskListError({});
-    pythonBridgeTaskListTitles_ = PythonBridgeProjection::taskListTitles(summary);
-    taskListModel_.setTaskLists(std::move(summary.taskLists));
-    QList<CalendarSummary> calendars = std::move(summary.calendars);
-    QStringList visibleIds;
-    QVariantList managementRows;
-    managementRows.reserve(calendars.size());
-    for (const CalendarSummary& calendar : calendars) {
-      if (calendar.selected && !calendar.hidden) {
-        visibleIds.append(calendar.id);
-      }
-      managementRows.append(QVariantMap{{QStringLiteral("id"), calendar.id},
-                                        {QStringLiteral("title"), calendar.title},
-                                        {QStringLiteral("description"),
-                                         calendar.description.value_or(QString())},
-                                        {QStringLiteral("timeZone"),
-                                         calendar.timeZone.value_or(QString())},
-                                        {QStringLiteral("colorId"),
-                                         calendar.colorId.value_or(QString())},
-                                        {QStringLiteral("backgroundColor"),
-                                         calendar.backgroundColor.value_or(QString())},
-                                        {QStringLiteral("accessRole"), QString()},
-                                        {QStringLiteral("selected"), calendar.selected},
-                                        {QStringLiteral("hidden"), calendar.hidden},
-                                        {QStringLiteral("primary"), calendar.primary}});
-    }
-    calendarSourceModel_.setCalendars(std::move(calendars));
-    monthGridModel_.setVisibleCalendarIds(visibleIds);
-    visibleCalendarIds_.clear();
-    visibleCalendarIds_.reserve(visibleIds.size());
-    for (const QString& id : visibleIds) {
-      visibleCalendarIds_.append(id);
-    }
-    calendarVisibilityConfigured_ = true;
-    emit visibleCalendarIdsChanged();
-    emit calendarVisibilityConfiguredChanged();
-    setCalendarManagementRows(std::move(managementRows));
-    loadBridgeTaskPage(generation, std::nullopt, {}, false);
-    loadBridgeCalendar(generation);
-  });
+  watch(pythonBridgeClient_->workspace(pythonBridgeAccountId_),
+        [this, generation](PythonBridgeResult result) {
+          if (generation != pythonBridgeRefreshGeneration_) {
+            return;
+          }
+          if (std::holds_alternative<AppError>(result)) {
+            const QString message = errorMessage(std::get<AppError>(std::move(result)));
+            setStatus(message);
+            setTaskListError(message);
+            return;
+          }
+          PythonBridgeWorkspaceSummaryOrError decoded =
+              PythonBridgeProjection::workspaceSummary(std::get<QJsonObject>(std::move(result)));
+          if (std::holds_alternative<AppError>(decoded)) {
+            const QString message = errorMessage(std::get<AppError>(std::move(decoded)));
+            setStatus(message);
+            setTaskListError(message);
+            return;
+          }
+          PythonBridgeWorkspaceSummary summary =
+              std::get<PythonBridgeWorkspaceSummary>(std::move(decoded));
+          if (summary.accountId != pythonBridgeAccountId_) {
+            setStatus(QStringLiteral("HCB bridge returned a different account"));
+            setTaskListError(statusMessage_);
+            return;
+          }
+          pythonBridgeExpectedEmail_ = summary.accountEmail;
+          setTaskListError({});
+          applyBridgeTaskLists(std::move(summary.taskLists));
+          applyBridgeCalendars(std::move(summary.calendars), false);
+          loadBridgeTaskPage(generation, std::nullopt, {}, false);
+          loadBridgeCalendar(generation);
+        });
 }
 
 void AppController::loadBridgeTaskPage(std::uint64_t generation,
@@ -1952,7 +1963,8 @@ void AppController::loadBridgeTaskPage(std::uint64_t generation,
           accumulated.append(std::move(page.tasks));
           const bool applyNow = !firstPageApplied || !page.nextCursor.has_value();
           if (applyNow) {
-            applyTaskProjections(accumulated);
+            pythonBridgeTasks_ = accumulated;
+            applyTaskProjections(visibleBridgeTasks());
           }
           if (page.nextCursor.has_value()) {
             setStatus(QStringLiteral("Loading HCB core tasks (%1 loaded)").arg(accumulated.size()));
@@ -1987,8 +1999,8 @@ void AppController::loadBridgeCalendar(std::uint64_t generation) {
             setStatus(errorMessage(std::get<AppError>(std::move(decoded))));
             return;
           }
-          applyBridgeCalendarEvents(
-              generation, std::get<QList<CalendarEventSummary>>(std::move(decoded)));
+          applyBridgeCalendarEvents(generation,
+                                    std::get<QList<CalendarEventSummary>>(std::move(decoded)));
         });
 }
 
@@ -1997,6 +2009,18 @@ void AppController::applyBridgeCalendarEvents(std::uint64_t generation,
   if (generation != pythonBridgeRefreshGeneration_) {
     return;
   }
+  QSet<QString> visibleCalendars;
+  for (const CalendarSummary& calendar : pythonBridgeCalendars_) {
+    if (calendar.selected && !calendar.hidden) {
+      visibleCalendars.insert(calendar.id);
+    }
+  }
+  events.erase(std::remove_if(events.begin(),
+                              events.end(),
+                              [&visibleCalendars](const CalendarEventSummary& event) {
+                                return !visibleCalendars.contains(event.calendarId);
+                              }),
+               events.end());
   const QDate date = calendarDate_;
   const QTimeZone displayTimeZone(displayTimeZone_.toUtf8());
   const int firstDay = weekStartDay_;
@@ -2018,6 +2042,81 @@ void AppController::applyBridgeCalendarEvents(std::uint64_t generation,
         });
 }
 
+void AppController::applyBridgeTaskLists(QList<TaskListSummary> taskLists) {
+  pythonBridgeTaskLists_ = std::move(taskLists);
+  pythonBridgeTaskListTitles_.clear();
+  pythonBridgeTaskListTitles_.reserve(pythonBridgeTaskLists_.size());
+  for (const TaskListSummary& taskList : pythonBridgeTaskLists_) {
+    pythonBridgeTaskListTitles_.insert(taskList.id, taskList.title);
+  }
+  taskListModel_.setTaskLists(pythonBridgeTaskLists_);
+  for (TaskModelTask& task : pythonBridgeTasks_) {
+    const auto title = pythonBridgeTaskListTitles_.constFind(task.taskListId);
+    if (title != pythonBridgeTaskListTitles_.cend()) {
+      task.taskListTitle = *title;
+    }
+  }
+  applyTaskProjections(visibleBridgeTasks());
+}
+
+QList<TaskModelTask> AppController::visibleBridgeTasks() const {
+  QSet<QString> selectedTaskLists;
+  for (const TaskListSummary& taskList : pythonBridgeTaskLists_) {
+    if (taskList.selected) {
+      selectedTaskLists.insert(taskList.id);
+    }
+  }
+  QList<TaskModelTask> visible;
+  visible.reserve(pythonBridgeTasks_.size());
+  for (const TaskModelTask& task : pythonBridgeTasks_) {
+    if (selectedTaskLists.contains(task.taskListId)) {
+      visible.append(task);
+    }
+  }
+  return visible;
+}
+
+void AppController::applyBridgeCalendars(QList<CalendarSummary> calendars,
+                                         bool reloadCalendarRange) {
+  pythonBridgeCalendars_ = std::move(calendars);
+  QStringList visibleIds;
+  QVariantList managementRows;
+  managementRows.reserve(pythonBridgeCalendars_.size());
+  for (const CalendarSummary& calendar : pythonBridgeCalendars_) {
+    if (calendar.selected && !calendar.hidden) {
+      visibleIds.append(calendar.id);
+    }
+    managementRows.append(QVariantMap{
+        {QStringLiteral("id"), calendar.id},
+        {QStringLiteral("title"), calendar.title},
+        {QStringLiteral("description"), calendar.description.value_or(QString())},
+        {QStringLiteral("timeZone"), calendar.timeZone.value_or(QString())},
+        {QStringLiteral("colorId"), calendar.colorId.value_or(QString())},
+        {QStringLiteral("backgroundColor"), calendar.backgroundColor.value_or(QString())},
+        {QStringLiteral("accessRole"), QString()},
+        {QStringLiteral("selected"), calendar.selected},
+        {QStringLiteral("hidden"), calendar.hidden},
+        {QStringLiteral("primary"), calendar.primary}});
+  }
+  calendarSourceModel_.setCalendars(pythonBridgeCalendars_);
+  monthGridModel_.setVisibleCalendarIds(visibleIds);
+  visibleCalendarIds_.clear();
+  visibleCalendarIds_.reserve(visibleIds.size());
+  for (const QString& id : visibleIds) {
+    visibleCalendarIds_.append(id);
+  }
+  if (!calendarVisibilityConfigured_) {
+    calendarVisibilityConfigured_ = true;
+    emit calendarVisibilityConfiguredChanged();
+  }
+  emit visibleCalendarIdsChanged();
+  setCalendarManagementRows(std::move(managementRows));
+  if (reloadCalendarRange) {
+    pythonBridgeCalendarReady_ = false;
+    loadBridgeCalendar(pythonBridgeRefreshGeneration_);
+  }
+}
+
 void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
   const QJsonObject task = data.value(QStringLiteral("task")).toObject();
   if (task.isEmpty()) {
@@ -2028,13 +2127,13 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
   const bool deleted =
       task.value(QStringLiteral("metadata")).toObject().value(QStringLiteral("deleted")).toBool();
   const auto existing =
-      std::find_if(taskProjectionTasks_.begin(),
-                   taskProjectionTasks_.end(),
+      std::find_if(pythonBridgeTasks_.begin(),
+                   pythonBridgeTasks_.end(),
                    [&id](const TaskModelTask& candidate) { return candidate.id == id; });
   if (deleted) {
-    if (existing != taskProjectionTasks_.end()) {
-      taskProjectionTasks_.erase(existing);
-      applyTaskProjections(taskProjectionTasks_);
+    if (existing != pythonBridgeTasks_.end()) {
+      pythonBridgeTasks_.erase(existing);
+      applyTaskProjections(visibleBridgeTasks());
       refreshSearchProjection();
     }
     return;
@@ -2048,14 +2147,14 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
     return;
   }
   TaskModelTask projected = std::get<PythonBridgeTaskPage>(decoded).tasks.first();
-  if (existing == taskProjectionTasks_.end()) {
-    projected.sortOrder = taskProjectionTasks_.size();
-    taskProjectionTasks_.append(std::move(projected));
+  if (existing == pythonBridgeTasks_.end()) {
+    projected.sortOrder = pythonBridgeTasks_.size();
+    pythonBridgeTasks_.append(std::move(projected));
   } else {
     projected.sortOrder = existing->sortOrder;
     *existing = std::move(projected);
   }
-  applyTaskProjections(taskProjectionTasks_);
+  applyTaskProjections(visibleBridgeTasks());
   refreshSearchProjection();
 }
 
@@ -2098,15 +2197,102 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
   refreshSearchProjection();
 }
 
+void AppController::applyBridgeTaskListResponse(const QJsonObject& data) {
+  const QJsonObject taskList = data.value(QStringLiteral("task_list")).toObject();
+  if (taskList.isEmpty() || pythonBridgeExpectedEmail_.isEmpty()) {
+    setStatus(QStringLiteral("HCB bridge mutation returned an invalid task list"));
+    return;
+  }
+  const QJsonObject workspace{{QStringLiteral("account"),
+                               QJsonObject{{QStringLiteral("id"), pythonBridgeAccountId_},
+                                           {QStringLiteral("email"), pythonBridgeExpectedEmail_}}},
+                              {QStringLiteral("pending"), 0},
+                              {QStringLiteral("task_lists"), QJsonArray{taskList}},
+                              {QStringLiteral("calendars"), QJsonArray{}}};
+  const PythonBridgeWorkspaceSummaryOrError decoded = PythonBridgeProjection::workspaceSummary(
+      QJsonObject{{QStringLiteral("workspace"), workspace}});
+  if (std::holds_alternative<AppError>(decoded)) {
+    setStatus(errorMessage(std::get<AppError>(decoded)));
+    return;
+  }
+  const TaskListSummary projected =
+      std::get<PythonBridgeWorkspaceSummary>(decoded).taskLists.first();
+  const bool deleted = taskList.value(QStringLiteral("metadata"))
+                           .toObject()
+                           .value(QStringLiteral("deleted"))
+                           .toBool();
+  const auto existing = std::find_if(
+      pythonBridgeTaskLists_.begin(),
+      pythonBridgeTaskLists_.end(),
+      [&projected](const TaskListSummary& candidate) { return candidate.id == projected.id; });
+  if (deleted) {
+    if (existing != pythonBridgeTaskLists_.end()) {
+      pythonBridgeTaskLists_.erase(existing);
+    }
+    pythonBridgeTasks_.erase(std::remove_if(pythonBridgeTasks_.begin(),
+                                            pythonBridgeTasks_.end(),
+                                            [&projected](const TaskModelTask& task) {
+                                              return task.taskListId == projected.id;
+                                            }),
+                             pythonBridgeTasks_.end());
+  } else if (existing == pythonBridgeTaskLists_.end()) {
+    pythonBridgeTaskLists_.append(projected);
+  } else {
+    *existing = projected;
+  }
+  applyBridgeTaskLists(pythonBridgeTaskLists_);
+  refreshSearchProjection();
+}
+
+void AppController::applyBridgeCalendarResponse(const QJsonObject& data) {
+  const QJsonObject calendar = data.value(QStringLiteral("calendar")).toObject();
+  if (calendar.isEmpty() || pythonBridgeExpectedEmail_.isEmpty()) {
+    setStatus(QStringLiteral("HCB bridge mutation returned an invalid calendar"));
+    return;
+  }
+  const QJsonObject workspace{{QStringLiteral("account"),
+                               QJsonObject{{QStringLiteral("id"), pythonBridgeAccountId_},
+                                           {QStringLiteral("email"), pythonBridgeExpectedEmail_}}},
+                              {QStringLiteral("pending"), 0},
+                              {QStringLiteral("task_lists"), QJsonArray{}},
+                              {QStringLiteral("calendars"), QJsonArray{calendar}}};
+  const PythonBridgeWorkspaceSummaryOrError decoded = PythonBridgeProjection::workspaceSummary(
+      QJsonObject{{QStringLiteral("workspace"), workspace}});
+  if (std::holds_alternative<AppError>(decoded)) {
+    setStatus(errorMessage(std::get<AppError>(decoded)));
+    return;
+  }
+  const CalendarSummary projected =
+      std::get<PythonBridgeWorkspaceSummary>(decoded).calendars.first();
+  const bool deleted = calendar.value(QStringLiteral("metadata"))
+                           .toObject()
+                           .value(QStringLiteral("deleted"))
+                           .toBool();
+  const auto existing = std::find_if(
+      pythonBridgeCalendars_.begin(),
+      pythonBridgeCalendars_.end(),
+      [&projected](const CalendarSummary& candidate) { return candidate.id == projected.id; });
+  if (deleted) {
+    if (existing != pythonBridgeCalendars_.end()) {
+      pythonBridgeCalendars_.erase(existing);
+    }
+  } else if (existing == pythonBridgeCalendars_.end()) {
+    pythonBridgeCalendars_.append(projected);
+  } else {
+    *existing = projected;
+  }
+  applyBridgeCalendars(pythonBridgeCalendars_, true);
+  refreshSearchProjection();
+}
+
 void AppController::startBridgeOperation(QString kind, std::future<PythonBridgeResult> future) {
   watch(std::move(future), [this, kind = std::move(kind)](PythonBridgeResult result) {
     if (std::holds_alternative<AppError>(result)) {
       setStatus(errorMessage(std::get<AppError>(std::move(result))));
       return;
     }
-    const QJsonObject operation = std::get<QJsonObject>(std::move(result))
-                                      .value(QStringLiteral("operation"))
-                                      .toObject();
+    const QJsonObject operation =
+        std::get<QJsonObject>(std::move(result)).value(QStringLiteral("operation")).toObject();
     const QString operationId = operation.value(QStringLiteral("id")).toString();
     if (operationId.isEmpty() || operationId.size() > 256 || operationId != operationId.trimmed() ||
         operationId.contains(QChar::Null)) {
@@ -2125,64 +2311,64 @@ void AppController::pollBridgeOperation(QString operationId) {
   if (pythonBridgeClient_ == nullptr || operationId != pythonBridgeOperationId_) {
     return;
   }
-  watch(pythonBridgeClient_->operation(operationId), [this, operationId](PythonBridgeResult result) {
-    if (operationId != pythonBridgeOperationId_) {
-      return;
-    }
-    if (std::holds_alternative<AppError>(result)) {
-      setStatus(errorMessage(std::get<AppError>(std::move(result))));
-      pythonBridgeOperationId_.clear();
-      pythonBridgeOperationKind_.clear();
-      emit bridgeOperationChanged();
-      return;
-    }
-    const QJsonObject operation = std::get<QJsonObject>(std::move(result))
-                                      .value(QStringLiteral("operation"))
-                                      .toObject();
-    const QString state = operation.value(QStringLiteral("state")).toString();
-    if (state != QStringLiteral("queued") && state != QStringLiteral("running") &&
-        state != QStringLiteral("succeeded") && state != QStringLiteral("failed") &&
-        state != QStringLiteral("cancelled")) {
-      setStatus(QStringLiteral("HCB bridge returned an invalid operation state"));
-      pythonBridgeOperationId_.clear();
-      pythonBridgeOperationKind_.clear();
-      emit bridgeOperationChanged();
-      return;
-    }
-    const QJsonArray progress = operation.value(QStringLiteral("progress")).toArray();
-    if (!progress.isEmpty() && progress.last().isString()) {
-      setStatus(progress.last().toString());
-    }
-    if (state == QStringLiteral("queued") || state == QStringLiteral("running")) {
-      QTimer::singleShot(250, this, [this, operationId] { pollBridgeOperation(operationId); });
-      return;
-    }
-    const QString kind = pythonBridgeOperationKind_;
-    pythonBridgeOperationId_.clear();
-    pythonBridgeOperationKind_.clear();
-    emit bridgeOperationChanged();
-    if (state == QStringLiteral("succeeded")) {
-      if (kind == QStringLiteral("Google authorization") && !googleConnected_) {
-        googleConnected_ = true;
-        emit googleConnectedChanged();
-      }
-      setSyncStatus(kind + QStringLiteral(" complete"));
-      setStatus(kind + QStringLiteral(" complete"));
-      refreshBridge();
-      return;
-    }
-    if (state == QStringLiteral("cancelled")) {
-      setSyncStatus(kind + QStringLiteral(" cancelled"));
-      setStatus(kind + QStringLiteral(" cancelled"));
-      return;
-    }
-    const QString message = operation.value(QStringLiteral("error"))
-                                .toObject()
-                                .value(QStringLiteral("message"))
-                                .toString();
-    setSyncStatus(kind + QStringLiteral(" failed"));
-    setStatus(message.isEmpty() ? kind + QStringLiteral(" failed") : message);
-  });
+  watch(
+      pythonBridgeClient_->operation(operationId), [this, operationId](PythonBridgeResult result) {
+        if (operationId != pythonBridgeOperationId_) {
+          return;
+        }
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          pythonBridgeOperationId_.clear();
+          pythonBridgeOperationKind_.clear();
+          emit bridgeOperationChanged();
+          return;
+        }
+        const QJsonObject operation =
+            std::get<QJsonObject>(std::move(result)).value(QStringLiteral("operation")).toObject();
+        const QString state = operation.value(QStringLiteral("state")).toString();
+        if (state != QStringLiteral("queued") && state != QStringLiteral("running") &&
+            state != QStringLiteral("succeeded") && state != QStringLiteral("failed") &&
+            state != QStringLiteral("cancelled")) {
+          setStatus(QStringLiteral("HCB bridge returned an invalid operation state"));
+          pythonBridgeOperationId_.clear();
+          pythonBridgeOperationKind_.clear();
+          emit bridgeOperationChanged();
+          return;
+        }
+        const QJsonArray progress = operation.value(QStringLiteral("progress")).toArray();
+        if (!progress.isEmpty() && progress.last().isString()) {
+          setStatus(progress.last().toString());
+        }
+        if (state == QStringLiteral("queued") || state == QStringLiteral("running")) {
+          QTimer::singleShot(250, this, [this, operationId] { pollBridgeOperation(operationId); });
+          return;
+        }
+        const QString kind = pythonBridgeOperationKind_;
+        pythonBridgeOperationId_.clear();
+        pythonBridgeOperationKind_.clear();
+        emit bridgeOperationChanged();
+        if (state == QStringLiteral("succeeded")) {
+          if (kind == QStringLiteral("Google authorization") && !googleConnected_) {
+            googleConnected_ = true;
+            emit googleConnectedChanged();
+          }
+          setSyncStatus(kind + QStringLiteral(" complete"));
+          setStatus(kind + QStringLiteral(" complete"));
+          refreshBridge();
+          return;
+        }
+        if (state == QStringLiteral("cancelled")) {
+          setSyncStatus(kind + QStringLiteral(" cancelled"));
+          setStatus(kind + QStringLiteral(" cancelled"));
+          return;
+        }
+        const QString message = operation.value(QStringLiteral("error"))
+                                    .toObject()
+                                    .value(QStringLiteral("message"))
+                                    .toString();
+        setSyncStatus(kind + QStringLiteral(" failed"));
+        setStatus(message.isEmpty() ? kind + QStringLiteral(" failed") : message);
+      });
 }
 
 void AppController::cancelBridgeOperation() {
@@ -2190,17 +2376,18 @@ void AppController::cancelBridgeOperation() {
     return;
   }
   const QString operationId = pythonBridgeOperationId_;
-  watch(pythonBridgeClient_->cancelOperation(operationId), [this, operationId](PythonBridgeResult result) {
-    if (operationId != pythonBridgeOperationId_) {
-      return;
-    }
-    if (std::holds_alternative<AppError>(result)) {
-      setStatus(errorMessage(std::get<AppError>(std::move(result))));
-      return;
-    }
-    setStatus(QStringLiteral("Cancelling HCB bridge operation"));
-    pollBridgeOperation(operationId);
-  });
+  watch(pythonBridgeClient_->cancelOperation(operationId),
+        [this, operationId](PythonBridgeResult result) {
+          if (operationId != pythonBridgeOperationId_) {
+            return;
+          }
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            return;
+          }
+          setStatus(QStringLiteral("Cancelling HCB bridge operation"));
+          pollBridgeOperation(operationId);
+        });
 }
 
 void AppController::completeBridgeReadyProbe() {
@@ -2235,7 +2422,11 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
   struct State final {
     QString reportPath;
     QString taskId;
+    QString hiddenTaskId;
     QString eventId;
+    QString taskListId;
+    QString calendarId;
+    QString subscriptionId;
     QString eventDate;
     int stage{0};
     int initialSearchResults{0};
@@ -2251,21 +2442,25 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
   auto* timer = new QTimer(this);
   timer->setInterval(20);
   const auto finish = [this, timer, state](bool success, QString error = {}) {
-    QJsonObject payload{{QStringLiteral("ok"), success},
-                        {QStringLiteral("stage"), state->stage},
-                        {QStringLiteral("task_id"), state->taskId},
-                        {QStringLiteral("event_id"), state->eventId},
-                        {QStringLiteral("event_date"), state->eventDate},
-                        {QStringLiteral("initial_search_results"), state->initialSearchResults},
-                        {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
+    QJsonObject payload{
+        {QStringLiteral("ok"), success},
+        {QStringLiteral("stage"), state->stage},
+        {QStringLiteral("task_id"), state->taskId},
+        {QStringLiteral("hidden_task_id"), state->hiddenTaskId},
+        {QStringLiteral("event_id"), state->eventId},
+        {QStringLiteral("task_list_id"), state->taskListId},
+        {QStringLiteral("calendar_id"), state->calendarId},
+        {QStringLiteral("event_date"), state->eventDate},
+        {QStringLiteral("initial_search_results"), state->initialSearchResults},
+        {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
     if (!error.isEmpty()) {
       payload.insert(QStringLiteral("error"), std::move(error));
       payload.insert(QStringLiteral("status"), statusMessage_);
     }
     QSaveFile report(state->reportPath);
     const QByteArray encoded = QJsonDocument(payload).toJson(QJsonDocument::Compact);
-    const bool wrote = report.open(QIODevice::WriteOnly) && report.write(encoded) == encoded.size() &&
-                       report.commit();
+    const bool wrote = report.open(QIODevice::WriteOnly) &&
+                       report.write(encoded) == encoded.size() && report.commit();
     timer->stop();
     timer->deleteLater();
     QCoreApplication::exit(success && wrote ? 0 : 3);
@@ -2273,19 +2468,17 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
 
   connect(timer, &QTimer::timeout, this, [this, state, finish] {
     const auto taskById = [this, state]() -> const TaskModelTask* {
-      const auto found = std::find_if(taskProjectionTasks_.cbegin(),
-                                      taskProjectionTasks_.cend(),
-                                      [state](const TaskModelTask& task) {
-                                        return task.id == state->taskId;
-                                      });
+      const auto found =
+          std::find_if(taskProjectionTasks_.cbegin(),
+                       taskProjectionTasks_.cend(),
+                       [state](const TaskModelTask& task) { return task.id == state->taskId; });
       return found == taskProjectionTasks_.cend() ? nullptr : &*found;
     };
     const auto eventById = [this, state]() -> const CalendarEventSummary* {
-      const auto found = std::find_if(pythonBridgeCalendarEvents_.cbegin(),
-                                      pythonBridgeCalendarEvents_.cend(),
-                                      [state](const CalendarEventSummary& event) {
-                                        return event.id == state->eventId;
-                                      });
+      const auto found = std::find_if(
+          pythonBridgeCalendarEvents_.cbegin(),
+          pythonBridgeCalendarEvents_.cend(),
+          [state](const CalendarEventSummary& event) { return event.id == state->eventId; });
       return found == pythonBridgeCalendarEvents_.cend() ? nullptr : &*found;
     };
     const auto countSearchTasks = [this](const QString& id = {}) {
@@ -2301,7 +2494,7 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
       }
       return matches;
     };
-    if (state->elapsed.elapsed() > 30'000) {
+    if (state->elapsed.elapsed() > 60'000) {
       finish(false, QStringLiteral("timed out waiting for Qt bridge interaction stage"));
       return;
     }
@@ -2320,7 +2513,7 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
                          {},
                          QString::fromLatin1(kBridgeAcceptanceInitialTaskTitle),
                          QString::fromLatin1(kBridgeAcceptanceInitialTaskNotes),
-                         state->eventDate,
+                         calendarDate_.toString(Qt::ISODate),
                          QStringLiteral("UTC"),
                          0,
                          false,
@@ -2332,12 +2525,12 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
       state->stage = 2;
       return;
     case 2: {
-      const auto created = std::find_if(taskProjectionTasks_.cbegin(),
-                                        taskProjectionTasks_.cend(),
-                                        [](const TaskModelTask& task) {
-                                          return task.title ==
-                                                 QString::fromLatin1(kBridgeAcceptanceInitialTaskTitle);
-                                        });
+      const auto created = std::find_if(
+          taskProjectionTasks_.cbegin(),
+          taskProjectionTasks_.cend(),
+          [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceInitialTaskTitle);
+          });
       if (created == taskProjectionTasks_.cend()) {
         return;
       }
@@ -2385,12 +2578,12 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
       return;
     }
     case 5: {
-      const auto created = std::find_if(pythonBridgeCalendarEvents_.cbegin(),
-                                        pythonBridgeCalendarEvents_.cend(),
-                                        [](const CalendarEventSummary& event) {
-                                          return event.title ==
-                                                 QString::fromLatin1(kBridgeAcceptanceInitialEventTitle);
-                                        });
+      const auto created = std::find_if(
+          pythonBridgeCalendarEvents_.cbegin(),
+          pythonBridgeCalendarEvents_.cend(),
+          [](const CalendarEventSummary& event) {
+            return event.title == QString::fromLatin1(kBridgeAcceptanceInitialEventTitle);
+          });
       if (created == pythonBridgeCalendarEvents_.cend()) {
         return;
       }
@@ -2423,6 +2616,157 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
     case 7:
       state->refreshedSearchResults = countSearchTasks(state->taskId);
       if (state->refreshedSearchResults == 0) {
+        return;
+      }
+      createTaskList(QString::fromLatin1(kBridgeAcceptanceInitialTaskListTitle));
+      state->stage = 8;
+      return;
+    case 8: {
+      const auto created = std::find_if(
+          pythonBridgeTaskLists_.cbegin(),
+          pythonBridgeTaskLists_.cend(),
+          [](const TaskListSummary& taskList) {
+            return taskList.title == QString::fromLatin1(kBridgeAcceptanceInitialTaskListTitle);
+          });
+      if (created == pythonBridgeTaskLists_.cend()) {
+        return;
+      }
+      state->taskListId = created->id;
+      renameTaskList(state->taskListId, QString::fromLatin1(kBridgeAcceptanceUpdatedTaskListTitle));
+      state->stage = 9;
+      return;
+    }
+    case 9: {
+      const auto updated = std::find_if(
+          pythonBridgeTaskLists_.cbegin(),
+          pythonBridgeTaskLists_.cend(),
+          [state](const TaskListSummary& taskList) {
+            return taskList.id == state->taskListId &&
+                   taskList.title == QString::fromLatin1(kBridgeAcceptanceUpdatedTaskListTitle);
+          });
+      if (updated == pythonBridgeTaskLists_.cend()) {
+        return;
+      }
+      createTaskDetailed(state->taskListId,
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceHiddenTaskTitle),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 10;
+      return;
+    }
+    case 10: {
+      const auto created =
+          std::find_if(pythonBridgeTasks_.cbegin(),
+                       pythonBridgeTasks_.cend(),
+                       [state](const TaskModelTask& task) {
+                         return task.taskListId == state->taskListId &&
+                                task.title == QString::fromLatin1(kBridgeAcceptanceHiddenTaskTitle);
+                       });
+      if (created == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->hiddenTaskId = created->id;
+      setTaskListSelected(state->taskListId, false);
+      state->stage = 11;
+      return;
+    }
+    case 11: {
+      const auto updated =
+          std::find_if(pythonBridgeTaskLists_.cbegin(),
+                       pythonBridgeTaskLists_.cend(),
+                       [state](const TaskListSummary& taskList) {
+                         return taskList.id == state->taskListId && !taskList.selected;
+                       });
+      if (updated == pythonBridgeTaskLists_.cend()) {
+        return;
+      }
+      const bool retainedInBridgeCache = std::any_of(
+          pythonBridgeTasks_.cbegin(),
+          pythonBridgeTasks_.cend(),
+          [state](const TaskModelTask& task) { return task.id == state->hiddenTaskId; });
+      const bool visibleInTaskProjection = std::any_of(
+          taskProjectionTasks_.cbegin(),
+          taskProjectionTasks_.cend(),
+          [state](const TaskModelTask& task) { return task.id == state->hiddenTaskId; });
+      if (!retainedInBridgeCache || visibleInTaskProjection) {
+        finish(false, QStringLiteral("task-list selection did not hide its retained task"));
+        return;
+      }
+      createGoogleCalendar(QString::fromLatin1(kBridgeAcceptanceInitialCalendarTitle),
+                           QStringLiteral("Initial acceptance calendar"),
+                           QStringLiteral("UTC"));
+      state->stage = 12;
+      return;
+    }
+    case 12: {
+      const auto created = std::find_if(
+          pythonBridgeCalendars_.cbegin(),
+          pythonBridgeCalendars_.cend(),
+          [](const CalendarSummary& calendar) {
+            return calendar.title == QString::fromLatin1(kBridgeAcceptanceInitialCalendarTitle);
+          });
+      if (created == pythonBridgeCalendars_.cend()) {
+        return;
+      }
+      state->calendarId = created->id;
+      saveGoogleCalendarSettings(state->calendarId,
+                                 QString::fromLatin1(kBridgeAcceptanceUpdatedCalendarTitle),
+                                 QString::fromLatin1(kBridgeAcceptanceUpdatedCalendarDescription),
+                                 QStringLiteral("UTC"),
+                                 false,
+                                 true,
+                                 QStringLiteral("#123456"));
+      state->stage = 13;
+      return;
+    }
+    case 13: {
+      const auto updated = std::find_if(
+          pythonBridgeCalendars_.cbegin(),
+          pythonBridgeCalendars_.cend(),
+          [state](const CalendarSummary& calendar) {
+            return calendar.id == state->calendarId && !calendar.selected && calendar.hidden &&
+                   calendar.title == QString::fromLatin1(kBridgeAcceptanceUpdatedCalendarTitle) &&
+                   calendar.description.value_or(QString()) ==
+                       QString::fromLatin1(kBridgeAcceptanceUpdatedCalendarDescription) &&
+                   calendar.backgroundColor.value_or(QString()) == QStringLiteral("#123456");
+          });
+      if (updated == pythonBridgeCalendars_.cend()) {
+        return;
+      }
+      subscribeGoogleCalendar(QString::fromLatin1(kBridgeAcceptanceSubscriptionRemoteId));
+      state->stage = 14;
+      return;
+    }
+    case 14: {
+      const auto subscribed = std::find_if(
+          pythonBridgeCalendars_.cbegin(),
+          pythonBridgeCalendars_.cend(),
+          [](const CalendarSummary& calendar) {
+            return calendar.remoteId == QString::fromLatin1(kBridgeAcceptanceSubscriptionRemoteId);
+          });
+      if (subscribed == pythonBridgeCalendars_.cend()) {
+        return;
+      }
+      state->subscriptionId = subscribed->id;
+      unsubscribeGoogleCalendar(state->subscriptionId);
+      state->stage = 15;
+      return;
+    }
+    case 15:
+      if (std::any_of(pythonBridgeCalendars_.cbegin(),
+                      pythonBridgeCalendars_.cend(),
+                      [state](const CalendarSummary& calendar) {
+                        return calendar.id == state->subscriptionId;
+                      })) {
         return;
       }
       finish(true);
@@ -2656,8 +3000,9 @@ void AppController::openExternalLink(QString value) {
     return;
   }
   if (!openExternalUrl(url, externalBrowser_)) {
-    setStatus(externalBrowser_.isEmpty() ? QStringLiteral("System browser could not be opened")
-                                         : QStringLiteral("Configured browser could not be opened"));
+    setStatus(externalBrowser_.isEmpty()
+                  ? QStringLiteral("System browser could not be opened")
+                  : QStringLiteral("Configured browser could not be opened"));
   }
 }
 
@@ -2678,9 +3023,8 @@ QuickCaptureAliases AppController::quickCaptureAliasesConfiguration() const {
           .lowPriority = quickCaptureLowPriorityAliases_};
 }
 
-QuickCaptureParseResult AppController::quickCaptureParse(QString text,
-                                                         int kind,
-                                                         QVariantList disabledRecognitionIds) const {
+QuickCaptureParseResult AppController::quickCaptureParse(
+    QString text, int kind, QVariantList disabledRecognitionIds) const {
   QStringList disabled;
   disabled.reserve(disabledRecognitionIds.size());
   for (const QVariant& value : disabledRecognitionIds) {
@@ -2724,10 +3068,11 @@ QVariantMap AppController::previewQuickCapture(QString text,
   preview.insert(QStringLiteral("parsedTitle"), parsed.parsedTitle);
   preview.insert(QStringLiteral("savedTitle"),
                  quickCaptureRemoveParsedText_ ? parsed.parsedTitle : parsed.rawTitle);
-  preview.insert(QStringLiteral("date"), parsed.date.has_value() ? parsed.date->toString(Qt::ISODate)
-                                                                    : QString());
-  preview.insert(QStringLiteral("time"), parsed.time.has_value() ? parsed.time->toString(QStringLiteral("HH:mm"))
-                                                                    : QString());
+  preview.insert(QStringLiteral("date"),
+                 parsed.date.has_value() ? parsed.date->toString(Qt::ISODate) : QString());
+  preview.insert(QStringLiteral("time"),
+                 parsed.time.has_value() ? parsed.time->toString(QStringLiteral("HH:mm"))
+                                         : QString());
   preview.insert(QStringLiteral("allDay"), parsed.allDay);
   preview.insert(QStringLiteral("eventDurationMinutes"), parsed.eventDurationMinutes);
   preview.insert(QStringLiteral("taskPriority"), parsed.taskPriority);
@@ -2755,16 +3100,18 @@ void AppController::createQuickCapture(QString text,
   }
   const QuickCaptureParseResult parsed =
       quickCaptureParse(std::move(text), kind, std::move(disabledRecognitionIds));
-  const QString title = (quickCaptureRemoveParsedText_ ? parsed.parsedTitle : parsed.rawTitle).trimmed();
+  const QString title =
+      (quickCaptureRemoveParsedText_ ? parsed.parsedTitle : parsed.rawTitle).trimmed();
   if (title.isEmpty()) {
     setStatus(QStringLiteral("Quick capture needs a title after parsing"));
     return;
   }
   if (parsed.kind == QuickCaptureKind::Task) {
     const QVariantList selectedLists = taskListModel_.selectedTaskLists();
-    const bool exists = std::any_of(selectedLists.cbegin(), selectedLists.cend(), [&destinationId](const QVariant& row) {
-      return row.toMap().value(QStringLiteral("id")).toString() == destinationId;
-    });
+    const bool exists = std::any_of(
+        selectedLists.cbegin(), selectedLists.cend(), [&destinationId](const QVariant& row) {
+          return row.toMap().value(QStringLiteral("id")).toString() == destinationId;
+        });
     if (!exists) {
       setStatus(QStringLiteral("Choose an active Google Task list for Quick Capture"));
       return;
@@ -2797,11 +3144,10 @@ void AppController::createQuickCapture(QString text,
     return;
   }
   const QTimeZone timeZone = resolvedTimeZone(displayTimeZone_);
-  const QDateTime start = QDateTime(*parsed.date,
-                                    parsed.allDay ? QTime(0, 0) : parsed.time.value_or(QTime(0, 0)),
-                                    timeZone);
-  const QDateTime end = parsed.allDay ? start.addDays(1)
-                                      : start.addSecs(parsed.eventDurationMinutes * 60);
+  const QDateTime start = QDateTime(
+      *parsed.date, parsed.allDay ? QTime(0, 0) : parsed.time.value_or(QTime(0, 0)), timeZone);
+  const QDateTime end =
+      parsed.allDay ? start.addDays(1) : start.addSecs(parsed.eventDurationMinutes * 60);
   if (!start.isValid() || !end.isValid() || end <= start) {
     setStatus(QStringLiteral("Quick capture event time is invalid in the selected time zone"));
     return;
@@ -2900,10 +3246,10 @@ void AppController::saveQuickCaptureRemoveParsedText(bool enabled) {
 }
 
 void AppController::saveQuickCaptureAliases(QString taskAliases,
-                                             QString eventAliases,
-                                             QString highPriorityAliases,
-                                             QString mediumPriorityAliases,
-                                             QString lowPriorityAliases) {
+                                            QString eventAliases,
+                                            QString highPriorityAliases,
+                                            QString mediumPriorityAliases,
+                                            QString lowPriorityAliases) {
   const std::optional<QStringList> task = quickCaptureAliasesFromText(taskAliases);
   const std::optional<QStringList> event = quickCaptureAliasesFromText(eventAliases);
   const std::optional<QStringList> high = quickCaptureAliasesFromText(highPriorityAliases);
@@ -2914,24 +3260,31 @@ void AppController::saveQuickCaptureAliases(QString taskAliases,
     setStatus(QStringLiteral("Quick capture aliases must be unique words of up to 32 characters"));
     return;
   }
-  const auto save = [this](const char* key, QStringList values, QStringList AppController::*property) {
-    watch(settingsService_.writeJson(QString::fromLatin1(kPresentationSettingsScope),
-                                     QString::fromLatin1(key),
-                                     jsonStringList(values)),
-          [this, values = std::move(values), property](SettingsMutationResultOrError result) {
-            if (std::holds_alternative<AppError>(result)) {
-              setStatus(errorMessage(std::get<AppError>(result)));
-            } else if ((this->*property) != values) {
-              (this->*property) = values;
-              emit quickCaptureAliasesChanged();
-            }
-          });
-  };
+  const auto save =
+      [this](const char* key, QStringList values, QStringList AppController::* property) {
+        watch(settingsService_.writeJson(QString::fromLatin1(kPresentationSettingsScope),
+                                         QString::fromLatin1(key),
+                                         jsonStringList(values)),
+              [this, values = std::move(values), property](SettingsMutationResultOrError result) {
+                if (std::holds_alternative<AppError>(result)) {
+                  setStatus(errorMessage(std::get<AppError>(result)));
+                } else if ((this->*property) != values) {
+                  (this->*property) = values;
+                  emit quickCaptureAliasesChanged();
+                }
+              });
+      };
   save(kQuickCaptureTaskAliasesSettingsKey, *task, &AppController::quickCaptureTaskAliases_);
   save(kQuickCaptureEventAliasesSettingsKey, *event, &AppController::quickCaptureEventAliases_);
-  save(kQuickCaptureHighPriorityAliasesSettingsKey, *high, &AppController::quickCaptureHighPriorityAliases_);
-  save(kQuickCaptureMediumPriorityAliasesSettingsKey, *medium, &AppController::quickCaptureMediumPriorityAliases_);
-  save(kQuickCaptureLowPriorityAliasesSettingsKey, *low, &AppController::quickCaptureLowPriorityAliases_);
+  save(kQuickCaptureHighPriorityAliasesSettingsKey,
+       *high,
+       &AppController::quickCaptureHighPriorityAliases_);
+  save(kQuickCaptureMediumPriorityAliasesSettingsKey,
+       *medium,
+       &AppController::quickCaptureMediumPriorityAliases_);
+  save(kQuickCaptureLowPriorityAliasesSettingsKey,
+       *low,
+       &AppController::quickCaptureLowPriorityAliases_);
 }
 
 void AppController::saveWeekStartDay(int day) {
@@ -3027,12 +3380,8 @@ QVariantMap AppController::dateTimeComponents(QString value, QString timeZone) c
           {QStringLiteral("minute"), local.time().minute()}};
 }
 
-QString AppController::dateTimeFromComponents(int year,
-                                              int month,
-                                              int day,
-                                              int hour,
-                                              int minute,
-                                              QString timeZone) const {
+QString AppController::dateTimeFromComponents(
+    int year, int month, int day, int hour, int minute, QString timeZone) const {
   const QDate date(year, month, day);
   const QTime time(hour, minute);
   const QDateTime local(date, time, resolvedTimeZone(timeZone));
@@ -3047,7 +3396,8 @@ void AppController::saveWorkdayHours(int startHour, int endHour) {
   const QString start = QString::number(startHour);
   const QString end = QString::number(endHour);
   watch(settingsService_.writeJson(QString::fromLatin1(kPresentationSettingsScope),
-                                   QString::fromLatin1(kWorkdayStartHourSettingsKey), start),
+                                   QString::fromLatin1(kWorkdayStartHourSettingsKey),
+                                   start),
         [this, startHour](SettingsMutationResultOrError result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
@@ -3057,7 +3407,8 @@ void AppController::saveWorkdayHours(int startHour, int endHour) {
           }
         });
   watch(settingsService_.writeJson(QString::fromLatin1(kPresentationSettingsScope),
-                                   QString::fromLatin1(kWorkdayEndHourSettingsKey), end),
+                                   QString::fromLatin1(kWorkdayEndHourSettingsKey),
+                                   end),
         [this, endHour](SettingsMutationResultOrError result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
@@ -3093,7 +3444,8 @@ void AppController::saveCalendarVisibility(QVariantList calendarIds) {
   }
   const QString json = QString::fromUtf8(QJsonDocument(stored).toJson(QJsonDocument::Compact));
   watch(settingsService_.writeJson(QString::fromLatin1(kPresentationSettingsScope),
-                                   QString::fromLatin1(kCalendarVisibilitySettingsKey), json),
+                                   QString::fromLatin1(kCalendarVisibilitySettingsKey),
+                                   json),
         [this, values = std::move(values)](SettingsMutationResultOrError result) mutable {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
@@ -3111,38 +3463,65 @@ void AppController::saveCalendarVisibility(QVariantList calendarIds) {
 }
 
 void AppController::createGoogleCalendar(QString title, QString description, QString timeZone) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || title.trimmed().isEmpty()) {
+      setStatus(QStringLiteral("Calendar title is required"));
+      return;
+    }
+    const QString trimmedTimeZone = timeZone.trimmed();
+    watch(pythonBridgeClient_->createCalendar(
+              pythonBridgeAccountId_,
+              QJsonObject{
+                  {QStringLiteral("summary"), title.trimmed()},
+                  {QStringLiteral("description"),
+                   description.trimmed().isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+                  {QStringLiteral("time_zone"),
+                   trimmedTimeZone.isEmpty() ? QJsonValue::Null : QJsonValue(trimmedTimeZone)}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar saved in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before creating a calendar"));
     return;
   }
   const GoogleCalendarCreateRequest request{
       .title = std::move(title),
-      .description = description.trimmed().isEmpty() ? std::optional<QString>{}
-                                                  : std::optional<QString>(std::move(description)),
+      .description = description.trimmed().isEmpty()
+                         ? std::optional<QString>{}
+                         : std::optional<QString>(std::move(description)),
       .timeZone = timeZone.trimmed().isEmpty() ? std::optional<QString>{}
-                                              : std::optional<QString>(std::move(timeZone))};
-  watch(std::async(std::launch::async,
-                   [this, request]() -> std::variant<GoogleCalendarManagementResult, AppError> {
-                     OAuthCredentialReadResult read =
-                         credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                     if (std::holds_alternative<AppError>(read)) {
-                       return std::get<AppError>(std::move(read));
-                     }
-                     const std::optional<OAuthStoredCredential>& credential =
-                         std::get<std::optional<OAuthStoredCredential>>(read);
-                     if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                       return AppError(AppErrorCode::Configuration,
-                                       QStringLiteral("Google authorization must be renewed"));
-                     }
-                     GoogleCalendarManagementResultOrError created =
-                         googleCalendarManagementClient_.create(request, credential->accessToken).get();
-                     return std::holds_alternative<GoogleApiError>(created)
-                                ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
-                                      AppErrorCode::Network,
-                                      std::get<GoogleApiError>(std::move(created)).message()))
-                                : std::variant<GoogleCalendarManagementResult, AppError>(
-                                      std::get<GoogleCalendarManagementResult>(std::move(created)));
-                   }),
+                                               : std::optional<QString>(std::move(timeZone))};
+  watch(std::async(
+            std::launch::async,
+            [this, request]() -> std::variant<GoogleCalendarManagementResult, AppError> {
+              OAuthCredentialReadResult read =
+                  credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+              if (std::holds_alternative<AppError>(read)) {
+                return std::get<AppError>(std::move(read));
+              }
+              const std::optional<OAuthStoredCredential>& credential =
+                  std::get<std::optional<OAuthStoredCredential>>(read);
+              if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                return AppError(AppErrorCode::Configuration,
+                                QStringLiteral("Google authorization must be renewed"));
+              }
+              GoogleCalendarManagementResultOrError created =
+                  googleCalendarManagementClient_.create(request, credential->accessToken).get();
+              return std::holds_alternative<GoogleApiError>(created)
+                         ? std::variant<GoogleCalendarManagementResult, AppError>(
+                               AppError(AppErrorCode::Network,
+                                        std::get<GoogleApiError>(std::move(created)).message()))
+                         : std::variant<GoogleCalendarManagementResult, AppError>(
+                               std::get<GoogleCalendarManagementResult>(std::move(created)));
+            }),
         [this](std::variant<GoogleCalendarManagementResult, AppError> result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -3154,33 +3533,53 @@ void AppController::createGoogleCalendar(QString title, QString description, QSt
 }
 
 void AppController::subscribeGoogleCalendar(QString calendarId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || calendarId.trimmed().isEmpty()) {
+      setStatus(QStringLiteral("Calendar ID is required"));
+      return;
+    }
+    watch(pythonBridgeClient_->subscribeCalendar(
+              pythonBridgeAccountId_,
+              QJsonObject{{QStringLiteral("remote_calendar_id"), calendarId.trimmed()}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar subscription queued in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before subscribing to a calendar"));
     return;
   }
   const GoogleCalendarSubscribeRequest request{.calendarId = std::move(calendarId)};
-  watch(std::async(std::launch::async,
-                   [this, request]() -> std::variant<GoogleCalendarManagementResult, AppError> {
-                     OAuthCredentialReadResult read =
-                         credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                     if (std::holds_alternative<AppError>(read)) {
-                       return std::get<AppError>(std::move(read));
-                     }
-                     const std::optional<OAuthStoredCredential>& credential =
-                         std::get<std::optional<OAuthStoredCredential>>(read);
-                     if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                       return AppError(AppErrorCode::Configuration,
-                                       QStringLiteral("Google authorization must be renewed"));
-                     }
-                     GoogleCalendarManagementResultOrError subscribed =
-                         googleCalendarManagementClient_.subscribe(request, credential->accessToken).get();
-                     return std::holds_alternative<GoogleApiError>(subscribed)
-                                ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
-                                      AppErrorCode::Network,
-                                      std::get<GoogleApiError>(std::move(subscribed)).message()))
-                                : std::variant<GoogleCalendarManagementResult, AppError>(
-                                      std::get<GoogleCalendarManagementResult>(std::move(subscribed)));
-                   }),
+  watch(std::async(
+            std::launch::async,
+            [this, request]() -> std::variant<GoogleCalendarManagementResult, AppError> {
+              OAuthCredentialReadResult read =
+                  credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+              if (std::holds_alternative<AppError>(read)) {
+                return std::get<AppError>(std::move(read));
+              }
+              const std::optional<OAuthStoredCredential>& credential =
+                  std::get<std::optional<OAuthStoredCredential>>(read);
+              if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                return AppError(AppErrorCode::Configuration,
+                                QStringLiteral("Google authorization must be renewed"));
+              }
+              GoogleCalendarManagementResultOrError subscribed =
+                  googleCalendarManagementClient_.subscribe(request, credential->accessToken).get();
+              return std::holds_alternative<GoogleApiError>(subscribed)
+                         ? std::variant<GoogleCalendarManagementResult, AppError>(
+                               AppError(AppErrorCode::Network,
+                                        std::get<GoogleApiError>(std::move(subscribed)).message()))
+                         : std::variant<GoogleCalendarManagementResult, AppError>(
+                               std::get<GoogleCalendarManagementResult>(std::move(subscribed)));
+            }),
         [this](std::variant<GoogleCalendarManagementResult, AppError> result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -3195,67 +3594,113 @@ void AppController::updateGoogleCalendar(QString calendarId,
                                          QString title,
                                          QString description,
                                          QString timeZone) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || calendarId.isEmpty() || title.trimmed().isEmpty()) {
+      setStatus(QStringLiteral("Calendar title is required"));
+      return;
+    }
+    const QString trimmedTimeZone = timeZone.trimmed();
+    watch(pythonBridgeClient_->updateCalendar(
+              pythonBridgeAccountId_,
+              calendarId,
+              QJsonObject{
+                  {QStringLiteral("summary"), title.trimmed()},
+                  {QStringLiteral("description"), QJsonValue(description)},
+                  {QStringLiteral("time_zone"),
+                   trimmedTimeZone.isEmpty() ? QJsonValue::Null : QJsonValue(trimmedTimeZone)}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar saved in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before editing a calendar"));
     return;
   }
-  watch(calendarReadService_.findCalendar(std::move(calendarId)),
-        [this,
-         title = std::move(title),
-         description = std::move(description),
-         timeZone = std::move(timeZone)](CalendarLookupResult result) mutable {
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(std::move(result))));
-            return;
-          }
-          const std::optional<CalendarSummary>& calendar =
-              std::get<std::optional<CalendarSummary>>(result);
-          if (!calendar.has_value() || calendar->primary ||
-              calendar->accessRole.value_or(QString()) != QStringLiteral("owner")) {
-            setStatus(QStringLiteral("Only owned secondary calendars can be edited"));
-            return;
-          }
-          const GoogleCalendarUpdateRequest request{
-              .calendarId = calendar->remoteId,
-              .title = std::move(title),
-              .description = std::optional<QString>(std::move(description)),
-              .timeZone = timeZone.trimmed().isEmpty() ? std::optional<QString>{}
-                                                        : std::optional<QString>(std::move(timeZone))};
-          watch(std::async(std::launch::async,
-                           [this, request]()
-                               -> std::variant<GoogleCalendarManagementResult, AppError> {
-                             OAuthCredentialReadResult read =
-                                 credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                             if (std::holds_alternative<AppError>(read)) {
-                               return std::get<AppError>(std::move(read));
-                             }
-                             const std::optional<OAuthStoredCredential>& credential =
-                                 std::get<std::optional<OAuthStoredCredential>>(read);
-                             if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                               return AppError(AppErrorCode::Configuration,
-                                               QStringLiteral("Google authorization must be renewed"));
-                             }
-                             GoogleCalendarManagementResultOrError updated =
-                                 googleCalendarManagementClient_.update(request, credential->accessToken).get();
-                             return std::holds_alternative<GoogleApiError>(updated)
-                                        ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
-                                              AppErrorCode::Network,
-                                              std::get<GoogleApiError>(std::move(updated)).message()))
-                                        : std::variant<GoogleCalendarManagementResult, AppError>(
-                                              std::get<GoogleCalendarManagementResult>(std::move(updated)));
-                           }),
-                [this](std::variant<GoogleCalendarManagementResult, AppError> updated) {
-                  if (std::holds_alternative<AppError>(updated)) {
-                    setStatus(errorMessage(std::get<AppError>(std::move(updated))));
-                    return;
-                  }
-                  setStatus(QStringLiteral("Google calendar updated"));
-                  requestGoogleSync(SyncScheduleTrigger::Manual);
-                });
-        });
+  watch(
+      calendarReadService_.findCalendar(std::move(calendarId)),
+      [this,
+       title = std::move(title),
+       description = std::move(description),
+       timeZone = std::move(timeZone)](CalendarLookupResult result) mutable {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        const std::optional<CalendarSummary>& calendar =
+            std::get<std::optional<CalendarSummary>>(result);
+        if (!calendar.has_value() || calendar->primary ||
+            calendar->accessRole.value_or(QString()) != QStringLiteral("owner")) {
+          setStatus(QStringLiteral("Only owned secondary calendars can be edited"));
+          return;
+        }
+        const GoogleCalendarUpdateRequest request{
+            .calendarId = calendar->remoteId,
+            .title = std::move(title),
+            .description = std::optional<QString>(std::move(description)),
+            .timeZone = timeZone.trimmed().isEmpty() ? std::optional<QString>{}
+                                                     : std::optional<QString>(std::move(timeZone))};
+        watch(std::async(
+                  std::launch::async,
+                  [this, request]() -> std::variant<GoogleCalendarManagementResult, AppError> {
+                    OAuthCredentialReadResult read =
+                        credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+                    if (std::holds_alternative<AppError>(read)) {
+                      return std::get<AppError>(std::move(read));
+                    }
+                    const std::optional<OAuthStoredCredential>& credential =
+                        std::get<std::optional<OAuthStoredCredential>>(read);
+                    if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                      return AppError(AppErrorCode::Configuration,
+                                      QStringLiteral("Google authorization must be renewed"));
+                    }
+                    GoogleCalendarManagementResultOrError updated =
+                        googleCalendarManagementClient_.update(request, credential->accessToken)
+                            .get();
+                    return std::holds_alternative<GoogleApiError>(updated)
+                               ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
+                                     AppErrorCode::Network,
+                                     std::get<GoogleApiError>(std::move(updated)).message()))
+                               : std::variant<GoogleCalendarManagementResult, AppError>(
+                                     std::get<GoogleCalendarManagementResult>(std::move(updated)));
+                  }),
+              [this](std::variant<GoogleCalendarManagementResult, AppError> updated) {
+                if (std::holds_alternative<AppError>(updated)) {
+                  setStatus(errorMessage(std::get<AppError>(std::move(updated))));
+                  return;
+                }
+                setStatus(QStringLiteral("Google calendar updated"));
+                requestGoogleSync(SyncScheduleTrigger::Manual);
+              });
+      });
 }
 
 void AppController::deleteGoogleCalendar(QString calendarId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || calendarId.isEmpty()) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->deleteCalendar(
+              pythonBridgeAccountId_,
+              calendarId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar deleted in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before deleting a calendar"));
     return;
@@ -3274,99 +3719,127 @@ void AppController::deleteGoogleCalendar(QString calendarId) {
             return;
           }
           const QString remoteId = calendar->remoteId;
-          watch(std::async(std::launch::async,
-                           [this, remoteId]()
-                               -> std::variant<GoogleCalendarManagementResult, AppError> {
-                             OAuthCredentialReadResult read =
-                                 credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                             if (std::holds_alternative<AppError>(read)) {
-                               return std::get<AppError>(std::move(read));
-                             }
-                             const std::optional<OAuthStoredCredential>& credential =
-                                 std::get<std::optional<OAuthStoredCredential>>(read);
-                             if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                               return AppError(AppErrorCode::Configuration,
-                                               QStringLiteral("Google authorization must be renewed"));
-                             }
-                             GoogleCalendarManagementResultOrError removed =
-                                 googleCalendarManagementClient_.remove(remoteId, credential->accessToken).get();
-                             return std::holds_alternative<GoogleApiError>(removed)
-                                        ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
-                                              AppErrorCode::Network,
-                                              std::get<GoogleApiError>(std::move(removed)).message()))
-                                        : std::variant<GoogleCalendarManagementResult, AppError>(
-                                              std::get<GoogleCalendarManagementResult>(std::move(removed)));
-                           }),
-                [this](std::variant<GoogleCalendarManagementResult, AppError> removed) {
-                  if (std::holds_alternative<AppError>(removed)) {
-                    setStatus(errorMessage(std::get<AppError>(std::move(removed))));
-                    return;
-                  }
-                  setStatus(QStringLiteral("Google calendar deleted"));
-                  requestGoogleSync(SyncScheduleTrigger::Manual);
-                });
+          watch(
+              std::async(
+                  std::launch::async,
+                  [this, remoteId]() -> std::variant<GoogleCalendarManagementResult, AppError> {
+                    OAuthCredentialReadResult read =
+                        credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+                    if (std::holds_alternative<AppError>(read)) {
+                      return std::get<AppError>(std::move(read));
+                    }
+                    const std::optional<OAuthStoredCredential>& credential =
+                        std::get<std::optional<OAuthStoredCredential>>(read);
+                    if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                      return AppError(AppErrorCode::Configuration,
+                                      QStringLiteral("Google authorization must be renewed"));
+                    }
+                    GoogleCalendarManagementResultOrError removed =
+                        googleCalendarManagementClient_.remove(remoteId, credential->accessToken)
+                            .get();
+                    return std::holds_alternative<GoogleApiError>(removed)
+                               ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
+                                     AppErrorCode::Network,
+                                     std::get<GoogleApiError>(std::move(removed)).message()))
+                               : std::variant<GoogleCalendarManagementResult, AppError>(
+                                     std::get<GoogleCalendarManagementResult>(std::move(removed)));
+                  }),
+              [this](std::variant<GoogleCalendarManagementResult, AppError> removed) {
+                if (std::holds_alternative<AppError>(removed)) {
+                  setStatus(errorMessage(std::get<AppError>(std::move(removed))));
+                  return;
+                }
+                setStatus(QStringLiteral("Google calendar deleted"));
+                requestGoogleSync(SyncScheduleTrigger::Manual);
+              });
         });
 }
 
 void AppController::updateGoogleCalendarListEntry(QString calendarId,
-                                                   bool selected,
-                                                   bool hidden,
-                                                   QString colorId) {
+                                                  bool selected,
+                                                  bool hidden,
+                                                  QString colorId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || calendarId.isEmpty()) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const QString trimmedColor = colorId.trimmed();
+    watch(pythonBridgeClient_->updateCalendar(
+              pythonBridgeAccountId_,
+              calendarId,
+              QJsonObject{{QStringLiteral("selected"), selected},
+                          {QStringLiteral("hidden"), hidden},
+                          {QStringLiteral("color"),
+                           trimmedColor.isEmpty() ? QJsonValue::Null : QJsonValue(trimmedColor)}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar preferences saved in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before editing calendar preferences"));
     return;
   }
-  watch(calendarReadService_.findCalendar(std::move(calendarId)),
-        [this, selected, hidden, colorId = std::move(colorId)](CalendarLookupResult result) mutable {
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(std::move(result))));
-            return;
-          }
-          const std::optional<CalendarSummary>& calendar =
-              std::get<std::optional<CalendarSummary>>(result);
-          if (!calendar.has_value()) {
-            setStatus(QStringLiteral("Calendar is unavailable"));
-            return;
-          }
-          const GoogleCalendarListUpdateRequest request{
-              .calendarId = calendar->remoteId,
-              .selected = selected,
-              .hidden = hidden,
-              .colorId = colorId.trimmed().isEmpty() ? std::optional<QString>{}
-                                                       : std::optional<QString>(std::move(colorId))};
-          watch(std::async(std::launch::async,
-                           [this, request]()
-                               -> std::variant<GoogleCalendarManagementResult, AppError> {
-                             OAuthCredentialReadResult read =
-                                 credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                             if (std::holds_alternative<AppError>(read)) {
-                               return std::get<AppError>(std::move(read));
-                             }
-                             const std::optional<OAuthStoredCredential>& credential =
-                                 std::get<std::optional<OAuthStoredCredential>>(read);
-                             if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                               return AppError(AppErrorCode::Configuration,
-                                               QStringLiteral("Google authorization must be renewed"));
-                             }
-                             GoogleCalendarManagementResultOrError updated =
-                                 googleCalendarManagementClient_.updateListEntry(request,
-                                                                                  credential->accessToken).get();
-                             return std::holds_alternative<GoogleApiError>(updated)
-                                        ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
-                                              AppErrorCode::Network,
-                                              std::get<GoogleApiError>(std::move(updated)).message()))
-                                        : std::variant<GoogleCalendarManagementResult, AppError>(
-                                              std::get<GoogleCalendarManagementResult>(std::move(updated)));
-                           }),
-                [this](std::variant<GoogleCalendarManagementResult, AppError> updated) {
-                  if (std::holds_alternative<AppError>(updated)) {
-                    setStatus(errorMessage(std::get<AppError>(std::move(updated))));
-                    return;
-                  }
-                  setStatus(QStringLiteral("Google calendar preferences updated"));
-                  requestGoogleSync(SyncScheduleTrigger::Manual);
-                });
-        });
+  watch(
+      calendarReadService_.findCalendar(std::move(calendarId)),
+      [this, selected, hidden, colorId = std::move(colorId)](CalendarLookupResult result) mutable {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        const std::optional<CalendarSummary>& calendar =
+            std::get<std::optional<CalendarSummary>>(result);
+        if (!calendar.has_value()) {
+          setStatus(QStringLiteral("Calendar is unavailable"));
+          return;
+        }
+        const GoogleCalendarListUpdateRequest request{
+            .calendarId = calendar->remoteId,
+            .selected = selected,
+            .hidden = hidden,
+            .colorId = colorId.trimmed().isEmpty() ? std::optional<QString>{}
+                                                   : std::optional<QString>(std::move(colorId))};
+        watch(std::async(
+                  std::launch::async,
+                  [this, request]() -> std::variant<GoogleCalendarManagementResult, AppError> {
+                    OAuthCredentialReadResult read =
+                        credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+                    if (std::holds_alternative<AppError>(read)) {
+                      return std::get<AppError>(std::move(read));
+                    }
+                    const std::optional<OAuthStoredCredential>& credential =
+                        std::get<std::optional<OAuthStoredCredential>>(read);
+                    if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                      return AppError(AppErrorCode::Configuration,
+                                      QStringLiteral("Google authorization must be renewed"));
+                    }
+                    GoogleCalendarManagementResultOrError updated =
+                        googleCalendarManagementClient_
+                            .updateListEntry(request, credential->accessToken)
+                            .get();
+                    return std::holds_alternative<GoogleApiError>(updated)
+                               ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
+                                     AppErrorCode::Network,
+                                     std::get<GoogleApiError>(std::move(updated)).message()))
+                               : std::variant<GoogleCalendarManagementResult, AppError>(
+                                     std::get<GoogleCalendarManagementResult>(std::move(updated)));
+                  }),
+              [this](std::variant<GoogleCalendarManagementResult, AppError> updated) {
+                if (std::holds_alternative<AppError>(updated)) {
+                  setStatus(errorMessage(std::get<AppError>(std::move(updated))));
+                  return;
+                }
+                setStatus(QStringLiteral("Google calendar preferences updated"));
+                requestGoogleSync(SyncScheduleTrigger::Manual);
+              });
+      });
 }
 
 void AppController::saveGoogleCalendarSettings(QString calendarId,
@@ -3376,98 +3849,149 @@ void AppController::saveGoogleCalendarSettings(QString calendarId,
                                                bool selected,
                                                bool hidden,
                                                QString colorId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || calendarId.isEmpty() || title.trimmed().isEmpty()) {
+      setStatus(QStringLiteral("Calendar title is required"));
+      return;
+    }
+    const QString trimmedTimeZone = timeZone.trimmed();
+    const QString trimmedColor = colorId.trimmed();
+    watch(pythonBridgeClient_->updateCalendar(
+              pythonBridgeAccountId_,
+              calendarId,
+              QJsonObject{
+                  {QStringLiteral("summary"), title.trimmed()},
+                  {QStringLiteral("description"), QJsonValue(description)},
+                  {QStringLiteral("time_zone"),
+                   trimmedTimeZone.isEmpty() ? QJsonValue::Null : QJsonValue(trimmedTimeZone)},
+                  {QStringLiteral("selected"), selected},
+                  {QStringLiteral("hidden"), hidden},
+                  {QStringLiteral("color"),
+                   trimmedColor.isEmpty() ? QJsonValue::Null : QJsonValue(trimmedColor)}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar settings saved in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before editing calendar settings"));
     return;
   }
-  watch(calendarReadService_.findCalendar(std::move(calendarId)),
-        [this,
-         title = std::move(title),
-         description = std::move(description),
-         timeZone = std::move(timeZone),
-         selected,
-         hidden,
-         colorId = std::move(colorId)](CalendarLookupResult result) mutable {
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(std::move(result))));
-            return;
-          }
-          const std::optional<CalendarSummary>& calendar =
-              std::get<std::optional<CalendarSummary>>(result);
-          if (!calendar.has_value()) {
-            setStatus(QStringLiteral("Calendar is unavailable"));
-            return;
-          }
-          const bool updateDetails =
-              !calendar->primary &&
-              calendar->accessRole.value_or(QString()) == QStringLiteral("owner");
-          const GoogleCalendarUpdateRequest calendarRequest{
-              .calendarId = calendar->remoteId,
-              .title = std::move(title),
-              .description = std::optional<QString>(std::move(description)),
-              .timeZone = timeZone.trimmed().isEmpty() ? std::optional<QString>{}
-                                                        : std::optional<QString>(std::move(timeZone))};
-          const GoogleCalendarListUpdateRequest listRequest{
-              .calendarId = calendar->remoteId,
-              .selected = selected,
-              .hidden = hidden,
-              .colorId = colorId.trimmed().isEmpty() ? std::optional<QString>{}
-                                                       : std::optional<QString>(std::move(colorId))};
-          watch(std::async(
-                    std::launch::async,
-                    [this, updateDetails, calendarRequest, listRequest]()
-                        -> std::variant<GoogleCalendarManagementResult, AppError> {
-                      OAuthCredentialReadResult read =
-                          credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                      if (std::holds_alternative<AppError>(read)) {
-                        return std::get<AppError>(std::move(read));
-                      }
-                      const std::optional<OAuthStoredCredential>& credential =
-                          std::get<std::optional<OAuthStoredCredential>>(read);
-                      if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                        return AppError(AppErrorCode::Configuration,
-                                        QStringLiteral("Google authorization must be renewed"));
-                      }
-                      if (updateDetails) {
-                        GoogleCalendarManagementResultOrError updated =
-                            googleCalendarManagementClient_.update(
-                                calendarRequest, credential->accessToken).get();
-                        if (std::holds_alternative<GoogleApiError>(updated)) {
-                          return AppError(
-                              AppErrorCode::Network,
-                              QStringLiteral("Google calendar details failed: ") +
-                                  std::get<GoogleApiError>(std::move(updated)).message());
-                        }
-                      }
-                      GoogleCalendarManagementResultOrError preferences =
-                          googleCalendarManagementClient_.updateListEntry(
-                              listRequest, credential->accessToken).get();
-                      if (std::holds_alternative<GoogleApiError>(preferences)) {
-                        return AppError(
-                            AppErrorCode::Network,
-                            (updateDetails
-                                 ? QStringLiteral("Calendar details updated; Google display preferences failed: ")
-                                 : QStringLiteral("Google display preferences failed: ")) +
-                                std::get<GoogleApiError>(std::move(preferences)).message());
-                      }
-                      return std::get<GoogleCalendarManagementResult>(std::move(preferences));
-                    }),
-                [this, updateDetails](
-                    std::variant<GoogleCalendarManagementResult, AppError> saved) {
-                  if (std::holds_alternative<AppError>(saved)) {
-                    setStatus(errorMessage(std::get<AppError>(std::move(saved))));
-                    requestGoogleSync(SyncScheduleTrigger::Manual);
-                    return;
+  watch(
+      calendarReadService_.findCalendar(std::move(calendarId)),
+      [this,
+       title = std::move(title),
+       description = std::move(description),
+       timeZone = std::move(timeZone),
+       selected,
+       hidden,
+       colorId = std::move(colorId)](CalendarLookupResult result) mutable {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        const std::optional<CalendarSummary>& calendar =
+            std::get<std::optional<CalendarSummary>>(result);
+        if (!calendar.has_value()) {
+          setStatus(QStringLiteral("Calendar is unavailable"));
+          return;
+        }
+        const bool updateDetails = !calendar->primary && calendar->accessRole.value_or(QString()) ==
+                                                             QStringLiteral("owner");
+        const GoogleCalendarUpdateRequest calendarRequest{
+            .calendarId = calendar->remoteId,
+            .title = std::move(title),
+            .description = std::optional<QString>(std::move(description)),
+            .timeZone = timeZone.trimmed().isEmpty() ? std::optional<QString>{}
+                                                     : std::optional<QString>(std::move(timeZone))};
+        const GoogleCalendarListUpdateRequest listRequest{
+            .calendarId = calendar->remoteId,
+            .selected = selected,
+            .hidden = hidden,
+            .colorId = colorId.trimmed().isEmpty() ? std::optional<QString>{}
+                                                   : std::optional<QString>(std::move(colorId))};
+        watch(
+            std::async(
+                std::launch::async,
+                [this, updateDetails, calendarRequest, listRequest]()
+                    -> std::variant<GoogleCalendarManagementResult, AppError> {
+                  OAuthCredentialReadResult read =
+                      credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+                  if (std::holds_alternative<AppError>(read)) {
+                    return std::get<AppError>(std::move(read));
                   }
-                  setStatus(updateDetails
-                                ? QStringLiteral("Google calendar details and preferences updated")
-                                : QStringLiteral("Google calendar preferences updated"));
-                  requestGoogleSync(SyncScheduleTrigger::Manual);
-                });
-        });
+                  const std::optional<OAuthStoredCredential>& credential =
+                      std::get<std::optional<OAuthStoredCredential>>(read);
+                  if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                    return AppError(AppErrorCode::Configuration,
+                                    QStringLiteral("Google authorization must be renewed"));
+                  }
+                  if (updateDetails) {
+                    GoogleCalendarManagementResultOrError updated =
+                        googleCalendarManagementClient_
+                            .update(calendarRequest, credential->accessToken)
+                            .get();
+                    if (std::holds_alternative<GoogleApiError>(updated)) {
+                      return AppError(AppErrorCode::Network,
+                                      QStringLiteral("Google calendar details failed: ") +
+                                          std::get<GoogleApiError>(std::move(updated)).message());
+                    }
+                  }
+                  GoogleCalendarManagementResultOrError preferences =
+                      googleCalendarManagementClient_
+                          .updateListEntry(listRequest, credential->accessToken)
+                          .get();
+                  if (std::holds_alternative<GoogleApiError>(preferences)) {
+                    return AppError(
+                        AppErrorCode::Network,
+                        (updateDetails
+                             ? QStringLiteral(
+                                   "Calendar details updated; Google display preferences failed: ")
+                             : QStringLiteral("Google display preferences failed: ")) +
+                            std::get<GoogleApiError>(std::move(preferences)).message());
+                  }
+                  return std::get<GoogleCalendarManagementResult>(std::move(preferences));
+                }),
+            [this, updateDetails](std::variant<GoogleCalendarManagementResult, AppError> saved) {
+              if (std::holds_alternative<AppError>(saved)) {
+                setStatus(errorMessage(std::get<AppError>(std::move(saved))));
+                requestGoogleSync(SyncScheduleTrigger::Manual);
+                return;
+              }
+              setStatus(updateDetails
+                            ? QStringLiteral("Google calendar details and preferences updated")
+                            : QStringLiteral("Google calendar preferences updated"));
+              requestGoogleSync(SyncScheduleTrigger::Manual);
+            });
+      });
 }
 
 void AppController::unsubscribeGoogleCalendar(QString calendarId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || calendarId.isEmpty()) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->unsubscribeCalendar(
+              pythonBridgeAccountId_,
+              calendarId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
+            setStatus(QStringLiteral("Calendar unsubscribed in HCB core"));
+          });
+    return;
+  }
   if (!googleConnected_ || credentialStore_ == nullptr) {
     setStatus(QStringLiteral("Connect Google before unsubscribing from a calendar"));
     return;
@@ -3485,38 +4009,40 @@ void AppController::unsubscribeGoogleCalendar(QString calendarId) {
             return;
           }
           const QString remoteId = calendar->remoteId;
-          watch(std::async(std::launch::async,
-                           [this, remoteId]()
-                               -> std::variant<GoogleCalendarManagementResult, AppError> {
-                             OAuthCredentialReadResult read =
-                                 credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                             if (std::holds_alternative<AppError>(read)) {
-                               return std::get<AppError>(std::move(read));
-                             }
-                             const std::optional<OAuthStoredCredential>& credential =
-                                 std::get<std::optional<OAuthStoredCredential>>(read);
-                             if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                               return AppError(AppErrorCode::Configuration,
-                                               QStringLiteral("Google authorization must be renewed"));
-                             }
-                             GoogleCalendarManagementResultOrError removed =
-                                 googleCalendarManagementClient_.removeListEntry(remoteId,
-                                                                                  credential->accessToken).get();
-                             return std::holds_alternative<GoogleApiError>(removed)
-                                        ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
-                                              AppErrorCode::Network,
-                                              std::get<GoogleApiError>(std::move(removed)).message()))
-                                        : std::variant<GoogleCalendarManagementResult, AppError>(
-                                              std::get<GoogleCalendarManagementResult>(std::move(removed)));
-                           }),
-                [this](std::variant<GoogleCalendarManagementResult, AppError> removed) {
-                  if (std::holds_alternative<AppError>(removed)) {
-                    setStatus(errorMessage(std::get<AppError>(std::move(removed))));
-                    return;
-                  }
-                  setStatus(QStringLiteral("Google calendar unsubscribed"));
-                  requestGoogleSync(SyncScheduleTrigger::Manual);
-                });
+          watch(
+              std::async(
+                  std::launch::async,
+                  [this, remoteId]() -> std::variant<GoogleCalendarManagementResult, AppError> {
+                    OAuthCredentialReadResult read =
+                        credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+                    if (std::holds_alternative<AppError>(read)) {
+                      return std::get<AppError>(std::move(read));
+                    }
+                    const std::optional<OAuthStoredCredential>& credential =
+                        std::get<std::optional<OAuthStoredCredential>>(read);
+                    if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                      return AppError(AppErrorCode::Configuration,
+                                      QStringLiteral("Google authorization must be renewed"));
+                    }
+                    GoogleCalendarManagementResultOrError removed =
+                        googleCalendarManagementClient_
+                            .removeListEntry(remoteId, credential->accessToken)
+                            .get();
+                    return std::holds_alternative<GoogleApiError>(removed)
+                               ? std::variant<GoogleCalendarManagementResult, AppError>(AppError(
+                                     AppErrorCode::Network,
+                                     std::get<GoogleApiError>(std::move(removed)).message()))
+                               : std::variant<GoogleCalendarManagementResult, AppError>(
+                                     std::get<GoogleCalendarManagementResult>(std::move(removed)));
+                  }),
+              [this](std::variant<GoogleCalendarManagementResult, AppError> removed) {
+                if (std::holds_alternative<AppError>(removed)) {
+                  setStatus(errorMessage(std::get<AppError>(std::move(removed))));
+                  return;
+                }
+                setStatus(QStringLiteral("Google calendar unsubscribed"));
+                requestGoogleSync(SyncScheduleTrigger::Manual);
+              });
         });
 }
 
@@ -3592,10 +4118,10 @@ void AppController::runImport(QString defaultTaskListId, QString defaultCalendar
             const ImportMutationReceipt receipt = std::get<ImportMutationReceipt>(result);
             refreshTasks();
             refreshCalendar();
-            setStatus(
-                QStringLiteral("Imported %1 task(s) and %2 calendar event(s); remote sync is queued")
-                    .arg(receipt.taskCount)
-                    .arg(receipt.eventCount));
+            setStatus(QStringLiteral(
+                          "Imported %1 task(s) and %2 calendar event(s); remote sync is queued")
+                          .arg(receipt.taskCount)
+                          .arg(receipt.eventCount));
             importItems_.clear();
             importDefaultTaskListId_.clear();
             importDefaultCalendarId_.clear();
@@ -3640,8 +4166,7 @@ void AppController::loadImportCalendars(QString defaultTaskListId,
                                         std::int64_t offset,
                                         QList<TaskListSummary> taskLists,
                                         QList<CalendarSummary> calendars) {
-  watch(calendarReadService_.listCalendars(
-            {.includeHidden = true, .limit = 100, .offset = offset}),
+  watch(calendarReadService_.listCalendars({.includeHidden = true, .limit = 100, .offset = offset}),
         [this,
          defaultTaskListId = std::move(defaultTaskListId),
          defaultCalendarId = std::move(defaultCalendarId),
@@ -3700,8 +4225,8 @@ void AppController::executeImport(QString defaultTaskListId,
         reject(item, QStringLiteral("task list is missing or ambiguous"));
         continue;
       }
-      const auto taskList =
-          std::find_if(taskLists.cbegin(), taskLists.cend(), [&taskListId](const TaskListSummary& value) {
+      const auto taskList = std::find_if(
+          taskLists.cbegin(), taskLists.cend(), [&taskListId](const TaskListSummary& value) {
             return value.id == *taskListId;
           });
       if (taskList == taskLists.cend()) {
@@ -3709,9 +4234,8 @@ void AppController::executeImport(QString defaultTaskListId,
         continue;
       }
       const std::optional<TaskPriority> priority = importPriority(item.taskPriority);
-      const std::optional<QString> due = item.taskDue.has_value()
-                                             ? normalizedDueAt(*item.taskDue)
-                                             : std::optional<QString>{};
+      const std::optional<QString> due =
+          item.taskDue.has_value() ? normalizedDueAt(*item.taskDue) : std::optional<QString>{};
       if (!priority.has_value() || (item.taskDue.has_value() && !due.has_value())) {
         reject(item, QStringLiteral("task due date or priority is invalid"));
         continue;
@@ -3719,18 +4243,20 @@ void AppController::executeImport(QString defaultTaskListId,
       TaskCreateInput input{.taskListId = *taskListId,
                             .title = item.title,
                             .notes = item.taskNotes,
-                            .due = due.has_value()
-                                       ? std::optional<TaskDue>(TaskDue{.at = due})
-                                       : std::optional<TaskDue>{},
+                            .due = due.has_value() ? std::optional<TaskDue>(TaskDue{.at = due})
+                                                   : std::optional<TaskDue>{},
                             .priority = *priority};
       if (item.taskRecurrenceRule.has_value()) {
         const std::optional<TaskRecurrenceRuleInfo> rule =
             parseTaskRecurrenceRule(*item.taskRecurrenceRule);
-        const std::optional<QList<QString>> excluded = importRecurrenceDates(item.taskExclusionDates);
+        const std::optional<QList<QString>> excluded =
+            importRecurrenceDates(item.taskExclusionDates);
         const std::optional<QList<QString>> added = importRecurrenceDates(item.taskAdditionDates);
-        const QDate anchor = due.has_value() ? QDateTime::fromString(*due, Qt::ISODate).date() : QDate();
+        const QDate anchor =
+            due.has_value() ? QDateTime::fromString(*due, Qt::ISODate).date() : QDate();
         if (!rule.has_value() || !excluded.has_value() || !added.has_value() || !anchor.isValid()) {
-          reject(item, QStringLiteral("task recurrence requires a valid due date and supported rule"));
+          reject(item,
+                 QStringLiteral("task recurrence requires a valid due date and supported rule"));
           continue;
         }
         TaskRecurrenceEndCondition end;
@@ -3740,8 +4266,7 @@ void AppController::executeImport(QString defaultTaskListId,
             reject(item, QStringLiteral("task recurrence until date is invalid"));
             continue;
           }
-          end = {.kind = TaskRecurrenceEndKind::Until,
-                 .untilDate = until.toString(Qt::ISODate)};
+          end = {.kind = TaskRecurrenceEndKind::Until, .untilDate = until.toString(Qt::ISODate)};
         } else if (item.taskRecurrenceCount.has_value()) {
           end = {.kind = TaskRecurrenceEndKind::Count,
                  .count = static_cast<std::int32_t>(*item.taskRecurrenceCount)};
@@ -3789,9 +4314,11 @@ void AppController::executeImport(QString defaultTaskListId,
     const std::optional<QString> calendarId =
         resolveImportTarget(item.calendar, defaultCalendarId, calendars);
     const auto calendar = calendarId.has_value()
-                              ? std::find_if(calendars.cbegin(), calendars.cend(), [&calendarId](const CalendarSummary& value) {
-                                  return value.id == *calendarId;
-                                })
+                              ? std::find_if(calendars.cbegin(),
+                                             calendars.cend(),
+                                             [&calendarId](const CalendarSummary& value) {
+                                               return value.id == *calendarId;
+                                             })
                               : calendars.cend();
     if (!calendarId.has_value() || calendar == calendars.cend() ||
         (calendar->accessRole.has_value() && calendar->accessRole != QStringLiteral("writer") &&
@@ -3800,19 +4327,19 @@ void AppController::executeImport(QString defaultTaskListId,
       continue;
     }
     std::variant<CalendarEventCreateInput, AppError> validated =
-        CalendarMutationService::validateCreate(
-            {.calendarId = *calendarId,
-             .title = item.title,
-             .startAt = item.eventStart,
-             .endAt = item.eventEnd,
-             .allDay = item.eventAllDay,
-             .description = item.eventDescription,
-             .location = item.eventLocation,
-             .startTimeZone = item.eventTimeZone,
-             .endTimeZone = item.eventTimeZone,
-             .recurrenceRule = item.eventRecurrence});
+        CalendarMutationService::validateCreate({.calendarId = *calendarId,
+                                                 .title = item.title,
+                                                 .startAt = item.eventStart,
+                                                 .endAt = item.eventEnd,
+                                                 .allDay = item.eventAllDay,
+                                                 .description = item.eventDescription,
+                                                 .location = item.eventLocation,
+                                                 .startTimeZone = item.eventTimeZone,
+                                                 .endTimeZone = item.eventTimeZone,
+                                                 .recurrenceRule = item.eventRecurrence});
     if (std::holds_alternative<AppError>(validated)) {
-      reject(item, QStringLiteral("event dates, time zone, recurrence, or field limits are invalid"));
+      reject(item,
+             QStringLiteral("event dates, time zone, recurrence, or field limits are invalid"));
       continue;
     }
     const CalendarEventCreateInput& ready = std::get<CalendarEventCreateInput>(validated);
@@ -3856,56 +4383,60 @@ void AppController::queryGoogleFreeBusy(QVariantList calendarIds, QString startA
     }
     ids.append(value.toString());
   }
-  watch(std::async(std::launch::async,
-                   [this, ids = std::move(ids), startAt = std::move(startAt), endAt = std::move(endAt)]
-                       () -> std::variant<QVariantList, AppError> {
-                     QList<QString> remoteIds;
-                     remoteIds.reserve(ids.size());
-                     for (const QString& id : ids) {
-                       CalendarLookupResult lookup = calendarReadService_.findCalendar(id).get();
-                       if (std::holds_alternative<AppError>(lookup)) {
-                         return std::get<AppError>(std::move(lookup));
-                       }
-                       const std::optional<CalendarSummary>& calendar =
-                           std::get<std::optional<CalendarSummary>>(lookup);
-                       if (!calendar.has_value() || calendar->remoteId.isEmpty()) {
-                         return AppError(AppErrorCode::Validation,
-                                         QStringLiteral("Free-busy calendar is unavailable"));
-                       }
-                       remoteIds.append(calendar->remoteId);
-                     }
-                     OAuthCredentialReadResult read =
-                         credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                     if (std::holds_alternative<AppError>(read)) {
-                       return std::get<AppError>(std::move(read));
-                     }
-                     const std::optional<OAuthStoredCredential>& credential =
-                         std::get<std::optional<OAuthStoredCredential>>(read);
-                     if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                       return AppError(AppErrorCode::Configuration,
-                                       QStringLiteral("Google authorization must be renewed"));
-                     }
-                     GoogleCalendarFreeBusyResultOrError response = googleCalendarFreeBusyClient_
-                         .query({.startAt = startAt, .endAt = endAt, .calendarIds = std::move(remoteIds)},
-                                credential->accessToken)
-                         .get();
-                     if (std::holds_alternative<GoogleApiError>(response)) {
-                       return AppError(AppErrorCode::Network,
-                                       std::get<GoogleApiError>(std::move(response)).message());
-                     }
-                     QVariantList intervals;
-                     const GoogleCalendarFreeBusyResult result =
-                         std::get<GoogleCalendarFreeBusyResult>(std::move(response));
-                     for (auto calendar = result.intervalsByCalendar.constBegin();
-                          calendar != result.intervalsByCalendar.constEnd(); ++calendar) {
-                       for (const GoogleCalendarBusyInterval& interval : calendar.value()) {
-                         intervals.append(QVariantMap{{QStringLiteral("calendarId"), calendar.key()},
-                                                      {QStringLiteral("startAt"), interval.startAt},
-                                                      {QStringLiteral("endAt"), interval.endAt}});
-                       }
-                     }
-                     return intervals;
-                   }),
+  watch(std::async(
+            std::launch::async,
+            [this, ids = std::move(ids), startAt = std::move(startAt), endAt = std::move(endAt)]()
+                -> std::variant<QVariantList, AppError> {
+              QList<QString> remoteIds;
+              remoteIds.reserve(ids.size());
+              for (const QString& id : ids) {
+                CalendarLookupResult lookup = calendarReadService_.findCalendar(id).get();
+                if (std::holds_alternative<AppError>(lookup)) {
+                  return std::get<AppError>(std::move(lookup));
+                }
+                const std::optional<CalendarSummary>& calendar =
+                    std::get<std::optional<CalendarSummary>>(lookup);
+                if (!calendar.has_value() || calendar->remoteId.isEmpty()) {
+                  return AppError(AppErrorCode::Validation,
+                                  QStringLiteral("Free-busy calendar is unavailable"));
+                }
+                remoteIds.append(calendar->remoteId);
+              }
+              OAuthCredentialReadResult read =
+                  credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+              if (std::holds_alternative<AppError>(read)) {
+                return std::get<AppError>(std::move(read));
+              }
+              const std::optional<OAuthStoredCredential>& credential =
+                  std::get<std::optional<OAuthStoredCredential>>(read);
+              if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                return AppError(AppErrorCode::Configuration,
+                                QStringLiteral("Google authorization must be renewed"));
+              }
+              GoogleCalendarFreeBusyResultOrError response =
+                  googleCalendarFreeBusyClient_
+                      .query(
+                          {.startAt = startAt, .endAt = endAt, .calendarIds = std::move(remoteIds)},
+                          credential->accessToken)
+                      .get();
+              if (std::holds_alternative<GoogleApiError>(response)) {
+                return AppError(AppErrorCode::Network,
+                                std::get<GoogleApiError>(std::move(response)).message());
+              }
+              QVariantList intervals;
+              const GoogleCalendarFreeBusyResult result =
+                  std::get<GoogleCalendarFreeBusyResult>(std::move(response));
+              for (auto calendar = result.intervalsByCalendar.constBegin();
+                   calendar != result.intervalsByCalendar.constEnd();
+                   ++calendar) {
+                for (const GoogleCalendarBusyInterval& interval : calendar.value()) {
+                  intervals.append(QVariantMap{{QStringLiteral("calendarId"), calendar.key()},
+                                               {QStringLiteral("startAt"), interval.startAt},
+                                               {QStringLiteral("endAt"), interval.endAt}});
+                }
+              }
+              return intervals;
+            }),
         [this](std::variant<QVariantList, AppError> result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -3934,27 +4465,29 @@ void AppController::searchGoogleDriveAttachments(QString query) {
                      const std::optional<OAuthStoredCredential>& credential =
                          std::get<std::optional<OAuthStoredCredential>>(read);
                      if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                       return AppError(AppErrorCode::Configuration,
-                                       QStringLiteral("Google authorization must be renewed for Drive access"));
+                       return AppError(
+                           AppErrorCode::Configuration,
+                           QStringLiteral("Google authorization must be renewed for Drive access"));
                      }
                      GoogleDriveAttachmentCandidatesOrError response =
                          googleDriveFilePickerClient_.search(query, credential->accessToken).get();
                      if (std::holds_alternative<GoogleApiError>(response)) {
                        const GoogleApiError error = std::get<GoogleApiError>(std::move(response));
                        return AppError(AppErrorCode::Network,
-                                       QStringLiteral("Drive API access failed: ") + error.message());
+                                       QStringLiteral("Drive API access failed: ") +
+                                           error.message());
                      }
                      QVariantList rows;
                      const QList<GoogleDriveAttachmentCandidate> candidates =
                          std::get<QList<GoogleDriveAttachmentCandidate>>(std::move(response));
                      rows.reserve(candidates.size());
                      for (const GoogleDriveAttachmentCandidate& candidate : candidates) {
-                       rows.append(QVariantMap{{QStringLiteral("id"), candidate.id},
-                                               {QStringLiteral("name"), candidate.name},
-                                               {QStringLiteral("mimeType"), candidate.mimeType},
-                                               {QStringLiteral("fileUrl"), candidate.webViewLink},
-                                               {QStringLiteral("iconLink"),
-                                                candidate.iconLink.value_or(QString())}});
+                       rows.append(QVariantMap{
+                           {QStringLiteral("id"), candidate.id},
+                           {QStringLiteral("name"), candidate.name},
+                           {QStringLiteral("mimeType"), candidate.mimeType},
+                           {QStringLiteral("fileUrl"), candidate.webViewLink},
+                           {QStringLiteral("iconLink"), candidate.iconLink.value_or(QString())}});
                      }
                      return rows;
                    }),
@@ -4263,20 +4796,19 @@ void AppController::handleOAuthCallback(OAuthLoopbackCallback callback) {
     setStatus(QStringLiteral("Google authorization listener is unavailable"));
     return;
   }
-  watch(oauthTokenExchangeClient_.exchange({.code = *callback.code,
-                                            .codeVerifier = state.codeVerifier,
-                                            .redirectUri = redirectUri,
-                                            .clientId = clientId_,
-                                            .clientSecret = clientSecret_.isEmpty()
-                                                                ? std::nullopt
-                                                                : std::optional<QString>(clientSecret_)}),
+  watch(oauthTokenExchangeClient_.exchange(
+            {.code = *callback.code,
+             .codeVerifier = state.codeVerifier,
+             .redirectUri = redirectUri,
+             .clientId = clientId_,
+             .clientSecret =
+                 clientSecret_.isEmpty() ? std::nullopt : std::optional<QString>(clientSecret_)}),
         [this, requestId = callback.requestId](OAuthTokenExchangeResult result) {
           if (std::holds_alternative<AppError>(result)) {
             const QString diagnostic =
                 SecretRedactor::redactText(errorMessage(std::get<AppError>(result)), 240);
             qWarning().noquote() << "oauth.token_exchange_failed" << diagnostic;
-            static_cast<void>(oauthLoopbackListener_.respond(
-                requestId, 500, diagnostic));
+            static_cast<void>(oauthLoopbackListener_.respond(requestId, 500, diagnostic));
             oauthLoopbackListener_.stop();
             setStatus(diagnostic);
             return;
@@ -4524,9 +5056,8 @@ std::optional<AppError> AppController::runGoogleSync(const SyncSchedulerRequest&
       oauthTokenRefreshClient_
           .refresh({.clientId = std::move(clientId),
                     .refreshToken = refreshToken,
-                    .clientSecret = clientSecret.isEmpty()
-                                        ? std::nullopt
-                                        : std::optional<QString>(clientSecret)})
+                    .clientSecret = clientSecret.isEmpty() ? std::nullopt
+                                                           : std::optional<QString>(clientSecret)})
           .get();
   if (std::holds_alternative<AppError>(refreshed)) {
     return fail(std::get<AppError>(std::move(refreshed)));
@@ -4670,7 +5201,8 @@ void AppController::createTaskDetailed(QString taskListId,
   }
   if (bridgeMode()) {
     if (managedRecurrence || pythonBridgeClient_ == nullptr) {
-      setStatus(QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
+      setStatus(
+          QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
       return;
     }
     const std::optional<QString> due = bridgeDueDate(normalizedDue);
@@ -4680,17 +5212,20 @@ void AppController::createTaskDetailed(QString taskListId,
     }
     QJsonObject request{{QStringLiteral("list_id"), taskListId},
                         {QStringLiteral("title"), title.trimmed()},
-                        {QStringLiteral("notes"), notes},
                         {QStringLiteral("priority"), priorityText(*parsedPriority)}};
+    if (!notes.isEmpty()) {
+      request.insert(QStringLiteral("notes"), notes);
+    }
     if (due.has_value()) {
       request.insert(QStringLiteral("due"), *due);
       if (!dueTimeZone.trimmed().isEmpty()) {
         request.insert(QStringLiteral("due_time_zone"), dueTimeZone.trimmed());
       }
     }
-    watch(pythonBridgeClient_->createTask(pythonBridgeAccountId_,
-                                          request,
-                                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    watch(pythonBridgeClient_->createTask(
+              pythonBridgeAccountId_,
+              request,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -4701,20 +5236,20 @@ void AppController::createTaskDetailed(QString taskListId,
           });
     return;
   }
-  TaskCreateInput input{.taskListId = std::move(taskListId),
-                        .parentTaskId = parentTaskId.isEmpty()
-                                            ? std::optional<QString>{}
-                                            : std::optional<QString>(std::move(parentTaskId)),
-                        .title = title.trimmed(),
-                        .notes = std::move(notes),
-                        .due = normalizedDue.has_value()
-                                   ? std::optional<TaskDue>(TaskDue{
-                                         .at = normalizedDue,
-                                         .timeZone = dueTimeZone.trimmed().isEmpty()
-                                                         ? std::optional<QString>{}
-                                                         : std::optional<QString>(dueTimeZone.trimmed())})
-                                   : std::optional<TaskDue>{},
-                        .priority = *parsedPriority};
+  TaskCreateInput input{
+      .taskListId = std::move(taskListId),
+      .parentTaskId = parentTaskId.isEmpty() ? std::optional<QString>{}
+                                             : std::optional<QString>(std::move(parentTaskId)),
+      .title = title.trimmed(),
+      .notes = std::move(notes),
+      .due = normalizedDue.has_value()
+                 ? std::optional<TaskDue>(
+                       TaskDue{.at = normalizedDue,
+                               .timeZone = dueTimeZone.trimmed().isEmpty()
+                                               ? std::optional<QString>{}
+                                               : std::optional<QString>(dueTimeZone.trimmed())})
+                 : std::optional<TaskDue>{},
+      .priority = *parsedPriority};
   if (managedRecurrence) {
     const std::optional<ManagedTaskRecurrenceConfiguration> recurrence =
         managedTaskRecurrenceConfiguration(recurrenceFrequency,
@@ -4723,7 +5258,8 @@ void AppController::createTaskDetailed(QString taskListId,
                                            recurrenceEndUntil,
                                            recurrenceEndCount);
     if (!recurrence.has_value() || !normalizedDue.has_value() || input.parentTaskId.has_value()) {
-      setStatus(QStringLiteral("Managed recurrence requires a top-level task with a valid due date"));
+      setStatus(
+          QStringLiteral("Managed recurrence requires a top-level task with a valid due date"));
       return;
     }
     const std::optional<QList<QString>> excluded = recurrenceDatesFromText(exclusionDates);
@@ -4834,6 +5370,28 @@ void AppController::saveNoteTask(QString taskId, QString taskListId, QString tit
 }
 
 void AppController::createTaskList(QString title) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || title.trimmed().isEmpty()) {
+      setStatus(QStringLiteral("Task list title is required"));
+      return;
+    }
+    watch(pythonBridgeClient_->createTaskList(
+              pythonBridgeAccountId_,
+              QJsonObject{{QStringLiteral("title"), title.trimmed()}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              const QString message = errorMessage(std::get<AppError>(std::move(result)));
+              setStatus(message);
+              setTaskListError(message);
+              return;
+            }
+            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            setTaskListError({});
+            setStatus(QStringLiteral("Task list saved in HCB core"));
+          });
+    return;
+  }
   watch(taskListMutationService_.create(
             {.accountId = QString::fromLatin1(kGoogleAccountId), .title = std::move(title)}),
         [this](TaskListMutationResult result) {
@@ -4849,6 +5407,29 @@ void AppController::createTaskList(QString title) {
 }
 
 void AppController::renameTaskList(QString taskListId, QString title) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || taskListId.isEmpty() || title.trimmed().isEmpty()) {
+      setStatus(QStringLiteral("Task list title is required"));
+      return;
+    }
+    watch(pythonBridgeClient_->updateTaskList(
+              pythonBridgeAccountId_,
+              taskListId,
+              QJsonObject{{QStringLiteral("title"), title.trimmed()}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              const QString message = errorMessage(std::get<AppError>(std::move(result)));
+              setStatus(message);
+              setTaskListError(message);
+              return;
+            }
+            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            setTaskListError({});
+            setStatus(QStringLiteral("Task list saved in HCB core"));
+          });
+    return;
+  }
   watch(taskListMutationService_.update(
             {.taskListId = std::move(taskListId), .title = std::move(title)}),
         [this](TaskListMutationResult result) {
@@ -4864,6 +5445,29 @@ void AppController::renameTaskList(QString taskListId, QString title) {
 }
 
 void AppController::setTaskListSelected(QString taskListId, bool selected) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || taskListId.isEmpty()) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->updateTaskList(
+              pythonBridgeAccountId_,
+              taskListId,
+              QJsonObject{{QStringLiteral("selected"), selected}},
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              const QString message = errorMessage(std::get<AppError>(std::move(result)));
+              setStatus(message);
+              setTaskListError(message);
+              return;
+            }
+            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            setTaskListError({});
+            setStatus(QStringLiteral("Task list visibility saved in HCB core"));
+          });
+    return;
+  }
   watch(taskListMutationService_.setSelected(
             {.taskListId = std::move(taskListId), .selected = selected}),
         [this](TaskListMutationResult result) {
@@ -4879,6 +5483,28 @@ void AppController::setTaskListSelected(QString taskListId, bool selected) {
 }
 
 void AppController::deleteTaskList(QString taskListId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr || taskListId.isEmpty()) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->deleteTaskList(
+              pythonBridgeAccountId_,
+              taskListId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              const QString message = errorMessage(std::get<AppError>(std::move(result)));
+              setStatus(message);
+              setTaskListError(message);
+              return;
+            }
+            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            setTaskListError({});
+            setStatus(QStringLiteral("Task list deleted in HCB core"));
+          });
+    return;
+  }
   watch(taskListMutationService_.remove(std::move(taskListId)),
         [this](TaskListMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
@@ -4969,7 +5595,8 @@ void AppController::updateTaskDetailed(QString taskId,
   }
   if (bridgeMode()) {
     if (managedRecurrence || pythonBridgeClient_ == nullptr) {
-      setStatus(QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
+      setStatus(
+          QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
       return;
     }
     const std::optional<QString> due = bridgeDueDate(normalizedDue);
@@ -4977,15 +5604,16 @@ void AppController::updateTaskDetailed(QString taskId,
       setStatus(QStringLiteral("Task due date is invalid"));
       return;
     }
-    QJsonObject request{{QStringLiteral("title"), title.trimmed()},
-                        {QStringLiteral("notes"), notes},
-                        {QStringLiteral("priority"), priorityText(*parsedPriority)},
-                        {QStringLiteral("due"),
-                         due.has_value() ? QJsonValue(*due) : QJsonValue::Null}};
-    watch(pythonBridgeClient_->updateTask(pythonBridgeAccountId_,
-                                          taskId,
-                                          request,
-                                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    QJsonObject request{
+        {QStringLiteral("title"), title.trimmed()},
+        {QStringLiteral("notes"), notes},
+        {QStringLiteral("priority"), priorityText(*parsedPriority)},
+        {QStringLiteral("due"), due.has_value() ? QJsonValue(*due) : QJsonValue::Null}};
+    watch(pythonBridgeClient_->updateTask(
+              pythonBridgeAccountId_,
+              taskId,
+              request,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5001,39 +5629,40 @@ void AppController::updateTaskDetailed(QString taskId,
                                                                          : recurrenceRule.trimmed())
                                    : QString();
   const QString selectedTaskId = taskId;
-  watch(taskMutationService_.update(
-            {.taskId = std::move(taskId),
-             .title = std::move(title),
-             .notes = std::move(notes),
-             .due = TaskDue{.at = normalizedDue,
-                            .timeZone = normalizedDue.has_value() && !dueTimeZone.isEmpty()
-                                            ? std::optional<QString>(std::move(dueTimeZone))
-                                            : std::nullopt},
-             .priority = *parsedPriority}),
-        [this, selectedTaskId, recurrence, selectedRule, excluded, added](TaskMutationResult result) {
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(result)));
-            return;
-          }
-          if (!recurrence.has_value()) {
-            refreshTasks();
-            return;
-          }
-          watch(taskMutationService_.reconfigureManagedRecurrence(selectedTaskId,
-                                                                    recurrence->frequency,
-                                                                    recurrence->interval,
-                                                                    recurrence->end,
-                                                                    selectedRule,
-                                                                    *excluded,
-                                                                    *added),
-                [this](TaskMutationResult reconfigured) {
-                  if (std::holds_alternative<AppError>(reconfigured)) {
-                    setStatus(errorMessage(std::get<AppError>(reconfigured)));
-                  } else {
-                    refreshTasks();
-                  }
-                });
-        });
+  watch(
+      taskMutationService_.update(
+          {.taskId = std::move(taskId),
+           .title = std::move(title),
+           .notes = std::move(notes),
+           .due = TaskDue{.at = normalizedDue,
+                          .timeZone = normalizedDue.has_value() && !dueTimeZone.isEmpty()
+                                          ? std::optional<QString>(std::move(dueTimeZone))
+                                          : std::nullopt},
+           .priority = *parsedPriority}),
+      [this, selectedTaskId, recurrence, selectedRule, excluded, added](TaskMutationResult result) {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+          return;
+        }
+        if (!recurrence.has_value()) {
+          refreshTasks();
+          return;
+        }
+        watch(taskMutationService_.reconfigureManagedRecurrence(selectedTaskId,
+                                                                recurrence->frequency,
+                                                                recurrence->interval,
+                                                                recurrence->end,
+                                                                selectedRule,
+                                                                *excluded,
+                                                                *added),
+              [this](TaskMutationResult reconfigured) {
+                if (std::holds_alternative<AppError>(reconfigured)) {
+                  setStatus(errorMessage(std::get<AppError>(reconfigured)));
+                } else {
+                  refreshTasks();
+                }
+              });
+      });
 }
 
 void AppController::setTaskCompleted(QString taskId, bool completed) {
@@ -5072,7 +5701,7 @@ void AppController::stopTaskRecurrence(QString taskId, int recurrenceScope) {
     setStatus(QStringLiteral("Task recurrence scope is invalid"));
     return;
   }
-  const auto scope = recurrenceScope == 0 ? TaskRecurrenceScope::ThisOccurrence
+  const auto scope = recurrenceScope == 0   ? TaskRecurrenceScope::ThisOccurrence
                      : recurrenceScope == 1 ? TaskRecurrenceScope::ThisAndFollowing
                                             : TaskRecurrenceScope::EntireSeries;
   watch(taskMutationService_.stopManagedRecurrence(std::move(taskId), scope),
@@ -5102,9 +5731,10 @@ void AppController::deleteTask(QString taskId) {
       reportBridgeUnsupportedAction();
       return;
     }
-    watch(pythonBridgeClient_->deleteTask(pythonBridgeAccountId_,
-                                          taskId,
-                                          QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    watch(pythonBridgeClient_->deleteTask(
+              pythonBridgeAccountId_,
+              taskId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5115,30 +5745,30 @@ void AppController::deleteTask(QString taskId) {
           });
     return;
   }
-  watch(taskMutationService_.inspect({taskId}), [this, taskId = std::move(taskId)](
-            TaskMutationSnapshotResult inspection) {
-    if (std::holds_alternative<AppError>(inspection) ||
-        std::get<QList<TaskMutationSnapshot>>(inspection).size() != 1) {
-      setStatus(std::holds_alternative<AppError>(inspection)
-                    ? errorMessage(std::get<AppError>(inspection))
-                    : QStringLiteral("Task is unavailable for deletion"));
-      return;
-    }
-    watch(taskMutationService_.remove(taskId), [this, taskId](TaskMutationResult result) {
-      if (std::holds_alternative<AppError>(result)) {
-        setStatus(errorMessage(std::get<AppError>(result)));
-      } else {
-        recordExistenceHistory(UndoResourceKind::Task,
-                               taskId,
-                               QStringLiteral("task.delete"),
-                               QStringLiteral("Delete task"),
-                               true,
-                               false);
-        refreshTasks();
-        refreshPendingSyncCount();
-      }
-    });
-  });
+  watch(taskMutationService_.inspect({taskId}),
+        [this, taskId = std::move(taskId)](TaskMutationSnapshotResult inspection) {
+          if (std::holds_alternative<AppError>(inspection) ||
+              std::get<QList<TaskMutationSnapshot>>(inspection).size() != 1) {
+            setStatus(std::holds_alternative<AppError>(inspection)
+                          ? errorMessage(std::get<AppError>(inspection))
+                          : QStringLiteral("Task is unavailable for deletion"));
+            return;
+          }
+          watch(taskMutationService_.remove(taskId), [this, taskId](TaskMutationResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(result)));
+            } else {
+              recordExistenceHistory(UndoResourceKind::Task,
+                                     taskId,
+                                     QStringLiteral("task.delete"),
+                                     QStringLiteral("Delete task"),
+                                     true,
+                                     false);
+              refreshTasks();
+              refreshPendingSyncCount();
+            }
+          });
+        });
 }
 
 void AppController::moveTask(QString taskId, QString taskListId) {
@@ -5214,12 +5844,12 @@ void AppController::bulkSetTaskDue(QVariantList taskIds, QString dueAt) {
               {.action = TaskBulkAction::SetDue, .taskIds = ids, .due = TaskDue{.at = due}},
               [this, before, due](const TaskBulkMutationSummary&) {
                 recordTaskDueHistory(before, QStringLiteral("Schedule task"));
-                static_cast<void>(mutationTelemetryStore_.record(
-                    {.resource = QStringLiteral("task"),
-                     .operation = QStringLiteral("task.schedule"),
-                     .scope = QStringLiteral("none"),
-                     .targetStartAt = due,
-                     .phase = MutationTelemetryPhase::Intent}));
+                static_cast<void>(
+                    mutationTelemetryStore_.record({.resource = QStringLiteral("task"),
+                                                    .operation = QStringLiteral("task.schedule"),
+                                                    .scope = QStringLiteral("none"),
+                                                    .targetStartAt = due,
+                                                    .phase = MutationTelemetryPhase::Intent}));
               });
         });
 }
@@ -5265,8 +5895,7 @@ void AppController::undo() { replayHistory(UndoAction::Undo); }
 void AppController::redo() { replayHistory(UndoAction::Redo); }
 
 void AppController::saveUndoHistorySettings(int retentionDays, int maximumEntries) {
-  if (retentionDays < 1 || retentionDays > 3'650 || maximumEntries < 50 ||
-      maximumEntries > 1'000) {
+  if (retentionDays < 1 || retentionDays > 3'650 || maximumEntries < 50 || maximumEntries > 1'000) {
     setStatus(QStringLiteral("Undo history settings are invalid"));
     return;
   }
@@ -5291,14 +5920,17 @@ void AppController::saveUndoHistorySettings(int retentionDays, int maximumEntrie
                   undoRecoveryPolicy_.configure(
                       {.retentionDays = retentionDays, .maximumEntries = maximumEntries});
                   emit undoHistorySettingsChanged();
-                  watch(undoRecoveryPolicy_.recover(), [this](UndoRecoveryResult recoveryResult) {
-                    if (std::holds_alternative<AppError>(recoveryResult)) {
-                      setStatus(errorMessage(std::get<AppError>(recoveryResult)));
-                      return;
-                    }
-                    refreshUndoStatus();
-                    setStatus(QStringLiteral("Undo history saved"));
-                  }, false);
+                  watch(
+                      undoRecoveryPolicy_.recover(),
+                      [this](UndoRecoveryResult recoveryResult) {
+                        if (std::holds_alternative<AppError>(recoveryResult)) {
+                          setStatus(errorMessage(std::get<AppError>(recoveryResult)));
+                          return;
+                        }
+                        refreshUndoStatus();
+                        setStatus(QStringLiteral("Undo history saved"));
+                      },
+                      false);
                 });
         });
 }
@@ -5333,11 +5965,8 @@ void AppController::bulkReparentTasks(QVariantList taskIds, QString parentTaskId
                                            : std::optional<QString>(std::move(parentTaskId))});
 }
 
-void AppController::bulkReplaceTaskText(QVariantList taskIds,
-                                        QString findText,
-                                        QString replaceText,
-                                        int fields,
-                                        int recurrenceScope) {
+void AppController::bulkReplaceTaskText(
+    QVariantList taskIds, QString findText, QString replaceText, int fields, int recurrenceScope) {
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value() || findText.isEmpty() || fields <= 0 || fields > 3 ||
       !isValidBulkTextRecurrenceScope(recurrenceScope)) {
@@ -5352,11 +5981,8 @@ void AppController::bulkReplaceTaskText(QVariantList taskIds,
                        .recurrenceScope = recurrenceScope});
 }
 
-void AppController::previewBulkTaskText(QVariantList taskIds,
-                                        QString findText,
-                                        int fields,
-                                        int recurrenceScope,
-                                        int requestToken) {
+void AppController::previewBulkTaskText(
+    QVariantList taskIds, QString findText, int fields, int recurrenceScope, int requestToken) {
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value() || findText.isEmpty() || fields <= 0 || fields > 3 ||
       !isValidBulkTextRecurrenceScope(recurrenceScope)) {
@@ -5365,11 +5991,11 @@ void AppController::previewBulkTaskText(QVariantList taskIds,
     return;
   }
   previewBulkTaskMutation({.action = TaskBulkAction::ReplaceText,
-                            .taskIds = *ids,
-                            .findText = std::move(findText),
-                            .textFields = static_cast<std::uint8_t>(fields),
-                            .recurrenceScope = recurrenceScope,
-                            .previewOnly = true},
+                           .taskIds = *ids,
+                           .findText = std::move(findText),
+                           .textFields = static_cast<std::uint8_t>(fields),
+                           .recurrenceScope = recurrenceScope,
+                           .previewOnly = true},
                           requestToken);
 }
 
@@ -5391,17 +6017,18 @@ void AppController::createEvent(QString calendarId,
       setStatus(QStringLiteral("Calendar event times are invalid"));
       return;
     }
-    QJsonObject request{{QStringLiteral("calendar_id"), calendarId},
-                        {QStringLiteral("summary"), title.trimmed()},
-                        {QStringLiteral("start"), *start},
-                        {QStringLiteral("end"), *end},
-                        {QStringLiteral("description"),
-                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
-                        {QStringLiteral("location"),
-                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
-    watch(pythonBridgeClient_->createEvent(pythonBridgeAccountId_,
-                                           request,
-                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    QJsonObject request{
+        {QStringLiteral("calendar_id"), calendarId},
+        {QStringLiteral("summary"), title.trimmed()},
+        {QStringLiteral("start"), *start},
+        {QStringLiteral("end"), *end},
+        {QStringLiteral("description"),
+         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+        {QStringLiteral("location"), location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    watch(pythonBridgeClient_->createEvent(
+              pythonBridgeAccountId_,
+              request,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5457,17 +6084,18 @@ void AppController::updateEvent(QString eventId,
       setStatus(QStringLiteral("Calendar event times are invalid"));
       return;
     }
-    QJsonObject request{{QStringLiteral("summary"), title.trimmed()},
-                        {QStringLiteral("start"), *start},
-                        {QStringLiteral("end"), *end},
-                        {QStringLiteral("description"),
-                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
-                        {QStringLiteral("location"),
-                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
-    watch(pythonBridgeClient_->updateEvent(pythonBridgeAccountId_,
-                                           eventId,
-                                           request,
-                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    QJsonObject request{
+        {QStringLiteral("summary"), title.trimmed()},
+        {QStringLiteral("start"), *start},
+        {QStringLiteral("end"), *end},
+        {QStringLiteral("description"),
+         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+        {QStringLiteral("location"), location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    watch(pythonBridgeClient_->updateEvent(
+              pythonBridgeAccountId_,
+              eventId,
+              request,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5530,16 +6158,14 @@ void AppController::createEventDetailed(QString calendarId,
     return;
   }
   if (bridgeMode()) {
-    const bool unsupported = !colorId.trimmed().isEmpty() || !available ||
-                             !visibility.trimmed().isEmpty() || !attendees.isEmpty() ||
-                             !remindersUseDefault || !reminders.isEmpty() || createGoogleMeet ||
-                             (!attachmentsJson.trimmed().isEmpty() && attachmentsJson.trimmed() != "{}") ||
-                             (!guestPermissionsJson.trimmed().isEmpty() &&
-                              guestPermissionsJson.trimmed() != "{}") ||
-                             (!eventType.trimmed().isEmpty() && eventType.trimmed() != "default") ||
-                             (!statusPropertiesJson.trimmed().isEmpty() &&
-                              statusPropertiesJson.trimmed() != "{}") ||
-                             (!sendUpdates.trimmed().isEmpty() && sendUpdates.trimmed() != "all");
+    const bool unsupported =
+        !colorId.trimmed().isEmpty() || !available || !visibility.trimmed().isEmpty() ||
+        !attendees.isEmpty() || !remindersUseDefault || !reminders.isEmpty() || createGoogleMeet ||
+        (!attachmentsJson.trimmed().isEmpty() && attachmentsJson.trimmed() != "{}") ||
+        (!guestPermissionsJson.trimmed().isEmpty() && guestPermissionsJson.trimmed() != "{}") ||
+        (!eventType.trimmed().isEmpty() && eventType.trimmed() != "default") ||
+        (!statusPropertiesJson.trimmed().isEmpty() && statusPropertiesJson.trimmed() != "{}") ||
+        (!sendUpdates.trimmed().isEmpty() && sendUpdates.trimmed() != "all");
     if (unsupported || pythonBridgeClient_ == nullptr) {
       setStatus(QStringLiteral("This event metadata is not supported by the HCB bridge preview"));
       return;
@@ -5550,20 +6176,21 @@ void AppController::createEventDetailed(QString calendarId,
       setStatus(QStringLiteral("Calendar event times are invalid"));
       return;
     }
-    QJsonObject request{{QStringLiteral("calendar_id"), calendarId},
-                        {QStringLiteral("summary"), title.trimmed()},
-                        {QStringLiteral("start"), *start},
-                        {QStringLiteral("end"), *end},
-                        {QStringLiteral("description"),
-                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
-                        {QStringLiteral("location"),
-                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    QJsonObject request{
+        {QStringLiteral("calendar_id"), calendarId},
+        {QStringLiteral("summary"), title.trimmed()},
+        {QStringLiteral("start"), *start},
+        {QStringLiteral("end"), *end},
+        {QStringLiteral("description"),
+         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+        {QStringLiteral("location"), location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
     if (!recurrenceRule.trimmed().isEmpty()) {
       request.insert(QStringLiteral("recurrence"), QJsonArray{recurrenceRule.trimmed()});
     }
-    watch(pythonBridgeClient_->createEvent(pythonBridgeAccountId_,
-                                           request,
-                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    watch(pythonBridgeClient_->createEvent(
+              pythonBridgeAccountId_,
+              request,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5653,21 +6280,19 @@ void AppController::updateEventDetailed(QString eventId,
     return;
   }
   if (bridgeMode()) {
-    const bool unsupported = !colorId.trimmed().isEmpty() || !available ||
-                             !visibility.trimmed().isEmpty() || !attendees.isEmpty() ||
-                             !remindersUseDefault || !reminders.isEmpty() ||
-                             !recurrenceRule.trimmed().isEmpty() || createGoogleMeet ||
-                             (!attachmentsJson.trimmed().isEmpty() && attachmentsJson.trimmed() != "{}") ||
-                             (!guestPermissionsJson.trimmed().isEmpty() &&
-                              guestPermissionsJson.trimmed() != "{}") ||
-                             (!statusPropertiesJson.trimmed().isEmpty() &&
-                              statusPropertiesJson.trimmed() != "{}") ||
-                             (!sendUpdates.trimmed().isEmpty() && sendUpdates.trimmed() != "all") ||
-                             recurrenceScope != 2;
-    const auto existing = std::find_if(
-        pythonBridgeCalendarEvents_.cbegin(),
-        pythonBridgeCalendarEvents_.cend(),
-        [&eventId](const CalendarEventSummary& event) { return event.id == eventId; });
+    const bool unsupported =
+        !colorId.trimmed().isEmpty() || !available || !visibility.trimmed().isEmpty() ||
+        !attendees.isEmpty() || !remindersUseDefault || !reminders.isEmpty() ||
+        !recurrenceRule.trimmed().isEmpty() || createGoogleMeet ||
+        (!attachmentsJson.trimmed().isEmpty() && attachmentsJson.trimmed() != "{}") ||
+        (!guestPermissionsJson.trimmed().isEmpty() && guestPermissionsJson.trimmed() != "{}") ||
+        (!statusPropertiesJson.trimmed().isEmpty() && statusPropertiesJson.trimmed() != "{}") ||
+        (!sendUpdates.trimmed().isEmpty() && sendUpdates.trimmed() != "all") ||
+        recurrenceScope != 2;
+    const auto existing =
+        std::find_if(pythonBridgeCalendarEvents_.cbegin(),
+                     pythonBridgeCalendarEvents_.cend(),
+                     [&eventId](const CalendarEventSummary& event) { return event.id == eventId; });
     if (unsupported || pythonBridgeClient_ == nullptr ||
         existing == pythonBridgeCalendarEvents_.cend() || existing->calendarId != calendarId) {
       setStatus(QStringLiteral("This event edit is not supported by the HCB bridge preview"));
@@ -5679,17 +6304,18 @@ void AppController::updateEventDetailed(QString eventId,
       setStatus(QStringLiteral("Calendar event times are invalid"));
       return;
     }
-    QJsonObject request{{QStringLiteral("summary"), title.trimmed()},
-                        {QStringLiteral("start"), *start},
-                        {QStringLiteral("end"), *end},
-                        {QStringLiteral("description"),
-                         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
-                        {QStringLiteral("location"),
-                         location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
-    watch(pythonBridgeClient_->updateEvent(pythonBridgeAccountId_,
-                                           eventId,
-                                           request,
-                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    QJsonObject request{
+        {QStringLiteral("summary"), title.trimmed()},
+        {QStringLiteral("start"), *start},
+        {QStringLiteral("end"), *end},
+        {QStringLiteral("description"),
+         description.isEmpty() ? QJsonValue::Null : QJsonValue(description)},
+        {QStringLiteral("location"), location.isEmpty() ? QJsonValue::Null : QJsonValue(location)}};
+    watch(pythonBridgeClient_->updateEvent(
+              pythonBridgeAccountId_,
+              eventId,
+              request,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5703,65 +6329,70 @@ void AppController::updateEventDetailed(QString eventId,
   const std::optional<QString> eventTimeZone = timeZone.trimmed().isEmpty()
                                                    ? std::optional<QString>{}
                                                    : std::optional<QString>(timeZone.trimmed());
-  const auto scope = recurrenceScope == 0 ? CalendarEventRecurrenceScope::ThisInstance
+  const auto scope = recurrenceScope == 0   ? CalendarEventRecurrenceScope::ThisInstance
                      : recurrenceScope == 1 ? CalendarEventRecurrenceScope::ThisAndFollowing
                                             : CalendarEventRecurrenceScope::FullSeries;
   if (recurrenceScope < 0 || recurrenceScope > 2) {
     setStatus(QStringLiteral("Calendar recurrence scope is invalid"));
     return;
   }
-  watch(calendarMutationService_.updateScoped(
-            {.update = {.eventId = std::move(eventId),
-             .calendarId = std::move(calendarId),
-             .title = std::move(title),
-             .description = std::optional<std::optional<QString>>(
-                 description.isEmpty() ? std::optional<QString>{}
-                                       : std::optional<QString>(std::move(description))),
-             .location = std::optional<std::optional<QString>>(
-                 location.isEmpty() ? std::optional<QString>{}
-                                    : std::optional<QString>(std::move(location))),
-             .startAt = std::move(startAt),
-             .endAt = std::move(endAt),
-             .allDay = allDay,
-             .startTimeZone = std::optional<std::optional<QString>>(eventTimeZone),
-             .endTimeZone = std::optional<std::optional<QString>>(eventTimeZone),
-             .colorId = std::optional<std::optional<QString>>(
-                 colorId.trimmed().isEmpty() ? std::optional<QString>{}
-                                             : std::optional<QString>(colorId.trimmed())),
-             .transparency = available ? std::optional<QString>(QStringLiteral("transparent"))
-                                       : std::optional<QString>(QStringLiteral("opaque")),
-             .visibility = visibility.trimmed().isEmpty()
-                               ? std::optional<QString>{}
-                               : std::optional<QString>(visibility.trimmed()),
-             .attendeeEmails = *parsedAttendees,
-             .reminders = *parsedReminders,
-             .recurrenceRule = std::optional<std::optional<QString>>(
-                 recurrenceRule.trimmed().isEmpty() ? std::optional<QString>{}
-                                                   : std::optional<QString>(recurrenceRule.trimmed())),
-             .createGoogleMeet = createGoogleMeet,
-             .attachmentsJson = std::move(attachmentsJson),
-             .guestPermissionsJson = std::move(guestPermissionsJson),
-             .statusPropertiesJson = std::move(statusPropertiesJson),
-             .sendUpdates = std::move(sendUpdates)},
-             .scope = scope}),
-        [this](CalendarEventMutationResult result) {
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(result)));
-          } else {
-            refreshCalendar();
-          }
-        });
+  watch(
+      calendarMutationService_.updateScoped(
+          {.update = {.eventId = std::move(eventId),
+                      .calendarId = std::move(calendarId),
+                      .title = std::move(title),
+                      .description = std::optional<std::optional<QString>>(
+                          description.isEmpty() ? std::optional<QString>{}
+                                                : std::optional<QString>(std::move(description))),
+                      .location = std::optional<std::optional<QString>>(
+                          location.isEmpty() ? std::optional<QString>{}
+                                             : std::optional<QString>(std::move(location))),
+                      .startAt = std::move(startAt),
+                      .endAt = std::move(endAt),
+                      .allDay = allDay,
+                      .startTimeZone = std::optional<std::optional<QString>>(eventTimeZone),
+                      .endTimeZone = std::optional<std::optional<QString>>(eventTimeZone),
+                      .colorId = std::optional<std::optional<QString>>(
+                          colorId.trimmed().isEmpty() ? std::optional<QString>{}
+                                                      : std::optional<QString>(colorId.trimmed())),
+                      .transparency = available
+                                          ? std::optional<QString>(QStringLiteral("transparent"))
+                                          : std::optional<QString>(QStringLiteral("opaque")),
+                      .visibility = visibility.trimmed().isEmpty()
+                                        ? std::optional<QString>{}
+                                        : std::optional<QString>(visibility.trimmed()),
+                      .attendeeEmails = *parsedAttendees,
+                      .reminders = *parsedReminders,
+                      .recurrenceRule = std::optional<std::optional<QString>>(
+                          recurrenceRule.trimmed().isEmpty()
+                              ? std::optional<QString>{}
+                              : std::optional<QString>(recurrenceRule.trimmed())),
+                      .createGoogleMeet = createGoogleMeet,
+                      .attachmentsJson = std::move(attachmentsJson),
+                      .guestPermissionsJson = std::move(guestPermissionsJson),
+                      .statusPropertiesJson = std::move(statusPropertiesJson),
+                      .sendUpdates = std::move(sendUpdates)},
+           .scope = scope}),
+      [this](CalendarEventMutationResult result) {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+        } else {
+          refreshCalendar();
+        }
+      });
 }
 
 void AppController::deleteEvent(QString eventId, int recurrenceScope) {
   if (bridgeMode()) {
     if (recurrenceScope != 2 || pythonBridgeClient_ == nullptr) {
-      setStatus(QStringLiteral("Only full-series event deletion is supported by the HCB bridge preview"));
+      setStatus(
+          QStringLiteral("Only full-series event deletion is supported by the HCB bridge preview"));
       return;
     }
-    watch(pythonBridgeClient_->deleteEvent(pythonBridgeAccountId_,
-                                           eventId,
-                                           QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+    watch(pythonBridgeClient_->deleteEvent(
+              pythonBridgeAccountId_,
+              eventId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
           [this](PythonBridgeResult result) {
             if (std::holds_alternative<AppError>(result)) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
@@ -5776,42 +6407,45 @@ void AppController::deleteEvent(QString eventId, int recurrenceScope) {
     setStatus(QStringLiteral("Calendar recurrence scope is invalid"));
     return;
   }
-  const auto scope = recurrenceScope == 0 ? CalendarEventRecurrenceScope::ThisInstance
+  const auto scope = recurrenceScope == 0   ? CalendarEventRecurrenceScope::ThisInstance
                      : recurrenceScope == 1 ? CalendarEventRecurrenceScope::ThisAndFollowing
                                             : CalendarEventRecurrenceScope::FullSeries;
-  watch(calendarMutationService_.inspect({eventId}),
-        [this, eventId = std::move(eventId), scope](CalendarEventMutationSnapshotResult inspection) {
-          if (std::holds_alternative<AppError>(inspection)) {
-            setStatus(errorMessage(std::get<AppError>(inspection)));
-            return;
-          }
-          const QList<CalendarEventMutationSnapshot> events =
-              std::get<QList<CalendarEventMutationSnapshot>>(std::move(inspection));
-          const bool undoable = events.size() == 1 && !events.front().recurrenceRule.has_value() &&
-                                !events.front().recurringRemoteId.has_value();
-          watch(calendarMutationService_.removeScoped({.eventId = eventId, .scope = scope}),
-                [this, eventId, undoable](CalendarEventMutationResult result) {
-                  if (std::holds_alternative<AppError>(result)) {
-                    setStatus(errorMessage(std::get<AppError>(result)));
-                  } else {
-                    if (undoable) {
-                      recordExistenceHistory(UndoResourceKind::Event,
-                                             eventId,
-                                             QStringLiteral("event.delete"),
-                                             QStringLiteral("Delete event"),
-                                             true,
-                                             false);
-                    }
-                    refreshCalendar();
-                    refreshPendingSyncCount();
+  watch(
+      calendarMutationService_.inspect({eventId}),
+      [this, eventId = std::move(eventId), scope](CalendarEventMutationSnapshotResult inspection) {
+        if (std::holds_alternative<AppError>(inspection)) {
+          setStatus(errorMessage(std::get<AppError>(inspection)));
+          return;
+        }
+        const QList<CalendarEventMutationSnapshot> events =
+            std::get<QList<CalendarEventMutationSnapshot>>(std::move(inspection));
+        const bool undoable = events.size() == 1 && !events.front().recurrenceRule.has_value() &&
+                              !events.front().recurringRemoteId.has_value();
+        watch(calendarMutationService_.removeScoped({.eventId = eventId, .scope = scope}),
+              [this, eventId, undoable](CalendarEventMutationResult result) {
+                if (std::holds_alternative<AppError>(result)) {
+                  setStatus(errorMessage(std::get<AppError>(result)));
+                } else {
+                  if (undoable) {
+                    recordExistenceHistory(UndoResourceKind::Event,
+                                           eventId,
+                                           QStringLiteral("event.delete"),
+                                           QStringLiteral("Delete event"),
+                                           true,
+                                           false);
                   }
-                });
-        });
+                  refreshCalendar();
+                  refreshPendingSyncCount();
+                }
+              });
+      });
 }
 
-void AppController::respondToEvent(QString eventId, QString responseStatus, QString responseComment) {
-  watch(calendarMutationService_.respond(std::move(eventId), std::move(responseStatus),
-                                         std::move(responseComment)),
+void AppController::respondToEvent(QString eventId,
+                                   QString responseStatus,
+                                   QString responseComment) {
+  watch(calendarMutationService_.respond(
+            std::move(eventId), std::move(responseStatus), std::move(responseComment)),
         [this](CalendarEventMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
@@ -5823,7 +6457,10 @@ void AppController::respondToEvent(QString eventId, QString responseStatus, QStr
 
 void AppController::moveEvent(QString eventId, QString startAt, QString endAt, bool allDay) {
   watch(calendarMutationService_.inspect({eventId}),
-        [this, eventId = std::move(eventId), startAt = std::move(startAt), endAt = std::move(endAt),
+        [this,
+         eventId = std::move(eventId),
+         startAt = std::move(startAt),
+         endAt = std::move(endAt),
          allDay](CalendarEventMutationSnapshotResult result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
@@ -5836,21 +6473,22 @@ void AppController::moveEvent(QString eventId, QString startAt, QString endAt, b
             return;
           }
           const CalendarEventMutationSnapshot before = snapshots.front();
-          watch(calendarMutationService_.update({.eventId = eventId,
-                                                 .startAt = startAt,
-                                                 .endAt = endAt,
-                                                 .allDay = allDay}),
+          watch(calendarMutationService_.update(
+                    {.eventId = eventId, .startAt = startAt, .endAt = endAt, .allDay = allDay}),
                 [this, before, startAt, endAt, allDay](CalendarEventMutationResult updateResult) {
                   if (std::holds_alternative<AppError>(updateResult)) {
                     setStatus(errorMessage(std::get<AppError>(updateResult)));
                     return;
                   }
                   recordEventTimingHistory(before, QStringLiteral("Move event"));
-                  static_cast<void>(mutationTelemetryStore_.record(
-                      {.resource = QStringLiteral("event"), .operation = QStringLiteral("event.move"),
-                       .scope = QStringLiteral("none"), .allDay = allDay,
-                       .targetStartAt = startAt, .targetEndAt = endAt,
-                       .phase = MutationTelemetryPhase::Intent}));
+                  static_cast<void>(
+                      mutationTelemetryStore_.record({.resource = QStringLiteral("event"),
+                                                      .operation = QStringLiteral("event.move"),
+                                                      .scope = QStringLiteral("none"),
+                                                      .allDay = allDay,
+                                                      .targetStartAt = startAt,
+                                                      .targetEndAt = endAt,
+                                                      .phase = MutationTelemetryPhase::Intent}));
                   refreshCalendar();
                   refreshPendingSyncCount();
                 });
@@ -5879,46 +6517,47 @@ void AppController::resizeEvent(QString eventId, QString endAt) {
                     return;
                   }
                   recordEventTimingHistory(before, QStringLiteral("Resize event"));
-                  static_cast<void>(mutationTelemetryStore_.record(
-                      {.resource = QStringLiteral("event"), .operation = QStringLiteral("event.resize"),
-                       .scope = QStringLiteral("none"), .allDay = before.allDay,
-                       .targetStartAt = before.startAt, .targetEndAt = endAt,
-                       .phase = MutationTelemetryPhase::Intent}));
+                  static_cast<void>(
+                      mutationTelemetryStore_.record({.resource = QStringLiteral("event"),
+                                                      .operation = QStringLiteral("event.resize"),
+                                                      .scope = QStringLiteral("none"),
+                                                      .allDay = before.allDay,
+                                                      .targetStartAt = before.startAt,
+                                                      .targetEndAt = endAt,
+                                                      .phase = MutationTelemetryPhase::Intent}));
                   refreshCalendar();
                   refreshPendingSyncCount();
                 });
         });
 }
 
-void AppController::moveEventScoped(QString eventId,
-                                    QString startAt,
-                                    QString endAt,
-                                    bool allDay,
-                                    int recurrenceScope) {
+void AppController::moveEventScoped(
+    QString eventId, QString startAt, QString endAt, bool allDay, int recurrenceScope) {
   if (recurrenceScope < 0 || recurrenceScope > 2) {
     setStatus(QStringLiteral("Calendar recurrence scope is invalid"));
     return;
   }
-  const auto scope = recurrenceScope == 0 ? CalendarEventRecurrenceScope::ThisInstance
+  const auto scope = recurrenceScope == 0   ? CalendarEventRecurrenceScope::ThisInstance
                      : recurrenceScope == 1 ? CalendarEventRecurrenceScope::ThisAndFollowing
                                             : CalendarEventRecurrenceScope::FullSeries;
-  const QString telemetryScope = recurrenceScope == 0 ? QStringLiteral("this_instance")
-                                : recurrenceScope == 1 ? QStringLiteral("this_and_following")
-                                                       : QStringLiteral("full_series");
+  const QString telemetryScope = recurrenceScope == 0   ? QStringLiteral("this_instance")
+                                 : recurrenceScope == 1 ? QStringLiteral("this_and_following")
+                                                        : QStringLiteral("full_series");
   watch(calendarMutationService_.updateScoped(
-            {.update = {.eventId = eventId,
-                        .startAt = startAt,
-                        .endAt = endAt,
-                        .allDay = allDay},
+            {.update = {.eventId = eventId, .startAt = startAt, .endAt = endAt, .allDay = allDay},
              .scope = scope}),
         [this, startAt, endAt, allDay, telemetryScope](CalendarEventMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
           } else {
-            static_cast<void>(mutationTelemetryStore_.record(
-                {.resource = QStringLiteral("event"), .operation = QStringLiteral("event.move"),
-                 .scope = telemetryScope, .allDay = allDay, .targetStartAt = startAt,
-                 .targetEndAt = endAt, .phase = MutationTelemetryPhase::Intent}));
+            static_cast<void>(
+                mutationTelemetryStore_.record({.resource = QStringLiteral("event"),
+                                                .operation = QStringLiteral("event.move"),
+                                                .scope = telemetryScope,
+                                                .allDay = allDay,
+                                                .targetStartAt = startAt,
+                                                .targetEndAt = endAt,
+                                                .phase = MutationTelemetryPhase::Intent}));
             refreshCalendar();
           }
         });
@@ -5929,22 +6568,24 @@ void AppController::resizeEventScoped(QString eventId, QString endAt, int recurr
     setStatus(QStringLiteral("Calendar recurrence scope is invalid"));
     return;
   }
-  const auto scope = recurrenceScope == 0 ? CalendarEventRecurrenceScope::ThisInstance
+  const auto scope = recurrenceScope == 0   ? CalendarEventRecurrenceScope::ThisInstance
                      : recurrenceScope == 1 ? CalendarEventRecurrenceScope::ThisAndFollowing
                                             : CalendarEventRecurrenceScope::FullSeries;
-  const QString telemetryScope = recurrenceScope == 0 ? QStringLiteral("this_instance")
-                                : recurrenceScope == 1 ? QStringLiteral("this_and_following")
-                                                       : QStringLiteral("full_series");
+  const QString telemetryScope = recurrenceScope == 0   ? QStringLiteral("this_instance")
+                                 : recurrenceScope == 1 ? QStringLiteral("this_and_following")
+                                                        : QStringLiteral("full_series");
   watch(calendarMutationService_.updateScoped(
             {.update = {.eventId = eventId, .endAt = endAt}, .scope = scope}),
         [this, endAt, telemetryScope](CalendarEventMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(result)));
           } else {
-            static_cast<void>(mutationTelemetryStore_.record(
-                {.resource = QStringLiteral("event"), .operation = QStringLiteral("event.resize"),
-                 .scope = telemetryScope, .targetEndAt = endAt,
-                 .phase = MutationTelemetryPhase::Intent}));
+            static_cast<void>(
+                mutationTelemetryStore_.record({.resource = QStringLiteral("event"),
+                                                .operation = QStringLiteral("event.resize"),
+                                                .scope = telemetryScope,
+                                                .targetEndAt = endAt,
+                                                .phase = MutationTelemetryPhase::Intent}));
             refreshCalendar();
           }
         });
@@ -6014,11 +6655,8 @@ void AppController::bulkShiftEventTimes(QVariantList eventIds, int shiftMinutes)
                         .shiftMinutes = shiftMinutes});
 }
 
-void AppController::bulkReplaceEventText(QVariantList eventIds,
-                                         QString findText,
-                                         QString replaceText,
-                                         int fields,
-                                         int recurrenceScope) {
+void AppController::bulkReplaceEventText(
+    QVariantList eventIds, QString findText, QString replaceText, int fields, int recurrenceScope) {
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(eventIds);
   if (!ids.has_value() || findText.isEmpty() || fields <= 0 || fields > 7 ||
       !isValidBulkTextRecurrenceScope(recurrenceScope)) {
@@ -6033,11 +6671,8 @@ void AppController::bulkReplaceEventText(QVariantList eventIds,
                         .recurrenceScope = recurrenceScope});
 }
 
-void AppController::previewBulkEventText(QVariantList eventIds,
-                                         QString findText,
-                                         int fields,
-                                         int recurrenceScope,
-                                         int requestToken) {
+void AppController::previewBulkEventText(
+    QVariantList eventIds, QString findText, int fields, int recurrenceScope, int requestToken) {
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(eventIds);
   if (!ids.has_value() || findText.isEmpty() || fields <= 0 || fields > 7 ||
       !isValidBulkTextRecurrenceScope(recurrenceScope)) {
@@ -6139,28 +6774,27 @@ void AppController::loadSavedSearches() {
 }
 
 void AppController::runBulkTaskMutation(
-    TaskBulkMutationInput input,
-    std::function<void(const TaskBulkMutationSummary&)> onSuccess) {
-  watch(taskBulkMutationService_.execute(std::move(input)), [this, onSuccess = std::move(onSuccess)](
-                                                       TaskBulkMutationResult result) {
-    if (std::holds_alternative<AppError>(result)) {
-      const QString message = errorMessage(std::get<AppError>(result));
-      setBulkTaskStatusMessage(message);
-      setStatus(message);
-      return;
-    }
-    const TaskBulkMutationSummary& summary = std::get<TaskBulkMutationSummary>(result);
-    const QString message = bulkTaskSummaryMessage(summary);
-    setBulkTaskStatusMessage(message);
-    setStatus(message);
-    if (summary.queued > 0) {
-      refreshTasks();
-      refreshPendingSyncCount();
-      if (onSuccess) {
-        onSuccess(summary);
-      }
-    }
-  });
+    TaskBulkMutationInput input, std::function<void(const TaskBulkMutationSummary&)> onSuccess) {
+  watch(taskBulkMutationService_.execute(std::move(input)),
+        [this, onSuccess = std::move(onSuccess)](TaskBulkMutationResult result) {
+          if (std::holds_alternative<AppError>(result)) {
+            const QString message = errorMessage(std::get<AppError>(result));
+            setBulkTaskStatusMessage(message);
+            setStatus(message);
+            return;
+          }
+          const TaskBulkMutationSummary& summary = std::get<TaskBulkMutationSummary>(result);
+          const QString message = bulkTaskSummaryMessage(summary);
+          setBulkTaskStatusMessage(message);
+          setStatus(message);
+          if (summary.queued > 0) {
+            refreshTasks();
+            refreshPendingSyncCount();
+            if (onSuccess) {
+              onSuccess(summary);
+            }
+          }
+        });
 }
 
 void AppController::runBulkEventMutation(CalendarEventBulkMutationInput input) {
@@ -6195,15 +6829,15 @@ void AppController::previewBulkTaskMutation(TaskBulkMutationInput input, int req
             return;
           }
           const TaskBulkMutationSummary& summary = std::get<TaskBulkMutationSummary>(result);
-          setBulkTaskPreviewMessage(
-              QStringLiteral("Preview: %1 records will change; %2 skipped.")
-                  .arg(summary.eligible)
-                  .arg(summary.skipped),
-              requestToken);
+          setBulkTaskPreviewMessage(QStringLiteral("Preview: %1 records will change; %2 skipped.")
+                                        .arg(summary.eligible)
+                                        .arg(summary.skipped),
+                                    requestToken);
         });
 }
 
-void AppController::previewBulkEventMutation(CalendarEventBulkMutationInput input, int requestToken) {
+void AppController::previewBulkEventMutation(CalendarEventBulkMutationInput input,
+                                             int requestToken) {
   latestEventPreviewRequestToken_ = requestToken;
   watch(calendarEventBulkMutationService_.execute(std::move(input)),
         [this, requestToken](CalendarEventBulkMutationResult result) {
@@ -6216,11 +6850,10 @@ void AppController::previewBulkEventMutation(CalendarEventBulkMutationInput inpu
           }
           const CalendarEventBulkMutationSummary& summary =
               std::get<CalendarEventBulkMutationSummary>(result);
-          setBulkEventPreviewMessage(
-              QStringLiteral("Preview: %1 records will change; %2 skipped.")
-                  .arg(summary.eligible)
-                  .arg(summary.skipped),
-              requestToken);
+          setBulkEventPreviewMessage(QStringLiteral("Preview: %1 records will change; %2 skipped.")
+                                         .arg(summary.eligible)
+                                         .arg(summary.skipped),
+                                     requestToken);
         });
 }
 
@@ -6281,34 +6914,41 @@ void AppController::applyTaskProjections(QList<TaskModelTask> tasks) {
 }
 
 void AppController::refreshUndoStatus() {
-  watch(undoRecoveryPolicy_.status(), [this](UndoStatusResult result) {
-    if (std::holds_alternative<AppError>(result)) {
-      setStatus(errorMessage(std::get<AppError>(result)));
-      return;
-    }
-    const UndoStatus status = std::get<UndoStatus>(std::move(result));
-    const QString undoLabel = status.undoLabel.value_or(QString());
-    const QString redoLabel = status.redoLabel.value_or(QString());
-    if (undoLabel_ != undoLabel || redoLabel_ != redoLabel) {
-      undoLabel_ = undoLabel;
-      redoLabel_ = redoLabel;
-      emit undoStateChanged();
-    }
-  }, false);
+  watch(
+      undoRecoveryPolicy_.status(),
+      [this](UndoStatusResult result) {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+          return;
+        }
+        const UndoStatus status = std::get<UndoStatus>(std::move(result));
+        const QString undoLabel = status.undoLabel.value_or(QString());
+        const QString redoLabel = status.redoLabel.value_or(QString());
+        if (undoLabel_ != undoLabel || redoLabel_ != redoLabel) {
+          undoLabel_ = undoLabel;
+          redoLabel_ = redoLabel;
+          emit undoStateChanged();
+        }
+      },
+      false);
 }
 
 void AppController::refreshPendingSyncCount() {
-  watch(optimisticMutationCoordinator_.listActive(), [this](PendingMutationListResult result) {
-    if (std::holds_alternative<AppError>(result)) {
-      setStatus(errorMessage(std::get<AppError>(result)));
-      return;
-    }
-    const int count = static_cast<int>(std::get<QList<PendingMutation>>(std::move(result)).size());
-    if (pendingSyncCount_ != count) {
-      pendingSyncCount_ = count;
-      emit pendingSyncCountChanged();
-    }
-  }, false);
+  watch(
+      optimisticMutationCoordinator_.listActive(),
+      [this](PendingMutationListResult result) {
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+          return;
+        }
+        const int count =
+            static_cast<int>(std::get<QList<PendingMutation>>(std::move(result)).size());
+        if (pendingSyncCount_ != count) {
+          pendingSyncCount_ = count;
+          emit pendingSyncCountChanged();
+        }
+      },
+      false);
 }
 
 void AppController::recordExistenceHistory(UndoResourceKind resource,
@@ -6317,20 +6957,21 @@ void AppController::recordExistenceHistory(UndoResourceKind resource,
                                            QString label,
                                            bool beforeExists,
                                            bool afterExists) {
-  watch(undoRecoveryPolicy_.record({.actionKind = std::move(actionKind),
-                                    .label = std::move(label),
-                                    .resource = resource,
-                                    .resourceId = std::move(resourceId),
-                                    .before = existenceSnapshot(beforeExists),
-                                    .after = existenceSnapshot(afterExists)}),
-        [this](std::optional<AppError> recordResult) {
-          if (recordResult.has_value()) {
-            setStatus(errorMessage(*recordResult));
-            return;
-          }
-          refreshUndoStatus();
-        },
-        false);
+  watch(
+      undoRecoveryPolicy_.record({.actionKind = std::move(actionKind),
+                                  .label = std::move(label),
+                                  .resource = resource,
+                                  .resourceId = std::move(resourceId),
+                                  .before = existenceSnapshot(beforeExists),
+                                  .after = existenceSnapshot(afterExists)}),
+      [this](std::optional<AppError> recordResult) {
+        if (recordResult.has_value()) {
+          setStatus(errorMessage(*recordResult));
+          return;
+        }
+        refreshUndoStatus();
+      },
+      false);
 }
 
 void AppController::recordTaskDueHistory(QList<TaskMutationSnapshot> before, QString label) {
@@ -6359,20 +7000,21 @@ void AppController::recordTaskDueHistory(QList<TaskMutationSnapshot> before, QSt
             if (afterTask == after.cend()) {
               continue;
             }
-            watch(undoRecoveryPolicy_.record({.actionKind = QStringLiteral("task.due"),
-                                              .label = label,
-                                              .resource = UndoResourceKind::Task,
-                                              .resourceId = beforeTask.taskId,
-                                              .before = taskDueSnapshot(beforeTask),
-                                              .after = taskDueSnapshot(*afterTask)}),
-                  [this](std::optional<AppError> recordResult) {
-                    if (recordResult.has_value()) {
-                      setStatus(errorMessage(*recordResult));
-                      return;
-                    }
-                    refreshUndoStatus();
-                  },
-                  false);
+            watch(
+                undoRecoveryPolicy_.record({.actionKind = QStringLiteral("task.due"),
+                                            .label = label,
+                                            .resource = UndoResourceKind::Task,
+                                            .resourceId = beforeTask.taskId,
+                                            .before = taskDueSnapshot(beforeTask),
+                                            .after = taskDueSnapshot(*afterTask)}),
+                [this](std::optional<AppError> recordResult) {
+                  if (recordResult.has_value()) {
+                    setStatus(errorMessage(*recordResult));
+                    return;
+                  }
+                  refreshUndoStatus();
+                },
+                false);
           }
         });
 }
@@ -6390,20 +7032,21 @@ void AppController::recordEventTimingHistory(CalendarEventMutationSnapshot befor
           if (after.size() != 1) {
             return;
           }
-          watch(undoRecoveryPolicy_.record({.actionKind = QStringLiteral("event.timing"),
-                                            .label = std::move(label),
-                                            .resource = UndoResourceKind::Event,
-                                            .resourceId = before.eventId,
-                                            .before = eventTimingSnapshot(before),
-                                            .after = eventTimingSnapshot(after.front())}),
-                [this](std::optional<AppError> recordResult) {
-                  if (recordResult.has_value()) {
-                    setStatus(errorMessage(*recordResult));
-                    return;
-                  }
-                  refreshUndoStatus();
-                },
-                false);
+          watch(
+              undoRecoveryPolicy_.record({.actionKind = QStringLiteral("event.timing"),
+                                          .label = std::move(label),
+                                          .resource = UndoResourceKind::Event,
+                                          .resourceId = before.eventId,
+                                          .before = eventTimingSnapshot(before),
+                                          .after = eventTimingSnapshot(after.front())}),
+              [this](std::optional<AppError> recordResult) {
+                if (recordResult.has_value()) {
+                  setStatus(errorMessage(*recordResult));
+                  return;
+                }
+                refreshUndoStatus();
+              },
+              false);
         });
 }
 
@@ -6432,7 +7075,8 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
               setStatus(errorMessage(std::get<AppError>(result)));
               return;
             }
-            const bool exists = std::get<QList<TaskMutationSnapshot>>(std::move(result)).size() == 1;
+            const bool exists =
+                std::get<QList<TaskMutationSnapshot>>(std::move(result)).size() == 1;
             const std::optional<bool> expected = existenceFromSnapshot(entry.expected);
             if (!expected.has_value() || exists != *expected) {
               setStatus(QStringLiteral("Undo is unavailable because the task changed"));
@@ -6455,12 +7099,15 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
                 if (std::holds_alternative<AppError>(mutation)) {
                   const AppError failure = std::get<AppError>(mutation);
                   auto rollback = replay.action == UndoAction::Undo
-                                            ? undoRecoveryPolicy_.redo(targetSnapshot)
-                                            : undoRecoveryPolicy_.undo(targetSnapshot);
-                  watch(std::move(rollback), [this, failure](UndoReplayResult) {
-                    refreshUndoStatus();
-                    setStatus(errorMessage(failure));
-                  }, false);
+                                      ? undoRecoveryPolicy_.redo(targetSnapshot)
+                                      : undoRecoveryPolicy_.undo(targetSnapshot);
+                  watch(
+                      std::move(rollback),
+                      [this, failure](UndoReplayResult) {
+                        refreshUndoStatus();
+                        setStatus(errorMessage(failure));
+                      },
+                      false);
                   return;
                 }
                 refreshTasks();
@@ -6514,26 +7161,30 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
                 return;
               }
               const QJsonObject targetSnapshot = existenceSnapshot(*target);
-              const auto complete = [this, replay, targetSnapshot](CalendarEventMutationResult mutation) {
-                if (std::holds_alternative<AppError>(mutation)) {
-                  const AppError failure = std::get<AppError>(mutation);
-                  auto rollback = replay.action == UndoAction::Undo
-                                            ? undoRecoveryPolicy_.redo(targetSnapshot)
-                                            : undoRecoveryPolicy_.undo(targetSnapshot);
-                  watch(std::move(rollback), [this, failure](UndoReplayResult) {
+              const auto complete =
+                  [this, replay, targetSnapshot](CalendarEventMutationResult mutation) {
+                    if (std::holds_alternative<AppError>(mutation)) {
+                      const AppError failure = std::get<AppError>(mutation);
+                      auto rollback = replay.action == UndoAction::Undo
+                                          ? undoRecoveryPolicy_.redo(targetSnapshot)
+                                          : undoRecoveryPolicy_.undo(targetSnapshot);
+                      watch(
+                          std::move(rollback),
+                          [this, failure](UndoReplayResult) {
+                            refreshUndoStatus();
+                            setStatus(errorMessage(failure));
+                          },
+                          false);
+                      return;
+                    }
+                    refreshCalendar();
+                    refreshPendingSyncCount();
                     refreshUndoStatus();
-                    setStatus(errorMessage(failure));
-                  }, false);
-                  return;
-                }
-                refreshCalendar();
-                refreshPendingSyncCount();
-                refreshUndoStatus();
-                setStatus(QStringLiteral("%1 queued for Google sync")
-                              .arg(replay.action == UndoAction::Undo
-                                       ? QStringLiteral("Undid %1").arg(replay.label)
-                                       : QStringLiteral("Redid %1").arg(replay.label)));
-              };
+                    setStatus(QStringLiteral("%1 queued for Google sync")
+                                  .arg(replay.action == UndoAction::Undo
+                                           ? QStringLiteral("Undid %1").arg(replay.label)
+                                           : QStringLiteral("Redid %1").arg(replay.label)));
+                  };
               if (*target) {
                 watch(calendarMutationService_.restore(replay.resourceId), complete);
               } else {
@@ -6568,7 +7219,8 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
                 return;
               }
               const UndoReplay replay = std::get<UndoReplay>(std::move(replayResult));
-              const std::optional<TaskDue> target = taskDueFromSnapshot(replay.target, replay.resourceId);
+              const std::optional<TaskDue> target =
+                  taskDueFromSnapshot(replay.target, replay.resourceId);
               if (!target.has_value()) {
                 setStatus(QStringLiteral("Stored undo task snapshot is invalid"));
                 return;
@@ -6576,19 +7228,23 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
               watch(taskMutationService_.update({.taskId = replay.resourceId, .due = *target}),
                     [this, replay, target = *target](TaskMutationResult updateResult) {
                       if (std::holds_alternative<AppError>(updateResult)) {
-                        auto restore = replay.action == UndoAction::Undo
-                                                 ? undoRecoveryPolicy_.redo(taskDueSnapshot(
-                                                       TaskMutationSnapshot{.taskId = replay.resourceId,
-                                                                            .dueAt = target.at,
-                                                                            .dueTimeZone = target.timeZone}))
-                                                 : undoRecoveryPolicy_.undo(taskDueSnapshot(
-                                                       TaskMutationSnapshot{.taskId = replay.resourceId,
-                                                                            .dueAt = target.at,
-                                                                            .dueTimeZone = target.timeZone}));
-                        watch(std::move(restore), [this, updateResult](UndoReplayResult) {
-                          refreshUndoStatus();
-                          setStatus(errorMessage(std::get<AppError>(updateResult)));
-                        }, false);
+                        auto restore =
+                            replay.action == UndoAction::Undo
+                                ? undoRecoveryPolicy_.redo(taskDueSnapshot(
+                                      TaskMutationSnapshot{.taskId = replay.resourceId,
+                                                           .dueAt = target.at,
+                                                           .dueTimeZone = target.timeZone}))
+                                : undoRecoveryPolicy_.undo(taskDueSnapshot(
+                                      TaskMutationSnapshot{.taskId = replay.resourceId,
+                                                           .dueAt = target.at,
+                                                           .dueTimeZone = target.timeZone}));
+                        watch(
+                            std::move(restore),
+                            [this, updateResult](UndoReplayResult) {
+                              refreshUndoStatus();
+                              setStatus(errorMessage(std::get<AppError>(updateResult)));
+                            },
+                            false);
                         return;
                       }
                       refreshTasks();
@@ -6641,17 +7297,21 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
                                                      .allDay = target->allDay}),
                     [this, replay, target = *target](CalendarEventMutationResult updateResult) {
                       if (std::holds_alternative<AppError>(updateResult)) {
-                        const QJsonObject targetSnapshot{{QStringLiteral("eventId"), replay.resourceId},
-                                                         {QStringLiteral("startAt"), target.startAt},
-                                                         {QStringLiteral("endAt"), target.endAt},
-                                                         {QStringLiteral("allDay"), target.allDay}};
+                        const QJsonObject targetSnapshot{
+                            {QStringLiteral("eventId"), replay.resourceId},
+                            {QStringLiteral("startAt"), target.startAt},
+                            {QStringLiteral("endAt"), target.endAt},
+                            {QStringLiteral("allDay"), target.allDay}};
                         auto restore = replay.action == UndoAction::Undo
-                                                 ? undoRecoveryPolicy_.redo(targetSnapshot)
-                                                 : undoRecoveryPolicy_.undo(targetSnapshot);
-                        watch(std::move(restore), [this, updateResult](UndoReplayResult) {
-                          refreshUndoStatus();
-                          setStatus(errorMessage(std::get<AppError>(updateResult)));
-                        }, false);
+                                           ? undoRecoveryPolicy_.redo(targetSnapshot)
+                                           : undoRecoveryPolicy_.undo(targetSnapshot);
+                        watch(
+                            std::move(restore),
+                            [this, updateResult](UndoReplayResult) {
+                              refreshUndoStatus();
+                              setStatus(errorMessage(std::get<AppError>(updateResult)));
+                            },
+                            false);
                         return;
                       }
                       refreshCalendar();
@@ -6716,95 +7376,96 @@ void AppController::refreshCalendar() {
 void AppController::loadCalendarManagementRows(std::uint64_t generation,
                                                std::int64_t offset,
                                                QVariantList rows) {
-  watch(calendarReadService_.listCalendars(
-            {.includeHidden = true, .limit = 100, .offset = offset}),
-        [this, generation, rows = std::move(rows)](CalendarListPageResult result) mutable {
-          if (generation != calendarRefreshGeneration_) {
-            return;
-          }
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(std::move(result))));
-            return;
-          }
-          CalendarListPage page = std::get<CalendarListPage>(std::move(result));
-          rows.reserve(rows.size() + page.items.size());
-          for (const CalendarSummary& calendar : page.items) {
-            QVariantMap row;
-            row.insert(QStringLiteral("id"), calendar.id);
-            row.insert(QStringLiteral("title"), calendar.title);
-            row.insert(QStringLiteral("description"), calendar.description.value_or(QString()));
-            row.insert(QStringLiteral("timeZone"), calendar.timeZone.value_or(QString()));
-            row.insert(QStringLiteral("colorId"), calendar.colorId.value_or(QString()));
-            row.insert(QStringLiteral("backgroundColor"),
-                       calendar.backgroundColor.value_or(QString()));
-            row.insert(QStringLiteral("accessRole"), calendar.accessRole.value_or(QString()));
-            row.insert(QStringLiteral("selected"), calendar.selected);
-            row.insert(QStringLiteral("hidden"), calendar.hidden);
-            row.insert(QStringLiteral("primary"), calendar.primary);
-            rows.append(std::move(row));
-          }
-          if (page.nextOffset.has_value()) {
-            loadCalendarManagementRows(generation, *page.nextOffset, std::move(rows));
-            return;
-          }
-          setCalendarManagementRows(std::move(rows));
-        },
-        false);
+  watch(
+      calendarReadService_.listCalendars({.includeHidden = true, .limit = 100, .offset = offset}),
+      [this, generation, rows = std::move(rows)](CalendarListPageResult result) mutable {
+        if (generation != calendarRefreshGeneration_) {
+          return;
+        }
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        CalendarListPage page = std::get<CalendarListPage>(std::move(result));
+        rows.reserve(rows.size() + page.items.size());
+        for (const CalendarSummary& calendar : page.items) {
+          QVariantMap row;
+          row.insert(QStringLiteral("id"), calendar.id);
+          row.insert(QStringLiteral("title"), calendar.title);
+          row.insert(QStringLiteral("description"), calendar.description.value_or(QString()));
+          row.insert(QStringLiteral("timeZone"), calendar.timeZone.value_or(QString()));
+          row.insert(QStringLiteral("colorId"), calendar.colorId.value_or(QString()));
+          row.insert(QStringLiteral("backgroundColor"),
+                     calendar.backgroundColor.value_or(QString()));
+          row.insert(QStringLiteral("accessRole"), calendar.accessRole.value_or(QString()));
+          row.insert(QStringLiteral("selected"), calendar.selected);
+          row.insert(QStringLiteral("hidden"), calendar.hidden);
+          row.insert(QStringLiteral("primary"), calendar.primary);
+          rows.append(std::move(row));
+        }
+        if (page.nextOffset.has_value()) {
+          loadCalendarManagementRows(generation, *page.nextOffset, std::move(rows));
+          return;
+        }
+        setCalendarManagementRows(std::move(rows));
+      },
+      false);
 }
 
 void AppController::refreshInvitations() {
   const std::uint64_t generation = ++invitationRefreshGeneration_;
-  const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-      clock_.wallNow().time_since_epoch());
+  const auto milliseconds =
+      std::chrono::duration_cast<std::chrono::milliseconds>(clock_.wallNow().time_since_epoch());
   const QDateTime current = QDateTime::fromMSecsSinceEpoch(milliseconds.count(), QTimeZone::UTC);
-  watch(calendarReadService_.listEvents({.startAt = current.addDays(-1).toString(Qt::ISODateWithMs),
-                                         .endAt = current.addDays(366).toString(Qt::ISODateWithMs),
-                                         .limit = 25'000}),
-        [this, generation](CalendarEventPageResult result) {
-          if (generation != invitationRefreshGeneration_) {
-            return;
+  watch(
+      calendarReadService_.listEvents({.startAt = current.addDays(-1).toString(Qt::ISODateWithMs),
+                                       .endAt = current.addDays(366).toString(Qt::ISODateWithMs),
+                                       .limit = 25'000}),
+      [this, generation](CalendarEventPageResult result) {
+        if (generation != invitationRefreshGeneration_) {
+          return;
+        }
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+          return;
+        }
+        QVariantList rows;
+        const CalendarEventPage page = std::get<CalendarEventPage>(std::move(result));
+        for (const CalendarEventSummary& event : page.items) {
+          QJsonParseError error;
+          const QJsonDocument attendees =
+              QJsonDocument::fromJson(event.attendeeDetailsJson.toUtf8(), &error);
+          if (error.error != QJsonParseError::NoError || !attendees.isArray()) {
+            continue;
           }
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(result)));
-            return;
-          }
-          QVariantList rows;
-          const CalendarEventPage page = std::get<CalendarEventPage>(std::move(result));
-          for (const CalendarEventSummary& event : page.items) {
-            QJsonParseError error;
-            const QJsonDocument attendees =
-                QJsonDocument::fromJson(event.attendeeDetailsJson.toUtf8(), &error);
-            if (error.error != QJsonParseError::NoError || !attendees.isArray()) {
+          QString response;
+          QString comment;
+          bool self = false;
+          for (const QJsonValue& attendeeValue : attendees.array()) {
+            if (!attendeeValue.isObject()) {
               continue;
             }
-            QString response;
-            QString comment;
-            bool self = false;
-            for (const QJsonValue& attendeeValue : attendees.array()) {
-              if (!attendeeValue.isObject()) {
-                continue;
-              }
-              const QJsonObject attendee = attendeeValue.toObject();
-              if (attendee.value(QStringLiteral("self")).toBool()) {
-                self = true;
-                response = attendee.value(QStringLiteral("responseStatus")).toString();
-                comment = attendee.value(QStringLiteral("comment")).toString();
-                break;
-              }
+            const QJsonObject attendee = attendeeValue.toObject();
+            if (attendee.value(QStringLiteral("self")).toBool()) {
+              self = true;
+              response = attendee.value(QStringLiteral("responseStatus")).toString();
+              comment = attendee.value(QStringLiteral("comment")).toString();
+              break;
             }
-            if (!self || response != QStringLiteral("needsAction")) {
-              continue;
-            }
-            rows.append(QVariantMap{{QStringLiteral("eventId"), event.id},
-                                    {QStringLiteral("calendarId"), event.calendarId},
-                                    {QStringLiteral("title"), event.title},
-                                    {QStringLiteral("startAt"), event.startAt},
-                                    {QStringLiteral("allDay"), event.allDay},
-                                    {QStringLiteral("comment"), comment}});
           }
-          setInvitations(std::move(rows));
-        },
-        false);
+          if (!self || response != QStringLiteral("needsAction")) {
+            continue;
+          }
+          rows.append(QVariantMap{{QStringLiteral("eventId"), event.id},
+                                  {QStringLiteral("calendarId"), event.calendarId},
+                                  {QStringLiteral("title"), event.title},
+                                  {QStringLiteral("startAt"), event.startAt},
+                                  {QStringLiteral("allDay"), event.allDay},
+                                  {QStringLiteral("comment"), comment}});
+        }
+        setInvitations(std::move(rows));
+      },
+      false);
 }
 
 void AppController::refreshCalendarEvents(QList<QString> calendarIds, std::uint64_t generation) {
@@ -6833,50 +7494,52 @@ void AppController::refreshCalendarEvents(QList<QString> calendarIds, std::uint6
     return;
   }
   const QList<QString> cacheCalendarIds = calendarIds;
-  watch(calendarReadService_.listEvents({.calendarIds = std::move(calendarIds),
-                                         .startAt = calendarRangeStart(date, firstDay),
-                                         .endAt = calendarRangeEnd(date, firstDay),
-                                         .limit = 25'000}),
-        [this, generation, date, displayTimeZone, firstDay, applyLayouts, cacheCalendarIds](
-            CalendarEventPageResult result) {
-          if (generation != calendarRefreshGeneration_) {
-            return;
+  watch(
+      calendarReadService_.listEvents({.calendarIds = std::move(calendarIds),
+                                       .startAt = calendarRangeStart(date, firstDay),
+                                       .endAt = calendarRangeEnd(date, firstDay),
+                                       .limit = 25'000}),
+      [this, generation, date, displayTimeZone, firstDay, applyLayouts, cacheCalendarIds](
+          CalendarEventPageResult result) {
+        if (generation != calendarRefreshGeneration_) {
+          return;
+        }
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(result)));
+        } else {
+          CalendarEventPage page = std::get<CalendarEventPage>(std::move(result));
+          if (page.nextOffset.has_value()) {
+            setStatus(QStringLiteral("Calendar range is limited to the first %1 events")
+                          .arg(page.items.size()));
           }
-          if (std::holds_alternative<AppError>(result)) {
-            setStatus(errorMessage(std::get<AppError>(result)));
-          } else {
-            CalendarEventPage page = std::get<CalendarEventPage>(std::move(result));
-            if (page.nextOffset.has_value()) {
-              setStatus(QStringLiteral("Calendar range is limited to the first %1 events")
-                            .arg(page.items.size()));
-            }
-            QList<CalendarEventSummary> events = std::move(page.items);
-            const qsizetype uncachedSeries = std::count_if(
-                events.cbegin(), events.cend(), [](const CalendarEventSummary& event) {
-                  return event.recurrenceRule.has_value() && !event.instanceRangeCached;
-                });
-            watch(std::async(std::launch::async,
-                             [date, events = std::move(events), displayTimeZone, firstDay]() mutable {
-                               return buildCalendarViewLayouts(
-                                   date, std::move(events), displayTimeZone, firstDay);
-                             }),
-                  applyLayouts);
-            if (uncachedSeries > 0 && !page.nextOffset.has_value()) {
-              setStatus(googleConnected_
-                            ? QStringLiteral("Loading Google recurrence for %1 series")
-                                  .arg(uncachedSeries)
-                            : QStringLiteral("Google recurrence cache may be stale for %1 series")
-                                  .arg(uncachedSeries));
-            }
-            refreshCalendarInstanceCache(cacheCalendarIds, date, generation);
+          QList<CalendarEventSummary> events = std::move(page.items);
+          const qsizetype uncachedSeries =
+              std::count_if(events.cbegin(), events.cend(), [](const CalendarEventSummary& event) {
+                return event.recurrenceRule.has_value() && !event.instanceRangeCached;
+              });
+          watch(std::async(std::launch::async,
+                           [date, events = std::move(events), displayTimeZone, firstDay]() mutable {
+                             return buildCalendarViewLayouts(
+                                 date, std::move(events), displayTimeZone, firstDay);
+                           }),
+                applyLayouts);
+          if (uncachedSeries > 0 && !page.nextOffset.has_value()) {
+            setStatus(
+                googleConnected_
+                    ? QStringLiteral("Loading Google recurrence for %1 series").arg(uncachedSeries)
+                    : QStringLiteral("Google recurrence cache may be stale for %1 series")
+                          .arg(uncachedSeries));
           }
-        });
+          refreshCalendarInstanceCache(cacheCalendarIds, date, generation);
+        }
+      });
 }
 
 void AppController::refreshCalendarInstanceCache(QList<QString> calendarIds,
                                                  QDate date,
                                                  std::uint64_t generation) {
-  if (generation != calendarRefreshGeneration_ || !googleConnected_ || credentialStore_ == nullptr) {
+  if (generation != calendarRefreshGeneration_ || !googleConnected_ ||
+      credentialStore_ == nullptr) {
     return;
   }
   const QString rangeStartAt = calendarRangeStart(date, weekStartDay_);

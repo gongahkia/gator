@@ -26,8 +26,8 @@ public:
   ImportMutationService& operator=(const ImportMutationService&) = delete;
 
   [[nodiscard]] std::shared_future<SqliteWriteResult> ready() const;
-  [[nodiscard]] std::future<ImportMutationResult>
-  create(QList<TaskCreateInput> tasks, QList<CalendarEventCreateInput> events);
+  [[nodiscard]] std::future<ImportMutationResult> create(QList<TaskCreateInput> tasks,
+                                                         QList<CalendarEventCreateInput> events);
 
 private:
   const Clock& clock_;

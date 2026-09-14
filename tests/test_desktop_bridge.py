@@ -291,6 +291,138 @@ def test_task_and_event_mutations_use_the_python_optimistic_core(
         assert storage.pending_mutation_count("work") == 6
 
 
+def test_task_list_and_calendar_management_stays_in_the_python_core(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    paths, bridge = bridge_env
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/task-lists",
+        body={"title": "Bridge list", "selected": False},
+        idempotency_key="bridge-list-create",
+    )
+    assert status == 201
+    task_list = _data(response)["task_list"]
+    assert isinstance(task_list, dict)
+    task_list_id = str(task_list["id"])
+    assert task_list["selected"] is False
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/task-lists",
+        body={"title": "Bridge list", "selected": False},
+        idempotency_key="bridge-list-create",
+    )
+    assert status == 201
+    assert _data(response)["task_list"]["id"] == task_list_id  # type: ignore[index]
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/task-lists",
+        body={"title": "Different bridge list"},
+        idempotency_key="bridge-list-create",
+    )
+    assert status == 409
+    assert failure["error"]["code"] == "conflict"  # type: ignore[index]
+
+    status, response = _request(
+        bridge,
+        "PATCH",
+        f"/v1/accounts/work/task-lists/{task_list_id}",
+        body={"title": "Renamed bridge list", "selected": True},
+    )
+    assert status == 200
+    assert _data(response)["task_list"]["title"] == "Renamed bridge list"  # type: ignore[index]
+    assert _data(response)["task_list"]["selected"] is True  # type: ignore[index]
+    with Storage(paths.database_file) as storage:
+        # The rename is queued, while the visibility preference stays local.
+        assert storage.pending_mutation_count("work") == 2
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/calendars",
+        body={
+            "summary": "Bridge calendar",
+            "description": "Created through the bridge",
+            "time_zone": "UTC",
+            "selected": False,
+        },
+    )
+    assert status == 201
+    calendar = _data(response)["calendar"]
+    assert isinstance(calendar, dict)
+    calendar_id = str(calendar["id"])
+    assert calendar["selected"] is False
+
+    status, response = _request(
+        bridge,
+        "PATCH",
+        f"/v1/accounts/work/calendars/{calendar_id}",
+        body={
+            "summary": "Renamed bridge calendar",
+            "description": None,
+            "color": "#123456",
+            "hidden": True,
+            "selected": True,
+        },
+    )
+    assert status == 200
+    updated_calendar = _data(response)["calendar"]
+    assert updated_calendar["summary"] == "Renamed bridge calendar"  # type: ignore[index]
+    assert updated_calendar["description"] is None  # type: ignore[index]
+    assert updated_calendar["color"] == "#123456"  # type: ignore[index]
+    assert updated_calendar["hidden"] is True  # type: ignore[index]
+    assert updated_calendar["selected"] is True  # type: ignore[index]
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/calendar-subscriptions",
+        body={"remote_calendar_id": "synthetic-subscription", "summary": "Subscribed fixture"},
+    )
+    assert status == 201
+    subscription = _data(response)["calendar"]
+    assert isinstance(subscription, dict)
+    subscription_id = str(subscription["id"])
+    assert subscription["remote_id"] == "synthetic-subscription"
+
+    status, response = _request(
+        bridge,
+        "DELETE",
+        f"/v1/accounts/work/calendar-subscriptions/{subscription_id}",
+    )
+    assert status == 200
+    assert _data(response)["calendar"]["metadata"]["deleted"] is True  # type: ignore[index]
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/workspace")
+    assert status == 200
+    workspace = _data(response)["workspace"]
+    assert isinstance(workspace, dict)
+    listed_task = next(item for item in workspace["task_lists"] if item["id"] == task_list_id)
+    listed_calendar = next(item for item in workspace["calendars"] if item["id"] == calendar_id)
+    assert listed_task["selected"] is True
+    assert listed_calendar["hidden"] is True
+
+    status, response = _request(bridge, "DELETE", f"/v1/accounts/work/task-lists/{task_list_id}")
+    assert status == 200
+    assert _data(response)["task_list"]["metadata"]["deleted"] is True  # type: ignore[index]
+    status, response = _request(bridge, "DELETE", f"/v1/accounts/work/calendars/{calendar_id}")
+    assert status == 200
+    assert _data(response)["calendar"]["metadata"]["deleted"] is True  # type: ignore[index]
+
+    with Storage(paths.database_file) as storage:
+        assert storage.get_task_list("work", task_list_id).metadata.deleted
+        assert storage.get_calendar("work", calendar_id).metadata.deleted
+        assert storage.get_calendar("work", subscription_id).metadata.deleted
+        # Selection alone is local; title and calendar writes retain normal outbox behavior.
+        assert storage.pending_mutation_count("work") == 10
+
+
 def test_mutation_idempotency_is_durable_and_rejects_key_reuse(
     bridge_env: tuple[AppPaths, DesktopBridge],
 ) -> None:

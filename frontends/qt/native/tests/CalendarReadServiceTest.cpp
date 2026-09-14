@@ -203,20 +203,21 @@ void CalendarReadServiceTest::includesRecurringMastersAndCancelledInstancesForPr
   }
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(connectionResult));
   seed(connection);
-  execute(connection.nativeHandle(),
-          "INSERT INTO local_calendar_events (id, calendar_id, remote_id, status, title, start_at, "
-          "end_at, is_all_day, recurrence_rule, recurring_remote_id, original_start_at, updated_at, "
-          "deleted_at) VALUES "
-          "('event-series', 'calendar-work', 'remote-series', 'confirmed', 'Series', "
-          "'2024-01-01T09:00:00.000Z', '2024-01-01T10:00:00.000Z', 0, "
-          "'RRULE:FREQ=DAILY', NULL, NULL, '2026-07-25T00:00:00Z', NULL), "
-          "('event-series-cancelled', 'calendar-work', 'remote-instance', 'cancelled', "
-          "'Cancelled instance', '2026-07-26T09:00:00.000Z', '2026-07-26T10:00:00.000Z', 0, "
-          "NULL, 'remote-series', '2026-07-26T09:00:00.000Z', '2026-07-25T00:00:00Z', NULL)");
-  std::future<hcb::CalendarEventPageResult> future = service.listEvents(
-      {.calendarIds = {QStringLiteral("calendar-work")},
-       .startAt = QStringLiteral("2026-07-25T00:00:00Z"),
-       .endAt = QStringLiteral("2026-07-28T00:00:00Z")});
+  execute(
+      connection.nativeHandle(),
+      "INSERT INTO local_calendar_events (id, calendar_id, remote_id, status, title, start_at, "
+      "end_at, is_all_day, recurrence_rule, recurring_remote_id, original_start_at, updated_at, "
+      "deleted_at) VALUES "
+      "('event-series', 'calendar-work', 'remote-series', 'confirmed', 'Series', "
+      "'2024-01-01T09:00:00.000Z', '2024-01-01T10:00:00.000Z', 0, "
+      "'RRULE:FREQ=DAILY', NULL, NULL, '2026-07-25T00:00:00Z', NULL), "
+      "('event-series-cancelled', 'calendar-work', 'remote-instance', 'cancelled', "
+      "'Cancelled instance', '2026-07-26T09:00:00.000Z', '2026-07-26T10:00:00.000Z', 0, "
+      "NULL, 'remote-series', '2026-07-26T09:00:00.000Z', '2026-07-25T00:00:00Z', NULL)");
+  std::future<hcb::CalendarEventPageResult> future =
+      service.listEvents({.calendarIds = {QStringLiteral("calendar-work")},
+                          .startAt = QStringLiteral("2026-07-25T00:00:00Z"),
+                          .endAt = QStringLiteral("2026-07-28T00:00:00Z")});
   const hcb::CalendarEventPageResult result = awaitResult(future);
   QVERIFY(std::holds_alternative<hcb::CalendarEventPage>(result));
   if (!std::holds_alternative<hcb::CalendarEventPage>(result)) {
@@ -233,9 +234,10 @@ void CalendarReadServiceTest::includesRecurringMastersAndCancelledInstancesForPr
   if (cancelled == page.items.cend()) {
     return;
   }
-  QVERIFY(std::any_of(page.items.cbegin(), page.items.cend(), [](const hcb::CalendarEventSummary& event) {
-    return event.id == QStringLiteral("event-series");
-  }));
+  QVERIFY(std::any_of(
+      page.items.cbegin(), page.items.cend(), [](const hcb::CalendarEventSummary& event) {
+        return event.id == QStringLiteral("event-series");
+      }));
   QCOMPARE(cancelled->status, QStringLiteral("cancelled"));
   QCOMPARE(cancelled->originalStartAt,
            std::optional<QString>(QStringLiteral("2026-07-26T09:00:00.000Z")));
@@ -259,26 +261,28 @@ void CalendarReadServiceTest::readsGoogleResolvedInstanceCachesAcrossFreshnessSt
   }
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(connectionResult));
   seed(connection);
-  execute(connection.nativeHandle(),
-          "INSERT INTO local_calendar_events (id, calendar_id, remote_id, status, title, start_at, "
-          "end_at, is_all_day, recurrence_rule, updated_at, deleted_at) VALUES "
-          "('series', 'calendar-work', 'remote-series', 'confirmed', 'Series', "
-          "'2024-01-01T09:00:00.000Z', '2024-01-01T10:00:00.000Z', 0, "
-          "'RRULE:FREQ=YEARLY;BYMONTH=7;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1', "
-          "'2026-07-25T00:00:00Z', NULL), "
-          "('series-instance', 'calendar-work', 'remote-instance', 'confirmed', 'Resolved instance', "
-          "'2026-07-31T09:00:00.000Z', '2026-07-31T10:00:00.000Z', 0, NULL, "
-          "'2026-07-25T00:00:00Z', NULL)");
+  execute(
+      connection.nativeHandle(),
+      "INSERT INTO local_calendar_events (id, calendar_id, remote_id, status, title, start_at, "
+      "end_at, is_all_day, recurrence_rule, updated_at, deleted_at) VALUES "
+      "('series', 'calendar-work', 'remote-series', 'confirmed', 'Series', "
+      "'2024-01-01T09:00:00.000Z', '2024-01-01T10:00:00.000Z', 0, "
+      "'RRULE:FREQ=YEARLY;BYMONTH=7;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1', "
+      "'2026-07-25T00:00:00Z', NULL), "
+      "('series-instance', 'calendar-work', 'remote-instance', 'confirmed', 'Resolved instance', "
+      "'2026-07-31T09:00:00.000Z', '2026-07-31T10:00:00.000Z', 0, NULL, "
+      "'2026-07-25T00:00:00Z', NULL)");
   execute(connection.nativeHandle(),
           "UPDATE local_calendar_events SET recurring_remote_id = 'remote-series', "
           "original_start_at = '2026-07-31T09:00:00.000Z', is_instance_cache = 1 "
           "WHERE id = 'series-instance'");
-  execute(connection.nativeHandle(),
-          "INSERT INTO local_calendar_instance_coverage "
-          "(calendar_id, recurring_remote_id, range_start_at, range_end_at, fetched_at, expires_at) "
-          "VALUES ('calendar-work', 'remote-series', '2026-07-25T00:00:00.000Z', "
-          "'2026-08-05T00:00:00.000Z', '2026-07-25T00:00:00.000Z', "
-          "'2099-01-01T00:00:00.000Z')");
+  execute(
+      connection.nativeHandle(),
+      "INSERT INTO local_calendar_instance_coverage "
+      "(calendar_id, recurring_remote_id, range_start_at, range_end_at, fetched_at, expires_at) "
+      "VALUES ('calendar-work', 'remote-series', '2026-07-25T00:00:00.000Z', "
+      "'2026-08-05T00:00:00.000Z', '2026-07-25T00:00:00.000Z', "
+      "'2099-01-01T00:00:00.000Z')");
   const hcb::CalendarEventRangeReadRequest range{
       .calendarIds = {QStringLiteral("calendar-work")},
       .startAt = QStringLiteral("2026-07-25T00:00:00.000Z"),

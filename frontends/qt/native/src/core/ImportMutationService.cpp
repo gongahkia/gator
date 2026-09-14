@@ -57,39 +57,39 @@ ImportMutationService::create(QList<TaskCreateInput> tasks,
     return future;
   }
   const QString updatedAt = timestamp(clock_);
-  return writerQueue_.enqueueResult(
-      [tasks = std::move(tasks), events = std::move(events), updatedAt](
-          SqliteConnection& connection) mutable {
-        SqliteTransactionResult transactionResult = SqliteTransaction::begin(connection);
-        if (std::holds_alternative<AppError>(transactionResult)) {
-          return ImportMutationResult(std::get<AppError>(std::move(transactionResult)));
-        }
-        SqliteTransaction transaction = std::get<SqliteTransaction>(std::move(transactionResult));
-        qsizetype taskCount = 0;
-        qsizetype eventCount = 0;
-        if (!tasks.isEmpty()) {
-          TaskBatchMutationResult taskResult = TaskMutationService::createBatchWithinTransaction(
-              connection, std::move(tasks), updatedAt);
-          if (std::holds_alternative<AppError>(taskResult)) {
-            return ImportMutationResult(std::get<AppError>(std::move(taskResult)));
-          }
-          taskCount = std::get<QList<TaskMutationReceipt>>(taskResult).size();
-        }
-        if (!events.isEmpty()) {
-          CalendarEventBatchMutationResult eventResult =
-              CalendarMutationService::createBatchWithinTransaction(
-                  connection, std::move(events), updatedAt);
-          if (std::holds_alternative<AppError>(eventResult)) {
-            return ImportMutationResult(std::get<AppError>(std::move(eventResult)));
-          }
-          eventCount = std::get<QList<CalendarEventMutationReceipt>>(eventResult).size();
-        }
-        if (const std::optional<AppError> error = transaction.commit(); error.has_value()) {
-          return ImportMutationResult(*error);
-        }
-        return ImportMutationResult(ImportMutationReceipt{.taskCount = taskCount,
-                                                           .eventCount = eventCount});
-      });
+  return writerQueue_.enqueueResult([tasks = std::move(tasks),
+                                     events = std::move(events),
+                                     updatedAt](SqliteConnection& connection) mutable {
+    SqliteTransactionResult transactionResult = SqliteTransaction::begin(connection);
+    if (std::holds_alternative<AppError>(transactionResult)) {
+      return ImportMutationResult(std::get<AppError>(std::move(transactionResult)));
+    }
+    SqliteTransaction transaction = std::get<SqliteTransaction>(std::move(transactionResult));
+    qsizetype taskCount = 0;
+    qsizetype eventCount = 0;
+    if (!tasks.isEmpty()) {
+      TaskBatchMutationResult taskResult = TaskMutationService::createBatchWithinTransaction(
+          connection, std::move(tasks), updatedAt);
+      if (std::holds_alternative<AppError>(taskResult)) {
+        return ImportMutationResult(std::get<AppError>(std::move(taskResult)));
+      }
+      taskCount = std::get<QList<TaskMutationReceipt>>(taskResult).size();
+    }
+    if (!events.isEmpty()) {
+      CalendarEventBatchMutationResult eventResult =
+          CalendarMutationService::createBatchWithinTransaction(
+              connection, std::move(events), updatedAt);
+      if (std::holds_alternative<AppError>(eventResult)) {
+        return ImportMutationResult(std::get<AppError>(std::move(eventResult)));
+      }
+      eventCount = std::get<QList<CalendarEventMutationReceipt>>(eventResult).size();
+    }
+    if (const std::optional<AppError> error = transaction.commit(); error.has_value()) {
+      return ImportMutationResult(*error);
+    }
+    return ImportMutationResult(
+        ImportMutationReceipt{.taskCount = taskCount, .eventCount = eventCount});
+  });
 }
 
 } // namespace hcb

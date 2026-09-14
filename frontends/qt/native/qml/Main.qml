@@ -205,9 +205,12 @@ ApplicationWindow {
     function controllerCall(method, args) {
         if (appController !== null && appController.bridgeMode === true &&
                 ["refresh", "setCalendarDate", "createTaskDetailed", "updateTaskDetailed",
-                 "setTaskCompleted", "deleteTask", "createEvent", "updateEvent",
-                 "createEventDetailed", "updateEventDetailed", "deleteEvent", "connectGoogle",
-                 "syncGoogle"].indexOf(method) < 0) {
+                 "setTaskCompleted", "deleteTask", "createTaskList", "renameTaskList",
+                 "setTaskListSelected", "deleteTaskList", "createEvent", "updateEvent",
+                 "createEventDetailed", "updateEventDetailed", "deleteEvent", "createGoogleCalendar",
+                 "subscribeGoogleCalendar", "updateGoogleCalendar", "deleteGoogleCalendar",
+                 "updateGoogleCalendarListEntry", "saveGoogleCalendarSettings",
+                 "unsubscribeGoogleCalendar", "connectGoogle", "syncGoogle"].indexOf(method) < 0) {
             appController.reportBridgeUnsupportedAction()
             return
         }
@@ -1108,7 +1111,8 @@ ApplicationWindow {
 
         function openForCalendar(calendar) {
             calendarId = calendar.id
-            ownedSecondary = calendar.accessRole === "owner" && !calendar.primary
+            ownedSecondary = (window.appController !== null && window.appController.bridgeMode === true) ||
+                             (calendar.accessRole === "owner" && !calendar.primary)
             primaryCalendar = calendar.primary === true
             initialTitle = calendar.title || ""
             initialDescription = calendar.description || ""

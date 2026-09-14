@@ -76,8 +76,9 @@ using DecodedCalendarListPageOrError = std::variant<DecodedCalendarListPage, Goo
     const QJsonObject reminder = reminderValue.toObject();
     const QJsonValue method = reminder.value(QStringLiteral("method"));
     const QJsonValue minutes = reminder.value(QStringLiteral("minutes"));
-    if (!method.isString() || (method.toString() != QStringLiteral("popup") &&
-                               method.toString() != QStringLiteral("email")) ||
+    if (!method.isString() ||
+        (method.toString() != QStringLiteral("popup") &&
+         method.toString() != QStringLiteral("email")) ||
         !minutes.isDouble() || minutes.toInt(-1) < 0 ||
         minutes.toInt(-1) > kMaximumReminderMinutes) {
       return std::nullopt;
@@ -283,7 +284,8 @@ calendarAccessRole(const QJsonObject& object) {
       {.name = QStringLiteral("showHidden"), .value = QStringLiteral("true")},
       {.name = QStringLiteral("fields"),
        .value = QStringLiteral(
-           "nextPageToken,nextSyncToken,items(id,summary,summaryOverride,description,timeZone,colorId,"
+           "nextPageToken,nextSyncToken,items(id,summary,summaryOverride,description,timeZone,"
+           "colorId,"
            "backgroundColor,foregroundColor,accessRole,selected,hidden,primary,deleted,etag,"
            "defaultReminders)")}};
   if (request.syncToken.has_value()) {

@@ -159,8 +159,8 @@ WHERE id = ?1
   return finalizeResult == SQLITE_OK ? std::optional<EventSnapshot>(snapshot) : std::nullopt;
 }
 
-[[nodiscard]] QList<PendingMutationSnapshot>
-readPendingEventMutations(sqlite3* handle, const QString& eventId) {
+[[nodiscard]] QList<PendingMutationSnapshot> readPendingEventMutations(sqlite3* handle,
+                                                                       const QString& eventId) {
   constexpr char sql[] = R"(
 SELECT id, operation, payload_json
 FROM local_pending_mutations
@@ -200,18 +200,20 @@ ORDER BY created_at ASC, id ASC
     mutations.append({.id = *id, .operation = *operation, .payload = payload.object()});
   }
   const int finalizeResult = sqlite3_finalize(statement);
-  return stepResult == SQLITE_DONE && finalizeResult == SQLITE_OK ? mutations
-                                                                    : QList<PendingMutationSnapshot>{};
+  return stepResult == SQLITE_DONE && finalizeResult == SQLITE_OK
+             ? mutations
+             : QList<PendingMutationSnapshot>{};
 }
 
 [[nodiscard]] std::int64_t pendingEventMutationCount(sqlite3* handle) {
   sqlite3_stmt* statement = nullptr;
-  if (sqlite3_prepare_v3(handle,
-                         "SELECT COUNT(*) FROM local_pending_mutations WHERE resource_type = 'event'",
-                         -1,
-                         SQLITE_PREPARE_PERSISTENT,
-                         &statement,
-                         nullptr) != SQLITE_OK) {
+  if (sqlite3_prepare_v3(
+          handle,
+          "SELECT COUNT(*) FROM local_pending_mutations WHERE resource_type = 'event'",
+          -1,
+          SQLITE_PREPARE_PERSISTENT,
+          &statement,
+          nullptr) != SQLITE_OK) {
     sqlite3_finalize(statement);
     return -1;
   }
@@ -297,27 +299,29 @@ void CalendarMutationServiceTest::createsUpdatesMovesAndDeletesEvents() {
   if (createMutations.size() != 1) {
     return;
   }
-  const QJsonObject createPayload = createMutations.constFirst().payload.value(QStringLiteral("event")).toObject();
+  const QJsonObject createPayload =
+      createMutations.constFirst().payload.value(QStringLiteral("event")).toObject();
   QCOMPARE(createPayload.value(QStringLiteral("attendees")).toArray(), QJsonArray());
-  QCOMPARE(createPayload.value(QStringLiteral("reminders")).toObject()
+  QCOMPARE(createPayload.value(QStringLiteral("reminders"))
+               .toObject()
                .value(QStringLiteral("useDefault"))
                .toBool(),
            true);
   QCOMPARE(createPayload.value(QStringLiteral("recurrence")).toArray(), QJsonArray());
 
   const std::optional<std::optional<QString>> clearText{std::optional<QString>{}};
-  std::future<hcb::CalendarEventMutationResult> update = service.update(
-      hcb::CalendarEventUpdateInput{.eventId = receipt.eventId,
-                                    .calendarId = QStringLiteral("calendar-other"),
-                                    .title = QStringLiteral(" Review "),
-                                    .description = clearText,
-                                    .location = clearText,
-                                    .startAt = QStringLiteral("2026-07-26T02:00:00Z"),
-                                    .allDay = true,
-                                    .startTimeZone = clearText,
-                                    .endTimeZone = clearText,
-                                    .colorId = std::optional<std::optional<QString>>(
-                                        std::optional<QString>{})});
+  std::future<hcb::CalendarEventMutationResult> update =
+      service.update(hcb::CalendarEventUpdateInput{
+          .eventId = receipt.eventId,
+          .calendarId = QStringLiteral("calendar-other"),
+          .title = QStringLiteral(" Review "),
+          .description = clearText,
+          .location = clearText,
+          .startAt = QStringLiteral("2026-07-26T02:00:00Z"),
+          .allDay = true,
+          .startTimeZone = clearText,
+          .endTimeZone = clearText,
+          .colorId = std::optional<std::optional<QString>>(std::optional<QString>{})});
   const hcb::CalendarEventMutationResult updateResult = awaitResult(update);
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(updateResult));
   const std::optional<EventSnapshot> updated = readEvent(handle, receipt.eventId);
@@ -368,27 +372,27 @@ void CalendarMutationServiceTest::createsBatchAtomically() {
   sqlite3* const handle = connection.nativeHandle();
   QVERIFY(handle != nullptr);
 
-  std::future<hcb::CalendarEventBatchMutationResult> rejected = service.createBatch(
-      {{.calendarId = QStringLiteral("calendar-work"),
-        .title = QStringLiteral("first"),
-        .startAt = QStringLiteral("2026-07-26T09:00:00.000Z"),
-        .endAt = QStringLiteral("2026-07-26T10:00:00.000Z")},
-       {.calendarId = QStringLiteral("calendar-deleted"),
-        .title = QStringLiteral("second"),
-        .startAt = QStringLiteral("2026-07-26T11:00:00.000Z"),
-        .endAt = QStringLiteral("2026-07-26T12:00:00.000Z")}});
+  std::future<hcb::CalendarEventBatchMutationResult> rejected =
+      service.createBatch({{.calendarId = QStringLiteral("calendar-work"),
+                            .title = QStringLiteral("first"),
+                            .startAt = QStringLiteral("2026-07-26T09:00:00.000Z"),
+                            .endAt = QStringLiteral("2026-07-26T10:00:00.000Z")},
+                           {.calendarId = QStringLiteral("calendar-deleted"),
+                            .title = QStringLiteral("second"),
+                            .startAt = QStringLiteral("2026-07-26T11:00:00.000Z"),
+                            .endAt = QStringLiteral("2026-07-26T12:00:00.000Z")}});
   QVERIFY(std::holds_alternative<hcb::AppError>(awaitResult(rejected)));
   QCOMPARE(pendingEventMutationCount(handle), std::int64_t{0});
 
-  std::future<hcb::CalendarEventBatchMutationResult> created = service.createBatch(
-      {{.calendarId = QStringLiteral("calendar-work"),
-        .title = QStringLiteral("first"),
-        .startAt = QStringLiteral("2026-07-26T09:00:00.000Z"),
-        .endAt = QStringLiteral("2026-07-26T10:00:00.000Z")},
-       {.calendarId = QStringLiteral("calendar-work"),
-        .title = QStringLiteral("second"),
-        .startAt = QStringLiteral("2026-07-26T11:00:00.000Z"),
-        .endAt = QStringLiteral("2026-07-26T12:00:00.000Z")}});
+  std::future<hcb::CalendarEventBatchMutationResult> created =
+      service.createBatch({{.calendarId = QStringLiteral("calendar-work"),
+                            .title = QStringLiteral("first"),
+                            .startAt = QStringLiteral("2026-07-26T09:00:00.000Z"),
+                            .endAt = QStringLiteral("2026-07-26T10:00:00.000Z")},
+                           {.calendarId = QStringLiteral("calendar-work"),
+                            .title = QStringLiteral("second"),
+                            .startAt = QStringLiteral("2026-07-26T11:00:00.000Z"),
+                            .endAt = QStringLiteral("2026-07-26T12:00:00.000Z")}});
   const hcb::CalendarEventBatchMutationResult result = awaitResult(created);
   QVERIFY(std::holds_alternative<QList<hcb::CalendarEventMutationReceipt>>(result));
   QCOMPARE(std::get<QList<hcb::CalendarEventMutationReceipt>>(result).size(), qsizetype{2});
@@ -423,14 +427,15 @@ void CalendarMutationServiceTest::createsRichGoogleEventsAndCarriesDeliveryPolic
        .title = QStringLiteral("Focus"),
        .startAt = QStringLiteral("2026-07-26T09:30:00+08:00"),
        .endAt = QStringLiteral("2026-07-26T10:30:00+08:00"),
-       .richMetadata = {.createGoogleMeet = true,
-                        .attachmentsJson = QStringLiteral(
-                            "[{\"fileUrl\":\"https://drive.google.com/open?id=file-1\",\"title\":\"Spec\"}]"),
-                        .guestPermissionsJson = QStringLiteral("{\"guestsCanModify\":true}"),
-                        .eventType = QStringLiteral("focusTime"),
-                        .statusPropertiesJson = QStringLiteral(
-                            "{\"focusTimeProperties\":{\"autoDeclineMode\":\"declineNone\",\"chatStatus\":\"available\"}}"),
-                        .sendUpdates = QStringLiteral("externalOnly")}});
+       .richMetadata = {
+           .createGoogleMeet = true,
+           .attachmentsJson = QStringLiteral(
+               "[{\"fileUrl\":\"https://drive.google.com/open?id=file-1\",\"title\":\"Spec\"}]"),
+           .guestPermissionsJson = QStringLiteral("{\"guestsCanModify\":true}"),
+           .eventType = QStringLiteral("focusTime"),
+           .statusPropertiesJson = QStringLiteral("{\"focusTimeProperties\":{\"autoDeclineMode\":"
+                                                  "\"declineNone\",\"chatStatus\":\"available\"}}"),
+           .sendUpdates = QStringLiteral("externalOnly")}});
   const hcb::CalendarEventMutationResult result = awaitResult(create);
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(result));
   if (!std::holds_alternative<hcb::CalendarEventMutationReceipt>(result)) {
@@ -451,7 +456,8 @@ void CalendarMutationServiceTest::createsRichGoogleEventsAndCarriesDeliveryPolic
   }
   QCOMPARE(snapshots.constFirst().eventType, std::optional<QString>(QStringLiteral("focusTime")));
   QVERIFY(snapshots.constFirst().conferenceJson.has_value());
-  QCOMPARE(QJsonDocument::fromJson(snapshots.constFirst().attachmentsJson.toUtf8()).array().size(), 1);
+  QCOMPARE(QJsonDocument::fromJson(snapshots.constFirst().attachmentsJson.toUtf8()).array().size(),
+           1);
   QCOMPARE(QJsonDocument::fromJson(snapshots.constFirst().guestPermissionsJson.toUtf8())
                .object()
                .value(QStringLiteral("guestsCanModify"))
@@ -467,12 +473,14 @@ void CalendarMutationServiceTest::createsRichGoogleEventsAndCarriesDeliveryPolic
   QCOMPARE(payload.value(QStringLiteral("sendUpdates")).toString(), QStringLiteral("externalOnly"));
   const QJsonObject event = payload.value(QStringLiteral("event")).toObject();
   QCOMPARE(event.value(QStringLiteral("eventType")).toString(), QStringLiteral("focusTime"));
-  QVERIFY(event.value(QStringLiteral("conferenceData")).toObject()
+  QVERIFY(event.value(QStringLiteral("conferenceData"))
+              .toObject()
               .value(QStringLiteral("createRequest"))
               .isObject());
   QCOMPARE(event.value(QStringLiteral("attachments")).toArray().size(), 1);
   QVERIFY(event.value(QStringLiteral("guestsCanModify")).toBool());
-  QCOMPARE(event.value(QStringLiteral("focusTimeProperties")).toObject()
+  QCOMPARE(event.value(QStringLiteral("focusTimeProperties"))
+               .toObject()
                .value(QStringLiteral("chatStatus"))
                .toString(),
            QStringLiteral("available"));
@@ -497,17 +505,16 @@ void CalendarMutationServiceTest::preservesAdvancedGoogleRecurrenceLines() {
   }
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(connectionResult));
   seed(connection);
-  const QString recurrence = QStringLiteral(
-      "RRULE:FREQ=HOURLY;INTERVAL=2;BYSECOND=0,30\n"
-      "EXRULE:FREQ=DAILY;BYHOUR=3\n"
-      "RDATE;VALUE=DATE:20261225\n"
-      "EXDATE;TZID=Asia/Singapore:20260726T093000");
-  std::future<hcb::CalendarEventMutationResult> create = service.create(
-      {.calendarId = QStringLiteral("calendar-work"),
-       .title = QStringLiteral("Advanced recurrence"),
-       .startAt = QStringLiteral("2026-07-26T09:30:00+08:00"),
-       .endAt = QStringLiteral("2026-07-26T10:30:00+08:00"),
-       .recurrenceRule = recurrence});
+  const QString recurrence = QStringLiteral("RRULE:FREQ=HOURLY;INTERVAL=2;BYSECOND=0,30\n"
+                                            "EXRULE:FREQ=DAILY;BYHOUR=3\n"
+                                            "RDATE;VALUE=DATE:20261225\n"
+                                            "EXDATE;TZID=Asia/Singapore:20260726T093000");
+  std::future<hcb::CalendarEventMutationResult> create =
+      service.create({.calendarId = QStringLiteral("calendar-work"),
+                      .title = QStringLiteral("Advanced recurrence"),
+                      .startAt = QStringLiteral("2026-07-26T09:30:00+08:00"),
+                      .endAt = QStringLiteral("2026-07-26T10:30:00+08:00"),
+                      .recurrenceRule = recurrence});
   const hcb::CalendarEventMutationResult createResult = awaitResult(create);
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(createResult));
   if (!std::holds_alternative<hcb::CalendarEventMutationReceipt>(createResult)) {
@@ -521,12 +528,13 @@ void CalendarMutationServiceTest::preservesAdvancedGoogleRecurrenceLines() {
   if (mutations.size() != 1) {
     return;
   }
-  const QJsonArray expected{
-      QStringLiteral("RRULE:FREQ=HOURLY;INTERVAL=2;BYSECOND=0,30"),
-      QStringLiteral("EXRULE:FREQ=DAILY;BYHOUR=3"),
-      QStringLiteral("RDATE;VALUE=DATE:20261225"),
-      QStringLiteral("EXDATE;TZID=Asia/Singapore:20260726T093000")};
-  QCOMPARE(mutations.constFirst().payload.value(QStringLiteral("event")).toObject()
+  const QJsonArray expected{QStringLiteral("RRULE:FREQ=HOURLY;INTERVAL=2;BYSECOND=0,30"),
+                            QStringLiteral("EXRULE:FREQ=DAILY;BYHOUR=3"),
+                            QStringLiteral("RDATE;VALUE=DATE:20261225"),
+                            QStringLiteral("EXDATE;TZID=Asia/Singapore:20260726T093000")};
+  QCOMPARE(mutations.constFirst()
+               .payload.value(QStringLiteral("event"))
+               .toObject()
                .value(QStringLiteral("recurrence"))
                .toArray(),
            expected);
@@ -550,7 +558,9 @@ void CalendarMutationServiceTest::preservesAdvancedGoogleRecurrenceLines() {
   if (rdateOnlyMutations.size() != 1) {
     return;
   }
-  QCOMPARE(rdateOnlyMutations.constFirst().payload.value(QStringLiteral("event")).toObject()
+  QCOMPARE(rdateOnlyMutations.constFirst()
+               .payload.value(QStringLiteral("event"))
+               .toObject()
                .value(QStringLiteral("recurrence"))
                .toArray(),
            QJsonArray{QStringLiteral("RDATE;TZID=Asia/Singapore:20261225T093000")});
@@ -603,37 +613,44 @@ void CalendarMutationServiceTest::journalsRemoteUpdatesMovesAndCreateReconciliat
                .value(QStringLiteral("summary"))
                .toString(),
            QStringLiteral("Local title"));
-  QVERIFY(!mutations.constFirst().payload.value(QStringLiteral("event"))
-                .toObject()
-                .contains(QStringLiteral("attendees")));
-  QVERIFY(!mutations.constFirst().payload.value(QStringLiteral("event"))
-                .toObject()
-                .contains(QStringLiteral("reminders")));
+  QVERIFY(!mutations.constFirst()
+               .payload.value(QStringLiteral("event"))
+               .toObject()
+               .contains(QStringLiteral("attendees")));
+  QVERIFY(!mutations.constFirst()
+               .payload.value(QStringLiteral("event"))
+               .toObject()
+               .contains(QStringLiteral("reminders")));
   const QJsonObject metadata =
       mutations.constFirst().payload.value(QStringLiteral("_hcbSync")).toObject();
   QCOMPARE(metadata.value(QStringLiteral("etag")).toString(), QStringLiteral("etag-old"));
-  QCOMPARE(metadata.value(QStringLiteral("base")).toObject().value(QStringLiteral("summary")).toString(),
-           QStringLiteral("Remote"));
+  QCOMPARE(
+      metadata.value(QStringLiteral("base")).toObject().value(QStringLiteral("summary")).toString(),
+      QStringLiteral("Remote"));
 
-  std::future<hcb::CalendarEventMutationResult> metadataUpdate = service.update(
-      {.eventId = QStringLiteral("event-remote"),
-       .attendeeEmails = QList<QString>{QStringLiteral("guest@example.com")},
-       .reminders = hcb::CalendarEventReminderSettings{
-           .useDefault = false,
-           .overrides = {{.method = QStringLiteral("popup"), .minutes = 10}}}});
+  std::future<hcb::CalendarEventMutationResult> metadataUpdate =
+      service.update({.eventId = QStringLiteral("event-remote"),
+                      .attendeeEmails = QList<QString>{QStringLiteral("guest@example.com")},
+                      .reminders = hcb::CalendarEventReminderSettings{
+                          .useDefault = false,
+                          .overrides = {{.method = QStringLiteral("popup"), .minutes = 10}}}});
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(awaitResult(metadataUpdate)));
   mutations = readPendingEventMutations(handle, QStringLiteral("event-remote"));
   QCOMPARE(mutations.size(), 1);
   if (mutations.size() != 1) {
     return;
   }
-  const QJsonObject metadataPatch = mutations.constFirst().payload.value(QStringLiteral("event")).toObject();
-  QCOMPARE(metadataPatch.value(QStringLiteral("attendees")).toArray().at(0)
+  const QJsonObject metadataPatch =
+      mutations.constFirst().payload.value(QStringLiteral("event")).toObject();
+  QCOMPARE(metadataPatch.value(QStringLiteral("attendees"))
+               .toArray()
+               .at(0)
                .toObject()
                .value(QStringLiteral("email"))
                .toString(),
            QStringLiteral("guest@example.com"));
-  QCOMPARE(metadataPatch.value(QStringLiteral("reminders")).toObject()
+  QCOMPARE(metadataPatch.value(QStringLiteral("reminders"))
+               .toObject()
                .value(QStringLiteral("overrides"))
                .toArray()
                .at(0)
@@ -676,21 +693,21 @@ void CalendarMutationServiceTest::journalsRemoteUpdatesMovesAndCreateReconciliat
   QCOMPARE(followUpMutation->payload.value(QStringLiteral("dependsOnMutationId")).toString(),
            moveMutation->id);
 
-  std::future<hcb::CalendarEventMutationResult> created = service.create(
-      {.calendarId = QStringLiteral("calendar-work"),
-       .title = QStringLiteral("New event"),
-       .startAt = QStringLiteral("2026-08-01T09:00:00Z"),
-       .endAt = QStringLiteral("2026-08-01T10:00:00Z")});
+  std::future<hcb::CalendarEventMutationResult> created =
+      service.create({.calendarId = QStringLiteral("calendar-work"),
+                      .title = QStringLiteral("New event"),
+                      .startAt = QStringLiteral("2026-08-01T09:00:00Z"),
+                      .endAt = QStringLiteral("2026-08-01T10:00:00Z")});
   const hcb::CalendarEventMutationResult createdResult = awaitResult(created);
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(createdResult));
   if (!std::holds_alternative<hcb::CalendarEventMutationReceipt>(createdResult)) {
     return;
   }
   const QString createdId = std::get<hcb::CalendarEventMutationReceipt>(createdResult).eventId;
-  std::future<hcb::CalendarEventMutationResult> reconciled = service.reconcileGoogleEvent(
-      {.localEventId = createdId,
-       .remoteEventId = QStringLiteral("remote-created"),
-       .remoteEtag = QStringLiteral("etag-created")});
+  std::future<hcb::CalendarEventMutationResult> reconciled =
+      service.reconcileGoogleEvent({.localEventId = createdId,
+                                    .remoteEventId = QStringLiteral("remote-created"),
+                                    .remoteEtag = QStringLiteral("etag-created")});
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(awaitResult(reconciled)));
   const std::optional<EventSnapshot> createdSnapshot = readEvent(handle, createdId);
   QVERIFY(createdSnapshot.has_value());
@@ -698,9 +715,11 @@ void CalendarMutationServiceTest::journalsRemoteUpdatesMovesAndCreateReconciliat
     return;
   }
   QCOMPARE(createdSnapshot->remoteId, QStringLiteral("remote-created"));
-  std::future<hcb::CalendarEventMutationResult> afterCreateUpdate = service.update(
-      {.eventId = createdId, .location = std::optional<std::optional<QString>>(QStringLiteral("HQ"))});
-  QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(awaitResult(afterCreateUpdate)));
+  std::future<hcb::CalendarEventMutationResult> afterCreateUpdate =
+      service.update({.eventId = createdId,
+                      .location = std::optional<std::optional<QString>>(QStringLiteral("HQ"))});
+  QVERIFY(
+      std::holds_alternative<hcb::CalendarEventMutationReceipt>(awaitResult(afterCreateUpdate)));
   const QList<PendingMutationSnapshot> createdMutations =
       readPendingEventMutations(handle, createdId);
   QCOMPARE(createdMutations.size(), 1);
@@ -708,7 +727,8 @@ void CalendarMutationServiceTest::journalsRemoteUpdatesMovesAndCreateReconciliat
     return;
   }
   QCOMPARE(createdMutations.constFirst().operation, QStringLiteral("event.create"));
-  QCOMPARE(createdMutations.constFirst().payload.value(QStringLiteral("_hcbSync"))
+  QCOMPARE(createdMutations.constFirst()
+               .payload.value(QStringLiteral("_hcbSync"))
                .toObject()
                .value(QStringLiteral("etag"))
                .toString(),
@@ -774,8 +794,8 @@ void CalendarMutationServiceTest::rejectsInvalidAndUnavailableMutations() {
   QVERIFY(std::holds_alternative<hcb::AppError>(invalidAttendeeResult));
   QCOMPARE(std::get<hcb::AppError>(invalidAttendeeResult).code(), hcb::AppErrorCode::Validation);
 
-  std::future<hcb::CalendarEventMutationResult> invalidReminder = service.create(
-      hcb::CalendarEventCreateInput{
+  std::future<hcb::CalendarEventMutationResult> invalidReminder =
+      service.create(hcb::CalendarEventCreateInput{
           .calendarId = QStringLiteral("calendar-work"),
           .title = QStringLiteral("Invalid reminder"),
           .startAt = QStringLiteral("2026-07-26T09:00:00Z"),
@@ -856,7 +876,8 @@ void CalendarMutationServiceTest::scopesRecurringSeriesWithoutUnsafeLegacyMutati
   const QString exceptionId = std::get<hcb::CalendarEventMutationReceipt>(exceptionResult).eventId;
   std::future<hcb::CalendarEventMutationSnapshotResult> exceptionInspectFuture =
       service.inspect({exceptionId});
-  const hcb::CalendarEventMutationSnapshotResult exceptionInspect = awaitResult(exceptionInspectFuture);
+  const hcb::CalendarEventMutationSnapshotResult exceptionInspect =
+      awaitResult(exceptionInspectFuture);
   QVERIFY(std::holds_alternative<QList<hcb::CalendarEventMutationSnapshot>>(exceptionInspect));
   if (!std::holds_alternative<QList<hcb::CalendarEventMutationSnapshot>>(exceptionInspect)) {
     return;
@@ -875,10 +896,12 @@ void CalendarMutationServiceTest::scopesRecurringSeriesWithoutUnsafeLegacyMutati
     return;
   }
   QCOMPARE(exceptionMutations.constFirst().operation, QStringLiteral("event.instance.update"));
-  QCOMPARE(exceptionMutations.constFirst().payload.value(QStringLiteral("recurringRemoteId")).toString(),
-           QStringLiteral("remote-series"));
-  QCOMPARE(exceptionMutations.constFirst().payload.value(QStringLiteral("originalStartAt")).toString(),
-           QStringLiteral("2026-07-26T09:00:00.000Z"));
+  QCOMPARE(
+      exceptionMutations.constFirst().payload.value(QStringLiteral("recurringRemoteId")).toString(),
+      QStringLiteral("remote-series"));
+  QCOMPARE(
+      exceptionMutations.constFirst().payload.value(QStringLiteral("originalStartAt")).toString(),
+      QStringLiteral("2026-07-26T09:00:00.000Z"));
 
   std::future<hcb::CalendarEventMutationResult> cancelException = service.removeScoped(
       {.eventId = exceptionId, .scope = hcb::CalendarEventRecurrenceScope::ThisInstance});
@@ -890,7 +913,8 @@ void CalendarMutationServiceTest::scopesRecurringSeriesWithoutUnsafeLegacyMutati
   if (cancelledExceptionMutations.size() != 1) {
     return;
   }
-  QCOMPARE(cancelledExceptionMutations.constFirst().operation, QStringLiteral("event.instance.delete"));
+  QCOMPARE(cancelledExceptionMutations.constFirst().operation,
+           QStringLiteral("event.instance.delete"));
 
   std::future<hcb::CalendarEventMutationResult> split = service.updateScoped(
       {.update = {.eventId = QStringLiteral("event-series:instance:20260727T090000Z"),
@@ -920,7 +944,8 @@ void CalendarMutationServiceTest::scopesRecurringSeriesWithoutUnsafeLegacyMutati
     return;
   }
   QCOMPARE(masterMutations.constFirst().operation, QStringLiteral("event.update"));
-  QCOMPARE(masterMutations.constFirst().payload.value(QStringLiteral("event"))
+  QCOMPARE(masterMutations.constFirst()
+               .payload.value(QStringLiteral("event"))
                .toObject()
                .value(QStringLiteral("recurrence"))
                .toArray()
@@ -928,9 +953,9 @@ void CalendarMutationServiceTest::scopesRecurringSeriesWithoutUnsafeLegacyMutati
                .toString(),
            QStringLiteral("RRULE:FREQ=DAILY;UNTIL=20260727T085959Z"));
 
-  std::future<hcb::CalendarEventMutationResult> virtualInstance = service.removeScoped(
-      {.eventId = QStringLiteral("event-series:instance:20260728T090000Z"),
-       .scope = hcb::CalendarEventRecurrenceScope::ThisInstance});
+  std::future<hcb::CalendarEventMutationResult> virtualInstance =
+      service.removeScoped({.eventId = QStringLiteral("event-series:instance:20260728T090000Z"),
+                            .scope = hcb::CalendarEventRecurrenceScope::ThisInstance});
   const hcb::CalendarEventMutationResult virtualInstanceResult = awaitResult(virtualInstance);
   QVERIFY(std::holds_alternative<hcb::AppError>(virtualInstanceResult));
 }
@@ -975,13 +1000,13 @@ void CalendarMutationServiceTest::bulkClassifiesAndQueuesEligibleEvents() {
           "'etag-immutable', '2026-07-25T00:00:00Z', 'focusTime')");
 
   hcb::CalendarEventBulkMutationService bulk(service);
-  std::future<hcb::CalendarEventBulkMutationResult> availability = bulk.execute(
-      {.action = hcb::CalendarEventBulkAction::SetAvailability,
-       .eventIds = {QStringLiteral("event-editable"),
-                    QStringLiteral("event-recurring"),
-                    QStringLiteral("event-read-only"),
-                    QStringLiteral("event-immutable")},
-       .available = true});
+  std::future<hcb::CalendarEventBulkMutationResult> availability =
+      bulk.execute({.action = hcb::CalendarEventBulkAction::SetAvailability,
+                    .eventIds = {QStringLiteral("event-editable"),
+                                 QStringLiteral("event-recurring"),
+                                 QStringLiteral("event-read-only"),
+                                 QStringLiteral("event-immutable")},
+                    .available = true});
   const hcb::CalendarEventBulkMutationResult availabilityResult = awaitResult(availability);
   QVERIFY(std::holds_alternative<hcb::CalendarEventBulkMutationSummary>(availabilityResult));
   if (!std::holds_alternative<hcb::CalendarEventBulkMutationSummary>(availabilityResult)) {
@@ -1006,10 +1031,10 @@ void CalendarMutationServiceTest::bulkClassifiesAndQueuesEligibleEvents() {
   QVERIFY(std::holds_alternative<hcb::AppError>(immutableUpdateResult));
   QCOMPARE(std::get<hcb::AppError>(immutableUpdateResult).code(), hcb::AppErrorCode::Validation);
 
-  std::future<hcb::CalendarEventBulkMutationResult> shift = bulk.execute(
-      {.action = hcb::CalendarEventBulkAction::ShiftTime,
-       .eventIds = {QStringLiteral("event-editable")},
-       .shiftMinutes = 60});
+  std::future<hcb::CalendarEventBulkMutationResult> shift =
+      bulk.execute({.action = hcb::CalendarEventBulkAction::ShiftTime,
+                    .eventIds = {QStringLiteral("event-editable")},
+                    .shiftMinutes = 60});
   const hcb::CalendarEventBulkMutationResult shiftResult = awaitResult(shift);
   QVERIFY(std::holds_alternative<hcb::CalendarEventBulkMutationSummary>(shiftResult));
   if (!std::holds_alternative<hcb::CalendarEventBulkMutationSummary>(shiftResult)) {
@@ -1046,17 +1071,18 @@ void CalendarMutationServiceTest::bulkReplacesLiteralEventTextWithPreviewAndScop
   seed(connection);
   sqlite3* const handle = connection.nativeHandle();
   QVERIFY(handle != nullptr);
-  execute(handle,
-          "UPDATE local_calendars SET access_role = 'owner' WHERE id = 'calendar-work'; "
-          "INSERT INTO local_calendar_events (id, calendar_id, remote_id, status, title, description, "
-          "location, start_at, end_at, is_all_day, recurrence_rule, etag, updated_at) VALUES "
-          "('event-replace', 'calendar-work', 'remote-replace', 'confirmed', 'Alpha Alpha', "
-          "'Alpha description', 'Alpha room', '2026-07-26T01:00:00.000Z', "
-          "'2026-07-26T02:00:00.000Z', 0, NULL, 'etag-replace', '2026-07-25T00:00:00Z'), "
-          "('event-replace-recurring', 'calendar-work', 'remote-replace-recurring', 'confirmed', "
-          "'Alpha recurring', NULL, NULL, '2026-07-27T01:00:00.000Z', "
-          "'2026-07-27T02:00:00.000Z', 0, 'RRULE:FREQ=DAILY', 'etag-recurring', "
-          "'2026-07-25T00:00:00Z')");
+  execute(
+      handle,
+      "UPDATE local_calendars SET access_role = 'owner' WHERE id = 'calendar-work'; "
+      "INSERT INTO local_calendar_events (id, calendar_id, remote_id, status, title, description, "
+      "location, start_at, end_at, is_all_day, recurrence_rule, etag, updated_at) VALUES "
+      "('event-replace', 'calendar-work', 'remote-replace', 'confirmed', 'Alpha Alpha', "
+      "'Alpha description', 'Alpha room', '2026-07-26T01:00:00.000Z', "
+      "'2026-07-26T02:00:00.000Z', 0, NULL, 'etag-replace', '2026-07-25T00:00:00Z'), "
+      "('event-replace-recurring', 'calendar-work', 'remote-replace-recurring', 'confirmed', "
+      "'Alpha recurring', NULL, NULL, '2026-07-27T01:00:00.000Z', "
+      "'2026-07-27T02:00:00.000Z', 0, 'RRULE:FREQ=DAILY', 'etag-recurring', "
+      "'2026-07-25T00:00:00Z')");
 
   hcb::CalendarEventBulkMutationService bulk(service);
   std::future<hcb::CalendarEventBulkMutationResult> preview = bulk.execute(

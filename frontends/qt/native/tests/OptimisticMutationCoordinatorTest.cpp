@@ -292,12 +292,12 @@ void OptimisticMutationCoordinatorTest::rebasesClaimedAndFailedMutations() {
   std::future<hcb::PendingMutationResult> retryLease = coordinator.claim(pending.id, 30s);
   const hcb::PendingMutation secondLease = awaitMutation(retryLease);
   QVERIFY(secondLease.leaseId.has_value());
-  std::future<hcb::PendingMutationResult> failed = coordinator.markFailed(
-      {.mutationId = secondLease.id,
-       .leaseId = *secondLease.leaseId,
-       .errorCode = QStringLiteral("conflict"),
-       .errorMessage = QStringLiteral("changed"),
-       .nextRetryAt = std::nullopt});
+  std::future<hcb::PendingMutationResult> failed =
+      coordinator.markFailed({.mutationId = secondLease.id,
+                              .leaseId = *secondLease.leaseId,
+                              .errorCode = QStringLiteral("conflict"),
+                              .errorMessage = QStringLiteral("changed"),
+                              .nextRetryAt = std::nullopt});
   QVERIFY(awaitMutation(failed).status == hcb::PendingMutationStatus::Failed);
   std::future<hcb::PendingMutationResult> rebaseFailed = coordinator.rebase(
       {.mutationId = pending.id,
@@ -307,8 +307,9 @@ void OptimisticMutationCoordinatorTest::rebasesClaimedAndFailedMutations() {
        .remoteEtag = QStringLiteral("etag-remote-2")});
   const hcb::PendingMutation reapplied = awaitMutation(rebaseFailed);
   QCOMPARE(reapplied.status, hcb::PendingMutationStatus::Pending);
-  QCOMPARE(reapplied.payload.value(QStringLiteral("task")).toObject().value(QStringLiteral("title")),
-           QJsonValue(QStringLiteral("Reapplied")));
+  QCOMPARE(
+      reapplied.payload.value(QStringLiteral("task")).toObject().value(QStringLiteral("title")),
+      QJsonValue(QStringLiteral("Reapplied")));
 }
 
 void OptimisticMutationCoordinatorTest::recoversExpiredLeasesAtStartup() {

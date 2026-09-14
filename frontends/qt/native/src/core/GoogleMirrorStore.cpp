@@ -110,8 +110,8 @@ struct StoredTaskRecurrence final {
   std::optional<QString> diagnostic;
 };
 
-[[nodiscard]] std::optional<StoredTaskRecurrence>
-readStoredTaskRecurrence(sqlite3* handle, const QString& localTaskListId, const QString& remoteTaskId) {
+[[nodiscard]] std::optional<StoredTaskRecurrence> readStoredTaskRecurrence(
+    sqlite3* handle, const QString& localTaskListId, const QString& remoteTaskId) {
   constexpr char sql[] = R"(
 SELECT notes, recurrence_diagnostic
 FROM local_tasks
@@ -126,16 +126,12 @@ LIMIT 1
   }
   const QByteArray listId = localTaskListId.toUtf8();
   const QByteArray taskId = remoteTaskId.toUtf8();
-  if (sqlite3_bind_text(statement,
-                        1,
-                        listId.constData(),
-                        static_cast<int>(listId.size()),
-                        SQLITE_TRANSIENT) != SQLITE_OK ||
-      sqlite3_bind_text(statement,
-                        2,
-                        taskId.constData(),
-                        static_cast<int>(taskId.size()),
-                        SQLITE_TRANSIENT) != SQLITE_OK) {
+  if (sqlite3_bind_text(
+          statement, 1, listId.constData(), static_cast<int>(listId.size()), SQLITE_TRANSIENT) !=
+          SQLITE_OK ||
+      sqlite3_bind_text(
+          statement, 2, taskId.constData(), static_cast<int>(taskId.size()), SQLITE_TRANSIENT) !=
+          SQLITE_OK) {
     sqlite3_finalize(statement);
     return std::nullopt;
   }
@@ -155,7 +151,7 @@ LIMIT 1
   StoredTaskRecurrence recurrence{.notes = optionalColumnText(statement, 0),
                                   .diagnostic = optionalColumnText(statement, 1)};
   return sqlite3_finalize(statement) == SQLITE_OK ? std::optional<StoredTaskRecurrence>(recurrence)
-                                                   : std::nullopt;
+                                                  : std::nullopt;
 }
 
 [[nodiscard]] std::optional<QString>
@@ -200,10 +196,11 @@ recurrenceDiagnostic(const std::optional<StoredTaskRecurrence>& previous,
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<AppError>
-executePrepared(sqlite3_stmt* statement, const QList<SqlValue>& values) {
+[[nodiscard]] std::optional<AppError> executePrepared(sqlite3_stmt* statement,
+                                                      const QList<SqlValue>& values) {
   if (statement == nullptr) {
-    return AppError(AppErrorCode::Database, QStringLiteral("SQLite mirror statement is unavailable"));
+    return AppError(AppErrorCode::Database,
+                    QStringLiteral("SQLite mirror statement is unavailable"));
   }
   for (qsizetype index = 0; index < values.size(); ++index) {
     const SqlValue& value = values.at(index);
@@ -347,8 +344,8 @@ markTasksDeleted(sqlite3* handle, const QString& listId, const QString& now) {
                                                                    : QStringLiteral("active");
   const std::optional<QString> deletedAt =
       task.deleted ? std::optional<QString>(now) : std::nullopt;
-  const std::optional<QString> diagnostic = recurrenceDiagnostic(
-      readStoredTaskRecurrence(handle, localListId, task.id), task);
+  const std::optional<QString> diagnostic =
+      recurrenceDiagnostic(readStoredTaskRecurrence(handle, localListId, task.id), task);
   return execute(
       statements,
       "INSERT INTO local_tasks (id, task_list_id, remote_id, parent_task_id, title, notes, state, "
@@ -431,10 +428,11 @@ markCalendarsDeleted(sqlite3* handle, const QString& accountId, const QString& n
                  {textValue(now), textValue(accountId)});
 }
 
-[[nodiscard]] std::optional<AppError>
-invalidateCachedInstances(sqlite3* handle, const QString& localCalendarId, const QString& masterRemoteId);
-[[nodiscard]] std::optional<AppError>
-invalidateCachedCalendar(sqlite3* handle, const QString& localCalendarId);
+[[nodiscard]] std::optional<AppError> invalidateCachedInstances(sqlite3* handle,
+                                                                const QString& localCalendarId,
+                                                                const QString& masterRemoteId);
+[[nodiscard]] std::optional<AppError> invalidateCachedCalendar(sqlite3* handle,
+                                                               const QString& localCalendarId);
 
 [[nodiscard]] std::optional<AppError>
 markEventsDeleted(sqlite3* handle, const QString& localCalendarId, const QString& now) {
@@ -466,7 +464,8 @@ markEventsDeleted(sqlite3* handle, const QString& localCalendarId, const QString
   return execute(
       handle,
       "INSERT INTO local_calendars (id, account_id, remote_id, title, description, time_zone, "
-      "color_id, background_color, foreground_color, access_role, is_selected, is_hidden, is_primary, etag, "
+      "color_id, background_color, foreground_color, access_role, is_selected, is_hidden, "
+      "is_primary, etag, "
       "default_reminders_json, updated_at, deleted_at) "
       "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17) "
       "ON CONFLICT(account_id, remote_id) DO UPDATE SET "
@@ -516,8 +515,9 @@ markEventsDeleted(sqlite3* handle, const QString& localCalendarId, const QString
   return {};
 }
 
-[[nodiscard]] std::optional<AppError>
-invalidateCachedInstances(sqlite3* handle, const QString& localCalendarId, const QString& masterRemoteId) {
+[[nodiscard]] std::optional<AppError> invalidateCachedInstances(sqlite3* handle,
+                                                                const QString& localCalendarId,
+                                                                const QString& masterRemoteId) {
   if (const std::optional<AppError> error =
           execute(handle,
                   "DELETE FROM local_calendar_instance_coverage WHERE calendar_id = ?1 "
@@ -573,8 +573,9 @@ WHERE calendar_id = ?1
     const int size = sqlite3_column_bytes(statement, 0);
     if (value == nullptr || size < 0) {
       sqlite3_finalize(statement);
-      return databaseError(QStringLiteral("SQLite cached-instance lookup returned invalid data (%1)"),
-                           SQLITE_MISMATCH);
+      return databaseError(
+          QStringLiteral("SQLite cached-instance lookup returned invalid data (%1)"),
+          SQLITE_MISMATCH);
     }
     masterIds.insert(QString::fromUtf8(value, size));
   }
@@ -614,8 +615,8 @@ invalidateChangedCachedInstances(sqlite3* handle,
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<AppError>
-invalidateCachedCalendar(sqlite3* handle, const QString& localCalendarId) {
+[[nodiscard]] std::optional<AppError> invalidateCachedCalendar(sqlite3* handle,
+                                                               const QString& localCalendarId) {
   if (const std::optional<AppError> error =
           execute(handle,
                   "DELETE FROM local_calendar_instance_coverage WHERE calendar_id = ?1",
@@ -690,8 +691,7 @@ storeEventRecurrence(SqliteStatementCache& statements,
   }
   const QString attendeeEmailJson =
       QString::fromUtf8(QJsonDocument(attendeeEmails).toJson(QJsonDocument::Compact));
-  const QJsonArray reminderOverrides =
-      event.reminders.value(QStringLiteral("overrides")).toArray();
+  const QJsonArray reminderOverrides = event.reminders.value(QStringLiteral("overrides")).toArray();
   const QString reminderJson =
       QString::fromUtf8(QJsonDocument(reminderOverrides).toJson(QJsonDocument::Compact));
   QJsonArray reminderMinutes;
@@ -702,11 +702,11 @@ storeEventRecurrence(SqliteStatementCache& statements,
       QString::fromUtf8(QJsonDocument(reminderMinutes).toJson(QJsonDocument::Compact));
   const QJsonValue useDefault = event.reminders.value(QStringLiteral("useDefault"));
   const bool remindersUseDefault = !useDefault.isBool() || useDefault.toBool();
-  const std::optional<QString> conferenceJson = event.conferenceData.isEmpty()
-                                                    ? std::optional<QString>{}
-                                                    : std::optional<QString>(QString::fromUtf8(
-                                                          QJsonDocument(event.conferenceData)
-                                                              .toJson(QJsonDocument::Compact)));
+  const std::optional<QString> conferenceJson =
+      event.conferenceData.isEmpty()
+          ? std::optional<QString>{}
+          : std::optional<QString>(QString::fromUtf8(
+                QJsonDocument(event.conferenceData).toJson(QJsonDocument::Compact)));
   const QString attachmentsJson =
       QString::fromUtf8(QJsonDocument(event.attachments).toJson(QJsonDocument::Compact));
   const QString guestPermissionsJson =
@@ -717,112 +717,119 @@ storeEventRecurrence(SqliteStatementCache& statements,
   const std::optional<QString> storedRecurrence =
       recurrence.isEmpty() ? std::nullopt : std::optional<QString>(recurrence);
   const std::optional<QString> legacyRecurrence = recurrence.isEmpty() ? std::nullopt
-      : recurrence.size() <= 4'096 ? std::optional<QString>(recurrence) : std::nullopt;
+                                                  : recurrence.size() <= 4'096
+                                                      ? std::optional<QString>(recurrence)
+                                                      : std::nullopt;
   if (const std::optional<AppError> error = execute(
-      statements,
-      "INSERT INTO local_calendar_events (id, calendar_id, remote_id, recurring_remote_id, "
-      "original_start_at, status, title, description, location, start_at, start_time_zone, end_at, "
-      "end_time_zone, is_all_day, recurrence_rule, is_instance_cache, color_id, transparency, "
-      "visibility, time_zone, event_type, attendee_emails_json, attendee_details_json, reminder_minutes_json, "
-      "reminders_json, "
-      "reminders_use_default, conference_json, attachments_json, guest_permissions_json, "
-      "status_properties_json, etag, sequence, remote_updated_at, updated_at, deleted_at) "
-      "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, "
-      "?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35) "
-      "ON CONFLICT(calendar_id, remote_id) WHERE remote_id IS NOT NULL DO UPDATE SET "
-      "recurring_remote_id = excluded.recurring_remote_id, original_start_at = "
-      "excluded.original_start_at, "
-      "status = excluded.status, title = excluded.title, description = excluded.description, "
-      "location = excluded.location, start_at = excluded.start_at, "
-      "start_time_zone = excluded.start_time_zone, end_at = excluded.end_at, "
-      "end_time_zone = excluded.end_time_zone, is_all_day = excluded.is_all_day, "
-      "recurrence_rule = excluded.recurrence_rule, is_instance_cache = CASE "
-      "WHEN local_calendar_events.is_instance_cache = 0 THEN 0 ELSE excluded.is_instance_cache END, "
-      "color_id = excluded.color_id, "
-      "transparency = excluded.transparency, visibility = excluded.visibility, "
-      "time_zone = excluded.time_zone, event_type = excluded.event_type, "
-      "attendee_emails_json = excluded.attendee_emails_json, "
-      "attendee_details_json = excluded.attendee_details_json, "
-      "reminder_minutes_json = excluded.reminder_minutes_json, reminders_json = "
-      "excluded.reminders_json, "
-      "reminders_use_default = excluded.reminders_use_default, "
-      "conference_json = excluded.conference_json, attachments_json = excluded.attachments_json, "
-      "guest_permissions_json = excluded.guest_permissions_json, "
-      "status_properties_json = excluded.status_properties_json, etag = excluded.etag, "
-      "sequence = excluded.sequence, "
-      "remote_updated_at = excluded.remote_updated_at, updated_at = excluded.updated_at, "
-      "deleted_at = excluded.deleted_at "
-      "WHERE NOT EXISTS (SELECT 1 FROM local_pending_mutations AS mutations "
-      "WHERE mutations.resource_type = 'event' "
-      "AND mutations.resource_id = local_calendar_events.id "
-      "AND (mutations.status IN ('pending', 'applying') "
-      "OR (mutations.status = 'failed' AND mutations.next_retry_at IS NOT NULL))) "
-      "AND (local_calendar_events.recurring_remote_id IS NOT excluded.recurring_remote_id "
-      "OR local_calendar_events.original_start_at IS NOT excluded.original_start_at "
-      "OR local_calendar_events.status IS NOT excluded.status "
-      "OR local_calendar_events.title IS NOT excluded.title "
-      "OR local_calendar_events.description IS NOT excluded.description "
-      "OR local_calendar_events.location IS NOT excluded.location "
-      "OR local_calendar_events.start_at IS NOT excluded.start_at "
-      "OR local_calendar_events.start_time_zone IS NOT excluded.start_time_zone "
-      "OR local_calendar_events.end_at IS NOT excluded.end_at "
-      "OR local_calendar_events.end_time_zone IS NOT excluded.end_time_zone "
-      "OR local_calendar_events.is_all_day IS NOT excluded.is_all_day "
-      "OR local_calendar_events.recurrence_rule IS NOT excluded.recurrence_rule "
-      "OR (local_calendar_events.is_instance_cache = 1 AND excluded.is_instance_cache = 0) "
-      "OR local_calendar_events.color_id IS NOT excluded.color_id "
-      "OR local_calendar_events.transparency IS NOT excluded.transparency "
-      "OR local_calendar_events.visibility IS NOT excluded.visibility "
-      "OR local_calendar_events.time_zone IS NOT excluded.time_zone "
-      "OR local_calendar_events.event_type IS NOT excluded.event_type "
-      "OR local_calendar_events.attendee_emails_json IS NOT excluded.attendee_emails_json "
-      "OR local_calendar_events.attendee_details_json IS NOT excluded.attendee_details_json "
-      "OR local_calendar_events.reminder_minutes_json IS NOT excluded.reminder_minutes_json "
-      "OR local_calendar_events.reminders_json IS NOT excluded.reminders_json "
-      "OR local_calendar_events.reminders_use_default IS NOT excluded.reminders_use_default "
-      "OR local_calendar_events.conference_json IS NOT excluded.conference_json "
-      "OR local_calendar_events.attachments_json IS NOT excluded.attachments_json "
-      "OR local_calendar_events.guest_permissions_json IS NOT excluded.guest_permissions_json "
-      "OR local_calendar_events.status_properties_json IS NOT excluded.status_properties_json "
-      "OR local_calendar_events.etag IS NOT excluded.etag "
-      "OR local_calendar_events.sequence IS NOT excluded.sequence "
-      "OR local_calendar_events.remote_updated_at IS NOT excluded.remote_updated_at "
-      "OR local_calendar_events.deleted_at IS NOT excluded.deleted_at)",
-      {textValue(localEventId),
-       textValue(calendarId(accountId, event.calendarId)),
-       textValue(event.id),
-       optionalTextValue(event.recurringEventId),
-       optionalTextValue(event.originalStartAt),
-       textValue(status),
-       textValue(event.title.left(500)),
-       optionalTextValue(event.description),
-       optionalTextValue(event.location),
-       textValue(startAt),
-       optionalTextValue(event.startTimeZone),
-       textValue(endAt),
-       optionalTextValue(event.endTimeZone),
-       integerValue(event.allDay ? 1 : 0),
-       optionalTextValue(legacyRecurrence),
-       integerValue(isInstanceCache ? 1 : 0),
-       optionalTextValue(event.colorId),
-       optionalTextValue(event.transparency),
-       optionalTextValue(event.visibility),
-       nullValue(),
-       optionalTextValue(event.eventType),
-       textValue(attendeeEmailJson),
-       textValue(attendeeDetails),
-       textValue(reminderMinuteJson),
-       textValue(reminderJson),
-       integerValue(remindersUseDefault ? 1 : 0),
-       optionalTextValue(conferenceJson),
-       textValue(attachmentsJson),
-       textValue(guestPermissionsJson),
-       textValue(statusPropertiesJson),
-       optionalTextValue(event.etag),
-       event.sequence.has_value() ? integerValue(*event.sequence) : nullValue(),
-       optionalTextValue(event.updatedAt),
-       textValue(now),
-       optionalTextValue(deletedAt)});
+          statements,
+          "INSERT INTO local_calendar_events (id, calendar_id, remote_id, recurring_remote_id, "
+          "original_start_at, status, title, description, location, start_at, start_time_zone, "
+          "end_at, "
+          "end_time_zone, is_all_day, recurrence_rule, is_instance_cache, color_id, transparency, "
+          "visibility, time_zone, event_type, attendee_emails_json, attendee_details_json, "
+          "reminder_minutes_json, "
+          "reminders_json, "
+          "reminders_use_default, conference_json, attachments_json, guest_permissions_json, "
+          "status_properties_json, etag, sequence, remote_updated_at, updated_at, deleted_at) "
+          "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, "
+          "?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, "
+          "?35) "
+          "ON CONFLICT(calendar_id, remote_id) WHERE remote_id IS NOT NULL DO UPDATE SET "
+          "recurring_remote_id = excluded.recurring_remote_id, original_start_at = "
+          "excluded.original_start_at, "
+          "status = excluded.status, title = excluded.title, description = excluded.description, "
+          "location = excluded.location, start_at = excluded.start_at, "
+          "start_time_zone = excluded.start_time_zone, end_at = excluded.end_at, "
+          "end_time_zone = excluded.end_time_zone, is_all_day = excluded.is_all_day, "
+          "recurrence_rule = excluded.recurrence_rule, is_instance_cache = CASE "
+          "WHEN local_calendar_events.is_instance_cache = 0 THEN 0 ELSE excluded.is_instance_cache "
+          "END, "
+          "color_id = excluded.color_id, "
+          "transparency = excluded.transparency, visibility = excluded.visibility, "
+          "time_zone = excluded.time_zone, event_type = excluded.event_type, "
+          "attendee_emails_json = excluded.attendee_emails_json, "
+          "attendee_details_json = excluded.attendee_details_json, "
+          "reminder_minutes_json = excluded.reminder_minutes_json, reminders_json = "
+          "excluded.reminders_json, "
+          "reminders_use_default = excluded.reminders_use_default, "
+          "conference_json = excluded.conference_json, attachments_json = "
+          "excluded.attachments_json, "
+          "guest_permissions_json = excluded.guest_permissions_json, "
+          "status_properties_json = excluded.status_properties_json, etag = excluded.etag, "
+          "sequence = excluded.sequence, "
+          "remote_updated_at = excluded.remote_updated_at, updated_at = excluded.updated_at, "
+          "deleted_at = excluded.deleted_at "
+          "WHERE NOT EXISTS (SELECT 1 FROM local_pending_mutations AS mutations "
+          "WHERE mutations.resource_type = 'event' "
+          "AND mutations.resource_id = local_calendar_events.id "
+          "AND (mutations.status IN ('pending', 'applying') "
+          "OR (mutations.status = 'failed' AND mutations.next_retry_at IS NOT NULL))) "
+          "AND (local_calendar_events.recurring_remote_id IS NOT excluded.recurring_remote_id "
+          "OR local_calendar_events.original_start_at IS NOT excluded.original_start_at "
+          "OR local_calendar_events.status IS NOT excluded.status "
+          "OR local_calendar_events.title IS NOT excluded.title "
+          "OR local_calendar_events.description IS NOT excluded.description "
+          "OR local_calendar_events.location IS NOT excluded.location "
+          "OR local_calendar_events.start_at IS NOT excluded.start_at "
+          "OR local_calendar_events.start_time_zone IS NOT excluded.start_time_zone "
+          "OR local_calendar_events.end_at IS NOT excluded.end_at "
+          "OR local_calendar_events.end_time_zone IS NOT excluded.end_time_zone "
+          "OR local_calendar_events.is_all_day IS NOT excluded.is_all_day "
+          "OR local_calendar_events.recurrence_rule IS NOT excluded.recurrence_rule "
+          "OR (local_calendar_events.is_instance_cache = 1 AND excluded.is_instance_cache = 0) "
+          "OR local_calendar_events.color_id IS NOT excluded.color_id "
+          "OR local_calendar_events.transparency IS NOT excluded.transparency "
+          "OR local_calendar_events.visibility IS NOT excluded.visibility "
+          "OR local_calendar_events.time_zone IS NOT excluded.time_zone "
+          "OR local_calendar_events.event_type IS NOT excluded.event_type "
+          "OR local_calendar_events.attendee_emails_json IS NOT excluded.attendee_emails_json "
+          "OR local_calendar_events.attendee_details_json IS NOT excluded.attendee_details_json "
+          "OR local_calendar_events.reminder_minutes_json IS NOT excluded.reminder_minutes_json "
+          "OR local_calendar_events.reminders_json IS NOT excluded.reminders_json "
+          "OR local_calendar_events.reminders_use_default IS NOT excluded.reminders_use_default "
+          "OR local_calendar_events.conference_json IS NOT excluded.conference_json "
+          "OR local_calendar_events.attachments_json IS NOT excluded.attachments_json "
+          "OR local_calendar_events.guest_permissions_json IS NOT excluded.guest_permissions_json "
+          "OR local_calendar_events.status_properties_json IS NOT excluded.status_properties_json "
+          "OR local_calendar_events.etag IS NOT excluded.etag "
+          "OR local_calendar_events.sequence IS NOT excluded.sequence "
+          "OR local_calendar_events.remote_updated_at IS NOT excluded.remote_updated_at "
+          "OR local_calendar_events.deleted_at IS NOT excluded.deleted_at)",
+          {textValue(localEventId),
+           textValue(calendarId(accountId, event.calendarId)),
+           textValue(event.id),
+           optionalTextValue(event.recurringEventId),
+           optionalTextValue(event.originalStartAt),
+           textValue(status),
+           textValue(event.title.left(500)),
+           optionalTextValue(event.description),
+           optionalTextValue(event.location),
+           textValue(startAt),
+           optionalTextValue(event.startTimeZone),
+           textValue(endAt),
+           optionalTextValue(event.endTimeZone),
+           integerValue(event.allDay ? 1 : 0),
+           optionalTextValue(legacyRecurrence),
+           integerValue(isInstanceCache ? 1 : 0),
+           optionalTextValue(event.colorId),
+           optionalTextValue(event.transparency),
+           optionalTextValue(event.visibility),
+           nullValue(),
+           optionalTextValue(event.eventType),
+           textValue(attendeeEmailJson),
+           textValue(attendeeDetails),
+           textValue(reminderMinuteJson),
+           textValue(reminderJson),
+           integerValue(remindersUseDefault ? 1 : 0),
+           optionalTextValue(conferenceJson),
+           textValue(attachmentsJson),
+           textValue(guestPermissionsJson),
+           textValue(statusPropertiesJson),
+           optionalTextValue(event.etag),
+           event.sequence.has_value() ? integerValue(*event.sequence) : nullValue(),
+           optionalTextValue(event.updatedAt),
+           textValue(now),
+           optionalTextValue(deletedAt)});
       error.has_value()) {
     return error;
   }
@@ -945,13 +952,12 @@ mergeStoredTaskLists(SqliteConnection& connection,
   return std::monostate{};
 }
 
-[[nodiscard]] GoogleMirrorWriteResult
-mergeStoredTasks(SqliteConnection& connection,
-                 const QString& accountId,
-                 const QString& taskListRemoteId,
-                 const QList<GoogleTaskMirror>& tasks,
-                 bool fullReconciliation,
-                 const Clock& clock) {
+[[nodiscard]] GoogleMirrorWriteResult mergeStoredTasks(SqliteConnection& connection,
+                                                       const QString& accountId,
+                                                       const QString& taskListRemoteId,
+                                                       const QList<GoogleTaskMirror>& tasks,
+                                                       bool fullReconciliation,
+                                                       const Clock& clock) {
   sqlite3* const handle = connection.nativeHandle();
   if (handle == nullptr) {
     return AppError(AppErrorCode::Database, QStringLiteral("SQLite task mirror is unavailable"));
@@ -1052,8 +1058,7 @@ replaceStoredCalendars(SqliteConnection& connection,
     }
   }
   for (const GoogleCalendarEventMirror& event : events) {
-    if (const std::optional<AppError> error =
-            upsertEvent(statements, accountId, event, now);
+    if (const std::optional<AppError> error = upsertEvent(statements, accountId, event, now);
         error.has_value()) {
       return *error;
     }
@@ -1149,8 +1154,7 @@ mergeStoredCalendarEvents(SqliteConnection& connection,
     return *error;
   }
   for (const GoogleCalendarEventMirror& event : events) {
-    if (const std::optional<AppError> error =
-            upsertEvent(statements, accountId, event, now);
+    if (const std::optional<AppError> error = upsertEvent(statements, accountId, event, now);
         error.has_value()) {
       return *error;
     }
@@ -1203,8 +1207,7 @@ cacheStoredCalendarInstances(SqliteConnection& connection,
   }
   const QString now = timestamp(clock);
   for (const GoogleCalendarEventMirror& event : events) {
-    if (const std::optional<AppError> error =
-            upsertEvent(statements, accountId, event, now, true);
+    if (const std::optional<AppError> error = upsertEvent(statements, accountId, event, now, true);
         error.has_value()) {
       return *error;
     }
@@ -1214,7 +1217,8 @@ cacheStoredCalendarInstances(SqliteConnection& connection,
   if (const std::optional<AppError> error =
           execute(handle,
                   "INSERT INTO local_calendar_instance_coverage "
-                  "(calendar_id, recurring_remote_id, range_start_at, range_end_at, fetched_at, expires_at) "
+                  "(calendar_id, recurring_remote_id, range_start_at, range_end_at, fetched_at, "
+                  "expires_at) "
                   "VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                   {textValue(localCalendarId),
                    textValue(recurringRemoteId),
@@ -1257,10 +1261,8 @@ std::future<GoogleMirrorWriteResult> GoogleMirrorStore::replaceTasks(
   });
 }
 
-std::future<GoogleMirrorWriteResult>
-GoogleMirrorStore::mergeTaskLists(QString accountId,
-                                  QList<GoogleTaskListMirror> taskLists,
-                                  bool fullReconciliation) {
+std::future<GoogleMirrorWriteResult> GoogleMirrorStore::mergeTaskLists(
+    QString accountId, QList<GoogleTaskListMirror> taskLists, bool fullReconciliation) {
   return writerQueue_.enqueueResult([this,
                                      accountId = std::move(accountId),
                                      taskLists = std::move(taskLists),
@@ -1269,11 +1271,10 @@ GoogleMirrorStore::mergeTaskLists(QString accountId,
   });
 }
 
-std::future<GoogleMirrorWriteResult>
-GoogleMirrorStore::mergeTasks(QString accountId,
-                              QString taskListRemoteId,
-                              QList<GoogleTaskMirror> tasks,
-                              bool fullReconciliation) {
+std::future<GoogleMirrorWriteResult> GoogleMirrorStore::mergeTasks(QString accountId,
+                                                                   QString taskListRemoteId,
+                                                                   QList<GoogleTaskMirror> tasks,
+                                                                   bool fullReconciliation) {
   return writerQueue_.enqueueResult([this,
                                      accountId = std::move(accountId),
                                      taskListRemoteId = std::move(taskListRemoteId),
@@ -1296,10 +1297,8 @@ GoogleMirrorStore::replaceCalendars(QString accountId,
   });
 }
 
-std::future<GoogleMirrorWriteResult>
-GoogleMirrorStore::mergeCalendars(QString accountId,
-                                  QList<GoogleCalendarMirror> calendars,
-                                  bool fullReconciliation) {
+std::future<GoogleMirrorWriteResult> GoogleMirrorStore::mergeCalendars(
+    QString accountId, QList<GoogleCalendarMirror> calendars, bool fullReconciliation) {
   return writerQueue_.enqueueResult([this,
                                      accountId = std::move(accountId),
                                      calendars = std::move(calendars),
@@ -1330,23 +1329,22 @@ GoogleMirrorStore::cacheCalendarInstances(QString accountId,
                                           QString rangeStartAt,
                                           QString rangeEndAt,
                                           QList<GoogleCalendarEventMirror> events) {
-  return writerQueue_.enqueueResult(
-      [this,
-       accountId = std::move(accountId),
-       calendarRemoteId = std::move(calendarRemoteId),
-       recurringRemoteId = std::move(recurringRemoteId),
-       rangeStartAt = std::move(rangeStartAt),
-       rangeEndAt = std::move(rangeEndAt),
-       events = std::move(events)](SqliteConnection& connection) {
-        return cacheStoredCalendarInstances(connection,
-                                            accountId,
-                                            calendarRemoteId,
-                                            recurringRemoteId,
-                                            rangeStartAt,
-                                            rangeEndAt,
-                                            events,
-                                            clock_);
-      });
+  return writerQueue_.enqueueResult([this,
+                                     accountId = std::move(accountId),
+                                     calendarRemoteId = std::move(calendarRemoteId),
+                                     recurringRemoteId = std::move(recurringRemoteId),
+                                     rangeStartAt = std::move(rangeStartAt),
+                                     rangeEndAt = std::move(rangeEndAt),
+                                     events = std::move(events)](SqliteConnection& connection) {
+    return cacheStoredCalendarInstances(connection,
+                                        accountId,
+                                        calendarRemoteId,
+                                        recurringRemoteId,
+                                        rangeStartAt,
+                                        rangeEndAt,
+                                        events,
+                                        clock_);
+  });
 }
 
 } // namespace hcb

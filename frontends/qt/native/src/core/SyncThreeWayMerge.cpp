@@ -132,11 +132,18 @@ SyncThreeWayMergeResult SyncThreeWayMerge::merge(SyncThreeWayMergeInput input) {
     return mergeFields(input, u"task", {u"title", u"notes", u"status", u"due"});
   }
   if (input.resource == SyncConflictResource::Event) {
-    return mergeFields(
-        input,
-        u"event",
-        {u"summary", u"description", u"location", u"start", u"end", u"colorId",
-         u"transparency", u"visibility", u"attendees", u"reminders"});
+    return mergeFields(input,
+                       u"event",
+                       {u"summary",
+                        u"description",
+                        u"location",
+                        u"start",
+                        u"end",
+                        u"colorId",
+                        u"transparency",
+                        u"visibility",
+                        u"attendees",
+                        u"reminders"});
   }
   return structuralResult(input);
 }

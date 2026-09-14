@@ -23,30 +23,35 @@ struct CsvRow final {
 
 [[nodiscard]] std::optional<ImportItemKind> kindForText(QString value) {
   value = value.trimmed().toCaseFolded();
-  if (value == QStringLiteral("task")) return ImportItemKind::Task;
-  if (value == QStringLiteral("event")) return ImportItemKind::Event;
+  if (value == QStringLiteral("task"))
+    return ImportItemKind::Task;
+  if (value == QStringLiteral("event"))
+    return ImportItemKind::Event;
   return std::nullopt;
 }
 
 [[nodiscard]] std::optional<bool> booleanForText(QString value) {
   value = value.trimmed().toCaseFolded();
-  if (value == QStringLiteral("true")) return true;
-  if (value == QStringLiteral("false")) return false;
+  if (value == QStringLiteral("true"))
+    return true;
+  if (value == QStringLiteral("false"))
+    return false;
   return std::nullopt;
 }
 
 [[nodiscard]] std::optional<int> countForText(const QString& value) {
-  if (value.isEmpty()) return std::optional<int>{};
+  if (value.isEmpty())
+    return std::optional<int>{};
   bool valid = false;
   const int count = value.toInt(&valid);
   return valid && count > 0 && count <= 10'000 ? std::optional<int>(count) : std::nullopt;
 }
 
 [[nodiscard]] std::optional<QString> optionalValue(const QHash<QString, QString>& fields,
-                                                    const QString& key) {
+                                                   const QString& key) {
   const auto value = fields.constFind(key);
   return value == fields.cend() || value->isEmpty() ? std::optional<QString>{}
-                                                     : std::optional<QString>(*value);
+                                                    : std::optional<QString>(*value);
 }
 
 [[nodiscard]] ImportPreviewRow rejected(int line, QString message) {
@@ -55,22 +60,34 @@ struct CsvRow final {
 
 [[nodiscard]] bool hasOnly(const QHash<QString, QString>& fields, const QSet<QString>& allowed) {
   for (auto it = fields.cbegin(); it != fields.cend(); ++it) {
-    if (!allowed.contains(it.key())) return false;
+    if (!allowed.contains(it.key()))
+      return false;
   }
   return true;
 }
 
-[[nodiscard]] std::optional<ImportItem>
-itemFromFields(int line, ImportItemKind kind, const QHash<QString, QString>& fields, QString& error) {
-  const QSet<QString> taskFields{QStringLiteral("title"), QStringLiteral("list"),
-                                 QStringLiteral("due"), QStringLiteral("notes"),
-                                 QStringLiteral("priority"), QStringLiteral("rrule"),
-                                 QStringLiteral("until"), QStringLiteral("count"),
-                                 QStringLiteral("exclude"), QStringLiteral("include")};
-  const QSet<QString> eventFields{QStringLiteral("title"), QStringLiteral("calendar"),
-                                  QStringLiteral("start"), QStringLiteral("end"),
-                                  QStringLiteral("all_day"), QStringLiteral("time_zone"),
-                                  QStringLiteral("description"), QStringLiteral("location"),
+[[nodiscard]] std::optional<ImportItem> itemFromFields(int line,
+                                                       ImportItemKind kind,
+                                                       const QHash<QString, QString>& fields,
+                                                       QString& error) {
+  const QSet<QString> taskFields{QStringLiteral("title"),
+                                 QStringLiteral("list"),
+                                 QStringLiteral("due"),
+                                 QStringLiteral("notes"),
+                                 QStringLiteral("priority"),
+                                 QStringLiteral("rrule"),
+                                 QStringLiteral("until"),
+                                 QStringLiteral("count"),
+                                 QStringLiteral("exclude"),
+                                 QStringLiteral("include")};
+  const QSet<QString> eventFields{QStringLiteral("title"),
+                                  QStringLiteral("calendar"),
+                                  QStringLiteral("start"),
+                                  QStringLiteral("end"),
+                                  QStringLiteral("all_day"),
+                                  QStringLiteral("time_zone"),
+                                  QStringLiteral("description"),
+                                  QStringLiteral("location"),
                                   QStringLiteral("recurrence")};
   if (!hasOnly(fields, kind == ImportItemKind::Task ? taskFields : eventFields)) {
     error = QStringLiteral("contains an unsupported field");
@@ -137,15 +154,18 @@ itemFromFields(int line, ImportItemKind kind, const QHash<QString, QString>& fie
   return item;
 }
 
-[[nodiscard]] std::optional<QHash<QString, QString>>
-parseDelimitedFields(QStringView text, QString& error) {
+[[nodiscard]] std::optional<QHash<QString, QString>> parseDelimitedFields(QStringView text,
+                                                                          QString& error) {
   QHash<QString, QString> fields;
   qsizetype index = 0;
   while (index < text.size()) {
-    while (index < text.size() && text.at(index).isSpace()) ++index;
-    if (index == text.size()) break;
+    while (index < text.size() && text.at(index).isSpace())
+      ++index;
+    if (index == text.size())
+      break;
     const qsizetype keyStart = index;
-    while (index < text.size() && (text.at(index).isLetterOrNumber() || text.at(index) == u'_')) ++index;
+    while (index < text.size() && (text.at(index).isLetterOrNumber() || text.at(index) == u'_'))
+      ++index;
     if (keyStart == index || index == text.size() || text.at(index) != u'=') {
       error = QStringLiteral("has invalid key=value syntax");
       return std::nullopt;
@@ -171,10 +191,14 @@ parseDelimitedFields(QStringView text, QString& error) {
           return std::nullopt;
         }
         const QChar escaped = text.at(index++);
-        if (escaped == u'n') value.append(u'\n');
-        else if (escaped == u'r') value.append(u'\r');
-        else if (escaped == u't') value.append(u'\t');
-        else if (escaped == u'\"' || escaped == u'\\') value.append(escaped);
+        if (escaped == u'n')
+          value.append(u'\n');
+        else if (escaped == u'r')
+          value.append(u'\r');
+        else if (escaped == u't')
+          value.append(u'\t');
+        else if (escaped == u'\"' || escaped == u'\\')
+          value.append(escaped);
         else {
           error = QStringLiteral("has an unsupported escape");
           return std::nullopt;
@@ -186,12 +210,13 @@ parseDelimitedFields(QStringView text, QString& error) {
       }
     } else {
       const qsizetype valueStart = index;
-      while (index < text.size() && !text.at(index).isSpace()) ++index;
+      while (index < text.size() && !text.at(index).isSpace())
+        ++index;
       value = text.sliced(valueStart, index - valueStart).toString();
     }
     if (value.size() > kMaximumFieldLength || fields.contains(key)) {
       error = value.size() > kMaximumFieldLength ? QStringLiteral("has an oversized field")
-                                                   : QStringLiteral("repeats a field");
+                                                 : QStringLiteral("repeats a field");
       return std::nullopt;
     }
     fields.insert(key, std::move(value));
@@ -229,7 +254,8 @@ parseDelimitedFields(QStringView text, QString& error) {
         }
       } else {
         field.append(character);
-        if (character == u'\n') ++line;
+        if (character == u'\n')
+          ++line;
       }
       continue;
     }
@@ -239,7 +265,8 @@ parseDelimitedFields(QStringView text, QString& error) {
         field.clear();
         afterQuote = false;
       } else if (character == u'\n' || character == u'\r') {
-        if (character == u'\r' && index + 1 < text.size() && text.at(index + 1) == u'\n') ++index;
+        if (character == u'\r' && index + 1 < text.size() && text.at(index + 1) == u'\n')
+          ++index;
         ++line;
         appendRecord();
         afterQuote = false;
@@ -259,7 +286,8 @@ parseDelimitedFields(QStringView text, QString& error) {
       fields.append(std::move(field));
       field.clear();
     } else if (character == u'\n' || character == u'\r') {
-      if (character == u'\r' && index + 1 < text.size() && text.at(index + 1) == u'\n') ++index;
+      if (character == u'\r' && index + 1 < text.size() && text.at(index + 1) == u'\n')
+        ++index;
       ++line;
       appendRecord();
     } else {
@@ -274,7 +302,8 @@ parseDelimitedFields(QStringView text, QString& error) {
     error = QStringLiteral("CSV has an unterminated quoted field");
     return std::nullopt;
   }
-  if (afterQuote || !field.isEmpty() || !fields.isEmpty()) appendRecord();
+  if (afterQuote || !field.isEmpty() || !fields.isEmpty())
+    appendRecord();
   return rows;
 }
 
@@ -283,9 +312,11 @@ parseDelimitedFields(QStringView text, QString& error) {
   const QStringList lines = text.split(u'\n');
   for (qsizetype index = 0; index < lines.size(); ++index) {
     QString line = lines.at(index);
-    if (line.endsWith(u'\r')) line.chop(1);
+    if (line.endsWith(u'\r'))
+      line.chop(1);
     const int sourceLine = static_cast<int>(index + 1);
-    if (line.trimmed().isEmpty() || line.trimmed().startsWith(u'#')) continue;
+    if (line.trimmed().isEmpty() || line.trimmed().startsWith(u'#'))
+      continue;
     if (line.size() > kMaximumLineLength) {
       result.rows.append(rejected(sourceLine, QStringLiteral("line exceeds the import limit")));
       continue;
@@ -298,8 +329,8 @@ parseDelimitedFields(QStringView text, QString& error) {
       continue;
     }
     QString error;
-    const std::optional<QHash<QString, QString>> fields =
-        parseDelimitedFields(separator < 0 ? QStringView{} : QStringView(line).sliced(separator + 1), error);
+    const std::optional<QHash<QString, QString>> fields = parseDelimitedFields(
+        separator < 0 ? QStringView{} : QStringView(line).sliced(separator + 1), error);
     if (!fields.has_value()) {
       result.rows.append(rejected(sourceLine, std::move(error)));
       continue;
@@ -327,16 +358,14 @@ parseDelimitedFields(QStringView text, QString& error) {
     result.rows.append(rejected(0, std::move(error)));
     return result;
   }
-  const QStringList expected{QStringLiteral("schema_version"), QStringLiteral("kind"),
-                             QStringLiteral("title"), QStringLiteral("list"),
-                             QStringLiteral("calendar"), QStringLiteral("due"),
-                             QStringLiteral("notes"), QStringLiteral("priority"),
-                             QStringLiteral("rrule"), QStringLiteral("until"),
-                             QStringLiteral("count"), QStringLiteral("exclude"),
-                             QStringLiteral("include"), QStringLiteral("start"),
-                             QStringLiteral("end"), QStringLiteral("all_day"),
-                             QStringLiteral("time_zone"), QStringLiteral("description"),
-                             QStringLiteral("location"), QStringLiteral("recurrence")};
+  const QStringList expected{
+      QStringLiteral("schema_version"), QStringLiteral("kind"),      QStringLiteral("title"),
+      QStringLiteral("list"),           QStringLiteral("calendar"),  QStringLiteral("due"),
+      QStringLiteral("notes"),          QStringLiteral("priority"),  QStringLiteral("rrule"),
+      QStringLiteral("until"),          QStringLiteral("count"),     QStringLiteral("exclude"),
+      QStringLiteral("include"),        QStringLiteral("start"),     QStringLiteral("end"),
+      QStringLiteral("all_day"),        QStringLiteral("time_zone"), QStringLiteral("description"),
+      QStringLiteral("location"),       QStringLiteral("recurrence")};
   if (rows->isEmpty() || rows->front().fields != expected) {
     result.rows.append(rejected(rows->isEmpty() ? 1 : rows->front().sourceLine,
                                 QStringLiteral("CSV header does not match schema version 1")));
@@ -349,17 +378,20 @@ parseDelimitedFields(QStringView text, QString& error) {
       continue;
     }
     if (row.fields.at(0) != QString::number(kSchemaVersion)) {
-      result.rows.append(rejected(row.sourceLine, QStringLiteral("CSV schema version is unsupported")));
+      result.rows.append(
+          rejected(row.sourceLine, QStringLiteral("CSV schema version is unsupported")));
       continue;
     }
     const std::optional<ImportItemKind> kind = kindForText(row.fields.at(1));
     if (!kind.has_value()) {
-      result.rows.append(rejected(row.sourceLine, QStringLiteral("CSV kind must be task or event")));
+      result.rows.append(
+          rejected(row.sourceLine, QStringLiteral("CSV kind must be task or event")));
       continue;
     }
     QHash<QString, QString> fields;
     for (qsizetype column = 2; column < expected.size(); ++column) {
-      if (!row.fields.at(column).isEmpty()) fields.insert(expected.at(column), row.fields.at(column));
+      if (!row.fields.at(column).isEmpty())
+        fields.insert(expected.at(column), row.fields.at(column));
     }
     QString itemError;
     const std::optional<ImportItem> item = itemFromFields(row.sourceLine, *kind, fields, itemError);
@@ -381,7 +413,7 @@ parseDelimitedFields(QStringView text, QString& error) {
 
 ImportFormat ImportService::detectFormat(const QString& filename) {
   return filename.endsWith(QStringLiteral(".csv"), Qt::CaseInsensitive) ? ImportFormat::Csv
-                                                                          : ImportFormat::Delimited;
+                                                                        : ImportFormat::Delimited;
 }
 
 ImportParseResult ImportService::parse(ImportFormat format, QByteArray bytes) {
@@ -396,7 +428,8 @@ ImportParseResult ImportService::parse(ImportFormat format, QByteArray bytes) {
     result.rows.append(rejected(0, QStringLiteral("Import file must be UTF-8")));
     return result;
   }
-  if (text.startsWith(QChar::ByteOrderMark)) text.remove(0, 1);
+  if (text.startsWith(QChar::ByteOrderMark))
+    text.remove(0, 1);
   result = format == ImportFormat::Csv ? parseCsv(text) : parseDelimited(text);
   if (result.rows.size() > kMaximumImportRows) {
     return {.items = {},

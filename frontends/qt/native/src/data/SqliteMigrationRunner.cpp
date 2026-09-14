@@ -200,12 +200,10 @@ validateAppliedHistory(const std::vector<AppliedMigration>& applied,
                       QStringLiteral("SQLite migration history name does not match"));
     }
     const bool checksumMatches =
-        recorded.checksum.has_value() &&
-        (*recorded.checksum == expected.checksum ||
-         (expected.acceptedLegacyChecksum.has_value() &&
-          *recorded.checksum == *expected.acceptedLegacyChecksum));
-    if (recorded.checksum.has_value() &&
-        (!isChecksum(*recorded.checksum) || !checksumMatches)) {
+        recorded.checksum.has_value() && (*recorded.checksum == expected.checksum ||
+                                          (expected.acceptedLegacyChecksum.has_value() &&
+                                           *recorded.checksum == *expected.acceptedLegacyChecksum));
+    if (recorded.checksum.has_value() && (!isChecksum(*recorded.checksum) || !checksumMatches)) {
       return AppError(AppErrorCode::Database,
                       QStringLiteral("SQLite migration history checksum does not match"));
     }

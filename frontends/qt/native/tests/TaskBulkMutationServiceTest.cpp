@@ -80,7 +80,7 @@ void verifyReady(hcb::TaskMutationService& service) {
 }
 
 [[nodiscard]] hcb::TaskBulkMutationSummary execute(hcb::TaskBulkMutationService& service,
-                                                    hcb::TaskBulkMutationInput input) {
+                                                   hcb::TaskBulkMutationInput input) {
   std::future<hcb::TaskBulkMutationResult> future = service.execute(std::move(input));
   const hcb::TaskBulkMutationResult result = await(future);
   if (!std::holds_alternative<hcb::TaskBulkMutationSummary>(result)) {
@@ -121,17 +121,18 @@ void TaskBulkMutationServiceTest::queuesEligibleItemsAndSeparatesSkips() {
   }
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(connectionResult));
   seed(connection);
-  const QString active = create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Active"));
+  const QString active =
+      create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Active"));
   const QString completed =
       create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Completed"));
   std::future<hcb::TaskMutationResult> complete = taskMutations.setCompleted(completed, true);
   QVERIFY(std::holds_alternative<hcb::TaskMutationReceipt>(await(complete)));
 
   hcb::TaskBulkMutationService bulk(taskMutations);
-  const hcb::TaskBulkMutationSummary summary = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::Complete,
-       .taskIds = {active, completed, QStringLiteral("task-missing")}});
+  const hcb::TaskBulkMutationSummary summary =
+      execute(bulk,
+              {.action = hcb::TaskBulkAction::Complete,
+               .taskIds = {active, completed, QStringLiteral("task-missing")}});
   QCOMPARE(summary.requested, 3);
   QCOMPARE(summary.eligible, 1);
   QCOMPARE(summary.queued, 1);
@@ -174,24 +175,22 @@ void TaskBulkMutationServiceTest::avoidsOrderDependentHierarchyMoves() {
   }
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(connectionResult));
   seed(connection);
-  const QString parent = create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Parent"));
-  const QString child = create(taskMutations,
-                               QStringLiteral("list-active"),
-                               QStringLiteral("Child"),
-                               parent);
+  const QString parent =
+      create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Parent"));
+  const QString child =
+      create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Child"), parent);
 
   hcb::TaskBulkMutationService bulk(taskMutations);
-  const hcb::TaskBulkMutationSummary summary = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::MoveToList,
-       .taskIds = {parent, child},
-       .taskListId = QStringLiteral("list-other")});
+  const hcb::TaskBulkMutationSummary summary =
+      execute(bulk,
+              {.action = hcb::TaskBulkAction::MoveToList,
+               .taskIds = {parent, child},
+               .taskListId = QStringLiteral("list-other")});
   QCOMPARE(summary.eligible, 1);
   QCOMPARE(summary.queued, 1);
   QCOMPARE(summary.skipped, 1);
 
-  std::future<hcb::TaskMutationSnapshotResult> inspected =
-      taskMutations.inspect({parent, child});
+  std::future<hcb::TaskMutationSnapshotResult> inspected = taskMutations.inspect({parent, child});
   const hcb::TaskMutationSnapshotResult snapshots = await(inspected);
   QVERIFY(std::holds_alternative<QList<hcb::TaskMutationSnapshot>>(snapshots));
   if (!std::holds_alternative<QList<hcb::TaskMutationSnapshot>>(snapshots)) {
@@ -226,17 +225,15 @@ void TaskBulkMutationServiceTest::handlesLargeSelectionsWithIndependentMutations
   constexpr int taskCount = 96;
   taskIds.reserve(taskCount);
   for (int index = 0; index < taskCount; ++index) {
-    taskIds.append(create(taskMutations,
-                          QStringLiteral("list-active"),
-                          QStringLiteral("Task %1").arg(index)));
+    taskIds.append(
+        create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Task %1").arg(index)));
   }
 
   hcb::TaskBulkMutationService bulk(taskMutations);
-  const hcb::TaskBulkMutationSummary summary = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::SetPriority,
-       .taskIds = taskIds,
-       .priority = hcb::TaskPriority::High});
+  const hcb::TaskBulkMutationSummary summary = execute(bulk,
+                                                       {.action = hcb::TaskBulkAction::SetPriority,
+                                                        .taskIds = taskIds,
+                                                        .priority = hcb::TaskPriority::High});
   QCOMPARE(summary.requested, taskCount);
   QCOMPARE(summary.eligible, taskCount);
   QCOMPARE(summary.queued, taskCount);
@@ -276,22 +273,19 @@ void TaskBulkMutationServiceTest::reparentsMaximumSelectionWithCompatibleParent(
   }
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(connectionResult));
   seed(connection);
-  const QString parent = create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Parent"));
+  const QString parent =
+      create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Parent"));
   QList<QString> taskIds;
   constexpr int taskCount = 500;
   taskIds.reserve(taskCount);
   for (int index = 0; index < taskCount; ++index) {
-    taskIds.append(create(taskMutations,
-                          QStringLiteral("list-active"),
-                          QStringLiteral("Task %1").arg(index)));
+    taskIds.append(
+        create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Task %1").arg(index)));
   }
 
   hcb::TaskBulkMutationService bulk(taskMutations);
   const hcb::TaskBulkMutationSummary summary = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::Reparent,
-       .taskIds = taskIds,
-       .parentTaskId = parent});
+      bulk, {.action = hcb::TaskBulkAction::Reparent, .taskIds = taskIds, .parentTaskId = parent});
   QCOMPARE(summary.requested, taskCount);
   QCOMPARE(summary.eligible, taskCount);
   QCOMPARE(summary.queued, taskCount);
@@ -320,36 +314,38 @@ void TaskBulkMutationServiceTest::replacesLiteralTaskTextWithPreview() {
   seed(connection);
   sqlite3* const handle = connection.nativeHandle();
   QVERIFY(handle != nullptr);
-  const QString matching = create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Alpha task"));
-  const QString unmatched = create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Other task"));
-  std::future<hcb::TaskMutationResult> setNotes = taskMutations.update(
-      {.taskId = matching, .notes = QStringLiteral("Alpha notes")});
+  const QString matching =
+      create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Alpha task"));
+  const QString unmatched =
+      create(taskMutations, QStringLiteral("list-active"), QStringLiteral("Other task"));
+  std::future<hcb::TaskMutationResult> setNotes =
+      taskMutations.update({.taskId = matching, .notes = QStringLiteral("Alpha notes")});
   QVERIFY(std::holds_alternative<hcb::TaskMutationReceipt>(await(setNotes)));
 
   hcb::TaskBulkMutationService bulk(taskMutations);
-  const hcb::TaskBulkMutationSummary preview = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::ReplaceText,
-       .taskIds = {matching, unmatched},
-       .findText = QStringLiteral("Alpha"),
-       .replaceText = QStringLiteral("Beta"),
-       .textFields = static_cast<std::uint8_t>(hcb::TaskBulkTextField::Title) |
-                     static_cast<std::uint8_t>(hcb::TaskBulkTextField::Notes),
-       .recurrenceScope = 0,
-       .previewOnly = true});
+  const hcb::TaskBulkMutationSummary preview =
+      execute(bulk,
+              {.action = hcb::TaskBulkAction::ReplaceText,
+               .taskIds = {matching, unmatched},
+               .findText = QStringLiteral("Alpha"),
+               .replaceText = QStringLiteral("Beta"),
+               .textFields = static_cast<std::uint8_t>(hcb::TaskBulkTextField::Title) |
+                             static_cast<std::uint8_t>(hcb::TaskBulkTextField::Notes),
+               .recurrenceScope = 0,
+               .previewOnly = true});
   QCOMPARE(preview.eligible, 1);
   QCOMPARE(preview.queued, 0);
   QCOMPARE(preview.skipped, 1);
 
-  const hcb::TaskBulkMutationSummary replaced = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::ReplaceText,
-       .taskIds = {matching, unmatched},
-       .findText = QStringLiteral("Alpha"),
-       .replaceText = QStringLiteral("Beta"),
-       .textFields = static_cast<std::uint8_t>(hcb::TaskBulkTextField::Title) |
-                     static_cast<std::uint8_t>(hcb::TaskBulkTextField::Notes),
-       .recurrenceScope = 0});
+  const hcb::TaskBulkMutationSummary replaced =
+      execute(bulk,
+              {.action = hcb::TaskBulkAction::ReplaceText,
+               .taskIds = {matching, unmatched},
+               .findText = QStringLiteral("Alpha"),
+               .replaceText = QStringLiteral("Beta"),
+               .textFields = static_cast<std::uint8_t>(hcb::TaskBulkTextField::Title) |
+                             static_cast<std::uint8_t>(hcb::TaskBulkTextField::Notes),
+               .recurrenceScope = 0});
   QCOMPARE(replaced.queued, 1);
   QCOMPARE(replaced.skipped, 1);
   std::future<hcb::TaskMutationSnapshotResult> inspected = taskMutations.inspect({matching});
@@ -364,14 +360,14 @@ void TaskBulkMutationServiceTest::replacesLiteralTaskTextWithPreview() {
   QCOMPARE(task.notes, std::optional<QString>(QStringLiteral("Beta notes")));
 
   const auto createManaged = [&taskMutations, handle](const QString& title,
-                                                       const QString& seriesId,
-                                                       std::int32_t ordinal) {
-    std::future<hcb::TaskMutationResult> future = taskMutations.create(
-        {.taskListId = QStringLiteral("list-active"),
-         .title = title,
-         .notes = QStringLiteral("Alpha recurrence"),
-         .due = hcb::TaskDue{.at = QStringLiteral("2026-08-01T00:00:00.000Z"),
-                              .timeZone = QStringLiteral("UTC")}});
+                                                      const QString& seriesId,
+                                                      std::int32_t ordinal) {
+    std::future<hcb::TaskMutationResult> future =
+        taskMutations.create({.taskListId = QStringLiteral("list-active"),
+                              .title = title,
+                              .notes = QStringLiteral("Alpha recurrence"),
+                              .due = hcb::TaskDue{.at = QStringLiteral("2026-08-01T00:00:00.000Z"),
+                                                  .timeZone = QStringLiteral("UTC")}});
     const hcb::TaskMutationResult result = await(future);
     if (!std::holds_alternative<hcb::TaskMutationReceipt>(result)) {
       qFatal("managed task create failed");
@@ -408,15 +404,15 @@ void TaskBulkMutationServiceTest::replacesLiteralTaskTextWithPreview() {
     return;
   }
   QCOMPARE(std::get<QList<hcb::TaskMutationSnapshot>>(managedSnapshots).size(), 2);
-  const hcb::TaskBulkMutationSummary fullSeries = execute(
-      bulk,
-      {.action = hcb::TaskBulkAction::ReplaceText,
-       .taskIds = {recurrenceCurrent},
-       .findText = QStringLiteral("Alpha"),
-       .replaceText = QStringLiteral("Beta"),
-       .textFields = static_cast<std::uint8_t>(hcb::TaskBulkTextField::Title) |
-                     static_cast<std::uint8_t>(hcb::TaskBulkTextField::Notes),
-       .recurrenceScope = 3});
+  const hcb::TaskBulkMutationSummary fullSeries =
+      execute(bulk,
+              {.action = hcb::TaskBulkAction::ReplaceText,
+               .taskIds = {recurrenceCurrent},
+               .findText = QStringLiteral("Alpha"),
+               .replaceText = QStringLiteral("Beta"),
+               .textFields = static_cast<std::uint8_t>(hcb::TaskBulkTextField::Title) |
+                             static_cast<std::uint8_t>(hcb::TaskBulkTextField::Notes),
+               .recurrenceScope = 3});
   QCOMPARE(fullSeries.items.size(), 2);
   QCOMPARE(fullSeries.eligible, 2);
   QCOMPARE(fullSeries.queued, 2);

@@ -92,19 +92,19 @@ readStoredConfiguration(SqliteConnection& connection) {
                     QStringLiteral("SQLite OAuth configuration connection is unavailable"));
   }
   sqlite3_stmt* statement = nullptr;
-  const int prepareResult =
-      sqlite3_prepare_v3(handle,
-                         "SELECT json_type(value_json), "
-                         "CASE json_type(value_json) "
-                         "WHEN 'text' THEN json_extract(value_json, '$') "
-                         "WHEN 'object' THEN json_extract(value_json, '$.clientId') END, "
-                         "CASE json_type(value_json) "
-                         "WHEN 'object' THEN json_extract(value_json, '$.clientSecret') END, updated_at "
-                         "FROM local_settings WHERE scope = ?1 AND key = ?2 LIMIT 1",
-                         -1,
-                         SQLITE_PREPARE_PERSISTENT,
-                         &statement,
-                         nullptr);
+  const int prepareResult = sqlite3_prepare_v3(
+      handle,
+      "SELECT json_type(value_json), "
+      "CASE json_type(value_json) "
+      "WHEN 'text' THEN json_extract(value_json, '$') "
+      "WHEN 'object' THEN json_extract(value_json, '$.clientId') END, "
+      "CASE json_type(value_json) "
+      "WHEN 'object' THEN json_extract(value_json, '$.clientSecret') END, updated_at "
+      "FROM local_settings WHERE scope = ?1 AND key = ?2 LIMIT 1",
+      -1,
+      SQLITE_PREPARE_PERSISTENT,
+      &statement,
+      nullptr);
   if (prepareResult != SQLITE_OK) {
     sqlite3_finalize(statement);
     return databaseError(QStringLiteral("SQLite OAuth configuration read preparation failed (%1)"),
@@ -157,11 +157,11 @@ readStoredConfiguration(SqliteConnection& connection) {
                                .updatedAt = *updatedAt});
 }
 
-[[nodiscard]] OAuthClientConfigurationMutationResultOrError saveStoredConfiguration(
-    SqliteConnection& connection,
-    const QString& clientId,
-    const QString& clientSecret,
-    const QString& updatedAt) {
+[[nodiscard]] OAuthClientConfigurationMutationResultOrError
+saveStoredConfiguration(SqliteConnection& connection,
+                        const QString& clientId,
+                        const QString& clientSecret,
+                        const QString& updatedAt) {
   sqlite3* const handle = connection.nativeHandle();
   if (handle == nullptr) {
     return AppError(AppErrorCode::Database,
@@ -295,11 +295,11 @@ OAuthClientConfigurationStore::save(QString clientId, QString clientSecret) {
         validationError(QStringLiteral("OAuth client ID is invalid"))));
   }
   const QString updatedAt = timestamp(clock_);
-  return writerQueue_.enqueueResult(
-      [clientId = std::move(clientId), clientSecret = std::move(clientSecret), updatedAt](
-          SqliteConnection& connection) {
-        return saveStoredConfiguration(connection, clientId, clientSecret, updatedAt);
-      });
+  return writerQueue_.enqueueResult([clientId = std::move(clientId),
+                                     clientSecret = std::move(clientSecret),
+                                     updatedAt](SqliteConnection& connection) {
+    return saveStoredConfiguration(connection, clientId, clientSecret, updatedAt);
+  });
 }
 
 std::future<OAuthClientConfigurationMutationResultOrError> OAuthClientConfigurationStore::clear() {

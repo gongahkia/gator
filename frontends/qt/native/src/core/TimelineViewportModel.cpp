@@ -100,9 +100,7 @@ void TimelineViewportModel::setActive(bool active) {
   emit activeChanged();
 }
 
-bool TimelineViewportModel::filterCalendarVisibility() const {
-  return filterCalendarVisibility_;
-}
+bool TimelineViewportModel::filterCalendarVisibility() const { return filterCalendarVisibility_; }
 
 void TimelineViewportModel::setFilterCalendarVisibility(bool filterCalendarVisibility) {
   if (filterCalendarVisibility_ == filterCalendarVisibility) {
@@ -126,8 +124,7 @@ void TimelineViewportModel::setVisibleCalendarIds(const QStringList& visibleCale
   emit visibleCalendarIdsChanged();
 }
 
-bool TimelineViewportModel::filterAcceptsRow(int sourceRow,
-                                              const QModelIndex& sourceParent) const {
+bool TimelineViewportModel::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
   if (!active_ || sourceModel() == nullptr) {
     return false;
   }
@@ -143,8 +140,8 @@ bool TimelineViewportModel::filterAcceptsRow(int sourceRow,
   const int dayIndex = sourceModel()->data(index, dayIndexRole).toInt();
   if (allDay_) {
     const int daySpanRole = roleForName(QByteArrayLiteral("daySpan"));
-    const int daySpan = daySpanRole < 0 ? 1
-                                        : std::max(1, sourceModel()->data(index, daySpanRole).toInt());
+    const int daySpan =
+        daySpanRole < 0 ? 1 : std::max(1, sourceModel()->data(index, daySpanRole).toInt());
     if (dayIndex >= firstDayIndex_ + dayCount_ || dayIndex + daySpan <= firstDayIndex_) {
       return false;
     }
@@ -158,7 +155,8 @@ bool TimelineViewportModel::filterAcceptsRow(int sourceRow,
       return false;
     }
     const int startMinute = sourceModel()->data(index, startMinuteRole).toInt();
-    const int endMinute = startMinute + std::max(1, sourceModel()->data(index, durationMinutesRole).toInt());
+    const int endMinute =
+        startMinute + std::max(1, sourceModel()->data(index, durationMinutesRole).toInt());
     if (startMinute >= visibleEndMinute_ || endMinute <= visibleStartMinute_) {
       return false;
     }

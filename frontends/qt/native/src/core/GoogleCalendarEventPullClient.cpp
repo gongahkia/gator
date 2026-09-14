@@ -160,8 +160,7 @@ optionalString(const QJsonObject& object, QStringView key, qsizetype maximumLeng
   }
   if (title.size() > kMaximumTitleLength) {
     qWarning().noquote() << "google.calendar_event_title_truncated"
-                          << "length" << title.size()
-                          << "limit" << kMaximumTitleLength;
+                         << "length" << title.size() << "limit" << kMaximumTitleLength;
     return title.first(kMaximumTitleLength);
   }
   return title;
@@ -328,12 +327,12 @@ optionalString(const QJsonObject& object, QStringView key, qsizetype maximumLeng
     const QJsonValue additionalGuests = source.value(QStringLiteral("additionalGuests"));
     const QJsonValue resource = source.value(QStringLiteral("resource"));
     const QJsonValue self = source.value(QStringLiteral("self"));
-    const bool validResponse = responseStatus.isUndefined() ||
-                               (responseStatus.isString() &&
-                                (responseStatus.toString() == QStringLiteral("needsAction") ||
-                                 responseStatus.toString() == QStringLiteral("declined") ||
-                                 responseStatus.toString() == QStringLiteral("tentative") ||
-                                 responseStatus.toString() == QStringLiteral("accepted")));
+    const bool validResponse =
+        responseStatus.isUndefined() ||
+        (responseStatus.isString() && (responseStatus.toString() == QStringLiteral("needsAction") ||
+                                       responseStatus.toString() == QStringLiteral("declined") ||
+                                       responseStatus.toString() == QStringLiteral("tentative") ||
+                                       responseStatus.toString() == QStringLiteral("accepted")));
     const bool validAdditionalGuests =
         additionalGuests.isUndefined() ||
         (additionalGuests.isDouble() && additionalGuests.toInteger(-1) >= 0 &&
@@ -407,15 +406,14 @@ optionalString(const QJsonObject& object, QStringView key, qsizetype maximumLeng
       const QJsonObject reminder = overrideValue.toObject();
       const QJsonValue method = reminder.value(QStringLiteral("method"));
       const QJsonValue minutes = reminder.value(QStringLiteral("minutes"));
-      if (!method.isString() || (method.toString() != QStringLiteral("email") &&
-                                 method.toString() != QStringLiteral("popup")) ||
-          !minutes.isDouble() || minutes.toInteger(-1) < 0 ||
-          minutes.toInteger(-1) > 40'320) {
+      if (!method.isString() ||
+          (method.toString() != QStringLiteral("email") &&
+           method.toString() != QStringLiteral("popup")) ||
+          !minutes.isDouble() || minutes.toInteger(-1) < 0 || minutes.toInteger(-1) > 40'320) {
         return std::nullopt;
       }
-      canonicalOverrides.append(
-          QJsonObject{{QStringLiteral("method"), method.toString()},
-                      {QStringLiteral("minutes"), minutes.toInteger()}});
+      canonicalOverrides.append(QJsonObject{{QStringLiteral("method"), method.toString()},
+                                            {QStringLiteral("minutes"), minutes.toInteger()}});
     }
   }
   return QJsonObject{{QStringLiteral("useDefault"), useDefault.toBool(true)},
@@ -455,8 +453,8 @@ decodedObject(const QJsonObject& source, QStringView key, qsizetype maximumBytes
 
 [[nodiscard]] std::optional<QJsonObject> decodedGuestPermissions(const QJsonObject& source) {
   QJsonObject permissions;
-  for (const QStringView key : {u"guestsCanInviteOthers", u"guestsCanModify",
-                                u"guestsCanSeeOtherGuests"}) {
+  for (const QStringView key :
+       {u"guestsCanInviteOthers", u"guestsCanModify", u"guestsCanSeeOtherGuests"}) {
     const QJsonValue value = source.value(key);
     if (!isPresent(value)) {
       continue;
@@ -471,15 +469,14 @@ decodedObject(const QJsonObject& source, QStringView key, qsizetype maximumBytes
 
 [[nodiscard]] std::optional<QJsonObject> decodedStatusProperties(const QJsonObject& source) {
   QJsonObject properties;
-  for (const QStringView key : {u"focusTimeProperties", u"outOfOfficeProperties",
-                                u"workingLocationProperties"}) {
+  for (const QStringView key :
+       {u"focusTimeProperties", u"outOfOfficeProperties", u"workingLocationProperties"}) {
     const QJsonValue value = source.value(key);
     if (!isPresent(value)) {
       continue;
     }
-    if (!value.isObject() ||
-        QJsonDocument(value.toObject()).toJson(QJsonDocument::Compact).size() >
-            kMaximumEventPropertiesJsonBytes) {
+    if (!value.isObject() || QJsonDocument(value.toObject()).toJson(QJsonDocument::Compact).size() >
+                                 kMaximumEventPropertiesJsonBytes) {
       return std::nullopt;
     }
     properties.insert(key.toString(), value);
@@ -490,9 +487,8 @@ decodedObject(const QJsonObject& source, QStringView key, qsizetype maximumBytes
              : std::nullopt;
 }
 
-[[nodiscard]] DecodedCalendarEventPageOrError decodePage(const QByteArray& responseBody,
-                                                         const QString& calendarId,
-                                                         qsizetype maximumItems) {
+[[nodiscard]] DecodedCalendarEventPageOrError
+decodePage(const QByteArray& responseBody, const QString& calendarId, qsizetype maximumItems) {
   if (responseBody.size() > kMaximumResponseBytes) {
     return invalidPayloadError();
   }
@@ -593,23 +589,17 @@ decodedObject(const QJsonObject& source, QStringView key, qsizetype maximumBytes
         !eventReminders.has_value() || !conferenceData.has_value() || !attachments.has_value() ||
         !guestPermissions.has_value() || !statusProperties.has_value();
     if (malformed) {
-      qWarning().noquote()
-          << "google.calendar_event_payload_invalid"
-          << "item_index" << itemIndex
-          << "status" << status.has_value()
-          << "title" << title.has_value()
-          << "updated" << updatedAt.has_value()
-          << "recurrence" << recurrence.has_value()
-          << "sequence" << eventSequence.has_value()
-          << "start" << start.has_value()
-          << "end" << end.has_value()
-          << "event_type" << isKnownEventType(eventType)
-          << "attendees" << eventAttendees.has_value()
-          << "reminders" << eventReminders.has_value()
-          << "conference" << conferenceData.has_value()
-          << "attachments" << attachments.has_value()
-          << "permissions" << guestPermissions.has_value()
-          << "properties" << statusProperties.has_value();
+      qWarning().noquote() << "google.calendar_event_payload_invalid"
+                           << "item_index" << itemIndex << "status" << status.has_value() << "title"
+                           << title.has_value() << "updated" << updatedAt.has_value()
+                           << "recurrence" << recurrence.has_value() << "sequence"
+                           << eventSequence.has_value() << "start" << start.has_value() << "end"
+                           << end.has_value() << "event_type" << isKnownEventType(eventType)
+                           << "attendees" << eventAttendees.has_value() << "reminders"
+                           << eventReminders.has_value() << "conference"
+                           << conferenceData.has_value() << "attachments" << attachments.has_value()
+                           << "permissions" << guestPermissions.has_value() << "properties"
+                           << statusProperties.has_value();
       return invalidPayloadError();
     }
     seenIds.insert(idValue.toString());
@@ -662,7 +652,8 @@ decodedObject(const QJsonObject& source, QStringView key, qsizetype maximumBytes
        .value = QStringLiteral(
            "nextPageToken,nextSyncToken,items(id,status,summary,description,location,"
            "start,end,recurringEventId,originalStartTime,recurrence,colorId,transparency,"
-           "visibility,eventType,attendees(email,displayName,comment,optional,responseStatus,additionalGuests,resource,self),reminders,conferenceData,attachments,"
+           "visibility,eventType,attendees(email,displayName,comment,optional,responseStatus,"
+           "additionalGuests,resource,self),reminders,conferenceData,attachments,"
            "guestsCanInviteOthers,guestsCanModify,guestsCanSeeOtherGuests,focusTimeProperties,"
            "outOfOfficeProperties,workingLocationProperties,etag,sequence,updated)")}};
   if (request.syncToken.has_value()) {
@@ -690,7 +681,8 @@ requestForInstancesPage(const GoogleCalendarEventInstancesPullRequest& request,
       {.name = QStringLiteral("fields"),
        .value = QStringLiteral(
            "nextPageToken,items(id,status,summary,description,location,start,end,recurringEventId,"
-           "originalStartTime,recurrence,colorId,transparency,visibility,eventType,attendees(email,displayName,comment,optional,responseStatus,additionalGuests,resource,self),"
+           "originalStartTime,recurrence,colorId,transparency,visibility,eventType,attendees(email,"
+           "displayName,comment,optional,responseStatus,additionalGuests,resource,self),"
            "reminders,conferenceData,attachments,guestsCanInviteOthers,guestsCanModify,"
            "guestsCanSeeOtherGuests,focusTimeProperties,outOfOfficeProperties,"
            "workingLocationProperties,etag,sequence,updated)")}};
@@ -821,8 +813,7 @@ GoogleCalendarEventPullClient::instances(GoogleCalendarEventInstancesPullRequest
           }
           for (GoogleCalendarEventMirror& event : pageData.events) {
             if (!event.recurringEventId.has_value() ||
-                *event.recurringEventId != request.recurringEventId ||
-                seenIds.contains(event.id)) {
+                *event.recurringEventId != request.recurringEventId || seenIds.contains(event.id)) {
               completion->set_value(invalidPayloadError());
               return;
             }
@@ -830,9 +821,8 @@ GoogleCalendarEventPullClient::instances(GoogleCalendarEventInstancesPullRequest
             events.append(std::move(event));
           }
           if (!pageData.nextPageToken.has_value()) {
-            completion->set_value(
-                GoogleCalendarEventInstancesPullResult{.events = std::move(events),
-                                                        .serverDate = serverDate});
+            completion->set_value(GoogleCalendarEventInstancesPullResult{
+                .events = std::move(events), .serverDate = serverDate});
             return;
           }
           pageToken = std::move(pageData.nextPageToken);

@@ -23,8 +23,7 @@ enum class GoogleSyncConflictOutcome : std::uint8_t {
   AwaitingUser
 };
 
-using GoogleSyncConflictResult =
-    std::variant<GoogleSyncConflictOutcome, GoogleApiError, AppError>;
+using GoogleSyncConflictResult = std::variant<GoogleSyncConflictOutcome, GoogleApiError, AppError>;
 
 class GoogleSyncConflictResolver final {
 public:
@@ -34,12 +33,10 @@ public:
 
   void setPolicy(SyncConflictPolicy policy) noexcept;
   [[nodiscard]] SyncConflictPolicy policy() const noexcept;
-  [[nodiscard]] GoogleSyncConflictResult handle(PendingMutation mutation,
-                                                QString errorCode,
-                                                QString errorMessage,
-                                                QString accessToken);
-  [[nodiscard]] std::future<std::optional<AppError>>
-  resolve(QString conflictId, SyncConflictResolution resolution);
+  [[nodiscard]] GoogleSyncConflictResult
+  handle(PendingMutation mutation, QString errorCode, QString errorMessage, QString accessToken);
+  [[nodiscard]] std::future<std::optional<AppError>> resolve(QString conflictId,
+                                                             SyncConflictResolution resolution);
 
 private:
   OptimisticMutationCoordinator& mutations_;

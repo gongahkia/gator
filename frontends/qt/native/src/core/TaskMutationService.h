@@ -111,11 +111,11 @@ public:
   [[nodiscard]] std::future<TaskBatchMutationResult> createBatch(QList<TaskCreateInput> inputs);
   [[nodiscard]] std::future<TaskMutationResult> update(TaskUpdateInput input);
   [[nodiscard]] std::future<TaskMutationResult> moveToTaskList(QString taskId, QString taskListId);
-  [[nodiscard]] std::future<TaskMutationResult>
-  reorder(QString taskId, TaskReorderDirection direction);
+  [[nodiscard]] std::future<TaskMutationResult> reorder(QString taskId,
+                                                        TaskReorderDirection direction);
   [[nodiscard]] std::future<TaskMutationResult> setCompleted(QString taskId, bool completed);
-  [[nodiscard]] std::future<TaskMutationResult>
-  stopManagedRecurrence(QString taskId, TaskRecurrenceScope scope);
+  [[nodiscard]] std::future<TaskMutationResult> stopManagedRecurrence(QString taskId,
+                                                                      TaskRecurrenceScope scope);
   [[nodiscard]] std::future<TaskMutationResult>
   reconfigureManagedRecurrence(QString taskId,
                                TaskRecurrenceFrequency frequency,
@@ -138,10 +138,8 @@ public:
 
 private:
   friend class ImportMutationService;
-  [[nodiscard]] static TaskBatchMutationResult
-  createBatchWithinTransaction(SqliteConnection& connection,
-                               QList<TaskCreateInput> inputs,
-                               const QString& updatedAt);
+  [[nodiscard]] static TaskBatchMutationResult createBatchWithinTransaction(
+      SqliteConnection& connection, QList<TaskCreateInput> inputs, const QString& updatedAt);
   const Clock& clock_;
   SqliteWriterQueue writerQueue_;
   std::shared_future<SqliteWriteResult> initialization_;

@@ -62,12 +62,10 @@ parseDateFilter(const QString& value, const QDate& today, const QString& name) {
     return LocalSearchDateFilter{.match = LocalSearchDateMatch::Exact, .first = today};
   }
   if (normalized == QStringLiteral("tomorrow")) {
-    return LocalSearchDateFilter{.match = LocalSearchDateMatch::Exact,
-                                 .first = today.addDays(1)};
+    return LocalSearchDateFilter{.match = LocalSearchDateMatch::Exact, .first = today.addDays(1)};
   }
   if (normalized == QStringLiteral("yesterday")) {
-    return LocalSearchDateFilter{.match = LocalSearchDateMatch::Exact,
-                                 .first = today.addDays(-1)};
+    return LocalSearchDateFilter{.match = LocalSearchDateMatch::Exact, .first = today.addDays(-1)};
   }
   const auto parseDate = [](const QString& text) -> std::optional<QDate> {
     const QDate date = QDate::fromString(text, Qt::ISODate);
@@ -94,9 +92,8 @@ parseDateFilter(const QString& value, const QDate& today, const QString& name) {
     if (!first.has_value() || !last.has_value() || *last < *first) {
       return invalid(QStringLiteral("Search filter %1 requires a valid date range").arg(name));
     }
-    return LocalSearchDateFilter{.match = LocalSearchDateMatch::Range,
-                                 .first = *first,
-                                 .last = *last};
+    return LocalSearchDateFilter{
+        .match = LocalSearchDateMatch::Range, .first = *first, .last = *last};
   }
   const std::optional<QDate> date = parseDate(value);
   if (!date.has_value()) {
@@ -112,7 +109,7 @@ void appendResource(QList<LocalSearchResource>& resources, LocalSearchResource r
 }
 
 [[nodiscard]] std::optional<AppError> parseSources(const QString& value,
-                                                    LocalSearchParsedQuery& parsed) {
+                                                   LocalSearchParsedQuery& parsed) {
   const QStringList values = value.split(u',', Qt::SkipEmptyParts);
   if (values.isEmpty()) {
     return invalid(QStringLiteral("Search filter source requires a value"));
@@ -197,15 +194,16 @@ LocalSearchQueryResult LocalSearchQuery::parse(QString query, QDate today) {
         parsed.taskStatus = QStringLiteral("active");
       } else if (normalized == QStringLiteral("done")) {
         parsed.taskStatus = QStringLiteral("completed");
-      } else if (normalized == QStringLiteral("active") || normalized == QStringLiteral("completed") ||
-                 normalized == QStringLiteral("hidden") || normalized == QStringLiteral("deleted")) {
+      } else if (normalized == QStringLiteral("active") ||
+                 normalized == QStringLiteral("completed") ||
+                 normalized == QStringLiteral("hidden") ||
+                 normalized == QStringLiteral("deleted")) {
         parsed.taskStatus = normalized;
       } else {
         return invalid(QStringLiteral("Search filter status has an unsupported value"));
       }
     } else if (key == QStringLiteral("due") || key == QStringLiteral("start")) {
-      const std::variant<LocalSearchDateFilter, AppError> date =
-          parseDateFilter(value, today, key);
+      const std::variant<LocalSearchDateFilter, AppError> date = parseDateFilter(value, today, key);
       if (std::holds_alternative<AppError>(date)) {
         return std::get<AppError>(date);
       }

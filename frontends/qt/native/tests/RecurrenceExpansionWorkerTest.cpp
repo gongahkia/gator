@@ -90,13 +90,13 @@ void RecurrenceExpansionWorkerTest::expandsWeeklyAndMonthlySelectors() {
 
 void RecurrenceExpansionWorkerTest::projectsOnlyOccurrencesWithinTheRequestedRange() {
   hcb::RecurrenceExpansionWorker worker;
-  std::future<hcb::RecurrenceExpansionResult> future = worker.expand(
-      {.eventId = QStringLiteral("event-range"),
-       .startAt = QStringLiteral("2024-01-01T09:00:00.000Z"),
-       .endAt = QStringLiteral("2024-01-01T10:00:00.000Z"),
-       .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY"),
-       .rangeStartAt = QStringLiteral("2026-07-25T00:00:00.000Z"),
-       .rangeEndAt = QStringLiteral("2026-07-28T00:00:00.000Z")});
+  std::future<hcb::RecurrenceExpansionResult> future =
+      worker.expand({.eventId = QStringLiteral("event-range"),
+                     .startAt = QStringLiteral("2024-01-01T09:00:00.000Z"),
+                     .endAt = QStringLiteral("2024-01-01T10:00:00.000Z"),
+                     .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY"),
+                     .rangeStartAt = QStringLiteral("2026-07-25T00:00:00.000Z"),
+                     .rangeEndAt = QStringLiteral("2026-07-28T00:00:00.000Z")});
   const hcb::RecurrenceExpansionResult result = awaitResult(future);
   const QList<hcb::RecurrenceOccurrence>& expanded = occurrences(result);
   QCOMPARE(expanded.size(), 3);
@@ -106,13 +106,13 @@ void RecurrenceExpansionWorkerTest::projectsOnlyOccurrencesWithinTheRequestedRan
 
 void RecurrenceExpansionWorkerTest::appliesExceptionAndAdditionalDates() {
   hcb::RecurrenceExpansionWorker worker;
-  std::future<hcb::RecurrenceExpansionResult> future = worker.expand(
-      {.eventId = QStringLiteral("event-exceptions"),
-       .startAt = QStringLiteral("2026-07-25T09:00:00.000Z"),
-       .endAt = QStringLiteral("2026-07-25T10:00:00.000Z"),
-       .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY;COUNT=3\n"
-                                        "EXDATE:20260726T090000Z\n"
-                                        "RDATE:20260728T090000Z")});
+  std::future<hcb::RecurrenceExpansionResult> future =
+      worker.expand({.eventId = QStringLiteral("event-exceptions"),
+                     .startAt = QStringLiteral("2026-07-25T09:00:00.000Z"),
+                     .endAt = QStringLiteral("2026-07-25T10:00:00.000Z"),
+                     .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY;COUNT=3\n"
+                                                      "EXDATE:20260726T090000Z\n"
+                                                      "RDATE:20260728T090000Z")});
   const hcb::RecurrenceExpansionResult result = awaitResult(future);
   const QList<hcb::RecurrenceOccurrence>& expanded = occurrences(result);
   QCOMPARE(expanded.size(), 3);
@@ -120,14 +120,14 @@ void RecurrenceExpansionWorkerTest::appliesExceptionAndAdditionalDates() {
   QCOMPARE(expanded.at(1).startAt, QStringLiteral("2026-07-27T09:00:00.000Z"));
   QCOMPARE(expanded.at(2).startAt, QStringLiteral("2026-07-28T09:00:00.000Z"));
 
-  std::future<hcb::RecurrenceExpansionResult> allDayFuture = worker.expand(
-      {.eventId = QStringLiteral("event-all-day-exception"),
-       .startAt = QStringLiteral("2026-07-25T00:00:00.000Z"),
-       .endAt = QStringLiteral("2026-07-26T00:00:00.000Z"),
-       .allDay = true,
-       .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY;COUNT=3\n"
-                                        "EXRULE:FREQ=DAILY;COUNT=1\n"
-                                        "RDATE:20260728")});
+  std::future<hcb::RecurrenceExpansionResult> allDayFuture =
+      worker.expand({.eventId = QStringLiteral("event-all-day-exception"),
+                     .startAt = QStringLiteral("2026-07-25T00:00:00.000Z"),
+                     .endAt = QStringLiteral("2026-07-26T00:00:00.000Z"),
+                     .allDay = true,
+                     .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY;COUNT=3\n"
+                                                      "EXRULE:FREQ=DAILY;COUNT=1\n"
+                                                      "RDATE:20260728")});
   const hcb::RecurrenceExpansionResult allDayResult = awaitResult(allDayFuture);
   const QList<hcb::RecurrenceOccurrence>& allDay = occurrences(allDayResult);
   QCOMPARE(allDay.size(), 3);
@@ -137,12 +137,12 @@ void RecurrenceExpansionWorkerTest::appliesExceptionAndAdditionalDates() {
 
 void RecurrenceExpansionWorkerTest::preservesLocalStartTimeAcrossDst() {
   hcb::RecurrenceExpansionWorker worker;
-  std::future<hcb::RecurrenceExpansionResult> future = worker.expand(
-      {.eventId = QStringLiteral("event-dst"),
-       .startAt = QStringLiteral("2026-03-07T14:00:00.000Z"),
-       .endAt = QStringLiteral("2026-03-07T15:00:00.000Z"),
-       .timeZone = QStringLiteral("America/New_York"),
-       .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY;COUNT=3")});
+  std::future<hcb::RecurrenceExpansionResult> future =
+      worker.expand({.eventId = QStringLiteral("event-dst"),
+                     .startAt = QStringLiteral("2026-03-07T14:00:00.000Z"),
+                     .endAt = QStringLiteral("2026-03-07T15:00:00.000Z"),
+                     .timeZone = QStringLiteral("America/New_York"),
+                     .recurrenceRule = QStringLiteral("RRULE:FREQ=DAILY;COUNT=3")});
   const hcb::RecurrenceExpansionResult result = awaitResult(future);
   const QList<hcb::RecurrenceOccurrence>& expanded = occurrences(result);
   QCOMPARE(expanded.size(), 3);

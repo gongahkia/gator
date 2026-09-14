@@ -55,12 +55,15 @@ class AccountTaskRepository(_StorageCore):
 
     def upsert_task_list(self, item: TaskList) -> None:
         self.connection.execute(
-            """INSERT INTO task_lists VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO task_lists(
+                id,account_id,title,remote_id,position,etag,remote_updated_at,local_updated_at,
+                deleted,dirty,selected
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(account_id,id) DO UPDATE SET title=excluded.title,
             remote_id=excluded.remote_id, position=excluded.position, etag=excluded.etag,
             remote_updated_at=excluded.remote_updated_at,
             local_updated_at=excluded.local_updated_at, deleted=excluded.deleted,
-            dirty=excluded.dirty""",
+            dirty=excluded.dirty, selected=excluded.selected""",
             (
                 item.id,
                 item.account_id,
@@ -68,6 +71,7 @@ class AccountTaskRepository(_StorageCore):
                 item.remote_id,
                 item.position,
                 *self._meta_values(item.metadata),
+                item.selected,
             ),
         )
 
@@ -79,6 +83,7 @@ class AccountTaskRepository(_StorageCore):
             row["remote_id"],
             row["position"],
             _metadata(row),
+            bool(row["selected"]),
         )
 
     def get_task_list(self, account_id: str, list_id: str) -> TaskList | None:

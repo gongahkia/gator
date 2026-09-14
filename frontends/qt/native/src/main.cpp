@@ -158,7 +158,8 @@ bridgeLaunchOptions(const QStringList& arguments) {
       error.has_value()) {
     return *error;
   }
-  if (const std::optional<QString> error = read(u"--bridge-account", accountId); error.has_value()) {
+  if (const std::optional<QString> error = read(u"--bridge-account", accountId);
+      error.has_value()) {
     return *error;
   }
   if (!descriptorPath.has_value() && !accountId.has_value()) {
@@ -184,9 +185,8 @@ timelineProfileEvents(int count, const QDate& weekStart, const QTimeZone& timeZo
   for (int index = 0; index < count; ++index) {
     const int dayIndex = index % 7;
     const int startMinute = index / 7 % (24 * 60);
-    const QDateTime startAt(weekStart.addDays(dayIndex),
-                            QTime(startMinute / 60, startMinute % 60),
-                            timeZone);
+    const QDateTime startAt(
+        weekStart.addDays(dayIndex), QTime(startMinute / 60, startMinute % 60), timeZone);
     events.append({.id = QStringLiteral("profile-event-%1").arg(index),
                    .calendarId = QStringLiteral("profile-calendar"),
                    .status = QStringLiteral("confirmed"),
@@ -359,13 +359,12 @@ int runApplication(int argc, char* argv[]) {
 #endif
   const QDate profileWeekStart = timelineProfileWeekStart(QDate::currentDate());
   if (timelineProfile) {
-    timelineModel.setRange(profileWeekStart,
-                           7,
-                           timelineProfileEvents(*profileEventCount,
-                                                 profileWeekStart,
-                                                 QTimeZone::systemTimeZone()),
-                           QTimeZone::systemTimeZone(),
-                           2);
+    timelineModel.setRange(
+        profileWeekStart,
+        7,
+        timelineProfileEvents(*profileEventCount, profileWeekStart, QTimeZone::systemTimeZone()),
+        QTimeZone::systemTimeZone(),
+        2);
   }
   QQmlApplicationEngine engine;
   QVariantMap initialProperties{
@@ -374,7 +373,8 @@ int runApplication(int argc, char* argv[]) {
       {QStringLiteral("navigationCommands"), QVariant::fromValue(&navigationCommands)},
       {QStringLiteral("monthGridModel"), QVariant::fromValue(&monthGridModel)},
       {QStringLiteral("notesModel"), QVariant::fromValue(&notesModel)},
-      {QStringLiteral("searchResultsModel"), QVariant::fromValue(&appController.searchResultsModel())},
+      {QStringLiteral("searchResultsModel"),
+       QVariant::fromValue(&appController.searchResultsModel())},
       {QStringLiteral("taskListModel"), QVariant::fromValue(&taskListModel)},
       {QStringLiteral("taskModel"), QVariant::fromValue(&taskModel)},
       {QStringLiteral("timelineModel"), QVariant::fromValue(&timelineModel)},
@@ -382,7 +382,8 @@ int runApplication(int argc, char* argv[]) {
       {QStringLiteral("transitionTimings"), QVariant::fromValue(&transitionTimings)}};
   if (timelineProfile) {
     initialProperties.insert(QStringLiteral("timelineProfile"), true);
-    initialProperties.insert(QStringLiteral("calendarDate"), profileWeekStart.toString(Qt::ISODate));
+    initialProperties.insert(QStringLiteral("calendarDate"),
+                             profileWeekStart.toString(Qt::ISODate));
   }
   engine.setInitialProperties(initialProperties);
 

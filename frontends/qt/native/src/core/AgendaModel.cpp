@@ -27,11 +27,13 @@ namespace {
          left.attendeeDetailsJson == right.attendeeDetailsJson &&
          left.remindersJson == right.remindersJson &&
          left.remindersUseDefault == right.remindersUseDefault &&
-         left.conferenceJson == right.conferenceJson && left.attachmentsJson == right.attachmentsJson &&
+         left.conferenceJson == right.conferenceJson &&
+         left.attachmentsJson == right.attachmentsJson &&
          left.guestPermissionsJson == right.guestPermissionsJson &&
-         left.statusPropertiesJson == right.statusPropertiesJson && left.eventType == right.eventType &&
-         left.etag == right.etag && left.sequence == right.sequence &&
-         left.remoteUpdatedAt == right.remoteUpdatedAt && left.updatedAt == right.updatedAt;
+         left.statusPropertiesJson == right.statusPropertiesJson &&
+         left.eventType == right.eventType && left.etag == right.etag &&
+         left.sequence == right.sequence && left.remoteUpdatedAt == right.remoteUpdatedAt &&
+         left.updatedAt == right.updatedAt;
 }
 
 [[nodiscard]] QDate eventDate(const CalendarEventSummary& event) {

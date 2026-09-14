@@ -111,7 +111,7 @@ bindInteger(sqlite3_stmt* statement, int index, std::int64_t value) {
 }
 
 [[nodiscard]] TaskTitleListResult readTaskTitles(SqliteConnection& connection,
-                                                  const QString& taskListId) {
+                                                 const QString& taskListId) {
   sqlite3* const handle = connection.nativeHandle();
   if (handle == nullptr) {
     return AppError(AppErrorCode::Database,
@@ -132,9 +132,7 @@ LIMIT ?2
     return databaseError(QStringLiteral("SQLite task-list preview preparation failed (%1)"),
                          prepareResult);
   }
-  if (const std::optional<AppError> error =
-          bindText(statement, 1, taskListId);
-      error.has_value()) {
+  if (const std::optional<AppError> error = bindText(statement, 1, taskListId); error.has_value()) {
     sqlite3_finalize(statement);
     return *error;
   }

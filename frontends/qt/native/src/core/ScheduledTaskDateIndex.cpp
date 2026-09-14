@@ -32,13 +32,12 @@ void ScheduledTaskDateIndex::setTasks(QVariantList tasks) {
 
 QVariantList ScheduledTaskDateIndex::tasksForDate(const QString& date) const {
   const QString normalized = date.left(10);
-  return QDate::fromString(normalized, Qt::ISODate).isValid()
-             ? tasksByDate_.value(normalized)
-             : QVariantList{};
+  return QDate::fromString(normalized, Qt::ISODate).isValid() ? tasksByDate_.value(normalized)
+                                                              : QVariantList{};
 }
 
 QVariantList ScheduledTaskDateIndex::tasksForRange(const QString& firstDate,
-                                                    const QString& lastDate) const {
+                                                   const QString& lastDate) const {
   QDate first = QDate::fromString(firstDate.left(10), Qt::ISODate);
   QDate last = QDate::fromString(lastDate.left(10), Qt::ISODate);
   if (!first.isValid() || !last.isValid()) {

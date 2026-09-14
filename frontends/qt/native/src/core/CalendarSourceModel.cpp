@@ -11,12 +11,12 @@ namespace {
   return left.id == right.id && left.accountId == right.accountId &&
          left.remoteId == right.remoteId && left.title == right.title &&
          left.description == right.description && left.timeZone == right.timeZone &&
-         left.colorId == right.colorId &&
-         left.backgroundColor == right.backgroundColor &&
+         left.colorId == right.colorId && left.backgroundColor == right.backgroundColor &&
          left.foregroundColor == right.foregroundColor && left.accessRole == right.accessRole &&
-         left.selected == right.selected && left.hidden == right.hidden && left.primary == right.primary &&
-         left.etag == right.etag && left.remoteUpdatedAt == right.remoteUpdatedAt &&
-         left.updatedAt == right.updatedAt && left.eventCount == right.eventCount;
+         left.selected == right.selected && left.hidden == right.hidden &&
+         left.primary == right.primary && left.etag == right.etag &&
+         left.remoteUpdatedAt == right.remoteUpdatedAt && left.updatedAt == right.updatedAt &&
+         left.eventCount == right.eventCount;
 }
 
 } // namespace

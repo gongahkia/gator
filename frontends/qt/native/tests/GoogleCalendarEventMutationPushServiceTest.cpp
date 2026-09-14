@@ -94,8 +94,7 @@ void execute(sqlite3* handle, const char* sql) {
   QVERIFY2(result == SQLITE_OK, qPrintable(message));
 }
 
-[[nodiscard]] std::optional<QString>
-readEventRemoteId(sqlite3* handle, const QString& eventId) {
+[[nodiscard]] std::optional<QString> readEventRemoteId(sqlite3* handle, const QString& eventId) {
   sqlite3_stmt* statement = nullptr;
   if (sqlite3_prepare_v3(handle,
                          "SELECT remote_id FROM local_calendar_events WHERE id = ?1",
@@ -118,9 +117,9 @@ readEventRemoteId(sqlite3* handle, const QString& eventId) {
   }
   const auto* raw = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
   const int size = sqlite3_column_bytes(statement, 0);
-  const std::optional<QString> result =
-      raw == nullptr || size < 0 ? std::nullopt
-                                 : std::optional<QString>(QString::fromUtf8(raw, size));
+  const std::optional<QString> result = raw == nullptr || size < 0
+                                            ? std::nullopt
+                                            : std::optional<QString>(QString::fromUtf8(raw, size));
   return sqlite3_finalize(statement) == SQLITE_OK ? result : std::nullopt;
 }
 
@@ -195,22 +194,22 @@ void GoogleCalendarEventMutationPushServiceTest::pushesCreateUpdateAndDeleteMuta
       {QStringLiteral("recurrence"),
        QJsonArray{QStringLiteral("RDATE;TZID=Asia/Singapore:20261225T093000")}},
       {QStringLiteral("conferenceData"),
-       QJsonObject{{QStringLiteral("createRequest"),
-                    QJsonObject{{QStringLiteral("requestId"), QStringLiteral("request-1")},
-                                {QStringLiteral("conferenceSolutionKey"),
-                                 QJsonObject{{QStringLiteral("type"),
-                                              QStringLiteral("hangoutsMeet")}}}}}}},
+       QJsonObject{
+           {QStringLiteral("createRequest"),
+            QJsonObject{{QStringLiteral("requestId"), QStringLiteral("request-1")},
+                        {QStringLiteral("conferenceSolutionKey"),
+                         QJsonObject{{QStringLiteral("type"), QStringLiteral("hangoutsMeet")}}}}}}},
       {QStringLiteral("attachments"),
-       QJsonArray{QJsonObject{{QStringLiteral("fileUrl"),
-                              QStringLiteral("https://drive.google.com/open?id=file-1")},
-                             {QStringLiteral("title"), QStringLiteral("Spec")}}}},
+       QJsonArray{QJsonObject{
+           {QStringLiteral("fileUrl"), QStringLiteral("https://drive.google.com/open?id=file-1")},
+           {QStringLiteral("title"), QStringLiteral("Spec")}}}},
       {QStringLiteral("guestsCanModify"), true}};
-  const hcb::PendingMutation created = enqueue(
-      coordinator,
-      QStringLiteral("event.create"),
-      {{QStringLiteral("calendarId"), QStringLiteral("calendar-1")},
-       {QStringLiteral("sendUpdates"), QStringLiteral("externalOnly")},
-       {QStringLiteral("event"), createdEvent}});
+  const hcb::PendingMutation created =
+      enqueue(coordinator,
+              QStringLiteral("event.create"),
+              {{QStringLiteral("calendarId"), QStringLiteral("calendar-1")},
+               {QStringLiteral("sendUpdates"), QStringLiteral("externalOnly")},
+               {QStringLiteral("event"), createdEvent}});
   const hcb::PendingMutation updated =
       enqueue(coordinator,
               QStringLiteral("event.update"),
@@ -223,10 +222,9 @@ void GoogleCalendarEventMutationPushServiceTest::pushesCreateUpdateAndDeleteMuta
                             {QStringLiteral("location"), QStringLiteral("Remote")},
                             {QStringLiteral("colorId"), QJsonValue::Null},
                             {QStringLiteral("attendees"),
-                             QJsonArray{QJsonObject{{QStringLiteral("email"),
-                                                    QStringLiteral("me@example.com")},
-                                                   {QStringLiteral("responseStatus"),
-                                                    QStringLiteral("accepted")}}}},
+                             QJsonArray{QJsonObject{
+                                 {QStringLiteral("email"), QStringLiteral("me@example.com")},
+                                 {QStringLiteral("responseStatus"), QStringLiteral("accepted")}}}},
                             {QStringLiteral("attendeesOmitted"), true}}}});
   const hcb::PendingMutation removed =
       enqueue(coordinator,
@@ -275,16 +273,21 @@ void GoogleCalendarEventMutationPushServiceTest::pushesCreateUpdateAndDeleteMuta
            QStringLiteral("2026-08-01T01:00:00.000Z"));
   QCOMPARE(QUrlQuery(createRequest->request.url()).queryItemValue(QStringLiteral("sendUpdates")),
            QStringLiteral("externalOnly"));
-  QCOMPARE(QUrlQuery(createRequest->request.url()).queryItemValue(QStringLiteral("conferenceDataVersion")),
+  QCOMPARE(QUrlQuery(createRequest->request.url())
+               .queryItemValue(QStringLiteral("conferenceDataVersion")),
            QStringLiteral("1"));
-  QCOMPARE(QUrlQuery(createRequest->request.url()).queryItemValue(QStringLiteral("supportsAttachments")),
-           QStringLiteral("true"));
-  QCOMPARE(createBody.value(QStringLiteral("attendees")).toArray().at(0)
+  QCOMPARE(
+      QUrlQuery(createRequest->request.url()).queryItemValue(QStringLiteral("supportsAttachments")),
+      QStringLiteral("true"));
+  QCOMPARE(createBody.value(QStringLiteral("attendees"))
+               .toArray()
+               .at(0)
                .toObject()
                .value(QStringLiteral("email"))
                .toString(),
            QStringLiteral("guest@example.com"));
-  QCOMPARE(createBody.value(QStringLiteral("reminders")).toObject()
+  QCOMPARE(createBody.value(QStringLiteral("reminders"))
+               .toObject()
                .value(QStringLiteral("overrides"))
                .toArray()
                .at(0)
@@ -294,7 +297,8 @@ void GoogleCalendarEventMutationPushServiceTest::pushesCreateUpdateAndDeleteMuta
            10);
   QCOMPARE(createBody.value(QStringLiteral("recurrence")).toArray(),
            createdEvent.value(QStringLiteral("recurrence")).toArray());
-  QCOMPARE(createBody.value(QStringLiteral("conferenceData")).toObject()
+  QCOMPARE(createBody.value(QStringLiteral("conferenceData"))
+               .toObject()
                .value(QStringLiteral("createRequest"))
                .toObject()
                .value(QStringLiteral("requestId"))
@@ -321,7 +325,8 @@ void GoogleCalendarEventMutationPushServiceTest::pushesCreateUpdateAndDeleteMuta
   QCOMPARE(find(coordinator, removed.id).status, hcb::PendingMutationStatus::Applied);
 }
 
-void GoogleCalendarEventMutationPushServiceTest::resolvesGeneratedInstanceBeforeApplyingScopedUpdate() {
+void GoogleCalendarEventMutationPushServiceTest::
+    resolvesGeneratedInstanceBeforeApplyingScopedUpdate() {
   std::unique_ptr<hcb::test::TemporarySqliteDatabase> database = createDatabase();
   QVERIFY(database != nullptr);
   if (database == nullptr) {
@@ -330,20 +335,21 @@ void GoogleCalendarEventMutationPushServiceTest::resolvesGeneratedInstanceBefore
   FixedClock clock;
   hcb::OptimisticMutationCoordinator coordinator(database->databasePath(), clock);
   verifyReady(coordinator);
-  const hcb::PendingMutation mutation = enqueue(
-      coordinator,
-      QStringLiteral("event.instance.update"),
-      {{QStringLiteral("calendarId"), QStringLiteral("calendar-1")},
-       {QStringLiteral("localCalendarId"), QStringLiteral("calendar-local")},
-       {QStringLiteral("localEventId"), QStringLiteral("event-local-instance")},
-       {QStringLiteral("recurringRemoteId"), QStringLiteral("series-remote")},
-       {QStringLiteral("originalStartAt"), QStringLiteral("2026-08-02T09:00:00.000Z")},
-       {QStringLiteral("event"),
-        QJsonObject{{QStringLiteral("description"), QStringLiteral("Changed instance")}}}},
-      QStringLiteral("event-local-instance"));
+  const hcb::PendingMutation mutation =
+      enqueue(coordinator,
+              QStringLiteral("event.instance.update"),
+              {{QStringLiteral("calendarId"), QStringLiteral("calendar-1")},
+               {QStringLiteral("localCalendarId"), QStringLiteral("calendar-local")},
+               {QStringLiteral("localEventId"), QStringLiteral("event-local-instance")},
+               {QStringLiteral("recurringRemoteId"), QStringLiteral("series-remote")},
+               {QStringLiteral("originalStartAt"), QStringLiteral("2026-08-02T09:00:00.000Z")},
+               {QStringLiteral("event"),
+                QJsonObject{{QStringLiteral("description"), QStringLiteral("Changed instance")}}}},
+              QStringLiteral("event-local-instance"));
   hcb::test::MockNetworkAccessManager manager;
-  manager.enqueue({.body = QByteArray(
-                      R"({"items":[{"id":"instance-remote","etag":"instance-etag","status":"confirmed","recurringEventId":"series-remote","originalStartTime":{"dateTime":"2026-08-02T09:00:00.000Z"}}]})")});
+  manager.enqueue(
+      {.body = QByteArray(
+           R"({"items":[{"id":"instance-remote","etag":"instance-etag","status":"confirmed","recurringEventId":"series-remote","originalStartTime":{"dateTime":"2026-08-02T09:00:00.000Z"}}]})")});
   manager.enqueue({.body = QByteArray(R"({"id":"instance-remote","etag":"new-instance-etag"})")});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
   hcb::GoogleCalendarEventMutationPushService service(
@@ -367,8 +373,9 @@ void GoogleCalendarEventMutationPushServiceTest::resolvesGeneratedInstanceBefore
   QCOMPARE(patch.request.url().path(),
            QStringLiteral("/calendar/v3/calendars/calendar-1/events/instance-remote"));
   QCOMPARE(QString::fromUtf8(patch.request.rawHeader("If-Match")), QStringLiteral("instance-etag"));
-  QCOMPARE(QJsonDocument::fromJson(patch.body).object().value(QStringLiteral("description")).toString(),
-           QStringLiteral("Changed instance"));
+  QCOMPARE(
+      QJsonDocument::fromJson(patch.body).object().value(QStringLiteral("description")).toString(),
+      QStringLiteral("Changed instance"));
   QCOMPARE(find(coordinator, mutation.id).status, hcb::PendingMutationStatus::Applied);
 }
 
@@ -397,15 +404,15 @@ void GoogleCalendarEventMutationPushServiceTest::batchesIndependentEventWritesWi
        {QStringLiteral("etag"), QStringLiteral("etag-2")},
        {QStringLiteral("event"), QJsonObject{{QStringLiteral("summary"), QStringLiteral("Two")}}}},
       QStringLiteral("event-two"));
-  const hcb::PendingMutation third = enqueue(
-      coordinator,
-      QStringLiteral("event.update"),
-      {{QStringLiteral("calendarId"), QStringLiteral("calendar-1")},
-       {QStringLiteral("remoteEventId"), QStringLiteral("remote-3")},
-       {QStringLiteral("etag"), QStringLiteral("etag-3")},
-       {QStringLiteral("event"),
-        QJsonObject{{QStringLiteral("summary"), QStringLiteral("Three")}}}},
-      QStringLiteral("event-three"));
+  const hcb::PendingMutation third =
+      enqueue(coordinator,
+              QStringLiteral("event.update"),
+              {{QStringLiteral("calendarId"), QStringLiteral("calendar-1")},
+               {QStringLiteral("remoteEventId"), QStringLiteral("remote-3")},
+               {QStringLiteral("etag"), QStringLiteral("etag-3")},
+               {QStringLiteral("event"),
+                QJsonObject{{QStringLiteral("summary"), QStringLiteral("Three")}}}},
+              QStringLiteral("event-three"));
   std::future<hcb::PendingMutationListResult> dueFuture = coordinator.listDue(100);
   const hcb::PendingMutationListResult dueResult = awaitResult(dueFuture);
   QVERIFY(std::holds_alternative<QList<hcb::PendingMutation>>(dueResult));
@@ -414,27 +421,26 @@ void GoogleCalendarEventMutationPushServiceTest::batchesIndependentEventWritesWi
   }
   const QList<hcb::PendingMutation>& due = std::get<QList<hcb::PendingMutation>>(dueResult);
   QCOMPARE(due.size(), 3);
-  const QByteArray batchResponse = QByteArrayLiteral(
-      "--batch_response\r\n"
-      "Content-Type: application/http\r\n"
-      "Content-ID: <response-item-2>\r\n\r\n"
-      "HTTP/1.1 412 Precondition Failed\r\n"
-      "Content-Type: application/json\r\n\r\n"
-      "{\"error\":{\"message\":\"stale\"}}\r\n"
-      "--batch_response\r\n"
-      "Content-Type: application/http\r\n"
-      "Content-ID: <response-item-1>\r\n\r\n"
-      "HTTP/1.1 503 Service Unavailable\r\n"
-      "Content-Type: application/json\r\n"
-      "Retry-After: 3\r\n\r\n"
-      "{\"error\":{\"message\":\"busy\"}}\r\n"
-      "--batch_response\r\n"
-      "Content-Type: application/http\r\n"
-      "Content-ID: <response-item-0>\r\n\r\n"
-      "HTTP/1.1 200 OK\r\n"
-      "Content-Type: application/json\r\n\r\n"
-      "{}\r\n"
-      "--batch_response--\r\n");
+  const QByteArray batchResponse = QByteArrayLiteral("--batch_response\r\n"
+                                                     "Content-Type: application/http\r\n"
+                                                     "Content-ID: <response-item-2>\r\n\r\n"
+                                                     "HTTP/1.1 412 Precondition Failed\r\n"
+                                                     "Content-Type: application/json\r\n\r\n"
+                                                     "{\"error\":{\"message\":\"stale\"}}\r\n"
+                                                     "--batch_response\r\n"
+                                                     "Content-Type: application/http\r\n"
+                                                     "Content-ID: <response-item-1>\r\n\r\n"
+                                                     "HTTP/1.1 503 Service Unavailable\r\n"
+                                                     "Content-Type: application/json\r\n"
+                                                     "Retry-After: 3\r\n\r\n"
+                                                     "{\"error\":{\"message\":\"busy\"}}\r\n"
+                                                     "--batch_response\r\n"
+                                                     "Content-Type: application/http\r\n"
+                                                     "Content-ID: <response-item-0>\r\n\r\n"
+                                                     "HTTP/1.1 200 OK\r\n"
+                                                     "Content-Type: application/json\r\n\r\n"
+                                                     "{}\r\n"
+                                                     "--batch_response--\r\n");
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.body = batchResponse});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
@@ -467,8 +473,7 @@ void GoogleCalendarEventMutationPushServiceTest::batchesIndependentEventWritesWi
   QCOMPARE(retriable.nextRetryAt,
            std::optional<QString>(QStringLiteral("2025-07-25T01:46:43.123Z")));
   QCOMPARE(conflicted.status, hcb::PendingMutationStatus::Failed);
-  QCOMPARE(conflicted.lastErrorCode,
-           std::optional<QString>(QStringLiteral("precondition_failed")));
+  QCOMPARE(conflicted.lastErrorCode, std::optional<QString>(QStringLiteral("precondition_failed")));
   QVERIFY(!conflicted.nextRetryAt.has_value());
   Q_UNUSED(first);
   Q_UNUSED(second);
@@ -523,8 +528,7 @@ void GoogleCalendarEventMutationPushServiceTest::batchesIndependentEventCreatesA
   QCOMPARE(result.failed, 0);
   QCOMPARE(manager.requests().size(), 1);
   const QByteArray body = manager.requests().constFirst().body;
-  QVERIFY(body.contains(
-      "POST /calendar/v3/calendars/calendar-1/events?sendUpdates=all HTTP/1.1"));
+  QVERIFY(body.contains("POST /calendar/v3/calendars/calendar-1/events?sendUpdates=all HTTP/1.1"));
   QVERIFY(body.contains(
       "POST /calendar/v3/calendars/calendar-1/events/remote-event/move?destination=calendar-2 "
       "HTTP/1.1"));
@@ -541,23 +545,23 @@ void GoogleCalendarEventMutationPushServiceTest::pushesMoveBeforeDependentPatch(
   FixedClock clock;
   hcb::OptimisticMutationCoordinator coordinator(database->databasePath(), clock);
   verifyReady(coordinator);
-  const hcb::PendingMutation moved = enqueue(
-      coordinator,
-      QStringLiteral("event.move"),
-      {{QStringLiteral("calendarId"), QStringLiteral("destination-calendar")},
-       {QStringLiteral("sourceCalendarId"), QStringLiteral("source-calendar")},
-       {QStringLiteral("destinationCalendarId"), QStringLiteral("destination-calendar")},
-       {QStringLiteral("remoteEventId"), QStringLiteral("remote-event")},
-       {QStringLiteral("etag"), QStringLiteral("etag-move")}});
-  const hcb::PendingMutation updated = enqueue(
-      coordinator,
-      QStringLiteral("event.update"),
-      {{QStringLiteral("calendarId"), QStringLiteral("destination-calendar")},
-       {QStringLiteral("remoteEventId"), QStringLiteral("remote-event")},
-       {QStringLiteral("etag"), QStringLiteral("etag-after-move")},
-       {QStringLiteral("dependsOnMutationId"), moved.id},
-       {QStringLiteral("event"),
-        QJsonObject{{QStringLiteral("summary"), QStringLiteral("Moved event")}}}});
+  const hcb::PendingMutation moved =
+      enqueue(coordinator,
+              QStringLiteral("event.move"),
+              {{QStringLiteral("calendarId"), QStringLiteral("destination-calendar")},
+               {QStringLiteral("sourceCalendarId"), QStringLiteral("source-calendar")},
+               {QStringLiteral("destinationCalendarId"), QStringLiteral("destination-calendar")},
+               {QStringLiteral("remoteEventId"), QStringLiteral("remote-event")},
+               {QStringLiteral("etag"), QStringLiteral("etag-move")}});
+  const hcb::PendingMutation updated =
+      enqueue(coordinator,
+              QStringLiteral("event.update"),
+              {{QStringLiteral("calendarId"), QStringLiteral("destination-calendar")},
+               {QStringLiteral("remoteEventId"), QStringLiteral("remote-event")},
+               {QStringLiteral("etag"), QStringLiteral("etag-after-move")},
+               {QStringLiteral("dependsOnMutationId"), moved.id},
+               {QStringLiteral("event"),
+                QJsonObject{{QStringLiteral("summary"), QStringLiteral("Moved event")}}}});
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.body = QByteArray("{}")});
   manager.enqueue({.body = QByteArray("{}")});
@@ -617,11 +621,11 @@ void GoogleCalendarEventMutationPushServiceTest::reconcilesCreatedEventIdentity(
           "INSERT INTO local_calendars (id, account_id, remote_id, title, updated_at) VALUES "
           "('calendar-local', 'account-a', 'calendar-remote', 'Calendar', "
           "'2026-07-25T00:00:00Z')");
-  std::future<hcb::CalendarEventMutationResult> created = calendarMutations.create(
-      {.calendarId = QStringLiteral("calendar-local"),
-       .title = QStringLiteral("Created"),
-       .startAt = QStringLiteral("2026-08-01T09:00:00Z"),
-       .endAt = QStringLiteral("2026-08-01T10:00:00Z")});
+  std::future<hcb::CalendarEventMutationResult> created =
+      calendarMutations.create({.calendarId = QStringLiteral("calendar-local"),
+                                .title = QStringLiteral("Created"),
+                                .startAt = QStringLiteral("2026-08-01T09:00:00Z"),
+                                .endAt = QStringLiteral("2026-08-01T10:00:00Z")});
   const hcb::CalendarEventMutationResult createdResult = awaitResult(created);
   QVERIFY(std::holds_alternative<hcb::CalendarEventMutationReceipt>(createdResult));
   if (!std::holds_alternative<hcb::CalendarEventMutationReceipt>(createdResult)) {
@@ -637,7 +641,8 @@ void GoogleCalendarEventMutationPushServiceTest::reconcilesCreatedEventIdentity(
   const hcb::GoogleCalendarEventMutationPushResult result = push(service);
   QCOMPARE(result.applied, 1);
   QCOMPARE(result.failed, 0);
-  QCOMPARE(readEventRemoteId(handle, eventId), std::optional<QString>(QStringLiteral("remote-created")));
+  QCOMPARE(readEventRemoteId(handle, eventId),
+           std::optional<QString>(QStringLiteral("remote-created")));
 }
 
 void GoogleCalendarEventMutationPushServiceTest::recordsPermanentAndRetriableFailures() {

@@ -67,8 +67,7 @@ struct CalendarEventBulkMutationSummary final {
   QList<CalendarEventBulkMutationItem> items;
 };
 
-using CalendarEventBulkMutationResult =
-    std::variant<CalendarEventBulkMutationSummary, AppError>;
+using CalendarEventBulkMutationResult = std::variant<CalendarEventBulkMutationSummary, AppError>;
 
 class CalendarEventBulkMutationService final {
 public:

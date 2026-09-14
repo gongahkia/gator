@@ -65,10 +65,9 @@ void execute(sqlite3* handle, const char* sql) {
   const int stepped = sqlite3_step(statement);
   const auto* value = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
   const int size = sqlite3_column_bytes(statement, 0);
-  const std::optional<QString> result =
-      stepped == SQLITE_ROW && value != nullptr && size >= 0
-          ? std::optional<QString>(QString::fromUtf8(value, size))
-          : std::nullopt;
+  const std::optional<QString> result = stepped == SQLITE_ROW && value != nullptr && size >= 0
+                                            ? std::optional<QString>(QString::fromUtf8(value, size))
+                                            : std::nullopt;
   return sqlite3_finalize(statement) == SQLITE_OK ? result : std::nullopt;
 }
 
@@ -120,8 +119,9 @@ void ReminderServiceTest::schedulesAllDayReminderInCalendarTimeZone() {
   hcb::ReminderService service(database->databasePath(), clock, notifier);
   service.refresh();
 
-  const std::optional<QString> triggerAt = scalarText(
-      connection->nativeHandle(), "SELECT trigger_at FROM local_reminder_state WHERE event_id = 'event-1'");
+  const std::optional<QString> triggerAt =
+      scalarText(connection->nativeHandle(),
+                 "SELECT trigger_at FROM local_reminder_state WHERE event_id = 'event-1'");
   QVERIFY(triggerAt.has_value());
   if (!triggerAt.has_value()) {
     return;
@@ -148,16 +148,18 @@ void ReminderServiceTest::persistsSnoozeAndDismissal() {
   hcb::NativeReminderNotifier notifier;
   hcb::ReminderService service(database->databasePath(), clock, notifier);
   service.refresh();
-  const std::optional<QString> identifier = scalarText(
-      connection->nativeHandle(), "SELECT identifier FROM local_reminder_state WHERE event_id = 'event-1'");
+  const std::optional<QString> identifier =
+      scalarText(connection->nativeHandle(),
+                 "SELECT identifier FROM local_reminder_state WHERE event_id = 'event-1'");
   QVERIFY(identifier.has_value());
   if (!identifier.has_value()) {
     return;
   }
 
   service.snooze(*identifier, 10);
-  const std::optional<QString> snoozedUntil = scalarText(
-      connection->nativeHandle(), "SELECT snoozed_until FROM local_reminder_state WHERE event_id = 'event-1'");
+  const std::optional<QString> snoozedUntil =
+      scalarText(connection->nativeHandle(),
+                 "SELECT snoozed_until FROM local_reminder_state WHERE event_id = 'event-1'");
   QVERIFY(snoozedUntil.has_value());
   if (!snoozedUntil.has_value()) {
     return;
@@ -165,8 +167,9 @@ void ReminderServiceTest::persistsSnoozeAndDismissal() {
   QCOMPARE(*snoozedUntil, QStringLiteral("2026-07-30T12:10:00.000Z"));
 
   service.dismiss(*identifier);
-  const std::optional<QString> dismissedAt = scalarText(
-      connection->nativeHandle(), "SELECT dismissed_at FROM local_reminder_state WHERE event_id = 'event-1'");
+  const std::optional<QString> dismissedAt =
+      scalarText(connection->nativeHandle(),
+                 "SELECT dismissed_at FROM local_reminder_state WHERE event_id = 'event-1'");
   QVERIFY(dismissedAt.has_value());
   if (!dismissedAt.has_value()) {
     return;

@@ -242,7 +242,7 @@ parseRecurrenceRule(const std::optional<QString>& recurrenceRule) {
 }
 
 [[nodiscard]] std::optional<QTimeZone> recurrencePropertyTimeZone(const QString& line,
-                                                                   const QTimeZone& fallback) {
+                                                                  const QTimeZone& fallback) {
   const qsizetype separator = line.indexOf(u':');
   if (separator <= 0) {
     return std::nullopt;
@@ -261,7 +261,7 @@ parseRecurrenceRule(const std::optional<QString>& recurrenceRule) {
 }
 
 [[nodiscard]] std::optional<QDateTime> recurrenceDateTime(QStringView value,
-                                                           const QTimeZone& timeZone) {
+                                                          const QTimeZone& timeZone) {
   static const QRegularExpression datePattern(QStringLiteral("^\\d{8}$"));
   static const QRegularExpression localDateTimePattern(QStringLiteral("^\\d{8}T\\d{6}$"));
   if (!datePattern.matchView(value).hasMatch() &&
@@ -290,8 +290,8 @@ parseRecurrenceRule(const std::optional<QString>& recurrenceRule) {
 }
 
 [[nodiscard]] std::optional<QList<QDateTime>> recurrenceDates(const std::optional<QString>& rule,
-                                                               QStringView property,
-                                                               const QTimeZone& fallback) {
+                                                              QStringView property,
+                                                              const QTimeZone& fallback) {
   QList<QDateTime> values;
   if (!rule.has_value()) {
     return values;
@@ -459,7 +459,8 @@ matchesRecurrenceWeek(const QDateTime& seriesStart, const QDateTime& candidate, 
   const std::optional<QDateTime> rangeEnd =
       request.rangeEndAt.has_value() ? parseUtcDateTime(*request.rangeEndAt) : std::nullopt;
   if (hasRange && (!rangeStart.has_value() || !rangeEnd.has_value() || *rangeEnd <= *rangeStart)) {
-    return AppError(AppErrorCode::Validation, QStringLiteral("Recurrence display range is invalid"));
+    return AppError(AppErrorCode::Validation,
+                    QStringLiteral("Recurrence display range is invalid"));
   }
   const qint64 duration = start->msecsTo(*end);
   const std::optional<QList<QDateTime>> exceptionDates =
@@ -507,9 +508,10 @@ matchesRecurrenceWeek(const QDateTime& seriesStart, const QDateTime& candidate, 
     return (!rangeStart.has_value() || utcStart.addMSecs(duration) > *rangeStart) &&
            (!rangeEnd.has_value() || utcStart < *rangeEnd);
   };
-  const int maximum = rule->count.value_or(hasRange ? kMaximumExpansionIterations : kMaximumOccurrences);
-  QDateTime until = rule->until.value_or(
-      hasRange ? *rangeEnd : start->addDays(kMaximumOccurrences));
+  const int maximum =
+      rule->count.value_or(hasRange ? kMaximumExpansionIterations : kMaximumOccurrences);
+  QDateTime until =
+      rule->until.value_or(hasRange ? *rangeEnd : start->addDays(kMaximumOccurrences));
   if (rangeEnd.has_value() && *rangeEnd < until) {
     until = *rangeEnd;
   }
@@ -561,12 +563,13 @@ matchesRecurrenceWeek(const QDateTime& seriesStart, const QDateTime& candidate, 
     } else {
       suffix.remove(u'-').remove(u':').remove(QStringLiteral(".000"));
     }
-    occurrences.append({.id = occurrenceStart == masterStart
-                                 ? request.eventId
-                                 : request.eventId + QStringLiteral(":instance:") + suffix,
-                        .startAt = occurrenceStart,
-                        .endAt = occurrenceStartAt.addMSecs(duration).toUTC().toString(Qt::ISODateWithMs),
-                        .originalStartAt = occurrenceStart});
+    occurrences.append(
+        {.id = occurrenceStart == masterStart
+                   ? request.eventId
+                   : request.eventId + QStringLiteral(":instance:") + suffix,
+         .startAt = occurrenceStart,
+         .endAt = occurrenceStartAt.addMSecs(duration).toUTC().toString(Qt::ISODateWithMs),
+         .originalStartAt = occurrenceStart});
   }
   return occurrences;
 }

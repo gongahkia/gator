@@ -107,9 +107,9 @@ void GoogleHttpClientTest::rejectsInvalidInputWithoutNetwork() {
 
 void GoogleHttpClientTest::rejectsInvalidTimeoutWithoutNetwork() {
   hcb::GoogleHttpClient client;
-  std::future<hcb::GoogleHttpResult> future = client.send(
-      {.path = QStringLiteral("/tasks/v1/users/@me/lists"), .timeoutMilliseconds = 0},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleHttpResult> future =
+      client.send({.path = QStringLiteral("/tasks/v1/users/@me/lists"), .timeoutMilliseconds = 0},
+                  QStringLiteral("access-token"));
   const hcb::GoogleHttpResult result = future.get();
   QVERIFY(std::holds_alternative<hcb::GoogleApiError>(result));
   QCOMPARE(std::get<hcb::GoogleApiError>(result).kind(), hcb::GoogleApiErrorKind::InvalidPayload);

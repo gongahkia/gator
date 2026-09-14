@@ -19,7 +19,8 @@ void ImportServiceTest::parsesDelimitedTasksAndEvents() {
       "task title=Report list=Work due=2026-08-01 priority=high rrule=FREQ=WEEKLY;BYDAY=MO,FR "
       "exclude=2026-08-03 include=2026-08-04\n"
       "event title=Planning calendar=Team start=2026-08-01T09:00:00.000Z "
-      "end=2026-08-01T10:00:00.000Z all_day=false recurrence=\"RRULE:FREQ=WEEKLY\\nEXDATE:20260808T090000Z\"\n");
+      "end=2026-08-01T10:00:00.000Z all_day=false "
+      "recurrence=\"RRULE:FREQ=WEEKLY\\nEXDATE:20260808T090000Z\"\n");
   const hcb::ImportParseResult result =
       hcb::ImportService::parse(hcb::ImportFormat::Delimited, input);
   QCOMPARE(result.items.size(), 2);
@@ -46,9 +47,11 @@ void ImportServiceTest::rejectsInvalidDelimitedLinesIndependently() {
 
 void ImportServiceTest::parsesVersionedCsvWithQuotedFields() {
   const QByteArray input(
-      "schema_version,kind,title,list,calendar,due,notes,priority,rrule,until,count,exclude,include,start,end,all_day,time_zone,description,location,recurrence\r\n"
+      "schema_version,kind,title,list,calendar,due,notes,priority,rrule,until,count,exclude,"
+      "include,start,end,all_day,time_zone,description,location,recurrence\r\n"
       "1,task,Report,Work,,2026-08-01,\"first, second\",high,,,,,,,,,,,,\r\n"
-      "1,event,Planning,,Team,,,,,,,,,2026-08-01T09:00:00.000Z,2026-08-01T10:00:00.000Z,false,Asia/Singapore,Desc,Room,\"RRULE:FREQ=WEEKLY\"\r\n");
+      "1,event,Planning,,Team,,,,,,,,,2026-08-01T09:00:00.000Z,2026-08-01T10:00:00.000Z,false,Asia/"
+      "Singapore,Desc,Room,\"RRULE:FREQ=WEEKLY\"\r\n");
   const hcb::ImportParseResult result = hcb::ImportService::parse(hcb::ImportFormat::Csv, input);
   QCOMPARE(result.items.size(), 2);
   QCOMPARE(result.items.at(0).taskNotes, std::optional<QString>(QStringLiteral("first, second")));
@@ -57,8 +60,8 @@ void ImportServiceTest::parsesVersionedCsvWithQuotedFields() {
 }
 
 void ImportServiceTest::rejectsCsvSchemaAndUtf8Errors() {
-  const hcb::ImportParseResult header = hcb::ImportService::parse(
-      hcb::ImportFormat::Csv, QByteArray("kind,title\ntask,Title\n"));
+  const hcb::ImportParseResult header =
+      hcb::ImportService::parse(hcb::ImportFormat::Csv, QByteArray("kind,title\ntask,Title\n"));
   QCOMPARE(header.items.size(), 0);
   QCOMPARE(header.rows.size(), 1);
   QVERIFY(!header.rows.front().accepted);
@@ -83,9 +86,9 @@ void ImportServiceTest::enforcesRecordAndCsvQuotingLimits() {
 
   const hcb::ImportParseResult malformed = hcb::ImportService::parse(
       hcb::ImportFormat::Csv,
-      QByteArray(
-          "schema_version,kind,title,list,calendar,due,notes,priority,rrule,until,count,exclude,include,start,end,all_day,time_zone,description,location,recurrence\n"
-          "1,task,\"title\"suffix,,,,,,,,,,,,,,,,,\n"));
+      QByteArray("schema_version,kind,title,list,calendar,due,notes,priority,rrule,until,count,"
+                 "exclude,include,start,end,all_day,time_zone,description,location,recurrence\n"
+                 "1,task,\"title\"suffix,,,,,,,,,,,,,,,,,\n"));
   QCOMPARE(malformed.items.size(), 0);
   QCOMPARE(malformed.rows.size(), 1);
   QVERIFY(malformed.rows.front().message.contains(QStringLiteral("closing quote")));

@@ -590,8 +590,9 @@ WHERE id = ?1 AND deleted_at IS NULL
                    validationError(QStringLiteral("Task list is unavailable for update")));
 }
 
-[[nodiscard]] TaskListMutationResult setStoredTaskListSelected(
-    SqliteConnection& connection, const TaskListSelectionInput& input, const QString& updatedAt) {
+[[nodiscard]] TaskListMutationResult setStoredTaskListSelected(SqliteConnection& connection,
+                                                               const TaskListSelectionInput& input,
+                                                               const QString& updatedAt) {
   sqlite3* const handle = connection.nativeHandle();
   if (handle == nullptr) {
     return AppError(AppErrorCode::Database,
@@ -616,9 +617,9 @@ WHERE id = ?1 AND deleted_at IS NULL
                   {bindText(statement, 1, input.taskListId),
                    sqlite3_bind_int(statement, 2, selected) == SQLITE_OK
                        ? std::optional<AppError>{}
-                       : std::optional<AppError>(AppError(
-                             AppErrorCode::Database,
-                             QStringLiteral("SQLite task-list selection binding failed"))),
+                       : std::optional<AppError>(
+                             AppError(AppErrorCode::Database,
+                                      QStringLiteral("SQLite task-list selection binding failed"))),
                    bindText(statement, 3, updatedAt)});
       error.has_value()) {
     return *error;
@@ -634,8 +635,8 @@ WHERE id = ?1 AND deleted_at IS NULL
                          finalizeResult);
   }
   return changedRows == 1
-             ? TaskListMutationResult(TaskListMutationReceipt{.taskListId = input.taskListId,
-                                                               .updatedAt = updatedAt})
+             ? TaskListMutationResult(
+                   TaskListMutationReceipt{.taskListId = input.taskListId, .updatedAt = updatedAt})
              : TaskListMutationResult(
                    validationError(QStringLiteral("Task list is unavailable for selection")));
 }

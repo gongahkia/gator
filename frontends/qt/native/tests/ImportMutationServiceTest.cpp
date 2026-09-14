@@ -27,9 +27,8 @@ public:
 };
 
 [[nodiscard]] std::optional<hcb::FilePath> databasePathFor(const QTemporaryDir& directory) {
-  return hcb::FilePath::fromAbsolute(
-      QDir(QFileInfo(directory.path()).canonicalFilePath())
-          .filePath(QStringLiteral("hot-cross-buns.sqlite")));
+  return hcb::FilePath::fromAbsolute(QDir(QFileInfo(directory.path()).canonicalFilePath())
+                                         .filePath(QStringLiteral("hot-cross-buns.sqlite")));
 }
 
 void execute(sqlite3* handle, const char* sql) {
@@ -73,7 +72,8 @@ void ImportMutationServiceTest::createsTasksAndEventsInOneTransaction() {
   QVERIFY(directory.isValid());
   const std::optional<hcb::FilePath> path = databasePathFor(directory);
   QVERIFY(path.has_value());
-  if (!path.has_value()) return;
+  if (!path.has_value())
+    return;
   FixedClock clock;
   hcb::ImportMutationService service(*path, clock);
   QCOMPARE(service.ready().wait_for(2s), std::future_status::ready);
@@ -81,7 +81,8 @@ void ImportMutationServiceTest::createsTasksAndEventsInOneTransaction() {
   hcb::SqliteConnectionResult opened =
       hcb::SqliteConnectionFactory::open(*path, hcb::SqliteOpenMode::ReadWriteCreate);
   QVERIFY(std::holds_alternative<hcb::SqliteConnection>(opened));
-  if (!std::holds_alternative<hcb::SqliteConnection>(opened)) return;
+  if (!std::holds_alternative<hcb::SqliteConnection>(opened))
+    return;
   hcb::SqliteConnection connection = std::move(std::get<hcb::SqliteConnection>(opened));
   sqlite3* const handle = connection.nativeHandle();
   QVERIFY(handle != nullptr);
@@ -97,26 +98,27 @@ void ImportMutationServiceTest::createsTasksAndEventsInOneTransaction() {
           "VALUES ('calendar-a', 'account-a', 'remote-calendar', 'Work', 'owner', "
           "'2026-07-25T00:00:00Z')");
 
-  std::future<hcb::ImportMutationResult> rejected = service.create(
-      {{.taskListId = QStringLiteral("list-a"), .title = QStringLiteral("Task")}},
-      {{.calendarId = QStringLiteral("missing-calendar"),
-        .title = QStringLiteral("Event"),
-        .startAt = QStringLiteral("2026-07-29T01:00:00.000Z"),
-        .endAt = QStringLiteral("2026-07-29T02:00:00.000Z")}});
+  std::future<hcb::ImportMutationResult> rejected =
+      service.create({{.taskListId = QStringLiteral("list-a"), .title = QStringLiteral("Task")}},
+                     {{.calendarId = QStringLiteral("missing-calendar"),
+                       .title = QStringLiteral("Event"),
+                       .startAt = QStringLiteral("2026-07-29T01:00:00.000Z"),
+                       .endAt = QStringLiteral("2026-07-29T02:00:00.000Z")}});
   QVERIFY(std::holds_alternative<hcb::AppError>(await(rejected)));
   QCOMPARE(count(handle, "local_tasks"), std::int64_t{0});
   QCOMPARE(count(handle, "local_calendar_events"), std::int64_t{0});
   QCOMPARE(count(handle, "local_pending_mutations"), std::int64_t{0});
 
-  std::future<hcb::ImportMutationResult> created = service.create(
-      {{.taskListId = QStringLiteral("list-a"), .title = QStringLiteral("Task")}},
-      {{.calendarId = QStringLiteral("calendar-a"),
-        .title = QStringLiteral("Event"),
-        .startAt = QStringLiteral("2026-07-29T01:00:00.000Z"),
-        .endAt = QStringLiteral("2026-07-29T02:00:00.000Z")}});
+  std::future<hcb::ImportMutationResult> created =
+      service.create({{.taskListId = QStringLiteral("list-a"), .title = QStringLiteral("Task")}},
+                     {{.calendarId = QStringLiteral("calendar-a"),
+                       .title = QStringLiteral("Event"),
+                       .startAt = QStringLiteral("2026-07-29T01:00:00.000Z"),
+                       .endAt = QStringLiteral("2026-07-29T02:00:00.000Z")}});
   const hcb::ImportMutationResult result = await(created);
   QVERIFY(std::holds_alternative<hcb::ImportMutationReceipt>(result));
-  if (!std::holds_alternative<hcb::ImportMutationReceipt>(result)) return;
+  if (!std::holds_alternative<hcb::ImportMutationReceipt>(result))
+    return;
   QCOMPARE(std::get<hcb::ImportMutationReceipt>(result).taskCount, qsizetype{1});
   QCOMPARE(std::get<hcb::ImportMutationReceipt>(result).eventCount, qsizetype{1});
   QCOMPARE(count(handle, "local_tasks"), std::int64_t{1});

@@ -51,16 +51,16 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
   return !value.isUndefined() && !value.isNull();
 }
 
-[[nodiscard]] std::optional<QString> requiredString(const QJsonObject& object, QStringView key,
-                                                     qsizetype maximumLength) {
+[[nodiscard]] std::optional<QString>
+requiredString(const QJsonObject& object, QStringView key, qsizetype maximumLength) {
   const QJsonValue value = object.value(key);
   return value.isString() && isValidText(value.toString(), maximumLength)
              ? std::optional<QString>(value.toString())
              : std::nullopt;
 }
 
-[[nodiscard]] std::optional<QString> optionalString(const QJsonObject& object, QStringView key,
-                                                     qsizetype maximumLength) {
+[[nodiscard]] std::optional<QString>
+optionalString(const QJsonObject& object, QStringView key, qsizetype maximumLength) {
   const QJsonValue value = object.value(key);
   if (!isPresent(value)) {
     return std::optional<QString>{};
@@ -118,7 +118,8 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
       return std::nullopt;
     }
     const QDate parsed = QDate::fromString(date.toString(), Qt::ISODate);
-    if (!parsed.isValid() || date.toString().size() != 10 || date.toString().contains(QChar::Null)) {
+    if (!parsed.isValid() || date.toString().size() != 10 ||
+        date.toString().contains(QChar::Null)) {
       return std::nullopt;
     }
     result.insert(QStringLiteral("date"), parsed.toString(Qt::ISODate));
@@ -163,12 +164,12 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
     const QJsonValue responseStatus = attendee.value(QStringLiteral("responseStatus"));
     const QJsonValue additionalGuests = attendee.value(QStringLiteral("additionalGuests"));
     const QJsonValue resource = attendee.value(QStringLiteral("resource"));
-    const bool validStatus = responseStatus.isUndefined() ||
-                             (responseStatus.isString() &&
-                              (responseStatus.toString() == QStringLiteral("needsAction") ||
-                               responseStatus.toString() == QStringLiteral("declined") ||
-                               responseStatus.toString() == QStringLiteral("tentative") ||
-                               responseStatus.toString() == QStringLiteral("accepted")));
+    const bool validStatus =
+        responseStatus.isUndefined() ||
+        (responseStatus.isString() && (responseStatus.toString() == QStringLiteral("needsAction") ||
+                                       responseStatus.toString() == QStringLiteral("declined") ||
+                                       responseStatus.toString() == QStringLiteral("tentative") ||
+                                       responseStatus.toString() == QStringLiteral("accepted")));
     if (hasInvalidOptional(email, attendee, u"email") ||
         hasInvalidOptional(displayName, attendee, u"displayName") ||
         hasInvalidOptional(comment, attendee, u"comment") ||
@@ -188,14 +189,19 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
       emails.insert(key);
       canonical.insert(QStringLiteral("email"), *email);
     }
-    if (displayName.has_value()) canonical.insert(QStringLiteral("displayName"), *displayName);
-    if (comment.has_value()) canonical.insert(QStringLiteral("comment"), *comment);
-    if (!optional.isUndefined()) canonical.insert(QStringLiteral("optional"), optional);
-    if (!responseStatus.isUndefined()) canonical.insert(QStringLiteral("responseStatus"), responseStatus);
+    if (displayName.has_value())
+      canonical.insert(QStringLiteral("displayName"), *displayName);
+    if (comment.has_value())
+      canonical.insert(QStringLiteral("comment"), *comment);
+    if (!optional.isUndefined())
+      canonical.insert(QStringLiteral("optional"), optional);
+    if (!responseStatus.isUndefined())
+      canonical.insert(QStringLiteral("responseStatus"), responseStatus);
     if (!additionalGuests.isUndefined()) {
       canonical.insert(QStringLiteral("additionalGuests"), additionalGuests.toInteger());
     }
-    if (!resource.isUndefined()) canonical.insert(QStringLiteral("resource"), resource);
+    if (!resource.isUndefined())
+      canonical.insert(QStringLiteral("resource"), resource);
     result.append(canonical);
   }
   return result;
@@ -238,7 +244,7 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
 }
 
 [[nodiscard]] std::optional<RemoteSnapshot> decodeTask(const GoogleHttpResponse& response,
-                                                        const QString& expectedId) {
+                                                       const QString& expectedId) {
   if (response.body.size() > kMaximumResponseBytes) {
     return std::nullopt;
   }
@@ -266,19 +272,17 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
     return std::nullopt;
   }
   const bool isDeleted = deleted.isBool() && deleted.toBool();
-  QJsonObject fields{{QStringLiteral("_deleted"), isDeleted},
-                     {QStringLiteral("title"), *title},
-                     {QStringLiteral("notes"), notes.has_value() ? QJsonValue(*notes)
-                                                                  : QJsonValue::Null},
-                     {QStringLiteral("status"), status.isString() ? status
-                                                                     : QJsonValue("needsAction")},
-                     {QStringLiteral("due"), due.has_value() ? QJsonValue(*due)
-                                                               : QJsonValue::Null}};
+  QJsonObject fields{
+      {QStringLiteral("_deleted"), isDeleted},
+      {QStringLiteral("title"), *title},
+      {QStringLiteral("notes"), notes.has_value() ? QJsonValue(*notes) : QJsonValue::Null},
+      {QStringLiteral("status"), status.isString() ? status : QJsonValue("needsAction")},
+      {QStringLiteral("due"), due.has_value() ? QJsonValue(*due) : QJsonValue::Null}};
   return RemoteSnapshot{.fields = std::move(fields), .etag = etag};
 }
 
 [[nodiscard]] std::optional<RemoteSnapshot> decodeTaskList(const GoogleHttpResponse& response,
-                                                            const QString& expectedId) {
+                                                           const QString& expectedId) {
   if (response.body.size() > kMaximumResponseBytes) {
     return std::nullopt;
   }
@@ -298,7 +302,7 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
 }
 
 [[nodiscard]] std::optional<RemoteSnapshot> decodeEvent(const GoogleHttpResponse& response,
-                                                         const QString& expectedId) {
+                                                        const QString& expectedId) {
   if (response.body.size() > kMaximumResponseBytes) {
     return std::nullopt;
   }
@@ -345,21 +349,19 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
   if (!deleted && (!start.has_value() || !end.has_value())) {
     return std::nullopt;
   }
-  QJsonObject fields{{QStringLiteral("_deleted"), deleted},
-                     {QStringLiteral("summary"), *summary},
-                     {QStringLiteral("description"), description.has_value()
-                                                           ? QJsonValue(*description)
-                                                           : QJsonValue::Null},
-                     {QStringLiteral("location"), location.has_value() ? QJsonValue(*location)
-                                                                         : QJsonValue::Null},
-                     {QStringLiteral("colorId"), colorId.has_value() ? QJsonValue(*colorId)
-                                                                        : QJsonValue::Null},
-                     {QStringLiteral("transparency"),
-                      transparency.has_value() ? QJsonValue(*transparency) : QJsonValue::Null},
-                     {QStringLiteral("visibility"),
-                      visibility.has_value() ? QJsonValue(*visibility) : QJsonValue::Null},
-                     {QStringLiteral("attendees"), *attendees},
-                     {QStringLiteral("reminders"), *reminders}};
+  QJsonObject fields{
+      {QStringLiteral("_deleted"), deleted},
+      {QStringLiteral("summary"), *summary},
+      {QStringLiteral("description"),
+       description.has_value() ? QJsonValue(*description) : QJsonValue::Null},
+      {QStringLiteral("location"), location.has_value() ? QJsonValue(*location) : QJsonValue::Null},
+      {QStringLiteral("colorId"), colorId.has_value() ? QJsonValue(*colorId) : QJsonValue::Null},
+      {QStringLiteral("transparency"),
+       transparency.has_value() ? QJsonValue(*transparency) : QJsonValue::Null},
+      {QStringLiteral("visibility"),
+       visibility.has_value() ? QJsonValue(*visibility) : QJsonValue::Null},
+      {QStringLiteral("attendees"), *attendees},
+      {QStringLiteral("reminders"), *reminders}};
   if (start.has_value() && end.has_value()) {
     fields.insert(QStringLiteral("start"), *start);
     fields.insert(QStringLiteral("end"), *end);
@@ -406,8 +408,8 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
 }
 
 [[nodiscard]] RemoteSnapshotResult fetchRemote(const PendingMutation& mutation,
-                                                GoogleHttpClient& httpClient,
-                                                const QString& accessToken) {
+                                               GoogleHttpClient& httpClient,
+                                               const QString& accessToken) {
   const std::optional<QString> remoteId = remoteIdFor(mutation);
   if (!remoteId.has_value()) {
     return validationError(QStringLiteral("Conflict mutation remote identity is invalid"));
@@ -447,9 +449,9 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
   } else {
     decoded = decodeEvent(remote, *remoteId);
   }
-  return decoded.has_value()
-             ? RemoteSnapshotResult(std::move(*decoded))
-             : RemoteSnapshotResult(validationError(QStringLiteral("Google conflict response is invalid")));
+  return decoded.has_value() ? RemoteSnapshotResult(std::move(*decoded))
+                             : RemoteSnapshotResult(validationError(
+                                   QStringLiteral("Google conflict response is invalid")));
 }
 
 [[nodiscard]] SyncConflictResource conflictResource(PendingMutationResource resource) {
@@ -465,7 +467,7 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
 }
 
 [[nodiscard]] std::optional<AppError> markAwaitingUser(OptimisticMutationCoordinator& mutations,
-                                                        const PendingMutation& mutation) {
+                                                       const PendingMutation& mutation) {
   if (!mutation.leaseId.has_value()) {
     return databaseError(QStringLiteral("Conflict mutation lease is missing"));
   }
@@ -483,7 +485,7 @@ using RemoteSnapshotResult = std::variant<RemoteSnapshot, GoogleApiError, AppErr
 }
 
 [[nodiscard]] std::optional<SyncConflict> findConflict(SyncConflictStore& store,
-                                                        const QString& conflictId) {
+                                                       const QString& conflictId) {
   SyncConflictListResult listed = store.listUnresolved(100).get();
   if (std::holds_alternative<AppError>(listed)) {
     return std::nullopt;
@@ -528,27 +530,26 @@ GoogleSyncConflictResult GoogleSyncConflictResolver::handle(PendingMutation muta
   }
   const RemoteSnapshot remote = std::get<RemoteSnapshot>(fetched);
   const SyncConflictPolicy selectedPolicy = policy();
-  const SyncThreeWayMergeResult merged = SyncThreeWayMerge::merge(
-      {.resource = conflictResource(mutation.resource),
-       .operation = mutation.operation,
-       .baseSnapshot = mutation.baseSnapshot,
-       .localIntent = mutation.payload,
-       .remoteSnapshot = remote.fields,
-       .policy = selectedPolicy});
-  SyncConflictResult recorded =
-      conflicts_
-          .record({.accountId = mutation.accountId,
-                   .resource = conflictResource(mutation.resource),
-                   .resourceId = mutation.resourceId,
-                   .mutationId = mutation.id,
-                   .errorCode = std::move(errorCode),
-                   .errorMessage = std::move(errorMessage),
-                   .baseSnapshot = mutation.baseSnapshot,
-                   .localPayload = mutation.payload,
-                   .remoteSnapshot = remote.fields,
-                   .remoteEtag = remote.etag,
-                   .policy = selectedPolicy})
-          .get();
+  const SyncThreeWayMergeResult merged =
+      SyncThreeWayMerge::merge({.resource = conflictResource(mutation.resource),
+                                .operation = mutation.operation,
+                                .baseSnapshot = mutation.baseSnapshot,
+                                .localIntent = mutation.payload,
+                                .remoteSnapshot = remote.fields,
+                                .policy = selectedPolicy});
+  SyncConflictResult recorded = conflicts_
+                                    .record({.accountId = mutation.accountId,
+                                             .resource = conflictResource(mutation.resource),
+                                             .resourceId = mutation.resourceId,
+                                             .mutationId = mutation.id,
+                                             .errorCode = std::move(errorCode),
+                                             .errorMessage = std::move(errorMessage),
+                                             .baseSnapshot = mutation.baseSnapshot,
+                                             .localPayload = mutation.payload,
+                                             .remoteSnapshot = remote.fields,
+                                             .remoteEtag = remote.etag,
+                                             .policy = selectedPolicy})
+                                    .get();
   if (std::holds_alternative<AppError>(recorded)) {
     return std::get<AppError>(std::move(recorded));
   }
@@ -565,14 +566,13 @@ GoogleSyncConflictResult GoogleSyncConflictResolver::handle(PendingMutation muta
                : GoogleSyncConflictResult(GoogleSyncConflictOutcome::KeptRemote);
   }
   if (merged.decision == SyncMergeDecision::ReapplyLocal && remote.etag.has_value()) {
-    PendingMutationResult rebased =
-        mutations_
-            .rebase({.mutationId = mutation.id,
-                     .leaseId = mutation.leaseId,
-                     .payload = merged.reapplyIntent,
-                     .baseSnapshot = remote.fields,
-                     .remoteEtag = remote.etag})
-            .get();
+    PendingMutationResult rebased = mutations_
+                                        .rebase({.mutationId = mutation.id,
+                                                 .leaseId = mutation.leaseId,
+                                                 .payload = merged.reapplyIntent,
+                                                 .baseSnapshot = remote.fields,
+                                                 .remoteEtag = remote.etag})
+                                        .get();
     if (std::holds_alternative<AppError>(rebased)) {
       return std::get<AppError>(std::move(rebased));
     }
@@ -582,7 +582,8 @@ GoogleSyncConflictResult GoogleSyncConflictResolver::handle(PendingMutation muta
                ? GoogleSyncConflictResult(std::get<AppError>(std::move(resolved)))
                : GoogleSyncConflictResult(GoogleSyncConflictOutcome::ReappliedLocal);
   }
-  if (const std::optional<AppError> error = markAwaitingUser(mutations_, mutation); error.has_value()) {
+  if (const std::optional<AppError> error = markAwaitingUser(mutations_, mutation);
+      error.has_value()) {
     return *error;
   }
   return GoogleSyncConflictOutcome::AwaitingUser;
@@ -617,24 +618,23 @@ GoogleSyncConflictResolver::resolve(QString conflictId, SyncConflictResolution r
         return std::optional<AppError>(
             validationError(QStringLiteral("Deleted Google resources cannot be reapplied")));
       }
-      const SyncThreeWayMergeResult merged = SyncThreeWayMerge::merge(
-          {.resource = conflict->resource,
-           .operation = mutation->operation,
-           .baseSnapshot = conflict->baseSnapshot,
-           .localIntent = conflict->localPayload,
-           .remoteSnapshot = conflict->remoteSnapshot,
-           .policy = SyncConflictPolicy::PreferHcb});
+      const SyncThreeWayMergeResult merged =
+          SyncThreeWayMerge::merge({.resource = conflict->resource,
+                                    .operation = mutation->operation,
+                                    .baseSnapshot = conflict->baseSnapshot,
+                                    .localIntent = conflict->localPayload,
+                                    .remoteSnapshot = conflict->remoteSnapshot,
+                                    .policy = SyncConflictPolicy::PreferHcb});
       if (merged.decision != SyncMergeDecision::ReapplyLocal) {
         return std::optional<AppError>(
             validationError(QStringLiteral("Sync conflict cannot be reapplied")));
       }
-      PendingMutationResult rebased =
-          mutations_
-              .rebase({.mutationId = mutation->id,
-                       .payload = merged.reapplyIntent,
-                       .baseSnapshot = conflict->remoteSnapshot,
-                       .remoteEtag = conflict->remoteEtag})
-              .get();
+      PendingMutationResult rebased = mutations_
+                                          .rebase({.mutationId = mutation->id,
+                                                   .payload = merged.reapplyIntent,
+                                                   .baseSnapshot = conflict->remoteSnapshot,
+                                                   .remoteEtag = conflict->remoteEtag})
+                                          .get();
       if (std::holds_alternative<AppError>(rebased)) {
         return std::optional<AppError>(std::get<AppError>(std::move(rebased)));
       }

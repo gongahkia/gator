@@ -284,6 +284,7 @@ def test_source_list_tombstone_does_not_undo_cross_list_move(store):
 
 
 def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Storage) -> None:
+    store.upsert_task_list(TaskList("list", "a", "Inbox", remote_id="list-r", selected=False))
     store.upsert_task(Task("child", "a", "list", "Child", remote_id="child-r"))
     gateway = FakeGateway()
     gateway.task_list_pages = {
@@ -304,6 +305,7 @@ def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Stor
     engine.sync_task_lists("a")
     assert child_document() == original_document
     assert store.get_task_list("a", "list").metadata.local_updated_at == original_timestamp
+    assert not store.get_task_list("a", "list").selected
 
     gateway.task_list_pages = {
         None: Page(({"id": "list-r", "title": "Renamed", "etag": '"list-2"'},))
@@ -311,6 +313,7 @@ def test_unchanged_task_list_pull_does_not_rebuild_child_search_rows(store: Stor
     engine.sync_task_lists("a")
     assert child_document()[1] == "Renamed"
     assert store.get_task_list("a", "list").metadata.etag == '"list-2"'
+    assert not store.get_task_list("a", "list").selected
 
 
 def test_sync_reports_completed_stages(store):

@@ -92,8 +92,8 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
   if (input.action == CalendarEventBulkAction::ReplaceText &&
       (input.findText.isEmpty() || input.textFields == 0 ||
        (input.textFields & ~static_cast<std::uint8_t>(CalendarEventBulkTextField::Title) &
-            ~static_cast<std::uint8_t>(CalendarEventBulkTextField::Description) &
-            ~static_cast<std::uint8_t>(CalendarEventBulkTextField::Location)) != 0 ||
+        ~static_cast<std::uint8_t>(CalendarEventBulkTextField::Description) &
+        ~static_cast<std::uint8_t>(CalendarEventBulkTextField::Location)) != 0 ||
        input.recurrenceScope < 0 || input.recurrenceScope > 3)) {
     return validationError(QStringLiteral("Bulk event text replacement is invalid"));
   }
@@ -134,9 +134,8 @@ shiftedTimes(const CalendarEventMutationSnapshot& event, int shiftMinutes) {
                                  shiftedEnd.toUTC().toString(Qt::ISODateWithMs)};
 }
 
-[[nodiscard]] std::optional<QString>
-ineligibility(const CalendarEventBulkMutationInput& input,
-              const CalendarEventMutationSnapshot& event) {
+[[nodiscard]] std::optional<QString> ineligibility(const CalendarEventBulkMutationInput& input,
+                                                   const CalendarEventMutationSnapshot& event) {
   if (!isWritable(event.calendarAccessRole)) {
     return QStringLiteral("Calendar is read-only");
   }
@@ -175,8 +174,8 @@ ineligibility(const CalendarEventBulkMutationInput& input,
                ? std::optional<QString>(QStringLiteral("Event already has that color"))
                : std::nullopt;
   case CalendarEventBulkAction::SetAvailability: {
-    const QString transparency = *input.available ? QStringLiteral("transparent")
-                                                   : QStringLiteral("opaque");
+    const QString transparency =
+        *input.available ? QStringLiteral("transparent") : QStringLiteral("opaque");
     return event.transparency == transparency
                ? std::optional<QString>(QStringLiteral("Event already has that availability"))
                : std::nullopt;
@@ -207,8 +206,8 @@ submit(CalendarMutationService& service,
   case CalendarEventBulkAction::MoveToCalendar:
     return service.update({.eventId = event.eventId, .calendarId = input.calendarId});
   case CalendarEventBulkAction::SetColor:
-    return service.update(
-        {.eventId = event.eventId, .colorId = std::optional<std::optional<QString>>(input.colorId)});
+    return service.update({.eventId = event.eventId,
+                           .colorId = std::optional<std::optional<QString>>(input.colorId)});
   case CalendarEventBulkAction::SetAvailability:
     return service.update({.eventId = event.eventId,
                            .transparency = *input.available ? QStringLiteral("transparent")
@@ -246,7 +245,7 @@ submit(CalendarMutationService& service,
     if (!isRecurring(event)) {
       return service.update(std::move(update));
     }
-    const auto scope = input.recurrenceScope == 1 ? CalendarEventRecurrenceScope::ThisInstance
+    const auto scope = input.recurrenceScope == 1   ? CalendarEventRecurrenceScope::ThisInstance
                        : input.recurrenceScope == 2 ? CalendarEventRecurrenceScope::ThisAndFollowing
                                                     : CalendarEventRecurrenceScope::FullSeries;
     return service.updateScoped({.update = std::move(update), .scope = scope});
@@ -289,106 +288,107 @@ CalendarEventBulkMutationService::execute(CalendarEventBulkMutationInput input) 
     return readyFuture(CalendarEventBulkMutationResult(*error));
   }
   try {
-    return std::async(std::launch::async,
-                      [this, input = std::move(input)]() mutable -> CalendarEventBulkMutationResult {
-                        CalendarEventMutationSnapshotResult inspected =
-                            calendarMutationService_.inspect(input.eventIds).get();
-                        if (std::holds_alternative<AppError>(inspected)) {
-                          return std::get<AppError>(std::move(inspected));
-                        }
-                        QHash<QString, CalendarEventMutationSnapshot> snapshots;
-                        for (CalendarEventMutationSnapshot& event :
-                             std::get<QList<CalendarEventMutationSnapshot>>(inspected)) {
-                          snapshots.insert(event.eventId, std::move(event));
-                        }
-                        CalendarEventBulkMutationSummary summary{
-                            .requested = static_cast<int>(input.eventIds.size())};
-                        summary.items.reserve(input.eventIds.size());
-                        struct PendingWrite final {
-                          qsizetype itemIndex;
-                          std::future<CalendarEventMutationResult> future;
-                        };
-                        std::deque<PendingWrite> pending;
-                        const auto collectFirst = [&summary, &pending] {
-                          PendingWrite write = std::move(pending.front());
-                          pending.pop_front();
-                          recordResult(summary, summary.items[write.itemIndex], write.future.get());
-                        };
-                        QList<QString> targetIds = input.eventIds;
-                        if (input.action == CalendarEventBulkAction::ReplaceText &&
-                            input.recurrenceScope >= 2) {
-                          QHash<QString, QString> representativeBySeries;
-                          for (const QString& eventId : input.eventIds) {
-                            const auto event = snapshots.constFind(eventId);
-                            if (event == snapshots.cend() || !isRecurring(*event)) {
-                              continue;
-                            }
-                            const QString seriesId = event->calendarId + QChar::Null +
-                                                     event->recurringRemoteId.value_or(event->remoteId);
-                            const auto current = representativeBySeries.constFind(seriesId);
-                            if (current == representativeBySeries.cend()) {
-                              representativeBySeries.insert(seriesId, eventId);
-                              continue;
-                            }
-                            const auto prior = snapshots.constFind(*current);
-                            if (input.recurrenceScope == 2 && prior != snapshots.cend() &&
-                                event->originalStartAt.value_or(QString()) <
-                                    prior->originalStartAt.value_or(QString())) {
-                              representativeBySeries[seriesId] = eventId;
-                            }
-                          }
-                          QSet<QString> targets(targetIds.cbegin(), targetIds.cend());
-                          for (auto selected = representativeBySeries.cbegin();
-                               selected != representativeBySeries.cend(); ++selected) {
-                            for (const QString& eventId : input.eventIds) {
-                              const auto event = snapshots.constFind(eventId);
-                              if (event == snapshots.cend() || !isRecurring(*event)) {
-                                continue;
-                              }
-                              const QString seriesId = event->calendarId + QChar::Null +
-                                                       event->recurringRemoteId.value_or(event->remoteId);
-                              if (seriesId == selected.key() && eventId != selected.value()) {
-                                targets.remove(eventId);
-                              }
-                            }
-                          }
-                          targetIds = targets.values();
-                          std::sort(targetIds.begin(), targetIds.end());
-                        }
-                        for (const QString& eventId : targetIds) {
-                          CalendarEventBulkMutationItem item{.eventId = eventId};
-                          const auto event = snapshots.constFind(eventId);
-                          if (event == snapshots.cend()) {
-                            item.message = QStringLiteral("Event is no longer available");
-                            ++summary.skipped;
-                            summary.items.append(std::move(item));
-                            continue;
-                          }
-                          if (const std::optional<QString> reason = ineligibility(input, *event);
-                              reason.has_value()) {
-                            item.message = *reason;
-                            ++summary.skipped;
-                            summary.items.append(std::move(item));
-                            continue;
-                          }
-                          const qsizetype itemIndex = summary.items.size();
-                          summary.items.append(std::move(item));
-                          ++summary.eligible;
-                          if (input.previewOnly) {
-                            summary.items[itemIndex].message = QStringLiteral("Matches find text");
-                            continue;
-                          }
-                          pending.push_back({.itemIndex = itemIndex,
-                                             .future = submit(calendarMutationService_, input, *event)});
-                          if (pending.size() >= static_cast<std::size_t>(kMaximumInFlightWrites)) {
-                            collectFirst();
-                          }
-                        }
-                        while (!pending.empty()) {
-                          collectFirst();
-                        }
-                        return summary;
-                      });
+    return std::async(
+        std::launch::async,
+        [this, input = std::move(input)]() mutable -> CalendarEventBulkMutationResult {
+          CalendarEventMutationSnapshotResult inspected =
+              calendarMutationService_.inspect(input.eventIds).get();
+          if (std::holds_alternative<AppError>(inspected)) {
+            return std::get<AppError>(std::move(inspected));
+          }
+          QHash<QString, CalendarEventMutationSnapshot> snapshots;
+          for (CalendarEventMutationSnapshot& event :
+               std::get<QList<CalendarEventMutationSnapshot>>(inspected)) {
+            snapshots.insert(event.eventId, std::move(event));
+          }
+          CalendarEventBulkMutationSummary summary{.requested =
+                                                       static_cast<int>(input.eventIds.size())};
+          summary.items.reserve(input.eventIds.size());
+          struct PendingWrite final {
+            qsizetype itemIndex;
+            std::future<CalendarEventMutationResult> future;
+          };
+          std::deque<PendingWrite> pending;
+          const auto collectFirst = [&summary, &pending] {
+            PendingWrite write = std::move(pending.front());
+            pending.pop_front();
+            recordResult(summary, summary.items[write.itemIndex], write.future.get());
+          };
+          QList<QString> targetIds = input.eventIds;
+          if (input.action == CalendarEventBulkAction::ReplaceText && input.recurrenceScope >= 2) {
+            QHash<QString, QString> representativeBySeries;
+            for (const QString& eventId : input.eventIds) {
+              const auto event = snapshots.constFind(eventId);
+              if (event == snapshots.cend() || !isRecurring(*event)) {
+                continue;
+              }
+              const QString seriesId = event->calendarId + QChar::Null +
+                                       event->recurringRemoteId.value_or(event->remoteId);
+              const auto current = representativeBySeries.constFind(seriesId);
+              if (current == representativeBySeries.cend()) {
+                representativeBySeries.insert(seriesId, eventId);
+                continue;
+              }
+              const auto prior = snapshots.constFind(*current);
+              if (input.recurrenceScope == 2 && prior != snapshots.cend() &&
+                  event->originalStartAt.value_or(QString()) <
+                      prior->originalStartAt.value_or(QString())) {
+                representativeBySeries[seriesId] = eventId;
+              }
+            }
+            QSet<QString> targets(targetIds.cbegin(), targetIds.cend());
+            for (auto selected = representativeBySeries.cbegin();
+                 selected != representativeBySeries.cend();
+                 ++selected) {
+              for (const QString& eventId : input.eventIds) {
+                const auto event = snapshots.constFind(eventId);
+                if (event == snapshots.cend() || !isRecurring(*event)) {
+                  continue;
+                }
+                const QString seriesId = event->calendarId + QChar::Null +
+                                         event->recurringRemoteId.value_or(event->remoteId);
+                if (seriesId == selected.key() && eventId != selected.value()) {
+                  targets.remove(eventId);
+                }
+              }
+            }
+            targetIds = targets.values();
+            std::sort(targetIds.begin(), targetIds.end());
+          }
+          for (const QString& eventId : targetIds) {
+            CalendarEventBulkMutationItem item{.eventId = eventId};
+            const auto event = snapshots.constFind(eventId);
+            if (event == snapshots.cend()) {
+              item.message = QStringLiteral("Event is no longer available");
+              ++summary.skipped;
+              summary.items.append(std::move(item));
+              continue;
+            }
+            if (const std::optional<QString> reason = ineligibility(input, *event);
+                reason.has_value()) {
+              item.message = *reason;
+              ++summary.skipped;
+              summary.items.append(std::move(item));
+              continue;
+            }
+            const qsizetype itemIndex = summary.items.size();
+            summary.items.append(std::move(item));
+            ++summary.eligible;
+            if (input.previewOnly) {
+              summary.items[itemIndex].message = QStringLiteral("Matches find text");
+              continue;
+            }
+            pending.push_back({.itemIndex = itemIndex,
+                               .future = submit(calendarMutationService_, input, *event)});
+            if (pending.size() >= static_cast<std::size_t>(kMaximumInFlightWrites)) {
+              collectFirst();
+            }
+          }
+          while (!pending.empty()) {
+            collectFirst();
+          }
+          return summary;
+        });
   } catch (...) {
     return readyFuture(CalendarEventBulkMutationResult(
         AppError(AppErrorCode::Database, QStringLiteral("Bulk event mutation could not start"))));

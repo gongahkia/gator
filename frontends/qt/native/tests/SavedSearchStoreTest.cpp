@@ -73,16 +73,20 @@ void SavedSearchStoreTest::persistsLoadsAndValidatesSavedSearches() {
     QVERIFY(std::holds_alternative<QList<hcb::SavedSearch>>(emptyResult));
     QVERIFY(std::get<QList<hcb::SavedSearch>>(emptyResult).isEmpty());
 
-    std::future<hcb::SavedSearchMutationResult> save = store.save(
-        {{.id = QStringLiteral("release"),
-          .name = QStringLiteral("Release"),
-          .query = QStringLiteral("source:tasks status:open")}});
+    std::future<hcb::SavedSearchMutationResult> save =
+        store.save({{.id = QStringLiteral("release"),
+                     .name = QStringLiteral("Release"),
+                     .query = QStringLiteral("source:tasks status:open")}});
     const hcb::SavedSearchMutationResult saveResult = awaitResult(save);
     QVERIFY(std::holds_alternative<hcb::SettingsMutationResult>(saveResult));
 
-    std::future<hcb::SavedSearchMutationResult> duplicate = store.save(
-        {{.id = QStringLiteral("first"), .name = QStringLiteral("Release"), .query = QStringLiteral("a")},
-         {.id = QStringLiteral("second"), .name = QStringLiteral("release"), .query = QStringLiteral("b")}});
+    std::future<hcb::SavedSearchMutationResult> duplicate =
+        store.save({{.id = QStringLiteral("first"),
+                     .name = QStringLiteral("Release"),
+                     .query = QStringLiteral("a")},
+                    {.id = QStringLiteral("second"),
+                     .name = QStringLiteral("release"),
+                     .query = QStringLiteral("b")}});
     const hcb::SavedSearchMutationResult duplicateResult = awaitResult(duplicate);
     QVERIFY(std::holds_alternative<hcb::AppError>(duplicateResult));
     QCOMPARE(std::get<hcb::AppError>(duplicateResult).code(), hcb::AppErrorCode::Validation);

@@ -7,15 +7,21 @@ namespace hcb {
 
 class TimelineViewportModel final : public QSortFilterProxyModel {
   Q_OBJECT
-  Q_PROPERTY(QAbstractItemModel* sourceModel READ sourceModel WRITE setSourceModel NOTIFY sourceModelChanged)
-  Q_PROPERTY(int firstDayIndex READ firstDayIndex WRITE setFirstDayIndex NOTIFY firstDayIndexChanged)
+  Q_PROPERTY(QAbstractItemModel* sourceModel READ sourceModel WRITE setSourceModel NOTIFY
+                 sourceModelChanged)
+  Q_PROPERTY(
+      int firstDayIndex READ firstDayIndex WRITE setFirstDayIndex NOTIFY firstDayIndexChanged)
   Q_PROPERTY(int dayCount READ dayCount WRITE setDayCount NOTIFY dayCountChanged)
-  Q_PROPERTY(int visibleStartMinute READ visibleStartMinute WRITE setVisibleStartMinute NOTIFY visibleStartMinuteChanged)
-  Q_PROPERTY(int visibleEndMinute READ visibleEndMinute WRITE setVisibleEndMinute NOTIFY visibleEndMinuteChanged)
+  Q_PROPERTY(int visibleStartMinute READ visibleStartMinute WRITE setVisibleStartMinute NOTIFY
+                 visibleStartMinuteChanged)
+  Q_PROPERTY(int visibleEndMinute READ visibleEndMinute WRITE setVisibleEndMinute NOTIFY
+                 visibleEndMinuteChanged)
   Q_PROPERTY(bool allDay READ allDay WRITE setAllDay NOTIFY allDayChanged)
   Q_PROPERTY(bool active READ active WRITE setActive NOTIFY activeChanged)
-  Q_PROPERTY(bool filterCalendarVisibility READ filterCalendarVisibility WRITE setFilterCalendarVisibility NOTIFY filterCalendarVisibilityChanged)
-  Q_PROPERTY(QStringList visibleCalendarIds READ visibleCalendarIds WRITE setVisibleCalendarIds NOTIFY visibleCalendarIdsChanged)
+  Q_PROPERTY(bool filterCalendarVisibility READ filterCalendarVisibility WRITE
+                 setFilterCalendarVisibility NOTIFY filterCalendarVisibilityChanged)
+  Q_PROPERTY(QStringList visibleCalendarIds READ visibleCalendarIds WRITE setVisibleCalendarIds
+                 NOTIFY visibleCalendarIdsChanged)
 
 public:
   explicit TimelineViewportModel(QObject* parent = nullptr);

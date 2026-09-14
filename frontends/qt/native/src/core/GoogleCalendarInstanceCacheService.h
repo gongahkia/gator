@@ -31,10 +31,8 @@ public:
                                      CalendarReadService& calendarReadService,
                                      GoogleMirrorStore& mirrorStore);
 
-  [[nodiscard]] std::future<GoogleCalendarInstanceCacheRefreshResultOrError>
-  refresh(QString accountId,
-          QString accessToken,
-          CalendarRecurringInstanceCacheReadRequest request);
+  [[nodiscard]] std::future<GoogleCalendarInstanceCacheRefreshResultOrError> refresh(
+      QString accountId, QString accessToken, CalendarRecurringInstanceCacheReadRequest request);
 
 private:
   GoogleCalendarEventPullClient& eventClient_;

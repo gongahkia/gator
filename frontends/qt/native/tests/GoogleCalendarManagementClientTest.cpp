@@ -29,11 +29,11 @@ void GoogleCalendarManagementClientTest::createsCalendar() {
   hcb::GoogleHttpClient http(nullptr, &manager);
   hcb::GoogleCalendarManagementClient client(http);
 
-  std::future<hcb::GoogleCalendarManagementResultOrError> future = client.create(
-      {.title = QStringLiteral("Team"),
-       .description = QStringLiteral("Planning"),
-       .timeZone = QStringLiteral("Asia/Singapore")},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarManagementResultOrError> future =
+      client.create({.title = QStringLiteral("Team"),
+                     .description = QStringLiteral("Planning"),
+                     .timeZone = QStringLiteral("Asia/Singapore")},
+                    QStringLiteral("access-token"));
   QTRY_VERIFY_WITH_TIMEOUT(
       future.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
   const hcb::GoogleCalendarManagementResultOrError result = future.get();
@@ -57,10 +57,12 @@ void GoogleCalendarManagementClientTest::subscribesCalendar() {
   hcb::GoogleHttpClient http(nullptr, &manager);
   hcb::GoogleCalendarManagementClient client(http);
 
-  std::future<hcb::GoogleCalendarManagementResultOrError> future = client.subscribe(
-      {.calendarId = QStringLiteral("calendar-shared"), .selected = false, .hidden = true,
-       .colorId = QStringLiteral("4")},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarManagementResultOrError> future =
+      client.subscribe({.calendarId = QStringLiteral("calendar-shared"),
+                        .selected = false,
+                        .hidden = true,
+                        .colorId = QStringLiteral("4")},
+                       QStringLiteral("access-token"));
   QTRY_VERIFY_WITH_TIMEOUT(
       future.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
   const hcb::GoogleCalendarManagementResultOrError result = future.get();
@@ -82,12 +84,12 @@ void GoogleCalendarManagementClientTest::updatesAndDeletesCalendar() {
   hcb::GoogleHttpClient http(nullptr, &manager);
   hcb::GoogleCalendarManagementClient client(http);
 
-  std::future<hcb::GoogleCalendarManagementResultOrError> updated = client.update(
-      {.calendarId = QStringLiteral("calendar-owned"),
-       .title = QStringLiteral("Renamed"),
-       .description = QStringLiteral("Description"),
-       .timeZone = QStringLiteral("UTC")},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarManagementResultOrError> updated =
+      client.update({.calendarId = QStringLiteral("calendar-owned"),
+                     .title = QStringLiteral("Renamed"),
+                     .description = QStringLiteral("Description"),
+                     .timeZone = QStringLiteral("UTC")},
+                    QStringLiteral("access-token"));
   QTRY_VERIFY_WITH_TIMEOUT(
       updated.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
   QVERIFY(std::holds_alternative<hcb::GoogleCalendarManagementResult>(updated.get()));
@@ -119,12 +121,12 @@ void GoogleCalendarManagementClientTest::updatesAndRemovesCalendarListEntry() {
   hcb::GoogleHttpClient http(nullptr, &manager);
   hcb::GoogleCalendarManagementClient client(http);
 
-  std::future<hcb::GoogleCalendarManagementResultOrError> updated = client.updateListEntry(
-      {.calendarId = QStringLiteral("calendar-shared"),
-       .selected = false,
-       .hidden = true,
-       .colorId = QStringLiteral("7")},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarManagementResultOrError> updated =
+      client.updateListEntry({.calendarId = QStringLiteral("calendar-shared"),
+                              .selected = false,
+                              .hidden = true,
+                              .colorId = QStringLiteral("7")},
+                             QStringLiteral("access-token"));
   QTRY_VERIFY_WITH_TIMEOUT(
       updated.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
   QVERIFY(std::holds_alternative<hcb::GoogleCalendarManagementResult>(updated.get()));
@@ -151,9 +153,9 @@ void GoogleCalendarManagementClientTest::updatesAndRemovesCalendarListEntry() {
 
 void GoogleCalendarManagementClientTest::surfacesApiFailure() {
   hcb::test::MockNetworkAccessManager manager;
-  manager.enqueue({.status = 403,
-                   .body = QByteArray(
-                       "{\"error\":{\"code\":403,\"message\":\"Insufficient permissions\"}}")});
+  manager.enqueue(
+      {.status = 403,
+       .body = QByteArray("{\"error\":{\"code\":403,\"message\":\"Insufficient permissions\"}}")});
   hcb::GoogleHttpClient http(nullptr, &manager);
   hcb::GoogleCalendarManagementClient client(http);
 
@@ -179,14 +181,14 @@ void GoogleCalendarManagementClientTest::rejectsInvalidInputBeforeNetwork() {
   QCOMPARE(std::get<hcb::GoogleApiError>(result).kind(), hcb::GoogleApiErrorKind::InvalidPayload);
   QCOMPARE(manager.requests().size(), 0);
 
-  std::future<hcb::GoogleCalendarManagementResultOrError> update = client.update(
-      {.calendarId = QStringLiteral("calendar-owned"),
-       .title = QStringLiteral("Calendar"),
-       .timeZone = QStringLiteral("Invalid/TimeZone")},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarManagementResultOrError> update =
+      client.update({.calendarId = QStringLiteral("calendar-owned"),
+                     .title = QStringLiteral("Calendar"),
+                     .timeZone = QStringLiteral("Invalid/TimeZone")},
+                    QStringLiteral("access-token"));
   QVERIFY(std::holds_alternative<hcb::GoogleApiError>(update.get()));
-  std::future<hcb::GoogleCalendarManagementResultOrError> listUpdate = client.updateListEntry(
-      {.calendarId = QStringLiteral(" ")}, QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarManagementResultOrError> listUpdate =
+      client.updateListEntry({.calendarId = QStringLiteral(" ")}, QStringLiteral("access-token"));
   QVERIFY(std::holds_alternative<hcb::GoogleApiError>(listUpdate.get()));
   QCOMPARE(manager.requests().size(), 0);
 }

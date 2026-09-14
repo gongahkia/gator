@@ -94,8 +94,8 @@ void complete(const std::shared_ptr<Completion>& completion, GoogleHttpResult re
 
 [[nodiscard]] bool isValidRequest(const GoogleHttpRequest& request) {
   if (!isValidPath(request.path) || request.query.size() > kMaximumQueryParameterCount ||
-      !isValidIfMatch(request.ifMatch) ||
-      !isValidHeaderValue(request.contentType) || !isValidHeaderValue(request.accept) ||
+      !isValidIfMatch(request.ifMatch) || !isValidHeaderValue(request.contentType) ||
+      !isValidHeaderValue(request.accept) ||
       (request.contentType.has_value() && !request.body.has_value()) ||
       (request.body.has_value() && request.body->size() > kMaximumRequestBodyBytes) ||
       request.timeoutMilliseconds < kMinimumTimeoutMilliseconds ||
@@ -206,8 +206,8 @@ std::future<GoogleHttpResult> GoogleHttpClient::send(GoogleHttpRequest request,
               networkRequest.setRawHeader("If-Match", request.ifMatch->toUtf8());
             }
             if (request.body.has_value()) {
-              networkRequest.setRawHeader(
-                  "Content-Type", request.contentType.value_or("application/json"));
+              networkRequest.setRawHeader("Content-Type",
+                                          request.contentType.value_or("application/json"));
             }
             const QByteArray body = request.body.value_or(QByteArray());
             QNetworkReply* reply = nullptr;

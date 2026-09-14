@@ -28,7 +28,9 @@ void GoogleCalendarListPullClientTest::readsEveryPageAndNormalizesCalendars() {
       {.body = QByteArray(
            "{\"nextPageToken\":\"page-2\",\"items\":[{\"id\":\"calendar-1\",\"summary\":"
            "\"Work\",\"summaryOverride\":\"Team\",\"description\":\"Planning\",\"timeZone\":"
-           "\"Asia/Singapore\",\"colorId\":\"9\",\"backgroundColor\":\"#123abc\",\"foregroundColor\":\"#FFFFFF\","
+           "\"Asia/"
+           "Singapore\",\"colorId\":\"9\",\"backgroundColor\":\"#123abc\",\"foregroundColor\":\"#"
+           "FFFFFF\","
            "\"accessRole\":\"owner\",\"selected\":false,\"hidden\":true,\"primary\":true,"
            "\"defaultReminders\":[{\"method\":\"popup\",\"minutes\":10}],"
            "\"etag\":\"etag-1\"}]}"),
@@ -60,9 +62,8 @@ void GoogleCalendarListPullClientTest::readsEveryPageAndNormalizesCalendars() {
   QVERIFY(first.hidden);
   QVERIFY(first.primary);
   QVERIFY(!first.deleted);
-  const QJsonArray expectedReminders{
-      QJsonObject{{QStringLiteral("method"), QStringLiteral("popup")},
-                  {QStringLiteral("minutes"), 10}}};
+  const QJsonArray expectedReminders{QJsonObject{
+      {QStringLiteral("method"), QStringLiteral("popup")}, {QStringLiteral("minutes"), 10}}};
   QCOMPARE(first.defaultReminders, expectedReminders);
   const hcb::GoogleCalendarMirror& second = pulled.calendars.at(1);
   QCOMPARE(second.title, QStringLiteral("Untitled calendar"));
@@ -82,8 +83,8 @@ void GoogleCalendarListPullClientTest::readsEveryPageAndNormalizesCalendars() {
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("maxResults")), QStringLiteral("250"));
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("showDeleted")), QStringLiteral("true"));
   QCOMPARE(firstQuery.queryItemValue(QStringLiteral("showHidden")), QStringLiteral("true"));
-  QVERIFY(firstQuery.queryItemValue(QStringLiteral("fields")).contains(
-      QStringLiteral("defaultReminders")));
+  QVERIFY(firstQuery.queryItemValue(QStringLiteral("fields"))
+              .contains(QStringLiteral("defaultReminders")));
   QVERIFY(!firstQuery.hasQueryItem(QStringLiteral("pageToken")));
   QCOMPARE(
       QUrlQuery(manager.requests().at(1).request.url()).queryItemValue(QStringLiteral("pageToken")),

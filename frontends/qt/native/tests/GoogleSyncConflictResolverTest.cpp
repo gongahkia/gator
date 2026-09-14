@@ -75,7 +75,8 @@ void verifyReady(const std::shared_future<hcb::SqliteWriteResult>& ready) {
   QVERIFY2(!result.has_value(), qPrintable(result.has_value() ? result->message() : QString()));
 }
 
-[[nodiscard]] hcb::PendingMutation enqueueAndClaim(hcb::OptimisticMutationCoordinator& coordinator) {
+[[nodiscard]] hcb::PendingMutation
+enqueueAndClaim(hcb::OptimisticMutationCoordinator& coordinator) {
   QJsonObject task{{QStringLiteral("title"), QStringLiteral("Local")},
                    {QStringLiteral("notes"), QStringLiteral("Base notes")},
                    {QStringLiteral("status"), QStringLiteral("needsAction")}};
@@ -140,8 +141,7 @@ enqueueAndClaimEvent(hcb::OptimisticMutationCoordinator& coordinator) {
   return std::get<hcb::PendingMutation>(claimedResult);
 }
 
-[[nodiscard]] QByteArray remoteTask(QString title,
-                                    QString notes = QStringLiteral("Base notes")) {
+[[nodiscard]] QByteArray remoteTask(QString title, QString notes = QStringLiteral("Base notes")) {
   return QJsonDocument(QJsonObject{{QStringLiteral("id"), QStringLiteral("task-remote")},
                                    {QStringLiteral("etag"), QStringLiteral("etag-remote")},
                                    {QStringLiteral("title"), std::move(title)},
@@ -165,11 +165,10 @@ enqueueAndClaimEvent(hcb::OptimisticMutationCoordinator& coordinator) {
       .toJson(QJsonDocument::Compact);
 }
 
-[[nodiscard]] hcb::GoogleSyncConflictResult resolveInWorker(
-    hcb::GoogleSyncConflictResolver& resolver, hcb::PendingMutation mutation) {
-  std::future<hcb::GoogleSyncConflictResult> future = std::async(
-      std::launch::async,
-      [&resolver, mutation = std::move(mutation)]() mutable {
+[[nodiscard]] hcb::GoogleSyncConflictResult
+resolveInWorker(hcb::GoogleSyncConflictResolver& resolver, hcb::PendingMutation mutation) {
+  std::future<hcb::GoogleSyncConflictResult> future =
+      std::async(std::launch::async, [&resolver, mutation = std::move(mutation)]() mutable {
         return resolver.handle(std::move(mutation),
                                QStringLiteral("precondition_failed"),
                                QStringLiteral("Google resource changed"),
@@ -245,7 +244,8 @@ void GoogleSyncConflictResolverTest::preferHcbRebasesWithFreshRemoteState() {
   const hcb::PendingMutation rebased = find(mutations, claimed.id);
   QCOMPARE(rebased.status, hcb::PendingMutationStatus::Pending);
   QCOMPARE(rebased.remoteEtag, std::optional<QString>(QStringLiteral("etag-remote")));
-  QCOMPARE(rebased.baseSnapshot.value(QStringLiteral("title")), QJsonValue(QStringLiteral("Remote")));
+  QCOMPARE(rebased.baseSnapshot.value(QStringLiteral("title")),
+           QJsonValue(QStringLiteral("Remote")));
   QCOMPARE(rebased.payload.value(QStringLiteral("task")).toObject().value(QStringLiteral("title")),
            QJsonValue(QStringLiteral("Local")));
 }
@@ -316,9 +316,13 @@ void GoogleSyncConflictResolverTest::preferHcbRetainsManagedRecurrenceMarkerOnCo
            hcb::GoogleSyncConflictOutcome::ReappliedLocal);
   const hcb::PendingMutation rebased = find(mutations, pending.id);
   QCOMPARE(rebased.remoteEtag, std::optional<QString>(QStringLiteral("etag-remote")));
-  QCOMPARE(rebased.baseSnapshot.value(QStringLiteral("notes")), QJsonValue(QStringLiteral("Remote notes")));
-  const hcb::TaskRecurrenceNotes notes = hcb::parseTaskRecurrenceNotes(
-      rebased.payload.value(QStringLiteral("task")).toObject().value(QStringLiteral("notes")).toString());
+  QCOMPARE(rebased.baseSnapshot.value(QStringLiteral("notes")),
+           QJsonValue(QStringLiteral("Remote notes")));
+  const hcb::TaskRecurrenceNotes notes =
+      hcb::parseTaskRecurrenceNotes(rebased.payload.value(QStringLiteral("task"))
+                                        .toObject()
+                                        .value(QStringLiteral("notes"))
+                                        .toString());
   QCOMPARE(notes.state, hcb::TaskRecurrenceNotesState::Managed);
   QVERIFY(notes.marker.has_value());
   if (notes.marker.has_value()) {
@@ -351,8 +355,9 @@ void GoogleSyncConflictResolverTest::rebaseCalendarEventWithFreshRemoteState() {
   const hcb::PendingMutation rebased = find(mutations, claimed.id);
   QCOMPARE(rebased.status, hcb::PendingMutationStatus::Pending);
   QCOMPARE(rebased.remoteEtag, std::optional<QString>(QStringLiteral("event-etag-remote")));
-  QCOMPARE(rebased.payload.value(QStringLiteral("event")).toObject().value(QStringLiteral("summary")),
-           QJsonValue(QStringLiteral("Local")));
+  QCOMPARE(
+      rebased.payload.value(QStringLiteral("event")).toObject().value(QStringLiteral("summary")),
+      QJsonValue(QStringLiteral("Local")));
   QCOMPARE(manager.requests().size(), 1);
   QCOMPARE(manager.requests().constFirst().request.url().path(),
            QStringLiteral("/calendar/v3/calendars/calendar-remote/events/event-remote"));

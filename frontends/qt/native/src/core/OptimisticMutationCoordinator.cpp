@@ -364,8 +364,8 @@ LIMIT ?2
                    QStringLiteral("SQLite due mutation finalization failed (%1)"), finalizeResult));
 }
 
-[[nodiscard]] PendingMutationListResult
-listStoredActiveMutations(SqliteConnection& connection, int limit) {
+[[nodiscard]] PendingMutationListResult listStoredActiveMutations(SqliteConnection& connection,
+                                                                  int limit) {
   sqlite3* const handle = connection.nativeHandle();
   if (handle == nullptr) {
     return AppError(AppErrorCode::Database,
@@ -412,8 +412,9 @@ LIMIT ?1
   const int finalizeResult = sqlite3_finalize(statement);
   return finalizeResult == SQLITE_OK
              ? PendingMutationListResult(mutations)
-             : PendingMutationListResult(databaseError(
-                   QStringLiteral("SQLite active mutation finalization failed (%1)"), finalizeResult));
+             : PendingMutationListResult(
+                   databaseError(QStringLiteral("SQLite active mutation finalization failed (%1)"),
+                                 finalizeResult));
 }
 
 [[nodiscard]] std::variant<OptimisticMutationInput, AppError>
@@ -457,8 +458,7 @@ canonicalize(MutationFailureInput input) {
   return input;
 }
 
-[[nodiscard]] std::variant<MutationRebaseInput, AppError>
-canonicalize(MutationRebaseInput input) {
+[[nodiscard]] std::variant<MutationRebaseInput, AppError> canonicalize(MutationRebaseInput input) {
   if (input.payload.contains(QString::fromLatin1(conflictMetadataKey)) ||
       !isValidRequiredText(input.mutationId, kMaximumIdentifierLength) ||
       (input.leaseId.has_value() &&
@@ -743,8 +743,8 @@ WHERE id = ?1 AND status = 'failed'
 }
 
 [[nodiscard]] PendingMutationResult rebaseStoredMutation(SqliteConnection& connection,
-                                                          const MutationRebaseInput& input,
-                                                          const QString& now) {
+                                                         const MutationRebaseInput& input,
+                                                         const QString& now) {
   sqlite3* const handle = connection.nativeHandle();
   if (handle == nullptr) {
     return AppError(AppErrorCode::Database,
@@ -774,12 +774,11 @@ WHERE id = ?1 AND (
   }
   const QString payloadJson =
       QString::fromUtf8(QJsonDocument(input.payload).toJson(QJsonDocument::Compact));
-  if (const std::optional<AppError> error =
-          bindAll(statement,
-                  {bindText(statement, 1, input.mutationId),
-                   bindOptionalText(statement, 2, input.leaseId),
-                   bindText(statement, 3, payloadJson),
-                   bindText(statement, 4, now)});
+  if (const std::optional<AppError> error = bindAll(statement,
+                                                    {bindText(statement, 1, input.mutationId),
+                                                     bindOptionalText(statement, 2, input.leaseId),
+                                                     bindText(statement, 3, payloadJson),
+                                                     bindText(statement, 4, now)});
       error.has_value()) {
     return *error;
   }

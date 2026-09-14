@@ -4,8 +4,8 @@
 
 namespace {
 
-[[nodiscard]] hcb::QuickCaptureParseRequest requestFor(QString text,
-                                                        hcb::QuickCaptureKind kind = hcb::QuickCaptureKind::Event) {
+[[nodiscard]] hcb::QuickCaptureParseRequest
+requestFor(QString text, hcb::QuickCaptureKind kind = hcb::QuickCaptureKind::Event) {
   return {.text = std::move(text),
           .kind = kind,
           .now = QDateTime(QDate(2026, 7, 28), QTime(16, 0), QTimeZone("Asia/Singapore")),
@@ -45,8 +45,8 @@ void QuickCaptureParserTest::parsesTimedRecurringEvent() {
 }
 
 void QuickCaptureParserTest::preservesTaskTimeWhileExtractingTaskMetadata() {
-  const hcb::QuickCaptureParseResult result = hcb::QuickCaptureParser::parse(
-      requestFor(QStringLiteral("Call Sam tomorrow at 5pm P1 every day"), hcb::QuickCaptureKind::Task));
+  const hcb::QuickCaptureParseResult result = hcb::QuickCaptureParser::parse(requestFor(
+      QStringLiteral("Call Sam tomorrow at 5pm P1 every day"), hcb::QuickCaptureKind::Task));
 
   QCOMPARE(result.kind, hcb::QuickCaptureKind::Task);
   QCOMPARE(result.date, std::optional<QDate>(QDate(2026, 7, 29)));
@@ -87,7 +87,8 @@ void QuickCaptureParserTest::honorsExplicitAliasesAndDisabledRecognitions() {
   QCOMPARE(task.kind, hcb::QuickCaptureKind::Task);
   QCOMPARE(task.taskPriority, 3);
   QVERIFY(!task.recognitions.isEmpty());
-  const auto priority = std::find_if(task.recognitions.cbegin(), task.recognitions.cend(),
+  const auto priority = std::find_if(task.recognitions.cbegin(),
+                                     task.recognitions.cend(),
                                      [](const hcb::QuickCaptureRecognition& recognition) {
                                        return recognition.label == QStringLiteral("High priority");
                                      });
@@ -100,8 +101,8 @@ void QuickCaptureParserTest::honorsExplicitAliasesAndDisabledRecognitions() {
 }
 
 void QuickCaptureParserTest::leavesUnsupportedTextUntouched() {
-  const hcb::QuickCaptureParseResult result =
-      hcb::QuickCaptureParser::parse(requestFor(QStringLiteral("Draft the project brief"), hcb::QuickCaptureKind::Task));
+  const hcb::QuickCaptureParseResult result = hcb::QuickCaptureParser::parse(
+      requestFor(QStringLiteral("Draft the project brief"), hcb::QuickCaptureKind::Task));
 
   QCOMPARE(result.parsedTitle, QStringLiteral("Draft the project brief"));
   QVERIFY(!result.date.has_value());

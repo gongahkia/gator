@@ -161,9 +161,8 @@ LIMIT 1
   const std::optional<QString> successfulAt = requiredText(statement, 2);
   const std::optional<QString> updatedAt = requiredText(statement, 3);
   const int finalizeResult = sqlite3_finalize(statement);
-  const QJsonDocument metadata = metadataText.has_value()
-                                     ? QJsonDocument::fromJson(metadataText->toUtf8())
-                                     : QJsonDocument();
+  const QJsonDocument metadata =
+      metadataText.has_value() ? QJsonDocument::fromJson(metadataText->toUtf8()) : QJsonDocument();
   if (!token.has_value() || !metadataText.has_value() || !metadata.isObject() ||
       !successfulAt.has_value() || !updatedAt.has_value() ||
       successfulAt->size() > kMaximumTimestampLength ||
@@ -309,9 +308,8 @@ std::future<SyncCheckpointLookupResult> SyncCheckpointStore::find(SyncCheckpoint
   });
 }
 
-std::future<SyncCheckpointSaveResult> SyncCheckpointStore::save(SyncCheckpointKey key,
-                                                                const QString& syncToken,
-                                                                QJsonObject metadata) {
+std::future<SyncCheckpointSaveResult>
+SyncCheckpointStore::save(SyncCheckpointKey key, const QString& syncToken, QJsonObject metadata) {
   if (!isValidKey(key) || !isValidToken(syncToken) || !encodedMetadata(metadata).has_value()) {
     return readyFuture(SyncCheckpointSaveResult(
         validationError(QStringLiteral("Sync checkpoint input is invalid"))));

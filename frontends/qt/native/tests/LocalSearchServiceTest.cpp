@@ -207,7 +207,8 @@ void LocalSearchServiceTest::returnsAllStructuredMatchesBeyondLegacyCandidateCap
     INSERT INTO local_tasks (id, task_list_id, remote_id, title, notes, updated_at)
     SELECT 'bulk-' || value, 'list', 'bulk-' || value, 'bulk review ' || value, '',
            '2026-07-25T00:00:00Z' FROM numbers
-  )"), SQLITE_OK);
+  )"),
+           SQLITE_OK);
   hcb::LocalSearchService service(database->databasePath());
   QCOMPARE(service.ready().wait_for(2s), std::future_status::ready);
   QVERIFY(!service.ready().get().has_value());

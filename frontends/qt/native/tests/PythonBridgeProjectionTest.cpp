@@ -31,7 +31,7 @@ void PythonBridgeProjectionTest::projectsSummaryAndTaskPage() {
   const QJsonObject summaryData = object(R"json(
     {"workspace":{"account":{"id":"work","email":"work@example.test"},"pending":2,
     "task_lists":[{"id":"inbox","account_id":"work","title":"Inbox","remote_id":null,
-      "position":3,"metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}],
+      "position":3,"selected":false,"metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}],
     "calendars":[{"id":"primary","account_id":"work","summary":"Primary","remote_id":null,
       "description":null,"time_zone":"UTC","color":"#123456","selected":true,"hidden":false,
       "metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}]}}
@@ -46,7 +46,9 @@ void PythonBridgeProjectionTest::projectsSummaryAndTaskPage() {
   QCOMPARE(summary.pending, 2);
   QCOMPARE(summary.taskLists.size(), 1);
   QCOMPARE(summary.taskLists.first().sortOrder, std::int64_t(3));
-  QCOMPARE(summary.calendars.first().backgroundColor, std::optional<QString>(QStringLiteral("#123456")));
+  QVERIFY(!summary.taskLists.first().selected);
+  QCOMPARE(summary.calendars.first().backgroundColor,
+           std::optional<QString>(QStringLiteral("#123456")));
 
   const QJsonObject taskPageData = object(R"json(
     {"page":{"tasks":[{"id":"task-1","account_id":"work","list_id":"inbox",
@@ -73,8 +75,7 @@ void PythonBridgeProjectionTest::projectsDateBoundedEvents() {
       "attendees":[],"reminder_overrides":[],"attachments":[],
       "metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}]}}
   )json");
-  const hcb::PythonBridgeEventRangeOrError decoded =
-      hcb::PythonBridgeProjection::eventRange(data);
+  const hcb::PythonBridgeEventRangeOrError decoded = hcb::PythonBridgeProjection::eventRange(data);
   QVERIFY(std::holds_alternative<QList<hcb::CalendarEventSummary>>(decoded));
   const hcb::CalendarEventSummary& event =
       std::get<QList<hcb::CalendarEventSummary>>(decoded).first();

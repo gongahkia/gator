@@ -478,6 +478,24 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             if method == "POST" and tail == ("tasks",):
                 _no_query(query)
                 return HTTPStatus.CREATED, {"task": self._create_task(account_id, body)}
+            if method == "POST" and tail == ("task-lists",):
+                _no_query(query)
+                return HTTPStatus.CREATED, {"task_list": self._create_task_list(account_id, body)}
+            if len(tail) == 2 and tail[0] == "task-lists":
+                task_list_id = tail[1]
+                if method == "PATCH":
+                    _no_query(query)
+                    return HTTPStatus.OK, {
+                        "task_list": self._update_task_list(account_id, task_list_id, body)
+                    }
+                if method == "DELETE":
+                    _empty_body(body)
+                    _no_query(query)
+                    return HTTPStatus.OK, {
+                        "task_list": self._with_application(
+                            lambda app: app.delete_task_list(account_id, task_list_id)
+                        )
+                    }
             if len(tail) == 2 and tail[0] == "tasks":
                 task_id = tail[1]
                 if method == "PATCH":
@@ -503,6 +521,35 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             if method == "POST" and tail == ("events",):
                 _no_query(query)
                 return HTTPStatus.CREATED, {"event": self._create_event(account_id, body)}
+            if method == "POST" and tail == ("calendars",):
+                _no_query(query)
+                return HTTPStatus.CREATED, {"calendar": self._create_calendar(account_id, body)}
+            if len(tail) == 2 and tail[0] == "calendars":
+                calendar_id = tail[1]
+                if method == "PATCH":
+                    _no_query(query)
+                    return HTTPStatus.OK, {
+                        "calendar": self._update_calendar(account_id, calendar_id, body)
+                    }
+                if method == "DELETE":
+                    _empty_body(body)
+                    _no_query(query)
+                    return HTTPStatus.OK, {
+                        "calendar": self._with_application(
+                            lambda app: app.delete_calendar(account_id, calendar_id)
+                        )
+                    }
+            if method == "POST" and tail == ("calendar-subscriptions",):
+                _no_query(query)
+                return HTTPStatus.CREATED, {"calendar": self._subscribe_calendar(account_id, body)}
+            if len(tail) == 2 and tail[0] == "calendar-subscriptions" and method == "DELETE":
+                _empty_body(body)
+                _no_query(query)
+                return HTTPStatus.OK, {
+                    "calendar": self._with_application(
+                        lambda app: app.remove_calendar_from_list(account_id, tail[1])
+                    )
+                }
             if len(tail) == 2 and tail[0] == "events":
                 event_id = tail[1]
                 if method == "PATCH":
@@ -589,6 +636,29 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                 )
             )
 
+        def _create_task_list(self, account_id: str, body: Json) -> Any:
+            _keys(body, required={"title"}, optional={"selected"})
+            return self._with_application(
+                lambda app: app.create_task_list(
+                    account_id,
+                    _string(body["title"], "title"),
+                    selected=_bool(body["selected"], "selected") if "selected" in body else True,
+                )
+            )
+
+        def _update_task_list(self, account_id: str, task_list_id: str, body: Json) -> Any:
+            _keys(body, optional={"title", "selected"})
+            if not body:
+                raise ValueError("task list update requires at least one field")
+            kwargs: dict[str, Any] = {}
+            if "title" in body:
+                kwargs["title"] = _string(body["title"], "title")
+            if "selected" in body:
+                kwargs["selected"] = _bool(body["selected"], "selected")
+            return self._with_application(
+                lambda app: app.update_task_list(account_id, task_list_id, **kwargs)
+            )
+
         def _update_task(self, account_id: str, task_id: str, body: Json) -> Any:
             _keys(body, optional={"title", "notes", "due", "priority"})
             if not body:
@@ -648,6 +718,62 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                 lambda app: app.update_event(account_id, event_id, **kwargs)
             )
 
+        def _create_calendar(self, account_id: str, body: Json) -> Any:
+            _keys(
+                body,
+                required={"summary"},
+                optional={"description", "time_zone", "color", "location", "selected"},
+            )
+            return self._with_application(
+                lambda app: app.create_calendar(
+                    account_id,
+                    _string(body["summary"], "summary"),
+                    description=_nullable_string(body.get("description"), "description"),
+                    time_zone=_nullable_string(body.get("time_zone"), "time_zone"),
+                    color=_nullable_string(body.get("color"), "color"),
+                    location=_nullable_string(body.get("location"), "location"),
+                    selected=_bool(body["selected"], "selected") if "selected" in body else True,
+                )
+            )
+
+        def _update_calendar(self, account_id: str, calendar_id: str, body: Json) -> Any:
+            _keys(
+                body,
+                optional={
+                    "summary",
+                    "description",
+                    "time_zone",
+                    "color",
+                    "location",
+                    "hidden",
+                    "selected",
+                },
+            )
+            if not body:
+                raise ValueError("calendar update requires at least one field")
+            kwargs: dict[str, Any] = {}
+            if "summary" in body:
+                kwargs["summary"] = _string(body["summary"], "summary")
+            for name in ("description", "time_zone", "color", "location"):
+                if name in body:
+                    kwargs[name] = _nullable_string(body[name], name)
+            for name in ("hidden", "selected"):
+                if name in body:
+                    kwargs[name] = _bool(body[name], name)
+            return self._with_application(
+                lambda app: app.update_calendar(account_id, calendar_id, **kwargs)
+            )
+
+        def _subscribe_calendar(self, account_id: str, body: Json) -> Any:
+            _keys(body, required={"remote_calendar_id"}, optional={"summary"})
+            return self._with_application(
+                lambda app: app.subscribe_calendar(
+                    account_id,
+                    _string(body["remote_calendar_id"], "remote_calendar_id"),
+                    summary=_nullable_string(body.get("summary"), "summary"),
+                )
+            )
+
         def _with_application(self, action: Callable[[ApplicationService], Any]) -> Any:
             return self._with_runtime(lambda runtime: action(runtime.application))
 
@@ -690,11 +816,14 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
     if len(path) < 4 or path[:2] != ("v1", "accounts"):
         return False
     tail = path[3:]
+    resources = {"tasks", "task-lists", "events", "calendars", "calendar-subscriptions"}
     if method == "POST":
-        return tail in {("tasks",), ("events",)} or (
+        return tail in {(resource,) for resource in resources} or (
             len(tail) == 3 and tail[0] == "tasks" and tail[2] == "complete"
         )
-    return method in {"PATCH", "DELETE"} and len(tail) == 2 and tail[0] in {"tasks", "events"}
+    if method == "PATCH":
+        return len(tail) == 2 and tail[0] in {"tasks", "task-lists", "events", "calendars"}
+    return method == "DELETE" and len(tail) == 2 and tail[0] in resources
 
 
 def _idempotency_key(value: str | None) -> str:

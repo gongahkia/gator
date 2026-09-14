@@ -13,7 +13,12 @@
 
 namespace hcb {
 
-enum class MutationTelemetryPhase : std::uint8_t { Intent, RemoteApplied, RemoteFailed, Rollback };
+enum class MutationTelemetryPhase : std::uint8_t {
+  Intent,
+  RemoteApplied,
+  RemoteFailed,
+  Rollback
+};
 
 struct MutationTelemetryInput final {
   QString mutationId;

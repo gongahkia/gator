@@ -27,6 +27,11 @@ UPDATED_TASK_NOTES = "Updated by the isolated Qt bridge acceptance"
 UPDATED_EVENT_TITLE = "Qt bridge interaction event updated"
 UPDATED_EVENT_DESCRIPTION = "Updated by the isolated Qt bridge acceptance"
 UPDATED_EVENT_LOCATION = "Updated acceptance location"
+UPDATED_TASK_LIST_TITLE = "Qt bridge acceptance list updated"
+HIDDEN_TASK_TITLE = "Qt bridge acceptance hidden-list task"
+UPDATED_CALENDAR_TITLE = "Qt bridge acceptance calendar updated"
+UPDATED_CALENDAR_DESCRIPTION = "Updated by the isolated Qt bridge calendar acceptance"
+SUBSCRIPTION_REMOTE_ID = "qt-bridge-acceptance-subscription"
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,8 +141,14 @@ def bridge_data(descriptor: dict[str, str | int], path: str) -> dict[str, object
     return data
 
 
-def wait_for_json(path: Path, process: subprocess.Popen[str], *, label: str) -> dict[str, object]:
-    deadline = monotonic() + 45
+def wait_for_json(
+    path: Path,
+    process: subprocess.Popen[str],
+    *,
+    label: str,
+    timeout_seconds: float = 45,
+) -> dict[str, object]:
+    deadline = monotonic() + timeout_seconds
     while monotonic() < deadline:
         if path.exists():
             try:
@@ -154,7 +165,7 @@ def wait_for_json(path: Path, process: subprocess.Popen[str], *, label: str) -> 
             stdout, stderr = process.communicate()
             if exit_code != 0:
                 detail = payload.get("error") or stderr or stdout
-                raise RuntimeError(f"{label} failed (exit {exit_code}): {detail}")
+                raise RuntimeError(f"{label} failed (exit {exit_code}): {detail}; report={payload}")
             return payload
         if process.poll() is not None:
             stdout, stderr = process.communicate()
@@ -193,7 +204,10 @@ def launch_qt(
         start_new_session=True,
     )
     return wait_for_json(
-        report, process, label="Qt bridge interaction" if acceptance else "Qt restart"
+        report,
+        process,
+        label="Qt bridge interaction" if acceptance else "Qt restart",
+        timeout_seconds=75 if acceptance else 45,
     )
 
 
@@ -208,7 +222,10 @@ def verify_persistence(
     descriptor: dict[str, str | int], report: dict[str, object]
 ) -> dict[str, int]:
     task_id = require_string(report, "task_id")
+    hidden_task_id = require_string(report, "hidden_task_id")
     event_id = require_string(report, "event_id")
+    task_list_id = require_string(report, "task_list_id")
+    calendar_id = require_string(report, "calendar_id")
     event_date = date.fromisoformat(require_string(report, "event_date"))
 
     search_path = "/v1/accounts/benchmark/search?" + urlencode(
@@ -234,8 +251,29 @@ def verify_persistence(
         task.get("title") != UPDATED_TASK_TITLE
         or task.get("notes") != UPDATED_TASK_NOTES
         or task.get("status") != "completed"
+        or task.get("due") != event_date.isoformat()
     ):
         raise RuntimeError("restarted bridge returned an incomplete Qt task mutation")
+
+    hidden_results = bridge_data(
+        descriptor,
+        "/v1/accounts/benchmark/search?" + urlencode({"q": HIDDEN_TASK_TITLE, "limit": 50}),
+    ).get("results")
+    if not isinstance(hidden_results, list):
+        raise RuntimeError("restarted bridge returned malformed hidden-list task search results")
+    hidden_task = next(
+        (
+            result.get("item")
+            for result in hidden_results
+            if isinstance(result, dict)
+            and result.get("kind") == "task"
+            and isinstance(result.get("item"), dict)
+            and result["item"].get("id") == hidden_task_id
+        ),
+        None,
+    )
+    if not isinstance(hidden_task, dict) or hidden_task.get("title") != HIDDEN_TASK_TITLE:
+        raise RuntimeError("restarted bridge did not retain the deselected-list task")
 
     workspace_path = "/v1/accounts/benchmark/workspace?" + urlencode(
         {
@@ -263,7 +301,52 @@ def verify_persistence(
         or event.get("location") != UPDATED_EVENT_LOCATION
     ):
         raise RuntimeError("restarted bridge returned an incomplete Qt event mutation")
-    return {"tasks": 1, "events": 1}
+    start = event.get("start")
+    end = event.get("end")
+    if (
+        not isinstance(start, dict)
+        or not isinstance(end, dict)
+        or start.get("kind") != "dateTime"
+        or start.get("value") != f"{event_date.isoformat()}T10:00:00+00:00"
+        or end.get("kind") != "dateTime"
+        or end.get("value") != f"{event_date.isoformat()}T11:00:00+00:00"
+    ):
+        raise RuntimeError("restarted bridge returned incomplete Qt event timing changes")
+
+    summary = bridge_data(descriptor, "/v1/accounts/benchmark/workspace").get("workspace")
+    if not isinstance(summary, dict):
+        raise RuntimeError("restarted bridge returned malformed workspace summary")
+    task_lists = summary.get("task_lists")
+    calendars = summary.get("calendars")
+    if not isinstance(task_lists, list) or not isinstance(calendars, list):
+        raise RuntimeError("restarted bridge omitted task-list or calendar summaries")
+    task_list = next(
+        (item for item in task_lists if isinstance(item, dict) and item.get("id") == task_list_id),
+        None,
+    )
+    calendar = next(
+        (item for item in calendars if isinstance(item, dict) and item.get("id") == calendar_id),
+        None,
+    )
+    if not isinstance(task_list, dict) or (
+        task_list.get("title") != UPDATED_TASK_LIST_TITLE or task_list.get("selected") is not False
+    ):
+        raise RuntimeError("restarted bridge returned incomplete Qt task-list changes")
+    if not isinstance(calendar, dict) or (
+        calendar.get("summary") != UPDATED_CALENDAR_TITLE
+        or calendar.get("description") != UPDATED_CALENDAR_DESCRIPTION
+        or calendar.get("time_zone") != "UTC"
+        or calendar.get("color") != "#123456"
+        or calendar.get("selected") is not False
+        or calendar.get("hidden") is not True
+    ):
+        raise RuntimeError("restarted bridge returned incomplete Qt calendar changes")
+    if any(
+        isinstance(item, dict) and item.get("remote_id") == SUBSCRIPTION_REMOTE_ID
+        for item in calendars
+    ):
+        raise RuntimeError("restarted bridge retained an unsubscribed calendar")
+    return {"tasks": 2, "events": 1, "task_lists": 1, "calendars": 1}
 
 
 def run_acceptance(native: Path) -> dict[str, object]:
@@ -286,7 +369,9 @@ def run_acceptance(native: Path) -> dict[str, object]:
             )
             if (
                 interaction.get("ok") is not True
-                or interaction.get("stage") != 7
+                or interaction.get("stage") != 15
+                or not isinstance(interaction.get("hidden_task_id"), str)
+                or not interaction["hidden_task_id"]
                 or not isinstance(interaction.get("initial_search_results"), int)
                 or interaction["initial_search_results"] < 1
                 or not isinstance(interaction.get("refreshed_search_results"), int)
@@ -314,6 +399,10 @@ def run_acceptance(native: Path) -> dict[str, object]:
                 "search_refresh": True,
                 "task_create_update_complete": True,
                 "event_create_update": True,
+                "task_list_create_rename_visibility": True,
+                "task_list_visibility_hides_tasks": True,
+                "calendar_create_settings": True,
+                "calendar_subscribe_unsubscribe": True,
                 "bridge_restart": True,
                 "qt_restart": True,
                 "persisted": persisted,

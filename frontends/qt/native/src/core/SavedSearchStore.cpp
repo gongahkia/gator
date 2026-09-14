@@ -26,9 +26,10 @@ constexpr qsizetype kMaximumSavedSearchQueryLength = 4096;
   for (const SavedSearch& search : searches) {
     if (search.id.isEmpty() || search.id != search.id.trimmed() ||
         search.id.size() > kMaximumSavedSearchNameLength || search.name.trimmed().isEmpty() ||
-        search.name != search.name.trimmed() || search.name.size() > kMaximumSavedSearchNameLength ||
-        search.query.trimmed().isEmpty() || search.query.size() > kMaximumSavedSearchQueryLength ||
-        ids.contains(search.id) || names.contains(search.name, Qt::CaseInsensitive)) {
+        search.name != search.name.trimmed() ||
+        search.name.size() > kMaximumSavedSearchNameLength || search.query.trimmed().isEmpty() ||
+        search.query.size() > kMaximumSavedSearchQueryLength || ids.contains(search.id) ||
+        names.contains(search.name, Qt::CaseInsensitive)) {
       return AppError(AppErrorCode::Validation, QStringLiteral("Saved search is invalid"));
     }
     ids.append(search.id);
@@ -78,19 +79,21 @@ constexpr qsizetype kMaximumSavedSearchQueryLength = 4096;
 
 } // namespace
 
-SavedSearchStore::SavedSearchStore(SettingsService& settingsService) : settingsService_(settingsService) {}
+SavedSearchStore::SavedSearchStore(SettingsService& settingsService)
+    : settingsService_(settingsService) {}
 
 std::future<SavedSearchListResult> SavedSearchStore::load() {
   std::future<SettingsJsonReadResult> read = settingsService_.readJson(
       QString::fromLatin1(kSearchSettingsScope), QString::fromLatin1(kSavedSearchesSettingsKey));
-  return std::async(std::launch::async, [read = std::move(read)]() mutable -> SavedSearchListResult {
-    SettingsJsonReadResult result = read.get();
-    if (std::holds_alternative<AppError>(result)) {
-      return std::get<AppError>(std::move(result));
-    }
-    const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
-    return stored.has_value() ? decode(*stored) : SavedSearchListResult(QList<SavedSearch>{});
-  });
+  return std::async(
+      std::launch::async, [read = std::move(read)]() mutable -> SavedSearchListResult {
+        SettingsJsonReadResult result = read.get();
+        if (std::holds_alternative<AppError>(result)) {
+          return std::get<AppError>(std::move(result));
+        }
+        const std::optional<QString>& stored = std::get<std::optional<QString>>(result);
+        return stored.has_value() ? decode(*stored) : SavedSearchListResult(QList<SavedSearch>{});
+      });
 }
 
 std::future<SavedSearchMutationResult> SavedSearchStore::save(QList<SavedSearch> searches) {
@@ -100,16 +103,17 @@ std::future<SavedSearchMutationResult> SavedSearchStore::save(QList<SavedSearch>
     completion.set_value(*error);
     return future;
   }
-  std::future<SettingsMutationResultOrError> write = settingsService_.writeJson(
-      QString::fromLatin1(kSearchSettingsScope),
-      QString::fromLatin1(kSavedSearchesSettingsKey),
-      encode(searches));
-  return std::async(std::launch::async, [write = std::move(write)]() mutable -> SavedSearchMutationResult {
-    SettingsMutationResultOrError result = write.get();
-    return std::holds_alternative<AppError>(result)
-               ? SavedSearchMutationResult(std::get<AppError>(std::move(result)))
-               : SavedSearchMutationResult(std::get<SettingsMutationResult>(result));
-  });
+  std::future<SettingsMutationResultOrError> write =
+      settingsService_.writeJson(QString::fromLatin1(kSearchSettingsScope),
+                                 QString::fromLatin1(kSavedSearchesSettingsKey),
+                                 encode(searches));
+  return std::async(
+      std::launch::async, [write = std::move(write)]() mutable -> SavedSearchMutationResult {
+        SettingsMutationResultOrError result = write.get();
+        return std::holds_alternative<AppError>(result)
+                   ? SavedSearchMutationResult(std::get<AppError>(std::move(result)))
+                   : SavedSearchMutationResult(std::get<SettingsMutationResult>(result));
+      });
 }
 
 } // namespace hcb

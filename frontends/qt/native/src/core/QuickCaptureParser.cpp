@@ -54,18 +54,17 @@ void addSpan(QList<TextSpan>& spans,
   spans.append(std::move(span));
 }
 
-[[nodiscard]] std::optional<QRegularExpressionMatch>
-firstAliasMatch(const QString& text, const QStringList& aliases) {
+[[nodiscard]] std::optional<QRegularExpressionMatch> firstAliasMatch(const QString& text,
+                                                                     const QStringList& aliases) {
   std::optional<QRegularExpressionMatch> first;
   for (const QString& alias : aliases) {
     const QString trimmed = alias.trimmed();
     if (trimmed.isEmpty()) {
       continue;
     }
-    const QRegularExpression expression(
-        QStringLiteral("(?<![\\p{L}\\p{N}])%1(?![\\p{L}\\p{N}])")
-            .arg(QRegularExpression::escape(trimmed)),
-        QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression expression(QStringLiteral("(?<![\\p{L}\\p{N}])%1(?![\\p{L}\\p{N}])")
+                                            .arg(QRegularExpression::escape(trimmed)),
+                                        QRegularExpression::CaseInsensitiveOption);
     const QRegularExpressionMatch match = expression.match(text);
     if (!match.hasMatch() ||
         (first.has_value() && match.capturedStart() >= first->capturedStart())) {
@@ -76,26 +75,28 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
   return first;
 }
 
-[[nodiscard]] std::optional<DateMatch> firstDateMatch(const QString& text,
-                                                       const QDate& today) {
+[[nodiscard]] std::optional<DateMatch> firstDateMatch(const QString& text, const QDate& today) {
   QList<DateMatch> candidates;
   const auto addCandidate = [&candidates](const QDate& date, const QRegularExpressionMatch& match) {
     if (date.isValid() && match.hasMatch()) {
-      candidates.append({.date = date, .start = match.capturedStart(), .length = match.capturedLength()});
+      candidates.append(
+          {.date = date, .start = match.capturedStart(), .length = match.capturedLength()});
     }
   };
 
   const QRegularExpression isoExpression(QStringLiteral("\\b(\\d{4})-(\\d{2})-(\\d{2})\\b"));
   const QRegularExpressionMatch iso = isoExpression.match(text);
   if (iso.hasMatch()) {
-    addCandidate(QDate(iso.captured(1).toInt(), iso.captured(2).toInt(), iso.captured(3).toInt()), iso);
+    addCandidate(QDate(iso.captured(1).toInt(), iso.captured(2).toInt(), iso.captured(3).toInt()),
+                 iso);
   }
 
   const QRegularExpression relativeExpression(QStringLiteral("\\b(today|tomorrow)\\b"),
                                               QRegularExpression::CaseInsensitiveOption);
   const QRegularExpressionMatch relative = relativeExpression.match(text);
   if (relative.hasMatch()) {
-    const bool tomorrow = relative.captured(1).compare(QStringLiteral("tomorrow"), Qt::CaseInsensitive) == 0;
+    const bool tomorrow =
+        relative.captured(1).compare(QStringLiteral("tomorrow"), Qt::CaseInsensitive) == 0;
     addCandidate(today.addDays(tomorrow ? 1 : 0), relative);
   }
 
@@ -105,12 +106,12 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
   const QRegularExpressionMatch weekday = weekdayExpression.match(text);
   if (weekday.hasMatch()) {
     static const std::array<QString, 7> names{QStringLiteral("monday"),
-                                               QStringLiteral("tuesday"),
-                                               QStringLiteral("wednesday"),
-                                               QStringLiteral("thursday"),
-                                               QStringLiteral("friday"),
-                                               QStringLiteral("saturday"),
-                                               QStringLiteral("sunday")};
+                                              QStringLiteral("tuesday"),
+                                              QStringLiteral("wednesday"),
+                                              QStringLiteral("thursday"),
+                                              QStringLiteral("friday"),
+                                              QStringLiteral("saturday"),
+                                              QStringLiteral("sunday")};
     const QString name = weekday.captured(2).toCaseFolded();
     const auto position = std::find(names.cbegin(), names.cend(), name);
     if (position != names.cend()) {
@@ -134,23 +135,24 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
   }
 
   const QRegularExpression monthExpression(
-      QStringLiteral("\\b(january|february|march|april|may|june|july|august|september|october|november|december)\\s+"
+      QStringLiteral("\\b(january|february|march|april|may|june|july|august|september|october|"
+                     "november|december)\\s+"
                      "(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b"),
       QRegularExpression::CaseInsensitiveOption);
   const QRegularExpressionMatch month = monthExpression.match(text);
   if (month.hasMatch()) {
     static const std::array<QString, 12> names{QStringLiteral("january"),
-                                                QStringLiteral("february"),
-                                                QStringLiteral("march"),
-                                                QStringLiteral("april"),
-                                                QStringLiteral("may"),
-                                                QStringLiteral("june"),
-                                                QStringLiteral("july"),
-                                                QStringLiteral("august"),
-                                                QStringLiteral("september"),
-                                                QStringLiteral("october"),
-                                                QStringLiteral("november"),
-                                                QStringLiteral("december")};
+                                               QStringLiteral("february"),
+                                               QStringLiteral("march"),
+                                               QStringLiteral("april"),
+                                               QStringLiteral("may"),
+                                               QStringLiteral("june"),
+                                               QStringLiteral("july"),
+                                               QStringLiteral("august"),
+                                               QStringLiteral("september"),
+                                               QStringLiteral("october"),
+                                               QStringLiteral("november"),
+                                               QStringLiteral("december")};
     const auto position = std::find(names.cbegin(), names.cend(), month.captured(1).toCaseFolded());
     if (position != names.cend()) {
       const int monthNumber = static_cast<int>(std::distance(names.cbegin(), position)) + 1;
@@ -166,9 +168,9 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
   if (candidates.isEmpty()) {
     return std::nullopt;
   }
-  std::sort(candidates.begin(), candidates.end(), [](const DateMatch& left, const DateMatch& right) {
-    return left.start < right.start;
-  });
+  std::sort(candidates.begin(),
+            candidates.end(),
+            [](const DateMatch& left, const DateMatch& right) { return left.start < right.start; });
   return candidates.constFirst();
 }
 
@@ -180,7 +182,8 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
   if (twelveHour.hasMatch()) {
     int hour = twelveHour.captured(1).toInt();
     const int minute = twelveHour.captured(2).isEmpty() ? 0 : twelveHour.captured(2).toInt();
-    const bool afternoon = twelveHour.captured(3).compare(QStringLiteral("pm"), Qt::CaseInsensitive) == 0;
+    const bool afternoon =
+        twelveHour.captured(3).compare(QStringLiteral("pm"), Qt::CaseInsensitive) == 0;
     if (hour >= 1 && hour <= 12 && minute >= 0 && minute <= 59) {
       hour %= 12;
       if (afternoon) {
@@ -197,9 +200,10 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
       QRegularExpression::CaseInsensitiveOption);
   const QRegularExpressionMatch twentyFourHour = twentyFourHourExpression.match(text);
   if (twentyFourHour.hasMatch()) {
-    return TimeMatch{.time = QTime(twentyFourHour.captured(1).toInt(), twentyFourHour.captured(2).toInt()),
-                     .start = twentyFourHour.capturedStart(),
-                     .length = twentyFourHour.capturedLength()};
+    return TimeMatch{
+        .time = QTime(twentyFourHour.captured(1).toInt(), twentyFourHour.captured(2).toInt()),
+        .start = twentyFourHour.capturedStart(),
+        .length = twentyFourHour.capturedLength()};
   }
   return std::nullopt;
 }
@@ -218,13 +222,13 @@ firstAliasMatch(const QString& text, const QStringList& aliases) {
 }
 
 [[nodiscard]] QDateTime normalizedNow(const QuickCaptureParseRequest& request) {
-  const QTimeZone timeZone = request.timeZone.isValid() ? request.timeZone : QTimeZone::systemTimeZone();
-  return (request.now.isValid() ? request.now : QDateTime::currentDateTimeUtc()).toTimeZone(timeZone);
+  const QTimeZone timeZone =
+      request.timeZone.isValid() ? request.timeZone : QTimeZone::systemTimeZone();
+  return (request.now.isValid() ? request.now : QDateTime::currentDateTimeUtc())
+      .toTimeZone(timeZone);
 }
 
-[[nodiscard]] int boundedDuration(int value) {
-  return value >= 1 && value <= 1'440 ? value : 30;
-}
+[[nodiscard]] int boundedDuration(int value) { return value >= 1 && value <= 1'440 ? value : 30; }
 
 } // namespace
 
@@ -241,20 +245,22 @@ QuickCaptureParseResult QuickCaptureParser::parse(const QuickCaptureParseRequest
   QuickCaptureParseResult result{.kind = request.kind,
                                  .rawTitle = request.text.trimmed(),
                                  .parsedTitle = request.text.trimmed(),
-                                 .eventDurationMinutes = boundedDuration(request.defaultEventDurationMinutes)};
+                                 .eventDurationMinutes =
+                                     boundedDuration(request.defaultEventDurationMinutes)};
   QList<TextSpan> spans;
 
   const auto chooseType = [&result, &spans, &request](const QStringList& aliases,
-                                                        QuickCaptureKind kind,
-                                                        const QString& label) {
+                                                      QuickCaptureKind kind,
+                                                      const QString& label) {
     const std::optional<QRegularExpressionMatch> match = firstAliasMatch(request.text, aliases);
     if (!match.has_value()) {
       return;
     }
-    TextSpan span{.start = match->capturedStart(),
-                  .length = match->capturedLength(),
-                  .id = QStringLiteral("type:%1:%2").arg(match->capturedStart()).arg(match->capturedLength()),
-                  .label = label};
+    TextSpan span{
+        .start = match->capturedStart(),
+        .length = match->capturedLength(),
+        .id = QStringLiteral("type:%1:%2").arg(match->capturedStart()).arg(match->capturedLength()),
+        .label = label};
     if (isDisabled(request.disabledRecognitionIds, span.id) ||
         std::any_of(spans.cbegin(), spans.cend(), [&span](const TextSpan& current) {
           return overlaps(current, span);
@@ -264,34 +270,38 @@ QuickCaptureParseResult QuickCaptureParser::parse(const QuickCaptureParseRequest
     result.kind = kind;
     addSpan(spans, request.disabledRecognitionIds, std::move(span), result.recognitions);
   };
-  const std::optional<QRegularExpressionMatch> taskMatch = firstAliasMatch(request.text, request.aliases.task);
-  const std::optional<QRegularExpressionMatch> eventMatch = firstAliasMatch(request.text, request.aliases.event);
-  if (taskMatch.has_value() && (!eventMatch.has_value() || taskMatch->capturedStart() < eventMatch->capturedStart())) {
+  const std::optional<QRegularExpressionMatch> taskMatch =
+      firstAliasMatch(request.text, request.aliases.task);
+  const std::optional<QRegularExpressionMatch> eventMatch =
+      firstAliasMatch(request.text, request.aliases.event);
+  if (taskMatch.has_value() &&
+      (!eventMatch.has_value() || taskMatch->capturedStart() < eventMatch->capturedStart())) {
     chooseType(request.aliases.task, QuickCaptureKind::Task, QStringLiteral("Task"));
   } else if (eventMatch.has_value()) {
     chooseType(request.aliases.event, QuickCaptureKind::Event, QStringLiteral("Event"));
   }
 
-  const auto choosePriority = [&result, &spans, &request](const QStringList& aliases,
-                                                            int priority,
-                                                            const QString& label) {
-    const std::optional<QRegularExpressionMatch> match = firstAliasMatch(request.text, aliases);
-    if (!match.has_value()) {
-      return;
-    }
-    TextSpan span{.start = match->capturedStart(),
-                  .length = match->capturedLength(),
-                  .id = QStringLiteral("priority:%1:%2").arg(match->capturedStart()).arg(match->capturedLength()),
-                  .label = label};
-    if (isDisabled(request.disabledRecognitionIds, span.id) ||
-        std::any_of(spans.cbegin(), spans.cend(), [&span](const TextSpan& current) {
-          return overlaps(current, span);
-        })) {
-      return;
-    }
-    result.taskPriority = priority;
-    addSpan(spans, request.disabledRecognitionIds, std::move(span), result.recognitions);
-  };
+  const auto choosePriority =
+      [&result, &spans, &request](const QStringList& aliases, int priority, const QString& label) {
+        const std::optional<QRegularExpressionMatch> match = firstAliasMatch(request.text, aliases);
+        if (!match.has_value()) {
+          return;
+        }
+        TextSpan span{.start = match->capturedStart(),
+                      .length = match->capturedLength(),
+                      .id = QStringLiteral("priority:%1:%2")
+                                .arg(match->capturedStart())
+                                .arg(match->capturedLength()),
+                      .label = label};
+        if (isDisabled(request.disabledRecognitionIds, span.id) ||
+            std::any_of(spans.cbegin(), spans.cend(), [&span](const TextSpan& current) {
+              return overlaps(current, span);
+            })) {
+          return;
+        }
+        result.taskPriority = priority;
+        addSpan(spans, request.disabledRecognitionIds, std::move(span), result.recognitions);
+      };
   if (result.kind == QuickCaptureKind::Task) {
     choosePriority(request.aliases.highPriority, 3, QStringLiteral("High priority"));
     choosePriority(request.aliases.mediumPriority, 2, QStringLiteral("Medium priority"));
@@ -305,19 +315,20 @@ QuickCaptureParseResult QuickCaptureParser::parse(const QuickCaptureParseRequest
   if (recurrence.hasMatch()) {
     const int interval = recurrence.captured(1).isEmpty() ? 1 : recurrence.captured(1).toInt();
     const QString unit = recurrence.captured(2).toCaseFolded();
-    const int frequency = unit == QStringLiteral("day") ? 0
-                        : unit == QStringLiteral("week") ? 1
-                        : unit == QStringLiteral("month") ? 2
-                        : 3;
+    const int frequency = unit == QStringLiteral("day")     ? 0
+                          : unit == QStringLiteral("week")  ? 1
+                          : unit == QStringLiteral("month") ? 2
+                                                            : 3;
     TextSpan span{.start = recurrence.capturedStart(),
                   .length = recurrence.capturedLength(),
-                  .id = QStringLiteral("recurrence:%1:%2").arg(recurrence.capturedStart()).arg(recurrence.capturedLength()),
-                  .label = interval == 1 ? QStringLiteral("Repeats every %1").arg(unit)
-                                         : QStringLiteral("Repeats every %1 %2s").arg(interval).arg(unit)};
+                  .id = QStringLiteral("recurrence:%1:%2")
+                            .arg(recurrence.capturedStart())
+                            .arg(recurrence.capturedLength()),
+                  .label = interval == 1
+                               ? QStringLiteral("Repeats every %1").arg(unit)
+                               : QStringLiteral("Repeats every %1 %2s").arg(interval).arg(unit)};
     if (!isDisabled(request.disabledRecognitionIds, span.id)) {
-      result.recurrence = {.enabled = true,
-                           .frequency = frequency,
-                           .interval = interval};
+      result.recurrence = {.enabled = true, .frequency = frequency, .interval = interval};
       if (unit == QStringLiteral("day")) {
         result.recurrence.rrule = QStringLiteral("RRULE:FREQ=DAILY;INTERVAL=%1").arg(interval);
       } else if (unit == QStringLiteral("week")) {
@@ -333,17 +344,22 @@ QuickCaptureParseResult QuickCaptureParser::parse(const QuickCaptureParseRequest
 
   if (result.kind == QuickCaptureKind::Event) {
     const QRegularExpression durationExpression(
-        QStringLiteral("\\bfor\\s+(\\d{1,4})\\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\\b"),
+        QStringLiteral(
+            "\\bfor\\s+(\\d{1,4})\\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\\b"),
         QRegularExpression::CaseInsensitiveOption);
     const QRegularExpressionMatch duration = durationExpression.match(request.text);
     if (duration.hasMatch()) {
-      const int multiplier = duration.captured(2).startsWith(QStringLiteral("h"), Qt::CaseInsensitive) ? 60 : 1;
+      const int multiplier =
+          duration.captured(2).startsWith(QStringLiteral("h"), Qt::CaseInsensitive) ? 60 : 1;
       const int minutes = duration.captured(1).toInt() * multiplier;
       TextSpan span{.start = duration.capturedStart(),
                     .length = duration.capturedLength(),
-                    .id = QStringLiteral("duration:%1:%2").arg(duration.capturedStart()).arg(duration.capturedLength()),
+                    .id = QStringLiteral("duration:%1:%2")
+                              .arg(duration.capturedStart())
+                              .arg(duration.capturedLength()),
                     .label = QStringLiteral("%1 minutes").arg(minutes)};
-      if (minutes >= 1 && minutes <= 1'440 && !isDisabled(request.disabledRecognitionIds, span.id)) {
+      if (minutes >= 1 && minutes <= 1'440 &&
+          !isDisabled(request.disabledRecognitionIds, span.id)) {
         result.eventDurationMinutes = minutes;
         addSpan(spans, request.disabledRecognitionIds, std::move(span), result.recognitions);
       }
@@ -372,26 +388,30 @@ QuickCaptureParseResult QuickCaptureParser::parse(const QuickCaptureParseRequest
     if (!isDisabled(request.disabledRecognitionIds, span.id)) {
       result.time = time->time;
       if (result.kind == QuickCaptureKind::Task) {
-        result.recognitions.append({.id = span.id,
-                                    .label = QStringLiteral("%1 remains in task title").arg(span.label),
-                                    .removable = false});
+        result.recognitions.append(
+            {.id = span.id,
+             .label = QStringLiteral("%1 remains in task title").arg(span.label),
+             .removable = false});
       } else {
         addSpan(spans, request.disabledRecognitionIds, std::move(span), result.recognitions);
       }
     }
   }
 
-  if (result.kind == QuickCaptureKind::Task && result.recurrence.enabled && !result.date.has_value()) {
+  if (result.kind == QuickCaptureKind::Task && result.recurrence.enabled &&
+      !result.date.has_value()) {
     result.date = now.date();
   }
-  if (result.kind == QuickCaptureKind::Event && result.time.has_value() && !result.date.has_value()) {
+  if (result.kind == QuickCaptureKind::Event && result.time.has_value() &&
+      !result.date.has_value()) {
     QDate dateForTime = now.date();
     if (*result.time <= now.time()) {
       dateForTime = dateForTime.addDays(1);
     }
     result.date = dateForTime;
   }
-  result.allDay = result.kind == QuickCaptureKind::Event && result.date.has_value() && !result.time.has_value();
+  result.allDay =
+      result.kind == QuickCaptureKind::Event && result.date.has_value() && !result.time.has_value();
   result.eventReady = result.kind != QuickCaptureKind::Event || result.date.has_value();
   result.parsedTitle = removeSpans(request.text, spans);
   return result;

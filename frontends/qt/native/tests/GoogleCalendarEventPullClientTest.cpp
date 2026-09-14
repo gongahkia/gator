@@ -37,13 +37,18 @@ void GoogleCalendarEventPullClientTest::readsEveryPageAndNormalizesEvents() {
            "00:00+02:00\"},"
            "\"recurrence\":[\"RRULE:FREQ=WEEKLY\"],\"colorId\":\"5\",\"transparency\":"
            "\"transparent\",\"attendees\":[{\"email\":\"guest@example.com\",\"displayName\":"
-           "\"Guest\",\"responseStatus\":\"accepted\",\"self\":true}],\"reminders\":{\"useDefault\":false,"
+           "\"Guest\",\"responseStatus\":\"accepted\",\"self\":true}],\"reminders\":{"
+           "\"useDefault\":false,"
            "\"overrides\":[{\"method\":\"popup\",\"minutes\":10}]},"
-           "\"conferenceData\":{\"entryPoints\":[{\"entryPointType\":\"video\",\"uri\":\"https://meet.google.com/abc\"}]},"
-           "\"attachments\":[{\"fileUrl\":\"https://drive.google.com/open?id=file-1\",\"title\":\"Spec\",\"mimeType\":\"text/plain\"}],"
-           "\"guestsCanInviteOthers\":false,\"guestsCanModify\":true,\"guestsCanSeeOtherGuests\":false,"
+           "\"conferenceData\":{\"entryPoints\":[{\"entryPointType\":\"video\",\"uri\":\"https://"
+           "meet.google.com/abc\"}]},"
+           "\"attachments\":[{\"fileUrl\":\"https://drive.google.com/"
+           "open?id=file-1\",\"title\":\"Spec\",\"mimeType\":\"text/plain\"}],"
+           "\"guestsCanInviteOthers\":false,\"guestsCanModify\":true,\"guestsCanSeeOtherGuests\":"
+           "false,"
            "\"visibility\":\"private\",\"timeZone\":\"Europe/Berlin\",\"eventType\":\"focusTime\","
-           "\"focusTimeProperties\":{\"autoDeclineMode\":\"declineNone\",\"chatStatus\":\"available\"},"
+           "\"focusTimeProperties\":{\"autoDeclineMode\":\"declineNone\",\"chatStatus\":"
+           "\"available\"},"
            "\"etag\":\"etag-1\",\"sequence\":3,\"updated\":\"2024-07-24T10:00:00Z\"}]}"),
        .headers = {{QByteArray("Date"), QByteArray("Wed, 24 Jul 2024 10:00:00 GMT")}}});
   manager.enqueue(
@@ -77,20 +82,25 @@ void GoogleCalendarEventPullClientTest::readsEveryPageAndNormalizesEvents() {
            QStringLiteral("guest@example.com"));
   QVERIFY(first.attendees.at(0).toObject().value(QStringLiteral("self")).toBool());
   QCOMPARE(first.reminders.value(QStringLiteral("useDefault")).toBool(), false);
-  QCOMPARE(first.reminders.value(QStringLiteral("overrides")).toArray().at(0)
+  QCOMPARE(first.reminders.value(QStringLiteral("overrides"))
+               .toArray()
+               .at(0)
                .toObject()
                .value(QStringLiteral("minutes"))
                .toInteger(),
            10);
   QCOMPARE(first.eventType, std::optional<QString>(QStringLiteral("focusTime")));
-  QCOMPARE(first.conferenceData.value(QStringLiteral("entryPoints")).toArray().at(0)
+  QCOMPARE(first.conferenceData.value(QStringLiteral("entryPoints"))
+               .toArray()
+               .at(0)
                .toObject()
                .value(QStringLiteral("uri"))
                .toString(),
            QStringLiteral("https://meet.google.com/abc"));
   QCOMPARE(first.attachments.size(), 1);
   QCOMPARE(first.guestPermissions.value(QStringLiteral("guestsCanModify")).toBool(), true);
-  QCOMPARE(first.statusProperties.value(QStringLiteral("focusTimeProperties")).toObject()
+  QCOMPARE(first.statusProperties.value(QStringLiteral("focusTimeProperties"))
+               .toObject()
                .value(QStringLiteral("chatStatus"))
                .toString(),
            QStringLiteral("available"));
@@ -150,19 +160,22 @@ void GoogleCalendarEventPullClientTest::sendsIncrementalSyncTokenOnEveryPage() {
 
 void GoogleCalendarEventPullClientTest::readsResolvedInstancesForBoundedRange() {
   hcb::test::MockNetworkAccessManager manager;
-  manager.enqueue({.body = QByteArray(
-      "{\"items\":[{\"id\":\"instance-1\",\"status\":\"confirmed\",\"summary\":\"Planning\","
-      "\"start\":{\"dateTime\":\"2026-08-01T09:00:00Z\"},\"end\":{\"dateTime\":\"2026-08-01T10:00:00Z\"},"
-      "\"recurringEventId\":\"series-1\",\"originalStartTime\":{\"dateTime\":\"2026-08-01T09:00:00Z\"}}]}")});
+  manager.enqueue(
+      {.body = QByteArray(
+           "{\"items\":[{\"id\":\"instance-1\",\"status\":\"confirmed\",\"summary\":\"Planning\","
+           "\"start\":{\"dateTime\":\"2026-08-01T09:00:00Z\"},\"end\":{\"dateTime\":\"2026-08-"
+           "01T10:00:00Z\"},"
+           "\"recurringEventId\":\"series-1\",\"originalStartTime\":{\"dateTime\":\"2026-08-01T09:"
+           "00:00Z\"}}]}")});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
   hcb::GoogleCalendarEventPullClient client(httpClient);
 
-  std::future<hcb::GoogleCalendarEventInstancesPullResultOrError> future = client.instances(
-      {.calendarId = QStringLiteral("calendar-1"),
-       .recurringEventId = QStringLiteral("series-1"),
-       .timeMin = QStringLiteral("2026-08-01T00:00:00.000Z"),
-       .timeMax = QStringLiteral("2026-08-02T00:00:00.000Z")},
-      QStringLiteral("access-token"));
+  std::future<hcb::GoogleCalendarEventInstancesPullResultOrError> future =
+      client.instances({.calendarId = QStringLiteral("calendar-1"),
+                        .recurringEventId = QStringLiteral("series-1"),
+                        .timeMin = QStringLiteral("2026-08-01T00:00:00.000Z"),
+                        .timeMax = QStringLiteral("2026-08-02T00:00:00.000Z")},
+                       QStringLiteral("access-token"));
 
   QTRY_VERIFY_WITH_TIMEOUT(
       future.wait_for(std::chrono::milliseconds::zero()) == std::future_status::ready, 1'000);
@@ -185,8 +198,8 @@ void GoogleCalendarEventPullClientTest::readsResolvedInstancesForBoundedRange() 
            QStringLiteral("2026-08-01T00:00:00.000Z"));
   QCOMPARE(query.queryItemValue(QStringLiteral("timeMax")),
            QStringLiteral("2026-08-02T00:00:00.000Z"));
-  QVERIFY(query.queryItemValue(QStringLiteral("fields")).contains(
-      QStringLiteral("originalStartTime")));
+  QVERIFY(
+      query.queryItemValue(QStringLiteral("fields")).contains(QStringLiteral("originalStartTime")));
 }
 
 void GoogleCalendarEventPullClientTest::acceptsCancelledEventTombstones() {
@@ -213,9 +226,11 @@ void GoogleCalendarEventPullClientTest::acceptsCancelledEventTombstones() {
 void GoogleCalendarEventPullClientTest::truncatesOversizedEventTitle() {
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue(
-      {.body = QByteArray("{\"items\":[{\"id\":\"event-1\",\"status\":\"confirmed\",\"summary\":\"") +
-                   QByteArray(501, 'x') +
-                   QByteArray("\",\"start\":{\"date\":\"2026-08-05\"},\"end\":{\"date\":\"2026-08-06\"}}]}")});
+      {.body =
+           QByteArray("{\"items\":[{\"id\":\"event-1\",\"status\":\"confirmed\",\"summary\":\"") +
+           QByteArray(501, 'x') +
+           QByteArray(
+               "\",\"start\":{\"date\":\"2026-08-05\"},\"end\":{\"date\":\"2026-08-06\"}}]}")});
   hcb::GoogleHttpClient httpClient(nullptr, &manager);
   hcb::GoogleCalendarEventPullClient client(httpClient);
 

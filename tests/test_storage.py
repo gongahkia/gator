@@ -50,6 +50,14 @@ def test_schema_wal_and_account_partitioning(store: Storage) -> None:
     assert diagnostics["integrity"] == "ok"
 
 
+def test_task_list_local_visibility_persists(store: Storage) -> None:
+    store.upsert_account(Account("a", "a@example.test"))
+    task_list = TaskList("hidden", "a", "Hidden", selected=False)
+    store.upsert_task_list(task_list)
+
+    assert store.get_task_list("a", "hidden") == task_list
+
+
 def test_event_occurrences_and_range_queries(store: Storage) -> None:
     seed(store)
     event = Event(

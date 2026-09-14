@@ -24,9 +24,8 @@ constexpr int kSnapMinutes = 15;
   return std::clamp(minute, lower, upper);
 }
 
-[[nodiscard]] QDateTime resolvedDateTime(const QDate& date,
-                                         const QTime& time,
-                                         const QTimeZone& timeZone) {
+[[nodiscard]] QDateTime
+resolvedDateTime(const QDate& date, const QTime& time, const QTimeZone& timeZone) {
   return QDateTime(date, time, timeZone, QDateTime::TransitionResolution::PreferAfter);
 }
 
@@ -360,8 +359,7 @@ QVariantMap TimelineModel::timedRangeInput(int firstDayIndex,
   }
   firstMinute = clampMinute(firstMinute, false);
   lastMinute = clampMinute(lastMinute, true);
-  if (lastDayIndex < firstDayIndex ||
-      (lastDayIndex == firstDayIndex && lastMinute < firstMinute)) {
+  if (lastDayIndex < firstDayIndex || (lastDayIndex == firstDayIndex && lastMinute < firstMinute)) {
     std::swap(firstDayIndex, lastDayIndex);
     std::swap(firstMinute, lastMinute);
   }
@@ -375,20 +373,16 @@ QVariantMap TimelineModel::timedRangeInput(int firstDayIndex,
   const QDateTime requestedStart(rangeStartDate_.addDays(firstDayIndex),
                                  QTime(firstMinute / 60, firstMinute % 60),
                                  QTimeZone::UTC);
-  const QDateTime requestedEnd(endDate,
-                               QTime((lastMinute % kMinutesPerDay) / 60,
-                                     lastMinute % 60),
-                               QTimeZone::UTC);
+  const QDateTime requestedEnd(
+      endDate, QTime((lastMinute % kMinutesPerDay) / 60, lastMinute % 60), QTimeZone::UTC);
   const QDateTime start = resolvedDateTime(rangeStartDate_.addDays(firstDayIndex),
                                            QTime(firstMinute / 60, firstMinute % 60),
                                            displayTimeZone_);
-  QDateTime end = resolvedDateTime(endDate,
-                                   QTime((lastMinute % kMinutesPerDay) / 60,
-                                         lastMinute % 60),
-                                   displayTimeZone_);
+  QDateTime end = resolvedDateTime(
+      endDate, QTime((lastMinute % kMinutesPerDay) / 60, lastMinute % 60), displayTimeZone_);
   if (end <= start) {
-    end = start.addMSecs(std::max<qint64>(kSnapMinutes * 60'000,
-                                          requestedStart.msecsTo(requestedEnd)));
+    end = start.addMSecs(
+        std::max<qint64>(kSnapMinutes * 60'000, requestedStart.msecsTo(requestedEnd)));
   }
   if (!start.isValid() || !end.isValid() || end <= start) {
     return {};
@@ -424,9 +418,10 @@ QVariantMap TimelineModel::timelinePointInput(double x,
     return {};
   }
   const double dayWidth = (availableWidth - timeColumnWidth) / static_cast<double>(dayCount_);
-  const int dayIndex = std::clamp(static_cast<int>((x - timeColumnWidth) / dayWidth), 0, dayCount_ - 1);
-  const int rounded = static_cast<int>(std::llround(y * 60.0 / hourHeight / kSnapMinutes)) *
-                      kSnapMinutes;
+  const int dayIndex =
+      std::clamp(static_cast<int>((x - timeColumnWidth) / dayWidth), 0, dayCount_ - 1);
+  const int rounded =
+      static_cast<int>(std::llround(y * 60.0 / hourHeight / kSnapMinutes)) * kSnapMinutes;
   return {{QStringLiteral("dayIndex"), dayIndex},
           {QStringLiteral("minute"), clampMinute(rounded, endPoint)}};
 }

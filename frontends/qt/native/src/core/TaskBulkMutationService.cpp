@@ -83,7 +83,7 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
   if (input.action == TaskBulkAction::ReplaceText &&
       (input.findText.isEmpty() || input.textFields == 0 ||
        (input.textFields & ~static_cast<std::uint8_t>(TaskBulkTextField::Title) &
-            ~static_cast<std::uint8_t>(TaskBulkTextField::Notes)) != 0 ||
+        ~static_cast<std::uint8_t>(TaskBulkTextField::Notes)) != 0 ||
        input.recurrenceScope < 0 || input.recurrenceScope > 3)) {
     return validationError(QStringLiteral("Bulk task text replacement is invalid"));
   }
@@ -97,7 +97,7 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
 [[nodiscard]] QString taskUserNotes(const TaskMutationSnapshot& task) {
   const TaskRecurrenceNotes recurrence = parseTaskRecurrenceNotes(task.notes.value_or(QString()));
   return recurrence.state == TaskRecurrenceNotesState::Managed ? recurrence.userNotes
-                                                                : task.notes.value_or(QString());
+                                                               : task.notes.value_or(QString());
 }
 
 [[nodiscard]] bool hasReplacement(const TaskBulkMutationInput& input,
@@ -107,10 +107,9 @@ template <typename Result> [[nodiscard]] std::future<Result> readyFuture(Result 
           taskUserNotes(task).contains(input.findText));
 }
 
-[[nodiscard]] std::future<TaskMutationResult>
-submit(TaskMutationService& service,
-       const TaskBulkMutationInput& input,
-       const TaskMutationSnapshot& task) {
+[[nodiscard]] std::future<TaskMutationResult> submit(TaskMutationService& service,
+                                                     const TaskBulkMutationInput& input,
+                                                     const TaskMutationSnapshot& task) {
   switch (input.action) {
   case TaskBulkAction::Complete:
     return service.setCompleted(task.taskId, true);
@@ -148,7 +147,8 @@ submit(TaskMutationService& service,
     return service.update(std::move(update));
   }
   }
-  return readyFuture(TaskMutationResult(validationError(QStringLiteral("Bulk task action is invalid"))));
+  return readyFuture(
+      TaskMutationResult(validationError(QStringLiteral("Bulk task action is invalid"))));
 }
 
 [[nodiscard]] std::optional<QString>
@@ -175,9 +175,9 @@ ineligibility(const TaskBulkMutationInput& input,
     if (task.taskListId == *input.taskListId) {
       return QStringLiteral("Task is already in that list");
     }
-    return task.hasActiveChildren
-               ? std::optional<QString>(QStringLiteral("Task with subtasks cannot move between lists"))
-               : std::nullopt;
+    return task.hasActiveChildren ? std::optional<QString>(QStringLiteral(
+                                        "Task with subtasks cannot move between lists"))
+                                  : std::nullopt;
   case TaskBulkAction::SetDue:
     return task.dueAt == input.due->at && task.dueTimeZone == input.due->timeZone
                ? std::optional<QString>(QStringLiteral("Task already has that due date"))
@@ -251,119 +251,116 @@ std::future<TaskBulkMutationResult> TaskBulkMutationService::execute(TaskBulkMut
     return readyFuture(TaskBulkMutationResult(*error));
   }
   try {
-    return std::async(std::launch::async,
-                      [this, input = std::move(input)]() mutable -> TaskBulkMutationResult {
-                        QList<QString> inspectedIds = input.taskIds;
-                        if (input.action == TaskBulkAction::Reparent && input.parentTaskId.has_value()) {
-                          inspectedIds.append(*input.parentTaskId);
-                        }
-                        TaskMutationSnapshotResult inspected =
-                            taskMutationService_.inspect(std::move(inspectedIds)).get();
-                        if (std::holds_alternative<AppError>(inspected)) {
-                          return std::get<AppError>(std::move(inspected));
-                        }
-                        QHash<QString, TaskMutationSnapshot> snapshots;
-                        for (TaskMutationSnapshot& task :
-                             std::get<QList<TaskMutationSnapshot>>(inspected)) {
-                          snapshots.insert(task.taskId, std::move(task));
-                        }
-                        QList<TaskMutationSnapshot> managedSeries;
-                        if (input.action == TaskBulkAction::ReplaceText &&
-                            input.recurrenceScope >= 2) {
-                          TaskMutationSnapshotResult managed =
-                              taskMutationService_.inspectManagedSeries(input.taskIds).get();
-                          if (std::holds_alternative<AppError>(managed)) {
-                            return std::get<AppError>(std::move(managed));
-                          }
-                          managedSeries = std::get<QList<TaskMutationSnapshot>>(std::move(managed));
-                          for (const TaskMutationSnapshot& task : managedSeries) {
-                            snapshots.insert(task.taskId, task);
-                          }
-                        }
-                        QSet<QString> selectedIds;
-                        QList<QString> targetIds = input.taskIds;
-                        if (input.action == TaskBulkAction::ReplaceText && input.recurrenceScope >= 2) {
-                          QSet<QString> targetSet(targetIds.cbegin(), targetIds.cend());
-                          if (input.recurrenceScope == 3) {
-                            for (const TaskMutationSnapshot& candidate : managedSeries) {
-                              targetSet.insert(candidate.taskId);
-                            }
-                          } else {
-                            for (const QString& selectedId : input.taskIds) {
-                              const auto selected = snapshots.constFind(selectedId);
-                              if (selected == snapshots.cend() ||
-                                  !selected->managedRecurrenceSeriesId.has_value()) {
-                                continue;
-                              }
-                              for (const TaskMutationSnapshot& candidate : managedSeries) {
-                                if (candidate.managedRecurrenceSeriesId != selected->managedRecurrenceSeriesId) {
-                                  continue;
-                                }
-                                const bool include = candidate.managedRecurrenceOrdinal.has_value() &&
-                                                     selected->managedRecurrenceOrdinal.has_value() &&
-                                                     *candidate.managedRecurrenceOrdinal >=
-                                                         *selected->managedRecurrenceOrdinal &&
-                                                     (!candidate.completed || candidate.taskId == selectedId);
-                                if (include) {
-                                  targetSet.insert(candidate.taskId);
-                                }
-                              }
-                            }
-                          }
-                          targetIds = targetSet.values();
-                          std::sort(targetIds.begin(), targetIds.end());
-                        }
-                        for (const QString& taskId : targetIds) {
-                          selectedIds.insert(taskId);
-                        }
-                        TaskBulkMutationSummary summary{
-                            .requested = static_cast<int>(input.taskIds.size())};
-                        summary.items.reserve(input.taskIds.size());
-                        struct PendingWrite final {
-                          qsizetype itemIndex;
-                          std::future<TaskMutationResult> future;
-                        };
-                        std::deque<PendingWrite> pending;
-                        const auto collectFirst = [&summary, &pending] {
-                          PendingWrite write = std::move(pending.front());
-                          pending.pop_front();
-                          recordResult(summary, summary.items[write.itemIndex], write.future.get());
-                        };
-                        for (const QString& taskId : targetIds) {
-                          TaskBulkMutationItem item{.taskId = taskId};
-                          const auto task = snapshots.constFind(taskId);
-                          if (task == snapshots.cend()) {
-                            item.message = QStringLiteral("Task is no longer available");
-                            ++summary.skipped;
-                            summary.items.append(std::move(item));
-                            continue;
-                          }
-                          if (const std::optional<QString> reason =
-                                  ineligibility(input, *task, snapshots, selectedIds);
-                              reason.has_value()) {
-                            item.message = *reason;
-                            ++summary.skipped;
-                            summary.items.append(std::move(item));
-                            continue;
-                          }
-                          const qsizetype itemIndex = summary.items.size();
-                          summary.items.append(std::move(item));
-                          ++summary.eligible;
-                          if (input.previewOnly) {
-                            summary.items[itemIndex].message = QStringLiteral("Matches find text");
-                            continue;
-                          }
-                          pending.push_back({.itemIndex = itemIndex,
-                                             .future = submit(taskMutationService_, input, *task)});
-                          if (pending.size() >= static_cast<std::size_t>(kMaximumInFlightWrites)) {
-                            collectFirst();
-                          }
-                        }
-                        while (!pending.empty()) {
-                          collectFirst();
-                        }
-                        return summary;
-                      });
+    return std::async(
+        std::launch::async, [this, input = std::move(input)]() mutable -> TaskBulkMutationResult {
+          QList<QString> inspectedIds = input.taskIds;
+          if (input.action == TaskBulkAction::Reparent && input.parentTaskId.has_value()) {
+            inspectedIds.append(*input.parentTaskId);
+          }
+          TaskMutationSnapshotResult inspected =
+              taskMutationService_.inspect(std::move(inspectedIds)).get();
+          if (std::holds_alternative<AppError>(inspected)) {
+            return std::get<AppError>(std::move(inspected));
+          }
+          QHash<QString, TaskMutationSnapshot> snapshots;
+          for (TaskMutationSnapshot& task : std::get<QList<TaskMutationSnapshot>>(inspected)) {
+            snapshots.insert(task.taskId, std::move(task));
+          }
+          QList<TaskMutationSnapshot> managedSeries;
+          if (input.action == TaskBulkAction::ReplaceText && input.recurrenceScope >= 2) {
+            TaskMutationSnapshotResult managed =
+                taskMutationService_.inspectManagedSeries(input.taskIds).get();
+            if (std::holds_alternative<AppError>(managed)) {
+              return std::get<AppError>(std::move(managed));
+            }
+            managedSeries = std::get<QList<TaskMutationSnapshot>>(std::move(managed));
+            for (const TaskMutationSnapshot& task : managedSeries) {
+              snapshots.insert(task.taskId, task);
+            }
+          }
+          QSet<QString> selectedIds;
+          QList<QString> targetIds = input.taskIds;
+          if (input.action == TaskBulkAction::ReplaceText && input.recurrenceScope >= 2) {
+            QSet<QString> targetSet(targetIds.cbegin(), targetIds.cend());
+            if (input.recurrenceScope == 3) {
+              for (const TaskMutationSnapshot& candidate : managedSeries) {
+                targetSet.insert(candidate.taskId);
+              }
+            } else {
+              for (const QString& selectedId : input.taskIds) {
+                const auto selected = snapshots.constFind(selectedId);
+                if (selected == snapshots.cend() ||
+                    !selected->managedRecurrenceSeriesId.has_value()) {
+                  continue;
+                }
+                for (const TaskMutationSnapshot& candidate : managedSeries) {
+                  if (candidate.managedRecurrenceSeriesId != selected->managedRecurrenceSeriesId) {
+                    continue;
+                  }
+                  const bool include =
+                      candidate.managedRecurrenceOrdinal.has_value() &&
+                      selected->managedRecurrenceOrdinal.has_value() &&
+                      *candidate.managedRecurrenceOrdinal >= *selected->managedRecurrenceOrdinal &&
+                      (!candidate.completed || candidate.taskId == selectedId);
+                  if (include) {
+                    targetSet.insert(candidate.taskId);
+                  }
+                }
+              }
+            }
+            targetIds = targetSet.values();
+            std::sort(targetIds.begin(), targetIds.end());
+          }
+          for (const QString& taskId : targetIds) {
+            selectedIds.insert(taskId);
+          }
+          TaskBulkMutationSummary summary{.requested = static_cast<int>(input.taskIds.size())};
+          summary.items.reserve(input.taskIds.size());
+          struct PendingWrite final {
+            qsizetype itemIndex;
+            std::future<TaskMutationResult> future;
+          };
+          std::deque<PendingWrite> pending;
+          const auto collectFirst = [&summary, &pending] {
+            PendingWrite write = std::move(pending.front());
+            pending.pop_front();
+            recordResult(summary, summary.items[write.itemIndex], write.future.get());
+          };
+          for (const QString& taskId : targetIds) {
+            TaskBulkMutationItem item{.taskId = taskId};
+            const auto task = snapshots.constFind(taskId);
+            if (task == snapshots.cend()) {
+              item.message = QStringLiteral("Task is no longer available");
+              ++summary.skipped;
+              summary.items.append(std::move(item));
+              continue;
+            }
+            if (const std::optional<QString> reason =
+                    ineligibility(input, *task, snapshots, selectedIds);
+                reason.has_value()) {
+              item.message = *reason;
+              ++summary.skipped;
+              summary.items.append(std::move(item));
+              continue;
+            }
+            const qsizetype itemIndex = summary.items.size();
+            summary.items.append(std::move(item));
+            ++summary.eligible;
+            if (input.previewOnly) {
+              summary.items[itemIndex].message = QStringLiteral("Matches find text");
+              continue;
+            }
+            pending.push_back(
+                {.itemIndex = itemIndex, .future = submit(taskMutationService_, input, *task)});
+            if (pending.size() >= static_cast<std::size_t>(kMaximumInFlightWrites)) {
+              collectFirst();
+            }
+          }
+          while (!pending.empty()) {
+            collectFirst();
+          }
+          return summary;
+        });
   } catch (...) {
     return readyFuture(TaskBulkMutationResult(
         AppError(AppErrorCode::Database, QStringLiteral("Bulk task mutation could not start"))));
