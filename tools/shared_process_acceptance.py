@@ -209,20 +209,24 @@ def start_tui(environment: dict[str, str]) -> TerminalTui:
 def stop_tui(tui: TerminalTui) -> None:
     if tui.closed:
         return
-    if tui.process.poll() is None:
-        with suppress(OSError):
-            os.write(tui.master, b"q")
+    signalled = tui.process.poll() is None
+    if signalled:
+        with suppress(ProcessLookupError):
+            os.killpg(tui.process.pid, signal.SIGTERM)
         try:
             tui.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             with suppress(ProcessLookupError):
-                os.killpg(tui.process.pid, signal.SIGTERM)
+                os.killpg(tui.process.pid, signal.SIGKILL)
             tui.process.wait(timeout=5)
     with suppress(OSError):
         os.close(tui.master)
     tui.closed = True
-    if tui.process.returncode != 0:
-        raise RuntimeError(f"terminal TUI did not shut down cleanly (exit {tui.process.returncode})")
+    expected_returncodes = {0, -signal.SIGTERM} if signalled else {0}
+    if tui.process.returncode not in expected_returncodes:
+        raise RuntimeError(
+            f"terminal TUI did not shut down cleanly (exit {tui.process.returncode})"
+        )
 
 
 def wait_for_qt_ready(path: Path, process: subprocess.Popen[str]) -> dict[str, int]:

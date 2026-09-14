@@ -45,3 +45,8 @@ The pseudo terminal records when HCB emits a task frame, not when a physical
 terminal emulator paints pixels. Headless timing includes `pilot.pause()` and
 does not draw terminal output. No macOS or real-account startup measurement has
 been made.
+
+The terminal benchmark and the shared-process acceptance stop their isolated
+terminal child with `SIGTERM` after it has rendered. A `SIGTERM` exit is expected
+for that process-lifecycle check; keyboard-driven quit behavior is covered by
+the TUI's headless tests instead.
