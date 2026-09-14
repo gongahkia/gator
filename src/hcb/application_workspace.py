@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 
 from .application import (
     Json,
+    TaskPage,
     TimeSlot,
     WorkspaceSnapshot,
     WorkspaceSummary,
@@ -65,6 +66,25 @@ class WorkspaceServiceMixin(_ApplicationServiceBase):
             instance_ranges=tuple(self.storage.list_instance_ranges(account_id)),
             pending=self.pending_count(account_id),
         )
+
+    def task_page(
+        self,
+        account_id: str,
+        *,
+        limit: int,
+        offset: int = 0,
+        list_id: str | None = None,
+    ) -> TaskPage:
+        """Return one bounded, ordered task page without hydrating the whole mirror."""
+        self._account(account_id)
+        if not 1 <= limit <= 500:
+            raise ValueError("task page limit must be between 1 and 500")
+        if offset < 0:
+            raise ValueError("task page offset must not be negative")
+        rows = self.storage.list_tasks_page(
+            account_id, limit=limit + 1, offset=offset, list_id=list_id
+        )
+        return TaskPage(tuple(rows[:limit]), offset + limit if len(rows) > limit else None)
 
     def pending_count(self, account_id: str) -> int:
         return self.storage.pending_mutation_count(account_id)

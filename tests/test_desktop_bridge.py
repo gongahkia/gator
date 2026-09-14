@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from pathlib import Path
+from time import perf_counter
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 import pytest
 
+from hcb.benchmarks import create_large_fixture
 from hcb.desktop_bridge import BRIDGE_API_VERSION, DesktopBridge
 from hcb.models import Account, Calendar, DateTimeKind, Event, EventDateTime, Task, TaskList
 from hcb.paths import AppPaths
@@ -326,3 +331,100 @@ def test_parallel_bridge_reads_coexist_with_cli_core_writes(
     assert pending_after_write == 20
     with Storage(paths.database_file) as storage:
         assert storage.pending_mutation_count("work") == 20
+
+
+def test_bridge_large_workspace_slices_avoid_hydration_until_requested(tmp_path: Path) -> None:
+    paths = AppPaths(tmp_path / "config", tmp_path / "data", tmp_path / "cache")
+    create_large_fixture(paths.database_file)
+    bridge = DesktopBridge(lambda: Runtime(paths, environ={}), token="bridge-test-token")
+    worker = threading.Thread(target=bridge.serve_forever, daemon=True)
+    worker.start()
+    try:
+        started = perf_counter()
+        status, response = _request(bridge, "GET", "/v1/accounts/benchmark/workspace")
+        summary_seconds = perf_counter() - started
+        assert status == 200
+        summary = _data(response)["workspace"]
+        assert isinstance(summary, dict)
+        assert "tasks" not in summary and "events" not in summary
+
+        started = perf_counter()
+        status, response = _request(bridge, "GET", "/v1/accounts/benchmark/tasks?limit=200")
+        first_page_seconds = perf_counter() - started
+        assert status == 200
+        page = _data(response)["page"]
+        assert isinstance(page, dict)
+        first_page = page["tasks"]
+        cursor = page["next_cursor"]
+        assert isinstance(first_page, list) and len(first_page) == 200
+        assert isinstance(cursor, str)
+
+        status, response = _request(
+            bridge, "GET", f"/v1/accounts/benchmark/tasks?limit=200&cursor={cursor}"
+        )
+        assert status == 200
+        second_page = _data(response)["page"]
+        assert isinstance(second_page, dict)
+        assert first_page[-1]["id"] != second_page["tasks"][0]["id"]  # type: ignore[index]
+
+        started = perf_counter()
+        status, response = _request(
+            bridge,
+            "GET",
+            "/v1/accounts/benchmark/workspace?include=tasks,events&start=2026-03-01&end=2026-04-01",
+        )
+        full_slice_seconds = perf_counter() - started
+        assert status == 200
+        workspace = _data(response)["workspace"]
+        assert isinstance(workspace, dict)
+        assert len(workspace["tasks"]) == 10_000  # type: ignore[arg-type]
+        assert len(workspace["events"]) > 100  # type: ignore[arg-type]
+
+        # Regression tripwires, deliberately looser than local development.
+        assert summary_seconds < 1.0
+        assert first_page_seconds < 0.25
+        assert full_slice_seconds < 5.0
+    finally:
+        bridge.shutdown()
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        bridge.close()
+
+
+def test_cli_bridge_process_writes_then_removes_its_descriptor(tmp_path: Path) -> None:
+    ready_file = tmp_path / "bridge.json"
+    environment = {
+        **os.environ,
+        "XDG_CONFIG_HOME": str(tmp_path / "config"),
+        "XDG_DATA_HOME": str(tmp_path / "data"),
+        "XDG_CACHE_HOME": str(tmp_path / "cache"),
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    process = subprocess.Popen(
+        [sys.executable, "-m", "hcb.cli", "bridge", "serve", "--ready-file", str(ready_file)],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 5
+        while not ready_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert ready_file.exists()
+        descriptor = json.loads(ready_file.read_text())
+        request = Request(
+            descriptor["url"] + "/v1/health",
+            headers={"Authorization": f"Bearer {descriptor['token']}"},
+        )
+        with urlopen(request, timeout=5) as response:  # noqa: S310 - launched loopback helper
+            assert response.status == 200
+            assert json.loads(response.read())["data"]["service"] == "hcb-desktop-bridge"
+    finally:
+        process.terminate()
+        process.wait(timeout=5)
+
+    assert process.returncode == 0
+    assert not ready_file.exists()

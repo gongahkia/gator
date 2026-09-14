@@ -114,6 +114,14 @@ class WorkspaceSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class TaskPage:
+    """A bounded local task slice for frontends that virtualize large lists."""
+
+    tasks: tuple[Task, ...]
+    next_offset: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class TimeSlot:
     start: datetime
     end: datetime

@@ -198,6 +198,21 @@ class AccountTaskRepository(_StorageCore):
         sql += " ORDER BY status,due,title"
         return [self._task(row) for row in self.connection.execute(sql, args)]
 
+    def list_tasks_page(
+        self,
+        account_id: str,
+        *,
+        limit: int,
+        offset: int,
+        list_id: str | None = None,
+    ) -> list[Task]:
+        """Load a bounded active-task page in the stable frontend list order."""
+        sql, args = "SELECT * FROM tasks WHERE account_id=? AND deleted=0", [account_id]
+        if list_id is not None:
+            sql, args = sql + " AND list_id=?", [*args, list_id]
+        sql += " ORDER BY status,due,title,id LIMIT ? OFFSET ?"
+        return [self._task(row) for row in self.connection.execute(sql, [*args, limit, offset])]
+
     def search_tasks(self, account_id: str, query: str, *, limit: int = 50) -> list[Task]:
         escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         rows = self.connection.execute(

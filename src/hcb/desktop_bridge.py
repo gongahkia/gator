@@ -14,6 +14,7 @@ import os
 import secrets
 import signal
 import threading
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -136,6 +137,12 @@ class BridgeOperations:
 
     def start_oauth(self, account_id: str, expected_email: str) -> _Operation:
         def run(runtime: Runtime, operation: _Operation) -> Json:
+            # GoogleAuthenticator currently has no cancellation hook once it has
+            # opened the browser/listener flow. A cancellation that wins before
+            # that point is honoured; a later one remains visible to the client
+            # but cannot interrupt the provider operation.
+            if operation.is_cancelled():
+                return {"cancelled": True}
             operation.add_progress("waiting for browser authorization")
             result = runtime.connect_account(account_id, expected_email=expected_email)
             # OAuthResult contains access and refresh tokens. Never cross the bridge.
@@ -192,7 +199,7 @@ class BridgeOperations:
         else:
             with operation._lock:
                 sync = result.get("sync")
-                if operation.is_cancelled() or (
+                if result.get("cancelled") is True or (
                     isinstance(sync, dict) and sync.get("cancelled") is True
                 ):
                     operation.state = "cancelled"
@@ -400,6 +407,8 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                 email = _string(body["expected_email"], "expected_email")
                 operation = bridge.operations.start_oauth(account_id, email)
                 return HTTPStatus.ACCEPTED, {"operation": operation.snapshot()}
+            if method == "GET" and tail == ("tasks",):
+                return HTTPStatus.OK, {"page": self._task_page(account_id, query)}
             if method == "POST" and tail == ("tasks",):
                 _no_query(query)
                 return HTTPStatus.CREATED, {"task": self._create_task(account_id, body)}
@@ -469,6 +478,22 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             result = self._with_application(read)
             assert isinstance(result, dict)
             return result
+
+        def _task_page(self, account_id: str, query: dict[str, list[str]]) -> Json:
+            _query_keys(query, {"cursor", "limit", "list_id"})
+            cursor = _single_query(query, "cursor")
+            offset = _decode_task_cursor(cursor) if cursor is not None else 0
+            limit = _query_int(query, "limit", default=200, minimum=1, maximum=500)
+            list_id = _single_query(query, "list_id")
+            page = self._with_application(
+                lambda app: app.task_page(account_id, limit=limit, offset=offset, list_id=list_id)
+            )
+            return {
+                "tasks": to_primitive(page.tasks),
+                "next_cursor": _encode_task_cursor(page.next_offset)
+                if page.next_offset is not None
+                else None,
+            }
 
         def _search(self, account_id: str, query: dict[str, list[str]]) -> Any:
             _query_keys(query, {"q", "limit"})
@@ -754,6 +779,25 @@ def _include(query: dict[str, list[str]]) -> set[str]:
     if not values.issubset(allowed) or "" in values:
         raise ValueError("include may contain only tasks and events")
     return values
+
+
+def _encode_task_cursor(offset: int) -> str:
+    return urlsafe_b64encode(f"v1:{offset}".encode()).rstrip(b"=").decode()
+
+
+def _decode_task_cursor(value: str) -> int:
+    if not 1 <= len(value) <= 128:
+        raise ValueError("task cursor is invalid")
+    try:
+        padded = value + "=" * (-len(value) % 4)
+        decoded = urlsafe_b64decode(padded.encode()).decode("ascii")
+        version, offset_text = decoded.split(":", maxsplit=1)
+        offset = int(offset_text)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ValueError("task cursor is invalid") from exc
+    if version != "v1" or offset < 0:
+        raise ValueError("task cursor is invalid")
+    return offset
 
 
 def _range_value(values: list[str]) -> date | datetime:
