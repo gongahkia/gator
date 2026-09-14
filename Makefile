@@ -1,19 +1,19 @@
 SHELL := /bin/sh
 
-.PHONY: sync format format-check lint typecheck test check build benchmark benchmark-desktop-bridge qt-bridge-acceptance calendar-mouse-smoke local-ci install-hooks clean
+.PHONY: sync format format-check lint typecheck test check build benchmark benchmark-desktop-bridge qt-bridge-acceptance shared-process-acceptance calendar-mouse-smoke local-ci install-hooks clean
 
 sync:
 	uv sync --extra dev
 
 format:
-	uv run ruff format src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/calendar_mouse_smoke.py
-	uv run ruff check --fix src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/calendar_mouse_smoke.py
+	uv run ruff format src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/shared_process_acceptance.py tools/calendar_mouse_smoke.py
+	uv run ruff check --fix src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/shared_process_acceptance.py tools/calendar_mouse_smoke.py
 
 format-check:
-	uv run ruff format --check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/calendar_mouse_smoke.py
+	uv run ruff format --check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/shared_process_acceptance.py tools/calendar_mouse_smoke.py
 
 lint:
-	uv run ruff check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/calendar_mouse_smoke.py
+	uv run ruff check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/qt_bridge_acceptance.py tools/shared_process_acceptance.py tools/calendar_mouse_smoke.py
 
 typecheck:
 	uv run mypy src
@@ -34,6 +34,9 @@ benchmark-desktop-bridge:
 
 qt-bridge-acceptance:
 	PYTHONDONTWRITEBYTECODE=1 uv run python tools/qt_bridge_acceptance.py --native "/tmp/hcb-qt-tests/native/Hot Cross Buns"
+
+shared-process-acceptance:
+	PYTHONDONTWRITEBYTECODE=1 uv run python tools/shared_process_acceptance.py --native "/tmp/hcb-qt-tests/native/Hot Cross Buns"
 
 calendar-mouse-smoke:
 	PYTHONDONTWRITEBYTECODE=1 uv run python tools/calendar_mouse_smoke.py
