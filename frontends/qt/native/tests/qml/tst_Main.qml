@@ -2233,6 +2233,82 @@ TestCase {
         mainWindow.destroy()
     }
 
+    function test_bridgeModeRoutesSupportedMutationUiCalls() {
+        const component = Qt.createComponent("../../qml/Main.qml")
+        compare(component.status, Component.Ready, component.errorString())
+
+        const calls = []
+        const controller = {
+            bridgeMode: true,
+            googleConnected: true,
+            busy: false,
+            createTaskDetailed: function(taskListId, parentTaskId, title) {
+                calls.push({ method: "createTaskDetailed", taskListId: taskListId, title: title })
+            },
+            updateTaskDetailed: function(taskId, title) {
+                calls.push({ method: "updateTaskDetailed", taskId: taskId, title: title })
+            },
+            setTaskCompleted: function(taskId, completed) {
+                calls.push({ method: "setTaskCompleted", taskId: taskId, completed: completed })
+            },
+            deleteTask: function(taskId) { calls.push({ method: "deleteTask", taskId: taskId }) },
+            createEvent: function(calendarId, title) {
+                calls.push({ method: "createEvent", calendarId: calendarId, title: title })
+            },
+            createEventDetailed: function(calendarId, title) {
+                calls.push({ method: "createEventDetailed", calendarId: calendarId, title: title })
+            },
+            updateEventDetailed: function(eventId, calendarId, title) {
+                calls.push({ method: "updateEventDetailed", eventId: eventId,
+                             calendarId: calendarId, title: title })
+            },
+            deleteEvent: function(eventId, recurrenceScope) {
+                calls.push({ method: "deleteEvent", eventId: eventId,
+                             recurrenceScope: recurrenceScope })
+            },
+            connectGoogle: function() { calls.push({ method: "connectGoogle" }) },
+            syncGoogle: function() { calls.push({ method: "syncGoogle" }) },
+            reportBridgeUnsupportedAction: function() { calls.push({ method: "unsupported" }) }
+        }
+        const mainWindow = component.createObject(null, {
+            navigationCommands: navigationCommands,
+            appController: controller
+        })
+        verify(mainWindow !== null)
+
+        mainWindow.taskCreateDialog.taskCreateRequested("list-inbox", "", "Create through HCB", "",
+                                                        "", "", 0, false, 0, 1, 0, "", 0, "", "", "")
+        mainWindow.taskEditDialog.taskUpdateRequested("task-1", "Update through HCB", "", "", "", 0,
+                                                      false, 0, 1, 0, "", 0, "", "", "")
+        mainWindow.taskList.taskCompletionRequested("task-1", true)
+        mainWindow.taskDeleteDialog.taskDeleteRequested("task-1")
+        mainWindow.calendarQuickCreateDialog.eventCreateRequested("Quick event",
+                                                                    "2026-07-26T10:00:00.000Z",
+                                                                    "2026-07-26T11:00:00.000Z", false)
+        mainWindow.controllerCall("createEventDetailed", ["calendar-primary", "Detailed event"])
+        mainWindow.controllerCall("updateEventDetailed", ["event-1", "calendar-primary", "Edited event"])
+        mainWindow.eventDeleteDialog.eventDeleteRequested("event-1", 2)
+        mainWindow.controllerCall("connectGoogle", [])
+        mainWindow.controllerCall("syncGoogle", [])
+        mainWindow.controllerCall("createTaskList", ["Blocked legacy mutation"])
+
+        compare(calls.length, 11)
+        compare(calls[0].method, "createTaskDetailed")
+        compare(calls[0].taskListId, "list-inbox")
+        compare(calls[1].method, "updateTaskDetailed")
+        compare(calls[2].method, "setTaskCompleted")
+        compare(calls[3].method, "deleteTask")
+        compare(calls[4].method, "createEvent")
+        compare(calls[5].method, "createEventDetailed")
+        compare(calls[6].method, "updateEventDetailed")
+        compare(calls[7].method, "deleteEvent")
+        compare(calls[7].recurrenceScope, 2)
+        compare(calls[8].method, "connectGoogle")
+        compare(calls[9].method, "syncGoogle")
+        compare(calls[10].method, "unsupported")
+        mainWindow.destroy()
+    }
+
     function test_mainForwardsTaskReparentRequest() {
         const component = Qt.createComponent("../../qml/Main.qml")
         compare(component.status, Component.Ready, component.errorString())

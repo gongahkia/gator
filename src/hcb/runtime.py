@@ -199,9 +199,10 @@ class Runtime:
         expected_email: str,
         cancelled: Callable[[], bool] | None = None,
     ) -> OAuthResult:
-        return self.authenticator(account_id).connect(
-            account_id, expected_email=expected_email, cancelled=cancelled
-        )
+        authenticator = self.authenticator(account_id)
+        if cancelled is None:
+            return authenticator.connect(account_id, expected_email=expected_email)
+        return authenticator.connect(account_id, expected_email=expected_email, cancelled=cancelled)
 
     def query_freebusy(self, account_id: str, body: dict[str, Any]) -> dict[str, Any]:
         return self.sync_engine(account_id).gateway.freebusy(body)

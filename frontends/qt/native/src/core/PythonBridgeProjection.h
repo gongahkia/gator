@@ -17,6 +17,7 @@ namespace hcb {
 
 struct PythonBridgeWorkspaceSummary final {
   QString accountId;
+  QString accountEmail;
   QList<TaskListSummary> taskLists;
   QList<CalendarSummary> calendars;
   int pending;

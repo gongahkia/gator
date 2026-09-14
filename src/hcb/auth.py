@@ -217,7 +217,7 @@ class GoogleAuthenticator:
         if timeout_seconds <= 0:
             raise ValueError("OAuth timeout must be positive")
         callback = _OAuthCallbackApplication(
-            "HCB authorization complete. You may close this window."
+            "HCB received the authorization response. You may return to HCB."
         )
         server = make_server(
             "127.0.0.1",

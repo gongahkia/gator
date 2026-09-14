@@ -87,8 +87,9 @@ def test_connect_checks_google_identity_before_storing_token(
 def test_connect_cancels_while_waiting_for_loopback_callback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import hcb.auth as auth_module
     from google_auth_oauthlib.flow import InstalledAppFlow
+
+    import hcb.auth as auth_module
 
     cancelled = False
 

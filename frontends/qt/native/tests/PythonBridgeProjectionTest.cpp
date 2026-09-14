@@ -28,7 +28,7 @@ private slots:
 
 void PythonBridgeProjectionTest::projectsSummaryAndTaskPage() {
   const QJsonObject summaryData = object(R"json(
-    {"workspace":{"account":{"id":"work"},"pending":2,
+    {"workspace":{"account":{"id":"work","email":"work@example.test"},"pending":2,
     "task_lists":[{"id":"inbox","account_id":"work","title":"Inbox","remote_id":null,
       "position":3,"metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}],
     "calendars":[{"id":"primary","account_id":"work","summary":"Primary","remote_id":null,
@@ -41,6 +41,7 @@ void PythonBridgeProjectionTest::projectsSummaryAndTaskPage() {
   const hcb::PythonBridgeWorkspaceSummary& summary =
       std::get<hcb::PythonBridgeWorkspaceSummary>(decoded);
   QCOMPARE(summary.accountId, QStringLiteral("work"));
+  QCOMPARE(summary.accountEmail, QStringLiteral("work@example.test"));
   QCOMPARE(summary.pending, 2);
   QCOMPARE(summary.taskLists.size(), 1);
   QCOMPARE(summary.taskLists.first().sortOrder, std::int64_t(3));
@@ -85,7 +86,7 @@ void PythonBridgeProjectionTest::projectsDateBoundedEvents() {
 
 void PythonBridgeProjectionTest::rejectsCrossAccountAndMalformedPayloads() {
   const QJsonObject crossAccount = object(R"json(
-    {"workspace":{"account":{"id":"work"},"pending":0,
+    {"workspace":{"account":{"id":"work","email":"work@example.test"},"pending":0,
     "task_lists":[{"id":"inbox","account_id":"other","title":"Inbox","remote_id":null,
       "position":0,"metadata":{"etag":null,"local_updated_at":"2026-09-14T00:00:00+00:00"}}],
     "calendars":[]}}

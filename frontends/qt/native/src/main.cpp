@@ -12,6 +12,7 @@
 #include <QQuickWindow>
 #include <QProcess>
 #include <QQmlApplicationEngine>
+#include <QTemporaryDir>
 #include <QTextStream>
 #include <QTimer>
 #include <QVariant>
@@ -269,6 +270,7 @@ int runApplication(int argc, char* argv[]) {
   }
   std::optional<hcb::PythonBridgeConnection> bridgeConnection;
   std::unique_ptr<hcb::PythonBridgeProcessLauncher> bridgeLauncher;
+  std::unique_ptr<QTemporaryDir> bridgeLegacyState;
   QString bridgeAccountId;
   if (std::holds_alternative<BridgeLaunchOptions>(bridgeOptions)) {
     const BridgeLaunchOptions& options = std::get<BridgeLaunchOptions>(bridgeOptions);
@@ -296,6 +298,14 @@ int runApplication(int argc, char* argv[]) {
   std::optional<hcb::FilePath> databasePath;
   if (timelineProfile) {
     databasePath = hcb::FilePath::fromAbsolute(QStringLiteral("/dev/null"));
+  } else if (bridgeConnection.has_value()) {
+    bridgeLegacyState = std::make_unique<QTemporaryDir>();
+    if (!bridgeLegacyState->isValid()) {
+      startupTimings.mark(u"bridge.legacy.state.unavailable");
+      return 1;
+    }
+    databasePath = hcb::FilePath::fromAbsolute(
+        bridgeLegacyState->filePath(QStringLiteral("legacy-ui.sqlite")));
   } else {
     std::optional<hcb::AppPaths> paths = hcb::AppPaths::discover();
     if (!paths.has_value()) {
@@ -309,7 +319,7 @@ int runApplication(int argc, char* argv[]) {
     startupTimings.mark(u"database.path.unavailable");
     return 1;
   }
-  if (!timelineProfile &&
+  if (!timelineProfile && !bridgeConnection.has_value() &&
       !QDir().mkpath(QFileInfo(databasePath->nativePath()).absolutePath())) {
     startupTimings.mark(u"database.directory.unavailable");
     return 1;

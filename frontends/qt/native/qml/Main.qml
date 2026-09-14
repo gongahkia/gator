@@ -206,7 +206,8 @@ ApplicationWindow {
         if (appController !== null && appController.bridgeMode === true &&
                 ["refresh", "setCalendarDate", "createTaskDetailed", "updateTaskDetailed",
                  "setTaskCompleted", "deleteTask", "createEvent", "updateEvent",
-                 "createEventDetailed", "updateEventDetailed", "deleteEvent"].indexOf(method) < 0) {
+                 "createEventDetailed", "updateEventDetailed", "deleteEvent", "connectGoogle",
+                 "syncGoogle"].indexOf(method) < 0) {
             appController.reportBridgeUnsupportedAction()
             return
         }
@@ -2020,6 +2021,7 @@ ApplicationWindow {
                 }
 
                 Button {
+                    visible: window.appController === null || window.appController.bridgeMode !== true
                     text: "Save OAuth client"
                     enabled: googleClientIdField.text.trim().length > 0 &&
                              (window.appController === null || !window.appController.busy)
@@ -2028,17 +2030,30 @@ ApplicationWindow {
                 }
 
                 Button {
-                    text: window.appController !== null && window.appController.googleConnected ? "Reconnect Google" : "Connect Google"
+                    text: window.appController !== null && window.appController.bridgeMode === true &&
+                          window.appController.bridgeOperationKind === "Google authorization"
+                          ? "Cancel Google authorization"
+                          : (window.appController !== null && window.appController.googleConnected
+                             ? "Reconnect Google" : "Connect Google")
                     enabled: window.appController !== null &&
-                             window.controllerString("clientId", "").length > 0 &&
+                             (window.appController.bridgeMode === true ||
+                              window.controllerString("clientId", "").length > 0) &&
+                             (window.appController.bridgeMode !== true ||
+                              window.appController.bridgeOperationActive !== true ||
+                              window.appController.bridgeOperationKind === "Google authorization") &&
                              !window.appController.busy
                     Accessible.name: text
                     onClicked: window.controllerCall("connectGoogle", [])
                 }
 
                 Button {
-                    text: "Sync Google now"
+                    text: window.appController !== null && window.appController.bridgeMode === true &&
+                          window.appController.bridgeOperationKind === "HCB sync"
+                          ? "Cancel HCB sync" : "Sync Google now"
                     enabled: window.appController !== null && window.appController.googleConnected &&
+                             (window.appController.bridgeMode !== true ||
+                              window.appController.bridgeOperationActive !== true ||
+                              window.appController.bridgeOperationKind === "HCB sync") &&
                              !window.appController.busy
                     Accessible.name: text
                     onClicked: window.controllerCall("syncGoogle", [])

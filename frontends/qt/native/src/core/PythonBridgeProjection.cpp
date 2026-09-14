@@ -217,10 +217,12 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
   const QJsonObject workspace = workspaceValue.toObject();
   const QJsonObject account = workspace.value(QStringLiteral("account")).toObject();
   const std::optional<QString> accountId = requiredString(account, u"id", kMaximumIdLength);
+  const std::optional<QString> accountEmail = requiredString(account, u"email", 320);
   const QJsonValue pending = workspace.value(QStringLiteral("pending"));
   const QJsonValue taskListsValue = workspace.value(QStringLiteral("task_lists"));
   const QJsonValue calendarsValue = workspace.value(QStringLiteral("calendars"));
-  if (!accountId.has_value() || !isIdentifier(*accountId) || !pending.isDouble() ||
+  if (!accountId.has_value() || !accountEmail.has_value() || !isIdentifier(*accountId) ||
+      !accountEmail->contains(u'@') || !pending.isDouble() ||
       pending.toInt(-1) < 0 || !taskListsValue.isArray() || !calendarsValue.isArray() ||
       taskListsValue.toArray().size() > kMaximumTaskLists ||
       calendarsValue.toArray().size() > kMaximumCalendars) {
@@ -294,7 +296,10 @@ PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(con
                       .hidden = hidden.toBool(),
                       .updatedAt = *updatedAt});
   }
-  return PythonBridgeWorkspaceSummary{*accountId, std::move(taskLists), std::move(calendars),
+  return PythonBridgeWorkspaceSummary{*accountId,
+                                      *accountEmail,
+                                      std::move(taskLists),
+                                      std::move(calendars),
                                       pending.toInt()};
 }
 

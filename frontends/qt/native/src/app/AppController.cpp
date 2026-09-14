@@ -21,6 +21,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QColor>
+#include <QCoreApplication>
 #include <QDesktopServices>
 #include <QFile>
 #include <QFileDialog>
@@ -33,6 +34,7 @@
 #include <QMetaType>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QSet>
 #include <QTimeZone>
 #include <QTimer>
@@ -1172,6 +1174,10 @@ bool AppController::busy() const { return busy_; }
 
 bool AppController::bridgeMode() const { return pythonBridgeClient_ != nullptr; }
 
+bool AppController::bridgeOperationActive() const { return !pythonBridgeOperationId_.isEmpty(); }
+
+QString AppController::bridgeOperationKind() const { return pythonBridgeOperationKind_; }
+
 SearchResultsModel& AppController::searchResultsModel() { return *searchResultsModelPointer_; }
 
 void AppController::initialize() {
@@ -1808,6 +1814,8 @@ void AppController::refreshBridge() {
     return;
   }
   const std::uint64_t generation = ++pythonBridgeRefreshGeneration_;
+  pythonBridgeTasksReady_ = false;
+  pythonBridgeCalendarReady_ = false;
   setStatus(QStringLiteral("Loading HCB core bridge"));
   watch(pythonBridgeClient_->workspace(pythonBridgeAccountId_), [this, generation](PythonBridgeResult result) {
     if (generation != pythonBridgeRefreshGeneration_) {
@@ -1834,6 +1842,7 @@ void AppController::refreshBridge() {
       setTaskListError(statusMessage_);
       return;
     }
+    pythonBridgeExpectedEmail_ = summary.accountEmail;
     setTaskListError({});
     pythonBridgeTaskListTitles_ = PythonBridgeProjection::taskListTitles(summary);
     taskListModel_.setTaskLists(std::move(summary.taskLists));
@@ -1912,6 +1921,8 @@ void AppController::loadBridgeTaskPage(std::uint64_t generation,
             return;
           }
           setStatus(QStringLiteral("HCB core bridge loaded %1 tasks").arg(accumulated.size()));
+          pythonBridgeTasksReady_ = true;
+          completeBridgeReadyProbe();
         });
 }
 
@@ -1962,6 +1973,8 @@ void AppController::applyBridgeCalendarEvents(std::uint64_t generation,
           agendaModel_.setEvents(std::move(layouts.agendaEvents));
           timelineModel_.applyLayout(std::move(layouts.timeline));
           monthGridModel_.applyLayout(std::move(layouts.month));
+          pythonBridgeCalendarReady_ = true;
+          completeBridgeReadyProbe();
         });
 }
 
@@ -2045,6 +2058,125 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
     *existing = std::move(projected);
   }
   applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
+}
+
+void AppController::startBridgeOperation(QString kind, std::future<PythonBridgeResult> future) {
+  watch(std::move(future), [this, kind = std::move(kind)](PythonBridgeResult result) {
+    if (std::holds_alternative<AppError>(result)) {
+      setStatus(errorMessage(std::get<AppError>(std::move(result))));
+      return;
+    }
+    const QJsonObject operation = std::get<QJsonObject>(std::move(result))
+                                      .value(QStringLiteral("operation"))
+                                      .toObject();
+    const QString operationId = operation.value(QStringLiteral("id")).toString();
+    if (operationId.isEmpty() || operationId.size() > 256 || operationId != operationId.trimmed() ||
+        operationId.contains(QChar::Null)) {
+      setStatus(QStringLiteral("HCB bridge returned an invalid operation"));
+      return;
+    }
+    pythonBridgeOperationId_ = operationId;
+    pythonBridgeOperationKind_ = kind;
+    emit bridgeOperationChanged();
+    setSyncStatus(kind + QStringLiteral(" in progress"));
+    pollBridgeOperation(operationId);
+  });
+}
+
+void AppController::pollBridgeOperation(QString operationId) {
+  if (pythonBridgeClient_ == nullptr || operationId != pythonBridgeOperationId_) {
+    return;
+  }
+  watch(pythonBridgeClient_->operation(operationId), [this, operationId](PythonBridgeResult result) {
+    if (operationId != pythonBridgeOperationId_) {
+      return;
+    }
+    if (std::holds_alternative<AppError>(result)) {
+      setStatus(errorMessage(std::get<AppError>(std::move(result))));
+      pythonBridgeOperationId_.clear();
+      pythonBridgeOperationKind_.clear();
+      emit bridgeOperationChanged();
+      return;
+    }
+    const QJsonObject operation = std::get<QJsonObject>(std::move(result))
+                                      .value(QStringLiteral("operation"))
+                                      .toObject();
+    const QString state = operation.value(QStringLiteral("state")).toString();
+    if (state != QStringLiteral("queued") && state != QStringLiteral("running") &&
+        state != QStringLiteral("succeeded") && state != QStringLiteral("failed") &&
+        state != QStringLiteral("cancelled")) {
+      setStatus(QStringLiteral("HCB bridge returned an invalid operation state"));
+      pythonBridgeOperationId_.clear();
+      pythonBridgeOperationKind_.clear();
+      emit bridgeOperationChanged();
+      return;
+    }
+    const QJsonArray progress = operation.value(QStringLiteral("progress")).toArray();
+    if (!progress.isEmpty() && progress.last().isString()) {
+      setStatus(progress.last().toString());
+    }
+    if (state == QStringLiteral("queued") || state == QStringLiteral("running")) {
+      QTimer::singleShot(250, this, [this, operationId] { pollBridgeOperation(operationId); });
+      return;
+    }
+    const QString kind = pythonBridgeOperationKind_;
+    pythonBridgeOperationId_.clear();
+    pythonBridgeOperationKind_.clear();
+    emit bridgeOperationChanged();
+    if (state == QStringLiteral("succeeded")) {
+      setSyncStatus(kind + QStringLiteral(" complete"));
+      setStatus(kind + QStringLiteral(" complete"));
+      refreshBridge();
+      return;
+    }
+    if (state == QStringLiteral("cancelled")) {
+      setSyncStatus(kind + QStringLiteral(" cancelled"));
+      setStatus(kind + QStringLiteral(" cancelled"));
+      return;
+    }
+    const QString message = operation.value(QStringLiteral("error"))
+                                .toObject()
+                                .value(QStringLiteral("message"))
+                                .toString();
+    setSyncStatus(kind + QStringLiteral(" failed"));
+    setStatus(message.isEmpty() ? kind + QStringLiteral(" failed") : message);
+  });
+}
+
+void AppController::cancelBridgeOperation() {
+  if (pythonBridgeClient_ == nullptr || pythonBridgeOperationId_.isEmpty()) {
+    return;
+  }
+  const QString operationId = pythonBridgeOperationId_;
+  watch(pythonBridgeClient_->cancelOperation(operationId), [this, operationId](PythonBridgeResult result) {
+    if (operationId != pythonBridgeOperationId_) {
+      return;
+    }
+    if (std::holds_alternative<AppError>(result)) {
+      setStatus(errorMessage(std::get<AppError>(std::move(result))));
+      return;
+    }
+    setStatus(QStringLiteral("Cancelling HCB bridge operation"));
+    pollBridgeOperation(operationId);
+  });
+}
+
+void AppController::completeBridgeReadyProbe() {
+  const QString readyPath = qEnvironmentVariable("HCB_BRIDGE_READY_FILE");
+  if (readyPath.isEmpty() || !pythonBridgeTasksReady_ || !pythonBridgeCalendarReady_) {
+    return;
+  }
+  QSaveFile readyFile(readyPath);
+  if (!readyFile.open(QIODevice::WriteOnly)) {
+    return;
+  }
+  const QJsonObject payload{{QStringLiteral("tasks"), taskProjectionTasks_.size()},
+                            {QStringLiteral("events"), pythonBridgeCalendarEvents_.size()}};
+  const QByteArray encoded = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+  if (readyFile.write(encoded) != encoded.size() || !readyFile.commit()) {
+    return;
+  }
+  QCoreApplication::quit();
 }
 
 void AppController::setReminderService(ReminderService* service) {
@@ -3762,6 +3894,18 @@ void AppController::saveClientId(QString clientId, QString clientSecret) {
 }
 
 void AppController::connectGoogle() {
+  if (bridgeMode()) {
+    if (bridgeOperationActive()) {
+      cancelBridgeOperation();
+    } else if (pythonBridgeClient_ == nullptr || pythonBridgeExpectedEmail_.isEmpty()) {
+      setStatus(QStringLiteral("HCB bridge account details have not loaded"));
+    } else {
+      startBridgeOperation(
+          QStringLiteral("Google authorization"),
+          pythonBridgeClient_->startOAuth(pythonBridgeAccountId_, pythonBridgeExpectedEmail_));
+    }
+    return;
+  }
   if (clientId_.isEmpty()) {
     setStatus(QStringLiteral("Save a desktop OAuth client ID before connecting Google"));
     return;
@@ -3908,6 +4052,17 @@ void AppController::finishOAuthConnection(std::uint64_t requestId, OAuthTokenSet
 }
 
 void AppController::syncGoogle() {
+  if (bridgeMode()) {
+    if (bridgeOperationActive()) {
+      cancelBridgeOperation();
+    } else if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+    } else {
+      startBridgeOperation(QStringLiteral("HCB sync"),
+                           pythonBridgeClient_->startSync(pythonBridgeAccountId_));
+    }
+    return;
+  }
   if (!googleConnected_ || clientId_.isEmpty() || credentialStore_ == nullptr) {
     return;
   }

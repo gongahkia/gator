@@ -11,6 +11,25 @@ Start it from the same installed HCB version as the frontend:
 hcb bridge serve --ready-file /private/launcher-directory/bridge.json
 ```
 
+The Qt prototype accepts either an externally managed descriptor or an account
+that it should launch itself:
+
+```sh
+Hot\ Cross\ Buns --bridge-descriptor /private/launcher-directory/bridge.json --bridge-account ACCOUNT
+Hot\ Cross\ Buns --bridge-account ACCOUNT
+```
+
+The second form resolves `hcb` from `PATH`, creates an owner-only temporary
+directory, waits for the descriptor to pass the same validation as an external
+one, and terminates the child during normal application shutdown. The external
+form remains available to support development and test harnesses that own the
+core process themselves.
+
+Bridge mode bypasses the historical Qt database initialization. Its remaining
+legacy controller dependencies receive an unused database path in a private
+temporary directory, which is removed when the Qt process exits; bridge-mode
+reads and mutations use only the Python core selected by the descriptor.
+
 The launcher must create a new path in an owner-only directory. The command
 binds only `127.0.0.1`, writes a new JSON descriptor with mode `0600`, and stays
 in the foreground. The descriptor contains a version, loopback URL, and

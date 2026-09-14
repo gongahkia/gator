@@ -180,6 +180,8 @@ class AppController final : public QObject {
   Q_PROPERTY(QString reminderStatusMessage READ reminderStatusMessage NOTIFY reminderStatusMessageChanged)
   Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
   Q_PROPERTY(bool bridgeMode READ bridgeMode CONSTANT)
+  Q_PROPERTY(bool bridgeOperationActive READ bridgeOperationActive NOTIFY bridgeOperationChanged)
+  Q_PROPERTY(QString bridgeOperationKind READ bridgeOperationKind NOTIFY bridgeOperationChanged)
 
 public:
   AppController(FilePath databasePath,
@@ -273,6 +275,8 @@ public:
   [[nodiscard]] QString reminderStatusMessage() const;
   [[nodiscard]] bool busy() const;
   [[nodiscard]] bool bridgeMode() const;
+  [[nodiscard]] bool bridgeOperationActive() const;
+  [[nodiscard]] QString bridgeOperationKind() const;
   [[nodiscard]] SearchResultsModel& searchResultsModel();
 
   Q_INVOKABLE void initialize();
@@ -575,6 +579,7 @@ signals:
   void pendingSyncCountChanged();
   void reminderStatusMessageChanged();
   void busyChanged();
+  void bridgeOperationChanged();
 
 private:
   class PendingOperation {
@@ -631,6 +636,10 @@ private:
   void applyBridgeCalendarEvents(std::uint64_t generation, QList<CalendarEventSummary> events);
   void applyBridgeTaskResponse(const QJsonObject& data);
   void applyBridgeEventResponse(const QJsonObject& data);
+  void startBridgeOperation(QString kind, std::future<PythonBridgeResult> future);
+  void pollBridgeOperation(QString operationId);
+  void cancelBridgeOperation();
+  void completeBridgeReadyProbe();
   void refreshUndoStatus();
   void refreshPendingSyncCount();
   void recordExistenceHistory(UndoResourceKind resource,
@@ -845,9 +854,14 @@ private:
   bool busy_{false};
   std::unique_ptr<PythonBridgeClient> pythonBridgeClient_;
   QString pythonBridgeAccountId_;
+  QString pythonBridgeExpectedEmail_;
   QHash<QString, QString> pythonBridgeTaskListTitles_;
   QList<CalendarEventSummary> pythonBridgeCalendarEvents_;
   std::uint64_t pythonBridgeRefreshGeneration_{0};
+  bool pythonBridgeTasksReady_{false};
+  bool pythonBridgeCalendarReady_{false};
+  QString pythonBridgeOperationId_;
+  QString pythonBridgeOperationKind_;
   bool pollScheduled_{false};
   std::vector<std::unique_ptr<PendingOperation>> pending_;
 };
