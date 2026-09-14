@@ -20,7 +20,7 @@ change the installed CLI package.
 | --- | --- | --- | --- |
 | [`macos/`](macos/) | `cc1e7f01abdf0e8bf0d42e3bcbc0d8fce51df5eb` | `apps/apple/` Xcode project, Swift source, tests, and source assets | The project defines a macOS app, macOS tests, and a share extension with macOS 14 deployment target. No iOS/iPadOS target was found in this commit. Xcode build and runtime behavior cannot be verified on Fedora. |
 | [`electron/`](electron/) | `6a98dc8dadba0775f9e09056d6595661b7f06a50` | React renderer, platform adapters, package/build configuration | The original package declared Electron 33, React 18, Node 20+, and Linux/macOS/Windows adapters. This review snapshot omits the old main-process backend, preload, dependency lockfile, and release scripts, so it is not a standalone build. |
-| [`qt/`](qt/) | `24dde3d9bb6b6c956a03634c6de3c0356e3d83d9` | CMake project, native C++/QML source, tests, benchmarks, and source brand assets | CMake configures and `hcb_native` builds on Fedora with Qt 6.10.3 and SQLite 3.50.2 in system-dependency mode. The old project declares Linux, macOS, and Windows adapters; runtime and installed-package checks remain open. |
+| [`qt/`](qt/) | `24dde3d9bb6b6c956a03634c6de3c0356e3d83d9` | CMake project, native C++/QML source, tests, benchmarks, and source brand assets | CMake configures and `hcb_native` builds on Fedora with Qt 6.10.3 and SQLite 3.50.2 in system-dependency mode. An isolated offscreen launch passes with one font, but a timeline test fails and startup exceeds the smoke timeout with the host's full font inventory. Installed-package checks remain open. |
 
 The source commits are the parents of the changes that removed each frontend:
 `e4f6318ae` (Apple), `90f34603b` (Electron), and `35604ba0d` (Qt).
@@ -80,11 +80,9 @@ timeline target failed `normalizesMultiDayTimedRanges`: it returned
 modulo 60 is needed. Validate and fix this in the active Qt adapter prototype;
 the historical source remains unchanged.
 
-An offscreen launch of the built app with `HCB_BENCHMARK_EXIT_AFTER_LOAD=1`
-timed out after 20 seconds. A second run with Qt software rendering timed out
-after 35 seconds, both without diagnostic output. The QML test target passed,
-but the full app's startup and exit path is **not verified**. Investigate this
-before treating the historical build as a runnable desktop prototype.
+Earlier offscreen launches of the built app with `HCB_BENCHMARK_EXIT_AFTER_LOAD=1`
+timed out after 20 and 35 seconds. The QML test target passed. A later isolated
+run traced the slow startup to font enumeration; see the verification below.
 
 After relocation, all 932 files tracked in the three source snapshots and
 audit were present in their new paths. Content was unchanged for 925 files;
@@ -97,6 +95,41 @@ Python CLI/TUI gate with 373 tests, wheel smoke, and terminal mouse smoke.
 There is no Xcode toolchain on this Fedora host, so the macOS build and tests
 remain unverified. The Electron snapshot still lacks its main, preload, and
 shared contract entry points and was not built.
+
+## Fedora verification, 2026-09-14
+
+Verification used a clean CMake/Ninja build under `/tmp`, empty private XDG
+config/data/cache directories, and `env -i` so the historical Qt app could not
+inherit account credentials or open the active HCB database. No live Google
+account was used.
+
+- **Qt:** `hcb_native` and eight selected test executables built. With the
+  system font inventory, six of eight CTest targets passed, the timeline target
+  reproduced the same `normalizesMultiDayTimedRanges` failure, and both QML
+  shell smoke cases exceeded their 15-second process timeout. GDB interrupts
+  sampled the main thread inside `AppController::availableFontFamilies` and
+  `QFontMetrics::inFont` while QML loaded. This host has about 1,178 font-family
+  entries. With a temporary Fontconfig file exposing one font, seven of eight
+  selected targets passed; the shell smoke passed in 0.74 seconds, and a normal
+  initialization launch exited after its one-second idle-RSS timer with status
+  zero in 1.35 seconds. It created only an isolated SQLite file. [Inference]
+  Filtering every installed font synchronously during QML creation is the
+  startup bottleneck on this host. The timeline failure remains a separate code
+  defect. These checks do not establish a usable desktop app or current-core
+  integration.
+- **Electron:** Node 22 and pnpm are present, but this snapshot has no
+  `node_modules` or lockfile. `pnpm run typecheck` stopped because `tsc` was not
+  installed. The configured `src/main/index.ts` and `src/preload/index.ts`
+  entrypoints are absent, as is `src/shared/ipc/contracts.ts`, which the native
+  adapter and renderer tests import. Build, tests, and runtime remain unverified;
+  the restored package cannot be built as configured without source restoration
+  or replacement and dependency installation.
+- **macOS Swift:** The Xcode project and scheme are present, and seven JSON,
+  xcstrings, or Package.resolved files, two plists, and the scheme parsed
+  successfully. The committed OAuth xcconfig is blank. `HotCrossBunsApp` still
+  bootstraps its old Google, sync, and cache services. This Fedora host has no `xcodebuild`,
+  `xcrun`, `swift`, or `swiftc`, so compilation, unit tests, launch, and packaging
+  were not run. A macOS host is required for those checks.
 
 Fedora source-build check (without modifying the current Python install):
 
