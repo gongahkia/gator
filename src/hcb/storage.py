@@ -17,7 +17,7 @@ from .models import (
 )
 from .paths import AppPaths
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 @dataclass(frozen=True, slots=True)
@@ -501,6 +501,21 @@ _MIGRATION_12 = """
 CREATE INDEX tasks_page ON tasks(account_id,deleted,status,due,title,id);
 """
 
+_MIGRATION_13 = """
+CREATE TABLE bridge_mutation_receipts (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    idempotency_key TEXT NOT NULL,
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    response_status INTEGER NOT NULL,
+    response_data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(account_id,idempotency_key)
+);
+CREATE INDEX bridge_mutation_receipts_expiry ON bridge_mutation_receipts(created_at);
+"""
+
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
@@ -613,6 +628,7 @@ class _StorageCore:
             _MIGRATION_10,
             _MIGRATION_11,
             _MIGRATION_12,
+            _MIGRATION_13,
         )
         with self.transaction():
             # Another process may have completed the migration while we waited
@@ -672,6 +688,7 @@ class _StorageCore:
 # Storage owns one SQLite connection and transaction manager; repositories below
 # expose cohesive persistence APIs over that shared owner.
 from .storage_accounts import AccountTaskRepository  # noqa: E402
+from .storage_bridge import BridgeRepository  # noqa: E402
 from .storage_calendars import CalendarEventRepository  # noqa: E402
 from .storage_reminders import ReminderRepository  # noqa: E402
 from .storage_sync import SyncStateRepository  # noqa: E402
@@ -679,6 +696,7 @@ from .storage_sync import SyncStateRepository  # noqa: E402
 
 class Storage(
     AccountTaskRepository,
+    BridgeRepository,
     CalendarEventRepository,
     SyncStateRepository,
     ReminderRepository,

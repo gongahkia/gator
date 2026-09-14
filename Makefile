@@ -1,19 +1,19 @@
 SHELL := /bin/sh
 
-.PHONY: sync format format-check lint typecheck test check build benchmark calendar-mouse-smoke local-ci install-hooks clean
+.PHONY: sync format format-check lint typecheck test check build benchmark benchmark-desktop-bridge calendar-mouse-smoke local-ci install-hooks clean
 
 sync:
 	uv sync --extra dev
 
 format:
-	uv run ruff format src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/calendar_mouse_smoke.py
-	uv run ruff check --fix src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/calendar_mouse_smoke.py
+	uv run ruff format src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/calendar_mouse_smoke.py
+	uv run ruff check --fix src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/calendar_mouse_smoke.py
 
 format-check:
-	uv run ruff format --check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/calendar_mouse_smoke.py
+	uv run ruff format --check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/calendar_mouse_smoke.py
 
 lint:
-	uv run ruff check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/calendar_mouse_smoke.py
+	uv run ruff check src tests tools/benchmark_python.py tools/benchmark_outbox.py tools/benchmark_pull.py tools/benchmark_live_pull.py tools/benchmark_tui_startup.py tools/benchmark_desktop_bridge.py tools/calendar_mouse_smoke.py
 
 typecheck:
 	uv run mypy src
@@ -28,6 +28,9 @@ build:
 
 benchmark:
 	PYTHONDONTWRITEBYTECODE=1 uv run python tools/benchmark_python.py
+
+benchmark-desktop-bridge:
+	PYTHONDONTWRITEBYTECODE=1 uv run python tools/benchmark_desktop_bridge.py
 
 calendar-mouse-smoke:
 	PYTHONDONTWRITEBYTECODE=1 uv run python tools/calendar_mouse_smoke.py

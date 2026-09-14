@@ -9,6 +9,7 @@ and a sync worker without sharing a connection across threads.
 from __future__ import annotations
 
 import hmac
+import hashlib
 import json
 import os
 import secrets
@@ -302,6 +303,10 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
     class BridgeHandler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            self._request_runtime: Runtime | None = None
+            super().__init__(*args, **kwargs)
+
         def do_GET(self) -> None:  # noqa: N802
             self._dispatch("GET")
 
@@ -330,12 +335,55 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                 path = tuple(unquote(part) for part in parsed.path.split("/") if part)
                 query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True)
                 body = self._body() if method in {"POST", "PATCH"} else {}
-                status, data = self._route(method, path, query, body)
+                if _is_durable_mutation(method, path):
+                    status, data = self._route_durable_mutation(method, path, query, body)
+                else:
+                    status, data = self._route(method, path, query, body)
             except Exception as exc:
                 status, error = _http_error(exc)
                 self._write(status, error=error)
                 return
             self._write(status, data=data)
+
+        def _route_durable_mutation(
+            self, method: str, path: tuple[str, ...], query: dict[str, list[str]], body: Json
+        ) -> tuple[HTTPStatus, Json]:
+            account_id = _account_id(path[2])
+            idempotency_key = _idempotency_key(self.headers.get("Idempotency-Key"))
+            request_path = "/" + "/".join(path)
+            request_hash = _request_hash(method, request_path, body)
+            runtime = bridge._runtime_factory()
+            self._request_runtime = runtime
+            try:
+                with runtime.storage.transaction():
+                    receipt = runtime.storage.bridge_mutation_receipt(account_id, idempotency_key)
+                    if receipt is not None:
+                        if (
+                            receipt.method != method
+                            or receipt.path != request_path
+                            or receipt.request_hash != request_hash
+                        ):
+                            raise ConflictError(
+                                "Idempotency-Key was already used for a different bridge mutation"
+                            )
+                        return HTTPStatus(receipt.response_status), json.loads(receipt.response_data)
+                    status, data = self._route(method, path, query, body)
+                    response_data = json.dumps(
+                        to_primitive(data), ensure_ascii=False, separators=(",", ":"), sort_keys=True
+                    )
+                    runtime.storage.save_bridge_mutation_receipt(
+                        account_id,
+                        idempotency_key,
+                        method=method,
+                        path=request_path,
+                        request_hash=request_hash,
+                        response_status=status.value,
+                        response_data=response_data,
+                    )
+                    return status, data
+            finally:
+                self._request_runtime = None
+                runtime.close()
 
         def _body(self) -> Json:
             content_type = self.headers.get("Content-Type", "")
@@ -583,6 +631,8 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             )
 
         def _with_application(self, action: Callable[[ApplicationService], Any]) -> Any:
+            if self._request_runtime is not None:
+                return action(self._request_runtime.application)
             runtime = bridge._runtime_factory()
             try:
                 return action(runtime.application)
@@ -613,6 +663,28 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
 
 def _authorized(header: str | None, token: str) -> bool:
     return header is not None and hmac.compare_digest(header, f"Bearer {token}")
+
+
+def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
+    if len(path) < 4 or path[:2] != ("v1", "accounts"):
+        return False
+    tail = path[3:]
+    if method == "POST":
+        return tail in {("tasks",), ("events",)} or (
+            len(tail) == 3 and tail[0] == "tasks" and tail[2] == "complete"
+        )
+    return method in {"PATCH", "DELETE"} and len(tail) == 2 and tail[0] in {"tasks", "events"}
+
+
+def _idempotency_key(value: str | None) -> str:
+    if value is None or not 1 <= len(value) <= 128 or any(character.isspace() for character in value):
+        raise ValueError("Idempotency-Key must be a non-empty token of at most 128 characters")
+    return value
+
+
+def _request_hash(method: str, path: str, body: Json) -> str:
+    canonical_body = json.dumps(body, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(f"{method}\n{path}\n{canonical_body}".encode()).hexdigest()
 
 
 def _http_error(exc: Exception) -> tuple[HTTPStatus, Json]:

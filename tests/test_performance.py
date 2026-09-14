@@ -51,6 +51,40 @@ def test_benchmark_report_measures_repeated_services_and_large_outbox() -> None:
         assert summary["max_seconds"] >= summary["median_seconds"] > 0
 
 
+def test_desktop_bridge_benchmark_reports_bounded_and_full_workspace_paths() -> None:
+    tool = Path(__file__).resolve().parents[1] / "tools/benchmark_desktop_bridge.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(tool),
+            "--tasks",
+            "120",
+            "--events",
+            "10",
+            "--page-size",
+            "20",
+            "--runs",
+            "2",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    report = json.loads(completed.stdout)
+    assert report["fixture"] == {"tasks": 120, "events": 10, "task_page_size": 20}
+    assert report["timings"].keys() == {
+        "workspace_summary",
+        "task_page",
+        "event_range",
+        "full_task_workspace",
+    }
+    for summary in report["timings"].values():
+        assert summary["runs"] == 2
+        assert len(summary["samples_seconds"]) == 2
+        assert summary["response_bytes"] > 0
+        assert summary["max_seconds"] >= summary["median_seconds"] > 0
+
+
 def test_outbox_benchmark_reports_completed_delivery_across_page_boundary() -> None:
     tool = Path(__file__).resolve().parents[1] / "tools/benchmark_outbox.py"
     completed = subprocess.run(
