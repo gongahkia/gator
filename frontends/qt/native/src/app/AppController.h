@@ -35,6 +35,8 @@
 #include "core/OAuthTokenRefreshClient.h"
 #include "core/OptimisticMutationCoordinator.h"
 #include "core/PkceAuthorization.h"
+#include "core/PythonBridgeClient.h"
+#include "core/PythonBridgeProjection.h"
 #include "core/QuickCaptureParser.h"
 #include "core/SyncCheckpointStore.h"
 #include "core/SyncConflictStore.h"
@@ -177,6 +179,7 @@ class AppController final : public QObject {
   Q_PROPERTY(int pendingSyncCount READ pendingSyncCount NOTIFY pendingSyncCountChanged)
   Q_PROPERTY(QString reminderStatusMessage READ reminderStatusMessage NOTIFY reminderStatusMessageChanged)
   Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+  Q_PROPERTY(bool bridgeReadOnly READ bridgeReadOnly CONSTANT)
 
 public:
   AppController(FilePath databasePath,
@@ -188,6 +191,8 @@ public:
                 TaskListModel& taskListModel,
                 TaskModel& taskModel,
                 TimelineModel& timelineModel,
+                std::optional<PythonBridgeConnection> bridgeConnection = std::nullopt,
+                QString bridgeAccountId = {},
                 QObject* parent = nullptr);
   ~AppController() override;
   AppController(const AppController&) = delete;
@@ -267,9 +272,11 @@ public:
   [[nodiscard]] int pendingSyncCount() const;
   [[nodiscard]] QString reminderStatusMessage() const;
   [[nodiscard]] bool busy() const;
+  [[nodiscard]] bool bridgeReadOnly() const;
   [[nodiscard]] SearchResultsModel& searchResultsModel();
 
   Q_INVOKABLE void initialize();
+  Q_INVOKABLE void reportBridgeReadOnlyAction();
   void setReminderService(ReminderService* service);
   void setPlatformReminderStatus(QString message);
   Q_INVOKABLE void refresh();
@@ -614,6 +621,14 @@ private:
   void schedulePoll();
   void pollPending();
   void refreshTasks();
+  void initializeBridge();
+  void refreshBridge();
+  void loadBridgeTaskPage(std::uint64_t generation,
+                          std::optional<QString> cursor,
+                          QList<TaskModelTask> accumulated,
+                          bool firstPageApplied);
+  void loadBridgeCalendar(std::uint64_t generation);
+  void applyBridgeCalendarEvents(std::uint64_t generation, QList<CalendarEventSummary> events);
   void refreshUndoStatus();
   void refreshPendingSyncCount();
   void recordExistenceHistory(UndoResourceKind resource,
@@ -826,6 +841,10 @@ private:
   std::unique_ptr<CancellationSource> searchCancellation_;
   std::uint64_t searchGeneration_{0};
   bool busy_{false};
+  std::unique_ptr<PythonBridgeClient> pythonBridgeClient_;
+  QString pythonBridgeAccountId_;
+  QHash<QString, QString> pythonBridgeTaskListTitles_;
+  std::uint64_t pythonBridgeRefreshGeneration_{0};
   bool pollScheduled_{false};
   std::vector<std::unique_ptr<PendingOperation>> pending_;
 };

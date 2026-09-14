@@ -805,6 +805,8 @@ AppController::AppController(FilePath databasePath,
                              TaskListModel& taskListModel,
                              TaskModel& taskModel,
                              TimelineModel& timelineModel,
+                             std::optional<PythonBridgeConnection> bridgeConnection,
+                             QString bridgeAccountId,
                              QObject* parent)
     : QObject(parent), clock_(clock), agendaModel_(agendaModel),
       calendarSourceModel_(calendarSourceModel), monthGridModel_(monthGridModel),
@@ -873,6 +875,10 @@ AppController::AppController(FilePath databasePath,
           &OAuthLoopbackCallbackListener::callbackReceived,
           this,
           &AppController::handleOAuthCallback);
+  if (bridgeConnection.has_value()) {
+    pythonBridgeClient_ = std::make_unique<PythonBridgeClient>(std::move(*bridgeConnection), this);
+    pythonBridgeAccountId_ = std::move(bridgeAccountId);
+  }
 }
 
 AppController::~AppController() {
@@ -1131,9 +1137,15 @@ QString AppController::reminderStatusMessage() const { return reminderStatusMess
 
 bool AppController::busy() const { return busy_; }
 
+bool AppController::bridgeReadOnly() const { return pythonBridgeClient_ != nullptr; }
+
 SearchResultsModel& AppController::searchResultsModel() { return *searchResultsModelPointer_; }
 
 void AppController::initialize() {
+  if (bridgeReadOnly()) {
+    initializeBridge();
+    return;
+  }
   loadSavedSearches();
   watch(undoRecoveryPolicy_.recover(), [this](UndoRecoveryResult result) {
     if (std::holds_alternative<AppError>(result)) {
@@ -1762,6 +1774,10 @@ void AppController::setPlatformReminderStatus(QString message) {
 }
 
 void AppController::refresh() {
+  if (bridgeReadOnly()) {
+    refreshBridge();
+    return;
+  }
   refreshTasks();
   refreshCalendar();
 }
