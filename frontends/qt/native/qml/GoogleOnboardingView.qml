@@ -5,6 +5,7 @@ import QtQuick.Layouts
 Pane {
     id: root
     required property string clientId
+    property bool bridgeMode: false
     property bool hasClientSecret: false
     property bool busy: false
     property string statusMessage: ""
@@ -97,7 +98,7 @@ Pane {
                     spacing: Theme.spacingSmall
 
                     Label {
-                        text: "1. Prepare Google Cloud"
+                        text: root.bridgeMode ? "1. HCB core OAuth configuration" : "1. Prepare Google Cloud"
                         font.pixelSize: Theme.labelFontSize
                         font.bold: true
                         Accessible.role: Accessible.Heading
@@ -106,7 +107,9 @@ Pane {
 
                     Label {
                         Layout.fillWidth: true
-                        text: "Configure OAuth consent, enable Google Tasks, Google Calendar, and Google Drive APIs, then create a Desktop app OAuth client."
+                        text: root.bridgeMode
+                              ? "The local HCB core owns the OAuth client configuration and credential file. Qt only asks the core to start browser authorization."
+                              : "Configure OAuth consent, enable Google Tasks, Google Calendar, and Google Drive APIs, then create a Desktop app OAuth client."
                         wrapMode: Text.WordWrap
                         color: Theme.textSecondary
                     }
@@ -115,6 +118,7 @@ Pane {
 
             Frame {
                 Layout.fillWidth: true
+                visible: !root.bridgeMode
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -212,7 +216,7 @@ Pane {
                     spacing: Theme.spacingMedium
 
                     Label {
-                        text: "3. Connect Google"
+                        text: root.bridgeMode ? "2. Connect Google" : "3. Connect Google"
                         font.pixelSize: Theme.labelFontSize
                         font.bold: true
                         Accessible.role: Accessible.Heading
@@ -221,7 +225,9 @@ Pane {
 
                     Label {
                         Layout.fillWidth: true
-                        text: "After saving, select Connect Google and finish consent in your browser. Hot Cross Buns uses a temporary local callback; return to the app after the browser confirms connection."
+                        text: root.bridgeMode
+                              ? "Select Connect Google and finish consent in your browser. The HCB core uses a temporary local callback; return to the app after the browser confirms connection."
+                              : "After saving, select Connect Google and finish consent in your browser. Hot Cross Buns uses a temporary local callback; return to the app after the browser confirms connection."
                         wrapMode: Text.WordWrap
                         color: Theme.textSecondary
                     }
@@ -229,7 +235,7 @@ Pane {
                     Button {
                         id: connectGoogleButton
                         text: "Connect Google"
-                        enabled: root.clientId.trim().length > 0 && !root.busy
+                        enabled: (root.bridgeMode || root.clientId.trim().length > 0) && !root.busy
                         Accessible.name: text
                         onClicked: {
                             root.awaitSetupStatus("connect")

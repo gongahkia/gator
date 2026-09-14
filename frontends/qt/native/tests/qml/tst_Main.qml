@@ -301,6 +301,20 @@ TestCase {
         view.destroy()
     }
 
+    function test_googleOnboardingUsesCoreOAuthInBridgeMode() {
+        const component = Qt.createComponent("../../qml/GoogleOnboardingView.qml")
+        compare(component.status, Component.Ready, component.errorString())
+        const view = component.createObject(null, { clientId: "", bridgeMode: true })
+        verify(view !== null)
+        const calls = []
+        view.connectGoogleRequested.connect(function() { calls.push("connect") })
+        verify(!view.saveClientIdButton.visible)
+        verify(view.connectGoogleButton.enabled)
+        view.connectGoogleButton.click()
+        compare(calls, ["connect"])
+        view.destroy()
+    }
+
     function test_invitationsHidesGenericPageFallback() {
         const component = Qt.createComponent("../../qml/Main.qml")
         compare(component.status, Component.Ready, component.errorString())

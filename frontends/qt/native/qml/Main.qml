@@ -1516,6 +1516,7 @@ ApplicationWindow {
                 anchors.fill: parent
                 visible: window.currentPage === "Onboarding"
                 clientId: window.controllerString("clientId", "")
+                bridgeMode: window.appController !== null && window.appController.bridgeMode === true
                 hasClientSecret: window.controllerBool("hasClientSecret", false)
                 busy: window.appController !== null && window.appController.busy === true
                 statusMessage: window.controllerString("statusMessage", "")

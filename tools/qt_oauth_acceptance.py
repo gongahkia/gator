@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import signal
 import stat
 import subprocess
@@ -164,6 +165,7 @@ def run_acceptance(
 ) -> None:
     if not native.is_file() or not os.access(native, os.X_OK):
         raise RuntimeError("the Qt executable is unavailable")
+    root: Path
     with tempfile.TemporaryDirectory(prefix="hcb-qt-oauth-") as temporary:
         root = Path(temporary)
         environment = isolated_environment(root, credential_file, account_id)
@@ -202,6 +204,7 @@ def run_acceptance(
                 "Approve only the expected disposable account in the browser."
             )
             deadline = monotonic() + timeout
+            authenticated = False
             while monotonic() < deadline:
                 if native_process.poll() is not None:
                     raise RuntimeError("the Qt app closed before browser authorization completed")
@@ -210,16 +213,22 @@ def run_acceptance(
                         "the Python bridge stopped before browser authorization completed"
                     )
                 if bridge_authenticated(descriptor, account_id):
-                    print(json.dumps({"qt_oauth_acceptance": {"authenticated": True}}))
-                    return
+                    authenticated = True
+                    break
                 sleep(0.5)
-            raise RuntimeError("browser authorization did not complete before the timeout")
+            if not authenticated:
+                raise RuntimeError("browser authorization did not complete before the timeout")
         finally:
             if native_process is not None:
                 stop_process(native_process)
             stop_process(bridge)
             if descriptor.exists():
                 raise RuntimeError("the bridge descriptor remained after shutdown")
+    if root.exists():
+        shutil.rmtree(root)
+    if root.exists():
+        raise RuntimeError("the isolated OAuth profile remained after cleanup")
+    print(json.dumps({"qt_oauth_acceptance": {"authenticated": True}}))
 
 
 def main() -> int:
