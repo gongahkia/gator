@@ -43,6 +43,7 @@ BRIDGE_API_VERSION: Final = 1
 BRIDGE_NAME: Final = "hcb-desktop-bridge"
 MAX_JSON_BODY_BYTES: Final = 1_048_576
 MAX_OPERATION_PROGRESS_ITEMS: Final = 32
+MAX_RETAINED_OPERATIONS: Final = 128
 
 Json = dict[str, Any]
 OperationKind = Literal["oauth", "sync"]
@@ -86,6 +87,10 @@ class _Operation:
 
     def is_cancelled(self) -> bool:
         return self._cancelled.is_set()
+
+    def is_terminal(self) -> bool:
+        with self._lock:
+            return self.state in {"succeeded", "failed", "cancelled"}
 
     def snapshot(self) -> Json:
         with self._lock:
@@ -146,6 +151,11 @@ class BridgeOperations:
     ) -> _Operation:
         operation = _Operation(secrets.token_urlsafe(18), kind, account_id)
         with self._lock:
+            self._discard_terminal_operations()
+            if len(self._operations) >= MAX_RETAINED_OPERATIONS:
+                raise ConflictError(
+                    "too many active desktop operations; wait for one to finish or cancel it"
+                )
             self._operations[operation.id] = operation
         worker = threading.Thread(
             target=self._run,
@@ -155,6 +165,16 @@ class BridgeOperations:
         )
         worker.start()
         return operation
+
+    def _discard_terminal_operations(self) -> None:
+        """Keep completed local-operation metadata from growing without bound."""
+        terminal = sorted(
+            (operation for operation in self._operations.values() if operation.is_terminal()),
+            key=lambda operation: operation.created_monotonic,
+        )
+        discard_count = max(0, len(self._operations) - (MAX_RETAINED_OPERATIONS - 1))
+        for operation in terminal[:discard_count]:
+            self._operations.pop(operation.id, None)
 
     def _run(self, operation: _Operation, action: Callable[[Runtime, _Operation], Json]) -> None:
         with operation._lock:
@@ -233,7 +253,9 @@ class DesktopBridge:
         ).encode()
         try:
             descriptor_fd = os.open(
-                path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600
+                path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0),
+                0o600,
             )
         except FileExistsError as exc:
             raise ValueError(f"bridge descriptor already exists: {path}") from exc
@@ -245,9 +267,14 @@ class DesktopBridge:
         self._ready_file = path
 
 
-def serve_from_cli(*, ready_file: Path, port: int = 0) -> None:
+def serve_from_cli(
+    *,
+    ready_file: Path,
+    port: int = 0,
+    runtime_factory: Callable[[], Runtime] = Runtime,
+) -> None:
     """Run the process form used by a native helper launcher."""
-    bridge = DesktopBridge(port=port)
+    bridge = DesktopBridge(runtime_factory, port=port)
     bridge.write_descriptor(ready_file)
 
     def stop(_signum: int, _frame: object) -> None:

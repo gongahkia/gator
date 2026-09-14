@@ -42,6 +42,7 @@ JSON_COMMANDS = (
     "conflicts.list",
     "conflicts.resolve",
     "conflicts.resolve-delivery",
+    "bridge.serve",
     "daemon.install",
     "daemon.run",
     "daemon.status",

@@ -24,7 +24,7 @@
       "enum": [
         "auth.connect", "auth.disconnect", "auth.reset", "auth.status",
         "calendars.colors", "calendars.create", "calendars.delete", "calendars.edit", "calendars.list", "calendars.remove", "calendars.set-list", "calendars.subscribe",
-        "capture", "config.edit", "config.explain", "config.get", "config.init", "config.path", "config.profiles.create", "config.profiles.delete", "config.profiles.list", "config.profiles.select", "config.schema", "config.set", "config.show", "config.unset", "conflicts.list", "conflicts.resolve", "conflicts.resolve-delivery",
+        "bridge.serve", "capture", "config.edit", "config.explain", "config.get", "config.init", "config.path", "config.profiles.create", "config.profiles.delete", "config.profiles.list", "config.profiles.select", "config.schema", "config.set", "config.show", "config.unset", "conflicts.list", "conflicts.resolve", "conflicts.resolve-delivery",
         "daemon.install", "daemon.run", "daemon.status", "daemon.uninstall", "doctor", "drive.list", "drive.search",
         "events.agenda", "events.create", "events.delete", "events.delete-many", "events.duplicate", "events.edit", "events.instance-cache", "events.instances", "events.invitations", "events.invite", "events.move", "events.move-many", "events.refresh-instances", "events.respond", "events.respond-many", "events.set-properties", "events.show", "events.split",
         "export", "find-time", "freebusy", "import.apply", "import.preview", "notes.clear", "notes.list", "notes.mode", "notes.set", "notes.show", "redo", "saved-searches.delete", "saved-searches.list", "saved-searches.run", "saved-searches.save", "schema.list", "schema.show", "search", "sync",

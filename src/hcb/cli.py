@@ -21,6 +21,7 @@ from typer import _click as click
 from .application import BatchActionPreview, BatchMovePreview, SearchResult
 from .config import Config, ConfigError, load, loads, profile_path, save
 from .config import schema as config_schema
+from .desktop_bridge import serve_from_cli
 from .errors import ConfigurationError, ConflictError, ExitCode, HcbError, OfflineError
 from .import_export import (
     ImportedEvent,
@@ -163,6 +164,9 @@ themes_app = typer.Typer(cls=ThemesGroup, context_settings=CONTEXT, help="Manage
 daemon_app = typer.Typer(
     cls=HcbGroup, context_settings=CONTEXT, help="Inspect sync daemon support."
 )
+bridge_app = typer.Typer(
+    cls=HcbGroup, context_settings=CONTEXT, help="Run the local desktop-core bridge."
+)
 drive_app = typer.Typer(cls=HcbGroup, context_settings=CONTEXT, help="Search Drive metadata.")
 schema_app = typer.Typer(cls=HcbGroup, context_settings=CONTEXT, help="Inspect JSON contracts.")
 
@@ -179,6 +183,7 @@ app.add_typer(config_app, name="config")
 config_app.add_typer(config_profiles_app, name="profiles")
 app.add_typer(themes_app, name="themes")
 app.add_typer(daemon_app, name="daemon")
+app.add_typer(bridge_app, name="bridge")
 app.add_typer(drive_app, name="drive")
 app.add_typer(schema_app, name="schema")
 
@@ -2257,6 +2262,31 @@ def daemon_run(
         state.write("stopped")
     finally:
         state.clear()
+
+
+@bridge_app.command("serve")
+def bridge_serve(
+    ctx: typer.Context,
+    ready_file: Path = typer.Option(  # noqa: B008
+        ..., "--ready-file", help="New private connection descriptor path."
+    ),
+    port: int = typer.Option(0, "--port", min=0, max=65_535, help="Loopback port; 0 chooses one."),
+) -> None:
+    """Serve the versioned local desktop bridge until the helper is terminated."""
+
+    state = _state(ctx)
+    if state.json or state.tsv:
+        raise ValueError(
+            "bridge serve writes its versioned HTTP API; --json and --tsv are unsupported"
+        )
+    paths = state.runtime.paths
+    environ = dict(state.runtime.environ)
+    credential_file = state.runtime.credential_file_override
+
+    def runtime_factory() -> Runtime:
+        return Runtime(paths, environ=environ, credential_file=credential_file)
+
+    serve_from_cli(ready_file=ready_file, port=port, runtime_factory=runtime_factory)
 
 
 def main() -> None:
