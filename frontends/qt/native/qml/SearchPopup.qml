@@ -14,6 +14,7 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
     property var appController: null
     property var searchResultsModel: null
+    property bool bridgeMode: appController !== null && appController.bridgeMode === true
     property string editingSavedSearchId: ""
     property string editingSavedSearchName: ""
     property bool optionsExpanded: false
@@ -82,6 +83,7 @@ Popup {
 
             ToolButton {
                 id: optionsToggleButton
+                visible: !root.bridgeMode
                 text: root.optionsExpanded ? "Options ▴" : "Options ▾"
                 checkable: true
                 checked: root.optionsExpanded
@@ -143,7 +145,7 @@ Popup {
 
         ColumnLayout {
             Layout.fillWidth: true
-            visible: root.optionsExpanded
+            visible: root.optionsExpanded && !root.bridgeMode
             spacing: Theme.spacingMedium
 
             Flow {

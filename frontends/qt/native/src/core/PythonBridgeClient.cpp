@@ -23,6 +23,7 @@ constexpr qsizetype kMaximumRequestBytes = 256 * 1024;
 constexpr qsizetype kMaximumAccountIdLength = 256;
 constexpr qsizetype kMaximumCursorLength = 128;
 constexpr qsizetype kMaximumListIdLength = 256;
+constexpr qsizetype kMaximumSearchQueryLength = 4 * 1024;
 constexpr int kRequestTimeoutMilliseconds = 10'000;
 
 struct Completion final {
@@ -211,12 +212,29 @@ PythonBridgeClient::taskPage(const QString& accountId,
   return get(result, cancellation);
 }
 
-std::future<PythonBridgeResult>
-PythonBridgeClient::eventRange(const QString& accountId,
-                               QDate start,
-                               QDate end,
-                               std::optional<QString> calendarId,
-                               CancellationToken cancellation) {
+std::future<PythonBridgeResult> PythonBridgeClient::search(const QString& accountId,
+                                                           const QString& query,
+                                                           int limit,
+                                                           CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/search");
+  if (!path.has_value() || query.trimmed().isEmpty() || query.size() > kMaximumSearchQueryLength ||
+      query.contains(QChar::Null) || limit < 1 || limit > 200) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("search request is invalid"))));
+  }
+  QUrl result = *path;
+  QUrlQuery parameters;
+  parameters.addQueryItem(QStringLiteral("q"), query);
+  parameters.addQueryItem(QStringLiteral("limit"), QString::number(limit));
+  result.setQuery(parameters);
+  return get(result, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::eventRange(const QString& accountId,
+                                                               QDate start,
+                                                               QDate end,
+                                                               std::optional<QString> calendarId,
+                                                               CancellationToken cancellation) {
   const std::optional<QUrl> path = accountPath(accountId, u"/workspace");
   if (!path.has_value() || !start.isValid() || !end.isValid() || end <= start ||
       (calendarId.has_value() && !isValidIdentifier(*calendarId, kMaximumListIdLength))) {

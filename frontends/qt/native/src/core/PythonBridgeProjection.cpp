@@ -17,6 +17,7 @@ constexpr qsizetype kMaximumTaskLists = 20'000;
 constexpr qsizetype kMaximumCalendars = 20'000;
 constexpr qsizetype kMaximumTasksPerPage = 500;
 constexpr qsizetype kMaximumEventsPerRange = 25'000;
+constexpr qsizetype kMaximumSearchResults = 200;
 
 [[nodiscard]] AppError invalidPayload() {
   return AppError(AppErrorCode::Validation,
@@ -207,6 +208,77 @@ bridgeTask(const QJsonObject& object, const QHash<QString, QString>& taskListTit
                               .updatedAt = *updatedAt};
 }
 
+[[nodiscard]] bool isKnownSearchKind(const QString& kind) {
+  return kind == QStringLiteral("task") || kind == QStringLiteral("task-list") ||
+         kind == QStringLiteral("calendar") || kind == QStringLiteral("event") ||
+         kind == QStringLiteral("drive") || kind == QStringLiteral("saved-search") ||
+         kind == QStringLiteral("conflict");
+}
+
+[[nodiscard]] std::optional<LocalSearchResource> searchResource(const QString& kind) {
+  if (kind == QStringLiteral("task")) {
+    return LocalSearchResource::Task;
+  }
+  if (kind == QStringLiteral("task-list")) {
+    return LocalSearchResource::TaskList;
+  }
+  if (kind == QStringLiteral("calendar")) {
+    return LocalSearchResource::Calendar;
+  }
+  if (kind == QStringLiteral("event")) {
+    return LocalSearchResource::Event;
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] std::optional<QString> searchTitle(const QString& kind, const QJsonObject& item) {
+  if (kind == QStringLiteral("task") || kind == QStringLiteral("task-list")) {
+    return requiredString(item, u"title", kMaximumTitleLength);
+  }
+  return requiredString(item, u"summary", kMaximumTitleLength);
+}
+
+[[nodiscard]] std::optional<QString> searchDetail(const QString& kind, const QJsonObject& item) {
+  if (kind == QStringLiteral("task-list")) {
+    return QString();
+  }
+  const QStringView primary = kind == QStringLiteral("task")       ? u"notes"
+                              : kind == QStringLiteral("calendar") ? u"description"
+                                                                   : u"location";
+  const std::optional<QString> primaryValue = optionalString(item, primary, kMaximumTextLength);
+  if (!isValidOptionalString(item, primary, kMaximumTextLength)) {
+    return std::nullopt;
+  }
+  if (primaryValue.has_value() || kind != QStringLiteral("event")) {
+    return primaryValue.value_or(QString());
+  }
+  const std::optional<QString> description =
+      optionalString(item, u"description", kMaximumTextLength);
+  if (!isValidOptionalString(item, u"description", kMaximumTextLength)) {
+    return std::nullopt;
+  }
+  return description.value_or(QString());
+}
+
+[[nodiscard]] std::optional<QString> searchScheduledAt(const QString& kind,
+                                                       const QJsonObject& item) {
+  if (kind == QStringLiteral("task")) {
+    const std::optional<QString> due = optionalString(item, u"due", 64);
+    if (!isValidOptionalString(item, u"due", 64)) {
+      return std::nullopt;
+    }
+    return due.value_or(QString());
+  }
+  if (kind != QStringLiteral("event")) {
+    return QString();
+  }
+  const QJsonValue startValue = item.value(QStringLiteral("start"));
+  if (!startValue.isObject()) {
+    return std::nullopt;
+  }
+  return requiredString(startValue.toObject(), u"value", 64);
+}
+
 } // namespace
 
 PythonBridgeWorkspaceSummaryOrError PythonBridgeProjection::workspaceSummary(const QJsonObject& data) {
@@ -348,6 +420,57 @@ PythonBridgeEventRangeOrError PythonBridgeProjection::eventRange(const QJsonObje
     events.append(*event);
   }
   return events;
+}
+
+PythonBridgeSearchOrError PythonBridgeProjection::searchResults(const QJsonObject& data,
+                                                                const QString& accountId) {
+  if (!isIdentifier(accountId)) {
+    return invalidPayload();
+  }
+  const QJsonValue resultsValue = data.value(QStringLiteral("results"));
+  if (!resultsValue.isArray() || resultsValue.toArray().size() > kMaximumSearchResults) {
+    return invalidPayload();
+  }
+  QList<LocalSearchRankedResult> results;
+  for (const QJsonValue& value : resultsValue.toArray()) {
+    if (!value.isObject()) {
+      return invalidPayload();
+    }
+    const QJsonObject result = value.toObject();
+    const std::optional<QString> kind = requiredString(result, u"kind", 32);
+    const QJsonValue scoreValue = result.value(QStringLiteral("score"));
+    const QJsonValue itemValue = result.value(QStringLiteral("item"));
+    if (!kind.has_value() || !isKnownSearchKind(*kind) || !scoreValue.isDouble() ||
+        !itemValue.isObject()) {
+      return invalidPayload();
+    }
+    const double scoreNumber = scoreValue.toDouble();
+    const int score = scoreValue.toInt(-1);
+    if (score < 0 || score > 100 || scoreNumber != static_cast<double>(score)) {
+      return invalidPayload();
+    }
+    const std::optional<LocalSearchResource> resource = searchResource(*kind);
+    if (!resource.has_value()) {
+      continue;
+    }
+    const QJsonObject item = itemValue.toObject();
+    const std::optional<QString> id = requiredString(item, u"id", kMaximumIdLength);
+    const std::optional<QString> owner = requiredString(item, u"account_id", kMaximumIdLength);
+    const std::optional<QString> title = searchTitle(*kind, item);
+    const std::optional<QString> detail = searchDetail(*kind, item);
+    const std::optional<QString> scheduledAt = searchScheduledAt(*kind, item);
+    if (!id.has_value() || !owner.has_value() || !title.has_value() || !detail.has_value() ||
+        !scheduledAt.has_value() || !isIdentifier(*id) || *owner != accountId) {
+      return invalidPayload();
+    }
+    results.append({.resource = *resource,
+                    .id = *id,
+                    .title = *title,
+                    .detail = *detail,
+                    .scheduledAt = *scheduledAt,
+                    .score = score});
+  }
+  return results;
 }
 
 QHash<QString, QString>

@@ -2009,19 +2009,17 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
     return;
   }
   const QString id = task.value(QStringLiteral("id")).toString();
-  const bool deleted = task.value(QStringLiteral("metadata"))
-                           .toObject()
-                           .value(QStringLiteral("deleted"))
-                           .toBool();
-  const auto existing = std::find_if(taskProjectionTasks_.begin(),
-                                     taskProjectionTasks_.end(),
-                                     [&id](const TaskModelTask& candidate) {
-                                       return candidate.id == id;
-                                     });
+  const bool deleted =
+      task.value(QStringLiteral("metadata")).toObject().value(QStringLiteral("deleted")).toBool();
+  const auto existing =
+      std::find_if(taskProjectionTasks_.begin(),
+                   taskProjectionTasks_.end(),
+                   [&id](const TaskModelTask& candidate) { return candidate.id == id; });
   if (deleted) {
     if (existing != taskProjectionTasks_.end()) {
       taskProjectionTasks_.erase(existing);
       applyTaskProjections(taskProjectionTasks_);
+      refreshSearchProjection();
     }
     return;
   }
@@ -2042,6 +2040,7 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
     *existing = std::move(projected);
   }
   applyTaskProjections(taskProjectionTasks_);
+  refreshSearchProjection();
 }
 
 void AppController::applyBridgeEventResponse(const QJsonObject& data) {
@@ -2051,19 +2050,17 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
     return;
   }
   const QString id = event.value(QStringLiteral("id")).toString();
-  const bool deleted = event.value(QStringLiteral("metadata"))
-                           .toObject()
-                           .value(QStringLiteral("deleted"))
-                           .toBool();
-  const auto existing = std::find_if(pythonBridgeCalendarEvents_.begin(),
-                                     pythonBridgeCalendarEvents_.end(),
-                                     [&id](const CalendarEventSummary& candidate) {
-                                       return candidate.id == id;
-                                     });
+  const bool deleted =
+      event.value(QStringLiteral("metadata")).toObject().value(QStringLiteral("deleted")).toBool();
+  const auto existing =
+      std::find_if(pythonBridgeCalendarEvents_.begin(),
+                   pythonBridgeCalendarEvents_.end(),
+                   [&id](const CalendarEventSummary& candidate) { return candidate.id == id; });
   if (deleted) {
     if (existing != pythonBridgeCalendarEvents_.end()) {
       pythonBridgeCalendarEvents_.erase(existing);
       applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
+      refreshSearchProjection();
     }
     return;
   }
@@ -2082,6 +2079,7 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
     *existing = std::move(projected);
   }
   applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
+  refreshSearchProjection();
 }
 
 void AppController::startBridgeOperation(QString kind, std::future<PythonBridgeResult> future) {
@@ -3754,6 +3752,17 @@ void AppController::setSearchQuery(QString query) {
   }
   searchQuery_ = std::move(query);
   emit searchQueryChanged();
+  if (bridgeMode()) {
+    setSearchError({});
+    setSearchFilterChips({});
+    if (searchQuery_.trimmed().isEmpty()) {
+      searchResultsModel().setResults({});
+      setSearchLoading(false);
+      return;
+    }
+    searchDebounce_.start();
+    return;
+  }
   const LocalSearchQueryResult parsed = LocalSearchQuery::parse(searchQuery_);
   if (std::holds_alternative<AppError>(parsed)) {
     setSearchError(errorMessage(std::get<AppError>(parsed)));
@@ -3788,6 +3797,10 @@ void AppController::refreshSearchProjection() {
 }
 
 void AppController::applySavedSearch(QString savedSearchId) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const auto found = std::find_if(
       savedSearches_.cbegin(), savedSearches_.cend(), [&savedSearchId](const SavedSearch& search) {
         return search.id == savedSearchId;
@@ -3800,6 +3813,10 @@ void AppController::applySavedSearch(QString savedSearchId) {
 }
 
 void AppController::saveSearch(QString name, QString query) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   name = name.trimmed();
   query = query.trimmed();
   if (name.isEmpty() || query.isEmpty()) {
@@ -3833,6 +3850,10 @@ void AppController::saveSearch(QString name, QString query) {
 }
 
 void AppController::renameSavedSearch(QString savedSearchId, QString name) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   name = name.trimmed();
   if (name.isEmpty()) {
     setStatus(QStringLiteral("Saved search name is required"));
@@ -3865,6 +3886,10 @@ void AppController::renameSavedSearch(QString savedSearchId, QString name) {
 }
 
 void AppController::deleteSavedSearch(QString savedSearchId) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   QList<SavedSearch> next = savedSearches_;
   const auto found =
       std::find_if(next.begin(), next.end(), [&savedSearchId](const SavedSearch& search) {
@@ -5791,15 +5816,51 @@ void AppController::previewBulkEventText(QVariantList eventIds,
     return;
   }
   previewBulkEventMutation({.action = CalendarEventBulkAction::ReplaceText,
-                             .eventIds = *ids,
-                             .findText = std::move(findText),
-                             .textFields = static_cast<std::uint8_t>(fields),
-                             .recurrenceScope = recurrenceScope,
-                             .previewOnly = true},
+                            .eventIds = *ids,
+                            .findText = std::move(findText),
+                            .textFields = static_cast<std::uint8_t>(fields),
+                            .recurrenceScope = recurrenceScope,
+                            .previewOnly = true},
                            requestToken);
 }
 
 void AppController::runSearch() {
+  if (bridgeMode()) {
+    if (searchQuery_.trimmed().isEmpty() || pythonBridgeClient_ == nullptr) {
+      setSearchLoading(false);
+      return;
+    }
+    searchCancellation_ = std::make_unique<CancellationSource>();
+    const std::uint64_t generation = searchGeneration_;
+    setSearchLoading(true);
+    watch(
+        pythonBridgeClient_->search(
+            pythonBridgeAccountId_, searchQuery_, 50, searchCancellation_->token()),
+        [this, generation](PythonBridgeResult result) {
+          if (generation != searchGeneration_) {
+            return;
+          }
+          setSearchLoading(false);
+          if (std::holds_alternative<AppError>(result)) {
+            const AppError& error = std::get<AppError>(result);
+            if (error.code() != AppErrorCode::Cancelled) {
+              setSearchError(errorMessage(error));
+            }
+            return;
+          }
+          PythonBridgeSearchOrError decoded = PythonBridgeProjection::searchResults(
+              std::get<QJsonObject>(std::move(result)), pythonBridgeAccountId_);
+          if (std::holds_alternative<AppError>(decoded)) {
+            setSearchError(errorMessage(std::get<AppError>(std::move(decoded))));
+            return;
+          }
+          setSearchError({});
+          searchResultsModel().setResults(
+              std::get<QList<LocalSearchRankedResult>>(std::move(decoded)));
+        },
+        false);
+    return;
+  }
   const LocalSearchQueryResult parsed = LocalSearchQuery::parse(searchQuery_);
   if (std::holds_alternative<AppError>(parsed)) {
     setSearchError(errorMessage(std::get<AppError>(parsed)));

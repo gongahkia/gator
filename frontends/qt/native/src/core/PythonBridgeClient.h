@@ -46,6 +46,10 @@ public:
            std::optional<QString> cursor = std::nullopt,
            std::optional<QString> listId = std::nullopt,
            CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult> search(const QString& accountId,
+                                                       const QString& query,
+                                                       int limit = 50,
+                                                       CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult>
   eventRange(const QString& accountId,
              QDate start,

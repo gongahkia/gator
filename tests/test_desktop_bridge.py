@@ -172,6 +172,30 @@ def test_workspace_slices_are_account_scoped_and_range_bounded(
     assert failure["error"]["code"] == "not_found"  # type: ignore[index]
 
 
+def test_search_uses_the_indexed_core_result_contract(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    _paths, bridge = bridge_env
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/search?q=Seed%20task&limit=1")
+    assert status == 200
+    results = _data(response)["results"]
+    assert isinstance(results, list) and len(results) == 1
+    result = results[0]
+    assert isinstance(result, dict)
+    assert result["kind"] == "task"
+    assert result["score"] == 100
+    item = result["item"]
+    assert isinstance(item, dict)
+    assert item["id"] == "seed-task"
+    assert item["account_id"] == "work"
+    assert item["title"] == "Seed task"
+
+    status, failure = _request(bridge, "GET", "/v1/accounts/work/search?q=Seed&limit=201")
+    assert status == 400
+    assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
+
+
 def test_authentication_state_is_reported_without_credential_material(tmp_path: Path) -> None:
     paths = AppPaths(tmp_path / "config", tmp_path / "data", tmp_path / "cache")
     with Storage(paths.database_file) as storage, storage.transaction():

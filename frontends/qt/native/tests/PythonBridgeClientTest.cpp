@@ -35,6 +35,7 @@ private slots:
   void readsPrivateLoopbackDescriptor();
   void rejectsUnsafeDescriptor();
   void requestsWorkspaceAndBoundedPages();
+  void requestsBoundedSearch();
   void requestsAuthenticationState();
   void sendsIdempotentMutations();
   void rejectsInvalidRequestsBeforeNetwork();
@@ -117,6 +118,23 @@ void PythonBridgeClientTest::requestsWorkspaceAndBoundedPages() {
   QCOMPARE(eventQuery.queryItemValue(QStringLiteral("end")), QStringLiteral("2026-09-15"));
 }
 
+void PythonBridgeClientTest::requestsBoundedSearch() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"results\":[]}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> future =
+      client.search(QStringLiteral("work"), QStringLiteral("type:task planning"), 50);
+  waitFor(future);
+  QVERIFY(std::holds_alternative<QJsonObject>(future.get()));
+  QCOMPARE(manager.requests().size(), 1);
+  QCOMPARE(manager.requests().first().request.url().path(),
+           QStringLiteral("/v1/accounts/work/search"));
+  const QUrlQuery query(manager.requests().first().request.url());
+  QCOMPARE(query.queryItemValue(QStringLiteral("q")), QStringLiteral("type:task planning"));
+  QCOMPARE(query.queryItemValue(QStringLiteral("limit")), QStringLiteral("50"));
+}
+
 void PythonBridgeClientTest::requestsAuthenticationState() {
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue(
@@ -184,6 +202,12 @@ void PythonBridgeClientTest::rejectsInvalidRequestsBeforeNetwork() {
   const hcb::PythonBridgeResult result = future.get();
   QVERIFY(std::holds_alternative<hcb::AppError>(result));
   QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Validation);
+  QCOMPARE(manager.requests().size(), 0);
+
+  std::future<hcb::PythonBridgeResult> search = client.search(QStringLiteral("work"), {});
+  const hcb::PythonBridgeResult searchResult = search.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(searchResult));
+  QCOMPARE(std::get<hcb::AppError>(searchResult).code(), hcb::AppErrorCode::Validation);
   QCOMPARE(manager.requests().size(), 0);
 }
 

@@ -23,6 +23,7 @@ class PythonBridgeProjectionTest final : public QObject {
 private slots:
   void projectsSummaryAndTaskPage();
   void projectsDateBoundedEvents();
+  void projectsSearchResults();
   void rejectsCrossAccountAndMalformedPayloads();
 };
 
@@ -84,7 +85,36 @@ void PythonBridgeProjectionTest::projectsDateBoundedEvents() {
   QCOMPARE(event.location, std::optional<QString>(QStringLiteral("Desk")));
 }
 
+void PythonBridgeProjectionTest::projectsSearchResults() {
+  const QJsonObject data = object(R"json(
+    {"results":[
+      {"kind":"task","score":100,"item":{"id":"task-1","account_id":"work",
+       "title":"Plan bridge search","notes":"Validate the core path","due":"2026-09-15"}},
+      {"kind":"event","score":80,"item":{"id":"event-1","account_id":"work",
+       "summary":"Planning","location":"Desk","start":{"kind":"dateTime",
+       "value":"2026-09-15T09:00:00+00:00"}}},
+      {"kind":"drive","score":60,"item":{"id":"file-1","account_id":"work","name":"Plan"}}
+    ]}
+  )json");
+  const hcb::PythonBridgeSearchOrError decoded =
+      hcb::PythonBridgeProjection::searchResults(data, QStringLiteral("work"));
+  QVERIFY(std::holds_alternative<QList<hcb::LocalSearchRankedResult>>(decoded));
+  const QList<hcb::LocalSearchRankedResult>& results =
+      std::get<QList<hcb::LocalSearchRankedResult>>(decoded);
+  QCOMPARE(results.size(), 2);
+  QCOMPARE(results.first().resource, hcb::LocalSearchResource::Task);
+  QCOMPARE(results.first().title, QStringLiteral("Plan bridge search"));
+  QCOMPARE(results.first().detail, QStringLiteral("Validate the core path"));
+  QCOMPARE(results.first().scheduledAt, QStringLiteral("2026-09-15"));
+  QCOMPARE(results.last().resource, hcb::LocalSearchResource::Event);
+  QCOMPARE(results.last().scheduledAt, QStringLiteral("2026-09-15T09:00:00+00:00"));
+}
+
 void PythonBridgeProjectionTest::rejectsCrossAccountAndMalformedPayloads() {
+  QVERIFY(std::holds_alternative<hcb::AppError>(hcb::PythonBridgeProjection::searchResults(
+      object(R"json({"results":[{"kind":"task","score":100,"item":{"id":"task-1",
+      "account_id":"other","title":"Wrong account","notes":null,"due":null}}]})json"),
+      QStringLiteral("work"))));
   const QJsonObject crossAccount = object(R"json(
     {"workspace":{"account":{"id":"work","email":"work@example.test"},"pending":0,
     "task_lists":[{"id":"inbox","account_id":"other","title":"Inbox","remote_id":null,

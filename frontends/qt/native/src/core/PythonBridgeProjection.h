@@ -4,6 +4,7 @@
 #include "core/CalendarReadService.h"
 #include "core/TaskListReadService.h"
 #include "core/TaskModel.h"
+#include "core/UnifiedLocalSearchRanker.h"
 
 #include <QHash>
 #include <QJsonObject>
@@ -31,6 +32,7 @@ struct PythonBridgeTaskPage final {
 using PythonBridgeWorkspaceSummaryOrError = std::variant<PythonBridgeWorkspaceSummary, AppError>;
 using PythonBridgeTaskPageOrError = std::variant<PythonBridgeTaskPage, AppError>;
 using PythonBridgeEventRangeOrError = std::variant<QList<CalendarEventSummary>, AppError>;
+using PythonBridgeSearchOrError = std::variant<QList<LocalSearchRankedResult>, AppError>;
 
 class PythonBridgeProjection final {
 public:
@@ -39,6 +41,8 @@ public:
   [[nodiscard]] static PythonBridgeTaskPageOrError
   taskPage(const QJsonObject& data, const QHash<QString, QString>& taskListTitles);
   [[nodiscard]] static PythonBridgeEventRangeOrError eventRange(const QJsonObject& data);
+  [[nodiscard]] static PythonBridgeSearchOrError searchResults(const QJsonObject& data,
+                                                               const QString& accountId);
   [[nodiscard]] static QHash<QString, QString>
   taskListTitles(const PythonBridgeWorkspaceSummary& summary);
 };
