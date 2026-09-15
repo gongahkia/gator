@@ -11,10 +11,14 @@ searches the Python core index, then creates, edits, and completes a task; creat
 and edits an event; creates, renames, and deselects a task list after proving its
 task is hidden from the displayed model but retained by the bridge; creates and updates a
 calendar's details and visibility; and queues then removes a synthetic calendar
-subscription. It verifies the refreshed search projection, shuts down the bridge,
-checks descriptor cleanup, restarts the bridge against the same database, verifies
-the surviving task, event, task-list, and calendar through the v1 API, and starts
-Qt a second time to verify it loads the persisted workspace.
+subscription. It also creates a managed recurring task, reconfigures it, completes
+it, stops its next occurrence, and splits a second series. It creates a task
+hierarchy, reorders siblings through the bridge controller, and moves one
+child into a deselected task list. It verifies the
+refreshed search projection, shuts down the bridge, checks descriptor cleanup,
+restarts the bridge against the same database, verifies the surviving task, event,
+task-list, calendar, recurrence markers, and hierarchy through the v1 API, and starts Qt a
+second time to verify it loads the persisted workspace.
 
 Run it after building the native executable:
 

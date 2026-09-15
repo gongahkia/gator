@@ -284,6 +284,23 @@ std::future<PythonBridgeResult> PythonBridgeClient::updateTask(const QString& ac
   return request("PATCH", target, changes, idempotencyKey, cancellation);
 }
 
+std::future<PythonBridgeResult> PythonBridgeClient::moveTask(const QString& accountId,
+                                                             const QString& taskId,
+                                                             const QJsonObject& move,
+                                                             const QByteArray& idempotencyKey,
+                                                             CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/");
+  if (!path.has_value() || !isValidIdentifier(taskId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("task move mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(taskId)) +
+                 QStringLiteral("/move"));
+  return request("POST", target, move, idempotencyKey, cancellation);
+}
+
 std::future<PythonBridgeResult> PythonBridgeClient::completeTask(const QString& accountId,
                                                                  const QString& taskId,
                                                                  bool completed,
@@ -303,6 +320,44 @@ std::future<PythonBridgeResult> PythonBridgeClient::completeTask(const QString& 
                  QJsonObject{{QStringLiteral("completed"), completed}},
                  idempotencyKey,
                  cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::stopTaskRecurrence(const QString& accountId,
+                                       const QString& taskId,
+                                       const QString& scope,
+                                       const QByteArray& idempotencyKey,
+                                       CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/");
+  if (!path.has_value() || !isValidIdentifier(taskId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey) ||
+      (scope != QStringLiteral("this") && scope != QStringLiteral("following") &&
+       scope != QStringLiteral("series"))) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("task recurrence mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(taskId)) +
+                 QStringLiteral("/recurrence/stop"));
+  return request(
+      "POST", target, QJsonObject{{QStringLiteral("scope"), scope}}, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::splitTaskRecurrence(const QString& accountId,
+                                        const QString& taskId,
+                                        const QByteArray& idempotencyKey,
+                                        CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/");
+  if (!path.has_value() || !isValidIdentifier(taskId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("task recurrence mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(taskId)) +
+                 QStringLiteral("/recurrence/split"));
+  return request("POST", target, QJsonObject{}, idempotencyKey, cancellation);
 }
 
 std::future<PythonBridgeResult> PythonBridgeClient::deleteTask(const QString& accountId,

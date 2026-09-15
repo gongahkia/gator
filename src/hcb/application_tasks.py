@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date, datetime
+from typing import Literal
+from uuid import uuid4
 
 from .application import (
     BatchActionPreview,
@@ -27,12 +29,26 @@ from .models import (
     utc_now,
 )
 from .task_recurrence import (
+    RecurrenceEnd,
+    TaskRecurrenceMarker,
     parse_task_recurrence_notes,
     serialize_task_notes,
     task_recurrence_successor,
 )
 
 _UNSET = _Unset()
+
+
+@dataclass(frozen=True, slots=True)
+class TaskRecurrenceConfiguration:
+    """User-editable settings for an HCB-managed task recurrence series."""
+
+    frequency: Literal["daily", "weekly", "monthly", "yearly"]
+    interval: int
+    end: RecurrenceEnd
+    recurrence_rule: str = ""
+    exclusion_dates: tuple[str, ...] = ()
+    addition_dates: tuple[str, ...] = ()
 
 
 class TaskServiceMixin(_ApplicationServiceBase):
@@ -178,6 +194,7 @@ class TaskServiceMixin(_ApplicationServiceBase):
         parent_id: str | None = None,
         position: str | None = None,
         id: str | None = None,
+        recurrence: TaskRecurrenceConfiguration | None = None,
     ) -> Task:
         self._require_task_list(account_id, list_id)
         if not title.strip():
@@ -191,23 +208,65 @@ class TaskServiceMixin(_ApplicationServiceBase):
             parent = self._require_task(account_id, parent_id)
             if parent.list_id != list_id:
                 raise ValueError("a task parent must be in the same list")
+        if position is not None:
+            previous = self._require_task(account_id, position)
+            if previous.list_id != list_id or previous.parent_id != parent_id:
+                raise ValueError("previous task must be a sibling in the destination list")
+        parsed_priority = TaskPriority(priority)
+        task_notes = notes
+        if recurrence is not None:
+            if due is None or due_time_zone is None or parent_id is not None:
+                raise ValueError(
+                    "managed recurrence requires a top-level task with a due date and time zone"
+                )
+            series_id = str(uuid4())
+            marker = TaskRecurrenceMarker(
+                series_id=series_id,
+                occurrence_id=f"{series_id}:0",
+                ordinal=0,
+                frequency=recurrence.frequency,
+                interval=recurrence.interval,
+                anchor_date=due.isoformat(),
+                time_zone=due_time_zone,
+                end=recurrence.end,
+                recurrence_rule=recurrence.recurrence_rule,
+                exclusion_dates=recurrence.exclusion_dates,
+                addition_dates=recurrence.addition_dates,
+                template_title=title.strip(),
+                template_due_date=due.isoformat(),
+                template_priority=parsed_priority.value,
+            )
+            serialized = serialize_task_notes(notes or "", marker)
+            if serialized.error:
+                raise ValueError(serialized.error)
+            task_notes = serialized.notes
         task = Task(
             id=id or _id(),
             account_id=account_id,
             list_id=list_id,
             title=title.strip(),
-            notes=notes,
+            notes=task_notes,
             due=due,
             parent_id=parent_id,
             position=position,
             metadata=_dirty(Metadata()),
-            priority=TaskPriority(priority),
+            priority=parsed_priority,
             due_time_zone=due_time_zone,
         )
         with self.storage.transaction():
             self.storage.upsert_task(task)
-            if self.notes_projection(account_id) is NotesProjection.DISABLED and notes is not None:
-                self.storage.set_private_task_note(account_id, task.id, notes)
+            sibling_ids = self.storage.list_task_sibling_ids(account_id, list_id, parent_id)
+            sibling_ids.remove(task.id)
+            insert_at = 0 if position is None else sibling_ids.index(position) + 1
+            sibling_ids.insert(insert_at, task.id)
+            self.storage.set_task_sibling_order(
+                account_id, list_id, parent_id, sibling_ids, task.id
+            )
+            if (
+                self.notes_projection(account_id) is NotesProjection.DISABLED
+                and task_notes is not None
+            ):
+                self.storage.set_private_task_note(account_id, task.id, task_notes)
             self._enqueue(
                 account_id,
                 EntityType.TASK,
@@ -241,6 +300,7 @@ class TaskServiceMixin(_ApplicationServiceBase):
         clear_due: bool = False,
         due_time_zone: str | None = None,
         priority: TaskPriority | str | None = None,
+        recurrence: TaskRecurrenceConfiguration | None | _Unset = _UNSET,
     ) -> Task:
         current = self._require_task(account_id, task_id)
         if title is not None and not title.strip():
@@ -254,20 +314,53 @@ class TaskServiceMixin(_ApplicationServiceBase):
         self._validate_zone(next_zone)
         if next_due is None and next_zone is not None:
             raise ValueError("a due time zone requires a due date")
+        next_title = title.strip() if title is not None else current.title
+        next_priority = TaskPriority(priority) if priority is not None else current.priority
+        next_notes = current.notes if isinstance(notes, _Unset) else notes
+        if not isinstance(recurrence, _Unset):
+            parsed = parse_task_recurrence_notes(current.notes or "")
+            user_notes = parsed.user_notes if isinstance(notes, _Unset) else (notes or "")
+            if recurrence is None:
+                serialized = serialize_task_notes(user_notes, reminder=parsed.reminder)
+            else:
+                if parsed.state != "managed" or parsed.marker is None:
+                    raise ValueError("task does not have managed recurrence")
+                if next_due is None:
+                    raise ValueError("managed recurrence requires a due date")
+                marker_zone = next_zone or parsed.marker.time_zone
+                self._validate_zone(marker_zone)
+                next_zone = marker_zone
+                marker = replace(
+                    parsed.marker,
+                    frequency=recurrence.frequency,
+                    interval=recurrence.interval,
+                    time_zone=marker_zone,
+                    end=recurrence.end,
+                    recurrence_rule=recurrence.recurrence_rule,
+                    exclusion_dates=recurrence.exclusion_dates,
+                    addition_dates=recurrence.addition_dates,
+                    template_title=next_title,
+                    template_due_date=next_due.isoformat(),
+                    template_priority=next_priority.value,
+                )
+                serialized = serialize_task_notes(user_notes, marker, parsed.reminder)
+            if serialized.error:
+                raise ValueError(serialized.error)
+            next_notes = serialized.notes
         updated = replace(
             current,
-            title=title.strip() if title is not None else current.title,
-            notes=current.notes if isinstance(notes, _Unset) else notes,
+            title=next_title,
+            notes=next_notes,
             due=next_due,
             due_time_zone=next_zone,
-            priority=TaskPriority(priority) if priority is not None else current.priority,
+            priority=next_priority,
             metadata=_dirty(current.metadata),
         )
         with self.storage.transaction():
             before = self._snapshot("tasks", account_id, task_id)
             self.storage.upsert_task(updated)
-            if self.notes_projection(account_id) is NotesProjection.DISABLED and not isinstance(
-                notes, _Unset
+            if self.notes_projection(account_id) is NotesProjection.DISABLED and (
+                not isinstance(notes, _Unset) or not isinstance(recurrence, _Unset)
             ):
                 self.storage.set_private_task_note(account_id, task_id, updated.notes)
             self._enqueue(
@@ -293,6 +386,12 @@ class TaskServiceMixin(_ApplicationServiceBase):
         return updated
 
     def complete_task(self, account_id: str, task_id: str, *, completed: bool = True) -> Task:
+        return self.complete_task_with_successor(account_id, task_id, completed=completed)[0]
+
+    def complete_task_with_successor(
+        self, account_id: str, task_id: str, *, completed: bool = True
+    ) -> tuple[Task, Task | None]:
+        """Apply completion and return the recurrence successor created for this task, if any."""
         current = self._require_task(account_id, task_id)
         now = utc_now() if completed else None
         updated = replace(
@@ -324,9 +423,8 @@ class TaskServiceMixin(_ApplicationServiceBase):
                 before,
                 self._snapshot("tasks", account_id, task_id),
             )
-            if completed:
-                self._ensure_recurrence_successor(updated)
-        return updated
+            successor = self._ensure_recurrence_successor(updated) if completed else None
+        return updated, successor
 
     def _ensure_recurrence_successor(self, task: Task) -> Task | None:
         parsed = parse_task_recurrence_notes(task.notes or "")
@@ -362,6 +460,112 @@ class TaskServiceMixin(_ApplicationServiceBase):
                         created.append(successor)
         return tuple(created)
 
+    def stop_task_recurrence(
+        self,
+        account_id: str,
+        task_id: str,
+        *,
+        scope: Literal["this", "following", "series"],
+    ) -> tuple[Task, ...]:
+        """Remove managed recurrence metadata from the requested occurrence scope."""
+        if scope not in {"this", "following", "series"}:
+            raise ValueError("task recurrence scope is invalid")
+        selected = self._require_task(account_id, task_id)
+        selected_notes = parse_task_recurrence_notes(selected.notes or "")
+        if selected_notes.state != "managed" or selected_notes.marker is None:
+            raise ValueError("task does not have managed recurrence")
+        marker = selected_notes.marker
+        successors: list[Task] = []
+        with self.storage.transaction():
+            if scope == "this":
+                successor = self._ensure_recurrence_successor(selected)
+                if successor is not None:
+                    successors.append(successor)
+                candidates = [selected]
+            else:
+                candidates = []
+                for candidate in self.storage.list_tasks(account_id):
+                    candidate_notes = parse_task_recurrence_notes(candidate.notes or "")
+                    candidate_marker = candidate_notes.marker
+                    if (
+                        candidate_notes.state == "managed"
+                        and candidate_marker is not None
+                        and candidate_marker.series_id == marker.series_id
+                        and (scope == "series" or candidate_marker.ordinal >= marker.ordinal)
+                    ):
+                        candidates.append(candidate)
+            if not candidates:
+                raise ValueError("task recurrence occurrences are unavailable")
+            updated = [
+                self.update_task(account_id, candidate.id, recurrence=None)
+                for candidate in candidates
+            ]
+        return tuple((*updated, *successors))
+
+    def split_task_recurrence(self, account_id: str, task_id: str) -> tuple[Task, ...]:
+        """Move this and later occurrences into a new managed recurrence series."""
+        selected = self._require_task(account_id, task_id)
+        selected_notes = parse_task_recurrence_notes(selected.notes or "")
+        if (
+            selected_notes.state != "managed"
+            or selected_notes.marker is None
+            or selected.due is None
+        ):
+            raise ValueError("managed recurrence split is unavailable")
+        selected_marker = selected_notes.marker
+        candidates: list[tuple[Task, TaskRecurrenceMarker]] = []
+        seen_ordinals: set[int] = set()
+        for candidate in self.storage.list_tasks(account_id):
+            candidate_notes = parse_task_recurrence_notes(candidate.notes or "")
+            candidate_marker = candidate_notes.marker
+            if (
+                candidate_notes.state != "managed"
+                or candidate_marker is None
+                or candidate_marker.series_id != selected_marker.series_id
+                or candidate_marker.ordinal < selected_marker.ordinal
+            ):
+                continue
+            if candidate_marker.ordinal in seen_ordinals:
+                raise ValueError("managed recurrence split has duplicate occurrence identities")
+            if candidate.due is None:
+                raise ValueError("managed recurrence split occurrence has no due date")
+            seen_ordinals.add(candidate_marker.ordinal)
+            candidates.append((candidate, candidate_marker))
+        if not candidates or selected_marker.ordinal not in seen_ordinals:
+            raise ValueError("task recurrence occurrences are unavailable")
+        candidates.sort(key=lambda value: value[1].ordinal)
+        end = selected_marker.end
+        if end.kind == "count" and end.count is not None:
+            end = replace(end, count=end.count - selected_marker.ordinal)
+        series_id = str(uuid4())
+        rewrites: list[tuple[Task, str | None]] = []
+        for candidate, candidate_marker in candidates:
+            parsed = parse_task_recurrence_notes(candidate.notes or "")
+            assert parsed.marker is not None and candidate.due is not None
+            ordinal = candidate_marker.ordinal - selected_marker.ordinal
+            marker = replace(
+                candidate_marker,
+                series_id=series_id,
+                occurrence_id=f"{series_id}:{ordinal}",
+                ordinal=ordinal,
+                anchor_date=selected.due.isoformat(),
+                time_zone=candidate.due_time_zone or candidate_marker.time_zone,
+                end=end,
+                template_title=candidate.title,
+                template_due_date=candidate.due.isoformat(),
+                template_priority=candidate.priority.value,
+            )
+            serialized = serialize_task_notes(parsed.user_notes, marker, parsed.reminder)
+            if serialized.error:
+                raise ValueError(serialized.error)
+            rewrites.append((candidate, serialized.notes))
+        with self.storage.transaction():
+            updated = [
+                self.update_task(account_id, candidate.id, notes=notes)
+                for candidate, notes in rewrites
+            ]
+        return tuple(updated)
+
     def complete_tasks(
         self, account_id: str, task_ids: list[str], *, completed: bool = True
     ) -> tuple[Task, ...]:
@@ -378,12 +582,12 @@ class TaskServiceMixin(_ApplicationServiceBase):
             for task in preview.items:
                 if not isinstance(task, Task):
                     continue
-                completed_task = self.complete_task(account_id, task.id, completed=completed)
+                completed_task, successor = self.complete_task_with_successor(
+                    account_id, task.id, completed=completed
+                )
                 completed_tasks.append(completed_task)
-                if completed:
-                    successor = self._ensure_recurrence_successor(completed_task)
-                    if successor is not None and successor.id != completed_task.id:
-                        successors.append(successor)
+                if successor is not None and successor.id != completed_task.id:
+                    successors.append(successor)
         return TaskCompletionResult(tuple(completed_tasks), tuple(successors))
 
     def delete_tasks(self, account_id: str, task_ids: list[str]) -> tuple[Task, ...]:
@@ -464,39 +668,80 @@ class TaskServiceMixin(_ApplicationServiceBase):
         task_id: str,
         *,
         list_id: str | None = None,
-        parent_id: str | None = None,
-        previous_id: str | None = None,
+        parent_id: str | None | _Unset = _UNSET,
+        previous_id: str | None | _Unset = _UNSET,
     ) -> Task:
         current = self._require_task(account_id, task_id)
         destination = list_id or current.list_id
         self._require_task_list(account_id, destination)
-        if parent_id == task_id:
+        moved_to_another_list = list_id is not None and list_id != current.list_id
+        if isinstance(parent_id, _Unset):
+            parent = None if moved_to_another_list else current.parent_id
+        else:
+            parent = parent_id
+        previous_is_explicit = not isinstance(previous_id, _Unset)
+        if isinstance(previous_id, _Unset):
+            previous = (
+                None
+                if moved_to_another_list or not isinstance(parent_id, _Unset)
+                else current.position
+            )
+        else:
+            previous = previous_id
+        if parent == task_id:
             raise ValueError("a task cannot parent itself")
-        if parent_id:
-            parent = self._require_task(account_id, parent_id)
-            if parent.list_id != destination:
+        if parent:
+            parent_task = self._require_task(account_id, parent)
+            if parent_task.list_id != destination:
                 raise ValueError("a task parent must be in the destination list")
-            cursor = parent
+            cursor = parent_task
             seen = {task_id}
             while cursor.parent_id:
                 if cursor.parent_id in seen:
                     raise ValueError("task move would create a parent cycle")
                 seen.add(cursor.parent_id)
                 cursor = self._require_task(account_id, cursor.parent_id)
-        if previous_id:
-            previous = self._require_task(account_id, previous_id)
-            if previous.list_id != destination or previous.parent_id != parent_id:
+        if previous_is_explicit and previous:
+            if previous == task_id:
+                raise ValueError("a task cannot follow itself")
+            previous_task = self._require_task(account_id, previous)
+            if previous_task.list_id != destination or previous_task.parent_id != parent:
                 raise ValueError("previous task must be a sibling in the destination list")
         updated = replace(
             current,
             list_id=destination,
-            parent_id=parent_id,
-            position=previous_id,
+            parent_id=parent,
+            position=previous,
             metadata=_dirty(current.metadata),
         )
         with self.storage.transaction():
             before = self._snapshot("tasks", account_id, task_id)
+            source_key = (current.list_id, current.parent_id)
+            destination_key = (destination, parent)
+            reorder_requested = (
+                moved_to_another_list or not isinstance(parent_id, _Unset) or previous_is_explicit
+            )
+            source_siblings = self.storage.list_task_sibling_ids(
+                account_id, current.list_id, current.parent_id
+            )
+            destination_siblings = (
+                source_siblings.copy()
+                if source_key == destination_key
+                else self.storage.list_task_sibling_ids(account_id, destination, parent)
+            )
+            source_siblings.remove(task_id)
+            destination_siblings = [item for item in destination_siblings if item != task_id]
+            if reorder_requested:
+                if previous_is_explicit and previous is not None:
+                    insert_at = destination_siblings.index(previous) + 1
+                else:
+                    insert_at = 0
+                destination_siblings.insert(insert_at, task_id)
             self.storage.upsert_task(updated)
+            if reorder_requested:
+                self.storage.set_task_sibling_order(
+                    account_id, destination, parent, destination_siblings, task_id
+                )
             self._enqueue(
                 account_id,
                 EntityType.TASK,
@@ -505,8 +750,8 @@ class TaskServiceMixin(_ApplicationServiceBase):
                 {
                     "source_list_id": current.list_id,
                     "list_id": destination,
-                    "parent": parent_id,
-                    "previous": previous_id,
+                    "parent": parent,
+                    "previous": previous,
                     "remote_id": current.remote_id,
                     "body": self._task_body(updated, self.notes_projection(account_id)),
                 },

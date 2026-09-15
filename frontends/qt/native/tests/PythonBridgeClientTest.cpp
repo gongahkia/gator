@@ -38,10 +38,14 @@ private slots:
   void requestsBoundedSearch();
   void requestsAuthenticationState();
   void sendsIdempotentMutations();
+  void sendsTaskMoveMutation();
+  void sendsTaskRecurrenceMutations();
   void sendsTaskListAndCalendarManagementMutations();
   void rejectsInvalidRequestsBeforeNetwork();
   void cancelsBeforeNetwork();
+  void cancelsAfterDispatch();
   void propagatesBridgeErrors();
+  void rejectsMalformedBridgeResponses();
 };
 
 void PythonBridgeClientTest::readsPrivateLoopbackDescriptor() {
@@ -195,6 +199,68 @@ void PythonBridgeClientTest::sendsIdempotentMutations() {
   QCOMPARE(manager.requests().at(2).body, QByteArray("{}"));
 }
 
+void PythonBridgeClientTest::sendsTaskMoveMutation() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"task\":{}}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  const QByteArray key("task-move-request-123");
+  std::future<hcb::PythonBridgeResult> move =
+      client.moveTask(QStringLiteral("work"),
+                      QStringLiteral("task-1"),
+                      QJsonObject{{QStringLiteral("list_id"), QStringLiteral("archive")}},
+                      key);
+  waitFor(move);
+  QVERIFY(std::holds_alternative<QJsonObject>(move.get()));
+
+  QCOMPARE(manager.requests().size(), 1);
+  QCOMPARE(manager.requests().first().request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks/task-1/move"));
+  QCOMPARE(manager.requests().first().request.rawHeader("Idempotency-Key"), key);
+  QCOMPARE(manager.requests().first().body, QByteArray("{\"list_id\":\"archive\"}"));
+}
+
+void PythonBridgeClientTest::sendsTaskRecurrenceMutations() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"tasks\":[]}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"tasks\":[]}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> stop =
+      client.stopTaskRecurrence(QStringLiteral("work"),
+                                QStringLiteral("task-1"),
+                                QStringLiteral("following"),
+                                QByteArray("recurrence-stop-123"));
+  waitFor(stop);
+  QVERIFY(std::holds_alternative<QJsonObject>(stop.get()));
+
+  std::future<hcb::PythonBridgeResult> split = client.splitTaskRecurrence(
+      QStringLiteral("work"), QStringLiteral("task-1"), QByteArray("recurrence-split-456"));
+  waitFor(split);
+  QVERIFY(std::holds_alternative<QJsonObject>(split.get()));
+
+  QCOMPARE(manager.requests().size(), 2);
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks/task-1/recurrence/stop"));
+  QCOMPARE(manager.requests().at(0).request.rawHeader("Idempotency-Key"),
+           QByteArray("recurrence-stop-123"));
+  QCOMPARE(manager.requests().at(0).body, QByteArray("{\"scope\":\"following\"}"));
+  QCOMPARE(manager.requests().at(1).request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks/task-1/recurrence/split"));
+  QCOMPARE(manager.requests().at(1).request.rawHeader("Idempotency-Key"),
+           QByteArray("recurrence-split-456"));
+  QCOMPARE(manager.requests().at(1).body, QByteArray("{}"));
+
+  std::future<hcb::PythonBridgeResult> invalid =
+      client.stopTaskRecurrence(QStringLiteral("work"),
+                                QStringLiteral("task-1"),
+                                QStringLiteral("invalid"),
+                                QByteArray("recurrence-invalid-789"));
+  const hcb::PythonBridgeResult invalidResult = invalid.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(invalidResult));
+  QCOMPARE(manager.requests().size(), 2);
+}
+
 void PythonBridgeClientTest::sendsTaskListAndCalendarManagementMutations() {
   hcb::test::MockNetworkAccessManager manager;
   for (int index = 0; index < 8; ++index) {
@@ -311,6 +377,25 @@ void PythonBridgeClientTest::cancelsBeforeNetwork() {
   QCOMPARE(manager.requests().size(), 0);
 }
 
+void PythonBridgeClientTest::cancelsAfterDispatch() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"workspace\":{}}}"),
+                   .delayMilliseconds = 200});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+  hcb::CancellationSource cancellation;
+
+  std::future<hcb::PythonBridgeResult> future =
+      client.workspace(QStringLiteral("work"), cancellation.token());
+  QTRY_COMPARE(manager.requests().size(), 1);
+  QVERIFY(cancellation.requestStop());
+  waitFor(future);
+  const hcb::PythonBridgeResult result = future.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(result));
+  QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Network);
+  QCOMPARE(std::get<hcb::AppError>(result).message(),
+           QStringLiteral("HCB bridge request was cancelled"));
+}
+
 void PythonBridgeClientTest::propagatesBridgeErrors() {
   hcb::test::MockNetworkAccessManager manager;
   manager.enqueue({.status = 401,
@@ -326,6 +411,27 @@ void PythonBridgeClientTest::propagatesBridgeErrors() {
   QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Network);
   QCOMPARE(std::get<hcb::AppError>(result).message(),
            QStringLiteral("missing or invalid bridge token"));
+}
+
+void PythonBridgeClientTest::rejectsMalformedBridgeResponses() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("not JSON")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":2,\"data\":{}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":[]}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  const auto checkFailure = [&client](const QString& expected) {
+    std::future<hcb::PythonBridgeResult> future = client.workspace(QStringLiteral("work"));
+    waitFor(future);
+    const hcb::PythonBridgeResult result = future.get();
+    QVERIFY(std::holds_alternative<hcb::AppError>(result));
+    QCOMPARE(std::get<hcb::AppError>(result).code(), hcb::AppErrorCode::Network);
+    QCOMPARE(std::get<hcb::AppError>(result).message(), expected);
+  };
+
+  checkFailure(QStringLiteral("HCB bridge returned malformed JSON"));
+  checkFailure(QStringLiteral("HCB bridge protocol version is unsupported"));
+  checkFailure(QStringLiteral("HCB bridge response has no data object"));
 }
 
 QTEST_GUILESS_MAIN(PythonBridgeClientTest)

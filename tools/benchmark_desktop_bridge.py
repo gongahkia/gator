@@ -17,12 +17,32 @@ from hcb.benchmarks import create_large_fixture
 from hcb.desktop_bridge import DesktopBridge
 from hcb.paths import AppPaths
 from hcb.runtime import Runtime
+from hcb.storage import Storage
 
 
 def _request(bridge: DesktopBridge, path: str) -> tuple[float, int]:
     request = Request(
         bridge.descriptor.url + path,
         headers={"Authorization": f"Bearer {bridge.descriptor.token}"},
+    )
+    started = perf_counter()
+    with urlopen(request, timeout=15) as response:  # noqa: S310 - loopback bridge created above
+        payload = json.loads(response.read())
+    return perf_counter() - started, len(json.dumps(payload, separators=(",", ":")))
+
+
+def _mutation(
+    bridge: DesktopBridge, path: str, body: dict[str, object], idempotency_key: str
+) -> tuple[float, int]:
+    request = Request(
+        bridge.descriptor.url + path,
+        data=json.dumps(body, separators=(",", ":")).encode(),
+        headers={
+            "Authorization": f"Bearer {bridge.descriptor.token}",
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotency_key,
+        },
+        method="POST",
     )
     started = perf_counter()
     with urlopen(request, timeout=15) as response:  # noqa: S310 - loopback bridge created above
@@ -57,6 +77,10 @@ def main() -> int:
         root = Path(directory)
         paths = AppPaths(root / "config", root / "data", root / "cache")
         create_large_fixture(paths.database_file, task_count=args.tasks, event_count=args.events)
+        with Storage(paths.database_file) as storage:
+            reorder_task_ids = [
+                task.id for task in storage.list_tasks_page("benchmark", limit=args.runs, offset=0)
+            ]
         bridge = DesktopBridge(lambda: Runtime(paths, environ={}))
         worker = threading.Thread(target=bridge.serve_forever, daemon=True)
         worker.start()
@@ -68,6 +92,15 @@ def main() -> int:
                 "task_page": [
                     _request(bridge, f"/v1/accounts/benchmark/tasks?limit={args.page_size}")
                     for _ in range(args.runs)
+                ],
+                "task_reorder": [
+                    _mutation(
+                        bridge,
+                        f"/v1/accounts/benchmark/tasks/{task_id}/move",
+                        {"previous_id": None},
+                        f"benchmark-reorder-{index}",
+                    )
+                    for index, task_id in enumerate(reorder_task_ids)
                 ],
                 "search": [
                     _request(bridge, "/v1/accounts/benchmark/search?q=release-marker&limit=50")

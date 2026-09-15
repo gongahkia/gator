@@ -103,6 +103,13 @@ constexpr char kBridgeAcceptanceInitialTaskTitle[] = "Qt bridge interaction task
 constexpr char kBridgeAcceptanceUpdatedTaskTitle[] = "Qt bridge interaction task updated";
 constexpr char kBridgeAcceptanceInitialTaskNotes[] = "Created by the isolated Qt bridge acceptance";
 constexpr char kBridgeAcceptanceUpdatedTaskNotes[] = "Updated by the isolated Qt bridge acceptance";
+constexpr char kBridgeAcceptanceRecurringTaskTitle[] = "Qt bridge recurring task";
+constexpr char kBridgeAcceptanceUpdatedRecurringTaskTitle[] = "Qt bridge recurring task updated";
+constexpr char kBridgeAcceptanceSplitRecurringTaskTitle[] = "Qt bridge split recurring task";
+constexpr char kBridgeAcceptanceHierarchyParentTaskTitle[] = "Qt bridge hierarchy parent";
+constexpr char kBridgeAcceptanceHierarchyFirstChildTaskTitle[] = "Qt bridge hierarchy first child";
+constexpr char kBridgeAcceptanceHierarchySecondChildTaskTitle[] =
+    "Qt bridge hierarchy second child";
 constexpr char kBridgeAcceptanceInitialEventTitle[] = "Qt bridge interaction event initial";
 constexpr char kBridgeAcceptanceUpdatedEventTitle[] = "Qt bridge interaction event updated";
 constexpr char kBridgeAcceptanceInitialEventDescription[] =
@@ -119,6 +126,9 @@ constexpr char kBridgeAcceptanceUpdatedCalendarTitle[] = "Qt bridge acceptance c
 constexpr char kBridgeAcceptanceUpdatedCalendarDescription[] =
     "Updated by the isolated Qt bridge calendar acceptance";
 constexpr char kBridgeAcceptanceSubscriptionRemoteId[] = "qt-bridge-acceptance-subscription";
+constexpr qsizetype kMaximumBridgeOperationIdLength = 256;
+constexpr qsizetype kMaximumBridgeOperationProgressItems = 32;
+constexpr qsizetype kMaximumBridgeOperationProgressLength = 512;
 
 [[nodiscard]] std::unique_ptr<OAuthCredentialStore> makeCredentialStore() {
 #if defined(Q_OS_MACOS)
@@ -187,6 +197,45 @@ constexpr char kBridgeAcceptanceSubscriptionRemoteId[] = "qt-bridge-acceptance-s
 [[nodiscard]] bool isValidQuickCaptureDestination(const QString& value) {
   return value.isEmpty() ||
          (value == value.trimmed() && value.size() <= 256 && !value.contains(QChar::Null));
+}
+
+[[nodiscard]] bool isValidBridgeOperationId(const QString& value) {
+  return !value.isEmpty() && value == value.trimmed() &&
+         value.size() <= kMaximumBridgeOperationIdLength && !value.contains(QChar::Null) &&
+         !value.contains(u'/') && !value.contains(u'\\');
+}
+
+[[nodiscard]] bool isValidBridgeOperationState(const QString& value) {
+  return value == QStringLiteral("queued") || value == QStringLiteral("running") ||
+         value == QStringLiteral("succeeded") || value == QStringLiteral("failed") ||
+         value == QStringLiteral("cancelled");
+}
+
+[[nodiscard]] bool isValidBridgeOperationProgress(const QJsonValue& value) {
+  if (!value.isArray()) {
+    return false;
+  }
+  const QJsonArray progress = value.toArray();
+  if (progress.size() > kMaximumBridgeOperationProgressItems) {
+    return false;
+  }
+  return std::all_of(progress.cbegin(), progress.cend(), [](const QJsonValue& item) {
+    return item.isString() && item.toString().size() <= kMaximumBridgeOperationProgressLength &&
+           !item.toString().contains(QChar::Null);
+  });
+}
+
+[[nodiscard]] bool
+isValidBridgeOperation(const QJsonObject& operation,
+                       const QString& expectedAccountId,
+                       const std::optional<QString>& expectedOperationId = std::nullopt) {
+  const QString operationId = operation.value(QStringLiteral("id")).toString();
+  const QString accountId = operation.value(QStringLiteral("account_id")).toString();
+  const QString state = operation.value(QStringLiteral("state")).toString();
+  return isValidBridgeOperationId(operationId) &&
+         (!expectedOperationId.has_value() || operationId == *expectedOperationId) &&
+         accountId == expectedAccountId && isValidBridgeOperationState(state) &&
+         isValidBridgeOperationProgress(operation.value(QStringLiteral("progress")));
 }
 
 [[nodiscard]] bool isValidQuickCaptureAlias(const QString& value) {
@@ -493,6 +542,54 @@ struct ManagedTaskRecurrenceConfiguration final {
           frequency == 4
               ? QStringLiteral("FREQ=DAILY;INTERVAL=%1;BYDAY=MO,TU,WE,TH,FR").arg(interval)
               : QString()};
+}
+
+[[nodiscard]] QString bridgeRecurrenceFrequency(TaskRecurrenceFrequency frequency) {
+  switch (frequency) {
+  case TaskRecurrenceFrequency::Daily:
+    return QStringLiteral("daily");
+  case TaskRecurrenceFrequency::Weekly:
+    return QStringLiteral("weekly");
+  case TaskRecurrenceFrequency::Monthly:
+    return QStringLiteral("monthly");
+  case TaskRecurrenceFrequency::Yearly:
+    return QStringLiteral("yearly");
+  }
+  return {};
+}
+
+[[nodiscard]] QJsonArray bridgeRecurrenceDates(const QList<QString>& dates) {
+  QJsonArray result;
+  for (const QString& date : dates) {
+    result.append(date);
+  }
+  return result;
+}
+
+[[nodiscard]] QJsonObject
+bridgeTaskRecurrence(const ManagedTaskRecurrenceConfiguration& configuration,
+                     const QString& recurrenceRule,
+                     const QList<QString>& exclusionDates,
+                     const QList<QString>& additionDates) {
+  QJsonObject end{{QStringLiteral("kind"), QStringLiteral("never")}};
+  switch (configuration.end.kind) {
+  case TaskRecurrenceEndKind::Never:
+    break;
+  case TaskRecurrenceEndKind::Until:
+    end.insert(QStringLiteral("kind"), QStringLiteral("until"));
+    end.insert(QStringLiteral("until_date"), configuration.end.untilDate.value_or(QString()));
+    break;
+  case TaskRecurrenceEndKind::Count:
+    end.insert(QStringLiteral("kind"), QStringLiteral("count"));
+    end.insert(QStringLiteral("count"), configuration.end.count.value_or(0));
+    break;
+  }
+  return {{QStringLiteral("frequency"), bridgeRecurrenceFrequency(configuration.frequency)},
+          {QStringLiteral("interval"), configuration.interval},
+          {QStringLiteral("end"), end},
+          {QStringLiteral("recurrence_rule"), recurrenceRule},
+          {QStringLiteral("exclusion_dates"), bridgeRecurrenceDates(exclusionDates)},
+          {QStringLiteral("addition_dates"), bridgeRecurrenceDates(additionDates)}};
 }
 
 [[nodiscard]] std::optional<QList<QString>> recurrenceDatesFromText(const QString& value) {
@@ -1207,7 +1304,9 @@ bool AppController::busy() const { return busy_; }
 
 bool AppController::bridgeMode() const { return pythonBridgeClient_ != nullptr; }
 
-bool AppController::bridgeOperationActive() const { return !pythonBridgeOperationId_.isEmpty(); }
+bool AppController::bridgeOperationActive() const {
+  return pythonBridgeOperationStarting_ || !pythonBridgeOperationId_.isEmpty();
+}
 
 QString AppController::bridgeOperationKind() const { return pythonBridgeOperationKind_; }
 
@@ -2117,11 +2216,11 @@ void AppController::applyBridgeCalendars(QList<CalendarSummary> calendars,
   }
 }
 
-void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
+bool AppController::applyBridgeTaskResponse(const QJsonObject& data) {
   const QJsonObject task = data.value(QStringLiteral("task")).toObject();
   if (task.isEmpty()) {
     setStatus(QStringLiteral("HCB bridge mutation returned an invalid task"));
-    return;
+    return false;
   }
   const QString id = task.value(QStringLiteral("id")).toString();
   const bool deleted =
@@ -2136,7 +2235,7 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
       applyTaskProjections(visibleBridgeTasks());
       refreshSearchProjection();
     }
-    return;
+    return true;
   }
   QJsonObject page{{QStringLiteral("tasks"), QJsonArray{task}},
                    {QStringLiteral("next_cursor"), QJsonValue::Null}};
@@ -2144,7 +2243,7 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
       QJsonObject{{QStringLiteral("page"), page}}, pythonBridgeTaskListTitles_);
   if (std::holds_alternative<AppError>(decoded)) {
     setStatus(errorMessage(std::get<AppError>(decoded)));
-    return;
+    return false;
   }
   TaskModelTask projected = std::get<PythonBridgeTaskPage>(decoded).tasks.first();
   if (existing == pythonBridgeTasks_.end()) {
@@ -2156,13 +2255,14 @@ void AppController::applyBridgeTaskResponse(const QJsonObject& data) {
   }
   applyTaskProjections(visibleBridgeTasks());
   refreshSearchProjection();
+  return true;
 }
 
-void AppController::applyBridgeEventResponse(const QJsonObject& data) {
+bool AppController::applyBridgeEventResponse(const QJsonObject& data) {
   const QJsonObject event = data.value(QStringLiteral("event")).toObject();
   if (event.isEmpty()) {
     setStatus(QStringLiteral("HCB bridge mutation returned an invalid event"));
-    return;
+    return false;
   }
   const QString id = event.value(QStringLiteral("id")).toString();
   const bool deleted =
@@ -2177,7 +2277,7 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
       applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
       refreshSearchProjection();
     }
-    return;
+    return true;
   }
   QJsonObject workspace;
   workspace.insert(QStringLiteral("events"), QJsonArray{event});
@@ -2185,7 +2285,7 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
       PythonBridgeProjection::eventRange(QJsonObject{{QStringLiteral("workspace"), workspace}});
   if (std::holds_alternative<AppError>(decoded)) {
     setStatus(errorMessage(std::get<AppError>(decoded)));
-    return;
+    return false;
   }
   CalendarEventSummary projected = std::get<QList<CalendarEventSummary>>(decoded).first();
   if (existing == pythonBridgeCalendarEvents_.end()) {
@@ -2195,13 +2295,14 @@ void AppController::applyBridgeEventResponse(const QJsonObject& data) {
   }
   applyBridgeCalendarEvents(pythonBridgeRefreshGeneration_, pythonBridgeCalendarEvents_);
   refreshSearchProjection();
+  return true;
 }
 
-void AppController::applyBridgeTaskListResponse(const QJsonObject& data) {
+bool AppController::applyBridgeTaskListResponse(const QJsonObject& data) {
   const QJsonObject taskList = data.value(QStringLiteral("task_list")).toObject();
   if (taskList.isEmpty() || pythonBridgeExpectedEmail_.isEmpty()) {
     setStatus(QStringLiteral("HCB bridge mutation returned an invalid task list"));
-    return;
+    return false;
   }
   const QJsonObject workspace{{QStringLiteral("account"),
                                QJsonObject{{QStringLiteral("id"), pythonBridgeAccountId_},
@@ -2213,7 +2314,7 @@ void AppController::applyBridgeTaskListResponse(const QJsonObject& data) {
       QJsonObject{{QStringLiteral("workspace"), workspace}});
   if (std::holds_alternative<AppError>(decoded)) {
     setStatus(errorMessage(std::get<AppError>(decoded)));
-    return;
+    return false;
   }
   const TaskListSummary projected =
       std::get<PythonBridgeWorkspaceSummary>(decoded).taskLists.first();
@@ -2242,13 +2343,14 @@ void AppController::applyBridgeTaskListResponse(const QJsonObject& data) {
   }
   applyBridgeTaskLists(pythonBridgeTaskLists_);
   refreshSearchProjection();
+  return true;
 }
 
-void AppController::applyBridgeCalendarResponse(const QJsonObject& data) {
+bool AppController::applyBridgeCalendarResponse(const QJsonObject& data) {
   const QJsonObject calendar = data.value(QStringLiteral("calendar")).toObject();
   if (calendar.isEmpty() || pythonBridgeExpectedEmail_.isEmpty()) {
     setStatus(QStringLiteral("HCB bridge mutation returned an invalid calendar"));
-    return;
+    return false;
   }
   const QJsonObject workspace{{QStringLiteral("account"),
                                QJsonObject{{QStringLiteral("id"), pythonBridgeAccountId_},
@@ -2260,7 +2362,7 @@ void AppController::applyBridgeCalendarResponse(const QJsonObject& data) {
       QJsonObject{{QStringLiteral("workspace"), workspace}});
   if (std::holds_alternative<AppError>(decoded)) {
     setStatus(errorMessage(std::get<AppError>(decoded)));
-    return;
+    return false;
   }
   const CalendarSummary projected =
       std::get<PythonBridgeWorkspaceSummary>(decoded).calendars.first();
@@ -2283,24 +2385,41 @@ void AppController::applyBridgeCalendarResponse(const QJsonObject& data) {
   }
   applyBridgeCalendars(pythonBridgeCalendars_, true);
   refreshSearchProjection();
+  return true;
 }
 
 void AppController::startBridgeOperation(QString kind, std::future<PythonBridgeResult> future) {
+  if (bridgeOperationActive()) {
+    setStatus(QStringLiteral("An HCB bridge operation is already in progress"));
+    return;
+  }
+  pythonBridgeOperationStarting_ = true;
+  pythonBridgeOperationKind_ = kind;
+  emit bridgeOperationChanged();
+  setSyncStatus(kind + QStringLiteral(" starting"));
   watch(std::move(future), [this, kind = std::move(kind)](PythonBridgeResult result) {
+    if (!pythonBridgeOperationStarting_ || pythonBridgeOperationKind_ != kind) {
+      return;
+    }
+    pythonBridgeOperationStarting_ = false;
     if (std::holds_alternative<AppError>(result)) {
       setStatus(errorMessage(std::get<AppError>(std::move(result))));
+      pythonBridgeOperationKind_.clear();
+      setSyncStatus(kind + QStringLiteral(" failed"));
+      emit bridgeOperationChanged();
       return;
     }
     const QJsonObject operation =
         std::get<QJsonObject>(std::move(result)).value(QStringLiteral("operation")).toObject();
     const QString operationId = operation.value(QStringLiteral("id")).toString();
-    if (operationId.isEmpty() || operationId.size() > 256 || operationId != operationId.trimmed() ||
-        operationId.contains(QChar::Null)) {
+    if (!isValidBridgeOperation(operation, pythonBridgeAccountId_)) {
       setStatus(QStringLiteral("HCB bridge returned an invalid operation"));
+      pythonBridgeOperationKind_.clear();
+      setSyncStatus(kind + QStringLiteral(" failed"));
+      emit bridgeOperationChanged();
       return;
     }
     pythonBridgeOperationId_ = operationId;
-    pythonBridgeOperationKind_ = kind;
     emit bridgeOperationChanged();
     setSyncStatus(kind + QStringLiteral(" in progress"));
     pollBridgeOperation(operationId);
@@ -2312,30 +2431,33 @@ void AppController::pollBridgeOperation(QString operationId) {
     return;
   }
   watch(
-      pythonBridgeClient_->operation(operationId), [this, operationId](PythonBridgeResult result) {
+      pythonBridgeClient_->operation(operationId),
+      [this, operationId](PythonBridgeResult result) {
         if (operationId != pythonBridgeOperationId_) {
           return;
         }
+        const QString kind = pythonBridgeOperationKind_;
         if (std::holds_alternative<AppError>(result)) {
           setStatus(errorMessage(std::get<AppError>(std::move(result))));
           pythonBridgeOperationId_.clear();
           pythonBridgeOperationKind_.clear();
+          setSyncStatus(kind + QStringLiteral(" failed"));
           emit bridgeOperationChanged();
           return;
         }
         const QJsonObject operation =
             std::get<QJsonObject>(std::move(result)).value(QStringLiteral("operation")).toObject();
         const QString state = operation.value(QStringLiteral("state")).toString();
-        if (state != QStringLiteral("queued") && state != QStringLiteral("running") &&
-            state != QStringLiteral("succeeded") && state != QStringLiteral("failed") &&
-            state != QStringLiteral("cancelled")) {
-          setStatus(QStringLiteral("HCB bridge returned an invalid operation state"));
+        const QJsonValue progressValue = operation.value(QStringLiteral("progress"));
+        const QJsonArray progress = progressValue.toArray();
+        if (!isValidBridgeOperation(operation, pythonBridgeAccountId_, operationId)) {
+          setStatus(QStringLiteral("HCB bridge returned an invalid operation response"));
           pythonBridgeOperationId_.clear();
           pythonBridgeOperationKind_.clear();
+          setSyncStatus(kind + QStringLiteral(" failed"));
           emit bridgeOperationChanged();
           return;
         }
-        const QJsonArray progress = operation.value(QStringLiteral("progress")).toArray();
         if (!progress.isEmpty() && progress.last().isString()) {
           setStatus(progress.last().toString());
         }
@@ -2343,7 +2465,6 @@ void AppController::pollBridgeOperation(QString operationId) {
           QTimer::singleShot(250, this, [this, operationId] { pollBridgeOperation(operationId); });
           return;
         }
-        const QString kind = pythonBridgeOperationKind_;
         pythonBridgeOperationId_.clear();
         pythonBridgeOperationKind_.clear();
         emit bridgeOperationChanged();
@@ -2368,11 +2489,19 @@ void AppController::pollBridgeOperation(QString operationId) {
                                     .toString();
         setSyncStatus(kind + QStringLiteral(" failed"));
         setStatus(message.isEmpty() ? kind + QStringLiteral(" failed") : message);
-      });
+      },
+      false);
 }
 
 void AppController::cancelBridgeOperation() {
-  if (pythonBridgeClient_ == nullptr || pythonBridgeOperationId_.isEmpty()) {
+  if (pythonBridgeClient_ == nullptr) {
+    return;
+  }
+  if (pythonBridgeOperationStarting_) {
+    setStatus(QStringLiteral("HCB bridge operation is still starting"));
+    return;
+  }
+  if (pythonBridgeOperationId_.isEmpty()) {
     return;
   }
   const QString operationId = pythonBridgeOperationId_;
@@ -2383,6 +2512,7 @@ void AppController::cancelBridgeOperation() {
           }
           if (std::holds_alternative<AppError>(result)) {
             setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            setSyncStatus(pythonBridgeOperationKind_ + QStringLiteral(" still in progress"));
             return;
           }
           setStatus(QStringLiteral("Cancelling HCB bridge operation"));
@@ -2393,8 +2523,17 @@ void AppController::cancelBridgeOperation() {
 void AppController::completeBridgeReadyProbe() {
   const QString readyPath = qEnvironmentVariable("HCB_BRIDGE_READY_FILE");
   const QString interactionPath = qEnvironmentVariable("HCB_BRIDGE_INTERACTION_ACCEPTANCE_FILE");
-  if ((readyPath.isEmpty() && interactionPath.isEmpty()) || !pythonBridgeTasksReady_ ||
-      !pythonBridgeCalendarReady_) {
+  const QString failurePath = qEnvironmentVariable("HCB_BRIDGE_FAILURE_ACCEPTANCE_FILE");
+  if ((readyPath.isEmpty() && interactionPath.isEmpty() && failurePath.isEmpty()) ||
+      !pythonBridgeTasksReady_ || !pythonBridgeCalendarReady_) {
+    return;
+  }
+  if (!failurePath.isEmpty()) {
+    if (bridgeFailureAcceptanceStarted_) {
+      return;
+    }
+    bridgeFailureAcceptanceStarted_ = true;
+    runBridgeFailureAcceptance(failurePath);
     return;
   }
   if (!interactionPath.isEmpty()) {
@@ -2427,6 +2566,15 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
     QString taskListId;
     QString calendarId;
     QString subscriptionId;
+    QString recurrenceTaskId;
+    QString recurrenceSuccessorId;
+    QString splitRecurrenceTaskId;
+    QString splitRecurrenceSuccessorId;
+    QString recurrenceSeriesId;
+    QString splitRecurrenceSeriesId;
+    QString hierarchyParentId;
+    QString hierarchyFirstChildId;
+    QString hierarchySecondChildId;
     QString eventDate;
     int stage{0};
     int initialSearchResults{0};
@@ -2450,6 +2598,13 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
         {QStringLiteral("event_id"), state->eventId},
         {QStringLiteral("task_list_id"), state->taskListId},
         {QStringLiteral("calendar_id"), state->calendarId},
+        {QStringLiteral("recurrence_task_id"), state->recurrenceTaskId},
+        {QStringLiteral("recurrence_successor_id"), state->recurrenceSuccessorId},
+        {QStringLiteral("split_recurrence_task_id"), state->splitRecurrenceTaskId},
+        {QStringLiteral("split_recurrence_successor_id"), state->splitRecurrenceSuccessorId},
+        {QStringLiteral("hierarchy_parent_id"), state->hierarchyParentId},
+        {QStringLiteral("hierarchy_first_child_id"), state->hierarchyFirstChildId},
+        {QStringLiteral("hierarchy_second_child_id"), state->hierarchySecondChildId},
         {QStringLiteral("event_date"), state->eventDate},
         {QStringLiteral("initial_search_results"), state->initialSearchResults},
         {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
@@ -2769,10 +2924,490 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
                       })) {
         return;
       }
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceRecurringTaskTitle),
+                         QStringLiteral("Recurring bridge acceptance context"),
+                         state->eventDate,
+                         QStringLiteral("UTC"),
+                         0,
+                         true,
+                         0,
+                         1,
+                         2,
+                         {},
+                         3);
+      state->stage = 16;
+      return;
+    case 16: {
+      const auto created = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceRecurringTaskTitle) &&
+                   task.managedRecurrence;
+          });
+      if (created == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->recurrenceTaskId = created->id;
+      state->recurrenceSeriesId = created->recurrenceSeriesId;
+      updateTaskDetailed(state->recurrenceTaskId,
+                         QString::fromLatin1(kBridgeAcceptanceUpdatedRecurringTaskTitle),
+                         QStringLiteral("Updated recurrence configuration"),
+                         state->eventDate,
+                         QStringLiteral("UTC"),
+                         0,
+                         true,
+                         1,
+                         2,
+                         2,
+                         {},
+                         3);
+      state->stage = 17;
+      return;
+    }
+    case 17: {
+      const auto reconfigured = std::find_if(
+          pythonBridgeTasks_.cbegin(),
+          pythonBridgeTasks_.cend(),
+          [state](const TaskModelTask& task) {
+            return task.id == state->recurrenceTaskId && task.managedRecurrence &&
+                   task.title == QString::fromLatin1(kBridgeAcceptanceUpdatedRecurringTaskTitle) &&
+                   task.recurrenceFrequency == 1 && task.recurrenceInterval == 2 &&
+                   task.recurrenceSeriesId == state->recurrenceSeriesId;
+          });
+      if (reconfigured == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      setTaskCompleted(state->recurrenceTaskId, true);
+      state->stage = 18;
+      return;
+    }
+    case 18: {
+      const auto successor =
+          std::find_if(pythonBridgeTasks_.cbegin(),
+                       pythonBridgeTasks_.cend(),
+                       [state](const TaskModelTask& task) {
+                         return task.managedRecurrence &&
+                                task.recurrenceSeriesId == state->recurrenceSeriesId &&
+                                task.id != state->recurrenceTaskId &&
+                                task.recurrenceFrequency == 1 && task.recurrenceInterval == 2;
+                       });
+      if (successor == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->recurrenceSuccessorId = successor->id;
+      stopTaskRecurrence(state->recurrenceSuccessorId, 0);
+      state->stage = 19;
+      return;
+    }
+    case 19: {
+      const auto stopped = std::find_if(
+          pythonBridgeTasks_.cbegin(),
+          pythonBridgeTasks_.cend(),
+          [state](const TaskModelTask& task) { return task.id == state->recurrenceSuccessorId; });
+      const bool continuingOccurrence = std::any_of(
+          pythonBridgeTasks_.cbegin(),
+          pythonBridgeTasks_.cend(),
+          [state](const TaskModelTask& task) {
+            return task.managedRecurrence && task.recurrenceSeriesId == state->recurrenceSeriesId &&
+                   task.id != state->recurrenceTaskId && task.id != state->recurrenceSuccessorId;
+          });
+      if (stopped == pythonBridgeTasks_.cend() || stopped->managedRecurrence ||
+          !continuingOccurrence) {
+        return;
+      }
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceSplitRecurringTaskTitle),
+                         {},
+                         state->eventDate,
+                         QStringLiteral("UTC"),
+                         0,
+                         true,
+                         0,
+                         1,
+                         2,
+                         {},
+                         3);
+      state->stage = 20;
+      return;
+    }
+    case 20: {
+      const auto created = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceSplitRecurringTaskTitle) &&
+                   task.managedRecurrence;
+          });
+      if (created == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->splitRecurrenceTaskId = created->id;
+      state->splitRecurrenceSeriesId = created->recurrenceSeriesId;
+      setTaskCompleted(state->splitRecurrenceTaskId, true);
+      state->stage = 21;
+      return;
+    }
+    case 21: {
+      const auto successor =
+          std::find_if(pythonBridgeTasks_.cbegin(),
+                       pythonBridgeTasks_.cend(),
+                       [state](const TaskModelTask& task) {
+                         return task.managedRecurrence &&
+                                task.recurrenceSeriesId == state->splitRecurrenceSeriesId &&
+                                task.id != state->splitRecurrenceTaskId;
+                       });
+      if (successor == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->splitRecurrenceSuccessorId = successor->id;
+      splitTaskRecurrence(state->splitRecurrenceSuccessorId);
+      state->stage = 22;
+      return;
+    }
+    case 22: {
+      const auto split =
+          std::find_if(pythonBridgeTasks_.cbegin(),
+                       pythonBridgeTasks_.cend(),
+                       [state](const TaskModelTask& task) {
+                         return task.id == state->splitRecurrenceSuccessorId &&
+                                task.managedRecurrence &&
+                                task.recurrenceSeriesId != state->splitRecurrenceSeriesId &&
+                                task.recurrenceOccurrenceId.endsWith(QStringLiteral(":0"));
+                       });
+      if (split == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceHierarchyParentTaskTitle),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 23;
+      return;
+    }
+    case 23: {
+      const auto parent = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceHierarchyParentTaskTitle);
+          });
+      if (parent == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->hierarchyParentId = parent->id;
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceHierarchyFirstChildTaskTitle),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 24;
+      return;
+    }
+    case 24: {
+      const auto child = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceHierarchyFirstChildTaskTitle);
+          });
+      if (child == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->hierarchyFirstChildId = child->id;
+      reparentTask(state->hierarchyFirstChildId, state->hierarchyParentId);
+      state->stage = 25;
+      return;
+    }
+    case 25: {
+      const auto child = std::find_if(pythonBridgeTasks_.cbegin(),
+                                      pythonBridgeTasks_.cend(),
+                                      [state](const TaskModelTask& task) {
+                                        return task.id == state->hierarchyFirstChildId &&
+                                               task.parentTaskId == state->hierarchyParentId;
+                                      });
+      if (child == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceHierarchySecondChildTaskTitle),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 26;
+      return;
+    }
+    case 26: {
+      const auto child = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title ==
+                   QString::fromLatin1(kBridgeAcceptanceHierarchySecondChildTaskTitle);
+          });
+      if (child == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->hierarchySecondChildId = child->id;
+      reparentTask(state->hierarchySecondChildId, state->hierarchyParentId);
+      state->stage = 27;
+      return;
+    }
+    case 27: {
+      const auto first = std::find_if(pythonBridgeTasks_.cbegin(),
+                                      pythonBridgeTasks_.cend(),
+                                      [state](const TaskModelTask& task) {
+                                        return task.id == state->hierarchyFirstChildId &&
+                                               task.parentTaskId == state->hierarchyParentId;
+                                      });
+      const auto second = std::find_if(pythonBridgeTasks_.cbegin(),
+                                       pythonBridgeTasks_.cend(),
+                                       [state](const TaskModelTask& task) {
+                                         return task.id == state->hierarchySecondChildId &&
+                                                task.parentTaskId == state->hierarchyParentId;
+                                       });
+      if (first == pythonBridgeTasks_.cend() || second == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      reorderTask(state->hierarchyFirstChildId, true);
+      state->stage = 28;
+      return;
+    }
+    case 28: {
+      const auto first = std::find_if(pythonBridgeTasks_.cbegin(),
+                                      pythonBridgeTasks_.cend(),
+                                      [state](const TaskModelTask& task) {
+                                        return task.id == state->hierarchyFirstChildId &&
+                                               task.parentTaskId == state->hierarchyParentId;
+                                      });
+      const auto second = std::find_if(pythonBridgeTasks_.cbegin(),
+                                       pythonBridgeTasks_.cend(),
+                                       [state](const TaskModelTask& task) {
+                                         return task.id == state->hierarchySecondChildId &&
+                                                task.parentTaskId == state->hierarchyParentId;
+                                       });
+      if (first == pythonBridgeTasks_.cend() || second == pythonBridgeTasks_.cend() ||
+          first->sortOrder >= second->sortOrder) {
+        return;
+      }
+      moveTask(state->hierarchyFirstChildId, state->taskListId);
+      state->stage = 29;
+      return;
+    }
+    case 29: {
+      const auto moved = std::find_if(pythonBridgeTasks_.cbegin(),
+                                      pythonBridgeTasks_.cend(),
+                                      [state](const TaskModelTask& task) {
+                                        return task.id == state->hierarchyFirstChildId &&
+                                               task.taskListId == state->taskListId &&
+                                               !task.parentTaskId.has_value();
+                                      });
+      if (moved == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      finish(true);
+      return;
+    }
+    default:
+      finish(false, QStringLiteral("invalid Qt bridge interaction stage"));
+      return;
+    }
+  });
+  timer->start();
+}
+
+void AppController::runBridgeFailureAcceptance(QString reportPath) {
+  struct State final {
+    QString reportPath;
+    int stage{0};
+    qsizetype initialTasks{0};
+    qsizetype initialTaskLists{0};
+    qsizetype initialCalendars{0};
+    bool pollingWasCancellable{false};
+    bool cancellationCompleted{false};
+    bool mutationFailuresPreservedModels{false};
+    bool malformedOperationRejected{false};
+    bool malformedStartRejected{false};
+    bool shutdownWithInFlightPoll{false};
+    QElapsedTimer elapsed;
+  };
+
+  const auto state = std::make_shared<State>();
+  state->reportPath = std::move(reportPath);
+  state->initialTasks = pythonBridgeTasks_.size();
+  state->initialTaskLists = pythonBridgeTaskLists_.size();
+  state->initialCalendars = pythonBridgeCalendars_.size();
+  state->elapsed.start();
+
+  auto* timer = new QTimer(this);
+  timer->setInterval(20);
+  const auto finish = [this, timer, state](bool success, QString error = {}) {
+    QJsonObject payload{
+        {QStringLiteral("ok"), success},
+        {QStringLiteral("stage"), state->stage},
+        {QStringLiteral("polling_was_cancellable"), state->pollingWasCancellable},
+        {QStringLiteral("cancellation_completed"), state->cancellationCompleted},
+        {QStringLiteral("mutation_failures_preserved_models"),
+         state->mutationFailuresPreservedModels},
+        {QStringLiteral("malformed_operation_rejected"), state->malformedOperationRejected},
+        {QStringLiteral("malformed_start_rejected"), state->malformedStartRejected},
+        {QStringLiteral("shutdown_with_in_flight_poll"), state->shutdownWithInFlightPoll}};
+    if (!error.isEmpty()) {
+      payload.insert(QStringLiteral("error"), std::move(error));
+      payload.insert(QStringLiteral("status"), statusMessage_);
+      payload.insert(QStringLiteral("sync_status"), syncStatus_);
+    }
+    QSaveFile report(state->reportPath);
+    const QByteArray encoded = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+    const bool wrote = report.open(QIODevice::WriteOnly) &&
+                       report.write(encoded) == encoded.size() && report.commit();
+    timer->stop();
+    timer->deleteLater();
+    QCoreApplication::exit(success && wrote ? 0 : 3);
+  };
+
+  connect(timer, &QTimer::timeout, this, [this, state, finish] {
+    const auto modelsUnchanged = [this, state] {
+      return pythonBridgeTasks_.size() == state->initialTasks &&
+             pythonBridgeTaskLists_.size() == state->initialTaskLists &&
+             pythonBridgeCalendars_.size() == state->initialCalendars;
+    };
+    if (state->elapsed.elapsed() > 20'000) {
+      finish(false, QStringLiteral("timed out waiting for Qt bridge failure stage"));
+      return;
+    }
+
+    switch (state->stage) {
+    case 0:
+      syncGoogle();
+      state->stage = 1;
+      return;
+    case 1:
+      if (!bridgeOperationActive() || busy_) {
+        return;
+      }
+      state->pollingWasCancellable = true;
+      syncGoogle();
+      state->stage = 2;
+      return;
+    case 2:
+      if (bridgeOperationActive()) {
+        return;
+      }
+      if (syncStatus_ != QStringLiteral("HCB sync cancelled")) {
+        finish(false, QStringLiteral("cancelled bridge operation did not report cancellation"));
+        return;
+      }
+      state->cancellationCompleted = true;
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QStringLiteral("rejected bridge task"),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 3;
+      return;
+    case 3:
+      if (busy_) {
+        return;
+      }
+      if (statusMessage_ != QStringLiteral("synthetic task rejection") || !modelsUnchanged()) {
+        finish(false, QStringLiteral("rejected task mutation changed the bridge models"));
+        return;
+      }
+      createTaskList(QStringLiteral("invalid bridge task list"));
+      state->stage = 4;
+      return;
+    case 4:
+      if (busy_) {
+        return;
+      }
+      if (statusMessage_ != QStringLiteral("HCB bridge mutation returned an invalid task list") ||
+          taskListErrorMessage_ != statusMessage_ || !modelsUnchanged()) {
+        finish(false, QStringLiteral("invalid task-list mutation was not retained as an error"));
+        return;
+      }
+      createGoogleCalendar(QStringLiteral("rejected bridge calendar"), {}, QStringLiteral("UTC"));
+      state->stage = 5;
+      return;
+    case 5:
+      if (busy_) {
+        return;
+      }
+      if (statusMessage_ != QStringLiteral("synthetic calendar rejection") || !modelsUnchanged()) {
+        finish(false, QStringLiteral("rejected calendar mutation changed the bridge models"));
+        return;
+      }
+      state->mutationFailuresPreservedModels = true;
+      syncGoogle();
+      state->stage = 6;
+      return;
+    case 6:
+      if (!bridgeOperationActive() || busy_) {
+        return;
+      }
+      state->stage = 7;
+      return;
+    case 7:
+      if (bridgeOperationActive()) {
+        return;
+      }
+      if (statusMessage_ != QStringLiteral("HCB bridge returned an invalid operation response") ||
+          syncStatus_ != QStringLiteral("HCB sync failed")) {
+        finish(false, QStringLiteral("mismatched bridge operation response was accepted"));
+        return;
+      }
+      state->malformedOperationRejected = true;
+      syncGoogle();
+      state->stage = 8;
+      return;
+    case 8:
+      if (bridgeOperationActive() || busy_) {
+        return;
+      }
+      if (statusMessage_ != QStringLiteral("HCB bridge returned an invalid operation") ||
+          syncStatus_ != QStringLiteral("HCB sync failed")) {
+        finish(false, QStringLiteral("malformed bridge operation start was accepted"));
+        return;
+      }
+      state->malformedStartRejected = true;
+      syncGoogle();
+      state->stage = 9;
+      return;
+    case 9:
+      if (!bridgeOperationActive() || busy_) {
+        return;
+      }
+      state->shutdownWithInFlightPoll = true;
       finish(true);
       return;
     default:
-      finish(false, QStringLiteral("invalid Qt bridge interaction stage"));
+      finish(false, QStringLiteral("invalid Qt bridge failure stage"));
       return;
     }
   });
@@ -3483,8 +4118,9 @@ void AppController::createGoogleCalendar(QString title, QString description, QSt
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar saved in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar saved in HCB core"));
+            }
           });
     return;
   }
@@ -3547,8 +4183,9 @@ void AppController::subscribeGoogleCalendar(QString calendarId) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar subscription queued in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar subscription queued in HCB core"));
+            }
           });
     return;
   }
@@ -3614,8 +4251,9 @@ void AppController::updateGoogleCalendar(QString calendarId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar saved in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar saved in HCB core"));
+            }
           });
     return;
   }
@@ -3696,8 +4334,9 @@ void AppController::deleteGoogleCalendar(QString calendarId) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar deleted in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar deleted in HCB core"));
+            }
           });
     return;
   }
@@ -3778,8 +4417,9 @@ void AppController::updateGoogleCalendarListEntry(QString calendarId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar preferences saved in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar preferences saved in HCB core"));
+            }
           });
     return;
   }
@@ -3874,8 +4514,9 @@ void AppController::saveGoogleCalendarSettings(QString calendarId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar settings saved in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar settings saved in HCB core"));
+            }
           });
     return;
   }
@@ -3916,59 +4557,57 @@ void AppController::saveGoogleCalendarSettings(QString calendarId,
             .hidden = hidden,
             .colorId = colorId.trimmed().isEmpty() ? std::optional<QString>{}
                                                    : std::optional<QString>(std::move(colorId))};
-        watch(
-            std::async(
-                std::launch::async,
-                [this, updateDetails, calendarRequest, listRequest]()
-                    -> std::variant<GoogleCalendarManagementResult, AppError> {
-                  OAuthCredentialReadResult read =
-                      credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
-                  if (std::holds_alternative<AppError>(read)) {
-                    return std::get<AppError>(std::move(read));
-                  }
-                  const std::optional<OAuthStoredCredential>& credential =
-                      std::get<std::optional<OAuthStoredCredential>>(read);
-                  if (!credential.has_value() || credential->accessToken.isEmpty()) {
-                    return AppError(AppErrorCode::Configuration,
-                                    QStringLiteral("Google authorization must be renewed"));
-                  }
-                  if (updateDetails) {
-                    GoogleCalendarManagementResultOrError updated =
-                        googleCalendarManagementClient_
-                            .update(calendarRequest, credential->accessToken)
-                            .get();
-                    if (std::holds_alternative<GoogleApiError>(updated)) {
-                      return AppError(AppErrorCode::Network,
-                                      QStringLiteral("Google calendar details failed: ") +
-                                          std::get<GoogleApiError>(std::move(updated)).message());
+        watch(std::async(
+                  std::launch::async,
+                  [this, updateDetails, calendarRequest, listRequest]()
+                      -> std::variant<GoogleCalendarManagementResult, AppError> {
+                    OAuthCredentialReadResult read =
+                        credentialStore_->read(QString::fromLatin1(kGoogleAccountId)).get();
+                    if (std::holds_alternative<AppError>(read)) {
+                      return std::get<AppError>(std::move(read));
                     }
-                  }
-                  GoogleCalendarManagementResultOrError preferences =
-                      googleCalendarManagementClient_
-                          .updateListEntry(listRequest, credential->accessToken)
-                          .get();
-                  if (std::holds_alternative<GoogleApiError>(preferences)) {
-                    return AppError(
-                        AppErrorCode::Network,
-                        (updateDetails
-                             ? QStringLiteral(
-                                   "Calendar details updated; Google display preferences failed: ")
-                             : QStringLiteral("Google display preferences failed: ")) +
-                            std::get<GoogleApiError>(std::move(preferences)).message());
-                  }
-                  return std::get<GoogleCalendarManagementResult>(std::move(preferences));
-                }),
-            [this, updateDetails](std::variant<GoogleCalendarManagementResult, AppError> saved) {
-              if (std::holds_alternative<AppError>(saved)) {
-                setStatus(errorMessage(std::get<AppError>(std::move(saved))));
+                    const std::optional<OAuthStoredCredential>& credential =
+                        std::get<std::optional<OAuthStoredCredential>>(read);
+                    if (!credential.has_value() || credential->accessToken.isEmpty()) {
+                      return AppError(AppErrorCode::Configuration,
+                                      QStringLiteral("Google authorization must be renewed"));
+                    }
+                    if (updateDetails) {
+                      GoogleCalendarManagementResultOrError updated =
+                          googleCalendarManagementClient_
+                              .update(calendarRequest, credential->accessToken)
+                              .get();
+                      if (std::holds_alternative<GoogleApiError>(updated)) {
+                        return AppError(AppErrorCode::Network,
+                                        QStringLiteral("Google calendar details failed: ") +
+                                            std::get<GoogleApiError>(std::move(updated)).message());
+                      }
+                    }
+                    GoogleCalendarManagementResultOrError preferences =
+                        googleCalendarManagementClient_
+                            .updateListEntry(listRequest, credential->accessToken)
+                            .get();
+                    if (std::holds_alternative<GoogleApiError>(preferences)) {
+                      return AppError(
+                          AppErrorCode::Network,
+                          (updateDetails ? QStringLiteral("Calendar details updated; Google "
+                                                          "display preferences failed: ")
+                                         : QStringLiteral("Google display preferences failed: ")) +
+                              std::get<GoogleApiError>(std::move(preferences)).message());
+                    }
+                    return std::get<GoogleCalendarManagementResult>(std::move(preferences));
+                  }),
+              [this, updateDetails](std::variant<GoogleCalendarManagementResult, AppError> saved) {
+                if (std::holds_alternative<AppError>(saved)) {
+                  setStatus(errorMessage(std::get<AppError>(std::move(saved))));
+                  requestGoogleSync(SyncScheduleTrigger::Manual);
+                  return;
+                }
+                setStatus(updateDetails
+                              ? QStringLiteral("Google calendar details and preferences updated")
+                              : QStringLiteral("Google calendar preferences updated"));
                 requestGoogleSync(SyncScheduleTrigger::Manual);
-                return;
-              }
-              setStatus(updateDetails
-                            ? QStringLiteral("Google calendar details and preferences updated")
-                            : QStringLiteral("Google calendar preferences updated"));
-              requestGoogleSync(SyncScheduleTrigger::Manual);
-            });
+              });
       });
 }
 
@@ -3987,8 +4626,9 @@ void AppController::unsubscribeGoogleCalendar(QString calendarId) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Calendar unsubscribed in HCB core"));
+            if (applyBridgeCalendarResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Calendar unsubscribed in HCB core"));
+            }
           });
     return;
   }
@@ -5200,9 +5840,8 @@ void AppController::createTaskDetailed(QString taskListId,
     return;
   }
   if (bridgeMode()) {
-    if (managedRecurrence || pythonBridgeClient_ == nullptr) {
-      setStatus(
-          QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
       return;
     }
     const std::optional<QString> due = bridgeDueDate(normalizedDue);
@@ -5222,6 +5861,33 @@ void AppController::createTaskDetailed(QString taskListId,
         request.insert(QStringLiteral("due_time_zone"), dueTimeZone.trimmed());
       }
     }
+    if (managedRecurrence) {
+      const std::optional<ManagedTaskRecurrenceConfiguration> recurrence =
+          managedTaskRecurrenceConfiguration(recurrenceFrequency,
+                                             recurrenceInterval,
+                                             recurrenceEndKind,
+                                             recurrenceEndUntil,
+                                             recurrenceEndCount);
+      const std::optional<QList<QString>> excluded = recurrenceDatesFromText(exclusionDates);
+      const std::optional<QList<QString>> added = recurrenceDatesFromText(additionDates);
+      const QString timeZone = dueTimeZone.trimmed().isEmpty()
+                                   ? QString::fromUtf8(QTimeZone::systemTimeZoneId())
+                                   : dueTimeZone.trimmed();
+      if (!recurrence.has_value() || !due.has_value() || !parentTaskId.isEmpty() ||
+          !excluded.has_value() || !added.has_value() || !QTimeZone(timeZone.toUtf8()).isValid()) {
+        setStatus(
+            QStringLiteral("Managed recurrence requires a top-level task with valid due details"));
+        return;
+      }
+      request.insert(QStringLiteral("due_time_zone"), timeZone);
+      request.insert(QStringLiteral("recurrence"),
+                     bridgeTaskRecurrence(*recurrence,
+                                          recurrenceRule.trimmed().isEmpty()
+                                              ? recurrence->defaultRule
+                                              : recurrenceRule.trimmed(),
+                                          *excluded,
+                                          *added));
+    }
     watch(pythonBridgeClient_->createTask(
               pythonBridgeAccountId_,
               request,
@@ -5231,8 +5897,9 @@ void AppController::createTaskDetailed(QString taskListId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Task saved in HCB core"));
+            if (applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Task saved in HCB core"));
+            }
           });
     return;
   }
@@ -5386,7 +6053,10 @@ void AppController::createTaskList(QString title) {
               setTaskListError(message);
               return;
             }
-            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            if (!applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)))) {
+              setTaskListError(statusMessage_);
+              return;
+            }
             setTaskListError({});
             setStatus(QStringLiteral("Task list saved in HCB core"));
           });
@@ -5424,7 +6094,10 @@ void AppController::renameTaskList(QString taskListId, QString title) {
               setTaskListError(message);
               return;
             }
-            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            if (!applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)))) {
+              setTaskListError(statusMessage_);
+              return;
+            }
             setTaskListError({});
             setStatus(QStringLiteral("Task list saved in HCB core"));
           });
@@ -5462,7 +6135,10 @@ void AppController::setTaskListSelected(QString taskListId, bool selected) {
               setTaskListError(message);
               return;
             }
-            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            if (!applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)))) {
+              setTaskListError(statusMessage_);
+              return;
+            }
             setTaskListError({});
             setStatus(QStringLiteral("Task list visibility saved in HCB core"));
           });
@@ -5499,7 +6175,10 @@ void AppController::deleteTaskList(QString taskListId) {
               setTaskListError(message);
               return;
             }
-            applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)));
+            if (!applyBridgeTaskListResponse(std::get<QJsonObject>(std::move(result)))) {
+              setTaskListError(statusMessage_);
+              return;
+            }
             setTaskListError({});
             setStatus(QStringLiteral("Task list deleted in HCB core"));
           });
@@ -5594,9 +6273,8 @@ void AppController::updateTaskDetailed(QString taskId,
     return;
   }
   if (bridgeMode()) {
-    if (managedRecurrence || pythonBridgeClient_ == nullptr) {
-      setStatus(
-          QStringLiteral("Managed task recurrence is not supported by the HCB bridge preview"));
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
       return;
     }
     const std::optional<QString> due = bridgeDueDate(normalizedDue);
@@ -5609,6 +6287,29 @@ void AppController::updateTaskDetailed(QString taskId,
         {QStringLiteral("notes"), notes},
         {QStringLiteral("priority"), priorityText(*parsedPriority)},
         {QStringLiteral("due"), due.has_value() ? QJsonValue(*due) : QJsonValue::Null}};
+    if (due.has_value() && !dueTimeZone.trimmed().isEmpty()) {
+      request.insert(QStringLiteral("due_time_zone"), dueTimeZone.trimmed());
+    }
+    if (managedRecurrence) {
+      const QString timeZone = dueTimeZone.trimmed().isEmpty()
+                                   ? QString::fromUtf8(QTimeZone::systemTimeZoneId())
+                                   : dueTimeZone.trimmed();
+      if (!recurrence.has_value() || !excluded.has_value() || !added.has_value() ||
+          !QTimeZone(timeZone.toUtf8()).isValid()) {
+        setStatus(QStringLiteral("Task recurrence input is invalid"));
+        return;
+      }
+      request.insert(QStringLiteral("due_time_zone"), timeZone);
+      request.insert(QStringLiteral("recurrence"),
+                     bridgeTaskRecurrence(*recurrence,
+                                          recurrenceRule.trimmed().isEmpty()
+                                              ? recurrence->defaultRule
+                                              : recurrenceRule.trimmed(),
+                                          *excluded,
+                                          *added));
+    } else {
+      request.insert(QStringLiteral("recurrence"), QJsonValue::Null);
+    }
     watch(pythonBridgeClient_->updateTask(
               pythonBridgeAccountId_,
               taskId,
@@ -5619,8 +6320,9 @@ void AppController::updateTaskDetailed(QString taskId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Task saved in HCB core"));
+            if (applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Task saved in HCB core"));
+            }
           });
     return;
   }
@@ -5681,8 +6383,18 @@ void AppController::setTaskCompleted(QString taskId, bool completed) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Task saved in HCB core"));
+            const QJsonObject data = std::get<QJsonObject>(std::move(result));
+            const QJsonValue successor = data.value(QStringLiteral("successor"));
+            if (!successor.isUndefined() && !successor.isNull() && !successor.isObject()) {
+              setStatus(QStringLiteral("HCB bridge completion returned an invalid successor"));
+              return;
+            }
+            if (applyBridgeTaskResponse(data)) {
+              if (successor.isObject()) {
+                refreshBridge();
+              }
+              setStatus(QStringLiteral("Task saved in HCB core"));
+            }
           });
     return;
   }
@@ -5701,6 +6413,34 @@ void AppController::stopTaskRecurrence(QString taskId, int recurrenceScope) {
     setStatus(QStringLiteral("Task recurrence scope is invalid"));
     return;
   }
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const QString scope = recurrenceScope == 0   ? QStringLiteral("this")
+                          : recurrenceScope == 1 ? QStringLiteral("following")
+                                                 : QStringLiteral("series");
+    watch(pythonBridgeClient_->stopTaskRecurrence(
+              pythonBridgeAccountId_,
+              taskId,
+              scope,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            const QJsonObject data = std::get<QJsonObject>(std::move(result));
+            if (!data.value(QStringLiteral("tasks")).isArray()) {
+              setStatus(QStringLiteral("HCB bridge recurrence stop returned an invalid task set"));
+              return;
+            }
+            refreshBridge();
+            setStatus(QStringLiteral("Task recurrence stopped in HCB core"));
+          });
+    return;
+  }
   const auto scope = recurrenceScope == 0   ? TaskRecurrenceScope::ThisOccurrence
                      : recurrenceScope == 1 ? TaskRecurrenceScope::ThisAndFollowing
                                             : TaskRecurrenceScope::EntireSeries;
@@ -5715,6 +6455,30 @@ void AppController::stopTaskRecurrence(QString taskId, int recurrenceScope) {
 }
 
 void AppController::splitTaskRecurrence(QString taskId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->splitTaskRecurrence(
+              pythonBridgeAccountId_,
+              taskId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            const QJsonObject data = std::get<QJsonObject>(std::move(result));
+            if (!data.value(QStringLiteral("tasks")).isArray()) {
+              setStatus(QStringLiteral("HCB bridge recurrence split returned an invalid task set"));
+              return;
+            }
+            refreshBridge();
+            setStatus(QStringLiteral("Task recurrence split in HCB core"));
+          });
+    return;
+  }
   watch(taskMutationService_.splitManagedRecurrence(std::move(taskId)),
         [this](TaskMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
@@ -5740,8 +6504,9 @@ void AppController::deleteTask(QString taskId) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Task deleted in HCB core"));
+            if (applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Task deleted in HCB core"));
+            }
           });
     return;
   }
@@ -5772,6 +6537,28 @@ void AppController::deleteTask(QString taskId) {
 }
 
 void AppController::moveTask(QString taskId, QString taskListId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(
+        pythonBridgeClient_->moveTask(pythonBridgeAccountId_,
+                                      taskId,
+                                      QJsonObject{{QStringLiteral("list_id"), taskListId}},
+                                      QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+        [this](PythonBridgeResult result) {
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            return;
+          }
+          if (applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)))) {
+            refreshBridge();
+            setStatus(QStringLiteral("Task moved in HCB core"));
+          }
+        });
+    return;
+  }
   watch(taskMutationService_.moveToTaskList(std::move(taskId), std::move(taskListId)),
         [this](TaskMutationResult result) {
           if (std::holds_alternative<AppError>(result)) {
@@ -5783,6 +6570,29 @@ void AppController::moveTask(QString taskId, QString taskListId) {
 }
 
 void AppController::reparentTask(QString taskId, QString parentTaskId) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const QJsonValue parent = parentTaskId.isEmpty() ? QJsonValue::Null : QJsonValue(parentTaskId);
+    watch(
+        pythonBridgeClient_->moveTask(pythonBridgeAccountId_,
+                                      taskId,
+                                      QJsonObject{{QStringLiteral("parent_id"), parent}},
+                                      QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+        [this](PythonBridgeResult result) {
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            return;
+          }
+          if (applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)))) {
+            refreshBridge();
+            setStatus(QStringLiteral("Task hierarchy updated in HCB core"));
+          }
+        });
+    return;
+  }
   const std::optional<std::optional<QString>> parent =
       parentTaskId.isEmpty() ? std::optional<std::optional<QString>>(std::optional<QString>{})
                              : std::optional<std::optional<QString>>(std::move(parentTaskId));
@@ -6034,8 +6844,9 @@ void AppController::createEvent(QString calendarId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Event saved in HCB core"));
+            if (applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Event saved in HCB core"));
+            }
           });
     return;
   }
@@ -6101,8 +6912,9 @@ void AppController::updateEvent(QString eventId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Event saved in HCB core"));
+            if (applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Event saved in HCB core"));
+            }
           });
     return;
   }
@@ -6196,8 +7008,9 @@ void AppController::createEventDetailed(QString calendarId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Event saved in HCB core"));
+            if (applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Event saved in HCB core"));
+            }
           });
     return;
   }
@@ -6321,8 +7134,9 @@ void AppController::updateEventDetailed(QString eventId,
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Event saved in HCB core"));
+            if (applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Event saved in HCB core"));
+            }
           });
     return;
   }
@@ -6398,8 +7212,9 @@ void AppController::deleteEvent(QString eventId, int recurrenceScope) {
               setStatus(errorMessage(std::get<AppError>(std::move(result))));
               return;
             }
-            applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)));
-            setStatus(QStringLiteral("Event deleted in HCB core"));
+            if (applyBridgeEventResponse(std::get<QJsonObject>(std::move(result)))) {
+              setStatus(QStringLiteral("Event deleted in HCB core"));
+            }
           });
     return;
   }
@@ -7335,6 +8150,67 @@ void AppController::replayHistoryEntry(UndoEntry entry) {
 }
 
 void AppController::reorderTask(QString taskId, bool earlier) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const auto selected =
+        std::find_if(pythonBridgeTasks_.cbegin(),
+                     pythonBridgeTasks_.cend(),
+                     [&taskId](const TaskModelTask& task) { return task.id == taskId; });
+    if (selected == pythonBridgeTasks_.cend()) {
+      setStatus(QStringLiteral("Task is unavailable for reordering"));
+      return;
+    }
+    QList<TaskModelTask> siblings;
+    for (const TaskModelTask& candidate : pythonBridgeTasks_) {
+      if (candidate.taskListId == selected->taskListId &&
+          candidate.parentTaskId == selected->parentTaskId) {
+        siblings.append(candidate);
+      }
+    }
+    std::sort(siblings.begin(),
+              siblings.end(),
+              [](const TaskModelTask& left, const TaskModelTask& right) {
+                return left.sortOrder != right.sortOrder ? left.sortOrder < right.sortOrder
+                                                         : left.id < right.id;
+              });
+    const auto current =
+        std::find_if(siblings.cbegin(), siblings.cend(), [&taskId](const TaskModelTask& task) {
+          return task.id == taskId;
+        });
+    if (current == siblings.cend()) {
+      setStatus(QStringLiteral("Task is unavailable for reordering"));
+      return;
+    }
+    const qsizetype index = static_cast<qsizetype>(std::distance(siblings.cbegin(), current));
+    if ((earlier && index == 0) || (!earlier && index + 1 >= siblings.size())) {
+      setStatus(QStringLiteral("Task is already at the requested position"));
+      return;
+    }
+    const std::optional<QString> previous =
+        earlier ? (index > 1 ? std::optional<QString>(siblings.at(index - 2).id) : std::nullopt)
+                : std::optional<QString>(siblings.at(index + 1).id);
+    const QJsonValue previousValue =
+        previous.has_value() ? QJsonValue(*previous) : QJsonValue::Null;
+    watch(
+        pythonBridgeClient_->moveTask(pythonBridgeAccountId_,
+                                      taskId,
+                                      QJsonObject{{QStringLiteral("previous_id"), previousValue}},
+                                      QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+        [this](PythonBridgeResult result) {
+          if (std::holds_alternative<AppError>(result)) {
+            setStatus(errorMessage(std::get<AppError>(std::move(result))));
+            return;
+          }
+          if (applyBridgeTaskResponse(std::get<QJsonObject>(std::move(result)))) {
+            refreshBridge();
+            setStatus(QStringLiteral("Task reordered in HCB core"));
+          }
+        });
+    return;
+  }
   watch(taskMutationService_.reorder(std::move(taskId),
                                      earlier ? TaskReorderDirection::Earlier
                                              : TaskReorderDirection::Later),

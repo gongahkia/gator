@@ -87,6 +87,8 @@ def test_private_notes_migration_preserves_existing_disabled_mode_notes(tmp_path
         connection.execute("DROP INDEX tasks_page")
         connection.execute("DROP TABLE bridge_mutation_receipts")
         connection.execute("ALTER TABLE task_lists DROP COLUMN selected")
+        connection.execute("DROP INDEX tasks_page_order")
+        connection.execute("ALTER TABLE tasks DROP COLUMN local_order")
         connection.execute("PRAGMA user_version = 9")
 
     with Storage(path) as migrated:
@@ -120,6 +122,10 @@ def test_historical_databases_migrate_to_current_without_data_loss(
             row["name"] for row in migrated.connection.execute("PRAGMA table_info(task_lists)")
         }
         assert "selected" in task_list_columns
+        task_columns = {
+            row["name"] for row in migrated.connection.execute("PRAGMA table_info(tasks)")
+        }
+        assert "local_order" in task_columns
         mutation = migrated.pending_mutations("legacy")[0]
         assert mutation.delivery_state.value == "pending"
         assert mutation.payload["body"]["title"] == "Legacy intent"

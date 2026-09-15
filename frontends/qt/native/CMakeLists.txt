@@ -2107,6 +2107,8 @@ if(BUILD_TESTING)
     src/core/CalendarReadService.h
     src/core/PythonBridgeProjection.cpp
     src/core/PythonBridgeProjection.h
+    src/core/TaskRecurrenceMarker.cpp
+    src/core/TaskRecurrenceMarker.h
     src/core/TaskListReadService.h
     src/core/TaskModel.cpp
     src/core/TaskModel.h

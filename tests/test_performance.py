@@ -75,6 +75,7 @@ def test_desktop_bridge_benchmark_reports_bounded_and_full_workspace_paths() -> 
     assert report["timings"].keys() == {
         "workspace_summary",
         "task_page",
+        "task_reorder",
         "search",
         "event_range",
         "full_task_workspace",

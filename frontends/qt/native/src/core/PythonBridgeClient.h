@@ -65,11 +65,27 @@ public:
                                                            const QJsonObject& changes,
                                                            const QByteArray& idempotencyKey,
                                                            CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult> moveTask(const QString& accountId,
+                                                         const QString& taskId,
+                                                         const QJsonObject& move,
+                                                         const QByteArray& idempotencyKey,
+                                                         CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult> completeTask(const QString& accountId,
                                                              const QString& taskId,
                                                              bool completed,
                                                              const QByteArray& idempotencyKey,
                                                              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  stopTaskRecurrence(const QString& accountId,
+                     const QString& taskId,
+                     const QString& scope,
+                     const QByteArray& idempotencyKey,
+                     CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  splitTaskRecurrence(const QString& accountId,
+                      const QString& taskId,
+                      const QByteArray& idempotencyKey,
+                      CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult> deleteTask(const QString& accountId,
                                                            const QString& taskId,
                                                            const QByteArray& idempotencyKey,

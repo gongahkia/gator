@@ -20,6 +20,7 @@ from urllib.request import Request, urlopen
 
 from hcb.benchmarks import create_large_fixture
 from hcb.paths import AppPaths
+from hcb.task_recurrence import parse_task_recurrence_notes
 
 ACCOUNT_ID = "benchmark"
 UPDATED_TASK_TITLE = "Qt bridge interaction task updated"
@@ -32,6 +33,9 @@ HIDDEN_TASK_TITLE = "Qt bridge acceptance hidden-list task"
 UPDATED_CALENDAR_TITLE = "Qt bridge acceptance calendar updated"
 UPDATED_CALENDAR_DESCRIPTION = "Updated by the isolated Qt bridge calendar acceptance"
 SUBSCRIPTION_REMOTE_ID = "qt-bridge-acceptance-subscription"
+HIERARCHY_PARENT_TASK_TITLE = "Qt bridge hierarchy parent"
+HIERARCHY_FIRST_CHILD_TASK_TITLE = "Qt bridge hierarchy first child"
+HIERARCHY_SECOND_CHILD_TASK_TITLE = "Qt bridge hierarchy second child"
 
 
 def parse_args() -> argparse.Namespace:
@@ -226,7 +230,58 @@ def verify_persistence(
     event_id = require_string(report, "event_id")
     task_list_id = require_string(report, "task_list_id")
     calendar_id = require_string(report, "calendar_id")
+    recurrence_task_id = require_string(report, "recurrence_task_id")
+    recurrence_successor_id = require_string(report, "recurrence_successor_id")
+    split_recurrence_task_id = require_string(report, "split_recurrence_task_id")
+    split_recurrence_successor_id = require_string(report, "split_recurrence_successor_id")
+    hierarchy_parent_id = require_string(report, "hierarchy_parent_id")
+    hierarchy_first_child_id = require_string(report, "hierarchy_first_child_id")
+    hierarchy_second_child_id = require_string(report, "hierarchy_second_child_id")
     event_date = date.fromisoformat(require_string(report, "event_date"))
+
+    def searched_task(title: str, task_id: str) -> dict[str, object]:
+        results = bridge_data(
+            descriptor,
+            "/v1/accounts/benchmark/search?" + urlencode({"q": title, "limit": 50}),
+        ).get("results")
+        if not isinstance(results, list):
+            raise RuntimeError("restarted bridge returned malformed recurrence task search results")
+        task = next(
+            (
+                result.get("item")
+                for result in results
+                if isinstance(result, dict)
+                and result.get("kind") == "task"
+                and isinstance(result.get("item"), dict)
+                and result["item"].get("id") == task_id
+            ),
+            None,
+        )
+        if not isinstance(task, dict):
+            raise RuntimeError("restarted bridge did not retain a Qt-managed recurrence task")
+        return task
+
+    recurring_source = searched_task("Qt bridge recurring task updated", recurrence_task_id)
+    stopped_occurrence = searched_task("Qt bridge recurring task updated", recurrence_successor_id)
+    split_source = searched_task("Qt bridge split recurring task", split_recurrence_task_id)
+    split_occurrence = searched_task(
+        "Qt bridge split recurring task", split_recurrence_successor_id
+    )
+    recurring_marker = parse_task_recurrence_notes(str(recurring_source.get("notes") or "")).marker
+    stopped_notes = parse_task_recurrence_notes(str(stopped_occurrence.get("notes") or ""))
+    split_source_marker = parse_task_recurrence_notes(str(split_source.get("notes") or "")).marker
+    split_marker = parse_task_recurrence_notes(str(split_occurrence.get("notes") or "")).marker
+    if (
+        recurring_source.get("status") != "completed"
+        or recurring_marker is None
+        or (recurring_marker.frequency, recurring_marker.interval) != ("weekly", 2)
+        or stopped_notes.state != "unmanaged"
+        or split_source_marker is None
+        or split_marker is None
+        or split_marker.series_id == split_source_marker.series_id
+        or split_marker.ordinal != 0
+    ):
+        raise RuntimeError("restarted bridge returned incomplete Qt recurrence mutations")
 
     search_path = "/v1/accounts/benchmark/search?" + urlencode(
         {"q": UPDATED_TASK_TITLE, "limit": 50}
@@ -274,6 +329,23 @@ def verify_persistence(
     )
     if not isinstance(hidden_task, dict) or hidden_task.get("title") != HIDDEN_TASK_TITLE:
         raise RuntimeError("restarted bridge did not retain the deselected-list task")
+
+    hierarchy_parent = searched_task(HIERARCHY_PARENT_TASK_TITLE, hierarchy_parent_id)
+    hierarchy_first_child = searched_task(
+        HIERARCHY_FIRST_CHILD_TASK_TITLE, hierarchy_first_child_id
+    )
+    hierarchy_second_child = searched_task(
+        HIERARCHY_SECOND_CHILD_TASK_TITLE, hierarchy_second_child_id
+    )
+    if (
+        hierarchy_parent.get("list_id") != "inbox"
+        or hierarchy_parent.get("parent_id") is not None
+        or hierarchy_first_child.get("list_id") != task_list_id
+        or hierarchy_first_child.get("parent_id") is not None
+        or hierarchy_second_child.get("list_id") != "inbox"
+        or hierarchy_second_child.get("parent_id") != hierarchy_parent_id
+    ):
+        raise RuntimeError("restarted bridge returned incomplete Qt task hierarchy changes")
 
     workspace_path = "/v1/accounts/benchmark/workspace?" + urlencode(
         {
@@ -346,7 +418,7 @@ def verify_persistence(
         for item in calendars
     ):
         raise RuntimeError("restarted bridge retained an unsubscribed calendar")
-    return {"tasks": 2, "events": 1, "task_lists": 1, "calendars": 1}
+    return {"tasks": 6, "events": 1, "task_lists": 1, "calendars": 1}
 
 
 def run_acceptance(native: Path) -> dict[str, object]:
@@ -369,9 +441,21 @@ def run_acceptance(native: Path) -> dict[str, object]:
             )
             if (
                 interaction.get("ok") is not True
-                or interaction.get("stage") != 15
+                or interaction.get("stage") != 29
                 or not isinstance(interaction.get("hidden_task_id"), str)
                 or not interaction["hidden_task_id"]
+                or not all(
+                    isinstance(interaction.get(key), str) and interaction[key]
+                    for key in (
+                        "recurrence_task_id",
+                        "recurrence_successor_id",
+                        "split_recurrence_task_id",
+                        "split_recurrence_successor_id",
+                        "hierarchy_parent_id",
+                        "hierarchy_first_child_id",
+                        "hierarchy_second_child_id",
+                    )
+                )
                 or not isinstance(interaction.get("initial_search_results"), int)
                 or interaction["initial_search_results"] < 1
                 or not isinstance(interaction.get("refreshed_search_results"), int)
@@ -403,6 +487,8 @@ def run_acceptance(native: Path) -> dict[str, object]:
                 "task_list_visibility_hides_tasks": True,
                 "calendar_create_settings": True,
                 "calendar_subscribe_unsubscribe": True,
+                "recurrence_create_reconfigure_complete_stop_split": True,
+                "task_hierarchy_reparent_reorder_move": True,
                 "bridge_restart": True,
                 "qt_restart": True,
                 "persisted": persisted,

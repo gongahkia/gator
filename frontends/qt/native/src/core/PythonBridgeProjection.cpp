@@ -1,4 +1,5 @@
 #include "core/PythonBridgeProjection.h"
+#include "core/TaskRecurrenceMarker.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -116,17 +117,56 @@ requiredString(const QJsonObject& object, QStringView key, qsizetype maximumLeng
        status.toString() != QStringLiteral("completed"))) {
     return std::nullopt;
   }
+  const TaskRecurrenceNotes recurrence = parseTaskRecurrenceNotes(notes.value_or(QString()));
+  const auto recurrenceFrequency = [&recurrence]() {
+    return recurrence.marker.has_value() ? static_cast<int>(recurrence.marker->frequency) : -1;
+  };
+  const auto recurrenceInterval = [&recurrence]() {
+    return recurrence.marker.has_value() ? recurrence.marker->interval : 1;
+  };
+  const auto recurrenceEndKind = [&recurrence]() {
+    return recurrence.marker.has_value() ? static_cast<int>(recurrence.marker->end.kind) : 0;
+  };
+  const auto recurrenceEndUntil = [&recurrence]() {
+    return recurrence.marker.has_value() ? recurrence.marker->end.untilDate.value_or(QString())
+                                         : QString();
+  };
+  const auto recurrenceEndCount = [&recurrence]() {
+    return recurrence.marker.has_value() ? recurrence.marker->end.count.value_or(0) : 0;
+  };
   return TaskModelTask{
       .id = *id,
       .taskListId = *listId,
       .taskListTitle = taskListTitles.value(*listId),
       .parentTaskId = parentId,
       .title = *title,
-      .notes = notes,
+      .notes = notes.has_value() ? std::optional<QString>(recurrence.userNotes)
+                                 : std::optional<QString>{},
       .due = due.has_value() ? std::optional<TaskDue>(TaskDue{.at = due, .timeZone = dueTimeZone})
                              : std::optional<TaskDue>{},
       .priority = *priority,
       .completed = status.toString() == QStringLiteral("completed"),
+      .managedRecurrence =
+          recurrence.state == TaskRecurrenceNotesState::Managed && recurrence.diagnostic.isEmpty(),
+      .recurrenceSummary =
+          recurrence.marker.has_value() ? taskRecurrenceSummary(*recurrence.marker) : QString(),
+      .recurrenceSeriesId = recurrence.marker.has_value() ? recurrence.marker->seriesId : QString(),
+      .recurrenceOccurrenceId =
+          recurrence.marker.has_value() ? recurrence.marker->occurrenceId : QString(),
+      .recurrenceFrequency = recurrenceFrequency(),
+      .recurrenceInterval = recurrenceInterval(),
+      .recurrenceEndKind = recurrenceEndKind(),
+      .recurrenceEndUntil = recurrenceEndUntil(),
+      .recurrenceEndCount = recurrenceEndCount(),
+      .recurrenceRule =
+          recurrence.marker.has_value() ? recurrence.marker->recurrenceRule : QString(),
+      .recurrenceExclusionDates = recurrence.marker.has_value()
+                                      ? recurrence.marker->exclusionDates.join(QStringLiteral(","))
+                                      : QString(),
+      .recurrenceAdditionDates = recurrence.marker.has_value()
+                                     ? recurrence.marker->additionDates.join(QStringLiteral(","))
+                                     : QString(),
+      .recurrenceDiagnostic = recurrence.diagnostic,
       .sortOrder = static_cast<std::int64_t>(sortOrder)};
 }
 

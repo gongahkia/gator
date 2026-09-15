@@ -623,15 +623,16 @@ private:
   [[nodiscard]] QList<TaskModelTask> visibleBridgeTasks() const;
   void applyBridgeTaskLists(QList<TaskListSummary> taskLists);
   void applyBridgeCalendars(QList<CalendarSummary> calendars, bool reloadCalendarRange);
-  void applyBridgeTaskResponse(const QJsonObject& data);
-  void applyBridgeEventResponse(const QJsonObject& data);
-  void applyBridgeTaskListResponse(const QJsonObject& data);
-  void applyBridgeCalendarResponse(const QJsonObject& data);
+  [[nodiscard]] bool applyBridgeTaskResponse(const QJsonObject& data);
+  [[nodiscard]] bool applyBridgeEventResponse(const QJsonObject& data);
+  [[nodiscard]] bool applyBridgeTaskListResponse(const QJsonObject& data);
+  [[nodiscard]] bool applyBridgeCalendarResponse(const QJsonObject& data);
   void startBridgeOperation(QString kind, std::future<PythonBridgeResult> future);
   void pollBridgeOperation(QString operationId);
   void cancelBridgeOperation();
   void completeBridgeReadyProbe();
   void runBridgeInteractionAcceptance(QString reportPath);
+  void runBridgeFailureAcceptance(QString reportPath);
   void refreshUndoStatus();
   void refreshPendingSyncCount();
   void recordExistenceHistory(UndoResourceKind resource,
@@ -852,6 +853,8 @@ private:
   bool pythonBridgeTasksReady_{false};
   bool pythonBridgeCalendarReady_{false};
   bool bridgeInteractionAcceptanceStarted_{false};
+  bool bridgeFailureAcceptanceStarted_{false};
+  bool pythonBridgeOperationStarting_{false};
   QString pythonBridgeOperationId_;
   QString pythonBridgeOperationKind_;
   bool pollScheduled_{false};

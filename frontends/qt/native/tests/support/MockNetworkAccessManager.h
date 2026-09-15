@@ -3,6 +3,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QTimer>
 
 #include <algorithm>
 #include <utility>
@@ -14,6 +15,7 @@ struct MockNetworkResponse final {
   QByteArray body;
   QNetworkReply::NetworkError error{QNetworkReply::NoError};
   QList<QPair<QByteArray, QByteArray>> headers;
+  int delayMilliseconds{0};
 };
 
 class MockNetworkReply final : public QNetworkReply {
@@ -28,16 +30,16 @@ public:
     }
     body_ = std::move(response.body);
     open(QIODevice::ReadOnly | QIODevice::Unbuffered);
-    QMetaObject::invokeMethod(
-        this,
-        [this] {
-          emit readyRead();
-          emit finished();
-        },
-        Qt::QueuedConnection);
+    QTimer::singleShot(response.delayMilliseconds, this, [this] { finish(); });
   }
 
-  void abort() override {}
+  void abort() override {
+    if (finished_) {
+      return;
+    }
+    setError(QNetworkReply::OperationCanceledError, QStringLiteral("mock request aborted"));
+    finish();
+  }
 
   [[nodiscard]] qint64 bytesAvailable() const override {
     return body_.size() - offset_ + QNetworkReply::bytesAvailable();
@@ -57,8 +59,18 @@ protected:
   }
 
 private:
+  void finish() {
+    if (finished_) {
+      return;
+    }
+    finished_ = true;
+    emit readyRead();
+    emit finished();
+  }
+
   QByteArray body_;
   qsizetype offset_{0};
+  bool finished_{false};
 };
 
 struct CapturedNetworkRequest final {

@@ -24,6 +24,7 @@ from hcb.paths import AppPaths
 from hcb.runtime import Runtime
 from hcb.storage import Storage
 from hcb.sync import SyncResult
+from hcb.task_recurrence import parse_task_recurrence_notes
 
 
 @pytest.fixture
@@ -289,6 +290,264 @@ def test_task_and_event_mutations_use_the_python_optimistic_core(
         assert storage.get_event("work", str(event_id)).metadata.deleted
         # Two updates plus one create per entity use the same core as the CLI/TUI.
         assert storage.pending_mutation_count("work") == 6
+
+
+def test_task_move_reparent_and_reorder_use_the_python_core(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    paths, bridge = bridge_env
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/task-lists",
+        body={"title": "Archive", "selected": False},
+    )
+    assert status == 201
+    archive = _data(response)["task_list"]
+    assert isinstance(archive, dict)
+    archive_id = str(archive["id"])
+
+    def create_task(title: str, *, parent_id: str | None = None) -> dict[str, object]:
+        body: dict[str, object] = {"list_id": "inbox", "title": title}
+        if parent_id is not None:
+            body["parent_id"] = parent_id
+        created_status, created_response = _request(
+            bridge, "POST", "/v1/accounts/work/tasks", body=body
+        )
+        assert created_status == 201
+        created = _data(created_response)["task"]
+        assert isinstance(created, dict)
+        return created
+
+    parent = create_task("Move parent")
+    parent_id = str(parent["id"])
+    first_child = create_task("Move first child", parent_id=parent_id)
+    first_child_id = str(first_child["id"])
+    second_child = create_task("Move second child", parent_id=parent_id)
+    second_child_id = str(second_child["id"])
+
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{second_child_id}/move",
+        body={"previous_id": None},
+    )
+    assert status == 200
+    reordered_first = _data(response)["task"]
+    assert isinstance(reordered_first, dict)
+    assert reordered_first["parent_id"] == parent_id
+    assert reordered_first["position"] is None
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/tasks?list_id=inbox")
+    assert status == 200
+    page = _data(response)["page"]
+    assert isinstance(page, dict)
+    ordered_ids = [str(item["id"]) for item in page["tasks"]]  # type: ignore[index]
+    assert ordered_ids.index(second_child_id) < ordered_ids.index(first_child_id)
+
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{first_child_id}/move",
+        body={"parent_id": None},
+    )
+    assert status == 200
+    reparented_root = _data(response)["task"]
+    assert isinstance(reparented_root, dict)
+    assert reparented_root["list_id"] == "inbox"
+    assert reparented_root["parent_id"] is None
+    assert reparented_root["position"] is None
+
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{first_child_id}/move",
+        body={"parent_id": parent_id, "previous_id": second_child_id},
+    )
+    assert status == 200
+    reparented_child = _data(response)["task"]
+    assert isinstance(reparented_child, dict)
+    assert reparented_child["parent_id"] == parent_id
+    assert reparented_child["position"] == second_child_id
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{parent_id}/move",
+        body={"parent_id": first_child_id},
+    )
+    assert status == 400
+    assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
+
+    idempotency_key = "cross-list-task-move"
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{first_child_id}/move",
+        body={"list_id": archive_id},
+        idempotency_key=idempotency_key,
+    )
+    assert status == 200
+    moved = _data(response)["task"]
+    assert isinstance(moved, dict)
+    assert moved["list_id"] == archive_id
+    assert moved["parent_id"] is None
+    assert moved["position"] is None
+
+    status, retried = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{first_child_id}/move",
+        body={"list_id": archive_id},
+        idempotency_key=idempotency_key,
+    )
+    assert status == 200
+    assert _data(retried) == _data(response)
+
+    with Storage(paths.database_file) as storage:
+        persisted = storage.get_task("work", first_child_id)
+        assert persisted is not None
+        assert persisted.list_id == archive_id
+        assert persisted.parent_id is None
+        assert persisted.position is None
+
+
+def test_managed_task_recurrence_uses_the_durable_python_core(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    _paths, bridge = bridge_env
+    recurrence = {
+        "frequency": "daily",
+        "interval": 1,
+        "end": {"kind": "count", "count": 3},
+    }
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks",
+        body={
+            "list_id": "inbox",
+            "title": "Recurring bridge task",
+            "notes": "Keep this context",
+            "due": "2026-09-15",
+            "due_time_zone": "UTC",
+            "priority": "high",
+            "recurrence": recurrence,
+        },
+    )
+    assert status == 201
+    created = _data(response)["task"]
+    assert isinstance(created, dict)
+    created_id = str(created["id"])
+    created_marker = parse_task_recurrence_notes(str(created["notes"])).marker
+    assert created_marker is not None
+    assert created_marker.ordinal == 0
+    assert created_marker.template_title == "Recurring bridge task"
+
+    status, response = _request(
+        bridge,
+        "PATCH",
+        f"/v1/accounts/work/tasks/{created_id}",
+        body={
+            "title": "Reconfigured recurring task",
+            "due": "2026-09-16",
+            "due_time_zone": "UTC",
+            "recurrence": {
+                "frequency": "weekly",
+                "interval": 2,
+                "end": {"kind": "count", "count": 3},
+            },
+        },
+    )
+    assert status == 200
+    reconfigured = _data(response)["task"]
+    assert isinstance(reconfigured, dict)
+    reconfigured_marker = parse_task_recurrence_notes(str(reconfigured["notes"])).marker
+    assert reconfigured_marker is not None
+    assert (reconfigured_marker.frequency, reconfigured_marker.interval) == ("weekly", 2)
+    assert reconfigured_marker.template_due_date == "2026-09-16"
+
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{created_id}/complete",
+        body={},
+    )
+    assert status == 200
+    completed = _data(response)
+    assert completed["task"]["status"] == "completed"  # type: ignore[index]
+    successor = completed["successor"]
+    assert isinstance(successor, dict)
+    successor_id = str(successor["id"])
+    successor_marker = parse_task_recurrence_notes(str(successor["notes"])).marker
+    assert successor_marker is not None
+    assert successor_marker.ordinal == 1
+
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{successor_id}/recurrence/stop",
+        body={"scope": "this"},
+        idempotency_key="stop-recurring-task",
+    )
+    assert status == 200
+    stopped = _data(response)["tasks"]
+    assert isinstance(stopped, list)
+    stopped_successor = next(item for item in stopped if item["id"] == successor_id)
+    assert parse_task_recurrence_notes(str(stopped_successor["notes"])).state == "unmanaged"
+
+    status, retry = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{successor_id}/recurrence/stop",
+        body={"scope": "this"},
+        idempotency_key="stop-recurring-task",
+    )
+    assert status == 200
+    assert _data(retry) == _data(response)
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks",
+        body={
+            "list_id": "inbox",
+            "title": "Split recurring bridge task",
+            "due": "2026-09-15",
+            "due_time_zone": "UTC",
+            "recurrence": recurrence,
+        },
+    )
+    assert status == 201
+    split_source = _data(response)["task"]
+    assert isinstance(split_source, dict)
+    split_source_id = str(split_source["id"])
+    source_marker = parse_task_recurrence_notes(str(split_source["notes"])).marker
+    assert source_marker is not None
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{split_source_id}/complete",
+        body={},
+    )
+    assert status == 200
+    split_successor = _data(response)["successor"]
+    assert isinstance(split_successor, dict)
+    split_successor_id = str(split_successor["id"])
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/tasks/{split_successor_id}/recurrence/split",
+        body={},
+    )
+    assert status == 200
+    split = _data(response)["tasks"]
+    assert isinstance(split, list) and len(split) == 1
+    split_marker = parse_task_recurrence_notes(str(split[0]["notes"])).marker
+    assert split_marker is not None
+    assert split_marker.series_id != source_marker.series_id
+    assert split_marker.ordinal == 0
 
 
 def test_task_list_and_calendar_management_stays_in_the_python_core(

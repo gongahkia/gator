@@ -61,9 +61,11 @@ snake_case; timed event values are objects such as
 | `GET /v1/accounts/{account}/workspace` | Small account summary: account, task lists, calendars, cached instance ranges, and pending count. |
 | `GET /v1/accounts/{account}/workspace?include=tasks` | Explicit full task mirror for bounded/small consumers. |
 | `GET /v1/accounts/{account}/workspace?include=events&start=...&end=...` | Date-bounded event range. `calendar_id` is optional. |
-| `GET /v1/accounts/{account}/tasks?limit=200&cursor=...&list_id=...` | Preferred virtual-list path. Limits are 1–500 and the opaque cursor resumes the stable local order. |
+| `GET /v1/accounts/{account}/tasks?limit=200&cursor=...&list_id=...` | Preferred virtual-list path. Limits are 1–500 and the opaque cursor resumes the stable HCB sibling order. |
 | `GET /v1/accounts/{account}/search?q=...&limit=...` | Existing local workspace search. |
-| `POST /v1/accounts/{account}/tasks`, `PATCH`/`DELETE /tasks/{id}`, `POST /tasks/{id}/complete` | Optimistic task operations through `ApplicationService`. |
+| `POST /v1/accounts/{account}/tasks`, `PATCH`/`DELETE /tasks/{id}`, `POST /tasks/{id}/complete` | Optimistic task operations through `ApplicationService`. Create and update accept an optional managed `recurrence` object; completion returns `successor` when one is created. |
+| `POST /v1/accounts/{account}/tasks/{id}/move` | Move to a task list, change parent, or position among siblings through `ApplicationService`. The body has one or more of `list_id`, `parent_id`, and `previous_id`; nullable parent or previous values mean top level or first sibling. |
+| `POST /v1/accounts/{account}/tasks/{id}/recurrence/stop`, `POST /tasks/{id}/recurrence/split` | Stop one occurrence, this-and-following occurrences, or an entire managed series with `{"scope":"this"|"following"|"series"}`; split this-and-following occurrences into a new series. Both return the affected tasks. |
 | `POST /v1/accounts/{account}/task-lists`, `PATCH`/`DELETE /task-lists/{id}` | Optimistic task-list create, rename, delete, and HCB-local visibility changes. |
 | `POST /v1/accounts/{account}/events`, `PATCH`/`DELETE /events/{id}` | Optimistic event operations through `ApplicationService`. |
 | `POST /v1/accounts/{account}/calendars`, `PATCH`/`DELETE /calendars/{id}` | Optimistic calendar create, details, list preferences, and delete operations. |
@@ -79,9 +81,22 @@ SQLite transaction as the core mutation. Retrying the same request after a
 lost response returns that stored result; reusing the key with different method,
 path, or payload returns `409`. Receipts expire after seven days.
 
+A task recurrence object has `frequency` (`daily`, `weekly`, `monthly`, or
+`yearly`), an `interval`, an `end` object (`{"kind":"never"}`, an `until_date`,
+or a `count`), and optional `recurrence_rule`, `exclusion_dates`, and
+`addition_dates`. The Python core validates and serializes the existing HCB marker
+in task notes; native frontends never write that marker or SQLite directly.
+
 Task-list `selected` is an HCB-local visibility preference. It is persisted in
 the Python-owned SQLite database, is returned in workspace summaries, does not
 enqueue a Google Tasks mutation, and survives later Google task-list pulls.
+
+Task order remains Python-owned. Google supplies a lexicographically ordered
+provider position on a later pull. Before that response arrives, HCB stores a local
+sibling rank in the same SQLite transaction as the task move and outbox entry.
+The paged bridge uses that rank so a local reorder is visible immediately and
+survives a bridge restart. The TUI keeps its existing due-date and title
+presentation order; it is not coupled to desktop drag/reorder rendering.
 
 `sync` cancellation is passed to the existing sync engine and reaches a
 cancelled state when it stops. OAuth cancellation closes HCB's loopback listener
@@ -95,15 +110,17 @@ that exchange returns.
 The bridge opens a fresh `Runtime` and SQLite connection for each ordinary
 request. It never shares a SQLite connection across HTTP worker threads. A
 mutation holds one outer SQLite transaction so its optimistic core update,
-outbox item, and idempotency receipt commit together. Existing process-level
+local sibling ordering, outbox item, and idempotency receipt commit together. Existing process-level
 sync ownership and SQLite WAL locking remain the coordination mechanism for the
 CLI, TUI, reminder process, sync workers, and bridge.
 
 For a synthetic 10,000-task/2,000-event local mirror on the Fedora development
-machine, the five-run median was about 7 ms for the summary and 35 ms for a
-200-task page. The deliberately full task workspace response was about 4.25 MB
-and took about 1.30 s. These are machine-specific observations, not release
-budgets; use the reproducible command below before releases:
+machine, the five-run median was about 2 ms for the summary and 10 ms for a
+200-task page after adding local sibling order. A 10,000-sibling reorder took
+about 16 ms because normal moves update one sparse local rank. The deliberately
+full task workspace response was about 4.25 MB and took about 250 ms. These are
+machine-specific observations, not release budgets; use the reproducible command
+below before releases:
 
 ```sh
 make benchmark-desktop-bridge

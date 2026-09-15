@@ -122,6 +122,7 @@ class AccountTaskRepository(_StorageCore):
             title=excluded.title, notes=excluded.notes, status=excluded.status,
             due=excluded.due, completed_at=excluded.completed_at,
             parent_id=excluded.parent_id, position=excluded.position,
+            local_order=CASE WHEN excluded.dirty=0 THEN 0 ELSE tasks.local_order END,
             remote_id=excluded.remote_id, etag=excluded.etag,
             remote_updated_at=excluded.remote_updated_at,
             local_updated_at=excluded.local_updated_at, deleted=excluded.deleted,
@@ -215,8 +216,85 @@ class AccountTaskRepository(_StorageCore):
         sql, args = "SELECT * FROM tasks WHERE account_id=? AND deleted=0", [account_id]
         if list_id is not None:
             sql, args = sql + " AND list_id=?", [*args, list_id]
-        sql += " ORDER BY status,due,title,id LIMIT ? OFFSET ?"
+        sql += " ORDER BY status,local_order,due,title,id LIMIT ? OFFSET ?"
         return [self._task(row) for row in self.connection.execute(sql, [*args, limit, offset])]
+
+    def list_task_sibling_ids(
+        self, account_id: str, list_id: str, parent_id: str | None
+    ) -> list[str]:
+        """Return active siblings in the durable local presentation order."""
+        rows = self.connection.execute(
+            """SELECT id FROM tasks
+            WHERE account_id=? AND list_id=? AND parent_id IS ? AND deleted=0
+            ORDER BY local_order,due,title,id""",
+            (account_id, list_id, parent_id),
+        )
+        return [str(row["id"]) for row in rows]
+
+    def set_task_sibling_order(
+        self,
+        account_id: str,
+        list_id: str,
+        parent_id: str | None,
+        task_ids: list[str],
+        moved_task_id: str,
+    ) -> None:
+        """Persist a sibling sequence with sparse ranks where possible.
+
+        Normal moves only need one rank between adjacent siblings. Rebuilding all
+        ranks is reserved for the rare case where repeated insertions exhaust an
+        integer gap.
+        """
+        rows = list(
+            self.connection.execute(
+                """SELECT id,local_order FROM tasks
+                WHERE account_id=? AND list_id=? AND parent_id IS ? AND deleted=0
+                ORDER BY local_order,due,title,id""",
+                (account_id, list_id, parent_id),
+            )
+        )
+        current_ids = [str(row["id"]) for row in rows]
+        if len(task_ids) != len(set(task_ids)) or set(current_ids) != set(task_ids):
+            raise ValueError("task sibling order references an unavailable task")
+        if current_ids == task_ids:
+            return
+
+        current_ranks = {str(row["id"]): int(row["local_order"]) for row in rows}
+
+        def sparse_rank(target: str) -> int | None:
+            index = task_ids.index(target)
+            other_ranks = [rank for item, rank in current_ranks.items() if item != target]
+            before = task_ids[index - 1] if index > 0 else None
+            after = task_ids[index + 1] if index + 1 < len(task_ids) else None
+            if before is None:
+                return min(other_ranks, default=0) - 1024
+            if after is None:
+                return max(other_ranks, default=0) + 1024
+            lower = current_ranks[before]
+            upper = current_ranks[after]
+            return lower + (upper - lower) // 2 if upper - lower > 1 else None
+
+        if moved_task_id not in current_ranks:
+            raise ValueError("task sibling order references an unavailable task")
+        rank = sparse_rank(moved_task_id)
+        if rank is not None:
+            result = self.connection.execute(
+                """UPDATE tasks SET local_order=?
+                WHERE account_id=? AND id=? AND list_id=? AND parent_id IS ? AND deleted=0""",
+                (rank, account_id, moved_task_id, list_id, parent_id),
+            )
+            if result.rowcount == 1:
+                return
+            raise ValueError("task sibling order references an unavailable task")
+
+        for local_order, task_id in enumerate(task_ids):
+            result = self.connection.execute(
+                """UPDATE tasks SET local_order=?
+                WHERE account_id=? AND id=? AND list_id=? AND parent_id IS ? AND deleted=0""",
+                (local_order * 1024, account_id, task_id, list_id, parent_id),
+            )
+            if result.rowcount != 1:
+                raise ValueError("task sibling order references an unavailable task")
 
     def search_tasks(self, account_id: str, query: str, *, limit: int = 50) -> list[Task]:
         escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

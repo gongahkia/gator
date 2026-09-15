@@ -385,6 +385,33 @@ def test_batch_task_move_preflights_hierarchies_and_queues_in_order(
     assert [item.entity_id for item in moves] == [second.id, first.id]
 
 
+def test_task_reorder_updates_a_sparse_local_sibling_rank(app: ApplicationService) -> None:
+    first = app.create_task("a", "inbox", "First", id="first")
+    second = app.create_task("a", "inbox", "Second", position=first.id, id="second")
+    third = app.create_task("a", "inbox", "Third", position=second.id, id="third")
+
+    def ranks() -> dict[str, int]:
+        return {
+            str(row["id"]): int(row["local_order"])
+            for row in app.storage.connection.execute(
+                "SELECT id,local_order FROM tasks WHERE account_id='a' AND list_id='inbox'"
+            )
+        }
+
+    before = ranks()
+    app.move_task("a", third.id, previous_id=None)
+    after = ranks()
+
+    assert after[first.id] == before[first.id]
+    assert after[second.id] == before[second.id]
+    assert after[third.id] < min(after[first.id], after[second.id])
+    assert [task.id for task in app.task_page("a", limit=10).tasks][:3] == [
+        third.id,
+        first.id,
+        second.id,
+    ]
+
+
 def test_batch_actions_preflight_all_targets_before_mutating(app: ApplicationService) -> None:
     first = app.create_task("a", "inbox", "First", id="first")
     second = app.create_task("a", "inbox", "Second", id="second")

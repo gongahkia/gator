@@ -24,10 +24,11 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from time import monotonic
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, cast
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .application import ApplicationService
+from .application_tasks import TaskRecurrenceConfiguration
 from .auth import OAuthCancelledError
 from .errors import (
     AuthenticationRequired,
@@ -41,6 +42,7 @@ from .errors import (
 from .models import DateTimeKind, EventDateTime, TaskPriority
 from .output import to_primitive
 from .runtime import Runtime
+from .task_recurrence import RecurrenceEnd
 
 BRIDGE_API_VERSION: Final = 1
 BRIDGE_NAME: Final = "hcb-desktop-bridge"
@@ -509,13 +511,55 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                             lambda app: app.delete_task(account_id, task_id)
                         )
                     }
+            if method == "POST" and len(tail) == 3 and tail[0] == "tasks" and tail[2] == "move":
+                _no_query(query)
+                return HTTPStatus.OK, {"task": self._move_task(account_id, tail[1], body)}
             if method == "POST" and len(tail) == 3 and tail[0] == "tasks" and tail[2] == "complete":
                 _no_query(query)
                 _keys(body, optional={"completed"})
                 completed = _bool(body["completed"], "completed") if "completed" in body else True
+                task, successor = self._with_application(
+                    lambda app: app.complete_task_with_successor(
+                        account_id, tail[1], completed=completed
+                    )
+                )
                 return HTTPStatus.OK, {
-                    "task": self._with_application(
-                        lambda app: app.complete_task(account_id, tail[1], completed=completed)
+                    "task": task,
+                    "successor": successor,
+                }
+            if (
+                method == "POST"
+                and len(tail) == 4
+                and tail[0] == "tasks"
+                and tail[2] == "recurrence"
+                and tail[3] == "stop"
+            ):
+                _no_query(query)
+                _keys(body, required={"scope"})
+                scope = _string(body["scope"], "scope")
+                if scope not in {"this", "following", "series"}:
+                    raise ValueError("scope is invalid")
+                return HTTPStatus.OK, {
+                    "tasks": self._with_application(
+                        lambda app: app.stop_task_recurrence(
+                            account_id,
+                            tail[1],
+                            scope=cast(Literal["this", "following", "series"], scope),
+                        )
+                    )
+                }
+            if (
+                method == "POST"
+                and len(tail) == 4
+                and tail[0] == "tasks"
+                and tail[2] == "recurrence"
+                and tail[3] == "split"
+            ):
+                _empty_body(body)
+                _no_query(query)
+                return HTTPStatus.OK, {
+                    "tasks": self._with_application(
+                        lambda app: app.split_task_recurrence(account_id, tail[1])
                     )
                 }
             if method == "POST" and tail == ("events",):
@@ -620,7 +664,15 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             _keys(
                 body,
                 required={"list_id", "title"},
-                optional={"notes", "due", "due_time_zone", "priority", "parent_id", "position"},
+                optional={
+                    "notes",
+                    "due",
+                    "due_time_zone",
+                    "priority",
+                    "parent_id",
+                    "position",
+                    "recurrence",
+                },
             )
             return self._with_application(
                 lambda app: app.create_task(
@@ -633,6 +685,9 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                     priority=_string(body.get("priority", TaskPriority.NONE.value), "priority"),
                     parent_id=_nullable_string(body.get("parent_id"), "parent_id"),
                     position=_nullable_string(body.get("position"), "position"),
+                    recurrence=_recurrence_configuration(body["recurrence"])
+                    if "recurrence" in body
+                    else None,
                 )
             )
 
@@ -660,7 +715,9 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             )
 
         def _update_task(self, account_id: str, task_id: str, body: Json) -> Any:
-            _keys(body, optional={"title", "notes", "due", "priority"})
+            _keys(
+                body, optional={"title", "notes", "due", "due_time_zone", "priority", "recurrence"}
+            )
             if not body:
                 raise ValueError("task update requires at least one field")
             kwargs: dict[str, Any] = {}
@@ -673,11 +730,32 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                     kwargs["clear_due"] = True
                 else:
                     kwargs["due"] = _date_value(body["due"], "due")
+            if "due_time_zone" in body:
+                kwargs["due_time_zone"] = _nullable_string(body["due_time_zone"], "due_time_zone")
             if "priority" in body:
                 kwargs["priority"] = _string(body["priority"], "priority")
+            if "recurrence" in body:
+                kwargs["recurrence"] = (
+                    None
+                    if body["recurrence"] is None
+                    else _recurrence_configuration(body["recurrence"])
+                )
             return self._with_application(
                 lambda app: app.update_task(account_id, task_id, **kwargs)
             )
+
+        def _move_task(self, account_id: str, task_id: str, body: Json) -> Any:
+            _keys(body, optional={"list_id", "parent_id", "previous_id"})
+            if not body:
+                raise ValueError("task move requires at least one field")
+            kwargs: dict[str, Any] = {}
+            if "list_id" in body:
+                kwargs["list_id"] = _string(body["list_id"], "list_id")
+            if "parent_id" in body:
+                kwargs["parent_id"] = _nullable_string(body["parent_id"], "parent_id")
+            if "previous_id" in body:
+                kwargs["previous_id"] = _nullable_string(body["previous_id"], "previous_id")
+            return self._with_application(lambda app: app.move_task(account_id, task_id, **kwargs))
 
         def _create_event(self, account_id: str, body: Json) -> Any:
             _keys(
@@ -818,8 +896,16 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
     tail = path[3:]
     resources = {"tasks", "task-lists", "events", "calendars", "calendar-subscriptions"}
     if method == "POST":
-        return tail in {(resource,) for resource in resources} or (
-            len(tail) == 3 and tail[0] == "tasks" and tail[2] == "complete"
+        return (
+            tail in {(resource,) for resource in resources}
+            or (len(tail) == 3 and tail[0] == "tasks" and tail[2] == "complete")
+            or (len(tail) == 3 and tail[0] == "tasks" and tail[2] == "move")
+            or (
+                len(tail) == 4
+                and tail[0] == "tasks"
+                and tail[2] == "recurrence"
+                and tail[3] in {"stop", "split"}
+            )
         )
     if method == "PATCH":
         return len(tail) == 2 and tail[0] in {"tasks", "task-lists", "events", "calendars"}
@@ -934,6 +1020,59 @@ def _date_value(value: Any, name: str) -> date | None:
         return date.fromisoformat(value)
     except ValueError as exc:
         raise ValueError(f"{name} must be an ISO date") from exc
+
+
+def _recurrence_configuration(value: Any) -> TaskRecurrenceConfiguration:
+    if not isinstance(value, dict):
+        raise ValueError("recurrence must be an object")
+    _keys(
+        value,
+        required={"frequency", "interval", "end"},
+        optional={"recurrence_rule", "exclusion_dates", "addition_dates"},
+    )
+    frequency = _string(value["frequency"], "recurrence.frequency")
+    if frequency not in {"daily", "weekly", "monthly", "yearly"}:
+        raise ValueError("recurrence.frequency is invalid")
+    interval = value["interval"]
+    if type(interval) is not int:
+        raise ValueError("recurrence.interval must be an integer")
+    end_value = value["end"]
+    if not isinstance(end_value, dict):
+        raise ValueError("recurrence.end must be an object")
+    _keys(end_value, required={"kind"}, optional={"until_date", "count"})
+    kind = _string(end_value["kind"], "recurrence.end.kind")
+    if kind == "never":
+        if "until_date" in end_value or "count" in end_value:
+            raise ValueError("recurrence never end cannot include a value")
+        end = RecurrenceEnd("never")
+    elif kind == "until":
+        _keys(end_value, required={"kind", "until_date"})
+        until_date = _date_value(end_value["until_date"], "recurrence.end.until_date")
+        assert until_date is not None
+        end = RecurrenceEnd("until", until_date=until_date.isoformat())
+    elif kind == "count":
+        _keys(end_value, required={"kind", "count"})
+        count = end_value["count"]
+        if type(count) is not int:
+            raise ValueError("recurrence.end.count must be an integer")
+        end = RecurrenceEnd("count", count=count)
+    else:
+        raise ValueError("recurrence.end.kind is invalid")
+    recurrence_rule = value.get("recurrence_rule", "")
+    if not isinstance(recurrence_rule, str):
+        raise ValueError("recurrence.recurrence_rule must be a string")
+    return TaskRecurrenceConfiguration(
+        frequency=cast(Literal["daily", "weekly", "monthly", "yearly"], frequency),
+        interval=interval,
+        end=end,
+        recurrence_rule=recurrence_rule,
+        exclusion_dates=tuple(
+            _string_list(value.get("exclusion_dates", []), "recurrence.exclusion_dates")
+        ),
+        addition_dates=tuple(
+            _string_list(value.get("addition_dates", []), "recurrence.addition_dates")
+        ),
+    )
 
 
 def _event_time(value: Any, name: str) -> EventDateTime:

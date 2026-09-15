@@ -17,7 +17,7 @@ from .models import (
 )
 from .paths import AppPaths
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 
 @dataclass(frozen=True, slots=True)
@@ -520,6 +520,11 @@ _MIGRATION_14 = """
 ALTER TABLE task_lists ADD COLUMN selected INTEGER NOT NULL DEFAULT 1;
 """
 
+_MIGRATION_15 = """
+ALTER TABLE tasks ADD COLUMN local_order INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX tasks_page_order ON tasks(account_id,deleted,status,local_order,due,title,id);
+"""
+
 
 def _iso(value: date | datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
@@ -634,6 +639,7 @@ class _StorageCore:
             _MIGRATION_12,
             _MIGRATION_13,
             _MIGRATION_14,
+            _MIGRATION_15,
         )
         with self.transaction():
             # Another process may have completed the migration while we waited

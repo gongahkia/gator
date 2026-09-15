@@ -52,7 +52,7 @@ void PythonBridgeProjectionTest::projectsSummaryAndTaskPage() {
 
   const QJsonObject taskPageData = object(R"json(
     {"page":{"tasks":[{"id":"task-1","account_id":"work","list_id":"inbox",
-      "title":"Bridge task","notes":"private note","parent_id":null,"due":"2026-09-15",
+      "title":"Bridge task","notes":"private note\n\n[HCB-RECURRENCE v2]\n{\"a\":\"2026-09-15\",\"d\":[],\"e\":{\"c\":3,\"k\":\"count\"},\"i\":2,\"n\":0,\"o\":\"3a21dc8d-2cb4-4b9a-980f-7aaf75ae2f43:0\",\"q\":\"\",\"r\":\"weekly\",\"s\":\"3a21dc8d-2cb4-4b9a-980f-7aaf75ae2f43\",\"t\":{\"d\":\"2026-09-15\",\"p\":\"high\",\"t\":\"Bridge task\"},\"x\":[],\"z\":\"UTC\"}\n[/HCB-RECURRENCE]","parent_id":null,"due":"2026-09-15",
       "due_time_zone":null,"priority":"high","status":"needsAction"}],"next_cursor":"djE6MjAw"}}
   )json");
   const hcb::PythonBridgeTaskPageOrError page = hcb::PythonBridgeProjection::taskPage(
@@ -62,6 +62,13 @@ void PythonBridgeProjectionTest::projectsSummaryAndTaskPage() {
   QCOMPARE(task.taskListTitle, QStringLiteral("Inbox"));
   QCOMPARE(task.priority, hcb::TaskPriority::High);
   QCOMPARE(task.due->at, std::optional<QString>(QStringLiteral("2026-09-15")));
+  QCOMPARE(task.notes, std::optional<QString>(QStringLiteral("private note")));
+  QVERIFY(task.managedRecurrence);
+  QCOMPARE(task.recurrenceSeriesId, QStringLiteral("3a21dc8d-2cb4-4b9a-980f-7aaf75ae2f43"));
+  QCOMPARE(task.recurrenceFrequency, 1);
+  QCOMPARE(task.recurrenceInterval, 2);
+  QCOMPARE(task.recurrenceEndKind, 2);
+  QCOMPARE(task.recurrenceEndCount, 3);
   QVERIFY(!task.completed);
 }
 
