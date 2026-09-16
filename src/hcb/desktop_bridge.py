@@ -27,7 +27,7 @@ from time import monotonic
 from typing import Any, Final, Literal, cast
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from .application import ApplicationService
+from .application import ApplicationService, SavedSearch
 from .application_tasks import TaskRecurrenceConfiguration
 from .auth import OAuthCancelledError
 from .errors import (
@@ -48,6 +48,9 @@ BRIDGE_API_VERSION: Final = 1
 BRIDGE_NAME: Final = "hcb-desktop-bridge"
 MAX_JSON_BODY_BYTES: Final = 1_048_576
 MAX_BULK_TASK_IDS: Final = 500
+MAX_SAVED_SEARCHES: Final = 100
+MAX_SAVED_SEARCH_NAME_LENGTH: Final = 128
+MAX_SAVED_SEARCH_QUERY_LENGTH: Final = 4_096
 MAX_OPERATION_PROGRESS_ITEMS: Final = 32
 MAX_RETAINED_OPERATIONS: Final = 128
 
@@ -502,6 +505,50 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                     lambda app: app.resolve_conflict(account_id, conflict_id, resolution)
                 )
                 return HTTPStatus.OK, {"conflict": _conflict_view(conflict)}
+            if method == "GET" and tail == ("saved-searches",):
+                _no_query(query)
+                return HTTPStatus.OK, {
+                    "saved_searches": self._with_application(
+                        lambda app: [
+                            _saved_search_view(search)
+                            for search in app.list_saved_searches(
+                                account_id, limit=MAX_SAVED_SEARCHES
+                            )
+                        ]
+                    )
+                }
+            if method == "POST" and tail == ("saved-searches",):
+                _no_query(query)
+                _keys(body, required={"name", "query"})
+                search = self._with_application(
+                    lambda app: app.save_search(
+                        account_id,
+                        _saved_search_name(body["name"]),
+                        _saved_search_query(body["query"]),
+                    )
+                )
+                return HTTPStatus.CREATED, {"saved_search": _saved_search_view(search)}
+            if len(tail) == 2 and tail[0] == "saved-searches":
+                search_id = _saved_search_id(tail[1])
+                if method == "PATCH":
+                    _no_query(query)
+                    _keys(body, optional={"name", "query"})
+                    search = self._with_application(
+                        lambda app: app.update_saved_search(
+                            account_id,
+                            search_id,
+                            name=_saved_search_name(body["name"]) if "name" in body else None,
+                            query=_saved_search_query(body["query"]) if "query" in body else None,
+                        )
+                    )
+                    return HTTPStatus.OK, {"saved_search": _saved_search_view(search)}
+                if method == "DELETE":
+                    _empty_body(body)
+                    _no_query(query)
+                    self._with_application(
+                        lambda app: app.delete_saved_search(account_id, search_id)
+                    )
+                    return HTTPStatus.OK, {"deleted": search_id}
             if method == "GET" and tail == ("tasks",):
                 return HTTPStatus.OK, {"page": self._task_page(account_id, query)}
             if method == "POST" and tail == ("tasks",):
@@ -959,7 +1006,14 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
     if len(path) < 4 or path[:2] != ("v1", "accounts"):
         return False
     tail = path[3:]
-    resources = {"tasks", "task-lists", "events", "calendars", "calendar-subscriptions"}
+    resources = {
+        "tasks",
+        "task-lists",
+        "events",
+        "calendars",
+        "calendar-subscriptions",
+        "saved-searches",
+    }
     if method == "POST":
         return (
             tail in {(resource,) for resource in resources}
@@ -1068,6 +1122,33 @@ def _string(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError(f"{name} must be a non-empty string")
     return value
+
+
+def _saved_search_id(value: str) -> str:
+    if (
+        not value
+        or value != value.strip()
+        or len(value) > MAX_SAVED_SEARCH_NAME_LENGTH
+        or "\x00" in value
+        or "/" in value
+        or "\\" in value
+    ):
+        raise ValueError("saved search id is invalid")
+    return value
+
+
+def _saved_search_name(value: Any) -> str:
+    result = _string(value, "saved search name").strip()
+    if not result or len(result) > MAX_SAVED_SEARCH_NAME_LENGTH:
+        raise ValueError("saved search name is invalid")
+    return result
+
+
+def _saved_search_query(value: Any) -> str:
+    result = _string(value, "saved search query").strip()
+    if not result or len(result) > MAX_SAVED_SEARCH_QUERY_LENGTH:
+        raise ValueError("saved search query is invalid")
+    return result
 
 
 def _positive_int(value: str, name: str) -> int:
@@ -1216,6 +1297,15 @@ def _conflict_view(conflict: Conflict) -> Json:
         "can_keep_local": not uncertain_delivery,
         "can_keep_remote": not uncertain_delivery,
         "resolved_at": conflict.resolved_at.isoformat() if conflict.resolved_at else None,
+    }
+
+
+def _saved_search_view(search: SavedSearch) -> Json:
+    return {
+        "id": search.id,
+        "name": search.name,
+        "query": search.query,
+        "created_at": search.created_at.isoformat(),
     }
 
 

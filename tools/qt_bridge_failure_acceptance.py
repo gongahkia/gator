@@ -169,6 +169,9 @@ class FailureBridgeHandler(BaseHTTPRequestHandler):
         if path == f"{prefix}/tasks":
             self.data({"page": {"tasks": [], "next_cursor": None}})
             return
+        if path == f"{prefix}/conflicts":
+            self.data({"conflicts": []})
+            return
         if path == "/v1/operations/sync-cancel":
             with self.server.lock:
                 cancelled = self.server.cancelled

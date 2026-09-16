@@ -2749,6 +2749,7 @@ ApplicationWindow {
 
                 Label {
                     text: "Conflict handling"
+                    visible: window.appController === null || !window.appController.bridgeMode
                     font.pixelSize: Theme.bodyFontSize
                     Accessible.role: Accessible.Heading
                     Accessible.name: text
@@ -2761,13 +2762,15 @@ ApplicationWindow {
                     currentIndex: window.appController !== null &&
                                   typeof window.appController.conflictPolicy === "number"
                                   ? window.appController.conflictPolicy : 0
-                    enabled: window.appController !== null && !window.appController.busy
+                    visible: window.appController === null || !window.appController.bridgeMode
+                    enabled: visible && window.appController !== null && !window.appController.busy
                     Accessible.name: "Sync conflict handling"
                     onActivated: index => window.controllerCall("saveConflictPolicy", [index])
                 }
 
                 Label {
                     Layout.fillWidth: true
+                    visible: window.appController === null || !window.appController.bridgeMode
                     text: "Google is the default. ‘Ask each time’ keeps conflicting changes pending until you choose."
                     wrapMode: Text.WordWrap
                     color: Theme.textSecondary

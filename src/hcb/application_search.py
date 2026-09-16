@@ -37,10 +37,17 @@ class SearchServiceMixin(_ApplicationServiceBase):
             datetime.fromisoformat(row["created_at"]),
         )
 
-    def list_saved_searches(self, account_id: str) -> tuple[SavedSearch, ...]:
-        rows = self.storage.connection.execute(
-            "SELECT * FROM saved_searches WHERE account_id=? ORDER BY name", (account_id,)
-        )
+    def list_saved_searches(
+        self, account_id: str, *, limit: int | None = None
+    ) -> tuple[SavedSearch, ...]:
+        if limit is not None and not 1 <= limit <= 1_000:
+            raise ValueError("saved search limit must be between 1 and 1000")
+        sql = "SELECT * FROM saved_searches WHERE account_id=? ORDER BY name"
+        args: tuple[str, ...] | tuple[str, int] = (account_id,)
+        if limit is not None:
+            sql += " LIMIT ?"
+            args = (account_id, limit)
+        rows = self.storage.connection.execute(sql, args)
         return tuple(
             SavedSearch(
                 row["id"],
@@ -50,6 +57,45 @@ class SearchServiceMixin(_ApplicationServiceBase):
                 datetime.fromisoformat(row["created_at"]),
             )
             for row in rows
+        )
+
+    def update_saved_search(
+        self,
+        account_id: str,
+        search_id: str,
+        *,
+        name: str | None = None,
+        query: str | None = None,
+    ) -> SavedSearch:
+        if name is None and query is None:
+            raise ValueError("saved search update requires a name or query")
+        self._account(account_id)
+        row = self.storage.connection.execute(
+            "SELECT * FROM saved_searches WHERE account_id=? AND id=?", (account_id, search_id)
+        ).fetchone()
+        if row is None:
+            raise NotFoundError(f"Saved search {search_id!r} does not exist")
+        next_name = row["name"] if name is None else name.strip()
+        next_query = row["query"] if query is None else query.strip()
+        if not next_name or not next_query:
+            raise ValueError("saved search name and query are required")
+        with self.storage.transaction():
+            existing = self.storage.connection.execute(
+                "SELECT 1 FROM saved_searches WHERE account_id=? AND name=? AND id<>?",
+                (account_id, next_name, search_id),
+            ).fetchone()
+            if existing is not None:
+                raise ValueError("saved search name already exists")
+            self.storage.connection.execute(
+                "UPDATE saved_searches SET name=?,query=? WHERE account_id=? AND id=?",
+                (next_name, next_query, account_id, search_id),
+            )
+        return SavedSearch(
+            search_id,
+            account_id,
+            next_name,
+            next_query,
+            datetime.fromisoformat(row["created_at"]),
         )
 
     def delete_saved_search(self, account_id: str, search_id: str) -> None:

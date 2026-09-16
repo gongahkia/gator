@@ -64,6 +64,23 @@ def test_workspace_metadata_reads_are_available_through_application(
     assert [conflict.id for conflict in app.list_conflicts("a")] == [conflict_id]
 
 
+def test_saved_search_update_preserves_its_id_and_rejects_duplicate_name(
+    app: ApplicationService,
+) -> None:
+    first = app.save_search("a", "Today", "due:today")
+    second = app.save_search("a", "Tomorrow", "due:tomorrow")
+
+    updated = app.update_saved_search("a", first.id, name="Now", query="due:overdue")
+
+    assert updated.id == first.id
+    assert updated.name == "Now"
+    assert updated.query == "due:overdue"
+    assert app.list_saved_searches("a") == (updated, second)
+    with pytest.raises(ValueError, match="name already exists"):
+        app.update_saved_search("a", first.id, name="Tomorrow")
+    assert app.list_saved_searches("a") == (updated, second)
+
+
 def test_keep_remote_releases_dirty_event_and_resets_incremental_cursor(
     app: ApplicationService,
 ) -> None:
