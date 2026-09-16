@@ -47,6 +47,7 @@ from .task_recurrence import RecurrenceEnd
 BRIDGE_API_VERSION: Final = 1
 BRIDGE_NAME: Final = "hcb-desktop-bridge"
 MAX_JSON_BODY_BYTES: Final = 1_048_576
+MAX_BULK_TASK_IDS: Final = 500
 MAX_OPERATION_PROGRESS_ITEMS: Final = 32
 MAX_RETAINED_OPERATIONS: Final = 128
 
@@ -480,6 +481,44 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
             if method == "POST" and tail == ("tasks",):
                 _no_query(query)
                 return HTTPStatus.CREATED, {"task": self._create_task(account_id, body)}
+            if method == "POST" and len(tail) == 3 and tail[:2] == ("tasks", "bulk"):
+                _no_query(query)
+                if tail[2] == "complete":
+                    _keys(body, required={"task_ids"}, optional={"completed"})
+                    completed = (
+                        _bool(body["completed"], "completed") if "completed" in body else True
+                    )
+                    result = self._with_application(
+                        lambda app: app.complete_tasks_detailed(
+                            account_id,
+                            _task_id_list(body["task_ids"]),
+                            completed=completed,
+                        )
+                    )
+                    return HTTPStatus.OK, {
+                        "tasks": result.tasks,
+                        "successors": result.successors,
+                    }
+                if tail[2] == "delete":
+                    _keys(body, required={"task_ids"})
+                    return HTTPStatus.OK, {
+                        "tasks": self._with_application(
+                            lambda app: app.delete_tasks(
+                                account_id, _task_id_list(body["task_ids"])
+                            )
+                        )
+                    }
+                if tail[2] == "move":
+                    _keys(body, required={"task_ids", "list_id"})
+                    return HTTPStatus.OK, {
+                        "tasks": self._with_application(
+                            lambda app: app.move_tasks(
+                                account_id,
+                                _task_id_list(body["task_ids"]),
+                                _string(body["list_id"], "list_id"),
+                            )
+                        )
+                    }
             if method == "POST" and tail == ("task-lists",):
                 _no_query(query)
                 return HTTPStatus.CREATED, {"task_list": self._create_task_list(account_id, body)}
@@ -901,6 +940,11 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
             or (len(tail) == 3 and tail[0] == "tasks" and tail[2] == "complete")
             or (len(tail) == 3 and tail[0] == "tasks" and tail[2] == "move")
             or (
+                len(tail) == 3
+                and tail[:2] == ("tasks", "bulk")
+                and tail[2] in {"complete", "delete", "move"}
+            )
+            or (
                 len(tail) == 4
                 and tail[0] == "tasks"
                 and tail[2] == "recurrence"
@@ -1101,6 +1145,17 @@ def _string_list(value: Any, name: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{name} must be an array of strings")
     return value
+
+
+def _task_id_list(value: Any) -> list[str]:
+    task_ids = _string_list(value, "task_ids")
+    if not task_ids:
+        raise ValueError("task_ids must contain at least one task id")
+    if len(task_ids) > MAX_BULK_TASK_IDS:
+        raise ValueError(f"task_ids must contain at most {MAX_BULK_TASK_IDS} task ids")
+    if any(not task_id for task_id in task_ids):
+        raise ValueError("task_ids must not contain empty task ids")
+    return task_ids
 
 
 def _query_keys(query: dict[str, list[str]], allowed: set[str]) -> None:

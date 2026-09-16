@@ -65,6 +65,7 @@ snake_case; timed event values are objects such as
 | `GET /v1/accounts/{account}/search?q=...&limit=...` | Existing local workspace search. |
 | `POST /v1/accounts/{account}/tasks`, `PATCH`/`DELETE /tasks/{id}`, `POST /tasks/{id}/complete` | Optimistic task operations through `ApplicationService`. Create and update accept an optional managed `recurrence` object; completion returns `successor` when one is created. |
 | `POST /v1/accounts/{account}/tasks/{id}/move` | Move to a task list, change parent, or position among siblings through `ApplicationService`. The body has one or more of `list_id`, `parent_id`, and `previous_id`; nullable parent or previous values mean top level or first sibling. |
+| `POST /v1/accounts/{account}/tasks/bulk/complete`, `/bulk/delete`, `/bulk/move` | Atomic core batch operations for 1–500 task IDs. Complete accepts optional `completed`; move requires `list_id`; completion returns managed recurrence successors. The core validates the full selection before changing any task. |
 | `POST /v1/accounts/{account}/tasks/{id}/recurrence/stop`, `POST /tasks/{id}/recurrence/split` | Stop one occurrence, this-and-following occurrences, or an entire managed series with `{"scope":"this"|"following"|"series"}`; split this-and-following occurrences into a new series. Both return the affected tasks. |
 | `POST /v1/accounts/{account}/task-lists`, `PATCH`/`DELETE /task-lists/{id}` | Optimistic task-list create, rename, delete, and HCB-local visibility changes. |
 | `POST /v1/accounts/{account}/events`, `PATCH`/`DELETE /events/{id}` | Optimistic event operations through `ApplicationService`. |
@@ -75,7 +76,7 @@ snake_case; timed event values are objects such as
 | `GET /v1/accounts/{account}/auth` | Reports whether the Python core can read a stored refresh token. It never returns credential material. |
 | `GET`/`DELETE /v1/operations/{id}` | Poll an asynchronous operation or request cancellation. |
 
-Task, task-list, calendar, subscription, and event changes require an `Idempotency-Key` header with a frontend-
+Task, task-list, calendar, subscription, event, and task-batch changes require an `Idempotency-Key` header with a frontend-
 generated token. HCB stores the resulting HTTP status and response in the same
 SQLite transaction as the core mutation. Retrying the same request after a
 lost response returns that stored result; reusing the key with different method,

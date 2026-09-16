@@ -110,6 +110,8 @@ constexpr char kBridgeAcceptanceHierarchyParentTaskTitle[] = "Qt bridge hierarch
 constexpr char kBridgeAcceptanceHierarchyFirstChildTaskTitle[] = "Qt bridge hierarchy first child";
 constexpr char kBridgeAcceptanceHierarchySecondChildTaskTitle[] =
     "Qt bridge hierarchy second child";
+constexpr char kBridgeAcceptanceBulkFirstTaskTitle[] = "Qt bridge bulk first task";
+constexpr char kBridgeAcceptanceBulkSecondTaskTitle[] = "Qt bridge bulk second task";
 constexpr char kBridgeAcceptanceInitialEventTitle[] = "Qt bridge interaction event initial";
 constexpr char kBridgeAcceptanceUpdatedEventTitle[] = "Qt bridge interaction event updated";
 constexpr char kBridgeAcceptanceInitialEventDescription[] =
@@ -2258,6 +2260,69 @@ bool AppController::applyBridgeTaskResponse(const QJsonObject& data) {
   return true;
 }
 
+bool AppController::applyBridgeTaskBatchResponse(const QJsonObject& data) {
+  const QJsonValue tasksValue = data.value(QStringLiteral("tasks"));
+  const QJsonValue successorsValue = data.value(QStringLiteral("successors"));
+  if (!tasksValue.isArray() || tasksValue.toArray().isEmpty() ||
+      (!successorsValue.isUndefined() && !successorsValue.isArray())) {
+    setStatus(QStringLiteral("HCB bridge bulk mutation returned invalid tasks"));
+    return false;
+  }
+  const QList<QJsonArray> batches{
+      tasksValue.toArray(), successorsValue.isArray() ? successorsValue.toArray() : QJsonArray{}};
+  QHash<QString, TaskModelTask> projectedTasks;
+  QHash<QString, bool> deletedById;
+  for (const QJsonArray& batch : batches) {
+    QJsonObject page{{QStringLiteral("tasks"), batch},
+                     {QStringLiteral("next_cursor"), QJsonValue::Null}};
+    const PythonBridgeTaskPageOrError decoded = PythonBridgeProjection::taskPage(
+        QJsonObject{{QStringLiteral("page"), page}}, pythonBridgeTaskListTitles_);
+    if (std::holds_alternative<AppError>(decoded)) {
+      setStatus(errorMessage(std::get<AppError>(decoded)));
+      return false;
+    }
+    const QList<TaskModelTask>& projected = std::get<PythonBridgeTaskPage>(decoded).tasks;
+    for (qsizetype index = 0; index < batch.size(); ++index) {
+      const QJsonObject raw = batch.at(index).toObject();
+      const QJsonObject metadata = raw.value(QStringLiteral("metadata")).toObject();
+      const QJsonValue deleted = metadata.value(QStringLiteral("deleted"));
+      const QString id = projected.at(index).id;
+      if (metadata.isEmpty() || !deleted.isBool() || projectedTasks.contains(id)) {
+        setStatus(QStringLiteral("HCB bridge bulk mutation returned invalid tasks"));
+        return false;
+      }
+      projectedTasks.insert(id, projected.at(index));
+      deletedById.insert(id, deleted.toBool());
+    }
+  }
+
+  QList<TaskModelTask> updatedTasks = pythonBridgeTasks_;
+  for (auto iterator = projectedTasks.cbegin(); iterator != projectedTasks.cend(); ++iterator) {
+    const QString& id = iterator.key();
+    const auto existing = std::find_if(updatedTasks.begin(),
+                                       updatedTasks.end(),
+                                       [&id](const TaskModelTask& task) { return task.id == id; });
+    if (deletedById.value(id)) {
+      if (existing != updatedTasks.end()) {
+        updatedTasks.erase(existing);
+      }
+      continue;
+    }
+    TaskModelTask projected = iterator.value();
+    if (existing == updatedTasks.end()) {
+      projected.sortOrder = updatedTasks.size();
+      updatedTasks.append(std::move(projected));
+    } else {
+      projected.sortOrder = existing->sortOrder;
+      *existing = std::move(projected);
+    }
+  }
+  pythonBridgeTasks_ = std::move(updatedTasks);
+  applyTaskProjections(visibleBridgeTasks());
+  refreshSearchProjection();
+  return true;
+}
+
 bool AppController::applyBridgeEventResponse(const QJsonObject& data) {
   const QJsonObject event = data.value(QStringLiteral("event")).toObject();
   if (event.isEmpty()) {
@@ -2575,6 +2640,8 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
     QString hierarchyParentId;
     QString hierarchyFirstChildId;
     QString hierarchySecondChildId;
+    QString bulkFirstTaskId;
+    QString bulkSecondTaskId;
     QString eventDate;
     int stage{0};
     int initialSearchResults{0};
@@ -2605,6 +2672,8 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
         {QStringLiteral("hierarchy_parent_id"), state->hierarchyParentId},
         {QStringLiteral("hierarchy_first_child_id"), state->hierarchyFirstChildId},
         {QStringLiteral("hierarchy_second_child_id"), state->hierarchySecondChildId},
+        {QStringLiteral("bulk_first_task_id"), state->bulkFirstTaskId},
+        {QStringLiteral("bulk_second_task_id"), state->bulkSecondTaskId},
         {QStringLiteral("event_date"), state->eventDate},
         {QStringLiteral("initial_search_results"), state->initialSearchResults},
         {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
@@ -3221,6 +3290,93 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
                                                !task.parentTaskId.has_value();
                                       });
       if (moved == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceBulkFirstTaskTitle),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 30;
+      return;
+    }
+    case 30: {
+      const auto first = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceBulkFirstTaskTitle);
+          });
+      if (first == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->bulkFirstTaskId = first->id;
+      createTaskDetailed(QStringLiteral("inbox"),
+                         {},
+                         QString::fromLatin1(kBridgeAcceptanceBulkSecondTaskTitle),
+                         {},
+                         {},
+                         QStringLiteral("UTC"),
+                         0,
+                         false,
+                         0,
+                         1,
+                         0,
+                         {},
+                         0);
+      state->stage = 31;
+      return;
+    }
+    case 31: {
+      const auto second = std::find_if(
+          pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), [](const TaskModelTask& task) {
+            return task.title == QString::fromLatin1(kBridgeAcceptanceBulkSecondTaskTitle);
+          });
+      if (second == pythonBridgeTasks_.cend()) {
+        return;
+      }
+      state->bulkSecondTaskId = second->id;
+      bulkSetTaskCompleted(QVariantList{state->bulkFirstTaskId, state->bulkSecondTaskId}, true);
+      state->stage = 32;
+      return;
+    }
+    case 32: {
+      const auto completed = [state](const TaskModelTask& task) {
+        return (task.id == state->bulkFirstTaskId || task.id == state->bulkSecondTaskId) &&
+               task.completed;
+      };
+      if (std::count_if(pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), completed) != 2) {
+        return;
+      }
+      bulkMoveTasks(QVariantList{state->bulkFirstTaskId, state->bulkSecondTaskId},
+                    state->taskListId);
+      state->stage = 33;
+      return;
+    }
+    case 33: {
+      const auto moved = [state](const TaskModelTask& task) {
+        return (task.id == state->bulkFirstTaskId || task.id == state->bulkSecondTaskId) &&
+               task.taskListId == state->taskListId && !task.parentTaskId.has_value();
+      };
+      if (std::count_if(pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), moved) != 2) {
+        return;
+      }
+      bulkDeleteTasks(QVariantList{state->bulkFirstTaskId, state->bulkSecondTaskId});
+      state->stage = 34;
+      return;
+    }
+    case 34: {
+      const auto deleted = [state](const TaskModelTask& task) {
+        return task.id == state->bulkFirstTaskId || task.id == state->bulkSecondTaskId;
+      };
+      if (std::find_if(pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), deleted) !=
+          pythonBridgeTasks_.cend()) {
         return;
       }
       finish(true);
@@ -6612,6 +6768,19 @@ void AppController::bulkSetTaskCompleted(QVariantList taskIds, bool completed) {
     setStatus(QStringLiteral("Bulk task selection is invalid"));
     return;
   }
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    runBridgeTaskBulkMutation(completed ? QStringLiteral("Completed") : QStringLiteral("Reopened"),
+                              pythonBridgeClient_->bulkCompleteTasks(
+                                  pythonBridgeAccountId_,
+                                  *ids,
+                                  completed,
+                                  QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()));
+    return;
+  }
   runBulkTaskMutation(
       {.action = completed ? TaskBulkAction::Complete : TaskBulkAction::Reopen, .taskIds = *ids});
 }
@@ -6620,6 +6789,18 @@ void AppController::bulkDeleteTasks(QVariantList taskIds) {
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value()) {
     setStatus(QStringLiteral("Bulk task selection is invalid"));
+    return;
+  }
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    runBridgeTaskBulkMutation(QStringLiteral("Deleted"),
+                              pythonBridgeClient_->bulkDeleteTasks(
+                                  pythonBridgeAccountId_,
+                                  *ids,
+                                  QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()));
     return;
   }
   runBulkTaskMutation({.action = TaskBulkAction::Delete, .taskIds = *ids});
@@ -6631,11 +6812,28 @@ void AppController::bulkMoveTasks(QVariantList taskIds, QString taskListId) {
     setStatus(QStringLiteral("Bulk task selection is invalid"));
     return;
   }
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    runBridgeTaskBulkMutation(QStringLiteral("Moved"),
+                              pythonBridgeClient_->bulkMoveTasks(
+                                  pythonBridgeAccountId_,
+                                  *ids,
+                                  taskListId,
+                                  QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()));
+    return;
+  }
   runBulkTaskMutation(
       {.action = TaskBulkAction::MoveToList, .taskIds = *ids, .taskListId = std::move(taskListId)});
 }
 
 void AppController::bulkSetTaskDue(QVariantList taskIds, QString dueAt) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   const std::optional<QString> normalizedDue = normalizedDueAt(std::move(dueAt));
   if (!ids.has_value() || !normalizedDue.has_value()) {
@@ -6665,6 +6863,10 @@ void AppController::bulkSetTaskDue(QVariantList taskIds, QString dueAt) {
 }
 
 void AppController::bulkClearTaskDue(QVariantList taskIds) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value()) {
     setStatus(QStringLiteral("Bulk task selection is invalid"));
@@ -6690,6 +6892,10 @@ void AppController::bulkClearTaskDue(QVariantList taskIds) {
 }
 
 void AppController::bulkSetTaskPriority(QVariantList taskIds, int priority) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   const std::optional<TaskPriority> parsedPriority = priorityForValue(priority);
   if (!ids.has_value() || !parsedPriority.has_value()) {
@@ -6763,6 +6969,10 @@ void AppController::dismissCalendarDragCreateHint() {
 }
 
 void AppController::bulkReparentTasks(QVariantList taskIds, QString parentTaskId) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value()) {
     setStatus(QStringLiteral("Bulk task selection is invalid"));
@@ -6777,6 +6987,10 @@ void AppController::bulkReparentTasks(QVariantList taskIds, QString parentTaskId
 
 void AppController::bulkReplaceTaskText(
     QVariantList taskIds, QString findText, QString replaceText, int fields, int recurrenceScope) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value() || findText.isEmpty() || fields <= 0 || fields > 3 ||
       !isValidBulkTextRecurrenceScope(recurrenceScope)) {
@@ -6793,6 +7007,11 @@ void AppController::bulkReplaceTaskText(
 
 void AppController::previewBulkTaskText(
     QVariantList taskIds, QString findText, int fields, int recurrenceScope, int requestToken) {
+  if (bridgeMode()) {
+    setBulkTaskPreviewMessage(
+        QStringLiteral("This action is not implemented in the HCB bridge preview"), requestToken);
+    return;
+  }
   const std::optional<QList<QString>> ids = taskIdsFromVariantList(taskIds);
   if (!ids.has_value() || findText.isEmpty() || fields <= 0 || fields > 3 ||
       !isValidBulkTextRecurrenceScope(recurrenceScope)) {
@@ -7585,6 +7804,38 @@ void AppController::loadSavedSearches() {
       return;
     }
     setSavedSearches(std::get<QList<SavedSearch>>(std::move(result)));
+  });
+}
+
+void AppController::runBridgeTaskBulkMutation(QString action,
+                                              std::future<PythonBridgeResult> future) {
+  if (bridgeTaskBulkMutationInFlight_) {
+    const QString message = QStringLiteral("Another HCB core bulk task mutation is still running");
+    setBulkTaskStatusMessage(message);
+    setStatus(message);
+    return;
+  }
+  bridgeTaskBulkMutationInFlight_ = true;
+  watch(std::move(future), [this, action = std::move(action)](PythonBridgeResult result) {
+    bridgeTaskBulkMutationInFlight_ = false;
+    if (std::holds_alternative<AppError>(result)) {
+      const QString message = errorMessage(std::get<AppError>(std::move(result)));
+      setBulkTaskStatusMessage(message);
+      setStatus(message);
+      return;
+    }
+    const QJsonObject data = std::get<QJsonObject>(std::move(result));
+    if (!applyBridgeTaskBatchResponse(data)) {
+      return;
+    }
+    const QJsonArray tasks = data.value(QStringLiteral("tasks")).toArray();
+    const QString message = QStringLiteral("%1 %2 task%3 in HCB core")
+                                .arg(action)
+                                .arg(tasks.size())
+                                .arg(tasks.size() == 1 ? QString() : QStringLiteral("s"));
+    setBulkTaskStatusMessage(message);
+    refreshBridge();
+    setStatus(message);
   });
 }
 

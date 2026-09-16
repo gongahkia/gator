@@ -5,6 +5,7 @@
 
 #include <QDate>
 #include <QByteArray>
+#include <QList>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QObject>
@@ -75,6 +76,22 @@ public:
                                                              bool completed,
                                                              const QByteArray& idempotencyKey,
                                                              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  bulkCompleteTasks(const QString& accountId,
+                    const QList<QString>& taskIds,
+                    bool completed,
+                    const QByteArray& idempotencyKey,
+                    CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  bulkDeleteTasks(const QString& accountId,
+                  const QList<QString>& taskIds,
+                  const QByteArray& idempotencyKey,
+                  CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult> bulkMoveTasks(const QString& accountId,
+                                                              const QList<QString>& taskIds,
+                                                              const QString& taskListId,
+                                                              const QByteArray& idempotencyKey,
+                                                              CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult>
   stopTaskRecurrence(const QString& accountId,
                      const QString& taskId,

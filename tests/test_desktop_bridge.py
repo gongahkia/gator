@@ -413,6 +413,108 @@ def test_task_move_reparent_and_reorder_use_the_python_core(
         assert persisted.position is None
 
 
+def test_atomic_bulk_task_mutations_use_the_python_core(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    paths, bridge = bridge_env
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/task-lists",
+        body={"title": "Bulk archive"},
+    )
+    assert status == 201
+    archive = _data(response)["task_list"]
+    assert isinstance(archive, dict)
+    archive_id = str(archive["id"])
+
+    def create_task(title: str, *, parent_id: str | None = None) -> str:
+        body: dict[str, object] = {"list_id": "inbox", "title": title}
+        if parent_id is not None:
+            body["parent_id"] = parent_id
+        created_status, created_response = _request(
+            bridge, "POST", "/v1/accounts/work/tasks", body=body
+        )
+        assert created_status == 201
+        task = _data(created_response)["task"]
+        assert isinstance(task, dict)
+        return str(task["id"])
+
+    first_id = create_task("Bulk first")
+    second_id = create_task("Bulk second")
+    parent_id = create_task("Bulk parent")
+    create_task("Bulk child", parent_id=parent_id)
+    task_ids = [first_id, second_id]
+
+    completion_key = "bulk-task-completion"
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks/bulk/complete",
+        body={"task_ids": task_ids},
+        idempotency_key=completion_key,
+    )
+    assert status == 200
+    completed = _data(response)
+    assert [task["id"] for task in completed["tasks"]] == task_ids  # type: ignore[index]
+    assert all(task["status"] == "completed" for task in completed["tasks"])  # type: ignore[index]
+    assert completed["successors"] == []
+
+    status, retry = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks/bulk/complete",
+        body={"task_ids": task_ids},
+        idempotency_key=completion_key,
+    )
+    assert status == 200
+    assert _data(retry) == completed
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks/bulk/move",
+        body={"task_ids": [parent_id], "list_id": archive_id},
+    )
+    assert status == 400
+    assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
+    with Storage(paths.database_file) as storage:
+        parent = storage.get_task("work", parent_id)
+        assert parent is not None
+        assert parent.list_id == "inbox"
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks/bulk/move",
+        body={"task_ids": task_ids, "list_id": archive_id},
+        idempotency_key="bulk-task-move",
+    )
+    assert status == 200
+    moved = _data(response)["tasks"]
+    assert [task["id"] for task in moved] == task_ids  # type: ignore[index]
+    assert all(task["list_id"] == archive_id for task in moved)  # type: ignore[index]
+    assert all(task["parent_id"] is None for task in moved)  # type: ignore[index]
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/tasks/bulk/delete",
+        body={"task_ids": task_ids},
+        idempotency_key="bulk-task-delete",
+    )
+    assert status == 200
+    deleted = _data(response)["tasks"]
+    assert [task["id"] for task in deleted] == task_ids  # type: ignore[index]
+    assert all(task["metadata"]["deleted"] is True for task in deleted)  # type: ignore[index]
+
+    with Storage(paths.database_file) as storage:
+        for task_id in task_ids:
+            task = storage.get_task("work", task_id)
+            assert task is not None and task.metadata.deleted
+
+
 def test_managed_task_recurrence_uses_the_durable_python_core(
     bridge_env: tuple[AppPaths, DesktopBridge],
 ) -> None:

@@ -624,6 +624,7 @@ private:
   void applyBridgeTaskLists(QList<TaskListSummary> taskLists);
   void applyBridgeCalendars(QList<CalendarSummary> calendars, bool reloadCalendarRange);
   [[nodiscard]] bool applyBridgeTaskResponse(const QJsonObject& data);
+  [[nodiscard]] bool applyBridgeTaskBatchResponse(const QJsonObject& data);
   [[nodiscard]] bool applyBridgeEventResponse(const QJsonObject& data);
   [[nodiscard]] bool applyBridgeTaskListResponse(const QJsonObject& data);
   [[nodiscard]] bool applyBridgeCalendarResponse(const QJsonObject& data);
@@ -669,6 +670,7 @@ private:
   void applyTaskProjections(QList<TaskModelTask> tasks);
   void ensureNotesSidebarTab();
   void loadSavedSearches();
+  void runBridgeTaskBulkMutation(QString action, std::future<PythonBridgeResult> future);
   void runBulkTaskMutation(TaskBulkMutationInput input,
                            std::function<void(const TaskBulkMutationSummary&)> onSuccess = {});
   void runBulkEventMutation(CalendarEventBulkMutationInput input);
@@ -852,6 +854,7 @@ private:
   std::uint64_t pythonBridgeRefreshGeneration_{0};
   bool pythonBridgeTasksReady_{false};
   bool pythonBridgeCalendarReady_{false};
+  bool bridgeTaskBulkMutationInFlight_{false};
   bool bridgeInteractionAcceptanceStarted_{false};
   bool bridgeFailureAcceptanceStarted_{false};
   bool pythonBridgeOperationStarting_{false};

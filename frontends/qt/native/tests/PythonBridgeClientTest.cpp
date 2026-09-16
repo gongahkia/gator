@@ -39,6 +39,7 @@ private slots:
   void requestsAuthenticationState();
   void sendsIdempotentMutations();
   void sendsTaskMoveMutation();
+  void sendsAtomicBulkTaskMutations();
   void sendsTaskRecurrenceMutations();
   void sendsTaskListAndCalendarManagementMutations();
   void rejectsInvalidRequestsBeforeNetwork();
@@ -218,6 +219,61 @@ void PythonBridgeClientTest::sendsTaskMoveMutation() {
            QStringLiteral("/v1/accounts/work/tasks/task-1/move"));
   QCOMPARE(manager.requests().first().request.rawHeader("Idempotency-Key"), key);
   QCOMPARE(manager.requests().first().body, QByteArray("{\"list_id\":\"archive\"}"));
+}
+
+void PythonBridgeClientTest::sendsAtomicBulkTaskMutations() {
+  hcb::test::MockNetworkAccessManager manager;
+  for (int index = 0; index < 3; ++index) {
+    manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"tasks\":[]}}")});
+  }
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+  const QList<QString> taskIds{QStringLiteral("task-1"), QStringLiteral("task-2")};
+
+  std::future<hcb::PythonBridgeResult> complete = client.bulkCompleteTasks(
+      QStringLiteral("work"), taskIds, false, QByteArray("bulk-complete-request-123"));
+  waitFor(complete);
+  QVERIFY(std::holds_alternative<QJsonObject>(complete.get()));
+
+  std::future<hcb::PythonBridgeResult> move =
+      client.bulkMoveTasks(QStringLiteral("work"),
+                           taskIds,
+                           QStringLiteral("archive"),
+                           QByteArray("bulk-move-request-456"));
+  waitFor(move);
+  QVERIFY(std::holds_alternative<QJsonObject>(move.get()));
+
+  std::future<hcb::PythonBridgeResult> remove = client.bulkDeleteTasks(
+      QStringLiteral("work"), taskIds, QByteArray("bulk-delete-request-789"));
+  waitFor(remove);
+  QVERIFY(std::holds_alternative<QJsonObject>(remove.get()));
+
+  QCOMPARE(manager.requests().size(), 3);
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks/bulk/complete"));
+  QCOMPARE(manager.requests().at(0).request.rawHeader("Idempotency-Key"),
+           QByteArray("bulk-complete-request-123"));
+  QCOMPARE(manager.requests().at(0).body,
+           QByteArray("{\"completed\":false,\"task_ids\":[\"task-1\",\"task-2\"]}"));
+  QCOMPARE(manager.requests().at(1).request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks/bulk/move"));
+  QCOMPARE(manager.requests().at(1).request.rawHeader("Idempotency-Key"),
+           QByteArray("bulk-move-request-456"));
+  QCOMPARE(manager.requests().at(1).body,
+           QByteArray("{\"list_id\":\"archive\",\"task_ids\":[\"task-1\",\"task-2\"]}"));
+  QCOMPARE(manager.requests().at(2).request.url().path(),
+           QStringLiteral("/v1/accounts/work/tasks/bulk/delete"));
+  QCOMPARE(manager.requests().at(2).request.rawHeader("Idempotency-Key"),
+           QByteArray("bulk-delete-request-789"));
+  QCOMPARE(manager.requests().at(2).body, QByteArray("{\"task_ids\":[\"task-1\",\"task-2\"]}"));
+
+  std::future<hcb::PythonBridgeResult> invalid =
+      client.bulkDeleteTasks(QStringLiteral("work"),
+                             QList<QString>{QStringLiteral("task-1"), QStringLiteral("task-1")},
+                             QByteArray("bulk-invalid-request-123"));
+  const hcb::PythonBridgeResult invalidResult = invalid.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(invalidResult));
+  QCOMPARE(std::get<hcb::AppError>(invalidResult).code(), hcb::AppErrorCode::Validation);
+  QCOMPARE(manager.requests().size(), 3);
 }
 
 void PythonBridgeClientTest::sendsTaskRecurrenceMutations() {

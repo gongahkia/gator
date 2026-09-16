@@ -2,12 +2,14 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QTimer>
 #include <QUrlQuery>
+#include <QSet>
 
 #include <atomic>
 #include <memory>
@@ -23,6 +25,7 @@ constexpr qsizetype kMaximumRequestBytes = 256 * 1024;
 constexpr qsizetype kMaximumAccountIdLength = 256;
 constexpr qsizetype kMaximumCursorLength = 128;
 constexpr qsizetype kMaximumListIdLength = 256;
+constexpr qsizetype kMaximumBulkTaskIds = 500;
 constexpr qsizetype kMaximumSearchQueryLength = 4 * 1024;
 constexpr int kRequestTimeoutMilliseconds = 10'000;
 
@@ -85,6 +88,22 @@ void complete(const std::shared_ptr<Completion>& completion, PythonBridgeResult 
     }
   }
   return true;
+}
+
+[[nodiscard]] std::optional<QJsonArray> bulkTaskIdsPayload(const QList<QString>& taskIds) {
+  if (taskIds.isEmpty() || taskIds.size() > kMaximumBulkTaskIds) {
+    return std::nullopt;
+  }
+  QSet<QString> seen;
+  QJsonArray payload;
+  for (const QString& taskId : taskIds) {
+    if (!isValidIdentifier(taskId, kMaximumListIdLength) || seen.contains(taskId)) {
+      return std::nullopt;
+    }
+    seen.insert(taskId);
+    payload.append(taskId);
+  }
+  return payload;
 }
 
 [[nodiscard]] bool isPrivateDescriptor(const QFileInfo& fileInfo) {
@@ -320,6 +339,62 @@ std::future<PythonBridgeResult> PythonBridgeClient::completeTask(const QString& 
                  QJsonObject{{QStringLiteral("completed"), completed}},
                  idempotencyKey,
                  cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::bulkCompleteTasks(const QString& accountId,
+                                      const QList<QString>& taskIds,
+                                      bool completed,
+                                      const QByteArray& idempotencyKey,
+                                      CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/bulk/complete");
+  const std::optional<QJsonArray> ids = bulkTaskIdsPayload(taskIds);
+  if (!path.has_value() || !ids.has_value() || !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("bulk task mutation is invalid"))));
+  }
+  return request(
+      "POST",
+      *path,
+      QJsonObject{{QStringLiteral("task_ids"), *ids}, {QStringLiteral("completed"), completed}},
+      idempotencyKey,
+      cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::bulkDeleteTasks(const QString& accountId,
+                                    const QList<QString>& taskIds,
+                                    const QByteArray& idempotencyKey,
+                                    CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/bulk/delete");
+  const std::optional<QJsonArray> ids = bulkTaskIdsPayload(taskIds);
+  if (!path.has_value() || !ids.has_value() || !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("bulk task mutation is invalid"))));
+  }
+  return request(
+      "POST", *path, QJsonObject{{QStringLiteral("task_ids"), *ids}}, idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::bulkMoveTasks(const QString& accountId,
+                                                                  const QList<QString>& taskIds,
+                                                                  const QString& taskListId,
+                                                                  const QByteArray& idempotencyKey,
+                                                                  CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/tasks/bulk/move");
+  const std::optional<QJsonArray> ids = bulkTaskIdsPayload(taskIds);
+  if (!path.has_value() || !ids.has_value() ||
+      !isValidIdentifier(taskListId, kMaximumListIdLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("bulk task mutation is invalid"))));
+  }
+  return request(
+      "POST",
+      *path,
+      QJsonObject{{QStringLiteral("task_ids"), *ids}, {QStringLiteral("list_id"), taskListId}},
+      idempotencyKey,
+      cancellation);
 }
 
 std::future<PythonBridgeResult>
