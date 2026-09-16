@@ -618,6 +618,7 @@ private:
                           std::optional<QString> cursor,
                           QList<TaskModelTask> accumulated,
                           bool firstPageApplied);
+  void loadBridgeConflicts(std::uint64_t generation);
   void loadBridgeCalendar(std::uint64_t generation);
   void applyBridgeCalendarEvents(std::uint64_t generation, QList<CalendarEventSummary> events);
   [[nodiscard]] QList<TaskModelTask> visibleBridgeTasks() const;
@@ -852,6 +853,7 @@ private:
   QList<TaskModelTask> pythonBridgeTasks_;
   QList<CalendarEventSummary> pythonBridgeCalendarEvents_;
   std::uint64_t pythonBridgeRefreshGeneration_{0};
+  std::uint64_t pythonBridgeConflictsGeneration_{0};
   bool pythonBridgeTasksReady_{false};
   bool pythonBridgeCalendarReady_{false};
   bool bridgeTaskBulkMutationInFlight_{false};

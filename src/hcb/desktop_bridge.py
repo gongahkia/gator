@@ -39,7 +39,7 @@ from .errors import (
     OfflineError,
     StorageError,
 )
-from .models import DateTimeKind, EventDateTime, TaskPriority
+from .models import Conflict, DateTimeKind, EventDateTime, TaskPriority
 from .output import to_primitive
 from .runtime import Runtime
 from .task_recurrence import RecurrenceEnd
@@ -476,6 +476,32 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                         )
                     }
                 }
+            if method == "GET" and tail == ("conflicts",):
+                _no_query(query)
+                return HTTPStatus.OK, {
+                    "conflicts": self._with_application(
+                        lambda app: [
+                            _conflict_view(conflict)
+                            for conflict in app.list_conflicts(account_id, limit=200)
+                        ]
+                    )
+                }
+            if (
+                method == "POST"
+                and len(tail) == 3
+                and tail[0] == "conflicts"
+                and tail[2] == "resolve"
+            ):
+                _no_query(query)
+                _keys(body, required={"resolution"})
+                conflict_id = _positive_int(tail[1], "conflict id")
+                resolution = _string(body["resolution"], "resolution")
+                if resolution not in {"keep_local", "keep_remote"}:
+                    raise ValueError("resolution is invalid")
+                conflict = self._with_application(
+                    lambda app: app.resolve_conflict(account_id, conflict_id, resolution)
+                )
+                return HTTPStatus.OK, {"conflict": _conflict_view(conflict)}
             if method == "GET" and tail == ("tasks",):
                 return HTTPStatus.OK, {"page": self._task_page(account_id, query)}
             if method == "POST" and tail == ("tasks",):
@@ -944,6 +970,7 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
                 and tail[:2] == ("tasks", "bulk")
                 and tail[2] in {"complete", "delete", "move"}
             )
+            or (len(tail) == 3 and tail[0] == "conflicts" and tail[2] == "resolve")
             or (
                 len(tail) == 4
                 and tail[0] == "tasks"
@@ -1041,6 +1068,16 @@ def _string(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError(f"{name} must be a non-empty string")
     return value
+
+
+def _positive_int(value: str, name: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if parsed < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return parsed
 
 
 def _nullable_string(value: Any, name: str) -> str | None:
@@ -1156,6 +1193,30 @@ def _task_id_list(value: Any) -> list[str]:
     if any(not task_id for task_id in task_ids):
         raise ValueError("task_ids must not contain empty task ids")
     return task_ids
+
+
+def _conflict_view(conflict: Conflict) -> Json:
+    """Return only the conflict metadata a desktop choice view needs."""
+    uncertain_delivery = conflict.local_payload.get("kind") == "uncertain-delivery"
+    resource = {
+        "task": "Task",
+        "task_list": "Task list",
+        "event": "Calendar event",
+        "calendar": "Calendar",
+    }.get(conflict.entity_type.value, "Google resource")
+    return {
+        "id": str(conflict.id),
+        "resource": resource,
+        "status": conflict.status.value,
+        "message": (
+            "This delivery needs explicit reconciliation in the CLI."
+            if uncertain_delivery
+            else "Local and Google changes need a choice."
+        ),
+        "can_keep_local": not uncertain_delivery,
+        "can_keep_remote": not uncertain_delivery,
+        "resolved_at": conflict.resolved_at.isoformat() if conflict.resolved_at else None,
+    }
 
 
 def _query_keys(query: dict[str, list[str]], allowed: set[str]) -> None:

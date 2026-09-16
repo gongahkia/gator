@@ -37,6 +37,7 @@ private slots:
   void requestsWorkspaceAndBoundedPages();
   void requestsBoundedSearch();
   void requestsAuthenticationState();
+  void sendsConflictRequests();
   void sendsIdempotentMutations();
   void sendsTaskMoveMutation();
   void sendsAtomicBulkTaskMutations();
@@ -198,6 +199,39 @@ void PythonBridgeClientTest::sendsIdempotentMutations() {
   QCOMPARE(manager.requests().at(2).request.url().path(), QStringLiteral("/v1/accounts/work/sync"));
   QVERIFY(manager.requests().at(2).request.rawHeader("Idempotency-Key").isEmpty());
   QCOMPARE(manager.requests().at(2).body, QByteArray("{}"));
+}
+
+void PythonBridgeClientTest::sendsConflictRequests() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"conflicts\":[]}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"conflict\":{}}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> conflicts = client.conflicts(QStringLiteral("work"));
+  waitFor(conflicts);
+  QVERIFY(std::holds_alternative<QJsonObject>(conflicts.get()));
+
+  const QByteArray key("conflict-resolution-request-123");
+  std::future<hcb::PythonBridgeResult> resolution =
+      client.resolveConflict(QStringLiteral("work"), QStringLiteral("42"), true, key);
+  waitFor(resolution);
+  QVERIFY(std::holds_alternative<QJsonObject>(resolution.get()));
+
+  QCOMPARE(manager.requests().size(), 2);
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/conflicts"));
+  QVERIFY(manager.requests().at(0).body.isEmpty());
+  QCOMPARE(manager.requests().at(1).request.url().path(),
+           QStringLiteral("/v1/accounts/work/conflicts/42/resolve"));
+  QCOMPARE(manager.requests().at(1).request.rawHeader("Idempotency-Key"), key);
+  QCOMPARE(manager.requests().at(1).body, QByteArray("{\"resolution\":\"keep_local\"}"));
+
+  std::future<hcb::PythonBridgeResult> invalid = client.resolveConflict(
+      QStringLiteral("work"), QStringLiteral("042"), false, QByteArray("invalid-conflict-456"));
+  const hcb::PythonBridgeResult invalidResult = invalid.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(invalidResult));
+  QCOMPARE(std::get<hcb::AppError>(invalidResult).code(), hcb::AppErrorCode::Validation);
+  QCOMPARE(manager.requests().size(), 2);
 }
 
 void PythonBridgeClientTest::sendsTaskMoveMutation() {

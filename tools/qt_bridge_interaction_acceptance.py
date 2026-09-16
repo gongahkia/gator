@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from hcb.benchmarks import create_large_fixture
+from hcb.models import Conflict, ConflictStatus, EntityType
 from hcb.paths import AppPaths
 from hcb.storage import Storage
 from hcb.task_recurrence import parse_task_recurrence_notes
@@ -240,6 +241,7 @@ def verify_persistence(
     hierarchy_second_child_id = require_string(report, "hierarchy_second_child_id")
     bulk_first_task_id = require_string(report, "bulk_first_task_id")
     bulk_second_task_id = require_string(report, "bulk_second_task_id")
+    conflict_id = int(require_string(report, "conflict_id"))
     event_date = date.fromisoformat(require_string(report, "event_date"))
 
     def searched_task(title: str, task_id: str) -> dict[str, object]:
@@ -355,6 +357,13 @@ def verify_persistence(
             task = storage.get_task(ACCOUNT_ID, task_id)
             if task is None or not task.metadata.deleted:
                 raise RuntimeError("restarted core did not retain a Qt bulk task deletion")
+        conflict = storage.get_conflict(ACCOUNT_ID, conflict_id)
+        if conflict is None or conflict.status is not ConflictStatus.KEEP_REMOTE:
+            raise RuntimeError("restarted core did not retain the Qt conflict resolution")
+
+    conflicts = bridge_data(descriptor, "/v1/accounts/benchmark/conflicts").get("conflicts")
+    if conflicts != []:
+        raise RuntimeError("restarted bridge retained the resolved Qt conflict")
 
     workspace_path = "/v1/accounts/benchmark/workspace?" + urlencode(
         {
@@ -440,6 +449,17 @@ def run_acceptance(native: Path) -> dict[str, object]:
         paths = discovered_paths(environment)
         paths.ensure()
         create_large_fixture(paths.database_file, task_count=1_000, event_count=1_500)
+        with Storage(paths.database_file) as storage, storage.transaction():
+            storage.add_conflict(
+                Conflict(
+                    None,
+                    ACCOUNT_ID,
+                    EntityType.TASK,
+                    "task-00000",
+                    {"list_id": "inbox", "body": {"title": "Qt conflict fixture"}},
+                    {"id": "remote-task-00000", "title": "Google conflict fixture"},
+                )
+            )
 
         descriptor_path = root / "bridge.json"
         bridge: subprocess.Popen[str] | None = None
@@ -450,7 +470,7 @@ def run_acceptance(native: Path) -> dict[str, object]:
             )
             if (
                 interaction.get("ok") is not True
-                or interaction.get("stage") != 34
+                or interaction.get("stage") != 35
                 or not isinstance(interaction.get("hidden_task_id"), str)
                 or not interaction["hidden_task_id"]
                 or not all(
@@ -465,6 +485,7 @@ def run_acceptance(native: Path) -> dict[str, object]:
                         "hierarchy_second_child_id",
                         "bulk_first_task_id",
                         "bulk_second_task_id",
+                        "conflict_id",
                     )
                 )
                 or not isinstance(interaction.get("initial_search_results"), int)
@@ -501,6 +522,7 @@ def run_acceptance(native: Path) -> dict[str, object]:
                 "recurrence_create_reconfigure_complete_stop_split": True,
                 "task_hierarchy_reparent_reorder_move": True,
                 "bulk_task_complete_move_delete": True,
+                "conflict_list_keep_remote": True,
                 "bridge_restart": True,
                 "qt_restart": True,
                 "persisted": persisted,

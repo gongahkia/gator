@@ -19,7 +19,18 @@ import pytest
 
 from hcb.benchmarks import create_large_fixture
 from hcb.desktop_bridge import BRIDGE_API_VERSION, DesktopBridge
-from hcb.models import Account, Calendar, DateTimeKind, Event, EventDateTime, Task, TaskList
+from hcb.models import (
+    Account,
+    Calendar,
+    Conflict,
+    ConflictStatus,
+    DateTimeKind,
+    EntityType,
+    Event,
+    EventDateTime,
+    Task,
+    TaskList,
+)
 from hcb.paths import AppPaths
 from hcb.runtime import Runtime
 from hcb.storage import Storage
@@ -513,6 +524,97 @@ def test_atomic_bulk_task_mutations_use_the_python_core(
         for task_id in task_ids:
             task = storage.get_task("work", task_id)
             assert task is not None and task.metadata.deleted
+
+
+def test_conflict_choices_use_the_python_core_without_exposing_payloads(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    paths, bridge = bridge_env
+    with Storage(paths.database_file) as storage, storage.transaction():
+        conflict_id = storage.add_conflict(
+            Conflict(
+                None,
+                "work",
+                EntityType.TASK,
+                "seed-task",
+                {"list_id": "inbox", "body": {"title": "Keep local"}},
+                {"id": "google-seed-task", "title": "Keep Google"},
+            )
+        )
+        uncertain_id = storage.add_conflict(
+            Conflict(
+                None,
+                "work",
+                EntityType.TASK,
+                "uncertain-task",
+                {"kind": "uncertain-delivery"},
+                {},
+            )
+        )
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/conflicts")
+    assert status == 200
+    conflicts = _data(response)["conflicts"]
+    assert isinstance(conflicts, list)
+    normal = next(conflict for conflict in conflicts if conflict["id"] == str(conflict_id))
+    uncertain = next(conflict for conflict in conflicts if conflict["id"] == str(uncertain_id))
+    assert normal == {
+        "id": str(conflict_id),
+        "resource": "Task",
+        "status": "open",
+        "message": "Local and Google changes need a choice.",
+        "can_keep_local": True,
+        "can_keep_remote": True,
+        "resolved_at": None,
+    }
+    assert uncertain["can_keep_local"] is False
+    assert uncertain["can_keep_remote"] is False
+    assert "local_payload" not in normal and "remote_payload" not in normal
+
+    resolution_key = "conflict-keep-remote"
+    status, response = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/conflicts/{conflict_id}/resolve",
+        body={"resolution": "keep_remote"},
+        idempotency_key=resolution_key,
+    )
+    assert status == 200
+    resolved = _data(response)["conflict"]
+    assert isinstance(resolved, dict)
+    assert resolved["id"] == str(conflict_id)
+    assert resolved["status"] == "keep_remote"
+    assert isinstance(resolved["resolved_at"], str)
+
+    status, retry = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/conflicts/{conflict_id}/resolve",
+        body={"resolution": "keep_remote"},
+        idempotency_key=resolution_key,
+    )
+    assert status == 200
+    assert _data(retry) == _data(response)
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        f"/v1/accounts/work/conflicts/{uncertain_id}/resolve",
+        body={"resolution": "keep_remote"},
+        idempotency_key="uncertain-conflict-resolution",
+    )
+    assert status == 400
+    assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
+    assert "uncertain delivery" in failure["error"]["message"]  # type: ignore[index]
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/conflicts")
+    assert status == 200
+    remaining = _data(response)["conflicts"]
+    assert isinstance(remaining, list)
+    assert [conflict["id"] for conflict in remaining] == [str(uncertain_id)]
+    with Storage(paths.database_file) as storage:
+        conflict = storage.get_conflict("work", conflict_id)
+        assert conflict is not None and conflict.status is ConflictStatus.KEEP_REMOTE
 
 
 def test_managed_task_recurrence_uses_the_durable_python_core(

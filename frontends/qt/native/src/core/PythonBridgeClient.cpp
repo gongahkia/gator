@@ -90,6 +90,15 @@ void complete(const std::shared_ptr<Completion>& completion, PythonBridgeResult 
   return true;
 }
 
+[[nodiscard]] bool isValidConflictId(const QString& value) {
+  if (value.isEmpty() || value != value.trimmed()) {
+    return false;
+  }
+  bool parsed = false;
+  const qlonglong conflictId = value.toLongLong(&parsed);
+  return parsed && conflictId > 0 && QString::number(conflictId) == value;
+}
+
 [[nodiscard]] std::optional<QJsonArray> bulkTaskIdsPayload(const QList<QString>& taskIds) {
   if (taskIds.isEmpty() || taskIds.size() > kMaximumBulkTaskIds) {
     return std::nullopt;
@@ -207,6 +216,40 @@ PythonBridgeClient::authenticationState(const QString& accountId, CancellationTo
         PythonBridgeResult(validationError(QStringLiteral("account id is invalid"))));
   }
   return get(*path, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::conflicts(const QString& accountId,
+                                                              CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/conflicts");
+  if (!path.has_value()) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("conflict request is invalid"))));
+  }
+  return get(*path, cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::resolveConflict(const QString& accountId,
+                                    const QString& conflictId,
+                                    bool keepLocal,
+                                    const QByteArray& idempotencyKey,
+                                    CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/conflicts/");
+  if (!path.has_value() || !isValidConflictId(conflictId) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("conflict resolution is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(conflictId)) +
+                 QStringLiteral("/resolve"));
+  return request(
+      "POST",
+      target,
+      QJsonObject{{QStringLiteral("resolution"),
+                   keepLocal ? QStringLiteral("keep_local") : QStringLiteral("keep_remote")}},
+      idempotencyKey,
+      cancellation);
 }
 
 std::future<PythonBridgeResult> PythonBridgeClient::taskPage(const QString& accountId,

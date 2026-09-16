@@ -41,6 +41,14 @@ public:
                                                           CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult>
   authenticationState(const QString& accountId, CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult> conflicts(const QString& accountId,
+                                                          CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  resolveConflict(const QString& accountId,
+                  const QString& conflictId,
+                  bool keepLocal,
+                  const QByteArray& idempotencyKey,
+                  CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult>
   taskPage(const QString& accountId,
            int limit = 200,

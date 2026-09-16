@@ -16,10 +16,12 @@ it, stops its next occurrence, and splits a second series. It creates a task
 hierarchy, reorders siblings through the bridge controller, and moves one
 child into a deselected task list. It then completes, moves, and deletes two
 tasks through one atomic bridge request for each bulk action. It verifies the
-refreshed search projection, shuts down the bridge, checks descriptor cleanup,
+core-provided conflict list and resolves a synthetic normal conflict by keeping
+Google's version. It then verifies the refreshed search projection, shuts down
+the bridge, checks descriptor cleanup,
 restarts the bridge against the same database, verifies the surviving task, event,
-task-list, calendar, recurrence markers, hierarchy, and persisted bulk deletions,
-and starts Qt a second time to verify it loads the persisted workspace.
+task-list, calendar, recurrence markers, hierarchy, persisted bulk deletions, and
+conflict resolution, and starts Qt a second time to verify it loads the persisted workspace.
 
 Run it after building the native executable:
 

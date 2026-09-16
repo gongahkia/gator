@@ -295,10 +295,18 @@ class SyncStateRepository(_StorageCore):
             raise RuntimeError("SQLite did not return a conflict id")
         return cursor.lastrowid
 
-    def list_conflicts(self, account_id: str, *, open_only: bool = True) -> list[Conflict]:
-        sql, args = "SELECT * FROM conflicts WHERE account_id=?", [account_id]
+    def list_conflicts(
+        self, account_id: str, *, open_only: bool = True, limit: int | None = None
+    ) -> list[Conflict]:
+        if limit is not None and limit < 1:
+            raise ValueError("conflict limit must be positive")
+        sql = "SELECT * FROM conflicts WHERE account_id=?"
+        args: list[str | int] = [account_id]
         if open_only:
             sql, args = sql + " AND status=?", [*args, ConflictStatus.OPEN.value]
+        sql = sql + " ORDER BY id"
+        if limit is not None:
+            sql, args = sql + " LIMIT ?", [*args, limit]
         return [
             Conflict(
                 row["id"],
@@ -311,7 +319,7 @@ class SyncStateRepository(_StorageCore):
                 datetime.fromisoformat(row["created_at"]),
                 _datetime(row["resolved_at"]),
             )
-            for row in self.connection.execute(sql + " ORDER BY id", args)
+            for row in self.connection.execute(sql, args)
         ]
 
     def get_conflict(self, account_id: str, conflict_id: int) -> Conflict | None:

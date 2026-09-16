@@ -2790,7 +2790,7 @@ ApplicationWindow {
 
                         Button {
                             text: "Keep Google"
-                            enabled: !window.appController.busy
+                            enabled: modelData.canKeepRemote && !window.appController.busy
                             Accessible.name: text
                             onClicked: window.controllerCall("resolveSyncConflict", [modelData.id, false])
                         }

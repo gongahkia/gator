@@ -806,6 +806,7 @@ searchPresentation(QList<LocalSearchRankedResult> results, bool notesEnabled, in
     row.insert(QStringLiteral("canKeepLocal"),
                conflict.remoteEtag.has_value() &&
                    !conflict.remoteSnapshot.value(QStringLiteral("_deleted")).toBool());
+    row.insert(QStringLiteral("canKeepRemote"), true);
     row.insert(QStringLiteral("resolution"),
                !conflict.resolution.has_value() ? QString()
                : *conflict.resolution == SyncConflictResolution::KeepLocal
@@ -813,6 +814,70 @@ searchPresentation(QList<LocalSearchRankedResult> results, bool notesEnabled, in
                    : QStringLiteral("Kept Google"));
     row.insert(QStringLiteral("resolvedAt"), conflict.resolvedAt.value_or(QString()));
     rows.append(std::move(row));
+  }
+  return rows;
+}
+
+[[nodiscard]] std::optional<QVariantMap> bridgeConflictRow(const QJsonObject& conflict) {
+  const QJsonValue idValue = conflict.value(QStringLiteral("id"));
+  const QJsonValue resourceValue = conflict.value(QStringLiteral("resource"));
+  const QJsonValue statusValue = conflict.value(QStringLiteral("status"));
+  const QJsonValue messageValue = conflict.value(QStringLiteral("message"));
+  const QJsonValue keepLocalValue = conflict.value(QStringLiteral("can_keep_local"));
+  const QJsonValue keepRemoteValue = conflict.value(QStringLiteral("can_keep_remote"));
+  const QJsonValue resolvedAtValue = conflict.value(QStringLiteral("resolved_at"));
+  if (!idValue.isString() || !resourceValue.isString() || !statusValue.isString() ||
+      !messageValue.isString() || !keepLocalValue.isBool() || !keepRemoteValue.isBool() ||
+      (!resolvedAtValue.isNull() && !resolvedAtValue.isString())) {
+    return std::nullopt;
+  }
+  const QString id = idValue.toString();
+  const QString resource = resourceValue.toString();
+  const QString status = statusValue.toString();
+  const QString message = messageValue.toString();
+  bool parsed = false;
+  const qlonglong parsedId = id.toLongLong(&parsed);
+  if (!parsed || parsedId < 1 || QString::number(parsedId) != id || resource.isEmpty() ||
+      resource.size() > 64 || message.isEmpty() || message.size() > 512 ||
+      (status != QStringLiteral("open") && status != QStringLiteral("keep_local") &&
+       status != QStringLiteral("keep_remote"))) {
+    return std::nullopt;
+  }
+  const QString resolvedAt = resolvedAtValue.isString() ? resolvedAtValue.toString() : QString();
+  if (resolvedAt.size() > 64 || (status == QStringLiteral("open") && !resolvedAt.isEmpty())) {
+    return std::nullopt;
+  }
+  const QString resolution = status == QStringLiteral("keep_local") ? QStringLiteral("Kept HCB")
+                             : status == QStringLiteral("keep_remote")
+                                 ? QStringLiteral("Kept Google")
+                                 : QString();
+  return QVariantMap{{QStringLiteral("id"), id},
+                     {QStringLiteral("resource"), resource},
+                     {QStringLiteral("message"), message},
+                     {QStringLiteral("canKeepLocal"), keepLocalValue.toBool()},
+                     {QStringLiteral("canKeepRemote"), keepRemoteValue.toBool()},
+                     {QStringLiteral("resolution"), resolution},
+                     {QStringLiteral("resolvedAt"), resolvedAt}};
+}
+
+[[nodiscard]] std::optional<QVariantList> bridgeConflictRows(const QJsonObject& data) {
+  const QJsonValue conflictsValue = data.value(QStringLiteral("conflicts"));
+  if (!conflictsValue.isArray() || conflictsValue.toArray().size() > 200) {
+    return std::nullopt;
+  }
+  QVariantList rows;
+  rows.reserve(conflictsValue.toArray().size());
+  QSet<QString> ids;
+  for (const QJsonValue& value : conflictsValue.toArray()) {
+    if (!value.isObject()) {
+      return std::nullopt;
+    }
+    const std::optional<QVariantMap> row = bridgeConflictRow(value.toObject());
+    if (!row.has_value() || ids.contains(row->value(QStringLiteral("id")).toString())) {
+      return std::nullopt;
+    }
+    ids.insert(row->value(QStringLiteral("id")).toString());
+    rows.append(*row);
   }
   return rows;
 }
@@ -1999,6 +2064,7 @@ void AppController::refreshBridge() {
     return;
   }
   const std::uint64_t generation = ++pythonBridgeRefreshGeneration_;
+  ++pythonBridgeConflictsGeneration_;
   pythonBridgeTasksReady_ = false;
   pythonBridgeCalendarReady_ = false;
   setStatus(QStringLiteral("Loading HCB core bridge"));
@@ -2032,9 +2098,40 @@ void AppController::refreshBridge() {
           setTaskListError({});
           applyBridgeTaskLists(std::move(summary.taskLists));
           applyBridgeCalendars(std::move(summary.calendars), false);
+          loadBridgeConflicts(generation);
           loadBridgeTaskPage(generation, std::nullopt, {}, false);
           loadBridgeCalendar(generation);
         });
+}
+
+void AppController::loadBridgeConflicts(std::uint64_t generation) {
+  if (generation != pythonBridgeRefreshGeneration_ || pythonBridgeClient_ == nullptr) {
+    return;
+  }
+  const std::uint64_t conflictsGeneration = ++pythonBridgeConflictsGeneration_;
+  watch(
+      pythonBridgeClient_->conflicts(pythonBridgeAccountId_),
+      [this, generation, conflictsGeneration](PythonBridgeResult result) {
+        if (generation != pythonBridgeRefreshGeneration_ ||
+            conflictsGeneration != pythonBridgeConflictsGeneration_) {
+          return;
+        }
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        const std::optional<QVariantList> rows =
+            bridgeConflictRows(std::get<QJsonObject>(std::move(result)));
+        if (!rows.has_value()) {
+          setStatus(QStringLiteral("HCB bridge returned invalid conflicts"));
+          return;
+        }
+        if (unresolvedConflicts_ != *rows) {
+          unresolvedConflicts_ = *rows;
+          emit unresolvedConflictsChanged();
+        }
+      },
+      false);
 }
 
 void AppController::loadBridgeTaskPage(std::uint64_t generation,
@@ -2642,6 +2739,7 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
     QString hierarchySecondChildId;
     QString bulkFirstTaskId;
     QString bulkSecondTaskId;
+    QString conflictId;
     QString eventDate;
     int stage{0};
     int initialSearchResults{0};
@@ -2674,6 +2772,7 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
         {QStringLiteral("hierarchy_second_child_id"), state->hierarchySecondChildId},
         {QStringLiteral("bulk_first_task_id"), state->bulkFirstTaskId},
         {QStringLiteral("bulk_second_task_id"), state->bulkSecondTaskId},
+        {QStringLiteral("conflict_id"), state->conflictId},
         {QStringLiteral("event_date"), state->eventDate},
         {QStringLiteral("initial_search_results"), state->initialSearchResults},
         {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
@@ -3377,6 +3476,27 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
       };
       if (std::find_if(pythonBridgeTasks_.cbegin(), pythonBridgeTasks_.cend(), deleted) !=
           pythonBridgeTasks_.cend()) {
+        return;
+      }
+      const auto conflict = std::find_if(
+          unresolvedConflicts_.cbegin(), unresolvedConflicts_.cend(), [](const QVariant& row) {
+            const QVariantMap values = row.toMap();
+            return values.value(QStringLiteral("canKeepRemote")).toBool();
+          });
+      if (conflict == unresolvedConflicts_.cend()) {
+        return;
+      }
+      state->conflictId = conflict->toMap().value(QStringLiteral("id")).toString();
+      resolveSyncConflict(state->conflictId, false);
+      state->stage = 35;
+      return;
+    }
+    case 35: {
+      const bool remainsOpen = std::any_of(
+          unresolvedConflicts_.cbegin(), unresolvedConflicts_.cend(), [state](const QVariant& row) {
+            return row.toMap().value(QStringLiteral("id")).toString() == state->conflictId;
+          });
+      if (remainsOpen) {
         return;
       }
       finish(true);
@@ -5682,6 +5802,10 @@ void AppController::syncGoogle() {
 }
 
 void AppController::saveConflictPolicy(int policyValue) {
+  if (bridgeMode()) {
+    reportBridgeUnsupportedAction();
+    return;
+  }
   const std::optional<SyncConflictPolicy> policy = conflictPolicyForValue(policyValue);
   if (!policy.has_value()) {
     setStatus(QStringLiteral("Sync conflict policy is invalid"));
@@ -5765,6 +5889,56 @@ void AppController::saveNotesProjectionMode(int mode) {
 }
 
 void AppController::resolveSyncConflict(QString conflictId, bool keepLocal) {
+  if (bridgeMode()) {
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const QString resolvedConflictId = conflictId;
+    watch(pythonBridgeClient_->resolveConflict(
+              pythonBridgeAccountId_,
+              resolvedConflictId,
+              keepLocal,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this, conflictId = resolvedConflictId](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            const QJsonObject data = std::get<QJsonObject>(std::move(result));
+            const std::optional<QVariantMap> resolved =
+                bridgeConflictRow(data.value(QStringLiteral("conflict")).toObject());
+            if (!resolved.has_value() ||
+                resolved->value(QStringLiteral("id")).toString() != conflictId ||
+                resolved->value(QStringLiteral("resolution")).toString().isEmpty()) {
+              setStatus(QStringLiteral("HCB bridge returned an invalid conflict resolution"));
+              return;
+            }
+            QVariantList unresolved;
+            unresolved.reserve(unresolvedConflicts_.size());
+            for (const QVariant& row : unresolvedConflicts_) {
+              if (row.toMap().value(QStringLiteral("id")).toString() != conflictId) {
+                unresolved.append(row);
+              }
+            }
+            if (unresolvedConflicts_ != unresolved) {
+              unresolvedConflicts_ = std::move(unresolved);
+              emit unresolvedConflictsChanged();
+            }
+            QVariantList recent = resolvedConflicts_;
+            recent.prepend(*resolved);
+            while (recent.size() > 20) {
+              recent.removeLast();
+            }
+            if (resolvedConflicts_ != recent) {
+              resolvedConflicts_ = std::move(recent);
+              emit resolvedConflictsChanged();
+            }
+            loadBridgeConflicts(pythonBridgeRefreshGeneration_);
+            setStatus(QStringLiteral("Sync conflict resolved in HCB core"));
+          });
+    return;
+  }
   const SyncConflictResolution resolution =
       keepLocal ? SyncConflictResolution::KeepLocal : SyncConflictResolution::KeepRemote;
   watch(googleSyncConflictResolver_.resolve(std::move(conflictId), resolution),

@@ -18,8 +18,10 @@ from .models import (
 
 
 class HistoryServiceMixin(_ApplicationServiceBase):
-    def list_conflicts(self, account_id: str) -> tuple[Conflict, ...]:
-        return tuple(self.storage.list_conflicts(account_id))
+    def list_conflicts(self, account_id: str, *, limit: int | None = None) -> tuple[Conflict, ...]:
+        if limit is not None and not 1 <= limit <= 1_000:
+            raise ValueError("conflict limit must be between 1 and 1000")
+        return tuple(self.storage.list_conflicts(account_id, limit=limit))
 
     def resolve_conflict(
         self,
