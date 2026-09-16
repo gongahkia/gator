@@ -17,11 +17,14 @@ hierarchy, reorders siblings through the bridge controller, and moves one
 child into a deselected task list. It then completes, moves, and deletes two
 tasks through one atomic bridge request for each bulk action. It verifies the
 core-provided conflict list and resolves a synthetic normal conflict by keeping
-Google's version. It then verifies the refreshed search projection, shuts down
-the bridge, checks descriptor cleanup,
-restarts the bridge against the same database, verifies the surviving task, event,
-task-list, calendar, recurrence markers, hierarchy, persisted bulk deletions, and
-conflict resolution, and starts Qt a second time to verify it loads the persisted workspace.
+Google's version. It creates a saved search in the Python core, applies it through
+the Qt controller to refresh search results, renames it, and creates then deletes
+a second saved search. It then verifies the refreshed search projection, shuts
+down the bridge, checks descriptor cleanup, restarts the bridge against the same
+database, verifies the surviving task, event, task-list, calendar, recurrence
+markers, hierarchy, persisted bulk deletions, conflict resolution, and retained
+saved search, and starts Qt a second time to verify it loads the persisted workspace
+and saved-search model.
 
 Run it after building the native executable:
 

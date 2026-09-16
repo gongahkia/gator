@@ -112,6 +112,11 @@ constexpr char kBridgeAcceptanceHierarchySecondChildTaskTitle[] =
     "Qt bridge hierarchy second child";
 constexpr char kBridgeAcceptanceBulkFirstTaskTitle[] = "Qt bridge bulk first task";
 constexpr char kBridgeAcceptanceBulkSecondTaskTitle[] = "Qt bridge bulk second task";
+constexpr char kBridgeAcceptanceSavedSearchName[] = "Qt bridge saved search";
+constexpr char kBridgeAcceptanceRenamedSavedSearchName[] = "Qt bridge saved search renamed";
+constexpr char kBridgeAcceptanceDeletedSavedSearchName[] = "Qt bridge deleted saved search";
+constexpr char kBridgeAcceptanceSavedSearchQuery[] = "release-marker";
+constexpr char kBridgeAcceptanceDeletedSavedSearchQuery[] = "type:task release-marker";
 constexpr char kBridgeAcceptanceInitialEventTitle[] = "Qt bridge interaction event initial";
 constexpr char kBridgeAcceptanceUpdatedEventTitle[] = "Qt bridge interaction event updated";
 constexpr char kBridgeAcceptanceInitialEventDescription[] =
@@ -880,6 +885,51 @@ searchPresentation(QList<LocalSearchRankedResult> results, bool notesEnabled, in
     rows.append(*row);
   }
   return rows;
+}
+
+[[nodiscard]] std::optional<SavedSearch> bridgeSavedSearch(const QJsonObject& search) {
+  const QJsonValue idValue = search.value(QStringLiteral("id"));
+  const QJsonValue nameValue = search.value(QStringLiteral("name"));
+  const QJsonValue queryValue = search.value(QStringLiteral("query"));
+  const QJsonValue createdAtValue = search.value(QStringLiteral("created_at"));
+  if (!idValue.isString() || !nameValue.isString() || !queryValue.isString() ||
+      !createdAtValue.isString()) {
+    return std::nullopt;
+  }
+  const QString id = idValue.toString();
+  const QString name = nameValue.toString();
+  const QString query = queryValue.toString();
+  const QString createdAt = createdAtValue.toString();
+  if (id.isEmpty() || id != id.trimmed() || id.size() > 128 || id.contains(QChar::Null) ||
+      id.contains(u'/') || id.contains(u'\\') || name.isEmpty() || name != name.trimmed() ||
+      name.size() > 128 || name.contains(QChar::Null) || query.isEmpty() ||
+      query != query.trimmed() || query.size() > 4 * 1024 || query.contains(QChar::Null) ||
+      createdAt.isEmpty() || createdAt.size() > 64) {
+    return std::nullopt;
+  }
+  return SavedSearch{.id = id, .name = name, .query = query};
+}
+
+[[nodiscard]] std::optional<QList<SavedSearch>> bridgeSavedSearches(const QJsonObject& data) {
+  const QJsonValue searchesValue = data.value(QStringLiteral("saved_searches"));
+  if (!searchesValue.isArray() || searchesValue.toArray().size() > 100) {
+    return std::nullopt;
+  }
+  QList<SavedSearch> searches;
+  searches.reserve(searchesValue.toArray().size());
+  QSet<QString> ids;
+  for (const QJsonValue& value : searchesValue.toArray()) {
+    if (!value.isObject()) {
+      return std::nullopt;
+    }
+    const std::optional<SavedSearch> search = bridgeSavedSearch(value.toObject());
+    if (!search.has_value() || ids.contains(search->id)) {
+      return std::nullopt;
+    }
+    ids.insert(search->id);
+    searches.append(*search);
+  }
+  return searches;
 }
 
 [[nodiscard]] QVariantList savedSearchRows(const QList<SavedSearch>& searches) {
@@ -2065,8 +2115,10 @@ void AppController::refreshBridge() {
   }
   const std::uint64_t generation = ++pythonBridgeRefreshGeneration_;
   ++pythonBridgeConflictsGeneration_;
+  ++pythonBridgeSavedSearchesGeneration_;
   pythonBridgeTasksReady_ = false;
   pythonBridgeCalendarReady_ = false;
+  pythonBridgeSavedSearchesReady_ = false;
   setStatus(QStringLiteral("Loading HCB core bridge"));
   watch(pythonBridgeClient_->workspace(pythonBridgeAccountId_),
         [this, generation](PythonBridgeResult result) {
@@ -2099,6 +2151,7 @@ void AppController::refreshBridge() {
           applyBridgeTaskLists(std::move(summary.taskLists));
           applyBridgeCalendars(std::move(summary.calendars), false);
           loadBridgeConflicts(generation);
+          loadBridgeSavedSearches(generation);
           loadBridgeTaskPage(generation, std::nullopt, {}, false);
           loadBridgeCalendar(generation);
         });
@@ -2130,6 +2183,35 @@ void AppController::loadBridgeConflicts(std::uint64_t generation) {
           unresolvedConflicts_ = *rows;
           emit unresolvedConflictsChanged();
         }
+      },
+      false);
+}
+
+void AppController::loadBridgeSavedSearches(std::uint64_t generation) {
+  if (generation != pythonBridgeRefreshGeneration_ || pythonBridgeClient_ == nullptr) {
+    return;
+  }
+  const std::uint64_t searchesGeneration = ++pythonBridgeSavedSearchesGeneration_;
+  watch(
+      pythonBridgeClient_->savedSearches(pythonBridgeAccountId_),
+      [this, generation, searchesGeneration](PythonBridgeResult result) {
+        if (generation != pythonBridgeRefreshGeneration_ ||
+            searchesGeneration != pythonBridgeSavedSearchesGeneration_) {
+          return;
+        }
+        if (std::holds_alternative<AppError>(result)) {
+          setStatus(errorMessage(std::get<AppError>(std::move(result))));
+          return;
+        }
+        const std::optional<QList<SavedSearch>> searches =
+            bridgeSavedSearches(std::get<QJsonObject>(std::move(result)));
+        if (!searches.has_value()) {
+          setStatus(QStringLiteral("HCB bridge returned invalid saved searches"));
+          return;
+        }
+        setSavedSearches(*searches);
+        pythonBridgeSavedSearchesReady_ = true;
+        completeBridgeReadyProbe();
       },
       false);
 }
@@ -2550,6 +2632,30 @@ bool AppController::applyBridgeCalendarResponse(const QJsonObject& data) {
   return true;
 }
 
+bool AppController::applyBridgeSavedSearchResponse(const QJsonObject& data) {
+  const std::optional<SavedSearch> search =
+      bridgeSavedSearch(data.value(QStringLiteral("saved_search")).toObject());
+  if (!search.has_value()) {
+    setStatus(QStringLiteral("HCB bridge mutation returned an invalid saved search"));
+    return false;
+  }
+  QList<SavedSearch> next = savedSearches_;
+  const auto existing =
+      std::find_if(next.begin(), next.end(), [&search](const SavedSearch& candidate) {
+        return candidate.id == search->id;
+      });
+  if (existing == next.end()) {
+    next.append(*search);
+  } else {
+    *existing = *search;
+  }
+  std::sort(next.begin(), next.end(), [](const SavedSearch& left, const SavedSearch& right) {
+    return left.name < right.name;
+  });
+  setSavedSearches(std::move(next));
+  return true;
+}
+
 void AppController::startBridgeOperation(QString kind, std::future<PythonBridgeResult> future) {
   if (bridgeOperationActive()) {
     setStatus(QStringLiteral("An HCB bridge operation is already in progress"));
@@ -2687,7 +2793,7 @@ void AppController::completeBridgeReadyProbe() {
   const QString interactionPath = qEnvironmentVariable("HCB_BRIDGE_INTERACTION_ACCEPTANCE_FILE");
   const QString failurePath = qEnvironmentVariable("HCB_BRIDGE_FAILURE_ACCEPTANCE_FILE");
   if ((readyPath.isEmpty() && interactionPath.isEmpty() && failurePath.isEmpty()) ||
-      !pythonBridgeTasksReady_ || !pythonBridgeCalendarReady_) {
+      !pythonBridgeTasksReady_ || !pythonBridgeCalendarReady_ || !pythonBridgeSavedSearchesReady_) {
     return;
   }
   if (!failurePath.isEmpty()) {
@@ -2711,7 +2817,8 @@ void AppController::completeBridgeReadyProbe() {
     return;
   }
   const QJsonObject payload{{QStringLiteral("tasks"), taskProjectionTasks_.size()},
-                            {QStringLiteral("events"), pythonBridgeCalendarEvents_.size()}};
+                            {QStringLiteral("events"), pythonBridgeCalendarEvents_.size()},
+                            {QStringLiteral("saved_searches"), savedSearches_.size()}};
   const QByteArray encoded = QJsonDocument(payload).toJson(QJsonDocument::Compact);
   if (readyFile.write(encoded) != encoded.size() || !readyFile.commit()) {
     return;
@@ -2740,6 +2847,8 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
     QString bulkFirstTaskId;
     QString bulkSecondTaskId;
     QString conflictId;
+    QString savedSearchId;
+    QString deletedSavedSearchId;
     QString eventDate;
     int stage{0};
     int initialSearchResults{0};
@@ -2773,6 +2882,7 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
         {QStringLiteral("bulk_first_task_id"), state->bulkFirstTaskId},
         {QStringLiteral("bulk_second_task_id"), state->bulkSecondTaskId},
         {QStringLiteral("conflict_id"), state->conflictId},
+        {QStringLiteral("saved_search_id"), state->savedSearchId},
         {QStringLiteral("event_date"), state->eventDate},
         {QStringLiteral("initial_search_results"), state->initialSearchResults},
         {QStringLiteral("refreshed_search_results"), state->refreshedSearchResults}};
@@ -3497,6 +3607,77 @@ void AppController::runBridgeInteractionAcceptance(QString reportPath) {
             return row.toMap().value(QStringLiteral("id")).toString() == state->conflictId;
           });
       if (remainsOpen) {
+        return;
+      }
+      saveSearch(QString::fromLatin1(kBridgeAcceptanceSavedSearchName),
+                 QString::fromLatin1(kBridgeAcceptanceSavedSearchQuery));
+      state->stage = 36;
+      return;
+    }
+    case 36: {
+      const auto saved = std::find_if(
+          savedSearches_.cbegin(), savedSearches_.cend(), [](const SavedSearch& search) {
+            return search.name == QString::fromLatin1(kBridgeAcceptanceSavedSearchName) &&
+                   search.query == QString::fromLatin1(kBridgeAcceptanceSavedSearchQuery);
+          });
+      if (saved == savedSearches_.cend()) {
+        return;
+      }
+      state->savedSearchId = saved->id;
+      applySavedSearch(state->savedSearchId);
+      state->stage = 37;
+      return;
+    }
+    case 37:
+      if (searchQuery_ != QString::fromLatin1(kBridgeAcceptanceSavedSearchQuery) ||
+          countSearchTasks() == 0) {
+        return;
+      }
+      renameSavedSearch(state->savedSearchId,
+                        QString::fromLatin1(kBridgeAcceptanceRenamedSavedSearchName));
+      state->stage = 38;
+      return;
+    case 38: {
+      const auto renamed = std::find_if(
+          savedSearches_.cbegin(), savedSearches_.cend(), [state](const SavedSearch& search) {
+            return search.id == state->savedSearchId &&
+                   search.name == QString::fromLatin1(kBridgeAcceptanceRenamedSavedSearchName) &&
+                   search.query == QString::fromLatin1(kBridgeAcceptanceSavedSearchQuery);
+          });
+      if (renamed == savedSearches_.cend()) {
+        return;
+      }
+      saveSearch(QString::fromLatin1(kBridgeAcceptanceDeletedSavedSearchName),
+                 QString::fromLatin1(kBridgeAcceptanceDeletedSavedSearchQuery));
+      state->stage = 39;
+      return;
+    }
+    case 39: {
+      const auto deleted = std::find_if(
+          savedSearches_.cbegin(), savedSearches_.cend(), [](const SavedSearch& search) {
+            return search.name == QString::fromLatin1(kBridgeAcceptanceDeletedSavedSearchName) &&
+                   search.query == QString::fromLatin1(kBridgeAcceptanceDeletedSavedSearchQuery);
+          });
+      if (deleted == savedSearches_.cend()) {
+        return;
+      }
+      state->deletedSavedSearchId = deleted->id;
+      deleteSavedSearch(state->deletedSavedSearchId);
+      state->stage = 40;
+      return;
+    }
+    case 40: {
+      const bool retained = std::any_of(
+          savedSearches_.cbegin(), savedSearches_.cend(), [state](const SavedSearch& search) {
+            return search.id == state->savedSearchId &&
+                   search.name == QString::fromLatin1(kBridgeAcceptanceRenamedSavedSearchName) &&
+                   search.query == QString::fromLatin1(kBridgeAcceptanceSavedSearchQuery);
+          });
+      const bool deleted = std::none_of(
+          savedSearches_.cbegin(), savedSearches_.cend(), [state](const SavedSearch& search) {
+            return search.id == state->deletedSavedSearchId;
+          });
+      if (!retained || !deleted) {
         return;
       }
       finish(true);
@@ -5476,10 +5657,6 @@ void AppController::refreshSearchProjection() {
 }
 
 void AppController::applySavedSearch(QString savedSearchId) {
-  if (bridgeMode()) {
-    reportBridgeUnsupportedAction();
-    return;
-  }
   const auto found = std::find_if(
       savedSearches_.cbegin(), savedSearches_.cend(), [&savedSearchId](const SavedSearch& search) {
         return search.id == savedSearchId;
@@ -5493,7 +5670,31 @@ void AppController::applySavedSearch(QString savedSearchId) {
 
 void AppController::saveSearch(QString name, QString query) {
   if (bridgeMode()) {
-    reportBridgeUnsupportedAction();
+    name = name.trimmed();
+    query = query.trimmed();
+    if (name.isEmpty() || query.isEmpty()) {
+      setStatus(QStringLiteral("Saved search name and query are required"));
+      return;
+    }
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    watch(pythonBridgeClient_->createSavedSearch(
+              pythonBridgeAccountId_,
+              std::move(name),
+              std::move(query),
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            if (applyBridgeSavedSearchResponse(std::get<QJsonObject>(std::move(result)))) {
+              loadBridgeSavedSearches(pythonBridgeRefreshGeneration_);
+              setStatus(QStringLiteral("Saved search stored in HCB core"));
+            }
+          });
     return;
   }
   name = name.trimmed();
@@ -5530,7 +5731,40 @@ void AppController::saveSearch(QString name, QString query) {
 
 void AppController::renameSavedSearch(QString savedSearchId, QString name) {
   if (bridgeMode()) {
-    reportBridgeUnsupportedAction();
+    name = name.trimmed();
+    if (name.isEmpty()) {
+      setStatus(QStringLiteral("Saved search name is required"));
+      return;
+    }
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const auto found = std::find_if(
+        savedSearches_.cbegin(),
+        savedSearches_.cend(),
+        [&savedSearchId](const SavedSearch& search) { return search.id == savedSearchId; });
+    if (found == savedSearches_.cend()) {
+      setStatus(QStringLiteral("Saved search was not found"));
+      return;
+    }
+    const QString targetId = savedSearchId;
+    watch(pythonBridgeClient_->updateSavedSearch(
+              pythonBridgeAccountId_,
+              targetId,
+              std::optional<QString>{std::move(name)},
+              std::nullopt,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            if (applyBridgeSavedSearchResponse(std::get<QJsonObject>(std::move(result)))) {
+              loadBridgeSavedSearches(pythonBridgeRefreshGeneration_);
+              setStatus(QStringLiteral("Saved search renamed in HCB core"));
+            }
+          });
     return;
   }
   name = name.trimmed();
@@ -5566,7 +5800,44 @@ void AppController::renameSavedSearch(QString savedSearchId, QString name) {
 
 void AppController::deleteSavedSearch(QString savedSearchId) {
   if (bridgeMode()) {
-    reportBridgeUnsupportedAction();
+    if (pythonBridgeClient_ == nullptr) {
+      reportBridgeUnsupportedAction();
+      return;
+    }
+    const auto found = std::find_if(
+        savedSearches_.cbegin(),
+        savedSearches_.cend(),
+        [&savedSearchId](const SavedSearch& search) { return search.id == savedSearchId; });
+    if (found == savedSearches_.cend()) {
+      setStatus(QStringLiteral("Saved search was not found"));
+      return;
+    }
+    const QString targetId = savedSearchId;
+    watch(pythonBridgeClient_->deleteSavedSearch(
+              pythonBridgeAccountId_,
+              targetId,
+              QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8()),
+          [this, targetId](PythonBridgeResult result) {
+            if (std::holds_alternative<AppError>(result)) {
+              setStatus(errorMessage(std::get<AppError>(std::move(result))));
+              return;
+            }
+            const QJsonObject data = std::get<QJsonObject>(std::move(result));
+            if (data.value(QStringLiteral("deleted")).toString() != targetId) {
+              setStatus(QStringLiteral("HCB bridge mutation returned an invalid saved search"));
+              return;
+            }
+            QList<SavedSearch> next = savedSearches_;
+            next.erase(std::remove_if(next.begin(),
+                                      next.end(),
+                                      [&targetId](const SavedSearch& search) {
+                                        return search.id == targetId;
+                                      }),
+                       next.end());
+            setSavedSearches(std::move(next));
+            loadBridgeSavedSearches(pythonBridgeRefreshGeneration_);
+            setStatus(QStringLiteral("Saved search deleted in HCB core"));
+          });
     return;
   }
   QList<SavedSearch> next = savedSearches_;

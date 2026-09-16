@@ -525,6 +525,7 @@ def _handler_type(bridge: DesktopBridge) -> type[BaseHTTPRequestHandler]:
                         account_id,
                         _saved_search_name(body["name"]),
                         _saved_search_query(body["query"]),
+                        max_count=MAX_SAVED_SEARCHES,
                     )
                 )
                 return HTTPStatus.CREATED, {"saved_search": _saved_search_view(search)}
@@ -1033,7 +1034,13 @@ def _is_durable_mutation(method: str, path: tuple[str, ...]) -> bool:
             )
         )
     if method == "PATCH":
-        return len(tail) == 2 and tail[0] in {"tasks", "task-lists", "events", "calendars"}
+        return len(tail) == 2 and tail[0] in {
+            "tasks",
+            "task-lists",
+            "events",
+            "calendars",
+            "saved-searches",
+        }
     return method == "DELETE" and len(tail) == 2 and tail[0] in resources
 
 

@@ -17,6 +17,7 @@ from uuid import uuid4
 
 import pytest
 
+from hcb.application import ApplicationService
 from hcb.benchmarks import create_large_fixture
 from hcb.desktop_bridge import BRIDGE_API_VERSION, DesktopBridge
 from hcb.models import (
@@ -204,6 +205,110 @@ def test_search_uses_the_indexed_core_result_contract(
     assert item["title"] == "Seed task"
 
     status, failure = _request(bridge, "GET", "/v1/accounts/work/search?q=Seed&limit=201")
+    assert status == 400
+    assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
+
+
+def test_saved_searches_are_durable_python_core_records(
+    bridge_env: tuple[AppPaths, DesktopBridge],
+) -> None:
+    paths, bridge = bridge_env
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/saved-searches")
+    assert status == 200
+    assert _data(response) == {"saved_searches": []}
+
+    key = "saved-search-create-123"
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/saved-searches",
+        body={"name": "  Today  ", "query": "  due:today  "},
+        idempotency_key=key,
+    )
+    assert status == 201
+    search = _data(response)["saved_search"]
+    assert isinstance(search, dict)
+    assert search["name"] == "Today"
+    assert search["query"] == "due:today"
+    assert isinstance(search["id"], str) and search["id"]
+    assert isinstance(search["created_at"], str) and search["created_at"]
+    search_id = search["id"]
+
+    status, replay = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/saved-searches",
+        body={"name": "  Today  ", "query": "  due:today  "},
+        idempotency_key=key,
+    )
+    assert status == 201
+    assert _data(replay) == _data(response)
+
+    status, response = _request(
+        bridge,
+        "PATCH",
+        f"/v1/accounts/work/saved-searches/{search_id}",
+        body={"name": "Now", "query": "due:overdue"},
+        idempotency_key="saved-search-update-456",
+    )
+    assert status == 200
+    updated = _data(response)["saved_search"]
+    assert isinstance(updated, dict)
+    assert updated["id"] == search_id
+    assert updated["name"] == "Now"
+    assert updated["query"] == "due:overdue"
+
+    status, response = _request(bridge, "GET", "/v1/accounts/work/saved-searches")
+    assert status == 200
+    assert _data(response)["saved_searches"] == [updated]
+
+    delete_key = "saved-search-delete-789"
+    status, response = _request(
+        bridge,
+        "DELETE",
+        f"/v1/accounts/work/saved-searches/{search_id}",
+        idempotency_key=delete_key,
+    )
+    assert status == 200
+    assert _data(response) == {"deleted": search_id}
+
+    status, replay = _request(
+        bridge,
+        "DELETE",
+        f"/v1/accounts/work/saved-searches/{search_id}",
+        idempotency_key=delete_key,
+    )
+    assert status == 200
+    assert _data(replay) == _data(response)
+
+    with Storage(paths.database_file) as storage:
+        assert storage.connection.execute("SELECT COUNT(*) FROM saved_searches").fetchone()[0] == 0
+
+    with Storage(paths.database_file) as storage:
+        app = ApplicationService(storage)
+        for index in range(100):
+            app.save_search("work", f"Search {index:03}", "due:today")
+
+    status, response = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/saved-searches",
+        body={"name": "Search 000", "query": "due:overdue"},
+        idempotency_key="saved-search-upsert-at-limit",
+    )
+    assert status == 201
+    existing = _data(response)["saved_search"]
+    assert isinstance(existing, dict)
+    assert existing["query"] == "due:overdue"
+
+    status, failure = _request(
+        bridge,
+        "POST",
+        "/v1/accounts/work/saved-searches",
+        body={"name": "One too many", "query": "due:today"},
+        idempotency_key="saved-search-limit-101",
+    )
     assert status == 400
     assert failure["error"]["code"] == "invalid_request"  # type: ignore[index]
 

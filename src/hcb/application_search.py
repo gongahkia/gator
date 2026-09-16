@@ -12,13 +12,32 @@ from .search import parse_palette_query
 
 class SearchServiceMixin(_ApplicationServiceBase):
     def save_search(
-        self, account_id: str, name: str, query: str, *, id: str | None = None
+        self,
+        account_id: str,
+        name: str,
+        query: str,
+        *,
+        id: str | None = None,
+        max_count: int | None = None,
     ) -> SavedSearch:
         self._account(account_id)
         if not name.strip() or not query.strip():
             raise ValueError("saved search name and query are required")
+        if max_count is not None and max_count < 1:
+            raise ValueError("saved search max_count must be positive")
         item = SavedSearch(id or _id(), account_id, name.strip(), query.strip(), utc_now())
         with self.storage.transaction():
+            if max_count is not None:
+                existing = self.storage.connection.execute(
+                    "SELECT 1 FROM saved_searches WHERE account_id=? AND name=?",
+                    (account_id, item.name),
+                ).fetchone()
+                if existing is None:
+                    count = self.storage.connection.execute(
+                        "SELECT COUNT(*) FROM saved_searches WHERE account_id=?", (account_id,)
+                    ).fetchone()[0]
+                    if count >= max_count:
+                        raise ValueError(f"saved search limit of {max_count} reached")
             self.storage.connection.execute(
                 """INSERT INTO saved_searches VALUES (?,?,?,?,?)
                 ON CONFLICT(account_id,name) DO UPDATE SET query=excluded.query""",

@@ -43,6 +43,26 @@ public:
   authenticationState(const QString& accountId, CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult> conflicts(const QString& accountId,
                                                           CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult> savedSearches(const QString& accountId,
+                                                              CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  createSavedSearch(const QString& accountId,
+                    const QString& name,
+                    const QString& query,
+                    const QByteArray& idempotencyKey,
+                    CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  updateSavedSearch(const QString& accountId,
+                    const QString& savedSearchId,
+                    std::optional<QString> name,
+                    std::optional<QString> query,
+                    const QByteArray& idempotencyKey,
+                    CancellationToken cancellation = {});
+  [[nodiscard]] std::future<PythonBridgeResult>
+  deleteSavedSearch(const QString& accountId,
+                    const QString& savedSearchId,
+                    const QByteArray& idempotencyKey,
+                    CancellationToken cancellation = {});
   [[nodiscard]] std::future<PythonBridgeResult>
   resolveConflict(const QString& accountId,
                   const QString& conflictId,

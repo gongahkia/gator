@@ -27,6 +27,8 @@ constexpr qsizetype kMaximumCursorLength = 128;
 constexpr qsizetype kMaximumListIdLength = 256;
 constexpr qsizetype kMaximumBulkTaskIds = 500;
 constexpr qsizetype kMaximumSearchQueryLength = 4 * 1024;
+constexpr qsizetype kMaximumSavedSearchNameLength = 128;
+constexpr qsizetype kMaximumSavedSearchQueryLength = 4 * 1024;
 constexpr int kRequestTimeoutMilliseconds = 10'000;
 
 struct Completion final {
@@ -97,6 +99,11 @@ void complete(const std::shared_ptr<Completion>& completion, PythonBridgeResult 
   bool parsed = false;
   const qlonglong conflictId = value.toLongLong(&parsed);
   return parsed && conflictId > 0 && QString::number(conflictId) == value;
+}
+
+[[nodiscard]] bool isValidSavedSearchText(const QString& value, qsizetype maximumLength) {
+  return !value.trimmed().isEmpty() && value.size() <= maximumLength &&
+         !value.contains(QChar::Null);
 }
 
 [[nodiscard]] std::optional<QJsonArray> bulkTaskIdsPayload(const QList<QString>& taskIds) {
@@ -226,6 +233,80 @@ std::future<PythonBridgeResult> PythonBridgeClient::conflicts(const QString& acc
         PythonBridgeResult(validationError(QStringLiteral("conflict request is invalid"))));
   }
   return get(*path, cancellation);
+}
+
+std::future<PythonBridgeResult> PythonBridgeClient::savedSearches(const QString& accountId,
+                                                                  CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/saved-searches");
+  if (!path.has_value()) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("saved search request is invalid"))));
+  }
+  return get(*path, cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::createSavedSearch(const QString& accountId,
+                                      const QString& name,
+                                      const QString& query,
+                                      const QByteArray& idempotencyKey,
+                                      CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/saved-searches");
+  if (!path.has_value() || !isValidSavedSearchText(name, kMaximumSavedSearchNameLength) ||
+      !isValidSavedSearchText(query, kMaximumSavedSearchQueryLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("saved search mutation is invalid"))));
+  }
+  return request("POST",
+                 *path,
+                 QJsonObject{{QStringLiteral("name"), name}, {QStringLiteral("query"), query}},
+                 idempotencyKey,
+                 cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::updateSavedSearch(const QString& accountId,
+                                      const QString& savedSearchId,
+                                      std::optional<QString> name,
+                                      std::optional<QString> query,
+                                      const QByteArray& idempotencyKey,
+                                      CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/saved-searches/");
+  if (!path.has_value() || !isValidIdentifier(savedSearchId, kMaximumSavedSearchNameLength) ||
+      (!name.has_value() && !query.has_value()) ||
+      (name.has_value() && !isValidSavedSearchText(*name, kMaximumSavedSearchNameLength)) ||
+      (query.has_value() && !isValidSavedSearchText(*query, kMaximumSavedSearchQueryLength)) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("saved search mutation is invalid"))));
+  }
+  QJsonObject changes;
+  if (name.has_value()) {
+    changes.insert(QStringLiteral("name"), *name);
+  }
+  if (query.has_value()) {
+    changes.insert(QStringLiteral("query"), *query);
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(savedSearchId)));
+  return request("PATCH", target, std::move(changes), idempotencyKey, cancellation);
+}
+
+std::future<PythonBridgeResult>
+PythonBridgeClient::deleteSavedSearch(const QString& accountId,
+                                      const QString& savedSearchId,
+                                      const QByteArray& idempotencyKey,
+                                      CancellationToken cancellation) {
+  const std::optional<QUrl> path = accountPath(accountId, u"/saved-searches/");
+  if (!path.has_value() || !isValidIdentifier(savedSearchId, kMaximumSavedSearchNameLength) ||
+      !isValidIdempotencyKey(idempotencyKey)) {
+    return readyFuture(
+        PythonBridgeResult(validationError(QStringLiteral("saved search mutation is invalid"))));
+  }
+  QUrl target = *path;
+  target.setPath(target.path() + QString::fromLatin1(QUrl::toPercentEncoding(savedSearchId)));
+  return request("DELETE", target, std::nullopt, idempotencyKey, cancellation);
 }
 
 std::future<PythonBridgeResult>

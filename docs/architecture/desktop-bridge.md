@@ -64,6 +64,7 @@ snake_case; timed event values are objects such as
 | `GET /v1/accounts/{account}/tasks?limit=200&cursor=...&list_id=...` | Preferred virtual-list path. Limits are 1–500 and the opaque cursor resumes the stable HCB sibling order. |
 | `GET /v1/accounts/{account}/search?q=...&limit=...` | Existing local workspace search. |
 | `GET /v1/accounts/{account}/conflicts`, `POST /conflicts/{id}/resolve` | Up to 200 open conflict-choice summaries, without local or remote mutation payloads. Resolve a normal conflict with `{"resolution":"keep_local"|"keep_remote"}`. Uncertain deliveries require their separate reconciliation workflow. |
+| `GET`/`POST /v1/accounts/{account}/saved-searches`, `PATCH`/`DELETE /saved-searches/{id}` | Up to 100 account-scoped saved local search queries. Create requires `name` and `query`; update changes either or both. The Python core owns records and SQLite indexing; these operations do not contact Google. |
 | `POST /v1/accounts/{account}/tasks`, `PATCH`/`DELETE /tasks/{id}`, `POST /tasks/{id}/complete` | Optimistic task operations through `ApplicationService`. Create and update accept an optional managed `recurrence` object; completion returns `successor` when one is created. |
 | `POST /v1/accounts/{account}/tasks/{id}/move` | Move to a task list, change parent, or position among siblings through `ApplicationService`. The body has one or more of `list_id`, `parent_id`, and `previous_id`; nullable parent or previous values mean top level or first sibling. |
 | `POST /v1/accounts/{account}/tasks/bulk/complete`, `/bulk/delete`, `/bulk/move` | Atomic core batch operations for 1–500 task IDs. Complete accepts optional `completed`; move requires `list_id`; completion returns managed recurrence successors. The core validates the full selection before changing any task. |
@@ -77,7 +78,7 @@ snake_case; timed event values are objects such as
 | `GET /v1/accounts/{account}/auth` | Reports whether the Python core can read a stored refresh token. It never returns credential material. |
 | `GET`/`DELETE /v1/operations/{id}` | Poll an asynchronous operation or request cancellation. |
 
-Task, task-list, calendar, subscription, event, task-batch, and conflict-resolution changes require an `Idempotency-Key` header with a frontend-
+Saved-search, task, task-list, calendar, subscription, event, task-batch, and conflict-resolution changes require an `Idempotency-Key` header with a frontend-
 generated token. HCB stores the resulting HTTP status and response in the same
 SQLite transaction as the core mutation. Retrying the same request after a
 lost response returns that stored result; reusing the key with different method,

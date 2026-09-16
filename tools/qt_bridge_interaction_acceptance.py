@@ -38,6 +38,8 @@ SUBSCRIPTION_REMOTE_ID = "qt-bridge-acceptance-subscription"
 HIERARCHY_PARENT_TASK_TITLE = "Qt bridge hierarchy parent"
 HIERARCHY_FIRST_CHILD_TASK_TITLE = "Qt bridge hierarchy first child"
 HIERARCHY_SECOND_CHILD_TASK_TITLE = "Qt bridge hierarchy second child"
+SAVED_SEARCH_NAME = "Qt bridge saved search renamed"
+SAVED_SEARCH_QUERY = "release-marker"
 
 
 def parse_args() -> argparse.Namespace:
@@ -242,6 +244,7 @@ def verify_persistence(
     bulk_first_task_id = require_string(report, "bulk_first_task_id")
     bulk_second_task_id = require_string(report, "bulk_second_task_id")
     conflict_id = int(require_string(report, "conflict_id"))
+    saved_search_id = require_string(report, "saved_search_id")
     event_date = date.fromisoformat(require_string(report, "event_date"))
 
     def searched_task(title: str, task_id: str) -> dict[str, object]:
@@ -365,6 +368,27 @@ def verify_persistence(
     if conflicts != []:
         raise RuntimeError("restarted bridge retained the resolved Qt conflict")
 
+    saved_searches = bridge_data(descriptor, "/v1/accounts/benchmark/saved-searches").get(
+        "saved_searches"
+    )
+    if not isinstance(saved_searches, list):
+        raise RuntimeError("restarted bridge returned malformed saved searches")
+    saved_search = next(
+        (
+            item
+            for item in saved_searches
+            if isinstance(item, dict) and item.get("id") == saved_search_id
+        ),
+        None,
+    )
+    if (
+        not isinstance(saved_search, dict)
+        or saved_search.get("name") != SAVED_SEARCH_NAME
+        or saved_search.get("query") != SAVED_SEARCH_QUERY
+        or len(saved_searches) != 1
+    ):
+        raise RuntimeError("restarted bridge did not retain the Qt-managed saved search")
+
     workspace_path = "/v1/accounts/benchmark/workspace?" + urlencode(
         {
             "include": "events",
@@ -436,7 +460,7 @@ def verify_persistence(
         for item in calendars
     ):
         raise RuntimeError("restarted bridge retained an unsubscribed calendar")
-    return {"tasks": 6, "events": 1, "task_lists": 1, "calendars": 1}
+    return {"tasks": 6, "events": 1, "task_lists": 1, "calendars": 1, "saved_searches": 1}
 
 
 def run_acceptance(native: Path) -> dict[str, object]:
@@ -470,7 +494,7 @@ def run_acceptance(native: Path) -> dict[str, object]:
             )
             if (
                 interaction.get("ok") is not True
-                or interaction.get("stage") != 35
+                or interaction.get("stage") != 40
                 or not isinstance(interaction.get("hidden_task_id"), str)
                 or not interaction["hidden_task_id"]
                 or not all(
@@ -486,6 +510,7 @@ def run_acceptance(native: Path) -> dict[str, object]:
                         "bulk_first_task_id",
                         "bulk_second_task_id",
                         "conflict_id",
+                        "saved_search_id",
                     )
                 )
                 or not isinstance(interaction.get("initial_search_results"), int)
@@ -505,9 +530,11 @@ def run_acceptance(native: Path) -> dict[str, object]:
             restart = launch_qt(
                 native, descriptor_path, environment, root / "qt-restart.json", acceptance=False
             )
-            if not all(isinstance(restart.get(key), int) for key in ("tasks", "events")):
+            if not all(
+                isinstance(restart.get(key), int) for key in ("tasks", "events", "saved_searches")
+            ):
                 raise RuntimeError("restarted Qt bridge readiness report is malformed")
-            if restart["tasks"] < 1_001 or restart["events"] < 1:
+            if restart["tasks"] < 1_001 or restart["events"] < 1 or restart["saved_searches"] != 1:
                 raise RuntimeError("restarted Qt bridge did not load the persisted workspace")
 
             return {
@@ -523,11 +550,13 @@ def run_acceptance(native: Path) -> dict[str, object]:
                 "task_hierarchy_reparent_reorder_move": True,
                 "bulk_task_complete_move_delete": True,
                 "conflict_list_keep_remote": True,
+                "saved_search_create_apply_rename_delete": True,
                 "bridge_restart": True,
                 "qt_restart": True,
                 "persisted": persisted,
                 "qt_restart_tasks": restart["tasks"],
                 "qt_restart_events": restart["events"],
+                "qt_restart_saved_searches": restart["saved_searches"],
             }
         finally:
             if bridge is not None:

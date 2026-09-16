@@ -619,6 +619,7 @@ private:
                           QList<TaskModelTask> accumulated,
                           bool firstPageApplied);
   void loadBridgeConflicts(std::uint64_t generation);
+  void loadBridgeSavedSearches(std::uint64_t generation);
   void loadBridgeCalendar(std::uint64_t generation);
   void applyBridgeCalendarEvents(std::uint64_t generation, QList<CalendarEventSummary> events);
   [[nodiscard]] QList<TaskModelTask> visibleBridgeTasks() const;
@@ -629,6 +630,7 @@ private:
   [[nodiscard]] bool applyBridgeEventResponse(const QJsonObject& data);
   [[nodiscard]] bool applyBridgeTaskListResponse(const QJsonObject& data);
   [[nodiscard]] bool applyBridgeCalendarResponse(const QJsonObject& data);
+  [[nodiscard]] bool applyBridgeSavedSearchResponse(const QJsonObject& data);
   void startBridgeOperation(QString kind, std::future<PythonBridgeResult> future);
   void pollBridgeOperation(QString operationId);
   void cancelBridgeOperation();
@@ -854,8 +856,10 @@ private:
   QList<CalendarEventSummary> pythonBridgeCalendarEvents_;
   std::uint64_t pythonBridgeRefreshGeneration_{0};
   std::uint64_t pythonBridgeConflictsGeneration_{0};
+  std::uint64_t pythonBridgeSavedSearchesGeneration_{0};
   bool pythonBridgeTasksReady_{false};
   bool pythonBridgeCalendarReady_{false};
+  bool pythonBridgeSavedSearchesReady_{false};
   bool bridgeTaskBulkMutationInFlight_{false};
   bool bridgeInteractionAcceptanceStarted_{false};
   bool bridgeFailureAcceptanceStarted_{false};

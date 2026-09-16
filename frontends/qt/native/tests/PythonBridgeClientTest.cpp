@@ -38,6 +38,7 @@ private slots:
   void requestsBoundedSearch();
   void requestsAuthenticationState();
   void sendsConflictRequests();
+  void sendsSavedSearchRequests();
   void sendsIdempotentMutations();
   void sendsTaskMoveMutation();
   void sendsAtomicBulkTaskMutations();
@@ -232,6 +233,69 @@ void PythonBridgeClientTest::sendsConflictRequests() {
   QVERIFY(std::holds_alternative<hcb::AppError>(invalidResult));
   QCOMPARE(std::get<hcb::AppError>(invalidResult).code(), hcb::AppErrorCode::Validation);
   QCOMPARE(manager.requests().size(), 2);
+}
+
+void PythonBridgeClientTest::sendsSavedSearchRequests() {
+  hcb::test::MockNetworkAccessManager manager;
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"saved_searches\":[]}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"saved_search\":{}}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"saved_search\":{}}}")});
+  manager.enqueue({.body = QByteArray("{\"api_version\":1,\"data\":{\"deleted\":\"saved-1\"}}")});
+  hcb::PythonBridgeClient client(connection(), nullptr, &manager);
+
+  std::future<hcb::PythonBridgeResult> searches = client.savedSearches(QStringLiteral("work"));
+  waitFor(searches);
+  QVERIFY(std::holds_alternative<QJsonObject>(searches.get()));
+
+  const QByteArray createKey("saved-search-create-123");
+  std::future<hcb::PythonBridgeResult> created = client.createSavedSearch(
+      QStringLiteral("work"), QStringLiteral("Today"), QStringLiteral("due:today"), createKey);
+  waitFor(created);
+  QVERIFY(std::holds_alternative<QJsonObject>(created.get()));
+
+  const QByteArray updateKey("saved-search-update-456");
+  std::future<hcb::PythonBridgeResult> updated = client.updateSavedSearch(QStringLiteral("work"),
+                                                                          QStringLiteral("saved-1"),
+                                                                          QStringLiteral("Now"),
+                                                                          std::nullopt,
+                                                                          updateKey);
+  waitFor(updated);
+  QVERIFY(std::holds_alternative<QJsonObject>(updated.get()));
+
+  const QByteArray deleteKey("saved-search-delete-789");
+  std::future<hcb::PythonBridgeResult> deleted =
+      client.deleteSavedSearch(QStringLiteral("work"), QStringLiteral("saved-1"), deleteKey);
+  waitFor(deleted);
+  QVERIFY(std::holds_alternative<QJsonObject>(deleted.get()));
+
+  QCOMPARE(manager.requests().size(), 4);
+  QCOMPARE(manager.requests().at(0).request.url().path(),
+           QStringLiteral("/v1/accounts/work/saved-searches"));
+  QVERIFY(manager.requests().at(0).body.isEmpty());
+  QCOMPARE(manager.requests().at(1).request.url().path(),
+           QStringLiteral("/v1/accounts/work/saved-searches"));
+  QCOMPARE(manager.requests().at(1).request.rawHeader("Idempotency-Key"), createKey);
+  QCOMPARE(manager.requests().at(1).body,
+           QByteArray("{\"name\":\"Today\",\"query\":\"due:today\"}"));
+  QCOMPARE(manager.requests().at(2).request.url().path(),
+           QStringLiteral("/v1/accounts/work/saved-searches/saved-1"));
+  QCOMPARE(manager.requests().at(2).request.rawHeader("Idempotency-Key"), updateKey);
+  QCOMPARE(manager.requests().at(2).body, QByteArray("{\"name\":\"Now\"}"));
+  QCOMPARE(manager.requests().at(3).request.url().path(),
+           QStringLiteral("/v1/accounts/work/saved-searches/saved-1"));
+  QCOMPARE(manager.requests().at(3).request.rawHeader("Idempotency-Key"), deleteKey);
+  QVERIFY(manager.requests().at(3).body.isEmpty());
+
+  std::future<hcb::PythonBridgeResult> invalid =
+      client.updateSavedSearch(QStringLiteral("work"),
+                               QStringLiteral("saved-1"),
+                               std::nullopt,
+                               std::nullopt,
+                               QByteArray("saved-search-invalid-012"));
+  const hcb::PythonBridgeResult invalidResult = invalid.get();
+  QVERIFY(std::holds_alternative<hcb::AppError>(invalidResult));
+  QCOMPARE(std::get<hcb::AppError>(invalidResult).code(), hcb::AppErrorCode::Validation);
+  QCOMPARE(manager.requests().size(), 4);
 }
 
 void PythonBridgeClientTest::sendsTaskMoveMutation() {
