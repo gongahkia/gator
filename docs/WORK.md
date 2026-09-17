@@ -258,8 +258,8 @@ The implementation is split around durable concepts:
 - `internal/artifact`: contracts, artifact inspection, validation, manifests,
   export, and apply;
 - `internal/workrun`: general-work orchestration built on `internal/agent`;
-- `internal/orchestrator`: bounded manager-as-tools specialist execution and
-  evidence;
+- `internal/orchestrator`: bounded manager-as-tools specialist execution
+  (`LLMSpecialist` and `HostedSpecialist` backends) and evidence;
 - `internal/action`: capability classification and external-action approval;
 - `internal/connector`: connector registry, schemas, provenance, and auth
   references;

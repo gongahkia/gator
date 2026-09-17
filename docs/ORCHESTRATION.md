@@ -41,13 +41,37 @@ for the final answer. Specialists start with fresh context unless the manager ex
 retained result using `continue`. Only the connected researcher receives selected
 read-only service tools. Specialists cannot recursively delegate or publish.
 
+## Registry: one manager type, two backends
+
+`orchestrator.Specialist` is the only manager-visible type. `delegate_agents`,
+`start_agent`, durable tasks, budgets, and `continue` do not branch on how a
+child executes. Constructors name the two backends:
+
+| Constructor | Backend | When to use | Result fields |
+| --- | --- | --- | --- |
+| `LLMSpecialist` | `llm` | Narrow in-process tools on frozen Work roots | `summary`, `steps`, `usage`; artifact and baseline hashes stay empty unless a caller wraps `Run` |
+| `HostedSpecialist` | `hosted` | An isolated host engine | Same `Result` fields; Code fills `artifact_path` / hashes when it retains a `.patch` |
+
+Host policy is the same for every registered specialist:
+
+- no recursive `delegate_agents` / supervisor tools
+- no publish tools
+- no nested Code scouts (`delegate_readonly`) or writers (`delegate_writer`, `delegate_writers`)
+- a shared request/token/wall budget across the manager and children
+- `work_roles` may only select a provider/model pair and narrow `max_steps`
+
+Work's `code` child is `HostedSpecialist("code", ...)`. It runs `internal/run` against a private Git copy of the frozen snapshot and omits scout/writer delegation. Nested coding agents remain a native Code-primary surface, not a Work specialist capability.
+
 ## Current specialists
 
-| Specialist | Trigger | Authority | Returned result |
-| --- | --- | --- | --- |
-| `source_researcher` | A focused source question benefits from separate context | Read/list/search the immutable `source/...` snapshot | Concise findings with exact paths and uncertainty |
-| `artifact_reviewer` | Staged output needs independent contract review | Read frozen source, prior output, and staged output; call `artifact_status` | Prioritized defects and validation evidence |
-| `code` | The Work objective contains a bounded implementation task | Run Gator Code against a private Git repository copied from the exact source snapshot | Summary, changed paths, and a retained `.patch` artifact |
+| Specialist | Backend | Trigger | Authority | Returned result |
+| --- | --- | --- | --- | --- |
+| `source_researcher` | LLM | A focused source question benefits from separate context | Read/list/search the immutable `source/...` snapshot | Concise findings with exact paths and uncertainty |
+| `artifact_reviewer` | LLM | Staged output needs independent contract review | Read frozen source, prior output, and staged output; call `artifact_status` | Prioritized defects and validation evidence |
+| `code` | Hosted | The Work objective contains a bounded implementation task | Run Gator Code against a private Git repository copied from the exact source snapshot | Summary, changed paths, and a retained `.patch` artifact |
+| `claim_verifier` | LLM | Claims need independent quotation checks | Selected evidence catalog | Unsupported and conflicting claims; quote match is not entailment |
+| `connected_researcher` | LLM | Selected services or allowed web need a separate read | Read-only connector/web evidence | Evidence IDs and missing-source disclosure |
+| `spreadsheet_analyst` | LLM | Tables or documents need cell-level inspection | `inspect_table`, `extract_document` on frozen source | Row/cell evidence without writes |
 
 The Code specialist never edits the user's source and is not directly
 user-facing. Strict sandboxing, denied network, no recursive writer/scout
@@ -86,9 +110,7 @@ are written at lifecycle transitions, independently of other children finishing.
 Dependencies name existing tasks only; forward references and cycles are rejected.
 Cancellation includes dependent subtrees; waits have explicit deadlines.
 
-The registry also includes `connected_researcher` (selected evidence/web/service
-reads only), `spreadsheet_analyst` (bounded source table/extraction inspection),
-and `claim_verifier` (selected evidence and quotation checks). Exact quotation
+The specialists in the closed registry are listed above. Exact quotation
 checks are distinct from semantic support. No document-design persona was added
 without a measured need.
 

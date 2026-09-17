@@ -12,11 +12,15 @@ import (
 	"time"
 )
 
+func hostedReader(run func(context.Context, Invocation) (Result, error)) Specialist {
+	return HostedSpecialist("reader", "Inspect frozen source without mutation.", run)
+}
+
 func TestSupervisorPersistsEachPeerAndRecoversWithoutReexecution(t *testing.T) {
 	release := make(chan struct{})
 	started := make(chan struct{})
 	options := Options{StatePath: t.TempDir(), ParentRun: "run-1", Source: "capture", PolicySHA256: "policy", MaxDelegations: 4, MaxParallel: 3}
-	s, err := NewSupervisor(context.Background(), []Specialist{{Name: "reader", Run: func(ctx context.Context, i Invocation) (Result, error) {
+	s, err := NewSupervisor(context.Background(), []Specialist{hostedReader(func(ctx context.Context, i Invocation) (Result, error) {
 		if i.Task == "wait" {
 			close(started)
 			select {
@@ -29,7 +33,7 @@ func TestSupervisorPersistsEachPeerAndRecoversWithoutReexecution(t *testing.T) {
 			return Result{}, errors.New("bad source")
 		}
 		return Result{Summary: i.Task}, nil
-	}}}, options)
+	})}, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,10 +65,10 @@ func TestSupervisorPersistsEachPeerAndRecoversWithoutReexecution(t *testing.T) {
 		t.Fatal(task)
 	}
 	s.Close()
-	recovered, err := NewSupervisor(context.Background(), []Specialist{{Name: "reader", Run: func(context.Context, Invocation) (Result, error) {
+	recovered, err := NewSupervisor(context.Background(), []Specialist{hostedReader(func(context.Context, Invocation) (Result, error) {
 		t.Error("recovery reexecuted work")
 		return Result{}, nil
-	}}}, options)
+	})}, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +79,7 @@ func TestSupervisorPersistsEachPeerAndRecoversWithoutReexecution(t *testing.T) {
 	}
 }
 func TestSupervisorBudgetDependenciesAndSubtreeCancellation(t *testing.T) {
-	s, err := NewSupervisor(context.Background(), []Specialist{{Name: "reader", Run: func(ctx context.Context, i Invocation) (Result, error) { <-ctx.Done(); return Result{}, ctx.Err() }}}, Options{StatePath: t.TempDir(), ParentRun: "run", Source: "source", MaxDelegations: 3, MaxParallel: 1})
+	s, err := NewSupervisor(context.Background(), []Specialist{hostedReader(func(ctx context.Context, i Invocation) (Result, error) { <-ctx.Done(); return Result{}, ctx.Err() })}, Options{StatePath: t.TempDir(), ParentRun: "run", Source: "source", MaxDelegations: 3, MaxParallel: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +132,7 @@ func TestSupervisorBudgetDependenciesAndSubtreeCancellation(t *testing.T) {
 
 func TestSupervisorCrashRecoveryExplicitContinuationAndAtomicBatchValidation(t *testing.T) {
 	options := Options{StatePath: t.TempDir(), ParentRun: "old", Source: "frozen", PolicySHA256: "policy"}
-	role := Specialist{Name: "reader", Run: func(_ context.Context, i Invocation) (Result, error) { return Result{Summary: i.Task}, nil }}
+	role := hostedReader(func(_ context.Context, i Invocation) (Result, error) { return Result{Summary: i.Task}, nil })
 	supervisor, err := NewSupervisor(context.Background(), []Specialist{role}, options)
 	if err != nil {
 		t.Fatal(err)

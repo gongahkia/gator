@@ -2,6 +2,12 @@
 // tools to a user-facing manager agent. It implements the manager-as-tools
 // orchestration pattern without coupling Gator's provider-neutral runtime to a
 // second model SDK.
+//
+// The manager-visible type is Specialist. Execution uses one of two backends:
+// LLMSpecialist (narrow in-process tools) or HostedSpecialist (an isolated
+// host engine such as Code). Both return the same Result fields. Specialists
+// cannot recursively delegate or publish; role configuration may only route
+// models and narrow steps.
 package orchestrator
 
 import (
@@ -54,8 +60,10 @@ type Result struct {
 
 // Specialist describes one capability visible to the manager. Run must start
 // from fresh context and return only the information needed by the manager.
+// Backend selects LLM tools or a hosted engine; it is not a second manager API.
 type Specialist struct {
 	Configuration RoleConfiguration
+	Backend       Backend
 	Name          string
 	Description   string
 	Run           func(context.Context, Invocation) (Result, error)
@@ -109,13 +117,14 @@ func Tools(specialists []Specialist, options Options) ([]agent.Tool, error) {
 	for index, specialist := range ordered {
 		specialist.Name = strings.TrimSpace(specialist.Name)
 		specialist.Description = strings.TrimSpace(specialist.Description)
-		if !specialistNamePattern.MatchString(specialist.Name) || specialist.Description == "" || len(specialist.Description) > 1024 || specialist.Run == nil {
-			return nil, fmt.Errorf("specialist %d is invalid", index+1)
+		if err := specialist.validate(); err != nil {
+			return nil, fmt.Errorf("specialist %d: %w", index+1, err)
 		}
 		if _, duplicate := registry[specialist.Name]; duplicate {
 			return nil, fmt.Errorf("specialist %q is repeated", specialist.Name)
 		}
 		registry[specialist.Name] = specialist
+		ordered[index] = specialist
 	}
 	if len(registry) == 0 {
 		return nil, nil
@@ -140,21 +149,6 @@ func Tools(specialists []Specialist, options Options) ([]agent.Tool, error) {
 		registry: registry, ordered: ordered, remaining: budget, parallel: parallel,
 		supervisor: options.Supervisor, now: now, onEvent: options.OnEvent, onRecord: options.OnRecord,
 	}}, nil
-}
-
-// LLMSpecialist adapts Gator's existing provider-neutral agent runner into a
-// fresh-context specialist.
-func LLMSpecialist(name, description string, model agent.Model, tools []agent.Tool, system string, maxSteps int, now func() time.Time) Specialist {
-	return Specialist{
-		Name: name, Description: description,
-		Run: func(ctx context.Context, invocation Invocation) (Result, error) {
-			usage := &agent.Budget{Limits: agent.Limits{ModelRequests: 4096}}
-			result, err := (agent.Runner{Model: agent.WithBudget(model, usage), Tools: tools, Now: now}).Run(ctx, agent.RunOptions{
-				Task: invocation.Task, System: system, MaxSteps: maxSteps, OnEvent: invocation.OnEvent,
-			})
-			return Result{Summary: result.FinalText, Steps: result.Steps, Usage: usage.Usage()}, err
-		},
-	}
 }
 
 type delegateTool struct {
@@ -214,6 +208,7 @@ type delegatedResult struct {
 	Steps          int    `json:"steps,omitempty"`
 	ArtifactPath   string `json:"artifact_path,omitempty"`
 	ArtifactSHA256 string `json:"artifact_sha256,omitempty"`
+	BaselineSHA256 string `json:"baseline_sha256,omitempty"`
 }
 
 func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
@@ -315,8 +310,10 @@ func (t *delegateTool) Execute(ctx context.Context, raw json.RawMessage) (agent.
 			results[index] = delegatedResult{
 				ID: item.id, Agent: item.agent, Status: status, Summary: summary, Error: errorText,
 				Steps: result.Steps, ArtifactPath: result.ArtifactPath, ArtifactSHA256: result.ArtifactSHA256,
+				BaselineSHA256: result.BaselineSHA256,
 			}
 			records[index] = Record{
+				BaselineSHA256: result.BaselineSHA256, Usage: result.Usage,
 				ID: item.id, Agent: item.agent, TaskSHA256: digest(item.task), OutputSHA256: digest(summary),
 				Status: status, Steps: result.Steps, ArtifactPath: result.ArtifactPath, ArtifactSHA256: result.ArtifactSHA256,
 				StartedAt: started, FinishedAt: finished,

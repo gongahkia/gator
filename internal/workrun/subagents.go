@@ -53,7 +53,7 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 			e.roleSteps("artifact_reviewer", steps), e.Now,
 		))
 		if e.Code != nil {
-			specialists = append(specialists, e.codeSpecialist(request, work))
+			specialists = append(specialists, e.hostedCodeSpecialist(request, work))
 		}
 	}
 
@@ -140,11 +140,11 @@ func (e Executor) subagentTools(ctx context.Context, request Request, work works
 	return append(batch, supervisor.Tools()...), supervisor.Close, nil
 }
 
-func (e Executor) codeSpecialist(request Request, work workspace.Work) orchestrator.Specialist {
-	return orchestrator.Specialist{
-		Name:        "code",
-		Description: "Use Gator Code in an isolated Git worktree to implement a bounded coding task from the frozen source and return a reviewable patch artifact.",
-		Run: func(ctx context.Context, invocation orchestrator.Invocation) (orchestrator.Result, error) {
+func (e Executor) hostedCodeSpecialist(request Request, work workspace.Work) orchestrator.Specialist {
+	return orchestrator.HostedSpecialist(
+		"code",
+		"Use Gator Code in an isolated Git worktree to implement a bounded coding task from the frozen source and return a reviewable patch artifact.",
+		func(ctx context.Context, invocation orchestrator.Invocation) (orchestrator.Result, error) {
 			baseline, err := request.integration.baseline(invocation.Baseline)
 			if err != nil {
 				return orchestrator.Result{}, err
@@ -180,7 +180,7 @@ func (e Executor) codeSpecialist(request Request, work workspace.Work) orchestra
 			}
 			return orchestrated, err
 		},
-	}
+	)
 }
 
 func subagentEvidence(record orchestrator.Record) artifact.SubagentEvidence {

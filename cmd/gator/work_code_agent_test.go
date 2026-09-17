@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gongahkia/gator/internal/instructions"
 )
 
 func TestPrepareCodeSnapshotRepositoryCreatesIndependentCleanGitSource(t *testing.T) {
@@ -73,5 +75,15 @@ func TestMergeCodeVerificationKeepsDiffCheckAndDeduplicates(t *testing.T) {
 	commands := mergeCodeVerification([][]string{{"go", "test", "./..."}, {"git", "diff", "--check"}, {"go", "test", "./..."}})
 	if len(commands) != 2 || strings.Join(commands[0], " ") != "git diff --check" || strings.Join(commands[1], " ") != "go test ./..." {
 		t.Fatalf("verification = %#v", commands)
+	}
+}
+
+func TestHostedCodeOmitsNestedScoutAndWriterDelegation(t *testing.T) {
+	omitted := hostedCodeNestedDelegationOmit()
+	if len(omitted) != 2 || omitted[0] != instructions.OmitDelegateWriter || omitted[1] != instructions.OmitDelegateReadOnly {
+		t.Fatalf("omit = %#v", omitted)
+	}
+	if !hostedCodeDisableWriterDelegation {
+		t.Fatal("Work hosted Code must disable writer delegation")
 	}
 }

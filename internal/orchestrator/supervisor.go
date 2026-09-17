@@ -96,9 +96,15 @@ func NewSupervisor(ctx context.Context, specialists []Specialist, options Option
 	ctx, cancel := context.WithCancel(ctx)
 	s := &Supervisor{ctx: ctx, cancel: cancel, tasks: map[string]*taskExecution{}, registry: map[string]Specialist{}, options: options, slots: make(chan struct{}, options.MaxParallel)}
 	for _, role := range specialists {
-		if !specialistNamePattern.MatchString(role.Name) || role.Run == nil {
+		role.Name = strings.TrimSpace(role.Name)
+		role.Description = strings.TrimSpace(role.Description)
+		if err := role.validate(); err != nil {
 			cancel()
-			return nil, errors.New("invalid specialist")
+			return nil, err
+		}
+		if _, duplicate := s.registry[role.Name]; duplicate {
+			cancel()
+			return nil, fmt.Errorf("specialist %q is repeated", role.Name)
 		}
 		s.registry[role.Name] = role
 	}

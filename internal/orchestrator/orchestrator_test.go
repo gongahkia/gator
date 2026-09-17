@@ -18,7 +18,7 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 	var events []agent.Event
 	started := make(chan struct{}, 2)
 	release := make(chan struct{})
-	specialist := Specialist{Name: "research", Description: "inspect one bounded question", Run: func(_ context.Context, invocation Invocation) (Result, error) {
+	specialist := HostedSpecialist("research", "inspect one bounded question", func(_ context.Context, invocation Invocation) (Result, error) {
 		current := active.Add(1)
 		defer active.Add(-1)
 		for {
@@ -30,7 +30,7 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 		started <- struct{}{}
 		<-release
 		return Result{Summary: "found " + invocation.Task, Steps: 2}, nil
-	}}
+	})
 	tools, err := Tools([]Specialist{specialist}, Options{
 		Now:      func() time.Time { return time.Date(2026, 9, 9, 1, 0, 0, 0, time.UTC) },
 		OnEvent:  func(event agent.Event) { events = append(events, event) },
@@ -65,9 +65,9 @@ func TestDelegationRunsSpecialistsAndRecordsBoundedEvidence(t *testing.T) {
 }
 
 func TestDelegationContainsFailuresAndEnforcesBudget(t *testing.T) {
-	tools, err := Tools([]Specialist{{Name: "review", Description: "review output", Run: func(context.Context, Invocation) (Result, error) {
+	tools, err := Tools([]Specialist{HostedSpecialist("review", "review output", func(context.Context, Invocation) (Result, error) {
 		return Result{}, errors.New("review unavailable")
-	}}}, Options{MaxDelegations: 1})
+	})}, Options{MaxDelegations: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,15 +84,15 @@ func TestLLMSpecialistStartsWithFreshContext(t *testing.T) {
 	model := &oneTurnModel{}
 	specialist := LLMSpecialist("research", "read", model, nil, "specialist system", 2, nil)
 	result, err := specialist.Run(context.Background(), Invocation{ID: "subagent-001", Task: "inspect this"})
-	if err != nil || result.Summary != "fresh" || len(model.request.Messages) != 1 || model.request.Messages[0].Content != "inspect this" {
+	if err != nil || result.Summary != "fresh" || result.ArtifactPath != "" || result.ArtifactSHA256 != "" || result.BaselineSHA256 != "" || specialist.Backend != BackendLLM || len(model.request.Messages) != 1 || model.request.Messages[0].Content != "inspect this" {
 		t.Fatalf("result=%#v err=%v request=%#v", result, err, model.request)
 	}
 }
 
 func TestDelegationRejectsTrailingJSON(t *testing.T) {
-	tools, err := Tools([]Specialist{{Name: "research", Description: "read", Run: func(context.Context, Invocation) (Result, error) {
+	tools, err := Tools([]Specialist{HostedSpecialist("research", "read", func(context.Context, Invocation) (Result, error) {
 		return Result{Summary: "unused"}, nil
-	}}}, Options{})
+	})}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

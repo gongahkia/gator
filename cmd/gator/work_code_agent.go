@@ -25,6 +25,14 @@ import (
 
 const maxCodeSubagentSteps = 32
 
+// hostedCodeDisableWriterDelegation is invariant for Work's hosted Code
+// specialist: one implementation assignment, not nested writer children.
+const hostedCodeDisableWriterDelegation = true
+
+func hostedCodeNestedDelegationOmit() []string {
+	return []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
+}
+
 func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 	return func(ctx context.Context, request workrun.CodeRequest) (workrun.CodeResult, error) {
 		policy := request.Policy.Sandbox.Normalize()
@@ -103,7 +111,9 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 		code.Model = agent.WithBudget(agent.WithBudget(code.Model, request.Budget), usage)
 		code.Sandbox = request.Policy.Sandbox.Normalize()
 		verification := mergeCodeVerification(request.Policy.Verification)
-		omitted := []string{instructions.OmitDelegateWriter, instructions.OmitDelegateReadOnly}
+		// Hosted Code is one implementation assignment. Nested scouts/writers
+		// are a native Code-primary surface, not a Work specialist capability.
+		omitted := hostedCodeNestedDelegationOmit()
 		for _, capability := range []struct{ name, omit string }{
 			{workrun.CodeCapabilityLSP, instructions.OmitLSP},
 			{workrun.CodeCapabilityMCP, instructions.OmitMCP},
@@ -143,7 +153,7 @@ func (b *nativeWorkBackend) codeDelegate(stateDir string) workrun.CodeDelegate {
 			Approve:                 request.Approve,
 			BrowserSession:          request.Policy.BrowserSession,
 			Mode:                    gatorrun.ExecuteMode,
-			DisableWriterDelegation: true,
+			DisableWriterDelegation: hostedCodeDisableWriterDelegation,
 			RolePolicy: instructions.ProfilePolicy{
 				MaxSteps: steps, Omit: omitted,
 			},

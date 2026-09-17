@@ -3,7 +3,10 @@
 CLI, the main TUI, scheduled jobs, and `work-rpc` call `workrun.Service`. Typed
 contracts reach execution intact. Provider adapters and credential lookup remain
 outside the service; UI rendering and protocol framing remain outside execution.
-The existing Go orchestrator owns children. No second language runtime was added.
+The existing Go orchestrator owns children. The manager-visible type is
+`orchestrator.Specialist` with two backends: `LLMSpecialist` for narrow
+in-process tools and `HostedSpecialist` for isolated engines (`code`). Both
+return the same result fields. No second language runtime was added.
 
 ## Conversation and evidence
 
