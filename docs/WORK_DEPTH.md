@@ -88,7 +88,8 @@ Explicit request/CLI choices override configured manager defaults. Settings
 `work_roles` entries are version 1 with `name`, optional `provider`/`model` pair,
 and a narrowing `max_steps`. Unspecified routes inherit the manager. The role
 registry is closed: source_researcher, artifact_reviewer, code,
-connected_researcher, spreadsheet_analyst, claim_verifier. Per-role model routing
+connected_researcher, spreadsheet_analyst, claim_verifier. LLM roles use
+`LLMSpecialist`; `code` uses `HostedSpecialist`. Per-role model routing
 changes no authority. There is no automatic cross-provider fallback.
 
 The effective policy digest covers the full normalized contract, mode, Code
