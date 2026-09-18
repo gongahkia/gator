@@ -12,11 +12,4 @@ before execution. Deliverables, code candidates,
 verification, and external-action proposals remain
 reviewable before transfer.
 
-= = = = = = =
-
-This project pins Go 1.25.13.
-
-```sh
-GOTOOLCHAIN=go1.25.13 make build
-./bin/gator
-```
+Gator pins Go 1.25.13.
