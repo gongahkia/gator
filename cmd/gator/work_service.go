@@ -51,7 +51,7 @@ func configuredWorkService(provider, modelName, stateDir string, request *workru
 	request.StateDir = stateDir
 	request.ConnectorPermissions = connector.PermissionSet(settings.ConnectorPermissions)
 	request.SnapshotOptions = snapshot.Options{Limits: snapshot.Limits{MaxFiles: settings.Snapshots.MaxFiles, MaxTotal: settings.Snapshots.MaxTotalBytes, MaxFileBytes: settings.Snapshots.MaxFileBytes}, Excludes: settings.Snapshots.Excludes}
-	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
+	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}}
 	if native, ok := backend.(*nativeWorkBackend); ok {
 		executor.Code = native.codeDelegate(stateDir)
 	}

@@ -29,10 +29,10 @@ const maxHTTPActionBytes = 12 * 1024
 // can review the proposal but can execute the payload only through Runtime,
 // which revalidates their binding before any network request.
 type PreparedAction struct {
-	Proposal   action.Proposal
-	descriptor Descriptor
-	operation  Operation
-	payload    []byte
+	Proposal    action.Proposal
+	descriptor  Descriptor
+	operation   Operation
+	payload     []byte
 	googleSteps []googlePreparedStep
 }
 
@@ -52,7 +52,7 @@ type Runtime struct {
 	// StateDir is Gator's resolved state root. Google uses it only for its
 	// private mirror; it never imports another application's state or stores
 	// credentials there.
-	StateDir    string
+	StateDir string
 }
 
 // Invoke validates a connector operation and its exact input before any I/O.
@@ -207,10 +207,10 @@ func (r Runtime) invokeRemoteMCP(ctx context.Context, descriptor Descriptor, ope
 }
 
 type serviceInput struct {
-	Query      string `json:"query,omitempty"`
-	ResourceID string `json:"resource_id,omitempty"`
-	Cursor     string `json:"cursor,omitempty"`
-	Limit      int    `json:"limit,omitempty"`
+	Query      string          `json:"query,omitempty"`
+	ResourceID string          `json:"resource_id,omitempty"`
+	Cursor     string          `json:"cursor,omitempty"`
+	Limit      int             `json:"limit,omitempty"`
 	Payload    json.RawMessage `json:"payload,omitempty"`
 }
 
@@ -546,8 +546,10 @@ func serviceActionMethod(descriptor Descriptor, operation string) string {
 		return http.MethodPatch
 	case KindGoogle + "/tasklists_delete", KindGoogle + "/tasks_delete", KindGoogle + "/calendars_delete", KindGoogle + "/events_delete":
 		return http.MethodDelete
-	case KindGoogle + "/tasks_move", KindGoogle + "/sheets_values_update":
+	case KindGoogle + "/tasks_move":
 		return http.MethodPost
+	case KindGoogle + "/sheets_values_update":
+		return http.MethodPut
 	default:
 		return http.MethodPost
 	}
@@ -808,6 +810,157 @@ func actionInput(payload []byte) json.RawMessage {
 	return result
 }
 
+// prepareGoogleBatch pins an ordered collection of independent Google calls
+// into one canonical approval payload. The batch is intentionally executed as
+// individual API requests rather than Google's multipart batch endpoint so a
+// timeout can never be mistaken for an offline queue or an automatically
+// replayable operation.
+func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePreparedStep, []byte, error) {
+	var input struct {
+		Actions []struct {
+			Operation string          `json:"operation"`
+			Payload   json.RawMessage `json:"payload"`
+		} `json:"actions"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil || len(input.Actions) == 0 || len(input.Actions) > 25 {
+		return nil, nil, errors.New("Google batch requires 1 through 25 typed actions")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return nil, nil, errors.New("Google batch payload contains trailing JSON")
+	}
+	type canonicalAction struct {
+		Operation string          `json:"operation"`
+		Payload   json.RawMessage `json:"payload"`
+	}
+	canonicalActions := make([]canonicalAction, 0, len(input.Actions))
+	steps := make([]googlePreparedStep, 0, len(input.Actions))
+	for _, item := range input.Actions {
+		operationID := strings.TrimSpace(item.Operation)
+		_, operation, err := (&Registry{byID: map[string]Descriptor{descriptor.ID: descriptor}}).Operation(descriptor.ID, operationID)
+		if err != nil || operationID == "batch" || !action.RequiresFreshApproval(operation.Capability) {
+			return nil, nil, fmt.Errorf("Google batch action %q is not an allowed Google mutation", operationID)
+		}
+		canonical, err := canonicalJSONObject(item.Payload)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Google batch %s payload: %w", operationID, err)
+		}
+		if _, _, err := serviceAction(descriptor, operationID, canonical); err != nil {
+			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
+		}
+		steps = append(steps, googlePreparedStep{operation: operationID, payload: canonical})
+		canonicalActions = append(canonicalActions, canonicalAction{Operation: operationID, Payload: canonical})
+	}
+	canonical, err := json.Marshal(struct {
+		Actions []canonicalAction `json:"actions"`
+	}{Actions: canonicalActions})
+	if err != nil {
+		return nil, nil, fmt.Errorf("encode canonical Google batch: %w", err)
+	}
+	return steps, canonical, nil
+}
+
+func canonicalJSONObject(raw json.RawMessage) ([]byte, error) {
+	var object map[string]any
+	if len(raw) == 0 || json.Unmarshal(raw, &object) != nil || object == nil {
+		return nil, errors.New("must be one JSON object")
+	}
+	result, err := json.Marshal(object)
+	if err != nil || len(result) == 0 || len(result) > maxHTTPActionBytes {
+		return nil, errors.New("is invalid or exceeds 12 KiB")
+	}
+	return result, nil
+}
+
+func (r Runtime) executeGoogleBatch(ctx context.Context, descriptor Descriptor, steps []googlePreparedStep) error {
+	if len(steps) == 0 || len(steps) > 25 {
+		return errors.New("prepared Google batch is invalid")
+	}
+	for _, step := range steps {
+		target, body, err := serviceAction(descriptor, step.operation, step.payload)
+		if err != nil {
+			return err
+		}
+		result, err := r.requestJSON(ctx, descriptor, step.operation, serviceActionMethod(descriptor, step.operation), target, body, true)
+		if err != nil {
+			// In particular, do not replay an earlier request after an unknown
+			// timeout or connection close. The caller gets the uncertain record.
+			return err
+		}
+		r.mirrorGoogle(ctx, descriptor, step.operation, result.Data)
+	}
+	return nil
+}
+
+func (r Runtime) invokeGoogleLocalSearch(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
+	var input struct {
+		Query string   `json:"query"`
+		Kinds []string `json:"kinds"`
+		Limit int      `json:"limit"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil || strings.TrimSpace(input.Query) == "" || len(input.Query) > 512 || input.Limit < 1 || input.Limit > 100 || len(input.Kinds) > 16 {
+		return Result{}, errors.New("Google local search input is invalid")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return Result{}, errors.New("Google local search input contains trailing JSON")
+	}
+	// The live health call is deliberately before opening/searching the mirror.
+	// A disconnected credential must never reveal stale connected data.
+	healthEndpoint, method, body, err := serviceRead(descriptor, "health", serviceInput{})
+	if err != nil {
+		return Result{}, err
+	}
+	health, err := r.requestJSON(ctx, descriptor, "health", method, healthEndpoint, body, false)
+	if err != nil {
+		return Result{}, err
+	}
+	store, err := r.openGoogleMirror(descriptor)
+	if err != nil {
+		return Result{}, err
+	}
+	defer store.Close()
+	records, err := store.Search(ctx, input.Query, input.Kinds, input.Limit)
+	if err != nil {
+		return Result{}, err
+	}
+	contents, err := json.Marshal(struct {
+		Records []googlework.Record `json:"records"`
+	}{Records: records})
+	if err != nil {
+		return Result{}, fmt.Errorf("encode Google local search result: %w", err)
+	}
+	digest := sha256.Sum256(contents)
+	health.Provenance.Operation = operation.ID
+	health.Provenance.Bytes = int64(len(contents))
+	health.Provenance.SHA256 = hex.EncodeToString(digest[:])
+	health.Data = contents
+	return health, nil
+}
+
+func (r Runtime) mirrorGoogle(ctx context.Context, descriptor Descriptor, operation string, contents json.RawMessage) {
+	if descriptor.Kind != KindGoogle || strings.TrimSpace(r.StateDir) == "" {
+		return
+	}
+	store, err := r.openGoogleMirror(descriptor)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+	// A mirror failure must not turn a completed live action into a retryable
+	// error. Google has already acknowledged the operation.
+	_ = store.Mirror(ctx, operation, contents, r.now())
+}
+
+func (r Runtime) openGoogleMirror(descriptor Descriptor) (*googlework.Store, error) {
+	if descriptor.Kind != KindGoogle || strings.TrimSpace(r.StateDir) == "" {
+		return nil, errors.New("Google Work mirror is unavailable without Gator state")
+	}
+	return googlework.Open(r.StateDir, descriptor.ID)
+}
+
 func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string, error) {
 	if descriptor.Authentication != AuthBearer && descriptor.Authentication != AuthOAuth {
 		return "", nil
@@ -823,7 +976,7 @@ func (r Runtime) bearerToken(ctx context.Context, descriptor Descriptor) (string
 		if descriptor.Authentication != AuthOAuth || !credential.IsOAuth() || credential.Refresh == "" {
 			return "", fmt.Errorf("connector %q credential has expired", descriptor.ID)
 		}
-		flow := auth.BrowserFlow{ClientID: descriptor.OAuthClientID, TokenURL: descriptor.OAuthTokenURL, AllowMissingExpiry: true, RequireBearerToken: true, HTTPClient: r.HTTPClient}
+		flow := auth.BrowserFlow{ClientID: descriptor.OAuthClientID, ClientSecret: credential.OAuthClientSecret, TokenURL: descriptor.OAuthTokenURL, AllowMissingExpiry: true, RequireBearerToken: true, HTTPClient: r.HTTPClient}
 		refreshed, refreshErr := flow.Refresh(ctx, credential)
 		if refreshErr != nil {
 			return "", fmt.Errorf("refresh connector %q credential: %w", descriptor.ID, refreshErr)

@@ -324,19 +324,23 @@ func recordsForOperation(operation string, data json.RawMessage) ([]Record, stri
 		kind = "drive_file"
 	case "tasklists_list":
 		kind, listKey = "task_list", "items"
+	case "tasklists_create", "tasklists_update":
+		kind = "task_list"
 	case "tasks_list":
 		kind, listKey, parentKey = "task", "items", "tasklist"
-	case "tasks_get":
+	case "tasks_get", "tasks_create", "tasks_update", "tasks_move":
 		kind, parentKey = "task", "tasklist"
 	case "calendars_list":
 		kind, listKey = "calendar", "items"
+	case "calendars_create", "calendars_update":
+		kind = "calendar"
 	case "events_list":
 		kind, listKey, parentKey = "event", "items", "calendar"
-	case "events_get":
+	case "events_get", "events_create", "events_update":
 		kind, parentKey = "event", "calendar"
-	case "docs_get":
+	case "docs_get", "docs_create", "docs_update":
 		kind = "document"
-	case "sheets_get":
+	case "sheets_get", "sheets_create", "sheets_batch_update":
 		kind = "spreadsheet"
 	default:
 		return nil, "", nil
@@ -384,6 +388,9 @@ func recordFromObject(kind, parent string, raw json.RawMessage) (Record, error) 
 	name := stringValue(object["name"])
 	if name == "" {
 		name = stringValue(object["title"])
+	}
+	if name == "" {
+		name = stringValue(object["summary"])
 	}
 	updated := parseGoogleTime(stringValue(object["updated"]))
 	if updated.IsZero() {

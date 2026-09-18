@@ -24,7 +24,7 @@ const oauthResponseLimit = 64 * 1024
 // caller supplies its own client ID: this package never reuses a vendor CLI or
 // another agent's application identity.
 type BrowserFlow struct {
-	ClientID           string
+	ClientID string
 	// ClientSecret is optional private material from a user-owned desktop
 	// OAuth app. PKCE remains enabled whether or not the provider requests it.
 	ClientSecret       string

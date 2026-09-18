@@ -16,6 +16,7 @@ import (
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/journal"
 )
 
 const maxConnectorTokenBytes = 64 * 1024
@@ -109,7 +110,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 	oauthClientID := flags.String("oauth-client-id", "", "public OAuth app client ID")
 	oauthAuthorizeURL := flags.String("oauth-authorize-url", "", "OAuth authorization endpoint")
 	oauthTokenURL := flags.String("oauth-token-url", "", "OAuth token endpoint")
-	oauthRedirectURL := flags.String("oauth-redirect-url", "", "registered HTTP loopback callback URL")
+	oauthRedirectURL := flags.String("oauth-redirect-url", "", "registered HTTP loopback callback URL (Google defaults to a private ephemeral callback)")
 	oauthScopes := flags.String("oauth-scopes", "", "space-separated OAuth scopes")
 	if err := flags.Parse(arguments); err != nil {
 		return err
@@ -151,6 +152,23 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		if kind != connector.KindHTTPJSON && kind != connector.KindHTTPWebhook {
 			*authentication = connector.AuthBearer
 		}
+		if kind == connector.KindGoogle {
+			*authentication = connector.AuthOAuth
+		}
+	}
+	if kind == connector.KindGoogle && strings.TrimSpace(*authentication) == connector.AuthOAuth {
+		if strings.TrimSpace(*oauthAuthorizeURL) == "" {
+			*oauthAuthorizeURL = connector.GoogleOAuthAuthorizeURL
+		}
+		if strings.TrimSpace(*oauthTokenURL) == "" {
+			*oauthTokenURL = connector.GoogleOAuthTokenURL
+		}
+		if strings.TrimSpace(*oauthRedirectURL) == "" {
+			*oauthRedirectURL = connector.GoogleOAuthRedirectURL
+		}
+		if strings.TrimSpace(*oauthScopes) == "" {
+			*oauthScopes = connector.GoogleOAuthScopes
+		}
 	}
 	descriptor := connector.Descriptor{
 		Version: connector.DescriptorVersion, ID: id, Name: strings.TrimSpace(*name),
@@ -183,7 +201,7 @@ func addConnector(id string, arguments []string, out io.Writer) error {
 		return err
 	}
 	if descriptor.Authentication == connector.AuthOAuth {
-		_, err = fmt.Fprintf(out, "Authenticate the BYO public OAuth app with: gator connector login %s\n", descriptor.ID)
+		_, err = fmt.Fprintf(out, "Authenticate the user-owned OAuth app with: gator connector login %s [--oauth-client-secret-from-env NAME]\n", descriptor.ID)
 		return err
 	}
 	return nil
@@ -214,6 +232,8 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	flags.SetOutput(io.Discard)
 	fromEnvironment := flags.String("from-env", "", "read bearer token from an environment variable")
 	fromStdin := flags.Bool("token-stdin", false, "read bearer token from standard input")
+	oauthClientSecret := flags.String("oauth-client-secret", "", "optional private OAuth client secret")
+	oauthClientSecretFromEnvironment := flags.String("oauth-client-secret-from-env", "", "read optional private OAuth client secret from an environment variable")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -235,7 +255,23 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 		if credentialSources != 0 {
 			return errors.New("OAuth connector login does not accept bearer-token flags")
 		}
-		return loginConnectorOAuth(descriptor, credentials, out)
+		if *oauthClientSecret != "" && *oauthClientSecretFromEnvironment != "" {
+			return errors.New("OAuth connector login accepts at most one client-secret source")
+		}
+		secret := strings.TrimSpace(*oauthClientSecret)
+		if *oauthClientSecretFromEnvironment != "" {
+			if !connectorEnvironmentPattern.MatchString(*oauthClientSecretFromEnvironment) {
+				return errors.New("OAuth client-secret environment variable name is invalid")
+			}
+			secret = strings.TrimSpace(os.Getenv(*oauthClientSecretFromEnvironment))
+			if secret == "" {
+				return fmt.Errorf("environment variable %s is empty", *oauthClientSecretFromEnvironment)
+			}
+		}
+		return loginConnectorOAuth(descriptor, credentials, secret, out)
+	}
+	if *oauthClientSecret != "" || *oauthClientSecretFromEnvironment != "" {
+		return errors.New("OAuth client-secret flags require an OAuth connector")
 	}
 	if descriptor.Authentication != connector.AuthBearer {
 		return fmt.Errorf("connector %q is configured without bearer authentication", id)
@@ -273,19 +309,30 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	return err
 }
 
-func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store, out io.Writer) error {
+func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store, clientSecret string, out io.Writer) error {
+	if clientSecret == "" {
+		if existing, found, err := credentials.Read(descriptor.CredentialRef()); err == nil && found && existing.IsOAuth() {
+			clientSecret = existing.OAuthClientSecret
+		}
+	}
 	flow := auth.BrowserFlow{
 		ClientID: descriptor.OAuthClientID, AuthorizationURL: descriptor.OAuthAuthorizeURL,
-		TokenURL: descriptor.OAuthTokenURL, RedirectURL: descriptor.OAuthRedirectURL,
+		ClientSecret: clientSecret, TokenURL: descriptor.OAuthTokenURL, RedirectURL: descriptor.OAuthRedirectURL,
 		Scopes: strings.Fields(descriptor.OAuthScopes), AllowMissingExpiry: true, RequireBearerToken: true,
 	}
-	attempt, err := auth.BeginBrowserFlow(flow)
+	var attempt auth.BrowserAttempt
+	var callback *auth.Callback
+	var err error
+	if descriptor.Kind == connector.KindGoogle {
+		attempt, callback, err = auth.BeginEphemeralLoopbackFlow(flow, "/oauth/callback")
+	} else {
+		attempt, err = auth.BeginBrowserFlow(flow)
+		if err == nil {
+			callback, err = attempt.StartCallback()
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("start connector OAuth login: %w", err)
-	}
-	callback, err := attempt.StartCallback()
-	if err != nil {
-		return fmt.Errorf("start connector OAuth callback: %w", err)
 	}
 	defer callback.Close()
 	if _, err := fmt.Fprintf(out, "Open this URL to authenticate connector %s with your OAuth app:\n%s\n\nWaiting for the local callback...\n", descriptor.ID, attempt.AuthorizationURL()); err != nil {
@@ -301,6 +348,7 @@ func loginConnectorOAuth(descriptor connector.Descriptor, credentials auth.Store
 	if err != nil {
 		return fmt.Errorf("exchange connector OAuth credential: %w", err)
 	}
+	credential.OAuthClientSecret = clientSecret
 	if err := credentials.Put(descriptor.CredentialRef(), credential); err != nil {
 		return fmt.Errorf("store connector OAuth credential: %w", err)
 	}
@@ -341,7 +389,11 @@ func testConnector(id string, out io.Writer) error {
 		return err
 	}
 	operation, input := connectorTestInvocation(descriptor)
-	result, err := (connector.Runtime{Registry: registry, Credentials: credentials}).Invoke(context.Background(), action.Inspect, id, operation, input)
+	stateDir, err := journal.ResolveStateDir(os.Getenv("GATOR_STATE_DIR"))
+	if err != nil {
+		return err
+	}
+	result, err := (connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}).Invoke(context.Background(), action.Inspect, id, operation, input)
 	if err != nil {
 		return err
 	}

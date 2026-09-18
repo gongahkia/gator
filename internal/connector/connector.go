@@ -31,6 +31,12 @@ const (
 	AuthBearer        = "bearer"
 	AuthOAuth         = "oauth"
 	maxConnectors     = 128
+	// GoogleOAuthAuthorizeURL and GoogleOAuthTokenURL are the fixed endpoints
+	// used by a user-owned Google desktop OAuth app.
+	GoogleOAuthAuthorizeURL = "https://accounts.google.com/o/oauth2/v2/auth"
+	GoogleOAuthTokenURL     = "https://oauth2.googleapis.com/token"
+	GoogleOAuthRedirectURL  = "http://127.0.0.1:0/oauth/callback"
+	GoogleOAuthScopes       = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/spreadsheets"
 )
 
 var idPattern = regexp.MustCompile(`\A[a-z][a-z0-9-]{0,63}\z`)
@@ -283,7 +289,7 @@ func googleOperations() []Operation {
 		{"sheets_values_update", "Prepare a Google Sheet range update for exact approval.", action.ConnectedMutate},
 		{"sheets_batch_update", "Prepare Google Sheet batch updates for exact approval.", action.ConnectedMutate},
 		{"batch", "Prepare an ordered batch of Google mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
-	}))
+	})...)
 	for index := range operations {
 		if operations[index].ID == "freebusy" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`)

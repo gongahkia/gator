@@ -221,7 +221,7 @@ func runWorkTask(arguments []string, in io.Reader, out io.Writer, modelFactory w
 			_, _ = fmt.Fprintf(out, "  snapshot: %s (%d files, %d bytes, %d exclusions)\n", manifest.ID, manifest.Files, manifest.Bytes, len(manifest.Exclusions))
 		}
 	}
-	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials}}
+	executor := workrun.Executor{Model: backend, StateDir: stateDir, Connectors: connector.Runtime{Registry: registry, Credentials: credentials, StateDir: stateDir}}
 	if native, ok := backend.(*nativeWorkBackend); ok {
 		if strings.TrimSpace(*codeBrowserSession) != "" {
 			if sandbox.Network(*codeNetwork) != sandbox.AllowNetwork {
