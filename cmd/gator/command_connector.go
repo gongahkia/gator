@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/auth"
 	"github.com/gongahkia/gator/internal/config"
@@ -234,6 +235,7 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 	fromStdin := flags.Bool("token-stdin", false, "read bearer token from standard input")
 	oauthClientSecret := flags.String("oauth-client-secret", "", "optional private OAuth client secret")
 	oauthClientSecretFromEnvironment := flags.String("oauth-client-secret-from-env", "", "read optional private OAuth client secret from an environment variable")
+	promptClientSecret := flags.Bool("prompt-client-secret", false, "read an optional OAuth client secret from a hidden terminal prompt")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -255,11 +257,32 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 		if credentialSources != 0 {
 			return errors.New("OAuth connector login does not accept bearer-token flags")
 		}
-		if *oauthClientSecret != "" && *oauthClientSecretFromEnvironment != "" {
+		secretSources := countNonEmpty(*oauthClientSecret, *oauthClientSecretFromEnvironment)
+		if *promptClientSecret {
+			secretSources++
+		}
+		if secretSources > 1 {
 			return errors.New("OAuth connector login accepts at most one client-secret source")
 		}
 		secret := strings.TrimSpace(*oauthClientSecret)
-		if *oauthClientSecretFromEnvironment != "" {
+		if *promptClientSecret {
+			if !term.IsTerminal(os.Stdin.Fd()) {
+				return errors.New("--prompt-client-secret requires an interactive terminal")
+			}
+			if _, err := fmt.Fprint(out, "Enter the OAuth client secret (input hidden; leave blank when optional): "); err != nil {
+				return err
+			}
+			value, err := term.ReadPassword(os.Stdin.Fd())
+			_, newlineErr := fmt.Fprintln(out)
+			if err != nil {
+				return fmt.Errorf("read OAuth client secret: %w", err)
+			}
+			secret = strings.TrimSpace(string(value))
+			clear(value)
+			if newlineErr != nil {
+				return newlineErr
+			}
+		} else if *oauthClientSecretFromEnvironment != "" {
 			if !connectorEnvironmentPattern.MatchString(*oauthClientSecretFromEnvironment) {
 				return errors.New("OAuth client-secret environment variable name is invalid")
 			}
@@ -270,7 +293,7 @@ func loginConnector(id string, arguments []string, in io.Reader, out io.Writer) 
 		}
 		return loginConnectorOAuth(descriptor, credentials, secret, out)
 	}
-	if *oauthClientSecret != "" || *oauthClientSecretFromEnvironment != "" {
+	if *oauthClientSecret != "" || *oauthClientSecretFromEnvironment != "" || *promptClientSecret {
 		return errors.New("OAuth client-secret flags require an OAuth connector")
 	}
 	if descriptor.Authentication != connector.AuthBearer {

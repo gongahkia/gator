@@ -259,6 +259,11 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		result, err = m.configureArtifacts(fields, command)
 	case "/connector":
 		result, err = m.configureConnectors(fields)
+		if err == nil && m.pendingConnectorCmd != nil {
+			command := m.pendingConnectorCmd
+			m.pendingConnectorCmd = nil
+			return m, command
+		}
 	case "/web-origin":
 		result, err = m.configureWebOrigins(fields)
 	case "/code":
@@ -412,7 +417,8 @@ func (m *Model) configureConnectors(fields []string) (string, error) {
 			available = m.config.ConnectorChoices()
 		}
 		return "Selected connectors: " + valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")) +
-			"\nAvailable: " + valueOrNone(strings.Join(available, ", ")), nil
+			"\nAvailable: " + valueOrNone(strings.Join(available, ", ")) +
+			"\nUse /connector setup ID GOOGLE_CLIENT_ID to configure Google Workspace.", nil
 	}
 	action := strings.ToLower(fields[1])
 	switch action {
@@ -431,9 +437,55 @@ func (m *Model) configureConnectors(fields []string) (string, error) {
 			return "", fmt.Errorf("connector %q is not configured", fields[2])
 		}
 		m.options.ConnectorIDs = appendUnique(m.options.ConnectorIDs, fields[2])
+	case "setup":
+		if len(fields) != 4 {
+			return "", fmt.Errorf("usage: /connector setup ID GOOGLE_CLIENT_ID")
+		}
+		return "", m.startConnectorAction("setup", fields[2], []string{
+			"add", fields[2], "--kind", "google", "--oauth-client-id", fields[3],
+		})
+	case "login":
+		if len(fields) < 3 || len(fields) > 4 || len(fields) == 4 && strings.ToLower(fields[3]) != "prompt" {
+			return "", fmt.Errorf("usage: /connector login ID [prompt]")
+		}
+		arguments := []string{"login", fields[2]}
+		if len(fields) == 4 {
+			arguments = append(arguments, "--prompt-client-secret")
+		}
+		return "", m.startConnectorCommand("login", fields[2], arguments)
+	case "logout":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /connector logout ID")
+		}
+		return "", m.startConnectorAction("logout", fields[2], []string{"logout", fields[2]})
+	case "status":
+		if len(fields) == 2 {
+			return "", m.startConnectorAction("status", "", []string{"list"})
+		}
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /connector status [ID]")
+		}
+		return "", m.startConnectorAction("status", fields[2], []string{"status", fields[2]})
+	case "test":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /connector test ID")
+		}
+		return "", m.startConnectorAction("test", fields[2], []string{"test", fields[2]})
+	case "permission":
+		if len(fields) != 6 {
+			return "", fmt.Errorf("usage: /connector permission ID OPERATION read|write allow|ask|deny|draft")
+		}
+		return "", m.startConnectorAction("permission", fields[2], []string{
+			"permission", fields[2], fields[3], strings.ToLower(fields[4]), strings.ToLower(fields[5]),
+		})
+	case "delete":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /connector delete ID")
+		}
+		return "", m.startConnectorAction("delete", fields[2], []string{"remove", fields[2], "--yes"})
 	default:
 		if len(fields) != 2 {
-			return "", fmt.Errorf("usage: /connector [list|add ID|remove ID|clear]")
+			return "", connectorUsage()
 		}
 		if m.config.ConnectorChoices != nil && !sliceContains(m.config.ConnectorChoices(), fields[1]) {
 			return "", fmt.Errorf("connector %q is not configured", fields[1])
@@ -441,6 +493,38 @@ func (m *Model) configureConnectors(fields []string) (string, error) {
 		m.options.ConnectorIDs = appendUnique(m.options.ConnectorIDs, fields[1])
 	}
 	return "Selected connectors: " + valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), nil
+}
+
+func connectorUsage() error {
+	return fmt.Errorf("usage: /connector [list|add ID|remove ID|clear|setup ID CLIENT_ID|login ID [prompt]|logout ID|status [ID]|test ID|permission ID OPERATION read|write POLICY|delete ID]")
+}
+
+func (m *Model) startConnectorAction(action, id string, arguments []string) error {
+	if m.config.ConnectorAction == nil {
+		return errorsUnavailable("connector management")
+	}
+	m.status = "Connector " + action + "…"
+	handler := m.config.ConnectorAction
+	m.pendingConnectorCmd = func() tea.Msg {
+		text, err := handler(arguments)
+		return connectorActionDone{action: action, id: id, text: text, err: err}
+	}
+	return nil
+}
+
+func (m *Model) startConnectorCommand(action, id string, arguments []string) error {
+	if m.config.ConnectorCommand == nil {
+		return errorsUnavailable("connector login")
+	}
+	command := m.config.ConnectorCommand(arguments)
+	if command == nil {
+		return errorsUnavailable("connector login")
+	}
+	m.status = "Connector " + action + "…"
+	m.pendingConnectorCmd = tea.ExecProcess(command, func(err error) tea.Msg {
+		return connectorActionDone{action: action, id: id, err: err}
+	})
+	return nil
 }
 
 func (m *Model) configureWebOrigins(fields []string) (string, error) {

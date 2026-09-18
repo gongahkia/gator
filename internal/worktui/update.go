@@ -35,6 +35,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateBundleActionDone(value)
 	case providerActionDone:
 		return m.updateProviderActionDone(value)
+	case connectorActionDone:
+		return m.updateConnectorActionDone(value)
 	case tea.KeyMsg:
 		return m.updateKey(value)
 	}
@@ -243,6 +245,33 @@ func (m Model) updateProviderActionDone(value providerActionDone) (tea.Model, te
 	m.options.Attachments = nil
 	m.options.RefreshSource = false
 	return m.startWork(source, conversation, prompt, options)
+}
+
+func (m Model) updateConnectorActionDone(value connectorActionDone) (tea.Model, tea.Cmd) {
+	m.status = ""
+	if value.err != nil {
+		m.messages = append(m.messages, message{role: "Gator", text: "Connector " + value.action + " did not finish: " + value.err.Error()})
+		m.scroll = 0
+		return m, nil
+	}
+	text := strings.TrimSpace(value.text)
+	switch value.action {
+	case "setup":
+		text += "\nNext: /connector login " + value.id + " prompt\nUse the prompt form when your Google desktop client has a client secret."
+	case "login":
+		m.options.ConnectorIDs = appendUnique(m.options.ConnectorIDs, value.id)
+		text = "Connector " + value.id + " is authenticated and selected for this conversation."
+	case "logout":
+		m.options.ConnectorIDs = removeString(m.options.ConnectorIDs, value.id)
+	case "delete":
+		m.options.ConnectorIDs = removeString(m.options.ConnectorIDs, value.id)
+	}
+	if text == "" {
+		text = "Connector " + value.action + " finished for " + value.id + "."
+	}
+	m.messages = append(m.messages, message{role: "Gator", text: text})
+	m.scroll = 0
+	return m, nil
 }
 
 func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {

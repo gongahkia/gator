@@ -245,6 +245,7 @@ type Model struct {
 	lastOutput           string
 	lastBundle           BundleSummary
 	pendingBundleAction  *pendingBundleAction
+	pendingConnectorCmd  tea.Cmd
 	theme                string
 	loadingFrame         int
 	loadingRun           uint64
