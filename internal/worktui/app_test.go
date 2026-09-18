@@ -185,6 +185,7 @@ func TestRequestedConversationRestoresTranscriptCardsAndSelectedRevision(t *test
 			return RunOptions{Context: context.Background(), Mode: "draft", PreviousArtifacts: []string{"report.docx"}}, nil
 		},
 	})
+	model.width, model.height = 120, 80
 	view := ansi.Strip(model.View())
 	for _, want := range []string{
 		"Draft the report", "The first draft is ready.", "Revise the executive summary", "The revised report is ready.",
@@ -226,6 +227,13 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 			head = "rev-one"
 			return "Moved back to rev-one.", nil
 		},
+		MoveForward: func(id string) (string, error) {
+			if id != "work-one" {
+				t.Fatalf("move ID = %q", id)
+			}
+			head = "rev-two"
+			return "Moved forward to rev-two.", nil
+		},
 	})
 	model.input = "/back"
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -235,6 +243,15 @@ func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
 		!strings.Contains(view, "Answer rev-one") || !strings.Contains(view, "rev-one.md") ||
 		!strings.Contains(view, "Moved back to rev-one.") || model.lastBundle.Path != "/retained/rev-one" {
 		t.Fatalf("navigation did not replace selected thread:\n%s\nstate=%#v", view, model)
+	}
+	model.input = "/forward"
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	view = ansi.Strip(model.View())
+	if strings.Contains(view, "Answer rev-one") || strings.Contains(view, "rev-one.md") ||
+		!strings.Contains(view, "Answer rev-two") || !strings.Contains(view, "rev-two.md") ||
+		!strings.Contains(view, "Moved forward to rev-two.") || model.lastBundle.Path != "/retained/rev-two" {
+		t.Fatalf("forward navigation did not replace selected thread:\n%s\nstate=%#v", view, model)
 	}
 }
 
