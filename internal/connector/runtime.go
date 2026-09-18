@@ -29,17 +29,21 @@ const maxHTTPActionBytes = 12 * 1024
 // can review the proposal but can execute the payload only through Runtime,
 // which revalidates their binding before any network request.
 type PreparedAction struct {
-	Proposal    action.Proposal
-	descriptor  Descriptor
-	operation   Operation
-	target      string
-	payload     []byte
-	googleSteps []googlePreparedStep
+	Proposal       action.Proposal
+	descriptor     Descriptor
+	operation      Operation
+	target         string
+	payload        []byte // approval-bound payload, including any ETag
+	requestPayload []byte // endpoint-specific body, never exposed to the approver
+	ifMatch        string
+	googleSteps    []googlePreparedStep
 }
 
 type googlePreparedStep struct {
 	operation string
+	target    string
 	payload   []byte
+	ifMatch   string
 }
 
 // Runtime invokes user-configured connectors under a work-mode capability
@@ -110,6 +114,8 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 		return PreparedAction{}, err
 	}
 	target := descriptor.Resource
+	requestPayload := append([]byte(nil), payload...)
+	ifMatch := ""
 	var googleSteps []googlePreparedStep
 	if descriptor.Kind == KindGoogle && operation.ID == "batch" {
 		googleSteps, payload, err = prepareGoogleBatch(descriptor, payload)
@@ -120,10 +126,15 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	}
 	if isServiceKind(descriptor.Kind) {
 		if !(descriptor.Kind == KindGoogle && operation.ID == "batch") {
-			target, payload, err = serviceAction(descriptor, operation.ID, payload)
+			preconditionPayload, precondition, preconditionErr := googlePrecondition(descriptor, payload)
+			if preconditionErr != nil {
+				return PreparedAction{}, preconditionErr
+			}
+			target, requestPayload, err = serviceAction(descriptor, operation.ID, preconditionPayload)
 			if err != nil {
 				return PreparedAction{}, err
 			}
+			ifMatch = precondition
 		}
 	} else if descriptor.Kind == KindRemoteMCP {
 		target = descriptor.Resource + "#tool=" + descriptor.ActionTool
@@ -138,7 +149,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	}
 	return PreparedAction{
 		Proposal: proposal, descriptor: descriptor, operation: operation,
-		target: target, payload: append([]byte(nil), payload...), googleSteps: googleSteps,
+		target: target, payload: append([]byte(nil), payload...), requestPayload: append([]byte(nil), requestPayload...), ifMatch: ifMatch, googleSteps: googleSteps,
 	}, nil
 }
 
@@ -164,14 +175,14 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 		return errors.New("prepared connector action payload does not match its proposal")
 	}
 	if prepared.descriptor.Kind == KindHTTPWebhook {
-		return r.publishHTTPJSON(ctx, descriptor, prepared.payload)
+		return r.publishHTTPJSON(ctx, descriptor, prepared.requestPayload)
 	}
 	if prepared.descriptor.Kind == KindRemoteMCP {
 		token, tokenErr := r.bearerToken(ctx, descriptor)
 		if tokenErr != nil {
 			return tokenErr
 		}
-		_, callErr := mcp.InvokeRemoteTool(ctx, descriptor.Resource, token, descriptor.ID, descriptor.ActionTool, prepared.payload)
+		_, callErr := mcp.InvokeRemoteTool(ctx, descriptor.Resource, token, descriptor.ID, descriptor.ActionTool, prepared.requestPayload)
 		if callErr != nil {
 			return action.MarkUncertain(callErr)
 		}
@@ -181,7 +192,7 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 		return r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
 	}
 	method := serviceActionMethod(descriptor, operation.ID)
-	result, err := r.requestJSON(ctx, descriptor, operation.ID, method, prepared.target, prepared.payload, true)
+	result, err := r.requestJSONWithPrecondition(ctx, descriptor, operation.ID, method, prepared.target, prepared.requestPayload, prepared.ifMatch, true)
 	if err != nil {
 		return err
 	}
@@ -215,11 +226,18 @@ func (r Runtime) invokeRemoteMCP(ctx context.Context, descriptor Descriptor, ope
 }
 
 type serviceInput struct {
-	Query      string          `json:"query,omitempty"`
-	ResourceID string          `json:"resource_id,omitempty"`
-	Cursor     string          `json:"cursor,omitempty"`
-	Limit      int             `json:"limit,omitempty"`
-	Payload    json.RawMessage `json:"payload,omitempty"`
+	Query            string          `json:"query,omitempty"`
+	ResourceID       string          `json:"resource_id,omitempty"`
+	Cursor           string          `json:"cursor,omitempty"`
+	Limit            int             `json:"limit,omitempty"`
+	Payload          json.RawMessage `json:"payload,omitempty"`
+	TimeMin          string          `json:"time_min,omitempty"`
+	TimeMax          string          `json:"time_max,omitempty"`
+	SingleEvents     *bool           `json:"single_events,omitempty"`
+	IncludeCompleted *bool           `json:"include_completed,omitempty"`
+	IncludeHidden    *bool           `json:"include_hidden,omitempty"`
+	IncludeDeleted   *bool           `json:"include_deleted,omitempty"`
+	Fields           string          `json:"fields,omitempty"`
 }
 
 func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
@@ -229,8 +247,15 @@ func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, opera
 	if err := decoder.Decode(&input); err != nil {
 		return Result{}, fmt.Errorf("decode connector operation input: %w", err)
 	}
-	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 || len(input.Payload) > maxHTTPActionBytes {
+	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 || len(input.Payload) > maxHTTPActionBytes || len(input.TimeMin) > 64 || len(input.TimeMax) > 64 || len(input.Fields) > 4096 {
 		return Result{}, errors.New("connector operation input exceeds its limits")
+	}
+	for _, value := range []string{input.TimeMin, input.TimeMax} {
+		if value != "" {
+			if _, err := time.Parse(time.RFC3339, value); err != nil {
+				return Result{}, errors.New("Google time bounds must be RFC3339 timestamps")
+			}
+		}
 	}
 	if len(input.Payload) > 0 {
 		var object map[string]json.RawMessage
@@ -290,11 +315,17 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 		if input.Cursor != "" {
 			query.Set("pageToken", input.Cursor)
 		}
+		if input.Fields != "" {
+			query.Set("fields", input.Fields)
+		}
 	case KindGoogle + "/drive_get":
 		if input.ResourceID == "" {
 			return "", "", nil, errors.New("Google Drive metadata requires resource_id")
 		}
 		path = "/drive/v3/files/" + url.PathEscape(input.ResourceID)
+		if input.Fields != "" {
+			query.Set("fields", input.Fields)
+		}
 	case KindGoogle + "/docs_get":
 		if input.ResourceID == "" {
 			return "", "", nil, errors.New("Google Docs read requires resource_id")
@@ -335,6 +366,19 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 		if input.Cursor != "" {
 			query.Set("pageToken", input.Cursor)
 		}
+		showCompleted := true
+		if input.IncludeCompleted != nil {
+			showCompleted = *input.IncludeCompleted
+		}
+		showHidden := true
+		if input.IncludeHidden != nil {
+			showHidden = *input.IncludeHidden
+		}
+		query.Set("showCompleted", fmt.Sprint(showCompleted))
+		query.Set("showHidden", fmt.Sprint(showHidden))
+		if input.IncludeDeleted != nil {
+			query.Set("showDeleted", fmt.Sprint(*input.IncludeDeleted))
+		}
 	case KindGoogle + "/tasks_get":
 		listID, taskID, err := splitGoogleID(input.ResourceID, "task-list ID and task ID")
 		if err != nil {
@@ -349,11 +393,19 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 		if input.Cursor != "" {
 			query.Set("pageToken", input.Cursor)
 		}
+		if input.IncludeHidden != nil {
+			query.Set("showHidden", fmt.Sprint(*input.IncludeHidden))
+		}
+		if input.IncludeDeleted != nil {
+			query.Set("showDeleted", fmt.Sprint(*input.IncludeDeleted))
+		}
 	case KindGoogle + "/calendars_get":
 		if input.ResourceID == "" {
 			return "", "", nil, errors.New("Google Calendar read requires resource_id")
 		}
 		path = "/calendar/v3/calendars/" + url.PathEscape(input.ResourceID)
+	case KindGoogle + "/calendar_colors":
+		path = "/calendar/v3/colors"
 	case KindGoogle + "/events_list":
 		if input.ResourceID == "" {
 			return "", "", nil, errors.New("Google Calendar event list requires resource_id calendar")
@@ -364,6 +416,18 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 		}
 		if input.Cursor != "" {
 			query.Set("pageToken", input.Cursor)
+		}
+		if input.TimeMin != "" {
+			query.Set("timeMin", input.TimeMin)
+		}
+		if input.TimeMax != "" {
+			query.Set("timeMax", input.TimeMax)
+		}
+		if input.SingleEvents != nil {
+			query.Set("singleEvents", fmt.Sprint(*input.SingleEvents))
+		}
+		if input.IncludeDeleted != nil {
+			query.Set("showDeleted", fmt.Sprint(*input.IncludeDeleted))
 		}
 	case KindGoogle + "/events_get":
 		calendarID, eventID, err := splitGoogleID(input.ResourceID, "calendar ID and event ID")
@@ -475,7 +539,11 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 		if err != nil {
 			return "", nil, err
 		}
-		path, payload = "/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks", sanitized
+		options, body, err := extractStringOptions(sanitized, "parent", "previous")
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = withQuery("/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks", options), body
 	case KindGoogle + "/tasks_update", KindGoogle + "/tasks_delete":
 		listID, taskID, sanitized, err := extractGoogleCompositeID(payload, "task-list ID and task ID")
 		if err != nil {
@@ -487,21 +555,15 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 		if err != nil {
 			return "", nil, err
 		}
-		var move struct {
-			Parent   string `json:"parent"`
-			Previous string `json:"previous"`
+		options, _, err := extractStringOptions(sanitized, "parent", "previous", "destination_tasklist")
+		if err != nil {
+			return "", nil, err
 		}
-		if err := json.Unmarshal(sanitized, &move); err != nil {
-			return "", nil, errors.New("Google task move payload is invalid")
+		if destination := options.Get("destination_tasklist"); destination != "" {
+			options.Del("destination_tasklist")
+			options.Set("destinationTasklist", destination)
 		}
-		query := url.Values{}
-		if strings.TrimSpace(move.Parent) != "" {
-			query.Set("parent", move.Parent)
-		}
-		if strings.TrimSpace(move.Previous) != "" {
-			query.Set("previous", move.Previous)
-		}
-		path, payload = "/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks/"+url.PathEscape(taskID)+"/move?"+query.Encode(), []byte(`{}`)
+		path, payload = withQuery("/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks/"+url.PathEscape(taskID)+"/move", options), []byte(`{}`)
 	case KindGoogle + "/calendars_create":
 		path = "/calendar/v3/calendars"
 	case KindGoogle + "/calendars_update", KindGoogle + "/calendars_delete":
@@ -510,18 +572,65 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 			return "", nil, err
 		}
 		path, payload = "/calendar/v3/calendars/"+url.PathEscape(id), sanitized
+	case KindGoogle + "/calendars_subscribe":
+		id, _, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/calendar/v3/users/me/calendarList", []byte(`{"id":`+mustJSONString(id)+`}`)
+	case KindGoogle + "/calendars_unsubscribe":
+		id, _, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/calendar/v3/users/me/calendarList/"+url.PathEscape(id), []byte(`{}`)
+	case KindGoogle + "/calendars_list_update":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/calendar/v3/users/me/calendarList/"+url.PathEscape(id), sanitized
 	case KindGoogle + "/events_create":
 		calendarID, sanitized, err := extractResourceID(payload)
 		if err != nil {
 			return "", nil, err
 		}
-		path, payload = "/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events", sanitized
+		options, body, err := extractEventOptions(sanitized)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = withQuery("/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events", options), body
 	case KindGoogle + "/events_update", KindGoogle + "/events_delete":
 		calendarID, eventID, sanitized, err := extractGoogleCompositeID(payload, "calendar ID and event ID")
 		if err != nil {
 			return "", nil, err
 		}
-		path, payload = "/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events/"+url.PathEscape(eventID), sanitized
+		options, body, err := extractEventOptions(sanitized)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = withQuery("/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events/"+url.PathEscape(eventID), options), body
+	case KindGoogle + "/events_move":
+		calendarID, eventID, sanitized, err := extractGoogleCompositeID(payload, "calendar ID and event ID")
+		if err != nil {
+			return "", nil, err
+		}
+		options, _, err := extractStringOptions(sanitized, "destination_calendar")
+		if err != nil || options.Get("destination_calendar") == "" {
+			return "", nil, errors.New("Google event move requires destination_calendar")
+		}
+		query := url.Values{"destination": {options.Get("destination_calendar")}}
+		path, payload = withQuery("/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events/"+url.PathEscape(eventID)+"/move", query), []byte(`{}`)
+	case KindGoogle + "/events_respond":
+		calendarID, eventID, sanitized, err := extractGoogleCompositeID(payload, "calendar ID and event ID")
+		if err != nil {
+			return "", nil, err
+		}
+		options, body, err := extractEventResponse(sanitized)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = withQuery("/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events/"+url.PathEscape(eventID), options), body
 	case KindAtlassian + "/jira_create":
 		path = "/rest/api/3/issue"
 	case KindAtlassian + "/confluence_create":
@@ -550,11 +659,11 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 
 func serviceActionMethod(descriptor Descriptor, operation string) string {
 	switch descriptor.Kind + "/" + operation {
-	case KindNotion + "/page_update", KindGoogle + "/tasklists_update", KindGoogle + "/tasks_update", KindGoogle + "/calendars_update", KindGoogle + "/events_update":
+	case KindNotion + "/page_update", KindGoogle + "/tasklists_update", KindGoogle + "/tasks_update", KindGoogle + "/calendars_update", KindGoogle + "/calendars_list_update", KindGoogle + "/events_update", KindGoogle + "/events_respond":
 		return http.MethodPatch
-	case KindGoogle + "/tasklists_delete", KindGoogle + "/tasks_delete", KindGoogle + "/calendars_delete", KindGoogle + "/events_delete":
+	case KindGoogle + "/tasklists_delete", KindGoogle + "/tasks_delete", KindGoogle + "/calendars_delete", KindGoogle + "/calendars_unsubscribe", KindGoogle + "/events_delete":
 		return http.MethodDelete
-	case KindGoogle + "/tasks_move":
+	case KindGoogle + "/tasks_move", KindGoogle + "/events_move":
 		return http.MethodPost
 	case KindGoogle + "/sheets_values_update":
 		return http.MethodPut
@@ -603,6 +712,115 @@ func extractGoogleCompositeID(payload []byte, label string) (string, string, []b
 	return first, second, sanitized, nil
 }
 
+func extractStringOptions(payload []byte, names ...string) (url.Values, []byte, error) {
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &object); err != nil || object == nil {
+		return nil, nil, errors.New("Google action payload is invalid")
+	}
+	options := url.Values{}
+	for _, name := range names {
+		raw, found := object[name]
+		if !found {
+			continue
+		}
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil || strings.TrimSpace(value) != value || len(value) > 2048 {
+			return nil, nil, fmt.Errorf("Google action option %s is invalid", name)
+		}
+		delete(object, name)
+		if value != "" {
+			options.Set(name, value)
+		}
+	}
+	body, err := json.Marshal(object)
+	if err != nil {
+		return nil, nil, err
+	}
+	return options, body, nil
+}
+
+func extractEventOptions(payload []byte) (url.Values, []byte, error) {
+	options, body, err := extractStringOptions(payload, "send_updates")
+	if err != nil {
+		return nil, nil, err
+	}
+	if value := options.Get("send_updates"); value != "" {
+		if value != "all" && value != "externalOnly" && value != "none" {
+			return nil, nil, errors.New("Google event send_updates must be all, externalOnly, or none")
+		}
+		options.Del("send_updates")
+		options.Set("sendUpdates", value)
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(body, &object); err != nil || object == nil {
+		return nil, nil, errors.New("Google event payload is invalid")
+	}
+	if raw, found := object["supports_attachments"]; found {
+		var value bool
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return nil, nil, errors.New("Google event supports_attachments must be boolean")
+		}
+		delete(object, "supports_attachments")
+		options.Set("supportsAttachments", fmt.Sprint(value))
+	}
+	if raw, found := object["conference_data_version"]; found {
+		var value int
+		if err := json.Unmarshal(raw, &value); err != nil || value < 0 || value > 1 {
+			return nil, nil, errors.New("Google event conference_data_version must be 0 or 1")
+		}
+		delete(object, "conference_data_version")
+		options.Set("conferenceDataVersion", fmt.Sprint(value))
+	}
+	body, err = json.Marshal(object)
+	if err != nil {
+		return nil, nil, err
+	}
+	return options, body, nil
+}
+
+func extractEventResponse(payload []byte) (url.Values, []byte, error) {
+	options, body, err := extractStringOptions(payload, "response_status", "comment", "send_updates")
+	if err != nil {
+		return nil, nil, err
+	}
+	status := options.Get("response_status")
+	if status != "accepted" && status != "declined" && status != "tentative" && status != "needsAction" {
+		return nil, nil, errors.New("Google event response_status is invalid")
+	}
+	if len(body) != 2 || string(body) != "{}" {
+		return nil, nil, errors.New("Google event response only accepts response_status, comment, and send_updates")
+	}
+	attendee := map[string]any{"self": true, "responseStatus": status}
+	if comment := options.Get("comment"); comment != "" {
+		attendee["comment"] = comment
+	}
+	updates := options.Get("send_updates")
+	if updates == "" {
+		updates = "all"
+	}
+	if updates != "all" && updates != "externalOnly" && updates != "none" {
+		return nil, nil, errors.New("Google event send_updates must be all, externalOnly, or none")
+	}
+	return url.Values{"sendUpdates": {updates}}, mustJSON(map[string]any{"attendees": []any{attendee}}), nil
+}
+
+func withQuery(path string, values url.Values) string {
+	if encoded := values.Encode(); encoded != "" {
+		return path + "?" + encoded
+	}
+	return path
+}
+
+func mustJSONString(value string) string {
+	payload, _ := json.Marshal(value)
+	return string(payload)
+}
+
+func mustJSON(value any) []byte {
+	payload, _ := json.Marshal(value)
+	return payload
+}
+
 func splitGoogleID(value, label string) (string, string, error) {
 	first, second, found := strings.Cut(strings.TrimSpace(value), "/")
 	if !found || strings.TrimSpace(first) == "" || strings.TrimSpace(second) == "" || strings.Contains(second, "/") || len(first) > 1024 || len(second) > 1024 {
@@ -611,11 +829,42 @@ func splitGoogleID(value, label string) (string, string, error) {
 	return first, second, nil
 }
 
+// googlePrecondition consumes the optional ETag from a typed Google action
+// payload and turns it into an HTTP If-Match precondition. The ETag remains in
+// the approval-bound payload, but is never sent as an unrecognised JSON field.
+func googlePrecondition(descriptor Descriptor, payload []byte) ([]byte, string, error) {
+	if descriptor.Kind != KindGoogle {
+		return payload, "", nil
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &object); err != nil || object == nil {
+		return nil, "", errors.New("Google action payload is invalid")
+	}
+	raw, found := object["etag"]
+	if !found {
+		return payload, "", nil
+	}
+	var etag string
+	if err := json.Unmarshal(raw, &etag); err != nil || strings.TrimSpace(etag) != etag || etag == "" || len(etag) > 4096 || strings.ContainsAny(etag, "\x00\r\n") {
+		return nil, "", errors.New("Google action etag is invalid")
+	}
+	delete(object, "etag")
+	body, err := json.Marshal(object)
+	if err != nil {
+		return nil, "", err
+	}
+	return body, etag, nil
+}
+
 func isServiceKind(kind string) bool {
 	return kind == KindSlack || kind == KindGoogle || kind == KindAtlassian || kind == KindNotion
 }
 
 func (r Runtime) requestJSON(ctx context.Context, descriptor Descriptor, operation, method, endpoint string, body []byte, uncertain bool) (Result, error) {
+	return r.requestJSONWithPrecondition(ctx, descriptor, operation, method, endpoint, body, "", uncertain)
+}
+
+func (r Runtime) requestJSONWithPrecondition(ctx context.Context, descriptor Descriptor, operation, method, endpoint string, body []byte, ifMatch string, uncertain bool) (Result, error) {
 	token, err := r.bearerToken(ctx, descriptor)
 	if err != nil {
 		return Result{}, err
@@ -631,6 +880,9 @@ func (r Runtime) requestJSON(ctx context.Context, descriptor Descriptor, operati
 	}
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	if ifMatch != "" {
+		request.Header.Set("If-Match", ifMatch)
 	}
 	if descriptor.Kind == KindNotion {
 		request.Header.Set("Notion-Version", "2026-03-11")
@@ -854,10 +1106,15 @@ func prepareGoogleBatch(descriptor Descriptor, payload []byte) ([]googlePrepared
 		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s payload: %w", operationID, err)
 		}
-		if _, _, err := serviceAction(descriptor, operationID, canonical); err != nil {
+		requestPayload, ifMatch, err := googlePrecondition(descriptor, canonical)
+		if err != nil {
 			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
 		}
-		steps = append(steps, googlePreparedStep{operation: operationID, payload: canonical})
+		target, transportBody, err := serviceAction(descriptor, operationID, requestPayload)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Google batch %s: %w", operationID, err)
+		}
+		steps = append(steps, googlePreparedStep{operation: operationID, target: target, payload: transportBody, ifMatch: ifMatch})
 		canonicalActions = append(canonicalActions, canonicalAction{Operation: operationID, Payload: canonical})
 	}
 	canonical, err := json.Marshal(struct {
@@ -886,11 +1143,7 @@ func (r Runtime) executeGoogleBatch(ctx context.Context, descriptor Descriptor, 
 		return errors.New("prepared Google batch is invalid")
 	}
 	for _, step := range steps {
-		target, body, err := serviceAction(descriptor, step.operation, step.payload)
-		if err != nil {
-			return err
-		}
-		result, err := r.requestJSON(ctx, descriptor, step.operation, serviceActionMethod(descriptor, step.operation), target, body, true)
+		result, err := r.requestJSONWithPrecondition(ctx, descriptor, step.operation, serviceActionMethod(descriptor, step.operation), step.target, step.payload, step.ifMatch, true)
 		if err != nil {
 			// In particular, do not replay an earlier request after an unknown
 			// timeout or connection close. The caller gets the uncertain record.

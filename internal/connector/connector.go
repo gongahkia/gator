@@ -263,6 +263,7 @@ func googleOperations() []Operation {
 		{"tasks_get", "Read one Google Task by task-list/task ID.", action.ConnectedRead},
 		{"calendars_list", "List Google Calendars available to this connection.", action.ConnectedRead},
 		{"calendars_get", "Read one Google Calendar.", action.ConnectedRead},
+		{"calendar_colors", "Read Google Calendar color definitions.", action.ConnectedRead},
 		{"events_list", "List events from one Google Calendar.", action.ConnectedRead},
 		{"events_get", "Read one Google Calendar event.", action.ConnectedRead},
 		{"freebusy", "Query Google Calendar free/busy information for an explicit time range.", action.ConnectedRead},
@@ -284,9 +285,14 @@ func googleOperations() []Operation {
 		{"calendars_create", "Prepare Google Calendar creation for exact approval.", action.ConnectedMutate},
 		{"calendars_update", "Prepare a Google Calendar update for exact approval.", action.ConnectedMutate},
 		{"calendars_delete", "Prepare Google Calendar deletion for exact approval.", action.ConnectedMutate},
+		{"calendars_subscribe", "Prepare adding an existing Google Calendar to the calendar list for exact approval.", action.ConnectedMutate},
+		{"calendars_unsubscribe", "Prepare removing a subscribed Google Calendar from the calendar list for exact approval.", action.ConnectedMutate},
+		{"calendars_list_update", "Prepare updates to Google Calendar-list preferences for exact approval.", action.ConnectedMutate},
 		{"events_create", "Prepare Google Calendar event creation for exact approval.", action.ConnectedMutate},
 		{"events_update", "Prepare a Google Calendar event update for exact approval.", action.ConnectedMutate},
 		{"events_delete", "Prepare Google Calendar event deletion for exact approval.", action.ConnectedMutate},
+		{"events_move", "Prepare moving a Google Calendar event to another calendar for exact approval.", action.ConnectedMutate},
+		{"events_respond", "Prepare an RSVP response to a Google Calendar event for exact approval.", action.ConnectedMutate},
 		{"docs_create", "Prepare Google Doc creation for exact approval.", action.ConnectedMutate},
 		{"docs_update", "Prepare Google Doc batch updates for exact approval.", action.ConnectedMutate},
 		{"sheets_create", "Prepare Google Sheet creation for exact approval.", action.ConnectedMutate},
@@ -297,6 +303,21 @@ func googleOperations() []Operation {
 	for index := range operations {
 		if operations[index].ID == "freebusy" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "tasks_list" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":1024},"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"include_completed":{"type":"boolean"},"include_hidden":{"type":"boolean"},"include_deleted":{"type":"boolean"}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "drive_search" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","maxLength":4096},"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"fields":{"type":"string","maxLength":4096}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "drive_get" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":2048},"fields":{"type":"string","maxLength":4096}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "calendars_list" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"include_hidden":{"type":"boolean"},"include_deleted":{"type":"boolean"}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "events_list" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["resource_id"],"properties":{"resource_id":{"type":"string","minLength":1,"maxLength":1024},"cursor":{"type":"string","maxLength":2048},"limit":{"type":"integer","minimum":1,"maximum":100},"time_min":{"type":"string","maxLength":64},"time_max":{"type":"string","maxLength":64},"single_events":{"type":"boolean"},"include_deleted":{"type":"boolean"}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "local_search" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512},"kinds":{"type":"array","items":{"type":"string"},"maxItems":16},"limit":{"type":"integer","minimum":1,"maximum":100}},"additionalProperties":false}`)

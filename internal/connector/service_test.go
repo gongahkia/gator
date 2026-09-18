@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,6 +47,74 @@ func TestGoogleAdapterUsesServiceSpecificHosts(t *testing.T) {
 	endpoint, _, _, err = serviceRead(descriptor, "sheets_get", serviceInput{ResourceID: "sheet"})
 	if err != nil || endpoint != "https://sheets.googleapis.com/v4/spreadsheets/sheet" {
 		t.Fatalf("Sheets endpoint = %q, %v", endpoint, err)
+	}
+}
+
+func TestGoogleAgendaAndTaskListExposeManualFrontendFilters(t *testing.T) {
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: "https://www.googleapis.com", Authentication: AuthNone}
+	includeCompleted := false
+	includeHidden := false
+	includeDeleted := true
+	endpoint, _, _, err := serviceRead(descriptor, "tasks_list", serviceInput{ResourceID: "list", IncludeCompleted: &includeCompleted, IncludeHidden: &includeHidden, IncludeDeleted: &includeDeleted})
+	if err != nil || !strings.Contains(endpoint, "showCompleted=false") || !strings.Contains(endpoint, "showHidden=false") || !strings.Contains(endpoint, "showDeleted=true") {
+		t.Fatalf("task list endpoint=%q err=%v", endpoint, err)
+	}
+	singleEvents := true
+	endpoint, _, _, err = serviceRead(descriptor, "events_list", serviceInput{ResourceID: "calendar", TimeMin: "2026-09-18T00:00:00Z", TimeMax: "2026-09-19T00:00:00Z", SingleEvents: &singleEvents})
+	if err != nil || !strings.Contains(endpoint, "timeMin=2026-09-18T00%3A00%3A00Z") || !strings.Contains(endpoint, "singleEvents=true") {
+		t.Fatalf("agenda endpoint=%q err=%v", endpoint, err)
+	}
+	endpoint, _, _, err = serviceRead(descriptor, "calendar_colors", serviceInput{})
+	if err != nil || endpoint != "https://www.googleapis.com/calendar/v3/colors" {
+		t.Fatalf("calendar colors endpoint=%q err=%v", endpoint, err)
+	}
+	endpoint, _, _, err = serviceRead(descriptor, "drive_get", serviceInput{ResourceID: "file", Fields: "id,name,owners"})
+	if err != nil || !strings.Contains(endpoint, "fields=id%2Cname%2Cowners") {
+		t.Fatalf("Drive metadata endpoint=%q err=%v", endpoint, err)
+	}
+}
+
+func TestGoogleEventResponsePinsRSVPOptionsAndETag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPatch || request.URL.Path != "/calendar/v3/calendars/calendar/events/event" || request.URL.Query().Get("sendUpdates") != "all" || request.Header.Get("If-Match") != "etag-value" {
+			t.Fatalf("request=%s %s?%s if-match=%q", request.Method, request.URL.Path, request.URL.RawQuery, request.Header.Get("If-Match"))
+		}
+		var body map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		attendees, ok := body["attendees"].([]any)
+		if !ok || len(attendees) != 1 {
+			t.Fatalf("RSVP body=%#v", body)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"id":"event","summary":"Planning"}`))
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client()}
+	prepared, err := runtime.PrepareAction(descriptor.ID, "events_respond", json.RawMessage(`{"payload":{"resource_id":"calendar/event","response_status":"accepted","comment":"Count me in","send_updates":"all","etag":"etag-value"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runtime.ExecutePrepared(context.Background(), action.Act, prepared); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGoogleCalendarSubscriptionAndEventMoveUsePinnedEndpoints(t *testing.T) {
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: "https://www.googleapis.com", Authentication: AuthNone}
+	target, body, err := serviceAction(descriptor, "calendars_subscribe", []byte(`{"resource_id":"team@example.test"}`))
+	if err != nil || target != "https://www.googleapis.com/calendar/v3/users/me/calendarList" || string(body) != `{"id":"team@example.test"}` {
+		t.Fatalf("calendar subscription target=%q body=%s err=%v", target, body, err)
+	}
+	target, body, err = serviceAction(descriptor, "events_move", []byte(`{"resource_id":"source/event","destination_calendar":"destination"}`))
+	if err != nil || target != "https://www.googleapis.com/calendar/v3/calendars/source/events/event/move?destination=destination" || string(body) != `{}` {
+		t.Fatalf("event move target=%q body=%s err=%v", target, body, err)
 	}
 }
 

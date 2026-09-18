@@ -45,10 +45,14 @@ gator connector permission google-work events_create write deny
 gator connector permission google-work tasks_create write ask
 ```
 
-Available read operations cover task lists/tasks, calendar lists/events,
-free/busy, Drive metadata, Docs, Sheets and bounded cell ranges. Mutating
-operations cover task-list/task/calendar/event lifecycle, Docs batch updates,
-Sheets creation/range/batch updates, and an ordered Google action batch.
+Available read operations cover task lists/tasks (including completed and
+hidden views), calendar lists/colors/events (including bounded agendas and
+expanded recurring instances), free/busy, Drive metadata, Docs, Sheets and
+bounded cell ranges. Mutating operations cover task-list/task lifecycle and
+placement, calendar lifecycle/list subscriptions/preferences, event lifecycle,
+moves and RSVPs, Docs batch updates, Sheets creation/range/batch updates, and
+an ordered Google action batch. Update and delete payloads may include a Google
+`etag`; Gator binds it to the approved payload and sends it as `If-Match`.
 Quick capture recognizes task/event, date, time, duration, priority, and
 simple recurrence phrases and produces a reviewable preview; it never creates
 a remote object by itself. `task_metadata_encode` similarly builds a bounded
