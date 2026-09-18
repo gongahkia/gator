@@ -434,8 +434,86 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 		path = "/chat.update"
 	case KindGoogle + "/docs_create":
 		path = "/v1/documents"
+	case KindGoogle + "/docs_update":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/v1/documents/"+url.PathEscape(id)+":batchUpdate", sanitized
 	case KindGoogle + "/sheets_create":
 		path = "/v4/spreadsheets"
+	case KindGoogle + "/sheets_values_update":
+		id, cellRange, sanitized, err := extractGoogleCompositeID(payload, "sheet ID and range")
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/v4/spreadsheets/"+url.PathEscape(id)+"/values/"+url.PathEscape(cellRange), sanitized
+	case KindGoogle + "/sheets_batch_update":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/v4/spreadsheets/"+url.PathEscape(id)+":batchUpdate", sanitized
+	case KindGoogle + "/tasklists_create":
+		path = "/tasks/v1/users/@me/lists"
+	case KindGoogle + "/tasklists_update", KindGoogle + "/tasklists_delete":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/tasks/v1/users/@me/lists/"+url.PathEscape(id), sanitized
+	case KindGoogle + "/tasks_create":
+		listID, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks", sanitized
+	case KindGoogle + "/tasks_update", KindGoogle + "/tasks_delete":
+		listID, taskID, sanitized, err := extractGoogleCompositeID(payload, "task-list ID and task ID")
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks/"+url.PathEscape(taskID), sanitized
+	case KindGoogle + "/tasks_move":
+		listID, taskID, sanitized, err := extractGoogleCompositeID(payload, "task-list ID and task ID")
+		if err != nil {
+			return "", nil, err
+		}
+		var move struct {
+			Parent   string `json:"parent"`
+			Previous string `json:"previous"`
+		}
+		if err := json.Unmarshal(sanitized, &move); err != nil {
+			return "", nil, errors.New("Google task move payload is invalid")
+		}
+		query := url.Values{}
+		if strings.TrimSpace(move.Parent) != "" {
+			query.Set("parent", move.Parent)
+		}
+		if strings.TrimSpace(move.Previous) != "" {
+			query.Set("previous", move.Previous)
+		}
+		path, payload = "/tasks/v1/lists/"+url.PathEscape(listID)+"/tasks/"+url.PathEscape(taskID)+"/move?"+query.Encode(), []byte(`{}`)
+	case KindGoogle + "/calendars_create":
+		path = "/calendar/v3/calendars"
+	case KindGoogle + "/calendars_update", KindGoogle + "/calendars_delete":
+		id, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/calendar/v3/calendars/"+url.PathEscape(id), sanitized
+	case KindGoogle + "/events_create":
+		calendarID, sanitized, err := extractResourceID(payload)
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events", sanitized
+	case KindGoogle + "/events_update", KindGoogle + "/events_delete":
+		calendarID, eventID, sanitized, err := extractGoogleCompositeID(payload, "calendar ID and event ID")
+		if err != nil {
+			return "", nil, err
+		}
+		path, payload = "/calendar/v3/calendars/"+url.PathEscape(calendarID)+"/events/"+url.PathEscape(eventID), sanitized
 	case KindAtlassian + "/jira_create":
 		path = "/rest/api/3/issue"
 	case KindAtlassian + "/confluence_create":
@@ -460,6 +538,19 @@ func serviceAction(descriptor Descriptor, operation string, payload []byte) (str
 		return "", nil, fmt.Errorf("connector operation %s/%s has no action runtime", descriptor.ID, operation)
 	}
 	return serviceBase(descriptor, operation) + path, payload, nil
+}
+
+func serviceActionMethod(descriptor Descriptor, operation string) string {
+	switch descriptor.Kind + "/" + operation {
+	case KindNotion + "/page_update", KindGoogle + "/tasklists_update", KindGoogle + "/tasks_update", KindGoogle + "/calendars_update", KindGoogle + "/events_update":
+		return http.MethodPatch
+	case KindGoogle + "/tasklists_delete", KindGoogle + "/tasks_delete", KindGoogle + "/calendars_delete", KindGoogle + "/events_delete":
+		return http.MethodDelete
+	case KindGoogle + "/tasks_move", KindGoogle + "/sheets_values_update":
+		return http.MethodPost
+	default:
+		return http.MethodPost
+	}
 }
 
 func serviceBase(descriptor Descriptor, operation string) string {
@@ -488,6 +579,26 @@ func extractResourceID(payload []byte) (string, []byte, error) {
 	delete(object, "resource_id")
 	result, err := json.Marshal(object)
 	return id, result, err
+}
+
+func extractGoogleCompositeID(payload []byte, label string) (string, string, []byte, error) {
+	id, sanitized, err := extractResourceID(payload)
+	if err != nil {
+		return "", "", nil, err
+	}
+	first, second, err := splitGoogleID(id, label)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return first, second, sanitized, nil
+}
+
+func splitGoogleID(value, label string) (string, string, error) {
+	first, second, found := strings.Cut(strings.TrimSpace(value), "/")
+	if !found || strings.TrimSpace(first) == "" || strings.TrimSpace(second) == "" || strings.Contains(second, "/") || len(first) > 1024 || len(second) > 1024 {
+		return "", "", fmt.Errorf("Google operation requires %s as resource_id separated by one slash", label)
+	}
+	return first, second, nil
 }
 
 func isServiceKind(kind string) bool {
