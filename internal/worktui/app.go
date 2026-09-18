@@ -262,8 +262,10 @@ func New(config Config) Model {
 	model.statusLine, model.statusLineConfigured = resolveStatusLine(config.StatusLine)
 	model.refreshModelStatus()
 	if config.StartConversationID != "" {
+		found := false
 		for _, conversation := range config.Conversations {
 			if conversation.ID == config.StartConversationID {
+				found = true
 				model.home = false
 				model.source = conversation.SourcePath
 				model.conversation = conversation.ID
@@ -271,6 +273,14 @@ func New(config Config) Model {
 				model.restoreConversation(conversation.ID, "")
 				break
 			}
+		}
+		if !found && config.LoadConversation != nil {
+			// The interactive entrypoint normally preloads a requested ID into the
+			// picker, but the TUI remains correct for other callers as well.
+			model.home = false
+			model.conversation = config.StartConversationID
+			model.title = "Restoring conversation"
+			model.restoreConversation(config.StartConversationID, "")
 		}
 	}
 	return model

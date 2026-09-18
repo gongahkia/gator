@@ -707,7 +707,7 @@ func loadWorkTUIConversation(store worksession.Store, conversationID string) (wo
 		state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "Deliverables", Bundle: &bundle})
 		if revision.ID == conversation.HeadRevision {
 			state.LastBundle = bundle
-			state.OutputPath = filepath.Join(revision.BundlePath, "output")
+			state.OutputPath = filepath.Join(bundle.Path, "output")
 		}
 	}
 	return state, nil

@@ -784,9 +784,9 @@ func singleLine(value string) string {
 }
 
 func (m Model) workStatus() string {
-	return fmt.Sprintf("Gator orchestration\n  workspace: %s%s\n  conversation: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n\n%s",
+	return fmt.Sprintf("Gator orchestration\n  workspace: %s%s\n  conversation: %s\n  selected revision: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n\n%s",
 		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
-		valueOrNone(m.conversation), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
+		valueOrNone(m.conversation), valueOrNone(m.revision), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
 		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
 		effortName(m.options.MaxSteps), m.options.MaxSteps,
 		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue), m.codeStatus())
