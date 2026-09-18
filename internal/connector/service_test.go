@@ -48,6 +48,133 @@ func TestGoogleAdapterUsesServiceSpecificHosts(t *testing.T) {
 	}
 }
 
+func TestGoogleLocalSearchRequiresLiveConnectionBeforeReturningMirrorData(t *testing.T) {
+	available := true
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/drive/v3/files":
+			_, _ = writer.Write([]byte(`{"files":[{"id":"file-1","name":"Roadmap"}]}`))
+		case "/oauth2/v3/userinfo":
+			if !available {
+				writer.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = writer.Write([]byte(`{"error":"offline"}`))
+				return
+			}
+			_, _ = writer.Write([]byte(`{"email":"person@example.test"}`))
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client(), StateDir: t.TempDir()}
+	if _, err := runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, "drive_search", json.RawMessage(`{"query":"roadmap"}`)); err != nil {
+		t.Fatal(err)
+	}
+	available = false
+	if _, err := runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, "local_search", json.RawMessage(`{"query":"roadmap","limit":10}`)); err == nil {
+		t.Fatal("local mirror result was exposed after live health failed")
+	}
+	available = true
+	result, err := runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, "local_search", json.RawMessage(`{"query":"roadmap","limit":10}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(result.Data, []byte(`"file-1"`)) || result.Provenance.Operation != "local_search" {
+		t.Fatalf("local search result = %s, provenance=%#v", result.Data, result.Provenance)
+	}
+}
+
+func TestGoogleBatchPinsCanonicalPayloadAndDoesNotSendDuringPreparation(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		if request.Method != http.MethodPost || request.URL.Path != "/tasks/v1/lists/list/tasks" {
+			t.Fatalf("request = %s %s", request.Method, request.URL.Path)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"id":"task-1","title":"Prepare release"}`))
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client(), StateDir: t.TempDir()}
+	prepared, err := runtime.PrepareAction(descriptor.ID, "batch", json.RawMessage(`{"payload":{"actions":[{"payload":{"title":"Prepare release","resource_id":"list"},"operation":"tasks_create"}]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 0 || !bytes.Contains([]byte(prepared.Proposal.Preview), []byte(`"operation":"tasks_create"`)) {
+		t.Fatalf("prepared request count=%d proposal=%#v", requests, prepared.Proposal)
+	}
+	if err := runtime.ExecutePrepared(context.Background(), action.Act, prepared); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 1 {
+		t.Fatalf("requests = %d", requests)
+	}
+}
+
+func TestPreparedGoogleActionRejectsAChangedApprovalEnvelope(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests++
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"id":"task-1"}`))
+	}))
+	defer server.Close()
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := (Runtime{Registry: registry, HTTPClient: server.Client()}).PrepareAction(descriptor.ID, "tasks_create", json.RawMessage(`{"payload":{"resource_id":"list","title":"Prepare release"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared.Proposal.Target = server.URL + "/different"
+	if err := (Runtime{Registry: registry, HTTPClient: server.Client()}).ExecutePrepared(context.Background(), action.Act, prepared); err == nil || requests != 0 {
+		t.Fatalf("tampered action error=%v requests=%d", err, requests)
+	}
+}
+
+func TestGoogleQuickCaptureDoesNotCreateAThing(t *testing.T) {
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: "https://www.googleapis.com", Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := (Runtime{Registry: registry, Now: func() time.Time { return time.Date(2026, 9, 18, 9, 0, 0, 0, time.UTC) }}).Invoke(context.Background(), action.Inspect, descriptor.ID, "quick_capture", json.RawMessage(`{"text":"meeting Roadmap tomorrow at 9am"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(result.Data, []byte(`"kind":"event"`)) || result.Provenance.Operation != "quick_capture" {
+		t.Fatalf("result = %s, provenance=%#v", result.Data, result.Provenance)
+	}
+}
+
+func TestGoogleTaskMetadataBuildsNotesBeforeAnyTaskWrite(t *testing.T) {
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: "https://www.googleapis.com", Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := (Runtime{Registry: registry}).Invoke(context.Background(), action.Inspect, descriptor.ID, "task_metadata_encode", json.RawMessage(`{"notes":"Launch plan","priority":"high","recurrence_rrule":"RRULE:FREQ=WEEKLY;INTERVAL=1","reminder_time":"09:00","reminder_zone":"Asia/Singapore"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(result.Data, []byte(`"notes":"Launch plan\n\n[GATOR-TASK v1]`)) {
+		t.Fatalf("metadata result = %s", result.Data)
+	}
+}
+
 func TestSlackHTTP200ErrorIsNotTreatedAsSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")

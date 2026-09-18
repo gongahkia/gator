@@ -144,3 +144,31 @@ func TestConnectorCommandConfiguresWebhookWithoutTestingItsSideEffect(t *testing
 		t.Fatalf("webhook test error=%v requests=%d", err, requests)
 	}
 }
+
+func TestConnectorCommandDefaultsGoogleToUserOwnedDesktopOAuthAndGranularOperations(t *testing.T) {
+	t.Setenv("GATOR_CONFIG_DIR", t.TempDir())
+	t.Setenv("GATOR_STATE_DIR", t.TempDir())
+	if err := connectorCommandWithIO([]string{"add", "google-work", "--kind", "google", "--oauth-client-id", "desktop-client"}, strings.NewReader(""), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := loadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(settings.Connectors) != 1 {
+		t.Fatalf("connectors = %#v", settings.Connectors)
+	}
+	descriptor := settings.Connectors[0]
+	if descriptor.Authentication != connector.AuthOAuth || descriptor.OAuthAuthorizeURL != connector.GoogleOAuthAuthorizeURL || descriptor.OAuthTokenURL != connector.GoogleOAuthTokenURL || descriptor.OAuthRedirectURL != connector.GoogleOAuthRedirectURL || !strings.Contains(descriptor.OAuthScopes, "/auth/tasks") {
+		t.Fatalf("Google descriptor = %#v", descriptor)
+	}
+	operations := map[string]bool{}
+	for _, operation := range descriptor.Operations() {
+		operations[operation.ID] = true
+	}
+	for _, required := range []string{"tasks_list", "events_list", "freebusy", "docs_update", "sheets_values_update", "batch", "quick_capture"} {
+		if !operations[required] {
+			t.Fatalf("Google operation %q is missing from %#v", required, operations)
+		}
+	}
+}

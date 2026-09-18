@@ -75,18 +75,18 @@ func TestBrowserFlowRefreshRetainsUnrotatedRefreshToken(t *testing.T) {
 		if err := request.ParseForm(); err != nil {
 			t.Fatalf("parse refresh form: %v", err)
 		}
-		if request.PostForm.Get("grant_type") != "refresh_token" || request.PostForm.Get("refresh_token") != "original-refresh" {
+		if request.PostForm.Get("grant_type") != "refresh_token" || request.PostForm.Get("refresh_token") != "original-refresh" || request.PostForm.Get("client_secret") != "desktop-secret" {
 			t.Fatalf("refresh form = %#v", request.PostForm)
 		}
 		_ = json.NewEncoder(writer).Encode(map[string]any{"access_token": "new-access", "expires_in": 7200})
 	}))
 	defer tokens.Close()
-	flow := BrowserFlow{ClientID: "client", TokenURL: tokens.URL}
-	credential, err := flow.Refresh(context.Background(), Credential{Type: oauthType, Access: "old-access", Refresh: "original-refresh", Expires: time.Now().Add(-time.Minute).UnixMilli(), Extra: map[string]string{"account": "one"}})
+	flow := BrowserFlow{ClientID: "client", ClientSecret: "desktop-secret", TokenURL: tokens.URL}
+	credential, err := flow.Refresh(context.Background(), Credential{Type: oauthType, Access: "old-access", Refresh: "original-refresh", Expires: time.Now().Add(-time.Minute).UnixMilli(), OAuthClientSecret: "desktop-secret", Extra: map[string]string{"account": "one"}})
 	if err != nil {
 		t.Fatalf("refresh credential: %v", err)
 	}
-	if credential.Access != "new-access" || credential.Refresh != "original-refresh" || credential.Extra["account"] != "one" || credential.Expired(time.Now()) {
+	if credential.Access != "new-access" || credential.Refresh != "original-refresh" || credential.OAuthClientSecret != "desktop-secret" || credential.Extra["account"] != "one" || credential.Expired(time.Now()) {
 		t.Fatalf("refreshed credential = %#v", credential)
 	}
 }

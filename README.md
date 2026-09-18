@@ -25,7 +25,7 @@ download, select, rename, or delete Ollama models, with progress and explicit
 confirmation. The TUI can start an installed Ollama runtime and keeps it alive
 until Gator exits. Native
 credentials stay in the private credential store. See [local models](docs/LOCAL_MODELS.md),
-[custom providers](docs/CUSTOM_PROVIDERS.md), and [Work](docs/WORK.md).
+[custom providers](docs/CUSTOM_PROVIDERS.md), [Google Work](docs/GOOGLE_WORK.md), and [Work](docs/WORK.md).
 
 ```sh
 gator inspect --source ./notes 'Identify gaps in these sources'

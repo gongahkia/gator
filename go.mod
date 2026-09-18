@@ -21,6 +21,7 @@ require (
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/image v0.45.0
 	golang.org/x/sys v0.47.0
+	modernc.org/sqlite v1.47.0
 )
 
 require (
@@ -67,5 +68,4 @@ require (
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.47.0 // indirect
 )

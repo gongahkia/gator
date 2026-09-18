@@ -285,6 +285,67 @@ func (s *Store) Search(ctx context.Context, query string, kinds []string, limit 
 	return records, nil
 }
 
+// List returns a bounded kind-specific mirror view for connected-only helpers
+// such as reminder evaluation. Callers must enforce their live Google gate
+// before using it.
+func (s *Store) List(ctx context.Context, kind string, limit int) ([]Record, error) {
+	if s == nil || s.db == nil || strings.TrimSpace(kind) == "" || len(kind) > 64 || limit < 1 || limit > 1000 {
+		return nil, errors.New("Google Work mirror list is invalid")
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT kind,id,parent_id,name,updated_at_ms,etag,raw_json
+        FROM mirror_records WHERE kind=? ORDER BY updated_at_ms DESC,name,id LIMIT ?`, kind, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list Google Work mirror: %w", err)
+	}
+	defer rows.Close()
+	return scanRecords(rows)
+}
+
+// ClaimReminder atomically de-duplicates a delivered reminder. It is never an
+// offline write queue: it records only a reminder already exposed after a live
+// Google health check.
+func (s *Store) ClaimReminder(ctx context.Context, key string, at time.Time) (bool, error) {
+	if s == nil || s.db == nil || strings.TrimSpace(key) == "" || len(key) > 512 || at.IsZero() {
+		return false, errors.New("Google Work reminder delivery is invalid")
+	}
+	result, err := s.db.ExecContext(ctx, `INSERT INTO reminder_deliveries(delivery_key,delivered_at_ms) VALUES(?,?) ON CONFLICT(delivery_key) DO NOTHING`, key, at.UnixMilli())
+	if err != nil {
+		return false, fmt.Errorf("claim Google Work reminder delivery: %w", err)
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read Google Work reminder delivery: %w", err)
+	}
+	return changed == 1, nil
+}
+
+type recordRows interface {
+	Next() bool
+	Scan(...any) error
+	Err() error
+}
+
+func scanRecords(rows recordRows) ([]Record, error) {
+	var records []Record
+	for rows.Next() {
+		var record Record
+		var updated int64
+		var raw []byte
+		if err := rows.Scan(&record.Kind, &record.ID, &record.ParentID, &record.Name, &updated, &record.ETag, &raw); err != nil {
+			return nil, fmt.Errorf("read Google Work mirror result: %w", err)
+		}
+		if updated > 0 {
+			record.UpdatedAt = time.UnixMilli(updated).UTC()
+		}
+		record.Raw = append(json.RawMessage(nil), raw...)
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate Google Work mirror result: %w", err)
+	}
+	return records, nil
+}
+
 // SaveSearch persists a named local query. It has no remote side effect.
 func (s *Store) SaveSearch(ctx context.Context, id, name, query string, kinds []string, at time.Time) error {
 	if s == nil || s.db == nil || !connectorIDPattern.MatchString(id) || strings.TrimSpace(name) == "" || len(name) > 256 || strings.TrimSpace(query) == "" || len(query) > 512 {

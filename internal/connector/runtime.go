@@ -32,6 +32,7 @@ type PreparedAction struct {
 	Proposal    action.Proposal
 	descriptor  Descriptor
 	operation   Operation
+	target      string
 	payload     []byte
 	googleSteps []googlePreparedStep
 }
@@ -75,6 +76,10 @@ func (r Runtime) Invoke(ctx context.Context, mode action.Mode, connectorID, oper
 		return r.fetchHTTPJSON(ctx, descriptor)
 	case descriptor.Kind == KindGoogle && operation.ID == "local_search":
 		return r.invokeGoogleLocalSearch(ctx, descriptor, operation, input)
+	case descriptor.Kind == KindGoogle && operation.ID == "quick_capture":
+		return r.invokeGoogleQuickCapture(descriptor, operation, input)
+	case descriptor.Kind == KindGoogle && (operation.ID == "task_metadata_encode" || operation.ID == "task_metadata_decode"):
+		return r.invokeGoogleTaskMetadata(descriptor, operation, input)
 	case isServiceKind(descriptor.Kind):
 		return r.invokeService(ctx, descriptor, operation, input)
 	case descriptor.Kind == KindRemoteMCP:
@@ -131,7 +136,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	}
 	return PreparedAction{
 		Proposal: proposal, descriptor: descriptor, operation: operation,
-		payload: append([]byte(nil), payload...), googleSteps: googleSteps,
+		target: target, payload: append([]byte(nil), payload...), googleSteps: googleSteps,
 	}, nil
 }
 
@@ -152,7 +157,8 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 		return errors.New("prepared connector action no longer matches the configured operation")
 	}
 	payloadDigest := sha256.Sum256(prepared.payload)
-	if hex.EncodeToString(payloadDigest[:]) != prepared.Proposal.PayloadSHA256 {
+	actionDigest := sha256.Sum256(append([]byte(descriptor.ID+"\x00"+operation.ID+"\x00"+prepared.target+"\x00"), prepared.payload...))
+	if prepared.Proposal.ConnectorID != descriptor.ID || prepared.Proposal.Operation != operation.ID || prepared.Proposal.Capability != operation.Capability || prepared.Proposal.Target != prepared.target || prepared.Proposal.Preview != string(prepared.payload) || prepared.Proposal.ID != "action-"+hex.EncodeToString(actionDigest[:8]) || hex.EncodeToString(payloadDigest[:]) != prepared.Proposal.PayloadSHA256 {
 		return errors.New("prepared connector action payload does not match its proposal")
 	}
 	if prepared.descriptor.Kind == KindHTTPWebhook {
@@ -173,7 +179,7 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 		return r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
 	}
 	method := serviceActionMethod(descriptor, operation.ID)
-	result, err := r.requestJSON(ctx, descriptor, operation.ID, method, prepared.Proposal.Target, prepared.payload, true)
+	result, err := r.requestJSON(ctx, descriptor, operation.ID, method, prepared.target, prepared.payload, true)
 	if err != nil {
 		return err
 	}
@@ -938,6 +944,71 @@ func (r Runtime) invokeGoogleLocalSearch(ctx context.Context, descriptor Descrip
 	health.Provenance.SHA256 = hex.EncodeToString(digest[:])
 	health.Data = contents
 	return health, nil
+}
+
+func (r Runtime) invokeGoogleQuickCapture(descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
+	var input struct {
+		Text string `json:"text"`
+		Kind string `json:"kind"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		return Result{}, errors.New("Google quick capture input is invalid")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return Result{}, errors.New("Google quick capture input contains trailing JSON")
+	}
+	kind := googlework.CaptureTask
+	if input.Kind != "" {
+		kind = googlework.CaptureKind(input.Kind)
+	}
+	capture, err := googlework.ParseQuickCapture(input.Text, kind, r.now())
+	if err != nil {
+		return Result{}, err
+	}
+	contents, err := json.Marshal(capture)
+	if err != nil {
+		return Result{}, fmt.Errorf("encode Google quick capture: %w", err)
+	}
+	digest := sha256.Sum256(contents)
+	return Result{Data: contents, Provenance: Provenance{ConnectorID: descriptor.ID, Operation: operation.ID, Resource: descriptor.Resource, RetrievedAt: r.now(), Bytes: int64(len(contents)), SHA256: hex.EncodeToString(digest[:])}}, nil
+}
+
+func (r Runtime) invokeGoogleTaskMetadata(descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
+	var input struct {
+		Notes           string `json:"notes"`
+		Priority        string `json:"priority"`
+		RecurrenceRRule string `json:"recurrence_rrule"`
+		ReminderTime    string `json:"reminder_time"`
+		ReminderZone    string `json:"reminder_zone"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		return Result{}, errors.New("Google task metadata input is invalid")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return Result{}, errors.New("Google task metadata input contains trailing JSON")
+	}
+	var output any
+	if operation.ID == "task_metadata_encode" {
+		notes, err := googlework.EncodeTaskNotes(input.Notes, googlework.TaskMetadata{Priority: input.Priority, RecurrenceRRule: input.RecurrenceRRule, ReminderTime: input.ReminderTime, ReminderZone: input.ReminderZone})
+		if err != nil {
+			return Result{}, err
+		}
+		output = struct {
+			Notes string `json:"notes"`
+		}{Notes: notes}
+	} else {
+		output = googlework.DecodeTaskNotes(input.Notes)
+	}
+	contents, err := json.Marshal(output)
+	if err != nil {
+		return Result{}, fmt.Errorf("encode Google task metadata: %w", err)
+	}
+	digest := sha256.Sum256(contents)
+	return Result{Data: contents, Provenance: Provenance{ConnectorID: descriptor.ID, Operation: operation.ID, Resource: descriptor.Resource, RetrievedAt: r.now(), Bytes: int64(len(contents)), SHA256: hex.EncodeToString(digest[:])}}, nil
 }
 
 func (r Runtime) mirrorGoogle(ctx context.Context, descriptor Descriptor, operation string, contents json.RawMessage) {

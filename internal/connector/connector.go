@@ -267,6 +267,9 @@ func googleOperations() []Operation {
 		{"events_get", "Read one Google Calendar event.", action.ConnectedRead},
 		{"freebusy", "Query Google Calendar free/busy information for an explicit time range.", action.ConnectedRead},
 		{"local_search", "Search Gator's private Google mirror after a live connection check. It never returns cached data while Google is disconnected.", action.ConnectedRead},
+		{"quick_capture", "Parse task or event quick-capture text locally into a reviewable Google mutation preview. It never creates anything by itself.", action.ConnectedRead},
+		{"task_metadata_encode", "Build validated portable priority, recurrence, and reminder metadata for a Google Task notes field. It never writes the task by itself.", action.ConnectedRead},
+		{"task_metadata_decode", "Read Gator-owned portable task metadata from one Google Task notes field without changing it.", action.ConnectedRead},
 	}
 	operations := serviceOperations(read)
 	operations = append(operations, serviceOperations([]serviceOperation{
@@ -296,6 +299,15 @@ func googleOperations() []Operation {
 		}
 		if operations[index].ID == "local_search" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512},"kinds":{"type":"array","items":{"type":"string"},"maxItems":16},"limit":{"type":"integer","minimum":1,"maximum":100}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "quick_capture" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["text"],"properties":{"text":{"type":"string","minLength":1,"maxLength":4096},"kind":{"type":"string","enum":["task","event"]}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "task_metadata_encode" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"notes":{"type":"string","maxLength":8192},"priority":{"type":"string","enum":["none","low","medium","high"]},"recurrence_rrule":{"type":"string","maxLength":128},"reminder_time":{"type":"string","maxLength":5},"reminder_zone":{"type":"string","maxLength":128}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "task_metadata_decode" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["notes"],"properties":{"notes":{"type":"string","maxLength":8192}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "batch" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)
