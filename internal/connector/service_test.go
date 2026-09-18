@@ -11,6 +11,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/googlework"
 )
 
 func TestSlackAdapterUsesPinnedServiceEndpoint(t *testing.T) {
@@ -172,6 +173,54 @@ func TestGoogleTaskMetadataBuildsNotesBeforeAnyTaskWrite(t *testing.T) {
 	}
 	if !bytes.Contains(result.Data, []byte(`"notes":"Launch plan\n\n[GATOR-TASK v1]`)) {
 		t.Fatalf("metadata result = %s", result.Data)
+	}
+}
+
+func TestGoogleRemindersAreLiveGatedAndDeliveredOnce(t *testing.T) {
+	available := true
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		if request.URL.Path != "/oauth2/v3/userinfo" {
+			http.NotFound(writer, request)
+			return
+		}
+		if !available {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = writer.Write([]byte(`{"error":"offline"}`))
+			return
+		}
+		_, _ = writer.Write([]byte(`{"email":"person@example.test"}`))
+	}))
+	defer server.Close()
+	stateDir := t.TempDir()
+	store, err := googlework.Open(stateDir, "google")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)
+	if err := store.Mirror(context.Background(), "events_list", json.RawMessage(`{"items":[{"id":"event-1","summary":"Planning","start":{"dateTime":"2026-09-18T10:05:00Z"},"reminders":{"overrides":[{"method":"popup","minutes":5}]}}]}`), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	descriptor := Descriptor{Version: DescriptorVersion, ID: "google", Name: "Google", Kind: KindGoogle, Resource: server.URL, Authentication: AuthNone}
+	registry, err := NewRegistry([]Descriptor{descriptor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := Runtime{Registry: registry, HTTPClient: server.Client(), StateDir: stateDir, Now: func() time.Time { return now }}
+	result, err := runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, "reminders_due", json.RawMessage(`{"window_minutes":1}`))
+	if err != nil || !bytes.Contains(result.Data, []byte(`"event-1"`)) {
+		t.Fatalf("first reminder result=%s err=%v", result.Data, err)
+	}
+	result, err = runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, "reminders_due", json.RawMessage(`{"window_minutes":1}`))
+	if err != nil || bytes.Contains(result.Data, []byte(`"event-1"`)) {
+		t.Fatalf("duplicate reminder result=%s err=%v", result.Data, err)
+	}
+	available = false
+	if _, err := runtime.Invoke(context.Background(), action.Inspect, descriptor.ID, "reminders_due", json.RawMessage(`{"window_minutes":1}`)); err == nil {
+		t.Fatal("cached reminder was exposed while the live Google health check failed")
 	}
 }
 

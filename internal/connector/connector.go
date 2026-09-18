@@ -270,6 +270,7 @@ func googleOperations() []Operation {
 		{"quick_capture", "Parse task or event quick-capture text locally into a reviewable Google mutation preview. It never creates anything by itself.", action.ConnectedRead},
 		{"task_metadata_encode", "Build validated portable priority, recurrence, and reminder metadata for a Google Task notes field. It never writes the task by itself.", action.ConnectedRead},
 		{"task_metadata_decode", "Read Gator-owned portable task metadata from one Google Task notes field without changing it.", action.ConnectedRead},
+		{"reminders_due", "After a live Google health check, return newly due explicit calendar or portable task reminders from Gator's private mirror.", action.ConnectedRead},
 	}
 	operations := serviceOperations(read)
 	operations = append(operations, serviceOperations([]serviceOperation{
@@ -308,6 +309,9 @@ func googleOperations() []Operation {
 		}
 		if operations[index].ID == "task_metadata_decode" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["notes"],"properties":{"notes":{"type":"string","maxLength":8192}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "reminders_due" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","properties":{"window_minutes":{"type":"integer","minimum":1,"maximum":1440}},"additionalProperties":false}`)
 		}
 		if operations[index].ID == "batch" {
 			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)

@@ -56,6 +56,12 @@ a remote object by itself. `task_metadata_encode` similarly builds a bounded
 timezone-aware reminder; a later `tasks_create` or `tasks_update` still needs
 its own fresh approval.
 
+`reminders_due` emits newly due explicit Calendar overrides and Gator portable
+task reminders to an active Work conversation. It health-checks Google before
+opening the mirror, and delivery keys are de-duplicated privately. A foreground
+scheduled Work run can use it; disconnected Google never emits cached
+reminders.
+
 ## Connected-only mirror
 
 Google is always live-authoritative. Gator keeps a private per-connector

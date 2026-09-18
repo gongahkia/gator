@@ -80,6 +80,8 @@ func (r Runtime) Invoke(ctx context.Context, mode action.Mode, connectorID, oper
 		return r.invokeGoogleQuickCapture(descriptor, operation, input)
 	case descriptor.Kind == KindGoogle && (operation.ID == "task_metadata_encode" || operation.ID == "task_metadata_decode"):
 		return r.invokeGoogleTaskMetadata(descriptor, operation, input)
+	case descriptor.Kind == KindGoogle && operation.ID == "reminders_due":
+		return r.invokeGoogleReminders(ctx, descriptor, operation, input)
 	case isServiceKind(descriptor.Kind):
 		return r.invokeService(ctx, descriptor, operation, input)
 	case descriptor.Kind == KindRemoteMCP:
@@ -1009,6 +1011,70 @@ func (r Runtime) invokeGoogleTaskMetadata(descriptor Descriptor, operation Opera
 	}
 	digest := sha256.Sum256(contents)
 	return Result{Data: contents, Provenance: Provenance{ConnectorID: descriptor.ID, Operation: operation.ID, Resource: descriptor.Resource, RetrievedAt: r.now(), Bytes: int64(len(contents)), SHA256: hex.EncodeToString(digest[:])}}, nil
+}
+
+func (r Runtime) invokeGoogleReminders(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
+	var input struct {
+		WindowMinutes int `json:"window_minutes"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil || input.WindowMinutes < 0 || input.WindowMinutes > 1440 {
+		return Result{}, errors.New("Google reminder input is invalid")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return Result{}, errors.New("Google reminder input contains trailing JSON")
+	}
+	if input.WindowMinutes == 0 {
+		input.WindowMinutes = 10
+	}
+	// Never expose a cached reminder while disconnected. This is intentionally
+	// the same live gate as local_search and runs before the mirror is opened.
+	healthEndpoint, method, body, err := serviceRead(descriptor, "health", serviceInput{})
+	if err != nil {
+		return Result{}, err
+	}
+	health, err := r.requestJSON(ctx, descriptor, "health", method, healthEndpoint, body, false)
+	if err != nil {
+		return Result{}, err
+	}
+	store, err := r.openGoogleMirror(descriptor)
+	if err != nil {
+		return Result{}, err
+	}
+	defer store.Close()
+	tasks, err := store.List(ctx, "task", 1000)
+	if err != nil {
+		return Result{}, err
+	}
+	events, err := store.List(ctx, "event", 1000)
+	if err != nil {
+		return Result{}, err
+	}
+	now := r.now()
+	due := googlework.DueReminders(tasks, events, now.Add(-time.Duration(input.WindowMinutes)*time.Minute), now, time.Local)
+	delivered := make([]googlework.Reminder, 0, len(due))
+	for _, reminder := range due {
+		claimed, err := store.ClaimReminder(ctx, reminder.Key, now)
+		if err != nil {
+			return Result{}, err
+		}
+		if claimed {
+			delivered = append(delivered, reminder)
+		}
+	}
+	contents, err := json.Marshal(struct {
+		Reminders []googlework.Reminder `json:"reminders"`
+	}{Reminders: delivered})
+	if err != nil {
+		return Result{}, fmt.Errorf("encode Google reminders: %w", err)
+	}
+	digest := sha256.Sum256(contents)
+	health.Provenance.Operation = operation.ID
+	health.Provenance.Bytes = int64(len(contents))
+	health.Provenance.SHA256 = hex.EncodeToString(digest[:])
+	health.Data = contents
+	return health, nil
 }
 
 func (r Runtime) mirrorGoogle(ctx context.Context, descriptor Descriptor, operation string, contents json.RawMessage) {
