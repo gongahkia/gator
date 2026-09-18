@@ -134,6 +134,8 @@ type Config struct {
 	CurrentFolder           string
 	ResolveSource           func(path string) (string, error)
 	ConnectorChoices        func() []string
+	ConnectorAction         func(arguments []string) (string, error)
+	ConnectorCommand        func(arguments []string) *exec.Cmd
 	BundleAction            func(BundleActionRequest) (string, error)
 	ListConversations       func() ([]worksession.Conversation, error)
 	LoadConversation        func(conversationID string) (ConversationState, error)
@@ -187,6 +189,13 @@ type providerActionDone struct {
 	action   string
 	provider string
 	err      error
+}
+
+type connectorActionDone struct {
+	action string
+	id     string
+	text   string
+	err    error
 }
 
 type queuedRun struct {
