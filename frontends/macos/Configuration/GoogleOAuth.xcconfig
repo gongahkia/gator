@@ -1,5 +1,0 @@
-// blank defaults satisfy the restored Xcode config reference without credentials.
-GOOGLE_MACOS_CLIENT_ID =
-GOOGLE_MACOS_REVERSED_CLIENT_ID =
-GOOGLE_MAPS_EMBED_API_KEY =
-#include? "GoogleOAuth.local.xcconfig"
