@@ -204,14 +204,7 @@ func (d Descriptor) Operations() []Operation {
 			{"update_message", "Prepare an update to one Slack message for exact approval.", action.ConnectedMutate},
 		})
 	case KindGoogle:
-		return serviceOperations([]serviceOperation{
-			{"drive_search", "Search files visible through Google Drive.", action.ConnectedRead},
-			{"drive_get", "Read metadata for one Google Drive file.", action.ConnectedRead},
-			{"docs_get", "Read one Google Doc.", action.ConnectedRead},
-			{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
-			{"docs_create", "Prepare creation of a Google Doc for exact approval.", action.ConnectedMutate},
-			{"sheets_create", "Prepare creation of a Google Sheet for exact approval.", action.ConnectedMutate},
-		})
+		return googleOperations()
 	case KindAtlassian:
 		return serviceOperations([]serviceOperation{
 			{"jira_search", "Search Jira issues with JQL.", action.ConnectedRead},
@@ -245,6 +238,64 @@ func (d Descriptor) Operations() []Operation {
 	default:
 		return nil
 	}
+}
+
+// googleOperations intentionally keeps Google permissions granular. A user
+// can permit a calendar read while denying task creation, for example; there
+// is no broad "Google Workspace" switch hidden behind the connector.
+func googleOperations() []Operation {
+	read := []serviceOperation{
+		{"health", "Verify this Google connection with a live account request; cached Google data is never exposed while disconnected.", action.ConnectedRead},
+		{"drive_search", "Search Google Drive metadata visible to this connection.", action.ConnectedRead},
+		{"drive_get", "Read metadata for one Google Drive file.", action.ConnectedRead},
+		{"docs_get", "Read one Google Doc.", action.ConnectedRead},
+		{"sheets_get", "Read one Google Sheet.", action.ConnectedRead},
+		{"sheets_values_get", "Read a bounded range from one Google Sheet.", action.ConnectedRead},
+		{"tasklists_list", "List Google Task lists.", action.ConnectedRead},
+		{"tasklists_get", "Read one Google Task list.", action.ConnectedRead},
+		{"tasks_list", "List tasks in one Google Task list.", action.ConnectedRead},
+		{"tasks_get", "Read one Google Task by task-list/task ID.", action.ConnectedRead},
+		{"calendars_list", "List Google Calendars available to this connection.", action.ConnectedRead},
+		{"calendars_get", "Read one Google Calendar.", action.ConnectedRead},
+		{"events_list", "List events from one Google Calendar.", action.ConnectedRead},
+		{"events_get", "Read one Google Calendar event.", action.ConnectedRead},
+		{"freebusy", "Query Google Calendar free/busy information for an explicit time range.", action.ConnectedRead},
+		{"local_search", "Search Gator's private Google mirror after a live connection check. It never returns cached data while Google is disconnected.", action.ConnectedRead},
+	}
+	operations := serviceOperations(read)
+	operations = append(operations, serviceOperations([]serviceOperation{
+		{"tasklists_create", "Prepare Google Task-list creation for exact approval.", action.ConnectedMutate},
+		{"tasklists_update", "Prepare a Google Task-list update for exact approval.", action.ConnectedMutate},
+		{"tasklists_delete", "Prepare Google Task-list deletion for exact approval.", action.ConnectedMutate},
+		{"tasks_create", "Prepare Google Task creation for exact approval.", action.ConnectedMutate},
+		{"tasks_update", "Prepare a Google Task update for exact approval.", action.ConnectedMutate},
+		{"tasks_delete", "Prepare Google Task deletion for exact approval.", action.ConnectedMutate},
+		{"tasks_move", "Prepare moving a Google Task for exact approval.", action.ConnectedMutate},
+		{"calendars_create", "Prepare Google Calendar creation for exact approval.", action.ConnectedMutate},
+		{"calendars_update", "Prepare a Google Calendar update for exact approval.", action.ConnectedMutate},
+		{"calendars_delete", "Prepare Google Calendar deletion for exact approval.", action.ConnectedMutate},
+		{"events_create", "Prepare Google Calendar event creation for exact approval.", action.ConnectedMutate},
+		{"events_update", "Prepare a Google Calendar event update for exact approval.", action.ConnectedMutate},
+		{"events_delete", "Prepare Google Calendar event deletion for exact approval.", action.ConnectedMutate},
+		{"docs_create", "Prepare Google Doc creation for exact approval.", action.ConnectedMutate},
+		{"docs_update", "Prepare Google Doc batch updates for exact approval.", action.ConnectedMutate},
+		{"sheets_create", "Prepare Google Sheet creation for exact approval.", action.ConnectedMutate},
+		{"sheets_values_update", "Prepare a Google Sheet range update for exact approval.", action.ConnectedMutate},
+		{"sheets_batch_update", "Prepare Google Sheet batch updates for exact approval.", action.ConnectedMutate},
+		{"batch", "Prepare an ordered batch of Google mutations for one exact approval. Gator never retries an ambiguous batch outcome.", action.ConnectedMutate},
+	}))
+	for index := range operations {
+		if operations[index].ID == "freebusy" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object"}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "local_search" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["query"],"properties":{"query":{"type":"string","minLength":1,"maxLength":512},"kinds":{"type":"array","items":{"type":"string"},"maxItems":16},"limit":{"type":"integer","minimum":1,"maximum":100}},"additionalProperties":false}`)
+		}
+		if operations[index].ID == "batch" {
+			operations[index].InputSchema = json.RawMessage(`{"type":"object","required":["payload"],"properties":{"payload":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array","minItems":1,"maxItems":25,"items":{"type":"object","required":["operation","payload"],"properties":{"operation":{"type":"string"},"payload":{"type":"object"}},"additionalProperties":false}}},"additionalProperties":false}},"additionalProperties":false}`)
+		}
+	}
+	return operations
 }
 
 type serviceOperation struct {

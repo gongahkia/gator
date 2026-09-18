@@ -17,6 +17,7 @@ import (
 
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/auth"
+	"github.com/gongahkia/gator/internal/googlework"
 	"github.com/gongahkia/gator/internal/mcp"
 )
 
@@ -32,6 +33,12 @@ type PreparedAction struct {
 	descriptor Descriptor
 	operation  Operation
 	payload    []byte
+	googleSteps []googlePreparedStep
+}
+
+type googlePreparedStep struct {
+	operation string
+	payload   []byte
 }
 
 // Runtime invokes user-configured connectors under a work-mode capability
@@ -42,6 +49,10 @@ type Runtime struct {
 	Credentials auth.Store
 	HTTPClient  *http.Client
 	Now         func() time.Time
+	// StateDir is Gator's resolved state root. Google uses it only for its
+	// private mirror; it never imports another application's state or stores
+	// credentials there.
+	StateDir    string
 }
 
 // Invoke validates a connector operation and its exact input before any I/O.
@@ -62,6 +73,8 @@ func (r Runtime) Invoke(ctx context.Context, mode action.Mode, connectorID, oper
 			return Result{}, err
 		}
 		return r.fetchHTTPJSON(ctx, descriptor)
+	case descriptor.Kind == KindGoogle && operation.ID == "local_search":
+		return r.invokeGoogleLocalSearch(ctx, descriptor, operation, input)
 	case isServiceKind(descriptor.Kind):
 		return r.invokeService(ctx, descriptor, operation, input)
 	case descriptor.Kind == KindRemoteMCP:
@@ -90,10 +103,20 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 		return PreparedAction{}, err
 	}
 	target := descriptor.Resource
-	if isServiceKind(descriptor.Kind) {
-		target, payload, err = serviceAction(descriptor, operation.ID, payload)
+	var googleSteps []googlePreparedStep
+	if descriptor.Kind == KindGoogle && operation.ID == "batch" {
+		googleSteps, payload, err = prepareGoogleBatch(descriptor, payload)
 		if err != nil {
 			return PreparedAction{}, err
+		}
+		target = strings.TrimRight(descriptor.Resource, "/") + "/gator/google-batch"
+	}
+	if isServiceKind(descriptor.Kind) {
+		if !(descriptor.Kind == KindGoogle && operation.ID == "batch") {
+			target, payload, err = serviceAction(descriptor, operation.ID, payload)
+			if err != nil {
+				return PreparedAction{}, err
+			}
 		}
 	} else if descriptor.Kind == KindRemoteMCP {
 		target = descriptor.Resource + "#tool=" + descriptor.ActionTool
@@ -108,7 +131,7 @@ func (r Runtime) PrepareAction(connectorID, operationID string, input json.RawMe
 	}
 	return PreparedAction{
 		Proposal: proposal, descriptor: descriptor, operation: operation,
-		payload: append([]byte(nil), payload...),
+		payload: append([]byte(nil), payload...), googleSteps: googleSteps,
 	}, nil
 }
 
@@ -146,15 +169,16 @@ func (r Runtime) ExecutePrepared(ctx context.Context, mode action.Mode, prepared
 		}
 		return nil
 	}
-	method := http.MethodPost
-	if descriptor.Kind == KindNotion && operation.ID == "page_update" || descriptor.Kind == KindSlack && operation.ID == "update_message" {
-		method = http.MethodPatch
-		if descriptor.Kind == KindSlack {
-			method = http.MethodPost
-		}
+	if descriptor.Kind == KindGoogle && operation.ID == "batch" {
+		return r.executeGoogleBatch(ctx, descriptor, prepared.googleSteps)
 	}
-	_, err = r.requestJSON(ctx, descriptor, operation.ID, method, prepared.Proposal.Target, prepared.payload, true)
-	return err
+	method := serviceActionMethod(descriptor, operation.ID)
+	result, err := r.requestJSON(ctx, descriptor, operation.ID, method, prepared.Proposal.Target, prepared.payload, true)
+	if err != nil {
+		return err
+	}
+	r.mirrorGoogle(ctx, descriptor, operation.ID, result.Data)
+	return nil
 }
 
 func (r Runtime) invokeRemoteMCP(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
@@ -187,6 +211,7 @@ type serviceInput struct {
 	ResourceID string `json:"resource_id,omitempty"`
 	Cursor     string `json:"cursor,omitempty"`
 	Limit      int    `json:"limit,omitempty"`
+	Payload    json.RawMessage `json:"payload,omitempty"`
 }
 
 func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, operation Operation, raw json.RawMessage) (Result, error) {
@@ -196,14 +221,25 @@ func (r Runtime) invokeService(ctx context.Context, descriptor Descriptor, opera
 	if err := decoder.Decode(&input); err != nil {
 		return Result{}, fmt.Errorf("decode connector operation input: %w", err)
 	}
-	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 {
+	if input.Limit < 0 || input.Limit > 100 || len(input.Query) > 4096 || len(input.ResourceID) > 2048 || len(input.Cursor) > 2048 || len(input.Payload) > maxHTTPActionBytes {
 		return Result{}, errors.New("connector operation input exceeds its limits")
+	}
+	if len(input.Payload) > 0 {
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(input.Payload, &object); err != nil || object == nil {
+			return Result{}, errors.New("connector operation payload must be one JSON object")
+		}
 	}
 	endpoint, method, body, err := serviceRead(descriptor, operation.ID, input)
 	if err != nil {
 		return Result{}, err
 	}
-	return r.requestJSON(ctx, descriptor, operation.ID, method, endpoint, body, false)
+	result, err := r.requestJSON(ctx, descriptor, operation.ID, method, endpoint, body, false)
+	if err != nil {
+		return Result{}, err
+	}
+	r.mirrorGoogle(ctx, descriptor, operation.ID, result.Data)
+	return result, nil
 }
 
 func serviceRead(descriptor Descriptor, operation string, input serviceInput) (string, string, []byte, error) {
@@ -212,6 +248,8 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 	method := http.MethodGet
 	var body []byte
 	switch descriptor.Kind + "/" + operation {
+	case KindGoogle + "/health":
+		path = "/oauth2/v3/userinfo"
 	case KindSlack + "/whoami":
 		path = "/auth.test"
 	case KindSlack + "/search":
@@ -245,11 +283,91 @@ func serviceRead(descriptor Descriptor, operation string, input serviceInput) (s
 			query.Set("pageToken", input.Cursor)
 		}
 	case KindGoogle + "/drive_get":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Drive metadata requires resource_id")
+		}
 		path = "/drive/v3/files/" + url.PathEscape(input.ResourceID)
 	case KindGoogle + "/docs_get":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Docs read requires resource_id")
+		}
 		path = "/v1/documents/" + url.PathEscape(input.ResourceID)
 	case KindGoogle + "/sheets_get":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Sheets read requires resource_id")
+		}
 		path = "/v4/spreadsheets/" + url.PathEscape(input.ResourceID)
+	case KindGoogle + "/sheets_values_get":
+		sheetID, cellRange, err := splitGoogleID(input.ResourceID, "sheet ID and range")
+		if err != nil {
+			return "", "", nil, err
+		}
+		path = "/v4/spreadsheets/" + url.PathEscape(sheetID) + "/values/" + url.PathEscape(cellRange)
+	case KindGoogle + "/tasklists_list":
+		path = "/tasks/v1/users/@me/lists"
+		if input.Limit > 0 {
+			query.Set("maxResults", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
+	case KindGoogle + "/tasklists_get":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Task-list read requires resource_id")
+		}
+		path = "/tasks/v1/users/@me/lists/" + url.PathEscape(input.ResourceID)
+	case KindGoogle + "/tasks_list":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Tasks list requires resource_id task list")
+		}
+		path = "/tasks/v1/lists/" + url.PathEscape(input.ResourceID) + "/tasks"
+		if input.Limit > 0 {
+			query.Set("maxResults", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
+	case KindGoogle + "/tasks_get":
+		listID, taskID, err := splitGoogleID(input.ResourceID, "task-list ID and task ID")
+		if err != nil {
+			return "", "", nil, err
+		}
+		path = "/tasks/v1/lists/" + url.PathEscape(listID) + "/tasks/" + url.PathEscape(taskID)
+	case KindGoogle + "/calendars_list":
+		path = "/calendar/v3/users/me/calendarList"
+		if input.Limit > 0 {
+			query.Set("maxResults", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
+	case KindGoogle + "/calendars_get":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Calendar read requires resource_id")
+		}
+		path = "/calendar/v3/calendars/" + url.PathEscape(input.ResourceID)
+	case KindGoogle + "/events_list":
+		if input.ResourceID == "" {
+			return "", "", nil, errors.New("Google Calendar event list requires resource_id calendar")
+		}
+		path = "/calendar/v3/calendars/" + url.PathEscape(input.ResourceID) + "/events"
+		if input.Limit > 0 {
+			query.Set("maxResults", fmt.Sprint(input.Limit))
+		}
+		if input.Cursor != "" {
+			query.Set("pageToken", input.Cursor)
+		}
+	case KindGoogle + "/events_get":
+		calendarID, eventID, err := splitGoogleID(input.ResourceID, "calendar ID and event ID")
+		if err != nil {
+			return "", "", nil, err
+		}
+		path = "/calendar/v3/calendars/" + url.PathEscape(calendarID) + "/events/" + url.PathEscape(eventID)
+	case KindGoogle + "/freebusy":
+		if len(input.Payload) == 0 {
+			return "", "", nil, errors.New("Google free/busy requires payload")
+		}
+		path, method, body = "/calendar/v3/freeBusy", http.MethodPost, append([]byte(nil), input.Payload...)
 	case KindAtlassian + "/jira_search":
 		path = "/rest/api/3/search/jql"
 		query.Set("jql", input.Query)
