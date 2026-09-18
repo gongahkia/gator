@@ -122,12 +122,18 @@ func workInteractiveConversation(startConversationID string) error {
 			return root.Path(), nil
 		},
 		ConnectorChoices: func() []string {
-			ids := make([]string, 0, len(settings.Connectors))
-			for _, descriptor := range settings.Connectors {
+			current, loadErr := settingsStore.Load()
+			if loadErr != nil {
+				return nil
+			}
+			ids := make([]string, 0, len(current.Connectors))
+			for _, descriptor := range current.Connectors {
 				ids = append(ids, descriptor.ID)
 			}
 			return ids
 		},
+		ConnectorAction:  workTUIConnectorAction,
+		ConnectorCommand: workTUIConnectorCommand,
 		BundleAction: workTUIBundleAction,
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
@@ -254,6 +260,20 @@ func workTUIProviderCommand(action, provider string) *exec.Cmd {
 		}
 	}
 	command := exec.Command(os.Args[0], arguments...)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command
+}
+
+func workTUIConnectorAction(arguments []string) (string, error) {
+	var output bytes.Buffer
+	err := connectorCommandWithIO(arguments, os.Stdin, &output)
+	return strings.TrimSpace(output.String()), err
+}
+
+func workTUIConnectorCommand(arguments []string) *exec.Cmd {
+	command := exec.Command(os.Args[0], append([]string{"connector"}, arguments...)...)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
