@@ -4,6 +4,25 @@ Gator's Google Work connector is a Go-native port of the useful backend
 workflows from Hot Cross Buns. It is a Work connector, not a separate Google
 planner UI or a `gator google` command hierarchy.
 
+## Set up entirely from the Work TUI
+
+After creating a Desktop OAuth client and enabling the Google APIs described
+below, the remaining setup can stay inside `gator work`:
+
+```text
+/connector setup google-work YOUR_CLIENT_ID
+/connector login google-work prompt
+/connector test google-work
+```
+
+The `prompt` form reads the optional client secret with hidden terminal input.
+Leave it blank for a public client that does not require one. Successful login
+selects the connector for the current conversation. `/connector status
+google-work`, `/connector permission ...`, `/connector logout google-work`,
+and `/connector delete google-work` expose the rest of the connector lifecycle
+without leaving the TUI; `/connector list` shows the selected and configured
+IDs.
+
 ## Set up a user-owned Google desktop OAuth app
 
 Create or select a **Desktop** OAuth client in your Google Cloud project for

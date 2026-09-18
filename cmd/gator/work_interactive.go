@@ -134,7 +134,7 @@ func workInteractiveConversation(startConversationID string) error {
 		},
 		ConnectorAction:  workTUIConnectorAction,
 		ConnectorCommand: workTUIConnectorCommand,
-		BundleAction: workTUIBundleAction,
+		BundleAction:     workTUIBundleAction,
 		ListConversations: func() ([]worksession.Conversation, error) {
 			return sessions.List(50)
 		},

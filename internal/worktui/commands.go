@@ -1003,7 +1003,14 @@ func workHelp() string {
   /refresh-source                capture changed workspace files next turn
   /mode auto|inspect|draft|act   choose automatic or explicit authority
   /artifact [add|remove] PATH    manage expected deliverables
-  /connector [add|remove] ID     manage connected sources for this session
+  /connector [add|remove] ID     select connected sources for this session
+  /connector setup ID CLIENT_ID  configure Google Workspace with desktop OAuth
+  /connector login ID [prompt]   authenticate and select a connector
+  /connector status [ID]         inspect configured connectors and operations
+  /connector test ID             verify live connector access
+  /connector permission ID OPERATION read|write POLICY
+                                  set allow/ask/deny/draft policy
+  /connector logout|delete ID    remove credentials or the connector
   /web-origin [add|remove] URL   manage bounded web research origins
   /code status                   inspect the internal Code envelope
   /code verify COMMAND           add required project verification

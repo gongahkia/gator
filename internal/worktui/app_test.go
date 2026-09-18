@@ -423,6 +423,68 @@ func TestProviderCommandsOpenPickerAndRunSelectedAction(t *testing.T) {
 	}
 }
 
+func TestConnectorSetupAndManagementRunInsideTUI(t *testing.T) {
+	var calls [][]string
+	available := []string(nil)
+	model := New(Config{
+		CurrentFolder: "/work",
+		ConnectorChoices: func() []string {
+			return append([]string(nil), available...)
+		},
+		ConnectorAction: func(arguments []string) (string, error) {
+			calls = append(calls, append([]string(nil), arguments...))
+			if arguments[0] == "add" {
+				available = []string{"google-work"}
+				return "Added connector google-work.", nil
+			}
+			return "done", nil
+		},
+	})
+	model.input = "/connector setup google-work desktop-client-id"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil {
+		t.Fatal("connector setup did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if len(calls) != 1 || strings.Join(calls[0], " ") != "add google-work --kind google --oauth-client-id desktop-client-id" {
+		t.Fatalf("connector setup arguments = %#v", calls)
+	}
+	if view := model.View(); !strings.Contains(view, "Added connector google-work") || !strings.Contains(view, "/connector login google-work prompt") {
+		t.Fatalf("connector setup result = %s", view)
+	}
+	model.input = "/connector google-work"
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if len(model.options.ConnectorIDs) != 1 || model.options.ConnectorIDs[0] != "google-work" {
+		t.Fatalf("new connector choices were not refreshed: %#v", model.options.ConnectorIDs)
+	}
+}
+
+func TestConnectorLoginUsesInteractiveCommandAndSelectsOnSuccess(t *testing.T) {
+	var arguments []string
+	model := New(Config{
+		CurrentFolder: "/work",
+		ConnectorCommand: func(values []string) *exec.Cmd {
+			arguments = append([]string(nil), values...)
+			return exec.Command("true")
+		},
+	})
+	model.input = "/connector login google-work prompt"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil || strings.Join(arguments, " ") != "login google-work --prompt-client-secret" {
+		t.Fatalf("connector login command = %#v", arguments)
+	}
+	updated, _ = model.Update(connectorActionDone{action: "login", id: "google-work"})
+	model = updated.(Model)
+	if len(model.options.ConnectorIDs) != 1 || model.options.ConnectorIDs[0] != "google-work" ||
+		!strings.Contains(model.View(), "authenticated and selected") {
+		t.Fatalf("connector login result = %#v\n%s", model.options.ConnectorIDs, model.View())
+	}
+}
+
 func TestProviderCommandsAcceptAnExplicitProvider(t *testing.T) {
 	for _, test := range []struct {
 		command string
