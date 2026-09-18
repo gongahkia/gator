@@ -12,4 +12,8 @@ before execution. Deliverables, code candidates,
 verification, and external-action proposals remain
 reviewable before transfer.
 
-Gator pins Go 1.25.13.
+Gator currently pins Go 1.25.13.
+
+= = = = = = = =
+
+🐊
