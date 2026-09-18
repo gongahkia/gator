@@ -225,12 +225,12 @@ Supported `@` references are a separate, bounded developer input channel.
 The TUI loads only repository-local PNG, JPEG, and WebP images; PDFs; selected
 UTF-8 text/data formats; and DOCX, ODT, and XLSX documents. Images and PDFs
 retain their original bytes for native provider inputs. Office documents are
-locally converted to bounded plain text before transmission. Gator sends PDFs
-only through adapters with a documented native document protocol (OpenAI
-Responses, Anthropic Messages, and Gemini GenerateContent); text attachments
-are framed as untrusted reference material for every native adapter. Generic
-Chat Completions endpoints therefore fail clearly for PDF inputs rather than
-silently dropping them. At most four attachments may total 8 MiB (4 MiB per
+locally converted to bounded plain text before transmission. Gator sends PDF
+bytes only through adapters with a documented native document protocol (OpenAI
+Responses, Anthropic Messages, and Gemini GenerateContent). For a declared
+text-only model or generic Chat Completions endpoint, Gator instead performs
+bounded local extraction and sends page-marked untrusted text; image-only pages
+remain explicit OCR gaps. At most four attachments may total 8 MiB (4 MiB per
 file). Gator reads them through descriptor-rooted workspace paths and rejects
 unsafe or pathological Office archives before extraction. The TUI shows an
 explicit per-send confirmation with each file, size, and provider. Raw bytes

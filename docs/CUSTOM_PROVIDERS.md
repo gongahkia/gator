@@ -42,9 +42,11 @@ The terminal picker and JSONL RPC validate the same catalog. In `/model`, `n`
 creates a custom provider, `c` on a custom row edits it, `g` previews the
 sibling `/models` catalog as untrusted server data, and `x` removes endpoint
 metadata after confirmation. A custom provider
-does not accept PDFs because the generic Chat Completions protocol has no
-stable document-input format. Gator persists endpoint metadata and model IDs in
-`config.json`, never API keys. A keyless endpoint sends no `Authorization`
+does not receive PDF bytes because the generic Chat Completions protocol has no
+stable document-input format; Gator converts selected PDFs to bounded,
+page-marked text first. Image-only pages are explicitly marked as needing OCR.
+Gator persists endpoint metadata and model IDs in `config.json`, never API keys.
+A keyless endpoint sends no `Authorization`
 header; a keyed endpoint reads exactly the named environment variable at run
 start. Removing a provider does not unset that environment variable.
 

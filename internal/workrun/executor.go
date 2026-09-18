@@ -354,13 +354,24 @@ func (e Executor) Execute(ctx context.Context, request Request) (finalOutcome Ou
 	}
 	initial = append(initial, agent.Message{Role: agent.RoleUser, Content: request.Objective, Images: request.Images, Attachments: request.Attachments})
 	if visual, ok := e.Model.(agent.VisualInputModel); ok && !visual.SupportsVisualInput() {
-		for _, message := range initial {
+		for messageIndex := range initial {
+			message := &initial[messageIndex]
 			if len(message.Images) > 0 {
 				return outcome, errors.New("selected model does not support retained or selected images")
 			}
-			for _, a := range message.Attachments {
-				if a.MediaType == "application/pdf" {
-					return outcome, errors.New("selected model does not support PDF attachments")
+			for attachmentIndex := range message.Attachments {
+				selected := &message.Attachments[attachmentIndex]
+				if selected.MediaType == attachment.PDFMediaType {
+					extraction, err := attachment.ExtractPDFText(ctx, selected.Data, attachment.MaxPDFExtractedBytes)
+					if err != nil {
+						return outcome, fmt.Errorf("extract PDF attachment %q for text-only model: %w", selected.Name, err)
+					}
+					text, err := extraction.PlainText(attachment.MaxPDFExtractedBytes)
+					if err != nil {
+						return outcome, fmt.Errorf("format PDF attachment %q for text-only model: %w", selected.Name, err)
+					}
+					selected.MediaType = "text/plain"
+					selected.Data = []byte(text)
 				}
 			}
 		}

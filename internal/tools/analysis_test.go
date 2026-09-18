@@ -4,12 +4,41 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/document"
 	"github.com/gongahkia/gator/internal/workspace"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestExtractDocumentReturnsPDFPageEvidence(t *testing.T) {
+	sourcePath := t.TempDir()
+	payload, _, err := document.RenderPDF(document.Spec{
+		Title:  "Evidence",
+		Blocks: []document.Block{{Kind: "paragraph", Text: "page-addressable fact"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourcePath, "evidence.pdf"), payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+	source, err := workspace.Open(sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := (ExtractDocument{Root: source}).Execute(context.Background(), json.RawMessage(`{"path":"source/evidence.pdf"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result.Content, `"locator_precision":"page"`) ||
+		!strings.Contains(result.Content, `"page":1`) ||
+		!strings.Contains(result.Content, "page-addressable fact") ||
+		!strings.Contains(result.Content, `"source_sha256"`) {
+		t.Fatalf("PDF extraction result = %s", result.Content)
+	}
+}
 
 func TestReconcileExactDecimalTotalsAndSourceRows(t *testing.T) {
 	sourcePath := t.TempDir()

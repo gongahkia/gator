@@ -44,9 +44,12 @@ DNS/pinning policy, and retain URL, time, digest, body, and truncation status.
 ## Deterministic tables and documents
 
 `extract_document` uses the attachment parser on demand and reports unsupported
-formats explicitly. Native PDF text extraction is unavailable; a selected PDF
-can be passed to a model advertising visual input. Gator does not invent page
-references. CSV/XLSX inspection retains source paths, hashes, sheets, and rows.
+formats explicitly. Native PDF extraction is pure Go, bounded to 2,000 pages and
+512 KiB of extracted text, and returns physical 1-based page references plus
+source/extraction digests. Image-only, sparse, or degraded pages are flagged for
+OCR or review; Gator does not pretend extraction is OCR. A selected PDF can also
+be passed directly to a model advertising native document input. CSV/XLSX
+inspection retains source paths, hashes, sheets, and rows.
 
 `reconcile_tables` joins exact keys and sums decimal amounts using rational
 arithmetic. It reports duplicates and missing values, excludes missing amounts

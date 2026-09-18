@@ -8,8 +8,11 @@ persisted model selection.
 
 Gator uses the existing Ollama runtime and its loopback Chat Completions API.
 Its Work service, tools, specialist boundaries, evidence, and approvals still
-own execution. The current catalog is text-only; unsupported image/PDF inputs
-are reported explicitly. No model-quality claim follows from being in the catalog.
+own execution. The current catalog is text-only: direct image prompt inputs are
+reported explicitly, while PDF prompt attachments and frozen source PDFs use
+Gator's bounded native text extraction. Scanned pages are flagged as requiring
+OCR rather than silently treated as empty. No model-quality claim follows from
+being in the catalog.
 
 ## Download, select, and delete
 
@@ -150,8 +153,9 @@ insecure pull option and never uploads models.
 Ollama documents Chat Completions streaming and tool support, which is why the
 catalog can retain Gator's tool loop rather than delegating to another harness.
 The selected coding models are text models, so do not use `--image` with them;
-text attachments retain the normal OpenAI-compatible provider behavior while
-PDF inputs remain unavailable on that generic protocol.
+text attachments retain the normal OpenAI-compatible provider behavior. Gator
+converts selected PDFs to bounded page-marked text before calling a text-only
+model; it does not send PDF bytes over the generic protocol.
 
 ## Verification of the Work TUI integration
 

@@ -3,12 +3,15 @@ package attachment
 import (
 	"archive/zip"
 	"bytes"
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/agent"
+	"github.com/gongahkia/gator/internal/document"
 	"github.com/gongahkia/gator/internal/workspace"
 )
 
@@ -31,6 +34,49 @@ func TestLoadPDFAndTextAttachments(t *testing.T) {
 	text, supported, err := Load(root, "notes.md", 1024)
 	if err != nil || !supported || text.MediaType != "text/plain" || string(text.Data) != "# Notes\nimportant detail" {
 		t.Fatalf("text attachment = %#v, supported = %v, err = %v", text, supported, err)
+	}
+}
+
+func TestExtractPDFTextReturnsPageAddressableContent(t *testing.T) {
+	payload, _, err := document.RenderPDF(document.Spec{
+		Title: "PDF extraction",
+		Blocks: []document.Block{
+			{Kind: "paragraph", Text: "first page searchable evidence"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	extraction, err := ExtractPDFText(context.Background(), payload, MaxPDFExtractedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if extraction.PageCount != 1 || len(extraction.Pages) != 1 || extraction.Pages[0].Page != 1 ||
+		!extraction.Pages[0].HasText || !strings.Contains(extraction.Pages[0].Text, "first page searchable evidence") ||
+		extraction.RequiresOCR {
+		t.Fatalf("extraction = %#v", extraction)
+	}
+	plain, err := extraction.PlainText(MaxPDFExtractedBytes)
+	if err != nil || !strings.Contains(plain, "[PDF page 1]") || !strings.Contains(plain, "first page searchable evidence") {
+		t.Fatalf("plain text = %q, %v", plain, err)
+	}
+}
+
+func TestExtractPDFTextHonorsCancellationAndBounds(t *testing.T) {
+	payload, _, err := document.RenderPDF(document.Spec{
+		Title:  "PDF extraction",
+		Blocks: []document.Block{{Kind: "paragraph", Text: strings.Repeat("bounded text ", 100)}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := ExtractPDFText(cancelled, payload, MaxPDFExtractedBytes); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancel error = %v", err)
+	}
+	if _, err := ExtractPDFText(context.Background(), payload, 16); err == nil || !strings.Contains(err.Error(), "extraction limit") {
+		t.Fatalf("bound error = %v", err)
 	}
 }
 

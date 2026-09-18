@@ -158,9 +158,9 @@ func (t InspectTable) Execute(_ context.Context, raw json.RawMessage) (agent.Too
 type ExtractDocument struct{ Root workspace.Root }
 
 func (t ExtractDocument) Definition() agent.ToolDefinition {
-	return agent.ToolDefinition{Name: "extract_document", Description: "Extract supported frozen source documents on demand. Returns path-level provenance; exact PDF pages are unavailable. Unsupported extraction is an error.", Parameters: schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string"}}}`)}
+	return agent.ToolDefinition{Name: "extract_document", Description: "Extract supported frozen source documents on demand. PDF text is page-addressable and reports image-only or degraded pages that require OCR/review. Unsupported extraction is an error.", Parameters: schema(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string"}}}`)}
 }
-func (t ExtractDocument) Execute(_ context.Context, raw json.RawMessage) (agent.ToolResult, error) {
+func (t ExtractDocument) Execute(ctx context.Context, raw json.RawMessage) (agent.ToolResult, error) {
 	var input struct {
 		Path string `json:"path"`
 	}
@@ -168,15 +168,35 @@ func (t ExtractDocument) Execute(_ context.Context, raw json.RawMessage) (agent.
 		return agent.ToolResult{}, err
 	}
 	path := strings.TrimPrefix(input.Path, "source/")
+	if strings.EqualFold(filepath.Ext(path), ".pdf") {
+		payload, err := t.Root.ReadRegularFile(path, attachment.MaxDocumentBytes)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		extraction, err := attachment.ExtractPDFText(ctx, payload, attachment.MaxPDFExtractedBytes)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		sourceSum := sha256.Sum256(payload)
+		extracted, err := json.Marshal(extraction)
+		if err != nil {
+			return agent.ToolResult{}, err
+		}
+		extractionSum := sha256.Sum256(extracted)
+		data, err := json.Marshal(map[string]any{
+			"path": path, "locator_precision": "page",
+			"source_sha256":     hex.EncodeToString(sourceSum[:]),
+			"extraction_sha256": hex.EncodeToString(extractionSum[:]),
+			"document":          extraction,
+		})
+		return agent.ToolResult{Content: string(data)}, err
+	}
 	document, supported, err := attachment.Load(t.Root, path, attachment.MaxDocumentBytes)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
 	if !supported {
 		return agent.ToolResult{}, errors.New("unsupported document extraction format")
-	}
-	if document.MediaType == attachment.PDFMediaType {
-		return agent.ToolResult{}, errors.New("PDF text extraction unavailable; explicitly attach the PDF to a capable model")
 	}
 	sum := sha256.Sum256(document.Data)
 	data, err := json.Marshal(map[string]any{"path": path, "locator_precision": "path", "extraction_sha256": hex.EncodeToString(sum[:]), "text": string(document.Data)})

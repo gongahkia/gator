@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/document"
 	"github.com/gongahkia/gator/internal/workrun"
-	"strings"
 	"testing"
 
 	"github.com/gongahkia/gator/internal/agent"
@@ -68,8 +69,12 @@ func TestAssembledWorkBackendStreamingFallbackCancellationAndVisualBoundary(t *t
 		t.Fatal("nonstream fallback lost")
 	}
 	backend.Model = streaming
-	_, err = (workrun.Service{Executor: workrun.Executor{Model: backend, StateDir: t.TempDir()}}).Execute(context.Background(), workrun.Request{SourcePath: t.TempDir(), Objective: "Inspect PDF", Mode: action.Inspect, Contract: artifact.InspectionContract(), Attachments: []agent.Attachment{{Name: "reference.pdf", MediaType: "application/pdf", Data: []byte("%PDF-1.4\n")}}})
-	if err == nil || !strings.Contains(err.Error(), "does not support PDF") {
-		t.Fatalf("unsupported attachment: %v", err)
+	pdfBytes, _, err := document.RenderPDF(document.Spec{Title: "Reference", Blocks: []document.Block{{Kind: "paragraph", Text: "text fallback"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outcome, err := (workrun.Service{Executor: workrun.Executor{Model: backend, StateDir: t.TempDir()}}).Execute(context.Background(), workrun.Request{SourcePath: t.TempDir(), Objective: "Inspect PDF", Mode: action.Inspect, Contract: artifact.InspectionContract(), Attachments: []agent.Attachment{{Name: "reference.pdf", MediaType: "application/pdf", Data: pdfBytes}}})
+	if err != nil || outcome.Result.FinalText != "complete" {
+		t.Fatalf("text-only PDF fallback: outcome=%#v err=%v", outcome.Result, err)
 	}
 }

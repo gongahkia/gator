@@ -3,6 +3,7 @@ module github.com/gongahkia/gator
 go 1.25.13
 
 require (
+	github.com/Detective-XH/gopdf v0.8.7
 	github.com/atotto/clipboard v0.1.4
 	github.com/aws/aws-sdk-go-v2 v1.43.6
 	github.com/aws/aws-sdk-go-v2/config v1.32.37

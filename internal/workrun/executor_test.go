@@ -16,9 +16,15 @@ import (
 	"github.com/gongahkia/gator/internal/action"
 	"github.com/gongahkia/gator/internal/agent"
 	"github.com/gongahkia/gator/internal/artifact"
+	"github.com/gongahkia/gator/internal/attachment"
 	"github.com/gongahkia/gator/internal/connector"
+	"github.com/gongahkia/gator/internal/document"
 	"github.com/gongahkia/gator/internal/sandbox"
 )
+
+type textOnlyScriptedModel struct{ *scriptedModel }
+
+func (textOnlyScriptedModel) SupportsVisualInput() bool { return false }
 
 func TestExecutorProducesSealedArtifactsFromNonGitSource(t *testing.T) {
 	source := t.TempDir()
@@ -126,6 +132,35 @@ func TestExecutorPassesPromptAttachmentsOnlyToTheUserFacingManager(t *testing.T)
 	}
 	if len(model.requests) != 1 || len(model.requests[0].Messages) != 1 || len(model.requests[0].Messages[0].Images) != 1 {
 		t.Fatalf("manager request = %#v", model.requests)
+	}
+}
+
+func TestExecutorExtractsPDFAttachmentForTextOnlyModel(t *testing.T) {
+	payload, _, err := document.RenderPDF(document.Spec{
+		Title:  "Attachment",
+		Blocks: []document.Block{{Kind: "paragraph", Text: "text-only fallback evidence"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := &scriptedModel{turns: []agent.Turn{{Text: "Inspected the PDF."}}}
+	model := textOnlyScriptedModel{script}
+	_, err = (Executor{Model: model, StateDir: t.TempDir()}).Execute(context.Background(), Request{
+		SourcePath: t.TempDir(), Objective: "Inspect the PDF", RunID: "work-pdf-attachment", Mode: action.Inspect,
+		Contract: artifact.InspectionContract(), MaxSteps: 1,
+		Attachments: []agent.Attachment{{Name: "report.pdf", MediaType: attachment.PDFMediaType, Data: payload}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(script.requests) != 1 || len(script.requests[0].Messages) != 1 ||
+		len(script.requests[0].Messages[0].Attachments) != 1 {
+		t.Fatalf("manager request = %#v", script.requests)
+	}
+	selected := script.requests[0].Messages[0].Attachments[0]
+	if selected.MediaType != "text/plain" || !strings.Contains(string(selected.Data), "[PDF page 1]") ||
+		!strings.Contains(string(selected.Data), "text-only fallback evidence") {
+		t.Fatalf("PDF fallback attachment = %#v", selected)
 	}
 }
 
