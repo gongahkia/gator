@@ -32,6 +32,90 @@ func TestHomeComposerStartsConversationAndRetainsResult(t *testing.T) {
 	}
 }
 
+func TestConversationSessionControlsReachEachRun(t *testing.T) {
+	var got RunOptions
+	model := New(Config{
+		CurrentFolder:    "/work",
+		ConnectorChoices: func() []string { return []string{"notion"} },
+		Run: func(_, _, _ string, options RunOptions) RunResult {
+			got = options
+			return RunResult{FinalText: "done"}
+		},
+	})
+	for _, command := range []string{
+		"/mode draft",
+		"/artifact brief.md",
+		"/connector notion",
+		"/web-origin https://example.com",
+		"/refresh-source",
+	} {
+		model.input = command
+		updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		model = updated.(Model)
+	}
+	model.input = "write it"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil {
+		t.Fatal("run did not start")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if got.Mode != "draft" || !got.RefreshSource ||
+		len(got.Artifacts) != 1 || got.Artifacts[0] != "brief.md" ||
+		len(got.ConnectorIDs) != 1 || got.ConnectorIDs[0] != "notion" ||
+		len(got.WebOrigins) != 1 || got.WebOrigins[0] != "https://example.com" {
+		t.Fatalf("run options = %#v", got)
+	}
+	if model.options.RefreshSource {
+		t.Fatal("source refresh was not one-shot")
+	}
+}
+
+func TestVerifiedDeliverablesRenderAndSaveWithOneConfirmation(t *testing.T) {
+	var requests []BundleActionRequest
+	model := New(Config{
+		CurrentFolder: "/work",
+		BundleAction: func(request BundleActionRequest) (string, error) {
+			requests = append(requests, request)
+			if request.Execute {
+				return "saved", nil
+			}
+			return "create brief.md", nil
+		},
+	})
+	model.home = false
+	updated, _ := model.Update(runDone(RunResult{
+		FinalText: "Done",
+		Bundle: BundleSummary{
+			Path: "/state/run",
+			Artifacts: []ArtifactSummary{{
+				Path: "brief.md", MediaType: "text/markdown", Bytes: 42, Valid: true,
+			}},
+		},
+	}))
+	model = updated.(Model)
+	if view := ansi.Strip(model.View()); !strings.Contains(view, "Verified deliverables") || !strings.Contains(view, "brief.md") {
+		t.Fatalf("bundle card = %q", view)
+	}
+	model.input = "/save /destination"
+	updated, command := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command != nil || model.pendingBundleAction == nil || !strings.Contains(ansi.Strip(model.View()), "Review transfer") {
+		t.Fatal("save did not stop for one explicit confirmation")
+	}
+	updated, command = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if command == nil {
+		t.Fatal("confirmation did not start save")
+	}
+	updated, _ = model.Update(command())
+	model = updated.(Model)
+	if len(requests) != 2 || requests[0].Execute || !requests[1].Execute || !strings.Contains(model.View(), "saved") {
+		t.Fatalf("requests = %#v", requests)
+	}
+}
+
 func TestRevisionCommandsStayInConversation(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work", Conversations: nil, MoveBack: func(id string) (string, error) { return "moved " + id, nil }})
 	model.launcher = false
@@ -163,9 +247,10 @@ func TestCommandPaletteContainsOnlySlashCommands(t *testing.T) {
 	model := New(Config{CurrentFolder: "/work"})
 	model.openCommandPalette()
 	expected := []string{
-		"/help", "/new", "/model", "/connect", "/login", "/logout", "/effort", "/attach", "/detach", "/status", "/statusline", "/permissions",
+		"/help", "/new", "/model", "/connect", "/login", "/logout", "/effort", "/attach", "/detach",
+		"/source", "/refresh-source", "/mode", "/artifact", "/connector", "/web-origin", "/status", "/statusline", "/permissions",
 		"/doctor", "/agents", "/settings", "/theme", "/history", "/back", "/forward", "/review",
-		"/copy", "/queue", "/dequeue", "/clear-queue", "/code status", "/code verify", "/code scope",
+		"/save", "/apply", "/copy", "/queue", "/dequeue", "/clear-queue", "/code status", "/code verify", "/code scope",
 		"/code profile", "/code setup", "/code allow", "/code allow-prefix", "/code sandbox",
 		"/code network", "/code max-steps", "/code grant", "/code revoke", "/code browser",
 		"/code reset", "/quit",

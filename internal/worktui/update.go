@@ -31,6 +31,8 @@ func (m Model) Update(messageValue tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateInteraction(value)
 	case runDone:
 		return m.updateRunDone(value)
+	case bundleActionDone:
+		return m.updateBundleActionDone(value)
 	case providerActionDone:
 		return m.updateProviderActionDone(value)
 	case tea.KeyMsg:
@@ -136,12 +138,13 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		if text == "" {
 			text = "Finished the Work revision."
 		}
-		if value.OutputPath != "" {
-			text += "\n\nArtifacts: " + value.OutputPath
-		}
 		m.messages = append(m.messages, message{role: "Gator", text: text})
+		if value.Bundle.Path != "" {
+			m.messages = append(m.messages, message{role: "Deliverables", text: formatBundleSummary(value.Bundle)})
+		}
 	}
 	m.lastOutput = value.OutputPath
+	m.lastBundle = value.Bundle
 	if value.RevisionID != "" || value.SnapshotID != "" {
 		m.status = "Revision " + value.RevisionID + " · snapshot " + value.SnapshotID
 	}
@@ -152,12 +155,24 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		m.messages = append(m.messages, message{role: "You", text: next.prompt})
 		m.running = true
 		m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
+		next.options.PreviousArtifacts = m.previousArtifactPaths()
 		source, conversation := m.source, m.conversation
 		return m.startWork(source, conversation, next.prompt, next.options)
 	}
 	if value.Error != "" && len(m.queue) > 0 {
 		m.status = fmt.Sprintf("Run stopped · %d queued prompt(s) paused", len(m.queue))
 	}
+	return m, nil
+}
+
+func (m Model) updateBundleActionDone(value bundleActionDone) (tea.Model, tea.Cmd) {
+	if value.err != nil {
+		m.messages = append(m.messages, message{role: "Gator", text: value.err.Error()})
+	} else {
+		m.messages = append(m.messages, message{role: "Gator", text: value.text})
+	}
+	m.status = ""
+	m.scroll = 0
 	return m, nil
 }
 
@@ -217,11 +232,16 @@ func (m Model) updateProviderActionDone(value providerActionDone) (tea.Model, te
 	}
 	source, conversation := m.source, m.conversation
 	options := cloneRunOptions(m.options)
+	options.PreviousArtifacts = m.previousArtifactPaths()
 	m.options.Attachments = nil
+	m.options.RefreshSource = false
 	return m.startWork(source, conversation, prompt, options)
 }
 
 func (m Model) updateKey(value tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.pendingBundleAction != nil {
+		return m.updateBundleConfirmation(value)
+	}
 	if value.String() == "ctrl+c" {
 		if m.running && m.cancel != nil {
 			m.cancel()
@@ -360,6 +380,7 @@ func (m Model) submitRunningInput() (tea.Model, tea.Cmd) {
 	}
 	m.queue = append(m.queue, queuedRun{prompt: prompt, options: cloneRunOptions(m.options)})
 	m.options.Attachments = nil
+	m.options.RefreshSource = false
 	m.status = fmt.Sprintf("Working from an immutable snapshot… · %d queued", len(m.queue))
 	return m, nil
 }
@@ -419,7 +440,9 @@ func (m Model) submitComposerInput() (tea.Model, tea.Cmd) {
 	}
 	source, conversation := m.source, m.conversation
 	options := cloneRunOptions(m.options)
+	options.PreviousArtifacts = m.previousArtifactPaths()
 	m.options.Attachments = nil
+	m.options.RefreshSource = false
 	return m.startWork(source, conversation, prompt, options)
 }
 
@@ -461,7 +484,9 @@ func (m Model) updateHome(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		source, conversation := m.source, m.conversation
 		options := cloneRunOptions(m.options)
+		options.PreviousArtifacts = m.previousArtifactPaths()
 		m.options.Attachments = nil
+		m.options.RefreshSource = false
 		return m.startWork(source, conversation, prompt, options)
 	case "backspace":
 		runes := []rune(m.input)
@@ -535,6 +560,14 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.source = selected.source
 			m.conversation = selected.id
 			m.title = selected.title
+			if m.config.LoadConversationOptions != nil {
+				options, err := m.config.LoadConversationOptions(selected.id)
+				if err != nil {
+					m.status = "Load conversation settings: " + err.Error()
+				} else {
+					m.options = options
+				}
+			}
 			m.scroll = 0
 			if switching {
 				m.messages = nil

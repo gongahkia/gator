@@ -68,10 +68,10 @@ Pi, or OpenCode.
 
 ## Recommended build order
 
-1. **Live main-TUI control.** Add event streaming, cancellation, and steering to
-   the Work conversation without exposing a child Code interface.
-2. **Integrated review and transfer.** Add a Work-bundle review/apply view that
-   understands artifact validation, connected actions, and Code patch evidence.
+1. **Artifact-card depth.** Extend the conversation-native verified cards with
+   richer format previews while keeping `/save` and `/apply` preflighted.
+2. **Connected workflow dogfood.** Exercise session-selected connectors, draft
+   actions, approvals, and retained provenance against real accounts.
 3. **Consolidated settings.** Turn model, connector, permissions, and trust
    inspection into one main-Gator settings surface.
 4. **Workflow depth.** Dogfood and harden a small number of complete

@@ -28,13 +28,16 @@ var statusLineOptions = []statusLineOption{
 	{id: "model", label: "Model", description: "Selected provider and model"},
 	{id: "model-access", label: "Model access", description: "Login, credential, or local-model readiness"},
 	{id: "current-dir", label: "Current directory", description: "Selected source directory"},
+	{id: "mode", label: "Work mode", description: "Automatic, inspect, draft, or act"},
+	{id: "artifacts", label: "Deliverables", description: "Expected output files"},
+	{id: "connectors", label: "Connected sources", description: "Selected connector IDs"},
 	{id: "conversation", label: "Conversation", description: "Current conversation ID"},
 	{id: "effort", label: "Effort", description: "Current manager effort"},
 	{id: "sandbox", label: "Sandbox", description: "Code sandbox and network policy"},
 	{id: "status", label: "Activity status", description: "Most recent transient status"},
 }
 
-var defaultStatusLine = []string{"queue", "send", "commands", "conversations", "inbox", "jobs"}
+var defaultStatusLine = []string{"queue", "current-dir", "mode", "artifacts", "connectors", "send", "commands", "conversations", "inbox", "jobs"}
 
 func resolveStatusLine(configured *[]string) ([]string, bool) {
 	if configured == nil {
@@ -105,6 +108,18 @@ func (m Model) statusLineValue(id string) string {
 			name = "current folder"
 		}
 		return "dir " + name
+	case "mode":
+		return "mode " + valueOrNone(m.options.Mode)
+	case "artifacts":
+		if len(m.options.Artifacts) == 0 {
+			return ""
+		}
+		return "files " + strings.Join(m.options.Artifacts, ",")
+	case "connectors":
+		if len(m.options.ConnectorIDs) == 0 {
+			return ""
+		}
+		return "sources " + strings.Join(m.options.ConnectorIDs, ",")
 	case "conversation":
 		return "conversation " + valueOrNone(singleLine(m.conversation))
 	case "effort":

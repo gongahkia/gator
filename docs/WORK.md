@@ -14,6 +14,20 @@ The product is designed for technical operators, founders, researchers,
 analysts, and developers who already use terminals and want automation that is
 composable, inspectable, and provider-independent.
 
+The interactive TUI is conversation-first. Starting `gator` selects the current
+directory as a read-only workspace. Questions use inspection mode automatically;
+requests to create work use draft mode and infer a conservative deliverable name.
+Use `/mode` and `/artifact` when the automatic choice is not the intended
+contract. `/source`, `/connector`, and `/web-origin` are visible session controls,
+not hidden model permissions.
+
+Completed files appear in the conversation as a verified deliverable card.
+`/review` previews them without leaving the TUI. `/save [DIRECTORY]` preflights
+and saves ordinary artifacts after one explicit confirmation; `/apply` does the
+same for a verified Code candidate. Both paths recheck retained evidence and
+target state at execution time. The selected source remains immutable during the
+run, and conflicting files still require an explicit `/save --replace`.
+
 ```text
 objective + sources + outcome contract
                   |

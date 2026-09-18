@@ -79,6 +79,12 @@ func commandPaletteEntries() []entry {
 		{title: "/effort", subtitle: "Set low, standard, or high effort", kind: "command-input", command: "/effort"},
 		{title: "/attach", subtitle: "Attach a source file to the next prompt", kind: "command-input", command: "/attach"},
 		{title: "/detach", subtitle: "Remove a pending attachment", kind: "command-input", command: "/detach"},
+		{title: "/source", subtitle: "Choose the conversation workspace", kind: "command-input", command: "/source"},
+		{title: "/refresh-source", subtitle: "Capture the selected workspace again", kind: "command", command: "/refresh-source"},
+		{title: "/mode", subtitle: "Set auto, inspect, draft, or act", kind: "command-input", command: "/mode"},
+		{title: "/artifact", subtitle: "Add, remove, or list deliverables", kind: "command-input", command: "/artifact"},
+		{title: "/connector", subtitle: "Select connected sources for this session", kind: "command-input", command: "/connector"},
+		{title: "/web-origin", subtitle: "Select an HTTPS research origin", kind: "command-input", command: "/web-origin"},
 		{title: "/status", subtitle: "Inspect Gator orchestration", kind: "command", command: "/status"},
 		{title: "/statusline", subtitle: "Choose and order composer footer items", kind: "command", command: "/statusline"},
 		{title: "/permissions", subtitle: "Inspect the Code capability envelope", kind: "command", command: "/permissions"},
@@ -90,6 +96,8 @@ func commandPaletteEntries() []entry {
 		{title: "/back", subtitle: "Move to the parent revision", kind: "command", command: "/back"},
 		{title: "/forward", subtitle: "Move to a child or named revision", kind: "command-input", command: "/forward"},
 		{title: "/review", subtitle: "Show latest staged output", kind: "command", command: "/review"},
+		{title: "/save", subtitle: "Save verified deliverables to a folder", kind: "command-input", command: "/save"},
+		{title: "/apply", subtitle: "Apply a verified Code candidate", kind: "command-input", command: "/apply"},
 		{title: "/copy", subtitle: "Copy the latest Gator response", kind: "command", command: "/copy"},
 		{title: "/queue", subtitle: "Inspect queued prompts", kind: "command", command: "/queue"},
 		{title: "/dequeue", subtitle: "Remove the next queued prompt", kind: "command", command: "/dequeue"},
@@ -130,6 +138,8 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
 		m.messages, m.status, m.queue = nil, "", nil
+		m.lastOutput, m.lastBundle = "", BundleSummary{}
+		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
 		return m, nil
 	case "/model", "/connect", "/login", "/logout":
 		if fields[0] == "/model" && m.config.Models != nil {
@@ -205,6 +215,43 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		m.options.Attachments = removeString(m.options.Attachments, filepath.ToSlash(filepath.Clean(value)))
 		result = "Removed the pending attachment when present."
+	case "/source":
+		value := commandRemainder(command, fields[:1])
+		if value == "" {
+			result = "Workspace: " + m.source
+			break
+		}
+		if m.config.ResolveSource == nil {
+			err = errorsUnavailable("source selection")
+			break
+		}
+		var resolved string
+		resolved, err = m.config.ResolveSource(value)
+		if err == nil {
+			m.source = resolved
+			m.title = "Work in " + filepath.Base(resolved)
+			m.options.RefreshSource = m.conversation != ""
+			result = "Workspace set to " + resolved + ". It remains read-only during Work."
+			if m.options.RefreshSource {
+				result += "\nThe next turn will capture a new immutable snapshot."
+			}
+		}
+	case "/refresh-source":
+		m.options.RefreshSource = true
+		result = "The next turn will capture a new immutable snapshot of " + m.source + "."
+	case "/mode":
+		if len(fields) != 2 || !sliceContains([]string{"auto", "inspect", "draft", "act"}, strings.ToLower(fields[1])) {
+			err = fmt.Errorf("usage: /mode auto|inspect|draft|act")
+			break
+		}
+		m.options.Mode = strings.ToLower(fields[1])
+		result = "Work mode set to " + m.options.Mode + "."
+	case "/artifact":
+		result, err = m.configureArtifacts(fields, command)
+	case "/connector":
+		result, err = m.configureConnectors(fields)
+	case "/web-origin":
+		result, err = m.configureWebOrigins(fields)
 	case "/code":
 		result, err = m.configureCode(fields, command)
 	case "/status":
@@ -262,11 +309,17 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.queue = nil
 		result = "Cleared the prompt queue."
 	case "/review":
-		if m.lastOutput == "" {
+		if m.lastBundle.Path == "" {
 			result = "No completed Work output is available yet."
+		} else if m.config.BundleAction == nil {
+			result = formatBundleSummary(m.lastBundle)
 		} else {
-			result = "Latest staged output: " + m.lastOutput + "\nUse `gator review " + filepath.Dir(m.lastOutput) + " --preview` for verified artifact and Code-patch evidence."
+			result, err = m.config.BundleAction(BundleActionRequest{Action: "preview", BundlePath: m.lastBundle.Path})
 		}
+	case "/save":
+		return m.prepareSave(command)
+	case "/apply":
+		return m.prepareCodeApply(command)
 	case "/back", "/forward", "/history":
 		if m.conversation == "" {
 			err = fmt.Errorf("start or resume a conversation before using revision history")
@@ -299,6 +352,214 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 	m.messages = append(m.messages, message{role: "Gator", text: result})
 	m.scroll = 0
 	return m, nil
+}
+
+func (m *Model) configureArtifacts(fields []string, raw string) (string, error) {
+	if len(fields) == 1 || fields[1] == "list" {
+		return "Deliverables: " + valueOrNone(strings.Join(m.options.Artifacts, ", ")), nil
+	}
+	action := strings.ToLower(fields[1])
+	value := commandRemainder(raw, fields[:2])
+	switch action {
+	case "add":
+		if err := artifactPathOK(value); err != nil {
+			return "", err
+		}
+		m.options.Artifacts = appendUnique(m.options.Artifacts, value)
+	case "remove":
+		if value == "" {
+			return "", fmt.Errorf("usage: /artifact remove PATH")
+		}
+		m.options.Artifacts = removeString(m.options.Artifacts, value)
+	case "clear":
+		m.options.Artifacts = nil
+	default:
+		value = commandRemainder(raw, fields[:1])
+		if err := artifactPathOK(value); err != nil {
+			return "", err
+		}
+		m.options.Artifacts = appendUnique(m.options.Artifacts, value)
+	}
+	return "Deliverables: " + valueOrNone(strings.Join(m.options.Artifacts, ", ")), nil
+}
+
+func artifactPathOK(value string) error {
+	clean := filepath.ToSlash(filepath.Clean(value))
+	if value == "" || filepath.IsAbs(value) || clean != value || clean == ".." || strings.HasPrefix(clean, "../") {
+		return fmt.Errorf("artifact path must be a clean output-relative path")
+	}
+	return nil
+}
+
+func (m *Model) configureConnectors(fields []string) (string, error) {
+	if len(fields) == 1 || fields[1] == "list" {
+		available := []string(nil)
+		if m.config.ConnectorChoices != nil {
+			available = m.config.ConnectorChoices()
+		}
+		return "Selected connectors: " + valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")) +
+			"\nAvailable: " + valueOrNone(strings.Join(available, ", ")), nil
+	}
+	action := strings.ToLower(fields[1])
+	switch action {
+	case "clear":
+		m.options.ConnectorIDs = nil
+	case "remove":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /connector remove ID")
+		}
+		m.options.ConnectorIDs = removeString(m.options.ConnectorIDs, fields[2])
+	case "add":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /connector add ID")
+		}
+		if m.config.ConnectorChoices != nil && !sliceContains(m.config.ConnectorChoices(), fields[2]) {
+			return "", fmt.Errorf("connector %q is not configured", fields[2])
+		}
+		m.options.ConnectorIDs = appendUnique(m.options.ConnectorIDs, fields[2])
+	default:
+		if len(fields) != 2 {
+			return "", fmt.Errorf("usage: /connector [list|add ID|remove ID|clear]")
+		}
+		if m.config.ConnectorChoices != nil && !sliceContains(m.config.ConnectorChoices(), fields[1]) {
+			return "", fmt.Errorf("connector %q is not configured", fields[1])
+		}
+		m.options.ConnectorIDs = appendUnique(m.options.ConnectorIDs, fields[1])
+	}
+	return "Selected connectors: " + valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), nil
+}
+
+func (m *Model) configureWebOrigins(fields []string) (string, error) {
+	if len(fields) == 1 || fields[1] == "list" {
+		return "Selected web origins: " + valueOrNone(strings.Join(m.options.WebOrigins, ", ")), nil
+	}
+	switch strings.ToLower(fields[1]) {
+	case "clear":
+		m.options.WebOrigins = nil
+	case "remove":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /web-origin remove HTTPS_ORIGIN")
+		}
+		m.options.WebOrigins = removeString(m.options.WebOrigins, fields[2])
+	case "add":
+		if len(fields) != 3 {
+			return "", fmt.Errorf("usage: /web-origin add HTTPS_ORIGIN")
+		}
+		m.options.WebOrigins = appendUnique(m.options.WebOrigins, fields[2])
+	default:
+		if len(fields) != 2 {
+			return "", fmt.Errorf("usage: /web-origin [list|add ORIGIN|remove ORIGIN|clear]")
+		}
+		m.options.WebOrigins = appendUnique(m.options.WebOrigins, fields[1])
+	}
+	return "Selected web origins: " + valueOrNone(strings.Join(m.options.WebOrigins, ", ")), nil
+}
+
+func (m Model) prepareSave(raw string) (tea.Model, tea.Cmd) {
+	if m.lastBundle.Path == "" {
+		m.messages = append(m.messages, message{role: "Gator", text: "No verified deliverables are available yet."})
+		return m, nil
+	}
+	if m.config.BundleAction == nil {
+		m.messages = append(m.messages, message{role: "Gator", text: errorsUnavailable("save").Error()})
+		return m, nil
+	}
+	replace := false
+	target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "/save"))
+	if target == "--replace" {
+		replace, target = true, ""
+	} else if strings.HasPrefix(target, "--replace ") {
+		replace, target = true, strings.TrimSpace(strings.TrimPrefix(target, "--replace"))
+	}
+	if target == "" {
+		target = m.source
+	}
+	request := BundleActionRequest{Action: "save", BundlePath: m.lastBundle.Path, Target: target, Replace: replace}
+	summary, err := m.config.BundleAction(request)
+	if err != nil {
+		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		return m, nil
+	}
+	m.pendingBundleAction = &pendingBundleAction{request: request, summary: summary}
+	m.status = "Confirm saving verified deliverables"
+	return m, nil
+}
+
+func (m Model) prepareCodeApply(raw string) (tea.Model, tea.Cmd) {
+	if m.lastBundle.Path == "" || len(m.lastBundle.Candidates) == 0 {
+		m.messages = append(m.messages, message{role: "Gator", text: "No verified Code candidate is available yet."})
+		return m, nil
+	}
+	candidate := CandidateSummary{}
+	target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "/apply"))
+	for _, item := range m.lastBundle.Candidates {
+		if target == item.ID || strings.HasPrefix(target, item.ID+" ") {
+			candidate = item
+			target = strings.TrimSpace(strings.TrimPrefix(target, item.ID))
+			break
+		}
+	}
+	if candidate.ID == "" {
+		for _, item := range m.lastBundle.Candidates {
+			if item.Status == "verified" {
+				candidate = item
+				break
+			}
+		}
+	}
+	if candidate.ID == "" {
+		m.messages = append(m.messages, message{role: "Gator", text: "No verified Code candidate is available yet."})
+		return m, nil
+	}
+	if target == "" {
+		target = m.source
+	}
+	request := BundleActionRequest{Action: "apply-code", BundlePath: m.lastBundle.Path, Target: target, CandidateID: candidate.ID}
+	summary, err := m.config.BundleAction(request)
+	if err != nil {
+		m.messages = append(m.messages, message{role: "Gator", text: err.Error()})
+		return m, nil
+	}
+	m.pendingBundleAction = &pendingBundleAction{request: request, summary: summary}
+	m.status = "Confirm applying verified Code candidate"
+	return m, nil
+}
+
+func (m Model) updateBundleConfirmation(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch strings.ToLower(key.String()) {
+	case "y", "enter":
+		pending := *m.pendingBundleAction
+		m.pendingBundleAction = nil
+		pending.request.Execute = true
+		m.status = "Applying reviewed output…"
+		return m, func() tea.Msg {
+			text, err := m.config.BundleAction(pending.request)
+			return bundleActionDone{action: pending.request.Action, text: text, err: err}
+		}
+	case "n", "esc":
+		m.pendingBundleAction = nil
+		m.status = "Transfer cancelled"
+	}
+	return m, nil
+}
+
+func formatBundleSummary(bundle BundleSummary) string {
+	lines := []string{"Artifacts:"}
+	for _, file := range bundle.Artifacts {
+		mark := "✓"
+		if !file.Valid {
+			mark = "!"
+		}
+		lines = append(lines, fmt.Sprintf("%s %s · %s · %d bytes", mark, file.Path, file.MediaType, file.Bytes))
+	}
+	for _, candidate := range bundle.Candidates {
+		lines = append(lines, fmt.Sprintf("patch %s · %s · %s", candidate.ID, candidate.Status, strings.Join(candidate.ChangedPaths, ", ")))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, "No files were required for this inspection turn.")
+	}
+	lines = append(lines, "Use /review to preview, /save to keep files, or /apply for a verified patch.")
+	return strings.Join(lines, "\n")
 }
 
 func (m *Model) configureCode(fields []string, raw string) (string, error) {
@@ -509,8 +770,11 @@ func singleLine(value string) string {
 }
 
 func (m Model) workStatus() string {
-	return fmt.Sprintf("Gator orchestration\n  source: %s\n  conversation: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n\n%s",
-		valueOrNone(m.source), valueOrNone(m.conversation), effortName(m.options.MaxSteps), m.options.MaxSteps,
+	return fmt.Sprintf("Gator orchestration\n  workspace: %s%s\n  conversation: %s\n  mode: %s\n  deliverables: %s\n  connectors: %s\n  web origins: %s\n  effort: %s (%d manager steps)\n  pending attachments: %s\n  queued prompts: %d\n\n%s",
+		valueOrNone(m.source), map[bool]string{true: " (refresh next turn)", false: " (frozen per turn)"}[m.options.RefreshSource],
+		valueOrNone(m.conversation), valueOrNone(m.options.Mode), valueOrNone(strings.Join(m.options.Artifacts, ", ")),
+		valueOrNone(strings.Join(m.options.ConnectorIDs, ", ")), valueOrNone(strings.Join(m.options.WebOrigins, ", ")),
+		effortName(m.options.MaxSteps), m.options.MaxSteps,
 		valueOrNone(strings.Join(m.options.Attachments, ", ")), len(m.queue), m.codeStatus())
 }
 
@@ -538,6 +802,10 @@ func (m Model) latestGatorMessage() string {
 func cloneRunOptions(options RunOptions) RunOptions {
 	result := options
 	result.Attachments = append([]string(nil), options.Attachments...)
+	result.Artifacts = append([]string(nil), options.Artifacts...)
+	result.PreviousArtifacts = append([]string(nil), options.PreviousArtifacts...)
+	result.ConnectorIDs = append([]string(nil), options.ConnectorIDs...)
+	result.WebOrigins = append([]string(nil), options.WebOrigins...)
 	result.Code.Verification = append([]string(nil), options.Code.Verification...)
 	result.Code.Scopes = append([]string(nil), options.Code.Scopes...)
 	result.Code.Setup = append([]string(nil), options.Code.Setup...)
@@ -545,6 +813,23 @@ func cloneRunOptions(options RunOptions) RunOptions {
 	result.Code.AllowedCommandPrefixes = append([]string(nil), options.Code.AllowedCommandPrefixes...)
 	result.Code.Capabilities = append([]string(nil), options.Code.Capabilities...)
 	return result
+}
+
+func (m Model) previousArtifactPaths() []string {
+	candidatePaths := map[string]bool{}
+	for _, candidate := range m.lastBundle.Candidates {
+		candidatePaths[candidate.PatchPath] = true
+	}
+	var paths []string
+	for _, file := range m.lastBundle.Artifacts {
+		if !candidatePaths[file.Path] {
+			paths = append(paths, file.Path)
+		}
+	}
+	if len(paths) == 0 {
+		paths = append(paths, m.options.PreviousArtifacts...)
+	}
+	return paths
 }
 
 func appendUnique(values []string, value string) []string {
@@ -616,6 +901,12 @@ func workHelp() string {
   /effort low|standard|high      set manager and Code turn budgets
   /attach PATH                   send one source file with the next prompt
   /detach PATH|all               remove pending attachments
+  /source [PATH]                 inspect or select the read-only workspace
+  /refresh-source                capture changed workspace files next turn
+  /mode auto|inspect|draft|act   choose automatic or explicit authority
+  /artifact [add|remove] PATH    manage expected deliverables
+  /connector [add|remove] ID     manage connected sources for this session
+  /web-origin [add|remove] URL   manage bounded web research origins
   /code status                   inspect the internal Code envelope
   /code verify COMMAND           add required project verification
   /code scope PATH               add a project-instruction scope
@@ -639,7 +930,10 @@ func workHelp() string {
   /approve · /deny                respond to the displayed exact request
   /cancel                        cancel and retain the running outcome
   /queue · /dequeue · /clear-queue
-  /review · /copy · /theme · /new · /quit
+  /review                        preview verified deliverables in this thread
+  /save [--replace] [DIR]        preflight and save deliverables after confirmation
+  /apply [CANDIDATE] [DIR]       preflight and apply verified code after confirmation
+  /copy · /theme · /new · /quit
 
 Navigation
   ctrl+x    retained conversations

@@ -81,6 +81,12 @@ forwards model streaming/visual declarations, captures approved project
 configuration with original trust identity, and offers live steering,
 cancellation, and exact approval responses. Code candidates support selected
 baselines, integration, independent frozen review, and explicit target apply.
+The main TUI renders sealed artifacts and verified Code candidates inside the
+conversation. `/review`, `/save`, and `/apply` provide preview and a single
+confirmation handoff while preserving bundle verification, checkout cleanliness,
+baseline hashes, and apply-time preflight. Workspace, inferred/explicit outcome
+mode, artifact paths, connected sources, and bounded web origins are session
+controls shown by `/status`.
 See [state migrations](WORK_DEPTH_MIGRATIONS.md) and [current behavior](WORK_DEPTH.md).
 
 The standalone Code frontend remains retired. Historical Code journals, direct

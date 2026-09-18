@@ -49,7 +49,28 @@ func (m Model) View() string {
 	var transcript strings.Builder
 	messageStyle := lipgloss.NewStyle().Width(max(20, width-4))
 	for _, item := range m.messages {
-		transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
+		if item.role == "Deliverables" {
+			card := lipgloss.NewStyle().
+				Width(max(16, width-8)).
+				Padding(0, 1).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("238")).
+				Render(accent.Render("Verified deliverables") + "\n" + item.text)
+			transcript.WriteString(card)
+		} else {
+			transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
+		}
+		transcript.WriteString("\n\n")
+	}
+	if m.pendingBundleAction != nil {
+		confirmation := accent.Render("Review transfer") + "\n" + m.pendingBundleAction.summary +
+			"\n\n" + dim.Render("enter/y confirm · esc/n cancel")
+		transcript.WriteString(lipgloss.NewStyle().
+			Width(max(16, width-8)).
+			Padding(0, 1).
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("214")).
+			Render(confirmation))
 		transcript.WriteString("\n\n")
 	}
 	footer := wrapStatusLine(m.statusLineItems(), width)

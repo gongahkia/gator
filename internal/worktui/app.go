@@ -22,20 +22,62 @@ type RunResult struct {
 	SnapshotID     string
 	FinalText      string
 	OutputPath     string
+	Bundle         BundleSummary
 	Error          string
+}
+
+// BundleSummary is the display-safe, verified projection of a retained Work
+// bundle. The TUI never trusts model prose to describe produced files.
+type BundleSummary struct {
+	Path       string
+	Status     string
+	Artifacts  []ArtifactSummary
+	Candidates []CandidateSummary
+}
+
+type ArtifactSummary struct {
+	Path        string
+	MediaType   string
+	Bytes       int64
+	Valid       bool
+	Preview     string
+	PreviewKind string
+	Truncated   bool
+}
+
+type CandidateSummary struct {
+	ID           string
+	PatchPath    string
+	Status       string
+	ChangedPaths []string
+}
+
+type BundleActionRequest struct {
+	Action      string
+	BundlePath  string
+	Target      string
+	CandidateID string
+	Replace     bool
+	Execute     bool
 }
 
 // RunOptions contains the user-selected orchestration controls that accompany
 // one prompt. They configure Gator and bound its internal Code specialist;
 // they are never editable by the manager model itself.
 type RunOptions struct {
-	Context     context.Context
-	OnEvent     agent.EventSink
-	Steering    <-chan string
-	OnOperation func(*workrun.Operation)
-	MaxSteps    int
-	Attachments []string
-	Code        CodeOptions
+	Context           context.Context
+	OnEvent           agent.EventSink
+	Steering          <-chan string
+	OnOperation       func(*workrun.Operation)
+	MaxSteps          int
+	Attachments       []string
+	Mode              string
+	Artifacts         []string
+	PreviousArtifacts []string
+	ConnectorIDs      []string
+	WebOrigins        []string
+	RefreshSource     bool
+	Code              CodeOptions
 }
 
 type CodeOptions struct {
@@ -62,28 +104,32 @@ type ModelStatus struct {
 }
 
 type Config struct {
-	Models              func() (ModelPanel, error)
-	SelectedModel       func() (provider, model string, err error)
-	ModelStatus         func() (ModelStatus, error)
-	Live                bool
-	CurrentFolder       string
-	Conversations       []worksession.Conversation
-	StartConversationID string
-	Jobs                []jobs.Definition
-	Inbox               []inbox.Entry
-	Run                 func(source, conversationID, prompt string, options RunOptions) RunResult
-	MoveBack            func(conversationID string) (string, error)
-	MoveForward         func(conversationID string) (string, error)
-	MoveToRevision      func(conversationID, revisionID string) (string, error)
-	History             func(conversationID string) (string, error)
-	FirstRun            bool
-	ProviderCommand     func(action, provider string) *exec.Cmd
-	ProviderChoices     func(action string) []string
-	CompleteSetup       func(provider string) error
-	Inspect             func(topic string) (string, error)
-	Copy                func(text string) error
-	Theme               string
-	SetTheme            func(name string) error
+	Models                  func() (ModelPanel, error)
+	SelectedModel           func() (provider, model string, err error)
+	ModelStatus             func() (ModelStatus, error)
+	Live                    bool
+	CurrentFolder           string
+	ResolveSource           func(path string) (string, error)
+	ConnectorChoices        func() []string
+	BundleAction            func(BundleActionRequest) (string, error)
+	LoadConversationOptions func(conversationID string) (RunOptions, error)
+	Conversations           []worksession.Conversation
+	StartConversationID     string
+	Jobs                    []jobs.Definition
+	Inbox                   []inbox.Entry
+	Run                     func(source, conversationID, prompt string, options RunOptions) RunResult
+	MoveBack                func(conversationID string) (string, error)
+	MoveForward             func(conversationID string) (string, error)
+	MoveToRevision          func(conversationID, revisionID string) (string, error)
+	History                 func(conversationID string) (string, error)
+	FirstRun                bool
+	ProviderCommand         func(action, provider string) *exec.Cmd
+	ProviderChoices         func(action string) []string
+	CompleteSetup           func(provider string) error
+	Inspect                 func(topic string) (string, error)
+	Copy                    func(text string) error
+	Theme                   string
+	SetTheme                func(name string) error
 	// StatusLine follows the Codex-style ordered-item convention. Nil uses
 	// Gator's defaults; a non-nil empty list hides the composer footer.
 	StatusLine    *[]string
@@ -101,6 +147,11 @@ type entry struct {
 }
 type message struct{ role, text string }
 type runDone RunResult
+type bundleActionDone struct {
+	action string
+	text   string
+	err    error
+}
 type loadingTickMsg struct{ run uint64 }
 
 type providerActionDone struct {
@@ -112,6 +163,11 @@ type providerActionDone struct {
 type queuedRun struct {
 	prompt  string
 	options RunOptions
+}
+
+type pendingBundleAction struct {
+	request BundleActionRequest
+	summary string
 }
 
 type Model struct {
@@ -147,6 +203,8 @@ type Model struct {
 	options              RunOptions
 	queue                []queuedRun
 	lastOutput           string
+	lastBundle           BundleSummary
+	pendingBundleAction  *pendingBundleAction
 	theme                string
 	loadingFrame         int
 	loadingRun           uint64
@@ -165,7 +223,7 @@ func New(config Config) Model {
 		source:   config.CurrentFolder,
 		title:    "Work in " + filepath.Base(config.CurrentFolder),
 		theme:    normalizeTheme(config.Theme),
-		options: RunOptions{MaxSteps: 24, Code: CodeOptions{
+		options: RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{
 			MaxSteps: 16, Sandbox: "strict", Network: "deny",
 		}},
 	}
@@ -179,6 +237,17 @@ func New(config Config) Model {
 				model.source = conversation.SourcePath
 				model.conversation = conversation.ID
 				model.title = conversation.Title
+				if config.LoadConversationOptions != nil {
+					options, err := config.LoadConversationOptions(conversation.ID)
+					if err != nil {
+						model.status = "Load conversation settings: " + err.Error()
+					} else {
+						options.Context = nil
+						options.OnEvent = nil
+						options.OnOperation = nil
+						model.options = options
+					}
+				}
 				break
 			}
 		}
