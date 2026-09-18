@@ -25,6 +25,9 @@ const oauthResponseLimit = 64 * 1024
 // another agent's application identity.
 type BrowserFlow struct {
 	ClientID           string
+	// ClientSecret is optional private material from a user-owned desktop
+	// OAuth app. PKCE remains enabled whether or not the provider requests it.
+	ClientSecret       string
 	AuthorizationURL   string
 	TokenURL           string
 	RedirectURL        string
@@ -269,6 +272,9 @@ func (a BrowserAttempt) Exchange(ctx context.Context, code string) (Credential, 
 	if a.flow.TokenIncludesState {
 		form.Set("state", a.state)
 	}
+	if a.flow.ClientSecret != "" {
+		form.Set("client_secret", a.flow.ClientSecret)
+	}
 	return a.flow.exchangeToken(ctx, form, "authorization code")
 }
 
@@ -287,6 +293,9 @@ func (f BrowserFlow) Refresh(ctx context.Context, credential Credential) (Creden
 		"client_id":     {f.ClientID},
 		"refresh_token": {credential.Refresh},
 	}
+	if f.ClientSecret != "" {
+		form.Set("client_secret", f.ClientSecret)
+	}
 	for key, value := range f.TokenParams {
 		form.Set(key, value)
 	}
@@ -297,6 +306,7 @@ func (f BrowserFlow) Refresh(ctx context.Context, credential Credential) (Creden
 	if refreshed.Refresh == "" {
 		refreshed.Refresh = credential.Refresh
 	}
+	refreshed.OAuthClientSecret = credential.OAuthClientSecret
 	refreshed.Extra = cloneCredential(credential).Extra
 	return refreshed, nil
 }

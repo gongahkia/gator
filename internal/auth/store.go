@@ -24,15 +24,19 @@ const (
 
 // Credential is one provider-scoped credential. API key credentials use Key.
 // Bearer-token and OAuth credentials use Access; only OAuth credentials use
-// Refresh. Extra holds public protocol metadata such as an account identifier
-// or a Copilot endpoint; it must never contain another credential.
+// Refresh. OAuthClientSecret is optional private OAuth client material for a
+// user-owned desktop app; unlike Extra it is never public metadata and is
+// stored only in this private file. Extra holds public protocol metadata such
+// as an account identifier or a Copilot endpoint; it must never contain
+// another credential.
 type Credential struct {
-	Type    string            `json:"type"`
-	Key     string            `json:"key,omitempty"`
-	Access  string            `json:"access,omitempty"`
-	Refresh string            `json:"refresh,omitempty"`
-	Expires int64             `json:"expires,omitempty"`
-	Extra   map[string]string `json:"extra,omitempty"`
+	Type              string            `json:"type"`
+	Key               string            `json:"key,omitempty"`
+	Access            string            `json:"access,omitempty"`
+	Refresh           string            `json:"refresh,omitempty"`
+	Expires           int64             `json:"expires,omitempty"`
+	OAuthClientSecret string            `json:"oauth_client_secret,omitempty"`
+	Extra             map[string]string `json:"extra,omitempty"`
 }
 
 // NewBearerToken creates a validated, user-supplied bearer credential. A zero
@@ -277,15 +281,15 @@ func validProvider(value string) (string, error) {
 func validateCredential(credential Credential) error {
 	switch credential.Type {
 	case apiKeyType:
-		if strings.TrimSpace(credential.Key) == "" || credential.Access != "" || credential.Refresh != "" || credential.Expires != 0 {
+		if strings.TrimSpace(credential.Key) == "" || credential.Access != "" || credential.Refresh != "" || credential.Expires != 0 || credential.OAuthClientSecret != "" {
 			return errors.New("API key credential is incomplete or contains OAuth fields")
 		}
 	case bearerTokenType:
-		if strings.TrimSpace(credential.Access) == "" || credential.Key != "" || credential.Refresh != "" || credential.Expires < 0 {
+		if strings.TrimSpace(credential.Access) == "" || credential.Key != "" || credential.Refresh != "" || credential.Expires < 0 || credential.OAuthClientSecret != "" {
 			return errors.New("bearer token credential is incomplete or contains API key or OAuth refresh fields")
 		}
 	case oauthType:
-		if strings.TrimSpace(credential.Access) == "" || credential.Expires < 0 || credential.Key != "" {
+		if strings.TrimSpace(credential.Access) == "" || credential.Expires < 0 || credential.Key != "" || len(credential.OAuthClientSecret) > 4096 || strings.TrimSpace(credential.OAuthClientSecret) != credential.OAuthClientSecret || strings.ContainsAny(credential.OAuthClientSecret, "\x00\r\n") {
 			return errors.New("OAuth credential is incomplete or contains an API key")
 		}
 	default:
