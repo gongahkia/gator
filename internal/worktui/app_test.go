@@ -1,6 +1,7 @@
 package worktui
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 	"strings"
@@ -152,6 +153,110 @@ func TestStartsRequestedConversationAndSelectsForwardBranch(t *testing.T) {
 	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if called != "work-one/revision-two" || !strings.Contains(updated.(Model).View(), "moved") {
 		t.Fatalf("called = %q, view = %s", called, updated.(Model).View())
+	}
+}
+
+func TestRequestedConversationRestoresTranscriptCardsAndSelectedRevision(t *testing.T) {
+	bundle := BundleSummary{Path: "/retained/rev-two", Status: "completed", Artifacts: []ArtifactSummary{{
+		Path: "report.docx", MediaType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Bytes: 128, Valid: true,
+	}}}
+	model := New(Config{
+		CurrentFolder:       "/work",
+		StartConversationID: "work-one",
+		Conversations:       []worksession.Conversation{{ID: "work-one", Title: "Quarterly report", SourcePath: "/source"}},
+		LoadConversation: func(id string) (ConversationState, error) {
+			if id != "work-one" {
+				t.Fatalf("conversation ID = %q", id)
+			}
+			return ConversationState{
+				Title: "Quarterly report", SourcePath: "/source", RevisionID: "rev-two", SnapshotID: "snap-two",
+				OutputPath: "/retained/rev-two/output", LastBundle: bundle,
+				Messages: []TranscriptMessage{
+					{Role: "You", Text: "Draft the report"},
+					{Role: "Gator", Text: "The first draft is ready."},
+					{Role: "Deliverables", Bundle: &BundleSummary{Path: "/retained/rev-one", Artifacts: []ArtifactSummary{{Path: "report.md", Valid: true}}}},
+					{Role: "You", Text: "Revise the executive summary"},
+					{Role: "Gator", Text: "The revised report is ready."},
+					{Role: "Deliverables", Bundle: &bundle},
+				},
+			}, nil
+		},
+		LoadConversationOptions: func(string) (RunOptions, error) {
+			return RunOptions{Context: context.Background(), Mode: "draft", PreviousArtifacts: []string{"report.docx"}}, nil
+		},
+	})
+	view := ansi.Strip(model.View())
+	for _, want := range []string{
+		"Draft the report", "The first draft is ready.", "Revise the executive summary", "The revised report is ready.",
+		"report.md", "report.docx", "Revision rev-two", "snapshot snap-two",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("restored view is missing %q:\n%s", want, view)
+		}
+	}
+	if model.lastBundle.Path != bundle.Path || model.lastOutput != "/retained/rev-two/output" || model.options.Context != nil || model.options.Mode != "draft" {
+		t.Fatalf("restored state = %#v", model)
+	}
+}
+
+func TestRevisionNavigationReloadsSelectedThreadAndBundle(t *testing.T) {
+	head := "rev-two"
+	stateFor := func(revision string) ConversationState {
+		bundle := BundleSummary{Path: "/retained/" + revision, Artifacts: []ArtifactSummary{{Path: revision + ".md", Valid: true}}}
+		return ConversationState{
+			Title: "Report", SourcePath: "/source", RevisionID: revision, SnapshotID: "snap-" + revision,
+			OutputPath: bundle.Path + "/output", LastBundle: bundle,
+			Messages: []TranscriptMessage{{Role: "You", Text: "Prompt " + revision}, {Role: "Gator", Text: "Answer " + revision}, {Role: "Deliverables", Bundle: &bundle}},
+		}
+	}
+	model := New(Config{
+		CurrentFolder:       "/work",
+		StartConversationID: "work-one",
+		Conversations:       []worksession.Conversation{{ID: "work-one", Title: "Report", SourcePath: "/source"}},
+		LoadConversation: func(id string) (ConversationState, error) {
+			if id != "work-one" {
+				t.Fatalf("conversation ID = %q", id)
+			}
+			return stateFor(head), nil
+		},
+		MoveBack: func(id string) (string, error) {
+			if id != "work-one" {
+				t.Fatalf("move ID = %q", id)
+			}
+			head = "rev-one"
+			return "Moved back to rev-one.", nil
+		},
+	})
+	model.input = "/back"
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	view := ansi.Strip(model.View())
+	if strings.Contains(view, "Answer rev-two") || strings.Contains(view, "rev-two.md") ||
+		!strings.Contains(view, "Answer rev-one") || !strings.Contains(view, "rev-one.md") ||
+		!strings.Contains(view, "Moved back to rev-one.") || model.lastBundle.Path != "/retained/rev-one" {
+		t.Fatalf("navigation did not replace selected thread:\n%s\nstate=%#v", view, model)
+	}
+}
+
+func TestConversationPickerRefreshesRetainedConversationList(t *testing.T) {
+	model := New(Config{
+		CurrentFolder: "/work",
+		ListConversations: func() ([]worksession.Conversation, error) {
+			return []worksession.Conversation{{ID: "work-new", Title: "Newly retained", SourcePath: "/source"}}, nil
+		},
+		LoadConversation: func(id string) (ConversationState, error) {
+			return ConversationState{Title: "Newly retained", SourcePath: "/source", RevisionID: "rev-new", Messages: []TranscriptMessage{{Role: "Gator", Text: id}}}, nil
+		},
+	})
+	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlX})
+	model = updated.(Model)
+	if !strings.Contains(model.View(), "Newly retained") {
+		t.Fatalf("picker did not refresh conversations: %s", model.View())
+	}
+	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = updated.(Model)
+	if model.conversation != "work-new" || !strings.Contains(model.View(), "work-new") {
+		t.Fatalf("picker did not restore selected conversation: %#v\n%s", model, model.View())
 	}
 }
 

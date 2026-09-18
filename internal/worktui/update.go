@@ -131,6 +131,12 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 	if value.ConversationID != "" {
 		m.conversation = value.ConversationID
 	}
+	if value.RevisionID != "" {
+		m.revision = value.RevisionID
+	}
+	if value.SnapshotID != "" {
+		m.snapshot = value.SnapshotID
+	}
 	if value.Error != "" {
 		m.messages = append(m.messages, message{role: "Gator", text: "I couldn't finish that run: " + value.Error})
 	} else {
@@ -140,13 +146,14 @@ func (m Model) updateRunDone(value runDone) (tea.Model, tea.Cmd) {
 		}
 		m.messages = append(m.messages, message{role: "Gator", text: text})
 		if value.Bundle.Path != "" {
-			m.messages = append(m.messages, message{role: "Deliverables", text: formatBundleSummary(value.Bundle)})
+			bundle := cloneBundleSummary(value.Bundle)
+			m.messages = append(m.messages, message{role: "Deliverables", bundle: &bundle})
 		}
 	}
 	m.lastOutput = value.OutputPath
 	m.lastBundle = value.Bundle
-	if value.RevisionID != "" || value.SnapshotID != "" {
-		m.status = "Revision " + value.RevisionID + " · snapshot " + value.SnapshotID
+	if m.revisionStatus() != "" {
+		m.status = m.revisionStatus()
 	}
 	m.scroll = 0
 	if value.Error == "" && len(m.queue) > 0 && m.config.Run != nil {
@@ -551,7 +558,6 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.paletteQuery = ""
 			return m.startProviderAction(selected.command, selected.id)
 		case "conversation":
-			switching := m.source != selected.source || m.conversation != selected.id
 			m.launcher = false
 			m.paletteQuery = ""
 			m.section = ""
@@ -560,19 +566,8 @@ func (m Model) updateLauncher(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.source = selected.source
 			m.conversation = selected.id
 			m.title = selected.title
-			if m.config.LoadConversationOptions != nil {
-				options, err := m.config.LoadConversationOptions(selected.id)
-				if err != nil {
-					m.status = "Load conversation settings: " + err.Error()
-				} else {
-					m.options = options
-				}
-			}
+			m.restoreConversation(selected.id, "")
 			m.scroll = 0
-			if switching {
-				m.messages = nil
-				m.status = ""
-			}
 		}
 	default:
 		if key.Type == tea.KeyRunes || key.String() == " " {

@@ -52,6 +52,29 @@ type CandidateSummary struct {
 	ChangedPaths []string
 }
 
+// TranscriptMessage is a display-safe item in a restored Work conversation.
+// A bundle is supplied as structured, verified metadata rather than as model
+// prose, so historical artifact cards retain the same trust boundary as new
+// cards produced in this TUI session.
+type TranscriptMessage struct {
+	Role   string
+	Text   string
+	Bundle *BundleSummary
+}
+
+// ConversationState is the projection the TUI needs to reopen one selected
+// conversation revision. Messages must contain only the selected head's
+// ancestry; sibling revisions belong to other retained branches.
+type ConversationState struct {
+	Title      string
+	SourcePath string
+	RevisionID string
+	SnapshotID string
+	OutputPath string
+	LastBundle BundleSummary
+	Messages   []TranscriptMessage
+}
+
 type BundleActionRequest struct {
 	Action      string
 	BundlePath  string
@@ -112,6 +135,8 @@ type Config struct {
 	ResolveSource           func(path string) (string, error)
 	ConnectorChoices        func() []string
 	BundleAction            func(BundleActionRequest) (string, error)
+	ListConversations       func() ([]worksession.Conversation, error)
+	LoadConversation        func(conversationID string) (ConversationState, error)
 	LoadConversationOptions func(conversationID string) (RunOptions, error)
 	Conversations           []worksession.Conversation
 	StartConversationID     string
@@ -145,7 +170,11 @@ type ModelPanel interface {
 type entry struct {
 	title, subtitle, kind, id, source, command string
 }
-type message struct{ role, text string }
+type message struct {
+	role   string
+	text   string
+	bundle *BundleSummary
+}
 type runDone RunResult
 type bundleActionDone struct {
 	action string
@@ -191,6 +220,8 @@ type Model struct {
 	entries              []entry
 	source               string
 	conversation         string
+	revision             string
+	snapshot             string
 	title                string
 	input                string
 	messages             []message
@@ -237,17 +268,7 @@ func New(config Config) Model {
 				model.source = conversation.SourcePath
 				model.conversation = conversation.ID
 				model.title = conversation.Title
-				if config.LoadConversationOptions != nil {
-					options, err := config.LoadConversationOptions(conversation.ID)
-					if err != nil {
-						model.status = "Load conversation settings: " + err.Error()
-					} else {
-						options.Context = nil
-						options.OnEvent = nil
-						options.OnOperation = nil
-						model.options = options
-					}
-				}
+				model.restoreConversation(conversation.ID, "")
 				break
 			}
 		}

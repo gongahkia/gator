@@ -225,6 +225,37 @@ func (s Store) Children(conversationID, revisionID string) ([]Revision, error) {
 	return children, nil
 }
 
+// Lineage returns the selected revision and every one of its ancestors in
+// conversation order. It intentionally follows parent links instead of using
+// Revisions' timestamp order: sibling branches are retained, but they are not
+// part of the visible transcript for a selected head.
+func (s Store) Lineage(conversationID, revisionID string) ([]Revision, error) {
+	if _, err := s.Load(conversationID); err != nil {
+		return nil, err
+	}
+	if revisionID == "" {
+		return nil, nil
+	}
+	lineage := make([]Revision, 0, 8)
+	seen := make(map[string]struct{})
+	for revisionID != "" {
+		if _, duplicate := seen[revisionID]; duplicate {
+			return nil, errors.New("Work revision history contains a cycle")
+		}
+		seen[revisionID] = struct{}{}
+		revision, err := s.LoadRevision(conversationID, revisionID)
+		if err != nil {
+			return nil, fmt.Errorf("load Work revision lineage: %w", err)
+		}
+		lineage = append(lineage, revision)
+		revisionID = revision.ParentRevisionID
+	}
+	for left, right := 0, len(lineage)-1; left < right; left, right = left+1, right-1 {
+		lineage[left], lineage[right] = lineage[right], lineage[left]
+	}
+	return lineage, nil
+}
+
 func (s Store) MoveHead(conversationID, revisionID string) (Conversation, error) {
 	conversation, err := s.Load(conversationID)
 	if err != nil {

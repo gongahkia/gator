@@ -129,6 +129,12 @@ func workInteractiveConversation(startConversationID string) error {
 			return ids
 		},
 		BundleAction: workTUIBundleAction,
+		ListConversations: func() ([]worksession.Conversation, error) {
+			return sessions.List(50)
+		},
+		LoadConversation: func(conversationID string) (worktui.ConversationState, error) {
+			return loadWorkTUIConversation(sessions, conversationID)
+		},
 		LoadConversationOptions: func(conversationID string) (worktui.RunOptions, error) {
 			return loadWorkTUIConversationOptions(sessions, conversationID)
 		},
@@ -655,6 +661,56 @@ func loadWorkTUIConversationOptions(store worksession.Store, conversationID stri
 	options.Code.Capabilities = append([]string(nil), configuration.Code.Capabilities...)
 	options.Code.BrowserSession = configuration.Code.BrowserSession
 	return options, nil
+}
+
+// loadWorkTUIConversation reconstructs exactly the visible path to a
+// conversation's selected head. Revision siblings remain available through
+// history navigation, but never leak into the active branch's transcript.
+// Bundle cards are created only from a freshly verified manifest.
+func loadWorkTUIConversation(store worksession.Store, conversationID string) (worktui.ConversationState, error) {
+	conversation, err := store.Load(conversationID)
+	if err != nil {
+		return worktui.ConversationState{}, err
+	}
+	state := worktui.ConversationState{
+		Title:      conversation.Title,
+		SourcePath: conversation.SourcePath,
+		RevisionID: conversation.HeadRevision,
+		SnapshotID: conversation.SnapshotID,
+	}
+	if conversation.HeadRevision == "" {
+		return state, nil
+	}
+	lineage, err := store.Lineage(conversationID, conversation.HeadRevision)
+	if err != nil {
+		return worktui.ConversationState{}, err
+	}
+	state.Messages = make([]worktui.TranscriptMessage, 0, len(lineage)*3)
+	for _, revision := range lineage {
+		state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "You", Text: revision.Objective})
+		if strings.TrimSpace(revision.FinalText) != "" {
+			state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "Gator", Text: revision.FinalText})
+		} else if revision.Status != string(artifact.Completed) {
+			state.Messages = append(state.Messages, worktui.TranscriptMessage{
+				Role: "Gator", Text: "This retained Work revision ended with status " + revision.Status + ".",
+			})
+		}
+		bundle, bundleErr := summarizeWorkBundle(revision.BundlePath)
+		if bundleErr != nil {
+			// Keep restoration usable when an older bundle has been removed or no
+			// longer verifies, while making the missing review evidence explicit.
+			state.Messages = append(state.Messages, worktui.TranscriptMessage{
+				Role: "Gator", Text: "The retained deliverables for revision " + revision.ID + " cannot be displayed: " + bundleErr.Error(),
+			})
+			continue
+		}
+		state.Messages = append(state.Messages, worktui.TranscriptMessage{Role: "Deliverables", Bundle: &bundle})
+		if revision.ID == conversation.HeadRevision {
+			state.LastBundle = bundle
+			state.OutputPath = filepath.Join(revision.BundlePath, "output")
+		}
+	}
+	return state, nil
 }
 
 func inspectWorkTUITopic(topic string) (string, error) {

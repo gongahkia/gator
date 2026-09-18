@@ -18,6 +18,14 @@ func (m *Model) openCommandPalette() {
 }
 
 func (m *Model) openConversationPicker() {
+	if m.config.ListConversations != nil {
+		conversations, err := m.config.ListConversations()
+		if err != nil {
+			m.status = "List conversations: " + err.Error()
+		} else {
+			m.config.Conversations = conversations
+		}
+	}
 	m.launcher = true
 	m.launcherMode = "conversations"
 	m.entries = make([]entry, 0, len(m.config.Conversations))
@@ -137,6 +145,7 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 		m.section, m.paletteQuery, m.launcherMode = "", "", ""
 		m.source = m.config.CurrentFolder
 		m.title = "Work in " + filepath.Base(m.source)
+		m.revision, m.snapshot = "", ""
 		m.messages, m.status, m.queue = nil, "", nil
 		m.lastOutput, m.lastBundle = "", BundleSummary{}
 		m.options = RunOptions{MaxSteps: 24, Mode: "auto", Code: CodeOptions{MaxSteps: 16, Sandbox: "strict", Network: "deny"}}
@@ -340,6 +349,11 @@ func (m Model) runLocalCommand(command string) (tea.Model, tea.Cmd) {
 			} else if m.config.MoveForward != nil {
 				result, err = m.config.MoveForward(m.conversation)
 			}
+		}
+		if err == nil && fields[0] != "/history" && m.config.LoadConversation != nil {
+			m.restoreConversation(m.conversation, result)
+			m.scroll = 0
+			return m, nil
 		}
 	case "/quit":
 		return m, tea.Quit

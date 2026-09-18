@@ -49,13 +49,17 @@ func (m Model) View() string {
 	var transcript strings.Builder
 	messageStyle := lipgloss.NewStyle().Width(max(20, width-4))
 	for _, item := range m.messages {
-		if item.role == "Deliverables" {
+		if item.role == "Deliverables" || item.bundle != nil {
+			contents := item.text
+			if item.bundle != nil {
+				contents = formatBundleSummary(*item.bundle)
+			}
 			card := lipgloss.NewStyle().
 				Width(max(16, width-8)).
 				Padding(0, 1).
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("238")).
-				Render(accent.Render("Verified deliverables") + "\n" + item.text)
+				Render(accent.Render("Verified deliverables") + "\n" + contents)
 			transcript.WriteString(card)
 		} else {
 			transcript.WriteString(messageStyle.Render(accent.Render(item.role+":") + " " + item.text))
